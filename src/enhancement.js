@@ -6,6 +6,7 @@ export const enhancementStyle = String.raw`
    Presentation rules:
    - photograph is the continuous screen canvas, including behind bottom controls
    - identical treatment for every aspect ratio: sharp contained photo + same-photo colour fill
+   - sharp contained photo edges feather into the blurred same-photo backdrop
    - timeline occupies about one fifth of the image height
    - timeline blur is made from the photograph and fades continuously into sharp image
    - no hard horizontal blur boundary
@@ -32,7 +33,6 @@ html,body{
   background:var(--talera-neutral)!important;
 }
 
-/* Photo now runs behind the controls as one uninterrupted canvas. */
 .app{
   position:relative!important;
   display:block!important;
@@ -87,8 +87,7 @@ main{
   transform:translate3d(0,0,0) scale(1);
 }
 
-/* Every photo gets exactly the same treatment. The same source photo
-   supplies colour to the complete screen, regardless of aspect ratio. */
+/* Same source photo fills every unused area with colour and blur. */
 .photo-backdrop{
   display:block!important;
   position:absolute!important;
@@ -102,6 +101,9 @@ main{
   transform:scale(1.14)!important;
 }
 
+/* The full original remains visible via contain. JS applies a dynamic vertical
+   feather exactly at the actual rendered contain edges. That removes the hard
+   line for landscape images while leaving portrait/full-height images intact. */
 .example-photo{
   position:absolute!important;
   z-index:2!important;
@@ -115,6 +117,10 @@ main{
   filter:none!important;
   opacity:1!important;
   background:transparent!important;
+  -webkit-mask-repeat:no-repeat!important;
+  mask-repeat:no-repeat!important;
+  -webkit-mask-size:100% 100%!important;
+  mask-size:100% 100%!important;
 }
 
 .memory-space::before,
@@ -144,8 +150,6 @@ main{
   user-select:none!important;
 }
 
-/* The blur extends below the timeline and disappears gradually. There is
-   intentionally no Y-coordinate that forms a visible edge. */
 .timeline::before{
   content:""!important;
   display:block!important;
@@ -188,7 +192,6 @@ main{
   filter:none!important;
 }
 
-/* Smaller visual needle; mechanics/active point remain unchanged. */
 .center-needle{
   z-index:3!important;
   width:1.5px!important;
@@ -221,7 +224,6 @@ main{
 }
 .memory-story-scroll::-webkit-scrollbar{display:none!important}
 
-/* Push the title down so the photograph owns most of the first screen. */
 .memory-photo-air{
   height:72%!important;
   min-height:430px!important;
@@ -281,8 +283,6 @@ main{
   text-shadow:0 2px 15px rgba(6,18,30,.52)!important;
 }
 
-/* Full body text remains available, but sits below the first presentation
-   screen. Swiping upward brings it into a calm reading surface. */
 .memory-sheet .story-more{
   display:block!important;
   margin:clamp(140px,19dvh,190px) -24px 0!important;
@@ -341,7 +341,6 @@ nav{
   backdrop-filter:blur(18px) saturate(1.05)!important;
   -webkit-backdrop-filter:blur(18px) saturate(1.05)!important;
 }
-/* Extend blur upward with a fade so the controls also have no hard top edge. */
 nav::before{
   content:""!important;
   display:block!important;
@@ -416,13 +415,69 @@ nav::after{display:none!important;content:none!important}
 }
 `;
 
-/* Preserve the already-tested interaction split:
-   horizontal = move through life, vertical = move deeper into the story. */
+/* Preserve the already-tested interaction split and dynamically feather the
+   real contain edge of each photo into its blurred same-photo backdrop. */
 export const enhancementScript = String.raw`
 (() => {
   const story = document.getElementById('memoryStoryScroll');
   const surface = document.getElementById('surface');
-  if (!story || !surface) return;
+  const photos = Array.from(document.querySelectorAll('.example-photo'));
+
+  function featherPhoto(img){
+    if(!img || !img.naturalWidth || !img.naturalHeight) return;
+    const rect = img.getBoundingClientRect();
+    const boxW = rect.width;
+    const boxH = rect.height;
+    if(!boxW || !boxH) return;
+
+    const scale = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight);
+    const renderedW = img.naturalWidth * scale;
+    const renderedH = img.naturalHeight * scale;
+    const top = Math.max(0, (boxH - renderedH) / 2);
+    const bottom = Math.min(boxH, top + renderedH);
+    const verticalGap = top;
+
+    /* Feather only where contain creates horizontal letterboxing.
+       Portrait/full-height photos stay fully sharp vertically. */
+    if(verticalGap > 2){
+      const feather = Math.min(132, Math.max(72, renderedH * 0.12));
+      const topOpaque = Math.min(bottom, top + feather);
+      const bottomOpaque = Math.max(top, bottom - feather);
+      const mask = 'linear-gradient(to bottom,' +
+        'transparent 0px,' +
+        'transparent ' + top.toFixed(1) + 'px,' +
+        '#000 ' + topOpaque.toFixed(1) + 'px,' +
+        '#000 ' + bottomOpaque.toFixed(1) + 'px,' +
+        'transparent ' + bottom.toFixed(1) + 'px,' +
+        'transparent 100%)';
+      img.style.webkitMaskImage = mask;
+      img.style.maskImage = mask;
+    }else{
+      img.style.webkitMaskImage = 'none';
+      img.style.maskImage = 'none';
+    }
+  }
+
+  function featherAll(){
+    requestAnimationFrame(() => photos.forEach(featherPhoto));
+  }
+
+  photos.forEach((img) => {
+    if(img.complete) featherPhoto(img);
+    img.addEventListener('load', () => featherPhoto(img), {passive:true});
+    new MutationObserver(() => {
+      if(img.complete) requestAnimationFrame(() => featherPhoto(img));
+    }).observe(img, {attributes:true, attributeFilter:['src']});
+  });
+
+  window.addEventListener('resize', featherAll, {passive:true});
+  if(window.ResizeObserver){
+    const ro = new ResizeObserver(featherAll);
+    const stage = document.getElementById('photoStage');
+    if(stage) ro.observe(stage);
+  }
+
+  if(!story || !surface) return;
 
   let pointerId=null,startX=0,startY=0,lastX=0,mode=null;
 

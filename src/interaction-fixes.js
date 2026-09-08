@@ -6,8 +6,6 @@ export const interactionFixStyle = String.raw`
   will-change:opacity!important;
 }
 .photo-layer.is-front{transform:none!important}
-
-/* Gesture overlay. It lives inside photoStage, underneath story text and timeline. */
 .photo-book-overlay{
   position:absolute!important;
   inset:0!important;
@@ -29,33 +27,16 @@ export const interactionFixStyle = String.raw`
   backface-visibility:hidden!important;
   -webkit-backface-visibility:hidden!important;
 }
-.photo-book-page.is-settling{
-  transition:transform .28s cubic-bezier(.22,.72,.25,1)!important;
-}
+.photo-book-page.is-settling{transition:transform .28s cubic-bezier(.22,.72,.25,1)!important}
 
 @media (pointer:coarse){
-  /* Mobile: a timeline may be internally active because time moved, but it only
-     LOOKS awake after deliberate intent on the timeline itself. */
-  .timeline.is-active:not(.touch-intent) canvas{
-    opacity:.26!important;
-    filter:saturate(.55) contrast(.70) brightness(.86)!important;
-  }
+  .timeline.is-active:not(.touch-intent) canvas{opacity:.26!important;filter:saturate(.55) contrast(.70) brightness(.86)!important}
   .timeline.is-active:not(.touch-intent) .center-needle{opacity:.32!important;filter:none!important}
   .timeline.is-active:not(.touch-intent) .focus{opacity:.36!important;transform:translateZ(0) scale(.97)!important;filter:none!important}
   .timeline.is-active:not(.touch-intent)::after{opacity:.10!important}
-  .timeline.is-active.touch-intent canvas{
-    opacity:1!important;
-    filter:saturate(1.22) contrast(1.42) brightness(1.20) drop-shadow(0 0 4px rgba(255,255,255,.62))!important;
-  }
-  .timeline.is-active.touch-intent .center-needle{
-    opacity:1!important;
-    filter:brightness(1.28) drop-shadow(0 0 4px rgba(255,255,255,1)) drop-shadow(0 2px 9px rgba(15,39,71,.48))!important;
-  }
-  .timeline.is-active.touch-intent .focus{
-    opacity:1!important;
-    transform:translateZ(0) scale(1.045)!important;
-    filter:brightness(1.20) drop-shadow(0 0 5px rgba(255,255,255,.70)) drop-shadow(0 2px 12px rgba(15,39,71,.40))!important;
-  }
+  .timeline.is-active.touch-intent canvas{opacity:1!important;filter:saturate(1.22) contrast(1.42) brightness(1.20) drop-shadow(0 0 4px rgba(255,255,255,.62))!important}
+  .timeline.is-active.touch-intent .center-needle{opacity:1!important;filter:brightness(1.28) drop-shadow(0 0 4px rgba(255,255,255,1)) drop-shadow(0 2px 9px rgba(15,39,71,.48))!important}
+  .timeline.is-active.touch-intent .focus{opacity:1!important;transform:translateZ(0) scale(1.045)!important;filter:brightness(1.20) drop-shadow(0 0 5px rgba(255,255,255,.70)) drop-shadow(0 2px 12px rgba(15,39,71,.40))!important}
   .timeline.is-active.touch-intent::after{opacity:1!important}
 }
 `;
@@ -68,7 +49,6 @@ export const interactionFixScript = String.raw`
   const photos=Array.from(document.querySelectorAll('.example-photo'));
   const coarse=matchMedia('(pointer:coarse)').matches;
 
-  /* Timeline wake intent: only deliberate work ON the timeline wakes it on touch. */
   if(timeline&&coarse){
     const pts=new Map();
     let restTimer=0;
@@ -91,7 +71,6 @@ export const interactionFixScript = String.raw`
     timeline.addEventListener('pointercancel',end,{passive:true,capture:true});
   }
 
-  /* Keep sharp and aligned-blur geometry synchronized immediately after a src change. */
   function fitNode(img,blur,boxW,boxH){
     if(!img||!img.complete||!img.naturalWidth||!img.naturalHeight||!boxW||!boxH)return false;
     const containScale=Math.min(boxW/img.naturalWidth,boxH/img.naturalHeight);
@@ -125,7 +104,29 @@ export const interactionFixScript = String.raw`
 
   if(!story||!stage||!window.__taleraPhotoBook)return;
 
-  let pid=null,startX=0,startY=0,lastX=0,startT=0,lastT=0,mode=null,direction=0,overlay=null,currentPage=null,targetPage=null;
+  /* Decode adjacent images ahead of the gesture. This avoids the mobile browser
+     first painting the blurred backdrop and only then resolving the sharp image. */
+  const decoded=new Map();
+  function warmImage(src){
+    if(!src)return Promise.resolve();
+    if(decoded.has(src))return decoded.get(src);
+    const img=new Image();
+    img.decoding='async';
+    img.loading='eager';
+    try{img.fetchPriority='high'}catch(e){}
+    img.src=src;
+    const p=(img.decode?img.decode():new Promise(resolve=>{
+      if(img.complete)resolve();else{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true})}
+    })).catch(()=>{});
+    decoded.set(src,p);
+    return p;
+  }
+  function warmState(s){
+    [s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image)});
+  }
+  warmState(window.__taleraPhotoBook.state());
+
+  let pid=null,startX=0,startY=0,lastX=0,startT=0,lastT=0,mode=null,direction=0,overlay=null,currentPage=null,targetPage=null,targetSrc='';
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'))}
   function makePage(src,isCurrent){
@@ -139,26 +140,29 @@ export const interactionFixScript = String.raw`
     const blur=page.querySelector('.photo-aligned-blur');
     const backdrop=page.querySelector('.photo-backdrop');
     if(!isCurrent&&src){
-      if(backdrop)backdrop.src=src;
-      if(blur)blur.src=src;
+      if(backdrop){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src}
+      if(blur){blur.decoding='async';blur.loading='eager';blur.src=src}
       if(sharp){
+        sharp.decoding='sync';sharp.loading='eager';
+        try{sharp.fetchPriority='high'}catch(e){}
         sharp.src=src;
         const fit=()=>{const r=stage.getBoundingClientRect();fitNode(sharp,blur,r.width,r.height)};
-        if(sharp.complete)fit(); else sharp.addEventListener('load',fit,{once:true,passive:true});
+        if(sharp.complete&&sharp.naturalWidth)fit();else sharp.addEventListener('load',fit,{once:true,passive:true});
       }
     }
     return page;
   }
-  function preloadState(s){[s.previous,s.next].forEach(m=>{if(!m)return;const i=new Image();i.decoding='async';i.src=m.image})}
-  function clearOverlay(){if(overlay)overlay.remove();overlay=currentPage=targetPage=null;direction=0}
+  function clearOverlay(){if(overlay)overlay.remove();overlay=currentPage=targetPage=null;direction=0;targetSrc=''}
   function buildOverlay(dir){
     const s=window.__taleraPhotoBook.state();
     const target=dir>0?s.next:s.previous;
     if(!target)return false;
     clearOverlay();
+    targetSrc=target.image;
+    warmImage(targetSrc);
     overlay=document.createElement('div');overlay.className='photo-book-overlay';
     currentPage=makePage(s.current&&s.current.image,true);
-    targetPage=makePage(target.image,false);
+    targetPage=makePage(targetSrc,false);
     overlay.append(currentPage,targetPage);stage.appendChild(overlay);
     direction=dir;
     return true;
@@ -169,17 +173,40 @@ export const interactionFixScript = String.raw`
     currentPage.style.transform='translate3d('+dx.toFixed(1)+'px,0,0)';
     targetPage.style.transform='translate3d('+(dx+direction*w).toFixed(1)+'px,0,0)';
   }
+
+  async function waitForBaseSharp(src){
+    const base=document.getElementById('memoryPhotoA')||document.querySelector('#photoLayerA .example-photo');
+    if(!base)return;
+    if(base.src!==src){
+      await new Promise(resolve=>{
+        const done=()=>resolve();
+        base.addEventListener('load',done,{once:true});
+        base.addEventListener('error',done,{once:true});
+        setTimeout(done,800);
+      });
+    }
+    if(base.decode){try{await base.decode()}catch(e){}}
+    fitNow(base);
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  }
+
   function settle(commit,velocity){
     if(!overlay||!currentPage||!targetPage){clearOverlay();return}
     const w=stage.getBoundingClientRect().width;
     currentPage.classList.add('is-settling');targetPage.classList.add('is-settling');
     requestAnimationFrame(()=>{
       if(commit){
+        const committedSrc=targetSrc;
         currentPage.style.transform='translate3d('+(-direction*w)+'px,0,0)';
         targetPage.style.transform='translate3d(0,0,0)';
-        setTimeout(()=>{
+        setTimeout(async()=>{
+          /* Keep the already-sharp overlay visible while the real underlying layer
+             switches, decodes and gets its final geometry. Only then hand over. */
+          await warmImage(committedSrc);
           window.__taleraPhotoBook.step(direction);
-          requestAnimationFrame(()=>setTimeout(clearOverlay,35));
+          await waitForBaseSharp(committedSrc);
+          warmState(window.__taleraPhotoBook.state());
+          clearOverlay();
         },250);
       }else{
         currentPage.style.transform='translate3d(0,0,0)';
@@ -189,14 +216,12 @@ export const interactionFixScript = String.raw`
     });
   }
 
-  /* Capture the photo gesture before the older wheel bridge sees it. Vertical movement
-     remains native scroll; horizontal movement becomes a real photo-book page drag. */
   story.addEventListener('pointerdown',e=>{
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(pid!==null)return;
     e.stopImmediatePropagation();
     pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;startT=lastT=performance.now();mode=null;direction=0;
-    preloadState(window.__taleraPhotoBook.state());
+    warmState(window.__taleraPhotoBook.state());
   },{passive:true,capture:true});
 
   story.addEventListener('pointermove',e=>{
@@ -219,7 +244,7 @@ export const interactionFixScript = String.raw`
     const dt=Math.max(16,now-lastT),velocity=(e.clientX-lastX)/dt;
     const w=stage.getBoundingClientRect().width;
     const commit=mode==='horizontal'&&overlay&&(Math.abs(dx)>Math.max(54,w*.17)||Math.abs(velocity)>.42);
-    if(mode==='horizontal')settle(commit,velocity); else clearOverlay();
+    if(mode==='horizontal')settle(commit,velocity);else clearOverlay();
     pid=null;mode=null;
   };
   story.addEventListener('pointerup',finish,{passive:true,capture:true});

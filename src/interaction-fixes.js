@@ -1,14 +1,17 @@
 export const interactionFixStyle = String.raw`
-/* TALERA interaction refinement — direct photo-book paging + calm timeline */
-.photo-layer{
+/* TALERA interaction refinement — one photo gesture owner, direct touch tracking */
+.photo-layer:not(.photo-book-page){
   transform:none!important;
   transition:opacity .14s linear!important;
   will-change:opacity!important;
 }
-.photo-layer.is-front{transform:none!important}
-/* Vertical reading stays native; horizontal touch is owned by the photo-book gesture.
-   This prevents the browser and our pointer handler from fighting over the same swipe. */
-.memory-story-scroll{touch-action:pan-y!important}
+.photo-layer:not(.photo-book-page).is-front{transform:none!important}
+/* Vertical reading stays native. Horizontal movement is owned by the photo gesture.
+   Keep horizontal browser overscroll from competing at the screen edges where supported. */
+.memory-story-scroll{
+  touch-action:pan-y!important;
+  overscroll-behavior-x:none!important;
+}
 .photo-book-overlay{
   position:absolute!important;
   inset:0!important;
@@ -16,21 +19,23 @@ export const interactionFixStyle = String.raw`
   overflow:hidden!important;
   pointer-events:none!important;
   contain:layout paint size!important;
+  visibility:hidden!important;
 }
+.photo-book-overlay.is-dragging{visibility:visible!important}
 .photo-book-page{
   position:absolute!important;
   inset:0!important;
   width:100%!important;
   height:100%!important;
   opacity:1!important;
-  transform:translate3d(0,0,0)!important;
+  transform:translate3d(0,0,0);
   transition:none!important;
   will-change:transform!important;
   overflow:hidden!important;
   backface-visibility:hidden!important;
   -webkit-backface-visibility:hidden!important;
 }
-.photo-book-page.is-settling{transition:transform .28s cubic-bezier(.22,.72,.25,1)!important}
+.photo-book-page.is-settling{transition:transform .22s cubic-bezier(.22,.72,.25,1)!important}
 
 @media (pointer:coarse){
   .timeline.is-active:not(.touch-intent) canvas{opacity:.26!important;filter:saturate(.55) contrast(.70) brightness(.86)!important}
@@ -122,8 +127,16 @@ export const interactionFixScript = String.raw`
   function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image)})}
   warmState(window.__taleraPhotoBook.state());
 
-  const SWIPE_INTENT_PX=8;
-  let pid=null,startX=0,startY=0,lastX=0,lastT=0,mode=null,overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
+  const INTENT_PX=5;
+  const INTENT_RATIO=1.08;
+  const VELOCITY_WINDOW_MS=110;
+  const FLICK_SPEED=.48;
+  const FLICK_MIN_PX=24;
+  const SETTLE_MS=220;
+
+  let drag=null;
+  let overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
+  let settling=false;
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'))}
   function matchingBaseLayer(src){
@@ -134,7 +147,7 @@ export const interactionFixScript = String.raw`
     })||layers.find(layer=>parseFloat(getComputedStyle(layer).opacity)>.5)||layers[0]||null;
   }
   function makePage(src,useVisibleBase=false){
-    const source=(useVisibleBase&&src?matchingBaseLayer(src):null)||document.getElementById('photoLayerA')||stage.querySelector('.photo-layer');
+    const source=(useVisibleBase&&src?matchingBaseLayer(src):null)||document.getElementById('photoLayerA')||stage.querySelector('.photo-layer:not(.photo-book-page)');
     const page=source?source.cloneNode(true):document.createElement('div');
     page.classList.add('photo-book-page');page.classList.remove('is-front');page.style.opacity='1';stripIds(page);
     const sharp=page.querySelector('.example-photo');
@@ -153,19 +166,23 @@ export const interactionFixScript = String.raw`
     }
     return page;
   }
-  function clearOverlay(){if(overlay)overlay.remove();overlay=previousPage=currentPage=nextPage=null;stateAtStart=null}
-  function buildOverlay(){
+  function clearOverlay(){
+    if(overlay)overlay.remove();
+    overlay=previousPage=currentPage=nextPage=null;stateAtStart=null;
+  }
+  function buildOverlay(s){
     clearOverlay();
-    const s=window.__taleraPhotoBook.state();
     stateAtStart=s;
     warmState(s);
     overlay=document.createElement('div');overlay.className='photo-book-overlay';
     previousPage=s.previous?makePage(s.previous.image):null;
     currentPage=makePage(s.current&&s.current.image,true);
     nextPage=s.next?makePage(s.next.image):null;
-    if(previousPage)overlay.appendChild(previousPage);
-    overlay.appendChild(currentPage);
+    /* Chronology follows the gesture the user described: pulling the current photo
+       to the right reveals the next (newer) memory; pulling left reveals the previous. */
     if(nextPage)overlay.appendChild(nextPage);
+    overlay.appendChild(currentPage);
+    if(previousPage)overlay.appendChild(previousPage);
     stage.appendChild(overlay);
     placePages(0);
   }
@@ -173,89 +190,155 @@ export const interactionFixScript = String.raw`
     if(!overlay||!currentPage)return;
     const w=stage.getBoundingClientRect().width;
     currentPage.style.transform='translate3d('+dx.toFixed(1)+'px,0,0)';
-    if(previousPage)previousPage.style.transform='translate3d('+(dx-w).toFixed(1)+'px,0,0)';
-    if(nextPage)nextPage.style.transform='translate3d('+(dx+w).toFixed(1)+'px,0,0)';
+    if(nextPage)nextPage.style.transform='translate3d('+(dx-w).toFixed(1)+'px,0,0)';
+    if(previousPage)previousPage.style.transform='translate3d('+(dx+w).toFixed(1)+'px,0,0)';
+  }
+  function hasTargetForDx(dx,s=stateAtStart){
+    if(!s||dx===0)return true;
+    return dx>0?!!s.next:!!s.previous;
+  }
+  function displayDx(dx){
+    return hasTargetForDx(dx)?dx:dx*.22;
+  }
+  function revealOverlay(){if(overlay)overlay.classList.add('is-dragging')}
+
+  function addSample(x,t){
+    if(!drag)return;
+    drag.samples.push({x,t});
+    const cutoff=t-VELOCITY_WINDOW_MS*1.7;
+    while(drag.samples.length>2&&drag.samples[0].t<cutoff)drag.samples.shift();
+  }
+  function addEventSamples(e){
+    const events=typeof e.getCoalescedEvents==='function'?e.getCoalescedEvents():null;
+    if(events&&events.length){events.forEach(p=>addSample(p.clientX,p.timeStamp||performance.now()))}
+    else addSample(e.clientX,e.timeStamp||performance.now());
+  }
+  function recentVelocity(){
+    if(!drag||drag.samples.length<2)return 0;
+    const samples=drag.samples;
+    const newest=samples[samples.length-1];
+    let oldest=samples[0];
+    for(let i=samples.length-2;i>=0;i--){
+      if(newest.t-samples[i].t>=VELOCITY_WINDOW_MS*.55){oldest=samples[i];break}
+      oldest=samples[i];
+    }
+    const dt=newest.t-oldest.t;
+    return dt>8?(newest.x-oldest.x)/dt:0;
   }
 
   async function waitForBaseSharp(src){
     const base=document.getElementById('memoryPhotoA')||document.querySelector('#photoLayerA .example-photo');
     if(!base)return;
     if(base.src!==src){
-      await new Promise(resolve=>{const done=()=>resolve();base.addEventListener('load',done,{once:true});base.addEventListener('error',done,{once:true});setTimeout(done,800)});
+      await new Promise(resolve=>{let doneCalled=false;const done=()=>{if(doneCalled)return;doneCalled=true;resolve()};base.addEventListener('load',done,{once:true});base.addEventListener('error',done,{once:true});setTimeout(done,800)});
     }
     if(base.decode){try{await base.decode()}catch(e){}}
-    fitNow(base);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    fitNow(base);
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }
 
   function settle(direction,commit){
-    if(!overlay||!currentPage){clearOverlay();return}
+    if(!overlay||!currentPage){clearOverlay();settling=false;return}
+    settling=true;
+    revealOverlay();
     const w=stage.getBoundingClientRect().width;
     [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>p.classList.add('is-settling'));
     requestAnimationFrame(()=>{
       if(!commit){
         placePages(0);
-        setTimeout(clearOverlay,300);
+        setTimeout(()=>{clearOverlay();settling=false},SETTLE_MS+30);
         return;
       }
       const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
       const targetPage=direction>0?nextPage:previousPage;
-      if(!target||!targetPage){placePages(0);setTimeout(clearOverlay,300);return}
-      placePages(direction>0?-w:w);
+      if(!target||!targetPage){
+        placePages(0);
+        setTimeout(()=>{clearOverlay();settling=false},SETTLE_MS+30);
+        return;
+      }
+      /* Commit the logical memory under the covering overlay immediately. The base
+         image gets the whole settle animation to load, so the hand-off stays sharp. */
+      warmImage(target.image);
+      window.__taleraPhotoBook.step(direction);
+      warmState(window.__taleraPhotoBook.state());
+      placePages(direction>0?w:-w);
       setTimeout(async()=>{
-        await warmImage(target.image);
-        window.__taleraPhotoBook.step(direction);
         await waitForBaseSharp(target.image);
-        warmState(window.__taleraPhotoBook.state());
-        clearOverlay();
-      },250);
+        clearOverlay();settling=false;
+      },SETTLE_MS);
     });
+  }
+
+  function resetDrag(){
+    if(!drag)return;
+    if(drag.captured){try{story.releasePointerCapture(drag.pointerId)}catch(err){}}
+    drag=null;
   }
 
   story.addEventListener('pointerdown',e=>{
     if(e.pointerType==='mouse'&&e.button!==0)return;
-    if(pid!==null)return;
+    if(e.target.closest('button,a,input,textarea,select'))return;
+    if(drag||settling)return;
+    /* Capture phase intentionally owns this stream. The older presentation helper
+       also has a bubble-phase swipe listener; stopping here keeps it dormant instead
+       of letting two gesture systems move the same photo/timeline. */
     e.stopImmediatePropagation();
-    pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;lastT=performance.now();mode=null;
-    try{story.setPointerCapture(e.pointerId)}catch(err){}
-    /* Important: touching the photo alone does not create/swap any visual layer.
-       We wait for a few genuine horizontal pixels before the photo-book strip appears. */
-    warmState(window.__taleraPhotoBook.state());
+    const s=window.__taleraPhotoBook.state();
+    drag={pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,mode:null,captured:false,samples:[]};
+    addSample(e.clientX,e.timeStamp||performance.now());
+    buildOverlay(s);
   },{passive:true,capture:true});
 
   story.addEventListener('pointermove',e=>{
-    if(e.pointerId!==pid)return;
+    if(!drag||e.pointerId!==drag.pointerId)return;
     e.stopImmediatePropagation();
-    const dx=e.clientX-startX,dy=e.clientY-startY;
-    if(!mode&&(Math.abs(dx)>SWIPE_INTENT_PX||Math.abs(dy)>SWIPE_INTENT_PX)){
-      mode=Math.abs(dx)>Math.abs(dy)*1.08?'horizontal':'vertical';
-      if(mode==='horizontal')buildOverlay();
+    addEventSamples(e);
+    const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
+    const ax=Math.abs(dx),ay=Math.abs(dy);
+
+    if(!drag.mode&&(ax>INTENT_PX||ay>INTENT_PX)){
+      if(ax>ay*INTENT_RATIO)drag.mode='horizontal';
+      else if(ay>ax*INTENT_RATIO)drag.mode='vertical';
+      else if(Math.max(ax,ay)>INTENT_PX*2.2)drag.mode=ax>=ay?'horizontal':'vertical';
+
+      if(drag.mode==='horizontal'){
+        revealOverlay();
+        try{story.setPointerCapture(e.pointerId);drag.captured=true}catch(err){}
+      }else if(drag.mode==='vertical'){
+        clearOverlay();
+      }
     }
-    if(mode==='vertical'){
-      clearOverlay();
-      return;
-    }
-    if(mode!=='horizontal')return;
+
+    if(drag.mode!=='horizontal')return;
     e.preventDefault();
-    placePages(dx);
-    lastX=e.clientX;lastT=performance.now();
+    placePages(displayDx(dx));
   },{passive:false,capture:true});
 
-  const finish=e=>{
-    if(e.pointerId!==pid)return;
+  story.addEventListener('pointerup',e=>{
+    if(!drag||e.pointerId!==drag.pointerId)return;
     e.stopImmediatePropagation();
-    const now=performance.now(),dx=e.clientX-startX;
-    const dt=Math.max(16,now-lastT),velocity=(e.clientX-lastX)/dt;
+    addEventSamples(e);
+    const dx=e.clientX-drag.startX;
+    const mode=drag.mode;
+    const velocity=recentVelocity();
     const w=stage.getBoundingClientRect().width;
-    const direction=dx<0?1:-1;
+    const direction=dx>0?1:-1;
     const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
-    const distanceCommit=Math.abs(dx)>Math.max(72,w*.22);
-    const flickCommit=Math.abs(dx)>44&&Math.abs(velocity)>.62;
+    const distanceCommit=Math.abs(dx)>=Math.max(56,w*.18);
+    const flickCommit=Math.abs(dx)>=FLICK_MIN_PX&&Math.abs(velocity)>=FLICK_SPEED&&Math.sign(velocity)===Math.sign(dx);
     const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
+    resetDrag();
     if(mode==='horizontal')settle(direction,commit);else clearOverlay();
-    try{story.releasePointerCapture(e.pointerId)}catch(err){}
-    pid=null;mode=null;
-  };
-  story.addEventListener('pointerup',finish,{passive:true,capture:true});
-  story.addEventListener('pointercancel',finish,{passive:true,capture:true});
+  },{passive:true,capture:true});
+
+  story.addEventListener('pointercancel',e=>{
+    if(!drag||e.pointerId!==drag.pointerId)return;
+    e.stopImmediatePropagation();
+    const mode=drag.mode;
+    resetDrag();
+    /* Cancellation is normally the browser/OS taking the gesture (not a deliberate
+       release), especially near screen edges. It must never advance a memory. */
+    if(mode==='horizontal'&&overlay)settle(0,false);else clearOverlay();
+  },{passive:true,capture:true});
 })();
 `;

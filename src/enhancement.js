@@ -1,18 +1,10 @@
 export const enhancementStyle = String.raw`
 /* =========================================================
    TALERA / LIFELINE — MASTER-ALIGNED PRESENTATION
-
-   Preserves the approved timeline architecture and restores
-   the visual/interaction agreements from the project master:
-   - fullscreen photographic memory area
-   - timeline over the photograph, without its own panel/blur
-   - full photo remains recognisable via contain
-   - same photo softly fills the background
-   - horizontal = through life
-   - vertical = deeper into active memory
-   - story moves into a calm neutral reading zone
-   - bottom navigation remains a reserved 60px row
-   - no new viewport hacks
+   Keeps approved V16/V21/V22 behaviour and adds:
+   - timeline blur only behind timeline
+   - blur fades out gradually, no hard lower edge
+   - horizontal swipe works from photo/story area
    ========================================================= */
 
 :root{
@@ -32,7 +24,6 @@ html,body{
   background:var(--talera-neutral) !important;
 }
 
-/* Keep the approved v16-style screen architecture: content + reserved nav. */
 .app{
   width:100% !important;
   height:100dvh !important;
@@ -52,9 +43,6 @@ main{
   background:var(--talera-neutral) !important;
 }
 
-/* =========================================================
-   PHOTOBOOK MEMORY CANVAS
-   ========================================================= */
 .memory-space{
   position:absolute !important;
   inset:0 !important;
@@ -91,7 +79,6 @@ main{
   transform:translate3d(0,0,0) scale(1);
 }
 
-/* v22 agreement: same image softly fills the full background. */
 .photo-backdrop{
   display:block !important;
   position:absolute !important;
@@ -105,7 +92,6 @@ main{
   transform:scale(1.10) !important;
 }
 
-/* The recognisable photo itself is never hard-cropped. */
 .example-photo{
   position:absolute !important;
   z-index:2 !important;
@@ -121,10 +107,7 @@ main{
   background:transparent !important;
 }
 
-/* No general dark overlay over the photograph. */
 .memory-space::before{ display:none !important; content:none !important; }
-
-/* Only the lower edge dissolves gently into the story/reading space. */
 .memory-space::after{
   content:"" !important;
   display:block !important;
@@ -132,21 +115,16 @@ main{
   inset:0 !important;
   z-index:2 !important;
   pointer-events:none !important;
-  background:linear-gradient(
-    180deg,
+  background:linear-gradient(180deg,
     rgba(247,244,239,0) 0%,
     rgba(247,244,239,0) 55%,
     rgba(247,244,239,.06) 66%,
     rgba(247,244,239,.18) 76%,
     rgba(247,244,239,.52) 90%,
-    rgba(247,244,239,.84) 100%
-  ) !important;
+    rgba(247,244,239,.84) 100%) !important;
 }
 
-/* =========================================================
-   TIMELINE — SAME FUNCTION, NEW COMPOSITION
-   Directly over the photograph. No pane, veil or blur yet.
-   ========================================================= */
+/* Timeline remains the original interactive surface. */
 .timeline{
   position:absolute !important;
   z-index:20 !important;
@@ -161,16 +139,38 @@ main{
   background:transparent !important;
   border:0 !important;
   box-shadow:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
   touch-action:none !important;
   user-select:none !important;
 }
-.timeline::before,
-.timeline::after{
-  display:none !important;
-  content:none !important;
+
+/* Blur only the image behind the timeline. The mask makes the blur
+   dissolve gradually toward the real sharp photo below. */
+.timeline::before{
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  inset:0 !important;
+  z-index:0 !important;
+  pointer-events:none !important;
+  backdrop-filter:blur(14px) saturate(.96) !important;
+  -webkit-backdrop-filter:blur(14px) saturate(.96) !important;
+  background:rgba(247,244,239,.035) !important;
+  -webkit-mask-image:linear-gradient(to bottom,
+    #000 0%,
+    #000 50%,
+    rgba(0,0,0,.94) 62%,
+    rgba(0,0,0,.70) 76%,
+    rgba(0,0,0,.34) 90%,
+    transparent 100%) !important;
+  mask-image:linear-gradient(to bottom,
+    #000 0%,
+    #000 50%,
+    rgba(0,0,0,.94) 62%,
+    rgba(0,0,0,.70) 76%,
+    rgba(0,0,0,.34) 90%,
+    transparent 100%) !important;
 }
+.timeline::after{ display:none !important; content:none !important; }
 .timeline canvas{
   position:relative !important;
   z-index:2 !important;
@@ -182,10 +182,6 @@ main{
 .zoom-hint{ z-index:5 !important; }
 .debug-panel{ z-index:20 !important; }
 
-/* =========================================================
-   STORYFLOW / LIFEBOOK
-   Horizontal = through life. Vertical = into this memory.
-   ========================================================= */
 .memory-story-scroll{
   position:absolute !important;
   inset:0 !important;
@@ -195,17 +191,14 @@ main{
   -webkit-overflow-scrolling:touch !important;
   overscroll-behavior-y:contain !important;
   scrollbar-width:none !important;
-  touch-action:pan-y !important;
+  touch-action:pan-y pan-x !important;
 }
 .memory-story-scroll::-webkit-scrollbar{ display:none !important; }
-
-/* Start photo-first: title begins near the lower part of the image. */
 .memory-photo-air{
   height:62% !important;
   min-height:260px !important;
   pointer-events:none !important;
 }
-
 .memory-sheet{
   position:relative !important;
   min-height:78% !important;
@@ -213,15 +206,13 @@ main{
   color:var(--talera-deep) !important;
   opacity:1 !important;
   transform:translateY(0) !important;
-  background:linear-gradient(
-    180deg,
+  background:linear-gradient(180deg,
     rgba(247,244,239,0) 0px,
     rgba(247,244,239,.18) 44px,
     rgba(247,244,239,.52) 102px,
     rgba(247,244,239,.88) 172px,
     rgba(247,244,239,.98) 238px,
-    rgb(247,244,239) 286px
-  ) !important;
+    rgb(247,244,239) 286px) !important;
   text-shadow:none !important;
   transition:opacity .22s ease, transform .28s ease, background .30s ease !important;
 }
@@ -268,17 +259,13 @@ main{
   white-space:pre-line !important;
   text-shadow:none !important;
 }
-
-/* As the user scrolls upward, reading becomes calmer and lighter. */
 .memory-story-scroll.is-reading .memory-sheet{
   color:var(--talera-deep) !important;
   text-shadow:none !important;
-  background:linear-gradient(
-    180deg,
+  background:linear-gradient(180deg,
     rgba(247,244,239,.90) 0px,
     rgba(247,244,239,.98) 92px,
-    rgb(247,244,239) 145px
-  ) !important;
+    rgb(247,244,239) 145px) !important;
 }
 .memory-story-scroll.is-reading .memory-sheet::before,
 .memory-story-scroll.is-reading .memory-sheet .date,
@@ -287,9 +274,6 @@ main{
   text-shadow:none !important;
 }
 
-/* =========================================================
-   BOTTOM NAVIGATION — RESERVED 60PX, NOT LOST
-   ========================================================= */
 nav{
   position:relative !important;
   z-index:30 !important;
@@ -309,8 +293,7 @@ nav{
   backdrop-filter:blur(12px) !important;
   -webkit-backdrop-filter:blur(12px) !important;
 }
-nav::before,
-nav::after{ display:none !important; content:none !important; }
+nav::before,nav::after{ display:none !important; content:none !important; }
 .nav-item{
   border:0 !important;
   background:transparent !important;
@@ -329,18 +312,9 @@ nav::after{ display:none !important; content:none !important; }
   width:auto !important;
   height:auto !important;
 }
-.nav-item.active{
-  color:var(--talera-deep) !important;
-  font-weight:650 !important;
-}
+.nav-item.active{ color:var(--talera-deep) !important; font-weight:650 !important; }
 .nav-item > span:last-child{ display:inline !important; }
-.more{
-  width:22px !important;
-  color:currentColor !important;
-  letter-spacing:3px !important;
-  font-size:18px !important;
-  line-height:1 !important;
-}
+.more{ width:22px !important; color:currentColor !important; letter-spacing:3px !important; font-size:18px !important; line-height:1 !important; }
 .tell{
   justify-self:center !important;
   width:50px !important;
@@ -353,13 +327,57 @@ nav::after{ display:none !important; content:none !important; }
   font-size:11px !important;
   font-weight:650 !important;
 }
-
-/* No live viewport-height workaround is introduced here. */
 `;
 
-/* The approved application JavaScript remains authoritative.
-   No presentation script is injected here, so timeline drag,
-   pinch zoom, snapping, nearest-memory selection, 50-memory
-   dataset, photo crossfades, story reset and zoom hint continue
-   to come from the existing v16/v21/v22-derived application. */
-export const enhancementScript = "";
+export const enhancementScript = String.raw`
+(() => {
+  const story = document.getElementById('memoryStoryScroll');
+  const surface = document.getElementById('surface');
+  if (!story || !surface) return;
+
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let lastX = 0;
+  let mode = null;
+
+  story.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    pointerId = e.pointerId;
+    startX = lastX = e.clientX;
+    startY = e.clientY;
+    mode = null;
+  }, {passive:true});
+
+  story.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== pointerId) return;
+    const dxTotal = e.clientX - startX;
+    const dyTotal = e.clientY - startY;
+
+    if (!mode && (Math.abs(dxTotal) > 9 || Math.abs(dyTotal) > 9)) {
+      mode = Math.abs(dxTotal) > Math.abs(dyTotal) * 1.18 ? 'horizontal' : 'vertical';
+    }
+    if (mode !== 'horizontal') return;
+
+    e.preventDefault();
+    const dx = e.clientX - lastX;
+    lastX = e.clientX;
+
+    surface.dispatchEvent(new WheelEvent('wheel', {
+      deltaX: -dx,
+      deltaY: 0,
+      bubbles: true,
+      cancelable: true
+    }));
+  }, {passive:false});
+
+  const end = (e) => {
+    if (e.pointerId !== pointerId) return;
+    pointerId = null;
+    mode = null;
+  };
+
+  story.addEventListener('pointerup', end, {passive:true});
+  story.addEventListener('pointercancel', end, {passive:true});
+})();
+`;

@@ -27,7 +27,7 @@ export const interactionFixStyle = String.raw`
   backface-visibility:hidden!important;
   -webkit-backface-visibility:hidden!important;
 }
-.photo-book-page.is-settling{transition:transform .28s cubic-bezier(.22,.72,.25,1)!important}
+.photo-book-page.is-settling{transition:transform .30s cubic-bezier(.22,.72,.25,1)!important}
 
 @media (pointer:coarse){
   .timeline.is-active:not(.touch-intent) canvas{opacity:.26!important;filter:saturate(.55) contrast(.70) brightness(.86)!important}
@@ -104,46 +104,39 @@ export const interactionFixScript = String.raw`
 
   if(!story||!stage||!window.__taleraPhotoBook)return;
 
-  /* Decode adjacent images ahead of the gesture. This avoids the mobile browser
-     first painting the blurred backdrop and only then resolving the sharp image. */
   const decoded=new Map();
   function warmImage(src){
     if(!src)return Promise.resolve();
     if(decoded.has(src))return decoded.get(src);
-    const img=new Image();
-    img.decoding='async';
-    img.loading='eager';
+    const img=new Image();img.decoding='async';img.loading='eager';
     try{img.fetchPriority='high'}catch(e){}
     img.src=src;
     const p=(img.decode?img.decode():new Promise(resolve=>{
       if(img.complete)resolve();else{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true})}
     })).catch(()=>{});
-    decoded.set(src,p);
-    return p;
+    decoded.set(src,p);return p;
   }
-  function warmState(s){
-    [s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image)});
-  }
+  function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image)})}
   warmState(window.__taleraPhotoBook.state());
 
-  let pid=null,startX=0,startY=0,lastX=0,startT=0,lastT=0,mode=null,direction=0,overlay=null,currentPage=null,targetPage=null,targetSrc='';
+  const INTENT_PX=12;
+  const FLICK_MIN_PX=34;
+  const FLICK_VELOCITY=.58;
+  let pid=null,startX=0,startY=0,lastX=0,lastT=0,mode=null,direction=0,overlay=null,currentPage=null,targetPage=null,targetSrc='';
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'))}
   function makePage(src,isCurrent){
     const source=document.getElementById('photoLayerA')||stage.querySelector('.photo-layer');
     const page=source?source.cloneNode(true):document.createElement('div');
-    page.classList.add('photo-book-page');
-    page.classList.remove('is-front');
-    page.style.opacity='1';
-    stripIds(page);
+    page.classList.add('photo-book-page');page.classList.remove('is-front');page.style.opacity='1';stripIds(page);
     const sharp=page.querySelector('.example-photo');
     const blur=page.querySelector('.photo-aligned-blur');
     const backdrop=page.querySelector('.photo-backdrop');
-    if(!isCurrent&&src){
+    if(src){
       if(backdrop){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src}
       if(blur){blur.decoding='async';blur.loading='eager';blur.src=src}
       if(sharp){
-        sharp.decoding='sync';sharp.loading='eager';
+        sharp.decoding=isCurrent?'sync':'async';sharp.loading='eager';
         try{sharp.fetchPriority='high'}catch(e){}
         sharp.src=src;
         const fit=()=>{const r=stage.getBoundingClientRect();fitNode(sharp,blur,r.width,r.height)};
@@ -157,19 +150,22 @@ export const interactionFixScript = String.raw`
     const s=window.__taleraPhotoBook.state();
     const target=dir>0?s.next:s.previous;
     if(!target)return false;
-    clearOverlay();
-    targetSrc=target.image;
-    warmImage(targetSrc);
+    clearOverlay();targetSrc=target.image;warmImage(targetSrc);
     overlay=document.createElement('div');overlay.className='photo-book-overlay';
     currentPage=makePage(s.current&&s.current.image,true);
     targetPage=makePage(targetSrc,false);
-    overlay.append(currentPage,targetPage);stage.appendChild(overlay);
-    direction=dir;
+    overlay.append(currentPage,targetPage);stage.appendChild(overlay);direction=dir;
     return true;
   }
-  function placePages(dx){
+  function effectiveDx(rawDx){
+    const sign=Math.sign(rawDx)||1;
+    const amount=Math.max(0,Math.abs(rawDx)-INTENT_PX);
+    return sign*amount;
+  }
+  function placePages(rawDx){
     if(!overlay||!currentPage||!targetPage)return;
     const w=stage.getBoundingClientRect().width;
+    const dx=effectiveDx(rawDx);
     currentPage.style.transform='translate3d('+dx.toFixed(1)+'px,0,0)';
     targetPage.style.transform='translate3d('+(dx+direction*w).toFixed(1)+'px,0,0)';
   }
@@ -178,19 +174,13 @@ export const interactionFixScript = String.raw`
     const base=document.getElementById('memoryPhotoA')||document.querySelector('#photoLayerA .example-photo');
     if(!base)return;
     if(base.src!==src){
-      await new Promise(resolve=>{
-        const done=()=>resolve();
-        base.addEventListener('load',done,{once:true});
-        base.addEventListener('error',done,{once:true});
-        setTimeout(done,800);
-      });
+      await new Promise(resolve=>{const done=()=>resolve();base.addEventListener('load',done,{once:true});base.addEventListener('error',done,{once:true});setTimeout(done,800)});
     }
     if(base.decode){try{await base.decode()}catch(e){}}
-    fitNow(base);
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    fitNow(base);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }
 
-  function settle(commit,velocity){
+  function settle(commit){
     if(!overlay||!currentPage||!targetPage){clearOverlay();return}
     const w=stage.getBoundingClientRect().width;
     currentPage.classList.add('is-settling');targetPage.classList.add('is-settling');
@@ -200,18 +190,16 @@ export const interactionFixScript = String.raw`
         currentPage.style.transform='translate3d('+(-direction*w)+'px,0,0)';
         targetPage.style.transform='translate3d(0,0,0)';
         setTimeout(async()=>{
-          /* Keep the already-sharp overlay visible while the real underlying layer
-             switches, decodes and gets its final geometry. Only then hand over. */
           await warmImage(committedSrc);
           window.__taleraPhotoBook.step(direction);
           await waitForBaseSharp(committedSrc);
           warmState(window.__taleraPhotoBook.state());
           clearOverlay();
-        },250);
+        },270);
       }else{
         currentPage.style.transform='translate3d(0,0,0)';
         targetPage.style.transform='translate3d('+(direction*w)+'px,0,0)';
-        setTimeout(clearOverlay,300);
+        setTimeout(clearOverlay,320);
       }
     });
   }
@@ -220,7 +208,7 @@ export const interactionFixScript = String.raw`
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(pid!==null)return;
     e.stopImmediatePropagation();
-    pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;startT=lastT=performance.now();mode=null;direction=0;
+    pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;lastT=performance.now();mode=null;direction=0;
     warmState(window.__taleraPhotoBook.state());
   },{passive:true,capture:true});
 
@@ -228,23 +216,24 @@ export const interactionFixScript = String.raw`
     if(e.pointerId!==pid)return;
     e.stopImmediatePropagation();
     const dx=e.clientX-startX,dy=e.clientY-startY;
-    if(!mode&&(Math.abs(dx)>7||Math.abs(dy)>7))mode=Math.abs(dx)>Math.abs(dy)*1.12?'horizontal':'vertical';
+    if(!mode&&(Math.abs(dx)>INTENT_PX||Math.abs(dy)>INTENT_PX))mode=Math.abs(dx)>Math.abs(dy)*1.12?'horizontal':'vertical';
     if(mode!=='horizontal')return;
     e.preventDefault();
     const dir=dx<0?1:-1;
     if(!overlay||dir!==direction){if(!buildOverlay(dir))return}
-    lastX=e.clientX;lastT=performance.now();
-    placePages(dx);
+    lastX=e.clientX;lastT=performance.now();placePages(dx);
   },{passive:false,capture:true});
 
   const finish=e=>{
     if(e.pointerId!==pid)return;
     e.stopImmediatePropagation();
-    const now=performance.now(),dx=e.clientX-startX;
+    const now=performance.now(),rawDx=e.clientX-startX,dragDx=effectiveDx(rawDx);
     const dt=Math.max(16,now-lastT),velocity=(e.clientX-lastX)/dt;
     const w=stage.getBoundingClientRect().width;
-    const commit=mode==='horizontal'&&overlay&&(Math.abs(dx)>Math.max(54,w*.17)||Math.abs(velocity)>.42);
-    if(mode==='horizontal')settle(commit,velocity);else clearOverlay();
+    const distanceCommit=Math.abs(dragDx)>Math.max(64,w*.20);
+    const flickCommit=Math.abs(rawDx)>=FLICK_MIN_PX&&Math.abs(velocity)>FLICK_VELOCITY;
+    const commit=mode==='horizontal'&&overlay&&(distanceCommit||flickCommit);
+    if(mode==='horizontal')settle(commit);else clearOverlay();
     pid=null;mode=null;
   };
   story.addEventListener('pointerup',finish,{passive:true,capture:true});

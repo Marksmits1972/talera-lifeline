@@ -9,6 +9,7 @@ export const enhancementStyle = String.raw`
    - feather is longer and gentler, blur itself is weaker
    - timeline lives in the photo and has a calm REST state
    - touching / dragging / pinching wakes the timeline into ACTIVE state
+   - stronger visual separation between REST and ACTIVE
    - timeline geometry does not jump between states
    - V16 timeline behaviour, swipe and vertical story movement stay unchanged
    ========================================================= */
@@ -35,16 +36,16 @@ main{position:absolute!important;inset:0!important;width:100%!important;height:1
 /* Timeline: same size in both modes. The visible graphics rest, the interaction
    area remains generous. We only change emphasis, never geometry. */
 .timeline{position:absolute!important;z-index:20!important;left:0!important;right:0!important;top:0!important;width:100%!important;height:clamp(148px,20dvh,176px)!important;min-height:148px!important;overflow:visible!important;isolation:isolate!important;background:transparent!important;border:0!important;box-shadow:none!important;touch-action:none!important;user-select:none!important}
-.timeline::before{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 54px)!important;z-index:0!important;pointer-events:none!important;background:transparent!important;backdrop-filter:blur(13px) saturate(1.02)!important;-webkit-backdrop-filter:blur(13px) saturate(1.02)!important;-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 42%,rgba(0,0,0,.88) 56%,rgba(0,0,0,.64) 70%,rgba(0,0,0,.38) 82%,rgba(0,0,0,.16) 92%,transparent 100%)!important;mask-image:linear-gradient(to bottom,#000 0%,#000 42%,rgba(0,0,0,.88) 56%,rgba(0,0,0,.64) 70%,rgba(0,0,0,.38) 82%,rgba(0,0,0,.16) 92%,transparent 100%)!important;transition:opacity .36s ease!important;opacity:.90!important}
-.timeline::after{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 38px)!important;z-index:1!important;pointer-events:none!important;background:linear-gradient(180deg,rgba(15,39,71,.015),rgba(15,39,71,.035) 62%,transparent 100%)!important;opacity:.42!important;transition:opacity .30s ease!important}
-.timeline canvas{position:relative!important;z-index:2!important;opacity:.70!important;filter:saturate(.88) contrast(.92)!important;transition:opacity .28s ease,filter .28s ease!important}
-.center-needle{z-index:3!important;width:1.5px!important;height:54%!important;max-height:86px!important;min-height:58px!important;top:24%!important;opacity:.74!important;transition:opacity .26s ease,filter .26s ease!important}.center-needle::before{transform:scale(.82)!important;transform-origin:center!important}.focus{z-index:4!important;opacity:.76!important;transform:translateZ(0) scale(.985)!important;transform-origin:center!important;transition:opacity .26s ease,transform .26s ease,filter .26s ease!important}.zoom-hint{z-index:5!important}.debug-panel{z-index:20!important}
+.timeline::before{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 54px)!important;z-index:0!important;pointer-events:none!important;background:transparent!important;backdrop-filter:blur(13px) saturate(1.02)!important;-webkit-backdrop-filter:blur(13px) saturate(1.02)!important;-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 42%,rgba(0,0,0,.88) 56%,rgba(0,0,0,.64) 70%,rgba(0,0,0,.38) 82%,rgba(0,0,0,.16) 92%,transparent 100%)!important;mask-image:linear-gradient(to bottom,#000 0%,#000 42%,rgba(0,0,0,.88) 56%,rgba(0,0,0,.64) 70%,rgba(0,0,0,.38) 82%,rgba(0,0,0,.16) 92%,transparent 100%)!important;opacity:.90!important}
+.timeline::after{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 38px)!important;z-index:1!important;pointer-events:none!important;background:linear-gradient(180deg,rgba(15,39,71,.012),rgba(15,39,71,.026) 62%,transparent 100%)!important;opacity:.16!important;transition:opacity .18s ease!important}
+.timeline canvas{position:relative!important;z-index:2!important;opacity:.42!important;filter:saturate(.72) contrast(.82) brightness(.94)!important;transition:opacity .16s ease,filter .16s ease!important}
+.center-needle{z-index:3!important;width:1.5px!important;height:54%!important;max-height:86px!important;min-height:58px!important;top:24%!important;opacity:.46!important;transition:opacity .16s ease,filter .16s ease!important}.center-needle::before{transform:scale(.82)!important;transform-origin:center!important}.focus{z-index:4!important;opacity:.50!important;transform:translateZ(0) scale(.975)!important;transform-origin:center!important;transition:opacity .16s ease,transform .16s ease,filter .16s ease!important}.zoom-hint{z-index:5!important}.debug-panel{z-index:20!important}
 
-/* ACTIVE: the timeline wakes up, but the photo/blur composition itself does not change. */
-.timeline.is-active canvas{opacity:1!important;filter:saturate(1) contrast(1.08)!important}
-.timeline.is-active .center-needle{opacity:1!important;filter:drop-shadow(0 1px 5px rgba(15,39,71,.22))!important}
-.timeline.is-active .focus{opacity:1!important;transform:translateZ(0) scale(1)!important;filter:drop-shadow(0 2px 8px rgba(15,39,71,.16))!important}
-.timeline.is-active::after{opacity:.82!important}
+/* ACTIVE: a deliberately obvious wake-up. Photo and blur stay unchanged. */
+.timeline.is-active canvas{opacity:1!important;filter:saturate(1.10) contrast(1.24) brightness(1.06)!important}
+.timeline.is-active .center-needle{opacity:1!important;filter:drop-shadow(0 0 2px rgba(255,255,255,.70)) drop-shadow(0 2px 7px rgba(15,39,71,.38))!important}
+.timeline.is-active .focus{opacity:1!important;transform:translateZ(0) scale(1.025)!important;filter:drop-shadow(0 2px 10px rgba(15,39,71,.32))!important}
+.timeline.is-active::after{opacity:.96!important}
 
 .memory-story-scroll{position:absolute!important;inset:0!important;z-index:8!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-y:contain!important;scrollbar-width:none!important;touch-action:pan-y pan-x!important}.memory-story-scroll::-webkit-scrollbar{display:none!important}.memory-photo-air{height:72%!important;min-height:430px!important;pointer-events:none!important}
 .memory-sheet{position:relative!important;min-height:94%!important;padding:46px 24px 130px!important;color:#fff!important;opacity:1!important;transform:translateY(0)!important;background:linear-gradient(180deg,rgba(10,24,40,0) 0px,rgba(10,24,40,.08) 52px,rgba(10,24,40,.18) 118px,rgba(10,24,40,.28) 190px,rgba(10,24,40,.34) 260px,rgba(10,24,40,.18) 350px,rgba(10,24,40,0) 440px)!important;text-shadow:0 2px 14px rgba(6,18,30,.46)!important;transition:opacity .22s ease,transform .28s ease,background .30s ease!important}.memory-sheet.story-switching{opacity:.16!important;transform:translateY(7px)!important}.memory-sheet::before{content:"↑"!important;position:absolute!important;top:18px!important;left:24px!important;font-size:15px!important;color:rgba(255,255,255,.82)!important;text-shadow:0 2px 9px rgba(6,18,30,.42)!important}.memory-sheet .date{color:rgba(255,255,255,.88)!important;font-size:13px!important;line-height:1.2!important;font-weight:680!important;margin:0 0 10px!important;letter-spacing:.08em!important;text-transform:uppercase!important;text-shadow:0 2px 12px rgba(6,18,30,.46)!important}.memory-sheet .story{color:#fff!important;font-size:clamp(25px,6.6vw,34px)!important;line-height:1.08!important;font-weight:680!important;letter-spacing:-.018em!important;max-width:18ch!important;margin:0!important;white-space:pre-line!important;text-shadow:0 2px 15px rgba(6,18,30,.52)!important}.memory-sheet .story-more{display:block!important;margin:clamp(140px,19dvh,190px) -24px 0!important;padding:64px 24px 150px!important;border-top:0!important;color:var(--talera-text)!important;background:linear-gradient(180deg,rgba(247,244,239,0) 0px,rgba(247,244,239,.68) 72px,rgba(247,244,239,.96) 132px,rgb(247,244,239) 190px)!important;font-size:16px!important;line-height:1.62!important;font-weight:430!important;max-width:none!important;white-space:pre-line!important;text-shadow:none!important}.memory-story-scroll.is-reading .memory-sheet{color:var(--talera-deep)!important;text-shadow:none!important;background:linear-gradient(180deg,rgba(247,244,239,.10) 0px,rgba(247,244,239,.74) 100px,rgba(247,244,239,.97) 180px,rgb(247,244,239) 250px)!important}.memory-story-scroll.is-reading .memory-sheet::before,.memory-story-scroll.is-reading .memory-sheet .date,.memory-story-scroll.is-reading .memory-sheet .story{color:var(--talera-deep)!important;text-shadow:none!important}
@@ -154,12 +155,12 @@ export const enhancementScript = String.raw`
   }
   if(timeline){
     timeline.addEventListener('pointerdown',()=>{timelinePointers+=1;wakeTimeline();},{passive:true});
-    const releaseTimeline=()=>{timelinePointers=Math.max(0,timelinePointers-1);scheduleTimelineRest(1050);};
+    const releaseTimeline=()=>{timelinePointers=Math.max(0,timelinePointers-1);scheduleTimelineRest(1150);};
     timeline.addEventListener('pointerup',releaseTimeline,{passive:true});
     timeline.addEventListener('pointercancel',releaseTimeline,{passive:true});
-    timeline.addEventListener('wheel',()=>{wakeTimeline();scheduleTimelineRest(850);},{passive:true});
+    timeline.addEventListener('wheel',()=>{wakeTimeline();scheduleTimelineRest(900);},{passive:true});
     timeline.addEventListener('touchstart',wakeTimeline,{passive:true});
-    timeline.addEventListener('touchend',()=>scheduleTimelineRest(1050),{passive:true});
+    timeline.addEventListener('touchend',()=>scheduleTimelineRest(1150),{passive:true});
     scheduleTimelineRest(500);
   }
 
@@ -167,6 +168,6 @@ export const enhancementScript = String.raw`
   let pointerId=null,startX=0,startY=0,lastX=0,mode=null;
   story.addEventListener('pointerdown',(e)=>{if(e.pointerType==='mouse'&&e.button!==0)return;pointerId=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;mode=null},{passive:true});
   story.addEventListener('pointermove',(e)=>{if(e.pointerId!==pointerId)return;const dxTotal=e.clientX-startX;const dyTotal=e.clientY-startY;if(!mode&&(Math.abs(dxTotal)>9||Math.abs(dyTotal)>9)){mode=Math.abs(dxTotal)>Math.abs(dyTotal)*1.18?'horizontal':'vertical';}if(mode!=='horizontal')return;e.preventDefault();wakeTimeline();const dx=e.clientX-lastX;lastX=e.clientX;surface.dispatchEvent(new WheelEvent('wheel',{deltaX:-dx,deltaY:0,bubbles:true,cancelable:true}));},{passive:false});
-  const end=(e)=>{if(e.pointerId!==pointerId)return;if(mode==='horizontal')scheduleTimelineRest(900);pointerId=null;mode=null;};story.addEventListener('pointerup',end,{passive:true});story.addEventListener('pointercancel',end,{passive:true});
+  const end=(e)=>{if(e.pointerId!==pointerId)return;if(mode==='horizontal')scheduleTimelineRest(1000);pointerId=null;mode=null;};story.addEventListener('pointerup',end,{passive:true});story.addEventListener('pointercancel',end,{passive:true});
 })();
 `;

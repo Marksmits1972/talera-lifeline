@@ -122,6 +122,7 @@ export const interactionFixScript = String.raw`
   function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image)})}
   warmState(window.__taleraPhotoBook.state());
 
+  const SWIPE_INTENT_PX=8;
   let pid=null,startX=0,startY=0,lastX=0,lastT=0,mode=null,overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'))}
@@ -216,23 +217,26 @@ export const interactionFixScript = String.raw`
     e.stopImmediatePropagation();
     pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;lastT=performance.now();mode=null;
     try{story.setPointerCapture(e.pointerId)}catch(err){}
-    buildOverlay();
+    /* Important: touching the photo alone does not create/swap any visual layer.
+       We wait for a few genuine horizontal pixels before the photo-book strip appears. */
+    warmState(window.__taleraPhotoBook.state());
   },{passive:true,capture:true});
 
   story.addEventListener('pointermove',e=>{
     if(e.pointerId!==pid)return;
     e.stopImmediatePropagation();
     const dx=e.clientX-startX,dy=e.clientY-startY;
-    if(!mode&&(Math.abs(dx)>5||Math.abs(dy)>5))mode=Math.abs(dx)>Math.abs(dy)*1.06?'horizontal':'vertical';
+    if(!mode&&(Math.abs(dx)>SWIPE_INTENT_PX||Math.abs(dy)>SWIPE_INTENT_PX)){
+      mode=Math.abs(dx)>Math.abs(dy)*1.08?'horizontal':'vertical';
+      if(mode==='horizontal')buildOverlay();
+    }
     if(mode==='vertical'){
       clearOverlay();
       return;
     }
-    /* Keep horizontal motion completely proportional to the finger. No direction
-       rebuilds, no easing, no delayed threshold: one pointer stream moves one strip. */
-    if(mode===null||mode==='horizontal')placePages(dx);
     if(mode!=='horizontal')return;
     e.preventDefault();
+    placePages(dx);
     lastX=e.clientX;lastT=performance.now();
   },{passive:false,capture:true});
 
@@ -247,7 +251,7 @@ export const interactionFixScript = String.raw`
     const distanceCommit=Math.abs(dx)>Math.max(72,w*.22);
     const flickCommit=Math.abs(dx)>44&&Math.abs(velocity)>.62;
     const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
-    if(mode==='horizontal'||mode===null)settle(direction,commit);else clearOverlay();
+    if(mode==='horizontal')settle(direction,commit);else clearOverlay();
     try{story.releasePointerCapture(e.pointerId)}catch(err){}
     pid=null;mode=null;
   };

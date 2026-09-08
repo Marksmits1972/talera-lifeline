@@ -9,6 +9,7 @@ import { chunk8 } from "./html/chunk8.js";
 import { chunk9 } from "./html/chunk9.js";
 import { enhancementStyle, enhancementScript } from "./enhancement.js";
 import { interactionFixStyle, interactionFixScript } from "./interaction-fixes.js";
+import { swipeHotfixScript } from "./swipe-hotfix.js";
 
 const BASE_HTML = [
   ...chunk1,
@@ -24,7 +25,7 @@ const BASE_HTML = [
 
 const HTML = BASE_HTML
   .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-immersive-photo-script">${enhancementScript}</script><script id="talera-interaction-fixes-script">${interactionFixScript}</script></body>`);
+  .replace("</body>", `<script id="talera-immersive-photo-script">${enhancementScript}</script><script id="talera-interaction-fixes-script">${interactionFixScript}</script><script id="talera-swipe-hotfix-script">${swipeHotfixScript}</script></body>`);
 
 export default {
   async fetch() {

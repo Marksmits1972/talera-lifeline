@@ -2,18 +2,24 @@ export const enhancementStyle = String.raw`
 :root{
   --active-photo:none;
   --timeline-ink:#0F2747;
-  --timeline-veil:rgba(247,250,252,.72);
+  --timeline-veil:rgba(247,250,252,.34);
 }
 
-main{ position:relative; }
-.memory-space{ background:#dfe7ec !important; }
-.photo-stage{ inset:0 !important; background:#dfe7ec !important; }
+/* One continuous photographic world: no card edges between timeline, photo and controls. */
+.app{ background:transparent !important; }
+main{ position:relative; background:transparent !important; }
+.memory-space{ background:transparent !important; overflow:hidden; }
+.photo-stage{ inset:0 !important; background:transparent !important; }
+.photo-layer{ overflow:visible !important; }
 .photo-backdrop{
-  inset:-48px !important;
-  width:calc(100% + 96px) !important;
-  height:calc(100% + 96px) !important;
-  filter:blur(34px) saturate(.92) brightness(1.04) !important;
-  opacity:.42 !important;
+  inset:-72px !important;
+  width:calc(100% + 144px) !important;
+  height:calc(100% + 144px) !important;
+  object-fit:cover !important;
+  object-position:center center !important;
+  filter:blur(28px) saturate(.96) brightness(1.02) !important;
+  opacity:.48 !important;
+  transform:scale(1.06) !important;
 }
 .example-photo{
   inset:0 !important;
@@ -24,13 +30,15 @@ main{ position:relative; }
   object-fit:cover !important;
   object-position:center center !important;
 }
+
+/* The image fades softly into its own colour field; never into a separate block. */
 .memory-space::after{
   background:linear-gradient(180deg,
-    rgba(15,39,71,.03) 0%,
-    rgba(15,39,71,0) 42%,
-    rgba(15,39,71,.06) 64%,
-    rgba(15,39,71,.28) 86%,
-    rgba(15,39,71,.42) 100%) !important;
+    rgba(15,39,71,0) 0%,
+    rgba(15,39,71,0) 52%,
+    rgba(15,39,71,.025) 67%,
+    rgba(15,39,71,.08) 82%,
+    rgba(15,39,71,.15) 100%) !important;
 }
 
 .memory-photo-air{ height:61% !important; min-height:210px !important; }
@@ -40,11 +48,11 @@ main{ position:relative; }
   color:#fff !important;
   background:linear-gradient(180deg,
     rgba(255,255,255,0) 0px,
-    rgba(255,255,255,0) 108px,
-    rgba(255,255,255,.16) 162px,
-    rgba(255,255,255,.76) 238px,
-    rgba(255,255,255,.96) 310px,
-    #fff 390px) !important;
+    rgba(255,255,255,0) 118px,
+    rgba(255,255,255,.08) 180px,
+    rgba(255,255,255,.48) 258px,
+    rgba(255,255,255,.90) 340px,
+    #fff 430px) !important;
   text-shadow:0 2px 14px rgba(8,24,44,.38);
 }
 .memory-sheet::before{ color:rgba(255,255,255,.66) !important; }
@@ -60,31 +68,38 @@ main{ position:relative; }
 .memory-story-scroll.is-reading .memory-sheet .date,
 .memory-story-scroll.is-reading .memory-sheet .story{ color:var(--talera-deep) !important; }
 
+/* Timeline floats inside the same photo colours. The blur eases out toward the sharp image. */
 .timeline{
   position:relative;
   isolation:isolate;
+  overflow:hidden;
   background:transparent !important;
-  border-color:rgba(255,255,255,.18) !important;
+  border-top:0 !important;
+  border-bottom:0 !important;
 }
 .timeline::before{
   content:"";
   position:absolute;
-  inset:-26px;
+  inset:-44px -34px -28px;
   z-index:0;
   background-image:var(--active-photo);
   background-size:cover;
   background-position:center top;
-  filter:blur(25px) saturate(.82) brightness(1.04);
-  transform:scale(1.08);
+  filter:blur(18px) saturate(.94) brightness(1.02);
+  transform:scale(1.07);
 }
 .timeline::after{
   content:"";
   position:absolute;
   inset:0;
   z-index:1;
-  background:var(--timeline-veil);
-  backdrop-filter:blur(7px);
-  -webkit-backdrop-filter:blur(7px);
+  background:linear-gradient(180deg,
+    rgba(247,250,252,.50) 0%,
+    var(--timeline-veil) 48%,
+    rgba(247,250,252,.16) 78%,
+    rgba(247,250,252,0) 100%);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
 }
 .timeline canvas{ position:relative; z-index:2; transition:filter .28s ease; }
 .center-needle{
@@ -94,40 +109,51 @@ main{ position:relative; }
 .focus{
   z-index:4 !important;
   color:var(--timeline-ink) !important;
-  background:rgba(255,255,255,.72) !important;
-  backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px);
+  background:rgba(255,255,255,.60) !important;
+  border-color:rgba(255,255,255,.34) !important;
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
 }
 
+/* Remove the visible seam between timeline and the sharp photograph. */
+.timeline + .memory-space{ margin-top:-18px !important; padding-top:18px !important; }
+.photo-stage{ top:-18px !important; }
+
+/* Bottom controls use the same image colours and fade into them, instead of sitting on a bar. */
 nav{
   position:relative;
   isolation:isolate;
   overflow:hidden;
+  margin-top:-16px;
+  padding-top:18px !important;
   background:transparent !important;
-  border-top:1px solid rgba(255,255,255,.14) !important;
+  border-top:0 !important;
   backdrop-filter:none !important;
   -webkit-backdrop-filter:none !important;
 }
 nav::before{
   content:"";
   position:absolute;
-  inset:-32px;
+  inset:-54px -34px -34px;
   z-index:0;
   background-image:var(--active-photo);
   background-size:cover;
   background-position:center bottom;
-  filter:blur(26px) saturate(.78) brightness(.72);
-  transform:scale(1.12);
+  filter:blur(20px) saturate(.92) brightness(.86);
+  transform:scale(1.08);
 }
 nav::after{
   content:"";
   position:absolute;
   inset:0;
   z-index:1;
-  background:rgba(15,39,71,.18);
+  background:linear-gradient(180deg,
+    rgba(15,39,71,0) 0%,
+    rgba(15,39,71,.05) 38%,
+    rgba(15,39,71,.16) 100%);
 }
 nav > *{ position:relative; z-index:2; }
-.nav-item{ color:rgba(255,255,255,.78) !important; text-shadow:0 1px 8px rgba(8,24,44,.28); }
+.nav-item{ color:rgba(255,255,255,.82) !important; text-shadow:0 1px 8px rgba(8,24,44,.30); }
 .nav-item.active{ color:#fff !important; }
 .tell{ background:rgba(255,255,255,.88) !important; color:var(--talera-deep) !important; box-shadow:0 7px 20px rgba(8,24,44,.20) !important; }
 
@@ -178,22 +204,22 @@ export const enhancementScript = [
   "        const lightAmount = Math.max(0, Math.min(1, contrast * .96));",
   "        const ink = mix(DEEP, LIGHT, lightAmount);",
   "        root.style.setProperty('--timeline-ink', rgb(ink));",
-  "        const veilAlpha = .46 + lum * .34;",
+  "        const veilAlpha = .18 + lum * .24;",
   "        root.style.setProperty('--timeline-veil', 'rgba(247,250,252,' + veilAlpha.toFixed(2) + ')');",
   "        if (timelineCanvas){",
-  "          const brightness = 0.72 + lightAmount * 1.35;",
-  "          const saturate = 1.08 - lightAmount * .18;",
+  "          const brightness = 0.78 + lightAmount * 1.18;",
+  "          const saturate = 1.04 - lightAmount * .12;",
   "          timelineCanvas.style.filter = 'brightness(' + brightness.toFixed(2) + ') saturate(' + saturate.toFixed(2) + ')';",
   "        }",
   "      }catch(e){",
   "        root.style.setProperty('--timeline-ink','#0F2747');",
-  "        root.style.setProperty('--timeline-veil','rgba(247,250,252,.72)');",
+  "        root.style.setProperty('--timeline-veil','rgba(247,250,252,.30)');",
   "        if (timelineCanvas) timelineCanvas.style.filter = '';",
   "      }",
   "    };",
   "    probe.onerror = () => {",
   "      root.style.setProperty('--timeline-ink','#0F2747');",
-  "      root.style.setProperty('--timeline-veil','rgba(247,250,252,.72)');",
+  "      root.style.setProperty('--timeline-veil','rgba(247,250,252,.30)');",
   "    };",
   "    probe.src = src;",
   "  }",

@@ -6,6 +6,9 @@ export const interactionFixStyle = String.raw`
   will-change:opacity!important;
 }
 .photo-layer.is-front{transform:none!important}
+/* Vertical reading stays native; horizontal touch is owned by the photo-book gesture.
+   This prevents the browser and our pointer handler from fighting over the same swipe. */
+.memory-story-scroll{touch-action:pan-y!important}
 .photo-book-overlay{
   position:absolute!important;
   inset:0!important;
@@ -122,21 +125,28 @@ export const interactionFixScript = String.raw`
   let pid=null,startX=0,startY=0,lastX=0,lastT=0,mode=null,overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'))}
-  function makePage(src){
-    const source=document.getElementById('photoLayerA')||stage.querySelector('.photo-layer');
+  function matchingBaseLayer(src){
+    const layers=Array.from(stage.querySelectorAll('.photo-layer:not(.photo-book-page)'));
+    return layers.find(layer=>{
+      const img=layer.querySelector('.example-photo');
+      return img&&img.src===src;
+    })||layers.find(layer=>parseFloat(getComputedStyle(layer).opacity)>.5)||layers[0]||null;
+  }
+  function makePage(src,useVisibleBase=false){
+    const source=(useVisibleBase&&src?matchingBaseLayer(src):null)||document.getElementById('photoLayerA')||stage.querySelector('.photo-layer');
     const page=source?source.cloneNode(true):document.createElement('div');
     page.classList.add('photo-book-page');page.classList.remove('is-front');page.style.opacity='1';stripIds(page);
     const sharp=page.querySelector('.example-photo');
     const blur=page.querySelector('.photo-aligned-blur');
     const backdrop=page.querySelector('.photo-backdrop');
     if(src){
-      if(backdrop){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src}
-      if(blur){blur.decoding='async';blur.loading='eager';blur.src=src}
+      if(backdrop&&backdrop.src!==src){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src}
+      if(blur&&blur.src!==src){blur.decoding='async';blur.loading='eager';blur.src=src}
       if(sharp){
         sharp.decoding='async';sharp.loading='eager';
         try{sharp.fetchPriority='high'}catch(e){}
-        sharp.src=src;
         const fit=()=>{const r=stage.getBoundingClientRect();fitNode(sharp,blur,r.width,r.height)};
+        if(sharp.src!==src)sharp.src=src;
         if(sharp.complete&&sharp.naturalWidth)fit();else sharp.addEventListener('load',fit,{once:true,passive:true});
       }
     }
@@ -150,7 +160,7 @@ export const interactionFixScript = String.raw`
     warmState(s);
     overlay=document.createElement('div');overlay.className='photo-book-overlay';
     previousPage=s.previous?makePage(s.previous.image):null;
-    currentPage=makePage(s.current&&s.current.image);
+    currentPage=makePage(s.current&&s.current.image,true);
     nextPage=s.next?makePage(s.next.image):null;
     if(previousPage)overlay.appendChild(previousPage);
     overlay.appendChild(currentPage);
@@ -189,8 +199,7 @@ export const interactionFixScript = String.raw`
       const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
       const targetPage=direction>0?nextPage:previousPage;
       if(!target||!targetPage){placePages(0);setTimeout(clearOverlay,300);return}
-      const finalDx=direction>0?-w:w;
-      placePages(finalDx);
+      placePages(direction>0?-w:w);
       setTimeout(async()=>{
         await warmImage(target.image);
         window.__taleraPhotoBook.step(direction);
@@ -206,6 +215,7 @@ export const interactionFixScript = String.raw`
     if(pid!==null)return;
     e.stopImmediatePropagation();
     pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;lastT=performance.now();mode=null;
+    try{story.setPointerCapture(e.pointerId)}catch(err){}
     buildOverlay();
   },{passive:true,capture:true});
 
@@ -213,15 +223,13 @@ export const interactionFixScript = String.raw`
     if(e.pointerId!==pid)return;
     e.stopImmediatePropagation();
     const dx=e.clientX-startX,dy=e.clientY-startY;
-
-    /* Direct manipulation: from the very first horizontal pixel the whole strip
-       follows the finger 1:1. We only decide whether this was horizontal or vertical
-       after a few pixels, so vertical reading still remains available. */
-    if(!mode&&(Math.abs(dx)>7||Math.abs(dy)>7))mode=Math.abs(dx)>Math.abs(dy)*1.08?'horizontal':'vertical';
+    if(!mode&&(Math.abs(dx)>5||Math.abs(dy)>5))mode=Math.abs(dx)>Math.abs(dy)*1.06?'horizontal':'vertical';
     if(mode==='vertical'){
       clearOverlay();
       return;
     }
+    /* Keep horizontal motion completely proportional to the finger. No direction
+       rebuilds, no easing, no delayed threshold: one pointer stream moves one strip. */
     if(mode===null||mode==='horizontal')placePages(dx);
     if(mode!=='horizontal')return;
     e.preventDefault();
@@ -240,6 +248,7 @@ export const interactionFixScript = String.raw`
     const flickCommit=Math.abs(dx)>44&&Math.abs(velocity)>.62;
     const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
     if(mode==='horizontal'||mode===null)settle(direction,commit);else clearOverlay();
+    try{story.releasePointerCapture(e.pointerId)}catch(err){}
     pid=null;mode=null;
   };
   story.addEventListener('pointerup',finish,{passive:true,capture:true});

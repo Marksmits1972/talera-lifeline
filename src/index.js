@@ -7,8 +7,9 @@ import { chunk6 } from "./html/chunk6.js";
 import { chunk7 } from "./html/chunk7.js";
 import { chunk8 } from "./html/chunk8.js";
 import { chunk9 } from "./html/chunk9.js";
+import { enhancementStyle, enhancementScript } from "./enhancement.js";
 
-const HTML = [
+const BASE_HTML = [
   ...chunk1,
   ...chunk2,
   ...chunk3,
@@ -19,6 +20,10 @@ const HTML = [
   ...chunk8,
   ...chunk9,
 ].join("\n");
+
+const HTML = BASE_HTML
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style></head>`)
+  .replace("</body>", `<script id="talera-immersive-photo-script">${enhancementScript}</script></body>`);
 
 export default {
   async fetch() {

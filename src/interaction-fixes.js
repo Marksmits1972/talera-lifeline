@@ -1,5 +1,5 @@
 export const interactionFixStyle = String.raw`
-/* TALERA interaction refinement — photo-book paging + calm timeline */
+/* TALERA interaction refinement — direct photo-book paging + calm timeline */
 .photo-layer{
   transform:none!important;
   transition:opacity .14s linear!important;
@@ -27,7 +27,7 @@ export const interactionFixStyle = String.raw`
   backface-visibility:hidden!important;
   -webkit-backface-visibility:hidden!important;
 }
-.photo-book-page.is-settling{transition:transform .30s cubic-bezier(.22,.72,.25,1)!important}
+.photo-book-page.is-settling{transition:transform .28s cubic-bezier(.22,.72,.25,1)!important}
 
 @media (pointer:coarse){
   .timeline.is-active:not(.touch-intent) canvas{opacity:.26!important;filter:saturate(.55) contrast(.70) brightness(.86)!important}
@@ -119,13 +119,10 @@ export const interactionFixScript = String.raw`
   function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image)})}
   warmState(window.__taleraPhotoBook.state());
 
-  const INTENT_PX=12;
-  const FLICK_MIN_PX=34;
-  const FLICK_VELOCITY=.58;
-  let pid=null,startX=0,startY=0,lastX=0,lastT=0,mode=null,direction=0,overlay=null,currentPage=null,targetPage=null,targetSrc='';
+  let pid=null,startX=0,startY=0,lastX=0,lastT=0,mode=null,overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'))}
-  function makePage(src,isCurrent){
+  function makePage(src){
     const source=document.getElementById('photoLayerA')||stage.querySelector('.photo-layer');
     const page=source?source.cloneNode(true):document.createElement('div');
     page.classList.add('photo-book-page');page.classList.remove('is-front');page.style.opacity='1';stripIds(page);
@@ -136,7 +133,7 @@ export const interactionFixScript = String.raw`
       if(backdrop){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src}
       if(blur){blur.decoding='async';blur.loading='eager';blur.src=src}
       if(sharp){
-        sharp.decoding=isCurrent?'sync':'async';sharp.loading='eager';
+        sharp.decoding='async';sharp.loading='eager';
         try{sharp.fetchPriority='high'}catch(e){}
         sharp.src=src;
         const fit=()=>{const r=stage.getBoundingClientRect();fitNode(sharp,blur,r.width,r.height)};
@@ -145,29 +142,28 @@ export const interactionFixScript = String.raw`
     }
     return page;
   }
-  function clearOverlay(){if(overlay)overlay.remove();overlay=currentPage=targetPage=null;direction=0;targetSrc=''}
-  function buildOverlay(dir){
+  function clearOverlay(){if(overlay)overlay.remove();overlay=previousPage=currentPage=nextPage=null;stateAtStart=null}
+  function buildOverlay(){
+    clearOverlay();
     const s=window.__taleraPhotoBook.state();
-    const target=dir>0?s.next:s.previous;
-    if(!target)return false;
-    clearOverlay();targetSrc=target.image;warmImage(targetSrc);
+    stateAtStart=s;
+    warmState(s);
     overlay=document.createElement('div');overlay.className='photo-book-overlay';
-    currentPage=makePage(s.current&&s.current.image,true);
-    targetPage=makePage(targetSrc,false);
-    overlay.append(currentPage,targetPage);stage.appendChild(overlay);direction=dir;
-    return true;
+    previousPage=s.previous?makePage(s.previous.image):null;
+    currentPage=makePage(s.current&&s.current.image);
+    nextPage=s.next?makePage(s.next.image):null;
+    if(previousPage)overlay.appendChild(previousPage);
+    overlay.appendChild(currentPage);
+    if(nextPage)overlay.appendChild(nextPage);
+    stage.appendChild(overlay);
+    placePages(0);
   }
-  function effectiveDx(rawDx){
-    const sign=Math.sign(rawDx)||1;
-    const amount=Math.max(0,Math.abs(rawDx)-INTENT_PX);
-    return sign*amount;
-  }
-  function placePages(rawDx){
-    if(!overlay||!currentPage||!targetPage)return;
+  function placePages(dx){
+    if(!overlay||!currentPage)return;
     const w=stage.getBoundingClientRect().width;
-    const dx=effectiveDx(rawDx);
     currentPage.style.transform='translate3d('+dx.toFixed(1)+'px,0,0)';
-    targetPage.style.transform='translate3d('+(dx+direction*w).toFixed(1)+'px,0,0)';
+    if(previousPage)previousPage.style.transform='translate3d('+(dx-w).toFixed(1)+'px,0,0)';
+    if(nextPage)nextPage.style.transform='translate3d('+(dx+w).toFixed(1)+'px,0,0)';
   }
 
   async function waitForBaseSharp(src){
@@ -180,27 +176,28 @@ export const interactionFixScript = String.raw`
     fitNow(base);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }
 
-  function settle(commit){
-    if(!overlay||!currentPage||!targetPage){clearOverlay();return}
+  function settle(direction,commit){
+    if(!overlay||!currentPage){clearOverlay();return}
     const w=stage.getBoundingClientRect().width;
-    currentPage.classList.add('is-settling');targetPage.classList.add('is-settling');
+    [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>p.classList.add('is-settling'));
     requestAnimationFrame(()=>{
-      if(commit){
-        const committedSrc=targetSrc;
-        currentPage.style.transform='translate3d('+(-direction*w)+'px,0,0)';
-        targetPage.style.transform='translate3d(0,0,0)';
-        setTimeout(async()=>{
-          await warmImage(committedSrc);
-          window.__taleraPhotoBook.step(direction);
-          await waitForBaseSharp(committedSrc);
-          warmState(window.__taleraPhotoBook.state());
-          clearOverlay();
-        },270);
-      }else{
-        currentPage.style.transform='translate3d(0,0,0)';
-        targetPage.style.transform='translate3d('+(direction*w)+'px,0,0)';
-        setTimeout(clearOverlay,320);
+      if(!commit){
+        placePages(0);
+        setTimeout(clearOverlay,300);
+        return;
       }
+      const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
+      const targetPage=direction>0?nextPage:previousPage;
+      if(!target||!targetPage){placePages(0);setTimeout(clearOverlay,300);return}
+      const finalDx=direction>0?-w:w;
+      placePages(finalDx);
+      setTimeout(async()=>{
+        await warmImage(target.image);
+        window.__taleraPhotoBook.step(direction);
+        await waitForBaseSharp(target.image);
+        warmState(window.__taleraPhotoBook.state());
+        clearOverlay();
+      },250);
     });
   }
 
@@ -208,32 +205,41 @@ export const interactionFixScript = String.raw`
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(pid!==null)return;
     e.stopImmediatePropagation();
-    pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;lastT=performance.now();mode=null;direction=0;
-    warmState(window.__taleraPhotoBook.state());
+    pid=e.pointerId;startX=lastX=e.clientX;startY=e.clientY;lastT=performance.now();mode=null;
+    buildOverlay();
   },{passive:true,capture:true});
 
   story.addEventListener('pointermove',e=>{
     if(e.pointerId!==pid)return;
     e.stopImmediatePropagation();
     const dx=e.clientX-startX,dy=e.clientY-startY;
-    if(!mode&&(Math.abs(dx)>INTENT_PX||Math.abs(dy)>INTENT_PX))mode=Math.abs(dx)>Math.abs(dy)*1.12?'horizontal':'vertical';
+
+    /* Direct manipulation: from the very first horizontal pixel the whole strip
+       follows the finger 1:1. We only decide whether this was horizontal or vertical
+       after a few pixels, so vertical reading still remains available. */
+    if(!mode&&(Math.abs(dx)>7||Math.abs(dy)>7))mode=Math.abs(dx)>Math.abs(dy)*1.08?'horizontal':'vertical';
+    if(mode==='vertical'){
+      clearOverlay();
+      return;
+    }
+    if(mode===null||mode==='horizontal')placePages(dx);
     if(mode!=='horizontal')return;
     e.preventDefault();
-    const dir=dx<0?1:-1;
-    if(!overlay||dir!==direction){if(!buildOverlay(dir))return}
-    lastX=e.clientX;lastT=performance.now();placePages(dx);
+    lastX=e.clientX;lastT=performance.now();
   },{passive:false,capture:true});
 
   const finish=e=>{
     if(e.pointerId!==pid)return;
     e.stopImmediatePropagation();
-    const now=performance.now(),rawDx=e.clientX-startX,dragDx=effectiveDx(rawDx);
+    const now=performance.now(),dx=e.clientX-startX;
     const dt=Math.max(16,now-lastT),velocity=(e.clientX-lastX)/dt;
     const w=stage.getBoundingClientRect().width;
-    const distanceCommit=Math.abs(dragDx)>Math.max(64,w*.20);
-    const flickCommit=Math.abs(rawDx)>=FLICK_MIN_PX&&Math.abs(velocity)>FLICK_VELOCITY;
-    const commit=mode==='horizontal'&&overlay&&(distanceCommit||flickCommit);
-    if(mode==='horizontal')settle(commit);else clearOverlay();
+    const direction=dx<0?1:-1;
+    const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
+    const distanceCommit=Math.abs(dx)>Math.max(72,w*.22);
+    const flickCommit=Math.abs(dx)>44&&Math.abs(velocity)>.62;
+    const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
+    if(mode==='horizontal'||mode===null)settle(direction,commit);else clearOverlay();
     pid=null;mode=null;
   };
   story.addEventListener('pointerup',finish,{passive:true,capture:true});

@@ -3,9 +3,10 @@ export const enhancementStyle = String.raw`
    TALERA — PRESENTATION SCREEN REFERENCE MARKER / 2026-09-08
    Refined photo treatment:
    - same-photo colour fill behind every memory
-   - contained photo is allowed a small adaptive enlargement on landscape images
-   - contain edges feather into the backdrop, but over a shorter distance
-   - timeline blur remains soft but no longer reaches as far down the screen
+   - every sharp photo gets a minimum visual height in the presentation
+   - wide photos are enlarged only as much as needed to reach that height
+   - top/bottom photo edges feather into the same-photo blurred backdrop
+   - timeline blur remains compact and soft
    - V16 timeline behaviour, swipe and vertical story movement stay unchanged
    ========================================================= */
 
@@ -23,11 +24,11 @@ main{position:absolute!important;inset:0!important;width:100%!important;height:1
 .photo-layer{position:absolute!important;inset:0!important;opacity:0;transform:translate3d(4%,0,0) scale(1.01);transition:opacity .30s ease,transform .38s cubic-bezier(.22,.72,.25,1)!important;will-change:opacity,transform}
 .photo-layer.is-front{opacity:1;transform:translate3d(0,0,0) scale(1)}
 .photo-backdrop{display:block!important;position:absolute!important;inset:-64px!important;width:calc(100% + 128px)!important;height:calc(100% + 128px)!important;object-fit:cover!important;object-position:center center!important;filter:blur(36px) saturate(1.04) brightness(.98)!important;opacity:.90!important;transform:scale(1.13)!important}
-.example-photo{position:absolute!important;z-index:2!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;display:block!important;object-fit:contain!important;object-position:center center!important;filter:none!important;opacity:1!important;background:transparent!important;-webkit-mask-repeat:no-repeat!important;mask-repeat:no-repeat!important;-webkit-mask-size:100% 100%!important;mask-size:100% 100%!important;transform-origin:center center!important;will-change:transform,-webkit-mask-image,mask-image}
+.example-photo{position:absolute!important;z-index:2!important;max-width:none!important;display:block!important;object-fit:fill!important;object-position:center center!important;filter:none!important;opacity:1!important;background:transparent!important;-webkit-mask-repeat:no-repeat!important;mask-repeat:no-repeat!important;-webkit-mask-size:100% 100%!important;mask-size:100% 100%!important;transform:none!important;will-change:left,top,width,height,-webkit-mask-image,mask-image}
 .memory-space::before,.memory-space::after{display:none!important;content:none!important}
 
 .timeline{position:absolute!important;z-index:20!important;left:0!important;right:0!important;top:0!important;width:100%!important;height:clamp(148px,20dvh,176px)!important;min-height:148px!important;overflow:visible!important;isolation:isolate!important;background:transparent!important;border:0!important;box-shadow:none!important;touch-action:none!important;user-select:none!important}
-.timeline::before{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 76px)!important;z-index:0!important;pointer-events:none!important;background:transparent!important;backdrop-filter:blur(17px) saturate(1.03)!important;-webkit-backdrop-filter:blur(17px) saturate(1.03)!important;-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 38%,rgba(0,0,0,.94) 52%,rgba(0,0,0,.74) 66%,rgba(0,0,0,.46) 78%,rgba(0,0,0,.20) 90%,transparent 100%)!important;mask-image:linear-gradient(to bottom,#000 0%,#000 38%,rgba(0,0,0,.94) 52%,rgba(0,0,0,.74) 66%,rgba(0,0,0,.46) 78%,rgba(0,0,0,.20) 90%,transparent 100%)!important}
+.timeline::before{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 68px)!important;z-index:0!important;pointer-events:none!important;background:transparent!important;backdrop-filter:blur(17px) saturate(1.03)!important;-webkit-backdrop-filter:blur(17px) saturate(1.03)!important;-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 40%,rgba(0,0,0,.92) 54%,rgba(0,0,0,.70) 68%,rgba(0,0,0,.42) 80%,rgba(0,0,0,.18) 91%,transparent 100%)!important;mask-image:linear-gradient(to bottom,#000 0%,#000 40%,rgba(0,0,0,.92) 54%,rgba(0,0,0,.70) 68%,rgba(0,0,0,.42) 80%,rgba(0,0,0,.18) 91%,transparent 100%)!important}
 .timeline::after{display:none!important;content:none!important}.timeline canvas{position:relative!important;z-index:2!important;opacity:1!important;filter:none!important}
 .center-needle{z-index:3!important;width:1.5px!important;height:54%!important;max-height:86px!important;min-height:58px!important;top:24%!important}.center-needle::before{transform:scale(.82)!important;transform-origin:center!important}.focus{z-index:4!important}.zoom-hint{z-index:5!important}.debug-panel{z-index:20!important}
 
@@ -42,45 +43,51 @@ export const enhancementScript = String.raw`
 (() => {
   const story = document.getElementById('memoryStoryScroll');
   const surface = document.getElementById('surface');
+  const stage = document.getElementById('photoStage');
   const photos = Array.from(document.querySelectorAll('.example-photo'));
 
-  function featherPhoto(img){
-    if(!img || !img.naturalWidth || !img.naturalHeight) return;
-    const rect = img.getBoundingClientRect();
-    const boxW = rect.width;
-    const boxH = rect.height;
+  function fitPhoto(img){
+    if(!img || !stage || !img.naturalWidth || !img.naturalHeight) return;
+    const stageRect = stage.getBoundingClientRect();
+    const boxW = stageRect.width;
+    const boxH = stageRect.height;
     if(!boxW || !boxH) return;
 
-    const baseScale = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight);
-    const baseRenderedW = img.naturalWidth * baseScale;
-    const baseRenderedH = img.naturalHeight * baseScale;
-    const baseGapY = Math.max(0,(boxH-baseRenderedH)/2);
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const containScale = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight);
+    const containW = img.naturalWidth * containScale;
+    const containH = img.naturalHeight * containScale;
 
-    /* Landscape photos previously left a very large blurred letterbox. Allow a
-       modest adaptive enlargement (max 22%) so more real photo is visible while
-       still preserving almost all of the original composition. */
-    const gapRatio = baseGapY / boxH;
-    const zoom = baseGapY > 4 ? Math.min(1.22,1 + gapRatio * .72) : 1;
-    img.style.transform = zoom > 1.001 ? 'scale(' + zoom.toFixed(4) + ')' : 'none';
+    /* Product rule: the recognisable, sharp photo must own a consistent minimum
+       amount of the first screen. Wide photos are enlarged until they reach it;
+       tall photos that already exceed it are left untouched. */
+    const minVisibleHeight = boxH * 0.64;
+    const targetH = Math.min(boxH, Math.max(containH, minVisibleHeight));
+    const maxZoomFromContain = 1.72;
+    const wantedZoom = targetH / containH;
+    const zoom = Math.min(maxZoomFromContain, Math.max(1, wantedZoom));
 
-    const renderedW = baseRenderedW * zoom;
-    const renderedH = baseRenderedH * zoom;
-    const top = Math.max(0,(boxH-renderedH)/2);
-    const bottom = Math.min(boxH,top+renderedH);
-    const verticalGap = top;
+    const renderedH = containH * zoom;
+    const renderedW = containW * zoom;
+    const left = (boxW - renderedW) / 2;
+    const top = (boxH - renderedH) / 2;
 
-    if(verticalGap > 2){
-      /* Shorter feather: enough to kill the hard edge, but it hands the image
-         back to full sharpness sooner than the previous 72–132px transition. */
-      const feather = Math.min(84,Math.max(46,renderedH * .075));
-      const topOpaque = Math.min(bottom,top+feather);
-      const bottomOpaque = Math.max(top,bottom-feather);
+    img.style.inset = 'auto';
+    img.style.width = renderedW.toFixed(1) + 'px';
+    img.style.height = renderedH.toFixed(1) + 'px';
+    img.style.left = left.toFixed(1) + 'px';
+    img.style.top = top.toFixed(1) + 'px';
+    img.style.transform = 'none';
+
+    /* Feather belongs to the actual photo bounds, not to the full viewport.
+       This removes hard horizontal edges without creating a giant blurred zone. */
+    const hasVerticalGap = renderedH < boxH - 4;
+    if(hasVerticalGap){
+      const feather = Math.min(68, Math.max(42, renderedH * 0.065));
       const mask = 'linear-gradient(to bottom,' +
         'transparent 0px,' +
-        'transparent ' + top.toFixed(1) + 'px,' +
-        '#000 ' + topOpaque.toFixed(1) + 'px,' +
-        '#000 ' + bottomOpaque.toFixed(1) + 'px,' +
-        'transparent ' + bottom.toFixed(1) + 'px,' +
+        '#000 ' + feather.toFixed(1) + 'px,' +
+        '#000 calc(100% - ' + feather.toFixed(1) + 'px),' +
         'transparent 100%)';
       img.style.webkitMaskImage = mask;
       img.style.maskImage = mask;
@@ -90,14 +97,14 @@ export const enhancementScript = String.raw`
     }
   }
 
-  function featherAll(){requestAnimationFrame(()=>photos.forEach(featherPhoto));}
+  function fitAll(){requestAnimationFrame(()=>photos.forEach(fitPhoto));}
   photos.forEach((img)=>{
-    if(img.complete) featherPhoto(img);
-    img.addEventListener('load',()=>featherPhoto(img),{passive:true});
-    new MutationObserver(()=>{if(img.complete)requestAnimationFrame(()=>featherPhoto(img));}).observe(img,{attributes:true,attributeFilter:['src']});
+    if(img.complete) fitPhoto(img);
+    img.addEventListener('load',()=>fitPhoto(img),{passive:true});
+    new MutationObserver(()=>{if(img.complete)requestAnimationFrame(()=>fitPhoto(img));}).observe(img,{attributes:true,attributeFilter:['src']});
   });
-  window.addEventListener('resize',featherAll,{passive:true});
-  if(window.ResizeObserver){const ro=new ResizeObserver(featherAll);const stage=document.getElementById('photoStage');if(stage)ro.observe(stage);}
+  window.addEventListener('resize',fitAll,{passive:true});
+  if(window.ResizeObserver && stage){const ro=new ResizeObserver(fitAll);ro.observe(stage);}
 
   if(!story || !surface) return;
   let pointerId=null,startX=0,startY=0,lastX=0,mode=null;

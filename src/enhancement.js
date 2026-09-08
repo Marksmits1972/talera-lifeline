@@ -1,12 +1,13 @@
 export const enhancementStyle = String.raw`
 /* =========================================================
    TALERA — PRESENTATION SCREEN REFERENCE MARKER / 2026-09-08
-   Refined photo treatment:
-   - same-photo colour fill behind every memory
-   - every sharp photo gets a minimum visual height in the presentation
-   - wide photos are enlarged only as much as needed to reach that height
-   - top/bottom photo edges feather into the same-photo blurred backdrop
-   - timeline blur remains compact and soft
+   Unified photo treatment:
+   - one low-strength full-screen atmosphere for colour continuity
+   - one blur layer with EXACTLY the same geometry as the sharp photo
+   - sharp photo keeps a consistent minimum visual height
+   - wide photos enlarge only as much as needed
+   - feather is longer and gentler, blur itself is weaker
+   - timeline blur is lighter and hands the image back sooner
    - V16 timeline behaviour, swipe and vertical story movement stay unchanged
    ========================================================= */
 
@@ -21,14 +22,22 @@ html,body{margin:0!important;width:100%!important;height:100%!important;overflow
 main{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;overflow:hidden!important;display:block!important;background:var(--talera-neutral)!important}
 .memory-space{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;background:var(--talera-neutral)!important;box-shadow:none!important}
 .photo-stage{position:absolute!important;inset:0!important;z-index:1!important;overflow:hidden!important;background:var(--talera-neutral)!important}
-.photo-layer{position:absolute!important;inset:0!important;opacity:0;transform:translate3d(4%,0,0) scale(1.01);transition:opacity .30s ease,transform .38s cubic-bezier(.22,.72,.25,1)!important;will-change:opacity,transform}
+.photo-layer{position:absolute!important;inset:0!important;opacity:0;transform:translate3d(4%,0,0) scale(1.01);transition:opacity .30s ease,transform .38s cubic-bezier(.22,.72,.25,1)!important;will-change:opacity,transform;overflow:hidden!important}
 .photo-layer.is-front{opacity:1;transform:translate3d(0,0,0) scale(1)}
-.photo-backdrop{display:block!important;position:absolute!important;inset:-64px!important;width:calc(100% + 128px)!important;height:calc(100% + 128px)!important;object-fit:cover!important;object-position:center center!important;filter:blur(36px) saturate(1.04) brightness(.98)!important;opacity:.90!important;transform:scale(1.13)!important}
+
+/* Ambient colour only. This is deliberately much softer than before and is
+   NOT the layer the sharp photo feathers into. */
+.photo-backdrop{display:block!important;position:absolute!important;inset:-64px!important;width:calc(100% + 128px)!important;height:calc(100% + 128px)!important;object-fit:cover!important;object-position:center center!important;filter:blur(42px) saturate(.96) brightness(1.01)!important;opacity:.46!important;transform:scale(1.12)!important}
+
+/* Dynamically inserted by JS. This blur uses the exact same left/top/width/
+   height as the sharp photo so objects cannot jump during the transition. */
+.photo-aligned-blur{position:absolute!important;z-index:1!important;max-width:none!important;display:block!important;object-fit:fill!important;object-position:center center!important;filter:blur(18px) saturate(1.01)!important;opacity:.96!important;transform:none!important;pointer-events:none!important;will-change:left,top,width,height!important}
+
 .example-photo{position:absolute!important;z-index:2!important;max-width:none!important;display:block!important;object-fit:fill!important;object-position:center center!important;filter:none!important;opacity:1!important;background:transparent!important;-webkit-mask-repeat:no-repeat!important;mask-repeat:no-repeat!important;-webkit-mask-size:100% 100%!important;mask-size:100% 100%!important;transform:none!important;will-change:left,top,width,height,-webkit-mask-image,mask-image}
 .memory-space::before,.memory-space::after{display:none!important;content:none!important}
 
 .timeline{position:absolute!important;z-index:20!important;left:0!important;right:0!important;top:0!important;width:100%!important;height:clamp(148px,20dvh,176px)!important;min-height:148px!important;overflow:visible!important;isolation:isolate!important;background:transparent!important;border:0!important;box-shadow:none!important;touch-action:none!important;user-select:none!important}
-.timeline::before{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 68px)!important;z-index:0!important;pointer-events:none!important;background:transparent!important;backdrop-filter:blur(17px) saturate(1.03)!important;-webkit-backdrop-filter:blur(17px) saturate(1.03)!important;-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 40%,rgba(0,0,0,.92) 54%,rgba(0,0,0,.70) 68%,rgba(0,0,0,.42) 80%,rgba(0,0,0,.18) 91%,transparent 100%)!important;mask-image:linear-gradient(to bottom,#000 0%,#000 40%,rgba(0,0,0,.92) 54%,rgba(0,0,0,.70) 68%,rgba(0,0,0,.42) 80%,rgba(0,0,0,.18) 91%,transparent 100%)!important}
+.timeline::before{content:""!important;display:block!important;position:absolute!important;left:0!important;right:0!important;top:0!important;height:calc(100% + 54px)!important;z-index:0!important;pointer-events:none!important;background:transparent!important;backdrop-filter:blur(13px) saturate(1.02)!important;-webkit-backdrop-filter:blur(13px) saturate(1.02)!important;-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 42%,rgba(0,0,0,.88) 56%,rgba(0,0,0,.64) 70%,rgba(0,0,0,.38) 82%,rgba(0,0,0,.16) 92%,transparent 100%)!important;mask-image:linear-gradient(to bottom,#000 0%,#000 42%,rgba(0,0,0,.88) 56%,rgba(0,0,0,.64) 70%,rgba(0,0,0,.38) 82%,rgba(0,0,0,.16) 92%,transparent 100%)!important}
 .timeline::after{display:none!important;content:none!important}.timeline canvas{position:relative!important;z-index:2!important;opacity:1!important;filter:none!important}
 .center-needle{z-index:3!important;width:1.5px!important;height:54%!important;max-height:86px!important;min-height:58px!important;top:24%!important}.center-needle::before{transform:scale(.82)!important;transform-origin:center!important}.focus{z-index:4!important}.zoom-hint{z-index:5!important}.debug-panel{z-index:20!important}
 
@@ -46,48 +55,68 @@ export const enhancementScript = String.raw`
   const stage = document.getElementById('photoStage');
   const photos = Array.from(document.querySelectorAll('.example-photo'));
 
+  function ensureAlignedBlur(img){
+    const layer = img && img.closest('.photo-layer');
+    if(!layer) return null;
+    let blur = layer.querySelector('.photo-aligned-blur');
+    if(!blur){
+      blur = document.createElement('img');
+      blur.className = 'photo-aligned-blur';
+      blur.alt = '';
+      blur.setAttribute('aria-hidden','true');
+      layer.insertBefore(blur,img);
+    }
+    if(blur.src !== img.src) blur.src = img.src;
+    return blur;
+  }
+
   function fitPhoto(img){
     if(!img || !stage || !img.naturalWidth || !img.naturalHeight) return;
+    const blur = ensureAlignedBlur(img);
     const stageRect = stage.getBoundingClientRect();
     const boxW = stageRect.width;
     const boxH = stageRect.height;
     if(!boxW || !boxH) return;
 
-    const aspect = img.naturalWidth / img.naturalHeight;
     const containScale = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight);
     const containW = img.naturalWidth * containScale;
     const containH = img.naturalHeight * containScale;
 
-    /* Product rule: the recognisable, sharp photo must own a consistent minimum
-       amount of the first screen. Wide photos are enlarged until they reach it;
-       tall photos that already exceed it are left untouched. */
-    const minVisibleHeight = boxH * 0.64;
-    const targetH = Math.min(boxH, Math.max(containH, minVisibleHeight));
-    const maxZoomFromContain = 1.72;
+    /* Give the real photo slightly more authority than before. */
+    const minVisibleHeight = boxH * 0.68;
+    const targetH = Math.min(boxH,Math.max(containH,minVisibleHeight));
+    const maxZoomFromContain = 1.82;
     const wantedZoom = targetH / containH;
-    const zoom = Math.min(maxZoomFromContain, Math.max(1, wantedZoom));
+    const zoom = Math.min(maxZoomFromContain,Math.max(1,wantedZoom));
 
     const renderedH = containH * zoom;
     const renderedW = containW * zoom;
-    const left = (boxW - renderedW) / 2;
-    const top = (boxH - renderedH) / 2;
+    const left = (boxW-renderedW)/2;
+    const top = (boxH-renderedH)/2;
 
-    img.style.inset = 'auto';
-    img.style.width = renderedW.toFixed(1) + 'px';
-    img.style.height = renderedH.toFixed(1) + 'px';
-    img.style.left = left.toFixed(1) + 'px';
-    img.style.top = top.toFixed(1) + 'px';
-    img.style.transform = 'none';
+    [img,blur].forEach((node)=>{
+      if(!node) return;
+      node.style.inset = 'auto';
+      node.style.width = renderedW.toFixed(1) + 'px';
+      node.style.height = renderedH.toFixed(1) + 'px';
+      node.style.left = left.toFixed(1) + 'px';
+      node.style.top = top.toFixed(1) + 'px';
+      node.style.transform = 'none';
+    });
 
-    /* Feather belongs to the actual photo bounds, not to the full viewport.
-       This removes hard horizontal edges without creating a giant blurred zone. */
+    /* Less blur, but a slower visual hand-off. The blur and sharp image are now
+       geometrically identical, so this feather can be longer without ghosting. */
     const hasVerticalGap = renderedH < boxH - 4;
     if(hasVerticalGap){
-      const feather = Math.min(68, Math.max(42, renderedH * 0.065));
+      const feather = Math.min(104,Math.max(72,renderedH * 0.095));
       const mask = 'linear-gradient(to bottom,' +
         'transparent 0px,' +
+        'rgba(0,0,0,.18) ' + (feather*.28).toFixed(1) + 'px,' +
+        'rgba(0,0,0,.62) ' + (feather*.68).toFixed(1) + 'px,' +
         '#000 ' + feather.toFixed(1) + 'px,' +
         '#000 calc(100% - ' + feather.toFixed(1) + 'px),' +
+        'rgba(0,0,0,.62) calc(100% - ' + (feather*.68).toFixed(1) + 'px),' +
+        'rgba(0,0,0,.18) calc(100% - ' + (feather*.28).toFixed(1) + 'px),' +
         'transparent 100%)';
       img.style.webkitMaskImage = mask;
       img.style.maskImage = mask;

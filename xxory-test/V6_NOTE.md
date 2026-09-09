@@ -1,0 +1,1 @@
+ORB v6 isolates the light-inside-the-orb experiment. V5 remains available via ?orbLab=5. V6 is served via ?orbLab=6. The ordinary vertel flow is unchanged.

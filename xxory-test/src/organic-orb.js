@@ -243,10 +243,10 @@ export const organicOrbScript = String.raw`
     var core=decorate();
     var awake=Math.max(0,Math.min(1,rootNumber('--awake',0)));
     var rawVoice=Math.max(0,Math.min(1,rootNumber('--voice',0)));
-    var voiceEase=rawVoice>runtime.voice?.12:.045;
+    var voiceEase=rawVoice>runtime.voice?0.12:0.045;
     runtime.voice+=(rawVoice-runtime.voice)*voiceEase;
     var target=1+(awake*.15)+(runtime.voice*.018);
-    var scaleEase=target>runtime.scale?.10:.035;
+    var scaleEase=target>runtime.scale?0.10:0.035;
     runtime.scale+=(target-runtime.scale)*scaleEase;
     document.documentElement.style.setProperty('--orb-voice',runtime.voice.toFixed(3));
     document.documentElement.style.setProperty('--orb-scale',runtime.scale.toFixed(4));

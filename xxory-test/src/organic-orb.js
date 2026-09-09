@@ -3,6 +3,12 @@ export const organicOrbStyle = String.raw`
 :root{
   --orb-voice:0;
   --orb-scale:1;
+  --orb-flow-back-opacity:.50;
+  --orb-flow-mid-opacity:.39;
+  --orb-flow-front-opacity:.26;
+  --orb-light-opacity:.68;
+  --orb-saturation:1.01;
+  --orb-brightness:1;
 }
 .core-wrap{
   width:min(62vw,268px)!important;
@@ -93,7 +99,7 @@ export const organicOrbStyle = String.raw`
 }
 .orb-flow-back{
   z-index:2;
-  opacity:calc(.50 + var(--orb-voice) * .07);
+  opacity:var(--orb-flow-back-opacity);
   background:
     radial-gradient(ellipse at 28% 35%,rgba(255,255,255,.72) 0 8%,rgba(239,248,255,.38) 18%,transparent 40%),
     radial-gradient(ellipse at 69% 62%,rgba(47,112,164,.28) 0 13%,rgba(97,161,207,.14) 29%,transparent 49%),
@@ -103,7 +109,7 @@ export const organicOrbStyle = String.raw`
 }
 .orb-flow-mid{
   z-index:3;
-  opacity:calc(.39 + var(--orb-voice) * .09);
+  opacity:var(--orb-flow-mid-opacity);
   background:
     conic-gradient(from 212deg at 48% 51%,transparent 0 12%,rgba(255,255,255,.33) 18%,transparent 28%,rgba(60,128,180,.24) 42%,transparent 55%,rgba(235,247,255,.27) 68%,transparent 82%),
     radial-gradient(ellipse at 62% 33%,rgba(255,255,255,.30),transparent 34%);
@@ -113,7 +119,7 @@ export const organicOrbStyle = String.raw`
 }
 .orb-flow-front{
   z-index:4;
-  opacity:calc(.26 + var(--orb-voice) * .08);
+  opacity:var(--orb-flow-front-opacity);
   background:
     radial-gradient(ellipse at 38% 66%,rgba(247,252,255,.48) 0 6%,rgba(230,243,253,.20) 21%,transparent 40%),
     radial-gradient(ellipse at 72% 42%,rgba(56,123,175,.18) 0 11%,transparent 34%),
@@ -132,7 +138,7 @@ export const organicOrbStyle = String.raw`
   border-radius:50%;
   background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.72) 0 7%,rgba(245,251,255,.38) 18%,rgba(222,239,252,.14) 36%,transparent 58%);
   filter:blur(8px);
-  opacity:calc(.68 + var(--orb-voice) * .10);
+  opacity:var(--orb-light-opacity);
   mix-blend-mode:screen;
   animation:orbLightDrift 16.5s ease-in-out infinite alternate;
   pointer-events:none;
@@ -151,7 +157,7 @@ export const organicOrbStyle = String.raw`
   animation:orbGrainDrift 17s linear infinite alternate;
 }
 .core.listening .orb-body{
-  filter:saturate(calc(1.01 + var(--orb-voice) * .11)) brightness(calc(1.00 + var(--orb-voice) * .035));
+  filter:saturate(var(--orb-saturation)) brightness(var(--orb-brightness));
 }
 .stage.has-photo .core-wrap .halo{
   opacity:.82!important;
@@ -244,6 +250,12 @@ export const organicOrbScript = String.raw`
     runtime.scale+=(target-runtime.scale)*scaleEase;
     document.documentElement.style.setProperty('--orb-voice',runtime.voice.toFixed(3));
     document.documentElement.style.setProperty('--orb-scale',runtime.scale.toFixed(4));
+    document.documentElement.style.setProperty('--orb-flow-back-opacity',(.50+runtime.voice*.07).toFixed(3));
+    document.documentElement.style.setProperty('--orb-flow-mid-opacity',(.39+runtime.voice*.09).toFixed(3));
+    document.documentElement.style.setProperty('--orb-flow-front-opacity',(.26+runtime.voice*.08).toFixed(3));
+    document.documentElement.style.setProperty('--orb-light-opacity',(.68+runtime.voice*.10).toFixed(3));
+    document.documentElement.style.setProperty('--orb-saturation',(1.01+runtime.voice*.11).toFixed(3));
+    document.documentElement.style.setProperty('--orb-brightness',(1+runtime.voice*.035).toFixed(3));
     tuneAnimationRate(core,1+(runtime.voice*.35));
     runtime.raf=requestAnimationFrame(frame);
   }

@@ -1,0 +1,1 @@
+V8 keeps the existing vertel flow intact and replaces only the old visual .core with the organic WebGL ORB. Lab versions remain available via ?orbLab=N. The app ORB reads existing --awake and --voice state, breathes subtly in rest, grows/reacts during speech, and uses a mathematically closed 30-second loop.

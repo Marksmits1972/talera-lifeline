@@ -1,0 +1,1 @@
+ORB v2 lab: standalone Canvas experiment. Normal TALERA vertel-flow must pass through unchanged. The lab is only shown with ?orbLab=2. Goals: irregular living contour, internal cloud/water flow, drifting light, subtle atmosphere/halo, slow breathing, and a smoothed 15% speaking expansion. No CSS/SVG overlay on the production orb until the visual lab is approved.

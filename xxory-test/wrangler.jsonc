@@ -1,6 +1,6 @@
 {
   "name": "xxory-test",
-  "main": "src/orb-webgl-v7-worker.js",
+  "main": "src/orb-app-v8-worker.js",
   "compatibility_date": "2026-09-08",
 
   "d1_databases": [

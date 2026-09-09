@@ -1,229 +1,269 @@
 import baseWorker from "./worker.js";
 
-const ORB_STYLE = String.raw`
-/* TALERA ORB V1 — isolated organic visual layer, 2026-09-09 */
-:root{
-  --orb-shell:#7fb4d5;
-  --orb-deep:#4f8fbc;
-  --orb-milk:#edf7fd;
-}
-.core-wrap{
-  isolation:isolate;
-  perspective:600px;
-}
-.halo{
-  width:116%!important;
-  height:116%!important;
-  border-radius:50%!important;
-  background:radial-gradient(circle,
-    rgba(218,236,248,.52) 0%,
-    rgba(184,216,237,.24) 42%,
-    rgba(167,206,232,.10) 61%,
-    transparent 76%)!important;
-  filter:blur(10px)!important;
-  opacity:.68!important;
-  animation:orbHaloBreath 9.6s ease-in-out infinite!important;
-  transform-origin:center;
-}
-.core,.core.active{
-  width:78%!important;
-  height:78%!important;
-  overflow:hidden!important;
-  isolation:isolate;
-  border-radius:49% 51% 47% 53% / 52% 47% 53% 48%!important;
-  background:
-    radial-gradient(ellipse at 34% 31%,rgba(255,255,255,.66) 0 10%,rgba(247,252,255,.28) 24%,transparent 44%),
-    radial-gradient(ellipse at 67% 70%,rgba(57,123,171,.28),transparent 49%),
-    radial-gradient(ellipse at 42% 74%,rgba(224,241,251,.35),transparent 44%),
-    linear-gradient(145deg,#eaf5fc 0%,#beddef 39%,#86b9d8 68%,#5b98c3 100%)!important;
-  box-shadow:
-    0 24px 58px rgba(40,91,130,.13),
-    inset -18px -22px 38px rgba(37,92,133,.13),
-    inset 14px 12px 28px rgba(255,255,255,.28)!important;
-  transform:scale(calc(1 + var(--awake)*.12 + var(--voice)*.03))!important;
-  scale:1;
-  transition:transform .52s cubic-bezier(.2,.72,.2,1),filter .5s ease!important;
-  animation:orbBreath 8.4s ease-in-out infinite,orbMorph 13.7s ease-in-out infinite!important;
-  filter:saturate(calc(1 + var(--voice)*.07)) brightness(calc(1 + var(--voice)*.025))!important;
-  will-change:transform,border-radius,filter;
-}
-.core.listening{
-  animation-duration:6.8s,11.8s!important;
-}
-.core::before,.core::after{display:none!important}
-.orb-layer{position:absolute;pointer-events:none;will-change:transform,opacity;transform-origin:center}
-.orb-flow-a{
-  inset:-23%;z-index:1;border-radius:43% 57% 52% 48% / 55% 45% 58% 42%;
-  background:
-    radial-gradient(ellipse at 28% 36%,rgba(255,255,255,.46) 0 12%,rgba(230,244,253,.22) 23%,transparent 43%),
-    radial-gradient(ellipse at 63% 30%,rgba(224,241,252,.30) 0 14%,transparent 39%),
-    radial-gradient(ellipse at 65% 72%,rgba(61,127,176,.24) 0 15%,transparent 44%),
-    conic-gradient(from 35deg at 53% 50%,transparent 0 18%,rgba(255,255,255,.18) 26%,transparent 39% 58%,rgba(75,144,190,.18) 69%,transparent 82%);
-  filter:blur(9px);
-  opacity:calc(.72 + var(--voice)*.08);
-  mix-blend-mode:soft-light;
-  animation:orbFlowA 16.8s ease-in-out infinite alternate;
-}
-.orb-flow-b{
-  inset:-18%;z-index:2;border-radius:56% 44% 46% 54% / 48% 58% 42% 52%;
-  background:
-    radial-gradient(ellipse at 39% 63%,rgba(244,251,255,.48) 0 11%,rgba(226,242,251,.18) 25%,transparent 43%),
-    radial-gradient(ellipse at 71% 54%,rgba(48,113,164,.25) 0 12%,transparent 40%),
-    radial-gradient(ellipse at 52% 22%,rgba(255,255,255,.26) 0 10%,transparent 36%),
-    conic-gradient(from 210deg at 48% 54%,transparent 0 21%,rgba(255,255,255,.16) 31%,transparent 47% 66%,rgba(55,125,174,.16) 76%,transparent 91%);
-  filter:blur(11px);
-  opacity:calc(.66 + var(--voice)*.09);
-  mix-blend-mode:screen;
-  animation:orbFlowB 21.4s ease-in-out infinite alternate;
-}
-.orb-light{
-  z-index:3;width:72%;height:64%;left:4%;top:3%;border-radius:50%;
-  background:radial-gradient(ellipse,rgba(255,255,255,.66) 0%,rgba(245,252,255,.30) 28%,rgba(224,241,251,.10) 52%,transparent 72%);
-  filter:blur(12px);
-  opacity:calc(.58 + var(--voice)*.13);
-  mix-blend-mode:screen;
-  animation:orbLightDrift 14.6s ease-in-out infinite;
-}
-.orb-depth{
-  z-index:2;width:54%;height:45%;right:-2%;bottom:1%;border-radius:50%;
-  background:radial-gradient(ellipse,rgba(52,116,165,.30),rgba(68,137,183,.12) 45%,transparent 72%);
-  filter:blur(14px);
-  opacity:.66;
-  animation:orbDepthDrift 18.2s ease-in-out infinite alternate;
-}
-.orb-grain{
-  inset:0;z-index:5;border-radius:inherit;
-  background-image:
-    radial-gradient(circle at 20% 30%,rgba(255,255,255,.20) 0 .55px,transparent .8px),
-    radial-gradient(circle at 72% 66%,rgba(42,101,145,.13) 0 .5px,transparent .8px),
-    radial-gradient(circle at 47% 18%,rgba(255,255,255,.13) 0 .45px,transparent .75px);
-  background-size:7px 7px,9px 9px,11px 11px;
-  opacity:.24;
-  mix-blend-mode:soft-light;
-  animation:orbGrainDrift 22s linear infinite;
-}
-.stage.has-photo .halo{
-  opacity:.58!important;
-  background:radial-gradient(circle,rgba(227,241,250,.48),rgba(197,222,239,.20) 44%,rgba(168,204,229,.08) 61%,transparent 75%)!important;
-}
-@keyframes orbBreath{
-  0%,100%{scale:.995}
-  45%{scale:1.008}
-  62%{scale:1.004}
-}
-@keyframes orbMorph{
-  0%,100%{border-radius:49% 51% 47% 53% / 52% 47% 53% 48%}
-  28%{border-radius:52% 48% 51% 49% / 47% 54% 46% 53%}
-  61%{border-radius:47% 53% 49% 51% / 54% 46% 55% 45%}
-  82%{border-radius:51% 49% 53% 47% / 49% 52% 48% 51%}
-}
-@keyframes orbHaloBreath{
-  0%,100%{transform:scale(.99);opacity:.62}
-  48%{transform:scale(1.035);opacity:.71}
-  70%{transform:scale(1.018);opacity:.67}
-}
-@keyframes orbFlowA{
-  0%{transform:translate(-4%,-2%) rotate(-5deg) scale(1.02)}
-  37%{transform:translate(2%,4%) rotate(5deg) scale(1.08)}
-  72%{transform:translate(5%,-1%) rotate(11deg) scale(1.04)}
-  100%{transform:translate(-1%,3%) rotate(17deg) scale(1.09)}
-}
-@keyframes orbFlowB{
-  0%{transform:translate(5%,3%) rotate(7deg) scale(1.07)}
-  36%{transform:translate(-4%,-2%) rotate(-3deg) scale(1.02)}
-  74%{transform:translate(-1%,5%) rotate(-11deg) scale(1.08)}
-  100%{transform:translate(4%,-4%) rotate(-17deg) scale(1.03)}
-}
-@keyframes orbLightDrift{
-  0%,100%{transform:translate(-5%,-4%) scale(1.02)}
-  24%{transform:translate(14%,7%) scale(1.12)}
-  49%{transform:translate(25%,24%) scale(.96)}
-  73%{transform:translate(5%,30%) scale(1.08)}
-}
-@keyframes orbDepthDrift{
-  0%{transform:translate(4%,5%) scale(1)}
-  48%{transform:translate(-12%,-7%) scale(1.12)}
-  100%{transform:translate(-3%,-14%) scale(1.03)}
-}
-@keyframes orbGrainDrift{
-  to{background-position:21px 14px,-18px 26px,33px -22px}
-}
-@media(prefers-reduced-motion:reduce){
-  .core,.core.active,.halo,.orb-layer{animation-duration:30s!important;animation-iteration-count:infinite!important}
-}
-`;
-
-const ORB_SCRIPT = String.raw`
+const ORB_LAB_HTML = String.raw`<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F7F4EF">
+<meta name="robots" content="noindex,nofollow">
+<title>TALERA — ORB lab v2</title>
+<style>
+:root{color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#F7F4EF;color:#0F2747}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+.lab{min-height:100dvh;display:grid;grid-template-rows:auto 1fr auto;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));background:radial-gradient(circle at 50% 42%,#fff 0,#fbfaf7 42%,#F7F4EF 76%)}
+.head{display:flex;justify-content:center;align-items:center;min-height:34px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.42}
+.stage{display:grid;place-items:center;min-height:0}
+.orb-frame{position:relative;width:min(86vw,430px);aspect-ratio:1;display:grid;place-items:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+canvas{display:block;width:100%;height:100%;background:transparent}
+.hint{min-height:34px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:13px;line-height:1.4;color:#3E4A59;opacity:.46}
+.hint strong{font-weight:650;color:#0F2747}
+@media(min-width:700px){.orb-frame{width:min(62vw,520px)}}
+@media(prefers-reduced-motion:reduce){.hint::after{content:" — beweging vertraagd"}}
+</style>
+</head>
+<body>
+<div class="lab">
+  <div class="head">ORB lab v2 — Canvas</div>
+  <div class="stage">
+    <div id="frame" class="orb-frame" role="button" tabindex="0" aria-label="Tik om spreekreactie te testen">
+      <canvas id="orb"></canvas>
+    </div>
+  </div>
+  <div id="hint" class="hint">Automatische demo: rust → spreken. <strong>&nbsp;Tik om handmatig te wisselen.</strong></div>
+</div>
+<script>
 (function(){
-  function decorateOrb(root){
-    var scope=root||document;
-    var cores=scope.querySelectorAll?scope.querySelectorAll('.core'):[];
-    cores.forEach(function(core){
-      if(core.dataset.orbV1==='1')return;
-      core.dataset.orbV1='1';
-      var names=['orb-flow-a','orb-flow-b','orb-depth','orb-light','orb-grain'];
-      names.forEach(function(name){
-        var layer=document.createElement('span');
-        layer.className='orb-layer '+name;
-        layer.setAttribute('aria-hidden','true');
-        core.appendChild(layer);
-      });
-    });
+  var canvas=document.getElementById('orb');
+  var frame=document.getElementById('frame');
+  var hint=document.getElementById('hint');
+  var ctx=canvas.getContext('2d',{alpha:true,desynchronized:true});
+  if(!ctx){hint.textContent='Canvas wordt op dit toestel niet ondersteund.';return;}
+
+  var DPR=Math.min(2,window.devicePixelRatio||1);
+  var logical=430;
+  var last=performance.now();
+  var manual=false;
+  var speakingTarget=0;
+  var speaking=0;
+  var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var clouds=[
+    {a:.18,r:.34,s:.017,rx:.34,ry:.24,o:.34,c:'255,255,255',p:.2},
+    {a:1.12,r:.31,s:-.014,rx:.28,ry:.19,o:.22,c:'238,248,254',p:1.7},
+    {a:2.05,r:.29,s:.011,rx:.37,ry:.22,o:.20,c:'255,255,255',p:2.8},
+    {a:3.14,r:.35,s:-.012,rx:.30,ry:.25,o:.18,c:'217,237,249',p:.9},
+    {a:4.15,r:.30,s:.016,rx:.29,ry:.21,o:.19,c:'255,255,255',p:2.1},
+    {a:5.08,r:.32,s:-.010,rx:.35,ry:.23,o:.17,c:'230,244,252',p:3.4},
+    {a:.72,r:.25,s:-.019,rx:.22,ry:.18,o:.17,c:'89,155,199',p:1.2},
+    {a:2.62,r:.27,s:.014,rx:.27,ry:.20,o:.14,c:'76,143,188',p:2.4},
+    {a:4.72,r:.23,s:-.015,rx:.24,ry:.18,o:.13,c:'62,127,174',p:.4},
+    {a:5.62,r:.22,s:.018,rx:.25,ry:.19,o:.12,c:'84,151,195',p:3.1}
+  ];
+
+  var grain=[];
+  for(var i=0;i<180;i++){
+    var ga=Math.random()*Math.PI*2;
+    var gr=Math.sqrt(Math.random())*.92;
+    grain.push({x:Math.cos(ga)*gr,y:Math.sin(ga)*gr,r:.35+Math.random()*1.1,a:.018+Math.random()*.035});
   }
 
-  var app=document.getElementById('app');
-  decorateOrb(document);
-  if(app){
-    new MutationObserver(function(){decorateOrb(app)}).observe(app,{childList:true,subtree:true});
+  function resize(){
+    var rect=frame.getBoundingClientRect();
+    logical=Math.max(260,Math.min(560,rect.width||430));
+    DPR=Math.min(2,window.devicePixelRatio||1);
+    canvas.width=Math.round(logical*DPR);
+    canvas.height=Math.round(logical*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
   }
+  resize();
+  window.addEventListener('resize',resize,{passive:true});
 
-  var params=new URLSearchParams(location.search);
-  if(params.get('orbDemo')==='1'){
-    var root=document.documentElement;
-    var phases=[
-      {awake:0,voice:0,duration:4200},
-      {awake:0,voice:0,duration:2600},
-      {awake:1,voice:.22,duration:1800},
-      {awake:1,voice:.72,duration:3000},
-      {awake:1,voice:.32,duration:2200},
-      {awake:0,voice:0,duration:3600}
-    ];
-    var index=0;
-    function next(){
-      var phase=phases[index%phases.length];
-      root.style.setProperty('--awake',String(phase.awake));
-      root.style.setProperty('--voice',String(phase.voice));
-      index++;
-      setTimeout(next,phase.duration);
+  function blobPath(cx,cy,r,t){
+    var n=96;
+    var pts=[];
+    for(var i=0;i<n;i++){
+      var a=i/n*Math.PI*2;
+      var wobble=
+        Math.sin(a*3+t*.23)*.019+
+        Math.sin(a*5-t*.17+1.3)*.013+
+        Math.sin(a*7+t*.11+2.4)*.007;
+      var rr=r*(1+wobble);
+      pts.push({x:cx+Math.cos(a)*rr,y:cy+Math.sin(a)*rr});
     }
-    next();
+    ctx.beginPath();
+    var p0=pts[0];
+    var plast=pts[pts.length-1];
+    ctx.moveTo((p0.x+plast.x)/2,(p0.y+plast.y)/2);
+    for(var j=0;j<pts.length;j++){
+      var p=pts[j];
+      var q=pts[(j+1)%pts.length];
+      ctx.quadraticCurveTo(p.x,p.y,(p.x+q.x)/2,(p.y+q.y)/2);
+    }
+    ctx.closePath();
   }
-})();
-`;
 
-function enhanceHtml(html) {
-  let out = html;
-  const styleClose = "</style>";
-  const bodyClose = "</body>";
-  if (out.includes(styleClose)) out = out.replace(styleClose, ORB_STYLE + "\n" + styleClose);
-  if (out.includes(bodyClose)) out = out.replace(bodyClose, "<script>" + ORB_SCRIPT + "</script>" + bodyClose);
-  return out;
-}
+  function ellipseGlow(x,y,rx,ry,angle,color,alpha){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(angle);
+    ctx.scale(rx,ry);
+    var g=ctx.createRadialGradient(0,0,0,0,0,1);
+    g.addColorStop(0,'rgba('+color+','+alpha+')');
+    g.addColorStop(.42,'rgba('+color+','+(alpha*.56)+')');
+    g.addColorStop(.76,'rgba('+color+','+(alpha*.16)+')');
+    g.addColorStop(1,'rgba('+color+',0)');
+    ctx.fillStyle=g;
+    ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  function drawWisps(cx,cy,r,t,activity){
+    ctx.save();
+    ctx.globalCompositeOperation='screen';
+    ctx.lineCap='round';
+    for(var k=0;k<6;k++){
+      var base=(k/6)*Math.PI*2+t*(.022+.006*activity)*(k%2?1:-1);
+      var rr=r*(.20+k*.075);
+      var x0=cx+Math.cos(base)*rr;
+      var y0=cy+Math.sin(base)*rr*.72;
+      var x1=cx+Math.cos(base+.75)*rr*.85;
+      var y1=cy+Math.sin(base+.75)*rr*.62;
+      var x2=cx+Math.cos(base+1.45)*rr*.68;
+      var y2=cy+Math.sin(base+1.45)*rr*.55;
+      ctx.beginPath();ctx.moveTo(x0,y0);ctx.quadraticCurveTo(cx+Math.cos(base+.38)*r*.12,cy+Math.sin(base+.38)*r*.12,x1,y1);ctx.quadraticCurveTo(cx+Math.cos(base+1.03)*r*.24,cy+Math.sin(base+1.03)*r*.20,x2,y2);
+      ctx.strokeStyle='rgba(246,252,255,'+(0.055+k*.007)+')';
+      ctx.lineWidth=r*(.055+k*.006);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function render(now){
+    var dt=Math.min(40,now-last);last=now;
+    var sec=now/1000;
+    if(!manual){
+      var phase=sec%19;
+      speakingTarget=(phase>9.5&&phase<14.5)?1:0;
+    }
+    var ease=speakingTarget>speaking?.055:.025;
+    if(reduced)ease*=.35;
+    speaking+=(speakingTarget-speaking)*ease*(dt/16.67);
+
+    var w=logical,h=logical,cx=w/2,cy=h/2;
+    ctx.clearRect(0,0,w,h);
+
+    var breath=1+Math.sin(sec*.58)*.008+Math.sin(sec*.31+1.6)*.005;
+    var r=w*.285*breath*(1+speaking*.15);
+    var activity=1+speaking*.42;
+
+    var hg=ctx.createRadialGradient(cx-r*.05,cy-r*.06,r*.70,cx,cy,r*1.28);
+    hg.addColorStop(0,'rgba(168,207,233,0)');
+    hg.addColorStop(.56,'rgba(168,207,233,.035)');
+    hg.addColorStop(.76,'rgba(151,196,226,.105)');
+    hg.addColorStop(.90,'rgba(166,207,233,.045)');
+    hg.addColorStop(1,'rgba(166,207,233,0)');
+    ctx.fillStyle=hg;ctx.beginPath();ctx.arc(cx,cy,r*1.34,0,Math.PI*2);ctx.fill();
+
+    blobPath(cx,cy,r,sec*.45);
+    ctx.save();ctx.clip();
+
+    var base=ctx.createLinearGradient(cx-r*.74,cy-r*.72,cx+r*.82,cy+r*.82);
+    base.addColorStop(0,'#eaf6fd');
+    base.addColorStop(.28,'#cfe8f7');
+    base.addColorStop(.58,'#9bc8e4');
+    base.addColorStop(.84,'#70acd2');
+    base.addColorStop(1,'#5d9ec8');
+    ctx.fillStyle=base;ctx.fillRect(cx-r*1.2,cy-r*1.2,r*2.4,r*2.4);
+
+    var deepX=cx+r*(.30+Math.sin(sec*.13)*.12);
+    var deepY=cy+r*(.30+Math.cos(sec*.11)*.10);
+    ellipseGlow(deepX,deepY,r*.82,r*.67,-.55,'49,112,160',.20+speaking*.025);
+    ellipseGlow(cx-r*.34,cy+r*.18,r*.64,r*.42,.32,'86,154,198',.12);
+
+    ctx.globalCompositeOperation='screen';
+    for(var c=0;c<clouds.length;c++){
+      var q=clouds[c];
+      var aa=q.a+sec*q.s*activity;
+      var drift=.06*Math.sin(sec*(.19+(c%3)*.017)+q.p);
+      var x=cx+Math.cos(aa)*r*(q.r+drift);
+      var y=cy+Math.sin(aa)*r*(q.r*.78+drift*.55);
+      var rx=r*q.rx*(1+.10*Math.sin(sec*.21+q.p));
+      var ry=r*q.ry*(1+.12*Math.cos(sec*.17+q.p));
+      ellipseGlow(x,y,rx,ry,aa*.45,q.c,q.o+(speaking*.018));
+    }
+
+    drawWisps(cx,cy,r,sec,activity);
+
+    ctx.globalCompositeOperation='screen';
+    var lx=cx+r*(-.26+Math.sin(sec*.17)*.26+Math.sin(sec*.071)*.09);
+    var ly=cy+r*(-.36+Math.cos(sec*.14)*.31);
+    var lg=ctx.createRadialGradient(lx,ly,0,lx,ly,r*.92);
+    lg.addColorStop(0,'rgba(255,255,255,'+(0.34+speaking*.045)+')');
+    lg.addColorStop(.22,'rgba(248,253,255,.23)');
+    lg.addColorStop(.54,'rgba(226,243,253,.10)');
+    lg.addColorStop(1,'rgba(226,243,253,0)');
+    ctx.fillStyle=lg;ctx.fillRect(cx-r,cy-r,r*2,r*2);
+
+    ctx.globalCompositeOperation='soft-light';
+    ctx.fillStyle='#fff';
+    ctx.save();
+    ctx.translate(cx,cy);ctx.rotate(sec*.008);
+    for(var g=0;g<grain.length;g++){
+      var z=grain[g];
+      ctx.globalAlpha=z.a;
+      ctx.beginPath();ctx.arc(z.x*r,z.y*r,z.r,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.globalCompositeOperation='source-over';
+    var edge=ctx.createRadialGradient(cx-r*.12,cy-r*.18,r*.28,cx,cy,r*1.02);
+    edge.addColorStop(0,'rgba(255,255,255,.03)');
+    edge.addColorStop(.64,'rgba(255,255,255,0)');
+    edge.addColorStop(.88,'rgba(48,107,151,.055)');
+    edge.addColorStop(1,'rgba(38,93,136,.11)');
+    ctx.fillStyle=edge;ctx.fillRect(cx-r*1.05,cy-r*1.05,r*2.1,r*2.1);
+    ctx.restore();
+
+    blobPath(cx,cy,r,sec*.45);
+    ctx.save();
+    ctx.strokeStyle='rgba(229,244,253,.34)';
+    ctx.lineWidth=Math.max(1.2,r*.012);
+    ctx.stroke();
+    ctx.restore();
+
+    requestAnimationFrame(render);
+  }
+
+  function toggleManual(){
+    manual=true;speakingTarget=speakingTarget>.5?0:1;
+    hint.innerHTML=speakingTarget?'<strong>Spreekreactie</strong> — circa 15% groter, stroming actiever.':'<strong>Rust</strong> — langzame ademhaling en interne stroming.';
+  }
+  frame.addEventListener('click',toggleManual);
+  frame.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleManual();}});
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>`;
 
 export default {
   async fetch(request, env, ctx) {
-    const response = await baseWorker.fetch(request, env, ctx);
-    const contentType = response.headers.get("content-type") || "";
-    if (request.method === "HEAD" || !contentType.includes("text/html")) return response;
+    const url = new URL(request.url);
+    if ((request.method === "GET" || request.method === "HEAD") && url.searchParams.get("orbLab") === "2") {
+      const headers = new Headers({
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "no-referrer",
+        "x-talera-orb-lab": "canvas-v2"
+      });
+      return new Response(request.method === "HEAD" ? null : ORB_LAB_HTML, { status: 200, headers });
+    }
 
-    const html = await response.text();
-    const headers = new Headers(response.headers);
-    headers.delete("content-length");
-    headers.set("x-talera-orb", "organic-v1");
-    return new Response(enhanceHtml(html), {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
+    return baseWorker.fetch(request, env, ctx);
   },
 };

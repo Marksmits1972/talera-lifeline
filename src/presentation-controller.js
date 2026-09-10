@@ -115,10 +115,10 @@ export const presentationControllerScript = String.raw`
 
   /* ---------------------------------------------------------
      ONE PHOTOBOOK OWNER.
-     A careful drag still has a small pickup zone. A fast flick now
-     owns its direction from the first clear horizontal movement and
-     carries momentum after release: faster flicks can travel through
-     several memories instead of resolving as one calm opposite click.
+     Fine dragging is primary again: gentle movement should pick up
+     one photo early and keep it under the finger. A normal flick also
+     advances only one photo, but settles faster. Multi-photo momentum
+     is reserved for an unmistakably strong, long flick.
      --------------------------------------------------------- */
   if(!story||!stage||!window.__taleraPhotoBook)return;
 
@@ -144,14 +144,15 @@ export const presentationControllerScript = String.raw`
   function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image);});}
   warmState(window.__taleraPhotoBook.state());
 
-  const DRAG_INTENT_PX=10;
-  const FLICK_INTENT_PX=4;
-  const FLICK_LOCK_SPEED=.34;
-  const HORIZONTAL_BIAS=1.08;
+  const DRAG_INTENT_PX=6;
+  const PICKUP_DEADZONE_PX=4;
+  const FLICK_INTENT_PX=8;
+  const FLICK_LOCK_SPEED=.85;
+  const HORIZONTAL_BIAS=1.06;
   let pid=null;
   let startX=0,startY=0,lastX=0,lastT=0,startT=0;
   let dragOriginX=0;
-  let peakVelocity=0;
+  let smoothedVelocity=0;
   let mode=null;
   let fastPickup=false;
   let lockedStepDirection=0;
@@ -255,21 +256,21 @@ export const presentationControllerScript = String.raw`
 
     await warmImage(target.image);
     buildOverlay();
-    const duration=Math.round(Math.max(88,Math.min(138,142-Math.min(speed,2.4)*22)));
+    const duration=Math.round(Math.max(94,Math.min(132,138-Math.min(speed,3)*14)));
     if(!transitionPages(direction,duration)){momentumRunning=false;return;}
 
     setTimeout(async()=>{
       window.__taleraPhotoBook.step(direction);
       await waitForBaseSharp(target.image);
       clearOverlay();
-      runMomentum(direction,remaining-1,Math.max(.45,speed*.84));
-    },Math.max(70,duration-8));
+      runMomentum(direction,remaining-1,Math.max(.65,speed*.82));
+    },Math.max(78,duration-8));
   }
 
   function settle(direction,commit,releaseSpeed=0,momentumSteps=1){
     if(!overlay||!currentPage){clearOverlay();return;}
     const speed=Math.abs(releaseSpeed);
-    const duration=Math.round(Math.max(135,Math.min(255,250-speed*82)));
+    const duration=Math.round(Math.max(140,Math.min(270,265-speed*70)));
 
     if(!commit){
       [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
@@ -301,7 +302,7 @@ export const presentationControllerScript = String.raw`
         momentumRunning=false;
         warmState(window.__taleraPhotoBook.state());
       }
-    },Math.max(90,duration-10));
+    },Math.max(95,duration-10));
   }
 
   function lockHorizontal(currentX,rawDx,isFast){
@@ -312,7 +313,7 @@ export const presentationControllerScript = String.raw`
       lockedStepDirection=rawDx<0?1:-1;
     }else{
       const sign=rawDx===0?1:Math.sign(rawDx);
-      dragOriginX=startX+sign*DRAG_INTENT_PX;
+      dragOriginX=startX+sign*PICKUP_DEADZONE_PX;
       lockedStepDirection=0;
     }
     buildOverlay();
@@ -320,11 +321,10 @@ export const presentationControllerScript = String.raw`
   }
 
   function momentumCount(speed,distance,w){
-    let steps=1;
-    if(speed>=.62||distance>=w*.34)steps=2;
-    if(speed>=1.02||distance>=w*.56)steps=3;
-    if(speed>=1.52||distance>=w*.82)steps=4;
-    return steps;
+    /* One photo is the default. Extra travel needs both real speed and distance. */
+    if(speed>=2.35&&distance>=w*.58)return 3;
+    if(speed>=1.55&&distance>=w*.36)return 2;
+    return 1;
   }
 
   story.addEventListener('pointerdown',e=>{
@@ -334,7 +334,7 @@ export const presentationControllerScript = String.raw`
     startX=lastX=dragOriginX=e.clientX;
     startY=e.clientY;
     startT=lastT=performance.now();
-    peakVelocity=0;
+    smoothedVelocity=0;
     mode=null;
     fastPickup=false;
     lockedStepDirection=0;
@@ -349,13 +349,15 @@ export const presentationControllerScript = String.raw`
     const dy=e.clientY-startY;
     const dt=Math.max(8,now-lastT);
     const segmentVelocity=(e.clientX-lastX)/dt;
-    peakVelocity=Math.max(peakVelocity,Math.abs(segmentVelocity));
+    smoothedVelocity=smoothedVelocity===0?segmentVelocity:(smoothedVelocity*.68+segmentVelocity*.32);
 
     if(!mode){
       const horizontalEnough=Math.abs(rawDx)>Math.abs(dy)*HORIZONTAL_BIAS;
-      const fastHorizontal=horizontalEnough&&Math.abs(rawDx)>=FLICK_INTENT_PX&&Math.abs(segmentVelocity)>=FLICK_LOCK_SPEED;
+      const age=Math.max(16,now-startT);
+      const intentSpeed=Math.max(Math.abs(smoothedVelocity),Math.abs(rawDx/age));
+      const fastHorizontal=horizontalEnough&&Math.abs(rawDx)>=FLICK_INTENT_PX&&intentSpeed>=FLICK_LOCK_SPEED;
       const deliberateHorizontal=horizontalEnough&&Math.abs(rawDx)>=DRAG_INTENT_PX;
-      const deliberateVertical=Math.abs(dy)>=DRAG_INTENT_PX&&Math.abs(dy)>Math.abs(rawDx)*1.08;
+      const deliberateVertical=Math.abs(dy)>=DRAG_INTENT_PX&&Math.abs(dy)>Math.abs(rawDx)*1.10;
 
       if(fastHorizontal||deliberateHorizontal){
         lockHorizontal(e.clientX,rawDx,fastHorizontal);
@@ -390,18 +392,18 @@ export const presentationControllerScript = String.raw`
     const rawDy=e.clientY-startY;
     const avgVelocity=rawDx/age;
 
-    if(!mode&&Math.abs(rawDx)>=FLICK_INTENT_PX&&Math.abs(rawDx)>Math.abs(rawDy)*HORIZONTAL_BIAS){
+    if(!mode&&Math.abs(rawDx)>=FLICK_INTENT_PX&&Math.abs(rawDx)>Math.abs(rawDy)*HORIZONTAL_BIAS&&Math.abs(avgVelocity)>=FLICK_LOCK_SPEED*.72){
       lockHorizontal(e.clientX,rawDx,true);
-      peakVelocity=Math.max(peakVelocity,Math.abs(avgVelocity));
+      smoothedVelocity=avgVelocity;
     }
 
     const visualDx=mode==='horizontal'?e.clientX-dragOriginX:rawDx;
     const w=stage.getBoundingClientRect().width;
     const direction=fastPickup&&lockedStepDirection?lockedStepDirection:(rawDx<0?1:-1);
     const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
-    const distanceCommit=Math.abs(visualDx)>Math.max(64,w*.18);
-    const flickSpeed=Math.min(2.6,Math.max(peakVelocity,Math.abs(avgVelocity)));
-    const flickCommit=Math.abs(rawDx)>=20&&flickSpeed>=.32;
+    const distanceCommit=Math.abs(visualDx)>Math.max(46,w*.13);
+    const flickSpeed=Math.min(3,Math.max(Math.abs(avgVelocity),Math.abs(smoothedVelocity)));
+    const flickCommit=Math.abs(rawDx)>=24&&flickSpeed>=.65;
     const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
     const steps=commit&&flickCommit?momentumCount(flickSpeed,Math.abs(rawDx),w):1;
 
@@ -412,6 +414,7 @@ export const presentationControllerScript = String.raw`
     mode=null;
     fastPickup=false;
     lockedStepDirection=0;
+    smoothedVelocity=0;
   }
 
   function cancel(e){
@@ -422,6 +425,7 @@ export const presentationControllerScript = String.raw`
     mode=null;
     fastPickup=false;
     lockedStepDirection=0;
+    smoothedVelocity=0;
   }
 
   story.addEventListener('pointerup',finish,{passive:true,capture:true});

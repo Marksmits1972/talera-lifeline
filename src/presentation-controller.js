@@ -8,13 +8,13 @@ export const presentationControllerScript = String.raw`
   /* ---------------------------------------------------------
      TIMELINE READOUT TUNING.
      Keep the large scale exactly as-is; make the exact date at
-     the needle just a little stronger so overview + precision
-     read as one hierarchy.
+     the needle slightly larger so overview + precision read as
+     one calm hierarchy.
      --------------------------------------------------------- */
   if(!document.getElementById('talera-timeline-readout-tuning')){
     const style=document.createElement('style');
     style.id='talera-timeline-readout-tuning';
-    style.textContent='.focus{font-size:12.5px!important;font-weight:720!important;padding:5px 11px!important;letter-spacing:.005em!important;white-space:nowrap!important}.timeline.is-active .focus{transform:translateZ(0) scale(1.045)!important}';
+    style.textContent='.focus{font-size:14px!important;font-weight:720!important;padding:5px 12px!important;letter-spacing:0!important;white-space:nowrap!important}.timeline.is-active .focus{transform:translateZ(0) scale(1.045)!important}';
     document.head.appendChild(style);
   }
 
@@ -115,12 +115,12 @@ export const presentationControllerScript = String.raw`
 
   /* ---------------------------------------------------------
      ONE PHOTOBOOK OWNER.
-     Horizontal photo movement never sends wheel/zoom input to timeline.
-     The first small movement is now a real "pickup" phase: the
-     current photo stays fixed until horizontal intent is clear.
-     Once locked, motion starts from zero instead of jumping by the
-     intent threshold. pointercancel always aborts and can never
-     commit a memory change.
+     Two natural gesture paths:
+     - deliberate drag: a small pickup zone prevents accidental jumps;
+     - quick flick: velocity can lock horizontal intent almost at once,
+       and the full gesture distance/direction is preserved.
+     A released flick must never look like it is calmly clicking back
+     against the user's finger direction.
      --------------------------------------------------------- */
   if(!story||!stage||!window.__taleraPhotoBook)return;
 
@@ -146,13 +146,16 @@ export const presentationControllerScript = String.raw`
   function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image);});}
   warmState(window.__taleraPhotoBook.state());
 
-  const INTENT_PX=14;
-  const HORIZONTAL_BIAS=1.18;
-  const MIN_COMMIT_AGE=90;
+  const DRAG_INTENT_PX=11;
+  const FLICK_INTENT_PX=5;
+  const FLICK_LOCK_SPEED=.42;       // px/ms; lets a normal finger sling engage immediately
+  const HORIZONTAL_BIAS=1.10;
   let pid=null;
   let startX=0,startY=0,lastX=0,lastT=0,startT=0;
   let dragOriginX=0;
+  let peakVelocity=0;
   let mode=null;
+  let fastPickup=false;
   let overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));}
@@ -233,18 +236,23 @@ export const presentationControllerScript = String.raw`
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }
 
-  function settle(direction,commit){
+  function settle(direction,commit,releaseSpeed=0){
     if(!overlay||!currentPage){clearOverlay();return;}
     const w=stage.getBoundingClientRect().width;
-    [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>p.classList.add('is-settling'));
+    const speed=Math.abs(releaseSpeed);
+    const duration=Math.round(Math.max(155,Math.min(275,265-speed*105)));
+    [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
+      p.classList.add('is-settling');
+      p.style.setProperty('transition-duration',duration+'ms','important');
+    });
     requestAnimationFrame(()=>{
       if(!commit){
         placePages(0);
-        setTimeout(clearOverlay,300);
+        setTimeout(clearOverlay,duration+25);
         return;
       }
       const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
-      if(!target){placePages(0);setTimeout(clearOverlay,300);return;}
+      if(!target){placePages(0);setTimeout(clearOverlay,duration+25);return;}
       placePages(direction>0?-w:w);
       setTimeout(async()=>{
         await warmImage(target.image);
@@ -252,8 +260,23 @@ export const presentationControllerScript = String.raw`
         await waitForBaseSharp(target.image);
         warmState(window.__taleraPhotoBook.state());
         clearOverlay();
-      },250);
+      },duration-12);
     });
+  }
+
+  function lockHorizontal(currentX,rawDx,isFast){
+    mode='horizontal';
+    fastPickup=!!isFast;
+    if(fastPickup){
+      /* A sling owns its displacement from the first contact. */
+      dragOriginX=startX;
+    }else{
+      /* A careful drag keeps a small stable pickup zone. */
+      const sign=rawDx===0?1:Math.sign(rawDx);
+      dragOriginX=startX+sign*DRAG_INTENT_PX;
+    }
+    buildOverlay();
+    placePages(currentX-dragOriginX);
   }
 
   story.addEventListener('pointerdown',e=>{
@@ -263,59 +286,83 @@ export const presentationControllerScript = String.raw`
     startX=lastX=dragOriginX=e.clientX;
     startY=e.clientY;
     startT=lastT=performance.now();
+    peakVelocity=0;
     mode=null;
+    fastPickup=false;
     try{story.setPointerCapture(e.pointerId);}catch(err){}
     warmState(window.__taleraPhotoBook.state());
   },{passive:true,capture:true});
 
   story.addEventListener('pointermove',e=>{
     if(e.pointerId!==pid)return;
+    const now=performance.now();
     const rawDx=e.clientX-startX;
     const dy=e.clientY-startY;
+    const dt=Math.max(8,now-lastT);
+    const segmentVelocity=(e.clientX-lastX)/dt;
+    peakVelocity=Math.max(peakVelocity,Math.abs(segmentVelocity));
 
-    if(!mode&&(Math.abs(rawDx)>INTENT_PX||Math.abs(dy)>INTENT_PX)){
-      mode=Math.abs(rawDx)>Math.abs(dy)*HORIZONTAL_BIAS?'horizontal':'vertical';
-      if(mode==='horizontal'){
-        /* Rebase at the edge of the dead-zone: pickup is visually stationary. */
-        const sign=rawDx===0?1:Math.sign(rawDx);
-        dragOriginX=startX+sign*INTENT_PX;
-        lastX=e.clientX;
-        lastT=performance.now();
-        buildOverlay();
-        placePages(e.clientX-dragOriginX);
+    if(!mode){
+      const horizontalEnough=Math.abs(rawDx)>Math.abs(dy)*HORIZONTAL_BIAS;
+      const fastHorizontal=horizontalEnough&&Math.abs(rawDx)>=FLICK_INTENT_PX&&Math.abs(segmentVelocity)>=FLICK_LOCK_SPEED;
+      const deliberateHorizontal=horizontalEnough&&Math.abs(rawDx)>=DRAG_INTENT_PX;
+      const deliberateVertical=Math.abs(dy)>=DRAG_INTENT_PX&&Math.abs(dy)>Math.abs(rawDx)*1.08;
+
+      if(fastHorizontal||deliberateHorizontal){
+        lockHorizontal(e.clientX,rawDx,fastHorizontal);
+      }else if(deliberateVertical){
+        mode='vertical';
       }
     }
 
     if(mode==='vertical'){
       clearOverlay();
+      lastX=e.clientX;
+      lastT=now;
       return;
     }
-    if(mode!=='horizontal')return;
+    if(mode!=='horizontal'){
+      lastX=e.clientX;
+      lastT=now;
+      return;
+    }
 
     e.preventDefault();
     placePages(e.clientX-dragOriginX);
     lastX=e.clientX;
-    lastT=performance.now();
+    lastT=now;
   },{passive:false,capture:true});
 
   function finish(e){
     if(e.pointerId!==pid)return;
     const now=performance.now();
-    const age=now-startT;
-    const dx=mode==='horizontal'?e.clientX-dragOriginX:e.clientX-startX;
-    const dt=Math.max(16,now-lastT);
-    const velocity=(e.clientX-lastX)/dt;
+    const age=Math.max(16,now-startT);
+    const rawDx=e.clientX-startX;
+    const rawDy=e.clientY-startY;
+    const avgVelocity=rawDx/age;
+
+    /* Extremely quick swipes can reach pointerup with very few move events.
+       Recover horizontal intent here instead of treating them as a failed tap. */
+    if(!mode&&Math.abs(rawDx)>=FLICK_INTENT_PX&&Math.abs(rawDx)>Math.abs(rawDy)*HORIZONTAL_BIAS){
+      lockHorizontal(e.clientX,rawDx,true);
+      peakVelocity=Math.max(peakVelocity,Math.abs(avgVelocity));
+    }
+
+    const visualDx=mode==='horizontal'?e.clientX-dragOriginX:rawDx;
     const w=stage.getBoundingClientRect().width;
-    const direction=dx<0?1:-1;
+    const direction=rawDx<0?1:-1;
     const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
-    const distanceCommit=Math.abs(dx)>Math.max(82,w*.24);
-    const flickCommit=Math.abs(dx)>58&&Math.abs(velocity)>.72;
-    const commit=mode==='horizontal'&&age>=MIN_COMMIT_AGE&&hasTarget&&(distanceCommit||flickCommit);
-    if(mode==='horizontal')settle(direction,commit);
+    const distanceCommit=Math.abs(visualDx)>Math.max(70,w*.20);
+    const flickSpeed=Math.max(peakVelocity,Math.abs(avgVelocity));
+    const flickCommit=Math.abs(rawDx)>=26&&flickSpeed>=.38;
+    const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
+
+    if(mode==='horizontal')settle(direction,commit,flickSpeed);
     else clearOverlay();
     try{story.releasePointerCapture(e.pointerId);}catch(err){}
     pid=null;
     mode=null;
+    fastPickup=false;
   }
 
   function cancel(e){
@@ -325,6 +372,7 @@ export const presentationControllerScript = String.raw`
     try{story.releasePointerCapture(e.pointerId);}catch(err){}
     pid=null;
     mode=null;
+    fastPickup=false;
   }
 
   story.addEventListener('pointerup',finish,{passive:true,capture:true});

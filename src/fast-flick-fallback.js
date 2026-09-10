@@ -48,8 +48,12 @@ export const fastFlickFallbackScript = String.raw`
     if(!g)return;
     active.delete(e.pointerId);
 
-    const endX=Number.isFinite(e.clientX)?e.clientX:g.lastX;
-    const endY=Number.isFinite(e.clientY)?e.clientY:g.lastY;
+    /* Some mobile browsers report (0,0) on pointercancel. Prefer the last
+       real move point in that case so a cancelled gesture cannot invent
+       a huge swipe toward the screen origin. */
+    const cancelLostPoint=e.type==='pointercancel'&&e.clientX===0&&e.clientY===0;
+    const endX=!cancelLostPoint&&Number.isFinite(e.clientX)?e.clientX:g.lastX;
+    const endY=!cancelLostPoint&&Number.isFinite(e.clientY)?e.clientY:g.lastY;
     const dx=endX-g.x;
     const dy=endY-g.y;
     const age=Math.max(16,performance.now()-g.started);

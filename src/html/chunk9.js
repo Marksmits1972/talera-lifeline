@@ -313,7 +313,7 @@ export const chunk9 = [
   "    const previous=MEMORIES[index-1]||null;",
   "    const next=MEMORIES[index+1]||null;",
   "    return {index,current,previous,next};",
-  "  }",
+  "  },",
   "  step(direction) {",
   "    const index=Math.max(0,MEMORIES.findIndex(m=>m.id===activeMemoryId));",
   "    const targetIndex=clamp(index+direction,0,MEMORIES.length-1);",

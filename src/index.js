@@ -11,6 +11,7 @@ import { enhancementStyle, enhancementScript } from "./enhancement.js";
 import { interactionFixStyle, interactionFixScript } from "./interaction-fixes.js";
 import { swipeHotfixScript } from "./swipe-hotfix.js";
 import { intentResponseStyle, intentResponseScript } from "./intent-response.js";
+import { navigationIntentStyle, navigationIntentScript } from "./navigation-intent-engine.js";
 
 const BASE_HTML = [
   ...chunk1,
@@ -25,8 +26,8 @@ const BASE_HTML = [
 ].join("\n");
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-intent-response">${intentResponseStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-immersive-photo-script">${enhancementScript}</script><script id="talera-interaction-fixes-script">${interactionFixScript}</script><script id="talera-swipe-hotfix-script">${swipeHotfixScript}</script><script id="talera-intent-response-script">${intentResponseScript}</script></body>`);
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-intent-response">${intentResponseStyle}</style><style id="talera-navigation-intent">${navigationIntentStyle}</style></head>`)
+  .replace("</body>", `<script id="talera-immersive-photo-script">${enhancementScript}</script><script id="talera-interaction-fixes-script">${interactionFixScript}</script><script id="talera-swipe-hotfix-script">${swipeHotfixScript}</script><script id="talera-intent-response-script">${intentResponseScript}</script><script id="talera-navigation-intent-script">${navigationIntentScript}</script></body>`);
 
 export default {
   async fetch() {

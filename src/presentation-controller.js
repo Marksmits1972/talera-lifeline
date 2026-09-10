@@ -115,10 +115,10 @@ export const presentationControllerScript = String.raw`
 
   /* ---------------------------------------------------------
      ONE PHOTOBOOK OWNER.
-     Fine dragging is primary again: gentle movement should pick up
-     one photo early and keep it under the finger. A normal flick also
-     advances only one photo, but settles faster. Multi-photo momentum
-     is reserved for an unmistakably strong, long flick.
+     Fine dragging remains primary. Every released gesture now owns
+     one transition epoch, so a stale timeout from an older swipe can
+     never clear or mutate a newer swipe. The memory step is committed
+     immediately under the overlay instead of after image/decode waits.
      --------------------------------------------------------- */
   if(!story||!stage||!window.__taleraPhotoBook)return;
 
@@ -156,8 +156,14 @@ export const presentationControllerScript = String.raw`
   let mode=null;
   let fastPickup=false;
   let lockedStepDirection=0;
-  let momentumRunning=false;
   let overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
+
+  /* Transition bookkeeping. A new touch may interrupt visual settling,
+     but it never has to wait for old image/decode work to finish. */
+  let transitionEpoch=0;
+  let transitionActive=false;
+  let settleTimer=0;
+  let momentumTimer=0;
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));}
   function matchingBaseLayer(src){
@@ -196,6 +202,15 @@ export const presentationControllerScript = String.raw`
     overlay=previousPage=currentPage=nextPage=null;
     stateAtStart=null;
   }
+  function stopTransitionVisuals(){
+    transitionEpoch+=1;
+    clearTimeout(settleTimer);
+    clearTimeout(momentumTimer);
+    settleTimer=0;
+    momentumTimer=0;
+    transitionActive=false;
+    clearOverlay();
+  }
   function buildOverlay(){
     clearOverlay();
     const s=window.__taleraPhotoBook.state();
@@ -220,23 +235,6 @@ export const presentationControllerScript = String.raw`
     if(nextPage)nextPage.style.transform='translate3d('+(dx+w).toFixed(1)+'px,0,0)';
   }
 
-  async function waitForBaseSharp(src){
-    const base=document.getElementById('memoryPhotoA')||document.querySelector('#photoLayerA .example-photo');
-    if(!base)return;
-    if(base.src!==src){
-      await new Promise(resolve=>{
-        let doneCalled=false;
-        const done=()=>{if(doneCalled)return;doneCalled=true;resolve();};
-        base.addEventListener('load',done,{once:true});
-        base.addEventListener('error',done,{once:true});
-        setTimeout(done,800);
-      });
-    }
-    if(base.decode){try{await base.decode();}catch(e){}}
-    fitNow(base);
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-  }
-
   function transitionPages(direction,duration){
     if(!overlay||!currentPage)return false;
     const w=stage.getBoundingClientRect().width;
@@ -248,29 +246,48 @@ export const presentationControllerScript = String.raw`
     return true;
   }
 
-  async function runMomentum(direction,remaining,speed){
-    if(remaining<=0){momentumRunning=false;warmState(window.__taleraPhotoBook.state());return;}
+  function finishTransition(epoch){
+    if(epoch!==transitionEpoch)return;
+    clearOverlay();
+    transitionActive=false;
+    settleTimer=0;
+    momentumTimer=0;
+    warmState(window.__taleraPhotoBook.state());
+  }
+
+  function runMomentum(direction,remaining,speed,epoch){
+    if(epoch!==transitionEpoch)return;
+    if(remaining<=0){finishTransition(epoch);return;}
+
     const s=window.__taleraPhotoBook.state();
     const target=direction>0?s.next:s.previous;
-    if(!target){momentumRunning=false;warmState(s);return;}
+    if(!target){finishTransition(epoch);return;}
 
-    await warmImage(target.image);
     buildOverlay();
     const duration=Math.round(Math.max(94,Math.min(132,138-Math.min(speed,3)*14)));
-    if(!transitionPages(direction,duration)){momentumRunning=false;return;}
+    if(!transitionPages(direction,duration)){finishTransition(epoch);return;}
 
-    setTimeout(async()=>{
-      window.__taleraPhotoBook.step(direction);
-      await waitForBaseSharp(target.image);
+    /* Commit state immediately. The overlay owns the animation while the
+       existing photo layer can update/load underneath without blocking input. */
+    const moved=window.__taleraPhotoBook.step(direction);
+    if(!moved){finishTransition(epoch);return;}
+    warmState(window.__taleraPhotoBook.state());
+
+    momentumTimer=setTimeout(()=>{
+      if(epoch!==transitionEpoch)return;
       clearOverlay();
-      runMomentum(direction,remaining-1,Math.max(.65,speed*.82));
-    },Math.max(78,duration-8));
+      runMomentum(direction,remaining-1,Math.max(.65,speed*.82),epoch);
+    },duration+18);
   }
 
   function settle(direction,commit,releaseSpeed=0,momentumSteps=1){
     if(!overlay||!currentPage){clearOverlay();return;}
     const speed=Math.abs(releaseSpeed);
     const duration=Math.round(Math.max(140,Math.min(270,265-speed*70)));
+    const epoch=++transitionEpoch;
+    transitionActive=true;
+    clearTimeout(settleTimer);
+    clearTimeout(momentumTimer);
 
     if(!commit){
       [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
@@ -278,31 +295,40 @@ export const presentationControllerScript = String.raw`
         p.style.setProperty('transition-duration',duration+'ms','important');
       });
       requestAnimationFrame(()=>placePages(0));
-      setTimeout(clearOverlay,duration+25);
+      settleTimer=setTimeout(()=>finishTransition(epoch),duration+24);
       return;
     }
 
     const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
     if(!target){
-      [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>p.classList.add('is-settling'));
+      [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
+        p.classList.add('is-settling');
+        p.style.setProperty('transition-duration',duration+'ms','important');
+      });
       requestAnimationFrame(()=>placePages(0));
-      setTimeout(clearOverlay,duration+25);
+      settleTimer=setTimeout(()=>finishTransition(epoch),duration+24);
       return;
     }
 
-    momentumRunning=momentumSteps>1;
     transitionPages(direction,duration);
-    setTimeout(async()=>{
-      await warmImage(target.image);
-      window.__taleraPhotoBook.step(direction);
-      await waitForBaseSharp(target.image);
+
+    /* The old implementation waited for image/decode work before committing.
+       That allowed several released swipes to overlap. Commit now, animate on
+       top, and let the existing image observers finish fitting independently. */
+    const moved=window.__taleraPhotoBook.step(direction);
+    if(!moved){
+      requestAnimationFrame(()=>placePages(0));
+      settleTimer=setTimeout(()=>finishTransition(epoch),duration+24);
+      return;
+    }
+    warmState(window.__taleraPhotoBook.state());
+
+    settleTimer=setTimeout(()=>{
+      if(epoch!==transitionEpoch)return;
       clearOverlay();
-      if(momentumSteps>1)runMomentum(direction,momentumSteps-1,speed);
-      else{
-        momentumRunning=false;
-        warmState(window.__taleraPhotoBook.state());
-      }
-    },Math.max(95,duration-10));
+      if(momentumSteps>1)runMomentum(direction,momentumSteps-1,speed,epoch);
+      else finishTransition(epoch);
+    },duration+18);
   }
 
   function lockHorizontal(currentX,rawDx,isFast){
@@ -329,7 +355,13 @@ export const presentationControllerScript = String.raw`
 
   story.addEventListener('pointerdown',e=>{
     if(e.pointerType==='mouse'&&e.button!==0)return;
-    if(pid!==null||momentumRunning)return;
+    if(pid!==null)return;
+
+    /* A fresh touch always wins. If the previous card is still visually
+       settling, discard only that old visual transaction; its memory state
+       was already committed synchronously. */
+    if(transitionActive)stopTransitionVisuals();
+
     pid=e.pointerId;
     startX=lastX=dragOriginX=e.clientX;
     startY=e.clientY;

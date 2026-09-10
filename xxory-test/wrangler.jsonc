@@ -1,3 +1,4 @@
+// v53 transparency deploy bump
 {
   "name": "xxory-test",
   "main": "src/orb-app-v53-worker.js",

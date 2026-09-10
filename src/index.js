@@ -25,7 +25,7 @@ const BASE_HTML = [
 ].join("\n");
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style></head>`)
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-hide-zoom-hint">.zoom-hint{display:none!important}</style></head>`)
   .replace("</body>", `<script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script></body>`);
 
 export default {

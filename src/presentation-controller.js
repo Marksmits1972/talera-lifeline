@@ -14,7 +14,7 @@ export const presentationControllerScript = String.raw`
   if(!document.getElementById('talera-timeline-readout-tuning')){
     const style=document.createElement('style');
     style.id='talera-timeline-readout-tuning';
-    style.textContent='.focus{font-size:14px!important;font-weight:720!important;padding:5px 12px!important;letter-spacing:0!important;white-space:nowrap!important}.timeline.is-active .focus{transform:translateZ(0) scale(1.045)!important}';
+    style.textContent='.focus{font-size:15.5px!important;font-weight:720!important;padding:6px 13px!important;letter-spacing:0!important;white-space:nowrap!important}.timeline.is-active .focus{transform:translateZ(0) scale(1.04)!important}';
     document.head.appendChild(style);
   }
 
@@ -115,12 +115,10 @@ export const presentationControllerScript = String.raw`
 
   /* ---------------------------------------------------------
      ONE PHOTOBOOK OWNER.
-     Two natural gesture paths:
-     - deliberate drag: a small pickup zone prevents accidental jumps;
-     - quick flick: velocity can lock horizontal intent almost at once,
-       and the full gesture distance/direction is preserved.
-     A released flick must never look like it is calmly clicking back
-     against the user's finger direction.
+     A careful drag still has a small pickup zone. A fast flick now
+     owns its direction from the first clear horizontal movement and
+     carries momentum after release: faster flicks can travel through
+     several memories instead of resolving as one calm opposite click.
      --------------------------------------------------------- */
   if(!story||!stage||!window.__taleraPhotoBook)return;
 
@@ -146,16 +144,18 @@ export const presentationControllerScript = String.raw`
   function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image);});}
   warmState(window.__taleraPhotoBook.state());
 
-  const DRAG_INTENT_PX=11;
-  const FLICK_INTENT_PX=5;
-  const FLICK_LOCK_SPEED=.42;       // px/ms; lets a normal finger sling engage immediately
-  const HORIZONTAL_BIAS=1.10;
+  const DRAG_INTENT_PX=10;
+  const FLICK_INTENT_PX=4;
+  const FLICK_LOCK_SPEED=.34;
+  const HORIZONTAL_BIAS=1.08;
   let pid=null;
   let startX=0,startY=0,lastX=0,lastT=0,startT=0;
   let dragOriginX=0;
   let peakVelocity=0;
   let mode=null;
   let fastPickup=false;
+  let lockedStepDirection=0;
+  let momentumRunning=false;
   let overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
 
   function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));}
@@ -236,52 +236,100 @@ export const presentationControllerScript = String.raw`
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }
 
-  function settle(direction,commit,releaseSpeed=0){
-    if(!overlay||!currentPage){clearOverlay();return;}
+  function transitionPages(direction,duration){
+    if(!overlay||!currentPage)return false;
     const w=stage.getBoundingClientRect().width;
-    const speed=Math.abs(releaseSpeed);
-    const duration=Math.round(Math.max(155,Math.min(275,265-speed*105)));
     [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
       p.classList.add('is-settling');
       p.style.setProperty('transition-duration',duration+'ms','important');
     });
-    requestAnimationFrame(()=>{
-      if(!commit){
-        placePages(0);
-        setTimeout(clearOverlay,duration+25);
-        return;
-      }
-      const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
-      if(!target){placePages(0);setTimeout(clearOverlay,duration+25);return;}
-      placePages(direction>0?-w:w);
-      setTimeout(async()=>{
-        await warmImage(target.image);
-        window.__taleraPhotoBook.step(direction);
-        await waitForBaseSharp(target.image);
+    requestAnimationFrame(()=>placePages(direction>0?-w:w));
+    return true;
+  }
+
+  async function runMomentum(direction,remaining,speed){
+    if(remaining<=0){momentumRunning=false;warmState(window.__taleraPhotoBook.state());return;}
+    const s=window.__taleraPhotoBook.state();
+    const target=direction>0?s.next:s.previous;
+    if(!target){momentumRunning=false;warmState(s);return;}
+
+    await warmImage(target.image);
+    buildOverlay();
+    const duration=Math.round(Math.max(88,Math.min(138,142-Math.min(speed,2.4)*22)));
+    if(!transitionPages(direction,duration)){momentumRunning=false;return;}
+
+    setTimeout(async()=>{
+      window.__taleraPhotoBook.step(direction);
+      await waitForBaseSharp(target.image);
+      clearOverlay();
+      runMomentum(direction,remaining-1,Math.max(.45,speed*.84));
+    },Math.max(70,duration-8));
+  }
+
+  function settle(direction,commit,releaseSpeed=0,momentumSteps=1){
+    if(!overlay||!currentPage){clearOverlay();return;}
+    const speed=Math.abs(releaseSpeed);
+    const duration=Math.round(Math.max(135,Math.min(255,250-speed*82)));
+
+    if(!commit){
+      [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
+        p.classList.add('is-settling');
+        p.style.setProperty('transition-duration',duration+'ms','important');
+      });
+      requestAnimationFrame(()=>placePages(0));
+      setTimeout(clearOverlay,duration+25);
+      return;
+    }
+
+    const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
+    if(!target){
+      [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>p.classList.add('is-settling'));
+      requestAnimationFrame(()=>placePages(0));
+      setTimeout(clearOverlay,duration+25);
+      return;
+    }
+
+    momentumRunning=momentumSteps>1;
+    transitionPages(direction,duration);
+    setTimeout(async()=>{
+      await warmImage(target.image);
+      window.__taleraPhotoBook.step(direction);
+      await waitForBaseSharp(target.image);
+      clearOverlay();
+      if(momentumSteps>1)runMomentum(direction,momentumSteps-1,speed);
+      else{
+        momentumRunning=false;
         warmState(window.__taleraPhotoBook.state());
-        clearOverlay();
-      },duration-12);
-    });
+      }
+    },Math.max(90,duration-10));
   }
 
   function lockHorizontal(currentX,rawDx,isFast){
     mode='horizontal';
     fastPickup=!!isFast;
     if(fastPickup){
-      /* A sling owns its displacement from the first contact. */
       dragOriginX=startX;
+      lockedStepDirection=rawDx<0?1:-1;
     }else{
-      /* A careful drag keeps a small stable pickup zone. */
       const sign=rawDx===0?1:Math.sign(rawDx);
       dragOriginX=startX+sign*DRAG_INTENT_PX;
+      lockedStepDirection=0;
     }
     buildOverlay();
     placePages(currentX-dragOriginX);
   }
 
+  function momentumCount(speed,distance,w){
+    let steps=1;
+    if(speed>=.62||distance>=w*.34)steps=2;
+    if(speed>=1.02||distance>=w*.56)steps=3;
+    if(speed>=1.52||distance>=w*.82)steps=4;
+    return steps;
+  }
+
   story.addEventListener('pointerdown',e=>{
     if(e.pointerType==='mouse'&&e.button!==0)return;
-    if(pid!==null)return;
+    if(pid!==null||momentumRunning)return;
     pid=e.pointerId;
     startX=lastX=dragOriginX=e.clientX;
     startY=e.clientY;
@@ -289,6 +337,7 @@ export const presentationControllerScript = String.raw`
     peakVelocity=0;
     mode=null;
     fastPickup=false;
+    lockedStepDirection=0;
     try{story.setPointerCapture(e.pointerId);}catch(err){}
     warmState(window.__taleraPhotoBook.state());
   },{passive:true,capture:true});
@@ -341,8 +390,6 @@ export const presentationControllerScript = String.raw`
     const rawDy=e.clientY-startY;
     const avgVelocity=rawDx/age;
 
-    /* Extremely quick swipes can reach pointerup with very few move events.
-       Recover horizontal intent here instead of treating them as a failed tap. */
     if(!mode&&Math.abs(rawDx)>=FLICK_INTENT_PX&&Math.abs(rawDx)>Math.abs(rawDy)*HORIZONTAL_BIAS){
       lockHorizontal(e.clientX,rawDx,true);
       peakVelocity=Math.max(peakVelocity,Math.abs(avgVelocity));
@@ -350,29 +397,31 @@ export const presentationControllerScript = String.raw`
 
     const visualDx=mode==='horizontal'?e.clientX-dragOriginX:rawDx;
     const w=stage.getBoundingClientRect().width;
-    const direction=rawDx<0?1:-1;
+    const direction=fastPickup&&lockedStepDirection?lockedStepDirection:(rawDx<0?1:-1);
     const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
-    const distanceCommit=Math.abs(visualDx)>Math.max(70,w*.20);
-    const flickSpeed=Math.max(peakVelocity,Math.abs(avgVelocity));
-    const flickCommit=Math.abs(rawDx)>=26&&flickSpeed>=.38;
+    const distanceCommit=Math.abs(visualDx)>Math.max(64,w*.18);
+    const flickSpeed=Math.min(2.6,Math.max(peakVelocity,Math.abs(avgVelocity)));
+    const flickCommit=Math.abs(rawDx)>=20&&flickSpeed>=.32;
     const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
+    const steps=commit&&flickCommit?momentumCount(flickSpeed,Math.abs(rawDx),w):1;
 
-    if(mode==='horizontal')settle(direction,commit,flickSpeed);
+    if(mode==='horizontal')settle(direction,commit,flickSpeed,steps);
     else clearOverlay();
     try{story.releasePointerCapture(e.pointerId);}catch(err){}
     pid=null;
     mode=null;
     fastPickup=false;
+    lockedStepDirection=0;
   }
 
   function cancel(e){
     if(e.pointerId!==pid)return;
-    /* Browser/system cancellation is never interpreted as user navigation. */
     clearOverlay();
     try{story.releasePointerCapture(e.pointerId);}catch(err){}
     pid=null;
     mode=null;
     fastPickup=false;
+    lockedStepDirection=0;
   }
 
   story.addEventListener('pointerup',finish,{passive:true,capture:true});

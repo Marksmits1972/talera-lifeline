@@ -9,6 +9,7 @@ export const intentResponseStyle = String.raw`
   --talera-timeline-glass-opacity:.58;
   --talera-needle-height:46px;
   --talera-focus-scale:.92;
+  --talera-focus-active-scale:.99;
   --talera-focus-font-size:10px;
   --talera-photo-blend:220ms;
 }
@@ -23,13 +24,14 @@ export const intentResponseStyle = String.raw`
   height:var(--talera-needle-height)!important;
   min-height:0!important;
   max-height:none!important;
-  top:calc(50% - (var(--talera-needle-height) / 2))!important;
+  top:50%!important;
+  transform:translate(-1px,-50%)!important;
 }
 .timeline .focus{
   font-size:var(--talera-focus-font-size)!important;
   transform:translateZ(0) scale(var(--talera-focus-scale))!important;
 }
-.timeline.is-active .focus{transform:translateZ(0) scale(calc(var(--talera-focus-scale) + .07))!important}
+.timeline.is-active .focus{transform:translateZ(0) scale(var(--talera-focus-active-scale))!important}
 .photo-layer:not(.photo-book-page){
   transition:opacity var(--talera-photo-blend) cubic-bezier(.22,.61,.36,1)!important;
 }
@@ -73,6 +75,7 @@ export const intentResponseScript = String.raw`
     const glassOpacity=lerp(.58,.94,p);
     const needleHeight=lerp(46,96,p);
     const focusScale=lerp(.92,1.035,p);
+    const focusActiveScale=focusScale+.07;
     const focusFont=lerp(10,12,p);
     const photoBlend=lerp(220,105,p);
 
@@ -82,6 +85,7 @@ export const intentResponseScript = String.raw`
     root.style.setProperty('--talera-timeline-glass-opacity',glassOpacity.toFixed(3));
     root.style.setProperty('--talera-needle-height',needleHeight.toFixed(1)+'px');
     root.style.setProperty('--talera-focus-scale',focusScale.toFixed(3));
+    root.style.setProperty('--talera-focus-active-scale',focusActiveScale.toFixed(3));
     root.style.setProperty('--talera-focus-font-size',focusFont.toFixed(2)+'px');
     root.style.setProperty('--talera-photo-blend',photoBlend.toFixed(0)+'ms');
     root.dataset.taleraZoom=visualZoom.toFixed(2);
@@ -130,10 +134,7 @@ export const intentResponseScript = String.raw`
   const pointerEnd=e=>{
     pts.delete(e.pointerId);
     if(pts.size===0){scheduleSnap();setMoving(false,900)}
-    else if(pts.size===1){
-      /* A pinch ending in one remaining finger starts a fresh potential pinch baseline. */
-      pinchStartZoom=visualZoom;
-    }
+    else if(pts.size===1){pinchStartZoom=visualZoom}
   };
   surface.addEventListener('pointerup',pointerEnd,{passive:true,capture:true});
   surface.addEventListener('pointercancel',pointerEnd,{passive:true,capture:true});

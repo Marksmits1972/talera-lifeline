@@ -10,6 +10,7 @@ import { chunk9 } from "./html/chunk9.js";
 import { enhancementStyle } from "./enhancement.js";
 import { interactionFixStyle } from "./interaction-fixes.js";
 import { presentationControllerScript } from "./presentation-controller.js";
+import { fastFlickFallbackScript } from "./fast-flick-fallback.js";
 
 const BASE_HTML = [
   ...chunk1,
@@ -25,7 +26,7 @@ const BASE_HTML = [
 
 const HTML = BASE_HTML
   .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-presentation-controller">${presentationControllerScript}</script></body>`);
+  .replace("</body>", `<script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script></body>`);
 
 export default {
   async fetch() {

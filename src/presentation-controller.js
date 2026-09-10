@@ -6,6 +6,19 @@ export const presentationControllerScript = String.raw`
   const photos=Array.from(document.querySelectorAll('.example-photo'));
 
   /* ---------------------------------------------------------
+     TIMELINE READOUT TUNING.
+     Keep the large scale exactly as-is; make the exact date at
+     the needle just a little stronger so overview + precision
+     read as one hierarchy.
+     --------------------------------------------------------- */
+  if(!document.getElementById('talera-timeline-readout-tuning')){
+    const style=document.createElement('style');
+    style.id='talera-timeline-readout-tuning';
+    style.textContent='.focus{font-size:12.5px!important;font-weight:720!important;padding:5px 11px!important;letter-spacing:.005em!important;white-space:nowrap!important}.timeline.is-active .focus{transform:translateZ(0) scale(1.045)!important}';
+    document.head.appendChild(style);
+  }
+
+  /* ---------------------------------------------------------
      VISUAL PHOTO FITTING ONLY — never changes timeline state.
      --------------------------------------------------------- */
   function ensureAlignedBlur(img){
@@ -103,7 +116,11 @@ export const presentationControllerScript = String.raw`
   /* ---------------------------------------------------------
      ONE PHOTOBOOK OWNER.
      Horizontal photo movement never sends wheel/zoom input to timeline.
-     pointercancel always aborts and can never commit a memory change.
+     The first small movement is now a real "pickup" phase: the
+     current photo stays fixed until horizontal intent is clear.
+     Once locked, motion starts from zero instead of jumping by the
+     intent threshold. pointercancel always aborts and can never
+     commit a memory change.
      --------------------------------------------------------- */
   if(!story||!stage||!window.__taleraPhotoBook)return;
 
@@ -129,10 +146,12 @@ export const presentationControllerScript = String.raw`
   function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image);});}
   warmState(window.__taleraPhotoBook.state());
 
-  const INTENT_PX=10;
-  const MIN_COMMIT_AGE=65;
+  const INTENT_PX=14;
+  const HORIZONTAL_BIAS=1.18;
+  const MIN_COMMIT_AGE=90;
   let pid=null;
   let startX=0,startY=0,lastX=0,lastT=0,startT=0;
+  let dragOriginX=0;
   let mode=null;
   let overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
 
@@ -241,7 +260,7 @@ export const presentationControllerScript = String.raw`
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(pid!==null)return;
     pid=e.pointerId;
-    startX=lastX=e.clientX;
+    startX=lastX=dragOriginX=e.clientX;
     startY=e.clientY;
     startT=lastT=performance.now();
     mode=null;
@@ -251,19 +270,30 @@ export const presentationControllerScript = String.raw`
 
   story.addEventListener('pointermove',e=>{
     if(e.pointerId!==pid)return;
-    const dx=e.clientX-startX;
+    const rawDx=e.clientX-startX;
     const dy=e.clientY-startY;
-    if(!mode&&(Math.abs(dx)>INTENT_PX||Math.abs(dy)>INTENT_PX)){
-      mode=Math.abs(dx)>Math.abs(dy)*1.12?'horizontal':'vertical';
-      if(mode==='horizontal')buildOverlay();
+
+    if(!mode&&(Math.abs(rawDx)>INTENT_PX||Math.abs(dy)>INTENT_PX)){
+      mode=Math.abs(rawDx)>Math.abs(dy)*HORIZONTAL_BIAS?'horizontal':'vertical';
+      if(mode==='horizontal'){
+        /* Rebase at the edge of the dead-zone: pickup is visually stationary. */
+        const sign=rawDx===0?1:Math.sign(rawDx);
+        dragOriginX=startX+sign*INTENT_PX;
+        lastX=e.clientX;
+        lastT=performance.now();
+        buildOverlay();
+        placePages(e.clientX-dragOriginX);
+      }
     }
+
     if(mode==='vertical'){
       clearOverlay();
       return;
     }
     if(mode!=='horizontal')return;
+
     e.preventDefault();
-    placePages(dx);
+    placePages(e.clientX-dragOriginX);
     lastX=e.clientX;
     lastT=performance.now();
   },{passive:false,capture:true});
@@ -272,14 +302,14 @@ export const presentationControllerScript = String.raw`
     if(e.pointerId!==pid)return;
     const now=performance.now();
     const age=now-startT;
-    const dx=e.clientX-startX;
+    const dx=mode==='horizontal'?e.clientX-dragOriginX:e.clientX-startX;
     const dt=Math.max(16,now-lastT);
     const velocity=(e.clientX-lastX)/dt;
     const w=stage.getBoundingClientRect().width;
     const direction=dx<0?1:-1;
     const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
-    const distanceCommit=Math.abs(dx)>Math.max(72,w*.22);
-    const flickCommit=Math.abs(dx)>48&&Math.abs(velocity)>.62;
+    const distanceCommit=Math.abs(dx)>Math.max(82,w*.24);
+    const flickCommit=Math.abs(dx)>58&&Math.abs(velocity)>.72;
     const commit=mode==='horizontal'&&age>=MIN_COMMIT_AGE&&hasTarget&&(distanceCommit||flickCommit);
     if(mode==='horizontal')settle(direction,commit);
     else clearOverlay();

@@ -6,7 +6,7 @@ export const WORKBLAD_UNIVERSAL_NAV_STYLE = String.raw`
 .work-nav-item.active{color:#0F2747;font-weight:650}
 .work-nav-timeline-icon{width:24px;height:17px;position:relative}
 .work-nav-timeline-icon::before{content:"";position:absolute;left:1px;right:1px;top:8px;height:2px;border-radius:2px;background:currentColor;box-shadow:-4px -4px 0 -.4px currentColor,4px 4px 0 -.4px currentColor}
-.work-nav-tell{justify-self:center;width:50px;height:50px;border:0;border-radius:50%;color:#FFFEFC;background:#0F2747;box-shadow:0 9px 23px rgba(15,39,71,.17);font-size:11px;font-weight:650;position:relative}
+.work-nav-tell{justify-self:center;width:50px;height:50px;border:0;border-radius:50%;color:#FFFEFC;background:#0F2747;box-shadow:0 9px 23px rgba(15,39,71,.17);font-size:11px;font-weight:650;position:relative;cursor:default}
 .work-nav-tell::after{content:"";display:block;width:5px;height:5px;border-radius:50%;background:#E7A98B;margin:3px auto 0;opacity:.88}
 .work-nav-more{width:22px;letter-spacing:3px;font-size:18px;line-height:1}
 .work-top .work-timeline-back{display:none!important}
@@ -48,10 +48,9 @@ function install(){
   var nav=document.createElement('nav');
   nav.className='work-universal-nav';
   nav.setAttribute('aria-label','TALERA navigatie');
-  nav.innerHTML='<button class="work-nav-item work-nav-timeline" type="button"><span class="work-nav-timeline-icon"></span><span>Tijdlijn</span></button><button class="work-nav-tell" type="button" aria-current="page">Vertel</button><button class="work-nav-item" type="button"><span class="work-nav-more">•••</span><span>Meer</span></button>';
+  nav.innerHTML='<button class="work-nav-item work-nav-timeline" type="button"><span class="work-nav-timeline-icon"></span><span>Tijdlijn</span></button><button class="work-nav-tell" type="button" aria-current="page" aria-label="Vertel - huidige pagina">Vertel</button><button class="work-nav-item" type="button"><span class="work-nav-more">•••</span><span>Meer</span></button>';
   stage.appendChild(nav);
   nav.querySelector('.work-nav-timeline').onclick=goTimeline;
-  nav.querySelector('.work-nav-tell').onclick=function(){var text=document.getElementById('workText');if(text)text.focus({preventScroll:true})};
 }
 var observer=new MutationObserver(install);
 observer.observe(document.documentElement,{childList:true,subtree:true});

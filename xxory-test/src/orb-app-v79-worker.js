@@ -3,14 +3,15 @@ import { WORKBLAD_V1_STYLE } from "./workblad-v1-style.js";
 import { WORKBLAD_V1_FOCUS_RING_STYLE } from "./workblad-v1-focus-ring-style.js";
 import { WORKBLAD_V2_STYLE } from "./workblad-v2-style.js";
 import { WORKBLAD_V2_SCRIPT } from "./workblad-v2-client.js";
+import { WORKBLAD_RETURN_STYLE, WORKBLAD_RETURN_SCRIPT } from "./workblad-return-nav.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-linked-timeline-proxy-ios-stable";
+const TALERA_DEPLOY_REV = "workblad-v2-return-to-timeline";
 
 function enhanceWorkblad(html){
   return html
-    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+'</style></head>')
-    .replace('</body>',WORKBLAD_V2_SCRIPT+'</body>');
+    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_RETURN_STYLE+'</style></head>')
+    .replace('</body>',WORKBLAD_V2_SCRIPT+WORKBLAD_RETURN_SCRIPT+'</body>');
 }
 
 export default {

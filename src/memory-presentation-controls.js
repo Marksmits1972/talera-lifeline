@@ -52,7 +52,7 @@ export const memoryPresentationControlsScript = String.raw`
   const audioLabel=tools.querySelector('.audio-label');
   const editButton=tools.querySelector('.talera-memory-edit');
   const audio=new Audio();
-  audio.preload='metadata';
+  audio.preload='auto';
   const audioUrls=new Map();
   const detailCache=new Map();
   let activeStoryId='';
@@ -138,21 +138,31 @@ export const memoryPresentationControlsScript = String.raw`
     setAudioUi();
   }
 
-  async function playCurrent(){
+  function playPreparedAudio(){
     if(!activeStoryId||!activeToken||!activeHasAudio||loading)return;
-    const storyId=activeStoryId,token=activeToken,epoch=++playbackEpoch;
-    loading=true;setAudioUi();
+    const url=audioUrls.get(activeStoryId);
+    if(!url){
+      loading=true;setAudioUi();
+      const storyId=activeStoryId,token=activeToken,epoch=playbackEpoch;
+      getAudioUrl(storyId,token).then(()=>{
+        if(epoch!==playbackEpoch||storyId!==activeStoryId)return;
+        loading=false;setAudioUi();
+      }).catch(e=>{
+        if(epoch!==playbackEpoch)return;
+        loading=false;setAudioUi();
+        console.warn('TALERA audio kon niet worden voorbereid',e);
+      });
+      return;
+    }
     try{
-      const url=await getAudioUrl(storyId,token);
-      if(epoch!==playbackEpoch||storyId!==activeStoryId)return;
       if(audio.src!==url){audio.src=url;audio.currentTime=0}
-      loading=false;setAudioUi();
-      await audio.play();
-      if(epoch!==playbackEpoch||storyId!==activeStoryId){audio.pause();return}
+      const playPromise=audio.play();
+      if(playPromise&&typeof playPromise.catch==='function'){
+        playPromise.catch(e=>{setAudioUi();console.warn('TALERA audio kon niet starten',e)});
+      }
       setAudioUi();
     }catch(e){
-      if(epoch!==playbackEpoch)return;
-      loading=false;setAudioUi();
+      setAudioUi();
       console.warn('TALERA audio kon niet starten',e);
     }
   }
@@ -169,7 +179,7 @@ export const memoryPresentationControlsScript = String.raw`
     e.preventDefault();e.stopPropagation();
     if(loading)return;
     if(!audio.paused){audio.pause();return}
-    playCurrent();
+    playPreparedAudio();
   });
 
   editButton.addEventListener('click',e=>{
@@ -209,9 +219,18 @@ export const memoryPresentationControlsScript = String.raw`
       }catch(e){}
     }
 
-    if(epoch!==renderEpoch)return;
-    showAudio(activeHasAudio);
-    setAudioUi();
+    if(epoch!==renderEpoch||!activeHasAudio)return;
+
+    /* Prepare the protected blob before the user taps, so iPhone can play inside the tap gesture. */
+    loading=true;showAudio(true);setAudioUi();
+    try{
+      await getAudioUrl(activeStoryId,activeToken);
+      if(epoch!==renderEpoch)return;
+      loading=false;showAudio(true);setAudioUi();
+    }catch(e){
+      if(epoch!==renderEpoch)return;
+      loading=false;activeHasAudio=false;memory._hasAudio=false;showAudio(false);setAudioUi();
+    }
   }
 
   runtime.subscribe(memory=>render(memory));

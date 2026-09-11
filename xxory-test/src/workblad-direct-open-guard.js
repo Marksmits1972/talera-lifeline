@@ -1,27 +1,31 @@
 export const WORKBLAD_DIRECT_OPEN_GUARD_SCRIPT = String.raw`<script>(function(){
-function isDirectFreshOpen(){
-  try{
-    var q=new URLSearchParams(location.search);
-    return !q.get('edit')&&!q.get('at')&&q.get('new')!=='1';
-  }catch(e){return true}
-}
+var direct=false,resolved=false,userPickedDate=false;
+try{
+  var q=new URLSearchParams(location.search);
+  direct=!q.get('edit')&&!q.get('at')&&q.get('new')!=='1';
+}catch(e){direct=true}
+if(!direct)return;
+
 function hasMeaningfulDraft(){
   try{
-    if(typeof state==='undefined')return true;
+    if(typeof state==='undefined')return false;
     if(String(state.workTitle||'').trim())return true;
     if(String(state.workText||'').trim())return true;
     if(Array.isArray(state.workMedia)&&state.workMedia.length)return true;
     if(state.audioBlob||state.hasExistingAudio)return true;
     return false;
-  }catch(e){return true}
+  }catch(e){return false}
 }
-async function clearDateOnlyDraft(){
-  if(!isDirectFreshOpen()||hasMeaningfulDraft())return;
-  try{
-    if(typeof state!=='undefined')state.workDate='';
-    var el=document.getElementById('workDate');
-    if(el){el.value='';el.placeholder='Wanneer speelde dit verhaal zich af? Bijvoorbeeld zomer 1987';}
-  }catch(e){}
+function clearVisibleDate(){
+  if(userPickedDate)return;
+  try{if(typeof state!=='undefined')state.workDate=''}catch(e){}
+  var el=document.getElementById('workDate');
+  if(el){
+    el.value='';
+    el.placeholder='Wanneer speelde dit verhaal zich af? Bijvoorbeeld zomer 1987';
+  }
+}
+async function clearPersistedDateOnlyDraft(){
   try{
     var db=await new Promise(function(ok,no){
       var r=indexedDB.open('talera-workblad-v2',1);
@@ -35,7 +39,8 @@ async function clearDateOnlyDraft(){
       var get=store.get('current');
       get.onsuccess=function(){
         var d=get.result;
-        if(d&&!String(d.title||'').trim()&&!String(d.text||'').trim()&&!(Array.isArray(d.photos)&&d.photos.length)&&!d.audio){store.delete('current')}
+        var meaningful=d&&(String(d.title||'').trim()||String(d.text||'').trim()||(Array.isArray(d.photos)&&d.photos.length)||d.audio);
+        if(d&&!meaningful)store.delete('current');
       };
       tx.oncomplete=ok;tx.onerror=function(){no(tx.error)};
     });
@@ -46,5 +51,24 @@ async function clearDateOnlyDraft(){
     if(p&&!String(p.title||'').trim()&&!String(p.text||'').trim())localStorage.removeItem('talera-workblad-text-v2');
   }catch(e){}
 }
-setTimeout(clearDateOnlyDraft,0);
+function reconcile(){
+  if(resolved||userPickedDate)return;
+  if(hasMeaningfulDraft()){
+    resolved=true;
+    return;
+  }
+  clearVisibleDate();
+  clearPersistedDateOnlyDraft();
+}
+
+document.addEventListener('input',function(e){
+  if(e.target&&e.target.id==='workDate'&&document.querySelector('.talera-date-backdrop')){
+    userPickedDate=true;
+    resolved=true;
+  }
+},true);
+
+clearVisibleDate();
+[40,120,260,520,900,1400].forEach(function(ms){setTimeout(reconcile,ms)});
+window.addEventListener('pageshow',function(){setTimeout(reconcile,60)});
 })();</scr`+`ipt>`;

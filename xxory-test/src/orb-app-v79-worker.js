@@ -4,33 +4,23 @@ import { WORKBLAD_V1_FOCUS_RING_STYLE } from "./workblad-v1-focus-ring-style.js"
 import { WORKBLAD_V2_STYLE } from "./workblad-v2-style.js";
 import { WORKBLAD_V2_SCRIPT } from "./workblad-v2-client.js";
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
+import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
 import { WORKBLAD_AUDIO_PERSIST_SCRIPT } from "./workblad-audio-persist.js";
 import { WORKBLAD_AUDIO_COMMIT_GUARD_SCRIPT } from "./workblad-audio-commit-guard.js";
 import { handleWorkbladAudioHead } from "./workblad-audio-head.js";
-import { TALERA_CORE_WORKBLAD_PRELUDE, TALERA_CORE_WORKBLAD_STYLE, TALERA_CORE_WORKBLAD_SCRIPT } from "./talera-core-workblad.js";
+import { WORKBLAD_PHOTO_SWIPE_LITE_STYLE, WORKBLAD_PHOTO_SWIPE_LITE_SCRIPT } from "./workblad-photo-swipe-lite.js";
+import { WORKBLAD_REQUIRED_DATE_STYLE, WORKBLAD_REQUIRED_DATE_SCRIPT } from "./workblad-required-date.js";
+import { WORKBLAD_DIRECT_OPEN_GUARD_SCRIPT } from "./workblad-direct-open-guard.js";
+import { WORKBLAD_VOICE_FIRST_STYLE, WORKBLAD_VOICE_FIRST_SCRIPT } from "./workblad-voice-first.js";
+import { WORKBLAD_NEW_STORY_CONTEXT_SCRIPT } from "./workblad-new-story-context.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "talera-core-direct-workblad-r2-final-20260911-2315";
-
-const CORE_BOOT_GUARD = String.raw`<script>(function(){
-setTimeout(function(){
-  if(document.querySelector('.work-stage'))return;
-  var root=document.getElementById('app');
-  if(!root)return;
-  root.innerHTML='<div style="min-height:100dvh;display:grid;place-items:center;padding:28px;background:#F7F4EF;color:#0F2747;font-family:system-ui,-apple-system,sans-serif;text-align:center"><div><strong style="font-size:20px">Talera kon het vertelblad niet openen.</strong><p style="line-height:1.5;opacity:.7">Ga terug naar je tijdlijn en probeer het opnieuw.</p><button id="taleraBootBack" style="border:0;border-radius:16px;background:#0F2747;color:white;padding:14px 18px;font-weight:700">Terug naar mijn tijdlijn</button></div></div>';
-  var b=document.getElementById('taleraBootBack');if(b)b.onclick=function(){location.href='https://talera-timeline-prototype.mark-a39.workers.dev/'};
-},900);
-})();</scr`+`ipt>`;
-
-function suppressLegacyEntry(html){
-  return html.replace(/renderEntry\(\);\s*<\/script>\s*<\/body>/,'/* TALERA core owns the initial render; legacy chooser intentionally disabled. */\n</script></body>');
-}
+const TALERA_DEPLOY_REV = "rollback-stable-workblad-after-core-boot-crash-20260911-2318";
 
 function enhanceWorkblad(html){
-  const base=suppressLegacyEntry(html);
-  return base
-    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+TALERA_CORE_WORKBLAD_STYLE+'</style></head>')
-    .replace('</body>',TALERA_CORE_WORKBLAD_PRELUDE+WORKBLAD_AUDIO_COMMIT_GUARD_SCRIPT+WORKBLAD_V2_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_AUDIO_PERSIST_SCRIPT+TALERA_CORE_WORKBLAD_SCRIPT+CORE_BOOT_GUARD+'</body>');
+  return html
+    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+WORKBLAD_PHOTO_SWIPE_LITE_STYLE+WORKBLAD_REQUIRED_DATE_STYLE+WORKBLAD_VOICE_FIRST_STYLE+'</style></head>')
+    .replace('</body>',WORKBLAD_NEW_STORY_CONTEXT_SCRIPT+WORKBLAD_AUDIO_COMMIT_GUARD_SCRIPT+WORKBLAD_V2_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+WORKBLAD_AUDIO_PERSIST_SCRIPT+WORKBLAD_PHOTO_SWIPE_LITE_SCRIPT+WORKBLAD_REQUIRED_DATE_SCRIPT+WORKBLAD_DIRECT_OPEN_GUARD_SCRIPT+WORKBLAD_VOICE_FIRST_SCRIPT+'</body>');
 }
 
 export default {
@@ -48,7 +38,7 @@ export default {
     const headers=new Headers(response.headers);
     headers.delete('content-length');
     headers.set('cache-control','no-store');
-    headers.set('x-talera-orb-app','organic-v79-stable-with-core-workblad');
+    headers.set('x-talera-orb-app','organic-v79-stable-with-workblad-v2');
     headers.set('x-talera-vertel-ui',TALERA_DEPLOY_REV);
     return new Response(enhanceWorkblad(html),{status:response.status,statusText:response.statusText,headers});
   }

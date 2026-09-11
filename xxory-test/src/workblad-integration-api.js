@@ -29,7 +29,7 @@ export async function handleWorkbladIntegrationApi(request, env) {
   }
 
   const audioMatch = url.pathname.match(/^\/api\/integration\/stories\/([^/]+)\/audio$/);
-  if (audioMatch && request.method === 'GET') {
+  if (audioMatch && (request.method === 'GET' || request.method === 'HEAD')) {
     const response = await getPrivateAudio(request, env, audioMatch[1]);
     return withCors(request, response);
   }
@@ -71,7 +71,12 @@ async function getPrivateStory(request, env, storyId, origin) {
   }));
 
   const eventAt = resolveEventAt(row.event_time_text, row.created_at);
-  const hasAudio = Boolean(row.audio_object_key) || Number(row.audio_size_bytes || 0) > 0;
+  let audioObject = null;
+  if (row.audio_object_key) {
+    try { audioObject = await env.MEDIA.head(row.audio_object_key); } catch {}
+  }
+  const hasAudio = Boolean(audioObject);
+  const audioMimeType = row.audio_mime_type || audioObject?.httpMetadata?.contentType || null;
   return json({
     storyId: row.id,
     createdAt: row.created_at,
@@ -87,7 +92,8 @@ async function getPrivateStory(request, env, storyId, origin) {
     sourceMode: row.source_mode || 'workblad',
     textContent: row.text_content || '',
     hasAudio,
-    audioMimeType: row.audio_mime_type || null,
+    audioMimeType,
+    audioSizeBytes: hasAudio ? Number(audioObject?.size || row.audio_size_bytes || 0) : 0,
     audioUrl: hasAudio
       ? `${origin}/api/integration/stories/${encodeURIComponent(storyId)}/audio`
       : null,
@@ -167,18 +173,24 @@ async function updatePrivateAudio(request, env, storyId) {
     customMetadata: { storyId, updatedAt, role: 'story-audio' },
   });
 
+  const written = await env.MEDIA.head(objectKey);
+  if (!written) {
+    try { await env.MEDIA.delete(objectKey); } catch {}
+    return json({ error: 'De opname kon niet veilig worden opgeslagen.' }, 502);
+  }
+
   await env.DB.prepare(`
     UPDATE stories
     SET audio_object_key = ?, audio_mime_type = ?, audio_size_bytes = ?, duration_seconds = ?, updated_at = ?
     WHERE id = ?
-  `).bind(objectKey, mimeType, audio.size, duration, updatedAt, storyId).run();
+  `).bind(objectKey, mimeType, written.size || audio.size, duration, updatedAt, storyId).run();
 
   const oldKey = auth.row.audio_object_key;
   if (oldKey && oldKey !== objectKey) {
     try { await env.MEDIA.delete(oldKey); } catch {}
   }
 
-  return json({ ok: true, storyId, hasAudio: true, durationSeconds: duration, updatedAt });
+  return json({ ok: true, storyId, hasAudio: true, audioSizeBytes: written.size || audio.size, durationSeconds: duration, updatedAt });
 }
 
 async function authorizedStory(request, env, storyId, query, queryAlreadyIncludesToken = false) {
@@ -203,6 +215,19 @@ async function authorizedStory(request, env, storyId, query, queryAlreadyInclude
 }
 
 async function r2Response(request, env, key, mimeType) {
+  if (request.method === 'HEAD') {
+    const object = await env.MEDIA.head(key);
+    if (!object) return new Response('Niet gevonden', { status: 404 });
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('content-type', mimeType || headers.get('content-type') || 'application/octet-stream');
+    headers.set('accept-ranges', 'bytes');
+    headers.set('cache-control', 'private, max-age=120');
+    headers.set('etag', object.httpEtag);
+    if (Number.isFinite(object.size)) headers.set('content-length', String(object.size));
+    return new Response(null, { status: 200, headers });
+  }
+
   const object = await env.MEDIA.get(key, { onlyIf: request.headers, range: request.headers });
   if (!object) return new Response('Niet gevonden', { status: 404 });
   if (!("body" in object)) return new Response(null, { status: 412 });
@@ -268,7 +293,7 @@ function withCors(request, response) {
   if (TIMELINE_ORIGIN_RE.test(origin)) {
     headers.set('access-control-allow-origin', origin);
     headers.set('vary', 'Origin');
-    headers.set('access-control-allow-methods', 'GET,PUT,OPTIONS');
+    headers.set('access-control-allow-methods', 'GET,HEAD,PUT,OPTIONS');
     headers.set('access-control-allow-headers', 'authorization,content-type');
     headers.set('access-control-max-age', '600');
   }

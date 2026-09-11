@@ -15,7 +15,7 @@ import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-
 import { memoryPresentationControlsStyle, memoryPresentationControlsScript } from "./memory-presentation-controls.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "listen-layer-manual-v1-20260911";
+const TALERA_TIMELINE_DEPLOY_REV = "listen-layer-manual-v1-r2-20260911";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();

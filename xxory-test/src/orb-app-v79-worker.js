@@ -8,7 +8,7 @@ import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./w
 import { WORKBLAD_AUDIO_PERSIST_SCRIPT } from "./workblad-audio-persist.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-photo-first-audio-persist";
+const TALERA_DEPLOY_REV = "workblad-v2-photo-first-audio-final-forced-1939";
 
 function enhanceWorkblad(html){
   return html

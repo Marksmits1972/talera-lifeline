@@ -15,6 +15,7 @@ import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-
 import { memoryPresentationControlsStyle, memoryPresentationControlsScript } from "./memory-presentation-controls.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
+const TALERA_TIMELINE_DEPLOY_REV = "listen-layer-manual-v1-20260911";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();
@@ -177,7 +178,7 @@ async function proxyLinkedMemory(request) {
   out.delete("access-control-allow-methods");
   out.delete("content-security-policy");
   out.set("cache-control", upstream.headers.get("content-type")?.startsWith("image/") ? "private, max-age=120" : "no-store");
-  out.set("x-talera-linked-proxy", "v5-audio-state-playback");
+  out.set("x-talera-linked-proxy", TALERA_TIMELINE_DEPLOY_REV);
 
   return new Response(request.method === "HEAD" ? null : upstream.body, {
     status: upstream.status,
@@ -195,7 +196,7 @@ export default {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",
-        "x-talera-timeline-ui": "linked-memories-v5-audio-state-playback",
+        "x-talera-timeline-ui": TALERA_TIMELINE_DEPLOY_REV,
       },
     });
   },

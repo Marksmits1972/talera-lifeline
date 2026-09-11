@@ -18,13 +18,6 @@ export const WORKBLAD_VOICE_FIRST_STYLE = String.raw`
 
 export const WORKBLAD_VOICE_FIRST_SCRIPT = String.raw`<script>(function(){
 function applyVoiceFirstCopy(){
-  var button=document.getElementById('workVoice');
-  if(button){
-    var hasVoice=Boolean(document.querySelector('.work-voice-note'));
-    var label=hasVoice?'Vertel nog iets':'Vertel iets';
-    if(button.textContent!==label)button.textContent=label;
-    button.setAttribute('aria-label',hasVoice?'Voeg nog een gesproken stukje toe':'Vertel iets over deze herinnering');
-  }
   var story=document.getElementById('workText');
   if(story)story.placeholder='Of schrijf wat je wilt onthouden…';
 }

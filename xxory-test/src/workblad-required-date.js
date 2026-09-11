@@ -24,7 +24,7 @@ function getState(){try{return typeof state!=='undefined'?state:null}catch(e){re
 function syncField(){
   var el=document.getElementById('workDate');
   if(!el)return;
-  el.placeholder='Wanneer speelde dit verhaal zich af?';
+  el.placeholder='Wanneer speelde dit verhaal zich af? Bijvoorbeeld zomer 1987';
   el.readOnly=true;
   el.setAttribute('aria-haspopup','dialog');
   el.setAttribute('aria-label','Wanneer speelde dit verhaal zich af?');

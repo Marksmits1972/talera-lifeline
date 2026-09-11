@@ -3,7 +3,7 @@ import { WORKBLAD_V1_STYLE } from "./workblad-v1-style.js";
 import { WORKBLAD_V1_FOCUS_RING_STYLE } from "./workblad-v1-focus-ring-style.js";
 import { WORKBLAD_V1_SCRIPT } from "./workblad-v1-client.js";
 
-const TALERA_DEPLOY_REV = "workblad-v1-orb-focus-feathered";
+const TALERA_DEPLOY_REV = "workblad-v1-orb-focus-tight-zero-fade";
 
 /* Repair the one-character Promise closure typo in the first workblad client build.
    Keep the source prototype intact while making the proven live entry boot correctly. */

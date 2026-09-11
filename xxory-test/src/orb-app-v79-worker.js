@@ -11,7 +11,7 @@ import { WORKBLAD_REQUIRED_DATE_STYLE, WORKBLAD_REQUIRED_DATE_SCRIPT } from "./w
 import { WORKBLAD_DIRECT_OPEN_GUARD_SCRIPT } from "./workblad-direct-open-guard.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-direct-open-date-guard-racefix-20260911";
+const TALERA_DEPLOY_REV = "workblad-v2-new-story-date-question-20260911";
 
 function enhanceWorkblad(html){
   return html

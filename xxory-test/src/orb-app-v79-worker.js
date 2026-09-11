@@ -6,7 +6,7 @@ import { WORKBLAD_V2_SCRIPT } from "./workblad-v2-client.js";
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-universal-bottom-nav";
+const TALERA_DEPLOY_REV = "workblad-v2-universal-bottom-nav-v2";
 
 function enhanceWorkblad(html){
   return html

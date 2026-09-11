@@ -13,7 +13,7 @@ import { WORKBLAD_VOICE_FIRST_STYLE, WORKBLAD_VOICE_FIRST_SCRIPT } from "./workb
 import { WORKBLAD_NEW_STORY_CONTEXT_SCRIPT } from "./workblad-new-story-context.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-voice-first-listen-chain-r2-20260911";
+const TALERA_DEPLOY_REV = "workblad-v2-voice-first-listen-chain-r3-20260911";
 
 function enhanceWorkblad(html){
   return html

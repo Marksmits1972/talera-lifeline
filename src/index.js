@@ -15,7 +15,7 @@ import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-
 import { memoryPresentationControlsStyle, memoryPresentationControlsScript } from "./memory-presentation-controls.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "audio-write-verify-listen-r3-20260911";
+const TALERA_TIMELINE_DEPLOY_REV = "listen-layer-r4-hide-bottom-date-force-20260911-2240";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();
@@ -85,6 +85,7 @@ const BASE_HTML = [
 );
 
 const timelineAfterglowStyle = String.raw`
+.memory-space .date,#memoryDate{display:none!important}
 .zoom-hint,#zoomHint{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 .timeline.is-timeline-afterglow canvas{opacity:1!important;filter:saturate(1.16) contrast(1.34) brightness(1.13) drop-shadow(0 0 3px rgba(255,255,255,.42))!important}
 .timeline.is-timeline-afterglow::after{opacity:.92!important}

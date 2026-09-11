@@ -45,7 +45,7 @@ export const memoryPresentationControlsScript = String.raw`
 
   const tools=document.createElement('div');
   tools.className='talera-memory-tools';
-  tools.innerHTML='<button class="talera-memory-tool talera-memory-audio" type="button" aria-label="Gesproken verhaal afspelen" hidden><span class="audio-symbol">▶</span><span class="audio-label">Luister</span></button><button class="talera-memory-tool talera-memory-auto" type="button" aria-label="Automatisch afspelen" hidden>Auto</button><button class="talera-memory-tool talera-memory-edit icon-only" type="button" aria-label="Herinnering bewerken" hidden><span class="edit-symbol">✎</span></button>';
+  tools.innerHTML='<button class="talera-memory-tool talera-memory-audio" type="button" aria-label="Gesproken verhaal afspelen" hidden><span class="audio-symbol">▶</span><span class="audio-label">Luister</span></button><button class="talera-memory-tool talera-memory-auto" type="button" aria-label="Automatisch afspelen" hidden>Auto aan</button><button class="talera-memory-tool talera-memory-edit icon-only" type="button" aria-label="Herinnering bewerken" hidden><span class="edit-symbol">✎</span></button>';
   memorySpace.appendChild(tools);
 
   const audioButton=tools.querySelector('.talera-memory-audio');
@@ -59,8 +59,11 @@ export const memoryPresentationControlsScript = String.raw`
   let activeStoryId='';
   let activeToken='';
   let activeHasAudio=false;
-  let autoEnabled=false;
-  try{autoEnabled=localStorage.getItem(AUTO_KEY)==='1'}catch(e){}
+  let autoEnabled=true;
+  try{
+    const saved=localStorage.getItem(AUTO_KEY);
+    autoEnabled=saved===null?true:saved==='1';
+  }catch(e){}
 
   function tokenFor(memory){return memory&&memory._manageToken||''}
   function isEditable(memory){return Boolean(memory&&memory._taleraLive&&memory.storyId&&tokenFor(memory))}
@@ -68,13 +71,17 @@ export const memoryPresentationControlsScript = String.raw`
   function setAutoUi(){
     autoButton.classList.toggle('is-on',autoEnabled);
     autoButton.setAttribute('aria-pressed',autoEnabled?'true':'false');
-    autoButton.textContent=autoEnabled?'Auto aan':'Auto';
+    autoButton.textContent=autoEnabled?'Auto aan':'Auto uit';
   }
   function setAudioUi(playing){
     audioButton.classList.toggle('is-playing',Boolean(playing));
     const symbol=audioButton.querySelector('.audio-symbol');
     if(symbol)symbol.textContent=playing?'Ⅱ':'▶';
     if(audioLabel)audioLabel.textContent=playing?'Pauze':'Luister';
+  }
+  function showAudioControls(show){
+    audioButton.hidden=!show;
+    autoButton.hidden=!show;
   }
   setAutoUi();setAudioUi(false);
 
@@ -84,7 +91,10 @@ export const memoryPresentationControlsScript = String.raw`
     if(detailCache.has(id))return detailCache.get(id);
     const localPath='/api/linked/stories/'+encodeURIComponent(id);
     let response=null;
-    try{response=await fetch(localPath,{headers:auth(token),cache:'no-store'});if(response.ok){const data=await response.json();detailCache.set(id,data);return data}}catch(e){}
+    try{
+      response=await fetch(localPath,{headers:auth(token),cache:'no-store'});
+      if(response.ok){const data=await response.json();detailCache.set(id,data);return data}
+    }catch(e){}
     response=await fetch(TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(id),{headers:auth(token),cache:'no-store'});
     if(!response.ok)throw new Error('detail '+response.status);
     const data=await response.json();detailCache.set(id,data);return data;
@@ -94,7 +104,10 @@ export const memoryPresentationControlsScript = String.raw`
     if(audioUrls.has(storyId))return audioUrls.get(storyId);
     const localPath='/api/linked/stories/'+encodeURIComponent(storyId)+'/audio';
     let response=null;
-    try{response=await fetch(localPath,{headers:auth(token),cache:'no-store'});if(response.ok){const blob=await response.blob();const url=URL.createObjectURL(blob);audioUrls.set(storyId,url);return url}}catch(e){}
+    try{
+      response=await fetch(localPath,{headers:auth(token),cache:'no-store'});
+      if(response.ok){const blob=await response.blob();const url=URL.createObjectURL(blob);audioUrls.set(storyId,url);return url}
+    }catch(e){}
     response=await fetch(TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(storyId)+'/audio',{headers:auth(token),cache:'no-store'});
     if(!response.ok)throw new Error('audio '+response.status);
     const blob=await response.blob();const url=URL.createObjectURL(blob);audioUrls.set(storyId,url);return url;
@@ -114,12 +127,14 @@ export const memoryPresentationControlsScript = String.raw`
       setAudioUi(true);
     }catch(e){
       setAudioUi(false);
+      /* iOS can block audible autoplay before the first user gesture. Keep Luister visible. */
       if(!fromAuto)console.warn('TALERA audio kon niet starten',e);
     }
   }
 
   audio.addEventListener('ended',()=>stopAudio(true));
   audio.addEventListener('pause',()=>{if(!audio.ended)setAudioUi(false)});
+  audio.addEventListener('play',()=>setAudioUi(true));
 
   audioButton.addEventListener('click',()=>{
     if(!audio.paused){audio.pause();return}
@@ -130,6 +145,7 @@ export const memoryPresentationControlsScript = String.raw`
     try{localStorage.setItem(AUTO_KEY,autoEnabled?'1':'0')}catch(e){}
     setAutoUi();
     if(autoEnabled&&activeHasAudio)playCurrent(false);
+    else if(!autoEnabled)stopAudio(false);
   });
   editButton.addEventListener('click',()=>{
     const memory=runtime.currentMemory();
@@ -145,24 +161,32 @@ export const memoryPresentationControlsScript = String.raw`
     stopAudio(true);
     activeStoryId=editable?memory.storyId:'';
     activeToken=editable?tokenFor(memory):'';
-    activeHasAudio=false;
-    audioButton.hidden=true;
-    autoButton.hidden=true;
+    activeHasAudio=Boolean(editable&&memory&&memory._hasAudio);
+    showAudioControls(activeHasAudio);
+    setAutoUi();setAudioUi(false);
     if(!editable)return;
 
     try{
       const detail=await getDetail(memory);
       if(epoch!==renderEpoch)return;
-      activeHasAudio=Boolean(detail&&detail.hasAudio);
-      audioButton.hidden=!activeHasAudio;
-      autoButton.hidden=!activeHasAudio;
-      setAutoUi();setAudioUi(false);
-      if(activeHasAudio&&autoEnabled&&mayAutoplay)setTimeout(()=>playCurrent(true),60);
-    }catch(e){
-      if(epoch!==renderEpoch)return;
-      audioButton.hidden=true;autoButton.hidden=true;
-      console.warn('TALERA audio status kon niet worden bepaald',e);
+      activeHasAudio=activeHasAudio||Boolean(detail&&detail.hasAudio);
+      if(memory)memory._hasAudio=activeHasAudio;
+    }catch(e){}
+
+    /* Last-resort probe: if metadata is stale but the R2 object exists, still expose it. */
+    if(!activeHasAudio&&epoch===renderEpoch){
+      try{
+        await getAudioUrl(activeStoryId,activeToken);
+        if(epoch!==renderEpoch)return;
+        activeHasAudio=true;
+        if(memory)memory._hasAudio=true;
+      }catch(e){}
     }
+
+    if(epoch!==renderEpoch)return;
+    showAudioControls(activeHasAudio);
+    setAutoUi();setAudioUi(false);
+    if(activeHasAudio&&autoEnabled&&mayAutoplay)setTimeout(()=>playCurrent(true),70);
   }
 
   runtime.subscribe(memory=>render(memory,true));

@@ -1,8 +1,9 @@
 import stableV79Worker from "./archive/orb-app-v79-stable-20260911.js";
 import { WORKBLAD_V1_STYLE } from "./workblad-v1-style.js";
+import { WORKBLAD_V1_FOCUS_RING_STYLE } from "./workblad-v1-focus-ring-style.js";
 import { WORKBLAD_V1_SCRIPT } from "./workblad-v1-client.js";
 
-const TALERA_DEPLOY_REV = "workblad-v1-photo-persist-bg30";
+const TALERA_DEPLOY_REV = "workblad-v1-orb-focus-ring";
 
 /* Repair the one-character Promise closure typo in the first workblad client build.
    Keep the source prototype intact while making the proven live entry boot correctly. */
@@ -13,7 +14,7 @@ const WORKBLAD_V1_SCRIPT_FIXED = WORKBLAD_V1_SCRIPT.replace(
 
 function enhanceWorkblad(html){
   return html
-    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+'</style></head>')
+    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+'</style></head>')
     .replace('</body>',WORKBLAD_V1_SCRIPT_FIXED+'</body>');
 }
 

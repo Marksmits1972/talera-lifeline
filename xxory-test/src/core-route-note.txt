@@ -1,1 +1,0 @@
-TALERA core routing marker 2026-09-11: legacy v79 entry render is intentionally suppressed by orb-app-v79-worker.js; v79 orb remains available inside the workblad voice overlay.

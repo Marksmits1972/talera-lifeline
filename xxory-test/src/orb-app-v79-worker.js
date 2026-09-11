@@ -2,7 +2,7 @@ import stableV79Worker from "./archive/orb-app-v79-stable-20260911.js";
 import { WORKBLAD_V1_STYLE } from "./workblad-v1-style.js";
 import { WORKBLAD_V1_SCRIPT } from "./workblad-v1-client.js";
 
-const TALERA_DEPLOY_REV = "workblad-v1-photo-preview-single-control";
+const TALERA_DEPLOY_REV = "workblad-v1-photo-persist-bg30";
 
 /* Repair the one-character Promise closure typo in the first workblad client build.
    Keep the source prototype intact while making the proven live entry boot correctly. */

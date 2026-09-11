@@ -38,9 +38,8 @@ export const memoryPresentationControlsScript = String.raw`
     oldTell.replaceWith(fresh);
     fresh.addEventListener('click',e=>{
       e.preventDefault();e.stopPropagation();
-      const memory=runtime.currentMemory();
-      const ms=memory&&memory.ms?memory.ms:runtime.centerMs();
-      location.href=TELL_ORIGIN+'/?at='+encodeURIComponent(new Date(ms).toISOString());
+      const ms=runtime.centerMs();
+      location.href=TELL_ORIGIN+'/?new=1&at='+encodeURIComponent(new Date(ms).toISOString());
     },true);
   }
 
@@ -161,7 +160,6 @@ export const memoryPresentationControlsScript = String.raw`
       if(activeHasAudio&&autoEnabled&&mayAutoplay)setTimeout(()=>playCurrent(true),60);
     }catch(e){
       if(epoch!==renderEpoch)return;
-      /* If metadata lookup itself failed, keep editing available but do not invent audio. */
       audioButton.hidden=true;autoButton.hidden=true;
       console.warn('TALERA audio status kon niet worden bepaald',e);
     }

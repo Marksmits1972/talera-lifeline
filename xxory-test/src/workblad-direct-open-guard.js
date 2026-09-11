@@ -1,10 +1,10 @@
 export const WORKBLAD_DIRECT_OPEN_GUARD_SCRIPT = String.raw`<script>(function(){
-var direct=false,resolved=false,userPickedDate=false;
+var fresh=false,resolved=false,userPickedDate=false;
 try{
   var q=new URLSearchParams(location.search);
-  direct=!q.get('edit')&&!q.get('at')&&q.get('new')!=='1';
-}catch(e){direct=true}
-if(!direct)return;
+  fresh=!q.get('edit');
+}catch(e){fresh=true}
+if(!fresh)return;
 
 function hasMeaningfulDraft(){
   try{
@@ -22,7 +22,7 @@ function clearVisibleDate(){
   var el=document.getElementById('workDate');
   if(el){
     el.value='';
-    el.placeholder='Wanneer speelde dit verhaal zich af? Bijvoorbeeld zomer 1987';
+    el.placeholder='Wanneer speelde dit verhaal zich af?';
   }
 }
 async function clearPersistedDateOnlyDraft(){

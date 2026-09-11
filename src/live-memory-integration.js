@@ -13,6 +13,7 @@ export const liveMemoryIntegrationScript = String.raw`
   const CREDS_KEY='talera-linked-memory-credentials-v1';
   const AUTO_START_MS=2000;
   const AUTO_STEP_MS=2400;
+  const RECENT_LANDING_MS=12*60*60*1000;
   const timeline=document.querySelector('.timeline');
   const storySurface=document.getElementById('memoryStoryScroll');
   const tellButton=document.querySelector('.tell');
@@ -53,12 +54,12 @@ export const liveMemoryIntegrationScript = String.raw`
 
   function authHeaders(token){return {'authorization':'Bearer '+token}}
   async function fetchStory(storyId,token){
-    const res=await fetch(TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(storyId),{headers:authHeaders(token),cache:'no-store'});
+    const res=await fetch('/api/linked/stories/'+encodeURIComponent(storyId),{headers:authHeaders(token),cache:'no-store'});
     if(!res.ok)throw new Error('story '+res.status);
     return res.json();
   }
-  async function mediaObjectUrl(item,token){
-    const res=await fetch(item.url,{headers:authHeaders(token),cache:'no-store'});
+  async function mediaObjectUrl(item,token,storyId){
+    const res=await fetch('/api/linked/stories/'+encodeURIComponent(storyId)+'/media/'+encodeURIComponent(item.id),{headers:authHeaders(token),cache:'no-store'});
     if(!res.ok)throw new Error('media '+res.status);
     const blob=await res.blob();
     return URL.createObjectURL(blob);
@@ -120,7 +121,7 @@ export const liveMemoryIntegrationScript = String.raw`
     const items=(detail.media||[]).filter(m=>m.mediaType==='image').slice(0,12);
     const urls=[];
     for(const item of items){
-      try{urls.push(await mediaObjectUrl(item,token))}catch(e){}
+      try{urls.push(await mediaObjectUrl(item,token,storyId))}catch(e){}
     }
     const memory=toTimelineMemory(detail,urls,token);
     registerMemory(memory);
@@ -204,18 +205,34 @@ export const liveMemoryIntegrationScript = String.raw`
   async function bootLinkedMemories(){
     const creds=loadCredentials();
     const ids=Object.keys(creds).sort((a,b)=>(creds[a].savedAt||0)-(creds[b].savedAt||0));
+
+    if(!landingStoryId&&ids.length){
+      const newestId=ids[ids.length-1];
+      const newest=creds[newestId];
+      if(newest&&Date.now()-(Number(newest.savedAt)||0)<=RECENT_LANDING_MS)landingStoryId=newestId;
+    }
+
     let landing=null;
     for(const id of ids){
       try{
         const memory=await hydrateCredential(id,creds[id]);
         if(memory&&id===landingStoryId)landing=memory;
-      }catch(e){}
+      }catch(e){
+        console.warn('TALERA linked memory kon niet laden',id,e);
+      }
     }
+
     if(landing){
-      centerMs=landing.ms;keepCenterValid();writeMemory(landing);draw();
+      centerMs=landing.ms;
+      keepCenterValid();
+      writeMemory(landing);
+      draw();
       timeline.classList.add('is-timeline-afterglow','is-marker-afterglow');
     }else{
-      const memory=currentMemory();renderDots(memory);scheduleAuto(memory);draw();
+      const memory=currentMemory();
+      renderDots(memory);
+      scheduleAuto(memory);
+      draw();
     }
   }
   bootLinkedMemories();

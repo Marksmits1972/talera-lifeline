@@ -13,6 +13,8 @@ import { presentationControllerScript } from "./presentation-controller.js";
 import { fastFlickFallbackScript } from "./fast-flick-fallback.js";
 import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-memory-integration.js";
 
+const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
+
 const BASE_HTML = [
   ...chunk1,
   ...chunk2,
@@ -74,13 +76,70 @@ const HTML = BASE_HTML
   .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style></head>`)
   .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-afterglow-controller">${timelineAfterglowScript}</script></body>`);
 
+async function proxyLinkedMemory(request) {
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/api/linked/")) return null;
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405, headers: { "allow": "GET, HEAD" } });
+  }
+
+  const allowed = /^\/api\/linked\/stories\/[^/]+(?:\/media\/[^/]+|\/audio)?$/;
+  if (!allowed.test(url.pathname)) {
+    return new Response(JSON.stringify({ error: "Niet gevonden." }), {
+      status: 404,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  const targetPath = url.pathname.replace(/^\/api\/linked/, "/api/integration");
+  const headers = new Headers();
+  const auth = request.headers.get("authorization");
+  if (auth) headers.set("authorization", auth);
+  const range = request.headers.get("range");
+  if (range) headers.set("range", range);
+  const ifNoneMatch = request.headers.get("if-none-match");
+  if (ifNoneMatch) headers.set("if-none-match", ifNoneMatch);
+
+  let upstream;
+  try {
+    upstream = await fetch(TELL_ORIGIN + targetPath, {
+      method: request.method,
+      headers,
+      redirect: "follow",
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: "De herinnering kon niet vanuit de tijdlijn worden opgehaald." }), {
+      status: 502,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  const out = new Headers(upstream.headers);
+  out.delete("access-control-allow-origin");
+  out.delete("access-control-allow-headers");
+  out.delete("access-control-allow-methods");
+  out.delete("content-security-policy");
+  out.set("cache-control", upstream.headers.get("content-type")?.startsWith("image/") ? "private, max-age=120" : "no-store");
+  out.set("x-talera-linked-proxy", "v2");
+
+  return new Response(request.method === "HEAD" ? null : upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
+    headers: out,
+  });
+}
+
 export default {
-  async fetch() {
+  async fetch(request) {
+    const linked = await proxyLinkedMemory(request);
+    if (linked) return linked;
+
     return new Response(HTML, {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",
-        "x-talera-timeline-ui": "linked-memories-multiphoto-v1",
+        "x-talera-timeline-ui": "linked-memories-multiphoto-v2-proxy",
       },
     });
   },

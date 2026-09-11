@@ -11,6 +11,7 @@ import { enhancementStyle } from "./enhancement.js";
 import { interactionFixStyle } from "./interaction-fixes.js";
 import { presentationControllerScript } from "./presentation-controller.js";
 import { fastFlickFallbackScript } from "./fast-flick-fallback.js";
+import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-memory-integration.js";
 
 const BASE_HTML = [
   ...chunk1,
@@ -70,8 +71,8 @@ const timelineAfterglowScript = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-afterglow-controller">${timelineAfterglowScript}</script></body>`);
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style></head>`)
+  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-afterglow-controller">${timelineAfterglowScript}</script></body>`);
 
 export default {
   async fetch() {
@@ -79,6 +80,7 @@ export default {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",
+        "x-talera-timeline-ui": "linked-memories-multiphoto-v1",
       },
     });
   },

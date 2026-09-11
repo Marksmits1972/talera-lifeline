@@ -15,11 +15,14 @@ export const liveMemoryIntegrationScript = String.raw`
   const AUTO_STEP_MS=2400;
   const RECENT_LANDING_MS=12*60*60*1000;
   const timeline=document.querySelector('.timeline');
+  const surface=document.getElementById('surface');
   const storySurface=document.getElementById('memoryStoryScroll');
   const tellButton=document.querySelector('.tell');
-  if(!timeline||typeof MEMORIES==='undefined')return;
+  const runtime=window.__taleraTimelineRuntime;
+  if(!timeline||!surface||!runtime)return;
 
-  let autoStartTimer=0,autoInterval=0,lastWrittenMemoryId=activeMemoryId;
+  let autoStartTimer=0,autoInterval=0;
+  let lastWrittenMemoryId=(runtime.currentMemory()||{}).id||'';
   let landingStoryId='';
 
   const dots=document.createElement('div');
@@ -94,7 +97,9 @@ export const liveMemoryIntegrationScript = String.raw`
   }
   function toTimelineMemory(detail,photoUrls,token){
     const rawMs=Date.parse(detail.eventAt||detail.createdAt||'');
-    const ms=Math.max(LIFE_START,Math.min(LIFE_END,Number.isFinite(rawMs)?rawMs:LIFE_END));
+    const fallback=runtime.centerMs();
+    const resolved=Number.isFinite(rawMs)?rawMs:fallback;
+    const ms=Math.max(runtime.lifeStart,Math.min(runtime.lifeEnd,resolved));
     const text=String(detail.textContent||'').trim();
     const headline=String(detail.title||'').trim()||firstSentence(text);
     const full=headline+(text&&text!==headline?'\n\n'+text:'');
@@ -117,22 +122,6 @@ export const liveMemoryIntegrationScript = String.raw`
       people:detail.people||''
     };
   }
-  function registerMemory(memory){
-    const existing=MEMORIES.findIndex(m=>m.storyId===memory.storyId);
-    if(existing>=0){
-      const old=MEMORIES[existing];
-      memory._photoIndex=old._photoIndex||0;
-      if(memory.photos[memory._photoIndex])memory.image=memory.photos[memory._photoIndex];
-      MEMORIES.splice(existing,1,memory);
-    }else{
-      MEMORIES.push(memory);
-      const offset=(memory.ms-LIFE_START)/MS_DAY;
-      EVENT_OFFSETS.push(offset);
-      const day=Math.floor(offset);
-      if(day>=0&&day<TOTAL_DAYS)dayCounts[day]++;
-    }
-    MEMORIES.sort((a,b)=>a.ms-b.ms);
-  }
   async function hydrateCredential(storyId,entry){
     const token=entry&&entry.token;
     if(!token)return null;
@@ -143,11 +132,11 @@ export const liveMemoryIntegrationScript = String.raw`
       try{urls.push(await mediaObjectUrl(item,token,storyId))}catch(e){}
     }
     const memory=toTimelineMemory(detail,urls,token);
-    registerMemory(memory);
+    runtime.registerMemory(memory);
     return memory;
   }
 
-  function currentMemory(){return MEMORIES.find(m=>m.id===activeMemoryId)||nearestMemory(centerMs)}
+  function currentMemory(){return runtime.currentMemory()}
   function clearAuto(){clearTimeout(autoStartTimer);clearInterval(autoInterval);autoStartTimer=0;autoInterval=0}
   function renderDots(memory){
     const photos=memory&&Array.isArray(memory.photos)?memory.photos:[];
@@ -163,7 +152,7 @@ export const liveMemoryIntegrationScript = String.raw`
     const count=memory.photos.length;
     memory._photoIndex=((index%count)+count)%count;
     memory.image=memory.photos[memory._photoIndex];
-    settlePhoto(memory);
+    runtime.settlePhoto(memory);
     renderDots(memory);
     if(manual)scheduleAuto(memory);
   }
@@ -173,21 +162,23 @@ export const liveMemoryIntegrationScript = String.raw`
     autoStartTimer=setTimeout(()=>{
       showPhoto(memory,(memory._photoIndex||0)+1,false);
       autoInterval=setInterval(()=>{
-        if(activeMemoryId!==memory.id||userIsMoving){clearAuto();return}
+        if(runtime.activeMemoryId()!==memory.id||runtime.isMoving()){clearAuto();return}
         showPhoto(memory,(memory._photoIndex||0)+1,false);
       },AUTO_STEP_MS);
     },AUTO_START_MS);
   }
 
-  const originalWriteMemory=writeMemory;
-  writeMemory=function(memory){
+  runtime.subscribe(memory=>{
     const changed=!memory||memory.id!==lastWrittenMemoryId;
-    if(changed&&memory&&Array.isArray(memory.photos)&&memory.photos.length){memory._photoIndex=0;memory.image=memory.photos[0]}
-    originalWriteMemory(memory);
+    if(changed&&memory&&Array.isArray(memory.photos)&&memory.photos.length){
+      memory._photoIndex=0;
+      memory.image=memory.photos[0];
+      runtime.settlePhoto(memory);
+    }
     lastWrittenMemoryId=memory&&memory.id;
     renderDots(memory);
     scheduleAuto(memory);
-  };
+  });
 
   surface.addEventListener('pointerdown',clearAuto,{passive:true});
   surface.addEventListener('pointerup',()=>{setTimeout(()=>scheduleAuto(currentMemory()),0)},{passive:true});
@@ -215,7 +206,7 @@ export const liveMemoryIntegrationScript = String.raw`
       if(memory&&memory._taleraLive&&memory.storyId&&memory._manageToken){
         location.href=TELL_ORIGIN+'/?edit='+encodeURIComponent(memory.storyId)+'#token='+encodeURIComponent(memory._manageToken);
       }else{
-        const at=memory&&memory.ms?new Date(memory.ms).toISOString():new Date(centerMs).toISOString();
+        const at=memory&&memory.ms?new Date(memory.ms).toISOString():new Date(runtime.centerMs()).toISOString();
         location.href=TELL_ORIGIN+'/?at='+encodeURIComponent(at);
       }
     },true);
@@ -242,16 +233,15 @@ export const liveMemoryIntegrationScript = String.raw`
     }
 
     if(landing){
-      centerMs=landing.ms;
-      keepCenterValid();
-      writeMemory(landing);
-      draw();
+      runtime.setCenter(landing.ms);
+      runtime.writeMemory(landing);
+      runtime.draw();
       timeline.classList.add('is-timeline-afterglow','is-marker-afterglow');
     }else{
       const memory=currentMemory();
       renderDots(memory);
       scheduleAuto(memory);
-      draw();
+      runtime.draw();
     }
   }
   bootLinkedMemories();

@@ -4,14 +4,15 @@ import { WORKBLAD_V1_FOCUS_RING_STYLE } from "./workblad-v1-focus-ring-style.js"
 import { WORKBLAD_V2_STYLE } from "./workblad-v2-style.js";
 import { WORKBLAD_V2_SCRIPT } from "./workblad-v2-client.js";
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
+import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-universal-bottom-nav-v2";
+const TALERA_DEPLOY_REV = "workblad-v2-expanded-photo-story-gentle-voice";
 
 function enhanceWorkblad(html){
   return html
-    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+'</style></head>')
-    .replace('</body>',WORKBLAD_V2_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+'</body>');
+    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+'</style></head>')
+    .replace('</body>',WORKBLAD_V2_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
 }
 
 export default {

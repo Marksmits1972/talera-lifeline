@@ -15,6 +15,58 @@ import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
 
+const TIMELINE_RUNTIME_BRIDGE = String.raw`
+const taleraIntegrationListeners=new Set();
+const taleraWriteMemoryBase=writeMemory;
+writeMemory=function(memory){
+  taleraWriteMemoryBase(memory);
+  taleraIntegrationListeners.forEach(fn=>{try{fn(memory)}catch(e){}});
+};
+function taleraRebuildDensity(){
+  EVENT_OFFSETS.splice(0,EVENT_OFFSETS.length,...MEMORIES.map(m=>(m.ms-LIFE_START)/MS_DAY));
+  dayCounts.fill(0);
+  for(const offset of EVENT_OFFSETS){
+    const day=Math.floor(offset);
+    if(day>=0&&day<TOTAL_DAYS)dayCounts[day]++;
+  }
+}
+window.__taleraTimelineRuntime={
+  version:'runtime-bridge-v1',
+  lifeStart:LIFE_START,
+  lifeEnd:LIFE_END,
+  msDay:MS_DAY,
+  totalDays:TOTAL_DAYS,
+  currentMemory(){return MEMORIES.find(m=>m.id===activeMemoryId)||nearestMemory(centerMs)},
+  activeMemoryId(){return activeMemoryId},
+  centerMs(){return centerMs},
+  isMoving(){return userIsMoving},
+  registerMemory(memory){
+    if(!memory)return null;
+    const existing=MEMORIES.findIndex(m=>m.storyId&&memory.storyId&&m.storyId===memory.storyId);
+    if(existing>=0){
+      const old=MEMORIES[existing];
+      memory._photoIndex=old._photoIndex||0;
+      if(Array.isArray(memory.photos)&&memory.photos[memory._photoIndex])memory.image=memory.photos[memory._photoIndex];
+      MEMORIES.splice(existing,1,memory);
+    }else{
+      MEMORIES.push(memory);
+    }
+    MEMORIES.sort((a,b)=>a.ms-b.ms);
+    taleraRebuildDensity();
+    return memory;
+  },
+  setCenter(ms){centerMs=Number(ms)||centerMs;keepCenterValid();return centerMs},
+  writeMemory(memory){writeMemory(memory)},
+  draw(){draw()},
+  settlePhoto(memory){settlePhoto(memory)},
+  subscribe(fn){
+    if(typeof fn!=='function')return ()=>{};
+    taleraIntegrationListeners.add(fn);
+    return ()=>taleraIntegrationListeners.delete(fn);
+  }
+};
+`;
+
 const BASE_HTML = [
   ...chunk1,
   ...chunk2,
@@ -25,7 +77,10 @@ const BASE_HTML = [
   ...chunk7,
   ...chunk8,
   ...chunk9,
-].join("\n");
+].join("\n").replace(
+  "writeMemory(nearestMemory(centerMs));\nresize();\n})();",
+  `${TIMELINE_RUNTIME_BRIDGE}\nwriteMemory(nearestMemory(centerMs));\nresize();\n})();`
+);
 
 const timelineAfterglowStyle = String.raw`
 .zoom-hint,#zoomHint{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
@@ -121,7 +176,7 @@ async function proxyLinkedMemory(request) {
   out.delete("access-control-allow-methods");
   out.delete("content-security-policy");
   out.set("cache-control", upstream.headers.get("content-type")?.startsWith("image/") ? "private, max-age=120" : "no-store");
-  out.set("x-talera-linked-proxy", "v2");
+  out.set("x-talera-linked-proxy", "v3-runtime-bridge");
 
   return new Response(request.method === "HEAD" ? null : upstream.body, {
     status: upstream.status,
@@ -139,7 +194,7 @@ export default {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",
-        "x-talera-timeline-ui": "linked-memories-multiphoto-v2-proxy",
+        "x-talera-timeline-ui": "linked-memories-multiphoto-v3-runtime-bridge",
       },
     });
   },

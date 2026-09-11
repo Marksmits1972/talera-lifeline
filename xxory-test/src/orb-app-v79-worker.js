@@ -7,7 +7,7 @@ import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./w
 import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-expanded-photo-story-gentle-voice";
+const TALERA_DEPLOY_REV = "workblad-v2-expanded-photo-story-fresh-new";
 
 function enhanceWorkblad(html){
   return html

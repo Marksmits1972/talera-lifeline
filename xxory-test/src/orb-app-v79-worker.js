@@ -2,10 +2,17 @@ import stableV79Worker from "./archive/orb-app-v79-stable-20260911.js";
 import { WORKBLAD_V1_STYLE } from "./workblad-v1-style.js";
 import { WORKBLAD_V1_SCRIPT } from "./workblad-v1-client.js";
 
+/* Repair the one-character Promise closure typo in the first workblad client build.
+   Keep the source prototype intact while making the proven live entry boot correctly. */
+const WORKBLAD_V1_SCRIPT_FIXED = WORKBLAD_V1_SCRIPT.replace(
+  "r.onerror=function(){no(r.error)})}",
+  "r.onerror=function(){no(r.error)}})}"
+);
+
 function enhanceWorkblad(html){
   return html
     .replace('</head>','<style>'+WORKBLAD_V1_STYLE+'</style></head>')
-    .replace('</body>',WORKBLAD_V1_SCRIPT+'</body>');
+    .replace('</body>',WORKBLAD_V1_SCRIPT_FIXED+'</body>');
 }
 
 export default {
@@ -18,7 +25,7 @@ export default {
     headers.delete('content-length');
     headers.set('cache-control','no-store');
     headers.set('x-talera-orb-app','organic-v79-stable-with-workblad-v1');
-    headers.set('x-talera-vertel-ui','workblad-v1-orb-tool');
+    headers.set('x-talera-vertel-ui','workblad-v1-orb-tool-fixed');
     return new Response(enhanceWorkblad(html),{status:response.status,statusText:response.statusText,headers});
   }
 };

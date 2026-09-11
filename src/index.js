@@ -12,6 +12,7 @@ import { interactionFixStyle } from "./interaction-fixes.js";
 import { presentationControllerScript } from "./presentation-controller.js";
 import { fastFlickFallbackScript } from "./fast-flick-fallback.js";
 import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-memory-integration.js";
+import { memoryPresentationControlsStyle, memoryPresentationControlsScript } from "./memory-presentation-controls.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
 
@@ -128,8 +129,8 @@ const timelineAfterglowScript = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-afterglow-controller">${timelineAfterglowScript}</script></body>`);
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style></head>`)
+  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-afterglow-controller">${timelineAfterglowScript}</script></body>`);
 
 async function proxyLinkedMemory(request) {
   const url = new URL(request.url);
@@ -176,7 +177,7 @@ async function proxyLinkedMemory(request) {
   out.delete("access-control-allow-methods");
   out.delete("content-security-policy");
   out.set("cache-control", upstream.headers.get("content-type")?.startsWith("image/") ? "private, max-age=120" : "no-store");
-  out.set("x-talera-linked-proxy", "v3-runtime-bridge");
+  out.set("x-talera-linked-proxy", "v4-edit-audio");
 
   return new Response(request.method === "HEAD" ? null : upstream.body, {
     status: upstream.status,
@@ -194,7 +195,7 @@ export default {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",
-        "x-talera-timeline-ui": "linked-memories-multiphoto-v3-runtime-bridge",
+        "x-talera-timeline-ui": "linked-memories-v4-new-edit-audio",
       },
     });
   },

@@ -10,7 +10,7 @@ import { handleWorkbladAudioHead } from "./workblad-audio-head.js";
 import { TALERA_CORE_WORKBLAD_PRELUDE, TALERA_CORE_WORKBLAD_STYLE, TALERA_CORE_WORKBLAD_SCRIPT } from "./talera-core-workblad.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "talera-core-direct-workblad-r2-20260911-2310";
+const TALERA_DEPLOY_REV = "talera-core-direct-workblad-r2-final-20260911-2315";
 
 const CORE_BOOT_GUARD = String.raw`<script>(function(){
 setTimeout(function(){

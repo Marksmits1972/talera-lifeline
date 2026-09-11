@@ -53,9 +53,9 @@ function tuneWorkblad(){
   var b=document.getElementById('workVoice');
   if(b){
     var hasVoice=Boolean(document.querySelector('.work-voice-note'));
-    var label=hasVoice?'Vertel nog iets':'Vertel iets';
+    var label=hasVoice?'Opnieuw inspreken':'Vertel iets';
     if(b.textContent!==label)b.textContent=label;
-    b.setAttribute('aria-label',hasVoice?'Voeg nog een gesproken stukje toe':'Vertel iets over deze herinnering');
+    b.setAttribute('aria-label',hasVoice?'Vervang de gesproken opname':'Vertel iets over deze herinnering');
   }
 
   var strip=document.querySelector('.work-photo-strip');
@@ -72,7 +72,7 @@ async function clearFreshDraftIfNeeded(){
     var q=new URLSearchParams(location.search);
     if(q.get('new')!=='1')return;
     var db=await new Promise(function(ok,no){var r=indexedDB.open('talera-workblad-v2',1);r.onsuccess=function(){ok(r.result)};r.onerror=function(){no(r.error)};r.onupgradeneeded=function(){if(!r.result.objectStoreNames.contains('drafts'))r.result.createObjectStore('drafts',{keyPath:'id'})}});
-    await new Promise(function(ok,no){var tx=db.transaction('drafts','readwrite');tx.oncomplete=ok;tx.onerror=function(){no(tx.error)};tx.objectStore('drafts').delete('current')});db.close();
+    await new Promise(function(ok,no){var tx=db.transaction('drafts','readwrite');tx.oncomplete=ok;tx.onerror=function(){no(tx.error)};tx.objectStore(STORE).delete('current')});db.close();
     try{localStorage.removeItem('talera-workblad-text-v2')}catch(e){}
   }catch(e){}
 }

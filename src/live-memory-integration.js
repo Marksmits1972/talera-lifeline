@@ -54,14 +54,33 @@ export const liveMemoryIntegrationScript = String.raw`
 
   function authHeaders(token){return {'authorization':'Bearer '+token}}
   async function fetchStory(storyId,token){
-    const res=await fetch('/api/linked/stories/'+encodeURIComponent(storyId),{headers:authHeaders(token),cache:'no-store'});
-    if(!res.ok)throw new Error('story '+res.status);
-    return res.json();
+    const path='/api/linked/stories/'+encodeURIComponent(storyId);
+    try{
+      const proxied=await fetch(path,{headers:authHeaders(token),cache:'no-store'});
+      if(proxied.ok)return proxied.json();
+    }catch(e){}
+    const direct=await fetch(TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(storyId),{
+      headers:authHeaders(token),
+      cache:'no-store'
+    });
+    if(!direct.ok)throw new Error('story '+direct.status);
+    return direct.json();
   }
   async function mediaObjectUrl(item,token,storyId){
-    const res=await fetch('/api/linked/stories/'+encodeURIComponent(storyId)+'/media/'+encodeURIComponent(item.id),{headers:authHeaders(token),cache:'no-store'});
-    if(!res.ok)throw new Error('media '+res.status);
-    const blob=await res.blob();
+    const proxyPath='/api/linked/stories/'+encodeURIComponent(storyId)+'/media/'+encodeURIComponent(item.id);
+    try{
+      const proxied=await fetch(proxyPath,{headers:authHeaders(token),cache:'no-store'});
+      if(proxied.ok){
+        const blob=await proxied.blob();
+        return URL.createObjectURL(blob);
+      }
+    }catch(e){}
+    const direct=await fetch(TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(storyId)+'/media/'+encodeURIComponent(item.id),{
+      headers:authHeaders(token),
+      cache:'no-store'
+    });
+    if(!direct.ok)throw new Error('media '+direct.status);
+    const blob=await direct.blob();
     return URL.createObjectURL(blob);
   }
   function placeholderImage(){

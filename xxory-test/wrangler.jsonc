@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: verified-audio-storage-forced-20260911-2245
+// TALERA_DEPLOY_REV: talera-core-golden-route-clean-20260911-2300
 {
   "name": "xxory-test",
   "main": "src/orb-app-v79-worker.js",

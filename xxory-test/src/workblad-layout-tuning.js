@@ -53,9 +53,9 @@ function tuneWorkblad(){
   var b=document.getElementById('workVoice');
   if(b){
     var hasVoice=Boolean(document.querySelector('.work-voice-note'));
-    var label=hasVoice?'Wil je nog iets vertellen?':'Wil je iets vertellen?';
+    var label=hasVoice?'Vertel nog iets':'Vertel iets';
     if(b.textContent!==label)b.textContent=label;
-    b.setAttribute('aria-label',label);
+    b.setAttribute('aria-label',hasVoice?'Voeg nog een gesproken stukje toe':'Vertel iets over deze herinnering');
   }
 
   var strip=document.querySelector('.work-photo-strip');

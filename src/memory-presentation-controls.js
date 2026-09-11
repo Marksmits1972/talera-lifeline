@@ -1,5 +1,6 @@
 export const memoryPresentationControlsStyle = String.raw`
 .talera-live-badge{display:none!important}
+.memory-caption .date,#memoryDate{display:none!important}
 .talera-photo-dots{gap:8px!important;min-height:24px!important;padding:5px 12px!important;background:rgba(15,39,71,.13)!important}
 .talera-photo-dot{width:8px!important;height:8px!important;opacity:.95!important;background:rgba(255,255,255,.80)!important;box-shadow:0 1px 6px rgba(15,39,71,.32)!important}
 .talera-photo-dot.active{background:#E7A98B!important;transform:scale(1.48)!important;box-shadow:0 0 0 2px rgba(255,254,252,.62),0 2px 8px rgba(15,39,71,.30)!important}
@@ -62,11 +63,6 @@ export const memoryPresentationControlsScript = String.raw`
     for(const path of paths){try{const r=await fetch(path,{headers:auth(token),cache:'no-store'});if(r.ok)return await r.json()}catch(e){}}
     return null;
   }
-  async function headAudio(id,token){
-    const paths=['/api/linked/stories/'+encodeURIComponent(id)+'/audio',TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(id)+'/audio'];
-    for(const path of paths){try{const r=await fetch(path,{method:'HEAD',headers:auth(token),cache:'no-store'});if(r.ok&&Number(r.headers.get('content-length')||1)>0)return true}catch(e){}}
-    return false;
-  }
   async function getAudioUrl(id,token,force=false){
     if(!force&&audioUrls.has(id))return audioUrls.get(id);
     const old=audioUrls.get(id);if(force&&old){try{URL.revokeObjectURL(old)}catch(e){}audioUrls.delete(id)}
@@ -87,9 +83,7 @@ export const memoryPresentationControlsScript = String.raw`
   }
   async function playNow(){
     if(!activeStoryId||!activeToken||!activeHasAudio||loading)return;
-    if(loadFailed||!audio.src){
-      const epoch=renderEpoch;const ok=await prepare(activeStoryId,activeToken,epoch,true);if(!ok||epoch!==renderEpoch)return;
-    }
+    if(loadFailed||!audio.src){const epoch=renderEpoch;const ok=await prepare(activeStoryId,activeToken,epoch,true);if(!ok||epoch!==renderEpoch)return}
     try{const p=audio.play();if(p&&typeof p.catch==='function')await p;loadFailed=false;setUi()}catch(e){loadFailed=true;setUi();console.warn('TALERA audio kon niet starten',e)}
   }
 
@@ -100,12 +94,14 @@ export const memoryPresentationControlsScript = String.raw`
   async function render(memory){
     const epoch=++renderEpoch;stopAudio(true);const ok=usable(memory);editButton.hidden=!ok;activeStoryId=ok?memory.storyId:'';activeToken=ok?tokenFor(memory):'';activeHasAudio=false;showAudio(false);setUi();if(!ok)return;
     const detail=await getDetail(activeStoryId,activeToken);if(epoch!==renderEpoch)return;
-    activeHasAudio=Boolean(detail&&detail.hasAudio);
-    if(!activeHasAudio)activeHasAudio=await headAudio(activeStoryId,activeToken);
+    const expected=Boolean(detail&&(detail.hasAudio||Number(detail.durationSeconds)>0))||Boolean(memory._hasAudio||Number(memory._durationSeconds)>0);
+    try{
+      const url=await getAudioUrl(activeStoryId,activeToken,false);if(epoch!==renderEpoch)return;
+      activeHasAudio=true;memory._hasAudio=true;showAudio(true);audio.src=url;audio.currentTime=0;audio.load();loadFailed=false;setUi();return;
+    }catch(e){}
     if(epoch!==renderEpoch)return;
-    memory._hasAudio=activeHasAudio;
-    if(!activeHasAudio){showAudio(false);return}
-    showAudio(true);setUi();await prepare(activeStoryId,activeToken,epoch,false);
+    activeHasAudio=expected;memory._hasAudio=expected;
+    if(expected){showAudio(true);loadFailed=true;setUi()}else showAudio(false);
   }
 
   runtime.subscribe(memory=>render(memory));render(runtime.currentMemory());

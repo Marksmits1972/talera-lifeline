@@ -1,4 +1,16 @@
 export const WORKBLAD_AUDIO_PERSIST_SCRIPT = String.raw`<script>(function(){
+async function verifyStoredAudio(storyId,token){
+  var res=await fetch('/api/integration/stories/'+encodeURIComponent(storyId),{
+    method:'GET',
+    headers:{'authorization':'Bearer '+token},
+    cache:'no-store'
+  });
+  var data={};
+  try{data=await res.json()}catch(e){}
+  if(!res.ok||!data.hasAudio)throw new Error('De gesproken opname is nog niet veilig opgeslagen. Probeer het nog een keer.');
+  return data;
+}
+
 async function persistEditedAudio(){
   if(typeof state==='undefined')return;
   if(!state.editingStoryId||!state.editingToken)return;
@@ -14,7 +26,8 @@ async function persistEditedAudio(){
   });
   var data={};
   try{data=await res.json()}catch(e){}
-  if(!res.ok)throw new Error(data.error||'De gesproken opname kon niet worden opgeslagen.');
+  if(!res.ok||!data.hasAudio)throw new Error(data.error||'De gesproken opname kon niet worden opgeslagen.');
+  await verifyStoredAudio(state.editingStoryId,state.editingToken);
   state.hasExistingAudio=true;
 }
 

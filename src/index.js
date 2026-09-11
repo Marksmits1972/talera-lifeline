@@ -177,7 +177,7 @@ async function proxyLinkedMemory(request) {
   out.delete("access-control-allow-methods");
   out.delete("content-security-policy");
   out.set("cache-control", upstream.headers.get("content-type")?.startsWith("image/") ? "private, max-age=120" : "no-store");
-  out.set("x-talera-linked-proxy", "v4-edit-audio");
+  out.set("x-talera-linked-proxy", "v5-audio-state-playback");
 
   return new Response(request.method === "HEAD" ? null : upstream.body, {
     status: upstream.status,
@@ -195,7 +195,7 @@ export default {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",
-        "x-talera-timeline-ui": "linked-memories-v4-new-edit-audio",
+        "x-talera-timeline-ui": "linked-memories-v5-audio-state-playback",
       },
     });
   },

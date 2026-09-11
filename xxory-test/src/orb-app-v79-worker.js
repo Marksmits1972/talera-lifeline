@@ -10,7 +10,7 @@ import { WORKBLAD_PHOTO_CAROUSEL_STYLE, WORKBLAD_PHOTO_CAROUSEL_SCRIPT } from ".
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 import { handleWorkbladCoverApi } from "./workblad-cover-api.js";
 
-const TALERA_DEPLOY_REV = "workblad-v2-photo-carousel-active-cover-20260911";
+const TALERA_DEPLOY_REV = "workblad-v2-photo-carousel-active-cover-r2-20260911";
 
 function enhanceWorkblad(html){
   return html

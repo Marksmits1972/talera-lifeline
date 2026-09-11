@@ -1,21 +1,25 @@
 export const memoryPresentationControlsStyle = String.raw`
-/* Multi-photo position needs to be readable at a glance without becoming a new bar. */
-.talera-photo-dots{gap:7px!important;min-height:22px!important;padding:5px 11px!important;background:rgba(15,39,71,.11)!important}
-.talera-photo-dot{width:7px!important;height:7px!important;opacity:.9!important;background:rgba(255,255,255,.72)!important;box-shadow:0 1px 5px rgba(15,39,71,.28)!important}
-.talera-photo-dot.active{background:#E7A98B!important;transform:scale(1.5)!important;box-shadow:0 0 0 2px rgba(255,254,252,.52),0 2px 7px rgba(15,39,71,.28)!important}
+/* The title already identifies the memory; do not repeat a separate badge. */
+.talera-live-badge{display:none!important}
 
-.talera-memory-tools{position:absolute;z-index:12;right:13px;top:13px;display:flex;align-items:center;gap:7px;pointer-events:none}
-.talera-memory-tool{pointer-events:auto;height:38px;min-width:38px;border:0;border-radius:999px;background:rgba(255,254,252,.88);color:#0F2747;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 11px;box-shadow:0 5px 16px rgba(15,39,71,.10),inset 0 0 0 1px rgba(15,39,71,.07);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;font-weight:720}
-.talera-memory-tool.icon-only{width:38px;padding:0;font-size:18px}
+/* Multi-photo position should read immediately as a photo sequence. */
+.talera-photo-dots{gap:8px!important;min-height:24px!important;padding:5px 12px!important;background:rgba(15,39,71,.13)!important}
+.talera-photo-dot{width:8px!important;height:8px!important;opacity:.95!important;background:rgba(255,255,255,.80)!important;box-shadow:0 1px 6px rgba(15,39,71,.32)!important}
+.talera-photo-dot.active{background:#E7A98B!important;transform:scale(1.48)!important;box-shadow:0 0 0 2px rgba(255,254,252,.62),0 2px 8px rgba(15,39,71,.30)!important}
+
+.talera-memory-tools{position:absolute;z-index:12;right:13px;top:13px;display:flex;align-items:center;justify-content:flex-end;gap:7px;pointer-events:none}
+.talera-memory-tool{pointer-events:auto;height:40px;min-width:40px;border:0;border-radius:999px;background:rgba(255,254,252,.91);color:#0F2747;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;box-shadow:0 5px 18px rgba(15,39,71,.12),inset 0 0 0 1px rgba(15,39,71,.075);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;font-weight:730}
+.talera-memory-tool.icon-only{width:40px;padding:0;font-size:18px}
 .talera-memory-tool[hidden]{display:none!important}
+.talera-memory-tool:disabled{opacity:.62}
 .talera-memory-auto.is-on{background:#0F2747;color:#fff;box-shadow:0 6px 18px rgba(15,39,71,.18)}
 .talera-memory-audio.is-playing{background:#0F2747;color:#fff}
-.talera-memory-audio .audio-symbol{font-size:17px;line-height:1}
+.talera-memory-audio .audio-symbol{font-size:15px;line-height:1}
 .talera-memory-edit .edit-symbol{font-size:17px;line-height:1}
 @media(max-width:430px){
   .talera-memory-tools{right:10px;top:10px;gap:6px}
-  .talera-memory-tool{height:36px;min-width:36px;padding:0 9px;font-size:11px}
-  .talera-memory-tool.icon-only{width:36px}
+  .talera-memory-tool{height:38px;min-width:38px;padding:0 10px;font-size:11px}
+  .talera-memory-tool.icon-only{width:38px}
 }
 `;
 
@@ -27,7 +31,7 @@ export const memoryPresentationControlsScript = String.raw`
   const memorySpace=document.querySelector('.memory-space');
   if(!runtime||!memorySpace)return;
 
-  /* Vertel always means a new workblad. Editing has its own pencil action. */
+  /* Vertel always starts a new memory. Existing content is edited only with the pencil. */
   const oldTell=document.querySelector('.tell');
   if(oldTell){
     const fresh=oldTell.cloneNode(true);
@@ -42,10 +46,11 @@ export const memoryPresentationControlsScript = String.raw`
 
   const tools=document.createElement('div');
   tools.className='talera-memory-tools';
-  tools.innerHTML='<button class="talera-memory-tool talera-memory-audio icon-only" type="button" aria-label="Gesproken verhaal afspelen" hidden><span class="audio-symbol">▶</span></button><button class="talera-memory-tool talera-memory-auto" type="button" aria-label="Automatisch afspelen" hidden>Auto</button><button class="talera-memory-tool talera-memory-edit icon-only" type="button" aria-label="Herinnering bewerken" hidden><span class="edit-symbol">✎</span></button>';
+  tools.innerHTML='<button class="talera-memory-tool talera-memory-audio" type="button" aria-label="Gesproken verhaal afspelen" hidden><span class="audio-symbol">▶</span><span class="audio-label">Luister</span></button><button class="talera-memory-tool talera-memory-auto" type="button" aria-label="Automatisch afspelen" hidden>Auto</button><button class="talera-memory-tool talera-memory-edit icon-only" type="button" aria-label="Herinnering bewerken" hidden><span class="edit-symbol">✎</span></button>';
   memorySpace.appendChild(tools);
 
   const audioButton=tools.querySelector('.talera-memory-audio');
+  const audioLabel=tools.querySelector('.audio-label');
   const autoButton=tools.querySelector('.talera-memory-auto');
   const editButton=tools.querySelector('.talera-memory-edit');
   const audio=new Audio();
@@ -60,39 +65,45 @@ export const memoryPresentationControlsScript = String.raw`
 
   function tokenFor(memory){return memory&&memory._manageToken||''}
   function isEditable(memory){return Boolean(memory&&memory._taleraLive&&memory.storyId&&tokenFor(memory))}
+  function auth(token){return {authorization:'Bearer '+token}}
   function setAutoUi(){
     autoButton.classList.toggle('is-on',autoEnabled);
     autoButton.setAttribute('aria-pressed',autoEnabled?'true':'false');
     autoButton.textContent=autoEnabled?'Auto aan':'Auto';
   }
-  setAutoUi();
+  function setAudioUi(playing){
+    audioButton.classList.toggle('is-playing',Boolean(playing));
+    const symbol=audioButton.querySelector('.audio-symbol');
+    if(symbol)symbol.textContent=playing?'Ⅱ':'▶';
+    if(audioLabel)audioLabel.textContent=playing?'Pauze':'Luister';
+  }
+  setAutoUi();setAudioUi(false);
 
   async function getDetail(memory){
     if(!isEditable(memory))return null;
     const id=memory.storyId,token=tokenFor(memory);
-    const cached=detailCache.get(id);
-    if(cached)return cached;
-    const res=await fetch('/api/linked/stories/'+encodeURIComponent(id),{headers:{authorization:'Bearer '+token},cache:'no-store'});
-    if(!res.ok)throw new Error('detail '+res.status);
-    const detail=await res.json();
-    detailCache.set(id,detail);
-    return detail;
+    if(detailCache.has(id))return detailCache.get(id);
+    const localPath='/api/linked/stories/'+encodeURIComponent(id);
+    let response=null;
+    try{response=await fetch(localPath,{headers:auth(token),cache:'no-store'});if(response.ok){const data=await response.json();detailCache.set(id,data);return data}}catch(e){}
+    response=await fetch(TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(id),{headers:auth(token),cache:'no-store'});
+    if(!response.ok)throw new Error('detail '+response.status);
+    const data=await response.json();detailCache.set(id,data);return data;
   }
 
   async function getAudioUrl(storyId,token){
     if(audioUrls.has(storyId))return audioUrls.get(storyId);
-    const res=await fetch('/api/linked/stories/'+encodeURIComponent(storyId)+'/audio',{headers:{authorization:'Bearer '+token},cache:'no-store'});
-    if(!res.ok)throw new Error('audio '+res.status);
-    const blob=await res.blob();
-    const url=URL.createObjectURL(blob);
-    audioUrls.set(storyId,url);
-    return url;
+    const localPath='/api/linked/stories/'+encodeURIComponent(storyId)+'/audio';
+    let response=null;
+    try{response=await fetch(localPath,{headers:auth(token),cache:'no-store'});if(response.ok){const blob=await response.blob();const url=URL.createObjectURL(blob);audioUrls.set(storyId,url);return url}}catch(e){}
+    response=await fetch(TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(storyId)+'/audio',{headers:auth(token),cache:'no-store'});
+    if(!response.ok)throw new Error('audio '+response.status);
+    const blob=await response.blob();const url=URL.createObjectURL(blob);audioUrls.set(storyId,url);return url;
   }
 
   function stopAudio(reset=true){
     try{audio.pause();if(reset)audio.currentTime=0}catch(e){}
-    audioButton.classList.remove('is-playing');
-    const symbol=audioButton.querySelector('.audio-symbol');if(symbol)symbol.textContent='▶';
+    setAudioUi(false);
   }
 
   async function playCurrent(fromAuto=false){
@@ -101,19 +112,15 @@ export const memoryPresentationControlsScript = String.raw`
       const url=await getAudioUrl(activeStoryId,activeToken);
       if(audio.src!==url){stopAudio(true);audio.src=url}
       await audio.play();
-      audioButton.classList.add('is-playing');
-      const symbol=audioButton.querySelector('.audio-symbol');if(symbol)symbol.textContent='Ⅱ';
+      setAudioUi(true);
     }catch(e){
+      setAudioUi(false);
       if(!fromAuto)console.warn('TALERA audio kon niet starten',e);
     }
   }
 
   audio.addEventListener('ended',()=>stopAudio(true));
-  audio.addEventListener('pause',()=>{
-    if(audio.ended)return;
-    audioButton.classList.remove('is-playing');
-    const symbol=audioButton.querySelector('.audio-symbol');if(symbol)symbol.textContent='▶';
-  });
+  audio.addEventListener('pause',()=>{if(!audio.ended)setAudioUi(false)});
 
   audioButton.addEventListener('click',()=>{
     if(!audio.paused){audio.pause();return}
@@ -150,11 +157,13 @@ export const memoryPresentationControlsScript = String.raw`
       activeHasAudio=Boolean(detail&&detail.hasAudio);
       audioButton.hidden=!activeHasAudio;
       autoButton.hidden=!activeHasAudio;
-      setAutoUi();
-      if(activeHasAudio&&autoEnabled&&mayAutoplay)setTimeout(()=>playCurrent(true),40);
+      setAutoUi();setAudioUi(false);
+      if(activeHasAudio&&autoEnabled&&mayAutoplay)setTimeout(()=>playCurrent(true),60);
     }catch(e){
       if(epoch!==renderEpoch)return;
+      /* If metadata lookup itself failed, keep editing available but do not invent audio. */
       audioButton.hidden=true;autoButton.hidden=true;
+      console.warn('TALERA audio status kon niet worden bepaald',e);
     }
   }
 

@@ -72,7 +72,7 @@ async function clearFreshDraftIfNeeded(){
     var q=new URLSearchParams(location.search);
     if(q.get('new')!=='1')return;
     var db=await new Promise(function(ok,no){var r=indexedDB.open('talera-workblad-v2',1);r.onsuccess=function(){ok(r.result)};r.onerror=function(){no(r.error)};r.onupgradeneeded=function(){if(!r.result.objectStoreNames.contains('drafts'))r.result.createObjectStore('drafts',{keyPath:'id'})}});
-    await new Promise(function(ok,no){var tx=db.transaction('drafts','readwrite');tx.oncomplete=ok;tx.onerror=function(){no(tx.error)};tx.objectStore(STORE).delete('current')});db.close();
+    await new Promise(function(ok,no){var tx=db.transaction('drafts','readwrite');tx.oncomplete=ok;tx.onerror=function(){no(tx.error)};tx.objectStore('drafts').delete('current')});db.close();
     try{localStorage.removeItem('talera-workblad-text-v2')}catch(e){}
   }catch(e){}
 }

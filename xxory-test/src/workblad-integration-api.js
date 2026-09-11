@@ -1,5 +1,6 @@
 const TIMELINE_ORIGIN_RE = /^https:\/\/talera-timeline-prototype\.[a-z0-9-]+\.workers\.dev$/i;
 const MAX_STORY_TEXT_CHARS = 20000;
+const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 
 export async function handleWorkbladIntegrationApi(request, env) {
   const url = new URL(request.url);
@@ -32,6 +33,10 @@ export async function handleWorkbladIntegrationApi(request, env) {
     const response = await getPrivateAudio(request, env, audioMatch[1]);
     return withCors(request, response);
   }
+  if (audioMatch && request.method === 'PUT') {
+    const response = await updatePrivateAudio(request, env, audioMatch[1]);
+    return withCors(request, response);
+  }
 
   return withCors(request, json({ error: 'Niet gevonden.' }, 404));
 }
@@ -39,7 +44,7 @@ export async function handleWorkbladIntegrationApi(request, env) {
 async function getPrivateStory(request, env, storyId, origin) {
   const story = await authorizedStory(request, env, storyId, `
     SELECT st.id, st.created_at, st.duration_seconds, st.display_name,
-      st.audio_mime_type, st.audio_size_bytes, st.title, st.event_time_text,
+      st.audio_object_key, st.audio_mime_type, st.audio_size_bytes, st.title, st.event_time_text,
       st.place_text, st.people_text, st.event_time_precision, st.source_mode,
       st.updated_at, tx.text_content
     FROM stories st
@@ -66,6 +71,7 @@ async function getPrivateStory(request, env, storyId, origin) {
   }));
 
   const eventAt = resolveEventAt(row.event_time_text, row.created_at);
+  const hasAudio = Boolean(row.audio_object_key) || Number(row.audio_size_bytes || 0) > 0;
   return json({
     storyId: row.id,
     createdAt: row.created_at,
@@ -80,9 +86,9 @@ async function getPrivateStory(request, env, storyId, origin) {
     people: row.people_text || '',
     sourceMode: row.source_mode || 'workblad',
     textContent: row.text_content || '',
-    hasAudio: Number(row.audio_size_bytes || 0) > 0,
+    hasAudio,
     audioMimeType: row.audio_mime_type || null,
-    audioUrl: Number(row.audio_size_bytes || 0) > 0
+    audioUrl: hasAudio
       ? `${origin}/api/integration/stories/${encodeURIComponent(storyId)}/audio`
       : null,
     media,
@@ -138,6 +144,43 @@ async function getPrivateAudio(request, env, storyId) {
   return r2Response(request, env, auth.row.audio_object_key, auth.row.audio_mime_type || 'application/octet-stream');
 }
 
+async function updatePrivateAudio(request, env, storyId) {
+  const auth = await authorizedStory(request, env, storyId, `
+    SELECT id, manage_token_hash, status, audio_object_key
+    FROM stories WHERE id = ? LIMIT 1
+  `, true);
+  if (auth.errorResponse) return auth.errorResponse;
+
+  const form = await request.formData();
+  const audio = form.get('audio');
+  if (!(audio instanceof File) || !audio.size) return json({ error: 'Opname ontbreekt.' }, 400);
+  if (audio.size > MAX_AUDIO_BYTES) return json({ error: 'Deze opname is te groot.' }, 413);
+
+  const mimeType = audio.type || 'application/octet-stream';
+  const extension = extensionForAudioMime(mimeType);
+  const objectKey = `stories/${storyId}/audio-${Date.now()}.${extension}`;
+  const duration = parseOptionalNumber(form.get('durationSeconds'));
+  const updatedAt = new Date().toISOString();
+
+  await env.MEDIA.put(objectKey, audio, {
+    httpMetadata: { contentType: mimeType },
+    customMetadata: { storyId, updatedAt, role: 'story-audio' },
+  });
+
+  await env.DB.prepare(`
+    UPDATE stories
+    SET audio_object_key = ?, audio_mime_type = ?, audio_size_bytes = ?, duration_seconds = ?, updated_at = ?
+    WHERE id = ?
+  `).bind(objectKey, mimeType, audio.size, duration, updatedAt, storyId).run();
+
+  const oldKey = auth.row.audio_object_key;
+  if (oldKey && oldKey !== objectKey) {
+    try { await env.MEDIA.delete(oldKey); } catch {}
+  }
+
+  return json({ ok: true, storyId, hasAudio: true, durationSeconds: duration, updatedAt });
+}
+
 async function authorizedStory(request, env, storyId, query, queryAlreadyIncludesToken = false) {
   const token = bearerToken(request);
   if (!token) return { errorResponse: json({ error: 'Beheer-token ontbreekt.' }, 401) };
@@ -170,6 +213,21 @@ async function r2Response(request, env, key, mimeType) {
   headers.set('cache-control', 'private, max-age=120');
   headers.set('etag', object.httpEtag);
   return new Response(object.body, { status: 200, headers });
+}
+
+function extensionForAudioMime(mimeType) {
+  const type = String(mimeType || '').toLowerCase();
+  if (type.includes('mp4') || type.includes('m4a')) return 'm4a';
+  if (type.includes('ogg')) return 'ogg';
+  if (type.includes('mpeg') || type.includes('mp3')) return 'mp3';
+  if (type.includes('wav')) return 'wav';
+  return 'webm';
+}
+
+function parseOptionalNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function resolveEventAt(value, fallback) {

@@ -13,7 +13,6 @@ export const WORKBLAD_PHOTO_CAROUSEL_STYLE = String.raw`
 export const WORKBLAD_PHOTO_CAROUSEL_SCRIPT = String.raw`<script>(function(){
 var COVER_KEY='talera-workblad-cover-index-v1';
 var suppressPhotoClick=false;
-var lastMediaCount=-1;
 
 function ensureCoverState(){
   if(typeof state==='undefined')return;
@@ -46,6 +45,7 @@ function rebuildThumbs(){
     b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();showPhoto(i,true)});
     strip.appendChild(b);
   });
+  strip.dataset.carouselReady='1';
 }
 function updateUi(scrollThumb){
   var items=mediaList();if(!items.length)return;
@@ -101,7 +101,8 @@ function bindPhoto(){
     photo.dataset.carouselClickGuard='1';
     photo.addEventListener('click',function(e){if(suppressPhotoClick){e.preventDefault();e.stopImmediatePropagation()}},true);
   }
-  if(items.length!==lastMediaCount){lastMediaCount=items.length;rebuildThumbs()}
+  var strip=document.querySelector('.work-photo-strip');
+  if(strip&&strip.dataset.carouselReady!=='1')rebuildThumbs();
   updateUi(false);
 }
 function bindVoiceSwipe(){

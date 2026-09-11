@@ -1,1 +1,0 @@
-Safe marker: required title/date picker added after photo-swipe-lite baseline on 2026-09-11.

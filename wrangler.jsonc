@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: listen-layer-r4-hide-bottom-date-force-20260911-2240
+// TALERA_DEPLOY_REV: presentation-date-audio-probe-forced-20260911-2245
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-timeline-prototype",

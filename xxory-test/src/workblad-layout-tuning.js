@@ -18,7 +18,22 @@ export const WORKBLAD_LAYOUT_TUNING_STYLE = String.raw`
 `;
 
 export const WORKBLAD_LAYOUT_TUNING_SCRIPT = String.raw`<script>(function(){
+var freshApplied=false;
+function freshRequested(){try{return new URLSearchParams(location.search).get('new')==='1'}catch(e){return false}}
+function applyFreshAfterBoot(){
+  if(freshApplied||!freshRequested()||!document.querySelector('.work-stage'))return;
+  freshApplied=true;
+  try{
+    if(Array.isArray(state.workMedia))state.workMedia.forEach(function(m){if(m&&m.localUrl)try{URL.revokeObjectURL(m.localUrl)}catch(e){}});
+    state.workMedia=[];state.newPhotoFiles=[];state.audioBlob=null;state.hasExistingAudio=false;state.duration=0;state.liveTranscript='';
+    state.workTitle='';state.workText='';state.workError='';state.storyId=null;state.manageToken=null;state.proposal=null;state.editingStoryId='';state.editingToken='';
+    var at=new URLSearchParams(location.search).get('at')||'';var d=new Date(at);
+    state.workDate=!isNaN(d.getTime())?d.toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'}):'';
+    if(typeof renderEntry==='function')renderEntry();
+  }catch(e){}
+}
 function tuneVoicePrompt(){
+  applyFreshAfterBoot();
   var b=document.getElementById('workVoice');
   if(!b)return;
   var hasVoice=Boolean(document.querySelector('.work-voice-note'));

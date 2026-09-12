@@ -5,24 +5,18 @@ import { WORKBLAD_V2_STYLE } from "./workblad-v2-style.js";
 import { WORKBLAD_V2_SCRIPT } from "./workblad-v2-client.js";
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
 import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
-import { WORKBLAD_AUDIO_PERSIST_SCRIPT } from "./workblad-audio-persist.js";
-import { WORKBLAD_AUDIO_COMMIT_GUARD_SCRIPT } from "./workblad-audio-commit-guard.js";
-import { handleWorkbladAudioHead } from "./workblad-audio-head.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "stable-tell-stack-clean-audio-guard-r2-20260912-0742";
+const TALERA_DEPLOY_REV = "full-listen-cycle-v1-verified-audio-20260912-0802";
 
 function enhanceWorkblad(html){
   return html
     .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+'</style></head>')
-    .replace('</body>',WORKBLAD_AUDIO_COMMIT_GUARD_SCRIPT+WORKBLAD_V2_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+WORKBLAD_AUDIO_PERSIST_SCRIPT+'</body>');
+    .replace('</body>',WORKBLAD_V2_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
 }
 
 export default {
   async fetch(request,env,ctx){
-    const audioHeadResponse=await handleWorkbladAudioHead(request,env);
-    if(audioHeadResponse)return audioHeadResponse;
-
     const integrationResponse=await handleWorkbladIntegrationApi(request,env);
     if(integrationResponse)return integrationResponse;
 
@@ -33,7 +27,7 @@ export default {
     const headers=new Headers(response.headers);
     headers.delete('content-length');
     headers.set('cache-control','no-store');
-    headers.set('x-talera-orb-app','organic-v79-stable-with-workblad-v2-clean-stack');
+    headers.set('x-talera-orb-app','organic-v79-stable-with-workblad-v2-audio-cycle');
     headers.set('x-talera-vertel-ui',TALERA_DEPLOY_REV);
     return new Response(enhanceWorkblad(html),{status:response.status,statusText:response.statusText,headers});
   }

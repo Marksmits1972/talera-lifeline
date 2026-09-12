@@ -12,7 +12,6 @@ export const WORKBLAD_LAYOUT_TUNING_STYLE = String.raw`
 .work-photo img{object-fit:contain!important;background:transparent!important}
 .work-photo-count.is-single,.work-photo-strip.is-single{display:none!important}
 
-/* The photo is the hero. Text remains readable, while voice is an optional next step. */
 @media(max-width:600px){
   .work-stage{grid-template-rows:minmax(0,1fr) auto 60px!important;gap:7px!important;padding:max(8px,env(safe-area-inset-top)) 10px 0!important}
   .work-scroll{overflow:hidden!important;padding:0!important}
@@ -67,28 +66,7 @@ function tuneWorkblad(){
   }
 }
 
-async function clearFreshDraftIfNeeded(){
-  try{
-    var q=new URLSearchParams(location.search);
-    if(q.get('new')!=='1')return;
-    var db=await new Promise(function(ok,no){var r=indexedDB.open('talera-workblad-v2',1);r.onsuccess=function(){ok(r.result)};r.onerror=function(){no(r.error)};r.onupgradeneeded=function(){if(!r.result.objectStoreNames.contains('drafts'))r.result.createObjectStore('drafts',{keyPath:'id'})}});
-    await new Promise(function(ok,no){var tx=db.transaction('drafts','readwrite');tx.oncomplete=ok;tx.onerror=function(){no(tx.error)};tx.objectStore('drafts').delete('current')});db.close();
-    try{localStorage.removeItem('talera-workblad-text-v2')}catch(e){}
-  }catch(e){}
-}
-
-function forceFreshDate(){
-  try{
-    var q=new URLSearchParams(location.search);if(q.get('new')!=='1')return;
-    var at=q.get('at'),d=at?new Date(at):null;if(!d||isNaN(d.getTime()))return;
-    var el=document.getElementById('workDate');if(!el)return;
-    var label=d.toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-    if(el.value!==label){el.value=label;el.dispatchEvent(new Event('input',{bubbles:true}))}
-  }catch(e){}
-}
-
-clearFreshDraftIfNeeded();
-var observer=new MutationObserver(function(){tuneWorkblad();forceFreshDate()});
+var observer=new MutationObserver(tuneWorkblad);
 observer.observe(document.documentElement,{childList:true,subtree:true});
-tuneWorkblad();forceFreshDate();
+tuneWorkblad();
 })();</scr`+`ipt>`;

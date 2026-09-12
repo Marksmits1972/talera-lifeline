@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: full-listen-cycle-v1-20260912-0805
+// TALERA_DEPLOY_REV: full-listen-cycle-v2-audio-hard-gate-20260912
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-timeline-prototype",

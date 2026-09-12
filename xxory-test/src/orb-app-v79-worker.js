@@ -10,7 +10,7 @@ import { WORKBLAD_AUDIO_COMMIT_GUARD_SCRIPT } from "./workblad-audio-commit-guar
 import { handleWorkbladAudioHead } from "./workblad-audio-head.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "stable-tell-stack-clean-r1-20260912-0735";
+const TALERA_DEPLOY_REV = "stable-tell-stack-clean-audio-guard-r2-20260912-0742";
 
 function enhanceWorkblad(html){
   return html

@@ -280,8 +280,10 @@ function resolveEventAt(value, fallback) {
   for (const [name,index] of Object.entries(months)) if (new RegExp(`\\b${name}\\b`,'i').test(lower)) { month=index;break; }
   if (month === null) {if (/\blente\b/.test(lower)) month=3;else if (/\bzomer\b/.test(lower)) month=6;else if (/\bherfst\b/.test(lower)) month=9;else if (/\bwinter\b/.test(lower)) month=0;else if (/^\s*(19\d{2}|20\d{2})\s*$/.test(lower)) month=6;else return fallback;}
   const dayMatch = lower.match(/\b([12]?\d|3[01])\b(?=\s+(?:januari|jan|februari|feb|maart|mrt|april|apr|mei|juni|jun|juli|jul|augustus|aug|september|sep|oktober|okt|november|nov|december|dec)\b)/i);
-  const day = dayMatch ? Math.max(1, Math.min(28, Number(dayMatch[1]))) : 1;
-  return new Date(Date.UTC(year, month, day, 12, 0, 0)).toISOString();
+  const day = dayMatch ? Number(dayMatch[1]) : 1;
+  const resolved = new Date(Date.UTC(year, month, day, 12, 0, 0));
+  if (resolved.getUTCFullYear() !== year || resolved.getUTCMonth() !== month || resolved.getUTCDate() !== day) return fallback;
+  return resolved.toISOString();
 }
 
 function withCors(request, response) {const origin=request.headers.get('origin')||'';const headers=new Headers(response.headers);if(TIMELINE_ORIGIN_RE.test(origin)){headers.set('access-control-allow-origin',origin);headers.set('vary','Origin');headers.set('access-control-allow-methods','GET,HEAD,POST,PUT,OPTIONS');headers.set('access-control-allow-headers','authorization,content-type');headers.set('access-control-max-age','600')}headers.set('cache-control',headers.get('cache-control')||'no-store');return new Response(response.body,{status:response.status,statusText:response.statusText,headers});}

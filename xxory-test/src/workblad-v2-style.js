@@ -8,6 +8,24 @@ export const WORKBLAD_V2_STYLE = String.raw`
 .work-photo-more{height:34px;min-width:34px;padding:0 8px;border-radius:999px;display:grid;place-items:center;background:rgba(220,234,246,.7);color:#0F2747;font-size:11px;font-weight:750}
 .work-saved-actions.one{grid-template-columns:1fr;max-width:300px}
 
+/* Datum hoort bij de kern van een herinnering. Het zichtbare veld opent onze eigen picker. */
+.work-date[readonly]{cursor:pointer;-webkit-user-select:none;user-select:none}
+.work-required-missing{outline:2px solid rgba(193,79,69,.55)!important;outline-offset:2px!important;border-radius:10px}
+.talera-date-backdrop{position:fixed;inset:0;z-index:80;background:rgba(15,39,71,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:flex-end;justify-content:center;padding:16px 12px max(16px,env(safe-area-inset-bottom))}
+.talera-date-sheet{width:min(100%,520px);background:#fffdfa;border-radius:26px;padding:18px;box-shadow:0 22px 70px rgba(15,39,71,.24);color:#0F2747;display:grid;gap:14px}
+.talera-date-sheet h2{margin:0;font-size:22px;line-height:1.08;letter-spacing:-.02em}
+.talera-date-sheet p{margin:0;color:#5e6b79;font-size:14px;line-height:1.4}
+.talera-date-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;background:rgba(220,234,246,.58);padding:4px;border-radius:14px}
+.talera-date-tab{border:0;border-radius:11px;min-height:42px;background:transparent;color:#0F2747;font-weight:700}
+.talera-date-tab.active{background:white;box-shadow:0 2px 9px rgba(15,39,71,.10)}
+.talera-date-panel{display:grid;gap:10px}.talera-date-panel[hidden]{display:none!important}
+.talera-date-sheet label{font-size:12px;font-weight:750;color:#526071;letter-spacing:.02em}
+.talera-date-sheet input,.talera-date-sheet select{width:100%;min-height:50px;border:1px solid rgba(15,39,71,.14);border-radius:14px;background:white;color:#0F2747;padding:0 13px;font-size:16px!important}
+.talera-date-approx{display:grid;grid-template-columns:1.2fr .8fr;gap:8px}
+.talera-date-actions{display:grid;grid-template-columns:auto 1fr;gap:8px;margin-top:2px}
+.talera-date-cancel,.talera-date-confirm{border:0;border-radius:15px;min-height:50px;padding:0 18px;font-weight:750;font-size:15px}
+.talera-date-cancel{background:rgba(220,234,246,.56);color:#0F2747}.talera-date-confirm{background:#0F2747;color:#fff}
+
 /* iOS: never trigger Safari's automatic focus zoom. */
 .work-stage input,.work-stage textarea{font-size:16px!important}
 

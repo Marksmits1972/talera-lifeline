@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: stable-tell-stack-clean-r1-20260912-0736
+// TALERA_DEPLOY_REV: full-listen-cycle-v1-verified-audio-20260912-0806
 {
   "name": "xxory-test",
   "main": "src/orb-app-v79-worker.js",

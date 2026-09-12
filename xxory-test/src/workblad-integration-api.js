@@ -6,43 +6,24 @@ const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 export async function handleWorkbladIntegrationApi(request, env) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith('/api/integration/')) return null;
-
-  if (request.method === 'OPTIONS') {
-    return withCors(request, new Response(null, { status: 204 }));
-  }
+  if (request.method === 'OPTIONS') return withCors(request, new Response(null, { status: 204 }));
 
   if (url.pathname === '/api/integration/stories' && request.method === 'POST') {
-    const response = await createVerifiedStory(request, env, url.origin);
-    return withCors(request, response);
+    return withCors(request, await createVerifiedStory(request, env, url.origin));
   }
 
   const storyMatch = url.pathname.match(/^\/api\/integration\/stories\/([^/]+)$/);
-  if (storyMatch && request.method === 'GET') {
-    const response = await getPrivateStory(request, env, storyMatch[1], url.origin);
-    return withCors(request, response);
-  }
+  if (storyMatch && request.method === 'GET') return withCors(request, await getPrivateStory(request, env, storyMatch[1], url.origin));
 
   const contentMatch = url.pathname.match(/^\/api\/integration\/stories\/([^/]+)\/content$/);
-  if (contentMatch && request.method === 'PUT') {
-    const response = await updatePrivateStoryText(request, env, contentMatch[1]);
-    return withCors(request, response);
-  }
+  if (contentMatch && request.method === 'PUT') return withCors(request, await updatePrivateStoryText(request, env, contentMatch[1]));
 
   const mediaMatch = url.pathname.match(/^\/api\/integration\/stories\/([^/]+)\/media\/([^/]+)$/);
-  if (mediaMatch && request.method === 'GET') {
-    const response = await getPrivateMedia(request, env, mediaMatch[1], mediaMatch[2]);
-    return withCors(request, response);
-  }
+  if (mediaMatch && request.method === 'GET') return withCors(request, await getPrivateMedia(request, env, mediaMatch[1], mediaMatch[2]));
 
   const audioMatch = url.pathname.match(/^\/api\/integration\/stories\/([^/]+)\/audio$/);
-  if (audioMatch && (request.method === 'GET' || request.method === 'HEAD')) {
-    const response = await getPrivateAudio(request, env, audioMatch[1]);
-    return withCors(request, response);
-  }
-  if (audioMatch && request.method === 'PUT') {
-    const response = await updatePrivateAudio(request, env, audioMatch[1]);
-    return withCors(request, response);
-  }
+  if (audioMatch && (request.method === 'GET' || request.method === 'HEAD')) return withCors(request, await getPrivateAudio(request, env, audioMatch[1]));
+  if (audioMatch && request.method === 'PUT') return withCors(request, await updatePrivateAudio(request, env, audioMatch[1]));
 
   return withCors(request, json({ error: 'Niet gevonden.' }, 404));
 }
@@ -59,8 +40,10 @@ async function createVerifiedStory(request, env, origin) {
   const hasAudio = audio instanceof File && audio.size > 0;
   const hasText = Boolean(storyText);
   const hasPhoto = startPhoto instanceof File && startPhoto.size > 0;
+  const eventAt = resolveEventAt(eventTime, '');
 
-  if (!eventTime) return json({ error: 'Vul eerst in wanneer deze herinnering was.' }, 422);
+  if (!title) return json({ error: 'Vul eerst een titel in.' }, 422);
+  if (!eventTime || !eventAt) return json({ error: 'Kies eerst wanneer dit verhaal speelde.' }, 422);
   if (voiceAttempted && !hasAudio) return json({ error: 'Je hebt Vertel gebruikt, maar er is geen geluidsbestand ontvangen. Spreek het verhaal nogmaals in.' }, 422);
   if (!hasAudio && !hasText) return json({ error: 'Verhaal ontbreekt.' }, 400);
   if (hasAudio && audio.size > MAX_AUDIO_BYTES) return json({ error: 'Deze opname is te groot.' }, 413);
@@ -108,9 +91,7 @@ async function createVerifiedStory(request, env, origin) {
       duration, displayName, manageTokenHash, sourceMode, startPhotoKey, createdAt, title, eventTime
     ).run();
 
-    if (hasText) {
-      await env.DB.prepare(`INSERT INTO story_texts (story_id, text_content) VALUES (?, ?)`).bind(storyId, storyText).run();
-    }
+    if (hasText) await env.DB.prepare(`INSERT INTO story_texts (story_id, text_content) VALUES (?, ?)`).bind(storyId, storyText).run();
     if (hasPhoto) {
       await env.DB.prepare(`
         INSERT INTO story_media (id, story_id, object_key, mime_type, size_bytes, media_type, role, created_at)
@@ -133,6 +114,7 @@ async function createVerifiedStory(request, env, origin) {
     proposal: {},
     title,
     eventTime,
+    eventAt,
     hasAudio,
     audioMimeType: hasAudio ? audioMimeType : null,
     audioSizeBytes: hasAudio ? Number(writtenAudio?.size || audio.size) : 0,
@@ -193,69 +175,41 @@ async function getPrivateStory(request, env, storyId, origin) {
     hasAudio,
     audioMimeType,
     audioSizeBytes: hasAudio ? Number(audioObject?.size || row.audio_size_bytes || 0) : 0,
-    audioUrl: hasAudio
-      ? `${origin}/api/integration/stories/${encodeURIComponent(storyId)}/audio`
-      : null,
+    audioUrl: hasAudio ? `${origin}/api/integration/stories/${encodeURIComponent(storyId)}/audio` : null,
     media,
   });
 }
 
 async function updatePrivateStoryText(request, env, storyId) {
-  const story = await authorizedStory(request, env, storyId, `
-    SELECT id, manage_token_hash, status FROM stories WHERE id = ? LIMIT 1
-  `, true);
+  const story = await authorizedStory(request, env, storyId, `SELECT id, manage_token_hash, status FROM stories WHERE id = ? LIMIT 1`, true);
   if (story.errorResponse) return story.errorResponse;
-
   let payload = {};
-  try { payload = await request.json(); }
-  catch { return json({ error: 'Ongeldige gegevens.' }, 400); }
-
+  try { payload = await request.json(); } catch { return json({ error: 'Ongeldige gegevens.' }, 400); }
   const textContent = cleanText(payload.storyText, MAX_STORY_TEXT_CHARS) || '';
   const updatedAt = new Date().toISOString();
-
-  await env.DB.prepare(`
-    INSERT INTO story_texts (story_id, text_content)
-    VALUES (?, ?)
-    ON CONFLICT(story_id) DO UPDATE SET text_content = excluded.text_content
-  `).bind(storyId, textContent).run();
+  await env.DB.prepare(`INSERT INTO story_texts (story_id, text_content) VALUES (?, ?) ON CONFLICT(story_id) DO UPDATE SET text_content = excluded.text_content`).bind(storyId, textContent).run();
   await env.DB.prepare(`UPDATE stories SET updated_at = ? WHERE id = ?`).bind(updatedAt, storyId).run();
-
   return json({ ok: true, storyId, updatedAt });
 }
 
 async function getPrivateMedia(request, env, storyId, mediaId) {
-  const auth = await authorizedStory(request, env, storyId, `
-    SELECT id, manage_token_hash, status FROM stories WHERE id = ? LIMIT 1
-  `, true);
+  const auth = await authorizedStory(request, env, storyId, `SELECT id, manage_token_hash, status FROM stories WHERE id = ? LIMIT 1`, true);
   if (auth.errorResponse) return auth.errorResponse;
-
-  const row = await env.DB.prepare(`
-    SELECT object_key, mime_type, media_type
-    FROM story_media
-    WHERE id = ? AND story_id = ? LIMIT 1
-  `).bind(mediaId, storyId).first();
+  const row = await env.DB.prepare(`SELECT object_key, mime_type, media_type FROM story_media WHERE id = ? AND story_id = ? LIMIT 1`).bind(mediaId, storyId).first();
   if (!row) return new Response('Media niet gevonden', { status: 404 });
-
   return r2Response(request, env, row.object_key, row.mime_type || 'application/octet-stream');
 }
 
 async function getPrivateAudio(request, env, storyId) {
-  const auth = await authorizedStory(request, env, storyId, `
-    SELECT id, manage_token_hash, status, audio_object_key, audio_mime_type
-    FROM stories WHERE id = ? LIMIT 1
-  `, true);
+  const auth = await authorizedStory(request, env, storyId, `SELECT id, manage_token_hash, status, audio_object_key, audio_mime_type FROM stories WHERE id = ? LIMIT 1`, true);
   if (auth.errorResponse) return auth.errorResponse;
   if (!auth.row.audio_object_key) return new Response('Audio niet gevonden', { status: 404 });
   return r2Response(request, env, auth.row.audio_object_key, auth.row.audio_mime_type || 'application/octet-stream');
 }
 
 async function updatePrivateAudio(request, env, storyId) {
-  const auth = await authorizedStory(request, env, storyId, `
-    SELECT id, manage_token_hash, status, audio_object_key
-    FROM stories WHERE id = ? LIMIT 1
-  `, true);
+  const auth = await authorizedStory(request, env, storyId, `SELECT id, manage_token_hash, status, audio_object_key FROM stories WHERE id = ? LIMIT 1`, true);
   if (auth.errorResponse) return auth.errorResponse;
-
   const form = await request.formData();
   const audio = form.get('audio');
   if (!(audio instanceof File) || !audio.size) return json({ error: 'Opname ontbreekt.' }, 400);
@@ -267,46 +221,27 @@ async function updatePrivateAudio(request, env, storyId) {
   const duration = parseOptionalNumber(form.get('durationSeconds'));
   const updatedAt = new Date().toISOString();
 
-  await env.MEDIA.put(objectKey, audio, {
-    httpMetadata: { contentType: mimeType },
-    customMetadata: { storyId, updatedAt, role: 'story-audio' },
-  });
-
+  await env.MEDIA.put(objectKey, audio, { httpMetadata: { contentType: mimeType }, customMetadata: { storyId, updatedAt, role: 'story-audio' } });
   const written = await env.MEDIA.head(objectKey);
   if (!written || Number(written.size || 0) <= 0) {
     try { await env.MEDIA.delete(objectKey); } catch {}
     return json({ error: 'De opname kon niet veilig worden opgeslagen.' }, 502);
   }
 
-  await env.DB.prepare(`
-    UPDATE stories
-    SET audio_object_key = ?, audio_mime_type = ?, audio_size_bytes = ?, duration_seconds = ?, updated_at = ?
-    WHERE id = ?
-  `).bind(objectKey, mimeType, written.size || audio.size, duration, updatedAt, storyId).run();
-
+  await env.DB.prepare(`UPDATE stories SET audio_object_key = ?, audio_mime_type = ?, audio_size_bytes = ?, duration_seconds = ?, updated_at = ? WHERE id = ?`).bind(objectKey, mimeType, written.size || audio.size, duration, updatedAt, storyId).run();
   const oldKey = auth.row.audio_object_key;
-  if (oldKey && oldKey !== objectKey) {
-    try { await env.MEDIA.delete(oldKey); } catch {}
-  }
-
+  if (oldKey && oldKey !== objectKey) try { await env.MEDIA.delete(oldKey); } catch {}
   return json({ ok: true, storyId, hasAudio: true, audioSizeBytes: written.size || audio.size, durationSeconds: duration, updatedAt });
 }
 
 async function authorizedStory(request, env, storyId, query, queryAlreadyIncludesToken = false) {
   const token = bearerToken(request);
   if (!token) return { errorResponse: json({ error: 'Beheer-token ontbreekt.' }, 401) };
-
-  let row;
-  if (queryAlreadyIncludesToken) {
-    row = await env.DB.prepare(query).bind(storyId).first();
-  } else {
-    row = await env.DB.prepare(query).bind(storyId).first();
-    if (row && !row.manage_token_hash) {
-      const tokenRow = await env.DB.prepare(`SELECT manage_token_hash FROM stories WHERE id = ? LIMIT 1`).bind(storyId).first();
-      if (tokenRow) row.manage_token_hash = tokenRow.manage_token_hash;
-    }
+  let row = await env.DB.prepare(query).bind(storyId).first();
+  if (!queryAlreadyIncludesToken && row && !row.manage_token_hash) {
+    const tokenRow = await env.DB.prepare(`SELECT manage_token_hash FROM stories WHERE id = ? LIMIT 1`).bind(storyId).first();
+    if (tokenRow) row.manage_token_hash = tokenRow.manage_token_hash;
   }
-
   if (!row || row.status === 'deleted') return { errorResponse: json({ error: 'Verhaal niet gevonden.' }, 404) };
   const expectedHash = row.manage_token_hash || (await env.DB.prepare(`SELECT manage_token_hash FROM stories WHERE id = ? LIMIT 1`).bind(storyId).first())?.manage_token_hash;
   if (!(await secureHashMatch(token, expectedHash))) return { errorResponse: json({ error: 'Geen toegang.' }, 403) };
@@ -317,52 +252,19 @@ async function r2Response(request, env, key, mimeType) {
   if (request.method === 'HEAD') {
     const object = await env.MEDIA.head(key);
     if (!object || Number(object.size || 0) <= 0) return new Response('Niet gevonden', { status: 404 });
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    headers.set('content-type', mimeType || headers.get('content-type') || 'application/octet-stream');
-    headers.set('accept-ranges', 'bytes');
-    headers.set('cache-control', 'private, max-age=120');
-    headers.set('etag', object.httpEtag);
-    if (Number.isFinite(object.size)) headers.set('content-length', String(object.size));
+    const headers = new Headers();object.writeHttpMetadata(headers);headers.set('content-type', mimeType || headers.get('content-type') || 'application/octet-stream');headers.set('accept-ranges', 'bytes');headers.set('cache-control', 'private, max-age=120');headers.set('etag', object.httpEtag);if (Number.isFinite(object.size)) headers.set('content-length', String(object.size));
     return new Response(null, { status: 200, headers });
   }
-
   const object = await env.MEDIA.get(key, { onlyIf: request.headers, range: request.headers });
   if (!object) return new Response('Niet gevonden', { status: 404 });
   if (!("body" in object)) return new Response(null, { status: 412 });
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set('content-type', mimeType || headers.get('content-type') || 'application/octet-stream');
-  headers.set('accept-ranges', 'bytes');
-  headers.set('cache-control', 'private, max-age=120');
-  headers.set('etag', object.httpEtag);
-  if (Number.isFinite(object.size)) headers.set('content-length', String(object.size));
+  const headers = new Headers();object.writeHttpMetadata(headers);headers.set('content-type', mimeType || headers.get('content-type') || 'application/octet-stream');headers.set('accept-ranges', 'bytes');headers.set('cache-control', 'private, max-age=120');headers.set('etag', object.httpEtag);if (Number.isFinite(object.size)) headers.set('content-length', String(object.size));
   return new Response(object.body, { status: 200, headers });
 }
 
-function extensionForAudioMime(mimeType) {
-  const type = String(mimeType || '').toLowerCase();
-  if (type.includes('mp4') || type.includes('m4a')) return 'm4a';
-  if (type.includes('ogg')) return 'ogg';
-  if (type.includes('mpeg') || type.includes('mp3')) return 'mp3';
-  if (type.includes('wav')) return 'wav';
-  return 'webm';
-}
-
-function extensionForMediaMime(mimeType) {
-  const type = String(mimeType || '').toLowerCase();
-  if (type.includes('png')) return 'png';
-  if (type.includes('webp')) return 'webp';
-  if (type.includes('heic') || type.includes('heif')) return 'heic';
-  if (type.includes('gif')) return 'gif';
-  return 'jpg';
-}
-
-function parseOptionalNumber(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
+function extensionForAudioMime(mimeType) {const type = String(mimeType || '').toLowerCase();if (type.includes('mp4') || type.includes('m4a')) return 'm4a';if (type.includes('ogg')) return 'ogg';if (type.includes('mpeg') || type.includes('mp3')) return 'mp3';if (type.includes('wav')) return 'wav';return 'webm';}
+function extensionForMediaMime(mimeType) {const type = String(mimeType || '').toLowerCase();if (type.includes('png')) return 'png';if (type.includes('webp')) return 'webp';if (type.includes('heic') || type.includes('heif')) return 'heic';if (type.includes('gif')) return 'gif';return 'jpg';}
+function parseOptionalNumber(value) {if (value === null || value === undefined || value === '') return null;const number = Number(value);return Number.isFinite(number) ? number : null;}
 
 function resolveEventAt(value, fallback) {
   const raw = String(value || '').trim();
@@ -370,81 +272,22 @@ function resolveEventAt(value, fallback) {
   const lower = raw.toLocaleLowerCase('nl-NL');
   const yearMatch = lower.match(/\b(19\d{2}|20\d{2})\b/);
   const year = yearMatch ? Number(yearMatch[1]) : null;
-
   const direct = Date.parse(raw);
   if (Number.isFinite(direct) && direct > Date.UTC(1900, 0, 1)) return new Date(direct).toISOString();
   if (!year) return fallback;
-
-  const months = {
-    januari: 0, jan: 0, februari: 1, feb: 1, maart: 2, mrt: 2, april: 3, apr: 3,
-    mei: 4, juni: 5, jun: 5, juli: 6, jul: 6, augustus: 7, aug: 7,
-    september: 8, sep: 8, oktober: 9, okt: 9, november: 10, nov: 10, december: 11, dec: 11,
-  };
+  const months = {januari:0,jan:0,februari:1,feb:1,maart:2,mrt:2,april:3,apr:3,mei:4,juni:5,jun:5,juli:6,jul:6,augustus:7,aug:7,september:8,sep:8,oktober:9,okt:9,november:10,nov:10,december:11,dec:11};
   let month = null;
-  for (const [name, index] of Object.entries(months)) {
-    if (new RegExp(`\\b${name}\\b`, 'i').test(lower)) { month = index; break; }
-  }
-  if (month === null) {
-    if (/\blente\b/.test(lower)) month = 3;
-    else if (/\bzomer\b/.test(lower)) month = 6;
-    else if (/\bherfst\b/.test(lower)) month = 9;
-    else if (/\bwinter\b/.test(lower)) month = 0;
-    else month = 6;
-  }
+  for (const [name,index] of Object.entries(months)) if (new RegExp(`\\b${name}\\b`,'i').test(lower)) { month=index;break; }
+  if (month === null) {if (/\blente\b/.test(lower)) month=3;else if (/\bzomer\b/.test(lower)) month=6;else if (/\bherfst\b/.test(lower)) month=9;else if (/\bwinter\b/.test(lower)) month=0;else if (/^\s*(19\d{2}|20\d{2})\s*$/.test(lower)) month=6;else return fallback;}
   const dayMatch = lower.match(/\b([12]?\d|3[01])\b(?=\s+(?:januari|jan|februari|feb|maart|mrt|april|apr|mei|juni|jun|juli|jul|augustus|aug|september|sep|oktober|okt|november|nov|december|dec)\b)/i);
   const day = dayMatch ? Math.max(1, Math.min(28, Number(dayMatch[1]))) : 1;
   return new Date(Date.UTC(year, month, day, 12, 0, 0)).toISOString();
 }
 
-function withCors(request, response) {
-  const origin = request.headers.get('origin') || '';
-  const headers = new Headers(response.headers);
-  if (TIMELINE_ORIGIN_RE.test(origin)) {
-    headers.set('access-control-allow-origin', origin);
-    headers.set('vary', 'Origin');
-    headers.set('access-control-allow-methods', 'GET,HEAD,POST,PUT,OPTIONS');
-    headers.set('access-control-allow-headers', 'authorization,content-type');
-    headers.set('access-control-max-age', '600');
-  }
-  headers.set('cache-control', headers.get('cache-control') || 'no-store');
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
-}
-
-function bearerToken(request) {
-  const value = request.headers.get('authorization') || '';
-  return value.toLowerCase().startsWith('bearer ') ? value.slice(7).trim() : null;
-}
-function cleanText(value, maxLength) {
-  if (typeof value !== 'string') return null;
-  const cleaned = value.trim();
-  return cleaned ? cleaned.slice(0, maxLength) : null;
-}
-function randomToken(bytes) {
-  const values = new Uint8Array(bytes);
-  crypto.getRandomValues(values);
-  let binary = '';
-  for (const value of values) binary += String.fromCharCode(value);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-async function sha256(value) {
-  const data = new TextEncoder().encode(value);
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
-  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-async function secureHashMatch(token, expectedHash) {
-  const actualHash = await sha256(token);
-  if (!expectedHash || actualHash.length !== expectedHash.length) return false;
-  let difference = 0;
-  for (let i = 0; i < actualHash.length; i++) difference |= actualHash.charCodeAt(i) ^ expectedHash.charCodeAt(i);
-  return difference === 0;
-}
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-      'x-content-type-options': 'nosniff',
-    },
-  });
-}
+function withCors(request, response) {const origin=request.headers.get('origin')||'';const headers=new Headers(response.headers);if(TIMELINE_ORIGIN_RE.test(origin)){headers.set('access-control-allow-origin',origin);headers.set('vary','Origin');headers.set('access-control-allow-methods','GET,HEAD,POST,PUT,OPTIONS');headers.set('access-control-allow-headers','authorization,content-type');headers.set('access-control-max-age','600')}headers.set('cache-control',headers.get('cache-control')||'no-store');return new Response(response.body,{status:response.status,statusText:response.statusText,headers});}
+function bearerToken(request) {const value=request.headers.get('authorization')||'';return value.toLowerCase().startsWith('bearer ')?value.slice(7).trim():null;}
+function cleanText(value,maxLength) {if(typeof value!=='string')return null;const cleaned=value.trim();return cleaned?cleaned.slice(0,maxLength):null;}
+function randomToken(bytes) {const values=new Uint8Array(bytes);crypto.getRandomValues(values);let binary='';for(const value of values)binary+=String.fromCharCode(value);return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');}
+async function sha256(value) {const data=new TextEncoder().encode(value);const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',data));return [...digest].map((b)=>b.toString(16).padStart(2,'0')).join('');}
+async function secureHashMatch(token,expectedHash) {const actualHash=await sha256(token);if(!expectedHash||actualHash.length!==expectedHash.length)return false;let difference=0;for(let i=0;i<actualHash.length;i++)difference|=actualHash.charCodeAt(i)^expectedHash.charCodeAt(i);return difference===0;}
+function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});}

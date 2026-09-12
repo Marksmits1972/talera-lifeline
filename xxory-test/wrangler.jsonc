@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: full-listen-cycle-v4-core-owned-date-fresh-rerecord-20260912
+// TALERA_DEPLOY_REV: full-listen-cycle-v5-keyboard-finish-visible-20260912
 {
   "name": "xxory-test",
   "main": "src/orb-app-v79-worker.js",

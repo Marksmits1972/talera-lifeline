@@ -82,25 +82,34 @@ export const memoryPresentationControlsScript = String.raw`
     }
   }
   async function playNow(){
-    if(!activeStoryId||!activeToken||!activeHasAudio||loading)return;
-    if(loadFailed||!audio.src){const epoch=renderEpoch;const ok=await prepare(activeStoryId,activeToken,epoch,true);if(!ok||epoch!==renderEpoch)return}
+    if(!activeStoryId||!activeToken||!activeHasAudio||loading||loadFailed||!audio.src)return;
     try{const p=audio.play();if(p&&typeof p.catch==='function')await p;loadFailed=false;setUi()}catch(e){loadFailed=true;setUi();console.warn('TALERA audio kon niet starten',e)}
   }
 
   audio.addEventListener('play',setUi);audio.addEventListener('pause',setUi);audio.addEventListener('ended',()=>{try{audio.currentTime=0}catch(e){}setUi()});audio.addEventListener('error',()=>{loadFailed=true;setUi()});
-  audioButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(loading)return;if(!audio.paused){audio.pause();return}playNow()});
+  audioButton.addEventListener('click',e=>{
+    e.preventDefault();e.stopPropagation();
+    if(loading)return;
+    if(!audio.paused){audio.pause();return}
+    if(loadFailed||!audio.src){prepare(activeStoryId,activeToken,renderEpoch,true);return}
+    playNow();
+  });
   editButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();stopAudio(true);const m=runtime.currentMemory();if(!usable(m))return;location.href=TELL_ORIGIN+'/?edit='+encodeURIComponent(m.storyId)+'#token='+encodeURIComponent(tokenFor(m))});
 
   async function render(memory){
     const epoch=++renderEpoch;stopAudio(true);const ok=usable(memory);editButton.hidden=!ok;activeStoryId=ok?memory.storyId:'';activeToken=ok?tokenFor(memory):'';activeHasAudio=false;showAudio(false);setUi();if(!ok)return;
+    const hinted=Boolean(memory._hasAudio||Number(memory._durationSeconds)>0);
+    if(hinted){activeHasAudio=true;loading=true;showAudio(true);setUi()}
     const detail=await getDetail(activeStoryId,activeToken);if(epoch!==renderEpoch)return;
-    const expected=Boolean(detail&&(detail.hasAudio||Number(detail.durationSeconds)>0))||Boolean(memory._hasAudio||Number(memory._durationSeconds)>0);
+    const expected=Boolean(detail&&(detail.hasAudio||Number(detail.durationSeconds)>0))||hinted;
+    activeHasAudio=expected;memory._hasAudio=expected;
+    if(expected){loading=true;showAudio(true);setUi()}
     try{
       const url=await getAudioUrl(activeStoryId,activeToken,false);if(epoch!==renderEpoch)return;
-      activeHasAudio=true;memory._hasAudio=true;showAudio(true);audio.src=url;audio.currentTime=0;audio.load();loadFailed=false;setUi();return;
+      activeHasAudio=true;memory._hasAudio=true;showAudio(true);audio.src=url;audio.currentTime=0;audio.load();loading=false;loadFailed=false;setUi();return;
     }catch(e){}
     if(epoch!==renderEpoch)return;
-    activeHasAudio=expected;memory._hasAudio=expected;
+    loading=false;activeHasAudio=expected;memory._hasAudio=expected;
     if(expected){showAudio(true);loadFailed=true;setUi()}else showAudio(false);
   }
 

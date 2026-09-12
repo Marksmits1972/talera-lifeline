@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: rollback-stable-workblad-after-core-boot-crash-20260911-2319
+// TALERA_DEPLOY_REV: stable-tell-stack-clean-r1-20260912-0736
 {
   "name": "xxory-test",
   "main": "src/orb-app-v79-worker.js",

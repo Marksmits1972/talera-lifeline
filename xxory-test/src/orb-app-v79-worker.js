@@ -7,7 +7,7 @@ import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./w
 import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 
-const TALERA_DEPLOY_REV = "full-listen-cycle-v5-keyboard-finish-visible-20260912";
+const TALERA_DEPLOY_REV = "full-listen-cycle-v6-recorder-controls-core-20260912";
 
 function enhanceWorkblad(html){
   return html

@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: full-listen-cycle-v1-verified-audio-20260912-0806
+// TALERA_DEPLOY_REV: full-listen-cycle-v2-date-audio-hard-gate-20260912
 {
   "name": "xxory-test",
   "main": "src/orb-app-v79-worker.js",

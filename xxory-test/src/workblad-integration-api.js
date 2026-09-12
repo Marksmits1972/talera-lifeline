@@ -1,6 +1,7 @@
 const TIMELINE_ORIGIN_RE = /^https:\/\/talera-timeline-prototype\.[a-z0-9-]+\.workers\.dev$/i;
 const MAX_STORY_TEXT_CHARS = 20000;
 const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
 export async function handleWorkbladIntegrationApi(request, env) {
   const url = new URL(request.url);
@@ -8,6 +9,11 @@ export async function handleWorkbladIntegrationApi(request, env) {
 
   if (request.method === 'OPTIONS') {
     return withCors(request, new Response(null, { status: 204 }));
+  }
+
+  if (url.pathname === '/api/integration/stories' && request.method === 'POST') {
+    const response = await createVerifiedStory(request, env, url.origin);
+    return withCors(request, response);
   }
 
   const storyMatch = url.pathname.match(/^\/api\/integration\/stories\/([^/]+)$/);
@@ -39,6 +45,92 @@ export async function handleWorkbladIntegrationApi(request, env) {
   }
 
   return withCors(request, json({ error: 'Niet gevonden.' }, 404));
+}
+
+async function createVerifiedStory(request, env, origin) {
+  const form = await request.formData();
+  const audio = form.get('audio');
+  const storyText = cleanText(form.get('storyText'), MAX_STORY_TEXT_CHARS) || '';
+  const startPhoto = form.get('startPhoto');
+  const sourceMode = cleanText(form.get('sourceMode'), 24) || 'workblad';
+  const hasAudio = audio instanceof File && audio.size > 0;
+  const hasText = Boolean(storyText);
+  const hasPhoto = startPhoto instanceof File && startPhoto.size > 0;
+
+  if (!hasAudio && !hasText) return json({ error: 'Verhaal ontbreekt.' }, 400);
+  if (hasAudio && audio.size > MAX_AUDIO_BYTES) return json({ error: 'Deze opname is te groot.' }, 413);
+  if (hasPhoto && startPhoto.size > MAX_MEDIA_BYTES) return json({ error: 'Deze foto is te groot.' }, 413);
+
+  const storyId = randomToken(16);
+  const manageToken = randomToken(32);
+  const manageTokenHash = await sha256(manageToken);
+  const createdAt = new Date().toISOString();
+  const displayName = cleanText(form.get('displayName'), 80);
+  const duration = hasAudio ? parseOptionalNumber(form.get('durationSeconds')) : null;
+  const audioMimeType = hasAudio ? (audio.type || 'application/octet-stream') : '';
+  const audioObjectKey = hasAudio ? `stories/${storyId}/audio-${Date.now()}.${extensionForAudioMime(audioMimeType)}` : '';
+  const startPhotoKey = hasPhoto ? `stories/${storyId}/start-${randomToken(6)}.${extensionForMediaMime(startPhoto.type)}` : null;
+  let writtenAudio = null;
+
+  if (hasAudio) {
+    await env.MEDIA.put(audioObjectKey, audio, {
+      httpMetadata: { contentType: audioMimeType },
+      customMetadata: { storyId, createdAt, role: 'story-audio' },
+    });
+    writtenAudio = await env.MEDIA.head(audioObjectKey);
+    if (!writtenAudio || Number(writtenAudio.size || 0) <= 0) {
+      try { await env.MEDIA.delete(audioObjectKey); } catch {}
+      return json({ error: 'De geluidsopname kon niet veilig op de server worden vastgelegd.' }, 502);
+    }
+  }
+
+  if (hasPhoto) {
+    await env.MEDIA.put(startPhotoKey, startPhoto, {
+      httpMetadata: { contentType: startPhoto.type || 'image/jpeg' },
+      customMetadata: { storyId, createdAt, role: 'start-photo' },
+    });
+  }
+
+  try {
+    await env.DB.prepare(`
+      INSERT INTO stories (
+        id, created_at, audio_object_key, audio_mime_type, audio_size_bytes,
+        duration_seconds, display_name, manage_token_hash, status,
+        source_mode, start_photo_key, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    `).bind(
+      storyId, createdAt, audioObjectKey, audioMimeType, hasAudio ? Number(writtenAudio?.size || audio.size) : 0,
+      duration, displayName, manageTokenHash, sourceMode, startPhotoKey, createdAt
+    ).run();
+
+    if (hasText) {
+      await env.DB.prepare(`INSERT INTO story_texts (story_id, text_content) VALUES (?, ?)`).bind(storyId, storyText).run();
+    }
+    if (hasPhoto) {
+      await env.DB.prepare(`
+        INSERT INTO story_media (id, story_id, object_key, mime_type, size_bytes, media_type, role, created_at)
+        VALUES (?, ?, ?, ?, ?, 'image', 'start', ?)
+      `).bind(randomToken(12), storyId, startPhotoKey, startPhoto.type || 'image/jpeg', startPhoto.size, createdAt).run();
+    }
+  } catch (error) {
+    try { await env.DB.prepare(`DELETE FROM story_texts WHERE story_id = ?`).bind(storyId).run(); } catch {}
+    try { await env.DB.prepare(`DELETE FROM story_media WHERE story_id = ?`).bind(storyId).run(); } catch {}
+    try { await env.DB.prepare(`DELETE FROM stories WHERE id = ?`).bind(storyId).run(); } catch {}
+    if (hasAudio) try { await env.MEDIA.delete(audioObjectKey); } catch {}
+    if (hasPhoto) try { await env.MEDIA.delete(startPhotoKey); } catch {}
+    throw error;
+  }
+
+  return json({
+    storyId,
+    manageToken,
+    createdAt,
+    proposal: {},
+    hasAudio,
+    audioMimeType: hasAudio ? audioMimeType : null,
+    audioSizeBytes: hasAudio ? Number(writtenAudio?.size || audio.size) : 0,
+    audioUrl: hasAudio ? `${origin}/api/integration/stories/${encodeURIComponent(storyId)}/audio` : null,
+  }, 201);
 }
 
 async function getPrivateStory(request, env, storyId, origin) {
@@ -75,7 +167,7 @@ async function getPrivateStory(request, env, storyId, origin) {
   if (row.audio_object_key) {
     try { audioObject = await env.MEDIA.head(row.audio_object_key); } catch {}
   }
-  const hasAudio = Boolean(audioObject);
+  const hasAudio = Boolean(audioObject && Number(audioObject.size || 0) > 0);
   const audioMimeType = row.audio_mime_type || audioObject?.httpMetadata?.contentType || null;
   return json({
     storyId: row.id,
@@ -174,7 +266,7 @@ async function updatePrivateAudio(request, env, storyId) {
   });
 
   const written = await env.MEDIA.head(objectKey);
-  if (!written) {
+  if (!written || Number(written.size || 0) <= 0) {
     try { await env.MEDIA.delete(objectKey); } catch {}
     return json({ error: 'De opname kon niet veilig worden opgeslagen.' }, 502);
   }
@@ -217,7 +309,7 @@ async function authorizedStory(request, env, storyId, query, queryAlreadyInclude
 async function r2Response(request, env, key, mimeType) {
   if (request.method === 'HEAD') {
     const object = await env.MEDIA.head(key);
-    if (!object) return new Response('Niet gevonden', { status: 404 });
+    if (!object || Number(object.size || 0) <= 0) return new Response('Niet gevonden', { status: 404 });
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set('content-type', mimeType || headers.get('content-type') || 'application/octet-stream');
@@ -237,6 +329,7 @@ async function r2Response(request, env, key, mimeType) {
   headers.set('accept-ranges', 'bytes');
   headers.set('cache-control', 'private, max-age=120');
   headers.set('etag', object.httpEtag);
+  if (Number.isFinite(object.size)) headers.set('content-length', String(object.size));
   return new Response(object.body, { status: 200, headers });
 }
 
@@ -247,6 +340,15 @@ function extensionForAudioMime(mimeType) {
   if (type.includes('mpeg') || type.includes('mp3')) return 'mp3';
   if (type.includes('wav')) return 'wav';
   return 'webm';
+}
+
+function extensionForMediaMime(mimeType) {
+  const type = String(mimeType || '').toLowerCase();
+  if (type.includes('png')) return 'png';
+  if (type.includes('webp')) return 'webp';
+  if (type.includes('heic') || type.includes('heif')) return 'heic';
+  if (type.includes('gif')) return 'gif';
+  return 'jpg';
 }
 
 function parseOptionalNumber(value) {
@@ -293,7 +395,7 @@ function withCors(request, response) {
   if (TIMELINE_ORIGIN_RE.test(origin)) {
     headers.set('access-control-allow-origin', origin);
     headers.set('vary', 'Origin');
-    headers.set('access-control-allow-methods', 'GET,HEAD,PUT,OPTIONS');
+    headers.set('access-control-allow-methods', 'GET,HEAD,POST,PUT,OPTIONS');
     headers.set('access-control-allow-headers', 'authorization,content-type');
     headers.set('access-control-max-age', '600');
   }
@@ -309,6 +411,13 @@ function cleanText(value, maxLength) {
   if (typeof value !== 'string') return null;
   const cleaned = value.trim();
   return cleaned ? cleaned.slice(0, maxLength) : null;
+}
+function randomToken(bytes) {
+  const values = new Uint8Array(bytes);
+  crypto.getRandomValues(values);
+  let binary = '';
+  for (const value of values) binary += String.fromCharCode(value);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 async function sha256(value) {
   const data = new TextEncoder().encode(value);

@@ -8,7 +8,13 @@ window.fetch=async function(input,init){
   if(method!=='POST'||target!=='/api/stories'||!(body instanceof FormData))return nativeFetch(input,init);
 
   var audio=body.get('audio');
-  if(!(audio instanceof Blob)||!audio.size)return nativeFetch(input,init);
+  var transcript=String(body.get('liveTranscript')||'').trim();
+  if(!(audio instanceof Blob)||!audio.size){
+    if(transcript){
+      return new Response(JSON.stringify({error:'Je woorden zijn wel herkend, maar de geluidsopname is niet vastgelegd. Probeer Vertel nogmaals voordat je dit verhaal op de tijdlijn zet.'}),{status:422,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+    }
+    return nativeFetch(input,init);
+  }
 
   var response=await nativeFetch(input,init);
   if(!response.ok)return response;

@@ -53,10 +53,15 @@ async function createVerifiedStory(request, env, origin) {
   const storyText = cleanText(form.get('storyText'), MAX_STORY_TEXT_CHARS) || '';
   const startPhoto = form.get('startPhoto');
   const sourceMode = cleanText(form.get('sourceMode'), 24) || 'workblad';
+  const title = cleanText(form.get('title'), 140) || '';
+  const eventTime = cleanText(form.get('eventTime'), 120) || '';
+  const voiceAttempted = String(form.get('voiceAttempted') || '') === '1';
   const hasAudio = audio instanceof File && audio.size > 0;
   const hasText = Boolean(storyText);
   const hasPhoto = startPhoto instanceof File && startPhoto.size > 0;
 
+  if (!eventTime) return json({ error: 'Vul eerst in wanneer deze herinnering was.' }, 422);
+  if (voiceAttempted && !hasAudio) return json({ error: 'Je hebt Vertel gebruikt, maar er is geen geluidsbestand ontvangen. Spreek het verhaal nogmaals in.' }, 422);
   if (!hasAudio && !hasText) return json({ error: 'Verhaal ontbreekt.' }, 400);
   if (hasAudio && audio.size > MAX_AUDIO_BYTES) return json({ error: 'Deze opname is te groot.' }, 413);
   if (hasPhoto && startPhoto.size > MAX_MEDIA_BYTES) return json({ error: 'Deze foto is te groot.' }, 413);
@@ -96,11 +101,11 @@ async function createVerifiedStory(request, env, origin) {
       INSERT INTO stories (
         id, created_at, audio_object_key, audio_mime_type, audio_size_bytes,
         duration_seconds, display_name, manage_token_hash, status,
-        source_mode, start_photo_key, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+        source_mode, start_photo_key, updated_at, title, event_time_text, event_time_precision
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 'gebruiker')
     `).bind(
       storyId, createdAt, audioObjectKey, audioMimeType, hasAudio ? Number(writtenAudio?.size || audio.size) : 0,
-      duration, displayName, manageTokenHash, sourceMode, startPhotoKey, createdAt
+      duration, displayName, manageTokenHash, sourceMode, startPhotoKey, createdAt, title, eventTime
     ).run();
 
     if (hasText) {
@@ -126,6 +131,8 @@ async function createVerifiedStory(request, env, origin) {
     manageToken,
     createdAt,
     proposal: {},
+    title,
+    eventTime,
     hasAudio,
     audioMimeType: hasAudio ? audioMimeType : null,
     audioSizeBytes: hasAudio ? Number(writtenAudio?.size || audio.size) : 0,

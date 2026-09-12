@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: listen-layer-r5-server-audio-confirmed-force-20260912-0855
+// TALERA_DEPLOY_REV: listen-layer-r6-same-date-active-snap-20260912-0900
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-timeline-prototype",

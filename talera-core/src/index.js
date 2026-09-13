@@ -9,6 +9,8 @@ import {
   updateStoryRecord,
 } from './repository.js';
 import { audioResponse, storeExactAudio } from './audio-store.js';
+import { ensureSchema, schemaReady } from './schema-bootstrap.js';
+import { TEST_UI_HTML } from './test-ui.js';
 
 const APP = 'talera-core-v1';
 
@@ -31,16 +33,23 @@ export default {
 };
 
 async function route(request, env, url) {
+  if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/') {
+    return html(request.method === 'HEAD' ? null : TEST_UI_HTML);
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/v1/health') {
+    const ready = await schemaReady(env);
     return json({
-      ok: true,
+      ok: Boolean(env.DB && env.MEDIA && ready),
       app: APP,
       databaseBound: Boolean(env.DB),
       mediaBound: Boolean(env.MEDIA),
+      schemaReady: ready,
     });
   }
 
   if (!env.DB) return json({ error: 'Databasebinding DB ontbreekt.' }, 503);
+  await ensureSchema(env);
 
   if (request.method === 'POST' && url.pathname === '/api/v1/stories') {
     return createStory(request, env);
@@ -177,6 +186,21 @@ function json(value, status = 200) {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
+      'x-talera-core': APP,
+    },
+  });
+}
+
+function html(body, status = 200) {
+  return new Response(body, {
+    status,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store, max-age=0',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+      'referrer-policy': 'no-referrer',
+      'permissions-policy': 'camera=(), geolocation=(), microphone=(self)',
       'x-talera-core': APP,
     },
   });

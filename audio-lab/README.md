@@ -1,38 +1,68 @@
-# TALERA Audio Lab
+# TALERA Audio Lab v2
 
-Dit project staat bewust los van de bestaande TALERA-app.
+Dit project staat bewust volledig los van de bestaande TALERA-app.
 
-Doel: één geïsoleerde keten bewijzen op iPhone/Safari:
+Doel: één geïsoleerde audioketen op een echte iPhone/Safari bewijzen zonder tijdlijn, Orb, transcriptie, datumlogica of andere TALERA-state.
 
-1. Microfoon openen.
-2. Audio opnemen met `MediaRecorder`.
-3. Lokale blob maken en lokaal afspelen.
-4. Exact die blob uploaden naar R2.
-5. R2-opslag byte-voor-byte controleren.
-6. Het bestand opnieuw via de Worker ophalen.
-7. De opnieuw opgehaalde serverblob afspelen.
+## Vier bewijzen
+
+1. **Opnemen**
+   - open de iPhone-microfoon;
+   - neem 5–10 seconden op;
+   - maak één lokale `Blob` met `MediaRecorder`.
+
+2. **Lokaal luisteren**
+   - toon lokale bytes, MIME en SHA-256;
+   - speel exact die lokale blob af;
+   - de tester bevestigt zelf: `Ja, ik hoor mezelf`.
+
+3. **R2-opslag en terughaalcontrole**
+   - upload exact dezelfde blob naar R2;
+   - server berekent SHA-256;
+   - R2 `head()` moet dezelfde bytegrootte en hash bevestigen;
+   - download daarna het object opnieuw;
+   - client berekent opnieuw SHA-256;
+   - lokale bytes/hash en serverbytes/hash moeten exact gelijk zijn.
+
+4. **Vanaf server luisteren**
+   - maak een nieuwe object-URL van de teruggehaalde R2-blob;
+   - speel die blob op de iPhone af;
+   - de tester bevestigt zelf: `Ja, dit is dezelfde opname`.
+
+Pas na die laatste bevestiging telt de ronde als geslaagd.
+
+## 10-rondes acceptatie
+
+De teller op het toestel moet `10/10` bereiken met tien opeenvolgende volledige rondes. Een ronde is alleen groen wanneer:
+
+- lokale blob > 0 bytes;
+- lokale playback hoorbaar de eigen opname is;
+- R2 stored bytes gelijk zijn aan lokale bytes;
+- teruggehaalde bytes gelijk zijn aan lokale bytes;
+- lokale SHA-256 exact gelijk is aan server/R2 SHA-256;
+- serverplayback hoorbaar exact dezelfde opname is;
+- een volgende nieuwe opname in dezelfde pagina opnieuw volledig werkt.
+
+Pas daarna wordt recorder/upload/playback-code teruggebracht naar TALERA.
 
 ## Cloudflare
 
-Workernaam: `talera-audio-lab`
+Worker: `talera-audio-lab`
 
-Root directory / working directory: `audio-lab`
+URL: `https://talera-audio-lab.mark-a39.workers.dev/`
+
+Root/config: `audio-lab/wrangler.jsonc`
 
 R2 binding:
 - variable: `AUDIO`
 - bucket: `talera-audio-lab`
 
-De bucket moet éénmalig in Cloudflare R2 worden aangemaakt voordat de Worker kan deployen.
+## Veiligheid
 
-## Acceptatie
+De bestaande TALERA-app is bevroren op:
 
-De keten is pas groen wanneer op een echte iPhone in Safari minimaal 10 opeenvolgende tests slagen waarbij:
+`archive/freeze-talera-before-audio-lab-20260912`
 
-- lokale bytes > 0;
-- `Luister lokaal` de juiste eigen opname afspeelt;
-- R2 stored bytes exact gelijk zijn aan lokale bytes;
-- opnieuw opgehaalde bytes exact gelijk zijn aan lokale bytes;
-- `Luister vanaf server` exact dezelfde opname hoorbaar afspeelt;
-- een tweede nieuwe opname in dezelfde pagina opnieuw volledig werkt.
+De vorige Audio Lab v1 staat op:
 
-Pas daarna wordt recorder/upload/playback-code teruggebracht naar TALERA.
+`archive/audio-lab-v1-20260913`

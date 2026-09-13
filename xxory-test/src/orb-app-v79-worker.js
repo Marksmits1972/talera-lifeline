@@ -17,8 +17,30 @@ function enhanceWorkblad(html){
 
 export default {
   async fetch(request,env,ctx){
-    const integrationResponse=await handleWorkbladIntegrationApi(request,env);
-    if(integrationResponse)return integrationResponse;
+    const url=new URL(request.url);
+    if(url.pathname.startsWith('/api/integration/')){
+      try{
+        // Integration routes run before the archived worker. Warm its health route
+        // first so the shared D1 schema and migrations are guaranteed to exist.
+        const healthRequest=new Request(new URL('/api/health',url),{method:'GET'});
+        const healthResponse=await stableV79Worker.fetch(healthRequest,env,ctx);
+        if(!healthResponse.ok){
+          return new Response(JSON.stringify({error:'De opslag kon niet worden voorbereid. Probeer het opnieuw.'}),{
+            status:503,
+            headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
+          });
+        }
+        const integrationResponse=await handleWorkbladIntegrationApi(request,env);
+        if(integrationResponse)return integrationResponse;
+      }catch(error){
+        console.error('TALERA workblad integration error',error);
+        const detail=String(error&&error.message?error.message:error||'onbekende fout').slice(0,180);
+        return new Response(JSON.stringify({error:'Opslaan op de server mislukt: '+detail}),{
+          status:500,
+          headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
+        });
+      }
+    }
 
     const response=await stableV79Worker.fetch(request,env,ctx);
     const type=response.headers.get('content-type')||'';

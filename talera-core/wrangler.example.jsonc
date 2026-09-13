@@ -8,16 +8,9 @@
     "ALLOWED_ORIGINS": "https://xxory-test.mark-a39.workers.dev,https://talera-timeline-prototype.mark-a39.workers.dev"
   },
   "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "talera-core",
-      "database_id": "REPLACE_WITH_NEW_TALERA_CORE_D1_ID"
-    }
+    { "binding": "DB" }
   ],
   "r2_buckets": [
-    {
-      "binding": "MEDIA",
-      "bucket_name": "talera-core-media"
-    }
+    { "binding": "MEDIA" }
   ]
 }

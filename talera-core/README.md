@@ -13,7 +13,7 @@ The current prototype grew through several generations of UI and API integration
 3. Reading/listening and editing do not share one all-powerful token. Transitional beta access uses separate `reader` and `owner` capabilities. Account sessions will replace these tokens later without changing story/audio tables.
 4. The Core API is versioned under `/api/v1`.
 5. `owner_user_id`, `core_users` and `core_story_grants` reserve the clean path to real accounts/admin without coupling the current beta to a specific identity provider.
-6. No deployment from this directory may point at the existing production D1/R2 resources. Create dedicated `talera-core` resources first.
+6. No deployment from this directory may point at the existing TALERA D1/R2 resources. Core uses its own `DB` and `MEDIA` bindings.
 
 ## Implemented in foundation 1
 
@@ -23,6 +23,33 @@ The current prototype grew through several generations of UI and API integration
 - `POST /api/v1/stories/:id/audio` requires owner access and stores audio using exact byte + SHA-256 verification.
 - `GET|HEAD /api/v1/stories/:id/audio` accepts owner or reader access.
 - D1 schema already contains the account/grant tables that later replace capability-only beta access.
+- The Worker bootstraps the Core schema with idempotent `CREATE IF NOT EXISTS` statements.
+- `/` serves an isolated iPhone test surface for health, story creation, reader-vs-owner permissions, MediaRecorder pause/resume, exact-byte audio upload, retrieval, SHA-256 comparison and server playback.
+
+## Cloudflare deployment
+
+`talera-core/wrangler.jsonc` deliberately declares only fresh `DB` and `MEDIA` bindings. With current Wrangler automatic resource provisioning enabled, deploying this config creates/links isolated D1 and R2 resources for Core instead of touching the existing TALERA resources.
+
+Cloudflare Git deploy command:
+
+```bash
+npx wrangler deploy --config talera-core/wrangler.jsonc
+```
+
+After a successful deploy, open the resulting `talera-core.<account>.workers.dev` URL on the iPhone. The first health request initializes the Core schema.
+
+## iPhone acceptance sequence
+
+A Core round is green when the test surface shows 6/6:
+
+1. Core + D1 + R2 reachable.
+2. Story created safely.
+3. Reader capability can read.
+4. Reader capability is blocked from editing.
+5. Audio is attached after exact server-side byte/hash verification.
+6. Retrieved server audio has exactly the same bytes and SHA-256 as the local iPhone recording and plays back correctly.
+
+The microphone is requested only when `Start opname` is pressed.
 
 ## Deliberately not implemented yet
 
@@ -33,7 +60,7 @@ The current prototype grew through several generations of UI and API integration
 - migration of existing prototype stories
 - Timeline/Workblad integration
 
-Those come after the Core Worker has its own D1/R2 resources and passes its isolated API tests.
+Those come after the isolated Core test is green on the real iPhone.
 
 ## Local checks
 
@@ -41,5 +68,3 @@ Those come after the Core Worker has its own D1/R2 resources and passes its isol
 cd talera-core
 npm test
 ```
-
-The checked-in Wrangler file is an example only. Copy it to `wrangler.jsonc` after dedicated Cloudflare resources exist. Do not reuse the current `xxory-test` D1 or media bucket.

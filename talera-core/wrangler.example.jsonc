@@ -1,0 +1,23 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "talera-core",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-13",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://xxory-test.mark-a39.workers.dev,https://talera-timeline-prototype.mark-a39.workers.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "talera-core",
+      "database_id": "REPLACE_WITH_NEW_TALERA_CORE_D1_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "talera-core-media"
+    }
+  ]
+}

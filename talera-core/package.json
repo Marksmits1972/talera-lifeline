@@ -1,0 +1,14 @@
+{
+  "name": "talera-core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "dev": "wrangler dev src/index.js",
+    "deploy": "wrangler deploy --config wrangler.jsonc"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -33,7 +33,13 @@ The current prototype grew through several generations of UI and API integration
 Cloudflare Git deploy command:
 
 ```bash
-npx wrangler deploy --config talera-core/wrangler.jsonc
+npx wrangler deploy
+```
+
+Cloudflare project root directory:
+
+```text
+talera-core
 ```
 
 After a successful deploy, open the resulting `talera-core.<account>.workers.dev` URL on the iPhone. The first health request initializes the Core schema.
@@ -68,3 +74,5 @@ Those come after the isolated Core test is green on the real iPhone.
 cd talera-core
 npm test
 ```
+
+Deployment trigger: production branch `feature/clean-core-v1-20260913` confirmed for the isolated Core Worker on 2026-09-13.

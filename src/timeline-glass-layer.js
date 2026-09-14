@@ -2,11 +2,11 @@ export const timelineGlassLayerStyle = String.raw`
 /* TALERA — isolated frosted-glass presentation layer for the top timeline.
    This file owns presentation geometry only; timeline mechanics remain untouched. */
 
-/* Allow the date badge to hang slightly into the photo area without enlarging
-   the technical timeline touch zone or changing its layout row. */
+/* The timeline is its own interaction plane and must stay above the story/photo
+   swipe surface. The photo swipe controller owns only the layer underneath. */
 .timeline{
   overflow:visible!important;
-  z-index:6!important;
+  z-index:20!important;
 }
 
 .timeline canvas{

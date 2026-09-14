@@ -45,15 +45,34 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
     }
   }
 
-  async function fixedBytes(blob,label){
-    if(!(blob instanceof Blob)||!blob.size)throw new Error((label||'Bestand')+' ontbreekt.');
-    var bytes=await blob.arrayBuffer();
-    if(!bytes||bytes.byteLength!==blob.size)throw new Error((label||'Bestand')+' kon niet volledig worden voorbereid.');
+  function fileReaderBytes(blob){
+    return new Promise(function(resolve,reject){
+      try{
+        var reader=new FileReader();
+        reader.onload=function(){resolve(reader.result)};
+        reader.onerror=function(){reject(reader.error||new Error('Bestand kon niet worden gelezen.'))};
+        reader.onabort=function(){reject(new Error('Lezen van bestand is afgebroken.'))};
+        reader.readAsArrayBuffer(blob);
+      }catch(error){reject(error)}
+    });
+  }
+
+  async function fixedBytes(blob,kind){
+    if(!(blob instanceof Blob)||!blob.size)throw new Error(kind==='audio'?'De geluidsopname ontbreekt.':'De foto ontbreekt.');
+    var bytes=null,firstError=null;
+    try{bytes=await blob.arrayBuffer()}catch(error){firstError=error}
+    if(!bytes||bytes.byteLength!==blob.size){
+      try{bytes=await fileReaderBytes(blob)}catch(error){if(!firstError)firstError=error}
+    }
+    if(!bytes||bytes.byteLength!==blob.size){
+      if(kind==='audio')throw new Error('De lokaal bewaarde geluidsopname is niet meer leesbaar op deze iPhone. Spreek alleen de opname opnieuw in; je tekst en foto blijven staan.');
+      throw new Error('De lokaal bewaarde foto is niet meer leesbaar op deze iPhone. Kies alleen deze foto opnieuw; je tekst en opname blijven staan.');
+    }
     return bytes;
   }
 
-  async function uploadRawAudio(storyId,token,blob,duration){
-    var bytes=await fixedBytes(blob,'De geluidsopname');
+  async function uploadRawAudio(storyId,token,blob,duration,preparedBytes){
+    var bytes=preparedBytes||await fixedBytes(blob,'audio');
     var res=await fetchTimed('/api/integration/raw/stories/'+encodeURIComponent(storyId)+'/audio',{
       method:'PUT',
       headers:{
@@ -67,8 +86,8 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
     return {response:res,data:await readJson(res)};
   }
 
-  async function uploadRawMedia(storyId,token,file,role){
-    var bytes=await fixedBytes(file,'De foto');
+  async function uploadRawMedia(storyId,token,file,role,preparedBytes){
+    var bytes=preparedBytes||await fixedBytes(file,'photo');
     var res=await fetchTimed('/api/integration/raw/stories/'+encodeURIComponent(storyId)+'/media?role='+(role==='start'?'start':'extra'),{
       method:'POST',
       headers:{
@@ -103,6 +122,11 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
         displayName:String(body.get('displayName')||'')
       };
 
+      setStage('Lokale opname en foto worden gecontroleerd…');
+      var preparedAudio=null,preparedPhoto=null;
+      if(audio instanceof Blob&&audio.size)preparedAudio=await fixedBytes(audio,'audio');
+      if(startPhoto instanceof Blob&&startPhoto.size)preparedPhoto=await fixedBytes(startPhoto,'photo');
+
       var createRes=await fetchTimed('/api/integration/raw/stories',{
         method:'POST',
         headers:{'content-type':'application/json'},
@@ -113,7 +137,7 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
       if(!createRes.ok)return jsonResponse(createData,createRes.status);
 
       if(audio instanceof Blob&&audio.size){
-        var audioResult=await uploadRawAudio(createData.storyId,createData.manageToken,audio,payload.durationSeconds);
+        var audioResult=await uploadRawAudio(createData.storyId,createData.manageToken,audio,payload.durationSeconds,preparedAudio);
         if(!audioResult.response.ok)return jsonResponse(audioResult.data,audioResult.response.status);
         createData.hasAudio=true;
         createData.audioMimeType=audioResult.data.audioMimeType||audio.type||null;
@@ -121,7 +145,7 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
       }
 
       if(startPhoto instanceof Blob&&startPhoto.size){
-        var mediaResult=await uploadRawMedia(createData.storyId,createData.manageToken,startPhoto,'start');
+        var mediaResult=await uploadRawMedia(createData.storyId,createData.manageToken,startPhoto,'start',preparedPhoto);
         if(!mediaResult.response.ok)return jsonResponse(mediaResult.data,mediaResult.response.status);
       }
 
@@ -134,8 +158,9 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
     if(method==='PUT'&&editAudio&&body instanceof FormData){
       var editBlob=body.get('audio');
       if(!(editBlob instanceof Blob)||!editBlob.size)return jsonResponse({error:'Opname ontbreekt.'},400);
+      var editBytes=await fixedBytes(editBlob,'audio');
       var token=headerValue(init.headers,'authorization').replace(/^Bearer\s+/i,'');
-      var editResult=await uploadRawAudio(decodeURIComponent(editAudio[1]),token,editBlob,body.get('durationSeconds'));
+      var editResult=await uploadRawAudio(decodeURIComponent(editAudio[1]),token,editBlob,body.get('durationSeconds'),editBytes);
       return jsonResponse(editResult.data,editResult.response.status);
     }
 
@@ -145,7 +170,8 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
       var auth=headerValue(init.headers,'authorization').replace(/^Bearer\s+/i,'');
       var storyId=decodeURIComponent(legacyMedia[1]);
       for(var i=0;i<files.length;i++){
-        var result=await uploadRawMedia(storyId,auth,files[i],'extra');
+        var fileBytes=await fixedBytes(files[i],'photo');
+        var result=await uploadRawMedia(storyId,auth,files[i],'extra',fileBytes);
         if(!result.response.ok)return jsonResponse(result.data,result.response.status);
       }
       return jsonResponse({ok:true,count:files.length,rawStorage:true},201);

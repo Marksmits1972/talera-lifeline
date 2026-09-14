@@ -5,12 +5,7 @@ export const presentationControllerScript = String.raw`
   const story=document.getElementById('memoryStoryScroll');
   const photos=Array.from(document.querySelectorAll('.example-photo'));
 
-  /* ---------------------------------------------------------
-     TIMELINE READOUT TUNING.
-     Keep the large scale exactly as-is; make the exact date at
-     the needle slightly larger so overview + precision read as
-     one calm hierarchy.
-     --------------------------------------------------------- */
+  /* Timeline readout tuning only. */
   if(!document.getElementById('talera-timeline-readout-tuning')){
     const style=document.createElement('style');
     style.id='talera-timeline-readout-tuning';
@@ -18,9 +13,7 @@ export const presentationControllerScript = String.raw`
     document.head.appendChild(style);
   }
 
-  /* ---------------------------------------------------------
-     VISUAL PHOTO FITTING ONLY — never changes timeline state.
-     --------------------------------------------------------- */
+  /* Visual photo fitting only — never changes timeline state. */
   function ensureAlignedBlur(img){
     const layer=img&&img.closest('.photo-layer');
     if(!layer)return null;
@@ -78,7 +71,6 @@ export const presentationControllerScript = String.raw`
   }
 
   function fitAll(){requestAnimationFrame(()=>photos.forEach(fitNow));}
-
   photos.forEach(img=>{
     if(img.complete)fitNow(img);
     img.addEventListener('load',()=>fitNow(img),{passive:true});
@@ -88,10 +80,8 @@ export const presentationControllerScript = String.raw`
   window.addEventListener('resize',fitAll,{passive:true});
   if(window.ResizeObserver&&stage){new ResizeObserver(fitAll).observe(stage);}
 
-  /* ---------------------------------------------------------
-     TIMELINE VISUAL WAKE/SLEEP ONLY.
-     The original timeline code remains the sole navigation owner.
-     --------------------------------------------------------- */
+  /* Timeline visual wake/sleep only. Timeline navigation remains owned by the
+     proven timeline motor in the base prototype. */
   if(timeline){
     let restTimer=0;
     let activePointers=0;
@@ -114,379 +104,289 @@ export const presentationControllerScript = String.raw`
   }
 
   /* ---------------------------------------------------------
-     ONE PHOTOBOOK OWNER.
-     Fine dragging remains primary. Every released gesture now owns
-     one transition epoch, so a stale timeout from an older swipe can
-     never clear or mutate a newer swipe. The memory step is committed
-     immediately under the overlay instead of after image/decode waits.
+     CLEAN PHOTO STRIP ENGINE — single gesture owner.
+
+     - one persistent previous/current/next strip, reused for every swipe;
+     - exact 1:1 finger displacement while touching;
+     - continuous release velocity feeds one spring, no slow/fast modes;
+     - at most one photo per gesture;
+     - timeline-started gestures are never claimed here;
+     - no extra fallback gesture listener exists.
      --------------------------------------------------------- */
-  if(!story||!stage||!window.__taleraPhotoBook)return;
+  const book=window.__taleraPhotoBook;
+  if(!story||!stage||!book)return;
 
-  const decoded=new Map();
-  function warmImage(src){
-    if(!src)return Promise.resolve();
-    if(decoded.has(src))return decoded.get(src);
-    const img=new Image();
-    img.decoding='async';
-    img.loading='eager';
-    try{img.fetchPriority='high';}catch(e){}
-    img.src=src;
-    const p=(img.decode?img.decode():new Promise(resolve=>{
-      if(img.complete)resolve();
-      else{
-        img.addEventListener('load',resolve,{once:true});
-        img.addEventListener('error',resolve,{once:true});
-      }
-    })).catch(()=>{});
-    decoded.set(src,p);
-    return p;
+  function stripIds(root){
+    if(root.id)root.removeAttribute('id');
+    root.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
   }
-  function warmState(s){[s.current,s.previous,s.next].forEach(m=>{if(m)warmImage(m.image);});}
-  warmState(window.__taleraPhotoBook.state());
 
-  const DRAG_INTENT_PX=6;
-  const PICKUP_DEADZONE_PX=4;
-  const FLICK_INTENT_PX=14;
-  const FLICK_LOCK_SPEED=1.0;
-  const HORIZONTAL_BIAS=1.06;
-  let pid=null;
-  let startX=0,startY=0,lastX=0,lastT=0,startT=0;
-  let dragOriginX=0;
-  let smoothedVelocity=0;
-  let mode=null;
-  let fastPickup=false;
-  let lockedStepDirection=0;
-  let overlay=null,previousPage=null,currentPage=null,nextPage=null,stateAtStart=null;
-
-  /* Transition bookkeeping. A new touch may interrupt visual settling,
-     but it never has to wait for old image/decode work to finish. */
-  let transitionEpoch=0;
-  let transitionActive=false;
-  let settleTimer=0;
-  let momentumTimer=0;
-
-  function stripIds(root){root.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));}
-  function matchingBaseLayer(src){
-    const layers=Array.from(stage.querySelectorAll('.photo-layer:not(.photo-book-page)'));
-    return layers.find(layer=>{
-      const img=layer.querySelector('.example-photo');
-      return img&&img.src===src;
-    })||layers.find(layer=>parseFloat(getComputedStyle(layer).opacity)>.5)||layers[0]||null;
-  }
-  function makePage(src,useVisibleBase=false){
-    const source=(useVisibleBase&&src?matchingBaseLayer(src):null)||document.getElementById('photoLayerA')||stage.querySelector('.photo-layer');
+  function makeStripPage(){
+    const source=document.getElementById('photoLayerA')||stage.querySelector('.photo-layer');
     const page=source?source.cloneNode(true):document.createElement('div');
-    page.classList.add('photo-book-page');
+    page.classList.add('photo-layer','talera-photo-strip-page');
     page.classList.remove('is-front');
     page.style.opacity='1';
     stripIds(page);
-    const sharp=page.querySelector('.example-photo');
-    const blur=page.querySelector('.photo-aligned-blur');
-    const backdrop=page.querySelector('.photo-backdrop');
-    if(src){
-      if(backdrop&&backdrop.src!==src){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src;}
-      if(blur&&blur.src!==src){blur.decoding='async';blur.loading='eager';blur.src=src;}
-      if(sharp){
-        sharp.decoding='async';sharp.loading='eager';
-        try{sharp.fetchPriority='high';}catch(e){}
-        const fit=()=>{const r=stage.getBoundingClientRect();fitNode(sharp,blur,r.width,r.height);};
-        if(sharp.src!==src)sharp.src=src;
-        if(sharp.complete&&sharp.naturalWidth)fit();
-        else sharp.addEventListener('load',fit,{once:true,passive:true});
-      }
-    }
     return page;
   }
-  function clearOverlay(){
-    if(overlay)overlay.remove();
-    overlay=previousPage=currentPage=nextPage=null;
+
+  const strip=document.createElement('div');
+  strip.className='talera-photo-strip';
+  strip.setAttribute('aria-hidden','true');
+  const previousPage=makeStripPage();
+  const currentPage=makeStripPage();
+  const nextPage=makeStripPage();
+  strip.appendChild(previousPage);
+  strip.appendChild(currentPage);
+  strip.appendChild(nextPage);
+  stage.appendChild(strip);
+
+  let stripVisible=false;
+  let stripX=0;
+  let stateAtStart=null;
+  let pointerId=null;
+  let mode=null;
+  let startX=0,startY=0,lastX=0,lastY=0;
+  let samples=[];
+  let springRaf=0;
+
+  function pageFit(page){
+    const sharp=page.querySelector('.example-photo');
+    const blur=page.querySelector('.photo-aligned-blur');
+    if(!sharp||!sharp.complete||!sharp.naturalWidth)return;
+    const r=stage.getBoundingClientRect();
+    fitNode(sharp,blur,r.width,r.height);
+  }
+
+  function setPage(page,memory){
+    if(!memory||!memory.image){
+      page.style.visibility='hidden';
+      page.dataset.taleraSrc='';
+      return;
+    }
+    page.style.visibility='visible';
+    const src=memory.image;
+    if(page.dataset.taleraSrc===src){
+      pageFit(page);
+      return;
+    }
+    page.dataset.taleraSrc=src;
+    const backdrop=page.querySelector('.photo-backdrop');
+    const blur=page.querySelector('.photo-aligned-blur');
+    const sharp=page.querySelector('.example-photo');
+    if(backdrop&&backdrop.src!==src){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src;}
+    if(blur&&blur.src!==src){blur.decoding='async';blur.loading='eager';blur.src=src;}
+    if(sharp){
+      sharp.decoding='async';
+      sharp.loading='eager';
+      try{sharp.fetchPriority='high';}catch(err){}
+      sharp.onload=()=>pageFit(page);
+      if(sharp.src!==src)sharp.src=src;
+      if(sharp.complete&&sharp.naturalWidth)pageFit(page);
+    }
+  }
+
+  function syncStrip(){
+    const state=book.state();
+    stateAtStart=state;
+    setPage(previousPage,state.previous);
+    setPage(currentPage,state.current);
+    setPage(nextPage,state.next);
+  }
+
+  function positionStrip(x){
+    stripX=x;
+    const w=stage.getBoundingClientRect().width;
+    currentPage.style.transform='translate3d('+x.toFixed(2)+'px,0,0)';
+    previousPage.style.transform='translate3d('+(x-w).toFixed(2)+'px,0,0)';
+    nextPage.style.transform='translate3d('+(x+w).toFixed(2)+'px,0,0)';
+  }
+
+  function showStrip(){
+    syncStrip();
+    stripVisible=true;
+    strip.classList.add('is-visible');
+    positionStrip(0);
+  }
+
+  function hideStrip(){
+    stripVisible=false;
+    strip.classList.remove('is-visible');
+    stripX=0;
     stateAtStart=null;
   }
-  function stopTransitionVisuals(){
-    transitionEpoch+=1;
-    clearTimeout(settleTimer);
-    clearTimeout(momentumTimer);
-    settleTimer=0;
-    momentumTimer=0;
-    transitionActive=false;
-    clearOverlay();
+
+  function cancelSpring(finishVisual=true){
+    if(springRaf)cancelAnimationFrame(springRaf);
+    springRaf=0;
+    if(finishVisual)hideStrip();
   }
-  function buildOverlay(){
-    clearOverlay();
-    const s=window.__taleraPhotoBook.state();
-    stateAtStart=s;
-    warmState(s);
-    overlay=document.createElement('div');
-    overlay.className='photo-book-overlay';
-    previousPage=s.previous?makePage(s.previous.image):null;
-    currentPage=makePage(s.current&&s.current.image,true);
-    nextPage=s.next?makePage(s.next.image):null;
-    if(previousPage)overlay.appendChild(previousPage);
-    overlay.appendChild(currentPage);
-    if(nextPage)overlay.appendChild(nextPage);
-    stage.appendChild(overlay);
-    placePages(0);
+
+  function startsOnTimeline(e){
+    const target=e.target&&e.target.nodeType===1?e.target:null;
+    if(target&&target.closest('.timeline'))return true;
+    if(!timeline)return false;
+    const r=timeline.getBoundingClientRect();
+    return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
   }
-  function placePages(dx){
-    if(!overlay||!currentPage)return;
+
+  function startsOnControl(e){
+    const target=e.target&&e.target.nodeType===1?e.target:null;
+    return !!(target&&target.closest('button,a,input,textarea,select,[role="button"],nav,.talera-memory-audio'));
+  }
+
+  function addSample(x,t){
+    samples.push({x,t});
+    const cutoff=t-110;
+    while(samples.length>2&&samples[0].t<cutoff)samples.shift();
+  }
+
+  function releaseVelocity(x,t){
+    addSample(x,t);
+    if(samples.length<2)return 0;
+    let first=samples[0];
+    for(let i=samples.length-2;i>=0;i--){
+      if(t-samples[i].t>=45){first=samples[i];break;}
+    }
+    const dt=Math.max(16,t-first.t);
+    return (x-first.x)/dt;
+  }
+
+  function animateSpring(targetX,initialVelocityPxMs,onDone){
+    if(springRaf)cancelAnimationFrame(springRaf);
+    const speed=Math.min(2.8,Math.abs(initialVelocityPxMs));
+    const stiffness=185+speed*42;
+    const damping=2*Math.sqrt(stiffness)*.98;
+    let x=stripX;
+    let velocity=initialVelocityPxMs*1000;
+    let last=performance.now();
+
+    function frame(now){
+      const dt=Math.min(.032,Math.max(.008,(now-last)/1000));
+      last=now;
+      const acceleration=-stiffness*(x-targetX)-damping*velocity;
+      velocity+=acceleration*dt;
+      x+=velocity*dt;
+      positionStrip(x);
+
+      if(Math.abs(x-targetX)<.6&&Math.abs(velocity)<9){
+        positionStrip(targetX);
+        springRaf=0;
+        onDone();
+        return;
+      }
+      springRaf=requestAnimationFrame(frame);
+    }
+    springRaf=requestAnimationFrame(frame);
+  }
+
+  function finishGestureTracking(){
+    if(pointerId!==null){
+      try{story.releasePointerCapture(pointerId);}catch(err){}
+    }
+    pointerId=null;
+    mode=null;
+    samples=[];
+  }
+
+  function settleFromRelease(dx,velocityPxMs){
     const w=stage.getBoundingClientRect().width;
-    currentPage.style.transform='translate3d('+dx.toFixed(1)+'px,0,0)';
-    if(previousPage)previousPage.style.transform='translate3d('+(dx-w).toFixed(1)+'px,0,0)';
-    if(nextPage)nextPage.style.transform='translate3d('+(dx+w).toFixed(1)+'px,0,0)';
-  }
+    if(!w||!stateAtStart){hideStrip();return;}
 
-  function transitionPages(direction,duration){
-    if(!overlay||!currentPage)return false;
-    const w=stage.getBoundingClientRect().width;
-    [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
-      p.classList.add('is-settling');
-      p.style.setProperty('transition-duration',duration+'ms','important');
-    });
-    requestAnimationFrame(()=>placePages(direction>0?-w:w));
-    return true;
-  }
+    const direction=dx<0?1:-1;
+    const targetMemory=direction>0?stateAtStart.next:stateAtStart.previous;
+    const projected=dx+velocityPxMs*145;
+    const distanceCommit=Math.abs(dx)>=w*.30;
+    const meaningfulTravel=Math.abs(dx)>=Math.max(46,w*.11);
+    const projectedCommit=meaningfulTravel&&Math.abs(projected)>=w*.34;
+    let commit=!!targetMemory&&(distanceCommit||projectedCommit);
 
-  function finishTransition(epoch){
-    if(epoch!==transitionEpoch)return;
-    clearOverlay();
-    transitionActive=false;
-    settleTimer=0;
-    momentumTimer=0;
-    warmState(window.__taleraPhotoBook.state());
-  }
-
-  /* Finish velocity is derived from the actual finger release instead of a
-     fixed quick snap. During pointermove the photo already follows the finger
-     1:1; this helper only controls the remaining distance after release. */
-  function settleDuration(distance,speed,commit){
-    const d=Math.max(0,distance);
-    if(d<12)return 90;
-    const v=Math.max(.18,Math.min(2.6,Math.abs(speed)));
-    const guidedVelocity=(commit ? .52 : .58)+v*.72;
-    const raw=d/Math.max(.45,guidedVelocity);
-    const min=d<40?110:(commit?180:150);
-    const max=commit?430:320;
-    return Math.round(Math.max(min,Math.min(max,raw)));
-  }
-
-  function runMomentum(direction,remaining,speed,epoch){
-    if(epoch!==transitionEpoch)return;
-    if(remaining<=0){finishTransition(epoch);return;}
-
-    const s=window.__taleraPhotoBook.state();
-    const target=direction>0?s.next:s.previous;
-    if(!target){finishTransition(epoch);return;}
-
-    buildOverlay();
-    const duration=Math.round(Math.max(150,Math.min(230,245-Math.min(speed,3)*28)));
-    if(!transitionPages(direction,duration)){finishTransition(epoch);return;}
-
-    const moved=window.__taleraPhotoBook.step(direction);
-    if(!moved){finishTransition(epoch);return;}
-    warmState(window.__taleraPhotoBook.state());
-
-    momentumTimer=setTimeout(()=>{
-      if(epoch!==transitionEpoch)return;
-      clearOverlay();
-      runMomentum(direction,remaining-1,Math.max(.65,speed*.82),epoch);
-    },duration+18);
-  }
-
-  function settle(direction,commit,releaseSpeed=0,momentumSteps=1,releaseDx=0){
-    if(!overlay||!currentPage){clearOverlay();return;}
-    const speed=Math.abs(releaseSpeed);
-    const w=stage.getBoundingClientRect().width;
-    const travelled=Math.min(w,Math.abs(releaseDx));
-    const distance=commit?Math.max(0,w-travelled):travelled;
-    const duration=settleDuration(distance,speed,commit);
-    const epoch=++transitionEpoch;
-    transitionActive=true;
-    clearTimeout(settleTimer);
-    clearTimeout(momentumTimer);
-
-    if(!commit){
-      [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
-        p.classList.add('is-settling');
-        p.style.setProperty('transition-duration',duration+'ms','important');
-      });
-      requestAnimationFrame(()=>placePages(0));
-      settleTimer=setTimeout(()=>finishTransition(epoch),duration+24);
-      return;
+    if(commit){
+      const moved=book.step(direction);
+      if(!moved)commit=false;
     }
 
-    const target=direction>0?stateAtStart&&stateAtStart.next:stateAtStart&&stateAtStart.previous;
-    if(!target){
-      [previousPage,currentPage,nextPage].filter(Boolean).forEach(p=>{
-        p.classList.add('is-settling');
-        p.style.setProperty('transition-duration',duration+'ms','important');
-      });
-      requestAnimationFrame(()=>placePages(0));
-      settleTimer=setTimeout(()=>finishTransition(epoch),duration+24);
-      return;
-    }
-
-    transitionPages(direction,duration);
-
-    const moved=window.__taleraPhotoBook.step(direction);
-    if(!moved){
-      requestAnimationFrame(()=>placePages(0));
-      settleTimer=setTimeout(()=>finishTransition(epoch),duration+24);
-      return;
-    }
-    warmState(window.__taleraPhotoBook.state());
-
-    settleTimer=setTimeout(()=>{
-      if(epoch!==transitionEpoch)return;
-      clearOverlay();
-      if(momentumSteps>1)runMomentum(direction,momentumSteps-1,speed,epoch);
-      else finishTransition(epoch);
-    },duration+18);
-  }
-
-  function lockHorizontal(currentX,rawDx,isFast){
-    mode='horizontal';
-    fastPickup=!!isFast;
-    if(fastPickup){
-      dragOriginX=startX;
-      lockedStepDirection=rawDx<0?1:-1;
-    }else{
-      const sign=rawDx===0?1:Math.sign(rawDx);
-      dragOriginX=startX+sign*PICKUP_DEADZONE_PX;
-      lockedStepDirection=0;
-    }
-    buildOverlay();
-    placePages(currentX-dragOriginX);
-  }
-
-  function momentumCount(){
-    /* One deliberate finger gesture advances at most one photo. Gesture speed
-       controls how fast that photo settles; it no longer skips extra memories. */
-    return 1;
+    const targetX=commit?(direction>0?-w:w):0;
+    animateSpring(targetX,velocityPxMs,()=>hideStrip());
   }
 
   story.addEventListener('pointerdown',e=>{
     if(e.pointerType==='mouse'&&e.button!==0)return;
-    if(pid!==null)return;
+    if(pointerId!==null)return;
+    if(startsOnTimeline(e)||startsOnControl(e))return;
 
-    /* Timeline gestures are exclusive. The photo-book controller must never
-       capture a pointer that starts on the timeline, even when visual children
-       use transparent/pointer-pass-through styling. */
-    if(timeline){
-      const targetInTimeline=!!(e.target&&e.target.closest&&e.target.closest('.timeline'));
-      const r=timeline.getBoundingClientRect();
-      const pointInTimeline=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
-      if(targetInTimeline||pointInTimeline)return;
-    }
+    if(springRaf)cancelSpring(true);
 
-    if(transitionActive)stopTransitionVisuals();
-
-    pid=e.pointerId;
-    startX=lastX=dragOriginX=e.clientX;
-    startY=e.clientY;
-    startT=lastT=performance.now();
-    smoothedVelocity=0;
+    pointerId=e.pointerId;
     mode=null;
-    fastPickup=false;
-    lockedStepDirection=0;
+    startX=lastX=e.clientX;
+    startY=lastY=e.clientY;
+    samples=[{x:e.clientX,t:performance.now()}];
     try{story.setPointerCapture(e.pointerId);}catch(err){}
-    warmState(window.__taleraPhotoBook.state());
   },{passive:true,capture:true});
 
   story.addEventListener('pointermove',e=>{
-    if(e.pointerId!==pid)return;
+    if(e.pointerId!==pointerId)return;
     const now=performance.now();
-    const rawDx=e.clientX-startX;
+    const dx=e.clientX-startX;
     const dy=e.clientY-startY;
-    const dt=Math.max(8,now-lastT);
-    const segmentVelocity=(e.clientX-lastX)/dt;
-    smoothedVelocity=smoothedVelocity===0?segmentVelocity:(smoothedVelocity*.68+segmentVelocity*.32);
+    lastX=e.clientX;
+    lastY=e.clientY;
+    addSample(e.clientX,now);
 
     if(!mode){
-      const horizontalEnough=Math.abs(rawDx)>Math.abs(dy)*HORIZONTAL_BIAS;
-      const age=Math.max(16,now-startT);
-      const intentSpeed=Math.max(Math.abs(smoothedVelocity),Math.abs(rawDx/age));
-      const fastHorizontal=horizontalEnough&&Math.abs(rawDx)>=FLICK_INTENT_PX&&intentSpeed>=FLICK_LOCK_SPEED;
-      const deliberateHorizontal=horizontalEnough&&Math.abs(rawDx)>=DRAG_INTENT_PX;
-      const deliberateVertical=Math.abs(dy)>=DRAG_INTENT_PX&&Math.abs(dy)>Math.abs(rawDx)*1.10;
-
-      if(fastHorizontal||deliberateHorizontal){
-        lockHorizontal(e.clientX,rawDx,fastHorizontal);
-      }else if(deliberateVertical){
+      const horizontal=Math.abs(dx)>=6&&Math.abs(dx)>Math.abs(dy)*1.06;
+      const vertical=Math.abs(dy)>=6&&Math.abs(dy)>Math.abs(dx)*1.10;
+      if(horizontal){
+        mode='horizontal';
+        showStrip();
+      }else if(vertical){
         mode='vertical';
       }
     }
 
-    if(mode==='vertical'){
-      clearOverlay();
-      lastX=e.clientX;
-      lastT=now;
-      return;
-    }
-    if(mode!=='horizontal'){
-      lastX=e.clientX;
-      lastT=now;
-      return;
-    }
-
+    if(mode!=='horizontal')return;
     e.preventDefault();
-    /* While the finger is down, the page has exactly the same displacement as
-       the finger: no acceleration, multiplier, momentum or interpolation. */
-    placePages(e.clientX-dragOriginX);
-    lastX=e.clientX;
-    lastT=now;
+    positionStrip(dx);
   },{passive:false,capture:true});
 
-  function finish(e){
-    if(e.pointerId!==pid)return;
+  story.addEventListener('pointerup',e=>{
+    if(e.pointerId!==pointerId)return;
     const now=performance.now();
-    const age=Math.max(16,now-startT);
-    const rawDx=e.clientX-startX;
-    const rawDy=e.clientY-startY;
-    const avgVelocity=rawDx/age;
+    const dx=e.clientX-startX;
+    const dy=e.clientY-startY;
 
-    if(!mode&&Math.abs(rawDx)>=FLICK_INTENT_PX&&Math.abs(rawDx)>Math.abs(rawDy)*HORIZONTAL_BIAS&&Math.abs(avgVelocity)>=FLICK_LOCK_SPEED*.72){
-      lockHorizontal(e.clientX,rawDx,true);
-      smoothedVelocity=avgVelocity;
+    if(!mode&&Math.abs(dx)>=12&&Math.abs(dx)>Math.abs(dy)*1.06){
+      mode='horizontal';
+      showStrip();
+      positionStrip(dx);
     }
 
-    const visualDx=mode==='horizontal'?e.clientX-dragOriginX:rawDx;
-    const w=stage.getBoundingClientRect().width;
-    const direction=fastPickup&&lockedStepDirection?lockedStepDirection:(rawDx<0?1:-1);
-    const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
-    const progress=w?Math.abs(visualDx)/w:0;
-    const flickSpeed=Math.min(3,Math.max(Math.abs(avgVelocity),Math.abs(smoothedVelocity)));
+    if(mode==='horizontal'){
+      const velocity=releaseVelocity(e.clientX,now);
+      settleFromRelease(dx,velocity);
+    }else if(stripVisible){
+      hideStrip();
+    }
+    finishGestureTracking();
+  },{passive:true,capture:true});
 
-    /* Deliberate paging: a slow drag can change photo by carrying it roughly
-       one third across the screen. A fast flick may commit earlier, but only
-       after meaningful travel as well. Tiny quick touches always return. */
-    const distanceCommit=progress>=.30;
-    const flickTravel=Math.max(64,w*.18);
-    const flickCommit=Math.abs(rawDx)>=flickTravel&&flickSpeed>=1.05;
-    const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
-    const steps=commit?momentumCount():1;
+  story.addEventListener('pointercancel',e=>{
+    if(e.pointerId!==pointerId)return;
+    if(mode==='horizontal'&&stripVisible){
+      const velocity=releaseVelocity(lastX,performance.now());
+      animateSpring(0,velocity,()=>hideStrip());
+    }else if(stripVisible){
+      hideStrip();
+    }
+    finishGestureTracking();
+  },{passive:true,capture:true});
 
-    if(mode==='horizontal')settle(direction,commit,flickSpeed,steps,visualDx);
-    else clearOverlay();
-    try{story.releasePointerCapture(e.pointerId);}catch(err){}
-    pid=null;
-    mode=null;
-    fastPickup=false;
-    lockedStepDirection=0;
-    smoothedVelocity=0;
-  }
-
-  function cancel(e){
-    if(e.pointerId!==pid)return;
-    clearOverlay();
-    try{story.releasePointerCapture(e.pointerId);}catch(err){}
-    pid=null;
-    mode=null;
-    fastPickup=false;
-    lockedStepDirection=0;
-    smoothedVelocity=0;
-  }
-
-  story.addEventListener('pointerup',finish,{passive:true,capture:true});
-  story.addEventListener('pointercancel',cancel,{passive:true,capture:true});
+  window.addEventListener('resize',()=>{
+    if(!stripVisible)return;
+    [previousPage,currentPage,nextPage].forEach(pageFit);
+    positionStrip(stripX);
+  },{passive:true});
 })();
 `;

@@ -10,7 +10,6 @@ import { chunk9 } from "./html/chunk9.js";
 import { enhancementStyle } from "./enhancement.js";
 import { interactionFixStyle } from "./interaction-fixes.js";
 import { presentationControllerScript } from "./presentation-controller.js";
-import { fastFlickFallbackScript } from "./fast-flick-fallback.js";
 import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-memory-integration.js";
 import { memoryPresentationControlsStyle, memoryPresentationControlsScript } from "./memory-presentation-controls.js";
 import { timelineVisualStateStyle, timelineVisualStateScript } from "./timeline-visual-state.js";
@@ -18,7 +17,7 @@ import { timelineGlassLayerStyle } from "./timeline-glass-layer.js";
 import { timelinePhotoSelectionScript } from "./timeline-photo-selection.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "timeline-photo-settle-contrast-r1-20260914";
+const TALERA_TIMELINE_DEPLOY_REV = "photo-strip-spring-v1-20260914";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();
@@ -133,7 +132,7 @@ const listenButtonOutlineStyle = String.raw`
 
 const HTML = BASE_HTML
   .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script></body>`);
+  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script></body>`);
 
 async function proxyLinkedMemory(request) {
   const url = new URL(request.url);

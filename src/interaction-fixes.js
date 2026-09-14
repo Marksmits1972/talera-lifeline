@@ -1,22 +1,25 @@
 export const interactionFixStyle = String.raw`
-/* TALERA — cleaned presentation interaction CSS.
-   Base photo layers stay fixed; only temporary PhotoBook pages translate. */
-.photo-layer:not(.photo-book-page){
+/* TALERA — clean presentation interaction CSS.
+   Base photo layers stay fixed. A single persistent three-page strip is the
+   only layer allowed to translate during direct photo swiping. */
+.photo-layer:not(.talera-photo-strip-page){
   transform:none!important;
   transition:opacity .14s linear!important;
   will-change:opacity!important;
 }
-.photo-layer.is-front:not(.photo-book-page){transform:none!important}
+.photo-layer.is-front:not(.talera-photo-strip-page){transform:none!important}
 .memory-story-scroll{touch-action:pan-y!important}
-.photo-book-overlay{
+.talera-photo-strip{
   position:absolute!important;
   inset:0!important;
   z-index:40!important;
   overflow:hidden!important;
   pointer-events:none!important;
   contain:layout paint size!important;
+  visibility:hidden!important;
 }
-.photo-book-page{
+.talera-photo-strip.is-visible{visibility:visible!important}
+.talera-photo-strip-page{
   position:absolute!important;
   inset:0!important;
   width:100%!important;
@@ -27,8 +30,5 @@ export const interactionFixStyle = String.raw`
   overflow:hidden!important;
   backface-visibility:hidden!important;
   -webkit-backface-visibility:hidden!important;
-}
-.photo-book-page.is-settling{
-  transition:transform .32s cubic-bezier(.24,.46,.32,1)!important;
 }
 `;

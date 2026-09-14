@@ -13,16 +13,26 @@ export const timelineVisualStateStyle = String.raw`
   filter:saturate(.64) contrast(.76) brightness(.90)!important;
   transition:opacity .18s ease,filter .18s ease!important;
 }
+
+/* The needle remains clearly present in rest so photo + date always retain context. */
 .timeline .center-needle,
 .timeline.is-active .center-needle{
-  opacity:.34!important;
-  filter:none!important;
+  opacity:.72!important;
+  filter:drop-shadow(0 1px 3px rgba(255,255,255,.48))!important;
   transition:opacity .18s ease,filter .18s ease!important;
 }
+
+/* The date badge is NOT part of timeline rest dimming: always clear and readable. */
 .timeline .focus,
-.timeline.is-active .focus{
-  opacity:.40!important;
-  transform:translateZ(0) scale(.97)!important;
+.timeline.is-active .focus,
+.timeline.is-timeline-engaged .focus,
+.timeline.is-marker-afterglow .focus{
+  opacity:1!important;
+  transform:translateZ(0) scale(1)!important;
+  color:var(--talera-deep)!important;
+  background:rgba(255,254,252,.96)!important;
+  border:1px solid rgba(91,143,185,.18)!important;
+  box-shadow:0 5px 16px rgba(15,39,71,.16)!important;
   filter:none!important;
   transition:opacity .18s ease,transform .18s ease,filter .18s ease!important;
 }
@@ -34,17 +44,11 @@ export const timelineVisualStateStyle = String.raw`
   filter:saturate(1.18) contrast(1.34) brightness(1.12) drop-shadow(0 0 3px rgba(255,255,255,.42))!important;
 }
 
-/* The marker/date can remain visible longer than the ruler. */
+/* The needle may remain highlighted longer than the ruler. The date badge stays clear always. */
 .timeline.is-timeline-engaged .center-needle,
 .timeline.is-marker-afterglow .center-needle{
   opacity:1!important;
   filter:brightness(1.18) drop-shadow(0 0 3px rgba(255,255,255,.92)) drop-shadow(0 2px 8px rgba(15,39,71,.42))!important;
-}
-.timeline.is-timeline-engaged .focus,
-.timeline.is-marker-afterglow .focus{
-  opacity:1!important;
-  transform:translateZ(0) scale(1.035)!important;
-  filter:brightness(1.12) drop-shadow(0 0 4px rgba(255,255,255,.55)) drop-shadow(0 2px 11px rgba(15,39,71,.34))!important;
 }
 
 @media (pointer:coarse){
@@ -54,9 +58,10 @@ export const timelineVisualStateStyle = String.raw`
     filter:saturate(.58) contrast(.72) brightness(.88)!important;
   }
   .timeline .center-needle,
-  .timeline.is-active .center-needle{opacity:.30!important;filter:none!important}
-  .timeline .focus,
-  .timeline.is-active .focus{opacity:.34!important;transform:translateZ(0) scale(.97)!important;filter:none!important}
+  .timeline.is-active .center-needle{
+    opacity:.68!important;
+    filter:drop-shadow(0 1px 3px rgba(255,255,255,.50))!important;
+  }
 
   .timeline.is-timeline-engaged canvas,
   .timeline.is-timeline-afterglow canvas{
@@ -67,12 +72,6 @@ export const timelineVisualStateStyle = String.raw`
   .timeline.is-marker-afterglow .center-needle{
     opacity:1!important;
     filter:brightness(1.27) drop-shadow(0 0 4px rgba(255,255,255,1)) drop-shadow(0 2px 9px rgba(15,39,71,.48))!important;
-  }
-  .timeline.is-timeline-engaged .focus,
-  .timeline.is-marker-afterglow .focus{
-    opacity:1!important;
-    transform:translateZ(0) scale(1.045)!important;
-    filter:brightness(1.20) drop-shadow(0 0 5px rgba(255,255,255,.70)) drop-shadow(0 2px 12px rgba(15,39,71,.40))!important;
   }
 }
 `;

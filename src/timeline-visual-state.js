@@ -8,25 +8,22 @@ export const timelineVisualStateStyle = timelineAdaptiveContrastStyle + String.r
 .memory-space .date,#memoryDate{display:none!important}
 .zoom-hint,#zoomHint{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 
-/* REST is always present. Adaptive variables choose the quiet contrast against
-   the current photo while keeping the yellow-balloon reference level: visible,
-   secondary, never absent. */
+/* REST: always visible, always secondary to the photo. */
 .timeline canvas,
 .timeline.is-active canvas{
-  opacity:var(--timeline-rest-opacity,.36)!important;
-  filter:var(--timeline-rest-filter,saturate(.72) contrast(.86) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.62)))!important;
-  transition:opacity .22s ease,filter .24s ease!important;
+  opacity:var(--timeline-rest-opacity,.46)!important;
+  filter:var(--timeline-rest-filter,saturate(.82) contrast(.98) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.88)) drop-shadow(0 1px 1px rgba(15,39,71,.20)))!important;
+  transition:opacity .20s ease,filter .22s ease!important;
 }
 
-/* The needle remains clearly present in rest so photo + date always retain context. */
 .timeline .center-needle,
 .timeline.is-active .center-needle{
-  opacity:.72!important;
-  filter:drop-shadow(0 1px 3px rgba(255,255,255,.48))!important;
+  opacity:.78!important;
+  filter:drop-shadow(0 1px 3px rgba(255,255,255,.58)) drop-shadow(0 1px 2px rgba(15,39,71,.18))!important;
   transition:opacity .18s ease,filter .18s ease!important;
 }
 
-/* The date badge is NOT part of timeline rest dimming: always clear and readable. */
+/* Date badge is never dimmed. */
 .timeline .focus,
 .timeline.is-active .focus,
 .timeline.is-timeline-engaged .focus,
@@ -34,48 +31,47 @@ export const timelineVisualStateStyle = timelineAdaptiveContrastStyle + String.r
   opacity:1!important;
   transform:translateZ(0) scale(1)!important;
   color:var(--talera-deep)!important;
-  background:rgba(255,254,252,.96)!important;
-  border:1px solid rgba(91,143,185,.18)!important;
-  box-shadow:0 5px 16px rgba(15,39,71,.16)!important;
+  background:rgba(255,254,252,.97)!important;
+  border:1px solid rgba(91,143,185,.20)!important;
+  box-shadow:0 5px 16px rgba(15,39,71,.18)!important;
   filter:none!important;
   transition:opacity .18s ease,transform .18s ease,filter .18s ease!important;
 }
 
-/* ENGAGED and the short timeline afterglow share the same clear ruler treatment. */
+/* ACTIVE + short AFTERGLOW: navigation becomes unmistakably foreground. */
 .timeline.is-timeline-engaged canvas,
 .timeline.is-timeline-afterglow canvas{
   opacity:1!important;
-  filter:saturate(1.18) contrast(1.34) brightness(1.12) drop-shadow(0 0 3px rgba(255,255,255,.42))!important;
+  filter:saturate(1.28) contrast(1.52) brightness(1.18) drop-shadow(0 0 4px rgba(255,255,255,.72)) drop-shadow(0 2px 3px rgba(15,39,71,.32))!important;
 }
 
-/* The needle may remain highlighted longer than the ruler. The date badge stays clear always. */
 .timeline.is-timeline-engaged .center-needle,
 .timeline.is-marker-afterglow .center-needle{
   opacity:1!important;
-  filter:brightness(1.18) drop-shadow(0 0 3px rgba(255,255,255,.92)) drop-shadow(0 2px 8px rgba(15,39,71,.42))!important;
+  filter:brightness(1.22) drop-shadow(0 0 4px rgba(255,255,255,.98)) drop-shadow(0 2px 8px rgba(15,39,71,.46))!important;
 }
 
 @media (pointer:coarse){
   .timeline canvas,
   .timeline.is-active canvas{
-    opacity:var(--timeline-rest-opacity,.36)!important;
-    filter:var(--timeline-rest-filter,saturate(.72) contrast(.86) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.64)))!important;
+    opacity:var(--timeline-rest-opacity,.46)!important;
+    filter:var(--timeline-rest-filter,saturate(.82) contrast(.98) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.90)) drop-shadow(0 1px 1px rgba(15,39,71,.20)))!important;
   }
   .timeline .center-needle,
   .timeline.is-active .center-needle{
-    opacity:.68!important;
-    filter:drop-shadow(0 1px 3px rgba(255,255,255,.50))!important;
+    opacity:.76!important;
+    filter:drop-shadow(0 1px 3px rgba(255,255,255,.62)) drop-shadow(0 1px 2px rgba(15,39,71,.20))!important;
   }
 
   .timeline.is-timeline-engaged canvas,
   .timeline.is-timeline-afterglow canvas{
     opacity:1!important;
-    filter:saturate(1.22) contrast(1.40) brightness(1.17) drop-shadow(0 0 4px rgba(255,255,255,.58))!important;
+    filter:saturate(1.32) contrast(1.60) brightness(1.22) drop-shadow(0 0 5px rgba(255,255,255,.82)) drop-shadow(0 2px 4px rgba(15,39,71,.36))!important;
   }
   .timeline.is-timeline-engaged .center-needle,
   .timeline.is-marker-afterglow .center-needle{
     opacity:1!important;
-    filter:brightness(1.27) drop-shadow(0 0 4px rgba(255,255,255,1)) drop-shadow(0 2px 9px rgba(15,39,71,.48))!important;
+    filter:brightness(1.30) drop-shadow(0 0 5px rgba(255,255,255,1)) drop-shadow(0 2px 9px rgba(15,39,71,.50))!important;
   }
 }
 `;
@@ -134,8 +130,6 @@ export const timelineVisualStateScript = timelineAdaptiveContrastScript + String
     if(activePointers.size===0)enterAfterglow();
   };
 
-  /* Window-level release handling prevents a captured/cancelled iPhone pointer
-     from leaving the presentation visually active forever. */
   window.addEventListener('pointerup',releasePointer,{passive:true});
   window.addEventListener('pointercancel',releasePointer,{passive:true});
 

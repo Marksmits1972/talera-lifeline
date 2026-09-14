@@ -104,12 +104,13 @@ export const presentationControllerScript = String.raw`
   }
 
   /* ---------------------------------------------------------
-     CLEAN PHOTO STRIP ENGINE — single gesture owner.
+     CONTINUOUS PHOTO STRIP ENGINE — one gesture owner, three reusable pages.
 
-     The strip is prepared while hidden. Pointerdown never changes a photo or
-     swaps a source. Only confirmed horizontal movement reveals the already
-     prepared strip at the exact finger displacement. This prevents a tap at
-     the start of a fast swipe from flashing a stale neighbour image.
+     The three pages are not rebuilt after every swipe. On a committed step the
+     off-screen page immediately starts loading the new far neighbour while the
+     current spring is still running. When the spring finishes the page roles are
+     rotated in place. A new gesture can also finish the previous spring instantly,
+     so repeated swipes never wait for an old animation to clean itself up.
      --------------------------------------------------------- */
   const book=window.__taleraPhotoBook;
   if(!story||!stage||!book)return;
@@ -134,9 +135,9 @@ export const presentationControllerScript = String.raw`
   const strip=document.createElement('div');
   strip.className='talera-photo-strip';
   strip.setAttribute('aria-hidden','true');
-  const previousPage=makeStripPage();
-  const currentPage=makeStripPage();
-  const nextPage=makeStripPage();
+  let previousPage=makeStripPage();
+  let currentPage=makeStripPage();
+  let nextPage=makeStripPage();
   strip.appendChild(previousPage);
   strip.appendChild(currentPage);
   strip.appendChild(nextPage);
@@ -151,6 +152,8 @@ export const presentationControllerScript = String.raw`
   let startX=0,startY=0,lastX=0,lastY=0;
   let samples=[];
   let springRaf=0;
+  let springTargetX=0;
+  let springDone=null;
 
   function stateKey(state){
     if(!state)return '';
@@ -183,8 +186,8 @@ export const presentationControllerScript = String.raw`
     }
 
     const src=memory.image;
-    if(page.dataset.taleraSrc===src&&page.dataset.taleraReady==='1'){
-      pageFit(page);
+    if(page.dataset.taleraSrc===src){
+      if(page.dataset.taleraReady==='1')pageFit(page);
       return;
     }
 
@@ -212,8 +215,19 @@ export const presentationControllerScript = String.raw`
     sharp.loading='eager';
     try{sharp.fetchPriority='high';}catch(err){}
     sharp.onload=()=>markPageReady(page,src);
+    sharp.onerror=()=>{
+      if(page.dataset.taleraSrc===src)page.dataset.taleraReady='0';
+    };
     if(sharp.src!==src)sharp.src=src;
     if(sharp.complete&&sharp.naturalWidth)markPageReady(page,src);
+  }
+
+  function positionStrip(x){
+    stripX=x;
+    const w=stage.getBoundingClientRect().width;
+    currentPage.style.transform='translate3d('+x.toFixed(2)+'px,0,0)';
+    previousPage.style.transform='translate3d('+(x-w).toFixed(2)+'px,0,0)';
+    nextPage.style.transform='translate3d('+(x+w).toFixed(2)+'px,0,0)';
   }
 
   function prepareStrip(state=book.state()){
@@ -226,32 +240,28 @@ export const presentationControllerScript = String.raw`
     return true;
   }
 
-  function positionStrip(x){
-    stripX=x;
-    const w=stage.getBoundingClientRect().width;
-    currentPage.style.transform='translate3d('+x.toFixed(2)+'px,0,0)';
-    previousPage.style.transform='translate3d('+(x-w).toFixed(2)+'px,0,0)';
-    nextPage.style.transform='translate3d('+(x+w).toFixed(2)+'px,0,0)';
-  }
-
-  function pageReadyForDirection(dx){
-    if(currentPage.dataset.taleraReady!=='1')return false;
-    if(dx<0&&stateAtStart&&stateAtStart.next)return nextPage.dataset.taleraReady==='1';
-    if(dx>0&&stateAtStart&&stateAtStart.previous)return previousPage.dataset.taleraReady==='1';
-    return true;
+  function currentPageReady(){
+    return currentPage.dataset.taleraReady==='1';
   }
 
   function showPreparedStripAt(x){
     const state=book.state();
     stateAtStart=state;
+
     if(preparedKey!==stateKey(state)){
+      if(stripVisible||springRaf){stateAtStart=null;return false;}
+      prepareStrip(state);
+    }
+
+    if(!currentPageReady()){
       stateAtStart=null;
       return false;
     }
-    if(!pageReadyForDirection(x)){
-      stateAtStart=null;
-      return false;
-    }
+
+    /* The far neighbour normally finishes loading during the preceding spring.
+       If it is still decoding, keep tracking the gesture and let that page become
+       visible as soon as its own load event fires instead of entering a wait mode
+       that forces the user's photo back. */
     positionStrip(x);
     stripVisible=true;
     strip.classList.add('is-visible');
@@ -265,18 +275,57 @@ export const presentationControllerScript = String.raw`
     stateAtStart=null;
   }
 
+  function completePreparedState(state){
+    preparedKey=stateKey(state);
+    setPage(previousPage,state.previous);
+    setPage(currentPage,state.current);
+    setPage(nextPage,state.next);
+    positionStrip(0);
+  }
+
+  function rotatePages(direction,state){
+    const oldPrevious=previousPage;
+    const oldCurrent=currentPage;
+    const oldNext=nextPage;
+
+    if(direction>0){
+      previousPage=oldCurrent;
+      currentPage=oldNext;
+      nextPage=oldPrevious;
+    }else{
+      previousPage=oldNext;
+      currentPage=oldPrevious;
+      nextPage=oldCurrent;
+    }
+
+    completePreparedState(state);
+  }
+
+  function primeFreedPage(direction,state){
+    /* During the spring one page is completely outside the visible transition.
+       Reuse exactly that page immediately for the new far neighbour. */
+    if(direction>0)setPage(previousPage,state.next);
+    else setPage(nextPage,state.previous);
+  }
+
   function afterVisualSettle(){
     hideStrip();
     requestAnimationFrame(()=>prepareStrip(book.state()));
   }
 
-  function cancelSpring(finishVisual=true){
-    if(springRaf)cancelAnimationFrame(springRaf);
+  function finishCommittedSwipe(direction,state){
+    rotatePages(direction,state);
+    hideStrip();
+  }
+
+  function finishSpringNow(){
+    if(!springRaf)return;
+    cancelAnimationFrame(springRaf);
     springRaf=0;
-    if(finishVisual){
-      hideStrip();
-      requestAnimationFrame(()=>prepareStrip(book.state()));
-    }
+    positionStrip(springTargetX);
+    const done=springDone;
+    springDone=null;
+    if(done)done();
   }
 
   function startsOnTimeline(e){
@@ -323,13 +372,24 @@ export const presentationControllerScript = String.raw`
   }
 
   function animateSpring(targetX,initialVelocityPxMs,onDone){
-    if(springRaf)cancelAnimationFrame(springRaf);
+    if(springRaf)finishSpringNow();
     const speed=Math.min(2.8,Math.abs(initialVelocityPxMs));
     const stiffness=185+speed*42;
     const damping=2*Math.sqrt(stiffness)*.98;
     let x=stripX;
     let velocity=initialVelocityPxMs*1000;
     let last=performance.now();
+
+    springTargetX=targetX;
+    springDone=onDone;
+
+    function complete(){
+      positionStrip(targetX);
+      springRaf=0;
+      const done=springDone;
+      springDone=null;
+      if(done)done();
+    }
 
     function frame(now){
       const dt=Math.min(.032,Math.max(.008,(now-last)/1000));
@@ -340,9 +400,7 @@ export const presentationControllerScript = String.raw`
       positionStrip(x);
 
       if(Math.abs(x-targetX)<.6&&Math.abs(velocity)<9){
-        positionStrip(targetX);
-        springRaf=0;
-        onDone();
+        complete();
         return;
       }
       springRaf=requestAnimationFrame(frame);
@@ -370,18 +428,30 @@ export const presentationControllerScript = String.raw`
     const meaningfulTravel=Math.abs(dx)>=Math.max(46,w*.11);
     const projectedCommit=meaningfulTravel&&Math.abs(projected)>=w*.34;
     let commit=!!targetMemory&&(distanceCommit||projectedCommit);
+    let committedState=null;
 
     if(commit){
       const moved=book.step(direction);
-      if(!moved)commit=false;
+      if(!moved){
+        commit=false;
+      }else{
+        committedState=book.state();
+        /* Do not wait until the transition is over to prepare the next swipe. */
+        primeFreedPage(direction,committedState);
+      }
     }
 
     const targetX=commit?(direction>0?-w:w):0;
-    animateSpring(targetX,velocityPxMs,afterVisualSettle);
+    animateSpring(
+      targetX,
+      velocityPxMs,
+      commit
+        ?()=>finishCommittedSwipe(direction,committedState)
+        :afterVisualSettle
+    );
   }
 
-  /* Prepare all three pages before the first touch. They remain hidden until
-     actual horizontal intent exists, so there is no visual action on tap. */
+  /* Prepare all three pages before the first touch. */
   prepareStrip(book.state());
 
   const runtime=window.__taleraTimelineRuntime;
@@ -397,7 +467,11 @@ export const presentationControllerScript = String.raw`
     if(pointerId!==null)return;
     if(startsOnTimeline(e)||startsOnControl(e))return;
 
-    if(springRaf)cancelSpring(true);
+    /* Repeated swipes may begin before the previous spring reached mathematical
+       rest. Finish that already-decided transition now instead of cancelling it
+       and rebuilding the strip from scratch. */
+    if(springRaf)finishSpringNow();
+    if(preparedKey!==stateKey(book.state()))prepareStrip(book.state());
 
     pointerId=e.pointerId;
     mode=null;
@@ -421,12 +495,10 @@ export const presentationControllerScript = String.raw`
       const horizontal=Math.abs(dx)>=4&&Math.abs(dx)>Math.abs(dy)*1.03;
       const vertical=Math.abs(dy)>=8&&Math.abs(dy)>Math.abs(dx)*1.12;
       if(horizontal){
-        mode=showPreparedStripAt(dx)?'horizontal':'horizontal-wait';
+        mode=showPreparedStripAt(dx)?'horizontal':null;
       }else if(vertical){
         mode='vertical';
       }
-    }else if(mode==='horizontal-wait'){
-      if(showPreparedStripAt(dx))mode='horizontal';
     }
 
     if(mode!=='horizontal')return;
@@ -442,7 +514,7 @@ export const presentationControllerScript = String.raw`
     const dy=e.clientY-startY;
 
     if(!mode&&Math.abs(dx)>=8&&Math.abs(dx)>Math.abs(dy)*1.03){
-      mode=showPreparedStripAt(dx)?'horizontal':'horizontal-wait';
+      mode=showPreparedStripAt(dx)?'horizontal':null;
     }
 
     if(mode==='horizontal'){
@@ -459,9 +531,6 @@ export const presentationControllerScript = String.raw`
     const now=performance.now();
     const dx=lastX-startX;
 
-    /* iOS can cancel an otherwise valid fast horizontal pointer stream. Once
-       horizontal intent was established, treat that cancel as a release rather
-       than forcing the photo to spring back. */
     if(mode==='horizontal'&&stripVisible){
       const velocity=releaseVelocity(lastX,now);
       settleFromRelease(dx,velocity);
@@ -472,12 +541,10 @@ export const presentationControllerScript = String.raw`
   },{passive:true,capture:true});
 
   window.addEventListener('resize',()=>{
-    if(stripVisible){
-      [previousPage,currentPage,nextPage].forEach(pageFit);
-      positionStrip(stripX);
-    }else{
-      requestAnimationFrame(()=>prepareStrip(book.state()));
-    }
+    if(springRaf)finishSpringNow();
+    [previousPage,currentPage,nextPage].forEach(pageFit);
+    if(stripVisible)positionStrip(stripX);
+    else prepareStrip(book.state());
   },{passive:true});
 })();
 `;

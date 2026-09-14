@@ -34,6 +34,14 @@ function storageError(status,message){
 
 export default {
   async fetch(request,env,ctx){
+    // Safari/chat link handling can occasionally preserve a trailing slash on the
+    // revision endpoint. Normalize only that harmless GET before entering v9.
+    const incomingUrl=new URL(request.url);
+    if(incomingUrl.pathname==='/api/v9/revision/'&&request.method==='GET'){
+      incomingUrl.pathname='/api/v9/revision';
+      request=new Request(incomingUrl.toString(),{method:'GET',headers:request.headers});
+    }
+
     // V9 is deliberately routed before every legacy workblad patch/normalizer.
     // It is an isolated rebuild based on the proven Audio Lab v2 train.
     try{

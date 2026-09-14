@@ -10,7 +10,7 @@ export const chunk3 = [
   "",
   "  <nav aria-label=\"TALERA navigatie\">",
   "    <button class=\"nav-item tell\" type=\"button\"><span class=\"tell-icon\" aria-hidden=\"true\"></span><span>Vertellen</span></button>",
-  "    <button class=\"presentation active\" type=\"button\" aria-current=\"page\"><span class=\"timeline-icon\" aria-hidden=\"true\"></span><span>Presentatie</span></button>",
+  "    <button class=\"home active\" type=\"button\" aria-label=\"Home\" aria-current=\"page\"><svg class=\"home-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3.5 10.5 12 3.5l8.5 7v9a1 1 0 0 1-1 1h-5.2v-6H9.7v6H4.5a1 1 0 0 1-1-1z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button>",
   "    <button class=\"nav-item\" type=\"button\"><span class=\"more\">•••</span><span>Meer</span></button>",
   "  </nav>",
   "</div>",

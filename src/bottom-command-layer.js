@@ -2,26 +2,26 @@
  * Bottom command layer
  *
  * Layer order:
- * 0  active photograph (owned by the presentation screen)
+ * 0  active photograph (owned by the home screen)
  * 30 navigation container
- * 30/0 one frosted-glass surface (::before)
+ * 30/0 one feathered frosted-glass surface (::before)
  * 30/1 command buttons
  *
- * The variables below are the only tuning points needed for later visual tests.
+ * The frost follows the same principle as the top timeline: a masked blur
+ * grows gradually out of the photograph. There is no border or second veil.
  */
 export const bottomCommandLayerStyle = String.raw`
 :root{
   --command-bar-height:76px;
+  --command-frost-feather:78px;
   --command-glass-tint:rgba(15,39,71,.075);
-  --command-glass-border:rgba(255,255,255,.22);
   --command-glass-blur:14px;
-  --command-glass-saturation:1.10;
-  --command-label:rgba(255,255,255,.88);
+  --command-glass-saturation:1.12;
+  --command-label:rgba(255,255,255,.90);
   --command-label-shadow:rgba(6,18,30,.42);
-  --command-primary:#315f87;
-  --command-primary-border:rgba(255,255,255,.46);
-  --command-primary-shadow:rgba(6,18,30,.28);
-  --command-accent:#E7A98B;
+  --command-home:#315f87;
+  --command-home-border:rgba(255,255,255,.48);
+  --command-home-shadow:rgba(6,18,30,.28);
 }
 
 nav{
@@ -47,22 +47,25 @@ nav{
   -webkit-backdrop-filter:none!important;
 }
 
-/* The command bar has exactly one shared glass surface. */
+/* One continuous glass surface, feathered upward into the photograph. */
 nav::before{
   content:""!important;
   display:block!important;
   position:absolute!important;
-  inset:0!important;
+  left:0!important;
+  right:0!important;
+  top:calc(-1 * var(--command-frost-feather))!important;
+  bottom:0!important;
   z-index:0!important;
   pointer-events:none!important;
   height:auto!important;
-  background:linear-gradient(180deg,rgba(15,39,71,.035),var(--command-glass-tint))!important;
-  border-top:1px solid var(--command-glass-border)!important;
-  box-shadow:0 -10px 30px rgba(6,18,30,.045)!important;
+  background:var(--command-glass-tint)!important;
+  border:0!important;
+  box-shadow:none!important;
   backdrop-filter:blur(var(--command-glass-blur)) saturate(var(--command-glass-saturation))!important;
   -webkit-backdrop-filter:blur(var(--command-glass-blur)) saturate(var(--command-glass-saturation))!important;
-  -webkit-mask-image:none!important;
-  mask-image:none!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.08) 18%,rgba(0,0,0,.24) 36%,rgba(0,0,0,.52) 56%,rgba(0,0,0,.82) 76%,#000 100%)!important;
+  mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.08) 18%,rgba(0,0,0,.24) 36%,rgba(0,0,0,.52) 56%,rgba(0,0,0,.82) 76%,#000 100%)!important;
 }
 nav::after{display:none!important;content:none!important}
 
@@ -71,7 +74,7 @@ nav > button{
   z-index:1!important;
 }
 
-/* Vertellen is deliberately the left secondary command. */
+/* Vertellen is the left secondary command. */
 .tell.nav-item{
   justify-self:stretch!important;
   width:auto!important;
@@ -108,46 +111,30 @@ nav > button{
   transform:skewY(-34deg);
 }
 
-/* Presentatie is the central primary destination. */
-.presentation{
+/* Home is the central primary destination: icon only, no functional label. */
+.home{
   position:relative!important;
   justify-self:center!important;
   align-self:center!important;
   width:58px!important;
   height:58px!important;
   min-width:58px!important;
-  padding:7px 4px 6px!important;
-  border:1px solid var(--command-primary-border)!important;
+  padding:0!important;
+  border:1px solid var(--command-home-border)!important;
   border-radius:50%!important;
   display:flex!important;
-  flex-direction:column!important;
   align-items:center!important;
   justify-content:center!important;
-  gap:3px!important;
   color:#fff!important;
-  background:var(--command-primary)!important;
-  box-shadow:0 9px 24px var(--command-primary-shadow),inset 0 1px 0 rgba(255,255,255,.20)!important;
-  font-size:8px!important;
-  line-height:1!important;
-  font-weight:720!important;
-  letter-spacing:-.01em!important;
-  text-shadow:0 1px 5px rgba(6,18,30,.30)!important;
+  background:var(--command-home)!important;
+  box-shadow:0 9px 24px var(--command-home-shadow),inset 0 1px 0 rgba(255,255,255,.20)!important;
+  text-shadow:none!important;
 }
-.presentation .timeline-icon{
-  width:24px!important;
-  height:16px!important;
-  color:#fff!important;
-}
-.presentation::after{
-  content:""!important;
-  position:absolute!important;
-  right:5px!important;
-  top:5px!important;
-  width:6px!important;
-  height:6px!important;
-  border-radius:50%!important;
-  background:var(--command-accent)!important;
-  box-shadow:0 0 0 2px rgba(49,95,135,.72)!important;
+.home-icon{
+  display:block;
+  width:27px;
+  height:27px;
+  overflow:visible;
 }
 
 @media(max-width:380px){

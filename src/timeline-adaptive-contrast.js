@@ -3,31 +3,31 @@ export const timelineAdaptiveContrastStyle = String.raw`
    This presentation layer does not touch timeline geometry, navigation,
    direct grip, scale/speed logic, marker/date mapping or snapping. */
 .timeline{
-  --timeline-rest-opacity:.34;
-  --timeline-rest-filter:saturate(.68) contrast(.82) brightness(.88) drop-shadow(0 0 1px rgba(255,255,255,.56));
+  --timeline-rest-opacity:.46;
+  --timeline-rest-filter:saturate(.82) contrast(.96) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.88)) drop-shadow(0 1px 1px rgba(15,39,71,.20));
 }
 
 /* On a dark/mixed photo band, render the resting ruler as a soft light trace. */
 .timeline[data-rest-contrast="light"]{
-  --timeline-rest-opacity:.34;
-  --timeline-rest-filter:brightness(0) invert(1) opacity(.92) drop-shadow(0 1px 2px rgba(15,39,71,.24));
+  --timeline-rest-opacity:.48;
+  --timeline-rest-filter:brightness(0) invert(1) opacity(.96) drop-shadow(0 1px 2px rgba(15,39,71,.36)) drop-shadow(0 0 1px rgba(255,255,255,.74));
 }
 
 /* On a light photo band, keep the familiar restrained TALERA dark ruler. */
 .timeline[data-rest-contrast="dark"]{
-  --timeline-rest-opacity:.34;
-  --timeline-rest-filter:saturate(.70) contrast(.90) brightness(.72) drop-shadow(0 0 1px rgba(255,255,255,.62));
+  --timeline-rest-opacity:.46;
+  --timeline-rest-filter:saturate(.82) contrast(1.00) brightness(.74) drop-shadow(0 0 1px rgba(255,255,255,.92)) drop-shadow(0 1px 1px rgba(15,39,71,.18));
 }
 
-/* Mixed/high-detail backgrounds get a little extra edge separation, not extra opacity. */
+/* Mixed/high-detail backgrounds get a little extra edge separation, not a loud ruler. */
 .timeline[data-rest-detail="busy"]{
-  --timeline-rest-opacity:.36;
+  --timeline-rest-opacity:.50;
 }
 .timeline[data-rest-contrast="light"][data-rest-detail="busy"]{
-  --timeline-rest-filter:brightness(0) invert(1) opacity(.94) drop-shadow(0 1px 2px rgba(15,39,71,.34)) drop-shadow(0 0 2px rgba(255,255,255,.16));
+  --timeline-rest-filter:brightness(0) invert(1) opacity(.98) drop-shadow(0 1px 2px rgba(15,39,71,.42)) drop-shadow(0 0 2px rgba(255,255,255,.24));
 }
 .timeline[data-rest-contrast="dark"][data-rest-detail="busy"]{
-  --timeline-rest-filter:saturate(.70) contrast(.94) brightness(.68) drop-shadow(0 0 1.5px rgba(255,255,255,.78)) drop-shadow(0 1px 2px rgba(15,39,71,.18));
+  --timeline-rest-filter:saturate(.84) contrast(1.04) brightness(.70) drop-shadow(0 0 1.5px rgba(255,255,255,.98)) drop-shadow(0 1px 2px rgba(15,39,71,.24));
 }
 `;
 
@@ -39,10 +39,7 @@ export const timelineAdaptiveContrastScript = String.raw`
 
   let runToken=0;
   let settleTimer=0;
-  let lastSrc='';
   let lastMode='dark';
-
-  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 
   function frontPhoto(){
     return stage.querySelector('.photo-layer.is-front .example-photo') || stage.querySelector('.example-photo');
@@ -55,9 +52,9 @@ export const timelineAdaptiveContrastScript = String.raw`
     else delete timeline.dataset.restDetail;
   }
 
-  function fallbackFromPageTone(img){
-    /* Safe fallback when pixel access is blocked by a remote image host.
-       White edge separation guarantees a visibility floor on any photograph. */
+  function fallback(){
+    /* Remote photos can deny pixel access. The dark ruler + bright edge floor
+       remains intentionally visible on both light and dark photography. */
     apply(lastMode||'dark',true);
   }
 
@@ -66,7 +63,6 @@ export const timelineAdaptiveContrastScript = String.raw`
     const img=frontPhoto();
     if(!img||!img.src)return;
     const src=img.currentSrc||img.src;
-    lastSrc=src;
 
     try{
       const response=await fetch(src,{mode:'cors',cache:'force-cache'});
@@ -81,8 +77,7 @@ export const timelineAdaptiveContrastScript = String.raw`
       const ctx=sample.getContext('2d',{willReadFrequently:true});
       if(!ctx){bitmap.close();return;}
 
-      /* Sample the upper image zone that visually sits behind the timeline.
-         The exact UI geometry is intentionally not fed back into the motor. */
+      /* Only the upper photographic zone behind the ruler matters. */
       const sourceH=Math.max(1,Math.round(bitmap.height*.24));
       ctx.drawImage(bitmap,0,0,bitmap.width,sourceH,0,0,sw,sh);
       bitmap.close();
@@ -100,14 +95,13 @@ export const timelineAdaptiveContrastScript = String.raw`
       const variance=Math.max(0,lumSq/count-mean*mean);
       const std=Math.sqrt(variance);
 
-      /* Hysteresis avoids colour flapping around the middle tone. */
       let mode=lastMode;
-      if(mean<.43)mode='light';
-      else if(mean>.57)mode='dark';
-      const busy=std>.22 || (mean>.40&&mean<.60&&std>.16);
+      if(mean<.45)mode='light';
+      else if(mean>.55)mode='dark';
+      const busy=std>.20 || (mean>.40&&mean<.60&&std>.15);
       apply(mode,busy);
     }catch(e){
-      if(token===runToken)fallbackFromPageTone(img);
+      if(token===runToken)fallback();
     }
   }
 
@@ -116,11 +110,10 @@ export const timelineAdaptiveContrastScript = String.raw`
     settleTimer=setTimeout(analyse,delay);
   }
 
-  /* Initial conservative state: dark ruler plus a light edge floor. */
   apply('dark',true);
   schedule(80);
 
-  /* Re-evaluate only after the photo has settled; never on timeline pointermove. */
+  /* Re-evaluate only after a photo settles; never during timeline pointermove. */
   const observer=new MutationObserver(mutations=>{
     let relevant=false;
     for(const m of mutations){
@@ -134,7 +127,6 @@ export const timelineAdaptiveContrastScript = String.raw`
     if(e.target&&e.target.classList&&e.target.classList.contains('example-photo'))schedule(180);
   },true);
 
-  /* The runtime subscription is the cleanest signal when a memory settles. */
   const bindRuntime=()=>{
     const runtime=window.__taleraTimelineRuntime;
     if(runtime&&typeof runtime.subscribe==='function'){

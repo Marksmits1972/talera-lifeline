@@ -368,6 +368,16 @@ export const presentationControllerScript = String.raw`
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(pid!==null)return;
 
+    /* Timeline gestures are exclusive. The photo-book controller must never
+       capture a pointer that starts on the timeline, even when visual children
+       use transparent/pointer-pass-through styling. */
+    if(timeline){
+      const targetInTimeline=!!(e.target&&e.target.closest&&e.target.closest('.timeline'));
+      const r=timeline.getBoundingClientRect();
+      const pointInTimeline=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
+      if(targetInTimeline||pointInTimeline)return;
+    }
+
     if(transitionActive)stopTransitionVisuals();
 
     pid=e.pointerId;

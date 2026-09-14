@@ -46,7 +46,18 @@ main .timeline.is-marker-afterglow .focus{
   opacity:.20!important;
   transition:opacity .18s ease,backdrop-filter .18s ease,-webkit-backdrop-filter .18s ease!important;
 }
+
+/* Reuse the existing transparent ::after layer as the one and only hit surface
+   for timeline gestures. It belongs to .timeline, so pointer events bubble into
+   the proven #surface motor; the photo swipe layer underneath never owns this
+   region. No second gesture controller is introduced. */
 .timeline::after{
+  top:0!important;
+  left:0!important;
+  right:0!important;
+  height:100%!important;
+  z-index:6!important;
+  pointer-events:auto!important;
   background:transparent!important;
   opacity:0!important;
 }

@@ -1,6 +1,6 @@
 export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera-workblad-v9-timeline-handoff">
 (() => {
-  const REV = 'workblad-v9-timeline-handoff-20260914-r1';
+  const REV = 'workblad-v9-timeline-handoff-20260914-r2';
   let publishing = false;
   let publishedMemoryId = '';
   let timer = 0;
@@ -17,18 +17,26 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     box.style.color = mode === 'bad' ? '#923d35' : mode === 'ok' ? '#2c684e' : '#17385e';
   }
 
-  function replaceFinishButton(text, onClick) {
-    const old = document.getElementById('workFinish');
-    if (!old) return null;
-    const btn = old.cloneNode(true);
-    btn.disabled = false;
-    btn.textContent = text;
-    btn.removeAttribute('data-v9-busy');
-    btn.removeAttribute('data-v9-saved');
-    btn.removeAttribute('data-v9-bridge-armed');
-    old.replaceWith(btn);
-    if (onClick) btn.addEventListener('click', onClick);
-    return btn;
+  function setFinishLabel(text) {
+    const btn = document.getElementById('workFinish');
+    if (btn) btn.textContent = text;
+  }
+
+  function addRetry(memoryId) {
+    const box = statusBox();
+    if (!box) return;
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.id = 'taleraTimelinePublishRetry';
+    retry.textContent = 'Probeer tijdlijnkoppeling opnieuw';
+    retry.style.cssText = 'display:block;width:100%;margin-top:10px;border:0;border-radius:14px;padding:12px 14px;background:#0f2f57;color:white;font:800 14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;';
+    retry.addEventListener('click', e => {
+      e.preventDefault();
+      retry.remove();
+      publishing = false;
+      publish(memoryId);
+    });
+    box.appendChild(retry);
   }
 
   function goToTimeline(handoffUrl) {
@@ -40,6 +48,7 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     if (!memoryId || publishing || publishedMemoryId === memoryId) return;
     publishing = true;
     clearTimeout(timer);
+    setFinishLabel('Koppelen aan tijdlijn…');
     setStatus('Laatste stap · je herinnering wordt aan de tijdlijn gekoppeld…');
     try {
       const res = await fetch('/api/v9/timeline-publish/' + encodeURIComponent(memoryId), {
@@ -63,20 +72,14 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
         }));
       } catch {}
 
+      setFinishLabel('Gekoppeld aan mijn tijdlijn');
       setStatus('✓ Veilig opgeslagen én aan je tijdlijn gekoppeld.', 'ok');
-      replaceFinishButton('Naar mijn tijdlijn', e => {
-        e.preventDefault();
-        goToTimeline(data.handoffUrl);
-      });
       timer = setTimeout(() => goToTimeline(data.handoffUrl), 1100);
       console.log('[TALERA V9 TIMELINE]', 'published', {revision:REV, memoryId, storyId:data.storyId, reused:Boolean(data.reused)});
     } catch (error) {
+      setFinishLabel('Veilig opgeslagen');
       setStatus('Je herinnering is veilig opgeslagen, maar de koppeling met de tijdlijn lukte nog niet: ' + String(error?.message || error), 'bad');
-      replaceFinishButton('Probeer tijdlijnkoppeling opnieuw', e => {
-        e.preventDefault();
-        publishing = false;
-        publish(memoryId);
-      });
+      addRetry(memoryId);
       console.warn('[TALERA V9 TIMELINE]', 'publish failed', error);
     } finally {
       publishing = false;

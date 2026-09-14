@@ -175,6 +175,11 @@ export const memoryPresentationControlsScript = String.raw`
     if(audio.paused&&audio.currentTime===0&&!manualSuppressed)scheduleAutoStart(renderEpoch);
   },true);
   document.addEventListener('pointercancel',cancelAutoStart,true);
+  document.addEventListener('talera:overlay-change',e=>{
+    if(e.detail&&e.detail.open){manualSuppressed=true;stopAudio(false);return}
+    manualSuppressed=false;
+    scheduleAutoStart(renderEpoch);
+  });
 
   consent.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();cancelAutoStart();

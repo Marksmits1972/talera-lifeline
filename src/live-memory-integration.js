@@ -240,6 +240,7 @@ export const liveMemoryIntegrationScript = String.raw`
       runtime.writeMemory(landing);
       runtime.draw();
       timeline.classList.add('is-timeline-afterglow','is-marker-afterglow');
+      document.dispatchEvent(new CustomEvent('talera:new-memory-landed',{detail:{storyId:landing.storyId||''}}));
     }else{
       const memory=currentMemory();
       renderDots(memory);

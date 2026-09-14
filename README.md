@@ -8,6 +8,8 @@ De eerste GitHub-basis is overgenomen uit `TALERA_TIMELINE_CURRENT_WORKER` (v22 
 
 - `src/index.js` — Cloudflare Worker entrypoint
 - `src/html/chunk*.js` — huidige HTML/CSS/JS van het prototype, in delen
+- `src/share-experience.js` — geïntegreerde mobiele deelervaring en ontvangersvoorbeelden
+- `docs/SHARING_BUILD_SPEC.md` — volledige bouwopdracht, toestandsmodel en acceptatiecriteria
 - `wrangler.jsonc` — deploymentconfiguratie voor de bestaande Worker `talera-timeline-prototype`
 
 ## Deployment

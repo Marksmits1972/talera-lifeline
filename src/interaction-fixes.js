@@ -32,31 +32,49 @@ export const interactionFixStyle = String.raw`
   transition:transform .28s cubic-bezier(.22,.72,.25,1)!important;
 }
 
-/* VISUAL-ONLY CHROME REFINEMENT R2.
-   Keep timeline scale/navigation untouched; only reposition the chrome.
-   Higher-specificity selectors intentionally override later generic styles. */
+/* VISUAL-ONLY CHROME REFINEMENT R3.
+   The timeline/date relationship is changed visually only; timeline math stays untouched. */
 .app .timeline{
   top:-18px!important;
 }
+.app .timeline canvas{
+  transform:translateY(-26px)!important;
+  transform-origin:center top!important;
+}
+.app .timeline .center-needle{
+  transform:translate(-1px,-26px)!important;
+}
 .app .timeline::before{
-  height:calc(100% - 4px)!important;
+  height:calc(100% - 10px)!important;
   backdrop-filter:blur(11px) saturate(1.05)!important;
   -webkit-backdrop-filter:blur(11px) saturate(1.05)!important;
-  -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 48%,rgba(0,0,0,.86) 61%,rgba(0,0,0,.54) 74%,rgba(0,0,0,.22) 87%,transparent 100%)!important;
-  mask-image:linear-gradient(to bottom,#000 0%,#000 48%,rgba(0,0,0,.86) 61%,rgba(0,0,0,.54) 74%,rgba(0,0,0,.22) 87%,transparent 100%)!important;
+  -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 44%,rgba(0,0,0,.84) 58%,rgba(0,0,0,.50) 72%,rgba(0,0,0,.18) 86%,transparent 100%)!important;
+  mask-image:linear-gradient(to bottom,#000 0%,#000 44%,rgba(0,0,0,.84) 58%,rgba(0,0,0,.50) 72%,rgba(0,0,0,.18) 86%,transparent 100%)!important;
 }
 .app .timeline::after{
-  height:calc(100% - 8px)!important;
+  height:calc(100% - 14px)!important;
 }
 
-/* Let the photograph continue visually through the bottom navigation.
-   One soft glass layer extends upward so there is no hard horizontal seam. */
+/* Keep title contrast, but let the photograph recover before the navigation starts. */
+.app .memory-sheet{
+  background:linear-gradient(180deg,
+    rgba(10,24,40,0) 0px,
+    rgba(10,24,40,.08) 48px,
+    rgba(10,24,40,.18) 110px,
+    rgba(10,24,40,.26) 170px,
+    rgba(10,24,40,.18) 215px,
+    rgba(10,24,40,.08) 255px,
+    rgba(10,24,40,0) 300px
+  )!important;
+}
+
+/* Bottom navigation is a glass overlay on the photograph, not a separate grey panel. */
 .app nav{
-  background:transparent!important;
+  background:rgba(15,39,71,.015)!important;
   border:0!important;
   box-shadow:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
+  backdrop-filter:blur(8px) saturate(1.16)!important;
+  -webkit-backdrop-filter:blur(8px) saturate(1.16)!important;
 }
 .app nav::before{
   display:block!important;
@@ -64,16 +82,16 @@ export const interactionFixStyle = String.raw`
   position:absolute!important;
   left:0!important;
   right:0!important;
-  top:-54px!important;
+  top:-64px!important;
   bottom:0!important;
   height:auto!important;
   z-index:0!important;
   pointer-events:none!important;
-  background:linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.008) 28%,rgba(15,39,71,.018) 58%,rgba(15,39,71,.035) 100%)!important;
-  backdrop-filter:blur(19px) saturate(1.20) brightness(1.03)!important;
-  -webkit-backdrop-filter:blur(19px) saturate(1.20) brightness(1.03)!important;
-  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.12) 24%,rgba(0,0,0,.44) 48%,rgba(0,0,0,.78) 70%,#000 100%)!important;
-  mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.12) 24%,rgba(0,0,0,.44) 48%,rgba(0,0,0,.78) 70%,#000 100%)!important;
+  background:linear-gradient(180deg,rgba(15,39,71,0) 0%,rgba(15,39,71,.012) 38%,rgba(15,39,71,.028) 70%,rgba(15,39,71,.04) 100%)!important;
+  backdrop-filter:blur(16px) saturate(1.18)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(1.18)!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.14) 26%,rgba(0,0,0,.48) 54%,rgba(0,0,0,.82) 78%,#000 100%)!important;
+  mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.14) 26%,rgba(0,0,0,.48) 54%,rgba(0,0,0,.82) 78%,#000 100%)!important;
 }
 .app .nav-item,
 .app .tell{

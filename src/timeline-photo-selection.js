@@ -3,6 +3,7 @@ export const timelinePhotoSelectionScript = String.raw`
   const timeline=document.querySelector('.timeline');
   if(!timeline)return;
 
+  const activePointers=new Set();
   let raf=0;
   let releaseTimer=0;
 
@@ -20,10 +21,19 @@ export const timelinePhotoSelectionScript = String.raw`
   /* Presentation-only follower: never owns the gesture, never changes centerMs,
      scale, speed or pointer capture. It only makes the nearest memory photo the
      single visible photo while the proven timeline motor moves underneath. */
-  timeline.addEventListener('pointerdown',schedule,{passive:true});
-  timeline.addEventListener('pointermove',schedule,{passive:true});
+  timeline.addEventListener('pointerdown',e=>{
+    activePointers.add(e.pointerId);
+    schedule();
+  },{passive:true});
 
-  const finish=()=>{
+  timeline.addEventListener('pointermove',e=>{
+    if(activePointers.has(e.pointerId))schedule();
+  },{passive:true});
+
+  const finish=e=>{
+    if(!activePointers.has(e.pointerId))return;
+    activePointers.delete(e.pointerId);
+    if(activePointers.size)return;
     clearTimeout(releaseTimer);
     schedule();
     /* Re-assert after the existing story settle window so no stale journey

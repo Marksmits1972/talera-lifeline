@@ -17,6 +17,11 @@ export const memoryPresentationControlsStyle = String.raw`
 .talera-memory-edit .edit-symbol{font-size:17px;line-height:1}
 .memory-space.is-listening .memory-sheet .story-more{opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease}
 .memory-space.is-listening.is-reading-during-listen .memory-sheet .story-more{opacity:1;transform:translateY(0)}
+.talera-audio-consent{position:absolute;z-index:18;left:50%;bottom:148px;transform:translateX(-50%);width:min(318px,calc(100% - 32px));min-height:58px;padding:10px 14px;border:1px solid rgba(255,255,255,.48);border-radius:18px;display:flex;align-items:center;justify-content:center;gap:10px;color:#fff;background:rgba(15,39,71,.82);box-shadow:0 10px 30px rgba(6,18,30,.25);backdrop-filter:blur(14px) saturate(1.12);-webkit-backdrop-filter:blur(14px) saturate(1.12);font-size:13px;font-weight:720;line-height:1.18;text-align:left;text-shadow:0 1px 5px rgba(6,18,30,.28)}
+.talera-audio-consent[hidden]{display:none!important}
+.talera-audio-consent .consent-speaker{font-size:21px;line-height:1}
+.talera-audio-consent .consent-copy{display:flex;flex-direction:column;gap:2px}
+.talera-audio-consent small{font-size:10px;font-weight:520;color:rgba(255,255,255,.76)}
 @media(max-width:430px){.talera-memory-audio{right:12px;bottom:74px;width:46px;min-width:46px;height:46px;padding:3px}.talera-memory-audio .audio-symbol{width:40px;height:40px}.talera-memory-edit{right:10px;top:10px;width:38px;height:38px}}
 `;
 
@@ -27,6 +32,13 @@ export const memoryPresentationControlsScript = String.raw`
   const memorySpace=document.querySelector('.memory-space');
   const storyScroll=document.getElementById('memoryStoryScroll');
   if(!runtime||!memorySpace)return;
+
+  const consent=document.createElement('button');
+  consent.type='button';
+  consent.className='talera-audio-consent';
+  consent.setAttribute('aria-label','Automatisch luisteren inschakelen');
+  consent.innerHTML='<span class="consent-speaker" aria-hidden="true">◖)))</span><span class="consent-copy">Automatisch luisteren inschakelen<small>Tik één keer om geluid toe te staan</small></span>';
+  memorySpace.appendChild(consent);
 
   const oldTell=document.querySelector('.tell');
   if(oldTell){
@@ -46,7 +58,7 @@ export const memoryPresentationControlsScript = String.raw`
   const audioUrls=new Map();
   const AUTO_START_DELAY=500;
   let activeStoryId='',activeToken='',activeHasAudio=false,loading=false,loadFailed=false,renderEpoch=0;
-  let autoStartTimer=null,autoStableSince=0,autoBlocked=false,manualSuppressed=false;
+  let autoStartTimer=null,autoStableSince=0,autoBlocked=false,manualSuppressed=false,audioEnabled=false;
 
   function tokenFor(m){return m&&m._manageToken||''}
   function usable(m){return Boolean(m&&m._taleraLive&&m.storyId&&tokenFor(m))}
@@ -112,7 +124,7 @@ export const memoryPresentationControlsScript = String.raw`
       autoBlocked=false;loadFailed=false;setUi();return true;
     }catch(e){
       if(fromAuto&&e&&e.name==='NotAllowedError'){
-        autoBlocked=true;loadFailed=false;
+        autoBlocked=true;audioEnabled=false;loadFailed=false;consent.hidden=false;
       }else{
         loadFailed=true;
         console.warn('TALERA audio kon niet starten',e);
@@ -123,10 +135,10 @@ export const memoryPresentationControlsScript = String.raw`
 
   function scheduleAutoStart(epoch=renderEpoch){
     cancelAutoStart();
-    if(epoch!==renderEpoch||manualSuppressed||!activeHasAudio||loading||loadFailed||!audio.src||!audio.paused||audio.currentTime>0)return;
+    if(epoch!==renderEpoch||!audioEnabled||manualSuppressed||!activeHasAudio||loading||loadFailed||!audio.src||!audio.paused||audio.currentTime>0)return;
     const probe=()=>{
       autoStartTimer=null;
-      if(epoch!==renderEpoch||manualSuppressed||!activeHasAudio||loading||loadFailed||!audio.src||!audio.paused||audio.currentTime>0)return;
+      if(epoch!==renderEpoch||!audioEnabled||manualSuppressed||!activeHasAudio||loading||loadFailed||!audio.src||!audio.paused||audio.currentTime>0)return;
       if(runtime.isMoving&&runtime.isMoving()){
         autoStableSince=0;
         autoStartTimer=setTimeout(probe,90);
@@ -149,7 +161,7 @@ export const memoryPresentationControlsScript = String.raw`
     },{passive:true});
   }
 
-  audio.addEventListener('play',()=>{enterListeningMode();setUi()});
+  audio.addEventListener('play',()=>{audioEnabled=true;autoBlocked=false;consent.hidden=true;enterListeningMode();setUi()});
   audio.addEventListener('pause',setUi);
   audio.addEventListener('timeupdate',()=>{setProgress();setUi()});
   audio.addEventListener('loadedmetadata',setProgress);
@@ -164,11 +176,31 @@ export const memoryPresentationControlsScript = String.raw`
   },true);
   document.addEventListener('pointercancel',cancelAutoStart,true);
 
+  consent.addEventListener('click',e=>{
+    e.preventDefault();e.stopPropagation();cancelAutoStart();
+    audioEnabled=true;autoBlocked=false;manualSuppressed=false;consent.hidden=true;
+    if(activeHasAudio&&!loading&&!loadFailed&&audio.src){
+      playNow(false);
+      return;
+    }
+    try{
+      const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+      if(AudioContextClass){
+        const context=new AudioContextClass();
+        const buffer=context.createBuffer(1,1,22050);
+        const source=context.createBufferSource();
+        source.buffer=buffer;source.connect(context.destination);source.start(0);
+        if(context.state==='suspended')context.resume();
+        setTimeout(()=>{try{context.close()}catch(err){}},180);
+      }
+    }catch(err){}
+  });
+
   audioButton.addEventListener('click',async e=>{
     e.preventDefault();e.stopPropagation();cancelAutoStart();
     if(loading)return;
     if(!audio.paused){manualSuppressed=true;audio.pause();return}
-    manualSuppressed=false;autoBlocked=false;
+    manualSuppressed=false;autoBlocked=false;audioEnabled=true;consent.hidden=true;
     if(loadFailed||!audio.src){const ok=await prepare(activeStoryId,activeToken,renderEpoch,true);if(ok)playNow(false);return}
     playNow(false);
   });

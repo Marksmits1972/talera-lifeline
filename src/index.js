@@ -18,7 +18,7 @@ import { timelinePhotoSelectionScript } from "./timeline-photo-selection.js";
 import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "memory-auto-audio-v1-20260914";
+const TALERA_TIMELINE_DEPLOY_REV = "memory-auto-audio-consent-v2-20260914";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();

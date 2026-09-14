@@ -13,12 +13,17 @@ import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 import { handleWorkbladV9 } from "./workblad-v9-clean.js";
 import { V9_PLAYBACK_PATCH_SCRIPT, V9_PLAYBACK_PATCH_REV } from "./workblad-v9-playback-patch.js";
 
-const TALERA_DEPLOY_REV = "workblad-v9-integrated-20260914";
+const TALERA_DEPLOY_REV = "workblad-v9-integrated-20260914-r3";
+const WORKBLAD_V9_HANDOFF = "window.__taleraWorkbladV9Read=function(){capture();ensure();var photos=state.workMedia.filter(function(m){return m&&m.kind==='local'&&m.file instanceof Blob&&m.file.size>0}).map(function(m){return m.file});return {audioBlob:(state.audioBlob instanceof Blob&&state.audioBlob.size)?state.audioBlob:null,photoFile:photos[0]||null,photos:photos,title:String(state.workTitle||''),eventTime:String(state.workDate||''),storyText:String(state.workText||''),duration:Number(state.duration)||0,voiceAttempted:Boolean(state.voiceAttempted)};};";
+const WORKBLAD_V2_EXPOSED_SCRIPT = WORKBLAD_V2_SCRIPT.replace(
+  'renderEntry=renderWorkblad;activateMic=voiceStart;',
+  WORKBLAD_V9_HANDOFF+'renderEntry=renderWorkblad;activateMic=voiceStart;'
+);
 
 function enhanceWorkblad(html){
   return html
     .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+'</style></head>')
-    .replace('</body>',WORKBLAD_V2_SCRIPT+WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
+    .replace('</body>',WORKBLAD_V2_EXPOSED_SCRIPT+WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
 }
 
 async function enhanceV9Response(response){
@@ -80,7 +85,8 @@ export default {
         ok:true,
         revision:TALERA_DEPLOY_REV,
         workbladV9Bridge:true,
-        workbladV9BridgeRevision:'workblad-v9-bridge-20260914-r2',
+        workbladV9BridgeRevision:'workblad-v9-bridge-20260914-r3',
+        workbladStateHandoff:true,
         v9IsolatedRoute:'/v9',
         v9RevisionRoute:'/api/v9/revision',
         v9PlaybackPatch:V9_PLAYBACK_PATCH_REV,

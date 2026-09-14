@@ -1,13 +1,30 @@
 export const timelineGlassLayerStyle = String.raw`
 /* TALERA — isolated frosted-glass presentation layer for the top timeline.
-   This file may be tuned later without touching timeline mechanics or state logic. */
+   This file owns timeline presentation geometry only; mechanics stay untouched. */
 
 .timeline canvas{
   transform:translateY(-26px)!important;
   transform-origin:center top!important;
 }
+
+/* The needle stays centred on the fixed timeline position, but its visible line
+   stops just above the date badge. */
 .timeline .center-needle{
   margin-top:-26px!important;
+  bottom:54px!important;
+}
+
+/* Single geometry owner for the date badge: horizontally centred on the needle,
+   vertically BELOW the complete ruler/labels so the timeline remains unobscured. */
+main .timeline .focus,
+main .timeline.is-active .focus,
+main .timeline.is-timeline-engaged .focus,
+main .timeline.is-timeline-afterglow .focus,
+main .timeline.is-marker-afterglow .focus{
+  left:50%!important;
+  top:auto!important;
+  bottom:12px!important;
+  transform:translateX(-50%)!important;
 }
 
 /* REST: photo remains dominant; glass is only a quiet readability aid. */

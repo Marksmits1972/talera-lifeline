@@ -6,8 +6,9 @@ import { WORKBLAD_V2_SCRIPT } from "./workblad-v2-client.js";
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
 import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
+import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 
-const TALERA_DEPLOY_REV = "full-listen-cycle-v6-recorder-controls-core-20260912";
+const TALERA_DEPLOY_REV = "full-listen-cycle-v7-safari-multipart-normalized-20260914";
 
 function enhanceWorkblad(html){
   return html
@@ -17,7 +18,19 @@ function enhanceWorkblad(html){
 
 export default {
   async fetch(request,env,ctx){
-    const url=new URL(request.url);
+    let activeRequest=request;
+    try{
+      activeRequest=await normalizeMultipartRequest(request);
+    }catch(error){
+      console.error('TALERA multipart normalization error',error);
+      const detail=String(error&&error.message?error.message:error||'onbekende fout').slice(0,180);
+      return new Response(JSON.stringify({error:'Opslaan op de server mislukt: '+detail}),{
+        status:400,
+        headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
+      });
+    }
+
+    const url=new URL(activeRequest.url);
     if(url.pathname.startsWith('/api/integration/')){
       try{
         // Integration routes run before the archived worker. Warm its health route
@@ -30,7 +43,7 @@ export default {
             headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
           });
         }
-        const integrationResponse=await handleWorkbladIntegrationApi(request,env);
+        const integrationResponse=await handleWorkbladIntegrationApi(activeRequest,env);
         if(integrationResponse)return integrationResponse;
       }catch(error){
         console.error('TALERA workblad integration error',error);
@@ -42,9 +55,9 @@ export default {
       }
     }
 
-    const response=await stableV79Worker.fetch(request,env,ctx);
+    const response=await stableV79Worker.fetch(activeRequest,env,ctx);
     const type=response.headers.get('content-type')||'';
-    if(request.method==='HEAD'||!type.includes('text/html'))return response;
+    if(activeRequest.method==='HEAD'||!type.includes('text/html'))return response;
     const html=await response.text();
     const headers=new Headers(response.headers);
     headers.delete('content-length');

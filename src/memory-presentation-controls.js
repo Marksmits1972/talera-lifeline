@@ -44,7 +44,9 @@ export const memoryPresentationControlsScript = String.raw`
   const editButton=tools.querySelector('.talera-memory-edit');
   const audio=new Audio();audio.preload='auto';audio.setAttribute('playsinline','');
   const audioUrls=new Map();
+  const AUTO_START_DELAY=500;
   let activeStoryId='',activeToken='',activeHasAudio=false,loading=false,loadFailed=false,renderEpoch=0;
+  let autoStartTimer=null,autoStableSince=0,autoBlocked=false,manualSuppressed=false;
 
   function tokenFor(m){return m&&m._manageToken||''}
   function usable(m){return Boolean(m&&m._taleraLive&&m.storyId&&tokenFor(m))}
@@ -71,10 +73,12 @@ export const memoryPresentationControlsScript = String.raw`
     if(playing){if(symbol)symbol.textContent='Ⅱ';audioLabel.textContent='Pauze';audioButton.setAttribute('aria-label','Gesproken verhaal pauzeren');return}
     if(symbol)symbol.textContent=loadFailed?'↻':'▶';
     if(loadFailed){audioLabel.textContent='Opnieuw';audioButton.setAttribute('aria-label','Gesproken verhaal opnieuw laden');return}
+    if(autoBlocked){if(symbol)symbol.textContent='▶';audioLabel.textContent='Tik om te luisteren';audioButton.setAttribute('aria-label','Tik om het gesproken verhaal te starten');return}
     audioLabel.textContent=(audio.currentTime>0&&!audio.ended)?'Verder':'Luister';
     audioButton.setAttribute('aria-label',(audio.currentTime>0&&!audio.ended)?'Verder luisteren naar het gesproken verhaal':'Luister naar het gesproken verhaal');
   }
-  function stopAudio(reset=true){loading=false;loadFailed=false;try{audio.pause();if(reset){audio.currentTime=0;audio.removeAttribute('src');audio.load();setProgress()}}catch(e){}exitListeningMode();setUi()}
+  function cancelAutoStart(){if(autoStartTimer){clearTimeout(autoStartTimer);autoStartTimer=null}autoStableSince=0}
+  function stopAudio(reset=true){cancelAutoStart();loading=false;loadFailed=false;autoBlocked=false;try{audio.pause();if(reset){audio.currentTime=0;audio.removeAttribute('src');audio.load();setProgress()}}catch(e){}exitListeningMode();setUi()}
 
   async function getDetail(id,token){
     const paths=['/api/linked/stories/'+encodeURIComponent(id),TELL_ORIGIN+'/api/integration/stories/'+encodeURIComponent(id)];
@@ -99,11 +103,43 @@ export const memoryPresentationControlsScript = String.raw`
       if(epoch!==renderEpoch)return false;loading=false;loadFailed=true;showAudio(true);setUi();return false;
     }
   }
-  async function playNow(){
-    if(!activeStoryId||!activeToken||!activeHasAudio||loading||loadFailed||!audio.src)return;
+  async function playNow(fromAuto=false){
+    if(!activeStoryId||!activeToken||!activeHasAudio||loading||loadFailed||!audio.src)return false;
     const wasListening=memorySpace.classList.contains('is-listening');
     if(!wasListening)enterListeningMode();
-    try{const p=audio.play();if(p&&typeof p.catch==='function')await p;loadFailed=false;setUi()}catch(e){loadFailed=true;if(!wasListening)exitListeningMode();setUi();console.warn('TALERA audio kon niet starten',e)}
+    try{
+      const p=audio.play();if(p&&typeof p.catch==='function')await p;
+      autoBlocked=false;loadFailed=false;setUi();return true;
+    }catch(e){
+      if(fromAuto&&e&&e.name==='NotAllowedError'){
+        autoBlocked=true;loadFailed=false;
+      }else{
+        loadFailed=true;
+        console.warn('TALERA audio kon niet starten',e);
+      }
+      if(!wasListening)exitListeningMode();setUi();return false;
+    }
+  }
+
+  function scheduleAutoStart(epoch=renderEpoch){
+    cancelAutoStart();
+    if(epoch!==renderEpoch||manualSuppressed||!activeHasAudio||loading||loadFailed||!audio.src||!audio.paused||audio.currentTime>0)return;
+    const probe=()=>{
+      autoStartTimer=null;
+      if(epoch!==renderEpoch||manualSuppressed||!activeHasAudio||loading||loadFailed||!audio.src||!audio.paused||audio.currentTime>0)return;
+      if(runtime.isMoving&&runtime.isMoving()){
+        autoStableSince=0;
+        autoStartTimer=setTimeout(probe,90);
+        return;
+      }
+      const now=performance.now();
+      if(!autoStableSince)autoStableSince=now;
+      const remaining=AUTO_START_DELAY-(now-autoStableSince);
+      if(remaining>0){autoStartTimer=setTimeout(probe,Math.min(remaining,90));return}
+      autoStableSince=0;
+      playNow(true);
+    };
+    autoStartTimer=setTimeout(probe,90);
   }
 
   if(storyScroll){
@@ -120,17 +156,26 @@ export const memoryPresentationControlsScript = String.raw`
   audio.addEventListener('durationchange',setProgress);
   audio.addEventListener('ended',()=>{try{audio.currentTime=0}catch(e){}setProgress();setUi()});
   audio.addEventListener('error',()=>{loadFailed=true;exitListeningMode();setUi()});
+  document.addEventListener('pointerdown',()=>{
+    cancelAutoStart();
+  },true);
+  document.addEventListener('pointerup',()=>{
+    if(audio.paused&&audio.currentTime===0&&!manualSuppressed)scheduleAutoStart(renderEpoch);
+  },true);
+  document.addEventListener('pointercancel',cancelAutoStart,true);
+
   audioButton.addEventListener('click',async e=>{
-    e.preventDefault();e.stopPropagation();
+    e.preventDefault();e.stopPropagation();cancelAutoStart();
     if(loading)return;
-    if(!audio.paused){audio.pause();return}
-    if(loadFailed||!audio.src){const ok=await prepare(activeStoryId,activeToken,renderEpoch,true);if(ok)playNow();return}
-    playNow();
+    if(!audio.paused){manualSuppressed=true;audio.pause();return}
+    manualSuppressed=false;autoBlocked=false;
+    if(loadFailed||!audio.src){const ok=await prepare(activeStoryId,activeToken,renderEpoch,true);if(ok)playNow(false);return}
+    playNow(false);
   });
   editButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();stopAudio(true);const m=runtime.currentMemory();if(!usable(m))return;location.href=TELL_ORIGIN+'/?edit='+encodeURIComponent(m.storyId)+'#token='+encodeURIComponent(tokenFor(m))});
 
   async function render(memory){
-    const epoch=++renderEpoch;stopAudio(true);const ok=usable(memory);editButton.hidden=!ok;activeStoryId=ok?memory.storyId:'';activeToken=ok?tokenFor(memory):'';activeHasAudio=false;showAudio(false);setUi();if(!ok)return;
+    const epoch=++renderEpoch;stopAudio(true);manualSuppressed=false;autoBlocked=false;const ok=usable(memory);editButton.hidden=!ok;activeStoryId=ok?memory.storyId:'';activeToken=ok?tokenFor(memory):'';activeHasAudio=false;showAudio(false);setUi();if(!ok)return;
     const hinted=Boolean(memory._hasAudio||memory._audioMimeType||Number(memory._durationSeconds)>0);
     loading=true;showAudio(true);setUi();
     const detail=await getDetail(activeStoryId,activeToken);if(epoch!==renderEpoch)return;
@@ -138,7 +183,7 @@ export const memoryPresentationControlsScript = String.raw`
     activeHasAudio=expected;memory._hasAudio=expected;
     try{
       const url=await getAudioUrl(activeStoryId,activeToken,false);if(epoch!==renderEpoch)return;
-      activeHasAudio=true;memory._hasAudio=true;showAudio(true);audio.src=url;audio.currentTime=0;audio.load();loading=false;loadFailed=false;setProgress();setUi();return;
+      activeHasAudio=true;memory._hasAudio=true;showAudio(true);audio.src=url;audio.currentTime=0;audio.load();loading=false;loadFailed=false;setProgress();setUi();scheduleAutoStart(epoch);return;
     }catch(e){}
     if(epoch!==renderEpoch)return;
     loading=false;activeHasAudio=expected;memory._hasAudio=expected;

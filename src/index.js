@@ -15,7 +15,7 @@ import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-
 import { memoryPresentationControlsStyle, memoryPresentationControlsScript } from "./memory-presentation-controls.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "listen-layer-r6-same-date-active-snap-20260912-0900";
+const TALERA_TIMELINE_DEPLOY_REV = "listen-outline-r1-20260914";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();
@@ -99,6 +99,41 @@ const timelineAfterglowStyle = String.raw`
 }
 `;
 
+const listenButtonOutlineStyle = String.raw`
+.talera-memory-audio{
+  right:20px!important;
+  bottom:112px!important;
+  width:46px!important;
+  min-width:46px!important;
+  height:46px!important;
+  padding:0!important;
+  border:1.5px solid rgba(255,255,255,.88)!important;
+  background:rgba(15,39,71,.07)!important;
+  box-shadow:0 3px 13px rgba(15,39,71,.18)!important;
+  backdrop-filter:blur(4px)!important;
+  -webkit-backdrop-filter:blur(4px)!important;
+}
+.talera-memory-audio .audio-symbol{
+  width:100%!important;
+  height:100%!important;
+  background:transparent!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  text-shadow:0 1px 4px rgba(15,39,71,.48)!important;
+  font-size:15px!important;
+}
+.talera-memory-audio.is-playing{
+  border-color:rgba(231,169,139,.96)!important;
+  background:rgba(15,39,71,.14)!important;
+  box-shadow:0 4px 14px rgba(15,39,71,.20)!important;
+}
+.talera-memory-audio.is-loading{opacity:.72!important}
+.talera-memory-audio.is-error{border-color:rgba(231,169,139,.92)!important;box-shadow:0 3px 13px rgba(15,39,71,.18)!important}
+@media(max-width:430px){
+  .talera-memory-audio{right:18px!important;bottom:104px!important;width:44px!important;min-width:44px!important;height:44px!important}
+}
+`;
+
 const timelineAfterglowScript = String.raw`
 (()=>{
   const timeline=document.querySelector('.timeline');
@@ -131,7 +166,7 @@ const timelineAfterglowScript = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style></head>`)
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style></head>`)
   .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-afterglow-controller">${timelineAfterglowScript}</script></body>`);
 
 async function proxyLinkedMemory(request) {

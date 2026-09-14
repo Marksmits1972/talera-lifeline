@@ -3,31 +3,32 @@ export const timelineAdaptiveContrastStyle = String.raw`
    This presentation layer does not touch timeline geometry, navigation,
    direct grip, scale/speed logic, marker/date mapping or snapping. */
 .timeline{
-  --timeline-rest-opacity:.46;
-  --timeline-rest-filter:saturate(.82) contrast(.96) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.88)) drop-shadow(0 1px 1px rgba(15,39,71,.20));
-}
-
-/* On a dark/mixed photo band, render the resting ruler as a soft light trace. */
-.timeline[data-rest-contrast="light"]{
-  --timeline-rest-opacity:.48;
-  --timeline-rest-filter:brightness(0) invert(1) opacity(.96) drop-shadow(0 1px 2px rgba(15,39,71,.36)) drop-shadow(0 0 1px rgba(255,255,255,.74));
-}
-
-/* On a light photo band, keep the familiar restrained TALERA dark ruler. */
-.timeline[data-rest-contrast="dark"]{
-  --timeline-rest-opacity:.46;
-  --timeline-rest-filter:saturate(.82) contrast(1.00) brightness(.74) drop-shadow(0 0 1px rgba(255,255,255,.92)) drop-shadow(0 1px 1px rgba(15,39,71,.18));
-}
-
-/* Mixed/high-detail backgrounds get a little extra edge separation, not a loud ruler. */
-.timeline[data-rest-detail="busy"]{
   --timeline-rest-opacity:.50;
+  --timeline-rest-filter:saturate(.86) contrast(1.06) brightness(.84) drop-shadow(0 0 1px rgba(255,255,255,.82)) drop-shadow(0 1px 1px rgba(15,39,71,.30));
+}
+
+/* Dark photo band: a soft light ruler with a dark edge floor. */
+.timeline[data-rest-contrast="light"]{
+  --timeline-rest-opacity:.52;
+  --timeline-rest-filter:brightness(0) invert(1) opacity(.96) drop-shadow(0 1px 2px rgba(15,39,71,.42)) drop-shadow(0 0 1px rgba(255,255,255,.80));
+}
+
+/* Light photo band: keep the ruler dark enough that pale skies/walls can never
+   swallow it. It remains secondary to the photo, but has a real visibility floor. */
+.timeline[data-rest-contrast="dark"]{
+  --timeline-rest-opacity:.54;
+  --timeline-rest-filter:saturate(.90) contrast(1.24) brightness(.62) drop-shadow(0 0 1px rgba(255,255,255,.72)) drop-shadow(0 1px 1.5px rgba(15,39,71,.48));
+}
+
+/* Mixed/high-detail backgrounds get slightly more edge separation, not a loud ruler. */
+.timeline[data-rest-detail="busy"]{
+  --timeline-rest-opacity:.56;
 }
 .timeline[data-rest-contrast="light"][data-rest-detail="busy"]{
-  --timeline-rest-filter:brightness(0) invert(1) opacity(.98) drop-shadow(0 1px 2px rgba(15,39,71,.42)) drop-shadow(0 0 2px rgba(255,255,255,.24));
+  --timeline-rest-filter:brightness(0) invert(1) opacity(.98) drop-shadow(0 1px 2px rgba(15,39,71,.48)) drop-shadow(0 0 2px rgba(255,255,255,.28));
 }
 .timeline[data-rest-contrast="dark"][data-rest-detail="busy"]{
-  --timeline-rest-filter:saturate(.84) contrast(1.04) brightness(.70) drop-shadow(0 0 1.5px rgba(255,255,255,.98)) drop-shadow(0 1px 2px rgba(15,39,71,.24));
+  --timeline-rest-filter:saturate(.92) contrast(1.30) brightness(.58) drop-shadow(0 0 1.5px rgba(255,255,255,.82)) drop-shadow(0 1px 2px rgba(15,39,71,.54));
 }
 `;
 
@@ -53,9 +54,9 @@ export const timelineAdaptiveContrastScript = String.raw`
   }
 
   function fallback(){
-    /* Remote photos can deny pixel access. The dark ruler + bright edge floor
-       remains intentionally visible on both light and dark photography. */
-    apply(lastMode||'dark',true);
+    /* Remote photos can deny pixel access. The conservative dark ruler keeps a
+       guaranteed floor against the most failure-prone case: very light photos. */
+    apply('dark',true);
   }
 
   async function analyse(){

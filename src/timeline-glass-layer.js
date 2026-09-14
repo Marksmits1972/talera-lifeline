@@ -1,13 +1,38 @@
 export const timelineGlassLayerStyle = String.raw`
 /* TALERA — isolated frosted-glass presentation layer for the top timeline.
-   This file may be tuned later without touching timeline mechanics or state logic. */
+   This file owns presentation geometry only; timeline mechanics remain untouched. */
+
+/* Allow the date badge to hang slightly into the photo area without enlarging
+   the technical timeline touch zone or changing its layout row. */
+.timeline{
+  overflow:visible!important;
+  z-index:6!important;
+}
 
 .timeline canvas{
   transform:translateY(-26px)!important;
   transform-origin:center top!important;
 }
+
+/* Keep the fixed needle aligned with the ruler and end it exactly where the
+   date badge begins. */
 .timeline .center-needle{
   margin-top:-26px!important;
+  bottom:42px!important;
+}
+
+/* Single geometry owner for the date badge. The full ruler and its labels stay
+   unobstructed; the badge sits centred under the needle and may overlap the
+   first few pixels of the photograph instead of covering timeline information. */
+main .timeline .focus,
+main .timeline.is-active .focus,
+main .timeline.is-timeline-engaged .focus,
+main .timeline.is-timeline-afterglow .focus,
+main .timeline.is-marker-afterglow .focus{
+  left:50%!important;
+  top:calc(100% - 42px)!important;
+  bottom:auto!important;
+  transform:translateX(-50%)!important;
 }
 
 /* REST: photo remains dominant; glass is only a quiet readability aid. */

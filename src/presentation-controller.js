@@ -106,12 +106,10 @@ export const presentationControllerScript = String.raw`
   /* ---------------------------------------------------------
      CLEAN PHOTO STRIP ENGINE — single gesture owner.
 
-     - one persistent previous/current/next strip, reused for every swipe;
-     - exact 1:1 finger displacement while touching;
-     - continuous release velocity feeds one spring, no slow/fast modes;
-     - at most one photo per gesture;
-     - timeline-started gestures are never claimed here;
-     - no extra fallback gesture listener exists.
+     The strip is prepared while hidden. Pointerdown never changes a photo or
+     swaps a source. Only confirmed horizontal movement reveals the already
+     prepared strip at the exact finger displacement. This prevents a tap at
+     the start of a fast swipe from flashing a stale neighbour image.
      --------------------------------------------------------- */
   const book=window.__taleraPhotoBook;
   if(!story||!stage||!book)return;
@@ -127,6 +125,8 @@ export const presentationControllerScript = String.raw`
     page.classList.add('photo-layer','talera-photo-strip-page');
     page.classList.remove('is-front');
     page.style.opacity='1';
+    page.style.visibility='hidden';
+    page.dataset.taleraReady='0';
     stripIds(page);
     return page;
   }
@@ -144,6 +144,7 @@ export const presentationControllerScript = String.raw`
 
   let stripVisible=false;
   let stripX=0;
+  let preparedKey='';
   let stateAtStart=null;
   let pointerId=null;
   let mode=null;
@@ -151,48 +152,78 @@ export const presentationControllerScript = String.raw`
   let samples=[];
   let springRaf=0;
 
+  function stateKey(state){
+    if(!state)return '';
+    return [state.previous,state.current,state.next]
+      .map(memory=>memory&&memory.image?memory.image:'')
+      .join('\n');
+  }
+
   function pageFit(page){
     const sharp=page.querySelector('.example-photo');
     const blur=page.querySelector('.photo-aligned-blur');
-    if(!sharp||!sharp.complete||!sharp.naturalWidth)return;
+    if(!sharp||!sharp.complete||!sharp.naturalWidth)return false;
     const r=stage.getBoundingClientRect();
-    fitNode(sharp,blur,r.width,r.height);
+    return fitNode(sharp,blur,r.width,r.height);
+  }
+
+  function markPageReady(page,src){
+    if(page.dataset.taleraSrc!==src)return;
+    if(!pageFit(page))return;
+    page.dataset.taleraReady='1';
+    page.style.visibility='visible';
   }
 
   function setPage(page,memory){
     if(!memory||!memory.image){
       page.style.visibility='hidden';
       page.dataset.taleraSrc='';
+      page.dataset.taleraReady='1';
       return;
     }
-    page.style.visibility='visible';
+
     const src=memory.image;
-    if(page.dataset.taleraSrc===src){
+    if(page.dataset.taleraSrc===src&&page.dataset.taleraReady==='1'){
       pageFit(page);
       return;
     }
+
     page.dataset.taleraSrc=src;
+    page.dataset.taleraReady='0';
+    page.style.visibility='hidden';
+
     const backdrop=page.querySelector('.photo-backdrop');
     const blur=page.querySelector('.photo-aligned-blur');
     const sharp=page.querySelector('.example-photo');
-    if(backdrop&&backdrop.src!==src){backdrop.decoding='async';backdrop.loading='eager';backdrop.src=src;}
-    if(blur&&blur.src!==src){blur.decoding='async';blur.loading='eager';blur.src=src;}
-    if(sharp){
-      sharp.decoding='async';
-      sharp.loading='eager';
-      try{sharp.fetchPriority='high';}catch(err){}
-      sharp.onload=()=>pageFit(page);
-      if(sharp.src!==src)sharp.src=src;
-      if(sharp.complete&&sharp.naturalWidth)pageFit(page);
+
+    if(backdrop&&backdrop.src!==src){
+      backdrop.decoding='async';
+      backdrop.loading='eager';
+      backdrop.src=src;
     }
+    if(blur&&blur.src!==src){
+      blur.decoding='async';
+      blur.loading='eager';
+      blur.src=src;
+    }
+    if(!sharp)return;
+
+    sharp.decoding='async';
+    sharp.loading='eager';
+    try{sharp.fetchPriority='high';}catch(err){}
+    sharp.onload=()=>markPageReady(page,src);
+    if(sharp.src!==src)sharp.src=src;
+    if(sharp.complete&&sharp.naturalWidth)markPageReady(page,src);
   }
 
-  function syncStrip(){
-    const state=book.state();
-    stateAtStart=state;
+  function prepareStrip(state=book.state()){
+    if(stripVisible||springRaf)return false;
+    preparedKey=stateKey(state);
     setPage(previousPage,state.previous);
     setPage(currentPage,state.current);
     setPage(nextPage,state.next);
+    positionStrip(0);
+    return true;
   }
 
   function positionStrip(x){
@@ -203,11 +234,28 @@ export const presentationControllerScript = String.raw`
     nextPage.style.transform='translate3d('+(x+w).toFixed(2)+'px,0,0)';
   }
 
-  function showStrip(){
-    syncStrip();
+  function pageReadyForDirection(dx){
+    if(currentPage.dataset.taleraReady!=='1')return false;
+    if(dx<0&&stateAtStart&&stateAtStart.next)return nextPage.dataset.taleraReady==='1';
+    if(dx>0&&stateAtStart&&stateAtStart.previous)return previousPage.dataset.taleraReady==='1';
+    return true;
+  }
+
+  function showPreparedStripAt(x){
+    const state=book.state();
+    stateAtStart=state;
+    if(preparedKey!==stateKey(state)){
+      stateAtStart=null;
+      return false;
+    }
+    if(!pageReadyForDirection(x)){
+      stateAtStart=null;
+      return false;
+    }
+    positionStrip(x);
     stripVisible=true;
     strip.classList.add('is-visible');
-    positionStrip(0);
+    return true;
   }
 
   function hideStrip(){
@@ -217,10 +265,18 @@ export const presentationControllerScript = String.raw`
     stateAtStart=null;
   }
 
+  function afterVisualSettle(){
+    hideStrip();
+    requestAnimationFrame(()=>prepareStrip(book.state()));
+  }
+
   function cancelSpring(finishVisual=true){
     if(springRaf)cancelAnimationFrame(springRaf);
     springRaf=0;
-    if(finishVisual)hideStrip();
+    if(finishVisual){
+      hideStrip();
+      requestAnimationFrame(()=>prepareStrip(book.state()));
+    }
   }
 
   function startsOnTimeline(e){
@@ -237,9 +293,22 @@ export const presentationControllerScript = String.raw`
   }
 
   function addSample(x,t){
+    if(!Number.isFinite(x)||!Number.isFinite(t))return;
     samples.push({x,t});
-    const cutoff=t-110;
+    const cutoff=t-120;
     while(samples.length>2&&samples[0].t<cutoff)samples.shift();
+  }
+
+  function addPointerSamples(e,now){
+    const coalesced=typeof e.getCoalescedEvents==='function'?e.getCoalescedEvents():null;
+    if(coalesced&&coalesced.length){
+      for(const point of coalesced){
+        const t=Number.isFinite(point.timeStamp)&&point.timeStamp>0?point.timeStamp:now;
+        addSample(point.clientX,t);
+      }
+    }else{
+      addSample(e.clientX,now);
+    }
   }
 
   function releaseVelocity(x,t){
@@ -247,9 +316,9 @@ export const presentationControllerScript = String.raw`
     if(samples.length<2)return 0;
     let first=samples[0];
     for(let i=samples.length-2;i>=0;i--){
-      if(t-samples[i].t>=45){first=samples[i];break;}
+      if(t-samples[i].t>=38){first=samples[i];break;}
     }
-    const dt=Math.max(16,t-first.t);
+    const dt=Math.max(12,t-first.t);
     return (x-first.x)/dt;
   }
 
@@ -292,7 +361,7 @@ export const presentationControllerScript = String.raw`
 
   function settleFromRelease(dx,velocityPxMs){
     const w=stage.getBoundingClientRect().width;
-    if(!w||!stateAtStart){hideStrip();return;}
+    if(!w||!stateAtStart){afterVisualSettle();return;}
 
     const direction=dx<0?1:-1;
     const targetMemory=direction>0?stateAtStart.next:stateAtStart.previous;
@@ -308,7 +377,19 @@ export const presentationControllerScript = String.raw`
     }
 
     const targetX=commit?(direction>0?-w:w):0;
-    animateSpring(targetX,velocityPxMs,()=>hideStrip());
+    animateSpring(targetX,velocityPxMs,afterVisualSettle);
+  }
+
+  /* Prepare all three pages before the first touch. They remain hidden until
+     actual horizontal intent exists, so there is no visual action on tap. */
+  prepareStrip(book.state());
+
+  const runtime=window.__taleraTimelineRuntime;
+  if(runtime&&typeof runtime.subscribe==='function'){
+    runtime.subscribe(()=>{
+      if(pointerId!==null||stripVisible||springRaf)return;
+      requestAnimationFrame(()=>prepareStrip(book.state()));
+    });
   }
 
   story.addEventListener('pointerdown',e=>{
@@ -329,21 +410,23 @@ export const presentationControllerScript = String.raw`
   story.addEventListener('pointermove',e=>{
     if(e.pointerId!==pointerId)return;
     const now=performance.now();
+    addPointerSamples(e,now);
+
     const dx=e.clientX-startX;
     const dy=e.clientY-startY;
     lastX=e.clientX;
     lastY=e.clientY;
-    addSample(e.clientX,now);
 
     if(!mode){
-      const horizontal=Math.abs(dx)>=6&&Math.abs(dx)>Math.abs(dy)*1.06;
-      const vertical=Math.abs(dy)>=6&&Math.abs(dy)>Math.abs(dx)*1.10;
+      const horizontal=Math.abs(dx)>=4&&Math.abs(dx)>Math.abs(dy)*1.03;
+      const vertical=Math.abs(dy)>=8&&Math.abs(dy)>Math.abs(dx)*1.12;
       if(horizontal){
-        mode='horizontal';
-        showStrip();
+        mode=showPreparedStripAt(dx)?'horizontal':'horizontal-wait';
       }else if(vertical){
         mode='vertical';
       }
+    }else if(mode==='horizontal-wait'){
+      if(showPreparedStripAt(dx))mode='horizontal';
     }
 
     if(mode!=='horizontal')return;
@@ -354,39 +437,47 @@ export const presentationControllerScript = String.raw`
   story.addEventListener('pointerup',e=>{
     if(e.pointerId!==pointerId)return;
     const now=performance.now();
+    addPointerSamples(e,now);
     const dx=e.clientX-startX;
     const dy=e.clientY-startY;
 
-    if(!mode&&Math.abs(dx)>=12&&Math.abs(dx)>Math.abs(dy)*1.06){
-      mode='horizontal';
-      showStrip();
-      positionStrip(dx);
+    if(!mode&&Math.abs(dx)>=8&&Math.abs(dx)>Math.abs(dy)*1.03){
+      mode=showPreparedStripAt(dx)?'horizontal':'horizontal-wait';
     }
 
     if(mode==='horizontal'){
       const velocity=releaseVelocity(e.clientX,now);
       settleFromRelease(dx,velocity);
     }else if(stripVisible){
-      hideStrip();
+      afterVisualSettle();
     }
     finishGestureTracking();
   },{passive:true,capture:true});
 
   story.addEventListener('pointercancel',e=>{
     if(e.pointerId!==pointerId)return;
+    const now=performance.now();
+    const dx=lastX-startX;
+
+    /* iOS can cancel an otherwise valid fast horizontal pointer stream. Once
+       horizontal intent was established, treat that cancel as a release rather
+       than forcing the photo to spring back. */
     if(mode==='horizontal'&&stripVisible){
-      const velocity=releaseVelocity(lastX,performance.now());
-      animateSpring(0,velocity,()=>hideStrip());
+      const velocity=releaseVelocity(lastX,now);
+      settleFromRelease(dx,velocity);
     }else if(stripVisible){
-      hideStrip();
+      afterVisualSettle();
     }
     finishGestureTracking();
   },{passive:true,capture:true});
 
   window.addEventListener('resize',()=>{
-    if(!stripVisible)return;
-    [previousPage,currentPage,nextPage].forEach(pageFit);
-    positionStrip(stripX);
+    if(stripVisible){
+      [previousPage,currentPage,nextPage].forEach(pageFit);
+      positionStrip(stripX);
+    }else{
+      requestAnimationFrame(()=>prepareStrip(book.state()));
+    }
   },{passive:true});
 })();
 `;

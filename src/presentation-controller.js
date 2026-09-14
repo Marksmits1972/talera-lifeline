@@ -255,6 +255,20 @@ export const presentationControllerScript = String.raw`
     warmState(window.__taleraPhotoBook.state());
   }
 
+  /* Finish velocity is derived from the actual finger release instead of a
+     fixed quick snap. During pointermove the photo already follows the finger
+     1:1; this helper only controls the remaining distance after release. */
+  function settleDuration(distance,speed,commit){
+    const d=Math.max(0,distance);
+    if(d<12)return 90;
+    const v=Math.max(.18,Math.min(2.6,Math.abs(speed)));
+    const guidedVelocity=(commit ? .52 : .58)+v*.72;
+    const raw=d/Math.max(.45,guidedVelocity);
+    const min=d<40?110:(commit?180:150);
+    const max=commit?430:320;
+    return Math.round(Math.max(min,Math.min(max,raw)));
+  }
+
   function runMomentum(direction,remaining,speed,epoch){
     if(epoch!==transitionEpoch)return;
     if(remaining<=0){finishTransition(epoch);return;}
@@ -264,7 +278,9 @@ export const presentationControllerScript = String.raw`
     if(!target){finishTransition(epoch);return;}
 
     buildOverlay();
-    const duration=Math.round(Math.max(94,Math.min(132,138-Math.min(speed,3)*14)));
+    /* Strong multi-photo momentum stays possible, but each extra page now
+       inherits the release speed instead of flashing through in ~100 ms. */
+    const duration=Math.round(Math.max(150,Math.min(230,245-Math.min(speed,3)*28)));
     if(!transitionPages(direction,duration)){finishTransition(epoch);return;}
 
     /* Commit state immediately. The overlay owns the animation while the
@@ -280,10 +296,13 @@ export const presentationControllerScript = String.raw`
     },duration+18);
   }
 
-  function settle(direction,commit,releaseSpeed=0,momentumSteps=1){
+  function settle(direction,commit,releaseSpeed=0,momentumSteps=1,releaseDx=0){
     if(!overlay||!currentPage){clearOverlay();return;}
     const speed=Math.abs(releaseSpeed);
-    const duration=Math.round(Math.max(140,Math.min(270,265-speed*70)));
+    const w=stage.getBoundingClientRect().width;
+    const travelled=Math.min(w,Math.abs(releaseDx));
+    const distance=commit?Math.max(0,w-travelled):travelled;
+    const duration=settleDuration(distance,speed,commit);
     const epoch=++transitionEpoch;
     transitionActive=true;
     clearTimeout(settleTimer);
@@ -411,6 +430,8 @@ export const presentationControllerScript = String.raw`
     }
 
     e.preventDefault();
+    /* Direct manipulation: while the finger is down, the photo moves exactly
+       with it. No multiplier, smoothing or artificial acceleration here. */
     placePages(e.clientX-dragOriginX);
     lastX=e.clientX;
     lastT=now;
@@ -439,7 +460,7 @@ export const presentationControllerScript = String.raw`
     const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
     const steps=commit&&flickCommit?momentumCount(flickSpeed,Math.abs(rawDx),w):1;
 
-    if(mode==='horizontal')settle(direction,commit,flickSpeed,steps);
+    if(mode==='horizontal')settle(direction,commit,flickSpeed,steps,visualDx);
     else clearOverlay();
     try{story.releasePointerCapture(e.pointerId);}catch(err){}
     pid=null;

@@ -29,6 +29,6 @@ export const interactionFixStyle = String.raw`
   -webkit-backface-visibility:hidden!important;
 }
 .photo-book-page.is-settling{
-  transition:transform .28s cubic-bezier(.22,.72,.25,1)!important;
+  transition:transform .32s cubic-bezier(.24,.46,.32,1)!important;
 }
 `;

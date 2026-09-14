@@ -146,8 +146,8 @@ export const presentationControllerScript = String.raw`
 
   const DRAG_INTENT_PX=6;
   const PICKUP_DEADZONE_PX=4;
-  const FLICK_INTENT_PX=8;
-  const FLICK_LOCK_SPEED=.85;
+  const FLICK_INTENT_PX=14;
+  const FLICK_LOCK_SPEED=1.0;
   const HORIZONTAL_BIAS=1.06;
   let pid=null;
   let startX=0,startY=0,lastX=0,lastT=0,startT=0;
@@ -278,13 +278,9 @@ export const presentationControllerScript = String.raw`
     if(!target){finishTransition(epoch);return;}
 
     buildOverlay();
-    /* Strong multi-photo momentum stays possible, but each extra page now
-       inherits the release speed instead of flashing through in ~100 ms. */
     const duration=Math.round(Math.max(150,Math.min(230,245-Math.min(speed,3)*28)));
     if(!transitionPages(direction,duration)){finishTransition(epoch);return;}
 
-    /* Commit state immediately. The overlay owns the animation while the
-       existing photo layer can update/load underneath without blocking input. */
     const moved=window.__taleraPhotoBook.step(direction);
     if(!moved){finishTransition(epoch);return;}
     warmState(window.__taleraPhotoBook.state());
@@ -331,9 +327,6 @@ export const presentationControllerScript = String.raw`
 
     transitionPages(direction,duration);
 
-    /* The old implementation waited for image/decode work before committing.
-       That allowed several released swipes to overlap. Commit now, animate on
-       top, and let the existing image observers finish fitting independently. */
     const moved=window.__taleraPhotoBook.step(direction);
     if(!moved){
       requestAnimationFrame(()=>placePages(0));
@@ -365,10 +358,9 @@ export const presentationControllerScript = String.raw`
     placePages(currentX-dragOriginX);
   }
 
-  function momentumCount(speed,distance,w){
-    /* One photo is the default. Extra travel needs both real speed and distance. */
-    if(speed>=2.35&&distance>=w*.58)return 3;
-    if(speed>=1.55&&distance>=w*.36)return 2;
+  function momentumCount(){
+    /* One deliberate finger gesture advances at most one photo. Gesture speed
+       controls how fast that photo settles; it no longer skips extra memories. */
     return 1;
   }
 
@@ -376,9 +368,6 @@ export const presentationControllerScript = String.raw`
     if(e.pointerType==='mouse'&&e.button!==0)return;
     if(pid!==null)return;
 
-    /* A fresh touch always wins. If the previous card is still visually
-       settling, discard only that old visual transaction; its memory state
-       was already committed synchronously. */
     if(transitionActive)stopTransitionVisuals();
 
     pid=e.pointerId;
@@ -430,8 +419,8 @@ export const presentationControllerScript = String.raw`
     }
 
     e.preventDefault();
-    /* Direct manipulation: while the finger is down, the photo moves exactly
-       with it. No multiplier, smoothing or artificial acceleration here. */
+    /* While the finger is down, the page has exactly the same displacement as
+       the finger: no acceleration, multiplier, momentum or interpolation. */
     placePages(e.clientX-dragOriginX);
     lastX=e.clientX;
     lastT=now;
@@ -454,11 +443,17 @@ export const presentationControllerScript = String.raw`
     const w=stage.getBoundingClientRect().width;
     const direction=fastPickup&&lockedStepDirection?lockedStepDirection:(rawDx<0?1:-1);
     const hasTarget=direction>0?!!(stateAtStart&&stateAtStart.next):!!(stateAtStart&&stateAtStart.previous);
-    const distanceCommit=Math.abs(visualDx)>Math.max(46,w*.13);
+    const progress=w?Math.abs(visualDx)/w:0;
     const flickSpeed=Math.min(3,Math.max(Math.abs(avgVelocity),Math.abs(smoothedVelocity)));
-    const flickCommit=Math.abs(rawDx)>=24&&flickSpeed>=.65;
+
+    /* Deliberate paging: a slow drag can change photo by carrying it roughly
+       one third across the screen. A fast flick may commit earlier, but only
+       after meaningful travel as well. Tiny quick touches always return. */
+    const distanceCommit=progress>=.30;
+    const flickTravel=Math.max(64,w*.18);
+    const flickCommit=Math.abs(rawDx)>=flickTravel&&flickSpeed>=1.05;
     const commit=mode==='horizontal'&&hasTarget&&(distanceCommit||flickCommit);
-    const steps=commit&&flickCommit?momentumCount(flickSpeed,Math.abs(rawDx),w):1;
+    const steps=commit?momentumCount():1;
 
     if(mode==='horizontal')settle(direction,commit,flickSpeed,steps,visualDx);
     else clearOverlay();

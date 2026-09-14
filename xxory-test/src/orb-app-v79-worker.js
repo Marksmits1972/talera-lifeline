@@ -10,7 +10,7 @@ import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 import { handleWorkbladRawStorageApi } from "./workblad-raw-storage-api.js";
 import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 
-const TALERA_DEPLOY_REV = "full-listen-cycle-v8.1-fixed-bytes-timeout-20260914";
+const TALERA_DEPLOY_REV = "full-listen-cycle-v8.2-readable-blob-preflight-20260914";
 
 function enhanceWorkblad(html){
   return html
@@ -40,6 +40,8 @@ export default {
         revision:TALERA_DEPLOY_REV,
         rawStorage:true,
         fixedBytes:true,
+        readableBlobPreflight:true,
+        fileReaderFallback:true,
         clientTimeoutSeconds:15,
         multipartNormalizer:true
       }),{

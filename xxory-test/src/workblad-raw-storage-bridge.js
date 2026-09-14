@@ -3,6 +3,7 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
   window.__taleraRawStorageBridge=true;
 
   var nativeFetch=window.fetch.bind(window);
+  var STORAGE_TIMEOUT_MS=15000;
 
   function absoluteUrl(input){
     try{return new URL(typeof input==='string'?input:input.url,location.href)}catch(e){return null}
@@ -10,6 +11,10 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
 
   function headerValue(headers,name){
     try{return new Headers(headers||{}).get(name)||''}catch(e){return ''}
+  }
+
+  function setStage(text){
+    try{var el=document.querySelector('.work-saving .muted');if(el&&text)el.textContent=text}catch(e){}
   }
 
   function jsonResponse(data,status){
@@ -25,30 +30,54 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
     return data;
   }
 
+  async function fetchTimed(input,init,label){
+    var controller=new AbortController();
+    var timer=setTimeout(function(){try{controller.abort()}catch(e){}},STORAGE_TIMEOUT_MS);
+    var options=Object.assign({},init||{}, {signal:controller.signal});
+    if(label)setStage(label);
+    try{
+      return await nativeFetch(input,options);
+    }catch(error){
+      if(error&&error.name==='AbortError')throw new Error((label||'Deze opslagstap')+' duurde te lang. Probeer het opnieuw.');
+      throw error;
+    }finally{
+      clearTimeout(timer);
+    }
+  }
+
+  async function fixedBytes(blob,label){
+    if(!(blob instanceof Blob)||!blob.size)throw new Error((label||'Bestand')+' ontbreekt.');
+    var bytes=await blob.arrayBuffer();
+    if(!bytes||bytes.byteLength!==blob.size)throw new Error((label||'Bestand')+' kon niet volledig worden voorbereid.');
+    return bytes;
+  }
+
   async function uploadRawAudio(storyId,token,blob,duration){
-    var res=await nativeFetch('/api/integration/raw/stories/'+encodeURIComponent(storyId)+'/audio',{
+    var bytes=await fixedBytes(blob,'De geluidsopname');
+    var res=await fetchTimed('/api/integration/raw/stories/'+encodeURIComponent(storyId)+'/audio',{
       method:'PUT',
       headers:{
         'authorization':'Bearer '+token,
         'content-type':blob.type||'application/octet-stream',
         'x-talera-duration-seconds':String(Number(duration)||0)
       },
-      body:blob,
+      body:bytes,
       cache:'no-store'
-    });
+    },'Je stem wordt veilig opgeslagen…');
     return {response:res,data:await readJson(res)};
   }
 
   async function uploadRawMedia(storyId,token,file,role){
-    var res=await nativeFetch('/api/integration/raw/stories/'+encodeURIComponent(storyId)+'/media?role='+(role==='start'?'start':'extra'),{
+    var bytes=await fixedBytes(file,'De foto');
+    var res=await fetchTimed('/api/integration/raw/stories/'+encodeURIComponent(storyId)+'/media?role='+(role==='start'?'start':'extra'),{
       method:'POST',
       headers:{
         'authorization':'Bearer '+token,
         'content-type':file.type||'application/octet-stream'
       },
-      body:file,
+      body:bytes,
       cache:'no-store'
-    });
+    },role==='start'?'Je foto wordt veilig opgeslagen…':'Extra foto wordt veilig opgeslagen…');
     return {response:res,data:await readJson(res)};
   }
 
@@ -74,12 +103,12 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
         displayName:String(body.get('displayName')||'')
       };
 
-      var createRes=await nativeFetch('/api/integration/raw/stories',{
+      var createRes=await fetchTimed('/api/integration/raw/stories',{
         method:'POST',
         headers:{'content-type':'application/json'},
         body:JSON.stringify(payload),
         cache:'no-store'
-      });
+      },'Je herinnering wordt voorbereid…');
       var createData=await readJson(createRes);
       if(!createRes.ok)return jsonResponse(createData,createRes.status);
 
@@ -96,6 +125,7 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
         if(!mediaResult.response.ok)return jsonResponse(mediaResult.data,mediaResult.response.status);
       }
 
+      setStage('Opslag wordt gecontroleerd…');
       createData.rawStorage=true;
       return jsonResponse(createData,201);
     }
@@ -119,6 +149,10 @@ export const WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT = String.raw`<script>(function()
         if(!result.response.ok)return jsonResponse(result.data,result.response.status);
       }
       return jsonResponse({ok:true,count:files.length,rawStorage:true},201);
+    }
+
+    if(url.pathname.indexOf('/api/integration/')===0){
+      return fetchTimed(input,init,'Opslag wordt gecontroleerd…');
     }
 
     return nativeFetch(input,init);

@@ -8,7 +8,7 @@ import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./w
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 
-const TALERA_DEPLOY_REV = "full-listen-cycle-v7-safari-multipart-normalized-20260914";
+const TALERA_DEPLOY_REV = "full-listen-cycle-v7-safari-multipart-normalized-20260914-r2";
 
 function enhanceWorkblad(html){
   return html
@@ -18,6 +18,14 @@ function enhanceWorkblad(html){
 
 export default {
   async fetch(request,env,ctx){
+    const initialUrl=new URL(request.url);
+    if(initialUrl.pathname==='/api/integration/revision'&&request.method==='GET'){
+      return new Response(JSON.stringify({ok:true,revision:TALERA_DEPLOY_REV,multipartNormalizer:true}),{
+        status:200,
+        headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
+      });
+    }
+
     let activeRequest=request;
     try{
       activeRequest=await normalizeMultipartRequest(request);

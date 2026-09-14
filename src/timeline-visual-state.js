@@ -23,19 +23,18 @@ export const timelineVisualStateStyle = timelineAdaptiveContrastStyle + String.r
   transition:opacity .18s ease,filter .18s ease!important;
 }
 
-/* Date badge is never dimmed. */
+/* Date badge is never dimmed. Geometry is owned only by timeline-glass-layer.js. */
 .timeline .focus,
 .timeline.is-active .focus,
 .timeline.is-timeline-engaged .focus,
 .timeline.is-marker-afterglow .focus{
   opacity:1!important;
-  transform:translateZ(0) scale(1)!important;
   color:var(--talera-deep)!important;
   background:rgba(255,254,252,.97)!important;
   border:1px solid rgba(91,143,185,.20)!important;
   box-shadow:0 5px 16px rgba(15,39,71,.18)!important;
   filter:none!important;
-  transition:opacity .18s ease,transform .18s ease,filter .18s ease!important;
+  transition:opacity .18s ease,filter .18s ease!important;
 }
 
 /* ACTIVE + short AFTERGLOW: navigation becomes unmistakably foreground. */

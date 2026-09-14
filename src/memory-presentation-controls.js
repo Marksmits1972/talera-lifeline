@@ -56,7 +56,7 @@ export const memoryPresentationControlsScript = String.raw`
   const editButton=tools.querySelector('.talera-memory-edit');
   const audio=new Audio();audio.preload='auto';audio.setAttribute('playsinline','');
   const audioUrls=new Map();
-  const AUTO_START_DELAY=500;
+  const AUTO_START_DELAY=360;
   let activeStoryId='',activeToken='',activeHasAudio=false,loading=false,loadFailed=false,renderEpoch=0;
   let autoStartTimer=null,autoStableSince=0,autoBlocked=false,manualSuppressed=false,audioEnabled=false;
 

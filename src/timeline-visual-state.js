@@ -3,6 +3,9 @@ export const timelineVisualStateStyle = String.raw`
    This layer NEVER changes timeline geometry, date mapping, direct grip, scale
    selection, speed response or snapping. It only controls visual emphasis. */
 
+.memory-space .date,#memoryDate{display:none!important}
+.zoom-hint,#zoomHint{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+
 /* REST is the canonical visual baseline, even if a legacy is-active class is present. */
 .timeline canvas,
 .timeline.is-active canvas{

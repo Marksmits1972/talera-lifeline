@@ -10,6 +10,7 @@ import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 import { handleWorkbladRawStorageApi } from "./workblad-raw-storage-api.js";
 import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 import { handleWorkbladV9 } from "./workblad-v9-clean.js";
+import { V9_PLAYBACK_PATCH_SCRIPT, V9_PLAYBACK_PATCH_REV } from "./workblad-v9-playback-patch.js";
 
 const TALERA_DEPLOY_REV = "full-listen-cycle-v8.2-readable-blob-preflight-20260914";
 
@@ -17,6 +18,22 @@ function enhanceWorkblad(html){
   return html
     .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+'</style></head>')
     .replace('</body>',WORKBLAD_V2_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
+}
+
+async function enhanceV9Response(response){
+  if(!response)return response;
+  const type=response.headers.get('content-type')||'';
+  if(!type.includes('text/html'))return response;
+  const html=await response.text();
+  const headers=new Headers(response.headers);
+  headers.delete('content-length');
+  headers.set('cache-control','no-store, max-age=0');
+  headers.set('x-talera-v9-playback',V9_PLAYBACK_PATCH_REV);
+  return new Response(html.replace('</body>',V9_PLAYBACK_PATCH_SCRIPT+'</body>'),{
+    status:response.status,
+    statusText:response.statusText,
+    headers
+  });
 }
 
 async function storageReady(url,env,ctx){
@@ -46,7 +63,13 @@ export default {
     // It is an isolated rebuild based on the proven Audio Lab v2 train.
     try{
       const v9Response=await handleWorkbladV9(request,env);
-      if(v9Response)return v9Response;
+      if(v9Response){
+        const currentPath=new URL(request.url).pathname;
+        if((currentPath==='/v9'||currentPath==='/v9/')&&request.method==='GET'){
+          return enhanceV9Response(v9Response);
+        }
+        return v9Response;
+      }
     }catch(error){
       console.error('TALERA v9 isolated error',error);
       const detail=String(error&&error.message?error.message:error||'onbekende fout').slice(0,180);
@@ -65,7 +88,8 @@ export default {
         clientTimeoutSeconds:15,
         multipartNormalizer:true,
         v9IsolatedRoute:'/v9',
-        v9RevisionRoute:'/api/v9/revision'
+        v9RevisionRoute:'/api/v9/revision',
+        v9PlaybackPatch:V9_PLAYBACK_PATCH_REV
       }),{
         status:200,
         headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}

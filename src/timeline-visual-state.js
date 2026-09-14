@@ -1,4 +1,6 @@
-export const timelineVisualStateStyle = String.raw`
+import { timelineAdaptiveContrastStyle, timelineAdaptiveContrastScript } from "./timeline-adaptive-contrast.js";
+
+export const timelineVisualStateStyle = timelineAdaptiveContrastStyle + String.raw`
 /* TALERA — single-owner visual state for the presentation timeline.
    This layer NEVER changes timeline geometry, date mapping, direct grip, scale
    selection, speed response or snapping. It only controls visual emphasis. */
@@ -6,13 +8,14 @@ export const timelineVisualStateStyle = String.raw`
 .memory-space .date,#memoryDate{display:none!important}
 .zoom-hint,#zoomHint{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 
-/* REST is the canonical visual baseline, even if a legacy is-active class is present.
-   The ruler always keeps a quiet visibility floor: present, but secondary to the photo. */
+/* REST is always present. Adaptive variables choose the quiet contrast against
+   the current photo while keeping the yellow-balloon reference level: visible,
+   secondary, never absent. */
 .timeline canvas,
 .timeline.is-active canvas{
-  opacity:.38!important;
-  filter:saturate(.78) contrast(.88) brightness(.95) drop-shadow(0 1px 1.5px rgba(255,255,255,.30))!important;
-  transition:opacity .18s ease,filter .18s ease!important;
+  opacity:var(--timeline-rest-opacity,.36)!important;
+  filter:var(--timeline-rest-filter,saturate(.72) contrast(.86) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.62)))!important;
+  transition:opacity .22s ease,filter .24s ease!important;
 }
 
 /* The needle remains clearly present in rest so photo + date always retain context. */
@@ -55,8 +58,8 @@ export const timelineVisualStateStyle = String.raw`
 @media (pointer:coarse){
   .timeline canvas,
   .timeline.is-active canvas{
-    opacity:.34!important;
-    filter:saturate(.72) contrast(.84) brightness(.93) drop-shadow(0 1px 1.5px rgba(255,255,255,.32))!important;
+    opacity:var(--timeline-rest-opacity,.36)!important;
+    filter:var(--timeline-rest-filter,saturate(.72) contrast(.86) brightness(.90) drop-shadow(0 0 1px rgba(255,255,255,.64)))!important;
   }
   .timeline .center-needle,
   .timeline.is-active .center-needle{
@@ -77,7 +80,7 @@ export const timelineVisualStateStyle = String.raw`
 }
 `;
 
-export const timelineVisualStateScript = String.raw`
+export const timelineVisualStateScript = timelineAdaptiveContrastScript + String.raw`
 (()=>{
   const timeline=document.querySelector('.timeline');
   if(!timeline)return;

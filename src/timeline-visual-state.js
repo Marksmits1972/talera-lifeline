@@ -6,11 +6,12 @@ export const timelineVisualStateStyle = String.raw`
 .memory-space .date,#memoryDate{display:none!important}
 .zoom-hint,#zoomHint{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 
-/* REST is the canonical visual baseline, even if a legacy is-active class is present. */
+/* REST is the canonical visual baseline, even if a legacy is-active class is present.
+   The ruler always keeps a quiet visibility floor: present, but secondary to the photo. */
 .timeline canvas,
 .timeline.is-active canvas{
-  opacity:.30!important;
-  filter:saturate(.64) contrast(.76) brightness(.90)!important;
+  opacity:.38!important;
+  filter:saturate(.78) contrast(.88) brightness(.95) drop-shadow(0 1px 1.5px rgba(255,255,255,.30))!important;
   transition:opacity .18s ease,filter .18s ease!important;
 }
 
@@ -54,8 +55,8 @@ export const timelineVisualStateStyle = String.raw`
 @media (pointer:coarse){
   .timeline canvas,
   .timeline.is-active canvas{
-    opacity:.24!important;
-    filter:saturate(.58) contrast(.72) brightness(.88)!important;
+    opacity:.34!important;
+    filter:saturate(.72) contrast(.84) brightness(.93) drop-shadow(0 1px 1.5px rgba(255,255,255,.32))!important;
   }
   .timeline .center-needle,
   .timeline.is-active .center-needle{

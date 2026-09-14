@@ -15,7 +15,7 @@ import { liveMemoryIntegrationStyle, liveMemoryIntegrationScript } from "./live-
 import { memoryPresentationControlsStyle, memoryPresentationControlsScript } from "./memory-presentation-controls.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "listen-outline-r1-20260914";
+const TALERA_TIMELINE_DEPLOY_REV = "layout-glass-r1-20260914";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();
@@ -134,6 +134,53 @@ const listenButtonOutlineStyle = String.raw`
 }
 `;
 
+const presentationLayoutRefinementStyle = String.raw`
+/* Visual-only refinement: preserve timeline geometry and all interaction logic. */
+.timeline::before{
+  height:100%!important;
+  backdrop-filter:blur(11px) saturate(1.04)!important;
+  -webkit-backdrop-filter:blur(11px) saturate(1.04)!important;
+  -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 48%,rgba(0,0,0,.88) 62%,rgba(0,0,0,.58) 76%,rgba(0,0,0,.24) 90%,transparent 100%)!important;
+  mask-image:linear-gradient(to bottom,#000 0%,#000 48%,rgba(0,0,0,.88) 62%,rgba(0,0,0,.58) 76%,rgba(0,0,0,.24) 90%,transparent 100%)!important;
+  opacity:.86!important;
+}
+.timeline::after{
+  height:100%!important;
+}
+.focus{
+  top:auto!important;
+  bottom:8px!important;
+  transform:translateX(-50%) scale(.97)!important;
+  padding:4px 10px!important;
+  background:rgba(255,254,252,.86)!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+}
+.timeline.is-active .focus,
+.timeline.is-marker-afterglow .focus{
+  transform:translateX(-50%) scale(1.035)!important;
+}
+@media (pointer:coarse){
+  .timeline.is-active .focus,
+  .timeline.is-marker-afterglow .focus{
+    transform:translateX(-50%) scale(1.045)!important;
+  }
+}
+nav{
+  background:linear-gradient(180deg,rgba(15,39,71,.012),rgba(15,39,71,.052))!important;
+  backdrop-filter:blur(17px) saturate(1.12) brightness(1.02)!important;
+  -webkit-backdrop-filter:blur(17px) saturate(1.12) brightness(1.02)!important;
+}
+nav::before{
+  height:46px!important;
+  background:rgba(15,39,71,.012)!important;
+  backdrop-filter:blur(15px) saturate(1.10)!important;
+  -webkit-backdrop-filter:blur(15px) saturate(1.10)!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.12) 34%,rgba(0,0,0,.44) 68%,#000 100%)!important;
+  mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.12) 34%,rgba(0,0,0,.44) 68%,#000 100%)!important;
+}
+`;
+
 const timelineAfterglowScript = String.raw`
 (()=>{
   const timeline=document.querySelector('.timeline');
@@ -166,7 +213,7 @@ const timelineAfterglowScript = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style></head>`)
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-afterglow">${timelineAfterglowStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-presentation-layout-refinement">${presentationLayoutRefinementStyle}</style></head>`)
   .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-fast-flick-fallback">${fastFlickFallbackScript}</script><script id="talera-timeline-afterglow-controller">${timelineAfterglowScript}</script></body>`);
 
 async function proxyLinkedMemory(request) {

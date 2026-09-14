@@ -9,6 +9,7 @@ import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./w
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 import { handleWorkbladRawStorageApi } from "./workblad-raw-storage-api.js";
 import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
+import { handleWorkbladV9 } from "./workblad-v9-clean.js";
 
 const TALERA_DEPLOY_REV = "full-listen-cycle-v8.2-readable-blob-preflight-20260914";
 
@@ -33,6 +34,17 @@ function storageError(status,message){
 
 export default {
   async fetch(request,env,ctx){
+    // V9 is deliberately routed before every legacy workblad patch/normalizer.
+    // It is an isolated rebuild based on the proven Audio Lab v2 train.
+    try{
+      const v9Response=await handleWorkbladV9(request,env);
+      if(v9Response)return v9Response;
+    }catch(error){
+      console.error('TALERA v9 isolated error',error);
+      const detail=String(error&&error.message?error.message:error||'onbekende fout').slice(0,180);
+      return storageError(500,'V9 opslag mislukt: '+detail);
+    }
+
     const initialUrl=new URL(request.url);
     if(initialUrl.pathname==='/api/integration/revision'&&request.method==='GET'){
       return new Response(JSON.stringify({
@@ -43,7 +55,9 @@ export default {
         readableBlobPreflight:true,
         fileReaderFallback:true,
         clientTimeoutSeconds:15,
-        multipartNormalizer:true
+        multipartNormalizer:true,
+        v9IsolatedRoute:'/v9',
+        v9RevisionRoute:'/api/v9/revision'
       }),{
         status:200,
         headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}

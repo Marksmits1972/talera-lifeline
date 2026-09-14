@@ -1,11 +1,10 @@
 export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="talera-workblad-v9-integration-bridge">
 (() => {
-  const REV = 'workblad-v9-bridge-20260914-r2';
+  const REV = 'workblad-v9-bridge-20260914-r3';
   const DB_NAME = 'talera-workblad-v2';
   const STORE = 'drafts';
   const originalFetch = window.fetch.bind(window);
   const log = (...args) => console.log('[TALERA V9 BRIDGE]', ...args);
-
   const $ = id => document.getElementById(id);
   const findSaveButton = () => $('workFinish');
 
@@ -29,23 +28,19 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     box.style.color = mode === 'bad' ? '#923d35' : mode === 'ok' ? '#2c684e' : '#17385e';
   }
 
+  function readCurrentWorkblad() {
+    if (typeof window.__taleraWorkbladV9Read !== 'function') throw new Error('De werkblad-koppeling is nog niet geladen. Herlaad deze pagina één keer.');
+    const snapshot = window.__taleraWorkbladV9Read();
+    if (!snapshot || typeof snapshot !== 'object') throw new Error('Het huidige werkblad kon niet worden uitgelezen.');
+    return snapshot;
+  }
+
   function openDraftDb() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, 1);
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error || new Error('Conceptopslag kon niet worden geopend'));
     });
-  }
-
-  async function readFreshDraft() {
-    const db = await openDraftDb();
-    try {
-      return await new Promise((resolve, reject) => {
-        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get('current');
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error || new Error('Concept kon niet worden gelezen'));
-      });
-    } finally { db.close(); }
   }
 
   async function clearDraft() {
@@ -85,7 +80,6 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     const form = new FormData();
     form.append('audio', blob, name);
     const data = await jsonFetch('/api/v9/audio', { method:'POST', body:form });
-
     const head = await originalFetch(data.playbackUrl, { method:'HEAD', cache:'no-store' });
     if (!head.ok) throw new Error('Serveraudio kon niet worden gecontroleerd');
     const get = await originalFetch(data.playbackUrl, { cache:'no-store' });
@@ -117,11 +111,11 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     return data;
   }
 
-  async function saveMemory(audioData, photoData) {
+  async function saveMemory(audioData, photoData, snapshot) {
     setStatus('Stap 3/4 · titel, datum en verhaal worden gekoppeld…');
-    const title = String($('workTitle')?.value || '').trim();
-    const eventTime = String($('workDate')?.value || '').trim();
-    const storyText = String($('workText')?.value || '').trim();
+    const title = String(snapshot.title || '').trim();
+    const eventTime = String(snapshot.eventTime || '').trim();
+    const storyText = String(snapshot.storyText || '').trim();
     if (!title) throw new Error('Vul eerst een titel in');
     if (!eventTime) throw new Error('Kies eerst wanneer dit verhaal speelde');
     return jsonFetch('/api/v9/memory', {
@@ -147,15 +141,16 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     btn.disabled = true;
     let saved = false;
     try {
-      const draft = await readFreshDraft();
-      const audio = draft?.audio;
-      const photos = Array.isArray(draft?.photos) ? draft.photos.filter(x => x instanceof Blob && x.size > 0) : [];
-      if (!(audio instanceof Blob) || !audio.size) throw new Error('Geen verse geluidsopname gevonden. Spreek eerst opnieuw in.');
+      const snapshot = readCurrentWorkblad();
+      const audio = snapshot.audioBlob;
+      const photos = Array.isArray(snapshot.photos) ? snapshot.photos.filter(x => x instanceof Blob && x.size > 0) : [];
+      if (!(audio instanceof Blob) || !audio.size) throw new Error('Geen geluidsopname gevonden in het huidige werkblad. Spreek eerst opnieuw in.');
       if (photos.length > 1) log('Voor deze eerste geïntegreerde proef wordt alleen de eerste foto gekoppeld', {photoCount:photos.length});
+      log('current workblad read', {audioBytes:audio.size, photoCount:photos.length, title:snapshot.title, eventTime:snapshot.eventTime});
 
       const audioData = await uploadAudio(audio);
-      const photoData = await uploadPhoto(photos[0] || null);
-      const memory = await saveMemory(audioData, photoData);
+      const photoData = await uploadPhoto(photos[0] || snapshot.photoFile || null);
+      const memory = await saveMemory(audioData, photoData, snapshot);
       await verifyMemory(memory);
       await clearDraft();
 

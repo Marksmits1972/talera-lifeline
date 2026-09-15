@@ -12,8 +12,17 @@ test('timeline keeps its own uninterrupted interaction plane', () => {
 });
 
 test('edit action sits in the right-hand story action stack above share and audio', () => {
-  assert.match(timelineStyleSource, /\.talera-memory-edit\{[^}]*right:20px!important;[^}]*top:auto!important;[^}]*bottom:220px!important;[^}]*width:46px!important;[^}]*height:46px!important;/s);
-  assert.match(timelineStyleSource, /@media\(max-width:430px\)[\s\S]*\.talera-memory-edit\{[^}]*right:18px!important;[^}]*bottom:220px!important;[^}]*width:44px!important;[^}]*height:44px!important;/);
+  const desktop = timelineStyleSource.match(/\.talera-memory-edit\{([^}]*)\}/s)?.[1] || '';
+  assert.match(desktop, /right:20px!important/);
+  assert.match(desktop, /top:auto!important/);
+  assert.match(desktop, /bottom:220px!important/);
+  assert.match(desktop, /width:46px!important/);
+  assert.match(desktop, /height:46px!important/);
+  const mobile = timelineStyleSource.match(/@media\(max-width:430px\)\{\s*\.talera-memory-edit\{([^}]*)\}/s)?.[1] || '';
+  assert.match(mobile, /right:18px!important/);
+  assert.match(mobile, /bottom:220px!important/);
+  assert.match(mobile, /width:44px!important/);
+  assert.match(mobile, /height:44px!important/);
   assert.match(controlsSource, /\.talera-memory-tools\{[^}]*pointer-events:none/);
   assert.match(controlsSource, /\.talera-memory-tool\{[^}]*pointer-events:auto/);
   assert.match(controlsSource, /editButton\.addEventListener\('click'/);

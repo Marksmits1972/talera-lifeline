@@ -606,7 +606,11 @@ export const shareExperienceScript = String.raw`
     const message=timeline
       ?OWNER_NAME+' nodigt je via TALERA uit om zijn levensverhalen te bekijken.\n\nOpen de uitnodiging:\n'+shareUrl
       :OWNER_NAME+' deelt via TALERA een persoonlijke herinnering met je:\n“'+memoryTitle()+'”\n\nOpen de uitnodiging:\n'+shareUrl;
-    return 'https://wa.me/?text='+encodeURIComponent(message);
+    const encoded=encodeURIComponent(message);
+    const isAppleMobile=/iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+    /* On iOS the app scheme skips the api.whatsapp.com interstitial. No phone
+       number is supplied, so WhatsApp remains responsible for recipient choice. */
+    return (isAppleMobile?'whatsapp://send?text=':'https://wa.me/?text=')+encoded;
   }
   async function prepareShare(){
     const timeline=state.kind==='timeline';

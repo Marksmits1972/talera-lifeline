@@ -1,6 +1,6 @@
 export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="talera-workblad-v9-integration-bridge">
 (() => {
-  const REV = 'workblad-v9-bridge-20260914-r3';
+  const REV = 'workblad-v9-photo-master-20260915-r4';
   const DB_NAME = 'talera-workblad-v2';
   const STORE = 'drafts';
   const originalFetch = window.fetch.bind(window);
@@ -143,7 +143,13 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     try {
       const snapshot = readCurrentWorkblad();
       const audio = snapshot.audioBlob;
-      const photos = Array.isArray(snapshot.photos) ? snapshot.photos.filter(x => x instanceof Blob && x.size > 0) : [];
+      const selectedPhotos = Array.isArray(snapshot.photos) ? snapshot.photos.filter(x => x instanceof Blob && x.size > 0) : [];
+      setStatus('Je foto’s worden voorbereid voor snelle, scherpe weergave…');
+      const photos = [];
+      for (const source of selectedPhotos) {
+        const optimized = typeof window.__taleraOptimizePhoto === 'function' ? await window.__taleraOptimizePhoto(source) : source;
+        photos.push(optimized || source);
+      }
       if (!(audio instanceof Blob) || !audio.size) throw new Error('Geen geluidsopname gevonden in het huidige werkblad. Spreek eerst opnieuw in.');
       log('current workblad read', {audioBytes:audio.size, photoCount:photos.length, title:snapshot.title, eventTime:snapshot.eventTime});
 

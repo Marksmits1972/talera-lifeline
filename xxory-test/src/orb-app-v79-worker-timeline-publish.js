@@ -3,7 +3,7 @@ import { handleV9TimelinePublish } from './workblad-v9-timeline-publish.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-multiphoto-autoplay-20260915-r3';
+const WRAPPER_REV = 'workblad-v9-photo-master-autoplay-20260915-r4';
 
 export default {
   async fetch(request, env, ctx) {

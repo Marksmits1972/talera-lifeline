@@ -5,6 +5,7 @@ import { WORKBLAD_V2_STYLE } from "./workblad-v2-style.js";
 import { WORKBLAD_V2_SCRIPT } from "./workblad-v2-client.js";
 import { WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT } from "./workblad-v9-integration-bridge.js";
 import { WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT } from "./workblad-raw-storage-bridge.js";
+import { WORKBLAD_PHOTO_OPTIMIZER_SCRIPT } from "./workblad-photo-optimizer.js";
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
 import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
@@ -23,7 +24,7 @@ const WORKBLAD_V2_EXPOSED_SCRIPT = WORKBLAD_V2_SCRIPT.replace(
 function enhanceWorkblad(html){
   return html
     .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+'</style></head>')
-    .replace('</body>',WORKBLAD_V2_EXPOSED_SCRIPT+WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
+    .replace('</body>',WORKBLAD_PHOTO_OPTIMIZER_SCRIPT+WORKBLAD_V2_EXPOSED_SCRIPT+WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
 }
 
 async function enhanceV9Response(response){

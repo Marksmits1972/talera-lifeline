@@ -2,9 +2,10 @@ import baseWorker from './orb-app-v79-worker.js';
 import { handleV9TimelinePublish } from './workblad-v9-timeline-publish.js';
 import { handleV9StagedPhotoLink } from './workblad-v9-staged-photo-link.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
+import { handleStoryPhotoCleanup, WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT } from './workblad-story-photo-cleanup.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-background-photo-staging-20260915-r6';
+const WRAPPER_REV = 'workblad-v9-story-photo-cleanup-20260915-r7';
 
 export default {
   async fetch(request, env, ctx) {
@@ -16,6 +17,14 @@ export default {
     } catch (error) {
       console.error('TALERA share preview storage error', error);
       return json({ error: 'De uitnodigingsminiatuur kon niet veilig worden opgeslagen.' }, 500);
+    }
+
+    try {
+      const cleanupResponse = await handleStoryPhotoCleanup(request, env);
+      if (cleanupResponse) return cleanupResponse;
+    } catch (error) {
+      console.error('TALERA story photo cleanup error', error);
+      return json({ error: 'De foto kon niet veilig uit deze herinnering worden verwijderd.' }, 500);
     }
 
     try {
@@ -43,7 +52,8 @@ export default {
         timelinePublishBridge: true,
         timelinePublishRevision: WRAPPER_REV,
         timelineHandoff: 'storyId+manageToken',
-        stagedPhotoLink: true
+        stagedPhotoLink: true,
+        storyPhotoCleanup: true
       }, base.status || 200);
     }
 
@@ -58,7 +68,7 @@ export default {
     headers.set('cache-control', 'no-store, max-age=0');
     headers.set('x-talera-v9-timeline-publish', WRAPPER_REV);
     return new Response(
-      html.replace('</body>', WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + '</body>'),
+      html.replace('</body>', WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT + '</body>'),
       { status: response.status, statusText: response.statusText, headers }
     );
   }

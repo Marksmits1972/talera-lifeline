@@ -1,6 +1,6 @@
 export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera-workblad-v9-timeline-handoff">
 (() => {
-  const REV = 'workblad-v9-manual-timeline-handoff-20260915-r3';
+  const REV = 'workblad-v9-clean-after-publish-20260915-r4';
   let publishing = false;
   let readyMemoryId = '';
   let publishedMemoryId = '';
@@ -64,8 +64,19 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     box.appendChild(retry);
   }
 
-  function goToTimeline(handoffUrl) {
+  async function resetPublishedWorkblad(renderFresh=false) {
+    try {
+      if (typeof window.__taleraWorkbladV9ResetAfterPublish === 'function') {
+        await window.__taleraWorkbladV9ResetAfterPublish(Boolean(renderFresh));
+      }
+    } catch (error) {
+      console.warn('[TALERA V9 TIMELINE]', 'published workblad reset failed', error);
+    }
+  }
+
+  async function goToTimeline(handoffUrl) {
     if (!handoffUrl) return;
+    await resetPublishedWorkblad(false);
     location.href = handoffUrl;
   }
 
@@ -123,6 +134,8 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
       publishedMemoryId = memoryId;
       publishedHandoffUrl = data.handoffUrl;
       window.__taleraPendingV9Photos = [];
+      window.__taleraExpectedV9PhotoCount = 0;
+      await resetPublishedWorkblad(false);
       try {
         localStorage.setItem('talera-last-v9-timeline-handoff-v1', JSON.stringify({
           memoryId,
@@ -175,7 +188,17 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
   }
 
   document.addEventListener('talera:v9-memory-saved', event => armManualHandoff(event.detail?.memoryId));
-  window.addEventListener('pageshow', () => armManualHandoff());
+  window.addEventListener('pageshow', event => {
+    if (event.persisted && publishedMemoryId) {
+      publishedMemoryId = '';
+      publishedHandoffUrl = '';
+      readyMemoryId = '';
+      window.__taleraLastV9MemoryId = '';
+      resetPublishedWorkblad(true);
+      return;
+    }
+    armManualHandoff();
+  });
   armButton();
   new MutationObserver(armButton).observe(document.documentElement, {subtree:true, childList:true});
 })();

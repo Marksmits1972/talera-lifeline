@@ -6,6 +6,10 @@ assert.match(shareExperienceScript, /function shareViaWhatsApp\(\)/);
 const directHandoff = shareExperienceScript.match(/function shareViaWhatsApp\(\)\{([\s\S]*?)\n  \}/)?.[1] || "";
 assert.doesNotMatch(directHandoff, /await|fetch\(/);
 assert.match(directHandoff, /location\.href=state\.preparedWhatsAppUrl/);
+assert.match(shareExperienceScript, /function activateRecipientPresentation\(\)/);
+assert.match(shareExperienceScript, /runtime\.restrictToMemory\(shared\)/);
+assert.match(shareExperienceScript, /if\(demoView==='recipient-story'\)loadInvitePreview\(\)\.finally\(\(\)=>setTimeout\(activateRecipientPresentation,280\)\)/);
+assert.doesNotMatch(shareExperienceScript, /open\('recipient-story'\)/);
 
 const entries = new Map();
 const bucket = {

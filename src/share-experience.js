@@ -256,6 +256,15 @@ body.talera-share-open{overscroll-behavior:none}
 .talera-share-toast{position:fixed;z-index:90;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));width:min(320px,calc(100% - 34px));padding:12px 14px;border-radius:16px;transform:translate(-50%,18px);opacity:0;pointer-events:none;color:#fff;background:rgba(15,39,71,.92);box-shadow:0 10px 30px rgba(6,18,30,.24);font:620 12px/1.35 system-ui,-apple-system,sans-serif;text-align:center;transition:opacity .2s ease,transform .2s ease}
 .talera-share-toast.show{opacity:1;transform:translate(-50%,0)}
 
+/* A received single-story invitation lands in the normal presentation canvas.
+   The invitation sheet and owner-only commands never become a second UI layer. */
+body.talera-recipient-presentation .talera-context-share,
+body.talera-recipient-presentation .talera-memory-edit,
+body.talera-recipient-presentation nav .tell,
+body.talera-recipient-presentation nav .nav-item:last-child{display:none!important}
+body.talera-recipient-presentation nav{grid-template-columns:1fr!important}
+body.talera-recipient-presentation nav .home{grid-column:1!important}
+
 @media(max-width:380px){
   :root{--share-sheet-radius:27px;--share-sheet-height:min(83dvh,700px)}
   .talera-share-body{padding-left:15px;padding-right:15px}
@@ -627,6 +636,32 @@ export const shareExperienceScript = String.raw`
       state.invitePreview=await response.json();
     }catch(e){}
   }
+  function recipientStoryMemory(){
+    const source=runtime.currentMemory()||{};
+    const headline=(state.invitePreview&&state.invitePreview.title)||String(source.title||source.story||'Gedeelde herinnering');
+    const originalStory=String(source.story||'');
+    let fullStory=String(source.fullStory||headline);
+    if(originalStory&&fullStory.startsWith(originalStory))fullStory=headline+fullStory.slice(originalStory.length);
+    const photos=Array.isArray(source.photos)&&source.photos.length?source.photos.slice():[source.image].filter(Boolean);
+    return Object.assign({},source,{
+      id:'recipient:'+inviteToken,
+      title:headline,
+      story:headline,
+      fullStory:fullStory||headline,
+      image:photos[0]||source.image||'',
+      photos:photos,
+      _photoIndex:0,
+      _taleraSharedRecipient:true
+    });
+  }
+  function activateRecipientPresentation(){
+    const shared=recipientStoryMemory();
+    document.body.classList.add('talera-recipient-presentation');
+    contextShare.hidden=true;
+    if(typeof runtime.restrictToMemory==='function')runtime.restrictToMemory(shared);
+    else{runtime.setCenter(shared.ms);runtime.writeMemory(shared);runtime.draw()}
+    document.dispatchEvent(new CustomEvent('talera:recipient-presentation',{detail:{scope:'story',token:inviteToken}}));
+  }
 
   moreButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('hub')},true);
   contextShare.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('share-choice')},true);
@@ -672,7 +707,8 @@ export const shareExperienceScript = String.raw`
   });
   document.addEventListener('talera:new-memory-landed',()=>setTimeout(()=>open('after-save'),650));
 
-  if(demoView==='recipient-story'||demoView==='recipient-timeline')loadInvitePreview().finally(()=>setTimeout(()=>open(demoView),280));
+  if(demoView==='recipient-story')loadInvitePreview().finally(()=>setTimeout(activateRecipientPresentation,280));
+  else if(demoView==='recipient-timeline')loadInvitePreview().finally(()=>setTimeout(()=>open(demoView),280));
 
   window.__taleraSharePrototype={open,close,show(view){open(view||'hub')}};
 })();

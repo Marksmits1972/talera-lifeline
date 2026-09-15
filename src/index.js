@@ -20,11 +20,12 @@ import { shareExperienceStyle, shareExperienceScript } from "./share-experience.
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "whatsapp-photo-preview-v6-prepared-handoff-20260915";
+const TALERA_TIMELINE_DEPLOY_REV = "recipient-presentation-v7-single-story-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();
+let taleraRecipientLock=false;
 const taleraWriteMemoryBase=writeMemory;
 writeMemory=function(memory){
   taleraWriteMemoryBase(memory);
@@ -54,6 +55,7 @@ window.__taleraTimelineRuntime={
   isMoving(){return userIsMoving},
   registerMemory(memory){
     if(!memory)return null;
+    if(taleraRecipientLock)return null;
     const existing=MEMORIES.findIndex(m=>m.storyId&&memory.storyId&&m.storyId===memory.storyId);
     if(existing>=0){
       const old=MEMORIES[existing];
@@ -65,6 +67,18 @@ window.__taleraTimelineRuntime={
     }
     MEMORIES.sort((a,b)=>a.ms-b.ms);
     taleraRebuildDensity();
+    return memory;
+  },
+  restrictToMemory(memory){
+    if(!memory)return null;
+    taleraRecipientLock=true;
+    MEMORIES.splice(0,MEMORIES.length,memory);
+    activeMemoryId=memory.id;
+    centerMs=Number(memory.ms)||centerMs;
+    keepCenterValid();
+    taleraRebuildDensity();
+    writeMemory(memory);
+    draw();
     return memory;
   },
   setCenter(ms){centerMs=Number(ms)||centerMs;keepCenterValid();return centerMs},

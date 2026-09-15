@@ -11,8 +11,9 @@ export const liveMemoryIntegrationScript = String.raw`
 (()=>{
   const TELL_ORIGIN='https://xxory-test.mark-a39.workers.dev';
   const CREDS_KEY='talera-linked-memory-credentials-v1';
-  const AUTO_START_MS=2000;
+  const AUTO_START_MS=500;
   const AUTO_STEP_MS=2400;
+  const MEDIA_RETRY_MS=260;
   const RECENT_LANDING_MS=12*60*60*1000;
   const timeline=document.querySelector('.timeline');
   const surface=document.getElementById('surface');
@@ -86,6 +87,17 @@ export const liveMemoryIntegrationScript = String.raw`
     const blob=await direct.blob();
     return URL.createObjectURL(blob);
   }
+  function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+  async function mediaObjectUrlWithRetry(item,token,storyId){
+    let lastError=null;
+    for(let attempt=0;attempt<3;attempt++){
+      try{return await mediaObjectUrl(item,token,storyId)}catch(error){
+        lastError=error;
+        if(attempt<2)await wait(MEDIA_RETRY_MS*(attempt+1));
+      }
+    }
+    throw lastError||new Error('media kon niet laden');
+  }
   function placeholderImage(){
     return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#DCEAF6"/><stop offset=".58" stop-color="#F7F4EF"/><stop offset="1" stop-color="#E7A98B" stop-opacity=".42"/></linearGradient></defs><rect width="1200" height="1600" fill="url(#g)"/><circle cx="880" cy="410" r="280" fill="#5B8FB9" opacity=".14"/><circle cx="260" cy="1180" r="360" fill="#0F2747" opacity=".07"/></svg>');
   }
@@ -130,10 +142,10 @@ export const liveMemoryIntegrationScript = String.raw`
     if(!token)return null;
     const detail=await fetchStory(storyId,token);
     const items=(detail.media||[]).filter(m=>m.mediaType==='image').slice(0,12);
-    const urls=[];
-    for(const item of items){
-      try{urls.push(await mediaObjectUrl(item,token,storyId))}catch(e){}
-    }
+    const loaded=await Promise.all(items.map(async item=>{
+      try{return await mediaObjectUrlWithRetry(item,token,storyId)}catch(e){return null}
+    }));
+    const urls=loaded.filter(Boolean);
     const memory=toTimelineMemory(detail,urls,token);
     runtime.registerMemory(memory);
     return memory;
@@ -194,7 +206,6 @@ export const liveMemoryIntegrationScript = String.raw`
     storySurface.addEventListener('click',e=>{
       if(e.defaultPrevented)return;
       if(e.target.closest('button,nav,.timeline'))return;
-      if(typeof e.clientY==='number'&&e.clientY>window.innerHeight*.74)return;
       const memory=currentMemory();
       if(!memory||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
       e.preventDefault();e.stopPropagation();

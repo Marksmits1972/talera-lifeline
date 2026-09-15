@@ -2,10 +2,11 @@ import baseWorker from './orb-app-v79-worker.js';
 import { handleV9TimelinePublish } from './workblad-v9-timeline-publish.js';
 import { handleV9StagedPhotoLink } from './workblad-v9-staged-photo-link.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
-import { handleStoryPhotoCleanup, WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT } from './workblad-story-photo-cleanup.js';
+import { handleStoryPhotoCleanup } from './workblad-story-photo-cleanup.js';
+import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workblad-story-management.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-story-photo-cleanup-20260915-r7';
+const WRAPPER_REV = 'workblad-v9-story-management-20260915-r8';
 
 export default {
   async fetch(request, env, ctx) {
@@ -17,6 +18,14 @@ export default {
     } catch (error) {
       console.error('TALERA share preview storage error', error);
       return json({ error: 'De uitnodigingsminiatuur kon niet veilig worden opgeslagen.' }, 500);
+    }
+
+    try {
+      const managementResponse = await handleStoryManagement(request, env);
+      if (managementResponse) return managementResponse;
+    } catch (error) {
+      console.error('TALERA story management error', error);
+      return json({ error: 'De herinnering kon niet veilig worden beheerd.' }, 500);
     }
 
     try {
@@ -53,7 +62,9 @@ export default {
         timelinePublishRevision: WRAPPER_REV,
         timelineHandoff: 'storyId+manageToken',
         stagedPhotoLink: true,
-        storyPhotoCleanup: true
+        storyPhotoCleanup: true,
+        storyManagement: true,
+        storyDeleteMode: 'soft-delete'
       }, base.status || 200);
     }
 
@@ -68,7 +79,7 @@ export default {
     headers.set('cache-control', 'no-store, max-age=0');
     headers.set('x-talera-v9-timeline-publish', WRAPPER_REV);
     return new Response(
-      html.replace('</body>', WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT + '</body>'),
+      html.replace('</body>', WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_STORY_MANAGEMENT_SCRIPT + '</body>'),
       { status: response.status, statusText: response.statusText, headers }
     );
   }

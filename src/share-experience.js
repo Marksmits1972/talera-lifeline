@@ -266,6 +266,7 @@ export const shareExperienceScript = String.raw`
 
   const STORAGE_KEY='talera-share-prototype-v1';
   const OWNER_NAME='Mark';
+  const demoView=new URLSearchParams(location.search).get('talera_demo')||'';
   const state={view:'hub',history:[],duration:'30 dagen',circle:'Binnenkring',kind:'story',invite:null,recipientListening:false};
   let previousFocus=null;
   let toastTimer=0;
@@ -359,8 +360,8 @@ export const shareExperienceScript = String.raw`
   function renderReady(){
     const timeline=state.kind==='timeline';
     const detail=timeline?'Toegang: '+state.circle+' · goedkeuring blijft nodig':'Geldig: '+state.duration+' · alleen dit verhaal';
-    return '<div class="talera-share-center"><div class="talera-share-success" aria-hidden="true">✓</div>'+title('Uitnodiging staat klaar','De vorm en toegang zijn gekozen. De echte beveiligde koppeling wordt in de backendfase aangesloten.')+'</div>'+memoryCard(timeline?'Tijdlijnuitnodiging':'Gedeeld verhaal')+
-      '<div class="talera-share-notice">'+escapeHtml(detail)+'</div><div class="talera-share-preview-actions"><button class="talera-share-secondary" type="button" data-action="preview-recipient">Voorbeeld ontvanger</button><button class="talera-share-primary" type="button" data-action="prototype-whatsapp">Via WhatsApp</button></div><button class="talera-share-text-action" type="button" data-action="close">Klaar</button>';
+    return '<div class="talera-share-center"><div class="talera-share-success" aria-hidden="true">✓</div>'+title('Uitnodiging staat klaar','Je kunt de voorbeeldlink nu via WhatsApp versturen. Later vervangen we deze door de beveiligde TALERA-uitnodiging.')+'</div>'+memoryCard(timeline?'Tijdlijnuitnodiging':'Gedeeld verhaal')+
+      '<div class="talera-share-notice">'+escapeHtml(detail)+'</div><div class="talera-share-preview-actions"><button class="talera-share-secondary" type="button" data-action="preview-recipient">Voorbeeld ontvanger</button><button class="talera-share-primary" type="button" data-action="share-whatsapp">Via WhatsApp</button></div><button class="talera-share-secondary" type="button" data-action="close">Terug naar mijn tijdlijn</button>';
   }
   function renderPeople(){
     const stored=loadPrototype().invites||[];
@@ -429,11 +430,12 @@ export const shareExperienceScript = String.raw`
       buttonAction('prototype-account','§','Voorwaarden en privacy','Gebruiksvoorwaarden en privacybeleid')+'</div>';
   }
   function renderRecipientStory(){
-    return '<div class="talera-share-center">'+title(OWNER_NAME+' deelt een herinnering met je','Je kunt dit persoonlijke verhaal binnen TALERA bekijken en beluisteren.')+'</div><div class="talera-recipient-photo"><img class="talera-recipient-image" alt="Gedeelde herinnering"><span>Persoonlijk met jou gedeeld</span></div><p class="talera-share-quote">'+escapeHtml(memoryTitle())+'</p>'+
+    const demo=demoView==='recipient-story';
+    return '<div class="talera-share-center">'+title(OWNER_NAME+' deelt een herinnering met je','Je kunt dit persoonlijke verhaal binnen TALERA bekijken en beluisteren.')+'</div>'+(demo?'<div class="talera-share-notice">Je bekijkt de WhatsApp-voorbeeldroute. Deze link geeft nog geen echte toegang tot persoonlijke media.</div>':'')+'<div class="talera-recipient-photo"><img class="talera-recipient-image" alt="Gedeelde herinnering"><span>Persoonlijk met jou gedeeld</span></div><p class="talera-share-quote">'+escapeHtml(demo?'Voorbeeld van een gedeelde herinnering':memoryTitle())+'</p>'+
       '<button class="talera-share-primary" type="button" data-action="recipient-listen">'+(state.recipientListening?'Pauze':'Luisteren')+'</button><button class="talera-share-secondary" type="button" data-action="recipient-memory">Roept dit bij jou een eigen herinnering op?</button><div class="talera-share-security">Geen download · niet opnieuw door te sturen</div>';
   }
   function renderRecipientTimeline(){
-    return '<div class="talera-share-center">'+title(OWNER_NAME+' nodigt je uit','Bekijk de levensverhalen die persoonlijk met jou worden gedeeld. Jouw toegangsniveau wordt niet getoond.')+'</div>'+memoryCard('Een voorproefje van de tijdlijn')+
+    return '<div class="talera-share-center">'+title(OWNER_NAME+' nodigt je uit','Bekijk de levensverhalen die persoonlijk met jou worden gedeeld. Jouw toegangsniveau wordt niet getoond.')+'</div>'+(demoView==='recipient-timeline'?'<div class="talera-share-notice">Je bekijkt de WhatsApp-voorbeeldroute. Er wordt nog geen echt account of toegangsverzoek aangemaakt.</div>':'')+memoryCard('Een voorproefje van de tijdlijn')+
       '<p class="talera-share-section-label">Veilig aanmelden zonder wachtwoord</p><div class="talera-share-choice-grid"><button class="talera-share-choice is-selected" type="button" data-action="prototype-register">Mobiel nummer</button><button class="talera-share-choice" type="button" data-action="prototype-register">E-mailadres</button></div><button class="talera-share-primary" type="button" data-action="request-access">Toegang aanvragen</button><div class="talera-share-security">Na verificatie beslist '+OWNER_NAME+' eenmalig over jouw aanvraag.</div>';
   }
   function renderWaiting(){
@@ -504,6 +506,15 @@ export const shareExperienceScript = String.raw`
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}catch(e){}
     state.invite=record;state.kind=kind;go('ready');
   }
+  function shareViaWhatsApp(){
+    const timeline=state.kind==='timeline';
+    const shareUrl=new URL(location.origin+location.pathname);
+    shareUrl.searchParams.set('talera_demo',timeline?'recipient-timeline':'recipient-story');
+    const message=timeline
+      ?OWNER_NAME+' nodigt je via TALERA uit om zijn levensverhalen te bekijken.\n\nOpen de voorbeeldlink:\n'+shareUrl.toString()
+      :OWNER_NAME+' deelt via TALERA een persoonlijke herinnering met je:\n“'+memoryTitle()+'”\n\nOpen de voorbeeldlink:\n'+shareUrl.toString();
+    location.href='https://wa.me/?text='+encodeURIComponent(message);
+  }
 
   moreButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('hub')},true);
   contextShare.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('share-choice')},true);
@@ -521,7 +532,7 @@ export const shareExperienceScript = String.raw`
     if(action==='create-story-invite'){saveInvite('story');return}
     if(action==='create-timeline-invite'){saveInvite('timeline');return}
     if(action==='preview-recipient'){go(state.kind==='timeline'?'recipient-timeline':'recipient-story');return}
-    if(action==='prototype-whatsapp'){showToast('De veilige WhatsApp-koppeling wordt aangesloten na goedkeuring van dit ontwerp.');return}
+    if(action==='share-whatsapp'){shareViaWhatsApp();return}
     if(action==='prototype-manage'){showToast('Hier komen straks verplaatsen en toegang intrekken.');return}
     if(action==='prototype-account'){showToast('Dit onderdeel is voorbereid en wordt aangesloten zodra de account- en betaalbasis gereed is.');return}
     if(action==='prototype-setting'){showToast('Deze voorkeur wordt in de accountfase aangesloten.');return}
@@ -547,6 +558,8 @@ export const shareExperienceScript = String.raw`
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
   });
   document.addEventListener('talera:new-memory-landed',()=>setTimeout(()=>open('after-save'),650));
+
+  if(demoView==='recipient-story'||demoView==='recipient-timeline')setTimeout(()=>open(demoView),280);
 
   window.__taleraSharePrototype={open,close,show(view){open(view||'hub')}};
 })();

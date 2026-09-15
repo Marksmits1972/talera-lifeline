@@ -189,6 +189,10 @@ De eerste UI-versie:
 - maakt geen productie-uitnodiging;
 - verstuurt geen echte beveiligde deelkoppeling;
 - toont duidelijk wanneer een actie nog een prototypevoorbeeld is.
+- opent bij **Via WhatsApp** rechtstreeks WhatsApp met een vooraf ingevulde tekst en een herkenbare voorbeeldlink;
+- laat de gebruiker in WhatsApp altijd zelf de ontvanger kiezen en het bericht verzenden;
+- opent de voorbeeldlink in een expliciet gemarkeerde ontvangersweergave zonder echte toegang tot persoonlijke media;
+- vervangt in productie alleen de voorbeeldlink door een unieke, beveiligde TALERA-uitnodiging.
 
 ## Acceptatiecriteria prototype
 

@@ -6,7 +6,7 @@ import { handleStoryPhotoCleanup } from './workblad-story-photo-cleanup.js';
 import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workblad-story-management.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-story-management-20260915-r8';
+const WRAPPER_REV = 'workblad-v9-management-v2-20260915-r9';
 
 export default {
   async fetch(request, env, ctx) {
@@ -64,6 +64,7 @@ export default {
         stagedPhotoLink: true,
         storyPhotoCleanup: true,
         storyManagement: true,
+        storyManagementRevision: 'v2-undo',
         storyDeleteMode: 'soft-delete'
       }, base.status || 200);
     }

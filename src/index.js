@@ -17,10 +17,10 @@ import { timelineGlassLayerStyle } from "./timeline-glass-layer.js";
 import { timelinePhotoSelectionScript } from "./timeline-photo-selection.js";
 import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 import { shareExperienceStyle, shareExperienceScript } from "./share-experience.js";
+import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
 const TALERA_TIMELINE_DEPLOY_REV = "whatsapp-photo-preview-v6-prepared-handoff-20260915";
-const SHARE_PREVIEW_MAX_BYTES = 900_000;
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
@@ -148,41 +148,14 @@ function escapeMeta(value) {
   })[character]);
 }
 
-function previewUpstreamUrl(request, type, token) {
-  const url = new URL(TELL_ORIGIN);
-  url.pathname = type
-    ? `/api/integration/share-preview/${type}/${token}`
-    : "/api/integration/share-preview";
-  return url.toString();
-}
-
-async function fetchPreviewMeta(token) {
-  if (!SHARE_PREVIEW_TOKEN.test(token)) return null;
-  const response = await fetch(previewUpstreamUrl(new Request(TELL_ORIGIN), "meta", token), { cache: "no-store" });
-  if (!response.ok) return null;
-  try { return await response.json(); } catch (error) { return null; }
-}
-
-async function handleSharePreview(request) {
+async function handleSharePreview(request, env) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/share-preview")) return null;
+  const stored = await handleSharePreviewStorage(request, { SHARE_PREVIEWS: env && env.SHARE_PREVIEWS });
+  if (!stored) return null;
 
-  if (url.pathname === "/api/share-preview" && request.method === "POST") {
-    const statedSize = Number(request.headers.get("content-length")) || 0;
-    if (statedSize > SHARE_PREVIEW_MAX_BYTES + 100_000) {
-      return new Response("Preview te groot", { status: 413 });
-    }
-
-    const contentType = request.headers.get("content-type") || "";
-    const bytes = await request.arrayBuffer();
-    if (bytes.byteLength > SHARE_PREVIEW_MAX_BYTES + 100_000) return new Response("Preview te groot", { status: 413 });
-    const upstream = await fetch(previewUpstreamUrl(request), {
-      method: "POST",
-      headers: { "content-type": contentType },
-      body: bytes,
-    });
-    if (!upstream.ok) return new Response(await upstream.text(), { status: upstream.status, headers: { "cache-control": "no-store" } });
-    const meta = await upstream.json();
+  if (url.pathname === "/api/share-preview" && request.method === "POST" && stored.ok) {
+    const meta = await stored.json();
     const token = String(meta.token || "");
     if (!SHARE_PREVIEW_TOKEN.test(token)) return new Response("Ongeldige preview", { status: 502 });
 
@@ -197,27 +170,23 @@ async function handleSharePreview(request) {
   }
 
   const match = url.pathname.match(/^\/api\/share-preview\/(image|meta)\/([a-f0-9]{32})$/);
-  if (match && (request.method === "GET" || request.method === "HEAD")) {
-    const upstream = await fetch(previewUpstreamUrl(request, match[1], match[2]), { method: request.method, cache: "no-store" });
-    const headers = new Headers(upstream.headers);
-    headers.delete("content-length");
-    headers.set("cache-control", match[1] === "image" ? "public, max-age=86400" : "no-store");
-    if (match[1] === "meta" && upstream.ok && request.method !== "HEAD") {
-      const meta = await upstream.json();
+  if (match && match[1] === "meta" && stored.ok && request.method !== "HEAD") {
+      const meta = await stored.json();
       meta.imageUrl = `${url.origin}/api/share-preview/image/${match[2]}`;
-      return new Response(JSON.stringify(meta), { status: upstream.status, headers });
-    }
-    return new Response(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
+      return new Response(JSON.stringify(meta), { status: stored.status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
   }
-
-  return new Response("Niet gevonden", { status: 404, headers: { "cache-control": "no-store" } });
+  return stored;
 }
 
-async function htmlWithSharePreview(request) {
+async function htmlWithSharePreview(request, env) {
   const url = new URL(request.url);
   const token = url.searchParams.get("talera_invite") || "";
   if (!SHARE_PREVIEW_TOKEN.test(token)) return HTML;
-  const meta = await fetchPreviewMeta(token);
+  const metaRequest = new Request(`${url.origin}/api/share-preview/meta/${token}`);
+  const metaResponse = await handleSharePreviewStorage(metaRequest, { SHARE_PREVIEWS: env && env.SHARE_PREVIEWS });
+  if (!metaResponse || !metaResponse.ok) return HTML;
+  let meta;
+  try { meta = await metaResponse.json(); } catch (error) { return HTML; }
   if (!meta) return HTML;
   meta.imageUrl = `${url.origin}/api/share-preview/image/${token}`;
 
@@ -286,14 +255,14 @@ async function proxyLinkedMemory(request) {
 }
 
 export default {
-  async fetch(request) {
-    const preview = await handleSharePreview(request);
+  async fetch(request, env) {
+    const preview = await handleSharePreview(request, env);
     if (preview) return preview;
 
     const linked = await proxyLinkedMemory(request);
     if (linked) return linked;
 
-    return new Response(await htmlWithSharePreview(request), {
+    return new Response(await htmlWithSharePreview(request, env), {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",

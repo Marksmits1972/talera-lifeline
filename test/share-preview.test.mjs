@@ -28,12 +28,6 @@ const bucket = {
 };
 const { handleSharePreviewStorage } = await import("../xxory-test/src/share-preview-storage.js");
 const storageEnv = { MEDIA: bucket };
-globalThis.fetch = async (input, init) => {
-  const request = input instanceof Request && !init ? input : new Request(input, init);
-  const response = await handleSharePreviewStorage(request, storageEnv);
-  if (!response) throw new Error(`Unexpected upstream request: ${request.url}`);
-  return response;
-};
 
 const { default: worker } = await import("../src/index.js");
 const form = new FormData();
@@ -43,32 +37,32 @@ form.append("kind", "story");
 form.append("duration", "7 dagen");
 form.append("hasPhoto", "1");
 
-const created = await worker.fetch(new Request("https://talera.example/api/share-preview", { method: "POST", body: form }));
+const created = await worker.fetch(new Request("https://talera.example/api/share-preview", { method: "POST", body: form }), { SHARE_PREVIEWS: bucket });
 assert.equal(created.status, 200);
 const { shareUrl } = await created.json();
 const invite = new URL(shareUrl);
 assert.equal(invite.searchParams.get("talera_demo"), "recipient-story");
 assert.match(invite.searchParams.get("talera_invite"), /^[a-f0-9]{32}$/);
 
-const page = await worker.fetch(new Request(shareUrl));
+const page = await worker.fetch(new Request(shareUrl), { SHARE_PREVIEWS: bucket });
 const html = await page.text();
 assert.match(html, /property="og:site_name" content="TALERA"/);
 assert.match(html, /property="og:image" content="https:\/\/talera\.example\/api\/share-preview\/image\/[a-f0-9]{32}"/);
 assert.match(html, /Mark deelt een herinnering: Terugkijken op al die losse momenten/);
 
 const token = invite.searchParams.get("talera_invite");
-const meta = await worker.fetch(new Request(`https://talera.example/api/share-preview/meta/${token}`));
+const meta = await worker.fetch(new Request(`https://talera.example/api/share-preview/meta/${token}`), { SHARE_PREVIEWS: bucket });
 assert.equal(meta.status, 200);
 assert.equal((await meta.json()).hasPhoto, true);
 
-const image = await worker.fetch(new Request(`https://talera.example/api/share-preview/image/${token}`));
+const image = await worker.fetch(new Request(`https://talera.example/api/share-preview/image/${token}`), { SHARE_PREVIEWS: bucket });
 assert.equal(image.status, 200);
 assert.equal(image.headers.get("content-type"), "image/jpeg");
 
 const secondForm = new FormData();
 secondForm.append("image", new Blob([new Uint8Array([255, 216, 255, 217])], { type: "image/jpeg" }), "preview.jpg");
 secondForm.append("title", "Dezelfde foto, nieuwe uitnodiging");
-const second = await worker.fetch(new Request("https://talera.example/api/share-preview", { method: "POST", body: secondForm }));
+const second = await worker.fetch(new Request("https://talera.example/api/share-preview", { method: "POST", body: secondForm }), { SHARE_PREVIEWS: bucket });
 assert.equal(second.status, 200);
 assert.equal([...entries.keys()].filter((key) => key.startsWith("share-previews/images/")).length, 1);
 

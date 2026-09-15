@@ -3,10 +3,12 @@ const TOKEN_PATTERN = /^[a-f0-9]{32}$/;
 
 export async function handleSharePreviewStorage(request, env) {
   const url = new URL(request.url);
-  if (!url.pathname.startsWith('/api/integration/share-preview')) return null;
-  if (!env || !env.MEDIA) return text('Preview-opslag niet beschikbaar', 503);
+  const route = url.pathname.replace(/^\/api\/integration\/share-preview/, '/api/share-preview');
+  if (!route.startsWith('/api/share-preview')) return null;
+  const bucket = env && (env.SHARE_PREVIEWS || env.MEDIA);
+  if (!bucket) return text('Preview-opslag niet beschikbaar', 503);
 
-  if (url.pathname === '/api/integration/share-preview' && request.method === 'POST') {
+  if (route === '/api/share-preview' && request.method === 'POST') {
     const statedSize = Number(request.headers.get('content-length')) || 0;
     if (statedSize > MAX_BYTES + 100_000) return text('Preview te groot', 413);
 
@@ -36,13 +38,13 @@ export async function handleSharePreviewStorage(request, env) {
       expiresAt: Date.now() + maxAge * 1000,
     };
 
-    if (!(await env.MEDIA.head(imageObjectKey))) {
-      await env.MEDIA.put(imageObjectKey, bytes, {
+    if (!(await bucket.head(imageObjectKey))) {
+      await bucket.put(imageObjectKey, bytes, {
         httpMetadata: { contentType: 'image/jpeg', cacheControl: 'public, max-age=86400' },
         customMetadata: { role: 'share-preview', createdAt: new Date().toISOString() },
       });
     }
-    await env.MEDIA.put(inviteKey(token), JSON.stringify(meta), {
+    await bucket.put(inviteKey(token), JSON.stringify(meta), {
       httpMetadata: { contentType: 'application/json; charset=utf-8', cacheControl: 'no-store' },
       customMetadata: { role: 'share-invite', expiresAt: String(meta.expiresAt) },
     });
@@ -50,10 +52,10 @@ export async function handleSharePreviewStorage(request, env) {
     return json({ token, kind: meta.kind, title: meta.title, hasPhoto: meta.hasPhoto, expiresAt: meta.expiresAt }, 201);
   }
 
-  const match = url.pathname.match(/^\/api\/integration\/share-preview\/(image|meta)\/([a-f0-9]{32})$/);
+  const match = route.match(/^\/api\/share-preview\/(image|meta)\/([a-f0-9]{32})$/);
   if (!match || (request.method !== 'GET' && request.method !== 'HEAD')) return text('Niet gevonden', 404);
 
-  const meta = await readMeta(env.MEDIA, match[2]);
+  const meta = await readMeta(bucket, match[2]);
   if (!meta) return text('Preview verlopen', 404);
   if (match[1] === 'meta') {
     return new Response(request.method === 'HEAD' ? null : JSON.stringify(meta), {
@@ -61,7 +63,7 @@ export async function handleSharePreviewStorage(request, env) {
     });
   }
 
-  const object = request.method === 'HEAD' ? await env.MEDIA.head(meta.imageKey) : await env.MEDIA.get(meta.imageKey);
+  const object = request.method === 'HEAD' ? await bucket.head(meta.imageKey) : await bucket.get(meta.imageKey);
   if (!object) return text('Preview verlopen', 404);
   const headers = new Headers();
   object.writeHttpMetadata(headers);

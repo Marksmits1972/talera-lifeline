@@ -19,7 +19,7 @@ import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 import { shareExperienceStyle, shareExperienceScript } from "./share-experience.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "share-experience-prototype-v1-20260914";
+const TALERA_TIMELINE_DEPLOY_REV = "share-workboard-v2-20260915";
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();

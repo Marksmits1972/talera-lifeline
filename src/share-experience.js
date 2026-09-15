@@ -4,14 +4,13 @@ export const shareExperienceStyle = String.raw`
   --share-blue:#315f87;
   --share-soft:#5B8FB9;
   --share-accent:#E7A98B;
-  --share-paper:#F7F4EF;
+  --share-paper:#FAF9F6;
+  --share-card:#FFFFFF;
+  --share-soft-panel:#F1F4F6;
   --share-ink:#26384f;
   --share-muted:#6e7b8c;
   --share-sheet-height:min(81dvh,720px);
   --share-sheet-radius:32px;
-  --share-sheet-feather:88px;
-  --share-glass-blur:28px;
-  --share-glass-saturation:1.12;
 }
 
 body.talera-share-open{overscroll-behavior:none}
@@ -30,7 +29,7 @@ body.talera-share-open{overscroll-behavior:none}
 .talera-share-shell.is-open{
   pointer-events:auto;
   visibility:visible;
-  background:rgba(6,18,30,.22);
+  background:rgba(6,18,30,.16);
   transition:background .28s ease,visibility 0s;
 }
 .talera-share-panel{
@@ -41,26 +40,20 @@ body.talera-share-open{overscroll-behavior:none}
   transform:translate3d(0,104%,0);
   transition:transform .42s cubic-bezier(.22,.78,.25,1);
   isolation:isolate;
+  overflow:hidden;
+  border-radius:var(--share-sheet-radius) var(--share-sheet-radius) 0 0;
+  background:var(--share-paper);
+  box-shadow:0 -18px 48px rgba(15,39,71,.16);
 }
 .talera-share-shell.is-open .talera-share-panel{transform:translate3d(0,0,0)}
 
-/* The complete sheet uses one frosted surface. Its masked top extension creates
-   the soft photo-to-glass transition without a border or stacked veil. */
+/* One solid work surface replaces the former translucent frost. */
 .talera-share-panel::before{
   content:"";
   position:absolute;
   z-index:0;
-  left:0;
-  right:0;
-  top:calc(-1 * var(--share-sheet-feather));
-  bottom:0;
-  border-radius:var(--share-sheet-radius) var(--share-sheet-radius) 0 0;
-  background:linear-gradient(180deg,rgba(247,244,239,0) 0,rgba(247,244,239,.16) 10%,rgba(247,244,239,.72) 23%,rgba(247,244,239,.93) 35%,rgba(247,244,239,.97) 100%);
-  backdrop-filter:blur(var(--share-glass-blur)) saturate(var(--share-glass-saturation));
-  -webkit-backdrop-filter:blur(var(--share-glass-blur)) saturate(var(--share-glass-saturation));
-  -webkit-mask-image:linear-gradient(to bottom,transparent 0,rgba(0,0,0,.08) 8%,rgba(0,0,0,.34) 18%,rgba(0,0,0,.78) 31%,#000 45%);
-  mask-image:linear-gradient(to bottom,transparent 0,rgba(0,0,0,.08) 8%,rgba(0,0,0,.34) 18%,rgba(0,0,0,.78) 31%,#000 45%);
-  box-shadow:0 -12px 40px rgba(6,18,30,.07);
+  inset:0;
+  background:linear-gradient(180deg,#fff 0,var(--share-paper) 118px,var(--share-paper) 100%);
   pointer-events:none;
 }
 .talera-share-panel::after{display:none;content:none}
@@ -72,6 +65,7 @@ body.talera-share-open{overscroll-behavior:none}
   flex-direction:column;
   overflow:hidden;
   border-radius:var(--share-sheet-radius) var(--share-sheet-radius) 0 0;
+  background:transparent;
 }
 .talera-share-grip{
   width:38px;
@@ -87,6 +81,7 @@ body.talera-share-open{overscroll-behavior:none}
   display:grid;
   grid-template-columns:40px 1fr 40px;
   align-items:center;
+  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(250,249,246,.94));
 }
 .talera-share-back,.talera-share-close{
   width:40px;
@@ -97,7 +92,7 @@ body.talera-share-open{overscroll-behavior:none}
   align-items:center;
   justify-content:center;
   color:var(--share-deep);
-  background:rgba(255,255,255,.45);
+  background:var(--share-card);
   box-shadow:inset 0 0 0 1px rgba(15,39,71,.07);
   font:700 23px/1 system-ui,-apple-system,sans-serif;
 }
@@ -112,6 +107,7 @@ body.talera-share-open{overscroll-behavior:none}
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:none;
+  background:var(--share-paper);
 }
 .talera-share-body::-webkit-scrollbar{display:none}
 .talera-share-title{margin:5px 0 7px;color:var(--share-deep);font:760 clamp(25px,7vw,34px)/1.05 system-ui,-apple-system,sans-serif;letter-spacing:-.025em}
@@ -125,8 +121,8 @@ body.talera-share-open{overscroll-behavior:none}
   min-height:88px;
   padding:9px;
   border-radius:21px;
-  background:rgba(255,255,255,.50);
-  box-shadow:inset 0 0 0 1px rgba(15,39,71,.06),0 8px 24px rgba(15,39,71,.05);
+  background:var(--share-card);
+  box-shadow:inset 0 0 0 1px rgba(15,39,71,.06),0 7px 20px rgba(15,39,71,.06);
 }
 .talera-share-memory img{width:76px;height:70px;display:block;object-fit:cover;border-radius:15px;background:#dbe4ea}
 .talera-share-memory small{display:block;margin-bottom:4px;color:var(--share-soft);font:730 10px/1.2 system-ui,-apple-system,sans-serif;letter-spacing:.04em;text-transform:uppercase}
@@ -145,8 +141,8 @@ body.talera-share-open{overscroll-behavior:none}
   align-items:center;
   color:var(--share-ink);
   text-align:left;
-  background:rgba(255,255,255,.52);
-  box-shadow:inset 0 0 0 1px rgba(15,39,71,.07),0 7px 22px rgba(15,39,71,.04);
+  background:var(--share-card);
+  box-shadow:inset 0 0 0 1px rgba(15,39,71,.07),0 7px 20px rgba(15,39,71,.06);
 }
 .talera-share-option:active{transform:scale(.985)}
 .talera-share-option-icon{width:42px;height:42px;border-radius:15px;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--share-blue);font:720 17px/1 system-ui,-apple-system,sans-serif;box-shadow:0 6px 17px rgba(49,95,135,.18)}
@@ -160,15 +156,15 @@ body.talera-share-open{overscroll-behavior:none}
   border:0;
   border-radius:17px;
   color:var(--share-deep);
-  background:rgba(255,255,255,.42);
+  background:var(--share-card);
   box-shadow:inset 0 0 0 1px rgba(15,39,71,.08);
   font:680 13px/1.22 system-ui,-apple-system,sans-serif;
 }
 .talera-share-choice.is-selected{color:#fff;background:var(--share-blue);box-shadow:0 7px 19px rgba(49,95,135,.19),inset 0 0 0 1px rgba(255,255,255,.24)}
 .talera-share-circle-list{display:grid;gap:8px}
-.talera-share-circle{width:100%;min-height:56px;padding:10px 13px;border:0;border-radius:17px;display:flex;align-items:center;gap:11px;text-align:left;color:var(--share-deep);background:rgba(255,255,255,.43);box-shadow:inset 0 0 0 1px rgba(15,39,71,.07)}
+.talera-share-circle{width:100%;min-height:56px;padding:10px 13px;border:0;border-radius:17px;display:flex;align-items:center;gap:11px;text-align:left;color:var(--share-deep);background:var(--share-card);box-shadow:inset 0 0 0 1px rgba(15,39,71,.07)}
 .talera-share-circle i{width:18px;height:18px;border:2px solid rgba(15,39,71,.25);border-radius:50%;box-sizing:border-box}
-.talera-share-circle.is-selected{background:rgba(255,255,255,.72);box-shadow:inset 0 0 0 2px var(--share-blue)}
+.talera-share-circle.is-selected{background:var(--share-card);box-shadow:inset 0 0 0 2px var(--share-blue),0 6px 16px rgba(49,95,135,.08)}
 .talera-share-circle.is-selected i{border:5px solid var(--share-blue)}
 .talera-share-circle span{font:700 14px/1.15 system-ui,-apple-system,sans-serif}
 .talera-share-circle small{display:block;margin-top:3px;color:var(--share-muted);font:500 11px/1.25 system-ui,-apple-system,sans-serif}
@@ -183,16 +179,16 @@ body.talera-share-open{overscroll-behavior:none}
 }
 .talera-share-primary{color:#fff;background:var(--share-blue);box-shadow:0 9px 24px rgba(49,95,135,.22),inset 0 1px 0 rgba(255,255,255,.20)}
 .talera-share-primary:disabled{opacity:.48;box-shadow:none}
-.talera-share-secondary{margin-top:9px;color:var(--share-deep);background:rgba(255,255,255,.48);box-shadow:inset 0 0 0 1px rgba(15,39,71,.08)}
+.talera-share-secondary{margin-top:9px;color:var(--share-deep);background:var(--share-card);box-shadow:inset 0 0 0 1px rgba(15,39,71,.08)}
 .talera-share-text-action{display:block;margin:14px auto 0;padding:8px 12px;border:0;color:var(--share-muted);background:transparent;font:650 12px/1 system-ui,-apple-system,sans-serif}
-.talera-share-notice{margin:13px 0 0;padding:12px 13px;border-radius:16px;color:var(--share-muted);background:rgba(255,255,255,.35);font:520 11px/1.42 system-ui,-apple-system,sans-serif}
+.talera-share-notice{margin:13px 0 0;padding:12px 13px;border-radius:16px;color:var(--share-muted);background:var(--share-soft-panel);font:520 11px/1.42 system-ui,-apple-system,sans-serif}
 .talera-share-success{width:58px;height:58px;margin:8px auto 13px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--share-blue);font:750 25px/1 system-ui,-apple-system,sans-serif;box-shadow:0 9px 24px rgba(49,95,135,.22)}
 .talera-share-center{text-align:center}
 .talera-share-center .talera-share-intro{max-width:36ch;margin-left:auto;margin-right:auto}
 .talera-share-preview-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}
 .talera-share-preview-actions .talera-share-primary,.talera-share-preview-actions .talera-share-secondary{margin:0;min-height:50px}
 .talera-share-status-list{display:grid;gap:9px}
-.talera-share-person{padding:13px;border-radius:18px;background:rgba(255,255,255,.48);box-shadow:inset 0 0 0 1px rgba(15,39,71,.06)}
+.talera-share-person{padding:13px;border-radius:18px;background:var(--share-card);box-shadow:inset 0 0 0 1px rgba(15,39,71,.06),0 6px 17px rgba(15,39,71,.05)}
 .talera-share-person-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .talera-share-person strong{color:var(--share-deep);font:710 14px/1.2 system-ui,-apple-system,sans-serif}
 .talera-share-person p{margin:6px 0 0;color:var(--share-muted);font:500 11px/1.35 system-ui,-apple-system,sans-serif}
@@ -200,7 +196,7 @@ body.talera-share-open{overscroll-behavior:none}
 .talera-share-status.is-action{color:#7a3d24;background:rgba(231,169,139,.28)}
 .talera-share-status.is-muted{color:var(--share-muted);background:rgba(110,123,140,.10)}
 .talera-share-person button{margin-top:9px;padding:7px 9px;border:0;border-radius:11px;color:var(--share-blue);background:rgba(91,143,185,.10);font:680 11px/1 system-ui,-apple-system,sans-serif}
-.talera-share-empty{padding:24px 17px;border-radius:22px;text-align:center;background:rgba(255,255,255,.37);box-shadow:inset 0 0 0 1px rgba(15,39,71,.06)}
+.talera-share-empty{padding:24px 17px;border-radius:22px;text-align:center;background:var(--share-card);box-shadow:inset 0 0 0 1px rgba(15,39,71,.06),0 6px 17px rgba(15,39,71,.05)}
 .talera-share-empty strong{display:block;color:var(--share-deep);font:710 15px/1.2 system-ui,-apple-system,sans-serif}
 .talera-share-empty p{margin:7px auto 0;max-width:34ch;color:var(--share-muted);font:500 12px/1.45 system-ui,-apple-system,sans-serif}
 .talera-recipient-photo{position:relative;height:190px;margin:3px 0 15px;overflow:hidden;border-radius:24px;background:#dbe4ea;box-shadow:0 10px 26px rgba(15,39,71,.10)}
@@ -218,7 +214,7 @@ body.talera-share-open{overscroll-behavior:none}
   .talera-share-title{font-size:25px}
 }
 @media(max-height:690px){
-  :root{--share-sheet-height:86dvh;--share-sheet-feather:68px}
+  :root{--share-sheet-height:86dvh}
   .talera-recipient-photo{height:145px}
   .talera-share-title{font-size:24px}
 }

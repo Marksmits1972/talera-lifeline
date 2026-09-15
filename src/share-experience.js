@@ -220,6 +220,22 @@ body.talera-share-open{overscroll-behavior:none}
 .talera-share-center .talera-share-intro{max-width:36ch;margin-left:auto;margin-right:auto}
 .talera-share-preview-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}
 .talera-share-preview-actions .talera-share-primary,.talera-share-preview-actions .talera-share-secondary{margin:0;min-height:50px}
+.talera-whatsapp-card{margin-top:14px;overflow:hidden;border-radius:20px;background:#fff;box-shadow:inset 0 0 0 1px rgba(15,39,71,.07),0 8px 22px rgba(15,39,71,.07)}
+.talera-whatsapp-visual{position:relative;height:142px;overflow:hidden;background:linear-gradient(135deg,var(--share-deep),var(--share-blue))}
+.talera-whatsapp-visual img{width:100%;height:100%;display:block;object-fit:cover}
+.talera-whatsapp-visual::after{content:"";position:absolute;inset:34% 0 0;background:linear-gradient(180deg,transparent,rgba(8,25,45,.82));pointer-events:none}
+.talera-whatsapp-brand{position:absolute;z-index:1;left:14px;bottom:12px;color:#fff;text-shadow:0 2px 8px rgba(6,18,30,.28)}
+.talera-whatsapp-brand strong{display:block;font:760 11px/1 system-ui,-apple-system,sans-serif;letter-spacing:.17em}
+.talera-whatsapp-brand span{display:block;margin-top:6px;max-width:32ch;font:700 13px/1.22 system-ui,-apple-system,sans-serif}
+.talera-whatsapp-copy{padding:11px 13px 12px}
+.talera-whatsapp-copy small{display:block;color:var(--share-muted);font:540 10px/1.25 system-ui,-apple-system,sans-serif}
+.talera-whatsapp-copy strong{display:-webkit-box;margin-top:4px;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--share-deep);font:700 13px/1.25 system-ui,-apple-system,sans-serif}
+.talera-preview-consent{width:100%;min-height:52px;margin-top:10px;padding:10px 12px;border:0;border-radius:16px;display:flex;align-items:center;gap:10px;text-align:left;color:var(--share-deep);background:var(--share-card);box-shadow:inset 0 0 0 1px rgba(15,39,71,.08);font:650 12px/1.3 system-ui,-apple-system,sans-serif}
+.talera-preview-switch{position:relative;flex:0 0 auto;width:40px;height:23px;border-radius:999px;background:rgba(110,123,140,.24);transition:background .18s ease}
+.talera-preview-switch::after{content:"";position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(15,39,71,.18);transition:transform .18s ease}
+.talera-preview-consent[aria-pressed="true"] .talera-preview-switch{background:var(--share-blue)}
+.talera-preview-consent[aria-pressed="true"] .talera-preview-switch::after{transform:translateX(17px)}
+.talera-preview-consent small{display:block;margin-top:2px;color:var(--share-muted);font:520 10px/1.3 system-ui,-apple-system,sans-serif}
 .talera-share-status-list{display:grid;gap:9px}
 .talera-share-person{padding:13px;border-radius:18px;background:var(--share-card);box-shadow:inset 0 0 0 1px rgba(15,39,71,.06),0 6px 17px rgba(15,39,71,.05)}
 .talera-share-person-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -266,8 +282,10 @@ export const shareExperienceScript = String.raw`
 
   const STORAGE_KEY='talera-share-prototype-v1';
   const OWNER_NAME='Mark';
-  const demoView=new URLSearchParams(location.search).get('talera_demo')||'';
-  const state={view:'hub',history:[],duration:'30 dagen',circle:'Binnenkring',kind:'story',invite:null,recipientListening:false};
+  const query=new URLSearchParams(location.search);
+  const demoView=query.get('talera_demo')||'';
+  const inviteToken=(query.get('talera_invite')||'').replace(/[^a-f0-9]/g,'').slice(0,32);
+  const state={view:'hub',history:[],duration:'30 dagen',circle:'Binnenkring',kind:'story',invite:null,recipientListening:false,previewPhoto:true,invitePreview:null,preparingShare:false};
   let previousFocus=null;
   let toastTimer=0;
 
@@ -295,9 +313,11 @@ export const shareExperienceScript = String.raw`
   }
   function memory(){return runtime.currentMemory()||{}}
   function memoryTitle(item=memory()){
+    if((state.view==='recipient-story'||state.view==='recipient-timeline')&&state.invitePreview&&state.invitePreview.title)return state.invitePreview.title;
     return String(item.title||item.story||'Mijn herinnering').replace(/\s+/g,' ').trim()||'Mijn herinnering';
   }
   function memoryImage(item=memory()){
+    if((state.view==='recipient-story'||state.view==='recipient-timeline')&&state.invitePreview&&state.invitePreview.imageUrl)return state.invitePreview.imageUrl;
     const photos=Array.isArray(item.photos)?item.photos:[];
     return photos[item._photoIndex||0]||item.image||'';
   }
@@ -312,7 +332,7 @@ export const shareExperienceScript = String.raw`
   function hydrateImages(){
     const src=memoryImage();
     if(!src)return;
-    body.querySelectorAll('.talera-share-memory-image,.talera-recipient-image').forEach(img=>{img.src=src});
+    body.querySelectorAll('.talera-share-memory-image,.talera-recipient-image,.talera-whatsapp-preview-image').forEach(img=>{img.src=src});
   }
   function buttonOption(view,icon,title,copy){
     return '<button class="talera-share-option" type="button" data-view="'+view+'"><span class="talera-share-option-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+copy+'</small></span><span class="talera-share-option-arrow" aria-hidden="true">›</span></button>';
@@ -361,7 +381,7 @@ export const shareExperienceScript = String.raw`
     const timeline=state.kind==='timeline';
     const detail=timeline?'Toegang: '+state.circle+' · goedkeuring blijft nodig':'Geldig: '+state.duration+' · alleen dit verhaal';
     return '<div class="talera-share-center"><div class="talera-share-success" aria-hidden="true">✓</div>'+title('Uitnodiging staat klaar','Je kunt de voorbeeldlink nu via WhatsApp versturen. Later vervangen we deze door de beveiligde TALERA-uitnodiging.')+'</div>'+memoryCard(timeline?'Tijdlijnuitnodiging':'Gedeeld verhaal')+
-      '<div class="talera-share-notice">'+escapeHtml(detail)+'</div><div class="talera-share-preview-actions"><button class="talera-share-secondary" type="button" data-action="preview-recipient">Voorbeeld ontvanger</button><button class="talera-share-primary" type="button" data-action="share-whatsapp">Via WhatsApp</button></div><button class="talera-share-secondary" type="button" data-action="close">Terug naar mijn tijdlijn</button>';
+      '<div class="talera-share-notice">'+escapeHtml(detail)+'</div><div class="talera-whatsapp-card" aria-label="Voorbeeld van de WhatsApp-uitnodiging"><div class="talera-whatsapp-visual">'+(state.previewPhoto?'<img class="talera-whatsapp-preview-image" alt="">':'')+'<div class="talera-whatsapp-brand"><strong>TALERA</strong><span>'+escapeHtml(timeline?OWNER_NAME+' nodigt je uit op zijn tijdlijn':memoryTitle())+'</span></div></div><div class="talera-whatsapp-copy"><small>talera-timeline-prototype.mark-a39.workers.dev</small><strong>'+escapeHtml(timeline?'Bekijk de levensverhalen die '+OWNER_NAME+' met je deelt':OWNER_NAME+' deelt een persoonlijke herinnering met je')+'</strong></div></div><button class="talera-preview-consent" type="button" data-action="toggle-preview-photo" aria-pressed="'+(state.previewPhoto?'true':'false')+'"><span class="talera-preview-switch" aria-hidden="true"></span><span>Foto tonen in WhatsApp-voorbeeld<small>Er wordt alleen een verkleinde uitnodigingsminiatuur gemaakt.</small></span></button><div class="talera-share-preview-actions"><button class="talera-share-secondary" type="button" data-action="preview-recipient">Voorbeeld ontvanger</button><button class="talera-share-primary" type="button" data-action="share-whatsapp" '+(state.preparingShare?'disabled':'')+'>'+(state.preparingShare?'Voorbereiden…':'Via WhatsApp')+'</button></div><button class="talera-share-secondary" type="button" data-action="close">Terug naar mijn tijdlijn</button>';
   }
   function renderPeople(){
     const stored=loadPrototype().invites||[];
@@ -506,14 +526,89 @@ export const shareExperienceScript = String.raw`
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}catch(e){}
     state.invite=record;state.kind=kind;go('ready');
   }
-  function shareViaWhatsApp(){
+  async function imageElementFromBlob(blob){
+    const url=URL.createObjectURL(blob);
+    const img=new Image();
+    img.src=url;
+    try{
+      if(img.decode)await img.decode();
+      else await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject});
+      return img;
+    }finally{setTimeout(()=>URL.revokeObjectURL(url),1000)}
+  }
+  function wrapCanvasText(ctx,text,maxWidth,maxLines){
+    const raw=String(text||'').trim(),words=raw.split(/\s+/).filter(Boolean),lines=[];
+    let line='',used=0;
+    for(const word of words){
+      const trial=line?line+' '+word:word;
+      if(ctx.measureText(trial).width>maxWidth&&line){lines.push(line);used+=line.length+1;line=word;if(lines.length===maxLines-1)break}
+      else line=trial;
+    }
+    if(line&&lines.length<maxLines){lines.push(line);used+=line.length}
+    if(used<raw.length&&lines.length)lines[lines.length-1]=lines[lines.length-1].replace(/[.,;:!?]?$/,'…');
+    return lines;
+  }
+  async function makeInvitationThumbnail(){
+    const canvas=document.createElement('canvas');
+    canvas.width=1200;canvas.height=630;
+    const ctx=canvas.getContext('2d');
+    const base=ctx.createLinearGradient(0,0,1200,630);
+    base.addColorStop(0,'#0F2747');base.addColorStop(1,'#315f87');
+    ctx.fillStyle=base;ctx.fillRect(0,0,1200,630);
+    if(state.previewPhoto){
+      try{
+        const response=await fetch(memoryImage());
+        if(!response.ok)throw new Error('image');
+        const img=await imageElementFromBlob(await response.blob());
+        const scale=Math.max(1200/img.naturalWidth,630/img.naturalHeight);
+        const width=img.naturalWidth*scale,height=img.naturalHeight*scale;
+        ctx.drawImage(img,(1200-width)/2,(630-height)/2,width,height);
+      }catch(e){}
+    }
+    const shade=ctx.createLinearGradient(0,170,0,630);
+    shade.addColorStop(0,'rgba(7,22,40,0)');shade.addColorStop(1,'rgba(7,22,40,.88)');
+    ctx.fillStyle=shade;ctx.fillRect(0,140,1200,490);
+    ctx.fillStyle='#fff';ctx.font='700 28px system-ui,-apple-system,sans-serif';ctx.fillText('T A L E R A',64,438);
+    ctx.font='700 43px system-ui,-apple-system,sans-serif';
+    const headline=state.kind==='timeline'?OWNER_NAME+' nodigt je uit':memoryTitle();
+    wrapCanvasText(ctx,headline,1060,2).forEach((line,index)=>ctx.fillText(line,64,500+index*50));
+    return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('thumbnail')),'image/jpeg',.84));
+  }
+  async function createPreviewLink(timeline){
+    const form=new FormData();
+    form.append('image',await makeInvitationThumbnail(),'talera-uitnodiging.jpg');
+    form.append('title',memoryTitle());
+    form.append('kind',timeline?'timeline':'story');
+    form.append('duration',timeline?'30 dagen':state.duration);
+    form.append('hasPhoto',state.previewPhoto?'1':'0');
+    const response=await fetch('/api/share-preview',{method:'POST',body:form});
+    if(!response.ok)throw new Error('preview '+response.status);
+    const result=await response.json();
+    if(!result||!result.shareUrl)throw new Error('preview response');
+    return result.shareUrl;
+  }
+  async function shareViaWhatsApp(){
     const timeline=state.kind==='timeline';
-    const shareUrl=new URL(location.origin+location.pathname);
-    shareUrl.searchParams.set('talera_demo',timeline?'recipient-timeline':'recipient-story');
+    if(state.preparingShare)return;
+    state.preparingShare=true;render();
+    let shareUrl='';
+    try{shareUrl=await createPreviewLink(timeline)}catch(e){
+      const fallback=new URL(location.origin+location.pathname);
+      fallback.searchParams.set('talera_demo',timeline?'recipient-timeline':'recipient-story');
+      shareUrl=fallback.toString();
+    }
     const message=timeline
-      ?OWNER_NAME+' nodigt je via TALERA uit om zijn levensverhalen te bekijken.\n\nOpen de voorbeeldlink:\n'+shareUrl.toString()
-      :OWNER_NAME+' deelt via TALERA een persoonlijke herinnering met je:\n“'+memoryTitle()+'”\n\nOpen de voorbeeldlink:\n'+shareUrl.toString();
+      ?OWNER_NAME+' nodigt je via TALERA uit om zijn levensverhalen te bekijken.\n\nOpen de uitnodiging:\n'+shareUrl
+      :OWNER_NAME+' deelt via TALERA een persoonlijke herinnering met je:\n“'+memoryTitle()+'”\n\nOpen de uitnodiging:\n'+shareUrl;
     location.href='https://wa.me/?text='+encodeURIComponent(message);
+  }
+  async function loadInvitePreview(){
+    if(!inviteToken)return;
+    try{
+      const response=await fetch('/api/share-preview/meta/'+inviteToken,{cache:'no-store'});
+      if(!response.ok)return;
+      state.invitePreview=await response.json();
+    }catch(e){}
   }
 
   moreButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('hub')},true);
@@ -532,6 +627,7 @@ export const shareExperienceScript = String.raw`
     if(action==='create-story-invite'){saveInvite('story');return}
     if(action==='create-timeline-invite'){saveInvite('timeline');return}
     if(action==='preview-recipient'){go(state.kind==='timeline'?'recipient-timeline':'recipient-story');return}
+    if(action==='toggle-preview-photo'){state.previewPhoto=!state.previewPhoto;render();return}
     if(action==='share-whatsapp'){shareViaWhatsApp();return}
     if(action==='prototype-manage'){showToast('Hier komen straks verplaatsen en toegang intrekken.');return}
     if(action==='prototype-account'){showToast('Dit onderdeel is voorbereid en wordt aangesloten zodra de account- en betaalbasis gereed is.');return}
@@ -559,7 +655,7 @@ export const shareExperienceScript = String.raw`
   });
   document.addEventListener('talera:new-memory-landed',()=>setTimeout(()=>open('after-save'),650));
 
-  if(demoView==='recipient-story'||demoView==='recipient-timeline')setTimeout(()=>open(demoView),280);
+  if(demoView==='recipient-story'||demoView==='recipient-timeline')loadInvitePreview().finally(()=>setTimeout(()=>open(demoView),280));
 
   window.__taleraSharePrototype={open,close,show(view){open(view||'hub')}};
 })();

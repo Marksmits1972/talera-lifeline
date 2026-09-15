@@ -1,12 +1,21 @@
 import baseWorker from './orb-app-v79-worker.js';
 import { handleV9TimelinePublish } from './workblad-v9-timeline-publish.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
+import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-timeline-publish-20260914-r1';
+const WRAPPER_REV = 'workblad-v9-timeline-publish-share-preview-20260915-r2';
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    try {
+      const previewResponse = await handleSharePreviewStorage(request, env);
+      if (previewResponse) return previewResponse;
+    } catch (error) {
+      console.error('TALERA share preview storage error', error);
+      return json({ error: 'De uitnodigingsminiatuur kon niet veilig worden opgeslagen.' }, 500);
+    }
 
     try {
       const publishResponse = await handleV9TimelinePublish(request, env);

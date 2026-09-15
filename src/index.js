@@ -19,7 +19,7 @@ import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 import { shareExperienceStyle, shareExperienceScript } from "./share-experience.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "whatsapp-photo-preview-v5-20260915";
+const TALERA_TIMELINE_DEPLOY_REV = "whatsapp-photo-preview-v6-prepared-handoff-20260915";
 const SHARE_PREVIEW_MAX_BYTES = 900_000;
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
@@ -138,18 +138,6 @@ const HTML = BASE_HTML
   .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style></head>`)
   .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script></body>`);
 
-function previewCacheRequest(request, type, token) {
-  const url = new URL(request.url);
-  url.pathname = `/api/share-preview/${type}/${token}`;
-  url.search = "";
-  return new Request(url.toString(), { method: "GET" });
-}
-
-function safePreviewText(value, fallback, maxLength = 180) {
-  const clean = String(value || "").replace(/\s+/g, " ").trim();
-  return (clean || fallback).slice(0, maxLength);
-}
-
 function escapeMeta(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -160,16 +148,24 @@ function escapeMeta(value) {
   })[character]);
 }
 
-function previewLifetime(duration) {
-  if (duration === "24 uur") return 24 * 60 * 60;
-  if (duration === "7 dagen") return 7 * 24 * 60 * 60;
-  return 30 * 24 * 60 * 60;
+function previewUpstreamUrl(request, type, token) {
+  const url = new URL(TELL_ORIGIN);
+  url.pathname = type
+    ? `/api/integration/share-preview/${type}/${token}`
+    : "/api/integration/share-preview";
+  return url.toString();
+}
+
+async function fetchPreviewMeta(token) {
+  if (!SHARE_PREVIEW_TOKEN.test(token)) return null;
+  const response = await fetch(previewUpstreamUrl(new Request(TELL_ORIGIN), "meta", token), { cache: "no-store" });
+  if (!response.ok) return null;
+  try { return await response.json(); } catch (error) { return null; }
 }
 
 async function handleSharePreview(request) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/share-preview")) return null;
-  const cache = caches.default;
 
   if (url.pathname === "/api/share-preview" && request.method === "POST") {
     const statedSize = Number(request.headers.get("content-length")) || 0;
@@ -177,45 +173,23 @@ async function handleSharePreview(request) {
       return new Response("Preview te groot", { status: 413 });
     }
 
-    let form;
-    try {
-      form = await request.formData();
-    } catch (error) {
-      return new Response("Ongeldige preview", { status: 400 });
-    }
-    const image = form.get("image");
-    if (!image || typeof image.arrayBuffer !== "function" || image.size > SHARE_PREVIEW_MAX_BYTES) {
-      return new Response("Afbeelding ontbreekt", { status: 400 });
-    }
-
-    const token = crypto.randomUUID().replace(/-/g, "");
-    const kind = form.get("kind") === "timeline" ? "timeline" : "story";
-    const title = safePreviewText(form.get("title"), "Een persoonlijke herinnering");
-    const maxAge = previewLifetime(String(form.get("duration") || "30 dagen"));
-    const imageRequest = previewCacheRequest(request, "image", token);
-    const metaRequest = previewCacheRequest(request, "meta", token);
-    const meta = {
-      token,
-      kind,
-      title,
-      imageUrl: imageRequest.url,
-      hasPhoto: form.get("hasPhoto") === "1",
-      expiresAt: Date.now() + maxAge * 1000,
-    };
-
-    await Promise.all([
-      cache.put(imageRequest, new Response(image, {
-        headers: { "content-type": "image/jpeg", "cache-control": `public, max-age=${maxAge}` },
-      })),
-      cache.put(metaRequest, new Response(JSON.stringify(meta), {
-        headers: { "content-type": "application/json; charset=utf-8", "cache-control": `public, max-age=${maxAge}` },
-      })),
-    ]);
+    const contentType = request.headers.get("content-type") || "";
+    const bytes = await request.arrayBuffer();
+    if (bytes.byteLength > SHARE_PREVIEW_MAX_BYTES + 100_000) return new Response("Preview te groot", { status: 413 });
+    const upstream = await fetch(previewUpstreamUrl(request), {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: bytes,
+    });
+    if (!upstream.ok) return new Response(await upstream.text(), { status: upstream.status, headers: { "cache-control": "no-store" } });
+    const meta = await upstream.json();
+    const token = String(meta.token || "");
+    if (!SHARE_PREVIEW_TOKEN.test(token)) return new Response("Ongeldige preview", { status: 502 });
 
     const shareUrl = new URL(request.url);
     shareUrl.pathname = "/";
     shareUrl.search = "";
-    shareUrl.searchParams.set("talera_demo", kind === "timeline" ? "recipient-timeline" : "recipient-story");
+    shareUrl.searchParams.set("talera_demo", meta.kind === "timeline" ? "recipient-timeline" : "recipient-story");
     shareUrl.searchParams.set("talera_invite", token);
     return Response.json({ shareUrl: shareUrl.toString(), expiresAt: meta.expiresAt }, {
       headers: { "cache-control": "no-store" },
@@ -224,14 +198,16 @@ async function handleSharePreview(request) {
 
   const match = url.pathname.match(/^\/api\/share-preview\/(image|meta)\/([a-f0-9]{32})$/);
   if (match && (request.method === "GET" || request.method === "HEAD")) {
-    const cached = await cache.match(previewCacheRequest(request, match[1], match[2]));
-    if (!cached) {
-      return new Response("Preview verlopen", { status: 404, headers: { "cache-control": "no-store" } });
+    const upstream = await fetch(previewUpstreamUrl(request, match[1], match[2]), { method: request.method, cache: "no-store" });
+    const headers = new Headers(upstream.headers);
+    headers.delete("content-length");
+    headers.set("cache-control", match[1] === "image" ? "public, max-age=86400" : "no-store");
+    if (match[1] === "meta" && upstream.ok && request.method !== "HEAD") {
+      const meta = await upstream.json();
+      meta.imageUrl = `${url.origin}/api/share-preview/image/${match[2]}`;
+      return new Response(JSON.stringify(meta), { status: upstream.status, headers });
     }
-    return new Response(request.method === "HEAD" ? null : cached.body, {
-      status: cached.status,
-      headers: cached.headers,
-    });
+    return new Response(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
   }
 
   return new Response("Niet gevonden", { status: 404, headers: { "cache-control": "no-store" } });
@@ -241,16 +217,9 @@ async function htmlWithSharePreview(request) {
   const url = new URL(request.url);
   const token = url.searchParams.get("talera_invite") || "";
   if (!SHARE_PREVIEW_TOKEN.test(token)) return HTML;
-  const cached = await caches.default.match(previewCacheRequest(request, "meta", token));
-  if (!cached) return HTML;
-
-  let meta;
-  try {
-    meta = await cached.json();
-  } catch (error) {
-    return HTML;
-  }
-  if (!meta || Number(meta.expiresAt) < Date.now()) return HTML;
+  const meta = await fetchPreviewMeta(token);
+  if (!meta) return HTML;
+  meta.imageUrl = `${url.origin}/api/share-preview/image/${token}`;
 
   const title = meta.kind === "timeline"
     ? "Mark nodigt je uit via TALERA"

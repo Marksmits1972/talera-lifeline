@@ -1,16 +1,38 @@
 import assert from "node:assert/strict";
+import { shareExperienceScript } from "../src/share-experience.js";
+
+assert.match(shareExperienceScript, /async function prepareShare\(\)/);
+assert.match(shareExperienceScript, /function shareViaWhatsApp\(\)/);
+const directHandoff = shareExperienceScript.match(/function shareViaWhatsApp\(\)\{([\s\S]*?)\n  \}/)?.[1] || "";
+assert.doesNotMatch(directHandoff, /await|fetch\(/);
+assert.match(directHandoff, /location\.href=state\.preparedWhatsAppUrl/);
 
 const entries = new Map();
-globalThis.caches = {
-  default: {
-    async put(request, response) {
-      entries.set(new URL(request.url).toString(), response.clone());
-    },
-    async match(request) {
-      const response = entries.get(new URL(request.url).toString());
-      return response ? response.clone() : undefined;
-    },
+const bucket = {
+  async put(key, value, options = {}) {
+    const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
+    entries.set(key, { bytes, options, etag: `etag-${key}` });
   },
+  async head(key) {
+    const entry = entries.get(key);
+    if (!entry) return null;
+    return { etag: entry.etag, httpEtag: entry.etag, writeHttpMetadata(headers) { if (entry.options.httpMetadata?.contentType) headers.set("content-type", entry.options.httpMetadata.contentType); } };
+  },
+  async get(key) {
+    const entry = entries.get(key);
+    if (!entry) return null;
+    const blob = new Blob([entry.bytes], { type: entry.options.httpMetadata?.contentType || "application/octet-stream" });
+    return { body: blob.stream(), etag: entry.etag, httpEtag: entry.etag, text: () => blob.text(), writeHttpMetadata(headers) { if (entry.options.httpMetadata?.contentType) headers.set("content-type", entry.options.httpMetadata.contentType); } };
+  },
+  async delete(key) { entries.delete(key); },
+};
+const { handleSharePreviewStorage } = await import("../xxory-test/src/share-preview-storage.js");
+const storageEnv = { MEDIA: bucket };
+globalThis.fetch = async (input, init) => {
+  const request = input instanceof Request && !init ? input : new Request(input, init);
+  const response = await handleSharePreviewStorage(request, storageEnv);
+  if (!response) throw new Error(`Unexpected upstream request: ${request.url}`);
+  return response;
 };
 
 const { default: worker } = await import("../src/index.js");
@@ -42,5 +64,17 @@ assert.equal((await meta.json()).hasPhoto, true);
 const image = await worker.fetch(new Request(`https://talera.example/api/share-preview/image/${token}`));
 assert.equal(image.status, 200);
 assert.equal(image.headers.get("content-type"), "image/jpeg");
+
+const secondForm = new FormData();
+secondForm.append("image", new Blob([new Uint8Array([255, 216, 255, 217])], { type: "image/jpeg" }), "preview.jpg");
+secondForm.append("title", "Dezelfde foto, nieuwe uitnodiging");
+const second = await worker.fetch(new Request("https://talera.example/api/share-preview", { method: "POST", body: secondForm }));
+assert.equal(second.status, 200);
+assert.equal([...entries.keys()].filter((key) => key.startsWith("share-previews/images/")).length, 1);
+
+const unavailableForm = new FormData();
+unavailableForm.append("image", new Blob([new Uint8Array([255, 216, 255, 217])], { type: "image/jpeg" }), "preview.jpg");
+const unavailable = await handleSharePreviewStorage(new Request("https://xxory.example/api/integration/share-preview", { method: "POST", body: unavailableForm }), {});
+assert.equal(unavailable.status, 503);
 
 console.log("share preview flow: ok");

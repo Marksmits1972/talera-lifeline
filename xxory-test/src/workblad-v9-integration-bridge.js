@@ -1,12 +1,13 @@
 export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="talera-workblad-v9-integration-bridge">
 (() => {
-  const REV = 'workblad-v9-manual-handoff-20260915-r5';
+  const REV = 'workblad-v9-optional-audio-edit-bypass-20260915-r6';
   const DB_NAME = 'talera-workblad-v2';
   const STORE = 'drafts';
   const originalFetch = window.fetch.bind(window);
   const log = (...args) => console.log('[TALERA V9 BRIDGE]', ...args);
   const $ = id => document.getElementById(id);
   const findSaveButton = () => $('workFinish');
+  const isEditMode = () => Boolean(new URLSearchParams(location.search).get('edit'));
 
   function ensureProgressStyles() {
     if ($('talera-v9-progress-styles')) return;
@@ -92,7 +93,7 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
   }
 
   async function uploadAudio(blob) {
-    setStatus('Stap 1/4 · je stem wordt exact gecontroleerd…');
+    setStatus('Je gesproken verhaal wordt exact gecontroleerd…');
     const localSha = await sha256(blob);
     const type = String(blob.type || 'application/octet-stream');
     const name = /mp4|m4a/i.test(type) ? 'verhaal.m4a' : /ogg/i.test(type) ? 'verhaal.ogg' : /mpeg|mp3/i.test(type) ? 'verhaal.mp3' : 'verhaal.webm';
@@ -115,7 +116,7 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
 
   async function uploadPhoto(blob) {
     if (!(blob instanceof Blob) || !blob.size) return null;
-    setStatus('Stap 2/4 · je foto wordt apart gecontroleerd…');
+    setStatus('Je foto wordt apart gecontroleerd…');
     const localSha = await sha256(blob);
     const type = String(blob.type || 'image/jpeg');
     const name = blob.name || (/png/i.test(type) ? 'herinnering.png' : /heic|heif/i.test(type) ? 'herinnering.heic' : 'herinnering.jpg');
@@ -131,21 +132,22 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
   }
 
   async function saveMemory(audioData, photoData, snapshot) {
-    setStatus('Stap 3/4 · titel, datum en verhaal worden gekoppeld…');
+    setStatus('Titel, datum en verhaal worden veilig gekoppeld…');
     const title = String(snapshot.title || '').trim();
     const eventTime = String(snapshot.eventTime || '').trim();
     const storyText = String(snapshot.storyText || '').trim();
     if (!title) throw new Error('Vul eerst een titel in');
     if (!eventTime) throw new Error('Kies eerst wanneer dit verhaal speelde');
+    if (!storyText && !audioData && !photoData) throw new Error('Voeg eerst tekst, een foto of een gesproken verhaal toe');
     return jsonFetch('/api/v9/memory', {
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({ title, eventTime, storyText, audioId:audioData.id, photoId:photoData?.id || null })
+      body:JSON.stringify({ title, eventTime, storyText, audioId:audioData?.id || null, photoId:photoData?.id || null })
     });
   }
 
   async function verifyMemory(memory) {
-    setStatus('Stap 4/4 · de complete herinnering wordt teruggelezen…');
+    setStatus('De complete herinnering wordt teruggelezen…');
     const data = await jsonFetch('/api/v9/memory/' + encodeURIComponent(memory.memoryId), { method:'GET' });
     if (!data?.memory?.id || data.memory.id !== memory.memoryId) throw new Error('Herinnering kon niet worden teruggelezen');
     return data;
@@ -154,6 +156,11 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
   async function runV9Save(ev) {
     const btn = findSaveButton();
     if (!btn) return;
+
+    // Bestaande herinneringen hebben al een bewezen updatepad in workblad-v2.
+    // Laat dat pad volledig eigenaar zijn; de V9-create bridge mag hier niet tussenkomen.
+    if (isEditMode()) return;
+
     if (btn.dataset.v9Saved === '1') return;
     if (btn.dataset.v9Busy === '1') {
       ev.preventDefault();
@@ -164,10 +171,10 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     ev.stopImmediatePropagation();
     btn.dataset.v9Busy = '1';
     btn.disabled = true;
-    let saved = false;
     try {
       const snapshot = readCurrentWorkblad();
       const audio = snapshot.audioBlob;
+      const hasAudio = audio instanceof Blob && audio.size > 0;
       const selectedPhotos = Array.isArray(snapshot.photos) ? snapshot.photos.filter(x => x instanceof Blob && x.size > 0) : [];
       setStatus('Je foto’s worden voorbereid voor snelle, scherpe weergave…');
       const photos = [];
@@ -175,10 +182,10 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
         const optimized = typeof window.__taleraOptimizePhoto === 'function' ? await window.__taleraOptimizePhoto(source) : source;
         photos.push(optimized || source);
       }
-      if (!(audio instanceof Blob) || !audio.size) throw new Error('Geen geluidsopname gevonden in het huidige werkblad. Spreek eerst opnieuw in.');
-      log('current workblad read', {audioBytes:audio.size, photoCount:photos.length, title:snapshot.title, eventTime:snapshot.eventTime});
+      log('current workblad read', {audioBytes:hasAudio?audio.size:0, photoCount:photos.length, title:snapshot.title, eventTime:snapshot.eventTime});
 
-      const audioData = await uploadAudio(audio);
+      const audioData = hasAudio ? await uploadAudio(audio) : null;
+      if (!hasAudio) setStatus('Geen opname gekozen · tekst en foto’s worden zonder audio opgeslagen…');
       const photoData = await uploadPhoto(photos[0] || snapshot.photoFile || null);
       const memory = await saveMemory(audioData, photoData, snapshot);
       await verifyMemory(memory);
@@ -190,7 +197,6 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
       setStatus('✓ Veilig opgeslagen. Koppel de herinnering wanneer jij klaar bent aan je tijdlijn.', 'ok');
       btn.textContent = 'Koppelen aan mijn tijdlijn';
       btn.dataset.v9Saved = '1';
-      saved = true;
       document.dispatchEvent(new CustomEvent('talera:v9-memory-saved', { detail:{ memoryId:memory.memoryId } }));
       log('complete memory saved', memory);
     } catch (error) {

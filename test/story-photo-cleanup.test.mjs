@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const cleanupSource = readFileSync(new URL('../xxory-test/src/workblad-story-photo-cleanup.js', import.meta.url), 'utf8');
 const managementSource = readFileSync(new URL('../xxory-test/src/workblad-story-management.js', import.meta.url), 'utf8');
+const compatSource = readFileSync(new URL('../xxory-test/src/workblad-management-compat.js', import.meta.url), 'utf8');
 const wrapperSource = readFileSync(new URL('../xxory-test/src/orb-app-v79-worker-timeline-publish.js', import.meta.url), 'utf8');
 
 test('photo cleanup is authenticated and limited to image media belonging to the story', () => {
@@ -25,6 +26,9 @@ test('legacy photo cleanup browser dialogs are completely retired', () => {
   assert.doesNotMatch(cleanupSource, /\bconfirm\s*\(\s*['\"]/);
   assert.doesNotMatch(cleanupSource, /\balert\s*\(\s*['\"]/);
   assert.doesNotMatch(cleanupSource, /location\.reload\s*\(/);
+  assert.match(compatSource, /talera-story-photo-cleanup-panel/);
+  assert.match(compatSource, /talera-story-photo-cleanup-style/);
+  assert.match(compatSource, /MutationObserver/);
 });
 
 test('management v2 owns the large photo removal controls', () => {
@@ -39,6 +43,6 @@ test('wrapper keeps cleanup API while only injecting the v2 management UI', () =
   assert.match(wrapperSource, /handleStoryPhotoCleanup/);
   assert.match(wrapperSource, /handleV9StagedPhotoLink/);
   assert.match(wrapperSource, /handleV9TimelinePublish/);
-  assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT \+ WORKBLAD_STORY_MANAGEMENT_SCRIPT/);
+  assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT \+ WORKBLAD_MANAGEMENT_COMPAT_SCRIPT \+ WORKBLAD_STORY_MANAGEMENT_SCRIPT/);
   assert.doesNotMatch(wrapperSource, /WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT/);
 });

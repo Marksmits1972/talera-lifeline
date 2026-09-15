@@ -28,13 +28,17 @@ export async function handleV9TimelinePublish(request, env) {
   `).bind(memoryId).first();
   if (!row) return json({ error: 'V9-herinnering niet gevonden.' }, 404);
 
-  const audioHead = await env.MEDIA.head(row.audio_key);
-  if (!audioHead || Number(audioHead.size || 0) !== Number(row.audio_size_bytes || 0)) {
-    return json({ error: 'De bewezen audio kon niet meer exact worden bevestigd.' }, 409);
-  }
-  const audioSha = String(audioHead.customMetadata?.sha256 || '');
-  if (!audioSha || audioSha !== String(row.audio_sha256 || '')) {
-    return json({ error: 'De bewezen audio-hash klopt niet meer.' }, 409);
+  const hasAudio = Boolean(String(row.audio_key || '') && Number(row.audio_size_bytes || 0) > 0 && String(row.audio_sha256 || ''));
+  let audioHead = null;
+  if (hasAudio) {
+    audioHead = await env.MEDIA.head(row.audio_key);
+    if (!audioHead || Number(audioHead.size || 0) !== Number(row.audio_size_bytes || 0)) {
+      return json({ error: 'De bewezen audio kon niet meer exact worden bevestigd.' }, 409);
+    }
+    const audioSha = String(audioHead.customMetadata?.sha256 || '');
+    if (!audioSha || audioSha !== String(row.audio_sha256 || '')) {
+      return json({ error: 'De bewezen audio-hash klopt niet meer.' }, 409);
+    }
   }
 
   let photoHead = null;
@@ -65,9 +69,9 @@ export async function handleV9TimelinePublish(request, env) {
     `).bind(
       storyId,
       row.created_at || now,
-      row.audio_key,
-      row.audio_mime_type || audioHead.httpMetadata?.contentType || 'application/octet-stream',
-      Number(audioHead.size || row.audio_size_bytes || 0),
+      hasAudio ? row.audio_key : '',
+      hasAudio ? (row.audio_mime_type || audioHead?.httpMetadata?.contentType || 'application/octet-stream') : '',
+      hasAudio ? Number(audioHead?.size || row.audio_size_bytes || 0) : 0,
       null,
       null,
       manageTokenHash,
@@ -116,7 +120,8 @@ export async function handleV9TimelinePublish(request, env) {
     LEFT JOIN story_texts tx ON tx.story_id = st.id
     WHERE st.id = ? LIMIT 1
   `).bind(storyId).first();
-  if (!verify || verify.status !== 'active' || verify.audio_object_key !== row.audio_key) {
+  const audioMatches = hasAudio ? verify?.audio_object_key === row.audio_key : !String(verify?.audio_object_key || '');
+  if (!verify || verify.status !== 'active' || !audioMatches) {
     return json({ error: 'De tijdlijnkoppeling kon niet worden teruggecontroleerd.' }, 500);
   }
 

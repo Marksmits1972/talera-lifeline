@@ -1,18 +1,38 @@
 export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera-workblad-v9-timeline-handoff">
 (() => {
-  const REV = 'workblad-v9-timeline-handoff-20260914-r2';
+  const REV = 'workblad-v9-manual-timeline-handoff-20260915-r3';
   let publishing = false;
+  let readyMemoryId = '';
   let publishedMemoryId = '';
-  let timer = 0;
+  let publishedHandoffUrl = '';
+
+  function ensureProgressStyles() {
+    if (document.getElementById('talera-v9-progress-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'talera-v9-progress-styles';
+    style.textContent = '@keyframes taleraV9Spin{to{transform:rotate(360deg)}}.talera-v9-spinner{display:inline-block;flex:0 0 auto;width:20px;height:20px;border:3px solid rgba(23,56,94,.22);border-top-color:#17385e;border-radius:50%;animation:taleraV9Spin .8s linear infinite}.talera-v9-status-text{min-width:0}';
+    document.head.appendChild(style);
+  }
 
   function statusBox() {
     return document.getElementById('talera-v9-bridge-status');
   }
 
-  function setStatus(text, mode='') {
+  function setStatus(text, mode='busy') {
     const box = statusBox();
     if (!box) return;
-    box.textContent = text;
+    ensureProgressStyles();
+    box.replaceChildren();
+    if (mode === 'busy') {
+      const spinner = document.createElement('span');
+      spinner.className = 'talera-v9-spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      box.appendChild(spinner);
+    }
+    const label = document.createElement('span');
+    label.className = 'talera-v9-status-text';
+    label.textContent = text;
+    box.appendChild(label);
     box.style.background = mode === 'bad' ? '#fbe9e6' : mode === 'ok' ? '#e8f3ed' : '#eef4f7';
     box.style.color = mode === 'bad' ? '#923d35' : mode === 'ok' ? '#2c684e' : '#17385e';
   }
@@ -20,6 +40,11 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
   function setFinishLabel(text) {
     const btn = document.getElementById('workFinish');
     if (btn) btn.textContent = text;
+  }
+
+  function setFinishDisabled(disabled) {
+    const btn = document.getElementById('workFinish');
+    if (btn) btn.disabled = Boolean(disabled);
   }
 
   function addRetry(memoryId) {
@@ -79,7 +104,7 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
   async function publish(memoryId) {
     if (!memoryId || publishing || publishedMemoryId === memoryId) return;
     publishing = true;
-    clearTimeout(timer);
+    setFinishDisabled(true);
     setFinishLabel('Koppelen aan tijdlijn…');
     setStatus('Laatste stap · je herinnering wordt aan de tijdlijn gekoppeld…');
     try {
@@ -96,6 +121,7 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
       await attachExtraPhotos(data);
 
       publishedMemoryId = memoryId;
+      publishedHandoffUrl = data.handoffUrl;
       window.__taleraPendingV9Photos = [];
       try {
         localStorage.setItem('talera-last-v9-timeline-handoff-v1', JSON.stringify({
@@ -107,28 +133,50 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
         }));
       } catch {}
 
-      setFinishLabel('Gekoppeld aan mijn tijdlijn');
-      setStatus('✓ Veilig opgeslagen én aan je tijdlijn gekoppeld.', 'ok');
-      timer = setTimeout(() => goToTimeline(data.handoffUrl), 1100);
+      setFinishLabel('Open mijn tijdlijn');
+      setStatus('✓ Veilig opgeslagen én gekoppeld. Open nu zelf je tijdlijn.', 'ok');
       console.log('[TALERA V9 TIMELINE]', 'published', {revision:REV, memoryId, storyId:data.storyId, reused:Boolean(data.reused)});
     } catch (error) {
-      setFinishLabel('Veilig opgeslagen');
+      setFinishLabel('Koppelen aan mijn tijdlijn');
       setStatus('Je herinnering is veilig opgeslagen, maar de koppeling met de tijdlijn lukte nog niet: ' + String(error?.message || error), 'bad');
       addRetry(memoryId);
       console.warn('[TALERA V9 TIMELINE]', 'publish failed', error);
     } finally {
       publishing = false;
+      setFinishDisabled(false);
     }
   }
 
-  function check() {
-    const id = String(window.__taleraLastV9MemoryId || '');
-    if (id && id !== publishedMemoryId) publish(id);
+  function armManualHandoff(memoryId) {
+    const id = String(memoryId || window.__taleraLastV9MemoryId || '');
+    if (!id || publishedMemoryId === id) return;
+    readyMemoryId = id;
+    setFinishLabel('Koppelen aan mijn tijdlijn');
+    setFinishDisabled(false);
   }
 
-  const interval = setInterval(check, 220);
-  window.addEventListener('pagehide', () => clearInterval(interval), {once:true});
-  window.addEventListener('pageshow', check);
-  check();
+  function onFinishClick(event) {
+    const memoryId = String(readyMemoryId || window.__taleraLastV9MemoryId || '');
+    if (!memoryId) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (publishedMemoryId === memoryId && publishedHandoffUrl) {
+      goToTimeline(publishedHandoffUrl);
+      return;
+    }
+    publish(memoryId);
+  }
+
+  function armButton() {
+    const btn = document.getElementById('workFinish');
+    if (!btn || btn.dataset.v9TimelineArmed === '1') return;
+    btn.dataset.v9TimelineArmed = '1';
+    btn.addEventListener('click', onFinishClick, true);
+  }
+
+  document.addEventListener('talera:v9-memory-saved', event => armManualHandoff(event.detail?.memoryId));
+  window.addEventListener('pageshow', () => armManualHandoff());
+  armButton();
+  new MutationObserver(armButton).observe(document.documentElement, {subtree:true, childList:true});
 })();
 </script>`;

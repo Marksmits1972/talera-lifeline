@@ -1,6 +1,6 @@
 export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="talera-workblad-v9-integration-bridge">
 (() => {
-  const REV = 'workblad-v9-photo-master-20260915-r4';
+  const REV = 'workblad-v9-manual-handoff-20260915-r5';
   const DB_NAME = 'talera-workblad-v2';
   const STORE = 'drafts';
   const originalFetch = window.fetch.bind(window);
@@ -8,12 +8,20 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
   const $ = id => document.getElementById(id);
   const findSaveButton = () => $('workFinish');
 
+  function ensureProgressStyles() {
+    if ($('talera-v9-progress-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'talera-v9-progress-styles';
+    style.textContent = '@keyframes taleraV9Spin{to{transform:rotate(360deg)}}.talera-v9-spinner{display:inline-block;flex:0 0 auto;width:20px;height:20px;border:3px solid rgba(23,56,94,.22);border-top-color:#17385e;border-radius:50%;animation:taleraV9Spin .8s linear infinite}.talera-v9-status-text{min-width:0}';
+    document.head.appendChild(style);
+  }
+
   function statusBox() {
     let box = $('talera-v9-bridge-status');
     if (box) return box;
     box = document.createElement('div');
     box.id = 'talera-v9-bridge-status';
-    box.style.cssText = 'margin:12px 0;padding:12px 14px;border-radius:16px;font:700 14px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#eef4f7;color:#17385e;';
+    box.style.cssText = 'display:flex;align-items:center;gap:10px;margin:12px 0;padding:12px 14px;border-radius:16px;font:700 14px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#eef4f7;color:#17385e;';
     const sheet = document.querySelector('.work-sheet');
     const tools = document.querySelector('.work-tools');
     if (sheet && tools) sheet.insertBefore(box, tools);
@@ -21,9 +29,20 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     return box;
   }
 
-  function setStatus(text, mode='') {
+  function setStatus(text, mode='busy') {
+    ensureProgressStyles();
     const box = statusBox();
-    box.textContent = text;
+    box.replaceChildren();
+    if (mode === 'busy') {
+      const spinner = document.createElement('span');
+      spinner.className = 'talera-v9-spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      box.appendChild(spinner);
+    }
+    const label = document.createElement('span');
+    label.className = 'talera-v9-status-text';
+    label.textContent = text;
+    box.appendChild(label);
     box.style.background = mode === 'bad' ? '#fbe9e6' : mode === 'ok' ? '#e8f3ed' : '#eef4f7';
     box.style.color = mode === 'bad' ? '#923d35' : mode === 'ok' ? '#2c684e' : '#17385e';
   }
@@ -133,10 +152,16 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
   }
 
   async function runV9Save(ev) {
+    const btn = findSaveButton();
+    if (!btn) return;
+    if (btn.dataset.v9Saved === '1') return;
+    if (btn.dataset.v9Busy === '1') {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      return;
+    }
     ev.preventDefault();
     ev.stopImmediatePropagation();
-    const btn = findSaveButton();
-    if (!btn || btn.dataset.v9Busy === '1' || btn.dataset.v9Saved === '1') return;
     btn.dataset.v9Busy = '1';
     btn.disabled = true;
     let saved = false;
@@ -162,17 +187,18 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
       await clearDraft();
 
       window.__taleraLastV9MemoryId = memory.memoryId;
-      setStatus('✓ Complete herinnering veilig bevestigd via de bewezen v9-motor.', 'ok');
-      btn.textContent = 'Veilig opgeslagen';
+      setStatus('✓ Veilig opgeslagen. Koppel de herinnering wanneer jij klaar bent aan je tijdlijn.', 'ok');
+      btn.textContent = 'Koppelen aan mijn tijdlijn';
       btn.dataset.v9Saved = '1';
       saved = true;
+      document.dispatchEvent(new CustomEvent('talera:v9-memory-saved', { detail:{ memoryId:memory.memoryId } }));
       log('complete memory saved', memory);
     } catch (error) {
       setStatus('Opslaan mislukt: ' + String(error?.message || error), 'bad');
       log('save failed', error);
     } finally {
       btn.dataset.v9Busy = '0';
-      btn.disabled = saved;
+      btn.disabled = false;
     }
   }
 

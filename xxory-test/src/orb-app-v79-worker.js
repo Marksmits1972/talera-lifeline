@@ -14,7 +14,7 @@ import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 import { handleWorkbladV9 } from "./workblad-v9-clean.js";
 import { V9_PLAYBACK_PATCH_SCRIPT, V9_PLAYBACK_PATCH_REV } from "./workblad-v9-playback-patch.js";
 
-const TALERA_DEPLOY_REV = "workblad-v9-integrated-20260914-r3";
+const TALERA_DEPLOY_REV = "workblad-v9-manual-handoff-20260915-r5";
 const WORKBLAD_V9_HANDOFF = "window.__taleraWorkbladV9Read=function(){capture();ensure();var photos=state.workMedia.filter(function(m){return m&&m.kind==='local'&&m.file instanceof Blob&&m.file.size>0}).map(function(m){return m.file});return {audioBlob:(state.audioBlob instanceof Blob&&state.audioBlob.size)?state.audioBlob:null,photoFile:photos[0]||null,photos:photos,title:String(state.workTitle||''),eventTime:String(state.workDate||''),storyText:String(state.workText||''),duration:Number(state.duration)||0,voiceAttempted:Boolean(state.voiceAttempted)};};";
 const WORKBLAD_V2_EXPOSED_SCRIPT = WORKBLAD_V2_SCRIPT.replace(
   'renderEntry=renderWorkblad;activateMic=voiceStart;',
@@ -86,7 +86,7 @@ export default {
         ok:true,
         revision:TALERA_DEPLOY_REV,
         workbladV9Bridge:true,
-        workbladV9BridgeRevision:'workblad-v9-bridge-20260914-r3',
+        workbladV9BridgeRevision:'workblad-v9-manual-handoff-20260915-r5',
         workbladStateHandoff:true,
         v9IsolatedRoute:'/v9',
         v9RevisionRoute:'/api/v9/revision',

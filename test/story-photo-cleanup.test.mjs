@@ -20,15 +20,22 @@ test('removing the cover promotes the next image or clears the cover safely', ()
   assert.match(cleanupSource, /UPDATE stories SET start_photo_key = NULL, updated_at = \?/);
 });
 
-test('large photo management controls exist only in edit context', () => {
-  assert.match(managementSource, /q\.get\('edit'\)/);
+test('legacy photo cleanup browser dialogs are completely retired', () => {
+  assert.match(cleanupSource, /WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT = ''/);
+  assert.doesNotMatch(cleanupSource, /\bconfirm\s*\(/);
+  assert.doesNotMatch(cleanupSource, /\balert\s*\(/);
+  assert.doesNotMatch(cleanupSource, /location\.reload\s*\(/);
+});
+
+test('management v2 owns the large photo removal controls', () => {
   assert.match(managementSource, /Verwijder foto/);
   assert.match(managementSource, /method:'DELETE'/);
   assert.match(managementSource, /talera-manage-photo-remove/);
-  assert.match(managementSource, /min-height:46px/);
+  assert.match(managementSource, /min-height:48px/);
+  assert.match(managementSource, /Ongedaan maken/);
 });
 
-test('wrapper keeps cleanup API while replacing the old tiny injected panel', () => {
+test('wrapper keeps cleanup API while only injecting the v2 management UI', () => {
   assert.match(wrapperSource, /handleStoryPhotoCleanup/);
   assert.match(wrapperSource, /handleV9StagedPhotoLink/);
   assert.match(wrapperSource, /handleV9TimelinePublish/);

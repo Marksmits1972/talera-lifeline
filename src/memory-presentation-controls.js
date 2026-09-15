@@ -22,7 +22,19 @@ export const memoryPresentationControlsStyle = String.raw`
 .talera-audio-consent .consent-speaker{font-size:21px;line-height:1}
 .talera-audio-consent .consent-copy{display:flex;flex-direction:column;gap:2px}
 .talera-audio-consent small{font-size:10px;font-weight:520;color:rgba(255,255,255,.76)}
-@media(max-width:430px){.talera-memory-audio{right:12px;bottom:74px;width:46px;min-width:46px;height:46px;padding:3px}.talera-memory-audio .audio-symbol{width:40px;height:40px}.talera-memory-edit{right:10px;top:10px;width:38px;height:38px}}
+.talera-memory-manager{position:fixed;inset:0;z-index:95;display:flex;align-items:flex-end;justify-content:center;padding:12px 10px max(12px,env(safe-area-inset-bottom));background:rgba(6,18,30,.18);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.talera-memory-manager[hidden]{display:none!important}
+.talera-memory-manager-card{width:min(100%,520px);padding:12px;border-radius:28px;background:#fffdfa;color:#0F2747;box-shadow:0 24px 70px rgba(6,18,30,.28)}
+.talera-memory-manager-head{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;padding:2px 2px 10px}
+.talera-memory-manager-head strong{display:block;text-align:center;font:790 18px/1.1 system-ui}
+.talera-memory-manager-close{grid-column:3;width:44px;height:44px;border:0;border-radius:50%;background:rgba(220,234,246,.62);color:#0F2747;font:700 23px/1 system-ui}
+.talera-memory-manager-title{margin:0 4px 12px;color:#647181;text-align:center;font:570 13px/1.35 system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.talera-memory-manager-actions{display:grid;gap:9px}
+.talera-memory-manager-action{width:100%;min-height:58px;border:0;border-radius:18px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;color:#0F2747;background:#f2f5f7;box-shadow:inset 0 0 0 1px rgba(15,39,71,.07);font:760 15px/1.2 system-ui}
+.talera-memory-manager-action span:last-child{font-size:22px;color:rgba(15,39,71,.36)}
+.talera-memory-manager-action.delete{color:#8A2F2A;background:rgba(193,79,69,.09);box-shadow:inset 0 0 0 1px rgba(193,79,69,.16)}
+.talera-memory-manager-note{margin:11px 5px 2px;color:#778391;text-align:center;font:520 11px/1.35 system-ui}
+@media(max-width:430px){.talera-memory-audio{right:12px;bottom:74px;width:46px;min-width:46px;height:46px;padding:3px}.talera-memory-audio .audio-symbol{width:40px;height:40px}.talera-memory-edit{right:10px;top:10px;width:38px;height:38px}.talera-memory-manager-card{border-radius:24px}.talera-memory-manager-action{min-height:56px}}
 `;
 
 export const memoryPresentationControlsScript = String.raw`
@@ -43,17 +55,23 @@ export const memoryPresentationControlsScript = String.raw`
   const oldTell=document.querySelector('.tell');
   if(oldTell){
     const fresh=oldTell.cloneNode(true);oldTell.replaceWith(fresh);
-    fresh.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();stopAudio(true);location.href=TELL_ORIGIN+'/?new=1&at='+encodeURIComponent(new Date(runtime.centerMs()).toISOString())},true);
+    fresh.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeManager();stopAudio(true);location.href=TELL_ORIGIN+'/?new=1&at='+encodeURIComponent(new Date(runtime.centerMs()).toISOString())},true);
   }
 
   const tools=document.createElement('div');
   tools.className='talera-memory-tools';
-  tools.innerHTML='<button class="talera-memory-tool talera-memory-audio" type="button" aria-label="Luister naar het gesproken verhaal" hidden><span class="audio-symbol">▶</span><span class="audio-label">Luister</span></button><button class="talera-memory-tool talera-memory-edit" type="button" aria-label="Herinnering bewerken" hidden><span class="edit-symbol">✎</span></button>';
+  tools.innerHTML='<button class="talera-memory-tool talera-memory-audio" type="button" aria-label="Luister naar het gesproken verhaal" hidden><span class="audio-symbol">▶</span><span class="audio-label">Luister</span></button><button class="talera-memory-tool talera-memory-edit" type="button" aria-label="Herinnering beheren" hidden><span class="edit-symbol">✎</span></button>';
   memorySpace.appendChild(tools);
+
+  const manager=document.createElement('div');
+  manager.className='talera-memory-manager';manager.hidden=true;
+  manager.innerHTML='<section class="talera-memory-manager-card" role="dialog" aria-modal="true" aria-label="Herinnering beheren"><div class="talera-memory-manager-head"><strong>Herinnering beheren</strong><button type="button" class="talera-memory-manager-close" aria-label="Sluiten">×</button></div><div class="talera-memory-manager-title"></div><div class="talera-memory-manager-actions"><button type="button" class="talera-memory-manager-action edit"><span>Herinnering bewerken</span><span>›</span></button><button type="button" class="talera-memory-manager-action photos"><span>Foto’s beheren</span><span>›</span></button><button type="button" class="talera-memory-manager-action delete"><span>Herinnering verwijderen</span><span>›</span></button></div><div class="talera-memory-manager-note">Verwijderen gebruikt een korte ongedaan-makenperiode en geen browsermelding.</div></section>';
+  document.body.appendChild(manager);
 
   const audioButton=tools.querySelector('.talera-memory-audio');
   const audioLabel=tools.querySelector('.audio-label');
   const editButton=tools.querySelector('.talera-memory-edit');
+  const managerTitle=manager.querySelector('.talera-memory-manager-title');
   const audio=new Audio();audio.preload='auto';audio.setAttribute('playsinline','');
   const audioUrls=new Map();
   const AUTO_START_DELAY=360;
@@ -64,6 +82,24 @@ export const memoryPresentationControlsScript = String.raw`
   function usable(m){return Boolean(m&&m._taleraLive&&m.storyId&&tokenFor(m))}
   function auth(token){return {authorization:'Bearer '+token}}
   function showAudio(v){audioButton.hidden=!v}
+  function editUrl(memory,mode=''){
+    const query=new URLSearchParams();query.set('edit',memory.storyId);if(mode)query.set('manage',mode);
+    return TELL_ORIGIN+'/?'+query.toString()+'#token='+encodeURIComponent(tokenFor(memory));
+  }
+  function notifyOverlay(open){document.dispatchEvent(new CustomEvent('talera:overlay-change',{detail:{open:Boolean(open),source:'memory-manager'}}))}
+  function closeManager(){if(manager.hidden)return;manager.hidden=true;notifyOverlay(false)}
+  function openManager(){
+    const memory=runtime.currentMemory();if(!usable(memory))return;
+    stopAudio(false);manualSuppressed=true;managerTitle.textContent=memory.title||memory.story||'Deze herinnering';manager.hidden=false;notifyOverlay(true);
+  }
+  function navigateManage(mode){const memory=runtime.currentMemory();if(!usable(memory))return;closeManager();stopAudio(true);location.href=editUrl(memory,mode)}
+
+  manager.querySelector('.talera-memory-manager-close').addEventListener('click',closeManager);
+  manager.addEventListener('click',e=>{if(e.target===manager)closeManager()});
+  manager.querySelector('.edit').addEventListener('click',()=>navigateManage(''));
+  manager.querySelector('.photos').addEventListener('click',()=>navigateManage('photos'));
+  manager.querySelector('.delete').addEventListener('click',()=>navigateManage('delete-now'));
+
   function setProgress(){
     const duration=Number(audio.duration)||0;
     const current=Number(audio.currentTime)||0;
@@ -168,35 +204,23 @@ export const memoryPresentationControlsScript = String.raw`
   audio.addEventListener('durationchange',setProgress);
   audio.addEventListener('ended',()=>{try{audio.currentTime=0}catch(e){}setProgress();setUi()});
   audio.addEventListener('error',()=>{loadFailed=true;exitListeningMode();setUi()});
-  document.addEventListener('pointerdown',()=>{
-    cancelAutoStart();
-  },true);
-  document.addEventListener('pointerup',()=>{
-    if(audio.paused&&audio.currentTime===0&&!manualSuppressed)scheduleAutoStart(renderEpoch);
-  },true);
+  document.addEventListener('pointerdown',()=>{cancelAutoStart()},true);
+  document.addEventListener('pointerup',()=>{if(audio.paused&&audio.currentTime===0&&!manualSuppressed)scheduleAutoStart(renderEpoch)},true);
   document.addEventListener('pointercancel',cancelAutoStart,true);
   document.addEventListener('talera:overlay-change',e=>{
+    if(e.detail&&e.detail.source==='memory-manager')return;
     if(e.detail&&e.detail.open){manualSuppressed=true;stopAudio(false);return}
-    manualSuppressed=false;
-    scheduleAutoStart(renderEpoch);
+    manualSuppressed=false;scheduleAutoStart(renderEpoch);
   });
 
   consent.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();cancelAutoStart();
     audioEnabled=true;autoBlocked=false;manualSuppressed=false;consent.hidden=true;
-    if(activeHasAudio&&!loading&&!loadFailed&&audio.src){
-      playNow(false);
-      return;
-    }
+    if(activeHasAudio&&!loading&&!loadFailed&&audio.src){playNow(false);return}
     try{
       const AudioContextClass=window.AudioContext||window.webkitAudioContext;
       if(AudioContextClass){
-        const context=new AudioContextClass();
-        const buffer=context.createBuffer(1,1,22050);
-        const source=context.createBufferSource();
-        source.buffer=buffer;source.connect(context.destination);source.start(0);
-        if(context.state==='suspended')context.resume();
-        setTimeout(()=>{try{context.close()}catch(err){}},180);
+        const context=new AudioContextClass();const buffer=context.createBuffer(1,1,22050);const source=context.createBufferSource();source.buffer=buffer;source.connect(context.destination);source.start(0);if(context.state==='suspended')context.resume();setTimeout(()=>{try{context.close()}catch(err){}},180);
       }
     }catch(err){}
   });
@@ -209,9 +233,10 @@ export const memoryPresentationControlsScript = String.raw`
     if(loadFailed||!audio.src){const ok=await prepare(activeStoryId,activeToken,renderEpoch,true);if(ok)playNow(false);return}
     playNow(false);
   });
-  editButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();stopAudio(true);const m=runtime.currentMemory();if(!usable(m))return;location.href=TELL_ORIGIN+'/?edit='+encodeURIComponent(m.storyId)+'#token='+encodeURIComponent(tokenFor(m))});
+  editButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openManager()});
 
   async function render(memory){
+    closeManager();
     const epoch=++renderEpoch;stopAudio(true);manualSuppressed=false;autoBlocked=false;const ok=usable(memory);editButton.hidden=!ok;activeStoryId=ok?memory.storyId:'';activeToken=ok?tokenFor(memory):'';activeHasAudio=false;showAudio(false);setUi();if(!ok)return;
     const hinted=Boolean(memory._hasAudio||memory._audioMimeType||Number(memory._durationSeconds)>0);
     loading=true;showAudio(true);setUi();

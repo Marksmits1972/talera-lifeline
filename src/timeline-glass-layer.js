@@ -62,12 +62,14 @@ main .timeline.is-marker-afterglow .focus{
   opacity:0!important;
 }
 
-/* Interaction stacking contract: story action buttons must stay above the
-   timeline hit surface. The tools wrapper itself remains pointer-transparent;
-   only its actual buttons receive taps, so timeline gestures keep working
-   everywhere else. */
-.talera-memory-tools{
-  z-index:24!important;
+/* Story actions belong to the photo/story plane, not to the timeline gesture
+   plane. Keep the pencil clearly below the timeline edge instead of punching a
+   higher-z-index hole through the timeline interaction surface. */
+.talera-memory-edit{
+  top:72px!important;
+}
+@media(max-width:430px){
+  .talera-memory-edit{top:64px!important}
 }
 
 /* ACTIVE: navigation is foreground, but still made from the photo beneath it. */

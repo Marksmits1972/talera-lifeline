@@ -19,7 +19,9 @@ import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 import { shareExperienceStyle, shareExperienceScript } from "./share-experience.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "whatsapp-demo-handoff-v4-20260915";
+const TALERA_TIMELINE_DEPLOY_REV = "whatsapp-photo-preview-v5-20260915";
+const SHARE_PREVIEW_MAX_BYTES = 900_000;
+const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
 const taleraIntegrationListeners=new Set();
@@ -136,6 +138,130 @@ const HTML = BASE_HTML
   .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style></head>`)
   .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script></body>`);
 
+function previewCacheRequest(request, type, token) {
+  const url = new URL(request.url);
+  url.pathname = `/api/share-preview/${type}/${token}`;
+  url.search = "";
+  return new Request(url.toString(), { method: "GET" });
+}
+
+function safePreviewText(value, fallback, maxLength = 180) {
+  const clean = String(value || "").replace(/\s+/g, " ").trim();
+  return (clean || fallback).slice(0, maxLength);
+}
+
+function escapeMeta(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+}
+
+function previewLifetime(duration) {
+  if (duration === "24 uur") return 24 * 60 * 60;
+  if (duration === "7 dagen") return 7 * 24 * 60 * 60;
+  return 30 * 24 * 60 * 60;
+}
+
+async function handleSharePreview(request) {
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/api/share-preview")) return null;
+  const cache = caches.default;
+
+  if (url.pathname === "/api/share-preview" && request.method === "POST") {
+    const statedSize = Number(request.headers.get("content-length")) || 0;
+    if (statedSize > SHARE_PREVIEW_MAX_BYTES + 100_000) {
+      return new Response("Preview te groot", { status: 413 });
+    }
+
+    let form;
+    try {
+      form = await request.formData();
+    } catch (error) {
+      return new Response("Ongeldige preview", { status: 400 });
+    }
+    const image = form.get("image");
+    if (!image || typeof image.arrayBuffer !== "function" || image.size > SHARE_PREVIEW_MAX_BYTES) {
+      return new Response("Afbeelding ontbreekt", { status: 400 });
+    }
+
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const kind = form.get("kind") === "timeline" ? "timeline" : "story";
+    const title = safePreviewText(form.get("title"), "Een persoonlijke herinnering");
+    const maxAge = previewLifetime(String(form.get("duration") || "30 dagen"));
+    const imageRequest = previewCacheRequest(request, "image", token);
+    const metaRequest = previewCacheRequest(request, "meta", token);
+    const meta = {
+      token,
+      kind,
+      title,
+      imageUrl: imageRequest.url,
+      hasPhoto: form.get("hasPhoto") === "1",
+      expiresAt: Date.now() + maxAge * 1000,
+    };
+
+    await Promise.all([
+      cache.put(imageRequest, new Response(image, {
+        headers: { "content-type": "image/jpeg", "cache-control": `public, max-age=${maxAge}` },
+      })),
+      cache.put(metaRequest, new Response(JSON.stringify(meta), {
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": `public, max-age=${maxAge}` },
+      })),
+    ]);
+
+    const shareUrl = new URL(request.url);
+    shareUrl.pathname = "/";
+    shareUrl.search = "";
+    shareUrl.searchParams.set("talera_demo", kind === "timeline" ? "recipient-timeline" : "recipient-story");
+    shareUrl.searchParams.set("talera_invite", token);
+    return Response.json({ shareUrl: shareUrl.toString(), expiresAt: meta.expiresAt }, {
+      headers: { "cache-control": "no-store" },
+    });
+  }
+
+  const match = url.pathname.match(/^\/api\/share-preview\/(image|meta)\/([a-f0-9]{32})$/);
+  if (match && (request.method === "GET" || request.method === "HEAD")) {
+    const cached = await cache.match(previewCacheRequest(request, match[1], match[2]));
+    if (!cached) {
+      return new Response("Preview verlopen", { status: 404, headers: { "cache-control": "no-store" } });
+    }
+    return new Response(request.method === "HEAD" ? null : cached.body, {
+      status: cached.status,
+      headers: cached.headers,
+    });
+  }
+
+  return new Response("Niet gevonden", { status: 404, headers: { "cache-control": "no-store" } });
+}
+
+async function htmlWithSharePreview(request) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("talera_invite") || "";
+  if (!SHARE_PREVIEW_TOKEN.test(token)) return HTML;
+  const cached = await caches.default.match(previewCacheRequest(request, "meta", token));
+  if (!cached) return HTML;
+
+  let meta;
+  try {
+    meta = await cached.json();
+  } catch (error) {
+    return HTML;
+  }
+  if (!meta || Number(meta.expiresAt) < Date.now()) return HTML;
+
+  const title = meta.kind === "timeline"
+    ? "Mark nodigt je uit via TALERA"
+    : `Mark deelt een herinnering: ${meta.title}`;
+  const description = meta.kind === "timeline"
+    ? "Bekijk de levensverhalen die Mark persoonlijk met je deelt."
+    : "Een persoonlijke herinnering om te bekijken en te beluisteren in TALERA.";
+  const tags = `<meta property="og:type" content="website"><meta property="og:site_name" content="TALERA"><meta property="og:title" content="${escapeMeta(title)}"><meta property="og:description" content="${escapeMeta(description)}"><meta property="og:image" content="${escapeMeta(meta.imageUrl)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMeta(title)}"><meta name="twitter:description" content="${escapeMeta(description)}"><meta name="twitter:image" content="${escapeMeta(meta.imageUrl)}">`;
+  return HTML.replace("</head>", `${tags}</head>`);
+}
+
 async function proxyLinkedMemory(request) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/linked/")) return null;
@@ -192,10 +318,13 @@ async function proxyLinkedMemory(request) {
 
 export default {
   async fetch(request) {
+    const preview = await handleSharePreview(request);
+    if (preview) return preview;
+
     const linked = await proxyLinkedMemory(request);
     if (linked) return linked;
 
-    return new Response(HTML, {
+    return new Response(await htmlWithSharePreview(request), {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",

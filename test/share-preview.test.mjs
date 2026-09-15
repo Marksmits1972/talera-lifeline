@@ -17,7 +17,8 @@ assert.match(shareExperienceScript, /if\(demoView==='recipient-story'\)loadInvit
 assert.doesNotMatch(shareExperienceScript, /open\('recipient-story'\)/);
 assert.doesNotMatch(liveMemoryIntegrationScript, /RECENT_LANDING_MS/);
 assert.doesNotMatch(liveMemoryIntegrationScript, /newest&&Date\.now/);
-assert.match(liveMemoryIntegrationScript, /if\(memory&&id===landingStoryId\)landing=memory/);
+assert.match(liveMemoryIntegrationScript, /await landTargetFirst\(landingStoryId,creds\[landingStoryId\]\)/);
+assert.match(liveMemoryIntegrationScript, /loadOtherMemoriesInBackground\(creds,landingStoryId\)/);
 
 const entries = new Map();
 const bucket = {

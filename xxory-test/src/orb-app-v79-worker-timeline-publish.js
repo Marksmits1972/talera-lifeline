@@ -5,9 +5,10 @@ import { handleV9TextMemory } from './workblad-v9-text-memory.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
 import { handleStoryPhotoCleanup } from './workblad-story-photo-cleanup.js';
 import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workblad-story-management.js';
+import { WORKBLAD_MANAGEMENT_COMPAT_SCRIPT } from './workblad-management-compat.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-text-photo-optional-audio-20260915-r10';
+const WRAPPER_REV = 'workblad-v9-text-photo-optional-audio-20260915-r11';
 
 export default {
   async fetch(request, env, ctx) {
@@ -76,6 +77,7 @@ export default {
         storyPhotoCleanup: true,
         storyManagement: true,
         storyManagementRevision: 'v2-undo',
+        legacyPhotoCleanupUi: false,
         storyDeleteMode: 'soft-delete'
       }, base.status || 200);
     }
@@ -91,7 +93,7 @@ export default {
     headers.set('cache-control', 'no-store, max-age=0');
     headers.set('x-talera-v9-timeline-publish', WRAPPER_REV);
     return new Response(
-      html.replace('</body>', WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_STORY_MANAGEMENT_SCRIPT + '</body>'),
+      html.replace('</body>', WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_MANAGEMENT_COMPAT_SCRIPT + WORKBLAD_STORY_MANAGEMENT_SCRIPT + '</body>'),
       { status: response.status, statusText: response.statusText, headers }
     );
   }

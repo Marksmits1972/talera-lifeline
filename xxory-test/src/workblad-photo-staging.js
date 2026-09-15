@@ -2,12 +2,14 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
 (() => {
   if (window.__taleraPhotoStaging) return;
 
-  const REV = 'photo-background-staging-20260915-r1';
+  const REV = 'photo-background-staging-20260915-r2';
   const cache = new WeakMap();
   const transportFetch = window.fetch.bind(window);
   const originalOptimizer = typeof window.__taleraOptimizePhoto === 'function'
     ? window.__taleraOptimizePhoto.bind(window)
     : null;
+  let pendingCount = 0;
+  let readyTimer = 0;
 
   function absoluteUrl(input) {
     try { return new URL(typeof input === 'string' ? input : input.url, location.href); }
@@ -23,6 +25,50 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
         'x-talera-photo-staging':REV
       }
     });
+  }
+
+  function ensureProgressStyle() {
+    if (document.getElementById('talera-photo-stage-style')) return;
+    const style = document.createElement('style');
+    style.id = 'talera-photo-stage-style';
+    style.textContent = '@keyframes taleraPhotoStageSpin{to{transform:rotate(360deg)}}.talera-photo-stage{display:flex;align-items:center;gap:9px;margin:10px 0;padding:10px 12px;border-radius:15px;background:#eef4f7;color:#17385e;font:690 12px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif}.talera-photo-stage.ready{background:#e8f3ed;color:#2c684e}.talera-photo-stage-spin{width:17px;height:17px;flex:0 0 auto;border:2.5px solid rgba(23,56,94,.20);border-top-color:#17385e;border-radius:50%;animation:taleraPhotoStageSpin .8s linear infinite}';
+    document.head.appendChild(style);
+  }
+
+  function progressNode() {
+    let node = document.getElementById('talera-photo-stage');
+    const sheet = document.querySelector('.work-sheet');
+    if (!sheet) return null;
+    if (!node) {
+      ensureProgressStyle();
+      node = document.createElement('div');
+      node.id = 'talera-photo-stage';
+      node.className = 'talera-photo-stage';
+      const tools = sheet.querySelector('.work-tools');
+      if (tools) sheet.insertBefore(node, tools);
+      else sheet.appendChild(node);
+    }
+    return node;
+  }
+
+  function renderProgress(mode = 'busy') {
+    clearTimeout(readyTimer);
+    if (pendingCount > 0) {
+      const node = progressNode();
+      if (!node) return;
+      node.className = 'talera-photo-stage';
+      node.innerHTML = '<span class="talera-photo-stage-spin" aria-hidden="true"></span><span>' + (pendingCount === 1 ? 'Foto wordt veilig klaargezet…' : pendingCount + ' foto’s worden veilig klaargezet…') + '</span>';
+      return;
+    }
+    const node = document.getElementById('talera-photo-stage');
+    if (!node) return;
+    if (mode === 'ready') {
+      node.className = 'talera-photo-stage ready';
+      node.textContent = '✓ Foto’s staan veilig klaar. Je kunt gewoon verder.';
+      readyTimer = setTimeout(() => node.remove(), 1100);
+    } else {
+      node.remove();
+    }
   }
 
   async function sha256(blob) {
@@ -59,12 +105,17 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
     const existing = cache.get(blob);
     if (existing?.promise) return existing.promise;
     const entry = {};
+    pendingCount += 1;
+    renderProgress('busy');
     entry.promise = uploadAndVerify(blob).then(data => {
       entry.data = data;
       return data;
     }).catch(error => {
       cache.delete(blob);
       throw error;
+    }).finally(() => {
+      pendingCount = Math.max(0, pendingCount - 1);
+      renderProgress(pendingCount ? 'busy' : 'ready');
     });
     cache.set(blob, entry);
     return entry.promise;
@@ -138,11 +189,13 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
     window.fetch = makeFetchWrapper(downstream);
   }
 
+  new MutationObserver(() => { if (pendingCount > 0) renderProgress('busy'); }).observe(document.documentElement, {subtree:true, childList:true});
   armFetch();
   window.__taleraPhotoStaging = Object.freeze({
     revision:REV,
     stage,
     has(blob){ return cache.has(blob); },
+    pending(){ return pendingCount; },
     rearmFetch:armFetch
   });
 })();

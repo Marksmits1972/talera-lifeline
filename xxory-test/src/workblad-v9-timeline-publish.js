@@ -27,6 +27,9 @@ export async function handleV9TimelinePublish(request, env) {
     WHERE id = ? LIMIT 1
   `).bind(memoryId).first();
   if (!row) return json({ error: 'V9-herinnering niet gevonden.' }, 404);
+  if (isFutureExactDate(row.event_time_text)) {
+    return json({ error: 'Een herinnering kan niet op een datum in de toekomst worden geplaatst.' }, 422);
+  }
 
   const hasAudio = Boolean(String(row.audio_key || '') && Number(row.audio_size_bytes || 0) > 0 && String(row.audio_sha256 || ''));
   let audioHead = null;
@@ -140,8 +143,27 @@ async function ensureLinkTable(env) {
 }
 
 function publishResponse(memoryId, storyId, manageToken, reused) {
-  const handoffUrl = `${TIMELINE_ORIGIN}/#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
+  const handoffUrl = `${TIMELINE_ORIGIN}/?handoff=1#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
   return json({ ok: true, memoryId, storyId, manageToken, handoffUrl, reused });
+}
+
+function isFutureExactDate(value) {
+  const raw = String(value || '').trim().toLocaleLowerCase('nl-NL');
+  if (!raw) return false;
+  const months = {januari:1,februari:2,maart:3,april:4,mei:5,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12};
+  let year = 0, month = 0, day = 0;
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    year = Number(match[1]); month = Number(match[2]); day = Number(match[3]);
+  } else {
+    match = raw.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/i);
+    if (!match || !months[match[2]]) return false;
+    day = Number(match[1]); month = months[match[2]]; year = Number(match[3]);
+  }
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const candidate = Date.UTC(year, month - 1, day);
+  return Number.isFinite(candidate) && candidate > today;
 }
 
 function randomToken(bytes = 24) {

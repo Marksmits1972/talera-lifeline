@@ -5,6 +5,8 @@ export const liveMemoryIntegrationStyle = String.raw`
 .talera-photo-dot.active{background:#E7A98B;transform:scale(1.42);opacity:1}
 .talera-live-badge{position:absolute;z-index:7;right:14px;top:calc(100% - 25px);font-size:9px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8);text-shadow:0 1px 6px rgba(15,39,71,.35);pointer-events:none;opacity:0;transition:opacity .2s ease}
 .talera-live-badge.show{opacity:1}
+.talera-live-loading{position:absolute;z-index:8;left:50%;bottom:78px;transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(247,244,239,.82);color:#0F2747;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(15,39,71,.12);font:700 11px/1.1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;opacity:0;pointer-events:none;transition:opacity .18s ease;white-space:nowrap}
+.talera-live-loading.show{opacity:1}
 `;
 
 export const liveMemoryIntegrationScript = String.raw`
@@ -33,6 +35,10 @@ export const liveMemoryIntegrationScript = String.raw`
   liveBadge.className='talera-live-badge';
   liveBadge.textContent='mijn herinnering';
   timeline.appendChild(liveBadge);
+  const loadingBadge=document.createElement('div');
+  loadingBadge.className='talera-live-loading';
+  loadingBadge.textContent='Foto wordt geladen…';
+  timeline.appendChild(loadingBadge);
 
   function loadCredentials(){
     try{
@@ -50,8 +56,31 @@ export const liveMemoryIntegrationScript = String.raw`
       creds[story]={token:token,savedAt:Date.now()};
       saveCredentials(creds);
       landingStoryId=story;
+      // Verwijder het beheer-token direct uit de zichtbare URL, maar houd de
+      // handoff-vlag nog even vast zodat de verkeerde oude herinnering niet flitst.
       try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
     }
+  }
+  function finishHandoff(){
+    document.documentElement.classList.remove('talera-handoff-boot');
+    const gate=document.getElementById('taleraHandoffGate');
+    if(gate)gate.remove();
+    try{
+      const clean=new URL(location.href);
+      clean.searchParams.delete('handoff');
+      clean.hash='';
+      history.replaceState(null,'',clean.pathname+(clean.searchParams.toString()?'?'+clean.searchParams.toString():''));
+    }catch(e){}
+  }
+  function failHandoff(message){
+    const gate=document.getElementById('taleraHandoffGate');
+    if(!gate){document.documentElement.classList.remove('talera-handoff-boot');return}
+    const copy=gate.querySelector('[data-talera-handoff-copy]');
+    if(copy)copy.textContent=message||'Deze herinnering kon nog niet worden geopend. Probeer het opnieuw.';
+    const spin=gate.querySelector('[data-talera-handoff-spin]');
+    if(spin)spin.remove();
+    let retry=gate.querySelector('button');
+    if(!retry){retry=document.createElement('button');retry.type='button';retry.textContent='Opnieuw proberen';retry.style.cssText='min-height:46px;margin-top:14px;border:0;border-radius:15px;padding:0 18px;background:#0F2747;color:white;font:760 13px system-ui';retry.onclick=()=>location.reload();gate.querySelector('.talera-handoff-card')?.appendChild(retry)}
   }
   acceptHandoff();
 
@@ -106,7 +135,7 @@ export const liveMemoryIntegrationScript = String.raw`
     const hit=clean.match(/^(.{1,145}?)(?:[.!?](?:\s|$)|$)/);
     return (hit&&hit[1]?hit[1]:clean.slice(0,145)).trim();
   }
-  function toTimelineMemory(detail,photoUrls,token){
+  function toTimelineMemory(detail,photoUrls,token,photoLoading=false){
     const rawMs=Date.parse(detail.eventAt||detail.createdAt||'');
     const fallback=runtime.centerMs();
     const resolved=Number.isFinite(rawMs)?rawMs:fallback;
@@ -126,6 +155,7 @@ export const liveMemoryIntegrationScript = String.raw`
       photos:photos,
       _photoIndex:0,
       _taleraLive:true,
+      _photoLoading:Boolean(photoLoading),
       _manageToken:token,
       _hasAudio:Boolean(detail.hasAudio),
       _audioMimeType:detail.audioMimeType||'',
@@ -136,16 +166,19 @@ export const liveMemoryIntegrationScript = String.raw`
       people:detail.people||''
     };
   }
-  async function hydrateCredential(storyId,entry){
-    const token=entry&&entry.token;
-    if(!token)return null;
-    const detail=await fetchStory(storyId,token);
+  async function loadPhotoUrls(detail,token,storyId){
     const items=(detail.media||[]).filter(m=>m.mediaType==='image').slice(0,12);
     const loaded=await Promise.all(items.map(async item=>{
       try{return await mediaObjectUrlWithRetry(item,token,storyId)}catch(e){return null}
     }));
-    const urls=loaded.filter(Boolean);
-    const memory=toTimelineMemory(detail,urls,token);
+    return loaded.filter(Boolean);
+  }
+  async function hydrateCredential(storyId,entry){
+    const token=entry&&entry.token;
+    if(!token)return null;
+    const detail=await fetchStory(storyId,token);
+    const urls=await loadPhotoUrls(detail,token,storyId);
+    const memory=toTimelineMemory(detail,urls,token,false);
     runtime.registerMemory(memory);
     return memory;
   }
@@ -160,6 +193,7 @@ export const liveMemoryIntegrationScript = String.raw`
       dots.classList.add('show');
     }
     liveBadge.classList.toggle('show',Boolean(memory&&memory._taleraLive));
+    loadingBadge.classList.toggle('show',Boolean(memory&&memory._taleraLive&&memory._photoLoading));
   }
   function forceLayerPhoto(layer,src,opacity){
     if(!layer||!src)return;
@@ -193,7 +227,7 @@ export const liveMemoryIntegrationScript = String.raw`
   }
   function scheduleAuto(memory){
     clearAuto();
-    if(!memory||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
+    if(!memory||memory._photoLoading||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
     autoStartTimer=setTimeout(()=>{
       showPhoto(memory,(memory._photoIndex||0)+1,false);
       autoInterval=setInterval(()=>{
@@ -227,7 +261,7 @@ export const liveMemoryIntegrationScript = String.raw`
       if(e.defaultPrevented)return;
       if(e.target.closest('button,nav,.timeline'))return;
       const memory=currentMemory();
-      if(!memory||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
+      if(!memory||memory._photoLoading||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
       e.preventDefault();e.stopPropagation();
       showPhoto(memory,(memory._photoIndex||0)+1,true);
     },true);
@@ -246,32 +280,68 @@ export const liveMemoryIntegrationScript = String.raw`
     },true);
   }
 
+  async function landTargetFirst(storyId,entry){
+    const token=entry&&entry.token;
+    if(!token)throw new Error('beheer-token ontbreekt');
+    const detail=await fetchStory(storyId,token);
+    const items=(detail.media||[]).filter(m=>m.mediaType==='image').slice(0,12);
+    // Eerst de juiste herinneringscontext neerzetten; foto’s mogen daarna in
+    // dezelfde context binnenkomen. Zo kan nooit een ouder verhaal tussendoor flitsen.
+    const memory=toTimelineMemory(detail,[],token,items.length>0);
+    runtime.registerMemory(memory);
+    runtime.setCenter(memory.ms);
+    runtime.writeMemory(memory);
+    runtime.draw();
+    timeline.classList.add('is-timeline-afterglow','is-marker-afterglow');
+    renderDots(memory);
+    document.dispatchEvent(new CustomEvent('talera:new-memory-landed',{detail:{storyId:memory.storyId||''}}));
+    finishHandoff();
+
+    if(items.length){
+      loadPhotoUrls(detail,token,storyId).then(urls=>{
+        memory._photoLoading=false;
+        if(urls.length){memory.photos=urls;memory._photoIndex=0;memory.image=urls[0]}
+        if(runtime.activeMemoryId()===memory.id){runtime.writeMemory(memory);settleVisiblePhoto(memory);renderDots(memory);scheduleAuto(memory)}
+        else renderDots(currentMemory());
+      }).catch(error=>{
+        memory._photoLoading=false;
+        if(runtime.activeMemoryId()===memory.id)renderDots(memory);
+        console.warn('TALERA targetfoto kon nog niet laden',storyId,error);
+      });
+    }
+    return memory;
+  }
+
+  async function loadOtherMemoriesInBackground(creds,skipStoryId){
+    const ids=Object.keys(creds).filter(id=>id!==skipStoryId).sort((a,b)=>(creds[a].savedAt||0)-(creds[b].savedAt||0));
+    for(const id of ids){
+      try{await hydrateCredential(id,creds[id])}catch(e){console.warn('TALERA linked memory kon niet laden',id,e)}
+    }
+    runtime.draw();
+  }
+
   async function bootLinkedMemories(){
     const creds=loadCredentials();
-    const ids=Object.keys(creds).sort((a,b)=>(creds[a].savedAt||0)-(creds[b].savedAt||0));
-
-    let landing=null;
-    for(const id of ids){
+    if(landingStoryId&&creds[landingStoryId]){
       try{
-        const memory=await hydrateCredential(id,creds[id]);
-        if(memory&&id===landingStoryId)landing=memory;
-      }catch(e){
-        console.warn('TALERA linked memory kon niet laden',id,e);
+        await landTargetFirst(landingStoryId,creds[landingStoryId]);
+        loadOtherMemoriesInBackground(creds,landingStoryId);
+      }catch(error){
+        console.warn('TALERA handoff memory kon niet laden',landingStoryId,error);
+        failHandoff('Deze nieuwe herinnering kon nog niet veilig uit de tijdlijn worden opgehaald. Je oude verhaal wordt daarom niet als vervanging getoond.');
       }
+      return;
     }
 
-    if(landing){
-      runtime.setCenter(landing.ms);
-      runtime.writeMemory(landing);
-      runtime.draw();
-      timeline.classList.add('is-timeline-afterglow','is-marker-afterglow');
-      document.dispatchEvent(new CustomEvent('talera:new-memory-landed',{detail:{storyId:landing.storyId||''}}));
-    }else{
-      const memory=currentMemory();
-      renderDots(memory);
-      scheduleAuto(memory);
-      runtime.draw();
+    const ids=Object.keys(creds).sort((a,b)=>(creds[a].savedAt||0)-(creds[b].savedAt||0));
+    for(const id of ids){
+      try{await hydrateCredential(id,creds[id])}catch(e){console.warn('TALERA linked memory kon niet laden',id,e)}
     }
+    const memory=currentMemory();
+    renderDots(memory);
+    scheduleAuto(memory);
+    runtime.draw();
+    if(document.documentElement.classList.contains('talera-handoff-boot'))finishHandoff();
   }
   bootLinkedMemories();
 })();

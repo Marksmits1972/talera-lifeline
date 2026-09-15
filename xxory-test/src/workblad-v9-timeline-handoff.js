@@ -1,6 +1,7 @@
 export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera-workblad-v9-timeline-handoff">
 (() => {
-  const REV = 'workblad-v9-clean-after-publish-20260915-r4';
+  const REV = 'workblad-v9-direct-timeline-handoff-20260915-r1';
+  const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev/';
   let publishing = false;
   let readyMemoryId = '';
   let publishedMemoryId = '';
@@ -47,21 +48,19 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     if (btn) btn.disabled = Boolean(disabled);
   }
 
-  function addRetry(memoryId) {
-    const box = statusBox();
-    if (!box) return;
-    const retry = document.createElement('button');
-    retry.type = 'button';
-    retry.id = 'taleraTimelinePublishRetry';
-    retry.textContent = 'Probeer tijdlijnkoppeling opnieuw';
-    retry.style.cssText = 'display:block;width:100%;margin-top:10px;border:0;border-radius:14px;padding:12px 14px;background:#0f2f57;color:white;font:800 14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;';
-    retry.addEventListener('click', e => {
-      e.preventDefault();
-      retry.remove();
-      publishing = false;
-      publish(memoryId);
-    });
-    box.appendChild(retry);
+  function editContext() {
+    const q = new URLSearchParams(location.search);
+    const storyId = q.get('edit') || '';
+    if (!storyId) return null;
+    const h = new URLSearchParams(String(location.hash || '').replace(/^#/,''));
+    let token = h.get('token') || '';
+    if (storyId && token) try { sessionStorage.setItem('talera-edit-token:' + storyId, token); } catch {}
+    if (storyId && !token) try { token = sessionStorage.getItem('talera-edit-token:' + storyId) || ''; } catch {}
+    return storyId && token ? { storyId, token } : null;
+  }
+
+  function timelineUrl(storyId, token) {
+    return TIMELINE_ORIGIN + '?handoff=1#story=' + encodeURIComponent(storyId) + '&token=' + encodeURIComponent(token);
   }
 
   async function resetPublishedWorkblad(renderFresh=false) {
@@ -116,8 +115,8 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     if (!memoryId || publishing || publishedMemoryId === memoryId) return;
     publishing = true;
     setFinishDisabled(true);
-    setFinishLabel('Koppelen aan tijdlijn…');
-    setStatus('Laatste stap · je herinnering wordt aan de tijdlijn gekoppeld…');
+    setFinishLabel('Koppelen aan mijn tijdlijn…');
+    setStatus('Je herinnering wordt op de juiste plek in je tijdlijn gezet…');
     try {
       const res = await fetch('/api/v9/timeline-publish/' + encodeURIComponent(memoryId), {
         method:'POST',
@@ -135,7 +134,6 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
       publishedHandoffUrl = data.handoffUrl;
       window.__taleraPendingV9Photos = [];
       window.__taleraExpectedV9PhotoCount = 0;
-      await resetPublishedWorkblad(false);
       try {
         localStorage.setItem('talera-last-v9-timeline-handoff-v1', JSON.stringify({
           memoryId,
@@ -146,13 +144,12 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
         }));
       } catch {}
 
-      setFinishLabel('Open mijn tijdlijn');
-      setStatus('✓ Veilig opgeslagen én gekoppeld. Open nu zelf je tijdlijn.', 'ok');
-      console.log('[TALERA V9 TIMELINE]', 'published', {revision:REV, memoryId, storyId:data.storyId, reused:Boolean(data.reused)});
+      setStatus('Je herinnering staat klaar. We openen precies dit verhaal…');
+      console.log('[TALERA V9 TIMELINE]', 'published and opening target', {revision:REV, memoryId, storyId:data.storyId, reused:Boolean(data.reused)});
+      await goToTimeline(data.handoffUrl);
     } catch (error) {
       setFinishLabel('Koppelen aan mijn tijdlijn');
-      setStatus('Je herinnering is veilig opgeslagen, maar de koppeling met de tijdlijn lukte nog niet: ' + String(error?.message || error), 'bad');
-      addRetry(memoryId);
+      setStatus('Je herinnering is veilig opgeslagen, maar de tijdlijnkoppeling lukte nog niet. Tik nogmaals op Koppelen om alleen die laatste stap opnieuw te proberen: ' + String(error?.message || error), 'bad');
       console.warn('[TALERA V9 TIMELINE]', 'publish failed', error);
     } finally {
       publishing = false;
@@ -168,7 +165,37 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     setFinishDisabled(false);
   }
 
+  async function runEditAndReturn(event, btn, context) {
+    if (!btn || btn.dataset.v9EditReturning === '1') return;
+    const originalHandler = btn.onclick;
+    if (typeof originalHandler !== 'function') return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    btn.dataset.v9EditReturning = '1';
+    btn.disabled = true;
+    btn.textContent = 'Opslaan…';
+    try {
+      await originalHandler.call(btn);
+      if (document.querySelector('.work-saved-sheet')) {
+        location.href = timelineUrl(context.storyId, context.token);
+        return;
+      }
+    } catch (error) {
+      console.warn('[TALERA V9 TIMELINE]', 'edit save failed', error);
+    }
+    btn.dataset.v9EditReturning = '0';
+    btn.disabled = false;
+  }
+
   function onFinishClick(event) {
+    const btn = event.currentTarget;
+    const context = editContext();
+    if (context) {
+      runEditAndReturn(event, btn, context);
+      return;
+    }
+
     const memoryId = String(readyMemoryId || window.__taleraLastV9MemoryId || '');
     if (!memoryId) return;
     event.preventDefault();
@@ -184,10 +211,17 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     const btn = document.getElementById('workFinish');
     if (!btn || btn.dataset.v9TimelineArmed === '1') return;
     btn.dataset.v9TimelineArmed = '1';
+    btn.textContent = editContext() ? 'Naar presentatie' : 'Koppelen aan mijn tijdlijn';
     btn.addEventListener('click', onFinishClick, true);
   }
 
-  document.addEventListener('talera:v9-memory-saved', event => armManualHandoff(event.detail?.memoryId));
+  document.addEventListener('talera:v9-memory-saved', event => {
+    const memoryId = String(event.detail?.memoryId || '');
+    armManualHandoff(memoryId);
+    // De gebruiker heeft zojuist bewust op Koppelen gedrukt. Na bewezen opslag
+    // gaat dezelfde handeling daarom direct door met publiceren en openen.
+    publish(memoryId);
+  });
   window.addEventListener('pageshow', event => {
     if (event.persisted && publishedMemoryId) {
       publishedMemoryId = '';

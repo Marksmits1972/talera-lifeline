@@ -2,13 +2,14 @@ import baseWorker from './orb-app-v79-worker.js';
 import { handleV9TimelinePublish } from './workblad-v9-timeline-publish.js';
 import { handleV9StagedPhotoLink } from './workblad-v9-staged-photo-link.js';
 import { handleV9TextMemory } from './workblad-v9-text-memory.js';
+import { handleWorkbladDatePolicy } from './workblad-date-policy.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
 import { handleStoryPhotoCleanup } from './workblad-story-photo-cleanup.js';
 import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workblad-story-management.js';
 import { WORKBLAD_MANAGEMENT_COMPAT_SCRIPT } from './workblad-management-compat.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-text-photo-optional-audio-20260915-r11';
+const WRAPPER_REV = 'workblad-v9-direct-timeline-cycle-20260915-r12';
 
 export default {
   async fetch(request, env, ctx) {
@@ -47,6 +48,14 @@ export default {
     }
 
     try {
+      const datePolicyResponse = await handleWorkbladDatePolicy(request);
+      if (datePolicyResponse) return datePolicyResponse;
+    } catch (error) {
+      console.error('TALERA date policy error', error);
+      return json({ error: 'De datum kon niet veilig worden gecontroleerd.' }, 500);
+    }
+
+    try {
       const textMemoryResponse = await handleV9TextMemory(request, env);
       if (textMemoryResponse) return textMemoryResponse;
     } catch (error) {
@@ -70,10 +79,11 @@ export default {
         ...data,
         timelinePublishBridge: true,
         timelinePublishRevision: WRAPPER_REV,
-        timelineHandoff: 'storyId+manageToken',
+        timelineHandoff: 'target-first-storyId+manageToken',
         stagedPhotoLink: true,
         v9TextPhotoMemory: true,
         audioRequiredForTimeline: false,
+        futureDateBlocked: true,
         storyPhotoCleanup: true,
         storyManagement: true,
         storyManagementRevision: 'v2-undo',

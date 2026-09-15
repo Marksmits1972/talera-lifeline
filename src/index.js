@@ -20,7 +20,7 @@ import { shareExperienceStyle, shareExperienceScript } from "./share-experience.
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "invite-first-frame-v10-20260915";
+const TALERA_TIMELINE_DEPLOY_REV = "direct-memory-handoff-v11-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
@@ -225,6 +225,32 @@ async function htmlWithSharePreview(request, env) {
     .replace("</head>", `${tags}${firstFrameGate}</head>`);
 }
 
+function withTimelineHandoffFirstFrame(request, html) {
+  const url = new URL(request.url);
+  if (url.searchParams.get('handoff') !== '1') return html;
+
+  const gateStyle = `<style id="talera-handoff-first-frame">
+@keyframes taleraHandoffSpin{to{transform:rotate(360deg)}}
+html.talera-handoff-boot body{background:#F7F4EF!important}
+html.talera-handoff-boot .app{visibility:hidden!important;pointer-events:none!important}
+.talera-handoff-gate{display:none;position:fixed;inset:0;z-index:10000;align-items:center;justify-content:center;padding:24px;background:#F7F4EF;color:#0F2747}
+html.talera-handoff-boot .talera-handoff-gate{display:flex}
+.talera-handoff-card{width:min(360px,100%);text-align:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.talera-handoff-spin{width:34px;height:34px;margin:0 auto 16px;border:4px solid rgba(15,39,71,.14);border-top-color:#0F2747;border-radius:50%;animation:taleraHandoffSpin .8s linear infinite}
+.talera-handoff-card strong{display:block;font-size:19px;line-height:1.2;margin-bottom:7px}.talera-handoff-card p{margin:0;color:#647181;font-size:14px;line-height:1.45}
+</style>`;
+  const gateMarkup = `<div id="taleraHandoffGate" class="talera-handoff-gate" aria-live="polite"><div class="talera-handoff-card"><div class="talera-handoff-spin" data-talera-handoff-spin aria-hidden="true"></div><strong>Je herinnering wordt geopend</strong><p data-talera-handoff-copy>We zetten je direct bij het verhaal dat je zojuist hebt gemaakt.</p></div></div>`;
+
+  let out = html;
+  if (out.includes('<html lang="nl" class="')) {
+    out = out.replace('<html lang="nl" class="', '<html lang="nl" class="talera-handoff-page talera-handoff-boot ');
+  } else {
+    out = out.replace('<html lang="nl">', '<html lang="nl" class="talera-handoff-page talera-handoff-boot">');
+  }
+  out = out.replace('</head>', `${gateStyle}</head>`);
+  return out.replace(/<body([^>]*)>/, `<body$1>${gateMarkup}`);
+}
+
 async function proxyLinkedMemory(request) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/linked/")) return null;
@@ -287,7 +313,8 @@ export default {
     const linked = await proxyLinkedMemory(request);
     if (linked) return linked;
 
-    return new Response(await htmlWithSharePreview(request, env), {
+    const html = withTimelineHandoffFirstFrame(request, await htmlWithSharePreview(request, env));
+    return new Response(html, {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store",

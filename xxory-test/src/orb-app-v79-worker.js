@@ -9,14 +9,15 @@ import { WORKBLAD_PHOTO_OPTIMIZER_SCRIPT } from "./workblad-photo-optimizer.js";
 import { WORKBLAD_PHOTO_STAGING_SCRIPT, WORKBLAD_PHOTO_STAGING_REARM_SCRIPT } from "./workblad-photo-staging.js";
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
 import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
+import { WORKBLAD_DATE_FLOW_STYLE, WORKBLAD_DATE_FLOW_SCRIPT } from "./workblad-date-flow.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 import { handleWorkbladRawStorageApi } from "./workblad-raw-storage-api.js";
 import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 import { handleWorkbladV9 } from "./workblad-v9-clean.js";
 import { V9_PLAYBACK_PATCH_SCRIPT, V9_PLAYBACK_PATCH_REV } from "./workblad-v9-playback-patch.js";
 
-const TALERA_DEPLOY_REV = "workblad-v9-clean-after-publish-20260915-r7";
-const WORKBLAD_V9_HANDOFF = "window.__taleraWorkbladV9Read=function(){capture();ensure();var photos=state.workMedia.filter(function(m){return m&&m.kind==='local'&&m.file instanceof Blob&&m.file.size>0}).map(function(m){return m.file});return {audioBlob:(state.audioBlob instanceof Blob&&state.audioBlob.size)?state.audioBlob:null,photoFile:photos[0]||null,photos:photos,title:String(state.workTitle||''),eventTime:String(state.workDate||''),storyText:String(state.workText||''),duration:Number(state.duration)||0,voiceAttempted:Boolean(state.voiceAttempted)};};window.__taleraWorkbladV9ResetAfterPublish=async function(renderFresh){clearTimeout(redirectTimer);clearStateForNew();draftLoaded=true;await draftClear();if(renderFresh)renderWorkblad();return true;};";
+const TALERA_DEPLOY_REV = "workblad-v9-direct-timeline-cycle-20260915-r1";
+const WORKBLAD_V9_HANDOFF = "window.__taleraWorkbladV9Read=function(){capture();ensure();var photos=state.workMedia.filter(function(m){return m&&m.kind==='local'&&m.file instanceof Blob&&m.file.size>0}).map(function(m){return m.file});return {audioBlob:(state.audioBlob instanceof Blob&&state.audioBlob.size)?state.audioBlob:null,photoFile:photos[0]||null,photos:photos,title:String(state.workTitle||''),eventTime:String(state.workDate||''),storyText:String(state.workText||''),duration:Number(state.duration)||0,voiceAttempted:Boolean(state.voiceAttempted)};};window.__taleraWorkbladV9SetDate=function(value){state.workDate=String(value||'');var el=document.getElementById('workDate');if(el){el.value=state.workDate;el.classList.remove('work-required-missing')}state.workError='';return draftSave();};window.__taleraWorkbladV9ResetAfterPublish=async function(renderFresh){clearTimeout(redirectTimer);clearStateForNew();draftLoaded=true;await draftClear();if(renderFresh)renderWorkblad();return true;};";
 const WORKBLAD_V2_EXPOSED_SCRIPT = WORKBLAD_V2_SCRIPT.replace(
   'renderEntry=renderWorkblad;activateMic=voiceStart;',
   WORKBLAD_V9_HANDOFF+'renderEntry=renderWorkblad;activateMic=voiceStart;'
@@ -24,8 +25,8 @@ const WORKBLAD_V2_EXPOSED_SCRIPT = WORKBLAD_V2_SCRIPT.replace(
 
 function enhanceWorkblad(html){
   return html
-    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+'</style></head>')
-    .replace('</body>',WORKBLAD_PHOTO_OPTIMIZER_SCRIPT+WORKBLAD_PHOTO_STAGING_SCRIPT+WORKBLAD_V2_EXPOSED_SCRIPT+WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_PHOTO_STAGING_REARM_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
+    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+WORKBLAD_DATE_FLOW_STYLE+'</style></head>')
+    .replace('</body>',WORKBLAD_PHOTO_OPTIMIZER_SCRIPT+WORKBLAD_PHOTO_STAGING_SCRIPT+WORKBLAD_V2_EXPOSED_SCRIPT+WORKBLAD_DATE_FLOW_SCRIPT+WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_PHOTO_STAGING_REARM_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
 }
 
 async function enhanceV9Response(response){
@@ -87,9 +88,11 @@ export default {
         ok:true,
         revision:TALERA_DEPLOY_REV,
         workbladV9Bridge:true,
-        workbladV9BridgeRevision:'workblad-v9-manual-handoff-20260915-r5',
+        workbladV9BridgeRevision:'workblad-v9-direct-timeline-cycle-20260915-r1',
         workbladStateHandoff:true,
         workbladStateResetAfterPublish:true,
+        directDateFlow:true,
+        futureDateBlocked:true,
         photoBackgroundStaging:true,
         photoBackgroundStagingRevision:'photo-background-staging-20260915-r1',
         v9IsolatedRoute:'/v9',

@@ -20,5 +20,31 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run regression suite
+      - name: Date flow regressions
+        run: node --test test/workblad-date-flow.test.mjs
+      - name: Target handoff regressions
+        run: node --test test/timeline-target-handoff.test.mjs
+      - name: Create-edit cycle regressions
+        run: node --test test/manual-timeline-handoff.test.mjs
+      - name: Photo background staging regressions
+        run: node --test test/photo-background-staging.test.mjs
+      - name: Published workblad cleanup regressions
+        run: node --test test/published-workblad-cleanup.test.mjs
+      - name: Text-only memory regressions
+        run: node --test test/text-only-memory.test.mjs
+      - name: Story management regressions
+        run: node --test test/story-management.test.mjs
+      - name: Story photo cleanup regressions
+        run: node --test test/story-photo-cleanup.test.mjs
+      - name: Share preview regressions
+        run: node --test test/share-preview.test.mjs
+      - name: Presentation shell regressions
+        run: node --test test/presentation-single-shell.test.mjs
+      - name: Photo optimizer regressions
+        run: node --test test/photo-optimizer.test.mjs
+      - name: Photo carousel regressions
+        run: node --test test/photo-carousel-visible-sync.test.mjs
+      - name: Edit button regressions
+        run: node --test test/edit-button-hit-layer.test.mjs
+      - name: Full regression suite
         run: node --test test/*.test.mjs

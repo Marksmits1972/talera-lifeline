@@ -16,9 +16,11 @@ test('photo policy produces an adaptive JPEG around the agreed storage target', 
   assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /TARGET_BYTES = 3\.2 \* 1024 \* 1024/);
 });
 
-test('both selection and the proven v9 save path optimize photos', () => {
+test('selection optimizes once and final save reuses the already prepared blobs', () => {
   assert.match(WORKBLAD_V2_SCRIPT, /await window\.__taleraOptimizePhoto\(source\)/);
-  assert.match(WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT, /await window\.__taleraOptimizePhoto\(source\)/);
+  assert.doesNotMatch(WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT, /await window\.__taleraOptimizePhoto\(source\)/);
+  assert.match(WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT, /const photos = Array\.isArray\(snapshot\.photos\)/);
+  assert.match(WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT, /exact diezelfde blobs/);
 });
 
 test('worker can still be imported after optimizer injection', () => {

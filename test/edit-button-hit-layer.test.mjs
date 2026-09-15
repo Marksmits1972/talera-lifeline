@@ -5,21 +5,15 @@ import { readFileSync } from 'node:fs';
 const timelineStyleSource = readFileSync(new URL('../src/timeline-glass-layer.js', import.meta.url), 'utf8');
 const controlsSource = readFileSync(new URL('../src/memory-presentation-controls.js', import.meta.url), 'utf8');
 
-function zIndex(source, selector) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = source.match(new RegExp(escaped + '\\s*\\{[^}]*z-index:(\\d+)!important', 's'));
-  return match ? Number(match[1]) : NaN;
-}
-
-test('memory action layer stays above the timeline hit surface', () => {
-  const timelineZ = zIndex(timelineStyleSource, '.timeline');
-  const toolsZ = zIndex(timelineStyleSource, '.talera-memory-tools');
-  assert.ok(Number.isFinite(timelineZ), 'timeline z-index should be explicit');
-  assert.ok(Number.isFinite(toolsZ), 'memory tools z-index override should be explicit');
-  assert.ok(toolsZ > timelineZ, `memory tools (${toolsZ}) must be above timeline (${timelineZ})`);
+test('timeline keeps its own uninterrupted interaction plane', () => {
+  assert.match(timelineStyleSource, /\.timeline\{[^}]*z-index:20!important/s);
+  assert.match(timelineStyleSource, /\.timeline::after\{[^}]*pointer-events:auto!important/s);
+  assert.doesNotMatch(timelineStyleSource, /\.talera-memory-tools\{[^}]*z-index:24!important/s);
 });
 
-test('only real memory buttons catch taps while the tools wrapper stays transparent', () => {
+test('edit action is positioned down in the story plane instead of over the timeline edge', () => {
+  assert.match(timelineStyleSource, /\.talera-memory-edit\{\s*top:72px!important;\s*\}/s);
+  assert.match(timelineStyleSource, /@media\(max-width:430px\)[\s\S]*\.talera-memory-edit\{top:64px!important\}/);
   assert.match(controlsSource, /\.talera-memory-tools\{[^}]*pointer-events:none/);
   assert.match(controlsSource, /\.talera-memory-tool\{[^}]*pointer-events:auto/);
   assert.match(controlsSource, /editButton\.addEventListener\('click'/);

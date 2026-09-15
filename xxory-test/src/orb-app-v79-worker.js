@@ -10,13 +10,14 @@ import { WORKBLAD_PHOTO_STAGING_SCRIPT, WORKBLAD_PHOTO_STAGING_REARM_SCRIPT } fr
 import { WORKBLAD_UNIVERSAL_NAV_STYLE, WORKBLAD_UNIVERSAL_NAV_SCRIPT } from "./workblad-universal-nav.js";
 import { WORKBLAD_LAYOUT_TUNING_STYLE, WORKBLAD_LAYOUT_TUNING_SCRIPT } from "./workblad-layout-tuning.js";
 import { WORKBLAD_DATE_FLOW_STYLE, WORKBLAD_DATE_FLOW_SCRIPT } from "./workblad-date-flow.js";
+import { WORKBLAD_UNIFIED_EXPERIENCE_STYLE } from "./workblad-unified-experience.js";
 import { handleWorkbladIntegrationApi } from "./workblad-integration-api.js";
 import { handleWorkbladRawStorageApi } from "./workblad-raw-storage-api.js";
 import { normalizeMultipartRequest } from "./multipart-request-normalizer.js";
 import { handleWorkbladV9 } from "./workblad-v9-clean.js";
 import { V9_PLAYBACK_PATCH_SCRIPT, V9_PLAYBACK_PATCH_REV } from "./workblad-v9-playback-patch.js";
 
-const TALERA_DEPLOY_REV = "workblad-v9-direct-timeline-cycle-20260915-r1";
+const TALERA_DEPLOY_REV = "workblad-unified-experience-20260915-r2";
 const WORKBLAD_V9_HANDOFF = "window.__taleraWorkbladV9Read=function(){capture();ensure();var photos=state.workMedia.filter(function(m){return m&&m.kind==='local'&&m.file instanceof Blob&&m.file.size>0}).map(function(m){return m.file});return {audioBlob:(state.audioBlob instanceof Blob&&state.audioBlob.size)?state.audioBlob:null,photoFile:photos[0]||null,photos:photos,title:String(state.workTitle||''),eventTime:String(state.workDate||''),storyText:String(state.workText||''),duration:Number(state.duration)||0,voiceAttempted:Boolean(state.voiceAttempted)};};window.__taleraWorkbladV9SetDate=function(value){state.workDate=String(value||'');var el=document.getElementById('workDate');if(el){el.value=state.workDate;el.classList.remove('work-required-missing')}state.workError='';return draftSave();};window.__taleraWorkbladV9ResetAfterPublish=async function(renderFresh){clearTimeout(redirectTimer);clearStateForNew();draftLoaded=true;await draftClear();if(renderFresh)renderWorkblad();return true;};";
 const WORKBLAD_V2_EXPOSED_SCRIPT = WORKBLAD_V2_SCRIPT.replace(
   'renderEntry=renderWorkblad;activateMic=voiceStart;',
@@ -25,7 +26,7 @@ const WORKBLAD_V2_EXPOSED_SCRIPT = WORKBLAD_V2_SCRIPT.replace(
 
 function enhanceWorkblad(html){
   return html
-    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+WORKBLAD_DATE_FLOW_STYLE+'</style></head>')
+    .replace('</head>','<style>'+WORKBLAD_V1_STYLE+WORKBLAD_V1_FOCUS_RING_STYLE+WORKBLAD_V2_STYLE+WORKBLAD_UNIVERSAL_NAV_STYLE+WORKBLAD_LAYOUT_TUNING_STYLE+WORKBLAD_DATE_FLOW_STYLE+WORKBLAD_UNIFIED_EXPERIENCE_STYLE+'</style></head>')
     .replace('</body>',WORKBLAD_PHOTO_OPTIMIZER_SCRIPT+WORKBLAD_PHOTO_STAGING_SCRIPT+WORKBLAD_V2_EXPOSED_SCRIPT+WORKBLAD_DATE_FLOW_SCRIPT+WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT+WORKBLAD_RAW_STORAGE_BRIDGE_SCRIPT+WORKBLAD_PHOTO_STAGING_REARM_SCRIPT+WORKBLAD_UNIVERSAL_NAV_SCRIPT+WORKBLAD_LAYOUT_TUNING_SCRIPT+'</body>');
 }
 
@@ -61,12 +62,22 @@ function storageError(status,message){
 export default {
   async fetch(request,env,ctx){
     const incomingUrl=new URL(request.url);
+
+    // /v9 is the canonical workblad URL. Keep that URL in the browser, but render
+    // the same full TALERA workblad shell as the main vertel flow instead of the
+    // retired technical V9 form. The /api/v9/* transport remains isolated below.
+    if((incomingUrl.pathname==='/v9'||incomingUrl.pathname==='/v9/')&&(request.method==='GET'||request.method==='HEAD')){
+      incomingUrl.pathname='/';
+      request=new Request(incomingUrl.toString(),{method:request.method,headers:request.headers});
+    }
+
     if(incomingUrl.pathname==='/api/v9/revision/'&&request.method==='GET'){
       incomingUrl.pathname='/api/v9/revision';
       request=new Request(incomingUrl.toString(),{method:'GET',headers:request.headers});
     }
 
-    // V9 blijft volledig voor de legacy workblad-opslagstack gerouteerd.
+    // Alleen de bewezen V9-opslagtransporten blijven geïsoleerd; de zichtbare
+    // werkbladervaring wordt hierboven door de volwaardige TALERA-shell geleverd.
     try{
       const v9Response=await handleWorkbladV9(request,env);
       if(v9Response){
@@ -88,14 +99,17 @@ export default {
         ok:true,
         revision:TALERA_DEPLOY_REV,
         workbladV9Bridge:true,
-        workbladV9BridgeRevision:'workblad-v9-direct-timeline-cycle-20260915-r1',
+        workbladV9BridgeRevision:'workblad-unified-experience-20260915-r2',
         workbladStateHandoff:true,
         workbladStateResetAfterPublish:true,
+        unifiedTaleraExperience:true,
+        canonicalWorkbladRoute:'/v9',
+        technicalV9FormRetired:true,
         directDateFlow:true,
         futureDateBlocked:true,
         photoBackgroundStaging:true,
         photoBackgroundStagingRevision:'photo-background-staging-20260915-r1',
-        v9IsolatedRoute:'/v9',
+        v9TransportApi:'/api/v9/*',
         v9RevisionRoute:'/api/v9/revision',
         v9PlaybackPatch:V9_PLAYBACK_PATCH_REV,
         legacyStorageFallbackStillPresent:true
@@ -150,7 +164,7 @@ export default {
     const headers=new Headers(response.headers);
     headers.delete('content-length');
     headers.set('cache-control','no-store');
-    headers.set('x-talera-orb-app','organic-v79-stable-with-workblad-v2-audio-cycle');
+    headers.set('x-talera-orb-app','organic-v79-stable-with-unified-workblad');
     headers.set('x-talera-vertel-ui',TALERA_DEPLOY_REV);
     return new Response(enhanceWorkblad(html),{status:response.status,statusText:response.statusText,headers});
   }

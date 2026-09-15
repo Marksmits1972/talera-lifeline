@@ -9,7 +9,7 @@ import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workb
 import { WORKBLAD_MANAGEMENT_COMPAT_SCRIPT } from './workblad-management-compat.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-direct-timeline-cycle-20260915-r12';
+const WRAPPER_REV = 'workblad-unified-experience-20260915-r13';
 
 export default {
   async fetch(request, env, ctx) {
@@ -80,6 +80,8 @@ export default {
         timelinePublishBridge: true,
         timelinePublishRevision: WRAPPER_REV,
         timelineHandoff: 'target-first-storyId+manageToken',
+        canonicalWorkbladRoute: '/v9',
+        unifiedTaleraExperience: true,
         stagedPhotoLink: true,
         v9TextPhotoMemory: true,
         audioRequiredForTimeline: false,
@@ -93,7 +95,8 @@ export default {
     }
 
     const response = await baseWorker.fetch(request, env, ctx);
-    if (request.method === 'HEAD' || url.pathname !== '/') return response;
+    const isWorkbladPage = url.pathname === '/' || url.pathname === '/v9' || url.pathname === '/v9/';
+    if (request.method === 'HEAD' || !isWorkbladPage) return response;
     const type = response.headers.get('content-type') || '';
     if (!type.includes('text/html')) return response;
 

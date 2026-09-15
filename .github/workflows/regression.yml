@@ -20,5 +20,11 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run regression suite
+      - name: Date flow regressions
+        run: node --test test/workblad-date-flow.test.mjs
+      - name: Target handoff regressions
+        run: node --test test/timeline-target-handoff.test.mjs
+      - name: Create-edit cycle regressions
+        run: node --test test/manual-timeline-handoff.test.mjs
+      - name: Full regression suite
         run: node --test test/*.test.mjs

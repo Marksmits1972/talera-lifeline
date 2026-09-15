@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT } from '../xxory-test/src/workblad-story-photo-cleanup.js';
 
 const cleanupSource = readFileSync(new URL('../xxory-test/src/workblad-story-photo-cleanup.js', import.meta.url), 'utf8');
+const managementSource = readFileSync(new URL('../xxory-test/src/workblad-story-management.js', import.meta.url), 'utf8');
 const wrapperSource = readFileSync(new URL('../xxory-test/src/orb-app-v79-worker-timeline-publish.js', import.meta.url), 'utf8');
 
 test('photo cleanup is authenticated and limited to image media belonging to the story', () => {
@@ -20,16 +20,18 @@ test('removing the cover promotes the next image or clears the cover safely', ()
   assert.match(cleanupSource, /UPDATE stories SET start_photo_key = NULL, updated_at = \?/);
 });
 
-test('cleanup controls exist only in edit context and reload the same story after removal', () => {
-  assert.match(WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT, /q\.get\('edit'\)/);
-  assert.match(WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT, /Deze foto uit deze herinnering verwijderen\?/);
-  assert.match(WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT, /method:'DELETE'/);
-  assert.match(WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT, /location\.reload\(\)/);
+test('large photo management controls exist only in edit context', () => {
+  assert.match(managementSource, /q\.get\('edit'\)/);
+  assert.match(managementSource, /Verwijder foto/);
+  assert.match(managementSource, /method:'DELETE'/);
+  assert.match(managementSource, /talera-manage-photo-remove/);
+  assert.match(managementSource, /min-height:46px/);
 });
 
-test('wrapper exposes cleanup without changing timeline publish or staged photo handlers', () => {
+test('wrapper keeps cleanup API while replacing the old tiny injected panel', () => {
   assert.match(wrapperSource, /handleStoryPhotoCleanup/);
   assert.match(wrapperSource, /handleV9StagedPhotoLink/);
   assert.match(wrapperSource, /handleV9TimelinePublish/);
-  assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT \+ WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT/);
+  assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT \+ WORKBLAD_STORY_MANAGEMENT_SCRIPT/);
+  assert.doesNotMatch(wrapperSource, /WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT/);
 });

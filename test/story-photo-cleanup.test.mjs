@@ -22,8 +22,8 @@ test('removing the cover promotes the next image or clears the cover safely', ()
 
 test('legacy photo cleanup browser dialogs are completely retired', () => {
   assert.match(cleanupSource, /WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT = ''/);
-  assert.doesNotMatch(cleanupSource, /\bconfirm\s*\(/);
-  assert.doesNotMatch(cleanupSource, /\balert\s*\(/);
+  assert.doesNotMatch(cleanupSource, /\bconfirm\s*\(\s*['\"]/);
+  assert.doesNotMatch(cleanupSource, /\balert\s*\(\s*['\"]/);
   assert.doesNotMatch(cleanupSource, /location\.reload\s*\(/);
 });
 

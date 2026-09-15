@@ -62,14 +62,19 @@ main .timeline.is-marker-afterglow .focus{
   opacity:0!important;
 }
 
-/* Story actions belong to the photo/story plane, not to the timeline gesture
-   plane. Keep the pencil clearly below the timeline edge instead of punching a
-   higher-z-index hole through the timeline interaction surface. */
+/* Story management is part of the existing right-hand action stack. Audio sits
+   at 112px, share at 166px and edit one step above at 220px. This keeps the
+   complete timeline gesture plane untouched and gives edit a full-size target. */
 .talera-memory-edit{
-  top:72px!important;
+  right:20px!important;
+  top:auto!important;
+  bottom:220px!important;
+  width:46px!important;
+  min-width:46px!important;
+  height:46px!important;
 }
 @media(max-width:430px){
-  .talera-memory-edit{top:64px!important}
+  .talera-memory-edit{right:18px!important;top:auto!important;bottom:220px!important;width:44px!important;min-width:44px!important;height:44px!important}
 }
 
 /* ACTIVE: navigation is foreground, but still made from the photo beneath it. */

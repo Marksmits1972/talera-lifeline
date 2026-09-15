@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { shareExperienceScript } from "../src/share-experience.js";
+import { liveMemoryIntegrationScript } from "../src/live-memory-integration.js";
 
 assert.match(shareExperienceScript, /async function prepareShare\(\)/);
 assert.match(shareExperienceScript, /function shareViaWhatsApp\(\)/);
@@ -14,6 +15,9 @@ assert.match(shareExperienceScript, /form\.append\('storyId'/);
 assert.match(shareExperienceScript, /async function exactRecipientMemory\(\)/);
 assert.match(shareExperienceScript, /if\(demoView==='recipient-story'\)loadInvitePreview\(\)\.finally\(\(\)=>setTimeout\(activateRecipientPresentation,280\)\)/);
 assert.doesNotMatch(shareExperienceScript, /open\('recipient-story'\)/);
+assert.doesNotMatch(liveMemoryIntegrationScript, /RECENT_LANDING_MS/);
+assert.doesNotMatch(liveMemoryIntegrationScript, /newest&&Date\.now/);
+assert.match(liveMemoryIntegrationScript, /if\(memory&&id===landingStoryId\)landing=memory/);
 
 const entries = new Map();
 const bucket = {

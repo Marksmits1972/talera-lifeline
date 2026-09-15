@@ -14,7 +14,6 @@ export const liveMemoryIntegrationScript = String.raw`
   const AUTO_START_MS=500;
   const AUTO_STEP_MS=2400;
   const MEDIA_RETRY_MS=260;
-  const RECENT_LANDING_MS=12*60*60*1000;
   const timeline=document.querySelector('.timeline');
   const surface=document.getElementById('surface');
   const storySurface=document.getElementById('memoryStoryScroll');
@@ -229,12 +228,6 @@ export const liveMemoryIntegrationScript = String.raw`
   async function bootLinkedMemories(){
     const creds=loadCredentials();
     const ids=Object.keys(creds).sort((a,b)=>(creds[a].savedAt||0)-(creds[b].savedAt||0));
-
-    if(!landingStoryId&&ids.length){
-      const newestId=ids[ids.length-1];
-      const newest=creds[newestId];
-      if(newest&&Date.now()-(Number(newest.savedAt)||0)<=RECENT_LANDING_MS)landingStoryId=newestId;
-    }
 
     let landing=null;
     for(const id of ids){

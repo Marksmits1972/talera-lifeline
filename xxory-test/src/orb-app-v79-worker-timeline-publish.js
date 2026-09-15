@@ -1,9 +1,10 @@
 import baseWorker from './orb-app-v79-worker.js';
 import { handleV9TimelinePublish } from './workblad-v9-timeline-publish.js';
+import { handleV9StagedPhotoLink } from './workblad-v9-staged-photo-link.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-manual-handoff-spinner-20260915-r5';
+const WRAPPER_REV = 'workblad-v9-background-photo-staging-20260915-r6';
 
 export default {
   async fetch(request, env, ctx) {
@@ -15,6 +16,14 @@ export default {
     } catch (error) {
       console.error('TALERA share preview storage error', error);
       return json({ error: 'De uitnodigingsminiatuur kon niet veilig worden opgeslagen.' }, 500);
+    }
+
+    try {
+      const stagedPhotoResponse = await handleV9StagedPhotoLink(request, env);
+      if (stagedPhotoResponse) return stagedPhotoResponse;
+    } catch (error) {
+      console.error('TALERA staged photo link error', error);
+      return json({ error: 'De klaargezette foto kon nog niet aan de herinnering worden gekoppeld.' }, 500);
     }
 
     try {
@@ -33,7 +42,8 @@ export default {
         ...data,
         timelinePublishBridge: true,
         timelinePublishRevision: WRAPPER_REV,
-        timelineHandoff: 'storyId+manageToken'
+        timelineHandoff: 'storyId+manageToken',
+        stagedPhotoLink: true
       }, base.status || 200);
     }
 

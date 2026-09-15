@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT } from '../xxory-test/src/workblad-v9-integration-bridge.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from '../xxory-test/src/workblad-v9-timeline-handoff.js';
-import { handleV9TimelinePublish } from '../xxory-test/src/workblad-v9-timeline-publish.js';
+
+const publishSource = readFileSync(new URL('../xxory-test/src/workblad-v9-timeline-publish.js', import.meta.url), 'utf8');
 
 test('the deliberate final action continues from safe save into timeline coupling', () => {
   assert.match(WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT, /talera:v9-memory-saved/);
@@ -30,10 +32,6 @@ test('long operations retain a familiar progress spinner', () => {
   assert.match(WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT, /talera-v9-spinner/);
 });
 
-test('timeline publish source contains a targeted first-frame handoff URL', () => {
-  assert.equal(typeof handleV9TimelinePublish, 'function');
-  const source = String.raw`${TIMELINE_SOURCE}`;
-  assert.match(source, /placeholder/);
+test('timeline publication uses a targeted first-frame handoff URL', () => {
+  assert.match(publishSource, /\?handoff=1#story=/);
 });
-
-const TIMELINE_SOURCE = '?handoff=1#story=';

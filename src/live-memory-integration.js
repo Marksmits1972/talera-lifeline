@@ -161,12 +161,33 @@ export const liveMemoryIntegrationScript = String.raw`
     }
     liveBadge.classList.toggle('show',Boolean(memory&&memory._taleraLive));
   }
+  function forceLayerPhoto(layer,src,opacity){
+    if(!layer||!src)return;
+    layer.style.opacity=String(opacity);
+    const nodes=[
+      layer.querySelector('.photo-backdrop'),
+      layer.querySelector('.photo-aligned-blur'),
+      layer.querySelector('.example-photo')
+    ];
+    nodes.forEach(node=>{if(node&&node.src!==src)node.src=src});
+  }
+  function settleVisiblePhoto(memory){
+    if(!memory||!memory.image)return;
+    runtime.settlePhoto(memory);
+    const src=memory.image;
+    forceLayerPhoto(document.getElementById('photoLayerA'),src,1);
+    forceLayerPhoto(document.getElementById('photoLayerB'),src,0);
+    const visibleStrip=document.querySelector('.talera-photo-strip.is-visible');
+    if(visibleStrip){
+      visibleStrip.querySelectorAll('.talera-photo-strip-page').forEach(page=>forceLayerPhoto(page,src,1));
+    }
+  }
   function showPhoto(memory,index,manual=false){
     if(!memory||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
     const count=memory.photos.length;
     memory._photoIndex=((index%count)+count)%count;
     memory.image=memory.photos[memory._photoIndex];
-    runtime.settlePhoto(memory);
+    settleVisiblePhoto(memory);
     renderDots(memory);
     if(manual)scheduleAuto(memory);
   }
@@ -187,7 +208,7 @@ export const liveMemoryIntegrationScript = String.raw`
     if(changed&&memory&&Array.isArray(memory.photos)&&memory.photos.length){
       memory._photoIndex=0;
       memory.image=memory.photos[0];
-      runtime.settlePhoto(memory);
+      settleVisiblePhoto(memory);
     }
     lastWrittenMemoryId=memory&&memory.id;
     renderDots(memory);

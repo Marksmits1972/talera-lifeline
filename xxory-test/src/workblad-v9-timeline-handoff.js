@@ -44,6 +44,38 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
     location.href = handoffUrl;
   }
 
+  async function attachExtraPhotos(data) {
+    const queue = Array.isArray(window.__taleraPendingV9Photos) ? window.__taleraPendingV9Photos : [];
+    const expected = Number(window.__taleraExpectedV9PhotoCount || 0);
+    while (queue.length) {
+      const photo = queue[0];
+      setStatus('Laatste stap · foto ' + (expected - queue.length + 1) + ' van ' + expected + ' wordt aan je verhaal gekoppeld…');
+      const form = new FormData();
+      form.append('media', photo, photo.name || 'herinnering.jpg');
+      const response = await fetch('/api/stories/' + encodeURIComponent(data.storyId) + '/media', {
+        method:'POST',
+        headers:{'authorization':'Bearer ' + data.manageToken},
+        body:form,
+        cache:'no-store'
+      });
+      let result = null;
+      try { result = await response.json(); } catch {}
+      const stored = Array.isArray(result?.items) ? result.items.length : Number(result?.count);
+      if (!response.ok || stored !== 1) throw new Error(result?.error || 'Een extra foto kon niet veilig worden gekoppeld.');
+      queue.shift();
+    }
+    if (expected > 0) {
+      const verify = await fetch('/api/integration/stories/' + encodeURIComponent(data.storyId), {
+        headers:{'authorization':'Bearer ' + data.manageToken},
+        cache:'no-store'
+      });
+      let detail = null;
+      try { detail = await verify.json(); } catch {}
+      const count = Array.isArray(detail?.media) ? detail.media.filter(item => item.mediaType === 'image').length : 0;
+      if (!verify.ok || count < expected) throw new Error('Nog niet alle gekozen foto’s staan in het verhaal.');
+    }
+  }
+
   async function publish(memoryId) {
     if (!memoryId || publishing || publishedMemoryId === memoryId) return;
     publishing = true;
@@ -61,7 +93,10 @@ export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera
         throw new Error(data?.error || ('HTTP ' + res.status));
       }
 
+      await attachExtraPhotos(data);
+
       publishedMemoryId = memoryId;
+      window.__taleraPendingV9Photos = [];
       try {
         localStorage.setItem('talera-last-v9-timeline-handoff-v1', JSON.stringify({
           memoryId,

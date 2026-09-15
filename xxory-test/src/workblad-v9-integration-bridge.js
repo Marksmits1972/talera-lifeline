@@ -145,13 +145,14 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
       const audio = snapshot.audioBlob;
       const photos = Array.isArray(snapshot.photos) ? snapshot.photos.filter(x => x instanceof Blob && x.size > 0) : [];
       if (!(audio instanceof Blob) || !audio.size) throw new Error('Geen geluidsopname gevonden in het huidige werkblad. Spreek eerst opnieuw in.');
-      if (photos.length > 1) log('Voor deze eerste geïntegreerde proef wordt alleen de eerste foto gekoppeld', {photoCount:photos.length});
       log('current workblad read', {audioBytes:audio.size, photoCount:photos.length, title:snapshot.title, eventTime:snapshot.eventTime});
 
       const audioData = await uploadAudio(audio);
       const photoData = await uploadPhoto(photos[0] || snapshot.photoFile || null);
       const memory = await saveMemory(audioData, photoData, snapshot);
       await verifyMemory(memory);
+      window.__taleraPendingV9Photos = photos.slice(1);
+      window.__taleraExpectedV9PhotoCount = photos.length;
       await clearDraft();
 
       window.__taleraLastV9MemoryId = memory.memoryId;

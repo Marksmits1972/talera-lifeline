@@ -46,7 +46,9 @@ export const WORKBLAD_PHOTO_OPTIMIZER_SCRIPT = String.raw`<script id="talera-wor
       const sourceHeight = Number(decoded.height || decoded.naturalHeight || 0);
       if (!sourceWidth || !sourceHeight) throw new Error('Afmetingen van de foto ontbreken.');
       const longEdge = Math.max(sourceWidth, sourceHeight);
-      const alreadyEfficient = /image\/jpe?g/i.test(file.type || '') && longEdge <= MAX_LONG_EDGE && file.size <= KEEP_ORIGINAL_BYTES;
+      const isJpeg = /image\/jpe?g/i.test(file.type || '');
+      const alreadyPrepared = isJpeg && /-talera\.jpe?g$/i.test(String(file.name || '')) && longEdge <= MAX_LONG_EDGE && file.size <= TARGET_BYTES;
+      const alreadyEfficient = alreadyPrepared || (isJpeg && longEdge <= MAX_LONG_EDGE && file.size <= KEEP_ORIGINAL_BYTES);
       if (alreadyEfficient) return file;
 
       const scale = Math.min(1, MAX_LONG_EDGE / longEdge);
@@ -82,7 +84,7 @@ export const WORKBLAD_PHOTO_OPTIMIZER_SCRIPT = String.raw`<script id="talera-wor
 
   window.__taleraOptimizePhoto = optimizePhoto;
   window.__taleraPhotoPolicy = Object.freeze({
-    revision:'photo-master-4k-jpeg-v1',
+    revision:'photo-master-4k-jpeg-v2-idempotent',
     maxLongEdge:MAX_LONG_EDGE,
     targetBytes:TARGET_BYTES,
     outputType:'image/jpeg'

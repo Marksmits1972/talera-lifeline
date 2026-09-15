@@ -14,6 +14,20 @@ export const shareExperienceStyle = String.raw`
 }
 
 body.talera-share-open{overscroll-behavior:none}
+.talera-context-share{
+  position:absolute!important;
+  right:20px!important;
+  bottom:166px!important;
+  width:46px!important;
+  min-width:46px!important;
+  height:46px!important;
+  padding:0!important;
+  border:1.5px solid rgba(255,255,255,.72)!important;
+  color:#fff!important;
+  background:var(--share-blue)!important;
+  box-shadow:0 6px 19px rgba(15,39,71,.28),inset 0 1px 0 rgba(255,255,255,.22)!important;
+}
+.talera-context-share svg{width:21px;height:21px;display:block;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .talera-share-shell{
   position:fixed;
   inset:0;
@@ -110,6 +124,25 @@ body.talera-share-open{overscroll-behavior:none}
   background:var(--share-paper);
 }
 .talera-share-body::-webkit-scrollbar{display:none}
+.talera-account-card{
+  width:100%;
+  min-height:86px;
+  padding:13px 15px;
+  border:0;
+  border-radius:22px;
+  display:grid;
+  grid-template-columns:52px 1fr 20px;
+  gap:13px;
+  align-items:center;
+  color:var(--share-ink);
+  text-align:left;
+  background:linear-gradient(135deg,#fff 0,#f3f6f8 100%);
+  box-shadow:inset 0 0 0 1px rgba(15,39,71,.07),0 7px 20px rgba(15,39,71,.06);
+}
+.talera-account-avatar{width:52px;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--share-deep);font:760 17px/1 system-ui,-apple-system,sans-serif;letter-spacing:.02em}
+.talera-account-card strong{display:block;color:var(--share-deep);font:740 15px/1.2 system-ui,-apple-system,sans-serif}
+.talera-account-card small{display:block;margin-top:5px;color:var(--share-muted);font:520 11px/1.3 system-ui,-apple-system,sans-serif}
+.talera-account-arrow{color:rgba(15,39,71,.35);font-size:22px}
 .talera-share-title{margin:5px 0 7px;color:var(--share-deep);font:760 clamp(25px,7vw,34px)/1.05 system-ui,-apple-system,sans-serif;letter-spacing:-.025em}
 .talera-share-intro{margin:0 0 18px;color:var(--share-muted);font:500 14px/1.42 system-ui,-apple-system,sans-serif}
 .talera-share-section-label{margin:22px 2px 9px;color:rgba(15,39,71,.57);font:720 10px/1.2 system-ui,-apple-system,sans-serif;letter-spacing:.09em;text-transform:uppercase}
@@ -213,6 +246,7 @@ body.talera-share-open{overscroll-behavior:none}
   .talera-share-header{padding-left:15px;padding-right:15px}
   .talera-share-title{font-size:25px}
 }
+@media(max-width:430px){.talera-context-share{right:18px!important;bottom:157px!important;width:44px!important;min-width:44px!important;height:44px!important}}
 @media(max-height:690px){
   :root{--share-sheet-height:86dvh}
   .talera-recipient-photo{height:145px}
@@ -227,7 +261,8 @@ export const shareExperienceScript = String.raw`
 (()=>{
   const runtime=window.__taleraTimelineRuntime;
   const moreButton=document.querySelector('.more')&&document.querySelector('.more').closest('button');
-  if(!runtime||!moreButton)return;
+  const memorySpace=document.querySelector('.memory-space');
+  if(!runtime||!moreButton||!memorySpace)return;
 
   const STORAGE_KEY='talera-share-prototype-v1';
   const OWNER_NAME='Mark';
@@ -235,11 +270,19 @@ export const shareExperienceScript = String.raw`
   let previousFocus=null;
   let toastTimer=0;
 
+  const contextShare=document.createElement('button');
+  contextShare.type='button';
+  contextShare.className='talera-memory-tool talera-context-share';
+  contextShare.setAttribute('aria-label','Deel deze herinnering');
+  contextShare.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0L7.7 7.3M12 3l4.3 4.3M5 11.5v7A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5v-7"/></svg>';
+  const toolLayer=document.querySelector('.talera-memory-tools')||memorySpace;
+  toolLayer.appendChild(contextShare);
+
   const shell=document.createElement('div');
   shell.className='talera-share-shell';
   shell.hidden=true;
   shell.setAttribute('aria-hidden','true');
-  shell.innerHTML='<section class="talera-share-panel" role="dialog" aria-modal="true" aria-label="TALERA delen"><div class="talera-share-card"><div class="talera-share-grip" aria-hidden="true"></div><header class="talera-share-header"><button class="talera-share-back" type="button" data-action="back" aria-label="Terug">‹</button><div class="talera-share-brand"><strong>TALERA</strong><span>persoonlijk bewaard</span></div><button class="talera-share-close" type="button" data-action="close" aria-label="Sluiten">×</button></header><div class="talera-share-body" tabindex="-1"></div></div></section><div class="talera-share-toast" role="status" aria-live="polite"></div>';
+  shell.innerHTML='<section class="talera-share-panel" role="dialog" aria-modal="true" aria-label="TALERA menu"><div class="talera-share-card"><div class="talera-share-grip" aria-hidden="true"></div><header class="talera-share-header"><button class="talera-share-back" type="button" data-action="back" aria-label="Terug">‹</button><div class="talera-share-brand"><strong>TALERA</strong><span>persoonlijk bewaard</span></div><button class="talera-share-close" type="button" data-action="close" aria-label="Sluiten">×</button></header><div class="talera-share-body" tabindex="-1"></div></div></section><div class="talera-share-toast" role="status" aria-live="polite"></div>';
   document.body.appendChild(shell);
 
   const body=shell.querySelector('.talera-share-body');
@@ -273,14 +316,24 @@ export const shareExperienceScript = String.raw`
   function buttonOption(view,icon,title,copy){
     return '<button class="talera-share-option" type="button" data-view="'+view+'"><span class="talera-share-option-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+copy+'</small></span><span class="talera-share-option-arrow" aria-hidden="true">›</span></button>';
   }
+  function buttonAction(action,icon,title,copy){
+    return '<button class="talera-share-option" type="button" data-action="'+action+'"><span class="talera-share-option-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+copy+'</small></span><span class="talera-share-option-arrow" aria-hidden="true">›</span></button>';
+  }
   function title(text,intro){return '<h1 class="talera-share-title">'+text+'</h1><p class="talera-share-intro">'+intro+'</p>'}
 
   function renderHub(){
-    return title('Meer','Alles rond deze actieve herinnering op één rustige plek.')+memoryCard()+
-      '<p class="talera-share-section-label">Delen en toegang</p><div class="talera-share-options">'+
-      buttonOption('share-choice','↗','Delen','Dit verhaal of jouw gefilterde tijdlijn')+
+    return title('Meer','Je account, mensen en algemene TALERA-instellingen op één plek.')+
+      '<button class="talera-account-card" type="button" data-view="profile"><span class="talera-account-avatar" aria-hidden="true">MS</span><span><strong>Mark Smits</strong><small>Maak je TALERA-account compleet</small></span><span class="talera-account-arrow" aria-hidden="true">›</span></button>'+
+      '<p class="talera-share-section-label">Delen en mensen</p><div class="talera-share-options">'+
       buttonOption('people','○','Mijn mensen','Uitnodigingen, toegang en jouw privékringen')+
       buttonOption('shared-with-me','⌁','Met mij gedeeld','Verhalen die anderen persoonlijk met jou deelden')+
+      '</div><p class="talera-share-section-label">Account en beheer</p><div class="talera-share-options">'+
+      buttonOption('subscription','€','Mijn abonnement','Pakket, betalen en facturen')+
+      buttonOption('privacy','◇','Privacy en beveiliging','Inloggen, apparaten en jouw gegevens')+
+      buttonOption('notifications','•','Meldingen','Alleen de berichten die voor jou nodig zijn')+
+      buttonOption('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave')+
+      '</div><p class="talera-share-section-label">Ondersteuning</p><div class="talera-share-options">'+
+      buttonOption('help','?','Hulp en over TALERA','Uitleg, contact, voorwaarden en privacy')+
       '</div>';
   }
   function renderChoice(){
@@ -318,7 +371,7 @@ export const shareExperienceScript = String.raw`
       '<article class="talera-share-person"><div class="talera-share-person-top"><strong>Peter</strong><span class="talera-share-status is-action">Wacht op jou</span></div><p>Vraagt toegang tot jouw tijdlijn.</p><button type="button" data-view="access-request">Aanvraag bekijken</button></article>'+
       '<article class="talera-share-person"><div class="talera-share-person-top"><strong>Anja</strong><span class="talera-share-status">Actief</span></div><p>Vertrouwde kring · alleen zichtbaar voor jou.</p><button type="button" data-action="prototype-manage">Toegang beheren</button></article>'+
       '<article class="talera-share-person"><div class="talera-share-person-top"><strong>Oude uitnodiging</strong><span class="talera-share-status is-muted">Verlopen</span></div><p>Los verhaal · de verwijzing is niet meer beschikbaar.</p></article></div>'+
-      '<div class="talera-share-notice">TALERA laat niet zien hoe vaak of hoe lang iemand luistert.</div>';
+      '<button class="talera-share-primary" type="button" data-view="timeline-settings">Nieuwe tijdlijnuitnodiging</button><div class="talera-share-notice">TALERA laat niet zien hoe vaak of hoe lang iemand luistert.</div>';
   }
   function renderAccessRequest(){
     return title('Toegang aanvragen','Peter heeft een account bevestigd en vraagt toegang tot jouw levenslijn.')+
@@ -330,6 +383,50 @@ export const shareExperienceScript = String.raw`
     return title('Met mij gedeeld','Hier bewaar je verwijzingen naar verhalen die anderen persoonlijk met jou delen.')+
       '<div class="talera-share-empty"><strong>Geen losse kopieën</strong><p>Foto, video en audio blijven bij de oorspronkelijke verteller. Als toegang verloopt of wordt ingetrokken, wordt ook deze verwijzing ontoegankelijk.</p></div>'+memoryCard('Voorbeeld van een verwijzing')+
       '<div class="talera-share-notice">Ontvangen verhalen worden niet tussen jouw eigen herinneringen geplaatst.</div>';
+  }
+  function renderProfile(){
+    return title('Mijn profiel','Je identiteit en accountgegevens blijven gescheiden van de verhalen die je bewaart.')+
+      '<div class="talera-share-empty"><strong>Mark Smits</strong><p>Je profiel is zichtbaar als afzender wanneer je iemand persoonlijk uitnodigt.</p></div>'+
+      '<p class="talera-share-section-label">Account</p><div class="talera-share-options">'+
+      buttonAction('prototype-account','◉','Persoonsgegevens','Naam, profielfoto en contactgegevens')+
+      buttonAction('prototype-account','↗','Inloggen en herstel','Mobiel nummer, e-mail en later passkeys')+
+      '</div><button class="talera-share-primary" type="button" data-action="prototype-account">Account compleet maken</button>';
+  }
+  function renderSubscription(){
+    return title('Mijn abonnement','Hier komt straks een rustig overzicht van je TALERA-pakket en betalingen.')+
+      '<div class="talera-share-empty"><strong>Nog geen abonnement gekoppeld</strong><p>De definitieve betaalmodellen worden hier toegevoegd zodra ze inhoudelijk zijn vastgesteld.</p></div>'+
+      '<p class="talera-share-section-label">Beheer</p><div class="talera-share-options">'+
+      buttonAction('prototype-account','€','Pakket en betaalmethode','Bekijk straks je pakket en betaalgegevens')+
+      buttonAction('prototype-account','≡','Facturen','Een overzicht van betalingen en facturen')+'</div>';
+  }
+  function renderPrivacy(){
+    return title('Privacy en beveiliging','Jij bepaalt wie binnen TALERA bij jouw persoonlijke verhalen kan.')+
+      '<div class="talera-share-options">'+
+      buttonAction('prototype-account','◇','Inloggen en herstel','Beveiligde toegang zonder zelfbedacht wachtwoord')+
+      buttonAction('prototype-account','▣','Mijn apparaten','Bekijk en beëindig actieve sessies')+
+      buttonAction('prototype-account','○','Mijn gegevens','Privacykeuzes, toestemming en gegevensbeheer')+'</div>'+
+      '<div class="talera-share-notice">Verhalen en media worden in de productiefase uitsluitend na servercontrole geleverd.</div>';
+  }
+  function renderNotifications(){
+    return title('Meldingen','TALERA meldt alleen wat aandacht of een beslissing van jou nodig heeft.')+
+      '<div class="talera-share-options">'+
+      buttonAction('prototype-setting','•','Toegangsaanvragen','Een melding wanneer iemand toegang vraagt')+
+      buttonAction('prototype-setting','✓','Bevestigingen','Een korte bevestiging na belangrijke wijzigingen')+
+      buttonAction('prototype-setting','–','Geen luistercontrole','Geen meldingen over openen, duur of luisterfrequentie')+'</div>';
+  }
+  function renderSettings(){
+    return title('Instellingen','Pas de algemene werking van TALERA aan zonder je verhalen te veranderen.')+
+      '<div class="talera-share-options">'+
+      buttonAction('prototype-setting','NL','Taal','Nederlands')+
+      buttonAction('prototype-setting','Aa','Toegankelijkheid','Tekstgrootte, contrast en bediening')+
+      buttonAction('prototype-setting','◐','Weergave','Rust, beweging en visuele voorkeuren')+'</div>';
+  }
+  function renderHelp(){
+    return title('Hulp en over TALERA','Uitleg en belangrijke informatie blijven altijd gemakkelijk bereikbaar.')+
+      '<div class="talera-share-options">'+
+      buttonAction('prototype-account','?','Hulp bij TALERA','Antwoorden en uitleg over vertellen, bewaren en delen')+
+      buttonAction('prototype-account','✉','Contact','Neem contact op met TALERA')+
+      buttonAction('prototype-account','§','Voorwaarden en privacy','Gebruiksvoorwaarden en privacybeleid')+'</div>';
   }
   function renderRecipientStory(){
     return '<div class="talera-share-center">'+title(OWNER_NAME+' deelt een herinnering met je','Je kunt dit persoonlijke verhaal binnen TALERA bekijken en beluisteren.')+'</div><div class="talera-recipient-photo"><img class="talera-recipient-image" alt="Gedeelde herinnering"><span>Persoonlijk met jou gedeeld</span></div><p class="talera-share-quote">'+escapeHtml(memoryTitle())+'</p>'+
@@ -356,6 +453,12 @@ export const shareExperienceScript = String.raw`
       people:renderPeople,
       'access-request':renderAccessRequest,
       'shared-with-me':renderSharedWithMe,
+      profile:renderProfile,
+      subscription:renderSubscription,
+      privacy:renderPrivacy,
+      notifications:renderNotifications,
+      settings:renderSettings,
+      help:renderHelp,
       'recipient-story':renderRecipientStory,
       'recipient-timeline':renderRecipientTimeline,
       waiting:renderWaiting,
@@ -403,6 +506,7 @@ export const shareExperienceScript = String.raw`
   }
 
   moreButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('hub')},true);
+  contextShare.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('share-choice')},true);
   shell.addEventListener('click',e=>{
     if(e.target===shell){close();return}
     const target=e.target.closest('button');
@@ -419,6 +523,8 @@ export const shareExperienceScript = String.raw`
     if(action==='preview-recipient'){go(state.kind==='timeline'?'recipient-timeline':'recipient-story');return}
     if(action==='prototype-whatsapp'){showToast('De veilige WhatsApp-koppeling wordt aangesloten na goedkeuring van dit ontwerp.');return}
     if(action==='prototype-manage'){showToast('Hier komen straks verplaatsen en toegang intrekken.');return}
+    if(action==='prototype-account'){showToast('Dit onderdeel is voorbereid en wordt aangesloten zodra de account- en betaalbasis gereed is.');return}
+    if(action==='prototype-setting'){showToast('Deze voorkeur wordt in de accountfase aangesloten.');return}
     if(action==='approve-request'){showToast('Toegang goedgekeurd. De ontvanger ziet alleen de toegestane tijdlijn.');back();return}
     if(action==='deny-request'){showToast('De aanvraag is geweigerd. Er is geen tijdlijntoegang gegeven.');back();return}
     if(action==='recipient-listen'){

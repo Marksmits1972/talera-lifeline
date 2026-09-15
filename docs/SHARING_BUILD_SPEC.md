@@ -118,6 +118,14 @@ Een ontvanger krijgt na intrekken of verlopen uitsluitend: “Dit verhaal of dez
 7. Goedgekeurde, gefilterde tijdlijn.
 8. Geweigerd, verlopen of ingetrokken.
 
+## Navigatiearchitectuur
+
+- **Meer** is de algemene TALERA-index en is niet gekoppeld aan de actieve herinnering.
+- Meer reserveert ruimte voor profiel, Mijn mensen, Met mij gedeeld, abonnement en betaling, privacy en beveiliging, meldingen, instellingen en hulp.
+- Delen is een afzonderlijke contextuele knop op het foto- en videoscherm.
+- De contextuele deelknop gebruikt automatisch de actieve herinnering en opent de keuze tussen één verhaal en de tijdlijn.
+- Tijdlijnuitnodigingen en bestaande toegang blijven daarnaast beheerbaar via Mijn mensen.
+
 ## Visuele architectuur
 
 - Eén deelmodule bezit overlay, frost, navigatie en toestanden.
@@ -184,7 +192,9 @@ De eerste UI-versie:
 
 ## Acceptatiecriteria prototype
 
-- Meer opent één rustig glass-frostvenster zonder harde scheidingslijn.
+- Meer opent één rustig, licht TALERA-werkblad met de algemene app-index.
+- De actieve-herinneringskaart en de directe ingang Delen staan niet in de algemene Meer-index.
+- Een afzonderlijke deelknop op het foto- of videoscherm opent de deelroute voor de actieve herinnering.
 - Delen toont de actieve herinnering zonder token of beheergegeven te kopiëren.
 - Alle twee deelvormen en vier duurkeuzes zijn bereikbaar.
 - Kringkeuze is als privé-instelling herkenbaar.

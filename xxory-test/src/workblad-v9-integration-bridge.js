@@ -1,6 +1,6 @@
 export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="talera-workblad-v9-integration-bridge">
 (() => {
-  const REV = 'workblad-v9-optional-audio-edit-bypass-20260915-r6';
+  const REV = 'workblad-v9-direct-timeline-cycle-20260915-r1';
   const DB_NAME = 'talera-workblad-v2';
   const STORE = 'drafts';
   const originalFetch = window.fetch.bind(window);
@@ -116,7 +116,7 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
 
   async function uploadPhoto(blob) {
     if (!(blob instanceof Blob) || !blob.size) return null;
-    setStatus('Je foto wordt apart gecontroleerd…');
+    setStatus('Je klaargezette foto wordt gecontroleerd…');
     const localSha = await sha256(blob);
     const type = String(blob.type || 'image/jpeg');
     const name = blob.name || (/png/i.test(type) ? 'herinnering.png' : /heic|heif/i.test(type) ? 'herinnering.heic' : 'herinnering.jpg');
@@ -157,8 +157,8 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
     const btn = findSaveButton();
     if (!btn) return;
 
-    // Bestaande herinneringen hebben al een bewezen updatepad in workblad-v2.
-    // Laat dat pad volledig eigenaar zijn; de V9-create bridge mag hier niet tussenkomen.
+    // Bestaande herinneringen behouden hun bewezen updatepad. De timeline-handoff
+    // onderschept alleen de terugkeer naar presentatie nadat dit pad groen is.
     if (isEditMode()) return;
 
     if (btn.dataset.v9Saved === '1') return;
@@ -175,13 +175,10 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
       const snapshot = readCurrentWorkblad();
       const audio = snapshot.audioBlob;
       const hasAudio = audio instanceof Blob && audio.size > 0;
-      const selectedPhotos = Array.isArray(snapshot.photos) ? snapshot.photos.filter(x => x instanceof Blob && x.size > 0) : [];
-      setStatus('Je foto’s worden voorbereid voor snelle, scherpe weergave…');
-      const photos = [];
-      for (const source of selectedPhotos) {
-        const optimized = typeof window.__taleraOptimizePhoto === 'function' ? await window.__taleraOptimizePhoto(source) : source;
-        photos.push(optimized || source);
-      }
+      // De foto’s in het werkblad zijn al geoptimaliseerd en direct na selectie
+      // op de achtergrond klaargezet. Hier gebruiken we exact diezelfde blobs,
+      // zodat de eindknop geen tweede optimalisatie/uploadronde start.
+      const photos = Array.isArray(snapshot.photos) ? snapshot.photos.filter(x => x instanceof Blob && x.size > 0) : [];
       log('current workblad read', {audioBytes:hasAudio?audio.size:0, photoCount:photos.length, title:snapshot.title, eventTime:snapshot.eventTime});
 
       const audioData = hasAudio ? await uploadAudio(audio) : null;
@@ -194,17 +191,17 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
       await clearDraft();
 
       window.__taleraLastV9MemoryId = memory.memoryId;
-      setStatus('✓ Veilig opgeslagen. Koppel de herinnering wanneer jij klaar bent aan je tijdlijn.', 'ok');
+      setStatus('Je herinnering is veilig opgeslagen. We zetten hem nu op je tijdlijn…');
       btn.textContent = 'Koppelen aan mijn tijdlijn';
       btn.dataset.v9Saved = '1';
       document.dispatchEvent(new CustomEvent('talera:v9-memory-saved', { detail:{ memoryId:memory.memoryId } }));
-      log('complete memory saved', memory);
+      log('complete memory saved; timeline coupling continues from same deliberate click', memory);
     } catch (error) {
       setStatus('Opslaan mislukt: ' + String(error?.message || error), 'bad');
       log('save failed', error);
     } finally {
       btn.dataset.v9Busy = '0';
-      btn.disabled = false;
+      if (!location.href.includes('talera-timeline-prototype')) btn.disabled = false;
     }
   }
 

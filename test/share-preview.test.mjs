@@ -38,6 +38,8 @@ const { handleSharePreviewStorage } = await import("../xxory-test/src/share-prev
 const storageEnv = { MEDIA: bucket };
 
 const { default: worker } = await import("../src/index.js");
+const plainPage = await worker.fetch(new Request("https://talera.example/"), { SHARE_PREVIEWS: bucket });
+assert.doesNotMatch(await plainPage.text(), /<html lang="nl" class="talera-invite-page talera-invite-boot">/);
 const form = new FormData();
 form.append("image", new Blob([new Uint8Array([255, 216, 255, 217])], { type: "image/jpeg" }), "preview.jpg");
 form.append("title", "Terugkijken op al die losse momenten");
@@ -62,6 +64,10 @@ const html = await page.text();
 assert.match(html, /property="og:site_name" content="TALERA"/);
 assert.match(html, /property="og:image" content="https:\/\/talera\.example\/api\/share-preview\/image\/[a-f0-9]{32}"/);
 assert.match(html, /Mark deelt een herinnering: Terugkijken op al die losse momenten/);
+assert.match(html, /class="talera-invite-page talera-invite-boot"/);
+assert.match(html, /talera-invite-first-frame/);
+assert.match(shareExperienceScript, /waitForRecipientFirstFrame/);
+assert.match(shareExperienceScript, /classList\.remove\('talera-invite-boot'\)/);
 
 const token = invite.searchParams.get("talera_invite");
 const meta = await worker.fetch(new Request(`https://talera.example/api/share-preview/meta/${token}`), { SHARE_PREVIEWS: bucket });

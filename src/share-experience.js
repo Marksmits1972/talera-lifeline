@@ -681,6 +681,17 @@ export const shareExperienceScript = String.raw`
       _taleraSharedRecipient:true
     });
   }
+  async function waitForRecipientFirstFrame(){
+    const image=document.getElementById('memoryPhotoA');
+    if(!image||image.complete&&image.naturalWidth)return;
+    await new Promise(resolve=>{
+      let done=false;
+      const finish=()=>{if(done)return;done=true;image.removeEventListener('load',finish);image.removeEventListener('error',finish);resolve()};
+      image.addEventListener('load',finish,{once:true});
+      image.addEventListener('error',finish,{once:true});
+      setTimeout(finish,1600);
+    });
+  }
   async function activateRecipientPresentation(){
     document.body.classList.add('talera-recipient-presentation');
     contextShare.hidden=true;
@@ -688,6 +699,8 @@ export const shareExperienceScript = String.raw`
     const shared=recipientStoryMemory(exact);
     if(typeof runtime.restrictToMemory==='function')runtime.restrictToMemory(shared);
     else{runtime.setCenter(shared.ms);runtime.writeMemory(shared);runtime.draw()}
+    await waitForRecipientFirstFrame();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>document.documentElement.classList.remove('talera-invite-boot')));
     document.dispatchEvent(new CustomEvent('talera:recipient-presentation',{detail:{scope:'story',token:inviteToken}}));
   }
 

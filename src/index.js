@@ -20,7 +20,7 @@ import { shareExperienceStyle, shareExperienceScript } from "./share-experience.
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "invite-story-identity-v9-20260915";
+const TALERA_TIMELINE_DEPLOY_REV = "invite-first-frame-v10-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
@@ -217,7 +217,12 @@ async function htmlWithSharePreview(request, env) {
     ? "Bekijk de levensverhalen die Mark persoonlijk met je deelt."
     : "Een persoonlijke herinnering om te bekijken en te beluisteren in TALERA.";
   const tags = `<meta property="og:type" content="website"><meta property="og:site_name" content="TALERA"><meta property="og:title" content="${escapeMeta(title)}"><meta property="og:description" content="${escapeMeta(description)}"><meta property="og:image" content="${escapeMeta(meta.imageUrl)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMeta(title)}"><meta name="twitter:description" content="${escapeMeta(description)}"><meta name="twitter:image" content="${escapeMeta(meta.imageUrl)}">`;
-  return HTML.replace("</head>", `${tags}</head>`);
+  if (meta.kind !== "story") return HTML.replace("</head>", `${tags}</head>`);
+
+  const firstFrameGate = `<style id="talera-invite-first-frame">html.talera-invite-page body{background:#F7F4EF}html.talera-invite-page .app{transition:opacity .16s ease}html.talera-invite-boot .app{opacity:0!important;pointer-events:none!important}</style><script>setTimeout(function(){document.documentElement.classList.remove('talera-invite-boot')},6000)</script>`;
+  return HTML
+    .replace('<html lang="nl">', '<html lang="nl" class="talera-invite-page talera-invite-boot">')
+    .replace("</head>", `${tags}${firstFrameGate}</head>`);
 }
 
 async function proxyLinkedMemory(request) {

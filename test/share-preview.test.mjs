@@ -10,6 +10,8 @@ assert.match(shareExperienceScript, /isAppleMobile\?'whatsapp:\/\/send\?text=':'
 assert.doesNotMatch(shareExperienceScript, /https:\/\/api\.whatsapp\.com/);
 assert.match(shareExperienceScript, /function activateRecipientPresentation\(\)/);
 assert.match(shareExperienceScript, /runtime\.restrictToMemory\(shared\)/);
+assert.match(shareExperienceScript, /form\.append\('storyId'/);
+assert.match(shareExperienceScript, /async function exactRecipientMemory\(\)/);
 assert.match(shareExperienceScript, /if\(demoView==='recipient-story'\)loadInvitePreview\(\)\.finally\(\(\)=>setTimeout\(activateRecipientPresentation,280\)\)/);
 assert.doesNotMatch(shareExperienceScript, /open\('recipient-story'\)/);
 
@@ -42,6 +44,11 @@ form.append("title", "Terugkijken op al die losse momenten");
 form.append("kind", "story");
 form.append("duration", "7 dagen");
 form.append("hasPhoto", "1");
+form.append("memoryId", "live:story-123");
+form.append("storyId", "story-123");
+form.append("story", "Terugkijken op al die losse momenten");
+form.append("fullStory", "Terugkijken op al die losse momenten. Het volledige verhaal.");
+form.append("eventAt", "2026-09-06T09:15:00.000Z");
 
 const created = await worker.fetch(new Request("https://talera.example/api/share-preview", { method: "POST", body: form }), { SHARE_PREVIEWS: bucket });
 assert.equal(created.status, 200);
@@ -59,7 +66,11 @@ assert.match(html, /Mark deelt een herinnering: Terugkijken op al die losse mome
 const token = invite.searchParams.get("talera_invite");
 const meta = await worker.fetch(new Request(`https://talera.example/api/share-preview/meta/${token}`), { SHARE_PREVIEWS: bucket });
 assert.equal(meta.status, 200);
-assert.equal((await meta.json()).hasPhoto, true);
+const metaPayload = await meta.json();
+assert.equal(metaPayload.hasPhoto, true);
+assert.equal(metaPayload.storyId, "story-123");
+assert.equal(metaPayload.memoryId, "live:story-123");
+assert.match(metaPayload.fullStory, /volledige verhaal/);
 
 const image = await worker.fetch(new Request(`https://talera.example/api/share-preview/image/${token}`), { SHARE_PREVIEWS: bucket });
 assert.equal(image.status, 200);

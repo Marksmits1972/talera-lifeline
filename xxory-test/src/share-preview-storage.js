@@ -33,6 +33,11 @@ export async function handleSharePreviewStorage(request, env) {
       token,
       kind: form.get('kind') === 'timeline' ? 'timeline' : 'story',
       title: cleanText(form.get('title'), 'Een persoonlijke herinnering', 180),
+      memoryId: cleanOptional(form.get('memoryId'), 160),
+      storyId: cleanOptional(form.get('storyId'), 160),
+      story: cleanOptional(form.get('story'), 2_000),
+      fullStory: cleanStory(form.get('fullStory'), 16_000),
+      eventAt: validDate(form.get('eventAt')),
       imageKey: imageObjectKey,
       hasPhoto: form.get('hasPhoto') === '1',
       expiresAt: Date.now() + maxAge * 1000,
@@ -98,6 +103,19 @@ function previewLifetime(duration) {
 function cleanText(value, fallback, maxLength) {
   const clean = String(value || '').replace(/\s+/g, ' ').trim();
   return (clean || fallback).slice(0, maxLength);
+}
+
+function cleanOptional(value, maxLength) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function cleanStory(value, maxLength) {
+  return String(value || '').replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, maxLength);
+}
+
+function validDate(value) {
+  const raw = String(value || '').trim();
+  return Number.isFinite(Date.parse(raw)) ? raw.slice(0, 64) : '';
 }
 
 function randomHex(bytes) {

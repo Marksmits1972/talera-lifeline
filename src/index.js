@@ -20,7 +20,7 @@ import { shareExperienceStyle, shareExperienceScript } from "./share-experience.
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "whatsapp-ios-direct-v8-recipient-routes-20260915";
+const TALERA_TIMELINE_DEPLOY_REV = "invite-story-identity-v9-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
@@ -46,6 +46,12 @@ window.__taleraTimelineRuntime={
   msDay:MS_DAY,
   totalDays:TOTAL_DAYS,
   currentMemory(){return MEMORIES.find(m=>m.id===activeMemoryId)||nearestMemory(centerMs)},
+  findMemory(identity){
+    if(!identity)return null;
+    const storyId=String(identity.storyId||'');
+    const memoryId=String(identity.memoryId||'');
+    return MEMORIES.find(m=>(storyId&&String(m.storyId||'')===storyId)||(memoryId&&String(m.id)===memoryId))||null;
+  },
   nearestMemory(ms=centerMs){
     const value=Number(ms);
     return nearestMemory(Number.isFinite(value)?value:centerMs);
@@ -81,8 +87,8 @@ window.__taleraTimelineRuntime={
     draw();
     return memory;
   },
-  setCenter(ms){centerMs=Number(ms)||centerMs;keepCenterValid();return centerMs},
-  writeMemory(memory){writeMemory(memory)},
+  setCenter(ms){if(taleraRecipientLock)return centerMs;centerMs=Number(ms)||centerMs;keepCenterValid();return centerMs},
+  writeMemory(memory){if(taleraRecipientLock&&(!memory||memory.id!==MEMORIES[0].id))return;writeMemory(memory)},
   draw(){draw()},
   settlePhoto(memory){settlePhoto(memory)},
   settleNearestPhoto(){

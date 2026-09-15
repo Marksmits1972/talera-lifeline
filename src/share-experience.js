@@ -585,12 +585,18 @@ export const shareExperienceScript = String.raw`
     return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('thumbnail')),'image/jpeg',.84));
   }
   async function createPreviewLink(timeline){
+    const selected=memory();
     const form=new FormData();
     form.append('image',await makeInvitationThumbnail(),'talera-uitnodiging.jpg');
     form.append('title',memoryTitle());
     form.append('kind',timeline?'timeline':'story');
     form.append('duration',timeline?'30 dagen':state.duration);
     form.append('hasPhoto',state.previewPhoto?'1':'0');
+    form.append('memoryId',selected.id==null?'':String(selected.id));
+    form.append('storyId',selected.storyId==null?'':String(selected.storyId));
+    form.append('story',String(selected.story||memoryTitle(selected)));
+    form.append('fullStory',String(selected.fullStory||selected.story||memoryTitle(selected)));
+    form.append('eventAt',String(selected.at||(selected.ms?new Date(selected.ms).toISOString():'')));
     const response=await fetch('/api/share-preview',{method:'POST',body:form});
     if(!response.ok)throw new Error('preview '+response.status);
     const result=await response.json();
@@ -640,28 +646,46 @@ export const shareExperienceScript = String.raw`
       state.invitePreview=await response.json();
     }catch(e){}
   }
-  function recipientStoryMemory(){
-    const source=runtime.currentMemory()||{};
+  async function exactRecipientMemory(){
+    const identity=state.invitePreview||{};
+    if(!identity.storyId&&!identity.memoryId)return null;
+    const deadline=Date.now()+3600;
+    while(Date.now()<deadline){
+      const found=typeof runtime.findMemory==='function'?runtime.findMemory(identity):null;
+      if(found)return found;
+      await new Promise(resolve=>setTimeout(resolve,90));
+    }
+    return typeof runtime.findMemory==='function'?runtime.findMemory(identity):null;
+  }
+  function recipientStoryMemory(source){
+    source=source||{};
     const headline=(state.invitePreview&&state.invitePreview.title)||String(source.title||source.story||'Gedeelde herinnering');
     const originalStory=String(source.story||'');
-    let fullStory=String(source.fullStory||headline);
+    const snapshotStory=String(state.invitePreview&&state.invitePreview.story||'');
+    let fullStory=String(source.fullStory||(state.invitePreview&&state.invitePreview.fullStory)||snapshotStory||headline);
     if(originalStory&&fullStory.startsWith(originalStory))fullStory=headline+fullStory.slice(originalStory.length);
-    const photos=Array.isArray(source.photos)&&source.photos.length?source.photos.slice():[source.image].filter(Boolean);
+    const fallbackImage=state.invitePreview&&state.invitePreview.imageUrl||'';
+    const photos=Array.isArray(source.photos)&&source.photos.length?source.photos.slice():[source.image||fallbackImage].filter(Boolean);
+    const eventAt=source.at||(state.invitePreview&&state.invitePreview.eventAt)||'';
+    const eventMs=Number(source.ms)||Date.parse(eventAt)||runtime.centerMs();
     return Object.assign({},source,{
       id:'recipient:'+inviteToken,
+      at:eventAt||new Date(eventMs).toISOString(),
+      ms:eventMs,
       title:headline,
       story:headline,
       fullStory:fullStory||headline,
-      image:photos[0]||source.image||'',
+      image:photos[0]||fallbackImage,
       photos:photos,
       _photoIndex:0,
       _taleraSharedRecipient:true
     });
   }
-  function activateRecipientPresentation(){
-    const shared=recipientStoryMemory();
+  async function activateRecipientPresentation(){
     document.body.classList.add('talera-recipient-presentation');
     contextShare.hidden=true;
+    const exact=await exactRecipientMemory();
+    const shared=recipientStoryMemory(exact);
     if(typeof runtime.restrictToMemory==='function')runtime.restrictToMemory(shared);
     else{runtime.setCenter(shared.ms);runtime.writeMemory(shared);runtime.draw()}
     document.dispatchEvent(new CustomEvent('talera:recipient-presentation',{detail:{scope:'story',token:inviteToken}}));

@@ -1,12 +1,13 @@
 import baseWorker from './orb-app-v79-worker.js';
 import { handleV9TimelinePublish } from './workblad-v9-timeline-publish.js';
 import { handleV9StagedPhotoLink } from './workblad-v9-staged-photo-link.js';
+import { handleV9TextMemory } from './workblad-v9-text-memory.js';
 import { WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT } from './workblad-v9-timeline-handoff.js';
 import { handleStoryPhotoCleanup } from './workblad-story-photo-cleanup.js';
 import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workblad-story-management.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 
-const WRAPPER_REV = 'workblad-v9-management-v2-20260915-r9';
+const WRAPPER_REV = 'workblad-v9-text-photo-optional-audio-20260915-r10';
 
 export default {
   async fetch(request, env, ctx) {
@@ -45,6 +46,14 @@ export default {
     }
 
     try {
+      const textMemoryResponse = await handleV9TextMemory(request, env);
+      if (textMemoryResponse) return textMemoryResponse;
+    } catch (error) {
+      console.error('TALERA v9 text/photo memory error', error);
+      return json({ error: 'De herinnering zonder geluidsopname kon niet veilig worden opgeslagen.' }, 500);
+    }
+
+    try {
       const publishResponse = await handleV9TimelinePublish(request, env);
       if (publishResponse) return publishResponse;
     } catch (error) {
@@ -62,6 +71,8 @@ export default {
         timelinePublishRevision: WRAPPER_REV,
         timelineHandoff: 'storyId+manageToken',
         stagedPhotoLink: true,
+        v9TextPhotoMemory: true,
+        audioRequiredForTimeline: false,
         storyPhotoCleanup: true,
         storyManagement: true,
         storyManagementRevision: 'v2-undo',

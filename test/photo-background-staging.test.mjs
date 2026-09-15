@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { WORKBLAD_PHOTO_OPTIMIZER_SCRIPT } from '../xxory-test/src/workblad-photo-optimizer.js';
 import { WORKBLAD_PHOTO_STAGING_SCRIPT, WORKBLAD_PHOTO_STAGING_REARM_SCRIPT } from '../xxory-test/src/workblad-photo-staging.js';
 import { handleV9StagedPhotoLink } from '../xxory-test/src/workblad-v9-staged-photo-link.js';
 import worker from '../xxory-test/src/orb-app-v79-worker.js';
@@ -13,6 +14,12 @@ test('optimized photos start verified v9 staging without blocking selection', ()
   assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /crypto\.subtle\.digest\('SHA-256'/);
   assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /serverBlob\.size !== blob\.size/);
   assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /serverSha !== localSha/);
+});
+
+test('a TALERA-prepared photo is not recompressed a second time during final save', () => {
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /alreadyPrepared/);
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /-talera\\\.jpe\?g/);
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /alreadyPrepared \|\|/);
 });
 
 test('final save reuses an already staged first photo and keeps normal upload fallback', () => {

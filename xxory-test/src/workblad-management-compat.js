@@ -15,6 +15,10 @@ export const WORKBLAD_MANAGEMENT_COMPAT_SCRIPT = String.raw`<script id="talera-m
     node.classList.toggle('bad',Boolean(message&&bad));
   }
 
+  function refreshStorytelling(){
+    requestAnimationFrame(()=>window.__taleraStorytellingPage?.refresh?.(true));
+  }
+
   async function acceptNativePhotoInput(input){
     const files=Array.from(input.files||[]);
     if(!files.length)return;
@@ -24,7 +28,7 @@ export const WORKBLAD_MANAGEMENT_COMPAT_SCRIPT = String.raw`<script id="talera-m
       if(!api||typeof api.addPhotos!=='function')throw new Error('Foto toevoegen is nog niet gekoppeld.');
       await api.addPhotos(files);
       setPhotoStatus(files.length===1?'Foto toegevoegd.':'Foto’s toegevoegd.');
-      window.__taleraStorytellingPage?.refresh?.(true);
+      refreshStorytelling();
     }catch(error){
       setPhotoStatus('Foto toevoegen lukt nog niet: '+String(error?.message||error),true);
     }finally{
@@ -86,6 +90,8 @@ export const WORKBLAD_MANAGEMENT_COMPAT_SCRIPT = String.raw`<script id="talera-m
     installNativePhotoInputs();
   }
 
+  document.addEventListener('talera:storytelling-photos-added',refreshStorytelling);
+  document.addEventListener('talera:storytelling-photos-prepared',refreshStorytelling);
   reconcile();
   addEventListener('pageshow',reconcile);
   new MutationObserver(()=>requestAnimationFrame(reconcile)).observe(document.documentElement,{subtree:true,childList:true});

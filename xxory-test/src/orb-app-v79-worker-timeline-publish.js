@@ -122,11 +122,7 @@ export default {
     return new Response(
       withPolishedStyle.replace(
         '</body>',
-        WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT +
-          WORKBLAD_MANAGEMENT_COMPAT_SCRIPT +
-          WORKBLAD_STORY_MANAGEMENT_SCRIPT +
-          WORKBLAD_POLISHED_TEST_PAGE_SCRIPT +
-          '</body>'
+        WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_MANAGEMENT_COMPAT_SCRIPT + WORKBLAD_STORY_MANAGEMENT_SCRIPT + WORKBLAD_POLISHED_TEST_PAGE_SCRIPT + '</body>'
       ),
       { status: response.status, statusText: response.statusText, headers }
     );

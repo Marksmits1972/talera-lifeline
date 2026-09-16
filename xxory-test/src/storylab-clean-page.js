@@ -1,23 +1,23 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-foundation-20260916-r1';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-foundation-20260916-r2';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#173851" />
+  <meta name="theme-color" content="#16384f" />
   <title>TALERA — Vertelpagina</title>
   <style>
     :root {
-      --bg-top: #607e94;
-      --bg-mid: #315b78;
+      --bg-top: #607f95;
+      --bg-mid: #355f7b;
       --bg-bottom: #102c43;
       --white: #ffffff;
-      --soft-white: rgba(255,255,255,.78);
+      --muted: rgba(255,255,255,.64);
       --line: rgba(255,255,255,.34);
       --orb: #3f78a6;
       --sheet: #f8f6f2;
-      --sheet-text: #64788c;
+      --sheet-text: #667b8f;
     }
 
     * { box-sizing: border-box; }
@@ -34,6 +34,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       overflow: hidden;
       color: var(--white);
       -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
 
     button {
@@ -51,17 +52,17 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       overflow: hidden;
       isolation: isolate;
       background:
-        radial-gradient(circle at 48% 33%, rgba(255,255,255,.08), rgba(255,255,255,0) 36%),
-        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 38%, var(--bg-bottom) 100%);
+        radial-gradient(circle at 48% 32%, rgba(255,255,255,.055), rgba(255,255,255,0) 38%),
+        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 39%, var(--bg-bottom) 100%);
     }
 
     .app::after {
       content: "";
       position: absolute;
       inset: 0;
-      pointer-events: none;
-      background: linear-gradient(180deg, rgba(6,20,31,.08), rgba(6,20,31,0) 28%, rgba(4,16,27,.18) 100%);
       z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(7,22,33,.07), rgba(7,22,33,0) 26%, rgba(4,16,27,.15) 100%);
     }
 
     .content {
@@ -69,165 +70,168 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       z-index: 2;
       min-height: 100dvh;
       padding:
-        calc(env(safe-area-inset-top) + 28px)
-        24px
-        calc(118px + env(safe-area-inset-bottom))
-        24px;
+        calc(env(safe-area-inset-top) + 18px)
+        16px
+        calc(96px + env(safe-area-inset-bottom))
+        16px;
     }
 
     .top {
       display: grid;
       grid-template-columns: minmax(0,1fr) auto;
-      gap: 18px;
+      gap: 12px;
       align-items: start;
     }
 
     .brand {
-      margin: 0 0 12px;
-      font-size: 15px;
+      margin: 0 0 9px;
+      font-size: 11px;
       line-height: 1;
       font-weight: 800;
-      letter-spacing: .26em;
-      color: rgba(255,255,255,.86);
+      letter-spacing: .28em;
+      color: rgba(255,255,255,.84);
     }
 
     .title {
       margin: 0;
-      font-size: clamp(26px, 7vw, 34px);
-      line-height: 1.04;
+      font-size: clamp(19px, 5.2vw, 22px);
+      line-height: 1.08;
       font-weight: 760;
-      letter-spacing: -.035em;
-      text-shadow: 0 1px 10px rgba(0,0,0,.08);
+      letter-spacing: -.025em;
+      white-space: nowrap;
     }
 
     .date-pill,
     .photo-pill {
       appearance: none;
-      border: 1.5px solid var(--line);
-      background: rgba(18,46,66,.16);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
-      backdrop-filter: blur(3px);
+      border: 1.25px solid var(--line);
+      background: rgba(18,46,66,.12);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+      backdrop-filter: blur(2px);
     }
 
     .date-pill {
-      margin-top: 18px;
-      min-height: 50px;
-      padding: 0 18px;
-      border-radius: 25px;
+      margin-top: 11px;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 21px;
       display: inline-flex;
       align-items: center;
-      gap: 11px;
-      font-size: 17px;
+      gap: 9px;
+      font-size: 15px;
+      line-height: 1;
       font-weight: 690;
     }
 
     .photo-pill {
-      margin-top: -3px;
-      min-width: 112px;
-      min-height: 62px;
-      padding: 0 20px;
-      border-radius: 32px;
+      margin-top: -1px;
+      min-width: 94px;
+      min-height: 48px;
+      padding: 0 16px;
+      border-radius: 25px;
       display: inline-flex;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
       white-space: nowrap;
-      font-size: 18px;
+      font-size: 15.5px;
+      line-height: 1;
       font-weight: 760;
     }
 
     .date-icon {
-      width: 20px;
-      height: 20px;
+      width: 17px;
+      height: 17px;
       flex: 0 0 auto;
     }
 
     .empty-state {
       position: absolute;
-      left: 24px;
-      right: 24px;
-      top: 47%;
+      left: 18px;
+      right: 18px;
+      top: 47.5%;
       transform: translateY(-50%);
       text-align: center;
     }
 
     .add-photo-large {
-      width: 128px;
-      height: 128px;
-      margin: 0 auto 22px;
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 14px;
       border: 0;
       border-radius: 50%;
-      background: rgba(255,255,255,.91);
+      background: rgba(255,255,255,.93);
       color: #12314b;
       display: grid;
       place-items: center;
-      font-size: 64px;
+      font-size: 42px;
       line-height: 1;
       font-weight: 300;
-      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+      box-shadow: 0 8px 22px rgba(0,0,0,.07);
     }
 
     .empty-title {
-      max-width: 430px;
+      max-width: 330px;
       margin: 0 auto;
-      font-size: clamp(27px, 7.6vw, 38px);
-      line-height: 1.08;
+      font-size: clamp(22px, 6vw, 25px);
+      line-height: 1.1;
       font-weight: 800;
-      letter-spacing: -.035em;
+      letter-spacing: -.03em;
       text-wrap: balance;
     }
 
     .empty-copy {
-      max-width: 450px;
-      margin: 22px auto 0;
-      color: rgba(255,255,255,.66);
-      font-size: clamp(18px, 4.8vw, 24px);
-      line-height: 1.35;
+      max-width: 350px;
+      margin: 14px auto 0;
+      color: var(--muted);
+      font-size: clamp(15px, 4.1vw, 17px);
+      line-height: 1.36;
       font-weight: 470;
       text-wrap: balance;
     }
 
     .voice-block {
       position: absolute;
-      left: 24px;
-      right: 24px;
-      bottom: calc(108px + env(safe-area-inset-bottom));
+      left: 16px;
+      right: 16px;
+      bottom: calc(91px + env(safe-area-inset-bottom));
       text-align: center;
     }
 
     .orb-shell {
-      width: 118px;
-      height: 118px;
-      margin: 0 auto 14px;
+      width: 82px;
+      height: 82px;
+      margin: 0 auto 9px;
       border-radius: 50%;
-      padding: 12px;
-      background: rgba(255,255,255,.18);
+      padding: 8px;
+      background: rgba(255,255,255,.17);
       display: grid;
       place-items: center;
     }
 
     .orb {
-      width: 94px;
-      height: 94px;
-      border: 1.5px solid rgba(255,255,255,.72);
+      width: 66px;
+      height: 66px;
+      border: 1.25px solid rgba(255,255,255,.72);
       border-radius: 50%;
       background: var(--orb);
       display: grid;
       place-items: center;
-      box-shadow: 0 12px 28px rgba(3,14,24,.18);
+      box-shadow: 0 8px 20px rgba(3,14,24,.16);
     }
 
     .orb svg {
-      width: 42px;
-      height: 42px;
-      stroke: white;
+      width: 30px;
+      height: 30px;
+      stroke: #fff;
     }
 
     .voice-caption {
       margin: 0;
-      font-size: clamp(15px, 4.2vw, 20px);
+      font-size: clamp(13px, 3.8vw, 15px);
       line-height: 1.25;
       font-weight: 720;
-      color: rgba(255,255,255,.78);
+      color: rgba(255,255,255,.76);
+      white-space: nowrap;
     }
 
     .sheet {
@@ -236,26 +240,26 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       left: 0;
       right: 0;
       bottom: 0;
-      height: calc(94px + env(safe-area-inset-bottom));
-      border-radius: 34px 34px 0 0;
+      height: calc(82px + env(safe-area-inset-bottom));
+      border-radius: 30px 30px 0 0;
       background: var(--sheet);
-      box-shadow: 0 -8px 28px rgba(3,18,28,.08);
+      box-shadow: 0 -6px 22px rgba(3,18,28,.07);
       color: var(--sheet-text);
-      padding: 15px 22px calc(16px + env(safe-area-inset-bottom));
+      padding: 12px 18px calc(13px + env(safe-area-inset-bottom));
     }
 
     .grabber {
-      width: 68px;
-      height: 7px;
-      margin: 0 auto 18px;
+      width: 54px;
+      height: 5px;
+      margin: 0 auto 14px;
       border-radius: 10px;
-      background: #c8ccd1;
+      background: #c7ccd1;
     }
 
     .sheet-hint {
       margin: 0;
       text-align: left;
-      font-size: 15px;
+      font-size: 13px;
       line-height: 1.3;
       font-weight: 700;
       white-space: nowrap;
@@ -264,16 +268,32 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     }
 
     @media (max-height: 740px) {
-      .content { padding-top: calc(env(safe-area-inset-top) + 20px); }
-      .brand { margin-bottom: 8px; }
-      .date-pill { margin-top: 12px; min-height: 44px; }
-      .photo-pill { min-height: 54px; }
-      .empty-state { top: 44%; }
-      .add-photo-large { width: 108px; height: 108px; font-size: 54px; margin-bottom: 16px; }
-      .empty-copy { margin-top: 14px; }
-      .orb-shell { width: 96px; height: 96px; padding: 9px; margin-bottom: 8px; }
-      .orb { width: 78px; height: 78px; }
-      .orb svg { width: 34px; height: 34px; }
+      .content {
+        padding-top: calc(env(safe-area-inset-top) + 14px);
+        padding-bottom: calc(88px + env(safe-area-inset-bottom));
+      }
+      .brand { margin-bottom: 7px; }
+      .date-pill { margin-top: 9px; min-height: 37px; }
+      .photo-pill { min-height: 44px; }
+      .empty-state { top: 45.5%; }
+      .add-photo-large { width: 68px; height: 68px; font-size: 38px; margin-bottom: 12px; }
+      .empty-copy { margin-top: 11px; }
+      .voice-block { bottom: calc(84px + env(safe-area-inset-bottom)); }
+      .orb-shell { width: 74px; height: 74px; padding: 7px; margin-bottom: 7px; }
+      .orb { width: 60px; height: 60px; }
+      .orb svg { width: 27px; height: 27px; }
+      .sheet { height: calc(76px + env(safe-area-inset-bottom)); }
+    }
+
+    @media (max-width: 360px) {
+      .content { padding-left: 14px; padding-right: 14px; }
+      .top { gap: 9px; }
+      .title { font-size: 18px; }
+      .photo-pill { min-width: 88px; padding: 0 13px; font-size: 14.5px; }
+      .date-pill { padding: 0 12px; font-size: 14px; }
+      .empty-title { font-size: 22px; }
+      .empty-copy { font-size: 15px; }
+      .voice-caption { font-size: 12.5px; }
     }
 
     @media (min-width: 541px) {

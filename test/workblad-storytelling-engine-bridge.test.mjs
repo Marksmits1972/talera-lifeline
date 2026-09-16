@@ -28,6 +28,13 @@ test('storytelling bridge keeps date and photo picking on the existing proven co
   assert.match(wrapperSource, /document\.getElementById\('workDate'\)/);
 });
 
+test('photo DOM is only rebuilt when media or active photo changes', () => {
+  assert.match(wrapperSource, /stableStorytellingScript/);
+  assert.match(wrapperSource, /lastRenderedPhotoKey/);
+  assert.match(wrapperSource, /const renderKey = sig \+ '#' \+ activePhotoIndex/);
+  assert.match(wrapperSource, /renderKey === lastRenderedPhotoKey/);
+});
+
 test('wrapper still preserves target-first handoff and management APIs', () => {
   assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT/);
   assert.match(wrapperSource, /handleV9TimelinePublish/);

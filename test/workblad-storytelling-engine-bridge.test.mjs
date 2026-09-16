@@ -14,12 +14,14 @@ test('storytelling bridge exposes state without replacing proven recorder and sa
   assert.match(wrapperSource, /finish:function/);
 });
 
-test('visible file input passes selected files directly into proven applyPhotoFiles engine', () => {
+test('visible file input adopts selected photos directly into the current memory state', () => {
   assert.match(wrapperSource, /addPhotos:async function\(files\)/);
   assert.match(wrapperSource, /Array\.prototype\.slice\.call\(files\|\|\[\]\)/);
-  assert.match(wrapperSource, /await applyPhotoFiles\(list\)/);
+  assert.match(wrapperSource, /state\.workMedia\.push/);
+  assert.match(wrapperSource, /state\.newPhotoFiles\.push/);
+  assert.match(wrapperSource, /await draftSave\(\)/);
+  assert.doesNotMatch(wrapperSource.slice(wrapperSource.indexOf('addPhotos:async function(files)'), wrapperSource.indexOf('pickPhotos:function()', wrapperSource.indexOf('addPhotos:async function(files)'))), /applyPhotoFiles\(/);
   assert.match(pageSource, /taleraStoryPhotoInput/);
-  assert.match(pageSource, /await actions\(\)\.addPhotos\(files\)/);
 });
 
 test('storytelling bridge supports local and existing photo removal', () => {

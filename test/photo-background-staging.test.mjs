@@ -8,18 +8,25 @@ import worker from '../xxory-test/src/orb-app-v79-worker.js';
 
 const workerSource = readFileSync(new URL('../xxory-test/src/orb-app-v79-worker.js', import.meta.url), 'utf8');
 
-test('optimized photos start verified v9 staging without blocking selection', () => {
+test('prepared photos stage in the background without duplicating full photo buffers on iPhone', () => {
   assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /window\.__taleraOptimizePhoto = async function/);
   assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /stageQuietly\(result\)/);
-  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /crypto\.subtle\.digest\('SHA-256'/);
-  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /serverBlob\.size !== blob\.size/);
-  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /serverSha !== localSha/);
+  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /method:'HEAD'/);
+  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /x-talera-sha256/);
+  assert.doesNotMatch(WORKBLAD_PHOTO_STAGING_SCRIPT, /blob\.arrayBuffer\(\)/);
+  assert.doesNotMatch(WORKBLAD_PHOTO_STAGING_SCRIPT, /serverBlob/);
+});
+
+test('photo staging is serialized so several iPhone photos do not peak memory together', () => {
+  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /let stageTail = Promise\.resolve\(\)/);
+  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /const run = stageTail\.then\(\(\) => uploadAndVerify\(blob\)\)/);
+  assert.match(WORKBLAD_PHOTO_STAGING_SCRIPT, /stageTail = run\.catch\(\(\) => \{\}\)/);
 });
 
 test('a TALERA-prepared photo is not recompressed a second time during final save', () => {
   assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /alreadyPrepared/);
   assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /-talera\\\.jpe\?g/);
-  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /alreadyPrepared \|\|/);
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /if \(alreadyPrepared\) return file/);
 });
 
 test('final save reuses an already staged first photo and keeps normal upload fallback', () => {

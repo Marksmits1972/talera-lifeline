@@ -16,6 +16,19 @@ test('photo policy produces an adaptive JPEG around the agreed storage target', 
   assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /TARGET_BYTES = 3\.2 \* 1024 \* 1024/);
 });
 
+test('Apple touch devices keep browser-safe picker output without a full-resolution decode', () => {
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /isAppleTouchDevice/);
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /browserSafeType/);
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /IOS_SAFE_PASS_THROUGH_BYTES = 25 \* 1024 \* 1024/);
+  assert.match(WORKBLAD_PHOTO_OPTIMIZER_SCRIPT, /if \(isAppleTouchDevice\(\) && browserSafeType\(file\)/);
+});
+
+test('small JPEGs avoid an unnecessary full decode before reuse', () => {
+  const cheapReuse = WORKBLAD_PHOTO_OPTIMIZER_SCRIPT.indexOf("if (/image\\/jpe?g/i.test(String(file.type || '')) && file.size <= KEEP_ORIGINAL_BYTES)");
+  const decode = WORKBLAD_PHOTO_OPTIMIZER_SCRIPT.indexOf('decoded = await decodePhoto(file)');
+  assert.ok(cheapReuse >= 0 && cheapReuse < decode, 'small JPEG short-circuit must happen before decode');
+});
+
 test('selection optimizes once and final save reuses the already prepared blobs', () => {
   assert.match(WORKBLAD_V2_SCRIPT, /await window\.__taleraOptimizePhoto\(source\)/);
   assert.doesNotMatch(WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT, /await window\.__taleraOptimizePhoto\(source\)/);

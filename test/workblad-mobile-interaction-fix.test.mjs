@@ -2,32 +2,33 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const fixSource = readFileSync(new URL('../xxory-test/src/workblad-mobile-interaction-fix.js', import.meta.url), 'utf8');
+const storytellingSource = readFileSync(new URL('../xxory-test/src/workblad-storytelling-page.js', import.meta.url), 'utf8');
 const wrapperSource = readFileSync(new URL('../xxory-test/src/orb-app-v79-worker-timeline-publish.js', import.meta.url), 'utf8');
 
-test('mobile interaction guard restores the real workblad hit plane', () => {
-  assert.match(fixSource, /talera-workblad-interaction-ready/);
-  assert.match(fixSource, /\.work-title/);
-  assert.match(fixSource, /\.work-date/);
-  assert.match(fixSource, /\.work-photo/);
-  assert.match(fixSource, /\.work-story/);
-  assert.match(fixSource, /\.work-finish/);
-  assert.match(fixSource, /pointer-events:auto!important/);
-  assert.match(fixSource, /touch-action:manipulation!important/);
-  assert.match(fixSource, /user-select:text!important/);
+test('new storytelling shell owns the mobile hit plane directly', () => {
+  assert.match(storytellingSource, /\.talera-storytelling-shell/);
+  assert.match(storytellingSource, /\.talera-storytelling-mic/);
+  assert.match(storytellingSource, /\.talera-storytelling-finish/);
+  assert.match(storytellingSource, /pointer-events:auto/);
+  assert.match(storytellingSource, /touch-action:pan-y/);
 });
 
-test('interaction guard yields to save, voice, date and management overlays', () => {
-  assert.match(fixSource, /\.work-saving/);
-  assert.match(fixSource, /\.voice-layer/);
-  assert.match(fixSource, /\.talera-date-choice-backdrop/);
-  assert.match(fixSource, /\.talera-manage-backdrop/);
-  assert.match(fixSource, /!blocked/);
+test('old engine stays mounted offscreen only as the proven functional engine', () => {
+  assert.match(storytellingSource, /left:-10000px!important/);
+  assert.match(storytellingSource, /> \.work-scroll/);
+  assert.match(storytellingSource, /> \.work-actions/);
+  assert.match(storytellingSource, /opacity:\.001!important/);
 });
 
-test('wrapper ships the interaction fix after the polished test page', () => {
-  assert.match(wrapperSource, /WORKBLAD_MOBILE_INTERACTION_FIX_STYLE/);
-  assert.match(wrapperSource, /WORKBLAD_POLISHED_TEST_PAGE_STYLE \+ WORKBLAD_MOBILE_INTERACTION_FIX_STYLE/);
-  assert.match(wrapperSource, /WORKBLAD_POLISHED_TEST_PAGE_SCRIPT \+\s*WORKBLAD_MOBILE_INTERACTION_FIX_SCRIPT/);
-  assert.match(wrapperSource, /mobileInteractionFix: true/);
+test('recording controls yield touch to the photo except for explicit recording controls', () => {
+  assert.match(storytellingSource, /\.voice-layer\{/);
+  assert.match(storytellingSource, /pointer-events:none!important/);
+  assert.match(storytellingSource, /\.voice-bottom/);
+  assert.match(storytellingSource, /pointer-events:auto!important/);
+});
+
+test('wrapper no longer injects the temporary mobile interaction patch', () => {
+  assert.doesNotMatch(wrapperSource, /WORKBLAD_MOBILE_INTERACTION_FIX_STYLE/);
+  assert.doesNotMatch(wrapperSource, /WORKBLAD_MOBILE_INTERACTION_FIX_SCRIPT/);
+  assert.match(wrapperSource, /WORKBLAD_STORYTELLING_PAGE_STYLE/);
 });

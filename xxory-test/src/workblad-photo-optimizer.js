@@ -5,7 +5,17 @@ export const WORKBLAD_PHOTO_OPTIMIZER_SCRIPT = String.raw`<script id="talera-wor
   const MAX_LONG_EDGE = 3840;
   const KEEP_ORIGINAL_BYTES = 3 * 1024 * 1024;
   const TARGET_BYTES = 3.2 * 1024 * 1024;
+  const IOS_SAFE_PASS_THROUGH_BYTES = 25 * 1024 * 1024;
   const JPEG_QUALITIES = [0.86, 0.82, 0.78, 0.74];
+
+  function isAppleTouchDevice() {
+    const ua = String(navigator.userAgent || '');
+    return /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && Number(navigator.maxTouchPoints || 0) > 1);
+  }
+
+  function browserSafeType(file) {
+    return /^image\/(jpe?g|png|webp)$/i.test(String(file?.type || ''));
+  }
 
   function outputName(file) {
     const source = String(file?.name || 'herinnering').replace(/\.[^.]+$/, '');
@@ -39,6 +49,21 @@ export const WORKBLAD_PHOTO_OPTIMIZER_SCRIPT = String.raw`<script id="talera-wor
 
   async function optimizePhoto(file) {
     if (!(file instanceof Blob) || !file.size || !String(file.type || '').startsWith('image/')) return file;
+
+    // iOS/WebKit kan bij het volledig decoderen van een moderne iPhone-foto honderden
+    // MB's werkgeheugen gebruiken. De native picker vraagt al om JPEG/PNG/WebP. Laat
+    // zulke bestanden daarom op Apple-touchtoestellen direct door zolang ze binnen de
+    // serverlimiet vallen; server-side opslag blijft byte/hash-gecontroleerd.
+    if (isAppleTouchDevice() && browserSafeType(file) && file.size <= IOS_SAFE_PASS_THROUGH_BYTES) {
+      return file;
+    }
+
+    // Kleine JPEGs hoeven niet eerst volledig gedecodeerd te worden om alleen vast te
+    // stellen dat ze al efficiënt genoeg zijn.
+    if (/image\/jpe?g/i.test(String(file.type || '')) && file.size <= KEEP_ORIGINAL_BYTES) {
+      return file;
+    }
+
     let decoded;
     try {
       decoded = await decodePhoto(file);
@@ -48,8 +73,7 @@ export const WORKBLAD_PHOTO_OPTIMIZER_SCRIPT = String.raw`<script id="talera-wor
       const longEdge = Math.max(sourceWidth, sourceHeight);
       const isJpeg = /image\/jpe?g/i.test(file.type || '');
       const alreadyPrepared = isJpeg && /-talera\.jpe?g$/i.test(String(file.name || '')) && longEdge <= MAX_LONG_EDGE && file.size <= TARGET_BYTES;
-      const alreadyEfficient = alreadyPrepared || (isJpeg && longEdge <= MAX_LONG_EDGE && file.size <= KEEP_ORIGINAL_BYTES);
-      if (alreadyEfficient) return file;
+      if (alreadyPrepared) return file;
 
       const scale = Math.min(1, MAX_LONG_EDGE / longEdge);
       const width = Math.max(1, Math.round(sourceWidth * scale));
@@ -84,10 +108,11 @@ export const WORKBLAD_PHOTO_OPTIMIZER_SCRIPT = String.raw`<script id="talera-wor
 
   window.__taleraOptimizePhoto = optimizePhoto;
   window.__taleraPhotoPolicy = Object.freeze({
-    revision:'photo-master-4k-jpeg-v2-idempotent',
+    revision:'photo-master-4k-jpeg-v3-ios-safe-pass-through',
     maxLongEdge:MAX_LONG_EDGE,
     targetBytes:TARGET_BYTES,
-    outputType:'image/jpeg'
+    outputType:'image/jpeg',
+    iosSafePassThroughBytes:IOS_SAFE_PASS_THROUGH_BYTES
   });
 })();
 </script>`;

@@ -2,7 +2,7 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
 (() => {
   if (window.__taleraPhotoStaging) return;
 
-  const REV = 'photo-background-staging-20260915-r2';
+  const REV = 'photo-background-staging-20260916-r3-memory-safe';
   const cache = new WeakMap();
   const transportFetch = window.fetch.bind(window);
   const originalOptimizer = typeof window.__taleraOptimizePhoto === 'function'
@@ -10,6 +10,7 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
     : null;
   let pendingCount = 0;
   let readyTimer = 0;
+  let stageTail = Promise.resolve();
 
   function absoluteUrl(input) {
     try { return new URL(typeof input === 'string' ? input : input.url, location.href); }
@@ -71,16 +72,8 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
     }
   }
 
-  async function sha256(blob) {
-    const bytes = await blob.arrayBuffer();
-    if (!bytes.byteLength || bytes.byteLength !== blob.size) throw new Error('Fotobytes konden niet volledig worden gelezen.');
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
-  }
-
   async function uploadAndVerify(blob) {
     if (!(blob instanceof Blob) || !blob.size) throw new Error('Geen foto om klaar te zetten.');
-    const localSha = await sha256(blob);
     const form = new FormData();
     form.append('photo', blob, blob.name || 'herinnering.jpg');
     const response = await transportFetch('/api/v9/photo', { method:'POST', body:form, cache:'no-store' });
@@ -90,12 +83,18 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
       throw new Error(data?.error || ('Foto klaarzetten mislukt (HTTP ' + response.status + ').'));
     }
 
-    const stored = await transportFetch(data.playbackUrl, { cache:'no-store' });
-    if (!stored.ok) throw new Error('Klaargezette foto kon niet worden teruggelezen.');
-    const serverBlob = await stored.blob();
-    const serverSha = await sha256(serverBlob);
-    if (serverBlob.size !== blob.size || serverSha !== localSha || String(data.sha256 || '') !== localSha) {
-      throw new Error('Klaargezette foto kwam niet byte/hash-gelijk terug.');
+    // De server heeft de volledige upload al byte-voor-byte gelezen, SHA-256 berekend
+    // en R2-head tegen size + hash gecontroleerd. Controleer vanaf de telefoon alleen
+    // nog via HEAD dat precies die bevestigde versie bereikbaar is. Zo hoeven we niet
+    // nóg twee volledige ArrayBuffers/Blobs in iPhone-geheugen te maken.
+    const stored = await transportFetch(data.playbackUrl, { method:'HEAD', cache:'no-store' });
+    if (!stored.ok) throw new Error('Klaargezette foto kon niet worden bevestigd.');
+    const storedBytes = Number(stored.headers.get('content-length') || 0);
+    const storedSha = String(stored.headers.get('x-talera-sha256') || '');
+    const responseSha = String(data.sha256 || '');
+    const responseBytes = Number(data.storedBytes || data.uploadedBytes || 0);
+    if (!storedBytes || storedBytes !== blob.size || responseBytes !== blob.size || !storedSha || storedSha !== responseSha) {
+      throw new Error('Klaargezette foto kwam niet met dezelfde opslagbevestiging terug.');
     }
     return data;
   }
@@ -107,7 +106,12 @@ export const WORKBLAD_PHOTO_STAGING_SCRIPT = String.raw`<script id="talera-workb
     const entry = {};
     pendingCount += 1;
     renderProgress('busy');
-    entry.promise = uploadAndVerify(blob).then(data => {
+
+    // Eén foto tegelijk. Dit voorkomt dat meerdere grote iPhone-foto's gelijktijdig
+    // worden gedecodeerd/geüpload/gecontroleerd en de WebKit-renderer uit geheugen raakt.
+    const run = stageTail.then(() => uploadAndVerify(blob));
+    stageTail = run.catch(() => {});
+    entry.promise = run.then(data => {
       entry.data = data;
       return data;
     }).catch(error => {

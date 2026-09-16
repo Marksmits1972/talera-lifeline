@@ -1,9 +1,9 @@
 import legacyWorker from './orb-app-v79-worker-timeline-publish.js';
-import { handleCleanRebuild } from './clean-rebuild-v1.js';
+import { handleCleanRebuildV2 } from './clean-rebuild-v2.js';
 
 export default {
   async fetch(request, env, ctx) {
-    const cleanResponse = await handleCleanRebuild(request, env);
+    const cleanResponse = await handleCleanRebuildV2(request, env);
     if (cleanResponse) return cleanResponse;
     return legacyWorker.fetch(request, env, ctx);
   }

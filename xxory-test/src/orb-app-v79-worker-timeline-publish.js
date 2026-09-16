@@ -8,8 +8,13 @@ import { handleStoryPhotoCleanup } from './workblad-story-photo-cleanup.js';
 import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workblad-story-management.js';
 import { WORKBLAD_MANAGEMENT_COMPAT_SCRIPT } from './workblad-management-compat.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
+import {
+  WORKBLAD_POLISHED_TEST_PAGE_REV,
+  WORKBLAD_POLISHED_TEST_PAGE_STYLE,
+  WORKBLAD_POLISHED_TEST_PAGE_SCRIPT
+} from './workblad-polished-test-page.js';
 
-const WRAPPER_REV = 'workblad-unified-experience-20260915-r13';
+const WRAPPER_REV = 'workblad-polished-photo-first-20260916-r1';
 
 export default {
   async fetch(request, env, ctx) {
@@ -82,6 +87,10 @@ export default {
         timelineHandoff: 'target-first-storyId+manageToken',
         canonicalWorkbladRoute: '/v9',
         unifiedTaleraExperience: true,
+        polishedWorkbladTestPage: true,
+        polishedWorkbladRevision: WORKBLAD_POLISHED_TEST_PAGE_REV,
+        photoFirstWorkblad: true,
+        photoSwipeWhileTelling: true,
         stagedPhotoLink: true,
         v9TextPhotoMemory: true,
         audioRequiredForTimeline: false,
@@ -105,8 +114,16 @@ export default {
     headers.delete('content-length');
     headers.set('cache-control', 'no-store, max-age=0');
     headers.set('x-talera-v9-timeline-publish', WRAPPER_REV);
+    headers.set('x-talera-workblad-experience', WORKBLAD_POLISHED_TEST_PAGE_REV);
+    const withPolishedStyle = html.replace(
+      '</head>',
+      '<style id="talera-workblad-polished-test-page-style">' + WORKBLAD_POLISHED_TEST_PAGE_STYLE + '</style></head>'
+    );
     return new Response(
-      html.replace('</body>', WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_MANAGEMENT_COMPAT_SCRIPT + WORKBLAD_STORY_MANAGEMENT_SCRIPT + '</body>'),
+      withPolishedStyle.replace(
+        '</body>',
+        WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_MANAGEMENT_COMPAT_SCRIPT + WORKBLAD_STORY_MANAGEMENT_SCRIPT + WORKBLAD_POLISHED_TEST_PAGE_SCRIPT + '</body>'
+      ),
       { status: response.status, statusText: response.statusText, headers }
     );
   }

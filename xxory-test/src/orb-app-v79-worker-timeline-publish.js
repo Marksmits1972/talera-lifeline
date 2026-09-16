@@ -14,7 +14,7 @@ import {
   WORKBLAD_STORYTELLING_PAGE_SCRIPT
 } from './workblad-storytelling-page.js';
 
-const WRAPPER_REV = 'workblad-presentation-like-tell-20260916-r3';
+const WRAPPER_REV = 'workblad-presentation-like-tell-20260916-r4';
 const ENGINE_MARKER = 'window.__taleraWorkbladV9SetDate=function(value){';
 const STORYTELLING_ENGINE_PATCH =
   "window.__taleraStorytellingActions=Object.freeze({" +
@@ -39,7 +39,7 @@ const STORYTELLING_ENGINE_PATCH =
     "};}," +
     "setTitle:function(value){ensure();state.workTitle=String(value||'').slice(0,140);var el=document.getElementById('workTitle');if(el)el.value=state.workTitle;state.workError='';draftSoon();return true;}," +
     "setText:function(value){ensure();state.workText=String(value||'').slice(0,20000);var el=document.getElementById('workText');if(el)el.value=state.workText;state.workError='';draftSoon();return true;}," +
-    "addPhotos:async function(files){" +
+    "addPhotos:function(files){" +
       "capture();ensure();" +
       "var room=Math.max(0,12-state.workMedia.length);" +
       "var list=Array.prototype.slice.call(files||[]).filter(function(file){" +
@@ -51,20 +51,30 @@ const STORYTELLING_ENGINE_PATCH =
       "if(!list.length)throw new Error('De gekozen foto kon niet worden gelezen. Kies hem opnieuw.');" +
       "state.photoPreparing=true;state.workError='';" +
       "var added=[];" +
-      "for(var i=0;i<list.length;i++){" +
-        "var source=list[i],prepared=source;" +
-        "if(typeof window.__taleraOptimizePhoto==='function'){" +
-          "try{prepared=await window.__taleraOptimizePhoto(source)||source;}" +
-          "catch(error){console.warn('[TALERA STORYTELLING] photo optimization fallback',error);prepared=source;if(window.__taleraPhotoStaging&&typeof window.__taleraPhotoStaging.stage==='function')Promise.resolve(window.__taleraPhotoStaging.stage(source)).catch(function(){});}" +
-        "}" +
-        "if(!(prepared instanceof Blob)||!prepared.size)prepared=source;" +
-        "var localUrl=URL.createObjectURL(prepared);" +
-        "state.workMedia.push({kind:'local',file:prepared,localUrl:localUrl,name:prepared.name||source.name||('foto-'+(state.workMedia.length+1))});" +
-        "state.newPhotoFiles.push(prepared);added.push(prepared);" +
-      "}" +
-      "state.photoPreparing=false;state.workError='';await draftSave();" +
-      "document.dispatchEvent(new CustomEvent('talera:storytelling-photos-added',{detail:{count:added.length}}));" +
-      "return {ok:true,count:added.length};" +
+      "list.forEach(function(source){" +
+        "var item={kind:'local',file:source,localUrl:URL.createObjectURL(source),name:source.name||('foto-'+(state.workMedia.length+1))};" +
+        "state.workMedia.push(item);state.newPhotoFiles.push(source);added.push({item:item,source:source});" +
+      "});" +
+      "document.dispatchEvent(new CustomEvent('talera:storytelling-photos-added',{detail:{count:added.length,phase:'selected'}}));" +
+      "Promise.resolve(draftSave()).catch(function(){});" +
+      "var jobs=added.map(function(entry){" +
+        "var source=entry.source,item=entry.item;" +
+        "var prep=typeof window.__taleraOptimizePhoto==='function'?Promise.resolve().then(function(){return window.__taleraOptimizePhoto(source);}):Promise.resolve(source);" +
+        "return prep.catch(function(error){console.warn('[TALERA STORYTELLING] photo optimization deferred',error);return source;}).then(function(prepared){" +
+          "if(state.workMedia.indexOf(item)<0)return;" +
+          "if(!(prepared instanceof Blob)||!prepared.size)prepared=source;" +
+          "if(prepared!==source){" +
+            "var nextUrl=URL.createObjectURL(prepared),oldUrl=item.localUrl;" +
+            "item.file=prepared;item.localUrl=nextUrl;item.name=prepared.name||source.name||item.name;" +
+            "var at=state.newPhotoFiles.indexOf(source);if(at>=0)state.newPhotoFiles[at]=prepared;" +
+            "if(oldUrl)setTimeout(function(){try{URL.revokeObjectURL(oldUrl);}catch(e){}},0);" +
+            "document.dispatchEvent(new CustomEvent('talera:storytelling-photos-added',{detail:{count:1,phase:'prepared'}}));" +
+          "}" +
+          "return draftSave();" +
+        "});" +
+      "});" +
+      "Promise.allSettled(jobs).then(function(){state.photoPreparing=false;Promise.resolve(draftSave()).catch(function(){});document.dispatchEvent(new CustomEvent('talera:storytelling-photos-prepared',{detail:{count:added.length}}));});" +
+      "return {ok:true,count:added.length,pending:true};" +
     "}," +
     "pickPhotos:function(){capture();photoPick();return true;}," +
     "openDate:function(){capture();var el=document.getElementById('workDate');if(el){el.click();return true;}openDatePicker();return true;}," +
@@ -190,7 +200,8 @@ export default {
         storyManagement: true,
         storyManagementRevision: 'v2-undo',
         legacyPhotoCleanupUi: false,
-        storyDeleteMode: 'soft-delete'
+        storyDeleteMode: 'soft-delete',
+        photoSelectionAdoption: 'immediate-local-preview-background-prepare'
       }, base.status || 200);
     }
 

@@ -1,6 +1,6 @@
-import { STORYLAB_HTML, STORYLAB_PAGE_REV } from './storylab-page-v1.js';
+import { STORYLAB_HTML, STORYLAB_PAGE_REV } from './storylab-page-v2.js';
 
-export const STORYLAB_REV = 'storylab-isolated-restart-20260916-r1';
+export const STORYLAB_REV = 'storylab-screenshot-lock-20260916-r2';
 
 export async function handleStoryLabV1(request) {
   const url = new URL(request.url);
@@ -20,7 +20,7 @@ export async function handleStoryLabV1(request) {
       ok: true,
       revision: STORYLAB_REV,
       pageRevision: STORYLAB_PAGE_REV,
-      phase: 'visual-foundation-only',
+      phase: 'screenshot-locked-visual-foundation',
       isolatedFromClean: true,
       isolatedFromV9: true,
       persistentStorage: false,

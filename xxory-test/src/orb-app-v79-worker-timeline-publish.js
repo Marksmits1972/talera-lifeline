@@ -74,6 +74,22 @@ function extendStorytellingEngine(html) {
   return html.replace(ENGINE_MARKER, STORYTELLING_ENGINE_PATCH + ENGINE_MARKER);
 }
 
+function stableStorytellingScript() {
+  return WORKBLAD_STORYTELLING_PAGE_SCRIPT
+    .replace(
+      "  let lastMediaSignature = '';",
+      "  let lastMediaSignature = '';\n  let lastRenderedPhotoKey = '';"
+    )
+    .replace(
+      '    stage.appendChild(shell);',
+      "    lastRenderedPhotoKey = '';\n    stage.appendChild(shell);"
+    )
+    .replace(
+      '    photo.replaceChildren();',
+      "    const renderKey = sig + '#' + activePhotoIndex;\n    if (renderKey === lastRenderedPhotoKey) return;\n    lastRenderedPhotoKey = renderKey;\n    photo.replaceChildren();"
+    );
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -188,7 +204,7 @@ export default {
         WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT +
           WORKBLAD_MANAGEMENT_COMPAT_SCRIPT +
           WORKBLAD_STORY_MANAGEMENT_SCRIPT +
-          WORKBLAD_STORYTELLING_PAGE_SCRIPT +
+          stableStorytellingScript() +
           '</body>'
       ),
       { status: response.status, statusText: response.statusText, headers }

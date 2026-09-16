@@ -3,14 +3,23 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const wrapperSource = readFileSync(new URL('../xxory-test/src/orb-app-v79-worker-timeline-publish.js', import.meta.url), 'utf8');
+const pageSource = readFileSync(new URL('../xxory-test/src/workblad-storytelling-page.js', import.meta.url), 'utf8');
 
-test('storytelling bridge exposes state without replacing the proven recorder and save engine', () => {
+test('storytelling bridge exposes state without replacing proven recorder and save engine', () => {
   assert.match(wrapperSource, /__taleraStorytellingActions/);
   assert.match(wrapperSource, /snapshot:function/);
   assert.match(wrapperSource, /setTitle:function/);
   assert.match(wrapperSource, /setText:function/);
   assert.match(wrapperSource, /startVoice:function\(\)\{capture\(\);return voiceStart\(\);\}/);
   assert.match(wrapperSource, /finish:function/);
+});
+
+test('visible file input passes selected files directly into proven applyPhotoFiles engine', () => {
+  assert.match(wrapperSource, /addPhotos:async function\(files\)/);
+  assert.match(wrapperSource, /Array\.prototype\.slice\.call\(files\|\|\[\]\)/);
+  assert.match(wrapperSource, /await applyPhotoFiles\(list\)/);
+  assert.match(pageSource, /taleraStoryPhotoInput/);
+  assert.match(pageSource, /await actions\(\)\.addPhotos\(files\)/);
 });
 
 test('storytelling bridge supports local and existing photo removal', () => {
@@ -22,17 +31,15 @@ test('storytelling bridge supports local and existing photo removal', () => {
   assert.match(wrapperSource, /method:'DELETE'/);
 });
 
-test('storytelling bridge keeps date and photo picking on the existing proven controls', () => {
-  assert.match(wrapperSource, /pickPhotos:function\(\)\{capture\(\);photoPick\(\);return true;\}/);
+test('date selection still delegates to proven direct date control', () => {
   assert.match(wrapperSource, /openDate:function/);
   assert.match(wrapperSource, /document\.getElementById\('workDate'\)/);
 });
 
-test('photo DOM is only rebuilt when media or active photo changes', () => {
-  assert.match(wrapperSource, /stableStorytellingScript/);
-  assert.match(wrapperSource, /lastRenderedPhotoKey/);
-  assert.match(wrapperSource, /const renderKey = sig \+ '#' \+ activePhotoIndex/);
-  assert.match(wrapperSource, /renderKey === lastRenderedPhotoKey/);
+test('photo render is stable between engine polling ticks', () => {
+  assert.match(pageSource, /lastRenderedPhotoKey/);
+  assert.match(pageSource, /const renderKey=sig\+'#'\+activePhotoIndex/);
+  assert.match(pageSource, /renderKey===lastRenderedPhotoKey/);
 });
 
 test('wrapper still preserves target-first handoff and management APIs', () => {

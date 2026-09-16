@@ -9,47 +9,60 @@ import {
 
 const wrapperSource = readFileSync(new URL('../xxory-test/src/orb-app-v79-worker-timeline-publish.js', import.meta.url), 'utf8');
 
-test('storytelling workblad makes the photo the memory anchor', () => {
-  assert.equal(WORKBLAD_STORYTELLING_PAGE_REV, 'workblad-storytelling-photo-first-20260916-r1');
-  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /height:clamp\(340px,52dvh,560px\)/);
+test('tell page is presentation-like with photo as full visual canvas', () => {
+  assert.equal(WORKBLAD_STORYTELLING_PAGE_REV, 'workblad-presentation-like-tell-20260916-r2');
+  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /\.talera-storytelling-visual\{/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /inset:0/);
   assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /object-fit:contain/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Voeg een foto toe die je helpt herinneren/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /talera-storytelling-dots/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Kies een foto die je herinnering oproept/);
 });
 
-test('photo-by-photo swipe stays inside the same storytelling shell', () => {
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /pointerdown/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /pointermove/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /pointerup/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /touchstart/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /activePhotoIndex \+ 1/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /activePhotoIndex - 1/);
+test('title and date live on top of the photo instead of below a form', () => {
+  const topAt = WORKBLAD_STORYTELLING_PAGE_SCRIPT.indexOf('talera-storytelling-top');
+  const titleAt = WORKBLAD_STORYTELLING_PAGE_SCRIPT.indexOf('id="taleraStoryTitle"');
+  const dateAt = WORKBLAD_STORYTELLING_PAGE_SCRIPT.indexOf('id="taleraStoryDate"');
+  const transcriptAt = WORKBLAD_STORYTELLING_PAGE_SCRIPT.indexOf('id="taleraStoryTranscript"');
+  assert.ok(topAt >= 0);
+  assert.ok(titleAt > topAt);
+  assert.ok(dateAt > titleAt);
+  assert.ok(transcriptAt > dateAt);
 });
 
-test('storytelling page uses a simple microphone and keeps the photo visible while recording', () => {
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /taleraStoryMic/);
+test('transcript is hidden by default and revealed vertically on request', () => {
+  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /transform:translateY\(calc\(100% - 54px\)\)/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /\.talera-storytelling-transcript\.open\{transform:translateY\(0\)\}/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /openTranscript\(true\)/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /dy<0/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /dy>70/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Tijdens vertellen blijft deze laag uit beeld/);
+});
+
+test('horizontal gesture changes photo while vertical gesture opens transcript', () => {
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Math\.abs\(dy\)>56/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Math\.abs\(dx\)>42/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /movePhoto\(dx<0\?1:-1\)/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /activePhotoIndex\+direction/);
+});
+
+test('simple microphone stays over the photo and ORB core remains hidden', () => {
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /id="taleraStoryMic"/);
   assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /startVoice/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /\.voice-layer \.core-wrap/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /display:none!important/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /pointer-events:none!important/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /de foto blijft gewoon zichtbaar/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_STYLE, /\.voice-layer \.core-wrap\{display:none!important\}/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /swipe gerust door je foto’s/);
 });
 
-test('story text comes before supporting title and date metadata', () => {
-  const storyAt = WORKBLAD_STORYTELLING_PAGE_SCRIPT.indexOf('id="taleraStoryText"');
-  const metaAt = WORKBLAD_STORYTELLING_PAGE_SCRIPT.indexOf('id="taleraStoryMeta"');
-  assert.ok(storyAt >= 0);
-  assert.ok(metaAt > storyAt);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Geef deze herinnering een titel/);
-  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Wanneer was dit\?/);
+test('visible shell owns a real image file input for Mobile Safari', () => {
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /id="taleraStoryPhotoInput" type="file" accept="image\/\*" multiple/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /input\.click\(\)/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /Array\.from\(input\.files\|\|\[\]\)/);
+  assert.match(WORKBLAD_STORYTELLING_PAGE_SCRIPT, /actions\(\)\.addPhotos/);
 });
 
-test('wrapper ships the new storytelling shell instead of the polished form layer', () => {
-  assert.match(wrapperSource, /WORKBLAD_STORYTELLING_PAGE_STYLE/);
-  assert.match(wrapperSource, /WORKBLAD_STORYTELLING_PAGE_SCRIPT/);
-  assert.match(wrapperSource, /storytellingWorkblad: true/);
-  assert.match(wrapperSource, /workbladOrbVisible: false/);
+test('wrapper declares corrected visual contract without replacing target-first handoff', () => {
+  assert.match(wrapperSource, /storytellingVisualModel: 'presentation-like-photo\+voice\+vertical-transcript'/);
+  assert.match(wrapperSource, /transcriptHiddenByDefault: true/);
+  assert.match(wrapperSource, /verticalTranscriptReveal: true/);
+  assert.match(wrapperSource, /shellOwnedPhotoInput: true/);
+  assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT/);
   assert.match(wrapperSource, /photoSwipeWhileTelling: true/);
-  assert.doesNotMatch(wrapperSource, /WORKBLAD_POLISHED_TEST_PAGE_STYLE/);
-  assert.doesNotMatch(wrapperSource, /WORKBLAD_MOBILE_INTERACTION_FIX_STYLE/);
 });

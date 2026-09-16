@@ -13,8 +13,13 @@ import {
   WORKBLAD_POLISHED_TEST_PAGE_STYLE,
   WORKBLAD_POLISHED_TEST_PAGE_SCRIPT
 } from './workblad-polished-test-page.js';
+import {
+  WORKBLAD_MOBILE_INTERACTION_FIX_REV,
+  WORKBLAD_MOBILE_INTERACTION_FIX_STYLE,
+  WORKBLAD_MOBILE_INTERACTION_FIX_SCRIPT
+} from './workblad-mobile-interaction-fix.js';
 
-const WRAPPER_REV = 'workblad-polished-photo-first-20260916-r1';
+const WRAPPER_REV = 'workblad-polished-photo-first-20260916-r2';
 
 export default {
   async fetch(request, env, ctx) {
@@ -89,6 +94,8 @@ export default {
         unifiedTaleraExperience: true,
         polishedWorkbladTestPage: true,
         polishedWorkbladRevision: WORKBLAD_POLISHED_TEST_PAGE_REV,
+        mobileInteractionFix: true,
+        mobileInteractionRevision: WORKBLAD_MOBILE_INTERACTION_FIX_REV,
         photoFirstWorkblad: true,
         photoSwipeWhileTelling: true,
         stagedPhotoLink: true,
@@ -115,14 +122,20 @@ export default {
     headers.set('cache-control', 'no-store, max-age=0');
     headers.set('x-talera-v9-timeline-publish', WRAPPER_REV);
     headers.set('x-talera-workblad-experience', WORKBLAD_POLISHED_TEST_PAGE_REV);
+    headers.set('x-talera-mobile-interaction', WORKBLAD_MOBILE_INTERACTION_FIX_REV);
     const withPolishedStyle = html.replace(
       '</head>',
-      '<style id="talera-workblad-polished-test-page-style">' + WORKBLAD_POLISHED_TEST_PAGE_STYLE + '</style></head>'
+      '<style id="talera-workblad-polished-test-page-style">' + WORKBLAD_POLISHED_TEST_PAGE_STYLE + WORKBLAD_MOBILE_INTERACTION_FIX_STYLE + '</style></head>'
     );
     return new Response(
       withPolishedStyle.replace(
         '</body>',
-        WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT + WORKBLAD_MANAGEMENT_COMPAT_SCRIPT + WORKBLAD_STORY_MANAGEMENT_SCRIPT + WORKBLAD_POLISHED_TEST_PAGE_SCRIPT + '</body>'
+        WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT +
+          WORKBLAD_MANAGEMENT_COMPAT_SCRIPT +
+          WORKBLAD_STORY_MANAGEMENT_SCRIPT +
+          WORKBLAD_POLISHED_TEST_PAGE_SCRIPT +
+          WORKBLAD_MOBILE_INTERACTION_FIX_SCRIPT +
+          '</body>'
       ),
       { status: response.status, statusText: response.statusText, headers }
     );
@@ -133,8 +146,8 @@ function json(value, status = 200) {
   return new Response(JSON.stringify(value), {
     status,
     headers: {
-      'content-type': 'application/json; charset=UTF-8',
-      'cache-control': 'no-store, max-age=0'
+      'content-type':'application/json; charset=UTF-8',
+      'cache-control':'no-store, max-age=0'
     }
   });
 }

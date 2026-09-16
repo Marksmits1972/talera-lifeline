@@ -14,7 +14,7 @@ import {
   WORKBLAD_STORYTELLING_PAGE_SCRIPT
 } from './workblad-storytelling-page.js';
 
-const WRAPPER_REV = 'workblad-storytelling-shell-20260916-r1';
+const WRAPPER_REV = 'workblad-presentation-like-tell-20260916-r2';
 const ENGINE_MARKER = 'window.__taleraWorkbladV9SetDate=function(value){';
 const STORYTELLING_ENGINE_PATCH =
   "window.__taleraStorytellingActions=Object.freeze({" +
@@ -39,6 +39,7 @@ const STORYTELLING_ENGINE_PATCH =
     "};}," +
     "setTitle:function(value){ensure();state.workTitle=String(value||'').slice(0,140);var el=document.getElementById('workTitle');if(el)el.value=state.workTitle;state.workError='';draftSoon();return true;}," +
     "setText:function(value){ensure();state.workText=String(value||'').slice(0,20000);var el=document.getElementById('workText');if(el)el.value=state.workText;state.workError='';draftSoon();return true;}," +
+    "addPhotos:async function(files){capture();ensure();var list=Array.prototype.slice.call(files||[]);if(!list.length)return {ok:true,count:0};await applyPhotoFiles(list);return {ok:true,count:list.length};}," +
     "pickPhotos:function(){capture();photoPick();return true;}," +
     "openDate:function(){capture();var el=document.getElementById('workDate');if(el){el.click();return true;}openDatePicker();return true;}," +
     "startVoice:function(){capture();return voiceStart();}," +
@@ -72,22 +73,6 @@ function extendStorytellingEngine(html) {
     return html;
   }
   return html.replace(ENGINE_MARKER, STORYTELLING_ENGINE_PATCH + ENGINE_MARKER);
-}
-
-function stableStorytellingScript() {
-  return WORKBLAD_STORYTELLING_PAGE_SCRIPT
-    .replace(
-      "  let lastMediaSignature = '';",
-      "  let lastMediaSignature = '';\n  let lastRenderedPhotoKey = '';"
-    )
-    .replace(
-      '    stage.appendChild(shell);',
-      "    lastRenderedPhotoKey = '';\n    stage.appendChild(shell);"
-    )
-    .replace(
-      '    photo.replaceChildren();',
-      "    const renderKey = sig + '#' + activePhotoIndex;\n    if (renderKey === lastRenderedPhotoKey) return;\n    lastRenderedPhotoKey = renderKey;\n    photo.replaceChildren();"
-    );
 }
 
 export default {
@@ -163,8 +148,11 @@ export default {
         unifiedTaleraExperience: true,
         storytellingWorkblad: true,
         storytellingWorkbladRevision: WORKBLAD_STORYTELLING_PAGE_REV,
-        storytellingVisualModel: 'photo-anchor+inline-microphone+same-page-story',
+        storytellingVisualModel: 'presentation-like-photo+voice+vertical-transcript',
         workbladOrbVisible: false,
+        transcriptHiddenByDefault: true,
+        verticalTranscriptReveal: true,
+        shellOwnedPhotoInput: true,
         photoFirstWorkblad: true,
         photoSwipeWhileTelling: true,
         photoRemovalBeforePublish: true,
@@ -204,7 +192,7 @@ export default {
         WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT +
           WORKBLAD_MANAGEMENT_COMPAT_SCRIPT +
           WORKBLAD_STORY_MANAGEMENT_SCRIPT +
-          stableStorytellingScript() +
+          WORKBLAD_STORYTELLING_PAGE_SCRIPT +
           '</body>'
       ),
       { status: response.status, statusText: response.statusText, headers }

@@ -39,10 +39,13 @@ test('management v2 owns the large photo removal controls', () => {
   assert.match(managementSource, /Ongedaan maken/);
 });
 
-test('wrapper keeps cleanup API while only injecting the v2 management UI', () => {
+test('wrapper keeps cleanup API while only injecting the v2 management UI for photo management', () => {
   assert.match(wrapperSource, /handleStoryPhotoCleanup/);
   assert.match(wrapperSource, /handleV9StagedPhotoLink/);
   assert.match(wrapperSource, /handleV9TimelinePublish/);
-  assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT \+ WORKBLAD_MANAGEMENT_COMPAT_SCRIPT \+ WORKBLAD_STORY_MANAGEMENT_SCRIPT/);
+  assert.match(wrapperSource, /WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT/);
+  assert.match(wrapperSource, /WORKBLAD_MANAGEMENT_COMPAT_SCRIPT/);
+  assert.match(wrapperSource, /WORKBLAD_STORY_MANAGEMENT_SCRIPT/);
   assert.doesNotMatch(wrapperSource, /WORKBLAD_STORY_PHOTO_CLEANUP_SCRIPT/);
+  assert.ok(wrapperSource.indexOf('WORKBLAD_MANAGEMENT_COMPAT_SCRIPT') < wrapperSource.lastIndexOf('WORKBLAD_STORY_MANAGEMENT_SCRIPT'));
 });

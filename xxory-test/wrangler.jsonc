@@ -1,7 +1,7 @@
-// TALERA_DEPLOY_REV: workblad-unified-force-deploy-20260915-r1
+// TALERA_DEPLOY_REV: clean-rebuild-photo-foundation-20260916-r1
 {
   "name": "xxory-test",
-  "main": "src/orb-app-v79-worker-timeline-publish.js",
+  "main": "src/clean-router-worker.js",
   "compatibility_date": "2026-09-08",
   "d1_databases": [{"binding":"DB","database_name":"xxory-test-eu","database_id":"6cadf197-f319-4464-8f1a-59413ed7a8b9"}],
   "r2_buckets": [{"binding":"MEDIA","bucket_name":"xxory-test-media-eu"}]

@@ -1,5 +1,7 @@
 export const WORKBLAD_MANAGEMENT_COMPAT_SCRIPT = String.raw`<script id="talera-management-compat">
 (() => {
+  const NATIVE_ACCEPT='image/jpeg,image/png,image/webp';
+
   function removeLegacyCleanup(){
     const panel=document.getElementById('talera-story-photo-cleanup-panel');
     if(panel)panel.remove();
@@ -26,13 +28,19 @@ export const WORKBLAD_MANAGEMENT_COMPAT_SCRIPT = String.raw`<script id="talera-m
     try{
       const api=window.__taleraStorytellingActions;
       if(!api||typeof api.addPhotos!=='function')throw new Error('Foto toevoegen is nog niet gekoppeld.');
-      await api.addPhotos(files);
+      const result=await api.addPhotos(files);
       setPhotoStatus(files.length===1?'Foto toegevoegd.':'Foto’s toegevoegd.');
       refreshStorytelling();
+      if(result&&result.pending){
+        input.dataset.taleraSelectionHeld='1';
+      }else{
+        input.value='';
+        input.dataset.taleraSelectionHeld='0';
+      }
     }catch(error){
-      setPhotoStatus('Foto toevoegen lukt nog niet: '+String(error?.message||error),true);
-    }finally{
       input.value='';
+      input.dataset.taleraSelectionHeld='0';
+      setPhotoStatus('Foto toevoegen lukt nog niet: '+String(error?.message||error),true);
     }
   }
 
@@ -50,7 +58,10 @@ export const WORKBLAD_MANAGEMENT_COMPAT_SCRIPT = String.raw`<script id="talera-m
 
     const input=document.createElement('input');
     input.type='file';
-    input.accept='image/*';
+    // Benoem expliciet web-veilige uitvoerformaten. Op iOS/WebKit wordt een foto uit
+    // de fotobibliotheek dan zo nodig als compatibele JPEG aangeboden in plaats van
+    // dat TALERA een niet-weergeefbare HEIC-blob als preview probeert te gebruiken.
+    input.accept=NATIVE_ACCEPT;
     input.multiple=true;
     input.setAttribute('aria-label',ariaLabel||'Kies foto’s');
     input.style.position='absolute';
@@ -61,6 +72,15 @@ export const WORKBLAD_MANAGEMENT_COMPAT_SCRIPT = String.raw`<script id="talera-m
     input.style.cursor='pointer';
     input.style.zIndex='3';
     input.style.pointerEvents='auto';
+    // Houd de zojuist gekozen File-objecten gekoppeld zolang de achtergrond-
+    // voorbereiding nog loopt. Wis pas vlak vóór een volgende bewuste keuze,
+    // zodat iOS de tijdelijke fotobron niet voortijdig hoeft vrij te geven.
+    input.addEventListener('click',()=>{
+      if(input.dataset.taleraSelectionHeld==='1'){
+        input.value='';
+        input.dataset.taleraSelectionHeld='0';
+      }
+    });
     input.addEventListener('change',()=>acceptNativePhotoInput(input));
 
     label.appendChild(input);

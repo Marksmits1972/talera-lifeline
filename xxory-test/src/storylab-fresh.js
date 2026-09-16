@@ -1,6 +1,6 @@
 import { STORYLAB_FRESH_HTML, STORYLAB_FRESH_PAGE_REV } from './storylab-fresh-page.js';
 
-export const STORYLAB_FRESH_REV = 'storylab-fresh-isolated-20260916-r1';
+export const STORYLAB_FRESH_REV = 'storylab-fresh-isolated-20260916-r2';
 
 export async function handleStoryLabFresh(request) {
   const url = new URL(request.url);
@@ -21,11 +21,14 @@ export async function handleStoryLabFresh(request) {
       ok: true,
       revision: STORYLAB_FRESH_REV,
       pageRevision: STORYLAB_FRESH_PAGE_REV,
-      phase: 'visual-shell-only',
+      phase: 'visual-interaction-shell',
       builtFromBlank: true,
       legacyStoryLabAttached: false,
       cleanStackAttached: false,
       v9StackAttached: false,
+      photoCarousel: true,
+      verticalTextSheet: true,
+      editableFinalText: true,
       audioEnabled: false,
       persistentPhotoStorage: false,
       timelineEnabled: false

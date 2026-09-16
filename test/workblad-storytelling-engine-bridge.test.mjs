@@ -15,12 +15,15 @@ test('storytelling bridge exposes state without replacing proven recorder and sa
 });
 
 test('visible file input adopts selected photos directly into the current memory state', () => {
-  assert.match(wrapperSource, /addPhotos:async function\(files\)/);
+  assert.match(wrapperSource, /addPhotos:function\(files\)/);
   assert.match(wrapperSource, /Array\.prototype\.slice\.call\(files\|\|\[\]\)/);
-  assert.match(wrapperSource, /state\.workMedia\.push/);
-  assert.match(wrapperSource, /state\.newPhotoFiles\.push/);
-  assert.match(wrapperSource, /await draftSave\(\)/);
-  assert.doesNotMatch(wrapperSource.slice(wrapperSource.indexOf('addPhotos:async function(files)'), wrapperSource.indexOf('pickPhotos:function()', wrapperSource.indexOf('addPhotos:async function(files)'))), /applyPhotoFiles\(/);
+  assert.match(wrapperSource, /URL\.createObjectURL\(source\)/);
+  assert.match(wrapperSource, /state\.workMedia\.push\(item\)/);
+  assert.match(wrapperSource, /state\.newPhotoFiles\.push\(source\)/);
+  assert.match(wrapperSource, /Promise\.resolve\(draftSave\(\)\)/);
+  const start=wrapperSource.indexOf('addPhotos:function(files)');
+  const end=wrapperSource.indexOf('pickPhotos:function()',start);
+  assert.doesNotMatch(wrapperSource.slice(start,end), /applyPhotoFiles\(/);
   assert.match(pageSource, /taleraStoryPhotoInput/);
 });
 

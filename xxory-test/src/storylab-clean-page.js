@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-foundation-20260916-r2';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-foundation-20260916-r3';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -52,7 +52,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       overflow: hidden;
       isolation: isolate;
       background:
-        radial-gradient(circle at 48% 32%, rgba(255,255,255,.055), rgba(255,255,255,0) 38%),
+        radial-gradient(circle at 48% 31%, rgba(255,255,255,.055), rgba(255,255,255,0) 39%),
         linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 39%, var(--bg-bottom) 100%);
     }
 
@@ -70,22 +70,22 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       z-index: 2;
       min-height: 100dvh;
       padding:
-        calc(env(safe-area-inset-top) + 18px)
-        16px
-        calc(96px + env(safe-area-inset-bottom))
-        16px;
+        calc(env(safe-area-inset-top) + 24px)
+        14px
+        calc(72px + env(safe-area-inset-bottom))
+        14px;
     }
 
     .top {
       display: grid;
       grid-template-columns: minmax(0,1fr) auto;
-      gap: 12px;
+      gap: 10px;
       align-items: start;
     }
 
     .brand {
       margin: 0 0 9px;
-      font-size: 11px;
+      font-size: 10px;
       line-height: 1;
       font-weight: 800;
       letter-spacing: .28em;
@@ -94,7 +94,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 
     .title {
       margin: 0;
-      font-size: clamp(19px, 5.2vw, 22px);
+      font-size: clamp(17px, 4.45vw, 18px);
       line-height: 1.08;
       font-weight: 760;
       letter-spacing: -.025em;
@@ -104,7 +104,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     .date-pill,
     .photo-pill {
       appearance: none;
-      border: 1.25px solid var(--line);
+      border: 1.2px solid var(--line);
       background: rgba(18,46,66,.12);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
       backdrop-filter: blur(2px);
@@ -112,51 +112,51 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 
     .date-pill {
       margin-top: 11px;
-      min-height: 40px;
-      padding: 0 14px;
-      border-radius: 21px;
+      min-height: 37px;
+      padding: 0 11px;
+      border-radius: 20px;
       display: inline-flex;
       align-items: center;
-      gap: 9px;
-      font-size: 15px;
+      gap: 7px;
+      font-size: 13px;
       line-height: 1;
       font-weight: 690;
     }
 
     .photo-pill {
-      margin-top: -1px;
-      min-width: 94px;
-      min-height: 48px;
-      padding: 0 16px;
-      border-radius: 25px;
+      margin-top: -2px;
+      min-width: 68px;
+      min-height: 40px;
+      padding: 0 12px;
+      border-radius: 22px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       white-space: nowrap;
-      font-size: 15.5px;
+      font-size: 13px;
       line-height: 1;
       font-weight: 760;
     }
 
     .date-icon {
-      width: 17px;
-      height: 17px;
+      width: 15px;
+      height: 15px;
       flex: 0 0 auto;
     }
 
     .empty-state {
       position: absolute;
-      left: 18px;
-      right: 18px;
-      top: 47.5%;
+      left: 14px;
+      right: 14px;
+      top: 49.3%;
       transform: translateY(-50%);
       text-align: center;
     }
 
     .add-photo-large {
-      width: 76px;
-      height: 76px;
-      margin: 0 auto 14px;
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 16px;
       border: 0;
       border-radius: 50%;
       background: rgba(255,255,255,.93);
@@ -170,48 +170,50 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     }
 
     .empty-title {
-      max-width: 330px;
+      width: 100%;
+      max-width: 370px;
       margin: 0 auto;
-      font-size: clamp(22px, 6vw, 25px);
-      line-height: 1.1;
+      font-size: clamp(20px, 5.3vw, 21px);
+      line-height: 1.12;
       font-weight: 800;
       letter-spacing: -.03em;
-      text-wrap: balance;
+      text-wrap: normal;
     }
 
     .empty-copy {
-      max-width: 350px;
-      margin: 14px auto 0;
+      width: 100%;
+      max-width: 365px;
+      margin: 15px auto 0;
       color: var(--muted);
-      font-size: clamp(15px, 4.1vw, 17px);
-      line-height: 1.36;
+      font-size: clamp(14px, 3.75vw, 14.8px);
+      line-height: 1.4;
       font-weight: 470;
-      text-wrap: balance;
+      text-wrap: normal;
     }
 
     .voice-block {
       position: absolute;
-      left: 16px;
-      right: 16px;
-      bottom: calc(91px + env(safe-area-inset-bottom));
+      left: 14px;
+      right: 14px;
+      bottom: calc(68px + env(safe-area-inset-bottom));
       text-align: center;
     }
 
     .orb-shell {
-      width: 82px;
-      height: 82px;
-      margin: 0 auto 9px;
+      width: 106px;
+      height: 106px;
+      margin: 0 auto 10px;
       border-radius: 50%;
-      padding: 8px;
+      padding: 10px;
       background: rgba(255,255,255,.17);
       display: grid;
       place-items: center;
     }
 
     .orb {
-      width: 66px;
-      height: 66px;
-      border: 1.25px solid rgba(255,255,255,.72);
+      width: 86px;
+      height: 86px;
+      border: 1.3px solid rgba(255,255,255,.72);
       border-radius: 50%;
       background: var(--orb);
       display: grid;
@@ -220,14 +222,14 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     }
 
     .orb svg {
-      width: 30px;
-      height: 30px;
+      width: 35px;
+      height: 35px;
       stroke: #fff;
     }
 
     .voice-caption {
       margin: 0;
-      font-size: clamp(13px, 3.8vw, 15px);
+      font-size: clamp(11px, 3vw, 12px);
       line-height: 1.25;
       font-weight: 720;
       color: rgba(255,255,255,.76);
@@ -240,18 +242,18 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       left: 0;
       right: 0;
       bottom: 0;
-      height: calc(82px + env(safe-area-inset-bottom));
-      border-radius: 30px 30px 0 0;
+      height: calc(60px + env(safe-area-inset-bottom));
+      border-radius: 28px 28px 0 0;
       background: var(--sheet);
       box-shadow: 0 -6px 22px rgba(3,18,28,.07);
       color: var(--sheet-text);
-      padding: 12px 18px calc(13px + env(safe-area-inset-bottom));
+      padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
     }
 
     .grabber {
-      width: 54px;
+      width: 52px;
       height: 5px;
-      margin: 0 auto 14px;
+      margin: 0 auto 11px;
       border-radius: 10px;
       background: #c7ccd1;
     }
@@ -259,7 +261,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     .sheet-hint {
       margin: 0;
       text-align: left;
-      font-size: 13px;
+      font-size: 11px;
       line-height: 1.3;
       font-weight: 700;
       white-space: nowrap;
@@ -269,31 +271,27 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 
     @media (max-height: 740px) {
       .content {
-        padding-top: calc(env(safe-area-inset-top) + 14px);
-        padding-bottom: calc(88px + env(safe-area-inset-bottom));
+        padding-top: calc(env(safe-area-inset-top) + 18px);
+        padding-bottom: calc(66px + env(safe-area-inset-bottom));
       }
-      .brand { margin-bottom: 7px; }
-      .date-pill { margin-top: 9px; min-height: 37px; }
-      .photo-pill { min-height: 44px; }
-      .empty-state { top: 45.5%; }
-      .add-photo-large { width: 68px; height: 68px; font-size: 38px; margin-bottom: 12px; }
-      .empty-copy { margin-top: 11px; }
-      .voice-block { bottom: calc(84px + env(safe-area-inset-bottom)); }
-      .orb-shell { width: 74px; height: 74px; padding: 7px; margin-bottom: 7px; }
-      .orb { width: 60px; height: 60px; }
-      .orb svg { width: 27px; height: 27px; }
-      .sheet { height: calc(76px + env(safe-area-inset-bottom)); }
+      .empty-state { top: 47.7%; }
+      .add-photo-large { width: 72px; height: 72px; font-size: 39px; margin-bottom: 13px; }
+      .empty-title { font-size: 19px; }
+      .empty-copy { margin-top: 12px; font-size: 13.5px; }
+      .voice-block { bottom: calc(62px + env(safe-area-inset-bottom)); }
+      .orb-shell { width: 94px; height: 94px; padding: 9px; margin-bottom: 8px; }
+      .orb { width: 76px; height: 76px; }
+      .orb svg { width: 32px; height: 32px; }
+      .sheet { height: calc(56px + env(safe-area-inset-bottom)); }
     }
 
     @media (max-width: 360px) {
-      .content { padding-left: 14px; padding-right: 14px; }
-      .top { gap: 9px; }
-      .title { font-size: 18px; }
-      .photo-pill { min-width: 88px; padding: 0 13px; font-size: 14.5px; }
-      .date-pill { padding: 0 12px; font-size: 14px; }
-      .empty-title { font-size: 22px; }
-      .empty-copy { font-size: 15px; }
-      .voice-caption { font-size: 12.5px; }
+      .title { font-size: 16.5px; }
+      .photo-pill { min-width: 64px; min-height: 38px; padding: 0 10px; font-size: 12.5px; }
+      .date-pill { min-height: 35px; padding: 0 10px; font-size: 12.5px; }
+      .empty-title { font-size: 19px; }
+      .empty-copy { font-size: 13.5px; }
+      .voice-caption { font-size: 10.5px; }
     }
 
     @media (min-width: 541px) {

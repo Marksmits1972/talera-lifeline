@@ -14,7 +14,7 @@ import {
   WORKBLAD_STORYTELLING_PAGE_SCRIPT
 } from './workblad-storytelling-page.js';
 
-const WRAPPER_REV = 'workblad-presentation-like-tell-20260916-r2';
+const WRAPPER_REV = 'workblad-presentation-like-tell-20260916-r3';
 const ENGINE_MARKER = 'window.__taleraWorkbladV9SetDate=function(value){';
 const STORYTELLING_ENGINE_PATCH =
   "window.__taleraStorytellingActions=Object.freeze({" +
@@ -39,7 +39,33 @@ const STORYTELLING_ENGINE_PATCH =
     "};}," +
     "setTitle:function(value){ensure();state.workTitle=String(value||'').slice(0,140);var el=document.getElementById('workTitle');if(el)el.value=state.workTitle;state.workError='';draftSoon();return true;}," +
     "setText:function(value){ensure();state.workText=String(value||'').slice(0,20000);var el=document.getElementById('workText');if(el)el.value=state.workText;state.workError='';draftSoon();return true;}," +
-    "addPhotos:async function(files){capture();ensure();var list=Array.prototype.slice.call(files||[]);if(!list.length)return {ok:true,count:0};await applyPhotoFiles(list);return {ok:true,count:list.length};}," +
+    "addPhotos:async function(files){" +
+      "capture();ensure();" +
+      "var room=Math.max(0,12-state.workMedia.length);" +
+      "var list=Array.prototype.slice.call(files||[]).filter(function(file){" +
+        "if(!(file instanceof Blob)||!file.size)return false;" +
+        "var type=String(file.type||'').toLowerCase();var name=String(file.name||'').toLowerCase();" +
+        "return !type||type.indexOf('image/')===0||/\\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(name);" +
+      "}).slice(0,room);" +
+      "if(!room)throw new Error('Voor deze herinnering houden we voorlopig maximaal 12 foto’s aan.');" +
+      "if(!list.length)throw new Error('De gekozen foto kon niet worden gelezen. Kies hem opnieuw.');" +
+      "state.photoPreparing=true;state.workError='';" +
+      "var added=[];" +
+      "for(var i=0;i<list.length;i++){" +
+        "var source=list[i],prepared=source;" +
+        "if(typeof window.__taleraOptimizePhoto==='function'){" +
+          "try{prepared=await window.__taleraOptimizePhoto(source)||source;}" +
+          "catch(error){console.warn('[TALERA STORYTELLING] photo optimization fallback',error);prepared=source;if(window.__taleraPhotoStaging&&typeof window.__taleraPhotoStaging.stage==='function')Promise.resolve(window.__taleraPhotoStaging.stage(source)).catch(function(){});}" +
+        "}" +
+        "if(!(prepared instanceof Blob)||!prepared.size)prepared=source;" +
+        "var localUrl=URL.createObjectURL(prepared);" +
+        "state.workMedia.push({kind:'local',file:prepared,localUrl:localUrl,name:prepared.name||source.name||('foto-'+(state.workMedia.length+1))});" +
+        "state.newPhotoFiles.push(prepared);added.push(prepared);" +
+      "}" +
+      "state.photoPreparing=false;state.workError='';await draftSave();" +
+      "document.dispatchEvent(new CustomEvent('talera:storytelling-photos-added',{detail:{count:added.length}}));" +
+      "return {ok:true,count:added.length};" +
+    "}," +
     "pickPhotos:function(){capture();photoPick();return true;}," +
     "openDate:function(){capture();var el=document.getElementById('workDate');if(el){el.click();return true;}openDatePicker();return true;}," +
     "startVoice:function(){capture();return voiceStart();}," +

@@ -9,17 +9,70 @@ import { handleStoryManagement, WORKBLAD_STORY_MANAGEMENT_SCRIPT } from './workb
 import { WORKBLAD_MANAGEMENT_COMPAT_SCRIPT } from './workblad-management-compat.js';
 import { handleSharePreviewStorage } from './share-preview-storage.js';
 import {
-  WORKBLAD_POLISHED_TEST_PAGE_REV,
-  WORKBLAD_POLISHED_TEST_PAGE_STYLE,
-  WORKBLAD_POLISHED_TEST_PAGE_SCRIPT
-} from './workblad-polished-test-page.js';
-import {
-  WORKBLAD_MOBILE_INTERACTION_FIX_REV,
-  WORKBLAD_MOBILE_INTERACTION_FIX_STYLE,
-  WORKBLAD_MOBILE_INTERACTION_FIX_SCRIPT
-} from './workblad-mobile-interaction-fix.js';
+  WORKBLAD_STORYTELLING_PAGE_REV,
+  WORKBLAD_STORYTELLING_PAGE_STYLE,
+  WORKBLAD_STORYTELLING_PAGE_SCRIPT
+} from './workblad-storytelling-page.js';
 
-const WRAPPER_REV = 'workblad-polished-photo-first-20260916-r2';
+const WRAPPER_REV = 'workblad-storytelling-shell-20260916-r1';
+const ENGINE_MARKER = 'window.__taleraWorkbladV9SetDate=function(value){';
+const STORYTELLING_ENGINE_PATCH =
+  "window.__taleraStorytellingActions=Object.freeze({" +
+    "snapshot:function(){capture();ensure();return {" +
+      "audioBlob:(state.audioBlob instanceof Blob&&state.audioBlob.size)?state.audioBlob:null," +
+      "hasExistingAudio:Boolean(state.hasExistingAudio)," +
+      "duration:Number(state.duration)||0," +
+      "voiceAttempted:Boolean(state.voiceAttempted)," +
+      "title:String(state.workTitle||'')," +
+      "eventTime:String(state.workDate||'')," +
+      "storyText:String(state.workText||'')," +
+      "view:String(state.view||'workblad')," +
+      "isEdit:Boolean(state.editingStoryId)," +
+      "media:state.workMedia.map(function(m){return {" +
+        "kind:String(m&&m.kind||'')," +
+        "id:String(m&&m.id||'')," +
+        "url:String(m&&m.localUrl||'')," +
+        "role:String(m&&m.role||'')," +
+        "size:(m&&m.file instanceof Blob)?m.file.size:0," +
+        "blob:(m&&m.file instanceof Blob)?m.file:null" +
+      "};})" +
+    "};}," +
+    "setTitle:function(value){ensure();state.workTitle=String(value||'').slice(0,140);var el=document.getElementById('workTitle');if(el)el.value=state.workTitle;state.workError='';draftSoon();return true;}," +
+    "setText:function(value){ensure();state.workText=String(value||'').slice(0,20000);var el=document.getElementById('workText');if(el)el.value=state.workText;state.workError='';draftSoon();return true;}," +
+    "pickPhotos:function(){capture();photoPick();return true;}," +
+    "openDate:function(){capture();var el=document.getElementById('workDate');if(el){el.click();return true;}openDatePicker();return true;}," +
+    "startVoice:function(){capture();return voiceStart();}," +
+    "finish:function(){var btn=document.getElementById('workFinish');if(btn){btn.click();return true;}finishWorkblad();return true;}," +
+    "removePhoto:async function(index){" +
+      "ensure();index=Number(index);if(!Number.isInteger(index)||index<0||index>=state.workMedia.length)throw new Error('Foto niet gevonden.');" +
+      "var item=state.workMedia[index],file=item&&item.file;" +
+      "if(item&&item.kind==='remote'&&item.id&&state.editingStoryId&&state.editingToken){" +
+        "var res=await fetch('/api/v9/story-photo/'+encodeURIComponent(state.editingStoryId)+'/'+encodeURIComponent(item.id),{method:'DELETE',headers:{authorization:'Bearer '+state.editingToken},cache:'no-store'});" +
+        "var data={};try{data=await res.json();}catch(e){}if(!res.ok||!data.ok)throw new Error(data.error||'Foto verwijderen mislukt.');" +
+      "}" +
+      "if(item&&item.localUrl)try{URL.revokeObjectURL(item.localUrl);}catch(e){}" +
+      "state.workMedia.splice(index,1);" +
+      "if(file instanceof Blob){" +
+        "state.newPhotoFiles=state.newPhotoFiles.filter(function(candidate){return candidate!==file;});" +
+        "if(window.__taleraPhotoStaging&&typeof window.__taleraPhotoStaging.stage==='function'){" +
+          "Promise.resolve(window.__taleraPhotoStaging.stage(file)).then(function(staged){" +
+            "if(staged&&staged.id)return fetch('/api/v9/photo/'+encodeURIComponent(staged.id),{method:'DELETE',cache:'no-store'});" +
+          "}).catch(function(error){console.warn('[TALERA STORYTELLING] staged photo cleanup deferred',error);});" +
+        "}" +
+      "}" +
+      "state.workError='';await draftSave();renderWorkblad();" +
+      "document.dispatchEvent(new CustomEvent('talera:storytelling-photo-removed',{detail:{index:index}}));" +
+      "return {ok:true,index:index};" +
+    "}" +
+  "});";
+
+function extendStorytellingEngine(html) {
+  if (!html.includes(ENGINE_MARKER)) {
+    console.warn('[TALERA STORYTELLING]', 'engine marker missing; storytelling shell will use read-only fallback');
+    return html;
+  }
+  return html.replace(ENGINE_MARKER, STORYTELLING_ENGINE_PATCH + ENGINE_MARKER);
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -92,12 +145,13 @@ export default {
         timelineHandoff: 'target-first-storyId+manageToken',
         canonicalWorkbladRoute: '/v9',
         unifiedTaleraExperience: true,
-        polishedWorkbladTestPage: true,
-        polishedWorkbladRevision: WORKBLAD_POLISHED_TEST_PAGE_REV,
-        mobileInteractionFix: true,
-        mobileInteractionRevision: WORKBLAD_MOBILE_INTERACTION_FIX_REV,
+        storytellingWorkblad: true,
+        storytellingWorkbladRevision: WORKBLAD_STORYTELLING_PAGE_REV,
+        storytellingVisualModel: 'photo-anchor+inline-microphone+same-page-story',
+        workbladOrbVisible: false,
         photoFirstWorkblad: true,
         photoSwipeWhileTelling: true,
+        photoRemovalBeforePublish: true,
         stagedPhotoLink: true,
         v9TextPhotoMemory: true,
         audioRequiredForTimeline: false,
@@ -116,25 +170,25 @@ export default {
     const type = response.headers.get('content-type') || '';
     if (!type.includes('text/html')) return response;
 
-    const html = await response.text();
+    const html = extendStorytellingEngine(await response.text());
     const headers = new Headers(response.headers);
     headers.delete('content-length');
     headers.set('cache-control', 'no-store, max-age=0');
     headers.set('x-talera-v9-timeline-publish', WRAPPER_REV);
-    headers.set('x-talera-workblad-experience', WORKBLAD_POLISHED_TEST_PAGE_REV);
-    headers.set('x-talera-mobile-interaction', WORKBLAD_MOBILE_INTERACTION_FIX_REV);
-    const withPolishedStyle = html.replace(
+    headers.set('x-talera-workblad-experience', WORKBLAD_STORYTELLING_PAGE_REV);
+
+    const withStorytellingStyle = html.replace(
       '</head>',
-      '<style id="talera-workblad-polished-test-page-style">' + WORKBLAD_POLISHED_TEST_PAGE_STYLE + WORKBLAD_MOBILE_INTERACTION_FIX_STYLE + '</style></head>'
+      '<style id="talera-workblad-storytelling-page-style">' + WORKBLAD_STORYTELLING_PAGE_STYLE + '</style></head>'
     );
+
     return new Response(
-      withPolishedStyle.replace(
+      withStorytellingStyle.replace(
         '</body>',
         WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT +
           WORKBLAD_MANAGEMENT_COMPAT_SCRIPT +
           WORKBLAD_STORY_MANAGEMENT_SCRIPT +
-          WORKBLAD_POLISHED_TEST_PAGE_SCRIPT +
-          WORKBLAD_MOBILE_INTERACTION_FIX_SCRIPT +
+          WORKBLAD_STORYTELLING_PAGE_SCRIPT +
           '</body>'
       ),
       { status: response.status, statusText: response.statusText, headers }

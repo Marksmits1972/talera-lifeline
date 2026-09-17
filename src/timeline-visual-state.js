@@ -146,4 +146,70 @@ export const timelineVisualStateScript = timelineAdaptiveContrastScript + String
   },{passive:true});
   window.addEventListener('pagehide',forceRest,{passive:true});
 })();
+
+/* Photo-carousel watchdog.
+   The live-memory integration already owns the normal automatic carousel and the
+   presentation controller owns finger-following swipes. This small watchdog only
+   steps in when the automatic carousel has not moved for several seconds, so it
+   never competes with a carousel that is already running. */
+(()=>{
+  const runtime=window.__taleraTimelineRuntime;
+  const surface=document.getElementById('surface');
+  const story=document.getElementById('memoryStoryScroll');
+  if(!runtime||!surface)return;
+
+  let lastMemoryId='';
+  let lastIndex=-1;
+  let lastMovement=Date.now();
+  let interacting=false;
+  const WATCH_MS=900;
+  const STALE_MS=5200;
+
+  function current(){return runtime.currentMemory&&runtime.currentMemory()}
+  function usable(memory){return Boolean(memory&&memory._taleraLive&&Array.isArray(memory.photos)&&memory.photos.length>1)}
+  function forceLayer(layer,src,opacity){
+    if(!layer||!src)return;
+    layer.style.opacity=String(opacity);
+    [layer.querySelector('.photo-backdrop'),layer.querySelector('.photo-aligned-blur'),layer.querySelector('.example-photo')].forEach(node=>{if(node&&node.src!==src)node.src=src});
+  }
+  function updateDots(memory){
+    const dots=Array.from(document.querySelectorAll('.talera-photo-dot'));
+    dots.forEach((dot,index)=>dot.classList.toggle('active',index===(memory._photoIndex||0)));
+  }
+  function show(memory,index){
+    if(!usable(memory))return;
+    const count=memory.photos.length;
+    memory._photoIndex=((index%count)+count)%count;
+    memory.image=memory.photos[memory._photoIndex];
+    try{runtime.settlePhoto(memory)}catch(e){}
+    forceLayer(document.getElementById('photoLayerA'),memory.image,1);
+    forceLayer(document.getElementById('photoLayerB'),memory.image,0);
+    const strip=document.querySelector('.talera-photo-strip.is-visible');
+    if(strip)strip.querySelectorAll('.talera-photo-strip-page').forEach(page=>forceLayer(page,memory.image,1));
+    updateDots(memory);
+    lastIndex=memory._photoIndex||0;
+    lastMovement=Date.now();
+  }
+  function markInteraction(active){
+    interacting=active;
+    lastMovement=Date.now();
+  }
+  [surface,story].filter(Boolean).forEach(node=>{
+    node.addEventListener('pointerdown',()=>markInteraction(true),{passive:true});
+    node.addEventListener('pointerup',()=>markInteraction(false),{passive:true});
+    node.addEventListener('pointercancel',()=>markInteraction(false),{passive:true});
+  });
+  document.addEventListener('visibilitychange',()=>{lastMovement=Date.now()},{passive:true});
+
+  setInterval(()=>{
+    const memory=current();
+    if(!usable(memory)){lastMemoryId='';lastIndex=-1;lastMovement=Date.now();return}
+    const index=Number(memory._photoIndex||0);
+    if(memory.id!==lastMemoryId){lastMemoryId=memory.id;lastIndex=index;lastMovement=Date.now();return}
+    if(index!==lastIndex){lastIndex=index;lastMovement=Date.now();updateDots(memory);return}
+    if(interacting||document.hidden)return;
+    if(Date.now()-lastMovement<STALE_MS)return;
+    show(memory,index+1);
+  },WATCH_MS);
+})();
 `;

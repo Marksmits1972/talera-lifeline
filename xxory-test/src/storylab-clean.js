@@ -1,9 +1,12 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260917-r14';
+
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
   'cache-control': 'no-store, max-age=0',
-  'x-storylab-clean-revision': STORYLAB_CLEAN_PAGE_REVISION
+  'x-storylab-clean-revision': STORYLAB_CLEAN_PAGE_REVISION,
+  'x-storylab-clean-ux': STORYLAB_CLEAN_UX_REVISION
 };
 
 const jsonHeaders = { 'cache-control': 'no-store, max-age=0' };
@@ -17,6 +20,76 @@ const DEFAULT_STATE = {
   fit: 'cover',
   audioId: ''
 };
+
+const UX_STYLE = `<style id="talera-storylab-clean-ux-r14">
+.sheet{cursor:pointer}.sheet:not(.open){touch-action:none}.sheet.open{z-index:22}
+.talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
+.screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
+@media(max-height:760px){.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}}
+</style>`;
+
+const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r14">
+(()=>{
+  const clientKey='talera.storylab.clean.client';
+  const sessionKey='talera.storylab.clean.session-client';
+  const params=new URLSearchParams(location.search);
+  const navigation=(performance.getEntriesByType&&performance.getEntriesByType('navigation')[0])||null;
+  let navType=navigation&&navigation.type?navigation.type:'navigate';
+  if(!navigation&&performance.navigation&&performance.navigation.type===1)navType='reload';
+  const keepExisting=params.get('resume')==='1'||navType==='reload'||navType==='back_forward';
+  let client=keepExisting?(sessionStorage.getItem(sessionKey)||localStorage.getItem(clientKey)||''):'';
+  if(!client){
+    client=(globalThis.crypto&&crypto.randomUUID)?crypto.randomUUID():('story-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12));
+  }
+  localStorage.setItem(clientKey,client);
+  sessionStorage.setItem(sessionKey,client);
+})();
+</script>`;
+
+const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r14">
+(()=>{
+  const sheet=document.getElementById('sheet');
+  const storyText=document.getElementById('storyText');
+  const screen=document.getElementById('screen');
+  if(sheet&&screen){
+    const openSheet=()=>{
+      if(sheet.classList.contains('open'))return;
+      sheet.classList.add('open');
+      screen.classList.add('sheet-open');
+      sheet.setAttribute('aria-expanded','true');
+      setTimeout(()=>{try{storyText&&storyText.focus({preventScroll:true})}catch(e){try{storyText&&storyText.focus()}catch(_){}}},60);
+    };
+    const closeState=()=>sheet.setAttribute('aria-expanded',sheet.classList.contains('open')?'true':'false');
+    sheet.setAttribute('aria-expanded',sheet.classList.contains('open')?'true':'false');
+    sheet.addEventListener('click',event=>{
+      if(sheet.classList.contains('open'))return;
+      const target=event.target;
+      if(target&&target.closest&&target.closest('textarea,button'))return;
+      openSheet();
+    });
+    let pointerY=null;
+    sheet.addEventListener('pointerdown',event=>{pointerY=event.clientY},{passive:true});
+    sheet.addEventListener('pointerup',event=>{
+      if(pointerY==null)return;
+      const dy=event.clientY-pointerY;pointerY=null;
+      if(dy<-18)openSheet();
+      closeState();
+    },{passive:true});
+    new MutationObserver(closeState).observe(sheet,{attributes:true,attributeFilter:['class']});
+  }
+  setTimeout(()=>{
+    const publish=document.getElementById('timelinePublish');
+    if(publish)publish.textContent='Plaats op tijdlijn';
+  },0);
+})();
+</script>`;
+
+function storyLabHtml() {
+  return STORYLAB_CLEAN_PAGE_HTML
+    .replace('</head>', UX_STYLE + '</head>')
+    .replace('<body>', '<body>' + EARLY_SESSION_SCRIPT)
+    .replace('</body>', LATE_UX_SCRIPT + '</body>');
+}
 
 function safeClient(value) {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(value) ? value : null;
@@ -128,12 +201,13 @@ export async function handleStoryLabClean(request, env) {
   const url = new URL(request.url);
 
   if (url.pathname === '/storylab-clean' || url.pathname === '/storylab-clean/') {
-    return new Response(STORYLAB_CLEAN_PAGE_HTML, { status: 200, headers: htmlHeaders });
+    return new Response(storyLabHtml(), { status: 200, headers: htmlHeaders });
   }
 
   if (url.pathname === '/api/storylab-clean/revision') {
     return Response.json({
       revision: STORYLAB_CLEAN_PAGE_REVISION,
+      uxRevision: STORYLAB_CLEAN_UX_REVISION,
       phase: 'functional-photo-story-build',
       cleanSlate: true,
       importsLegacyStoryLab: false,
@@ -147,6 +221,10 @@ export async function handleStoryLabClean(request, env) {
       audioPersistence: 'r2',
       transcriptEnabled: false,
       editableStoryText: true,
+      freshDraftOnNavigate: true,
+      resumeDraftOnReload: true,
+      transcriptSheetInteraction: 'tap+swipe',
+      compactTimelineButton: true,
       timelineEnabled: false
     }, {
       headers: jsonHeaders

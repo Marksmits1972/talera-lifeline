@@ -1,7 +1,7 @@
-// TALERA_DEPLOY_REV: storylab-clean-sheet-polish-20260917-r1
+// TALERA_DEPLOY_REV: storylab-clean-direct-manipulation-20260917-r16
 {
   "name": "xxory-test",
-  "main": "src/ux-polish-worker.js",
+  "main": "src/clean-router-worker.js",
   "compatibility_date": "2026-09-08",
   "d1_databases": [{"binding":"DB","database_name":"xxory-test-eu","database_id":"6cadf197-f319-4464-8f1a-59413ed7a8b9"}],
   "r2_buckets": [{"binding":"MEDIA","bucket_name":"xxory-test-media-eu"}]

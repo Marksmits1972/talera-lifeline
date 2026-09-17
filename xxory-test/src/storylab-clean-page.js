@@ -17,27 +17,27 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b2740}
 body{-webkit-text-size-adjust:100%;color:#fff;-webkit-font-smoothing:antialiased}
-button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
 .screen{
   position:relative;
   width:100%;
   height:100dvh;
   min-height:100dvh;
   overflow:hidden;
-  background:linear-gradient(180deg,#5f7f95 0%,#507389 33%,#24506a 63%,#0d3048 100%);
+  background:linear-gradient(180deg,#5b7b91 0%,#4c7087 34%,#1b4561 66%,#0b2c45 100%);
 }
 .shade{
   position:absolute;
   inset:0;
   pointer-events:none;
-  background:linear-gradient(180deg,rgba(4,23,38,.045) 0%,rgba(4,23,38,0) 46%,rgba(4,23,38,.02) 62%,rgba(5,24,39,.13) 100%);
+  background:linear-gradient(180deg,rgba(4,23,38,.08) 0%,rgba(4,23,38,.015) 43%,rgba(4,23,38,.015) 60%,rgba(5,24,39,.18) 100%);
 }
 .top{
   position:absolute;
   z-index:3;
-  left:5.8vw;
-  right:5.8vw;
-  top:3.2dvh;
+  left:18px;
+  right:18px;
+  top:max(30px,env(safe-area-inset-top));
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
   gap:12px;
@@ -45,7 +45,7 @@ button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 }
 .brand{
   margin:0;
-  font-size:clamp(11px,3.2vw,13px);
+  font-size:12px;
   line-height:1;
   font-weight:900;
   letter-spacing:.28em;
@@ -53,51 +53,49 @@ button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 }
 .title{
   margin:12px 0 0;
-  max-width:58vw;
-  font-size:clamp(25px,7.3vw,30px);
-  line-height:1.03;
+  max-width:290px;
+  font-size:clamp(20px,5.2vw,25px);
+  line-height:1.05;
   font-weight:820;
-  letter-spacing:-.038em;
+  letter-spacing:-.035em;
   color:#fff;
 }
 .date{
   margin-top:15px;
-  min-height:40px;
-  padding:0 14px;
-  border:1px solid rgba(255,255,255,.38);
+  min-height:44px;
+  padding:0 13px;
+  border:1px solid rgba(255,255,255,.42);
   border-radius:999px;
-  background:rgba(10,34,53,.075);
+  background:rgba(10,34,53,.10);
   display:inline-flex;
   align-items:center;
-  gap:9px;
-  font-size:clamp(14px,4vw,16px);
-  line-height:1;
-  font-weight:800;
+  gap:8px;
+  font-size:14px;
+  font-weight:820;
 }
-.date svg{width:18px;height:18px;flex:0 0 auto}
+.date svg{width:17px;height:17px;flex:0 0 auto}
 .photo-button{
-  min-height:45px;
-  padding:0 17px;
-  border:1px solid rgba(255,255,255,.37);
+  min-height:49px;
+  padding:0 15px;
+  border:1px solid rgba(255,255,255,.40);
   border-radius:999px;
-  background:rgba(10,34,53,.075);
-  font-size:clamp(14px,4vw,16px);
-  line-height:1;
-  font-weight:850;
+  background:rgba(10,34,53,.10);
+  font-size:15px;
+  font-weight:860;
   white-space:nowrap;
 }
 .empty{
   position:absolute;
   z-index:2;
-  left:6vw;
-  right:6vw;
-  top:25.5dvh;
+  left:24px;
+  right:24px;
+  top:40%;
+  transform:translateY(-22%);
   text-align:center;
 }
 .plus{
-  width:27vw;
-  max-width:108px;
-  aspect-ratio:1;
+  width:84px;
+  height:84px;
   margin:0 auto 21px;
   border:0;
   border-radius:50%;
@@ -105,75 +103,70 @@ button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
   place-items:center;
   background:rgba(250,248,244,.98);
   color:var(--ink);
-  font-size:clamp(48px,14vw,58px);
+  font-size:43px;
   line-height:1;
   font-weight:300;
-  box-shadow:0 10px 28px rgba(0,0,0,.055);
+  box-shadow:0 10px 28px rgba(0,0,0,.06);
 }
 .empty h2{
   margin:0 auto;
-  max-width:82vw;
-  font-size:clamp(24px,7vw,28px);
-  line-height:1.08;
+  max-width:325px;
+  font-size:22px;
+  line-height:1.09;
   font-weight:850;
-  letter-spacing:-.038em;
-  text-wrap:balance;
+  letter-spacing:-.034em;
 }
 .empty p{
-  margin:17px auto 0;
-  max-width:79vw;
-  color:rgba(255,255,255,.66);
-  font-size:clamp(14px,4.15vw,16px);
-  line-height:1.4;
-  font-weight:540;
-  text-wrap:balance;
+  margin:16px auto 0;
+  max-width:330px;
+  color:rgba(255,255,255,.67);
+  font-size:14px;
+  line-height:1.42;
+  font-weight:550;
 }
 .mic-zone{
   position:absolute;
   z-index:4;
   left:0;
   right:0;
-  top:67dvh;
+  bottom:102px;
   text-align:center;
 }
 .mic-halo{
   display:inline-grid;
   place-items:center;
-  width:21vw;
-  max-width:84px;
-  aspect-ratio:1;
+  width:114px;
+  height:114px;
   border-radius:50%;
   background:rgba(173,206,229,.12);
 }
 .mic-ring{
   display:grid;
   place-items:center;
-  width:17.5vw;
-  max-width:70px;
-  aspect-ratio:1;
+  width:94px;
+  height:94px;
   border-radius:50%;
-  background:rgba(123,166,198,.25);
-  box-shadow:inset 0 0 0 1.25px rgba(225,238,248,.34);
+  background:rgba(123,166,198,.27);
+  box-shadow:inset 0 0 0 1.5px rgba(225,238,248,.28);
 }
 .mic{
-  width:15vw;
-  max-width:60px;
-  aspect-ratio:1;
-  border:1px solid rgba(255,255,255,.57);
+  width:78px;
+  height:78px;
+  border:1px solid rgba(255,255,255,.54);
   border-radius:50%;
   background:#4682b2;
   color:#fff;
   display:grid;
   place-items:center;
-  box-shadow:0 7px 18px rgba(4,20,32,.13),inset 0 0 0 1px rgba(255,255,255,.10);
+  box-shadow:0 9px 22px rgba(4,20,32,.15),inset 0 0 0 1px rgba(255,255,255,.11);
 }
-.mic svg{width:43%;height:43%}
+.mic svg{width:29px;height:29px}
 .mic-label{
-  margin-top:11px;
-  font-size:clamp(11.5px,3.35vw,14px);
+  margin-top:7px;
+  font-size:12px;
   line-height:1.2;
-  font-weight:790;
-  color:rgba(255,255,255,.80);
+  font-weight:800;
+  color:rgba(255,255,255,.82);
 }
 .sheet{
   position:absolute;
@@ -181,34 +174,48 @@ button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
   left:0;
   right:0;
   bottom:0;
-  height:14dvh;
-  min-height:76px;
-  border-radius:29px 29px 0 0;
+  height:88px;
+  border-radius:30px 30px 0 0;
   background:var(--cream);
   color:var(--sheet-text);
-  box-shadow:0 -7px 22px rgba(0,0,0,.065);
+  box-shadow:0 -8px 26px rgba(0,0,0,.09);
 }
 .handle{
   width:58px;
   height:5px;
-  margin:11px auto 18px;
+  margin:12px auto 16px;
   border-radius:999px;
-  background:#c5cbd1;
+  background:#c3c9d0;
 }
 .sheet-text{
-  padding:0 5.8vw;
-  font-size:clamp(13px,3.7vw,15px);
+  padding:0 17px;
+  font-size:12px;
   line-height:1.3;
-  font-weight:790;
+  font-weight:800;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
-@media(max-width:360px){
-  .top{left:5vw;right:5vw}
-  .title{max-width:61vw}
-  .date{padding:0 12px;gap:8px}
-  .photo-button{padding:0 15px}
+@media(max-height:760px){
+  .top{top:max(18px,env(safe-area-inset-top));left:17px;right:17px}
+  .brand{font-size:10.5px}
+  .title{margin-top:9px;font-size:19.5px;max-width:260px}
+  .date{margin-top:13px;min-height:40px;padding:0 12px;gap:7px;font-size:13.5px}
+  .date svg{width:16px;height:16px}
+  .photo-button{min-height:45px;padding:0 14px;font-size:14.5px}
+  .empty{top:34.5%;transform:translateY(-4%);left:22px;right:22px}
+  .plus{width:82px;height:82px;margin-bottom:17px;font-size:41px}
+  .empty h2{max-width:305px;font-size:20.5px;line-height:1.1}
+  .empty p{margin-top:13px;max-width:305px;font-size:13px;line-height:1.4}
+  .mic-zone{bottom:72px}
+  .mic-halo{width:98px;height:98px}
+  .mic-ring{width:82px;height:82px}
+  .mic{width:68px;height:68px}
+  .mic svg{width:26px;height:26px}
+  .mic-label{margin-top:6px;font-size:11.5px}
+  .sheet{height:64px;border-radius:26px 26px 0 0}
+  .handle{width:52px;height:5px;margin:9px auto 10px}
+  .sheet-text{padding:0 16px;font-size:11.5px}
 }
 @media(min-width:700px){
   body{background:#082238}

@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: storylab-clean-timeline-publish-20260917-r1
+// TALERA_DEPLOY_REV: storylab-clean-ux-20260917-r14
 {
   "name": "xxory-test",
   "main": "src/clean-router-worker.js",

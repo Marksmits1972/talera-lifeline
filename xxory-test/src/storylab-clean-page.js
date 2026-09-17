@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-reference-20260917-r7';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-reference-20260917-r8';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -45,43 +45,43 @@ button{font:inherit;color:inherit}
 }
 .brand{
   margin:0;
-  font-size:12px;
+  font-size:11.5px;
   line-height:1;
   font-weight:900;
   letter-spacing:.28em;
-  color:rgba(255,255,255,.94);
+  color:rgba(255,255,255,.93);
 }
 .title{
-  margin:12px 0 0;
-  max-width:290px;
-  font-size:clamp(20px,5.2vw,25px);
+  margin:10px 0 0;
+  max-width:288px;
+  font-size:clamp(19px,5vw,24px);
   line-height:1.05;
-  font-weight:820;
+  font-weight:810;
   letter-spacing:-.035em;
   color:#fff;
 }
 .date{
-  margin-top:15px;
-  min-height:44px;
-  padding:0 13px;
-  border:1px solid rgba(255,255,255,.42);
-  border-radius:999px;
-  background:rgba(10,34,53,.10);
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  font-size:14px;
-  font-weight:820;
-}
-.date svg{width:17px;height:17px;flex:0 0 auto}
-.photo-button{
-  min-height:49px;
-  padding:0 15px;
+  margin-top:14px;
+  min-height:40px;
+  padding:0 11px;
   border:1px solid rgba(255,255,255,.40);
   border-radius:999px;
-  background:rgba(10,34,53,.10);
-  font-size:15px;
-  font-weight:860;
+  background:rgba(10,34,53,.08);
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  font-size:13.2px;
+  font-weight:800;
+}
+.date svg{width:16px;height:16px;flex:0 0 auto}
+.photo-button{
+  min-height:45px;
+  padding:0 14px;
+  border:1px solid rgba(255,255,255,.38);
+  border-radius:999px;
+  background:rgba(10,34,53,.08);
+  font-size:14.2px;
+  font-weight:840;
   white-space:nowrap;
 }
 .empty{
@@ -94,79 +94,79 @@ button{font:inherit;color:inherit}
   text-align:center;
 }
 .plus{
-  width:84px;
-  height:84px;
-  margin:0 auto 21px;
+  width:78px;
+  height:78px;
+  margin:0 auto 20px;
   border:0;
   border-radius:50%;
   display:grid;
   place-items:center;
   background:rgba(250,248,244,.98);
   color:var(--ink);
-  font-size:43px;
+  font-size:40px;
   line-height:1;
   font-weight:300;
-  box-shadow:0 10px 28px rgba(0,0,0,.06);
+  box-shadow:0 9px 24px rgba(0,0,0,.055);
 }
 .empty h2{
   margin:0 auto;
-  max-width:325px;
-  font-size:22px;
-  line-height:1.09;
-  font-weight:850;
-  letter-spacing:-.034em;
+  max-width:318px;
+  font-size:21px;
+  line-height:1.1;
+  font-weight:840;
+  letter-spacing:-.032em;
 }
 .empty p{
-  margin:16px auto 0;
-  max-width:330px;
-  color:rgba(255,255,255,.67);
-  font-size:14px;
+  margin:15px auto 0;
+  max-width:326px;
+  color:rgba(255,255,255,.62);
+  font-size:13.5px;
   line-height:1.42;
-  font-weight:550;
+  font-weight:530;
 }
 .mic-zone{
   position:absolute;
   z-index:4;
   left:0;
   right:0;
-  bottom:102px;
+  bottom:92px;
   text-align:center;
 }
 .mic-halo{
   display:inline-grid;
   place-items:center;
-  width:114px;
-  height:114px;
+  width:106px;
+  height:106px;
   border-radius:50%;
-  background:rgba(173,206,229,.12);
+  background:rgba(173,206,229,.11);
 }
 .mic-ring{
   display:grid;
   place-items:center;
-  width:94px;
-  height:94px;
+  width:88px;
+  height:88px;
   border-radius:50%;
-  background:rgba(123,166,198,.27);
-  box-shadow:inset 0 0 0 1.5px rgba(225,238,248,.28);
+  background:rgba(123,166,198,.25);
+  box-shadow:inset 0 0 0 1.25px rgba(225,238,248,.26);
 }
 .mic{
-  width:78px;
-  height:78px;
-  border:1px solid rgba(255,255,255,.54);
+  width:72px;
+  height:72px;
+  border:1px solid rgba(255,255,255,.52);
   border-radius:50%;
   background:#4682b2;
   color:#fff;
   display:grid;
   place-items:center;
-  box-shadow:0 9px 22px rgba(4,20,32,.15),inset 0 0 0 1px rgba(255,255,255,.11);
+  box-shadow:0 8px 20px rgba(4,20,32,.14),inset 0 0 0 1px rgba(255,255,255,.10);
 }
-.mic svg{width:29px;height:29px}
+.mic svg{width:27px;height:27px}
 .mic-label{
-  margin-top:7px;
-  font-size:12px;
+  margin-top:6px;
+  font-size:11.5px;
   line-height:1.2;
-  font-weight:800;
-  color:rgba(255,255,255,.82);
+  font-weight:790;
+  color:rgba(255,255,255,.79);
 }
 .sheet{
   position:absolute;
@@ -174,48 +174,48 @@ button{font:inherit;color:inherit}
   left:0;
   right:0;
   bottom:0;
-  height:88px;
-  border-radius:30px 30px 0 0;
+  height:76px;
+  border-radius:28px 28px 0 0;
   background:var(--cream);
   color:var(--sheet-text);
-  box-shadow:0 -8px 26px rgba(0,0,0,.09);
+  box-shadow:0 -7px 22px rgba(0,0,0,.08);
 }
 .handle{
-  width:58px;
+  width:55px;
   height:5px;
-  margin:12px auto 16px;
+  margin:10px auto 13px;
   border-radius:999px;
   background:#c3c9d0;
 }
 .sheet-text{
   padding:0 17px;
-  font-size:12px;
+  font-size:11.5px;
   line-height:1.3;
-  font-weight:800;
+  font-weight:790;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 @media(max-height:760px){
   .top{top:max(18px,env(safe-area-inset-top));left:17px;right:17px}
-  .brand{font-size:10.5px}
-  .title{margin-top:9px;font-size:19.5px;max-width:260px}
-  .date{margin-top:13px;min-height:40px;padding:0 12px;gap:7px;font-size:13.5px}
-  .date svg{width:16px;height:16px}
-  .photo-button{min-height:45px;padding:0 14px;font-size:14.5px}
+  .brand{font-size:10.2px}
+  .title{margin-top:8px;font-size:18.7px;max-width:258px}
+  .date{margin-top:12px;min-height:36px;padding:0 10px;gap:6px;font-size:12.8px}
+  .date svg{width:15px;height:15px}
+  .photo-button{min-height:40px;padding:0 12px;font-size:13.8px}
   .empty{top:34.5%;transform:translateY(-4%);left:22px;right:22px}
-  .plus{width:82px;height:82px;margin-bottom:17px;font-size:41px}
-  .empty h2{max-width:305px;font-size:20.5px;line-height:1.1}
-  .empty p{margin-top:13px;max-width:305px;font-size:13px;line-height:1.4}
-  .mic-zone{bottom:72px}
-  .mic-halo{width:98px;height:98px}
-  .mic-ring{width:82px;height:82px}
-  .mic{width:68px;height:68px}
-  .mic svg{width:26px;height:26px}
-  .mic-label{margin-top:6px;font-size:11.5px}
-  .sheet{height:64px;border-radius:26px 26px 0 0}
-  .handle{width:52px;height:5px;margin:9px auto 10px}
-  .sheet-text{padding:0 16px;font-size:11.5px}
+  .plus{width:76px;height:76px;margin-bottom:16px;font-size:38px}
+  .empty h2{max-width:300px;font-size:19.8px;line-height:1.1}
+  .empty p{margin-top:12px;max-width:300px;font-size:12.8px;line-height:1.4}
+  .mic-zone{bottom:62px}
+  .mic-halo{width:92px;height:92px}
+  .mic-ring{width:77px;height:77px}
+  .mic{width:64px;height:64px}
+  .mic svg{width:25px;height:25px}
+  .mic-label{margin-top:5px;font-size:11px}
+  .sheet{height:54px;border-radius:25px 25px 0 0}
+  .handle{width:50px;height:5px;margin:8px auto 8px}
+  .sheet-text{padding:0 15px;font-size:11px}
 }
 @media(min-width:700px){
   body{background:#082238}

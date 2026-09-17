@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-reference-20260917-r9';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260917-r10';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -8,260 +8,102 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <meta name="theme-color" content="#0b2740" />
 <title>TALERA — Vertelpagina</title>
 <style>
-:root{
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",system-ui,sans-serif;
-  --ink:#0d2b49;
-  --cream:#f7f4ef;
-  --sheet-text:#60738a;
-}
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b2740}
-body{-webkit-text-size-adjust:100%;color:#fff;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-button{font:inherit;color:inherit}
-.screen{
-  position:relative;
-  width:100%;
-  height:100dvh;
-  min-height:100dvh;
-  overflow:hidden;
-  background:linear-gradient(180deg,#5d7d92 0%,#4f7187 34%,#1d4661 66%,#0c2c44 100%);
-}
-.shade{
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  background:linear-gradient(180deg,rgba(4,23,38,.055) 0%,rgba(4,23,38,.01) 44%,rgba(4,23,38,.01) 61%,rgba(5,24,39,.15) 100%);
-}
-.top{
-  position:absolute;
-  z-index:3;
-  left:18px;
-  right:18px;
-  top:max(30px,env(safe-area-inset-top));
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:12px;
-  align-items:start;
-}
-.brand{
-  margin:0;
-  font-size:10.8px;
-  line-height:1;
-  font-weight:800;
-  letter-spacing:.30em;
-  color:rgba(255,255,255,.88);
-}
-.title{
-  margin:9px 0 0;
-  max-width:282px;
-  font-size:clamp(18.2px,4.75vw,22.5px);
-  line-height:1.06;
-  font-weight:760;
-  letter-spacing:-.028em;
-  color:rgba(255,255,255,.96);
-}
-.date{
-  margin-top:13px;
-  min-height:37px;
-  padding:0 10px;
-  border:.85px solid rgba(255,255,255,.34);
-  border-radius:999px;
-  background:rgba(10,34,53,.055);
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  font-size:12.5px;
-  font-weight:720;
-}
-.date svg{width:15px;height:15px;flex:0 0 auto;opacity:.92}
-.photo-button{
-  min-height:42px;
-  padding:0 13px;
-  border:.85px solid rgba(255,255,255,.32);
-  border-radius:999px;
-  background:rgba(10,34,53,.055);
-  font-size:13.5px;
-  font-weight:780;
-  white-space:nowrap;
-}
-.empty{
-  position:absolute;
-  z-index:2;
-  left:24px;
-  right:24px;
-  top:40%;
-  transform:translateY(-22%);
-  text-align:center;
-}
-.plus{
-  width:70px;
-  height:70px;
-  margin:0 auto 19px;
-  border:0;
-  border-radius:50%;
-  display:grid;
-  place-items:center;
-  background:rgba(250,248,244,.985);
-  color:var(--ink);
-  font-size:36px;
-  line-height:1;
-  font-weight:280;
-  box-shadow:0 7px 20px rgba(0,0,0,.045);
-}
-.empty h2{
-  margin:0 auto;
-  max-width:314px;
-  font-size:19.6px;
-  line-height:1.11;
-  font-weight:780;
-  letter-spacing:-.026em;
-}
-.empty p{
-  margin:14px auto 0;
-  max-width:322px;
-  color:rgba(255,255,255,.58);
-  font-size:13.2px;
-  line-height:1.43;
-  font-weight:450;
-}
-.mic-zone{
-  position:absolute;
-  z-index:4;
-  left:0;
-  right:0;
-  bottom:88px;
-  text-align:center;
-}
-.mic-halo{
-  display:inline-grid;
-  place-items:center;
-  width:100px;
-  height:100px;
-  border-radius:50%;
-  background:rgba(173,206,229,.10);
-}
-.mic-ring{
-  display:grid;
-  place-items:center;
-  width:84px;
-  height:84px;
-  border-radius:50%;
-  background:rgba(123,166,198,.22);
-  box-shadow:inset 0 0 0 1px rgba(225,238,248,.22);
-}
-.mic{
-  width:70px;
-  height:70px;
-  border:.9px solid rgba(255,255,255,.48);
-  border-radius:50%;
-  background:#4682b2;
-  color:#fff;
-  display:grid;
-  place-items:center;
-  box-shadow:0 7px 18px rgba(4,20,32,.11),inset 0 0 0 1px rgba(255,255,255,.08);
-}
-.mic svg{width:26px;height:26px;opacity:.96}
-.mic-label{
-  margin-top:6px;
-  font-size:11.2px;
-  line-height:1.2;
-  font-weight:730;
-  color:rgba(255,255,255,.75);
-}
-.sheet{
-  position:absolute;
-  z-index:5;
-  left:0;
-  right:0;
-  bottom:0;
-  height:70px;
-  border-radius:27px 27px 0 0;
-  background:var(--cream);
-  color:var(--sheet-text);
-  box-shadow:0 -5px 18px rgba(0,0,0,.055);
-}
-.handle{
-  width:52px;
-  height:4px;
-  margin:10px auto 12px;
-  border-radius:999px;
-  background:#c5cbd1;
-}
-.sheet-text{
-  padding:0 17px;
-  font-size:11.2px;
-  line-height:1.3;
-  font-weight:720;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-@media(max-height:760px){
-  .top{top:max(18px,env(safe-area-inset-top));left:17px;right:17px}
-  .brand{font-size:9.8px}
-  .title{margin-top:8px;font-size:17.8px;max-width:252px}
-  .date{margin-top:11px;min-height:33px;padding:0 9px;gap:6px;font-size:12.1px}
-  .date svg{width:14px;height:14px}
-  .photo-button{min-height:37px;padding:0 11px;font-size:13px}
-  .empty{top:34.5%;transform:translateY(-4%);left:22px;right:22px}
-  .plus{width:68px;height:68px;margin-bottom:15px;font-size:34px}
-  .empty h2{max-width:296px;font-size:19px;line-height:1.11}
-  .empty p{margin-top:11px;max-width:296px;font-size:12.4px;line-height:1.42}
-  .mic-zone{bottom:58px}
-  .mic-halo{width:88px;height:88px}
-  .mic-ring{width:74px;height:74px}
-  .mic{width:62px;height:62px}
-  .mic svg{width:24px;height:24px}
-  .mic-label{margin-top:5px;font-size:10.7px}
-  .sheet{height:46px;border-radius:24px 24px 0 0}
-  .handle{width:48px;height:4px;margin:7px auto 7px}
-  .sheet-text{padding:0 14px;font-size:10.7px}
-}
-@media(min-width:700px){
-  body{background:#082238}
-  .screen{max-width:520px;margin:0 auto;box-shadow:0 0 70px rgba(0,0,0,.25)}
-}
+:root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",system-ui,sans-serif;--ink:#0d2b49;--cream:#f7f4ef;--sheet-text:#60738a;--glass:rgba(20,25,31,.56)}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b2740}body{-webkit-text-size-adjust:100%;color:#fff;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}button,input,textarea{font:inherit}button{color:inherit;-webkit-tap-highlight-color:transparent}.hidden{display:none!important}
+.screen{position:relative;width:100%;height:100dvh;min-height:100dvh;overflow:hidden;background:linear-gradient(180deg,#5d7d92 0%,#4f7187 34%,#1d4661 66%,#0c2c44 100%)}
+.bg-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .2s ease}.screen.has-photo .bg-photo{opacity:1}.shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(4,23,38,.055) 0%,rgba(4,23,38,.01) 44%,rgba(4,23,38,.01) 61%,rgba(5,24,39,.15) 100%)}.screen.has-photo .shade{background:linear-gradient(180deg,rgba(7,15,22,.42) 0%,rgba(7,15,22,.10) 38%,rgba(7,15,22,.02) 60%,rgba(7,15,22,.48) 100%)}
+.top{position:absolute;z-index:5;left:18px;right:18px;top:max(30px,env(safe-area-inset-top));display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}.brand{margin:0;font-size:10.8px;line-height:1;font-weight:800;letter-spacing:.30em;color:rgba(255,255,255,.88)}
+.title{display:block;width:min(76vw,330px);margin:9px 0 0;padding:0;border:0;outline:0;background:transparent;color:rgba(255,255,255,.96);font-size:clamp(18.2px,4.75vw,22.5px);line-height:1.06;font-weight:760;letter-spacing:-.028em}.title::placeholder{color:rgba(255,255,255,.96);opacity:1}.screen.has-photo .title{font-size:clamp(22px,5.5vw,29px);font-weight:790;text-shadow:0 2px 18px rgba(0,0,0,.22)}
+.date{position:relative;margin-top:13px;min-height:37px;padding:0 10px;border:.85px solid rgba(255,255,255,.34);border-radius:999px;background:rgba(10,34,53,.055);display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:720;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}.date svg{width:15px;height:15px;flex:0 0 auto;opacity:.92}.date input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
+.photo-button,.photo-mode-badge{min-height:42px;padding:0 13px;border:.85px solid rgba(255,255,255,.32);border-radius:999px;background:rgba(10,34,53,.055);font-size:13.5px;font-weight:780;white-space:nowrap;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}.photo-mode-badge{display:none;align-items:center;letter-spacing:.12em;font-size:10px;text-transform:uppercase;background:rgba(255,255,255,.17)}.screen.has-photo .photo-button{display:none}.screen.has-photo .photo-mode-badge{display:inline-flex}
+.empty{position:absolute;z-index:3;left:24px;right:24px;top:40%;transform:translateY(-22%);text-align:center}.plus{width:70px;height:70px;margin:0 auto 19px;border:0;border-radius:50%;display:grid;place-items:center;background:rgba(250,248,244,.985);color:var(--ink);font-size:36px;line-height:1;font-weight:280;box-shadow:0 7px 20px rgba(0,0,0,.045)}.empty h2{margin:0 auto;max-width:314px;font-size:19.6px;line-height:1.11;font-weight:780;letter-spacing:-.026em}.empty p{margin:14px auto 0;max-width:322px;color:rgba(255,255,255,.58);font-size:13.2px;line-height:1.43;font-weight:450}
+.mic-zone{position:absolute;z-index:4;left:0;right:0;bottom:88px;text-align:center}.mic-halo{display:inline-grid;place-items:center;width:100px;height:100px;border-radius:50%;background:rgba(173,206,229,.10)}.mic-ring{display:grid;place-items:center;width:84px;height:84px;border-radius:50%;background:rgba(123,166,198,.22);box-shadow:inset 0 0 0 1px rgba(225,238,248,.22)}.mic{width:70px;height:70px;border:.9px solid rgba(255,255,255,.48);border-radius:50%;background:#4682b2;color:#fff;display:grid;place-items:center;box-shadow:0 7px 18px rgba(4,20,32,.11),inset 0 0 0 1px rgba(255,255,255,.08)}.mic.recording{background:#9e3f3f}.mic svg{width:26px;height:26px;opacity:.96}.mic-label{margin-top:6px;font-size:11.2px;line-height:1.2;font-weight:730;color:rgba(255,255,255,.75)}
+.sheet{position:absolute;z-index:7;left:0;right:0;bottom:0;height:70px;border-radius:27px 27px 0 0;background:var(--cream);color:var(--sheet-text);box-shadow:0 -5px 18px rgba(0,0,0,.055);transition:height .24s ease}.sheet.open{height:min(52dvh,440px)}.handle{width:52px;height:4px;margin:10px auto 12px;border-radius:999px;background:#c5cbd1}.sheet-text{padding:0 17px;font-size:11.2px;line-height:1.3;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sheet-editor{display:none;height:calc(100% - 42px);padding:0 18px 18px}.sheet.open .sheet-text{display:none}.sheet.open .sheet-editor{display:flex;flex-direction:column;gap:10px}.sheet-editor textarea{flex:1;width:100%;resize:none;border:0;outline:0;border-radius:18px;background:#fff;color:#233a50;padding:16px;font-size:16px;line-height:1.45}.sheet-close{align-self:flex-end;border:0;border-radius:999px;background:#dce4ea;color:#304b63;padding:9px 14px;font-weight:760}
+.photo-ui{display:none}.screen.has-photo .empty,.screen.has-photo .mic-zone,.screen.has-photo .sheet{display:none}.screen.has-photo .photo-ui{display:block}.photo-tools{position:absolute;z-index:6;left:18px;right:18px;top:max(139px,calc(env(safe-area-inset-top) + 112px));display:flex;gap:10px;justify-content:flex-end;align-items:center}.tool-pill{min-height:42px;padding:0 15px;border:1px solid rgba(255,255,255,.42);border-radius:999px;background:rgba(30,24,20,.26);color:#fff;font-size:13px;font-weight:760;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}.tool-pill.danger{background:rgba(46,36,30,.42)}
+.saved-badge{position:absolute;z-index:6;left:20px;bottom:198px;padding:9px 13px;border-radius:999px;background:rgba(28,31,34,.64);font-size:12px;font-weight:770;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+.story-trigger{position:absolute;z-index:6;left:50%;bottom:128px;transform:translateX(-50%);width:100px;height:100px;border:0;border-radius:50%;background:rgba(247,244,239,.88);color:#172d44;display:grid;place-items:center;box-shadow:0 14px 34px rgba(0,0,0,.16);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}.story-trigger.recording{background:rgba(157,61,61,.88);color:#fff}.story-trigger svg{width:34px;height:34px}
+.safe-panel{position:absolute;z-index:6;left:18px;right:18px;bottom:78px;min-height:55px;border-radius:17px;background:rgba(31,37,44,.72);padding:13px 16px;color:#fff;font-size:12px;line-height:1.28;font-weight:720;text-align:center;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.action-rail{position:absolute;z-index:8;left:12px;right:12px;bottom:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.action{display:grid;place-items:center;gap:4px;border:0;background:transparent;color:#fff;font-size:10px;font-weight:700;min-width:0}.action .circle{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:rgba(25,27,30,.75);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}.action svg{width:24px;height:24px}.action span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.modal{position:fixed;z-index:30;inset:0;display:none;align-items:flex-end;background:rgba(5,12,18,.38);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}.modal.open{display:flex}.card{width:100%;padding:18px 18px calc(18px + env(safe-area-inset-bottom));border-radius:28px 28px 0 0;background:#fbfaf7;color:#19324a}.card h3{margin:0 0 14px;font-size:21px}.field{display:grid;gap:6px;margin:10px 0}.field label{font-size:12px;font-weight:760;color:#627589}.field input,.field textarea{width:100%;border:1px solid #d7dde2;border-radius:14px;background:#fff;padding:12px 13px;color:#19324a}.field textarea{min-height:120px;resize:vertical}.card-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.card-actions button{border:0;border-radius:13px;padding:11px 14px;font-weight:760}.secondary{background:#e8edf1;color:#496075}.primary{background:#173851;color:#fff}.notice{position:fixed;z-index:40;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;max-width:calc(100vw - 36px);padding:10px 14px;border-radius:999px;background:rgba(16,28,39,.88);color:#fff;font-size:12px;font-weight:700;transition:.2s ease;white-space:nowrap}.notice.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.file-input{display:none}
+@media(max-height:760px){.top{top:max(18px,env(safe-area-inset-top));left:17px;right:17px}.brand{font-size:9.8px}.title{margin-top:8px;font-size:17.8px;max-width:252px}.screen.has-photo .title{font-size:22px}.date{margin-top:11px;min-height:33px;padding:0 9px;gap:6px;font-size:12.1px}.date svg{width:14px;height:14px}.photo-button{min-height:37px;padding:0 11px;font-size:13px}.empty{top:34.5%;transform:translateY(-4%);left:22px;right:22px}.plus{width:68px;height:68px;margin-bottom:15px;font-size:34px}.empty h2{max-width:296px;font-size:19px}.empty p{margin-top:11px;max-width:296px;font-size:12.4px}.mic-zone{bottom:58px}.mic-halo{width:88px;height:88px}.mic-ring{width:74px;height:74px}.mic{width:62px;height:62px}.mic svg{width:24px;height:24px}.mic-label{font-size:10.7px}.sheet{height:46px;border-radius:24px 24px 0 0}.handle{width:48px;height:4px;margin:7px auto 7px}.sheet-text{padding:0 14px;font-size:10.7px}.photo-tools{top:max(124px,calc(env(safe-area-inset-top) + 98px))}.story-trigger{width:88px;height:88px;bottom:110px}.saved-badge{bottom:178px}.safe-panel{bottom:65px;min-height:49px;font-size:11px}.action-rail{bottom:4px}.action .circle{width:46px;height:46px}}
+@media(min-width:700px){body{background:#082238}.screen{max-width:520px;margin:0 auto;box-shadow:0 0 70px rgba(0,0,0,.25)}.modal .card{max-width:520px;margin:0 auto}}
 </style>
 </head>
 <body>
-<main class="screen" data-revision="${STORYLAB_CLEAN_PAGE_REVISION}">
+<main id="screen" class="screen" data-revision="${STORYLAB_CLEAN_PAGE_REVISION}">
+  <img id="bgPhoto" class="bg-photo" alt="Foto bij deze herinnering" />
   <div class="shade"></div>
+  <input id="photoInput" class="file-input" type="file" accept="image/*" multiple />
   <header class="top">
     <div>
       <p class="brand">TALERA</p>
-      <h1 class="title">Titel van deze herinnering</h1>
-      <button class="date" type="button" aria-label="Wanneer was dit?">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <rect x="3" y="5" width="18" height="16" rx="2"></rect>
-          <path d="M16 3v4M8 3v4M3 10h18"></path>
-        </svg>
-        <span>Wanneer was dit?</span>
-      </button>
+      <input id="title" class="title" type="text" maxlength="140" autocomplete="off" placeholder="Titel van deze herinnering" aria-label="Titel van deze herinnering" />
+      <label class="date" aria-label="Wanneer was dit?">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>
+        <span id="dateText">Wanneer was dit?</span><input id="dateInput" type="date" />
+      </label>
     </div>
-    <button class="photo-button" type="button">+ foto</button>
+    <button id="topPhoto" class="photo-button" type="button">+ foto</button>
+    <div class="photo-mode-badge">SCHONE BOUW · FOTO</div>
   </header>
   <section class="empty" aria-label="Foto kiezen">
-    <button class="plus" type="button" aria-label="Kies een foto">+</button>
+    <button id="bigPlus" class="plus" type="button" aria-label="Kies een foto">+</button>
     <h2>Kies een foto die je herinnering oproept</h2>
     <p>Daarna kun je gewoon naar de foto kijken en je verhaal vertellen.</p>
   </section>
   <section class="mic-zone" aria-label="Vertellen">
-    <div class="mic-halo">
-      <div class="mic-ring">
-        <button class="mic" type="button" aria-label="Microfoon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
-            <rect x="9" y="3" width="6" height="11" rx="3"></rect>
-            <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-    <div class="mic-label">Je vertelt nu · swipe gerust door je foto’s</div>
+    <div class="mic-halo"><div class="mic-ring"><button id="mic" class="mic" type="button" aria-label="Microfoon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6"></path></svg></button></div></div>
+    <div id="micLabel" class="mic-label">Je vertelt nu · swipe gerust door je foto’s</div>
   </section>
-  <section class="sheet" aria-label="Verhaaltekst">
-    <div class="handle"></div>
-    <div class="sheet-text">Veeg omlaag om terug te gaan naar je foto</div>
+  <section id="sheet" class="sheet" aria-label="Verhaaltekst"><div id="sheetHandle" class="handle"></div><div class="sheet-text">Veeg omlaag om terug te gaan naar je foto</div><div class="sheet-editor"><textarea id="storyText" placeholder="Je verhaaltekst..."></textarea><button id="sheetClose" class="sheet-close" type="button">Klaar</button></div></section>
+
+  <section class="photo-ui" aria-label="Fotomodus">
+    <div class="photo-tools"><button id="addAnother" class="tool-pill" type="button">+ andere foto</button><button id="removeTop" class="tool-pill danger" type="button">Verwijder</button></div>
+    <div id="savedBadge" class="saved-badge">✓ veilig bewaard</div>
+    <button id="storyTrigger" class="story-trigger" type="button" aria-label="Vertellen"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10l8 6-6 6M24 10l-8 6 6 6"></path></svg></button>
+    <div class="safe-panel">✓ Foto veilig bewaard. Ververs nu gerust deze pagina: dezelfde foto moet terugkomen.</div>
+    <nav class="action-rail" aria-label="Fotoacties">
+      <button id="editBtn" class="action" type="button"><span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="14" height="12" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M5 15l4-3 3 2 3-3 2 2M17 7h4M19 5v4"></path></svg></span><span>Bewerken</span></button>
+      <button id="noteBtn" class="action" type="button"><span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"></circle><path d="M10 7v6M7 10h6M15 15l4 4"></path></svg></span><span>Opmerking</span></button>
+      <button id="fitBtn" class="action" type="button"><span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="2"></rect><path d="M3 9V5a2 2 0 012-2h4M21 9V5a2 2 0 00-2-2h-4M3 15v4a2 2 0 002 2h4M21 15v4a2 2 0 01-2 2h-4"></path></svg></span><span>Formaat wijzigen</span></button>
+      <button id="removeBtn" class="action" type="button"><span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"></path></svg></span><span>Verwijderen</span></button>
+    </nav>
   </section>
 </main>
+
+<div id="editModal" class="modal"><section class="card"><h3>Herinnering bewerken</h3><div class="field"><label>Titel</label><input id="editTitle" maxlength="140" /></div><div class="field"><label>Datum</label><input id="editDate" type="date" /></div><div class="card-actions"><button class="secondary" data-close="editModal">Annuleren</button><button id="saveEdit" class="primary">Opslaan</button></div></section></div>
+<div id="noteModal" class="modal"><section class="card"><h3>Opmerking</h3><div class="field"><textarea id="noteText" placeholder="Voeg een opmerking toe..."></textarea></div><div class="card-actions"><button class="secondary" data-close="noteModal">Annuleren</button><button id="saveNote" class="primary">Opslaan</button></div></section></div>
+<div id="notice" class="notice"></div>
+
+<script>
+(function(){
+  const screen=document.getElementById('screen'), bg=document.getElementById('bgPhoto'), photoInput=document.getElementById('photoInput'), title=document.getElementById('title'), dateInput=document.getElementById('dateInput'), dateText=document.getElementById('dateText'), storyText=document.getElementById('storyText'), sheet=document.getElementById('sheet'), notice=document.getElementById('notice');
+  const today=new Date().toISOString().slice(0,10); dateInput.max=today; document.getElementById('editDate').max=today;
+  const clientKey='talera.storylab.clean.client'; let clientId=localStorage.getItem(clientKey); if(!clientId){clientId=crypto.randomUUID();localStorage.setItem(clientKey,clientId)}
+  let state={title:'',date:'',storyText:'',note:'',photos:[],currentIndex:0,fit:'cover',audioId:''}; let objectUrl=''; let recorder=null, chunks=[], stream=null, touchX=0;
+  function showNotice(t){notice.textContent=t;notice.classList.add('show');setTimeout(()=>notice.classList.remove('show'),1800)}
+  function api(path,opts){return fetch(path+(path.indexOf('?')>-1?'&':'?')+'client='+encodeURIComponent(clientId),opts)}
+  function formatDate(v){if(!v)return 'Wanneer was dit?'; const d=new Date(v+'T12:00:00'); return new Intl.DateTimeFormat('nl-NL',{day:'numeric',month:'long',year:'numeric'}).format(d)}
+  async function saveState(){state.title=title.value.trim();state.date=dateInput.value;state.storyText=storyText.value;await api('/api/storylab-clean/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(state)}).catch(()=>{});}
+  async function loadState(){try{const r=await api('/api/storylab-clean/state');if(r.ok){const s=await r.json();state=Object.assign(state,s||{})}}catch(e){} title.value=state.title||'';dateInput.value=state.date||'';dateText.textContent=formatDate(state.date);storyText.value=state.storyText||'';renderPhoto();}
+  async function renderPhoto(){if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=''} if(!state.photos||!state.photos.length){screen.classList.remove('has-photo');bg.removeAttribute('src');return} if(state.currentIndex<0)state.currentIndex=0;if(state.currentIndex>=state.photos.length)state.currentIndex=state.photos.length-1;const p=state.photos[state.currentIndex];try{const r=await api('/api/storylab-clean/photo&id='+encodeURIComponent(p.id));if(!r.ok)throw new Error();const blob=await r.blob();objectUrl=URL.createObjectURL(blob);bg.src=objectUrl;bg.style.objectFit=state.fit||'cover';screen.classList.add('has-photo')}catch(e){showNotice('Foto kon niet worden geladen')}
+  }
+  async function addFiles(files){const list=Array.from(files||[]).filter(f=>f.type&&f.type.startsWith('image/')).slice(0,12);if(!list.length)return;for(const f of list){const id=crypto.randomUUID();const r=await api('/api/storylab-clean/photo&id='+encodeURIComponent(id),{method:'PUT',headers:{'content-type':f.type,'x-file-name':encodeURIComponent(f.name||'foto')},body:f});if(r.ok)state.photos.push({id:id,name:f.name||'foto',type:f.type,createdAt:Date.now()})}state.currentIndex=Math.max(0,state.photos.length-list.length);await saveState();await renderPhoto();showNotice('Foto veilig bewaard')}
+  async function removeCurrent(){if(!state.photos.length)return;const p=state.photos[state.currentIndex];await api('/api/storylab-clean/photo&id='+encodeURIComponent(p.id),{method:'DELETE'}).catch(()=>{});state.photos.splice(state.currentIndex,1);if(state.currentIndex>=state.photos.length)state.currentIndex=Math.max(0,state.photos.length-1);await saveState();await renderPhoto();showNotice('Foto verwijderd')}
+  async function startStopRecording(btn){if(recorder&&recorder.state==='recording'){recorder.stop();btn.classList.remove('recording');document.getElementById('mic').classList.remove('recording');document.getElementById('micLabel').textContent='Opname veilig bewaren…';return}if(!navigator.mediaDevices||!window.MediaRecorder){showNotice('Opname wordt hier niet ondersteund');return}try{stream=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=async()=>{const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});const id=crypto.randomUUID();const r=await api('/api/storylab-clean/audio&id='+encodeURIComponent(id),{method:'PUT',headers:{'content-type':blob.type||'audio/webm'},body:blob});if(r.ok){state.audioId=id;await saveState();showNotice('Opname veilig bewaard')}document.getElementById('micLabel').textContent='Je vertelt nu · swipe gerust door je foto’s';if(stream)stream.getTracks().forEach(t=>t.stop())};recorder.start();btn.classList.add('recording');document.getElementById('mic').classList.add('recording');document.getElementById('micLabel').textContent='Je vertelt nu · tik om te stoppen'}catch(e){showNotice('Microfoon niet beschikbaar')}}
+  document.getElementById('topPhoto').onclick=()=>photoInput.click();document.getElementById('bigPlus').onclick=()=>photoInput.click();document.getElementById('addAnother').onclick=()=>photoInput.click();photoInput.onchange=async()=>{await addFiles(photoInput.files);photoInput.value=''};
+  title.addEventListener('change',saveState);title.addEventListener('blur',saveState);dateInput.addEventListener('change',async()=>{if(dateInput.value>today){dateInput.value=today}dateText.textContent=formatDate(dateInput.value);await saveState()});storyText.addEventListener('change',saveState);storyText.addEventListener('blur',saveState);
+  document.getElementById('sheetHandle').onclick=()=>sheet.classList.add('open');document.querySelector('.sheet-text').onclick=()=>sheet.classList.add('open');document.getElementById('sheetClose').onclick=async()=>{sheet.classList.remove('open');await saveState()};
+  document.getElementById('mic').onclick=e=>startStopRecording(e.currentTarget);document.getElementById('storyTrigger').onclick=e=>startStopRecording(e.currentTarget);
+  document.getElementById('removeTop').onclick=removeCurrent;document.getElementById('removeBtn').onclick=removeCurrent;
+  document.getElementById('fitBtn').onclick=async()=>{state.fit=state.fit==='contain'?'cover':'contain';bg.style.objectFit=state.fit;await saveState();showNotice(state.fit==='contain'?'Hele foto zichtbaar':'Foto vult scherm')};
+  function openModal(id){document.getElementById(id).classList.add('open')}function closeModal(id){document.getElementById(id).classList.remove('open')}
+  document.getElementById('editBtn').onclick=()=>{document.getElementById('editTitle').value=title.value;document.getElementById('editDate').value=dateInput.value;openModal('editModal')};document.getElementById('noteBtn').onclick=()=>{document.getElementById('noteText').value=state.note||'';openModal('noteModal')};
+  document.getElementById('saveEdit').onclick=async()=>{title.value=document.getElementById('editTitle').value;dateInput.value=document.getElementById('editDate').value;dateText.textContent=formatDate(dateInput.value);closeModal('editModal');await saveState();showNotice('Wijzigingen opgeslagen')};document.getElementById('saveNote').onclick=async()=>{state.note=document.getElementById('noteText').value;closeModal('noteModal');await saveState();showNotice('Opmerking opgeslagen')};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+  screen.addEventListener('touchstart',e=>{touchX=e.changedTouches[0].clientX},{passive:true});screen.addEventListener('touchend',async e=>{if(!screen.classList.contains('has-photo')||state.photos.length<2)return;const dx=e.changedTouches[0].clientX-touchX;if(Math.abs(dx)<55)return;state.currentIndex=(state.currentIndex+(dx<0?1:-1)+state.photos.length)%state.photos.length;await saveState();await renderPhoto()},{passive:true});
+  window.addEventListener('pagehide',()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);if(stream)stream.getTracks().forEach(t=>t.stop())});loadState();
+})();
+</script>
 </body>
 </html>`;

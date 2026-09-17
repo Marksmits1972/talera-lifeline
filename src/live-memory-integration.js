@@ -7,6 +7,8 @@ export const liveMemoryIntegrationStyle = String.raw`
 .talera-live-badge.show{opacity:1}
 .talera-live-loading{position:absolute;z-index:8;left:50%;bottom:78px;transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(247,244,239,.82);color:#0F2747;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(15,39,71,.12);font:700 11px/1.1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;opacity:0;pointer-events:none;transition:opacity .18s ease;white-space:nowrap}
 .talera-live-loading.show{opacity:1}
+.talera-live-saved{position:fixed;z-index:79;left:50%;top:calc(18px + env(safe-area-inset-top));transform:translate(-50%,-8px);max-width:calc(100vw - 36px);padding:9px 14px;border-radius:999px;background:rgba(247,244,239,.94);color:#0F2747;box-shadow:0 7px 22px rgba(15,39,71,.14);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font:720 11.5px/1.15 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease}
+.talera-live-saved.show{opacity:1;transform:translate(-50%,0)}
 `;
 
 export const liveMemoryIntegrationScript = String.raw`
@@ -23,7 +25,7 @@ export const liveMemoryIntegrationScript = String.raw`
   const runtime=window.__taleraTimelineRuntime;
   if(!timeline||!surface||!runtime)return;
 
-  let autoStartTimer=0,autoInterval=0;
+  let autoStartTimer=0,autoInterval=0,savedTimer=0;
   let lastWrittenMemoryId=(runtime.currentMemory()||{}).id||'';
   let landingStoryId='';
 
@@ -39,6 +41,10 @@ export const liveMemoryIntegrationScript = String.raw`
   loadingBadge.className='talera-live-loading';
   loadingBadge.textContent='Foto wordt geladen…';
   timeline.appendChild(loadingBadge);
+  const savedBadge=document.createElement('div');
+  savedBadge.className='talera-live-saved';
+  savedBadge.textContent='Je verhaal is veilig opgeslagen';
+  document.body.appendChild(savedBadge);
 
   function loadCredentials(){
     try{
@@ -81,6 +87,11 @@ export const liveMemoryIntegrationScript = String.raw`
     if(spin)spin.remove();
     let retry=gate.querySelector('button');
     if(!retry){retry=document.createElement('button');retry.type='button';retry.textContent='Opnieuw proberen';retry.style.cssText='min-height:46px;margin-top:14px;border:0;border-radius:15px;padding:0 18px;background:#0F2747;color:white;font:760 13px system-ui';retry.onclick=()=>location.reload();gate.querySelector('.talera-handoff-card')?.appendChild(retry)}
+  }
+  function showSavedBadge(){
+    clearTimeout(savedTimer);
+    savedBadge.classList.add('show');
+    savedTimer=setTimeout(()=>savedBadge.classList.remove('show'),2200);
   }
   acceptHandoff();
 
@@ -294,7 +305,12 @@ export const liveMemoryIntegrationScript = String.raw`
     runtime.draw();
     timeline.classList.add('is-timeline-afterglow','is-marker-afterglow');
     renderDots(memory);
-    document.dispatchEvent(new CustomEvent('talera:new-memory-landed',{detail:{storyId:memory.storyId||''}}));
+    if(String(detail.sourceMode||'')==='storylab-clean'){
+      showSavedBadge();
+      document.dispatchEvent(new CustomEvent('talera:storylab-memory-landed',{detail:{storyId:memory.storyId||''}}));
+    }else{
+      document.dispatchEvent(new CustomEvent('talera:new-memory-landed',{detail:{storyId:memory.storyId||''}}));
+    }
     finishHandoff();
 
     if(items.length){

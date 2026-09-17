@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: listen-layer-r6-same-date-active-snap-20260912-0900
+// TALERA_DEPLOY_REV: storylab-direct-timeline-landing-20260917-r1
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-timeline-prototype",

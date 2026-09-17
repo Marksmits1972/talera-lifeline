@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: timeline-photo-handoff-polish-20260917-r1
+// TALERA_DEPLOY_REV: timeline-photo-carousel-polish-20260917-r2
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-timeline-prototype",

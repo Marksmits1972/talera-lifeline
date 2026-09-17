@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-reference-20260917-r5';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-reference-20260917-r6';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -24,20 +24,20 @@ button{font:inherit;color:inherit}
   height:100dvh;
   min-height:100dvh;
   overflow:hidden;
-  background:linear-gradient(180deg,#56758a 0%,#486c84 35%,#173c58 68%,#09263e 100%);
+  background:linear-gradient(180deg,#5b7b91 0%,#4c7087 34%,#1b4561 66%,#0b2c45 100%);
 }
 .shade{
   position:absolute;
   inset:0;
   pointer-events:none;
-  background:linear-gradient(180deg,rgba(4,23,38,.12) 0%,rgba(4,23,38,.02) 43%,rgba(4,23,38,.02) 60%,rgba(5,24,39,.22) 100%);
+  background:linear-gradient(180deg,rgba(4,23,38,.08) 0%,rgba(4,23,38,.015) 43%,rgba(4,23,38,.015) 60%,rgba(5,24,39,.18) 100%);
 }
 .top{
   position:absolute;
   z-index:3;
   left:24px;
   right:24px;
-  top:max(31px,env(safe-area-inset-top));
+  top:max(30px,env(safe-area-inset-top));
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
   gap:14px;
@@ -49,12 +49,12 @@ button{font:inherit;color:inherit}
   line-height:1;
   font-weight:900;
   letter-spacing:.28em;
-  color:rgba(255,255,255,.95);
+  color:rgba(255,255,255,.94);
 }
 .title{
   margin:13px 0 0;
   max-width:330px;
-  font-size:clamp(24px,6.1vw,31px);
+  font-size:clamp(23px,5.9vw,30px);
   line-height:1.05;
   font-weight:820;
   letter-spacing:-.035em;
@@ -62,25 +62,24 @@ button{font:inherit;color:inherit}
 }
 .date{
   margin-top:17px;
-  min-height:51px;
+  min-height:50px;
   padding:0 16px;
-  border:1px solid rgba(255,255,255,.45);
+  border:1px solid rgba(255,255,255,.42);
   border-radius:999px;
-  background:rgba(10,34,53,.14);
+  background:rgba(10,34,53,.10);
   display:inline-flex;
   align-items:center;
   gap:10px;
   font-size:16px;
   font-weight:820;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
 }
 .date svg{width:19px;height:19px;flex:0 0 auto}
 .photo-button{
-  min-height:56px;
+  min-height:55px;
   padding:0 19px;
-  border:1px solid rgba(255,255,255,.42);
+  border:1px solid rgba(255,255,255,.40);
   border-radius:999px;
-  background:rgba(10,34,53,.13);
+  background:rgba(10,34,53,.10);
   font-size:16px;
   font-weight:860;
   white-space:nowrap;
@@ -88,86 +87,86 @@ button{font:inherit;color:inherit}
 .empty{
   position:absolute;
   z-index:2;
-  left:32px;
-  right:32px;
-  top:39%;
-  transform:translateY(-10%);
+  left:28px;
+  right:28px;
+  top:40%;
+  transform:translateY(-22%);
   text-align:center;
 }
 .plus{
-  width:126px;
-  height:126px;
-  margin:0 auto 26px;
+  width:116px;
+  height:116px;
+  margin:0 auto 24px;
   border:0;
   border-radius:50%;
   display:grid;
   place-items:center;
   background:rgba(250,248,244,.98);
   color:var(--ink);
-  font-size:58px;
+  font-size:54px;
   line-height:1;
   font-weight:300;
-  box-shadow:0 16px 44px rgba(0,0,0,.09);
+  box-shadow:0 12px 34px rgba(0,0,0,.07);
 }
 .empty h2{
   margin:0 auto;
-  max-width:370px;
-  font-size:28px;
-  line-height:1.08;
+  max-width:365px;
+  font-size:27px;
+  line-height:1.09;
   font-weight:850;
-  letter-spacing:-.036em;
+  letter-spacing:-.034em;
 }
 .empty p{
-  margin:20px auto 0;
-  max-width:345px;
-  color:rgba(255,255,255,.70);
+  margin:18px auto 0;
+  max-width:355px;
+  color:rgba(255,255,255,.67);
   font-size:16px;
-  line-height:1.42;
-  font-weight:560;
+  line-height:1.4;
+  font-weight:550;
 }
 .mic-zone{
   position:absolute;
   z-index:4;
   left:0;
   right:0;
-  bottom:112px;
+  bottom:102px;
   text-align:center;
 }
 .mic-halo{
   display:inline-grid;
   place-items:center;
-  width:168px;
-  height:168px;
+  width:142px;
+  height:142px;
   border-radius:50%;
-  background:rgba(173,206,229,.13);
-  box-shadow:0 0 0 1px rgba(255,255,255,.02);
+  background:rgba(173,206,229,.12);
 }
 .mic-ring{
   display:grid;
   place-items:center;
-  width:136px;
-  height:136px;
+  width:116px;
+  height:116px;
   border-radius:50%;
-  background:rgba(123,166,198,.30);
-  box-shadow:inset 0 0 0 2px rgba(225,238,248,.28);
+  background:rgba(123,166,198,.27);
+  box-shadow:inset 0 0 0 1.5px rgba(225,238,248,.28);
 }
 .mic{
-  width:112px;
-  height:112px;
-  border:1px solid rgba(255,255,255,.56);
+  width:94px;
+  height:94px;
+  border:1px solid rgba(255,255,255,.54);
   border-radius:50%;
-  background:#3f79a7;
+  background:#4682b2;
   color:#fff;
   display:grid;
   place-items:center;
-  box-shadow:0 13px 34px rgba(4,20,32,.20),inset 0 0 0 1px rgba(255,255,255,.13);
+  box-shadow:0 10px 26px rgba(4,20,32,.16),inset 0 0 0 1px rgba(255,255,255,.11);
 }
-.mic svg{width:39px;height:39px}
+.mic svg{width:34px;height:34px}
 .mic-label{
-  margin-top:3px;
+  margin-top:7px;
   font-size:14px;
-  font-weight:820;
-  color:rgba(255,255,255,.88);
+  line-height:1.2;
+  font-weight:800;
+  color:rgba(255,255,255,.82);
 }
 .sheet{
   position:absolute;
@@ -175,39 +174,47 @@ button{font:inherit;color:inherit}
   left:0;
   right:0;
   bottom:0;
-  height:95px;
+  height:88px;
   border-radius:30px 30px 0 0;
   background:var(--cream);
   color:var(--sheet-text);
-  box-shadow:0 -12px 34px rgba(0,0,0,.13);
+  box-shadow:0 -8px 26px rgba(0,0,0,.09);
 }
 .handle{
-  width:65px;
+  width:62px;
   height:6px;
-  margin:12px auto 14px;
+  margin:12px auto 15px;
   border-radius:999px;
-  background:#bec6cf;
+  background:#c3c9d0;
 }
 .sheet-text{
   padding:0 23px;
   font-size:14px;
   line-height:1.3;
-  font-weight:820;
+  font-weight:800;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 @media(max-height:760px){
-  .top{top:max(22px,env(safe-area-inset-top))}
-  .empty{top:37%}
-  .plus{width:108px;height:108px;margin-bottom:20px;font-size:52px}
-  .empty h2{font-size:25px}
-  .empty p{margin-top:15px;font-size:15px}
-  .mic-zone{bottom:96px}
-  .mic-halo{width:142px;height:142px}
-  .mic-ring{width:116px;height:116px}
-  .mic{width:96px;height:96px}
-  .sheet{height:82px}
+  .top{top:max(18px,env(safe-area-inset-top))}
+  .brand{font-size:11px}
+  .title{margin-top:10px;font-size:22px;max-width:290px}
+  .date{margin-top:14px;min-height:44px;font-size:15px}
+  .photo-button{min-height:48px;font-size:15px}
+  .empty{top:34.5%;transform:translateY(-4%);left:24px;right:24px}
+  .plus{width:96px;height:96px;margin-bottom:18px;font-size:48px}
+  .empty h2{max-width:340px;font-size:23px;line-height:1.1}
+  .empty p{margin-top:13px;max-width:335px;font-size:14.5px;line-height:1.38}
+  .mic-zone{bottom:72px}
+  .mic-halo{width:118px;height:118px}
+  .mic-ring{width:98px;height:98px}
+  .mic{width:80px;height:80px}
+  .mic svg{width:30px;height:30px}
+  .mic-label{margin-top:6px;font-size:12.5px}
+  .sheet{height:64px;border-radius:26px 26px 0 0}
+  .handle{width:54px;height:5px;margin:9px auto 10px}
+  .sheet-text{padding:0 18px;font-size:12.5px}
 }
 @media(min-width:700px){
   body{background:#082238}
@@ -218,7 +225,6 @@ button{font:inherit;color:inherit}
 <body>
 <main class="screen" data-revision="${STORYLAB_CLEAN_PAGE_REVISION}">
   <div class="shade"></div>
-
   <header class="top">
     <div>
       <p class="brand">TALERA</p>
@@ -233,13 +239,11 @@ button{font:inherit;color:inherit}
     </div>
     <button class="photo-button" type="button">+ foto</button>
   </header>
-
   <section class="empty" aria-label="Foto kiezen">
     <button class="plus" type="button" aria-label="Kies een foto">+</button>
     <h2>Kies een foto die je herinnering oproept</h2>
     <p>Daarna kun je gewoon naar de foto kijken en je verhaal vertellen.</p>
   </section>
-
   <section class="mic-zone" aria-label="Vertellen">
     <div class="mic-halo">
       <div class="mic-ring">
@@ -253,7 +257,6 @@ button{font:inherit;color:inherit}
     </div>
     <div class="mic-label">Je vertelt nu · swipe gerust door je foto’s</div>
   </section>
-
   <section class="sheet" aria-label="Verhaaltekst">
     <div class="handle"></div>
     <div class="sheet-text">Veeg omlaag om terug te gaan naar je foto</div>

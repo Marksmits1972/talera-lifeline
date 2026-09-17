@@ -1,4 +1,4 @@
-// TALERA_DEPLOY_REV: clean-rebuild-photo-foundation-20260916-r1
+// TALERA_DEPLOY_REV: storylab-clean-timeline-publish-20260917-r1
 {
   "name": "xxory-test",
   "main": "src/clean-router-worker.js",

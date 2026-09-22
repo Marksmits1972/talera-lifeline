@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r17';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r18';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -21,16 +21,16 @@ const DEFAULT_STATE = {
   audioId: ''
 };
 
-const UX_STYLE = `<style id="talera-storylab-clean-ux-r17">
+const UX_STYLE = `<style id="talera-storylab-clean-ux-r18">
 html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:min(58dvh,500px);z-index:22!important;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,0,0);cursor:grab;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .34s cubic-bezier(.22,.78,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{height:var(--talera-sheet-open-height)!important;cursor:default;touch-action:pan-y}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none;touch-action:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(8px);transition:opacity .20s ease,transform .22s ease}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{display:flex}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.dragging .sheet-text{opacity:0}.sheet textarea{cursor:text;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
 .talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
 .screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
-.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
+.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease;touch-action:none;overscroll-behavior:none}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
 .bg-photo{z-index:0}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}
 @media(max-height:760px){.sheet{--talera-sheet-height:50px}.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}.talera-story-dots{bottom:214px}}
 </style>`;
 
-const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r17">
+const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r18">
 (()=>{
   const clientKey='talera.storylab.clean.client';
   const sessionKey='talera.storylab.clean.session-client';
@@ -48,7 +48,7 @@ const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r1
 })();
 </script>`;
 
-const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r17">
+const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r18">
 (()=>{
   let sheet=document.getElementById('sheet');
   const storyText=document.getElementById('storyText');
@@ -239,9 +239,6 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r17">
   carousel.innerHTML='<img class="talera-story-page previous" alt=""><img class="talera-story-page current" alt=""><img class="talera-story-page next" alt="">';
   const dots=document.createElement('div');dots.className='talera-story-dots';dots.setAttribute('aria-hidden','true');
   if(shade&&shade.parentNode){shade.parentNode.insertBefore(carousel,shade);shade.parentNode.insertBefore(dots,shade.nextSibling)}else{screen.prepend(carousel);screen.appendChild(dots)}
-  ['touchstart','touchmove','touchend','touchcancel'].forEach(type=>{
-    carousel.addEventListener(type,event=>event.stopPropagation(),{capture:true,passive:true});
-  });
   const previous=carousel.querySelector('.previous'),current=carousel.querySelector('.current'),next=carousel.querySelector('.next');
   const cache=new Map();
   let viewState=null,photoPointer=null,photoStartX=0,photoStartY=0,photoLastX=0,photoLastY=0,photoMode='',settling=false;
@@ -251,6 +248,21 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r17">
   async function readState(){
     if(!client)return null;
     try{const res=await fetch(stateUrl(),{cache:'no-store'});if(!res.ok)return null;return await res.json()}catch(e){return null}
+  }
+  async function persistCurrentIndex(){
+    if(!client||!viewState)return;
+    const wanted=Number(viewState.currentIndex||0);
+    try{
+      const latest=await readState();
+      if(!latest)return;
+      latest.currentIndex=wanted;
+      await fetch(stateUrl(),{
+        method:'PUT',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify(latest),
+        cache:'no-store'
+      });
+    }catch(e){}
   }
   async function sourceFor(photo){
     if(!photo||!photo.id)return '';
@@ -292,32 +304,103 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r17">
     viewState.currentIndex=normalized(viewState.currentIndex+direction,viewState.photos.length);
     const chosen=direction>0?next:previous;
     if(chosen&&chosen.src&&bg){bg.src=chosen.src;bg.style.objectFit=viewState.fit==='contain'?'contain':'cover'}
-    setTimeout(()=>{preparePages();setTimeout(refreshCarousel,220)},305);
+    syncDots();
+    persistCurrentIndex();
+    setTimeout(()=>{preparePages()},20);
   }
-  function releasePhoto(event){
-    if(photoPointer!==event.pointerId||settling)return;
-    const dx=photoLastX-photoStartX,dy=photoLastY-photoStartY,w=screen.getBoundingClientRect().width;
-    const commit=photoMode==='horizontal'&&Math.abs(dx)>=42&&Math.abs(dx)>Math.abs(dy)*1.15;
-    photoPointer=null;carousel.classList.remove('dragging');
-    try{carousel.releasePointerCapture(event.pointerId)}catch(e){}
-    if(!photoMode){photoMode='';return}
+  let photoTouch=null;
+  function finishPhotoSwipe(dx,dy){
+    if(settling||!viewState||viewState.photos.length<=1)return;
+    const w=screen.getBoundingClientRect().width;
+    const horizontal=photoMode==='horizontal'&&Math.abs(dx)>Math.abs(dy)*1.08;
+    const commit=horizontal&&Math.abs(dx)>=Math.min(52,w*.12);
+    carousel.classList.remove('dragging');
+    if(!horizontal){
+      setTransform(previous,-w,true);setTransform(current,0,true);setTransform(next,w,true);
+      photoMode='';
+      return;
+    }
     settling=true;
     if(commit){
-      const direction=dx<0?1:-1,target=direction>0?-w:w;
-      setTransform(previous,target-w,true);setTransform(current,target,true);setTransform(next,target+w,true);
-      setTimeout(()=>{settling=false;photoMode='';settlePhoto(direction)},300);
+      const direction=dx<0?1:-1;
+      const target=direction>0?-w:w;
+      setTransform(previous,target-w,true);
+      setTransform(current,target,true);
+      setTransform(next,target+w,true);
+      setTimeout(()=>{
+        settlePhoto(direction);
+        settling=false;
+        photoMode='';
+      },265);
     }else{
       setTransform(previous,-w,true);setTransform(current,0,true);setTransform(next,w,true);
-      setTimeout(()=>{settling=false;photoMode=''},300);
+      setTimeout(()=>{settling=false;photoMode=''},265);
     }
   }
+
+  carousel.addEventListener('touchstart',event=>{
+    if(event.touches.length!==1||settling||screen.classList.contains('sheet-open')||!viewState||viewState.photos.length<=1)return;
+    const t=event.touches[0];
+    photoTouch={startX:t.clientX,startY:t.clientY,lastX:t.clientX,lastY:t.clientY};
+    photoStartX=photoLastX=t.clientX;
+    photoStartY=photoLastY=t.clientY;
+    photoMode='';
+    carousel.classList.add('dragging');
+  },{passive:true,capture:true});
+
+  carousel.addEventListener('touchmove',event=>{
+    if(!photoTouch||event.touches.length!==1||settling)return;
+    const t=event.touches[0];
+    photoLastX=photoTouch.lastX=t.clientX;
+    photoLastY=photoTouch.lastY=t.clientY;
+    const dx=t.clientX-photoTouch.startX;
+    const dy=t.clientY-photoTouch.startY;
+    if(!photoMode){
+      if(Math.abs(dx)>=5&&Math.abs(dx)>Math.abs(dy)*1.08)photoMode='horizontal';
+      else if(Math.abs(dy)>=9&&Math.abs(dy)>Math.abs(dx)*1.12)photoMode='vertical';
+    }
+    if(photoMode!=='horizontal')return;
+    if(event.cancelable)event.preventDefault();
+    event.stopPropagation();
+    const w=screen.getBoundingClientRect().width;
+    setTransform(previous,dx-w,false);
+    setTransform(current,dx,false);
+    setTransform(next,dx+w,false);
+  },{passive:false,capture:true});
+
+  carousel.addEventListener('touchend',event=>{
+    if(!photoTouch)return;
+    const t=event.changedTouches&&event.changedTouches[0];
+    const dx=(t?t.clientX:photoTouch.lastX)-photoTouch.startX;
+    const dy=(t?t.clientY:photoTouch.lastY)-photoTouch.startY;
+    photoTouch=null;
+    if(photoMode==='horizontal'){
+      event.stopPropagation();
+      if(event.cancelable)event.preventDefault();
+    }
+    finishPhotoSwipe(dx,dy);
+  },{passive:false,capture:true});
+
+  carousel.addEventListener('touchcancel',event=>{
+    if(!photoTouch)return;
+    const dx=photoTouch.lastX-photoTouch.startX;
+    const dy=photoTouch.lastY-photoTouch.startY;
+    photoTouch=null;
+    finishPhotoSwipe(0,dy);
+  },{passive:true,capture:true});
+
+  /* Mouse fallback for desktop testing; iPhone uses the touch path above. */
   carousel.addEventListener('pointerdown',event=>{
-    if(settling||sheet.classList.contains('open')||!viewState||viewState.photos.length<=1)return;
-    photoPointer=event.pointerId;photoStartX=photoLastX=event.clientX;photoStartY=photoLastY=event.clientY;photoMode='';carousel.classList.add('dragging');
+    if(event.pointerType!=='mouse'||settling||screen.classList.contains('sheet-open')||!viewState||viewState.photos.length<=1)return;
+    photoPointer=event.pointerId;
+    photoStartX=photoLastX=event.clientX;
+    photoStartY=photoLastY=event.clientY;
+    photoMode='';
+    carousel.classList.add('dragging');
     try{carousel.setPointerCapture(event.pointerId)}catch(e){}
   });
   carousel.addEventListener('pointermove',event=>{
-    if(photoPointer!==event.pointerId||settling)return;
+    if(event.pointerType!=='mouse'||photoPointer!==event.pointerId||settling)return;
     photoLastX=event.clientX;photoLastY=event.clientY;
     const dx=photoLastX-photoStartX,dy=photoLastY-photoStartY;
     if(!photoMode){
@@ -325,12 +408,15 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r17">
       else if(Math.abs(dy)>=9&&Math.abs(dy)>Math.abs(dx)*1.14)photoMode='vertical';
     }
     if(photoMode!=='horizontal')return;
-    if(event.cancelable)event.preventDefault();
     const w=screen.getBoundingClientRect().width;
     setTransform(previous,dx-w,false);setTransform(current,dx,false);setTransform(next,dx+w,false);
-  },{passive:false});
-  carousel.addEventListener('pointerup',releasePhoto);
-  carousel.addEventListener('pointercancel',releasePhoto);
+  });
+  carousel.addEventListener('pointerup',event=>{
+    if(event.pointerType!=='mouse'||photoPointer!==event.pointerId)return;
+    const dx=photoLastX-photoStartX,dy=photoLastY-photoStartY;
+    photoPointer=null;
+    finishPhotoSwipe(dx,dy);
+  });
 
   const observer=new MutationObserver(()=>{if(screen.classList.contains('has-photo'))setTimeout(refreshCarousel,80);else{carousel.classList.remove('ready');dots.classList.remove('show')}});
   observer.observe(screen,{attributes:true,attributeFilter:['class']});

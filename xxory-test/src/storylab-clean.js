@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r18';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r19';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -21,8 +21,8 @@ const DEFAULT_STATE = {
   audioId: ''
 };
 
-const UX_STYLE = `<style id="talera-storylab-clean-ux-r18">
-html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:min(58dvh,500px);z-index:22!important;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,0,0);cursor:grab;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .34s cubic-bezier(.22,.78,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{height:var(--talera-sheet-open-height)!important;cursor:default;touch-action:pan-y}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none;touch-action:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(8px);transition:opacity .20s ease,transform .22s ease}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{display:flex}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.dragging .sheet-text{opacity:0}.sheet textarea{cursor:text;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
+const UX_STYLE = `<style id="talera-storylab-clean-ux-r19">
+html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:calc(100dvh - 12px);z-index:22!important;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,0,0);cursor:grab;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .34s cubic-bezier(.22,.78,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{height:var(--talera-sheet-open-height)!important;cursor:default;touch-action:pan-y;border-radius:22px 22px 0 0}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none;touch-action:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(8px);transition:opacity .20s ease,transform .22s ease;min-height:0}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{display:flex}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.dragging .sheet-text{opacity:0}.sheet.open .sheet-editor{height:calc(100% - 26px);padding:0 18px calc(16px + env(safe-area-inset-bottom));position:relative;min-height:0}.sheet textarea{cursor:text;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;min-height:0}.sheet.open textarea{background:transparent!important;border-radius:0!important;padding:18px 6px calc(96px + env(safe-area-inset-bottom))!important;font-size:17px!important;line-height:1.55!important}.sheet.open .sheet-close{position:absolute;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:2;box-shadow:0 5px 18px rgba(16,42,62,.10)}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
 .talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
 .screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
 .talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease;touch-action:none;overscroll-behavior:none}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
@@ -30,7 +30,7 @@ html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:min
 @media(max-height:760px){.sheet{--talera-sheet-height:50px}.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}.talera-story-dots{bottom:214px}}
 </style>`;
 
-const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r18">
+const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r19">
 (()=>{
   const clientKey='talera.storylab.clean.client';
   const sessionKey='talera.storylab.clean.session-client';
@@ -48,7 +48,7 @@ const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r1
 })();
 </script>`;
 
-const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r18">
+const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19">
 (()=>{
   let sheet=document.getElementById('sheet');
   const storyText=document.getElementById('storyText');
@@ -90,7 +90,10 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r18">
   function measure(){
     const h=Math.max(320,screen.getBoundingClientRect().height||window.innerHeight||640);
     const closed=h<=760?50:56;
-    const open=Math.min(h*.58,500);
+    /* Fully opened reading mode uses almost the complete TALERA viewport.
+       This gives long transcripts a real reading surface instead of a half-height editor. */
+    const topGap=12;
+    const open=Math.max(closed+120,h-topGap);
     geometry={openHeight:open,closedHeight:closed,maxOffset:Math.max(0,open-closed)};
     sheet.style.setProperty('--talera-sheet-open-height',open+'px');
   }

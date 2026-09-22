@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r20';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r21';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -21,16 +21,16 @@ const DEFAULT_STATE = {
   audioId: ''
 };
 
-const UX_STYLE = `<style id="talera-storylab-clean-ux-r20">
+const UX_STYLE = `<style id="talera-storylab-clean-ux-r21">
 html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:calc(100dvh - 12px);z-index:22!important;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,0,0);cursor:grab;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .34s cubic-bezier(.22,.78,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{height:var(--talera-sheet-open-height)!important;cursor:default;touch-action:pan-y;border-radius:22px 22px 0 0}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none;touch-action:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(8px);transition:opacity .20s ease,transform .22s ease;min-height:0}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{display:flex}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.dragging .sheet-text{opacity:0}.sheet.open .sheet-editor{height:calc(100% - 26px);padding:0 18px calc(16px + env(safe-area-inset-bottom));position:relative;min-height:0}.sheet textarea{cursor:text;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;min-height:0}.sheet.open textarea{background:transparent!important;border-radius:0!important;padding:18px 6px calc(96px + env(safe-area-inset-bottom))!important;font-size:17px!important;line-height:1.55!important}.sheet.open .sheet-close{position:absolute;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:2;box-shadow:0 5px 18px rgba(16,42,62,.10)}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
 .talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
 .screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
 .talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease;touch-action:none;overscroll-behavior:none}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
-.bg-photo{z-index:0}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}.photo-ui{position:absolute!important;inset:0;z-index:8!important;pointer-events:none}.photo-ui .photo-voice,.photo-ui .photo-more,.photo-ui button{pointer-events:auto}.talera-story-carousel{z-index:1!important}
+.bg-photo{z-index:0}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}.photo-ui{position:absolute!important;inset:0;z-index:20!important;pointer-events:none;transform:translate3d(0,0,0);backface-visibility:hidden;-webkit-backface-visibility:hidden}.screen.has-photo:not(.sheet-open) .photo-ui{display:block!important;opacity:1!important;visibility:visible!important}.screen.has-photo:not(.sheet-open) .photo-voice,.screen.has-photo:not(.sheet-open) .photo-more{visibility:visible!important}.photo-ui .photo-voice,.photo-ui .photo-more,.photo-ui button{pointer-events:auto}.talera-story-carousel{z-index:1!important}.talera-story-dots{z-index:6!important}
 @media(max-height:760px){.sheet{--talera-sheet-height:50px}.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}.talera-story-dots{bottom:214px}}
 </style>`;
 
-const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r20">
+const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r21">
 (()=>{
   const clientKey='talera.storylab.clean.client';
   const sessionKey='talera.storylab.clean.session-client';
@@ -48,7 +48,7 @@ const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r2
 })();
 </script>`;
 
-const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r20">
+const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r21">
 (()=>{
   let sheet=document.getElementById('sheet');
   const storyText=document.getElementById('storyText');
@@ -244,7 +244,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r20">
   if(shade&&shade.parentNode){shade.parentNode.insertBefore(carousel,shade);shade.parentNode.insertBefore(dots,shade.nextSibling)}else{screen.prepend(carousel);screen.appendChild(dots)}
   const previous=carousel.querySelector('.previous'),current=carousel.querySelector('.current'),next=carousel.querySelector('.next');
   const cache=new Map();
-  let viewState=null,photoPointer=null,photoStartX=0,photoStartY=0,photoLastX=0,photoLastY=0,photoMode='',settling=false;
+  let viewState=null,photoPointer=null,photoStartX=0,photoStartY=0,photoLastX=0,photoLastY=0,photoMode='',settling=false,carouselReady=false,prepareToken=0;
 
   function stateUrl(){return '/api/storylab-clean/state?client='+encodeURIComponent(client)}
   function photoUrl(id){return '/api/storylab-clean/photo?id='+encodeURIComponent(id)+'&client='+encodeURIComponent(client)}
@@ -284,10 +284,17 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r20">
     node.style.transition=animate?'transform .30s cubic-bezier(.22,.82,.25,1)':'none';
     node.style.transform='translate3d('+Math.round(x)+'px,0,0)';
   }
-  async function setPage(node,index){
-    if(!viewState||!viewState.photos||!viewState.photos.length){node.removeAttribute('src');return}
+  async function setPage(node,index,token){
+    if(!viewState||!viewState.photos||!viewState.photos.length){node.removeAttribute('src');return false}
     const photo=viewState.photos[normalized(index,viewState.photos.length)];
-    try{const src=await sourceFor(photo);if(node.dataset.photoId!==photo.id){node.dataset.photoId=photo.id;node.src=src}node.style.objectFit=viewState.fit==='contain'?'contain':'cover'}catch(e){}
+    try{
+      const src=await sourceFor(photo);
+      if(token!==prepareToken)return false;
+      if(node.dataset.photoId!==photo.id){node.dataset.photoId=photo.id;node.src=src}
+      node.style.objectFit=viewState.fit==='contain'?'contain':'cover';
+      if(node.decode){try{await node.decode()}catch(e){}}
+      return token===prepareToken&&Boolean(node.src);
+    }catch(e){return false}
   }
   function syncDots(){
     if(!viewState||viewState.photos.length<=1){dots.classList.remove('show');dots.innerHTML='';return}
@@ -295,11 +302,20 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r20">
     dots.classList.add('show');
   }
   async function preparePages(){
-    if(!viewState||!Array.isArray(viewState.photos)||viewState.photos.length<=1){carousel.classList.remove('ready');syncDots();return}
-    carousel.classList.add('ready');
+    const token=++prepareToken;
+    carouselReady=false;
+    carousel.classList.remove('ready');
+    if(!viewState||!Array.isArray(viewState.photos)||viewState.photos.length<=1){syncDots();return}
     const w=screen.getBoundingClientRect().width;
     setTransform(previous,-w,false);setTransform(current,0,false);setTransform(next,w,false);
-    await Promise.all([setPage(previous,viewState.currentIndex-1),setPage(current,viewState.currentIndex),setPage(next,viewState.currentIndex+1)]);
+    const loaded=await Promise.all([
+      setPage(previous,viewState.currentIndex-1,token),
+      setPage(current,viewState.currentIndex,token),
+      setPage(next,viewState.currentIndex+1,token)
+    ]);
+    if(token!==prepareToken)return;
+    carouselReady=loaded.every(Boolean);
+    if(carouselReady)carousel.classList.add('ready');
     syncDots();
   }
   function liveStateSnapshot(){
@@ -357,6 +373,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r20">
         settlePhoto(direction);
         settling=false;
         photoMode='';
+        if(!sheet.classList.contains('open'))screen.classList.remove('sheet-open');
       },265);
     }else{
       setTransform(previous,-w,true);setTransform(current,0,true);setTransform(next,w,true);
@@ -365,7 +382,8 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r20">
   }
 
   carousel.addEventListener('touchstart',event=>{
-    if(event.touches.length!==1||settling||screen.classList.contains('sheet-open')||!viewState||viewState.photos.length<=1)return;
+    if(event.touches.length!==1||settling||!carouselReady||screen.classList.contains('sheet-open')||!viewState||viewState.photos.length<=1)return;
+    if(!sheet.classList.contains('open'))screen.classList.remove('sheet-open');
     const t=event.touches[0];
     photoTouch={startX:t.clientX,startY:t.clientY,lastX:t.clientX,lastY:t.clientY};
     photoStartX=photoLastX=t.clientX;
@@ -444,7 +462,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r20">
     finishPhotoSwipe(dx,dy);
   });
 
-  const observer=new MutationObserver(()=>{if(screen.classList.contains('has-photo'))setTimeout(refreshCarousel,20);else{carousel.classList.remove('ready');dots.classList.remove('show')}});
+  const observer=new MutationObserver(()=>{if(screen.classList.contains('has-photo'))setTimeout(refreshCarousel,20);else{carouselReady=false;carousel.classList.remove('ready');dots.classList.remove('show')}});
   observer.observe(screen,{attributes:true,attributeFilter:['class']});
   window.addEventListener('talera-storylab-mediachange',()=>setTimeout(refreshCarousel,0));
   window.addEventListener('pageshow',refreshCarousel);

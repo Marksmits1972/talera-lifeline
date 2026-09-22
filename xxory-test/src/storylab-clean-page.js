@@ -90,6 +90,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   window.__taleraStoryLabCleanMedia={
     getState:()=>state,
     getPhotoUrl:(id)=>localPhotoUrls.get(id)||photoCache.get(id)||'',
+    setCurrentIndex:(index)=>{if(state.photos&&state.photos.length)state.currentIndex=((Number(index)||0)%state.photos.length+state.photos.length)%state.photos.length},
     refresh:notifyMediaChange
   };
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition||null;

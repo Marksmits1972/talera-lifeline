@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260917-r15';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r16';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -21,16 +21,16 @@ const DEFAULT_STATE = {
   audioId: ''
 };
 
-const UX_STYLE = `<style id="talera-storylab-clean-ux-r15">
-.sheet{--talera-sheet-height:56px;height:var(--talera-sheet-height)!important;cursor:grab;will-change:height;transition:height .34s cubic-bezier(.22,.82,.25,1),box-shadow .24s ease!important;overflow:hidden}.sheet:not(.open){touch-action:none}.sheet.open{z-index:22;height:var(--talera-sheet-height)!important;cursor:default}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(10px);transition:opacity .18s ease,transform .22s ease}.sheet.open .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.open .sheet-editor{display:flex}.sheet textarea{cursor:text}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
+const UX_STYLE = `<style id="talera-storylab-clean-ux-r16">
+.sheet{--talera-sheet-open-height:min(58dvh,500px);--talera-sheet-offset:calc(var(--talera-sheet-open-height) - 56px);height:var(--talera-sheet-open-height)!important;transform:translate3d(0,var(--talera-sheet-offset),0)!important;cursor:grab;will-change:transform;transition:transform .38s cubic-bezier(.22,.82,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{z-index:22;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,var(--talera-sheet-offset),0)!important;cursor:default}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(10px);transition:opacity .18s ease,transform .22s ease}.sheet.open .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.open .sheet-editor{display:flex}.sheet textarea{cursor:text}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
 .talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
 .screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
-.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}
+.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:4;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity}.top,.photo-voice,.photo-more,.talera-publish-timeline,.talera-story-dots{will-change:opacity}
 .bg-photo{z-index:0}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}
 @media(max-height:760px){.sheet{--talera-sheet-height:50px}.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}.talera-story-dots{bottom:214px}}
 </style>`;
 
-const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r15">
+const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r16">
 (()=>{
   const clientKey='talera.storylab.clean.client';
   const sessionKey='talera.storylab.clean.session-client';
@@ -48,7 +48,7 @@ const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r1
 })();
 </script>`;
 
-const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r15">
+const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r16">
 (()=>{
   const sheet=document.getElementById('sheet');
   const storyText=document.getElementById('storyText');
@@ -58,47 +58,78 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r15">
   const closeButton=document.getElementById('sheetClose');
   const bg=document.getElementById('bgPhoto');
   const shade=document.querySelector('.shade');
+  const topArea=document.querySelector('.top');
+  const photoVoice=document.querySelector('.photo-voice');
+  const photoMore=document.querySelector('.photo-more');
   const client=localStorage.getItem('talera.storylab.clean.client')||'';
   if(!sheet||!screen)return;
+
+  const wash=document.createElement('div');
+  wash.className='talera-story-wash';
+  wash.setAttribute('aria-hidden','true');
+  if(shade&&shade.parentNode)shade.parentNode.insertBefore(wash,shade.nextSibling);
+  else screen.prepend(wash);
 
   const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
   const closedHeight=()=>window.innerHeight<=760?50:56;
   const openHeight=()=>Math.min(window.innerHeight*.58,500);
-  let sheetPointer=null,startY=0,startHeight=0,lastY=0,lastT=0,dragMoved=false;
+  const closedOffset=()=>Math.max(0,openHeight()-closedHeight());
+  let sheetPointer=null,startY=0,startOffset=closedOffset(),sheetOffset=closedOffset(),lastY=0,lastT=0,dragMoved=false;
 
   if(handle)handle.onclick=null;
   if(preview)preview.onclick=null;
   if(closeButton)closeButton.onclick=null;
 
-  function applySheetHeight(height){
-    sheet.style.setProperty('--talera-sheet-height',Math.round(height)+'px');
+  function progressFor(offset){
+    const max=closedOffset();
+    return max<=0?1:clamp(1-(offset/max),0,1);
+  }
+  function updateScene(progress){
+    const p=clamp(progress,0,1);
+    wash.style.opacity=String(p*.84);
+    if(topArea)topArea.style.opacity=String(1-p*.46);
+    if(photoVoice)photoVoice.style.opacity=String(1-p*.94);
+    if(photoMore)photoMore.style.opacity=String(1-p*.94);
+    const publish=document.getElementById('timelinePublish');
+    if(publish)publish.style.opacity=String(1-p*.94);
+    const photoDots=document.querySelector('.talera-story-dots');
+    if(photoDots)photoDots.style.opacity=String((photoDots.classList.contains('show')?1:0)*(1-p*.88));
+  }
+  function applySheetOffset(offset){
+    sheetOffset=clamp(offset,0,closedOffset());
+    sheet.style.setProperty('--talera-sheet-open-height',Math.round(openHeight())+'px');
+    sheet.style.setProperty('--talera-sheet-offset',Math.round(sheetOffset)+'px');
+    updateScene(progressFor(sheetOffset));
   }
   function setSheet(open,animate=true){
-    sheet.classList.toggle('dragging',!animate);
-    if(animate)requestAnimationFrame(()=>sheet.classList.remove('dragging'));
+    if(animate)sheet.classList.remove('dragging');
+    else sheet.classList.add('dragging');
     sheet.classList.toggle('open',Boolean(open));
     screen.classList.toggle('sheet-open',Boolean(open));
     sheet.setAttribute('aria-expanded',open?'true':'false');
-    applySheetHeight(open?openHeight():closedHeight());
+    applySheetOffset(open?0:closedOffset());
     if(!open&&storyText){try{storyText.blur()}catch(e){}}
+    if(!animate)requestAnimationFrame(()=>sheet.classList.remove('dragging'));
   }
   setSheet(sheet.classList.contains('open'),false);
+
+  ['touchstart','touchmove','touchend','touchcancel'].forEach(type=>{
+    sheet.addEventListener(type,event=>event.stopImmediatePropagation(),{capture:true,passive:true});
+  });
 
   sheet.addEventListener('pointerdown',event=>{
     const target=event.target;
     if(target&&target.closest&&target.closest('textarea,button'))return;
     sheetPointer=event.pointerId;startY=event.clientY;lastY=event.clientY;lastT=performance.now();dragMoved=false;
-    startHeight=sheet.getBoundingClientRect().height;
+    startOffset=sheetOffset;
     sheet.classList.add('dragging');
     try{sheet.setPointerCapture(event.pointerId)}catch(e){}
   });
   sheet.addEventListener('pointermove',event=>{
     if(sheetPointer!==event.pointerId)return;
-    const dy=startY-event.clientY;
+    const dy=event.clientY-startY;
     if(Math.abs(dy)>3)dragMoved=true;
-    const height=clamp(startHeight+dy,closedHeight(),openHeight());
-    applySheetHeight(height);
-    screen.classList.toggle('sheet-open',height>closedHeight()+18);
+    applySheetOffset(startOffset+dy);
     lastY=event.clientY;lastT=performance.now();
     if(event.cancelable)event.preventDefault();
   },{passive:false});
@@ -107,13 +138,12 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r15">
     const now=performance.now();
     const dt=Math.max(12,now-lastT);
     const velocity=(event.clientY-lastY)/dt;
-    const height=sheet.getBoundingClientRect().height;
-    const projected=height-velocity*145;
-    const midpoint=closedHeight()+(openHeight()-closedHeight())*.43;
+    const projected=clamp(sheetOffset+velocity*150,0,closedOffset());
+    const midpoint=closedOffset()*.54;
     sheetPointer=null;
     try{sheet.releasePointerCapture(event.pointerId)}catch(e){}
     sheet.classList.remove('dragging');
-    setSheet(projected>midpoint,true);
+    setSheet(projected<midpoint,true);
   }
   sheet.addEventListener('pointerup',finishSheet);
   sheet.addEventListener('pointercancel',finishSheet);
@@ -132,6 +162,9 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r15">
   carousel.innerHTML='<img class="talera-story-page previous" alt=""><img class="talera-story-page current" alt=""><img class="talera-story-page next" alt="">';
   const dots=document.createElement('div');dots.className='talera-story-dots';dots.setAttribute('aria-hidden','true');
   if(shade&&shade.parentNode){shade.parentNode.insertBefore(carousel,shade);shade.parentNode.insertBefore(dots,shade.nextSibling)}else{screen.prepend(carousel);screen.appendChild(dots)}
+  ['touchstart','touchmove','touchend','touchcancel'].forEach(type=>{
+    carousel.addEventListener(type,event=>event.stopPropagation(),{capture:true,passive:true});
+  });
   const previous=carousel.querySelector('.previous'),current=carousel.querySelector('.current'),next=carousel.querySelector('.next');
   const cache=new Map();
   let viewState=null,photoPointer=null,photoStartX=0,photoStartY=0,photoLastX=0,photoLastY=0,photoMode='',settling=false;

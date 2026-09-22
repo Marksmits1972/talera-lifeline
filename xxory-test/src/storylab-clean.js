@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r16';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260922-r17';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -21,16 +21,16 @@ const DEFAULT_STATE = {
   audioId: ''
 };
 
-const UX_STYLE = `<style id="talera-storylab-clean-ux-r16">
-.sheet{--talera-sheet-open-height:min(58dvh,500px);--talera-sheet-offset:calc(var(--talera-sheet-open-height) - 56px);height:var(--talera-sheet-open-height)!important;transform:translate3d(0,var(--talera-sheet-offset),0)!important;cursor:grab;will-change:transform;transition:transform .38s cubic-bezier(.22,.82,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{z-index:22;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,var(--talera-sheet-offset),0)!important;cursor:default}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(10px);transition:opacity .18s ease,transform .22s ease}.sheet.open .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.open .sheet-editor{display:flex}.sheet textarea{cursor:text}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
+const UX_STYLE = `<style id="talera-storylab-clean-ux-r17">
+html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:min(58dvh,500px);z-index:22!important;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,0,0);cursor:grab;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .34s cubic-bezier(.22,.78,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{height:var(--talera-sheet-open-height)!important;cursor:default;touch-action:pan-y}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none;touch-action:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(8px);transition:opacity .20s ease,transform .22s ease}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{display:flex}.sheet.open .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.dragging .sheet-text{opacity:.35}.sheet textarea{cursor:text;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
 .talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
 .screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
-.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:4;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity}.top,.photo-voice,.photo-more,.talera-publish-timeline,.talera-story-dots{will-change:opacity}
+.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
 .bg-photo{z-index:0}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}
 @media(max-height:760px){.sheet{--talera-sheet-height:50px}.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}.talera-story-dots{bottom:214px}}
 </style>`;
 
-const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r16">
+const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r17">
 (()=>{
   const clientKey='talera.storylab.clean.client';
   const sessionKey='talera.storylab.clean.session-client';
@@ -48,9 +48,9 @@ const EARLY_SESSION_SCRIPT = `<script id="talera-storylab-clean-fresh-session-r1
 })();
 </script>`;
 
-const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r16">
+const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r17">
 (()=>{
-  const sheet=document.getElementById('sheet');
+  let sheet=document.getElementById('sheet');
   const storyText=document.getElementById('storyText');
   const screen=document.getElementById('screen');
   const handle=document.getElementById('sheetHandle');
@@ -64,6 +64,13 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r16">
   const client=localStorage.getItem('talera.storylab.clean.client')||'';
   if(!sheet||!screen)return;
 
+  /* Replace only the sheet shell. This removes the older sheet gesture listeners
+     without replacing its children, so recording/transcription keeps the same DOM nodes. */
+  const cleanSheet=sheet.cloneNode(false);
+  while(sheet.firstChild)cleanSheet.appendChild(sheet.firstChild);
+  sheet.replaceWith(cleanSheet);
+  sheet=cleanSheet;
+
   const wash=document.createElement('div');
   wash.className='talera-story-wash';
   wash.setAttribute('aria-hidden','true');
@@ -71,90 +78,161 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r16">
   else screen.prepend(wash);
 
   const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
-  const closedHeight=()=>window.innerHeight<=760?50:56;
-  const openHeight=()=>Math.min(window.innerHeight*.58,500);
-  const closedOffset=()=>Math.max(0,openHeight()-closedHeight());
-  let sheetPointer=null,startY=0,startOffset=closedOffset(),sheetOffset=closedOffset(),lastY=0,lastT=0,dragMoved=false;
+  let geometry={openHeight:0,closedHeight:0,maxOffset:0};
+  let sheetOffset=0;
+  let touch=null;
+  let raf=0,pendingOffset=null,dragMoved=false;
 
   if(handle)handle.onclick=null;
   if(preview)preview.onclick=null;
   if(closeButton)closeButton.onclick=null;
 
+  function measure(){
+    const h=Math.max(320,screen.getBoundingClientRect().height||window.innerHeight||640);
+    const closed=h<=760?50:56;
+    const open=Math.min(h*.58,500);
+    geometry={openHeight:open,closedHeight:closed,maxOffset:Math.max(0,open-closed)};
+    sheet.style.setProperty('--talera-sheet-open-height',open+'px');
+  }
   function progressFor(offset){
-    const max=closedOffset();
-    return max<=0?1:clamp(1-(offset/max),0,1);
+    return geometry.maxOffset<=0?1:clamp(1-offset/geometry.maxOffset,0,1);
   }
-  function updateScene(progress){
-    const p=clamp(progress,0,1);
-    wash.style.opacity=String(p*.84);
-    if(topArea)topArea.style.opacity=String(1-p*.46);
-    if(photoVoice)photoVoice.style.opacity=String(1-p*.94);
-    if(photoMore)photoMore.style.opacity=String(1-p*.94);
-    const publish=document.getElementById('timelinePublish');
-    if(publish)publish.style.opacity=String(1-p*.94);
-    const photoDots=document.querySelector('.talera-story-dots');
-    if(photoDots)photoDots.style.opacity=String((photoDots.classList.contains('show')?1:0)*(1-p*.88));
+  function paint(offset){
+    sheetOffset=clamp(offset,0,geometry.maxOffset);
+    const p=progressFor(sheetOffset);
+    sheet.style.transform='translate3d(0,'+sheetOffset.toFixed(2)+'px,0)';
+    wash.style.opacity=String(Math.pow(p,.88)*.94);
   }
-  function applySheetOffset(offset){
-    sheetOffset=clamp(offset,0,closedOffset());
-    sheet.style.setProperty('--talera-sheet-open-height',Math.round(openHeight())+'px');
-    sheet.style.setProperty('--talera-sheet-offset',Math.round(sheetOffset)+'px');
-    updateScene(progressFor(sheetOffset));
+  function queuePaint(offset){
+    pendingOffset=offset;
+    if(raf)return;
+    raf=requestAnimationFrame(()=>{
+      raf=0;
+      if(pendingOffset!=null){const next=pendingOffset;pendingOffset=null;paint(next)}
+    });
+  }
+  function setDragVisual(active){
+    sheet.classList.toggle('dragging',active);
+    wash.style.transition=active?'none':'opacity .34s cubic-bezier(.22,.78,.25,1)';
   }
   function setSheet(open,animate=true){
-    if(animate)sheet.classList.remove('dragging');
-    else sheet.classList.add('dragging');
+    if(!geometry.openHeight)measure();
+    if(!animate){sheet.style.transition='none';wash.style.transition='none'}
+    else{sheet.style.transition='transform .34s cubic-bezier(.22,.78,.25,1),box-shadow .24s ease';wash.style.transition='opacity .34s cubic-bezier(.22,.78,.25,1)'}
+    setDragVisual(false);
     sheet.classList.toggle('open',Boolean(open));
     screen.classList.toggle('sheet-open',Boolean(open));
     sheet.setAttribute('aria-expanded',open?'true':'false');
-    applySheetOffset(open?0:closedOffset());
+    paint(open?0:geometry.maxOffset);
     if(!open&&storyText){try{storyText.blur()}catch(e){}}
-    if(!animate)requestAnimationFrame(()=>sheet.classList.remove('dragging'));
+    if(!animate)requestAnimationFrame(()=>{sheet.style.transition='';wash.style.transition=''});
   }
+
+  measure();
   setSheet(sheet.classList.contains('open'),false);
 
-  ['touchstart','touchmove','touchend','touchcancel'].forEach(type=>{
-    sheet.addEventListener(type,event=>event.stopImmediatePropagation(),{capture:true,passive:true});
-  });
+  function beginSheetDrag(y,startOffset){
+    dragMoved=false;
+    setDragVisual(true);
+    /* Show the text surface while revealing it, but only mark the screen open after release. */
+    sheet.classList.add('open');
+    touch.mode='sheet';
+    touch.startY=y;
+    touch.startOffset=startOffset;
+    touch.lastY=y;
+    touch.lastT=performance.now();
+  }
 
+  sheet.addEventListener('touchstart',event=>{
+    if(event.touches.length!==1)return;
+    const target=event.target;
+    if(target&&target.closest&&target.closest('button'))return;
+    const y=event.touches[0].clientY;
+    const opened=screen.classList.contains('sheet-open');
+    touch={mode:'pending',startY:y,startOffset:sheetOffset,lastY:y,lastT:performance.now(),startScroll:storyText?storyText.scrollTop:0,opened,target};
+    if(!opened||!(target&&target.closest&&target.closest('textarea'))){
+      beginSheetDrag(y,sheetOffset);
+      if(event.cancelable)event.preventDefault();
+    }
+  },{passive:false,capture:true});
+
+  sheet.addEventListener('touchmove',event=>{
+    if(!touch||event.touches.length!==1)return;
+    const y=event.touches[0].clientY;
+    const dy=y-touch.startY;
+
+    /* When the sheet is open, upward gestures in the text remain native scrolling.
+       A downward pull at the top hands control back to the sheet. */
+    if(touch.mode==='pending'){
+      const atTop=!storyText||storyText.scrollTop<=1;
+      if(dy>7&&atTop){
+        beginSheetDrag(touch.startY,0);
+      }else if(dy<-7||!atTop){
+        touch.mode='scroll';
+        return;
+      }else{
+        return;
+      }
+    }
+    if(touch.mode==='scroll')return;
+
+    if(Math.abs(dy)>3)dragMoved=true;
+    queuePaint(touch.startOffset+dy);
+    touch.lastY=y;touch.lastT=performance.now();
+    if(event.cancelable)event.preventDefault();
+  },{passive:false,capture:true});
+
+  function finishTouch(event,cancelled=false){
+    if(!touch)return;
+    if(touch.mode==='scroll'||touch.mode==='pending'){touch=null;return}
+    if(raf){cancelAnimationFrame(raf);raf=0}
+    if(pendingOffset!=null){paint(pendingOffset);pendingOffset=null}
+    const changed=event.changedTouches&&event.changedTouches[0];
+    const y=changed?changed.clientY:touch.lastY;
+    const now=performance.now();
+    const dt=Math.max(12,now-touch.lastT);
+    const velocity=(y-touch.lastY)/dt;
+    const projected=clamp(sheetOffset+velocity*125,0,geometry.maxOffset);
+    const open=!cancelled&&projected<geometry.maxOffset*.54;
+    const wasTap=!dragMoved&&Math.abs(y-touch.startY)<5;
+    const startedOpen=touch.opened;
+    touch=null;
+    setDragVisual(false);
+    if(wasTap&&!startedOpen)setSheet(true,true);
+    else setSheet(open,true);
+  }
+  sheet.addEventListener('touchend',event=>finishTouch(event,false),{passive:false,capture:true});
+  sheet.addEventListener('touchcancel',event=>finishTouch(event,true),{passive:false,capture:true});
+
+  /* Mouse/trackpad fallback without participating in iPhone touch handling. */
+  let mouse=null;
   sheet.addEventListener('pointerdown',event=>{
+    if(event.pointerType!=='mouse')return;
     const target=event.target;
     if(target&&target.closest&&target.closest('textarea,button'))return;
-    sheetPointer=event.pointerId;startY=event.clientY;lastY=event.clientY;lastT=performance.now();dragMoved=false;
-    startOffset=sheetOffset;
-    sheet.classList.add('dragging');
+    mouse={id:event.pointerId,startY:event.clientY,startOffset:sheetOffset,lastY:event.clientY,lastT:performance.now()};
+    setDragVisual(true);sheet.classList.add('open');
     try{sheet.setPointerCapture(event.pointerId)}catch(e){}
   });
   sheet.addEventListener('pointermove',event=>{
-    if(sheetPointer!==event.pointerId)return;
-    const dy=event.clientY-startY;
-    if(Math.abs(dy)>3)dragMoved=true;
-    applySheetOffset(startOffset+dy);
-    lastY=event.clientY;lastT=performance.now();
-    if(event.cancelable)event.preventDefault();
-  },{passive:false});
-  function finishSheet(event){
-    if(sheetPointer!==event.pointerId)return;
-    const now=performance.now();
-    const dt=Math.max(12,now-lastT);
-    const velocity=(event.clientY-lastY)/dt;
-    const projected=clamp(sheetOffset+velocity*150,0,closedOffset());
-    const midpoint=closedOffset()*.54;
-    sheetPointer=null;
-    try{sheet.releasePointerCapture(event.pointerId)}catch(e){}
-    sheet.classList.remove('dragging');
-    setSheet(projected<midpoint,true);
-  }
-  sheet.addEventListener('pointerup',finishSheet);
-  sheet.addEventListener('pointercancel',finishSheet);
-  sheet.addEventListener('click',event=>{
-    if(dragMoved){dragMoved=false;event.preventDefault();return}
-    const target=event.target;
-    if(target&&target.closest&&target.closest('textarea,button'))return;
-    if(!sheet.classList.contains('open'))setSheet(true,true);
+    if(!mouse||mouse.id!==event.pointerId)return;
+    queuePaint(mouse.startOffset+(event.clientY-mouse.startY));
+    mouse.lastY=event.clientY;mouse.lastT=performance.now();
   });
+  sheet.addEventListener('pointerup',event=>{
+    if(!mouse||mouse.id!==event.pointerId)return;
+    if(raf){cancelAnimationFrame(raf);raf=0}
+    if(pendingOffset!=null){paint(pendingOffset);pendingOffset=null}
+    const open=sheetOffset<geometry.maxOffset*.54;
+    mouse=null;setDragVisual(false);setSheet(open,true);
+  });
+
   if(closeButton)closeButton.addEventListener('click',()=>setSheet(false,true));
-  window.addEventListener('resize',()=>setSheet(sheet.classList.contains('open'),false),{passive:true});
+  window.addEventListener('resize',()=>{
+    if(touch||mouse)return;
+    const open=screen.classList.contains('sheet-open');
+    measure();setSheet(open,false);
+  },{passive:true});
 
   const carousel=document.createElement('div');
   carousel.className='talera-story-carousel';

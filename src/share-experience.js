@@ -357,6 +357,8 @@ export const shareExperienceScript = String.raw`
       '<p class="talera-share-section-label">Delen en mensen</p><div class="talera-share-options">'+
       buttonOption('people','○','Mijn mensen','Uitnodigingen, toegang en jouw privékringen')+
       buttonOption('shared-with-me','⌁','Met mij gedeeld','Verhalen die anderen persoonlijk met jou deelden')+
+      '</div><p class="talera-share-section-label">Luisteren</p><div class="talera-share-options">'+
+      buttonAction('enable-listening','▶','Luisteren inschakelen','Sta geluid toe en luister naar gesproken herinneringen')+
       '</div><p class="talera-share-section-label">Account en beheer</p><div class="talera-share-options">'+
       buttonOption('subscription','€','Mijn abonnement','Pakket, betalen en facturen')+
       buttonOption('privacy','◇','Privacy en beveiliging','Inloggen, apparaten en jouw gegevens')+
@@ -722,6 +724,12 @@ export const shareExperienceScript = String.raw`
     if(action==='preview-recipient'){go(state.kind==='timeline'?'recipient-timeline':'recipient-story');return}
     if(action==='toggle-preview-photo'){state.previewPhoto=!state.previewPhoto;prepareShare();return}
     if(action==='share-whatsapp'){shareViaWhatsApp();return}
+    if(action==='enable-listening'){
+      close();
+      document.dispatchEvent(new CustomEvent('talera:enable-listening'));
+      showToast('Luisteren is ingeschakeld.');
+      return;
+    }
     if(action==='prototype-manage'){showToast('Hier komen straks verplaatsen en toegang intrekken.');return}
     if(action==='prototype-account'){showToast('Dit onderdeel is voorbereid en wordt aangesloten zodra de account- en betaalbasis gereed is.');return}
     if(action==='prototype-setting'){showToast('Deze voorkeur wordt in de accountfase aangesloten.');return}

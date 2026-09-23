@@ -25,7 +25,7 @@ const UX_STYLE = `<style id="talera-storylab-clean-ux-r19h2">
 html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:calc(100dvh - 12px);z-index:22!important;height:var(--talera-sheet-open-height)!important;transform:translate3d(0,0,0);cursor:grab;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .34s cubic-bezier(.22,.78,.25,1),box-shadow .24s ease!important;overflow:hidden;touch-action:none}.sheet.open{height:var(--talera-sheet-open-height)!important;cursor:default;touch-action:pan-y;border-radius:22px 22px 0 0}.sheet.dragging{transition:none!important;cursor:grabbing;user-select:none;-webkit-user-select:none;touch-action:none}.sheet.dragging .handle{background:#aeb8c1}.sheet-editor{opacity:0;transform:translateY(8px);transition:opacity .20s ease,transform .22s ease;min-height:0}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{display:flex}.sheet.open .sheet-editor,.sheet.dragging .sheet-editor{opacity:1;transform:translateY(0)}.sheet.open .sheet-text{display:none}.sheet.dragging .sheet-text{opacity:0}.sheet.open .sheet-editor{height:calc(100% - 26px);padding:0 18px calc(16px + env(safe-area-inset-bottom));position:relative;min-height:0}.sheet textarea{cursor:text;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;min-height:0}.sheet.open textarea{background:transparent!important;border-radius:0!important;padding:18px 6px calc(96px + env(safe-area-inset-bottom))!important;font-size:17px!important;line-height:1.55!important}.sheet.open .sheet-close{position:absolute;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:2;box-shadow:0 5px 18px rgba(16,42,62,.10)}.sheet-close{transition:transform .16s ease}.sheet-close:active{transform:scale(.97)}
 .talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
 .screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
-.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease;touch-action:none;overscroll-behavior:none}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;transform:translate3d(0,0,0);will-change:transform;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
+.talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease;touch-action:none;overscroll-behavior:none}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;transform:translate3d(0,0,0);will-change:transform;user-select:none;pointer-events:none;background:#081a28}.talera-story-page>img,.talera-story-page>video{position:absolute;inset:0;width:100%;height:100%;object-position:center center;display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
 .bg-photo{z-index:0}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}.photo-ui{position:absolute;inset:0;z-index:15;pointer-events:none;transform:translate3d(0,0,0)}.screen.has-photo:not(.sheet-open) .photo-ui,.screen.has-photo:not(.sheet-open) .photo-voice,.screen.has-photo:not(.sheet-open) .photo-more{display:block!important;opacity:1!important;visibility:visible!important}.photo-ui .photo-voice,.photo-ui .photo-more,.photo-ui button{pointer-events:auto}
 @media(max-height:760px){.sheet{--talera-sheet-height:50px}.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}.talera-story-dots{bottom:214px}}
 </style>`;
@@ -238,8 +238,8 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
 
   const carousel=document.createElement('div');
   carousel.className='talera-story-carousel';
-  carousel.setAttribute('aria-label','Foto’s van deze herinnering');
-  carousel.innerHTML='<img class="talera-story-page previous" alt=""><img class="talera-story-page current" alt=""><img class="talera-story-page next" alt="">';
+  carousel.setAttribute('aria-label','Foto’s en video’s van deze herinnering');
+  carousel.innerHTML='<div class="talera-story-page previous"></div><div class="talera-story-page current"></div><div class="talera-story-page next"></div>';
   const dots=document.createElement('div');dots.className='talera-story-dots';dots.setAttribute('aria-hidden','true');
   if(shade&&shade.parentNode){shade.parentNode.insertBefore(carousel,shade);shade.parentNode.insertBefore(dots,shade.nextSibling)}else{screen.prepend(carousel);screen.appendChild(dots)}
   const previous=carousel.querySelector('.previous'),current=carousel.querySelector('.current'),next=carousel.querySelector('.next');
@@ -247,7 +247,8 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
   let viewState=null,photoPointer=null,photoStartX=0,photoStartY=0,photoLastX=0,photoLastY=0,photoMode='',settling=false,carouselReady=false,prepareToken=0;
 
   function stateUrl(){return '/api/storylab-clean/state?client='+encodeURIComponent(client)}
-  function photoUrl(id){return '/api/storylab-clean/photo?id='+encodeURIComponent(id)+'&client='+encodeURIComponent(client)}
+  function isVideoItem(item){return String(item&&item.type||'').toLowerCase().startsWith('video/')}
+  function mediaUrl(item){const kind=isVideoItem(item)?'video':'photo';return '/api/storylab-clean/'+kind+'?id='+encodeURIComponent(item.id)+'&client='+encodeURIComponent(client)}
   async function readState(){
     if(!client)return null;
     try{const res=await fetch(stateUrl(),{cache:'no-store'});if(!res.ok)return null;return await res.json()}catch(e){return null}
@@ -278,7 +279,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     if(cache.has(photo.id))return cache.get(photo.id);
     const bridge=window.__taleraStoryLabMedia;
     const uploading=bridge&&bridge.isUploading&&bridge.isUploading();
-    const preview=bridge&&bridge.getPreviewUrl?bridge.getPreviewUrl(photo.id):'';
+    const preview=!isVideoItem(photo)&&bridge&&bridge.getPreviewUrl?bridge.getPreviewUrl(photo.id):'';
     if(preview){cache.set(photo.id,preview);return preview}
     if(uploading)return '';
     const local=bridge&&bridge.getUrl?bridge.getUrl(photo.id):'';
@@ -287,7 +288,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
       const ensured=await bridge.ensureUrl(photo.id);
       if(ensured){cache.set(photo.id,ensured);return ensured}
     }
-    const res=await fetch(photoUrl(photo.id),{cache:'force-cache'});if(!res.ok)throw new Error('photo');
+    const res=await fetch(mediaUrl(photo),{cache:'force-cache'});if(!res.ok)throw new Error('media');
     const blob=await res.blob(),url=URL.createObjectURL(blob);cache.set(photo.id,url);return url;
   }
   function normalized(index,count){return ((index%count)+count)%count}
@@ -295,16 +296,36 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     node.style.transition=animate?'transform .22s cubic-bezier(.20,.78,.22,1)':'none';
     node.style.transform='translate3d('+Math.round(x)+'px,0,0)';
   }
+  function pausePage(node){
+    const video=node&&node.querySelector?node.querySelector('video'):null;
+    if(video){try{video.pause()}catch(e){}}
+  }
+  function syncVideoPlayback(){
+    [previous,next].forEach(pausePage);
+    const video=current.querySelector('video');
+    if(video){
+      video.muted=true;video.playsInline=true;
+      const p=video.play();if(p&&p.catch)p.catch(()=>{});
+    }
+  }
   async function setPage(node,index,token){
-    if(!viewState||!viewState.photos||!viewState.photos.length){node.removeAttribute('src');return false}
+    if(!viewState||!viewState.photos||!viewState.photos.length){node.innerHTML='';delete node.dataset.photoId;return false}
     const photo=viewState.photos[normalized(index,viewState.photos.length)];
     try{
       const src=await sourceFor(photo);
       if(token!==prepareToken||!src)return false;
-      if(node.dataset.photoId!==photo.id){node.dataset.photoId=photo.id;node.src=src}
-      node.style.objectFit=viewState.fit==='contain'?'contain':'cover';
-      if(node.decode)node.decode().catch(()=>{});
-      return token===prepareToken&&Boolean(node.src);
+      const kind=isVideoItem(photo)?'video':'image';
+      if(node.dataset.photoId!==photo.id||node.dataset.mediaKind!==kind){
+        pausePage(node);node.innerHTML='';node.dataset.photoId=photo.id;node.dataset.mediaKind=kind;
+        if(kind==='video'){
+          const video=document.createElement('video');video.src=src;video.muted=true;video.playsInline=true;video.loop=true;video.preload='metadata';video.style.objectFit=viewState.fit==='contain'?'contain':'cover';node.appendChild(video);
+        }else{
+          const img=document.createElement('img');img.alt='';img.src=src;img.style.objectFit=viewState.fit==='contain'?'contain':'cover';node.appendChild(img);if(img.decode)img.decode().catch(()=>{});
+        }
+      }else{
+        const media=node.firstElementChild;if(media)media.style.objectFit=viewState.fit==='contain'?'contain':'cover';
+      }
+      return token===prepareToken&&Boolean(node.firstElementChild);
     }catch(e){return false}
   }
   function syncDots(){
@@ -325,7 +346,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     ]);
     if(token!==prepareToken)return;
     carouselReady=loaded.every(Boolean);
-    if(carouselReady)carousel.classList.add('ready');
+    if(carouselReady){carousel.classList.add('ready');syncVideoPlayback()}
     syncDots();
   }
   function localState(){
@@ -337,6 +358,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     }catch(e){return null}
   }
   function prewarm(photo){
+    if(isVideoItem(photo))return;
     sourceFor(photo).then(src=>{
       if(!src)return;
       const img=new Image();img.src=src;
@@ -353,8 +375,6 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
   function settlePhoto(direction){
     if(!viewState||viewState.photos.length<=1)return;
     viewState.currentIndex=normalized(viewState.currentIndex+direction,viewState.photos.length);
-    const chosen=direction>0?next:previous;
-    if(chosen&&chosen.src&&bg){bg.src=chosen.src;bg.style.objectFit=viewState.fit==='contain'?'contain':'cover'}
     syncDots();
     persistCurrentIndex();
     setTimeout(()=>{preparePages()},20);
@@ -469,7 +489,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     finishPhotoSwipe(dx,dy);
   });
 
-  const observer=new MutationObserver(()=>{if(screen.classList.contains('has-photo'))setTimeout(refreshCarousel,40);else{carouselReady=false;carousel.classList.remove('ready');dots.classList.remove('show')}});
+  const observer=new MutationObserver(()=>{if(screen.classList.contains('has-photo'))setTimeout(refreshCarousel,40);else{carouselReady=false;[previous,current,next].forEach(pausePage);carousel.classList.remove('ready');dots.classList.remove('show')}});
   observer.observe(screen,{attributes:true,attributeFilter:['class']});
   window.addEventListener('talera-storylab-mediachange',()=>setTimeout(refreshCarousel,0));
   window.addEventListener('pageshow',refreshCarousel);

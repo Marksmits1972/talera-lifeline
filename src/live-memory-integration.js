@@ -184,14 +184,54 @@ export const liveMemoryIntegrationScript = String.raw`
     }));
     return loaded.filter(Boolean);
   }
-  async function hydrateCredential(storyId,entry){
+  async function hydrateCredential(storyId,entry,{full=false}={}){
     const token=entry&&entry.token;
     if(!token)return null;
     const detail=await fetchStory(storyId,token);
-    const urls=await loadPhotoUrls(detail,token,storyId);
+    const items=(detail.media||[]).filter(m=>m.mediaType==='image').slice(0,12);
+    let urls=[];
+    if(items.length){
+      if(full){
+        urls=await loadPhotoUrls(detail,token,storyId);
+      }else{
+        try{urls=[await mediaObjectUrlWithRetry(items[0],token,storyId)]}catch(e){urls=[]}
+      }
+    }
     const memory=toTimelineMemory(detail,urls,token,false);
+    memory._photoItems=items;
+    memory._photosHydrated=items.length<=urls.length;
+    memory._photoHydrating=false;
     runtime.registerMemory(memory);
     return memory;
+  }
+
+  let hydrateActiveTimer=0;
+  function scheduleHydrateActive(memory,delay=320){
+    clearTimeout(hydrateActiveTimer);
+    if(!memory||!memory._taleraLive||memory._photosHydrated||memory._photoHydrating)return;
+    hydrateActiveTimer=setTimeout(()=>hydrateActivePhotos(memory),delay);
+  }
+  async function hydrateActivePhotos(memory){
+    if(!memory||memory._photosHydrated||memory._photoHydrating||runtime.activeMemoryId()!==memory.id||runtime.isMoving())return;
+    const items=Array.isArray(memory._photoItems)?memory._photoItems:[];
+    if(items.length<=1){memory._photosHydrated=true;return}
+    memory._photoHydrating=true;
+    try{
+      const existing=Array.isArray(memory.photos)&&memory.photos.length?memory.photos.slice(0,1):[];
+      const rest=await Promise.all(items.slice(1).map(async item=>{
+        try{return await mediaObjectUrlWithRetry(item,memory._manageToken,memory.storyId)}catch(e){return null}
+      }));
+      if(runtime.activeMemoryId()!==memory.id)return;
+      const urls=existing.concat(rest.filter(Boolean));
+      if(urls.length){memory.photos=urls;memory._photoIndex=0;memory.image=urls[0]}
+      memory._photosHydrated=true;
+      renderDots(memory);
+      scheduleAuto(memory);
+    }catch(e){
+      console.warn('TALERA extra foto’s konden nog niet laden',memory.storyId,e);
+    }finally{
+      memory._photoHydrating=false;
+    }
   }
 
   function currentMemory(){return runtime.currentMemory()}
@@ -258,6 +298,7 @@ export const liveMemoryIntegrationScript = String.raw`
     lastWrittenMemoryId=memory&&memory.id;
     renderDots(memory);
     scheduleAuto(memory);
+    if(changed)scheduleHydrateActive(memory);
   });
 
   surface.addEventListener('pointerdown',clearAuto,{passive:true});
@@ -331,9 +372,10 @@ export const liveMemoryIntegrationScript = String.raw`
   async function loadOtherMemoriesInBackground(creds,skipStoryId){
     const ids=Object.keys(creds).filter(id=>id!==skipStoryId).sort((a,b)=>(creds[a].savedAt||0)-(creds[b].savedAt||0));
     for(const id of ids){
-      try{await hydrateCredential(id,creds[id])}catch(e){console.warn('TALERA linked memory kon niet laden',id,e)}
+      try{await hydrateCredential(id,creds[id],{full:false})}catch(e){console.warn('TALERA linked memory kon niet laden',id,e)}
     }
     runtime.draw();
+    scheduleHydrateActive(currentMemory(),180);
   }
 
   async function bootLinkedMemories(){
@@ -351,11 +393,12 @@ export const liveMemoryIntegrationScript = String.raw`
 
     const ids=Object.keys(creds).sort((a,b)=>(creds[a].savedAt||0)-(creds[b].savedAt||0));
     for(const id of ids){
-      try{await hydrateCredential(id,creds[id])}catch(e){console.warn('TALERA linked memory kon niet laden',id,e)}
+      try{await hydrateCredential(id,creds[id],{full:false})}catch(e){console.warn('TALERA linked memory kon niet laden',id,e)}
     }
     const memory=currentMemory();
     renderDots(memory);
     scheduleAuto(memory);
+    scheduleHydrateActive(memory,180);
     runtime.draw();
     if(document.documentElement.classList.contains('talera-handoff-boot'))finishHandoff();
   }

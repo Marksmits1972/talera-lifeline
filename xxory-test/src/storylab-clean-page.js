@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-r19h2';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-r19h3';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -164,7 +164,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   async function removeCurrent(){if(!state.photos.length)return;await removePhotoById(state.photos[state.currentIndex].id);closeModal('moreModal')}
   async function renderPhotoManager(){
     if(!photoManageGrid)return;
-    photoManageCount.textContent=(state.photos||[]).length+' / 12';
+    const photoCount=(state.photos||[]).length;photoManageCount.textContent=photoCount+(photoCount===1?' foto':' foto’s');
     photoManageGrid.innerHTML='';
     const add=document.createElement('button');add.type='button';add.className='photo-manage-tile photo-manage-add';add.innerHTML='<span>+</span>';add.setAttribute('aria-label','Foto toevoegen');add.onclick=()=>{closeModal('photoManageModal');photoInput.click()};photoManageGrid.appendChild(add);
     if(!state.photos||!state.photos.length){const empty=document.createElement('div');empty.className='photo-manage-empty';empty.textContent='Nog geen foto’s toegevoegd';photoManageGrid.appendChild(empty);return}

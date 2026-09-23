@@ -92,6 +92,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   function signalMedia(){try{window.dispatchEvent(new CustomEvent('talera-storylab-mediachange'))}catch(e){}}
   window.__taleraStoryLabMedia={
     getState:()=>state,
+    getPreviewUrl:(id)=>previewPhotoUrls.get(id)||'',
     getUrl:(id)=>previewPhotoUrls.get(id)||localPhotoUrls.get(id)||photoCache.get(id)||'',
     ensureUrl:async(id)=>{
       const p=(state.photos||[]).find(photo=>photo.id===id);

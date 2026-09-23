@@ -352,13 +352,18 @@ export const shareExperienceScript = String.raw`
   function title(text,intro){return '<h1 class="talera-share-title">'+text+'</h1><p class="talera-share-intro">'+intro+'</p>'}
 
   function renderHub(){
+    const audioControls=window.__taleraAudioControls;
+    const listeningEnabled=Boolean(audioControls&&audioControls.isEnabled&&audioControls.isEnabled());
+    const listeningAction=listeningEnabled
+      ? buttonAction('disable-listening','Ⅱ','Luisteren uitschakelen','Stop automatisch luisteren naar gesproken herinneringen')
+      : buttonAction('enable-listening','▶','Luisteren inschakelen','Sta geluid toe en luister naar gesproken herinneringen');
     return title('Meer','Je account, mensen en algemene TALERA-instellingen op één plek.')+
       '<button class="talera-account-card" type="button" data-view="profile"><span class="talera-account-avatar" aria-hidden="true">MS</span><span><strong>Mark Smits</strong><small>Maak je TALERA-account compleet</small></span><span class="talera-account-arrow" aria-hidden="true">›</span></button>'+
       '<p class="talera-share-section-label">Delen en mensen</p><div class="talera-share-options">'+
       buttonOption('people','○','Mijn mensen','Uitnodigingen, toegang en jouw privékringen')+
       buttonOption('shared-with-me','⌁','Met mij gedeeld','Verhalen die anderen persoonlijk met jou deelden')+
       '</div><p class="talera-share-section-label">Luisteren</p><div class="talera-share-options">'+
-      buttonAction('enable-listening','▶','Luisteren inschakelen','Sta geluid toe en luister naar gesproken herinneringen')+
+      listeningAction+
       '</div><p class="talera-share-section-label">Account en beheer</p><div class="talera-share-options">'+
       buttonOption('subscription','€','Mijn abonnement','Pakket, betalen en facturen')+
       buttonOption('privacy','◇','Privacy en beveiliging','Inloggen, apparaten en jouw gegevens')+
@@ -725,9 +730,16 @@ export const shareExperienceScript = String.raw`
     if(action==='toggle-preview-photo'){state.previewPhoto=!state.previewPhoto;prepareShare();return}
     if(action==='share-whatsapp'){shareViaWhatsApp();return}
     if(action==='enable-listening'){
-      close();
-      document.dispatchEvent(new CustomEvent('talera:enable-listening'));
-      showToast('Luisteren is ingeschakeld.');
+      const controls=window.__taleraAudioControls;
+      if(controls&&controls.enable)controls.enable();
+      else document.dispatchEvent(new CustomEvent('talera:enable-listening'));
+      close();showToast('Luisteren is ingeschakeld.');
+      return;
+    }
+    if(action==='disable-listening'){
+      const controls=window.__taleraAudioControls;
+      if(controls&&controls.disable)controls.disable();
+      close();showToast('Luisteren is uitgeschakeld.');
       return;
     }
     if(action==='prototype-manage'){showToast('Hier komen straks verplaatsen en toegang intrekken.');return}

@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260923-video-r2';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260923-video-r3';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -26,7 +26,7 @@ html,body,.screen{overscroll-behavior:none}.sheet{--talera-sheet-open-height:cal
 .talera-publish-timeline{left:50%!important;right:auto!important;width:min(58vw,220px)!important;min-width:176px!important;height:38px!important;bottom:66px!important;transform:translateX(-50%)!important;padding:0 18px!important;font-size:12px!important;white-space:nowrap!important;box-shadow:0 6px 18px rgba(4,20,32,.13)!important}
 .screen.sheet-open .talera-publish-timeline{transform:translate(-50%,10px)!important}
 .talera-story-carousel{position:absolute;z-index:1;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease;touch-action:none;overscroll-behavior:none}.screen.has-photo .talera-story-carousel.ready{opacity:1;pointer-events:auto}.talera-story-page{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;transform:translate3d(0,0,0);will-change:transform;user-select:none;pointer-events:none;background:#081a28}.talera-story-page>img,.talera-story-page>video{position:absolute;inset:0;width:100%;height:100%;object-position:center center;display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}.talera-story-carousel.dragging .talera-story-page{transition:none!important}.talera-story-dots{position:absolute;z-index:6;left:50%;bottom:244px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;justify-content:center;min-height:22px;padding:5px 9px;border-radius:999px;background:rgba(8,28,43,.20);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .18s ease}.screen.has-photo .talera-story-dots.show{opacity:1}.talera-story-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:0 1px 5px rgba(4,20,32,.18)}.talera-story-dot.active{background:#fff;transform:scale(1.35)}.talera-story-wash{position:absolute;z-index:21;inset:0;background:#f8f7f2;opacity:0;pointer-events:none;will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:opacity .34s cubic-bezier(.22,.78,.25,1)}
-.bg-photo{z-index:0}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}.photo-ui{position:absolute;inset:0;z-index:15;pointer-events:none;transform:translate3d(0,0,0)}.screen.has-photo:not(.sheet-open) .photo-ui,.screen.has-photo:not(.sheet-open) .photo-voice,.screen.has-photo:not(.sheet-open) .photo-more{display:block!important;opacity:1!important;visibility:visible!important}.photo-ui .photo-voice,.photo-ui .photo-more,.photo-ui button{pointer-events:auto}
+.bg-photo,.bg-video{z-index:0;pointer-events:none}.screen.talera-mixed-media-active>.bg-photo,.screen.talera-mixed-media-active>.bg-video{opacity:0!important;visibility:hidden!important}.shade{z-index:2}.top,.empty,.mic-zone,.photo-ui,.sheet{isolation:isolate}.photo-ui{position:absolute;inset:0;z-index:15;pointer-events:none;transform:translate3d(0,0,0)}.screen.has-photo:not(.sheet-open) .photo-ui,.screen.has-photo:not(.sheet-open) .photo-voice,.screen.has-photo:not(.sheet-open) .photo-more{display:block!important;opacity:1!important;visibility:visible!important}.photo-ui .photo-voice,.photo-ui .photo-more,.photo-ui button{pointer-events:auto}
 @media(max-height:760px){.sheet{--talera-sheet-height:50px}.talera-publish-timeline{bottom:58px!important;height:36px!important;width:min(60vw,210px)!important;min-width:168px!important}.talera-story-dots{bottom:214px}}
 </style>`;
 
@@ -243,6 +243,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
   const dots=document.createElement('div');dots.className='talera-story-dots';dots.setAttribute('aria-hidden','true');
   if(shade&&shade.parentNode){shade.parentNode.insertBefore(carousel,shade);shade.parentNode.insertBefore(dots,shade.nextSibling)}else{screen.prepend(carousel);screen.appendChild(dots)}
   const previous=carousel.querySelector('.previous'),current=carousel.querySelector('.current'),next=carousel.querySelector('.next');
+  const baseVideo=document.getElementById('bgVideo');
   const cache=new Map();
   let viewState=null,photoPointer=null,photoStartX=0,photoStartY=0,photoLastX=0,photoLastY=0,photoMode='',settling=false,carouselReady=false,prepareToken=0;
 
@@ -336,7 +337,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
   async function preparePages(){
     const token=++prepareToken;
     carouselReady=false;
-    if(!viewState||!Array.isArray(viewState.photos)||viewState.photos.length<=1){carousel.classList.remove('ready');syncDots();return}
+    if(!viewState||!Array.isArray(viewState.photos)||viewState.photos.length<=1){screen.classList.remove('talera-mixed-media-active');carousel.classList.remove('ready');syncDots();return}
     const w=screen.getBoundingClientRect().width;
     setTransform(previous,-w,false);setTransform(current,0,false);setTransform(next,w,false);
     const currentLoaded=await setPage(current,viewState.currentIndex,token);
@@ -372,6 +373,9 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     const fresh=localState()||await readState();if(!fresh)return;
     fresh.currentIndex=clamp(Number(fresh.currentIndex||0),0,Math.max(0,(fresh.photos||[]).length-1));
     viewState=fresh;
+    const mixed=Array.isArray(viewState.photos)&&viewState.photos.length>1;
+    screen.classList.toggle('talera-mixed-media-active',mixed);
+    if(mixed&&baseVideo){try{baseVideo.pause()}catch(e){}}
     (viewState.photos||[]).forEach(prewarm);
     await preparePages();
   }
@@ -492,7 +496,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     finishPhotoSwipe(dx,dy);
   });
 
-  const observer=new MutationObserver(()=>{if(screen.classList.contains('has-photo'))setTimeout(refreshCarousel,40);else{carouselReady=false;[previous,current,next].forEach(pausePage);carousel.classList.remove('ready');dots.classList.remove('show')}});
+  const observer=new MutationObserver(()=>{if(screen.classList.contains('has-photo'))setTimeout(refreshCarousel,40);else{carouselReady=false;screen.classList.remove('talera-mixed-media-active');[previous,current,next].forEach(pausePage);carousel.classList.remove('ready');dots.classList.remove('show')}});
   observer.observe(screen,{attributes:true,attributeFilter:['class']});
   window.addEventListener('talera-storylab-mediachange',()=>setTimeout(refreshCarousel,0));
   window.addEventListener('pageshow',refreshCarousel);

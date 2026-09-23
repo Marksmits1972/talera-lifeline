@@ -99,7 +99,11 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       return p?fetchPhotoUrl(p):'';
     },
     isUploading:()=>mediaUploading>0,
-    setIndex:(index)=>{if(state.photos&&state.photos.length)state.currentIndex=((Number(index)||0)%state.photos.length+state.photos.length)%state.photos.length}
+    setIndex:(index)=>{
+      if(!state.photos||!state.photos.length)return;
+      state.currentIndex=((Number(index)||0)%state.photos.length+state.photos.length)%state.photos.length;
+      renderPhoto().catch(()=>{});
+    }
   };
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition||null;
   const photoManageGrid=document.getElementById('photoManageGrid'),photoManageCount=document.getElementById('photoManageCount');

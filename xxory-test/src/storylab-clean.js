@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260923-video-r1';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260923-video-r2';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -281,9 +281,9 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     const uploading=bridge&&bridge.isUploading&&bridge.isUploading();
     const preview=!isVideoItem(photo)&&bridge&&bridge.getPreviewUrl?bridge.getPreviewUrl(photo.id):'';
     if(preview){cache.set(photo.id,preview);return preview}
-    if(uploading)return '';
     const local=bridge&&bridge.getUrl?bridge.getUrl(photo.id):'';
     if(local){cache.set(photo.id,local);return local}
+    if(uploading)return '';
     if(bridge&&bridge.ensureUrl){
       const ensured=await bridge.ensureUrl(photo.id);
       if(ensured){cache.set(photo.id,ensured);return ensured}
@@ -339,15 +339,18 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     if(!viewState||!Array.isArray(viewState.photos)||viewState.photos.length<=1){carousel.classList.remove('ready');syncDots();return}
     const w=screen.getBoundingClientRect().width;
     setTransform(previous,-w,false);setTransform(current,0,false);setTransform(next,w,false);
-    const loaded=await Promise.all([
-      setPage(previous,viewState.currentIndex-1,token),
-      setPage(current,viewState.currentIndex,token),
-      setPage(next,viewState.currentIndex+1,token)
-    ]);
+    const currentLoaded=await setPage(current,viewState.currentIndex,token);
     if(token!==prepareToken)return;
-    carouselReady=loaded.every(Boolean);
-    if(carouselReady){carousel.classList.add('ready');syncVideoPlayback()}
+    carouselReady=Boolean(currentLoaded);
+    if(carouselReady){carousel.classList.add('ready');syncVideoPlayback()}else carousel.classList.remove('ready');
     syncDots();
+    Promise.allSettled([
+      setPage(previous,viewState.currentIndex-1,token),
+      setPage(next,viewState.currentIndex+1,token)
+    ]).then(()=>{
+      if(token!==prepareToken)return;
+      syncVideoPlayback();
+    });
   }
   function localState(){
     try{
@@ -405,7 +408,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
       },210);
     }else{
       setTransform(previous,-w,true);setTransform(current,0,true);setTransform(next,w,true);
-      setTimeout(()=>{settling=false;photoMode=''},210);
+      setTimeout(()=>{settling=false;photoMode='';syncVideoPlayback()},210);
     }
   }
 
@@ -427,7 +430,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     const dx=t.clientX-photoTouch.startX;
     const dy=t.clientY-photoTouch.startY;
     if(!photoMode){
-      if(Math.abs(dx)>=5&&Math.abs(dx)>Math.abs(dy)*1.08)photoMode='horizontal';
+      if(Math.abs(dx)>=5&&Math.abs(dx)>Math.abs(dy)*1.08){photoMode='horizontal';pausePage(current)}
       else if(Math.abs(dy)>=9&&Math.abs(dy)>Math.abs(dx)*1.12)photoMode='vertical';
     }
     if(photoMode!=='horizontal')return;
@@ -475,7 +478,7 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     photoLastX=event.clientX;photoLastY=event.clientY;
     const dx=photoLastX-photoStartX,dy=photoLastY-photoStartY;
     if(!photoMode){
-      if(Math.abs(dx)>=4&&Math.abs(dx)>Math.abs(dy)*1.05)photoMode='horizontal';
+      if(Math.abs(dx)>=4&&Math.abs(dx)>Math.abs(dy)*1.05){photoMode='horizontal';pausePage(current)}
       else if(Math.abs(dy)>=9&&Math.abs(dy)>Math.abs(dx)*1.14)photoMode='vertical';
     }
     if(photoMode!=='horizontal')return;

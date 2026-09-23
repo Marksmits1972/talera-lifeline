@@ -80,6 +80,7 @@ export const memoryPresentationControlsScript = String.raw`
   const AUTO_START_DELAY=360;
   let activeStoryId='',activeToken='',activeHasAudio=false,loading=false,loadFailed=false,renderEpoch=0;
   let autoStartTimer=null,autoStableSince=0,autoBlocked=false,manualSuppressed=false,audioEnabled=false;
+  let audioPrepareTimer=0;
   const CONSENT_DISMISSED_KEY='talera.audio-consent-dismissed';
   let consentDismissed=sessionStorage.getItem(CONSENT_DISMISSED_KEY)==='1';
   if(consentDismissed)consent.hidden=true;
@@ -232,7 +233,7 @@ export const memoryPresentationControlsScript = String.raw`
     }catch(err){}
   }
   function disableListening(){
-    cancelAutoStart();
+    cancelAutoStart();clearTimeout(audioPrepareTimer);audioPrepareTimer=0;
     stopAudio(false);
     audioEnabled=false;autoBlocked=false;manualSuppressed=true;
     consentDismissed=true;consent.hidden=true;
@@ -263,19 +264,34 @@ export const memoryPresentationControlsScript = String.raw`
 
   async function render(memory){
     closeManager();
+    clearTimeout(audioPrepareTimer);audioPrepareTimer=0;
     const epoch=++renderEpoch;stopAudio(true);manualSuppressed=false;autoBlocked=false;const ok=usable(memory);editButton.hidden=!ok;activeStoryId=ok?memory.storyId:'';activeToken=ok?tokenFor(memory):'';activeHasAudio=false;showAudio(false);setUi();if(!ok)return;
     const hinted=Boolean(memory._hasAudio||memory._audioMimeType||Number(memory._durationSeconds)>0);
-    loading=true;showAudio(true);setUi();
-    const detail=await getDetail(activeStoryId,activeToken);if(epoch!==renderEpoch)return;
-    const expected=Boolean(detail&&(detail.hasAudio||detail.audioMimeType||Number(detail.audioSizeBytes)>0||Number(detail.durationSeconds)>0))||hinted;
-    activeHasAudio=expected;memory._hasAudio=expected;
-    try{
-      const url=await getAudioUrl(activeStoryId,activeToken,false);if(epoch!==renderEpoch)return;
-      activeHasAudio=true;memory._hasAudio=true;showAudio(true);audio.src=url;audio.currentTime=0;audio.load();loading=false;loadFailed=false;setProgress();setUi();scheduleAutoStart(epoch);return;
-    }catch(e){}
-    if(epoch!==renderEpoch)return;
-    loading=false;activeHasAudio=expected;memory._hasAudio=expected;
-    if(expected){showAudio(true);loadFailed=true;setUi()}else showAudio(false);
+    activeHasAudio=hinted;showAudio(hinted);setUi();
+
+    // During fast timeline swiping we do not fetch detail/audio for every story
+    // that briefly passes under the needle. Only prepare after the view settles.
+    audioPrepareTimer=setTimeout(async()=>{
+      if(epoch!==renderEpoch||runtime.isMoving&&runtime.isMoving())return;
+      if(!audioEnabled&&!hinted)return;
+      loading=true;showAudio(true);setUi();
+      let expected=hinted;
+      if(!expected){
+        try{
+          const detail=await getDetail(activeStoryId,activeToken);if(epoch!==renderEpoch)return;
+          expected=Boolean(detail&&(detail.hasAudio||detail.audioMimeType||Number(detail.audioSizeBytes)>0||Number(detail.durationSeconds)>0));
+        }catch(e){}
+      }
+      activeHasAudio=expected;memory._hasAudio=expected;
+      if(!expected){loading=false;showAudio(false);setUi();return}
+      if(!audioEnabled){loading=false;showAudio(true);setUi();return}
+      try{
+        const url=await getAudioUrl(activeStoryId,activeToken,false);if(epoch!==renderEpoch)return;
+        activeHasAudio=true;memory._hasAudio=true;showAudio(true);audio.src=url;audio.currentTime=0;audio.load();loading=false;loadFailed=false;setProgress();setUi();scheduleAutoStart(epoch);return;
+      }catch(e){}
+      if(epoch!==renderEpoch)return;
+      loading=false;loadFailed=true;showAudio(true);setUi();
+    },260);
   }
 
   runtime.subscribe(memory=>render(memory));render(runtime.currentMemory());

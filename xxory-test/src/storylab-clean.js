@@ -585,12 +585,47 @@ async function handleBinary(request, env, url, client, kind, expectedPrefix, max
   const key = mediaKey(client, kind === 'photo' ? 'photos' : kind === 'video' ? 'videos' : 'audio', id);
 
   if (request.method === 'GET') {
+    const rangeHeader = request.headers.get('range') || '';
+    if (kind === 'video' && rangeHeader) {
+      const head = await env.MEDIA.head(key);
+      if (!head) return new Response('Not found', { status: 404 });
+      const size = Number(head.size || 0);
+      const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+      if (!match || !size) return new Response('Range Not Satisfiable', { status: 416, headers: { 'content-range': 'bytes */' + size } });
+      let start = match[1] ? Number(match[1]) : NaN;
+      let end = match[2] ? Number(match[2]) : NaN;
+      if (!Number.isFinite(start) && Number.isFinite(end)) {
+        const suffix = Math.min(size, end);
+        start = Math.max(0, size - suffix);
+        end = size - 1;
+      } else {
+        if (!Number.isFinite(start)) start = 0;
+        if (!Number.isFinite(end)) end = size - 1;
+      }
+      start = Math.max(0, Math.min(start, size - 1));
+      end = Math.max(start, Math.min(end, size - 1));
+      const length = end - start + 1;
+      const object = await env.MEDIA.get(key, { range: { offset: start, length } });
+      if (!object) return new Response('Not found', { status: 404 });
+      const headers = new Headers();
+      object.writeHttpMetadata(headers);
+      headers.set('etag', object.httpEtag);
+      headers.set('cache-control', 'private, max-age=3600');
+      headers.set('accept-ranges', 'bytes');
+      headers.set('content-range', 'bytes ' + start + '-' + end + '/' + size);
+      headers.set('content-length', String(length));
+      return new Response(object.body, { status: 206, headers });
+    }
     const object = await env.MEDIA.get(key);
     if (!object) return new Response('Not found', { status: 404 });
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set('etag', object.httpEtag);
     headers.set('cache-control', 'private, max-age=3600');
+    if (kind === 'video') {
+      headers.set('accept-ranges', 'bytes');
+      headers.set('content-length', String(object.size || 0));
+    }
     return new Response(object.body, { headers });
   }
 

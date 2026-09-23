@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260923-r19h2';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260923-video-r1';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -562,7 +562,7 @@ async function handleState(request, env, url, client) {
 async function handleBinary(request, env, url, client, kind, expectedPrefix, maxBytes) {
   const id = idFromUrl(url, kind);
   if (!id) return Response.json({ error: 'invalid_id' }, { status: 400, headers: jsonHeaders });
-  const key = mediaKey(client, kind === 'photo' ? 'photos' : 'audio', id);
+  const key = mediaKey(client, kind === 'photo' ? 'photos' : kind === 'video' ? 'videos' : 'audio', id);
 
   if (request.method === 'GET') {
     const object = await env.MEDIA.get(key);
@@ -607,7 +607,7 @@ export async function handleStoryLabClean(request, env) {
     return Response.json({
       revision: STORYLAB_CLEAN_PAGE_REVISION,
       uxRevision: STORYLAB_CLEAN_UX_REVISION,
-      phase: 'functional-photo-story-build',
+      phase: 'functional-mixed-media-story-build',
       cleanSlate: true,
       importsLegacyStoryLab: false,
       importsV9: false,
@@ -615,6 +615,8 @@ export async function handleStoryLabClean(request, env) {
       photoSelectionEnabled: true,
       persistentPhotoStorage: 'r2',
       multiplePhotosEnabled: true,
+      videoSelectionEnabled: true,
+      videoPersistence: 'r2',
       swipePhotosEnabled: true,
       photoSwipeInteraction: 'direct-follow-snap',
       audioEnabled: true,
@@ -631,13 +633,14 @@ export async function handleStoryLabClean(request, env) {
     });
   }
 
-  if (url.pathname === '/api/storylab-clean/state' || url.pathname.startsWith('/api/storylab-clean/photo') || url.pathname.startsWith('/api/storylab-clean/audio')) {
+  if (url.pathname === '/api/storylab-clean/state' || url.pathname.startsWith('/api/storylab-clean/photo') || url.pathname.startsWith('/api/storylab-clean/video') || url.pathname.startsWith('/api/storylab-clean/audio')) {
     if (!env?.MEDIA) return Response.json({ error: 'media_binding_missing' }, { status: 503, headers: jsonHeaders });
     const client = safeClient(url.searchParams.get('client'));
     if (!client) return Response.json({ error: 'invalid_client' }, { status: 400, headers: jsonHeaders });
 
     if (url.pathname === '/api/storylab-clean/state') return handleState(request, env, url, client);
     if (url.pathname.startsWith('/api/storylab-clean/photo')) return handleBinary(request, env, url, client, 'photo', 'image/', 20 * 1024 * 1024);
+    if (url.pathname.startsWith('/api/storylab-clean/video')) return handleBinary(request, env, url, client, 'video', 'video/', 95 * 1024 * 1024);
     if (url.pathname.startsWith('/api/storylab-clean/audio')) return handleBinary(request, env, url, client, 'audio', 'audio/', 60 * 1024 * 1024);
   }
 

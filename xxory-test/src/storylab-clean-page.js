@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-r19h5-touchdrag';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-video-r1';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -11,7 +11,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 :root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",system-ui,sans-serif;--ink:#0d2b49;--cream:#f7f4ef;--sheet-text:#60738a}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b2740}body{-webkit-text-size-adjust:100%;color:#fff;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}button,input,textarea{font:inherit}button{color:inherit;-webkit-tap-highlight-color:transparent}.hidden{display:none!important}
 .screen{position:relative;width:100%;height:100dvh;min-height:100dvh;overflow:hidden;background:linear-gradient(180deg,#5d7d92 0%,#4f7187 34%,#1d4661 66%,#0c2c44 100%)}
-.bg-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .12s ease}.screen.has-photo .bg-photo{opacity:1}.shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(4,23,38,.055) 0%,rgba(4,23,38,.01) 44%,rgba(4,23,38,.01) 61%,rgba(5,24,39,.15) 100%)}.screen.has-photo .shade{background:linear-gradient(180deg,rgba(7,15,22,.32) 0%,rgba(7,15,22,.07) 31%,rgba(7,15,22,.015) 61%,rgba(5,20,32,.36) 100%)}
+.bg-photo,.bg-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .12s ease}.screen.has-photo:not(.has-video) .bg-photo{opacity:1}.screen.has-video .bg-video{opacity:1}.bg-video{background:#081a28}.shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(4,23,38,.055) 0%,rgba(4,23,38,.01) 44%,rgba(4,23,38,.01) 61%,rgba(5,24,39,.15) 100%)}.screen.has-photo .shade{background:linear-gradient(180deg,rgba(7,15,22,.32) 0%,rgba(7,15,22,.07) 31%,rgba(7,15,22,.015) 61%,rgba(5,20,32,.36) 100%)}
 .top{position:absolute;z-index:5;left:18px;right:18px;top:max(30px,env(safe-area-inset-top));display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}.brand{margin:0;font-size:10.8px;line-height:1;font-weight:800;letter-spacing:.30em;color:rgba(255,255,255,.88)}
 .title{display:block;width:min(76vw,330px);margin:9px 0 0;padding:0;border:0;outline:0;background:transparent;color:rgba(255,255,255,.96);font-size:clamp(18.2px,4.75vw,22.5px);line-height:1.06;font-weight:760;letter-spacing:-.028em}.title::placeholder{color:rgba(255,255,255,.96);opacity:1}.screen.has-photo .title{font-size:clamp(18px,4.8vw,23px);font-weight:760;text-shadow:0 2px 16px rgba(0,0,0,.22)}
 .date{position:relative;margin-top:13px;min-height:37px;padding:0 10px;border:.85px solid rgba(255,255,255,.34);border-radius:999px;background:rgba(10,34,53,.055);display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:720;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}.date svg{width:15px;height:15px;flex:0 0 auto;opacity:.92}.date input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
@@ -23,7 +23,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 .photo-voice{position:absolute;z-index:7;left:0;right:0;bottom:124px;text-align:center;transition:opacity .18s ease,transform .18s ease}.photo-mic-halo{display:inline-grid;place-items:center;width:124px;height:124px;border-radius:50%;background:rgba(117,167,201,.18);box-shadow:0 12px 34px rgba(2,17,28,.18)}.photo-mic-ring{display:grid;place-items:center;width:104px;height:104px;border-radius:50%;background:rgba(95,151,190,.26);box-shadow:inset 0 0 0 1px rgba(239,247,252,.25)}.photo-mic{width:88px;height:88px;border:1.2px solid rgba(255,255,255,.68);border-radius:50%;background:#4384b7;display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.18),inset 0 0 0 1px rgba(255,255,255,.08)}.photo-mic.recording{background:#a84848}.photo-mic svg{width:35px;height:35px}.photo-voice-title{margin-top:9px;font-size:14px;font-weight:790;text-shadow:0 2px 12px rgba(0,0,0,.28)}.photo-voice-sub{margin:3px auto 0;max-width:290px;font-size:11.5px;line-height:1.3;font-weight:620;color:rgba(255,255,255,.78);text-shadow:0 2px 12px rgba(0,0,0,.28)}
 .photo-more{position:absolute;z-index:10;right:16px;bottom:66px;width:44px;height:38px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(14,24,32,.34);font-size:19px;letter-spacing:.06em;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}.screen.sheet-open .photo-voice,.screen.sheet-open .photo-more{opacity:0;pointer-events:none;transform:translateY(12px)}
 .modal{position:fixed;z-index:30;inset:0;display:none;align-items:flex-end;background:rgba(5,12,18,.34);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}.modal.open{display:flex}.card{width:100%;padding:18px 18px calc(18px + env(safe-area-inset-bottom));border-radius:28px 28px 0 0;background:#fbfaf7;color:#19324a}.card h3{margin:0 0 14px;font-size:21px}.field{display:grid;gap:6px;margin:10px 0}.field label{font-size:12px;font-weight:760;color:#627589}.field input,.field textarea{width:100%;border:1px solid #d7dde2;border-radius:14px;background:#fff;padding:12px 13px;color:#19324a}.field textarea{min-height:120px;resize:vertical}.card-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.card-actions button{border:0;border-radius:13px;padding:11px 14px;font-weight:760}.secondary{background:#e8edf1;color:#496075}.primary{background:#173851;color:#fff}.more-list{display:grid;gap:8px}.more-item{width:100%;min-height:50px;border:0;border-radius:15px;background:#eef2f5;color:#263f56;display:flex;align-items:center;justify-content:space-between;padding:0 15px;font-weight:740}.more-item.danger{color:#9d3d3d;background:#f4eceb}.more-close{margin-top:10px;width:100%;min-height:48px;border:0;border-radius:15px;background:#173851;color:#fff;font-weight:760}
-.photo-manage-card{padding-bottom:calc(14px + env(safe-area-inset-bottom))}.photo-manage-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.photo-manage-head h3{margin:0}.photo-manage-count{font-size:12px;font-weight:760;color:#6a7c8c}.photo-manage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-height:52dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px}.photo-manage-tile{position:relative;aspect-ratio:1/1;border-radius:13px;overflow:hidden;background:#e9eef1;box-shadow:inset 0 0 0 1px rgba(26,52,73,.08);touch-action:pan-y;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;transition:transform .16s ease,box-shadow .16s ease,opacity .16s ease}.photo-manage-tile.current{box-shadow:inset 0 0 0 3px #3b8ec5}.photo-manage-tile.drag-source{opacity:.35;transform:scale(.96)}.photo-manage-tile.drag-target{box-shadow:inset 0 0 0 3px #168cf0;transform:scale(.97)}.photo-manage-tile img{width:100%;height:100%;object-fit:cover;display:block}.photo-manage-delete{position:absolute;top:5px;right:5px;width:27px;height:27px;border:0;border-radius:50%;background:rgba(9,31,47,.92);color:#fff;display:grid;place-items:center;font-size:18px;line-height:1;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2}.photo-manage-add{border:2px dashed #9dc5df;background:#f6fafc;color:#347eaa;display:grid;place-items:center;font-size:34px;font-weight:300}.photo-manage-add span{display:block;margin-top:-2px}.photo-manage-empty{grid-column:1/-1;padding:28px 14px;text-align:center;color:#687b8b;font-size:14px}.photo-drag-ghost{position:fixed;z-index:80;pointer-events:none;border-radius:13px;overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,.28);transform:scale(1.04);opacity:.95}.photo-drag-ghost .photo-manage-delete{display:none}
+.photo-manage-card{padding-bottom:calc(14px + env(safe-area-inset-bottom))}.photo-manage-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.photo-manage-head h3{margin:0}.photo-manage-count{font-size:12px;font-weight:760;color:#6a7c8c}.photo-manage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-height:52dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px}.photo-manage-tile{position:relative;aspect-ratio:1/1;border-radius:13px;overflow:hidden;background:#e9eef1;box-shadow:inset 0 0 0 1px rgba(26,52,73,.08);touch-action:pan-y;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;transition:transform .16s ease,box-shadow .16s ease,opacity .16s ease}.photo-manage-tile.current{box-shadow:inset 0 0 0 3px #3b8ec5}.photo-manage-tile.drag-source{opacity:.35;transform:scale(.96)}.photo-manage-tile.drag-target{box-shadow:inset 0 0 0 3px #168cf0;transform:scale(.97)}.photo-manage-tile img,.photo-manage-tile video{width:100%;height:100%;object-fit:cover;display:block}.photo-manage-video-badge{position:absolute;left:6px;bottom:6px;z-index:2;min-width:28px;height:23px;padding:0 7px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:rgba(7,25,39,.78);color:#fff;font-size:11px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.16)}.photo-manage-delete{position:absolute;top:5px;right:5px;width:27px;height:27px;border:0;border-radius:50%;background:rgba(9,31,47,.92);color:#fff;display:grid;place-items:center;font-size:18px;line-height:1;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2}.photo-manage-add{border:2px dashed #9dc5df;background:#f6fafc;color:#347eaa;display:grid;place-items:center;font-size:34px;font-weight:300}.photo-manage-add span{display:block;margin-top:-2px}.photo-manage-empty{grid-column:1/-1;padding:28px 14px;text-align:center;color:#687b8b;font-size:14px}.photo-drag-ghost{position:fixed;z-index:80;pointer-events:none;border-radius:13px;overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,.28);transform:scale(1.04);opacity:.95}.photo-drag-ghost .photo-manage-delete{display:none}
 .notice{position:fixed;z-index:40;left:50%;bottom:74px;transform:translateX(-50%) translateY(18px);opacity:0;pointer-events:none;max-width:calc(100vw - 36px);padding:10px 14px;border-radius:999px;background:rgba(16,28,39,.90);color:#fff;font-size:12px;font-weight:700;transition:.2s ease;white-space:nowrap}.notice.show{opacity:1;transform:translateX(-50%) translateY(0)}.file-input{display:none}
 @media(max-height:760px){.top{top:max(18px,env(safe-area-inset-top));left:17px;right:17px}.brand{font-size:9.8px}.title{margin-top:8px;font-size:17.8px;max-width:252px}.screen.has-photo .title{font-size:18px}.date{margin-top:11px;min-height:33px;padding:0 9px;gap:6px;font-size:12.1px}.date svg{width:14px;height:14px}.photo-button{min-height:37px;padding:0 11px;font-size:13px}.empty{top:34.5%;transform:translateY(-4%);left:22px;right:22px}.plus{width:68px;height:68px;margin-bottom:15px;font-size:34px}.empty h2{max-width:296px;font-size:19px}.empty p{margin-top:11px;max-width:296px;font-size:12.4px}.mic-zone{bottom:72px}.mic-halo{width:88px;height:88px}.mic-ring{width:74px;height:74px}.mic{width:62px;height:62px}.mic svg{width:24px;height:24px}.mic-label{font-size:10.7px}.sheet{height:50px;border-radius:23px 23px 0 0}.handle{width:46px;margin:7px auto 6px}.sheet-text{font-size:10.7px}.photo-voice{bottom:105px}.photo-mic-halo{width:108px;height:108px}.photo-mic-ring{width:91px;height:91px}.photo-mic{width:77px;height:77px}.photo-mic svg{width:31px;height:31px}.photo-more{bottom:58px;height:36px}}
 @media(min-width:700px){body{background:#082238}.screen{max-width:520px;margin:0 auto;box-shadow:0 0 70px rgba(0,0,0,.25)}.modal .card{max-width:520px;margin:0 auto}}
@@ -31,9 +31,9 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 </head>
 <body>
 <main id="screen" class="screen" data-revision="${STORYLAB_CLEAN_PAGE_REVISION}">
-  <img id="bgPhoto" class="bg-photo" alt="Foto bij deze herinnering" />
+  <img id="bgPhoto" class="bg-photo" alt="Foto bij deze herinnering" /><video id="bgVideo" class="bg-video" muted playsinline loop preload="metadata" aria-label="Video bij deze herinnering"></video>
   <div class="shade"></div>
-  <input id="photoInput" class="file-input" type="file" accept="image/*,.heic,.heif" multiple />
+  <input id="photoInput" class="file-input" type="file" accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v" multiple />
   <header class="top">
     <div>
       <p class="brand">TALERA</p>
@@ -47,9 +47,9 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   </header>
 
   <section class="empty" aria-label="Foto kiezen">
-    <button id="bigPlus" class="plus" type="button" aria-label="Kies een foto">+</button>
-    <h2>Kies een foto die je herinnering oproept</h2>
-    <p>Daarna kun je gewoon naar de foto kijken en je verhaal vertellen.</p>
+    <button id="bigPlus" class="plus" type="button" aria-label="Kies een foto of video">+</button>
+    <h2>Kies een foto of video die je herinnering oproept</h2>
+    <p>Daarna kun je gewoon kijken en je verhaal vertellen.</p>
   </section>
 
   <section class="mic-zone" aria-label="Vertellen">
@@ -75,13 +75,13 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 
 <div id="editModal" class="modal"><section class="card"><h3>Herinnering bewerken</h3><div class="field"><label>Titel</label><input id="editTitle" maxlength="140" /></div><div class="field"><label>Datum</label><input id="editDate" type="date" /></div><div class="card-actions"><button class="secondary" data-close="editModal">Annuleren</button><button id="saveEdit" class="primary">Opslaan</button></div></section></div>
 <div id="noteModal" class="modal"><section class="card"><h3>Opmerking</h3><div class="field"><textarea id="noteText" placeholder="Voeg een opmerking toe..."></textarea></div><div class="card-actions"><button class="secondary" data-close="noteModal">Annuleren</button><button id="saveNote" class="primary">Opslaan</button></div></section></div>
-<div id="moreModal" class="modal"><section class="card"><h3>Meer</h3><div class="more-list"><button id="addAnother" class="more-item" type="button"><span>Foto toevoegen</span><span>›</span></button><button id="managePhotosBtn" class="more-item" type="button"><span>Foto’s beheren</span><span>›</span></button><button id="editBtn" class="more-item" type="button"><span>Titel en datum</span><span>›</span></button></div><button class="more-close" data-close="moreModal" type="button">Klaar</button></section></div>
-<div id="photoManageModal" class="modal"><section class="card photo-manage-card"><div class="photo-manage-head"><h3>Foto’s beheren</h3><span id="photoManageCount" class="photo-manage-count"></span></div><div id="photoManageGrid" class="photo-manage-grid"></div><button class="more-close" data-close="photoManageModal" type="button">Klaar</button></section></div>
+<div id="moreModal" class="modal"><section class="card"><h3>Meer</h3><div class="more-list"><button id="addAnother" class="more-item" type="button"><span>Foto of video toevoegen</span><span>›</span></button><button id="managePhotosBtn" class="more-item" type="button"><span>Foto’s en video’s beheren</span><span>›</span></button><button id="editBtn" class="more-item" type="button"><span>Titel en datum</span><span>›</span></button></div><button class="more-close" data-close="moreModal" type="button">Klaar</button></section></div>
+<div id="photoManageModal" class="modal"><section class="card photo-manage-card"><div class="photo-manage-head"><h3>Foto’s en video’s beheren</h3><span id="photoManageCount" class="photo-manage-count"></span></div><div id="photoManageGrid" class="photo-manage-grid"></div><button class="more-close" data-close="photoManageModal" type="button">Klaar</button></section></div>
 <div id="notice" class="notice"></div>
 
 <script>
 (function(){
-  const screen=document.getElementById('screen'),bg=document.getElementById('bgPhoto'),photoInput=document.getElementById('photoInput'),title=document.getElementById('title'),dateInput=document.getElementById('dateInput'),dateText=document.getElementById('dateText'),storyText=document.getElementById('storyText'),sheet=document.getElementById('sheet'),sheetPreview=document.getElementById('sheetPreview'),notice=document.getElementById('notice'),photoVoiceTitle=document.getElementById('photoVoiceTitle'),photoVoiceSub=document.getElementById('photoVoiceSub'),baseMicLabel=document.getElementById('micLabel');
+  const screen=document.getElementById('screen'),bg=document.getElementById('bgPhoto'),bgVideo=document.getElementById('bgVideo'),photoInput=document.getElementById('photoInput'),title=document.getElementById('title'),dateInput=document.getElementById('dateInput'),dateText=document.getElementById('dateText'),storyText=document.getElementById('storyText'),sheet=document.getElementById('sheet'),sheetPreview=document.getElementById('sheetPreview'),notice=document.getElementById('notice'),photoVoiceTitle=document.getElementById('photoVoiceTitle'),photoVoiceSub=document.getElementById('photoVoiceSub'),baseMicLabel=document.getElementById('micLabel');
   const today=new Date().toISOString().slice(0,10);dateInput.max=today;document.getElementById('editDate').max=today;
   function makeId(){return crypto&&crypto.randomUUID?crypto.randomUUID():('id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2))}
   const clientKey='talera.storylab.clean.client';let clientId=localStorage.getItem(clientKey);if(!clientId){clientId=makeId();localStorage.setItem(clientKey,clientId)}
@@ -108,7 +108,10 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   function api(path,opts){return fetch(path+(path.indexOf('?')>-1?'&':'?')+'client='+encodeURIComponent(clientId),opts)}
   function formatDate(v){if(!v)return 'Wanneer was dit?';const d=new Date(v+'T12:00:00');return new Intl.DateTimeFormat('nl-NL',{day:'numeric',month:'long',year:'numeric'}).format(d)}
   function imageMime(file){const t=String(file&&file.type||'').toLowerCase();if(t.startsWith('image/'))return t;const n=String(file&&file.name||'').toLowerCase();if(/\.heic$/.test(n))return 'image/heic';if(/\.heif$/.test(n))return 'image/heif';if(/\.png$/.test(n))return 'image/png';if(/\.webp$/.test(n))return 'image/webp';if(/\.gif$/.test(n))return 'image/gif';if(/\.avif$/.test(n))return 'image/avif';return 'image/jpeg'}
+  function videoMime(file){const t=String(file&&file.type||'').toLowerCase();if(t.startsWith('video/'))return t;const n=String(file&&file.name||'').toLowerCase();if(/\.mov$/i.test(n))return 'video/quicktime';if(/\.m4v$/i.test(n))return 'video/x-m4v';return 'video/mp4'}
   function isImageFile(file){const t=String(file&&file.type||'').toLowerCase(),n=String(file&&file.name||'').toLowerCase();return t.startsWith('image/')||/\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(n)}
+  function isVideoFile(file){const t=String(file&&file.type||'').toLowerCase(),n=String(file&&file.name||'').toLowerCase();return t.startsWith('video/')||/\.(mov|mp4|m4v|webm)$/i.test(n)}
+  function isVideoItem(item){return String(item&&item.type||'').toLowerCase().startsWith('video/')}
   async function makePreview(blob,id){
     if(!blob||!id||previewPhotoUrls.has(id))return previewPhotoUrls.get(id)||'';
     let bitmap=null,source=null,width=0,height=0;
@@ -137,38 +140,40 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   }
   function updateSheetPreview(custom){if(custom){sheetPreview.textContent=custom;return}const text=String(storyText.value||'').trim();sheetPreview.textContent=text?text:'Je tekst verschijnt hier · veeg omhoog'}
   async function saveState(){state.title=title.value.trim();state.date=dateInput.value;state.storyText=storyText.value;await api('/api/storylab-clean/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(state)}).catch(()=>{})}
-  function setPhotoSource(url){if(!url)return;bg.src=url;bg.style.objectFit=state.fit||'cover';screen.classList.add('has-photo')}
+  function setPhotoSource(url){if(!url)return;try{bgVideo.pause()}catch(e){}bgVideo.removeAttribute('src');screen.classList.remove('has-video');bg.src=url;bg.style.objectFit=state.fit||'cover';screen.classList.add('has-photo')}
+  function setVideoSource(url){if(!url)return;bg.removeAttribute('src');screen.classList.add('has-photo','has-video');if(bgVideo.src!==url)bgVideo.src=url;bgVideo.style.objectFit=state.fit||'cover';bgVideo.muted=true;bgVideo.playsInline=true;const p=bgVideo.play();if(p&&p.catch)p.catch(()=>{})}
   async function fetchPhotoUrl(photo){
     if(!photo)return '';
-    if(previewPhotoUrls.has(photo.id))return previewPhotoUrls.get(photo.id);
+    if(!isVideoItem(photo)&&previewPhotoUrls.has(photo.id))return previewPhotoUrls.get(photo.id);
     if(localPhotoUrls.has(photo.id))return localPhotoUrls.get(photo.id);
     if(photoCache.has(photo.id))return photoCache.get(photo.id);
-    const r=await api('/api/storylab-clean/photo?id='+encodeURIComponent(photo.id));if(!r.ok)throw new Error('load '+r.status);
+    const kind=isVideoItem(photo)?'video':'photo';
+    const r=await api('/api/storylab-clean/'+kind+'?id='+encodeURIComponent(photo.id));if(!r.ok)throw new Error('load '+r.status);
     const blob=await r.blob(),url=URL.createObjectURL(blob);photoCache.set(photo.id,url);
-    makePreview(blob,photo.id).catch(()=>{});
+    if(!isVideoItem(photo))makePreview(blob,photo.id).catch(()=>{});
     return url
   }
   function prefetchIndex(index){if(!state.photos.length)return;const i=(index+state.photos.length)%state.photos.length,photo=state.photos[i];if(!photo||localPhotoUrls.has(photo.id)||photoCache.has(photo.id))return;fetchPhotoUrl(photo).catch(()=>{})}
-  async function renderPhoto(){if(!state.photos||!state.photos.length){screen.classList.remove('has-photo');bg.removeAttribute('src');setIdleVoiceCopy();return}if(state.currentIndex<0)state.currentIndex=0;if(state.currentIndex>=state.photos.length)state.currentIndex=state.photos.length-1;const photo=state.photos[state.currentIndex];try{const cached=previewPhotoUrls.get(photo.id)||localPhotoUrls.get(photo.id)||photoCache.get(photo.id);if(cached)setPhotoSource(cached);else setPhotoSource(await fetchPhotoUrl(photo));prefetchIndex(state.currentIndex-1);prefetchIndex(state.currentIndex+1)}catch(e){showNotice('Foto kon niet worden geladen')}setIdleVoiceCopy()}
+  async function renderPhoto(){if(!state.photos||!state.photos.length){screen.classList.remove('has-photo','has-video');bg.removeAttribute('src');try{bgVideo.pause();bgVideo.removeAttribute('src')}catch(e){}setIdleVoiceCopy();return}if(state.currentIndex<0)state.currentIndex=0;if(state.currentIndex>=state.photos.length)state.currentIndex=state.photos.length-1;const photo=state.photos[state.currentIndex];try{const cached=(!isVideoItem(photo)&&previewPhotoUrls.get(photo.id))||localPhotoUrls.get(photo.id)||photoCache.get(photo.id);const src=cached||await fetchPhotoUrl(photo);if(isVideoItem(photo))setVideoSource(src);else setPhotoSource(src);prefetchIndex(state.currentIndex-1);prefetchIndex(state.currentIndex+1)}catch(e){showNotice(isVideoItem(photo)?'Video kon niet worden geladen':'Foto kon niet worden geladen')}setIdleVoiceCopy()}
   async function loadState(){try{const r=await api('/api/storylab-clean/state');if(r.ok){const s=await r.json();state=Object.assign(state,s||{})}}catch(e){}title.value=state.title||'';dateInput.value=state.date||'';dateText.textContent=formatDate(state.date);storyText.value=state.storyText||'';updateSheetPreview();await renderPhoto()}
   async function addFiles(files){
-    const room=Math.max(0,12-(state.photos||[]).length),list=Array.from(files||[]).filter(isImageFile).slice(0,room);
-    if(!list.length){showNotice(room?'Geen bruikbare foto geselecteerd':'Maximaal 12 foto’s');return}
+    const room=Math.max(0,12-(state.photos||[]).length),list=Array.from(files||[]).filter(f=>isImageFile(f)||isVideoFile(f)).slice(0,room);
+    if(!list.length){showNotice(room?'Geen bruikbare foto of video geselecteerd':'Maximaal 12 media-items');return}
     const startIndex=state.photos.length,pending=[];
     for(const f of list){
-      const id=makeId(),url=URL.createObjectURL(f);
+      const id=makeId(),url=URL.createObjectURL(f),video=isVideoFile(f),type=video?videoMime(f):imageMime(f);
       localPhotoUrls.set(id,url);
-      state.photos.push({id:id,name:f.name||'foto',type:imageMime(f),createdAt:Date.now()});
-      pending.push({id:id,file:f,type:imageMime(f),url:url});
+      state.photos.push({id:id,name:f.name||(video?'video':'foto'),type:type,createdAt:Date.now()});
+      pending.push({id:id,file:f,type:type,url:url,video:video});
     }
     state.currentIndex=startIndex;
     mediaUploading++;
     renderPhoto();
-    const previewWork=Promise.allSettled(pending.map(item=>makePreview(item.file,item.id)));
+    const previewWork=Promise.allSettled(pending.filter(item=>!item.video).map(item=>makePreview(item.file,item.id)));
     let failed=0;
     const uploadWork=Promise.all(pending.map(async item=>{
       try{
-        const r=await api('/api/storylab-clean/photo?id='+encodeURIComponent(item.id),{method:'PUT',headers:{'content-type':item.type,'x-file-name':encodeURIComponent(item.file.name||'foto')},body:item.file});
+        const kind=item.video?'video':'photo';const r=await api('/api/storylab-clean/'+kind+'?id='+encodeURIComponent(item.id),{method:'PUT',headers:{'content-type':item.type,'x-file-name':encodeURIComponent(item.file.name||(item.video?'video':'foto'))},body:item.file});
         if(!r.ok)throw new Error('upload '+r.status);
         photoCache.set(item.id,item.url);
         localPhotoUrls.delete(item.id);
@@ -192,12 +197,12 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     mediaUploading=Math.max(0,mediaUploading-1);
     signalMedia();
     renderPhoto();
-    if(failed)showNotice(failed===list.length?'Upload niet gelukt · probeer opnieuw':'Niet alle foto’s konden worden bewaard');
+    if(failed)showNotice(failed===list.length?'Upload niet gelukt · probeer opnieuw':'Niet alle media konden worden bewaard');
   }
   async function removePhotoById(id){
     const idx=state.photos.findIndex(p=>p.id===id);if(idx<0)return;
     const p=state.photos[idx];
-    await api('/api/storylab-clean/photo?id='+encodeURIComponent(p.id),{method:'DELETE'}).catch(()=>{});
+    await api('/api/storylab-clean/'+(isVideoItem(p)?'video':'photo')+'?id='+encodeURIComponent(p.id),{method:'DELETE'}).catch(()=>{});
     const local=localPhotoUrls.get(p.id),preview=previewPhotoUrls.get(p.id),cached=photoCache.get(p.id);
     if(local)URL.revokeObjectURL(local);if(preview&&preview!==local)URL.revokeObjectURL(preview);if(cached&&cached!==local&&cached!==preview)URL.revokeObjectURL(cached);
     localPhotoUrls.delete(p.id);previewPhotoUrls.delete(p.id);photoCache.delete(p.id);
@@ -261,14 +266,14 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   }
   async function renderPhotoManager(){
     if(!photoManageGrid)return;
-    const photoCount=(state.photos||[]).length;photoManageCount.textContent=photoCount+(photoCount===1?' foto':' foto’s');
+    const photoCount=(state.photos||[]).length;photoManageCount.textContent=photoCount+(photoCount===1?' item':' items');
     photoManageGrid.innerHTML='';
-    const add=document.createElement('button');add.type='button';add.className='photo-manage-tile photo-manage-add';add.innerHTML='<span>+</span>';add.setAttribute('aria-label','Foto toevoegen');add.onclick=()=>{closeModal('photoManageModal');photoInput.click()};photoManageGrid.appendChild(add);
-    if(!state.photos||!state.photos.length){const empty=document.createElement('div');empty.className='photo-manage-empty';empty.textContent='Nog geen foto’s toegevoegd';photoManageGrid.appendChild(empty);return}
+    const add=document.createElement('button');add.type='button';add.className='photo-manage-tile photo-manage-add';add.innerHTML='<span>+</span>';add.setAttribute('aria-label','Foto of video toevoegen');add.onclick=()=>{closeModal('photoManageModal');photoInput.click()};photoManageGrid.appendChild(add);
+    if(!state.photos||!state.photos.length){const empty=document.createElement('div');empty.className='photo-manage-empty';empty.textContent='Nog geen foto’s of video’s toegevoegd';photoManageGrid.appendChild(empty);return}
     for(let i=0;i<state.photos.length;i++){
       const p=state.photos[i],tile=document.createElement('div');tile.className='photo-manage-tile'+(i===state.currentIndex?' current':'');tile.dataset.photoId=p.id;
-      const img=document.createElement('img');img.alt='';tile.appendChild(img);
-      const del=document.createElement('button');del.type='button';del.className='photo-manage-delete';del.textContent='×';del.setAttribute('aria-label','Foto verwijderen');del.onclick=e=>{e.stopPropagation();removePhotoById(p.id)};tile.appendChild(del);
+      const media=isVideoItem(p)?document.createElement('video'):document.createElement('img');media.alt='';if(isVideoItem(p)){media.muted=true;media.playsInline=true;media.preload='metadata';const badge=document.createElement('span');badge.className='photo-manage-video-badge';badge.textContent='▶';tile.appendChild(badge)}tile.appendChild(media);
+      const del=document.createElement('button');del.type='button';del.className='photo-manage-delete';del.textContent='×';del.setAttribute('aria-label',isVideoItem(p)?'Video verwijderen':'Foto verwijderen');del.onclick=e=>{e.stopPropagation();removePhotoById(p.id)};tile.appendChild(del);
       tile.onclick=()=>{if(photoDragJustEnded)return;state.currentIndex=i;renderPhoto();saveState();signalMedia()};
       let touchStartX=0,touchStartY=0,touchId=null;
       tile.addEventListener('touchstart',e=>{
@@ -310,10 +315,10 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       },{passive:false});
       tile.addEventListener('pointerup',e=>{if(e.pointerType==='mouse'){cancelPhotoDragPending();if(photoDrag&&photoDrag.touchId==='mouse')finishPhotoDrag()}});
       photoManageGrid.appendChild(tile);
-      try{img.src=previewPhotoUrls.get(p.id)||localPhotoUrls.get(p.id)||photoCache.get(p.id)||await fetchPhotoUrl(p)}catch(e){}
+      try{media.src=(!isVideoItem(p)&&previewPhotoUrls.get(p.id))||localPhotoUrls.get(p.id)||photoCache.get(p.id)||await fetchPhotoUrl(p)}catch(e){}
     }
   }
-  function setIdleVoiceCopy(){if(!screen.classList.contains('has-photo')){baseMicLabel.textContent='Tik om te vertellen';return}if(state.audioId||String(storyText.value||'').trim()){photoVoiceTitle.textContent='Vertel verder';photoVoiceSub.textContent='Of veeg de witte balk omhoog voor je tekst'}else{photoVoiceTitle.textContent='Tik en vertel';photoVoiceSub.textContent=state.photos.length>1?'Swipe door je foto’s en vertel wat je ziet':'Kijk naar je foto en vertel wat er gebeurde'}}
+  function setIdleVoiceCopy(){if(!screen.classList.contains('has-photo')){baseMicLabel.textContent='Tik om te vertellen';return}if(state.audioId||String(storyText.value||'').trim()){photoVoiceTitle.textContent='Vertel verder';photoVoiceSub.textContent='Of veeg de witte balk omhoog voor je tekst'}else{photoVoiceTitle.textContent='Tik en vertel';photoVoiceSub.textContent=state.photos.length>1?'Swipe door je foto’s en video’s en vertel wat je ziet':(isVideoItem(state.photos[state.currentIndex])?'Kijk naar je video en vertel wat er gebeurde':'Kijk naar je foto en vertel wat er gebeurde')}}
   function openSheet(){sheet.classList.add('open');screen.classList.add('sheet-open');storyText.focus()}
   function closeSheet(){sheet.classList.remove('open');screen.classList.remove('sheet-open');updateSheetPreview()}
   function nudgeSheet(message){updateSheetPreview(message);sheet.classList.remove('nudge');void sheet.offsetWidth;sheet.classList.add('nudge');setTimeout(()=>sheet.classList.remove('nudge'),1900)}

@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-r19h3';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-r19h4';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -87,12 +87,16 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   const clientKey='talera.storylab.clean.client';let clientId=localStorage.getItem(clientKey);if(!clientId){clientId=makeId();localStorage.setItem(clientKey,clientId)}
   let state={title:'',date:'',storyText:'',note:'',photos:[],currentIndex:0,fit:'cover',audioId:''};
   let recorder=null,chunks=[],stream=null,touchX=0,touchY=0,touchBlocked=false,sheetY=0,recognition=null,speechWanted=false,speechBase='',speechFinal='',speechInterim='';
-  const localPhotoUrls=new Map(),photoCache=new Map();
+  const localPhotoUrls=new Map(),previewPhotoUrls=new Map(),photoCache=new Map();
   let mediaUploading=0;
   function signalMedia(){try{window.dispatchEvent(new CustomEvent('talera-storylab-mediachange'))}catch(e){}}
   window.__taleraStoryLabMedia={
     getState:()=>state,
-    getUrl:(id)=>localPhotoUrls.get(id)||photoCache.get(id)||'',
+    getUrl:(id)=>previewPhotoUrls.get(id)||localPhotoUrls.get(id)||photoCache.get(id)||'',
+    ensureUrl:async(id)=>{
+      const p=(state.photos||[]).find(photo=>photo.id===id);
+      return p?fetchPhotoUrl(p):'';
+    },
     isUploading:()=>mediaUploading>0,
     setIndex:(index)=>{if(state.photos&&state.photos.length)state.currentIndex=((Number(index)||0)%state.photos.length+state.photos.length)%state.photos.length}
   };
@@ -103,12 +107,47 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   function formatDate(v){if(!v)return 'Wanneer was dit?';const d=new Date(v+'T12:00:00');return new Intl.DateTimeFormat('nl-NL',{day:'numeric',month:'long',year:'numeric'}).format(d)}
   function imageMime(file){const t=String(file&&file.type||'').toLowerCase();if(t.startsWith('image/'))return t;const n=String(file&&file.name||'').toLowerCase();if(/\.heic$/.test(n))return 'image/heic';if(/\.heif$/.test(n))return 'image/heif';if(/\.png$/.test(n))return 'image/png';if(/\.webp$/.test(n))return 'image/webp';if(/\.gif$/.test(n))return 'image/gif';if(/\.avif$/.test(n))return 'image/avif';return 'image/jpeg'}
   function isImageFile(file){const t=String(file&&file.type||'').toLowerCase(),n=String(file&&file.name||'').toLowerCase();return t.startsWith('image/')||/\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(n)}
+  async function makePreview(blob,id){
+    if(!blob||!id||previewPhotoUrls.has(id))return previewPhotoUrls.get(id)||'';
+    let bitmap=null,source=null,width=0,height=0;
+    try{
+      if(window.createImageBitmap){
+        bitmap=await createImageBitmap(blob);
+        width=bitmap.width;height=bitmap.height;source=bitmap;
+      }else{
+        const url=URL.createObjectURL(blob),img=new Image();
+        await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
+        URL.revokeObjectURL(url);
+        width=img.naturalWidth||img.width;height=img.naturalHeight||img.height;source=img;
+      }
+      if(!width||!height)return '';
+      const maxSide=1280,scale=Math.min(1,maxSide/Math.max(width,height));
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
+      const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)return '';
+      ctx.drawImage(source,0,0,canvas.width,canvas.height);
+      if(bitmap&&bitmap.close)bitmap.close();
+      const out=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.82));
+      if(!out)return '';
+      const url=URL.createObjectURL(out);
+      previewPhotoUrls.set(id,url);signalMedia();return url;
+    }catch(e){try{if(bitmap&&bitmap.close)bitmap.close()}catch(_e){}return ''}
+  }
   function updateSheetPreview(custom){if(custom){sheetPreview.textContent=custom;return}const text=String(storyText.value||'').trim();sheetPreview.textContent=text?text:'Je tekst verschijnt hier · veeg omhoog'}
   async function saveState(){state.title=title.value.trim();state.date=dateInput.value;state.storyText=storyText.value;await api('/api/storylab-clean/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(state)}).catch(()=>{})}
   function setPhotoSource(url){if(!url)return;bg.src=url;bg.style.objectFit=state.fit||'cover';screen.classList.add('has-photo')}
-  async function fetchPhotoUrl(photo){if(!photo)return '';if(localPhotoUrls.has(photo.id))return localPhotoUrls.get(photo.id);if(photoCache.has(photo.id))return photoCache.get(photo.id);const r=await api('/api/storylab-clean/photo?id='+encodeURIComponent(photo.id));if(!r.ok)throw new Error('load '+r.status);const blob=await r.blob(),url=URL.createObjectURL(blob);photoCache.set(photo.id,url);return url}
+  async function fetchPhotoUrl(photo){
+    if(!photo)return '';
+    if(previewPhotoUrls.has(photo.id))return previewPhotoUrls.get(photo.id);
+    if(localPhotoUrls.has(photo.id))return localPhotoUrls.get(photo.id);
+    if(photoCache.has(photo.id))return photoCache.get(photo.id);
+    const r=await api('/api/storylab-clean/photo?id='+encodeURIComponent(photo.id));if(!r.ok)throw new Error('load '+r.status);
+    const blob=await r.blob(),url=URL.createObjectURL(blob);photoCache.set(photo.id,url);
+    makePreview(blob,photo.id).catch(()=>{});
+    return url
+  }
   function prefetchIndex(index){if(!state.photos.length)return;const i=(index+state.photos.length)%state.photos.length,photo=state.photos[i];if(!photo||localPhotoUrls.has(photo.id)||photoCache.has(photo.id))return;fetchPhotoUrl(photo).catch(()=>{})}
-  async function renderPhoto(){if(!state.photos||!state.photos.length){screen.classList.remove('has-photo');bg.removeAttribute('src');setIdleVoiceCopy();return}if(state.currentIndex<0)state.currentIndex=0;if(state.currentIndex>=state.photos.length)state.currentIndex=state.photos.length-1;const photo=state.photos[state.currentIndex];try{const cached=localPhotoUrls.get(photo.id)||photoCache.get(photo.id);if(cached)setPhotoSource(cached);else setPhotoSource(await fetchPhotoUrl(photo));prefetchIndex(state.currentIndex-1);prefetchIndex(state.currentIndex+1)}catch(e){showNotice('Foto kon niet worden geladen')}setIdleVoiceCopy()}
+  async function renderPhoto(){if(!state.photos||!state.photos.length){screen.classList.remove('has-photo');bg.removeAttribute('src');setIdleVoiceCopy();return}if(state.currentIndex<0)state.currentIndex=0;if(state.currentIndex>=state.photos.length)state.currentIndex=state.photos.length-1;const photo=state.photos[state.currentIndex];try{const cached=previewPhotoUrls.get(photo.id)||localPhotoUrls.get(photo.id)||photoCache.get(photo.id);if(cached)setPhotoSource(cached);else setPhotoSource(await fetchPhotoUrl(photo));prefetchIndex(state.currentIndex-1);prefetchIndex(state.currentIndex+1)}catch(e){showNotice('Foto kon niet worden geladen')}setIdleVoiceCopy()}
   async function loadState(){try{const r=await api('/api/storylab-clean/state');if(r.ok){const s=await r.json();state=Object.assign(state,s||{})}}catch(e){}title.value=state.title||'';dateInput.value=state.date||'';dateText.textContent=formatDate(state.date);storyText.value=state.storyText||'';updateSheetPreview();await renderPhoto()}
   async function addFiles(files){
     const room=Math.max(0,12-(state.photos||[]).length),list=Array.from(files||[]).filter(isImageFile).slice(0,room);
@@ -122,10 +161,10 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     }
     state.currentIndex=startIndex;
     mediaUploading++;
-    signalMedia();
     renderPhoto();
+    const previewWork=Promise.allSettled(pending.map(item=>makePreview(item.file,item.id)));
     let failed=0;
-    for(const item of pending){
+    const uploadWork=Promise.all(pending.map(async item=>{
       try{
         const r=await api('/api/storylab-clean/photo?id='+encodeURIComponent(item.id),{method:'PUT',headers:{'content-type':item.type,'x-file-name':encodeURIComponent(item.file.name||'foto')},body:item.file});
         if(!r.ok)throw new Error('upload '+r.status);
@@ -138,9 +177,14 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
         const u=localPhotoUrls.get(item.id);
         if(u)URL.revokeObjectURL(u);
         localPhotoUrls.delete(item.id);
+        const preview=previewPhotoUrls.get(item.id);if(preview){URL.revokeObjectURL(preview);previewPhotoUrls.delete(item.id)}
         signalMedia();
       }
-    }
+    }));
+    await previewWork;
+    signalMedia();
+    renderPhoto();
+    await uploadWork;
     if(state.currentIndex>=state.photos.length)state.currentIndex=Math.max(0,state.photos.length-1);
     await saveState();
     mediaUploading=Math.max(0,mediaUploading-1);
@@ -152,9 +196,9 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     const idx=state.photos.findIndex(p=>p.id===id);if(idx<0)return;
     const p=state.photos[idx];
     await api('/api/storylab-clean/photo?id='+encodeURIComponent(p.id),{method:'DELETE'}).catch(()=>{});
-    const local=localPhotoUrls.get(p.id),cached=photoCache.get(p.id);
-    if(local)URL.revokeObjectURL(local);if(cached&&cached!==local)URL.revokeObjectURL(cached);
-    localPhotoUrls.delete(p.id);photoCache.delete(p.id);
+    const local=localPhotoUrls.get(p.id),preview=previewPhotoUrls.get(p.id),cached=photoCache.get(p.id);
+    if(local)URL.revokeObjectURL(local);if(preview&&preview!==local)URL.revokeObjectURL(preview);if(cached&&cached!==local&&cached!==preview)URL.revokeObjectURL(cached);
+    localPhotoUrls.delete(p.id);previewPhotoUrls.delete(p.id);photoCache.delete(p.id);
     state.photos.splice(idx,1);
     if(!state.photos.length)state.currentIndex=0;
     else if(idx<state.currentIndex)state.currentIndex=Math.max(0,state.currentIndex-1);
@@ -174,7 +218,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       const del=document.createElement('button');del.type='button';del.className='photo-manage-delete';del.textContent='×';del.setAttribute('aria-label','Foto verwijderen');del.onclick=e=>{e.stopPropagation();removePhotoById(p.id)};tile.appendChild(del);
       tile.onclick=()=>{state.currentIndex=i;renderPhoto();saveState();signalMedia()};
       photoManageGrid.appendChild(tile);
-      try{img.src=localPhotoUrls.get(p.id)||photoCache.get(p.id)||await fetchPhotoUrl(p)}catch(e){}
+      try{img.src=previewPhotoUrls.get(p.id)||localPhotoUrls.get(p.id)||photoCache.get(p.id)||await fetchPhotoUrl(p)}catch(e){}
     }
   }
   function setIdleVoiceCopy(){if(!screen.classList.contains('has-photo')){baseMicLabel.textContent='Tik om te vertellen';return}if(state.audioId||String(storyText.value||'').trim()){photoVoiceTitle.textContent='Vertel verder';photoVoiceSub.textContent='Of veeg de witte balk omhoog voor je tekst'}else{photoVoiceTitle.textContent='Tik en vertel';photoVoiceSub.textContent=state.photos.length>1?'Swipe door je foto’s en vertel wat je ziet':'Kijk naar je foto en vertel wat er gebeurde'}}
@@ -193,8 +237,8 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   function openModal(id){document.getElementById(id).classList.add('open')}function closeModal(id){document.getElementById(id).classList.remove('open')}
   document.getElementById('moreBtn').onclick=()=>openModal('moreModal');document.getElementById('managePhotosBtn').onclick=()=>{closeModal('moreModal');renderPhotoManager();openModal('photoManageModal')};document.getElementById('editBtn').onclick=()=>{closeModal('moreModal');document.getElementById('editTitle').value=title.value;document.getElementById('editDate').value=dateInput.value;openModal('editModal')};document.getElementById('noteBtn').onclick=()=>{closeModal('moreModal');document.getElementById('noteText').value=state.note||'';openModal('noteModal')};document.getElementById('fitBtn').onclick=async()=>{state.fit=state.fit==='contain'?'cover':'contain';bg.style.objectFit=state.fit;await saveState();closeModal('moreModal')};
   document.getElementById('saveEdit').onclick=async()=>{title.value=document.getElementById('editTitle').value;dateInput.value=document.getElementById('editDate').value;if(dateInput.value>today)dateInput.value=today;dateText.textContent=formatDate(dateInput.value);closeModal('editModal');await saveState()};document.getElementById('saveNote').onclick=async()=>{state.note=document.getElementById('noteText').value;closeModal('noteModal');await saveState()};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
-  screen.addEventListener('touchstart',e=>{const t=e.target;touchBlocked=!!(t&&t.closest&&t.closest('button,input,textarea,.sheet,.modal'));touchX=e.changedTouches[0].clientX;touchY=e.changedTouches[0].clientY},{passive:true});screen.addEventListener('touchend',e=>{if(touchBlocked||sheet.classList.contains('open')||!screen.classList.contains('has-photo')||state.photos.length<2)return;const dx=e.changedTouches[0].clientX-touchX,dy=e.changedTouches[0].clientY-touchY;if(Math.abs(dx)<42||Math.abs(dx)<Math.abs(dy)*1.15)return;state.currentIndex=(state.currentIndex+(dx<0?1:-1)+state.photos.length)%state.photos.length;renderPhoto();saveState();setIdleVoiceCopy()},{passive:true});
-  window.addEventListener('pagehide',()=>{speechWanted=false;if(recognition){try{recognition.stop()}catch(e){}}for(const u of localPhotoUrls.values()){try{URL.revokeObjectURL(u)}catch(e){}}for(const u of photoCache.values()){try{URL.revokeObjectURL(u)}catch(e){}}if(stream)stream.getTracks().forEach(t=>t.stop())});loadState();
+  /* Horizontal photo swiping is owned exclusively by the r19 carousel layer. */
+  window.addEventListener('pagehide',()=>{speechWanted=false;if(recognition){try{recognition.stop()}catch(e){}}for(const u of localPhotoUrls.values()){try{URL.revokeObjectURL(u)}catch(e){}}for(const u of previewPhotoUrls.values()){try{URL.revokeObjectURL(u)}catch(e){}}for(const u of photoCache.values()){try{URL.revokeObjectURL(u)}catch(e){}}if(stream)stream.getTracks().forEach(t=>t.stop())});loadState();
 })();
 </script>
 </body>

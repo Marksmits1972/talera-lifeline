@@ -148,12 +148,16 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     if(localPhotoUrls.has(photo.id))return localPhotoUrls.get(photo.id);
     if(photoCache.has(photo.id))return photoCache.get(photo.id);
     const kind=isVideoItem(photo)?'video':'photo';
+    if(isVideoItem(photo)){
+      const url='/api/storylab-clean/video?id='+encodeURIComponent(photo.id)+'&client='+encodeURIComponent(clientId);
+      photoCache.set(photo.id,url);return url
+    }
     const r=await api('/api/storylab-clean/'+kind+'?id='+encodeURIComponent(photo.id));if(!r.ok)throw new Error('load '+r.status);
     const blob=await r.blob(),url=URL.createObjectURL(blob);photoCache.set(photo.id,url);
-    if(!isVideoItem(photo))makePreview(blob,photo.id).catch(()=>{});
+    makePreview(blob,photo.id).catch(()=>{});
     return url
   }
-  function prefetchIndex(index){if(!state.photos.length)return;const i=(index+state.photos.length)%state.photos.length,photo=state.photos[i];if(!photo||localPhotoUrls.has(photo.id)||photoCache.has(photo.id))return;fetchPhotoUrl(photo).catch(()=>{})}
+  function prefetchIndex(index){if(!state.photos.length)return;const i=(index+state.photos.length)%state.photos.length,photo=state.photos[i];if(!photo||isVideoItem(photo)||localPhotoUrls.has(photo.id)||photoCache.has(photo.id))return;fetchPhotoUrl(photo).catch(()=>{})}
   async function renderPhoto(){if(!state.photos||!state.photos.length){screen.classList.remove('has-photo','has-video');bg.removeAttribute('src');try{bgVideo.pause();bgVideo.removeAttribute('src')}catch(e){}setIdleVoiceCopy();return}if(state.currentIndex<0)state.currentIndex=0;if(state.currentIndex>=state.photos.length)state.currentIndex=state.photos.length-1;const photo=state.photos[state.currentIndex];try{const cached=(!isVideoItem(photo)&&previewPhotoUrls.get(photo.id))||localPhotoUrls.get(photo.id)||photoCache.get(photo.id);const src=cached||await fetchPhotoUrl(photo);if(isVideoItem(photo))setVideoSource(src);else setPhotoSource(src);prefetchIndex(state.currentIndex-1);prefetchIndex(state.currentIndex+1)}catch(e){showNotice(isVideoItem(photo)?'Video kon niet worden geladen':'Foto kon niet worden geladen')}setIdleVoiceCopy()}
   async function loadState(){try{const r=await api('/api/storylab-clean/state');if(r.ok){const s=await r.json();state=Object.assign(state,s||{})}}catch(e){}title.value=state.title||'';dateInput.value=state.date||'';dateText.textContent=formatDate(state.date);storyText.value=state.storyText||'';updateSheetPreview();await renderPhoto()}
   async function addFiles(files){

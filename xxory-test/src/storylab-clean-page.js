@@ -179,7 +179,13 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       try{
         const kind=item.video?'video':'photo';const r=await api('/api/storylab-clean/'+kind+'?id='+encodeURIComponent(item.id),{method:'PUT',headers:{'content-type':item.type,'x-file-name':encodeURIComponent(item.file.name||(item.video?'video':'foto'))},body:item.file});
         if(!r.ok)throw new Error('upload '+r.status);
-        photoCache.set(item.id,item.url);
+        if(item.video){
+          const remote='/api/storylab-clean/video?id='+encodeURIComponent(item.id)+'&client='+encodeURIComponent(clientId);
+          photoCache.set(item.id,remote);
+          try{URL.revokeObjectURL(item.url)}catch(e){}
+        }else{
+          photoCache.set(item.id,item.url);
+        }
         localPhotoUrls.delete(item.id);
       }catch(e){
         failed++;

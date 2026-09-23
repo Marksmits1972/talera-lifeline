@@ -4,7 +4,7 @@ import { handleStoryLabFresh } from './storylab-fresh.js';
 import { handleStoryLabClean } from './storylab-clean.js';
 
 const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev';
-const PUBLISH_REVISION = 'storylab-clean-timeline-publish-20260917-r1';
+const PUBLISH_REVISION = 'storylab-clean-timeline-publish-20260923-video-r1';
 
 function safeClient(value) {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(value) ? value : null;
@@ -33,6 +33,10 @@ function stateKey(client) {
 
 function photoKey(client, id) {
   return `storylab-clean/${client}/photos/${id}`;
+}
+
+function videoKey(client, id) {
+  return `storylab-clean/${client}/videos/${id}`;
 }
 
 function audioKey(client, id) {
@@ -116,15 +120,17 @@ async function handleCleanPublish(request, env) {
 
   const media = [];
   for (let index = 0; index < state.photos.length; index += 1) {
-    const photo = state.photos[index];
-    const key = photoKey(client, photo.id);
+    const item = state.photos[index];
+    const mediaType = String(item.type || '').toLowerCase().startsWith('video/') ? 'video' : 'image';
+    const key = mediaType === 'video' ? videoKey(client, item.id) : photoKey(client, item.id);
     let head = null;
     try { head = await env.MEDIA.head(key); } catch {}
     if (!head || !Number(head.size || 0)) continue;
     media.push({
       key,
-      mimeType: String(head.httpMetadata?.contentType || photo.type || 'image/jpeg'),
+      mimeType: String(head.httpMetadata?.contentType || item.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg')),
       size: Number(head.size || 0),
+      mediaType,
       order: index
     });
   }
@@ -152,7 +158,7 @@ async function handleCleanPublish(request, env) {
   const now = new Date().toISOString();
   const createdAt = reused ? (existing?.created_at || now) : now;
   const title = state.title || fallbackTitle(state.storyText);
-  const startPhotoKey = media[0]?.key || null;
+  const startPhotoKey = media.find((item) => item.mediaType === 'image')?.key || null;
   const audioMimeType = audioHead ? String(audioHead.httpMetadata?.contentType || 'application/octet-stream') : '';
   const audioSize = audioHead ? Number(audioHead.size || 0) : 0;
   const statements = [];
@@ -187,8 +193,8 @@ async function handleCleanPublish(request, env) {
     const mediaCreatedAt = new Date(Date.now() + index).toISOString();
     statements.push(env.DB.prepare(`
       INSERT INTO story_media (id, story_id, object_key, mime_type, size_bytes, media_type, role, created_at)
-      VALUES (?, ?, ?, ?, ?, 'image', ?, ?)
-    `).bind(randomToken(12), storyId, item.key, item.mimeType, item.size, index === 0 ? 'start' : 'extra', mediaCreatedAt));
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(randomToken(12), storyId, item.key, item.mimeType, item.size, item.mediaType, item.key === startPhotoKey ? 'start' : 'extra', mediaCreatedAt));
   });
 
   if (reused) {

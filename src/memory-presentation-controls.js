@@ -231,6 +231,18 @@ export const memoryPresentationControlsScript = String.raw`
       }
     }catch(err){}
   }
+  function disableListening(){
+    cancelAutoStart();
+    stopAudio(false);
+    audioEnabled=false;autoBlocked=false;manualSuppressed=true;
+    consentDismissed=true;consent.hidden=true;
+    sessionStorage.setItem(CONSENT_DISMISSED_KEY,'1');
+  }
+  window.__taleraAudioControls={
+    isEnabled:()=>Boolean(audioEnabled&&!consentDismissed),
+    enable:enableListening,
+    disable:disableListening
+  };
   consentMain.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();enableListening()});
   consentClose.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();cancelAutoStart();

@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260917-r13';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-r19h1';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -86,6 +86,14 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   let state={title:'',date:'',storyText:'',note:'',photos:[],currentIndex:0,fit:'cover',audioId:''};
   let recorder=null,chunks=[],stream=null,touchX=0,touchY=0,touchBlocked=false,sheetY=0,recognition=null,speechWanted=false,speechBase='',speechFinal='',speechInterim='';
   const localPhotoUrls=new Map(),photoCache=new Map();
+  let mediaUploading=0;
+  function signalMedia(){try{window.dispatchEvent(new CustomEvent('talera-storylab-mediachange'))}catch(e){}}
+  window.__taleraStoryLabMedia={
+    getState:()=>state,
+    getUrl:(id)=>localPhotoUrls.get(id)||photoCache.get(id)||'',
+    isUploading:()=>mediaUploading>0,
+    setIndex:(index)=>{if(state.photos&&state.photos.length)state.currentIndex=((Number(index)||0)%state.photos.length+state.photos.length)%state.photos.length}
+  };
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition||null;
   function showNotice(t){notice.textContent=t;notice.classList.add('show');setTimeout(()=>notice.classList.remove('show'),2200)}
   function api(path,opts){return fetch(path+(path.indexOf('?')>-1?'&':'?')+'client='+encodeURIComponent(clientId),opts)}
@@ -99,8 +107,45 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   function prefetchIndex(index){if(!state.photos.length)return;const i=(index+state.photos.length)%state.photos.length,photo=state.photos[i];if(!photo||localPhotoUrls.has(photo.id)||photoCache.has(photo.id))return;fetchPhotoUrl(photo).catch(()=>{})}
   async function renderPhoto(){if(!state.photos||!state.photos.length){screen.classList.remove('has-photo');bg.removeAttribute('src');setIdleVoiceCopy();return}if(state.currentIndex<0)state.currentIndex=0;if(state.currentIndex>=state.photos.length)state.currentIndex=state.photos.length-1;const photo=state.photos[state.currentIndex];try{const cached=localPhotoUrls.get(photo.id)||photoCache.get(photo.id);if(cached)setPhotoSource(cached);else setPhotoSource(await fetchPhotoUrl(photo));prefetchIndex(state.currentIndex-1);prefetchIndex(state.currentIndex+1)}catch(e){showNotice('Foto kon niet worden geladen')}setIdleVoiceCopy()}
   async function loadState(){try{const r=await api('/api/storylab-clean/state');if(r.ok){const s=await r.json();state=Object.assign(state,s||{})}}catch(e){}title.value=state.title||'';dateInput.value=state.date||'';dateText.textContent=formatDate(state.date);storyText.value=state.storyText||'';updateSheetPreview();await renderPhoto()}
-  async function addFiles(files){const room=Math.max(0,12-(state.photos||[]).length),list=Array.from(files||[]).filter(isImageFile).slice(0,room);if(!list.length){showNotice(room?'Geen bruikbare foto geselecteerd':'Maximaal 12 foto’s');return}const startIndex=state.photos.length,pending=[];for(const f of list){const id=makeId(),url=URL.createObjectURL(f);localPhotoUrls.set(id,url);state.photos.push({id:id,name:f.name||'foto',type:imageMime(f),createdAt:Date.now()});pending.push({id:id,file:f,type:imageMime(f),url:url})}state.currentIndex=startIndex;renderPhoto();let failed=0;for(const item of pending){try{const r=await api('/api/storylab-clean/photo?id='+encodeURIComponent(item.id),{method:'PUT',headers:{'content-type':item.type,'x-file-name':encodeURIComponent(item.file.name||'foto')},body:item.file});if(!r.ok)throw new Error('upload '+r.status);photoCache.set(item.id,item.url);localPhotoUrls.delete(item.id)}catch(e){failed++;const idx=state.photos.findIndex(p=>p.id===item.id);if(idx>-1)state.photos.splice(idx,1);const u=localPhotoUrls.get(item.id);if(u)URL.revokeObjectURL(u);localPhotoUrls.delete(item.id)}}if(state.currentIndex>=state.photos.length)state.currentIndex=Math.max(0,state.photos.length-1);await saveState();renderPhoto();if(failed)showNotice(failed===list.length?'Upload niet gelukt · probeer opnieuw':'Niet alle foto’s konden worden bewaard')}
-  async function removeCurrent(){if(!state.photos.length)return;const p=state.photos[state.currentIndex];await api('/api/storylab-clean/photo?id='+encodeURIComponent(p.id),{method:'DELETE'}).catch(()=>{});const local=localPhotoUrls.get(p.id),cached=photoCache.get(p.id);if(local)URL.revokeObjectURL(local);if(cached&&cached!==local)URL.revokeObjectURL(cached);localPhotoUrls.delete(p.id);photoCache.delete(p.id);state.photos.splice(state.currentIndex,1);if(state.currentIndex>=state.photos.length)state.currentIndex=Math.max(0,state.photos.length-1);closeModal('moreModal');await saveState();renderPhoto()}
+  async function addFiles(files){
+    const room=Math.max(0,12-(state.photos||[]).length),list=Array.from(files||[]).filter(isImageFile).slice(0,room);
+    if(!list.length){showNotice(room?'Geen bruikbare foto geselecteerd':'Maximaal 12 foto’s');return}
+    const startIndex=state.photos.length,pending=[];
+    for(const f of list){
+      const id=makeId(),url=URL.createObjectURL(f);
+      localPhotoUrls.set(id,url);
+      state.photos.push({id:id,name:f.name||'foto',type:imageMime(f),createdAt:Date.now()});
+      pending.push({id:id,file:f,type:imageMime(f),url:url});
+    }
+    state.currentIndex=startIndex;
+    mediaUploading++;
+    signalMedia();
+    renderPhoto();
+    let failed=0;
+    for(const item of pending){
+      try{
+        const r=await api('/api/storylab-clean/photo?id='+encodeURIComponent(item.id),{method:'PUT',headers:{'content-type':item.type,'x-file-name':encodeURIComponent(item.file.name||'foto')},body:item.file});
+        if(!r.ok)throw new Error('upload '+r.status);
+        photoCache.set(item.id,item.url);
+        localPhotoUrls.delete(item.id);
+      }catch(e){
+        failed++;
+        const idx=state.photos.findIndex(p=>p.id===item.id);
+        if(idx>-1)state.photos.splice(idx,1);
+        const u=localPhotoUrls.get(item.id);
+        if(u)URL.revokeObjectURL(u);
+        localPhotoUrls.delete(item.id);
+        signalMedia();
+      }
+    }
+    if(state.currentIndex>=state.photos.length)state.currentIndex=Math.max(0,state.photos.length-1);
+    await saveState();
+    mediaUploading=Math.max(0,mediaUploading-1);
+    signalMedia();
+    renderPhoto();
+    if(failed)showNotice(failed===list.length?'Upload niet gelukt · probeer opnieuw':'Niet alle foto’s konden worden bewaard');
+  }
+  async function removeCurrent(){if(!state.photos.length)return;const p=state.photos[state.currentIndex];await api('/api/storylab-clean/photo?id='+encodeURIComponent(p.id),{method:'DELETE'}).catch(()=>{});const local=localPhotoUrls.get(p.id),cached=photoCache.get(p.id);if(local)URL.revokeObjectURL(local);if(cached&&cached!==local)URL.revokeObjectURL(cached);localPhotoUrls.delete(p.id);photoCache.delete(p.id);state.photos.splice(state.currentIndex,1);if(state.currentIndex>=state.photos.length)state.currentIndex=Math.max(0,state.photos.length-1);closeModal('moreModal');await saveState();signalMedia();renderPhoto()}
   function setIdleVoiceCopy(){if(!screen.classList.contains('has-photo')){baseMicLabel.textContent='Tik om te vertellen';return}if(state.audioId||String(storyText.value||'').trim()){photoVoiceTitle.textContent='Vertel verder';photoVoiceSub.textContent='Of veeg de witte balk omhoog voor je tekst'}else{photoVoiceTitle.textContent='Tik en vertel';photoVoiceSub.textContent=state.photos.length>1?'Swipe door je foto’s en vertel wat je ziet':'Kijk naar je foto en vertel wat er gebeurde'}}
   function openSheet(){sheet.classList.add('open');screen.classList.add('sheet-open');storyText.focus()}
   function closeSheet(){sheet.classList.remove('open');screen.classList.remove('sheet-open');updateSheetPreview()}

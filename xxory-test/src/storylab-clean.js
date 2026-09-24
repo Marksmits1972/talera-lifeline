@@ -1,6 +1,6 @@
 import { STORYLAB_CLEAN_PAGE_HTML, STORYLAB_CLEAN_PAGE_REVISION } from './storylab-clean-page.js';
 
-const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260924-video-poster-r1';
+const STORYLAB_CLEAN_UX_REVISION = 'storylab-clean-ux-20260924-video-ended-r1';
 
 const htmlHeaders = {
   'content-type': 'text/html; charset=utf-8',
@@ -338,9 +338,10 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
           if(poster){
             const img=document.createElement('img');img.className='talera-video-poster';img.alt='';img.src=poster;img.style.objectFit=viewState.fit==='contain'?'contain':'cover';node.appendChild(img);
           }
-          const video=document.createElement('video');video.src=src;video.muted=true;video.playsInline=true;video.loop=true;video.preload='auto';video.style.objectFit=viewState.fit==='contain'?'contain':'cover';
+          const video=document.createElement('video');video.src=src;video.muted=true;video.playsInline=true;video.loop=false;video.preload='auto';video.style.objectFit=viewState.fit==='contain'?'contain':'cover';
           video.addEventListener('playing',()=>revealVideo(node));
           video.addEventListener('loadeddata',()=>{if(node===current&&video.paused===false)revealVideo(node)});
+          video.addEventListener('ended',()=>advanceAfterVideoEnd(photo.id,node));
           node.appendChild(video);
         }else{
           const img=document.createElement('img');img.alt='';img.src=src;img.style.objectFit=viewState.fit==='contain'?'contain':'cover';node.appendChild(img);if(img.decode)img.decode().catch(()=>{});
@@ -410,6 +411,21 @@ const LATE_UX_SCRIPT = `<script id="talera-storylab-clean-late-ux-r19h2">
     syncDots();
     persistCurrentIndex();
     setTimeout(()=>{preparePages()},20);
+  }
+  function advanceAfterVideoEnd(photoId,node){
+    if(node!==current||settling||photoTouch||screen.classList.contains('sheet-open')||!viewState||viewState.photos.length<=1)return;
+    const active=viewState.photos[viewState.currentIndex];
+    if(!active||active.id!==photoId)return;
+    const w=screen.getBoundingClientRect().width;
+    settling=true;carousel.classList.remove('dragging');
+    setTransform(previous,-2*w,true);
+    setTransform(current,-w,true);
+    setTransform(next,0,true);
+    setTimeout(()=>{
+      settlePhoto(1);
+      settling=false;
+      photoMode='';
+    },210);
   }
   let photoTouch=null;
   function finishPhotoSwipe(dx,dy){

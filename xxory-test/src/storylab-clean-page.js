@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260924-video-ended-r1';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260924-video-duration-r1';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -147,7 +147,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       if(!blob)return null;
       const preview=URL.createObjectURL(blob);
       previewPhotoUrls.set(id,preview);signalMedia();
-      return blob
+      return {blob:blob,durationSeconds:Number.isFinite(video.duration)?Math.max(0,video.duration):0}
     }catch(e){return null}
     finally{
       clearTimeout(timer);
@@ -211,17 +211,21 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
       const id=makeId(),url=URL.createObjectURL(f),video=isVideoFile(f),type=video?videoMime(f):imageMime(f),posterId=video?makeId():'';
       localPhotoUrls.set(id,url);
       state.photos.push({id:id,name:f.name||(video?'video':'foto'),type:type,posterId:posterId,createdAt:Date.now()});
-      pending.push({id:id,file:f,type:type,url:url,video:video,posterId:posterId,posterBlob:null});
+      pending.push({id:id,file:f,type:type,url:url,video:video,posterId:posterId,posterBlob:null,durationSeconds:0});
     }
     state.currentIndex=startIndex;
     mediaUploading++;
     renderPhoto();
     const previewWork=Promise.allSettled(pending.map(async item=>{
       if(!item.video)return makePreview(item.file,item.id);
-      const blob=await makeVideoPoster(item.file,item.posterId);
+      const posterResult=await makeVideoPoster(item.file,item.posterId);
+      const blob=posterResult&&posterResult.blob||null;
       item.posterBlob=blob;
+      item.durationSeconds=posterResult&&Number(posterResult.durationSeconds)||0;
+      const media=(state.photos||[]).find(p=>p.id===item.id);
+      if(media&&item.durationSeconds)media.durationSeconds=item.durationSeconds;
       if(!blob){
-        const media=(state.photos||[]).find(p=>p.id===item.id);if(media)media.posterId='';
+        if(media)media.posterId='';
         return null
       }
       try{
@@ -334,6 +338,34 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     renderPhotoManager();
     setTimeout(()=>{photoDragJustEnded=false},100);
   }
+  function formatDuration(seconds){
+    const total=Math.max(0,Math.round(Number(seconds)||0));
+    const mins=Math.floor(total/60),secs=total%60;
+    return mins+':'+String(secs).padStart(2,'0')
+  }
+  async function ensureVideoDuration(item,badge){
+    if(!item||!isVideoItem(item))return;
+    if(Number(item.durationSeconds)>0){if(badge)badge.textContent='▶ '+formatDuration(item.durationSeconds);return}
+    let video=null;
+    try{
+      const src=localPhotoUrls.get(item.id)||photoCache.get(item.id)||await fetchPhotoUrl(item);
+      if(!src)return;
+      video=document.createElement('video');video.preload='metadata';video.muted=true;video.playsInline=true;video.src=src;
+      const duration=await new Promise((resolve,reject)=>{
+        const done=()=>{const d=Number(video.duration)||0;cleanup();d>0?resolve(d):reject(new Error('duration'))};
+        const fail=()=>{cleanup();reject(new Error('duration'))};
+        const cleanup=()=>{clearTimeout(timer);video.removeEventListener('loadedmetadata',done);video.removeEventListener('error',fail)};
+        const timer=setTimeout(fail,5000);
+        video.addEventListener('loadedmetadata',done,{once:true});
+        video.addEventListener('error',fail,{once:true});
+        try{video.load()}catch(e){}
+      });
+      item.durationSeconds=duration;
+      if(badge)badge.textContent='▶ '+formatDuration(duration);
+      saveState().catch(()=>{});
+    }catch(e){}
+    finally{if(video){try{video.pause();video.removeAttribute('src');video.load()}catch(e){}}}
+  }
   async function renderPhotoManager(){
     if(!photoManageGrid)return;
     const photoCount=(state.photos||[]).length;photoManageCount.textContent=photoCount+(photoCount===1?' item':' items');
@@ -342,7 +374,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     if(!state.photos||!state.photos.length){const empty=document.createElement('div');empty.className='photo-manage-empty';empty.textContent='Nog geen foto’s of video’s toegevoegd';photoManageGrid.appendChild(empty);return}
     for(let i=0;i<state.photos.length;i++){
       const p=state.photos[i],tile=document.createElement('div');tile.className='photo-manage-tile'+(i===state.currentIndex?' current':'');tile.dataset.photoId=p.id;
-      const media=document.createElement('img');media.alt='';if(isVideoItem(p)){const badge=document.createElement('span');badge.className='photo-manage-video-badge';badge.textContent='▶';tile.appendChild(badge)}tile.appendChild(media);
+      const media=document.createElement('img');media.alt='';if(isVideoItem(p)){const badge=document.createElement('span');badge.className='photo-manage-video-badge';badge.textContent=Number(p.durationSeconds)>0?('▶ '+formatDuration(p.durationSeconds)):'▶';tile.appendChild(badge);ensureVideoDuration(p,badge)}tile.appendChild(media);
       const del=document.createElement('button');del.type='button';del.className='photo-manage-delete';del.textContent='×';del.setAttribute('aria-label',isVideoItem(p)?'Video verwijderen':'Foto verwijderen');del.onclick=e=>{e.stopPropagation();removePhotoById(p.id)};tile.appendChild(del);
       tile.onclick=()=>{if(photoDragJustEnded)return;state.currentIndex=i;renderPhoto();saveState();signalMedia()};
       let touchStartX=0,touchStartY=0,touchId=null;

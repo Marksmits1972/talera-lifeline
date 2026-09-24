@@ -583,6 +583,7 @@ function cleanState(input) {
     name: String(photo?.name || 'foto').slice(0, 180),
     type: String(photo?.type || 'image/jpeg').slice(0, 100),
     posterId: safeId(photo?.posterId) || '',
+    durationSeconds: Math.max(0, Math.min(86400, Number(photo?.durationSeconds || 0))),
     createdAt: Number(photo?.createdAt || Date.now())
   })).filter((photo) => photo.id) : [];
   const maxIndex = Math.max(0, photos.length - 1);

@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260924-video-poster-r1';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260924-video-ended-r1';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -31,7 +31,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 </head>
 <body>
 <main id="screen" class="screen" data-revision="${STORYLAB_CLEAN_PAGE_REVISION}">
-  <img id="bgPhoto" class="bg-photo" alt="Foto bij deze herinnering" /><video id="bgVideo" class="bg-video" muted playsinline loop preload="metadata" aria-label="Video bij deze herinnering"></video>
+  <img id="bgPhoto" class="bg-photo" alt="Foto bij deze herinnering" /><video id="bgVideo" class="bg-video" muted playsinline preload="metadata" aria-label="Video bij deze herinnering"></video>
   <div class="shade"></div>
   <input id="photoInput" class="file-input" type="file" accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v" multiple />
   <header class="top">

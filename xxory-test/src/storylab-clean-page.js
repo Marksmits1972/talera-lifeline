@@ -1,4 +1,4 @@
-export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260923-video-picker-r1';
+export const STORYLAB_CLEAN_PAGE_REVISION = 'storylab-clean-functional-20260924-native-picker-r2';
 
 export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 <html lang="nl">
@@ -47,7 +47,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   </header>
 
   <section class="empty" aria-label="Foto kiezen">
-    <button id="bigPlus" class="plus" type="button" aria-label="Kies een foto of video">+</button>
+    <label id="bigPlus" class="plus" for="photoInput" role="button" aria-label="Kies een foto of video">+</label>
     <h2>Kies een foto of video die je herinnering oproept</h2>
     <p>Daarna kun je gewoon kijken en je verhaal vertellen.</p>
   </section>
@@ -75,7 +75,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
 
 <div id="editModal" class="modal"><section class="card"><h3>Herinnering bewerken</h3><div class="field"><label>Titel</label><input id="editTitle" maxlength="140" /></div><div class="field"><label>Datum</label><input id="editDate" type="date" /></div><div class="card-actions"><button class="secondary" data-close="editModal">Annuleren</button><button id="saveEdit" class="primary">Opslaan</button></div></section></div>
 <div id="noteModal" class="modal"><section class="card"><h3>Opmerking</h3><div class="field"><textarea id="noteText" placeholder="Voeg een opmerking toe..."></textarea></div><div class="card-actions"><button class="secondary" data-close="noteModal">Annuleren</button><button id="saveNote" class="primary">Opslaan</button></div></section></div>
-<div id="moreModal" class="modal"><section class="card"><h3>Meer</h3><div class="more-list"><button id="addAnother" class="more-item" type="button"><span>Foto of video toevoegen</span><span>›</span></button><button id="managePhotosBtn" class="more-item" type="button"><span>Foto’s en video’s beheren</span><span>›</span></button><button id="editBtn" class="more-item" type="button"><span>Titel en datum</span><span>›</span></button></div><button class="more-close" data-close="moreModal" type="button">Klaar</button></section></div>
+<div id="moreModal" class="modal"><section class="card"><h3>Meer</h3><div class="more-list"><label id="addAnother" class="more-item" for="photoInput" role="button"><span>Foto of video toevoegen</span><span>›</span></label><button id="managePhotosBtn" class="more-item" type="button"><span>Foto’s en video’s beheren</span><span>›</span></button><button id="editBtn" class="more-item" type="button"><span>Titel en datum</span><span>›</span></button></div><button class="more-close" data-close="moreModal" type="button">Klaar</button></section></div>
 <div id="photoManageModal" class="modal"><section class="card photo-manage-card"><div class="photo-manage-head"><h3>Foto’s en video’s beheren</h3><span id="photoManageCount" class="photo-manage-count"></span></div><div id="photoManageGrid" class="photo-manage-grid"></div><button class="more-close" data-close="photoManageModal" type="button">Klaar</button></section></div>
 <div id="notice" class="notice"></div>
 
@@ -110,14 +110,6 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   let photoDragTimer=0,photoDrag=null,photoDragJustEnded=false;
   function showNotice(t){notice.textContent=t;notice.classList.add('show');setTimeout(()=>notice.classList.remove('show'),2200)}
   function api(path,opts){return fetch(path+(path.indexOf('?')>-1?'&':'?')+'client='+encodeURIComponent(clientId),opts)}
-  function openMediaPicker(closeId){
-    let opened=false;
-    try{
-      if(typeof photoInput.showPicker==='function'){photoInput.showPicker();opened=true}
-    }catch(e){}
-    if(!opened){try{photoInput.click();opened=true}catch(e){}}
-    if(closeId)setTimeout(()=>closeModal(closeId),0);
-  }
   function formatDate(v){if(!v)return 'Wanneer was dit?';const d=new Date(v+'T12:00:00');return new Intl.DateTimeFormat('nl-NL',{day:'numeric',month:'long',year:'numeric'}).format(d)}
   function imageMime(file){const t=String(file&&file.type||'').toLowerCase();if(t.startsWith('image/'))return t;const n=String(file&&file.name||'').toLowerCase();if(/\.heic$/.test(n))return 'image/heic';if(/\.heif$/.test(n))return 'image/heif';if(/\.png$/.test(n))return 'image/png';if(/\.webp$/.test(n))return 'image/webp';if(/\.gif$/.test(n))return 'image/gif';if(/\.avif$/.test(n))return 'image/avif';return 'image/jpeg'}
   function videoMime(file){const t=String(file&&file.type||'').toLowerCase();if(t.startsWith('video/'))return t;const n=String(file&&file.name||'').toLowerCase();if(/\.mov$/i.test(n))return 'video/quicktime';if(/\.m4v$/i.test(n))return 'video/x-m4v';return 'video/mp4'}
@@ -290,7 +282,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
     if(!photoManageGrid)return;
     const photoCount=(state.photos||[]).length;photoManageCount.textContent=photoCount+(photoCount===1?' item':' items');
     photoManageGrid.innerHTML='';
-    const add=document.createElement('button');add.type='button';add.className='photo-manage-tile photo-manage-add';add.innerHTML='<span>+</span>';add.setAttribute('aria-label','Foto of video toevoegen');add.onclick=()=>openMediaPicker('photoManageModal');photoManageGrid.appendChild(add);
+    const add=document.createElement('label');add.className='photo-manage-tile photo-manage-add';add.htmlFor='photoInput';add.setAttribute('role','button');add.innerHTML='<span>+</span>';add.setAttribute('aria-label','Foto of video toevoegen');photoManageGrid.appendChild(add);
     if(!state.photos||!state.photos.length){const empty=document.createElement('div');empty.className='photo-manage-empty';empty.textContent='Nog geen foto’s of video’s toegevoegd';photoManageGrid.appendChild(empty);return}
     for(let i=0;i<state.photos.length;i++){
       const p=state.photos[i],tile=document.createElement('div');tile.className='photo-manage-tile'+(i===state.currentIndex?' current':'');tile.dataset.photoId=p.id;
@@ -349,7 +341,7 @@ export const STORYLAB_CLEAN_PAGE_HTML = `<!doctype html>
   function beginSpeechCapture(){speechBase=String(storyText.value||'').trim();speechFinal='';speechInterim='';speechWanted=true;launchRecognition()}
   function stopSpeechCapture(){speechWanted=false;if(recognition){try{recognition.stop()}catch(e){}recognition=null}speechInterim='';storyText.value=currentSpeechText();updateSheetPreview()}
   async function startStopRecording(btn){if(recorder&&recorder.state==='recording'){recorder.stop();btn.classList.remove('recording');document.getElementById('mic').classList.remove('recording');photoVoiceTitle.textContent='Even afronden…';photoVoiceSub.textContent='';baseMicLabel.textContent='Even afronden…';stopSpeechCapture();return}if(!navigator.mediaDevices||!window.MediaRecorder){showNotice('Opname wordt hier niet ondersteund');return}try{stream=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=async()=>{const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'}),id=makeId();await new Promise(r=>setTimeout(r,180));try{const r=await api('/api/storylab-clean/audio?id='+encodeURIComponent(id),{method:'PUT',headers:{'content-type':blob.type||'audio/webm'},body:blob});if(r.ok){state.audioId=id;state.storyText=storyText.value;await saveState();if(screen.classList.contains('has-photo')){photoVoiceTitle.textContent='Klaar';photoVoiceSub.textContent='Veeg de witte balk omhoog om je tekst te bekijken';nudgeSheet(String(storyText.value||'').trim()?'Je tekst staat klaar · veeg omhoog':'Opname bewaard · veeg omhoog voor je tekst')}else{baseMicLabel.textContent='Klaar · veeg de witte balk omhoog';nudgeSheet(String(storyText.value||'').trim()?'Je tekst staat klaar · veeg omhoog':'Opname bewaard · veeg omhoog')}}else{showNotice('Opname kon niet worden bewaard');setIdleVoiceCopy()}}catch(e){showNotice('Opname kon niet worden bewaard');setIdleVoiceCopy()}if(stream)stream.getTracks().forEach(t=>t.stop())};recorder.start();beginSpeechCapture();btn.classList.add('recording');if(btn.id!=='mic')document.getElementById('mic').classList.add('recording');if(screen.classList.contains('has-photo')){photoVoiceTitle.textContent='Je vertelt nu';photoVoiceSub.textContent='Tik om te stoppen'}else baseMicLabel.textContent='Je vertelt nu · tik om te stoppen'}catch(e){showNotice('Microfoon niet beschikbaar')}}
-  document.getElementById('bigPlus').onclick=()=>openMediaPicker();document.getElementById('addAnother').onclick=()=>openMediaPicker('moreModal');photoInput.onchange=async()=>{const chosen=Array.from(photoInput.files||[]);photoInput.value='';await addFiles(chosen)};
+  photoInput.onchange=async()=>{const chosen=Array.from(photoInput.files||[]);photoInput.value='';closeModal('moreModal');closeModal('photoManageModal');await addFiles(chosen)};
   title.addEventListener('change',saveState);title.addEventListener('blur',saveState);dateInput.addEventListener('change',async()=>{if(dateInput.value>today)dateInput.value=today;dateText.textContent=formatDate(dateInput.value);await saveState()});storyText.addEventListener('input',updateSheetPreview);storyText.addEventListener('change',saveState);storyText.addEventListener('blur',saveState);
   document.getElementById('sheetHandle').onclick=openSheet;sheetPreview.onclick=openSheet;document.getElementById('sheetClose').onclick=async()=>{closeSheet();await saveState();setIdleVoiceCopy()};sheet.addEventListener('touchstart',e=>{sheetY=e.changedTouches[0].clientY},{passive:true});sheet.addEventListener('touchend',e=>{const dy=e.changedTouches[0].clientY-sheetY;if(dy<-28)openSheet();else if(dy>28&&sheet.classList.contains('open')){closeSheet();saveState();setIdleVoiceCopy()}},{passive:true});
   document.getElementById('mic').onclick=e=>startStopRecording(e.currentTarget);document.getElementById('storyTrigger').onclick=e=>startStopRecording(e.currentTarget);

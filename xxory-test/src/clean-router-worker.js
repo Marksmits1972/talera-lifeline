@@ -16,6 +16,8 @@ function cleanStoryState(input) {
     id: String(photo?.id || ''),
     name: String(photo?.name || 'foto').slice(0, 180),
     type: String(photo?.type || 'image/jpeg').slice(0, 100),
+    posterId: String(photo?.posterId || '').slice(0, 80),
+    durationSeconds: Math.max(0, Math.min(86400, Number(photo?.durationSeconds || 0))),
     createdAt: Number(photo?.createdAt || Date.now())
   })).filter((photo) => /^[A-Za-z0-9_-]{8,80}$/.test(photo.id)) : [];
   return {

@@ -2,6 +2,7 @@ import legacyWorker from './orb-app-v79-worker-timeline-publish.js';
 import { handleCleanRebuildV2 } from './clean-rebuild-v2.js';
 import { handleStoryLabFresh } from './storylab-fresh.js';
 import { handleStoryLabClean } from './storylab-clean.js';
+import { handleTVPlayer } from './tv-player.js';
 
 const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev';
 const PUBLISH_REVISION = 'storylab-clean-timeline-publish-20260923-video-r1';
@@ -337,6 +338,9 @@ async function decorateCleanStoryLabResponse(response, url) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    const tvResponse = await handleTVPlayer(request, env);
+    if (tvResponse) return tvResponse;
 
     const publishResponse = await handleCleanPublish(request, env);
     if (publishResponse) return publishResponse;

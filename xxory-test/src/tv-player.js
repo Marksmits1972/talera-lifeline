@@ -63,7 +63,7 @@ export async function handleTVPlayer(request, env) {
 
 async function ensureSchema(env) {
   if (!schemaPromise) {
-    schemaPromise = env.DB.prepare(\`
+    schemaPromise = env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS tv_sessions (
         session_id TEXT PRIMARY KEY,
         created_at TEXT NOT NULL,
@@ -78,7 +78,7 @@ async function ensureSchema(env) {
         command_version INTEGER NOT NULL DEFAULT 0,
         command_json TEXT
       )
-    \`).run().catch((error) => {
+    `).run().catch((error) => {
       schemaPromise = null;
       throw error;
     });
@@ -95,17 +95,17 @@ async function createSession(request, env) {
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
 
   try {
-    await env.DB.prepare(\`
+    await env.DB.prepare(`
       DELETE FROM tv_sessions WHERE expires_at < ?
-    \`).bind(now.toISOString()).run();
+    `).bind(now.toISOString()).run();
   } catch {}
 
-  await env.DB.prepare(\`
+  await env.DB.prepare(`
     INSERT INTO tv_sessions (
       session_id, created_at, expires_at, state, pair_code,
       pair_token_hash, player_token_hash, updated_at
     ) VALUES (?, ?, ?, 'waiting', ?, ?, ?, ?)
-  \`).bind(
+  `).bind(
     sessionId,
     now.toISOString(),
     expiresAt.toISOString(),
@@ -116,7 +116,7 @@ async function createSession(request, env) {
   ).run();
 
   const origin = new URL(request.url).origin;
-  const pairUrl = \`\${origin}/tv/pair?session=\${encodeURIComponent(sessionId)}&token=\${encodeURIComponent(pairToken)}\`;
+  const pairUrl = `\${origin}/tv/pair?session=\${encodeURIComponent(sessionId)}&token=\${encodeURIComponent(pairToken)}`;
 
   return json({
     ok: true,
@@ -133,11 +133,11 @@ async function getSessionState(request, env, sessionId) {
   const token = bearerToken(request);
   if (!token) return json({ error: 'Sessie-token ontbreekt.' }, 401);
 
-  const row = await env.DB.prepare(\`
+  const row = await env.DB.prepare(`
     SELECT session_id, expires_at, state, player_token_hash, controller_token_hash,
       paired_at, updated_at, command_version, command_json
     FROM tv_sessions WHERE session_id = ? LIMIT 1
-  \`).bind(sessionId).first();
+  `).bind(sessionId).first();
 
   if (!row || isExpired(row.expires_at)) return json({ error: 'Deze TV-sessie is verlopen.' }, 404);
 
@@ -172,10 +172,10 @@ async function pairSession(request, env, sessionId) {
   const pairToken = String(payload.pairToken || '');
   if (!pairToken) return json({ error: 'Koppel-token ontbreekt.' }, 400);
 
-  const row = await env.DB.prepare(\`
+  const row = await env.DB.prepare(`
     SELECT session_id, expires_at, state, pair_token_hash
     FROM tv_sessions WHERE session_id = ? LIMIT 1
-  \`).bind(sessionId).first();
+  `).bind(sessionId).first();
 
   if (!row || isExpired(row.expires_at)) return json({ error: 'Deze TV-sessie is verlopen.' }, 404);
   if (!safeEqual(await sha256(pairToken), row.pair_token_hash)) return json({ error: 'Deze QR-code is niet geldig.' }, 403);
@@ -183,11 +183,11 @@ async function pairSession(request, env, sessionId) {
   const controllerToken = randomToken(24);
   const now = new Date().toISOString();
 
-  await env.DB.prepare(\`
+  await env.DB.prepare(`
     UPDATE tv_sessions
     SET state = 'paired', controller_token_hash = ?, paired_at = ?, updated_at = ?
     WHERE session_id = ?
-  \`).bind(await sha256(controllerToken), now, now, sessionId).run();
+  `).bind(await sha256(controllerToken), now, now, sessionId).run();
 
   return json({
     ok: true,
@@ -203,10 +203,10 @@ async function sendCommand(request, env, sessionId) {
   const token = bearerToken(request);
   if (!token) return json({ error: 'Bediening-token ontbreekt.' }, 401);
 
-  const row = await env.DB.prepare(\`
+  const row = await env.DB.prepare(`
     SELECT session_id, expires_at, state, controller_token_hash, command_version
     FROM tv_sessions WHERE session_id = ? LIMIT 1
-  \`).bind(sessionId).first();
+  `).bind(sessionId).first();
 
   if (!row || isExpired(row.expires_at)) return json({ error: 'Deze TV-sessie is verlopen.' }, 404);
   if (row.state !== 'paired' || !row.controller_token_hash) return json({ error: 'Koppel eerst een telefoon.' }, 409);
@@ -229,13 +229,13 @@ async function sendCommand(request, env, sessionId) {
   };
 
   const nextState = type === 'disconnect' ? 'waiting' : 'paired';
-  await env.DB.prepare(\`
+  await env.DB.prepare(`
     UPDATE tv_sessions
     SET state = ?, command_version = ?, command_json = ?, updated_at = ?,
       controller_token_hash = CASE WHEN ? = 'disconnect' THEN NULL ELSE controller_token_hash END,
       paired_at = CASE WHEN ? = 'disconnect' THEN NULL ELSE paired_at END
     WHERE session_id = ?
-  \`).bind(nextState, version, JSON.stringify(command), now, type, type, sessionId).run();
+  `).bind(nextState, version, JSON.stringify(command), now, type, type, sessionId).run();
 
   return json({ ok: true, version, command });
 }
@@ -244,10 +244,10 @@ async function closeSession(request, env, sessionId) {
   const token = bearerToken(request);
   if (!token) return json({ error: 'Sessie-token ontbreekt.' }, 401);
 
-  const row = await env.DB.prepare(\`
+  const row = await env.DB.prepare(`
     SELECT session_id, player_token_hash, controller_token_hash
     FROM tv_sessions WHERE session_id = ? LIMIT 1
-  \`).bind(sessionId).first();
+  `).bind(sessionId).first();
   if (!row) return json({ ok: true });
 
   const hash = await sha256(token);
@@ -255,12 +255,12 @@ async function closeSession(request, env, sessionId) {
     (row.controller_token_hash && safeEqual(hash, row.controller_token_hash));
   if (!allowed) return json({ error: 'Geen toegang.' }, 403);
 
-  await env.DB.prepare(\`DELETE FROM tv_sessions WHERE session_id = ?\`).bind(sessionId).run();
+  await env.DB.prepare(`DELETE FROM tv_sessions WHERE session_id = ?`).bind(sessionId).run();
   return json({ ok: true });
 }
 
 function renderTVPage() {
-  return \`<!doctype html>
+  return `<!doctype html>
 <html lang="nl">
 <head>
 <meta charset="utf-8">
@@ -383,11 +383,11 @@ linear-gradient(180deg,#FBF9F5 0%,#F7F4EF 100%)}
 })();
 </script>
 </body>
-</html>\`;
+</html>`;
 }
 
 function renderPairPage() {
-  return \`<!doctype html>
+  return `<!doctype html>
 <html lang="nl">
 <head>
 <meta charset="utf-8">
@@ -479,7 +479,7 @@ button:disabled{opacity:.55}.notice{min-height:24px;margin:16px 0 0;color:var(--
 })();
 </script>
 </body>
-</html>\`;
+</html>`;
 }
 
 function cleanId(value) {

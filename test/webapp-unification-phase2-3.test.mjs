@@ -64,6 +64,15 @@ test('timeline linked-memory transport is local in unified webapp', () => {
 test('desktop timeline has responsive large-screen rules while tell stays phone-primary', () => {
   assert.match(source.unified, /@media \(min-width:900px\)/);
   assert.match(source.unified, /width:min\(1440px,100%\)/);
-  assert.match(source.unified, /tell-phone-primary-responsive/);
+  assert.match(source.router, /tell-phone-primary-responsive/);
+  assert.match(source.router, /rewritten\.pathname = '\/storylab-clean'/);
+  assert.match(source.router, /editMode = unifiedTellUrl\.searchParams\.has\('edit'\)/);
   assert.match(source.unified, /timeline-desktop-responsive/);
+});
+
+test('StoryLab Clean receives timeline date context for new memories', () => {
+  const storylab = readFileSync(fileURLToPath(new URL('../xxory-test/src/storylab-clean-page.js', import.meta.url)), 'utf8');
+  assert.match(storylab, /const requestedAt=/);
+  assert.match(storylab, /const seededDate=!state\.date&&requestedAt/);
+  assert.match(storylab, /if\(seededDate\)await saveState\(\)/);
 });

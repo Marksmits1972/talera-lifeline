@@ -3,8 +3,8 @@ import { handleCleanRebuildV2 } from './clean-rebuild-v2.js';
 import { handleStoryLabFresh } from './storylab-fresh.js';
 import { handleStoryLabClean } from './storylab-clean.js';
 import { handleTVPlayer } from './tv-player.js';
+import { handleUnifiedWebapp } from './unified-webapp.js';
 
-const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev';
 const PUBLISH_REVISION = 'storylab-clean-timeline-publish-20260923-video-r1';
 
 function safeClient(value) {
@@ -224,7 +224,7 @@ async function handleCleanPublish(request, env) {
     return Response.json({ error: 'De tijdlijnkoppeling kon niet worden teruggecontroleerd.' }, { status: 500 });
   }
 
-  const handoffUrl = `${TIMELINE_ORIGIN}/?handoff=1#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
+  const handoffUrl = `${url.origin}/timeline?handoff=1#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
   return Response.json({ ok: true, storyId, manageToken, handoffUrl, reused, revision: PUBLISH_REVISION }, {
     headers: { 'cache-control': 'no-store, max-age=0' }
   });
@@ -338,6 +338,9 @@ async function decorateCleanStoryLabResponse(response, url) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    const unifiedResponse = await handleUnifiedWebapp(request, env, ctx, legacyWorker);
+    if (unifiedResponse) return unifiedResponse;
 
     const tvResponse = await handleTVPlayer(request, env);
     if (tvResponse) return tvResponse;

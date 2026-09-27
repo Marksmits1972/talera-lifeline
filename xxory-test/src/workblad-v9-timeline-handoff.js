@@ -1,7 +1,7 @@
 export const WORKBLAD_V9_TIMELINE_HANDOFF_SCRIPT = String.raw`<script id="talera-workblad-v9-timeline-handoff">
 (() => {
   const REV = 'workblad-v9-direct-timeline-handoff-20260915-r1';
-  const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev/';
+  const TIMELINE_ORIGIN = location.origin + '/timeline';
   let publishing = false;
   let readyMemoryId = '';
   let publishedMemoryId = '';

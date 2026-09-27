@@ -101,3 +101,36 @@ Visible changes are not considered a new TALERA baseline until:
 PLAN/SCOPE → BUILD → INTERNAL TEST → GREEN → REAL MOBILE/SAFARI USER CHECK → APPROVAL → BASELINE.
 
 The same rule applies to desktop and TV Player flows, with desktop used first as the TV simulator.
+
+
+## Implementation status — 27 september 2026
+
+Phase 2 and phase 3 are now implemented on the feature branch as an internal test foundation.
+
+### Phase 2 implemented
+
+- the existing timeline is mounted at `/timeline` inside the same TALERA Worker as the tell environment
+- the existing tell/edit experience is reachable at `/tell`
+- StoryLab Clean publish handoff now returns to `/timeline` on the current origin instead of the old external timeline Worker
+- V9 publish/edit handoff uses the same-origin `/timeline` route
+- timeline private-memory reads through `/api/linked/*` are translated locally to the existing `/api/integration/*` story API
+- the existing D1 story rows and R2 media remain the memory source; no duplicate desktop memory store has been introduced
+- share-preview traffic can be served from the same Worker, with generated timeline share links rewritten to the unified `/timeline` route
+
+### Phase 3 implemented
+
+- `/app` provides a responsive test entry point for the combined TALERA webapp
+- `/timeline` keeps the existing phone behavior and receives a wider desktop presentation layout at larger breakpoints
+- `/tell` keeps the phone-primary creation model while remaining usable and centered on desktop
+- navigation from the unified timeline to create/edit uses the same-origin `/tell` route
+- `/tv` remains the dedicated large-screen Player surface built in phase 1
+- `/api/webapp/revision` reports the current phase 2/3 capabilities for deployment verification
+
+### Still deliberately pending
+
+- Cloudflare preview deployment and binding verification
+- real desktop walkthrough by the product owner
+- real iPhone/Safari acceptance after the unified deployment is reachable
+- any merge to `main` or production cutover
+
+Those pending items are acceptance/deployment gates, not missing product architecture.

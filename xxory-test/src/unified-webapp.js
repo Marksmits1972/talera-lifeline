@@ -103,16 +103,6 @@ export async function handleUnifiedWebapp(request, env, ctx, legacyWorker) {
     });
   }
 
-  if ((url.pathname === '/tell' || url.pathname === '/tell/') &&
-      (request.method === 'GET' || request.method === 'HEAD')) {
-    const rewritten = new URL(request.url);
-    rewritten.pathname = '/';
-    const response = await legacyWorker.fetch(new Request(rewritten.toString(), {
-      method: request.method,
-      headers: request.headers
-    }), env, ctx);
-    return decorateTellResponse(response);
-  }
 
   if ((url.pathname === '/timeline' || url.pathname === '/timeline/') &&
       (request.method === 'GET' || request.method === 'HEAD')) {
@@ -214,30 +204,6 @@ async function decorateTimelineResponse(response) {
     .replace('<title>TALERA — Tijdlijnprototype v22 · PhotoBook</title>', '<title>TALERA — Mijn tijdlijn</title>');
 
   return new Response(htmlText, {
-    status: response.status,
-    statusText: response.statusText,
-    headers
-  });
-}
-
-async function decorateTellResponse(response) {
-  const type = response.headers.get('content-type') || '';
-  if (!type.includes('text/html')) return withHeader(response, 'x-talera-webapp', UNIFIED_WEBAPP_REV);
-  const source = await response.text();
-  const headers = new Headers(response.headers);
-  headers.delete('content-length');
-  headers.set('cache-control', 'no-store, max-age=0');
-  headers.set('x-talera-webapp', UNIFIED_WEBAPP_REV);
-  headers.set('x-talera-surface', 'tell-phone-primary-responsive');
-
-  const extra = `<style id="talera-unified-tell-desktop">
-@media(min-width:900px){
-  body{background:linear-gradient(90deg,#EEF3F6 0,#F7F4EF 20%,#F7F4EF 80%,#EEF3F6 100%)!important}
-  .work-stage{max-width:760px!important;min-height:100dvh!important;margin:0 auto!important}
-}
-</style>`;
-
-  return new Response(source.replace('</head>', extra + '</head>'), {
     status: response.status,
     statusText: response.statusText,
     headers

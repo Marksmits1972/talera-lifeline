@@ -201,7 +201,7 @@ export const WORKBLAD_V9_INTEGRATION_BRIDGE_SCRIPT = String.raw`<script id="tale
       log('save failed', error);
     } finally {
       btn.dataset.v9Busy = '0';
-      if (!location.href.includes('talera-timeline-prototype')) btn.disabled = false;
+      if (!location.pathname.startsWith('/timeline')) btn.disabled = false;
     }
   }
 

@@ -23,10 +23,11 @@ for (const [name, path] of Object.entries(files)) {
   });
 }
 
-test('unified webapp exposes app, tell and timeline routes on one origin', () => {
+test('unified webapp exposes app and timeline while router owns the current tell surface', () => {
   assert.match(source.unified, /url\.pathname === '\/app'/);
-  assert.match(source.unified, /url\.pathname === '\/tell'/);
   assert.match(source.unified, /url\.pathname === '\/timeline'/);
+  assert.match(source.router, /unifiedTellUrl\.pathname === '\/tell'/);
+  assert.match(source.router, /rewritten\.pathname = '\/storylab-clean'/);
   assert.match(source.unified, /sameOriginLinkedMemoryApi: true/);
   assert.match(source.unified, /desktopPrimaryTimelinePresentation: true/);
   assert.match(source.unified, /phonePrimaryCreation: true/);

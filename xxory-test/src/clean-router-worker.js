@@ -369,7 +369,16 @@ export default {
     const unifiedTellUrl = new URL(request.url);
     if ((unifiedTellUrl.pathname === '/tell' || unifiedTellUrl.pathname === '/tell/') &&
         (request.method === 'GET' || request.method === 'HEAD')) {
+      const editMode = unifiedTellUrl.searchParams.has('edit') || unifiedTellUrl.searchParams.has('manage');
       const rewritten = new URL(request.url);
+      if (editMode) {
+        rewritten.pathname = '/';
+        const editResponse = await legacyWorker.fetch(new Request(rewritten.toString(), {
+          method: request.method,
+          headers: request.headers
+        }), env, ctx);
+        return editResponse;
+      }
       rewritten.pathname = '/storylab-clean';
       const tellRequest = new Request(rewritten.toString(), { method: request.method, headers: request.headers });
       const tellResponse = await handleStoryLabClean(tellRequest, env);

@@ -335,12 +335,49 @@ async function decorateCleanStoryLabResponse(response, url) {
   });
 }
 
+async function decorateUnifiedTellAlias(response) {
+  if (!response) return response;
+  const type = response.headers.get('content-type') || '';
+  if (!type.includes('text/html')) return response;
+  const html = await response.text();
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.set('cache-control', 'no-store, max-age=0');
+  headers.set('x-talera-webapp', 'webapp-phase2-3-20260927-r1');
+  headers.set('x-talera-surface', 'tell-phone-primary-responsive');
+  const desktop = `<style id="talera-unified-storylab-clean-desktop">
+@media(min-width:900px){
+  html,body{background:#EDF2F5!important}
+  body{display:grid!important;place-items:center!important}
+  .screen{width:min(760px,100%)!important;box-shadow:0 0 0 1px rgba(15,39,71,.05),0 22px 80px rgba(4,20,32,.18)!important}
+}
+</style>`;
+  return new Response(html.replace('</head>', desktop + '</head>'), {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     const unifiedResponse = await handleUnifiedWebapp(request, env, ctx, legacyWorker);
     if (unifiedResponse) return unifiedResponse;
+
+    const unifiedTellUrl = new URL(request.url);
+    if ((unifiedTellUrl.pathname === '/tell' || unifiedTellUrl.pathname === '/tell/') &&
+        (request.method === 'GET' || request.method === 'HEAD')) {
+      const rewritten = new URL(request.url);
+      rewritten.pathname = '/storylab-clean';
+      const tellRequest = new Request(rewritten.toString(), { method: request.method, headers: request.headers });
+      const tellResponse = await handleStoryLabClean(tellRequest, env);
+      if (tellResponse) {
+        const publishedTell = await decorateCleanStoryLabResponse(tellResponse, rewritten);
+        return decorateUnifiedTellAlias(publishedTell);
+      }
+    }
 
     const tvResponse = await handleTVPlayer(request, env);
     if (tvResponse) return tvResponse;

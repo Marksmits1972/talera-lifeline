@@ -197,8 +197,13 @@ async function decorateTimelineResponse(response) {
   headers.set('x-talera-webapp', UNIFIED_WEBAPP_REV);
   headers.set('x-talera-surface', 'timeline-desktop-responsive');
 
-  const htmlText = source
-    .replace('<html lang="nl">', '<html lang="nl" class="talera-unified-timeline">')
+  let htmlText = source;
+  if (htmlText.includes('<html lang="nl" class="')) {
+    htmlText = htmlText.replace('<html lang="nl" class="', '<html lang="nl" class="talera-unified-timeline ');
+  } else {
+    htmlText = htmlText.replace('<html lang="nl">', '<html lang="nl" class="talera-unified-timeline">');
+  }
+  htmlText = htmlText
     .replace('</head>', DESKTOP_STYLE + '</head>')
     .replace('</body>', UNIFIED_SCRIPT + '</body>')
     .replace('<title>TALERA — Tijdlijnprototype v22 · PhotoBook</title>', '<title>TALERA — Mijn tijdlijn</title>');

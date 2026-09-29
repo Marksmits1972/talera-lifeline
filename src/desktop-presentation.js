@@ -44,16 +44,21 @@ export const desktopPresentationStyle = String.raw`
     --timeline-rest-opacity:1;
     --timeline-rest-filter:saturate(1.20) contrast(1.52) brightness(1.06) drop-shadow(0 1px 2px rgba(255,255,255,.95)) drop-shadow(0 3px 5px rgba(15,39,71,.34));
   }
-  .timeline::before{
-    height:286px!important;
-    background:linear-gradient(180deg,rgba(247,244,239,.30) 0%,rgba(247,244,239,.15) 42%,rgba(247,244,239,.04) 72%,transparent 100%)!important;
-    backdrop-filter:blur(20px) saturate(1.16)!important;
-    -webkit-backdrop-filter:blur(20px) saturate(1.16)!important;
+  .timeline::before,
+  .timeline.is-timeline-engaged::before,
+  .timeline.is-timeline-afterglow::before{
+    height:224px!important;
+    background:linear-gradient(180deg,rgba(247,244,239,.10) 0%,rgba(247,244,239,.045) 58%,transparent 100%)!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
     opacity:1!important;
+    transition:none!important;
   }
-  .timeline::after{
-    opacity:1!important;
-    background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(91,143,185,.10) 54%,transparent 100%)!important;
+  .timeline::after,
+  .timeline.is-timeline-engaged::after,
+  .timeline.is-timeline-afterglow::after{
+    background:transparent!important;
+    opacity:0!important;
   }
   .timeline canvas,.timeline.is-active canvas,
   .timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{

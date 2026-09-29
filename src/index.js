@@ -21,7 +21,7 @@ import { desktopPresentationStyle, desktopPresentationScript } from "./desktop-p
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "large-screen-lifeline-renderer-v6-20260929";
+const TALERA_TIMELINE_DEPLOY_REV = "approved-tv-presentation-v7-20260929";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
@@ -59,6 +59,8 @@ window.__taleraTimelineRuntime={
   },
   activeMemoryId(){return activeMemoryId},
   centerMs(){return centerMs},
+  bounds(){return bounds()},
+  memories(){return MEMORIES.slice()},
   isMoving(){return userIsMoving},
   registerMemory(memory){
     if(!memory)return null;

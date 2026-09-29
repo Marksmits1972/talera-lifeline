@@ -81,8 +81,8 @@ export const desktopPresentationScript = String.raw`
   const render=()=>{
     const rt=window.__taleraTimelineRuntime;if(!rt||!large())return;
     const memories=rt.memories?rt.memories():[];const bounds=rt.bounds?rt.bounds():null;if(!bounds)return;
-    const start=bounds[0],end=bounds[1],span=Math.max(1,end-start),w=timeline.clientWidth,active=rt.activeMemoryId();
-    const visible=memories.filter(m=>m&&Number.isFinite(Number(m.ms))&&m.ms>=start&&m.ms<=end&&m.id!==active&&m.image).map(m=>({m,x:(m.ms-start)/span*w})).sort((a,b)=>a.x-b.x);
+    const start=bounds[0],end=bounds[1],span=Math.max(1,end-start),w=timeline.clientWidth||window.innerWidth,active=rt.activeMemoryId();
+    let visible=memories.filter(m=>m&&Number.isFinite(Number(m.ms))&&m.ms>=start&&m.ms<=end&&m.id!==active&&m.image).map(m=>({m,x:(m.ms-start)/span*w})).sort((a,b)=>a.x-b.x);if(!visible.length){const center=rt.centerMs?rt.centerMs():(start+end)/2;visible=memories.filter(m=>m&&m.id!==active&&m.image&&Number.isFinite(Number(m.ms))).sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,9).sort((a,b)=>a.ms-b.ms).map((m,i,a)=>({m,x:70+(i+1)*(Math.max(1,w-140)/(a.length+1))}))}
     const groups=[];
     for(const item of visible){const prev=groups[groups.length-1];if(prev&&Math.abs(item.x-prev.x)<34){prev.items.push(item.m);prev.x=(prev.x*(prev.items.length-1)+item.x)/prev.items.length}else groups.push({x:item.x,items:[item.m]})}
     layer.replaceChildren();

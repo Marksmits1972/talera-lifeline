@@ -42,7 +42,9 @@ export const memoryPresentationControlsStyle = String.raw`
 
 export const memoryPresentationControlsScript = String.raw`
 (()=>{
-  const TELL_ORIGIN='https://xxory-test.mark-a39.workers.dev';
+  const UNIFIED_TIMELINE=location.pathname==='/timeline'||location.pathname==='/timeline/';
+  const TELL_ORIGIN=UNIFIED_TIMELINE?location.origin:'https://xxory-test.mark-a39.workers.dev';
+  const TELL_ROUTE=UNIFIED_TIMELINE?'/tell':'/';
   const runtime=window.__taleraTimelineRuntime;
   const memorySpace=document.querySelector('.memory-space');
   const storyScroll=document.getElementById('memoryStoryScroll');
@@ -58,7 +60,7 @@ export const memoryPresentationControlsScript = String.raw`
   const oldTell=document.querySelector('.tell');
   if(oldTell){
     const fresh=oldTell.cloneNode(true);oldTell.replaceWith(fresh);
-    fresh.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeManager();stopAudio(true);location.href=TELL_ORIGIN+'/?new=1&at='+encodeURIComponent(new Date(runtime.centerMs()).toISOString())},true);
+    fresh.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeManager();stopAudio(true);location.href=TELL_ORIGIN+TELL_ROUTE+'?new=1&at='+encodeURIComponent(new Date(runtime.centerMs()).toISOString())},true);
   }
 
   const tools=document.createElement('div');
@@ -90,7 +92,7 @@ export const memoryPresentationControlsScript = String.raw`
   function showAudio(v){audioButton.hidden=!v}
   function editUrl(memory,mode=''){
     const query=new URLSearchParams();query.set('edit',memory.storyId);if(mode)query.set('manage',mode);
-    return TELL_ORIGIN+'/?'+query.toString()+'#token='+encodeURIComponent(tokenFor(memory));
+    return TELL_ORIGIN+TELL_ROUTE+'?'+query.toString()+'#token='+encodeURIComponent(tokenFor(memory));
   }
   function notifyOverlay(open){document.dispatchEvent(new CustomEvent('talera:overlay-change',{detail:{open:Boolean(open),source:'memory-manager'}}))}
   function closeManager(){if(manager.hidden)return;manager.hidden=true;notifyOverlay(false)}

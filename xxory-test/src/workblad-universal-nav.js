@@ -23,7 +23,7 @@ export const WORKBLAD_UNIVERSAL_NAV_STYLE = String.raw`
 `;
 
 export const WORKBLAD_UNIVERSAL_NAV_SCRIPT = String.raw`<script>(function(){
-var TIMELINE_URL='https://talera-timeline-prototype.mark-a39.workers.dev/';
+var TIMELINE_URL=location.origin+'/timeline';
 function cameFromTimeline(){
   try{
     var q=new URLSearchParams(location.search);

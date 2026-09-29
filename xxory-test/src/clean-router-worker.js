@@ -2,8 +2,9 @@ import legacyWorker from './orb-app-v79-worker-timeline-publish.js';
 import { handleCleanRebuildV2 } from './clean-rebuild-v2.js';
 import { handleStoryLabFresh } from './storylab-fresh.js';
 import { handleStoryLabClean } from './storylab-clean.js';
+import { handleTVPlayer } from './tv-player.js';
+import { handleUnifiedWebapp } from './unified-webapp.js';
 
-const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev';
 const PUBLISH_REVISION = 'storylab-clean-timeline-publish-20260923-video-r1';
 
 function safeClient(value) {
@@ -223,7 +224,7 @@ async function handleCleanPublish(request, env) {
     return Response.json({ error: 'De tijdlijnkoppeling kon niet worden teruggecontroleerd.' }, { status: 500 });
   }
 
-  const handoffUrl = `${TIMELINE_ORIGIN}/?handoff=1#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
+  const handoffUrl = `${url.origin}/timeline?handoff=1#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
   return Response.json({ ok: true, storyId, manageToken, handoffUrl, reused, revision: PUBLISH_REVISION }, {
     headers: { 'cache-control': 'no-store, max-age=0' }
   });
@@ -334,9 +335,61 @@ async function decorateCleanStoryLabResponse(response, url) {
   });
 }
 
+async function decorateUnifiedTellAlias(response) {
+  if (!response) return response;
+  const type = response.headers.get('content-type') || '';
+  if (!type.includes('text/html')) return response;
+  const html = await response.text();
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.set('cache-control', 'no-store, max-age=0');
+  headers.set('x-talera-webapp', 'webapp-phase2-3-20260927-r1');
+  headers.set('x-talera-surface', 'tell-phone-primary-responsive');
+  const desktop = `<style id="talera-unified-storylab-clean-desktop">
+@media(min-width:900px){
+  html,body{background:#EDF2F5!important}
+  body{display:grid!important;place-items:center!important}
+  .screen{width:min(760px,100%)!important;box-shadow:0 0 0 1px rgba(15,39,71,.05),0 22px 80px rgba(4,20,32,.18)!important}
+}
+</style>`;
+  return new Response(html.replace('</head>', desktop + '</head>'), {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    const unifiedResponse = await handleUnifiedWebapp(request, env, ctx, legacyWorker);
+    if (unifiedResponse) return unifiedResponse;
+
+    const unifiedTellUrl = new URL(request.url);
+    if ((unifiedTellUrl.pathname === '/tell' || unifiedTellUrl.pathname === '/tell/') &&
+        (request.method === 'GET' || request.method === 'HEAD')) {
+      const editMode = unifiedTellUrl.searchParams.has('edit') || unifiedTellUrl.searchParams.has('manage');
+      const rewritten = new URL(request.url);
+      if (editMode) {
+        rewritten.pathname = '/';
+        const editResponse = await legacyWorker.fetch(new Request(rewritten.toString(), {
+          method: request.method,
+          headers: request.headers
+        }), env, ctx);
+        return editResponse;
+      }
+      rewritten.pathname = '/storylab-clean';
+      const tellRequest = new Request(rewritten.toString(), { method: request.method, headers: request.headers });
+      const tellResponse = await handleStoryLabClean(tellRequest, env);
+      if (tellResponse) {
+        const publishedTell = await decorateCleanStoryLabResponse(tellResponse, rewritten);
+        return decorateUnifiedTellAlias(publishedTell);
+      }
+    }
+
+    const tvResponse = await handleTVPlayer(request, env);
+    if (tvResponse) return tvResponse;
 
     const publishResponse = await handleCleanPublish(request, env);
     if (publishResponse) return publishResponse;

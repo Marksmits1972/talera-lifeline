@@ -1,5 +1,3 @@
-const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev';
-
 export async function handleV9TimelinePublish(request, env) {
   const url = new URL(request.url);
   const match = url.pathname.match(/^\/api\/v9\/timeline-publish\/([A-Za-z0-9_-]{16,80})$/);
@@ -16,7 +14,7 @@ export async function handleV9TimelinePublish(request, env) {
   `).bind(memoryId).first();
   if (existing?.story_id && existing?.manage_token) {
     const story = await env.DB.prepare(`SELECT id, status FROM stories WHERE id = ? LIMIT 1`).bind(existing.story_id).first();
-    if (story && story.status === 'active') return publishResponse(memoryId, existing.story_id, existing.manage_token, true);
+    if (story && story.status === 'active') return publishResponse(url.origin, memoryId, existing.story_id, existing.manage_token, true);
   }
 
   const row = await env.DB.prepare(`
@@ -128,7 +126,7 @@ export async function handleV9TimelinePublish(request, env) {
     return json({ error: 'De tijdlijnkoppeling kon niet worden teruggecontroleerd.' }, 500);
   }
 
-  return publishResponse(memoryId, storyId, manageToken, false);
+  return publishResponse(url.origin, memoryId, storyId, manageToken, false);
 }
 
 async function ensureLinkTable(env) {
@@ -142,8 +140,8 @@ async function ensureLinkTable(env) {
   `).run();
 }
 
-function publishResponse(memoryId, storyId, manageToken, reused) {
-  const handoffUrl = `${TIMELINE_ORIGIN}/?handoff=1#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
+function publishResponse(origin, memoryId, storyId, manageToken, reused) {
+  const handoffUrl = `${origin}/timeline?handoff=1#story=${encodeURIComponent(storyId)}&token=${encodeURIComponent(manageToken)}`;
   return json({ ok: true, memoryId, storyId, manageToken, handoffUrl, reused });
 }
 

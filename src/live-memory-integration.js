@@ -13,7 +13,9 @@ export const liveMemoryIntegrationStyle = String.raw`
 
 export const liveMemoryIntegrationScript = String.raw`
 (()=>{
-  const TELL_ORIGIN='https://xxory-test.mark-a39.workers.dev';
+  const UNIFIED_TIMELINE=location.pathname==='/timeline'||location.pathname==='/timeline/';
+  const TELL_ORIGIN=UNIFIED_TIMELINE?location.origin:'https://xxory-test.mark-a39.workers.dev';
+  const TELL_ROUTE=UNIFIED_TIMELINE?'/tell':'/';
   const CREDS_KEY='talera-linked-memory-credentials-v1';
   const AUTO_START_MS=500;
   const AUTO_STEP_MS=2400;
@@ -283,10 +285,10 @@ export const liveMemoryIntegrationScript = String.raw`
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();clearAuto();
       const memory=currentMemory();
       if(memory&&memory._taleraLive&&memory.storyId&&memory._manageToken){
-        location.href=TELL_ORIGIN+'/?edit='+encodeURIComponent(memory.storyId)+'#token='+encodeURIComponent(memory._manageToken);
+        location.href=TELL_ORIGIN+TELL_ROUTE+'?edit='+encodeURIComponent(memory.storyId)+'#token='+encodeURIComponent(memory._manageToken);
       }else{
         const at=memory&&memory.ms?new Date(memory.ms).toISOString():new Date(runtime.centerMs()).toISOString();
-        location.href=TELL_ORIGIN+'/?at='+encodeURIComponent(at);
+        location.href=TELL_ORIGIN+TELL_ROUTE+'?at='+encodeURIComponent(at);
       }
     },true);
   }

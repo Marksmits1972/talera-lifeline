@@ -16,7 +16,8 @@ export const desktopPresentationStyle = String.raw`
   /* Approved TV composition: compact timeline high in the picture, edge-to-edge flow. */
   .timeline{position:absolute!important;left:0!important;right:0!important;top:0!important;z-index:20!important;height:214px!important;min-height:214px!important;isolation:isolate!important;--timeline-rest-opacity:1;overflow:visible!important;display:block!important;visibility:visible!important}
   .timeline::before,.timeline::after{display:none!important}
-  .timeline canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;visibility:visible!important}\n  .timeline canvas,.timeline.is-active canvas,.timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
+  .timeline canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;visibility:visible!important}
+  .timeline canvas,.timeline.is-active canvas,.timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
     opacity:1!important;transform:none!important;filter:drop-shadow(0 1px 2px rgba(255,255,255,.86))!important
   }
   .talera-tv-memories{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
@@ -41,11 +42,20 @@ export const desktopPresentationStyle = String.raw`
   .memory-sheet .story{max-width:min(920px,76vw)!important;margin:0 auto!important;text-align:center!important;font-size:clamp(28px,2.35vw,42px)!important;line-height:1.08!important;font-weight:700!important;letter-spacing:-.022em!important;color:#fff!important;text-wrap:balance!important;-webkit-text-stroke:.2px rgba(15,39,71,.18);text-shadow:0 2px 4px rgba(6,18,30,.72),0 8px 26px rgba(6,18,30,.42)!important}
   .memory-sheet .story-more,.memory-date{display:none!important}
   nav,.talera-context-share,.talera-memory-edit,.talera-memory-audio,.talera-audio-consent,.talera-memory-manager{display:none!important}
-  .memory-story-scroll{bottom:0!important;z-index:12!important;pointer-events:none!important}\n  .memory-caption{display:block!important;visibility:visible!important;opacity:1!important}\n  .memory-sheet{position:absolute!important;left:0!important;right:0!important;bottom:0!important;min-height:0!important;height:auto!important}\n  .memory-sheet .story{display:block!important;visibility:visible!important;opacity:1!important;color:#fff!important}
+  .memory-story-scroll{bottom:0!important;z-index:12!important;pointer-events:none!important}
+  .memory-caption{display:block!important;visibility:visible!important;opacity:1!important}
+  .memory-sheet{position:absolute!important;left:0!important;right:0!important;bottom:0!important;min-height:0!important;height:auto!important}
+  .memory-sheet .story{display:block!important;visibility:visible!important;opacity:1!important;color:#fff!important}
+  .talera-tv-axis{position:absolute;left:28px;right:28px;top:150px;height:2px;background:rgba(23,103,177,.82);box-shadow:0 1px 2px rgba(255,255,255,.9);z-index:4}
+  .talera-tv-axis::before,.talera-tv-axis::after{content:"";position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 5px rgba(15,39,71,.24);transform:translateY(-50%)}
+  .talera-tv-axis::before{left:-9px}.talera-tv-axis::after{right:-9px}
+  .talera-tv-tick{position:absolute;bottom:-1px;width:2px;border-radius:2px;background:#1767b1;transform:translateX(-50%)}
+  .talera-tv-tick.is-minor{height:7px;opacity:.68}.talera-tv-tick.is-major{height:15px;opacity:.95}
+  .talera-tv-title{position:fixed;left:50%;bottom:46px;z-index:30;transform:translateX(-50%);width:min(900px,78vw);margin:0;text-align:center;color:#fff;font:700 clamp(28px,2.35vw,42px)/1.08 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.022em;text-shadow:0 2px 4px rgba(6,18,30,.78),0 8px 26px rgba(6,18,30,.48);pointer-events:none}
 }
 `;
 
-export const desktopPresentationScript = String.raw`
+export const desktopPresentationScript = String.raw\`
 (()=>{
   const large=()=>window.matchMedia('(min-width:768px)').matches;
   const classify=img=>{
@@ -60,30 +70,38 @@ export const desktopPresentationScript = String.raw`
   const timeline=document.querySelector('.timeline');
   if(!timeline||!large())return;
   timeline.classList.add('is-active','is-timeline-engaged','is-timeline-afterglow','is-marker-afterglow');
+
+  const axis=document.createElement('div');axis.className='talera-tv-axis';
+  for(let i=1;i<40;i++){const t=document.createElement('i');t.className='talera-tv-tick '+(i%5===0?'is-major':'is-minor');t.style.left=(i/40*100)+'%';axis.appendChild(t)}
+  timeline.appendChild(axis);
+
   const layer=document.createElement('div');layer.className='talera-tv-memories';timeline.appendChild(layer);
+  const title=document.createElement('div');title.className='talera-tv-title';document.body.appendChild(title);
 
   const render=()=>{
     const rt=window.__taleraTimelineRuntime;if(!rt||!large())return;
-    const memories=rt.memories?rt.memories():[];const bounds=rt.bounds?rt.bounds():null;if(!bounds||!memories.length)return;
-    const [start,end]=bounds,span=end-start,w=timeline.clientWidth,active=rt.activeMemoryId();
-    const visible=memories.filter(m=>m.ms>=start&&m.ms<=end&&m.id!==active).map(m=>({m,x:(m.ms-start)/span*w}));
+    const memories=rt.memories?rt.memories():[];const bounds=rt.bounds?rt.bounds():null;if(!bounds)return;
+    const start=bounds[0],end=bounds[1],span=Math.max(1,end-start),w=timeline.clientWidth,active=rt.activeMemoryId();
+    const visible=memories.filter(m=>m.ms>=start&&m.ms<=end&&m.id!==active).map(m=>({m,x:(m.ms-start)/span*w})).sort((a,b)=>a.x-b.x);
     const groups=[];
-    for(const item of visible){const prev=groups[groups.length-1];if(prev&&Math.abs(item.x-prev.x)<30){prev.items.push(item.m);prev.x=(prev.x*(prev.items.length-1)+item.x)/prev.items.length}else groups.push({x:item.x,items:[item.m]})}
+    for(const item of visible){const prev=groups[groups.length-1];if(prev&&Math.abs(item.x-prev.x)<34){prev.items.push(item.m);prev.x=(prev.x*(prev.items.length-1)+item.x)/prev.items.length}else groups.push({x:item.x,items:[item.m]})}
     layer.replaceChildren();
     groups.forEach((g,i)=>{
-      if(g.x<22||g.x>w-22)return;
-      const n=g.items.length,m=g.items[Math.floor((g.items.length-1)/2)];
-      const base=n>=4?82:n>=2?72:60;const aspect=[.86,1.05,1.22,.94][Math.abs(Number(m.id)||i)%4];
-      const width=Math.round(base*aspect),height=Math.round(base);
-      const lift=[10,31,18,42,24][Math.abs(Number(m.id)||i)%5];const stem=14+lift;
-      const el=document.createElement('div');el.className='talera-tv-memory';el.style.left=g.x+'px';el.style.width=width+'px';el.style.height=height+'px';el.style.top=Math.max(7,158-stem-height)+'px';el.style.setProperty('--stem',stem+'px');
+      if(g.x<34||g.x>w-34)return;
+      const n=g.items.length,m=g.items[Math.floor((n-1)/2)];
+      const base=n>=4?84:n>=2?74:62, aspect=[.84,1.08,1.22,.94][i%4];
+      const width=Math.round(base*aspect),height=base,lift=[12,34,20,44,26][i%5],stem=14+lift;
+      const el=document.createElement('div');el.className='talera-tv-memory';el.style.left=g.x+'px';el.style.width=width+'px';el.style.height=height+'px';el.style.top=Math.max(7,150-stem-height)+'px';el.style.setProperty('--stem',stem+'px');
       const img=document.createElement('img');img.src=m.image;img.alt='';img.decoding='async';el.appendChild(img);
       if(n>1){const badge=document.createElement('span');badge.className='talera-tv-memory-count';badge.textContent=String(n);el.appendChild(badge)}
       const dot=document.createElement('span');dot.className='talera-tv-memory-dot';el.appendChild(dot);layer.appendChild(el);
     });
+    const current=rt.currentMemory?rt.currentMemory():null;
+    title.textContent=current&&current.story?current.story:'';
   };
   let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;render()})};
   window.addEventListener('talera:timeline-draw',schedule);window.addEventListener('resize',schedule,{passive:true});
-  setTimeout(schedule,0);setTimeout(schedule,250);
+  const rt=window.__taleraTimelineRuntime;if(rt&&rt.subscribe)rt.subscribe(schedule);
+  setTimeout(schedule,0);setTimeout(schedule,250);setTimeout(schedule,800);
 })();
-`;
+\`;

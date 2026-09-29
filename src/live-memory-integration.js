@@ -280,13 +280,8 @@ export const liveMemoryIntegrationScript = String.raw`
     },true);
   }
 
-  if(tellButton){
-    tellButton.addEventListener('click',e=>{
-      e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();clearAuto();
-      if(typeof window.__taleraTellOpen==='function'){window.__taleraTellOpen();return}
-      console.warn('[TALERA] vertelroute is nog niet geladen');
-    },true);
-  }
+  // De Vertellen-knop heeft precies één eigenaar: talera-tell.js.
+  // Geen tweede capture-listener hier; die veroorzaakte concurrerende click-afhandeling op iOS.
 
   async function landTargetFirst(storyId,entry){
     const token=entry&&entry.token;

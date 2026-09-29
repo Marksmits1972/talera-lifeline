@@ -62,46 +62,17 @@ export const desktopPresentationScript = String.raw`
     if(!large()||!img||!img.naturalWidth||!img.naturalHeight)return;
     const layer=img.closest('.photo-layer');if(!layer)return;
     const landscape=(img.naturalWidth/img.naturalHeight)>=1.18;
-    layer.classList.toggle('talera-landscape',landscape);layer.classList.toggle('talera-portrait',!landscape);
+    layer.classList.toggle('talera-landscape',landscape);
+    layer.classList.toggle('talera-portrait',!landscape);
   };
-  const scan=()=>document.querySelectorAll('.example-photo').forEach(img=>{if(img.complete)classify(img);img.addEventListener('load',()=>classify(img),{passive:true,once:true})});
-  scan();new MutationObserver(scan).observe(document.documentElement,{subtree:true,childList:true});window.addEventListener('resize',scan,{passive:true});
-
+  const scan=()=>document.querySelectorAll('.example-photo').forEach(img=>{
+    if(img.complete)classify(img);
+    else img.addEventListener('load',()=>classify(img),{passive:true,once:true});
+  });
+  scan();
+  new MutationObserver(scan).observe(document.documentElement,{subtree:true,childList:true});
+  window.addEventListener('resize',scan,{passive:true});
   const timeline=document.querySelector('.timeline');
-  if(!timeline||!large())return;
-  timeline.classList.add('is-active','is-timeline-engaged','is-timeline-afterglow','is-marker-afterglow');
-
-  const axis=document.createElement('div');axis.className='talera-tv-axis';
-  for(let i=1;i<40;i++){const t=document.createElement('i');t.className='talera-tv-tick '+(i%5===0?'is-major':'is-minor');t.style.left=(i/40*100)+'%';axis.appendChild(t)}
-  timeline.appendChild(axis);
-
-  document.querySelectorAll('.talera-tv-memories').forEach(el=>el.remove());const layer=document.createElement('div');layer.className='talera-tv-memories';document.body.appendChild(layer);
-  const title=document.createElement('div');title.className='talera-tv-title';document.body.appendChild(title);
-
-  const render=()=>{
-    const rt=window.__taleraTimelineRuntime;if(!rt||!large())return;
-    const memories=rt.memories?rt.memories():[];const bounds=rt.bounds?rt.bounds():null;if(!bounds)return;
-    const start=bounds[0],end=bounds[1],span=Math.max(1,end-start),w=timeline.clientWidth||window.innerWidth,active=rt.activeMemoryId();
-    let visible=memories.filter(m=>m&&Number.isFinite(Number(m.ms))&&m.ms>=start&&m.ms<=end&&m.id!==active&&m.image).map(m=>({m,x:(m.ms-start)/span*w})).sort((a,b)=>a.x-b.x);if(!visible.length){const center=rt.centerMs?rt.centerMs():(start+end)/2;visible=memories.filter(m=>m&&m.id!==active&&m.image&&Number.isFinite(Number(m.ms))).sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,9).sort((a,b)=>a.ms-b.ms).map((m,i,a)=>({m,x:70+(i+1)*(Math.max(1,w-140)/(a.length+1))}))}
-    const groups=[];
-    for(const item of visible){const prev=groups[groups.length-1];if(prev&&Math.abs(item.x-prev.x)<34){prev.items.push(item.m);prev.x=(prev.x*(prev.items.length-1)+item.x)/prev.items.length}else groups.push({x:item.x,items:[item.m]})}
-    layer.replaceChildren();
-    groups.forEach((g,i)=>{
-      if(g.x<34||g.x>w-34)return;
-      const n=g.items.length,m=g.items[Math.floor((n-1)/2)];
-      const base=n>=4?84:n>=2?74:62, aspect=[.84,1.08,1.22,.94][i%4];
-      const width=Math.round(base*aspect),height=base,lift=[12,34,20,44,26][i%5],stem=14+lift;
-      const el=document.createElement('div');el.className='talera-tv-memory';el.style.left=g.x+'px';el.style.width=width+'px';el.style.height=height+'px';el.style.top=Math.max(7,150-stem-height)+'px';el.style.setProperty('--stem',stem+'px');
-      const img=document.createElement('img');img.src=m.image;img.alt='';img.decoding='async';el.appendChild(img);
-      if(n>1){const badge=document.createElement('span');badge.className='talera-tv-memory-count';badge.textContent=String(n);el.appendChild(badge)}
-      const dot=document.createElement('span');dot.className='talera-tv-memory-dot';el.appendChild(dot);layer.appendChild(el);
-    });
-    const current=rt.currentMemory?rt.currentMemory():null;
-    title.textContent=current&&current.story?current.story:'';
-  };
-  let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;render()})};
-  window.addEventListener('talera:timeline-draw',schedule);window.addEventListener('resize',schedule,{passive:true});
-  setInterval(schedule,180);
-  setTimeout(schedule,0);setTimeout(schedule,250);setTimeout(schedule,800);
+  if(timeline&&large())timeline.classList.add('is-active','is-timeline-engaged','is-timeline-afterglow','is-marker-afterglow');
 })();
 `;

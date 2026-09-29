@@ -16,7 +16,7 @@ export const desktopPresentationStyle = String.raw`
   /* Approved TV composition: compact timeline high in the picture, edge-to-edge flow. */
   .timeline{position:absolute!important;left:0!important;right:0!important;top:0!important;z-index:20!important;height:214px!important;min-height:214px!important;isolation:isolate!important;--timeline-rest-opacity:1;overflow:visible!important;display:block!important;visibility:visible!important}
   .timeline::before,.timeline::after{display:none!important}
-  .timeline canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;visibility:visible!important}
+  .timeline canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;visibility:visible!important;z-index:6!important;pointer-events:none!important}
   .timeline canvas,.timeline.is-active canvas,.timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
     opacity:1!important;transform:none!important;filter:drop-shadow(0 1px 2px rgba(255,255,255,.86))!important
   }
@@ -28,11 +28,11 @@ export const desktopPresentationStyle = String.raw`
   .talera-tv-memory-dot{position:absolute;left:50%;top:calc(100% + var(--stem,18px) - 5px);width:10px;height:10px;border-radius:50%;background:#1767b1;border:2px solid rgba(255,255,255,.96);transform:translateX(-50%);box-shadow:0 1px 4px rgba(15,39,71,.25)}
 
   .timeline .center-needle,.timeline.is-active .center-needle,.timeline.is-timeline-engaged .center-needle,.timeline.is-marker-afterglow .center-needle{
-    z-index:7!important;width:2px!important;height:91px!important;top:67px!important;bottom:auto!important;margin-top:0!important;opacity:1!important;background:linear-gradient(180deg,rgba(15,39,71,.2),#0F4A84 22%,#0F4A84 100%)!important;box-shadow:0 0 0 1px rgba(255,255,255,.28)!important;filter:none!important
+    z-index:8!important;width:2px!important;height:91px!important;top:67px!important;bottom:auto!important;margin-top:0!important;opacity:1!important;background:linear-gradient(180deg,rgba(15,39,71,.2),#0F4A84 22%,#0F4A84 100%)!important;box-shadow:0 0 0 1px rgba(255,255,255,.28)!important;filter:none!important
   }
   .timeline .center-needle::before{box-shadow:0 0 0 4px rgba(255,255,255,.78),0 2px 8px rgba(15,39,71,.3)!important}
   main .timeline .focus,main .timeline.is-active .focus,main .timeline.is-timeline-engaged .focus,main .timeline.is-timeline-afterglow .focus,main .timeline.is-marker-afterglow .focus{
-    z-index:9!important;top:31px!important;transform:translateX(-50%)!important;padding:8px 16px!important;border-radius:999px!important;font-weight:750!important;letter-spacing:-.01em!important;color:#0F2747!important;background:#fff!important;border:1px solid rgba(15,39,71,.12)!important;box-shadow:0 6px 16px rgba(15,39,71,.20)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;opacity:1!important
+    z-index:10!important;top:31px!important;transform:translateX(-50%)!important;padding:8px 16px!important;border-radius:999px!important;font-weight:750!important;letter-spacing:-.01em!important;color:#0F2747!important;background:#fff!important;border:1px solid rgba(15,39,71,.12)!important;box-shadow:0 6px 16px rgba(15,39,71,.20)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;opacity:1!important
   }
 
   /* Only the story heading remains, centered low over the photograph. */

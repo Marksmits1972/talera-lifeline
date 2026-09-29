@@ -55,7 +55,7 @@ export const desktopPresentationStyle = String.raw`
 }
 `;
 
-export const desktopPresentationScript = String.raw\`
+export const desktopPresentationScript = String.raw`
 (()=>{
   const large=()=>window.matchMedia('(min-width:768px)').matches;
   const classify=img=>{

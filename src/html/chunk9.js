@@ -1,5 +1,5 @@
 export const chunk9 = [
-  "  drawScale(level,startMs,endMs,w,axisY);",
+  "  if(window.innerWidth<768) drawScale(level,startMs,endMs,w,axisY);",
   "",
   "  if(Math.abs(centerMs-LIFE_END)<60000) {",
   "    focusText.textContent=\"vandaag\";",

@@ -77,6 +77,68 @@ export const desktopPresentationStyle = String.raw`
     box-shadow:0 9px 28px rgba(15,39,71,.27)!important;
   }
 
+  /* TALERA life-line: turn the proven ruler into a permanent visual story landscape. */
+  .timeline{isolation:isolate!important}
+  .timeline canvas{
+    transform:translateY(-14px) scaleY(1.16)!important;
+    transform-origin:center 58%!important;
+  }
+  .timeline::before{
+    content:""!important;
+    position:absolute!important;
+    left:0!important;right:0!important;top:76px!important;
+    height:98px!important;
+    background:
+      radial-gradient(ellipse at 50% 48%,rgba(91,143,185,.16) 0%,rgba(91,143,185,.07) 24%,transparent 58%),
+      linear-gradient(180deg,transparent 0%,rgba(255,255,255,.06) 44%,rgba(15,39,71,.07) 49%,rgba(15,39,71,.11) 50%,rgba(15,39,71,.04) 52%,transparent 100%)!important;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)!important;
+    mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)!important;
+    pointer-events:none!important;
+  }
+  .timeline .center-needle,
+  .timeline.is-active .center-needle,
+  .timeline.is-timeline-engaged .center-needle,
+  .timeline.is-marker-afterglow .center-needle{
+    width:2px!important;
+    height:118px!important;max-height:none!important;
+    top:31px!important;margin-top:0!important;bottom:auto!important;
+    background:linear-gradient(180deg,rgba(15,39,71,.22),#0F2747 32%,#0F2747 76%,rgba(15,39,71,.18))!important;
+    box-shadow:0 0 0 1px rgba(255,255,255,.32),0 0 18px rgba(91,143,185,.38)!important;
+  }
+  .timeline .center-needle::before{
+    transform:scale(1.05)!important;
+    box-shadow:0 0 0 4px rgba(255,255,255,.42),0 0 18px rgba(91,143,185,.58)!important;
+  }
+  main .timeline .focus,
+  main .timeline.is-active .focus,
+  main .timeline.is-timeline-engaged .focus,
+  main .timeline.is-timeline-afterglow .focus,
+  main .timeline.is-marker-afterglow .focus{
+    top:156px!important;
+    transform:translateX(-50%)!important;
+    padding:8px 15px!important;
+    border-radius:999px!important;
+    font-weight:720!important;
+    letter-spacing:-.01em!important;
+    background:rgba(255,255,255,.90)!important;
+    border:1px solid rgba(91,143,185,.32)!important;
+    box-shadow:0 8px 24px rgba(15,39,71,.20),inset 0 1px 0 rgba(255,255,255,.88)!important;
+    backdrop-filter:blur(8px)!important;
+    -webkit-backdrop-filter:blur(8px)!important;
+  }
+  .timeline::after{
+    content:""!important;
+    position:absolute!important;
+    left:50%!important;top:50px!important;
+    width:210px!important;height:132px!important;
+    transform:translateX(-50%)!important;
+    border-radius:50%!important;
+    background:radial-gradient(ellipse,rgba(255,255,255,.18) 0%,rgba(91,143,185,.07) 34%,transparent 70%)!important;
+    opacity:1!important;
+    pointer-events:none!important;
+    z-index:1!important;
+  }
+
   /* Hero copy: quieter than mobile, anchored in the image without dominating it. */
   .memory-photo-air{height:57%!important;min-height:360px!important}
   .memory-sheet{

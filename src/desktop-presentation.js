@@ -101,7 +101,7 @@ export const desktopPresentationScript = String.raw`
   };
   let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;render()})};
   window.addEventListener('talera:timeline-draw',schedule);window.addEventListener('resize',schedule,{passive:true});
-  const rt=window.__taleraTimelineRuntime;if(rt&&rt.subscribe)rt.subscribe(schedule);
+  setInterval(schedule,180);
   setTimeout(schedule,0);setTimeout(schedule,250);setTimeout(schedule,800);
 })();
 `;

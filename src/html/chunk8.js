@@ -273,6 +273,7 @@ export const chunk8 = [
   "    else if(level===3) drawLevel3(startMs,endMs,w,axisY);",
   "    else if(level===4) drawLevel4(startMs,endMs,w,axisY);",
   "    else drawLevel5(startMs,endMs,w,axisY);",
+  "    window.dispatchEvent(new CustomEvent(\\\"talera:timeline-draw\\\"));",
   "  } else {",
   "    drawDensity(level,startMs,endMs,w,axisY);",
   "    drawMemoryBeacons(level,startMs,endMs,w,axisY);",

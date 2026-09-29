@@ -22,7 +22,7 @@ import { taleraTellStyle, taleraTellScript } from "./talera-tell.js";
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "native-tell-photo-mic-v14-20260929";
+const TALERA_TIMELINE_DEPLOY_REV = "native-tell-ios-capture-v15-20260929";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`

@@ -283,13 +283,8 @@ export const liveMemoryIntegrationScript = String.raw`
   if(tellButton){
     tellButton.addEventListener('click',e=>{
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();clearAuto();
-      const memory=currentMemory();
-      if(memory&&memory._taleraLive&&memory.storyId&&memory._manageToken){
-        location.href=TELL_ORIGIN+TELL_ROUTE+'?edit='+encodeURIComponent(memory.storyId)+'#token='+encodeURIComponent(memory._manageToken);
-      }else{
-        const at=memory&&memory.ms?new Date(memory.ms).toISOString():new Date(runtime.centerMs()).toISOString();
-        location.href=TELL_ORIGIN+TELL_ROUTE+'?at='+encodeURIComponent(at);
-      }
+      if(typeof window.__taleraTellOpen==='function'){window.__taleraTellOpen();return}
+      console.warn('[TALERA] vertelroute is nog niet geladen');
     },true);
   }
 

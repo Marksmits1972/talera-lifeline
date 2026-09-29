@@ -282,7 +282,6 @@ export const liveMemoryIntegrationScript = String.raw`
 
   if(tellButton){
     tellButton.addEventListener('click',e=>{
-      if(window.__taleraNativeTellEnabled)return;
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();clearAuto();
       const memory=currentMemory();
       if(memory&&memory._taleraLive&&memory.storyId&&memory._manageToken){

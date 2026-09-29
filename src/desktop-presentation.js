@@ -104,4 +104,4 @@ export const desktopPresentationScript = String.raw\`
   const rt=window.__taleraTimelineRuntime;if(rt&&rt.subscribe)rt.subscribe(schedule);
   setTimeout(schedule,0);setTimeout(schedule,250);setTimeout(schedule,800);
 })();
-\`;
+`;

@@ -3,6 +3,7 @@ export const taleraTellStyle = String.raw`
 `;
 export const taleraTellScript = String.raw`
 (()=>{
+ window.__taleraNativeTellEnabled=true;
  const tell=document.querySelector('.tell');if(!tell)return;
  const root=document.createElement('section');root.className='talera-tell';root.setAttribute('aria-label','Nieuwe herinnering');
  root.innerHTML='<div class="talera-tell-inner"><header class="talera-tell-head"><strong class="talera-tell-brand">TALERA</strong><button class="talera-tell-close" type="button" aria-label="Sluiten">×</button></header><div class="talera-tell-body"><div class="talera-tell-preview"><div class="talera-tell-empty">Kies een foto<small>Daarna kun je je herinnering inspreken.</small></div><img hidden alt="Gekozen foto"></div><input class="talera-tell-file" type="file" accept="image/*"><div class="talera-tell-actions"><button class="talera-tell-round talera-pick" type="button" aria-label="Foto kiezen">＋</button><button class="talera-tell-round talera-record" type="button" aria-label="Opname starten">●</button></div><div class="talera-tell-status" aria-live="polite">Kies eerst een foto en vertel daarna je herinnering.</div><audio class="talera-tell-audio" controls hidden></audio><button class="talera-tell-save" type="button" disabled>Bewaar herinnering</button></div></div>';

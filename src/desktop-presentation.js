@@ -14,9 +14,9 @@ export const desktopPresentationStyle = String.raw`
   .photo-layer.talera-landscape .photo-aligned-blur{opacity:0!important}
 
   /* Approved TV composition: compact timeline high in the picture, edge-to-edge flow. */
-  .timeline{height:214px!important;min-height:214px!important;isolation:isolate!important;--timeline-rest-opacity:1;overflow:visible!important}
+  .timeline{position:absolute!important;left:0!important;right:0!important;top:0!important;z-index:20!important;height:214px!important;min-height:214px!important;isolation:isolate!important;--timeline-rest-opacity:1;overflow:visible!important;display:block!important;visibility:visible!important}
   .timeline::before,.timeline::after{display:none!important}
-  .timeline canvas,.timeline.is-active canvas,.timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
+  .timeline canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;visibility:visible!important}\n  .timeline canvas,.timeline.is-active canvas,.timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
     opacity:1!important;transform:none!important;filter:drop-shadow(0 1px 2px rgba(255,255,255,.86))!important
   }
   .talera-tv-memories{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
@@ -41,7 +41,7 @@ export const desktopPresentationStyle = String.raw`
   .memory-sheet .story{max-width:min(920px,76vw)!important;margin:0 auto!important;text-align:center!important;font-size:clamp(28px,2.35vw,42px)!important;line-height:1.08!important;font-weight:700!important;letter-spacing:-.022em!important;color:#fff!important;text-wrap:balance!important;-webkit-text-stroke:.2px rgba(15,39,71,.18);text-shadow:0 2px 4px rgba(6,18,30,.72),0 8px 26px rgba(6,18,30,.42)!important}
   .memory-sheet .story-more,.memory-date{display:none!important}
   nav,.talera-context-share,.talera-memory-edit,.talera-memory-audio,.talera-audio-consent,.talera-memory-manager{display:none!important}
-  .memory-story-scroll{bottom:0!important}
+  .memory-story-scroll{bottom:0!important;z-index:12!important;pointer-events:none!important}\n  .memory-caption{display:block!important;visibility:visible!important;opacity:1!important}\n  .memory-sheet{position:absolute!important;left:0!important;right:0!important;bottom:0!important;min-height:0!important;height:auto!important}\n  .memory-sheet .story{display:block!important;visibility:visible!important;opacity:1!important;color:#fff!important}
 }
 `;
 

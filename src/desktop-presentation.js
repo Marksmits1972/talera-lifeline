@@ -19,40 +19,57 @@ export const desktopPresentationStyle = String.raw`
   html,body,.app{height:100dvh!important;background:#0F2747!important}
   .memory-space{position:absolute!important;inset:0!important;overflow:hidden!important}
 
-  /* The photograph is the stage: always fill the complete large screen. */
+  /* The photograph is the stage. Landscape imagery fills the viewport; portrait
+     imagery stays intact over a soft edge-to-edge backdrop. */
   .photo-stage,.photo-layer{position:absolute!important;inset:0!important}
   .photo-backdrop{
     inset:-72px!important;
     width:calc(100% + 144px)!important;
     height:calc(100% + 144px)!important;
     object-fit:cover!important;
-    opacity:.72!important;
-    filter:blur(34px) saturate(1.02) brightness(.94)!important;
+    opacity:.78!important;
+    filter:blur(34px) saturate(1.02) brightness(.90)!important;
   }
+  .example-photo,.photo-aligned-blur{max-width:none!important}
+  .photo-layer.talera-landscape .example-photo{
+    inset:0!important;width:100%!important;height:100%!important;
+    object-fit:cover!important;object-position:center center!important;
+    -webkit-mask-image:none!important;mask-image:none!important;
+  }
+  .photo-layer.talera-landscape .photo-aligned-blur{opacity:0!important}
 
   /* Timeline becomes a clear visual navigation ribbon, while remaining secondary. */
-  .timeline{height:210px!important;min-height:210px!important}
+  .timeline{
+    height:224px!important;min-height:224px!important;
+    --timeline-rest-opacity:1;
+    --timeline-rest-filter:saturate(1.20) contrast(1.52) brightness(1.06) drop-shadow(0 1px 2px rgba(255,255,255,.95)) drop-shadow(0 3px 5px rgba(15,39,71,.34));
+  }
   .timeline::before{
-    height:258px!important;
-    backdrop-filter:blur(18px) saturate(1.10)!important;
-    -webkit-backdrop-filter:blur(18px) saturate(1.10)!important;
+    height:286px!important;
+    background:linear-gradient(180deg,rgba(247,244,239,.30) 0%,rgba(247,244,239,.15) 42%,rgba(247,244,239,.04) 72%,transparent 100%)!important;
+    backdrop-filter:blur(20px) saturate(1.16)!important;
+    -webkit-backdrop-filter:blur(20px) saturate(1.16)!important;
     opacity:1!important;
   }
-  .timeline canvas,.timeline.is-active canvas{
-    opacity:.82!important;
-    filter:saturate(1.08) contrast(1.30) brightness(.96) drop-shadow(0 0 2px rgba(255,255,255,.96)) drop-shadow(0 2px 3px rgba(15,39,71,.34))!important;
+  .timeline::after{
+    opacity:1!important;
+    background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(91,143,185,.10) 54%,transparent 100%)!important;
   }
-  .timeline .center-needle,.timeline.is-active .center-needle{
-    width:2px!important;opacity:1!important;
-    filter:drop-shadow(0 0 4px rgba(255,255,255,.92)) drop-shadow(0 2px 4px rgba(15,39,71,.34))!important;
-  }
-  .timeline .focus,.timeline.is-active .focus{
-    transform:scale(1.08)!important;
-    box-shadow:0 8px 26px rgba(15,39,71,.28)!important;
-  }
+  .timeline canvas,.timeline.is-active canvas,
   .timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
     opacity:1!important;
-    filter:saturate(1.38) contrast(1.78) brightness(1.14) drop-shadow(0 0 5px rgba(255,255,255,.84)) drop-shadow(0 2px 5px rgba(15,39,71,.42))!important;
+    filter:saturate(1.20) contrast(1.52) brightness(1.06) drop-shadow(0 1px 2px rgba(255,255,255,.95)) drop-shadow(0 3px 5px rgba(15,39,71,.34))!important;
+  }
+  .timeline .center-needle,.timeline.is-active .center-needle,
+  .timeline.is-timeline-engaged .center-needle,.timeline.is-marker-afterglow .center-needle{
+    width:3px!important;opacity:1!important;
+    filter:drop-shadow(0 0 5px rgba(255,255,255,1)) drop-shadow(0 3px 5px rgba(15,39,71,.44))!important;
+  }
+  .timeline .focus,.timeline.is-active .focus,
+  .timeline.is-timeline-engaged .focus,.timeline.is-marker-afterglow .focus{
+    opacity:1!important;transform:scale(1.10)!important;
+    border:1px solid rgba(91,143,185,.34)!important;
+    box-shadow:0 9px 28px rgba(15,39,71,.27)!important;
   }
 
   /* Hero copy: quieter than mobile, anchored in the image without dominating it. */
@@ -80,4 +97,34 @@ export const desktopPresentationStyle = String.raw`
   /* Presentation itself should never suggest a desktop work surface. */
   .memory-story-scroll{bottom:0!important}
 }
+
+/* Presentation behaviour: classify each image by aspect ratio and keep the
+   timeline permanently in its strong visual state on large screens. */
+@media (min-width:768px){
+  .memory-sheet .story{
+    -webkit-text-stroke:.15px rgba(15,39,71,.18);
+    text-shadow:0 2px 3px rgba(6,18,30,.82),0 7px 24px rgba(6,18,30,.68)!important;
+  }
+}
+`;
+
+export const desktopPresentationScript = String.raw`
+(()=>{
+  const large=()=>window.matchMedia('(min-width:768px)').matches;
+  const classify=img=>{
+    if(!large()||!img||!img.naturalWidth||!img.naturalHeight)return;
+    const layer=img.closest('.photo-layer'); if(!layer)return;
+    layer.classList.toggle('talera-landscape',(img.naturalWidth/img.naturalHeight)>=1.18);
+    layer.classList.toggle('talera-portrait',(img.naturalWidth/img.naturalHeight)<1.18);
+  };
+  const scan=()=>document.querySelectorAll('.example-photo').forEach(img=>{
+    if(img.complete)classify(img);
+    img.addEventListener('load',()=>classify(img),{passive:true,once:true});
+  });
+  scan();
+  new MutationObserver(scan).observe(document.documentElement,{subtree:true,childList:true});
+  window.addEventListener('resize',scan,{passive:true});
+  const timeline=document.querySelector('.timeline');
+  if(timeline&&large())timeline.classList.add('is-active','is-timeline-engaged','is-timeline-afterglow','is-marker-afterglow');
+})();
 `;

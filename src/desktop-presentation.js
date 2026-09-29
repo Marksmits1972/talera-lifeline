@@ -20,7 +20,7 @@ export const desktopPresentationStyle = String.raw`
   .timeline canvas,.timeline.is-active canvas,.timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
     opacity:1!important;transform:none!important;filter:drop-shadow(0 1px 2px rgba(255,255,255,.86))!important
   }
-  .talera-tv-memories{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+  .talera-tv-memories{position:fixed!important;left:0!important;right:0!important;top:0!important;height:214px!important;z-index:26!important;pointer-events:none!important;overflow:visible!important;display:block!important;visibility:visible!important;opacity:1!important}
   .talera-tv-memory{position:absolute;transform:translateX(-50%);border-radius:11px;background:rgba(255,255,255,.92);padding:3px;box-shadow:0 5px 14px rgba(15,39,71,.24),0 0 0 1px rgba(255,255,255,.7);transition:left .55s cubic-bezier(.2,.75,.2,1),top .55s cubic-bezier(.2,.75,.2,1)}
   .talera-tv-memory img{display:block;width:100%;height:100%;object-fit:cover;border-radius:8px}
   .talera-tv-memory::after{content:"";position:absolute;left:50%;top:100%;width:1.5px;height:var(--stem,18px);background:rgba(15,74,132,.82);transform:translateX(-50%)}
@@ -75,14 +75,14 @@ export const desktopPresentationScript = String.raw`
   for(let i=1;i<40;i++){const t=document.createElement('i');t.className='talera-tv-tick '+(i%5===0?'is-major':'is-minor');t.style.left=(i/40*100)+'%';axis.appendChild(t)}
   timeline.appendChild(axis);
 
-  const layer=document.createElement('div');layer.className='talera-tv-memories';timeline.appendChild(layer);
+  document.querySelectorAll('.talera-tv-memories').forEach(el=>el.remove());const layer=document.createElement('div');layer.className='talera-tv-memories';document.body.appendChild(layer);
   const title=document.createElement('div');title.className='talera-tv-title';document.body.appendChild(title);
 
   const render=()=>{
     const rt=window.__taleraTimelineRuntime;if(!rt||!large())return;
     const memories=rt.memories?rt.memories():[];const bounds=rt.bounds?rt.bounds():null;if(!bounds)return;
     const start=bounds[0],end=bounds[1],span=Math.max(1,end-start),w=timeline.clientWidth,active=rt.activeMemoryId();
-    const visible=memories.filter(m=>m.ms>=start&&m.ms<=end&&m.id!==active).map(m=>({m,x:(m.ms-start)/span*w})).sort((a,b)=>a.x-b.x);
+    const visible=memories.filter(m=>m&&Number.isFinite(Number(m.ms))&&m.ms>=start&&m.ms<=end&&m.id!==active&&m.image).map(m=>({m,x:(m.ms-start)/span*w})).sort((a,b)=>a.x-b.x);
     const groups=[];
     for(const item of visible){const prev=groups[groups.length-1];if(prev&&Math.abs(item.x-prev.x)<34){prev.items.push(item.m);prev.x=(prev.x*(prev.items.length-1)+item.x)/prev.items.length}else groups.push({x:item.x,items:[item.m]})}
     layer.replaceChildren();

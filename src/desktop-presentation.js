@@ -1,177 +1,47 @@
 /*
- * TALERA large-screen presentation mode
- * Phone remains the controller/editor. Desktop, tablet-landscape and TV are a
- * presentation surface: image, story and timeline only.
+ * TALERA large-screen presentation mode — approved TV reference, 29 Sep 2026.
+ * Phone remains controller/editor. Large screens are presentation only.
  */
 export const desktopPresentationStyle = String.raw`
 @media (min-width:768px){
-  html,body,.app,main,.memory-space,.photo-stage,.photo-layer{
-    width:100%!important;
-    height:100%!important;
-    min-width:100%!important;
-    min-height:100%!important;
-    max-width:none!important;
-    max-height:none!important;
-    margin:0!important;
-    border:0!important;
-    border-radius:0!important;
-  }
+  html,body,.app,main,.memory-space,.photo-stage,.photo-layer{width:100%!important;height:100%!important;min-width:100%!important;min-height:100%!important;max-width:none!important;max-height:none!important;margin:0!important;border:0!important;border-radius:0!important}
   html,body,.app{height:100dvh!important;background:#0F2747!important}
   .memory-space{position:absolute!important;inset:0!important;overflow:hidden!important}
-
-  /* The photograph is the stage. Landscape imagery fills the viewport; portrait
-     imagery stays intact over a soft edge-to-edge backdrop. */
   .photo-stage,.photo-layer{position:absolute!important;inset:0!important}
-  .photo-backdrop{
-    inset:-72px!important;
-    width:calc(100% + 144px)!important;
-    height:calc(100% + 144px)!important;
-    object-fit:cover!important;
-    opacity:.78!important;
-    filter:blur(34px) saturate(1.02) brightness(.90)!important;
-  }
+  .photo-backdrop{inset:-72px!important;width:calc(100% + 144px)!important;height:calc(100% + 144px)!important;object-fit:cover!important;opacity:.78!important;filter:blur(34px) saturate(1.02) brightness(.90)!important}
   .example-photo,.photo-aligned-blur{max-width:none!important}
-  .photo-layer.talera-landscape .example-photo{
-    inset:0!important;width:100%!important;height:100%!important;
-    object-fit:cover!important;object-position:center center!important;
-    -webkit-mask-image:none!important;mask-image:none!important;
-  }
+  .photo-layer.talera-landscape .example-photo{inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center center!important;-webkit-mask-image:none!important;mask-image:none!important}
   .photo-layer.talera-landscape .photo-aligned-blur{opacity:0!important}
 
-  /* Timeline becomes a clear visual navigation ribbon, while remaining secondary. */
-  .timeline{
-    height:224px!important;min-height:224px!important;
-    --timeline-rest-opacity:1;
-    --timeline-rest-filter:saturate(1.20) contrast(1.52) brightness(1.06) drop-shadow(0 1px 2px rgba(255,255,255,.95)) drop-shadow(0 3px 5px rgba(15,39,71,.34));
+  /* Approved TV composition: compact timeline high in the picture, edge-to-edge flow. */
+  .timeline{height:214px!important;min-height:214px!important;isolation:isolate!important;--timeline-rest-opacity:1;overflow:visible!important}
+  .timeline::before,.timeline::after{display:none!important}
+  .timeline canvas,.timeline.is-active canvas,.timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
+    opacity:1!important;transform:none!important;filter:drop-shadow(0 1px 2px rgba(255,255,255,.86))!important
   }
-  .timeline::before,
-  .timeline.is-timeline-engaged::before,
-  .timeline.is-timeline-afterglow::before{
-    height:224px!important;
-    background:linear-gradient(180deg,rgba(247,244,239,.10) 0%,rgba(247,244,239,.045) 58%,transparent 100%)!important;
-    backdrop-filter:none!important;
-    -webkit-backdrop-filter:none!important;
-    opacity:1!important;
-    transition:none!important;
+  .talera-tv-memories{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+  .talera-tv-memory{position:absolute;transform:translateX(-50%);border-radius:11px;background:rgba(255,255,255,.92);padding:3px;box-shadow:0 5px 14px rgba(15,39,71,.24),0 0 0 1px rgba(255,255,255,.7);transition:left .55s cubic-bezier(.2,.75,.2,1),top .55s cubic-bezier(.2,.75,.2,1)}
+  .talera-tv-memory img{display:block;width:100%;height:100%;object-fit:cover;border-radius:8px}
+  .talera-tv-memory::after{content:"";position:absolute;left:50%;top:100%;width:1.5px;height:var(--stem,18px);background:rgba(15,74,132,.82);transform:translateX(-50%)}
+  .talera-tv-memory-count{position:absolute;right:-7px;top:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#0F2747;color:#fff;font:700 10px/20px Inter,-apple-system,sans-serif;text-align:center;box-shadow:0 2px 7px rgba(15,39,71,.3)}
+  .talera-tv-memory-dot{position:absolute;left:50%;top:calc(100% + var(--stem,18px) - 5px);width:10px;height:10px;border-radius:50%;background:#1767b1;border:2px solid rgba(255,255,255,.96);transform:translateX(-50%);box-shadow:0 1px 4px rgba(15,39,71,.25)}
+
+  .timeline .center-needle,.timeline.is-active .center-needle,.timeline.is-timeline-engaged .center-needle,.timeline.is-marker-afterglow .center-needle{
+    z-index:7!important;width:2px!important;height:91px!important;top:67px!important;bottom:auto!important;margin-top:0!important;opacity:1!important;background:linear-gradient(180deg,rgba(15,39,71,.2),#0F4A84 22%,#0F4A84 100%)!important;box-shadow:0 0 0 1px rgba(255,255,255,.28)!important;filter:none!important
   }
-  .timeline::after,
-  .timeline.is-timeline-engaged::after,
-  .timeline.is-timeline-afterglow::after{
-    background:transparent!important;
-    opacity:0!important;
-  }
-  .timeline canvas,.timeline.is-active canvas,
-  .timeline.is-timeline-engaged canvas,.timeline.is-timeline-afterglow canvas{
-    opacity:1!important;
-    filter:saturate(1.20) contrast(1.52) brightness(1.06) drop-shadow(0 1px 2px rgba(255,255,255,.95)) drop-shadow(0 3px 5px rgba(15,39,71,.34))!important;
-  }
-  .timeline .center-needle,.timeline.is-active .center-needle,
-  .timeline.is-timeline-engaged .center-needle,.timeline.is-marker-afterglow .center-needle{
-    width:3px!important;opacity:1!important;
-    filter:drop-shadow(0 0 5px rgba(255,255,255,1)) drop-shadow(0 3px 5px rgba(15,39,71,.44))!important;
-  }
-  .timeline .focus,.timeline.is-active .focus,
-  .timeline.is-timeline-engaged .focus,.timeline.is-marker-afterglow .focus{
-    opacity:1!important;transform:scale(1.10)!important;
-    border:1px solid rgba(91,143,185,.34)!important;
-    box-shadow:0 9px 28px rgba(15,39,71,.27)!important;
+  .timeline .center-needle::before{box-shadow:0 0 0 4px rgba(255,255,255,.78),0 2px 8px rgba(15,39,71,.3)!important}
+  main .timeline .focus,main .timeline.is-active .focus,main .timeline.is-timeline-engaged .focus,main .timeline.is-timeline-afterglow .focus,main .timeline.is-marker-afterglow .focus{
+    z-index:9!important;top:31px!important;transform:translateX(-50%)!important;padding:8px 16px!important;border-radius:999px!important;font-weight:750!important;letter-spacing:-.01em!important;color:#0F2747!important;background:#fff!important;border:1px solid rgba(15,39,71,.12)!important;box-shadow:0 6px 16px rgba(15,39,71,.20)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;opacity:1!important
   }
 
-  /* TALERA life-line: turn the proven ruler into a permanent visual story landscape. */
-  .timeline{isolation:isolate!important}
-  .timeline canvas{
-    transform:translateY(-14px) scaleY(1.16)!important;
-    transform-origin:center 58%!important;
-  }
-  .timeline::before{
-    content:""!important;
-    position:absolute!important;
-    left:0!important;right:0!important;top:76px!important;
-    height:98px!important;
-    background:
-      radial-gradient(ellipse at 50% 48%,rgba(91,143,185,.16) 0%,rgba(91,143,185,.07) 24%,transparent 58%),
-      linear-gradient(180deg,transparent 0%,rgba(255,255,255,.06) 44%,rgba(15,39,71,.07) 49%,rgba(15,39,71,.11) 50%,rgba(15,39,71,.04) 52%,transparent 100%)!important;
-    -webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)!important;
-    mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)!important;
-    pointer-events:none!important;
-  }
-  .timeline .center-needle,
-  .timeline.is-active .center-needle,
-  .timeline.is-timeline-engaged .center-needle,
-  .timeline.is-marker-afterglow .center-needle{
-    width:2px!important;
-    height:118px!important;max-height:none!important;
-    top:31px!important;margin-top:0!important;bottom:auto!important;
-    background:linear-gradient(180deg,rgba(15,39,71,.22),#0F2747 32%,#0F2747 76%,rgba(15,39,71,.18))!important;
-    box-shadow:0 0 0 1px rgba(255,255,255,.32),0 0 18px rgba(91,143,185,.38)!important;
-  }
-  .timeline .center-needle::before{
-    transform:scale(1.05)!important;
-    box-shadow:0 0 0 4px rgba(255,255,255,.42),0 0 18px rgba(91,143,185,.58)!important;
-  }
-  main .timeline .focus,
-  main .timeline.is-active .focus,
-  main .timeline.is-timeline-engaged .focus,
-  main .timeline.is-timeline-afterglow .focus,
-  main .timeline.is-marker-afterglow .focus{
-    top:156px!important;
-    transform:translateX(-50%)!important;
-    padding:8px 15px!important;
-    border-radius:999px!important;
-    font-weight:720!important;
-    letter-spacing:-.01em!important;
-    background:rgba(255,255,255,.90)!important;
-    border:1px solid rgba(91,143,185,.32)!important;
-    box-shadow:0 8px 24px rgba(15,39,71,.20),inset 0 1px 0 rgba(255,255,255,.88)!important;
-    backdrop-filter:blur(8px)!important;
-    -webkit-backdrop-filter:blur(8px)!important;
-  }
-  .timeline::after{
-    content:""!important;
-    position:absolute!important;
-    left:50%!important;top:50px!important;
-    width:210px!important;height:132px!important;
-    transform:translateX(-50%)!important;
-    border-radius:50%!important;
-    background:radial-gradient(ellipse,rgba(255,255,255,.18) 0%,rgba(91,143,185,.07) 34%,transparent 70%)!important;
-    opacity:1!important;
-    pointer-events:none!important;
-    z-index:1!important;
-  }
-
-  /* Hero copy: quieter than mobile, anchored in the image without dominating it. */
-  .memory-photo-air{height:57%!important;min-height:360px!important}
-  .memory-sheet{
-    padding:40px clamp(44px,6vw,104px) 110px!important;
-    background:linear-gradient(180deg,rgba(6,18,30,0) 0,rgba(6,18,30,.06) 30%,rgba(6,18,30,.26) 68%,rgba(6,18,30,.42) 100%)!important;
-  }
+  /* Only the story heading remains, centered low over the photograph. */
+  .memory-photo-air{height:64%!important;min-height:360px!important}
+  .memory-sheet{padding:0 clamp(44px,6vw,104px) 54px!important;background:linear-gradient(180deg,transparent 0%,transparent 62%,rgba(6,18,30,.18) 100%)!important;display:flex!important;justify-content:center!important;align-items:flex-end!important}
   .memory-sheet::before{display:none!important}
-  .memory-sheet .story{
-    max-width:min(620px,48vw)!important;
-    font-size:clamp(24px,2.05vw,36px)!important;
-    line-height:1.12!important;
-    font-weight:620!important;
-    letter-spacing:-.018em!important;
-    text-wrap:balance!important;
-    text-shadow:0 3px 18px rgba(6,18,30,.58)!important;
-  }
-  .memory-sheet .story-more{display:none!important}
-
-  /* Large screen is presentation only. All creation, management and navigation live on the phone. */
-  nav,.talera-context-share,.talera-memory-edit,.talera-memory-audio,
-  .talera-audio-consent,.talera-memory-manager{display:none!important}
-
-  /* Presentation itself should never suggest a desktop work surface. */
+  .memory-sheet .story{max-width:min(920px,76vw)!important;margin:0 auto!important;text-align:center!important;font-size:clamp(28px,2.35vw,42px)!important;line-height:1.08!important;font-weight:700!important;letter-spacing:-.022em!important;color:#fff!important;text-wrap:balance!important;-webkit-text-stroke:.2px rgba(15,39,71,.18);text-shadow:0 2px 4px rgba(6,18,30,.72),0 8px 26px rgba(6,18,30,.42)!important}
+  .memory-sheet .story-more,.memory-date{display:none!important}
+  nav,.talera-context-share,.talera-memory-edit,.talera-memory-audio,.talera-audio-consent,.talera-memory-manager{display:none!important}
   .memory-story-scroll{bottom:0!important}
-}
-
-/* Presentation behaviour: classify each image by aspect ratio and keep the
-   timeline permanently in its strong visual state on large screens. */
-@media (min-width:768px){
-  .memory-sheet .story{
-    -webkit-text-stroke:.15px rgba(15,39,71,.18);
-    text-shadow:0 2px 3px rgba(6,18,30,.82),0 7px 24px rgba(6,18,30,.68)!important;
-  }
 }
 `;
 
@@ -180,18 +50,40 @@ export const desktopPresentationScript = String.raw`
   const large=()=>window.matchMedia('(min-width:768px)').matches;
   const classify=img=>{
     if(!large()||!img||!img.naturalWidth||!img.naturalHeight)return;
-    const layer=img.closest('.photo-layer'); if(!layer)return;
-    layer.classList.toggle('talera-landscape',(img.naturalWidth/img.naturalHeight)>=1.18);
-    layer.classList.toggle('talera-portrait',(img.naturalWidth/img.naturalHeight)<1.18);
+    const layer=img.closest('.photo-layer');if(!layer)return;
+    const landscape=(img.naturalWidth/img.naturalHeight)>=1.18;
+    layer.classList.toggle('talera-landscape',landscape);layer.classList.toggle('talera-portrait',!landscape);
   };
-  const scan=()=>document.querySelectorAll('.example-photo').forEach(img=>{
-    if(img.complete)classify(img);
-    img.addEventListener('load',()=>classify(img),{passive:true,once:true});
-  });
-  scan();
-  new MutationObserver(scan).observe(document.documentElement,{subtree:true,childList:true});
-  window.addEventListener('resize',scan,{passive:true});
+  const scan=()=>document.querySelectorAll('.example-photo').forEach(img=>{if(img.complete)classify(img);img.addEventListener('load',()=>classify(img),{passive:true,once:true})});
+  scan();new MutationObserver(scan).observe(document.documentElement,{subtree:true,childList:true});window.addEventListener('resize',scan,{passive:true});
+
   const timeline=document.querySelector('.timeline');
-  if(timeline&&large())timeline.classList.add('is-active','is-timeline-engaged','is-timeline-afterglow','is-marker-afterglow');
+  if(!timeline||!large())return;
+  timeline.classList.add('is-active','is-timeline-engaged','is-timeline-afterglow','is-marker-afterglow');
+  const layer=document.createElement('div');layer.className='talera-tv-memories';timeline.appendChild(layer);
+
+  const render=()=>{
+    const rt=window.__taleraTimelineRuntime;if(!rt||!large())return;
+    const memories=rt.memories?rt.memories():[];const bounds=rt.bounds?rt.bounds():null;if(!bounds||!memories.length)return;
+    const [start,end]=bounds,span=end-start,w=timeline.clientWidth,active=rt.activeMemoryId();
+    const visible=memories.filter(m=>m.ms>=start&&m.ms<=end&&m.id!==active).map(m=>({m,x:(m.ms-start)/span*w}));
+    const groups=[];
+    for(const item of visible){const prev=groups[groups.length-1];if(prev&&Math.abs(item.x-prev.x)<30){prev.items.push(item.m);prev.x=(prev.x*(prev.items.length-1)+item.x)/prev.items.length}else groups.push({x:item.x,items:[item.m]})}
+    layer.replaceChildren();
+    groups.forEach((g,i)=>{
+      if(g.x<22||g.x>w-22)return;
+      const n=g.items.length,m=g.items[Math.floor((g.items.length-1)/2)];
+      const base=n>=4?82:n>=2?72:60;const aspect=[.86,1.05,1.22,.94][Math.abs(Number(m.id)||i)%4];
+      const width=Math.round(base*aspect),height=Math.round(base);
+      const lift=[10,31,18,42,24][Math.abs(Number(m.id)||i)%5];const stem=14+lift;
+      const el=document.createElement('div');el.className='talera-tv-memory';el.style.left=g.x+'px';el.style.width=width+'px';el.style.height=height+'px';el.style.top=Math.max(7,158-stem-height)+'px';el.style.setProperty('--stem',stem+'px');
+      const img=document.createElement('img');img.src=m.image;img.alt='';img.decoding='async';el.appendChild(img);
+      if(n>1){const badge=document.createElement('span');badge.className='talera-tv-memory-count';badge.textContent=String(n);el.appendChild(badge)}
+      const dot=document.createElement('span');dot.className='talera-tv-memory-dot';el.appendChild(dot);layer.appendChild(el);
+    });
+  };
+  let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;render()})};
+  window.addEventListener('talera:timeline-draw',schedule);window.addEventListener('resize',schedule,{passive:true});
+  setTimeout(schedule,0);setTimeout(schedule,250);
 })();
 `;

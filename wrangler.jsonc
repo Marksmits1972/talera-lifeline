@@ -1,4 +1,4 @@
-// TALERA_REFERENCE_REV: pre-unification-baseline-20260924-e6819f8
+// TALERA_REFERENCE_REV: pre-unification-baseline-20260924-e6819f8-trigger-20261001
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-r19-reference",

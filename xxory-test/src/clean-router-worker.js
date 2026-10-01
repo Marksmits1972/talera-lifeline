@@ -3,7 +3,7 @@ import { handleCleanRebuildV2 } from './clean-rebuild-v2.js';
 import { handleStoryLabFresh } from './storylab-fresh.js';
 import { handleStoryLabClean } from './storylab-clean.js';
 
-const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev';
+const TIMELINE_ORIGIN = '';
 const PUBLISH_REVISION = 'storylab-clean-timeline-publish-20260917-r1';
 
 function safeClient(value) {

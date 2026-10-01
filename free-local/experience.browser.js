@@ -51,10 +51,20 @@ export function installTimelineExperience({runtime,storage,registerPhoto=()=>{},
   window.addEventListener('pagehide',clear);
   window.addEventListener('pageshow',event=>{if(event.persisted){selected='';runtime.writeMemory(runtime.currentMemory());}});
 }
-export async function installDeviceExperience(){
+export async function installDeviceExperience({beforeReload=async()=>{}}={}){
   const button=document.getElementById('freeDeviceOpen');if(!button)return;
   const dialog=document.createElement('dialog');dialog.id='freeDevice';dialog.innerHTML=`<h2>${t('deviceTitle')}</h2><p>${t('deviceHelp')}</p><p id="freeOfflineStatus"></p><p id="freeStorageUsage"></p><button id="freePersist">${t('protectStorage')}</button><p>${t('storageWarning')}</p><button id="freeDeviceClose">${t('storageClose')}</button>`;document.body.append(dialog);
-  button.onclick=async()=>{document.getElementById('moreModal')?.classList.remove('open');document.getElementById('freeStorageInfo')?.close();dialog.showModal();try{const estimate=await navigator.storage?.estimate?.(),persisted=await navigator.storage?.persisted?.();dialog.querySelector('#freeStorageUsage').textContent=(estimate?Math.round(estimate.usage/1024/1024)+' MB '+t('storageUsed'):t('storageEstimateMissing'))+(persisted?' '+t('storageProtected'):'');}catch{}let cached=false;try{if(await caches.has('talera-free-integrated-v3')){const cache=await caches.open('talera-free-integrated-v3');cached=Boolean(await cache.match('/tell'))&&Boolean(await cache.match('/local/experience.js'));}}catch{}dialog.querySelector('#freeOfflineStatus').textContent=t(cached?'offlineReady':'offlinePending');};
+  button.onclick=async()=>{document.getElementById('moreModal')?.classList.remove('open');document.getElementById('freeStorageInfo')?.close();dialog.showModal();try{const estimate=await navigator.storage?.estimate?.(),persisted=await navigator.storage?.persisted?.();dialog.querySelector('#freeStorageUsage').textContent=(estimate?Math.round(estimate.usage/1024/1024)+' MB '+t('storageUsed'):t('storageEstimateMissing'))+(persisted?' '+t('storageProtected'):'');}catch{}let cached=false;try{if(await caches.has('talera-free-integrated-v4')){const cache=await caches.open('talera-free-integrated-v4');cached=Boolean(await cache.match('/tell'))&&Boolean(await cache.match('/local/experience.js'));}}catch{}dialog.querySelector('#freeOfflineStatus').textContent=t(cached?'offlineReady':'offlinePending');};
   dialog.querySelector('#freeDeviceClose').onclick=()=>dialog.close();dialog.querySelector('#freePersist').onclick=async()=>{let result=false;try{result=await navigator.storage?.persist?.();}catch{}dialog.querySelector('#freeStorageUsage').textContent=t(result?'storageProtected':'storageNotProtected');};
-  if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'}).then(()=>navigator.serviceWorker.ready).then(()=>{window.dispatchEvent(new Event('talera-offline-ready'));}).catch(()=>{});
+  if('serviceWorker' in navigator){
+    let requested=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(requested)location.reload();});
+    navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'}).then(registration=>{
+      const update=document.createElement('button');update.id='freeUpdate';update.type='button';update.textContent=t('updateReady');update.hidden=true;document.body.append(update);
+      const show=()=>{update.hidden=!registration.waiting||!navigator.serviceWorker.controller;};
+      update.onclick=async()=>{try{if(window.__taleraFreeRecording?.busy())throw new Error(t('audioFinishFirst'));await beforeReload();if(registration.waiting){requested=true;registration.waiting.postMessage({type:'ACTIVATE'});}}catch(error){const notice=document.getElementById('notice');notice.textContent=error.message;notice.classList.add('show');setTimeout(()=>notice.classList.remove('show'),4500);}};
+      show();registration.addEventListener('updatefound',()=>registration.installing?.addEventListener('statechange',show));
+      return navigator.serviceWorker.ready;
+    }).then(()=>window.dispatchEvent(new Event('talera-offline-ready'))).catch(()=>{});
+  }
 }

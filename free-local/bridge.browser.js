@@ -52,15 +52,16 @@ window.__taleraFreeApi=async function(path,options={}) {
   }catch(error){message(error.name==='QuotaExceededError'?t('storageFull'):error.message);return Response.json({error:error.message},{status:409});}
 };
 window.__taleraFreeStorage=storage;
-installBackup({storage,exclusive:serialized,beforeExport:async()=>{
+async function flushDraft(){
   await ready;await queue;if(window.__taleraFreeRecording?.busy())throw new Error(t('audioFinishFirst'));
   if(window.__taleraStoryLabMedia?.isUploading())throw new Error(t('photoBusy'));
   if(location.pathname.startsWith('/tell')){
     const response=await window.__taleraFreeApi('/api/storylab-clean/state',{method:'PUT',body:JSON.stringify({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value})});
     if(!response.ok)throw new Error((await response.json()).error);
   }
-}});
-installDeviceExperience();
+}
+installBackup({storage,exclusive:serialized,beforeExport:flushDraft});
+installDeviceExperience({beforeReload:flushDraft});
 if(location.pathname.startsWith('/tell')) {
   await ready.catch(()=>{});
   for(const script of document.querySelectorAll('script[type="text/talera"]')) {
@@ -95,7 +96,7 @@ if(location.pathname.startsWith('/tell')) {
   document.querySelector('.more')?.closest('button')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').showModal());
   document.getElementById('freeStorageClose')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').close());
   try {
-    const stories=(await storage.stories()).filter(story=>story.status==='published').sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    const stories=(await storage.stories()).filter(story=>story.status==='published').sort((a,b)=>Date.parse(a.date||new Date(a.createdAt||0).toISOString())-Date.parse(b.date||new Date(b.createdAt||0).toISOString()));
     const urls=[],photoBlobs=new Map();
     window.__taleraFreePhotoResponse=async url=>photoBlobs.has(url)?new Response(photoBlobs.get(url)):new Response('',{status:404});
     window.__taleraFreeMemories=[];

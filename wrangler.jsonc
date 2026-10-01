@@ -1,4 +1,4 @@
-// TALERA_REFERENCE_REV: r19h2-carousel-complete-isolated-20261001
+// TALERA_REFERENCE_REV: r19h2-carousel-complete-isolated-20261001-trigger
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-r19-reference",

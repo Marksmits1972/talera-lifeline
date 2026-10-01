@@ -17,6 +17,13 @@ export default {
     // Dedicated R19 tell entry. Always opens the exact Story Lab clean route
     // that belongs to the R19 baseline, while preserving query/hash context.
     if (path === "/tell" || path === "/tell/") {
+      // Warm the historical API once so a fresh isolated D1 gets the exact
+      // R19 base schema before the user starts saving/publishing.
+      if (env && env.DB && ctx && typeof ctx.waitUntil === "function") {
+        ctx.waitUntil(
+          tellWorker.fetch(rewrite(request, "/api/health"), env, ctx).catch(() => null)
+        );
+      }
       return tellWorker.fetch(rewrite(request, "/storylab-clean"), env, ctx);
     }
 

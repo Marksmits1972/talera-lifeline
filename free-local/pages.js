@@ -20,8 +20,8 @@ export async function makePages() {
   tell=tell.replace('location.href=data.handoffUrl;',"localStorage.removeItem('talera.free.draft');location.href=data.handoffUrl;");
   tell=tell.replace(/\bmultiple\b/g,'');
   tell=tell.replace('Maximaal 12 foto’s','Deze eerste proef bewaart één foto per herinnering');
-  tell=tell.replace('Tik om te vertellen','Tik om je tekst te schrijven').replaceAll('Tik en vertel','Tik en schrijf');
-  tell=tell.replace('Vertel verder','Schrijf verder').replaceAll('Kijk naar je foto en vertel wat er gebeurde','Kijk naar je foto en schrijf wat er gebeurde');
+  tell=tell.replaceAll('Tik om te vertellen','Tik om je tekst te schrijven').replaceAll('Tik en vertel','Tik en schrijf');
+  tell=tell.replaceAll('Vertel verder','Schrijf verder').replaceAll('Kijk naar je foto en vertel wat er gebeurde','Kijk naar je foto en schrijf wat er gebeurde');
   tell=tell.replaceAll('Publiceer op tijdlijn','Op mijn tijdlijn');
   tell=tell.replaceAll('Upload niet gelukt · probeer opnieuw','Foto lokaal bewaren lukte niet · probeer opnieuw');
   tell=tell.replaceAll('Publiceren…','Lokaal bewaren…');
@@ -41,7 +41,7 @@ export async function makePages() {
   timeline=timeline.replace('const LIFE_END = new Date(2026,8,6).getTime();','const LIFE_END = Math.max(Date.now(),...window.__taleraFreeMemories.map(m=>new Date(m.at).getTime()));');
   timeline=timeline.replace(/https:\/\/images\.unsplash\.com\/[^"'<>\s]+/g,'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
   timeline=timeline.replace('<html lang="nl">','<html lang="nl" class="free-loading">');
-  timeline=timeline.replace('</head>',`<style>.free-loading .app{visibility:hidden}#freeEmpty{position:fixed;inset:0;display:grid;place-content:center;text-align:center;padding:28px;background:#F7F4EF;color:#0F2747;font-family:system-ui}#freeEmpty[hidden]{display:none}#freeEmpty a{color:#0F2747;padding:14px;font-weight:700}#freeEmpty p{max-width:330px;line-height:1.5}#freeEdit{position:fixed;right:18px;top:calc(260px + env(safe-area-inset-top));z-index:30;border:1px solid #fff;border-radius:50%;width:40px;height:40px;background:#F7F4EF;color:#0F2747}#freeError{position:fixed;top:15px;left:15px;right:15px;z-index:100;color:#0F2747;background:#F7F4EF}</style></head>`);
+  timeline=timeline.replace('</head>',`<style>.free-loading .app{visibility:hidden}#freeEmpty{position:fixed;left:20px;right:20px;top:32%;z-index:30;display:grid;place-content:center;text-align:center;padding:20px;background:#F7F4EF;color:#0F2747;font-family:system-ui}#freeEmpty[hidden]{display:none}#freeEmpty a{color:#0F2747;padding:14px;font-weight:700}#freeEmpty p{max-width:330px;line-height:1.5}#freeEdit{position:fixed;right:18px;top:calc(260px + env(safe-area-inset-top));z-index:30;border:1px solid #fff;border-radius:50%;width:40px;height:40px;background:#F7F4EF;color:#0F2747}#freeError:empty{display:none}#freeError{padding:16px;position:fixed;top:15px;left:15px;right:15px;z-index:100;color:#0F2747;background:#F7F4EF}</style></head>`);
   timeline=timeline.replace('</body>',`<section id="freeEmpty" hidden><h1>TALERA</h1><p>${catalog.localNotice}</p><a href="/tell?new=1">${catalog.firstMemory}</a></section><button id="freeEdit" hidden aria-label="${catalog.editMemory}">✎</button><div id="freeError" role="alert"></div></body>`);
   // No reference narrative should flash before the local store has been read.
   timeline=timeline.replace(/(<div class="story" id="memoryStory">)[\s\S]*?(<\/div>)/,'$1$2');

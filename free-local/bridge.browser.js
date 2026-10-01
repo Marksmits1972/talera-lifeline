@@ -54,7 +54,17 @@ if(location.pathname.startsWith('/tell')) {
     const running=document.createElement('script');running.textContent=script.textContent;document.body.appendChild(running);
   }
   const save=document.getElementById('timelinePublish');
-  save?.addEventListener('click',event=>{if(failed){event.stopImmediatePropagation();message(t('storageUnavailable'));}},true);
+  save?.addEventListener('click',event=>{
+    const stop=key=>{event.stopImmediatePropagation();message(t(key));};
+    if(failed){stop('storageUnavailable');return;}
+    if(window.__taleraStoryLabMedia?.isUploading()){stop('photoBusy');return;}
+    if(!document.getElementById('dateInput').value){
+      stop('addDate');document.getElementById('editBtn').click();document.getElementById('editDate').focus();return;
+    }
+    if(!document.getElementById('storyText').value.trim()){
+      stop('writeFirst');window.__taleraFreeOpenText?.();
+    }
+  },true);
 }else {
   document.querySelector('.tell')?.addEventListener('click',()=>location.href='/tell?new=1',true);
   document.querySelector('.more')?.closest('button')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').showModal());

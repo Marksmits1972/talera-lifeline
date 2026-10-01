@@ -28,5 +28,15 @@ await new Promise(resolve=>setTimeout(resolve,100));
 assert.equal(tw.document.getElementById('title').value,'Lokale proef');
 assert.equal(tw.document.getElementById('dateInput').value,'2021-04-10');
 assert.equal(tw.document.getElementById('storyText').value,'De tekst blijft hier.');
+// A photo-only draft must expose the next step instead of hiding publication.
+assert.ok((await makePages()).tell.includes('.screen.has-photo .talera-publish-timeline{display:flex}'));
+tw.document.getElementById('storyText').value='';
+tw.document.getElementById('timelinePublish').click();
+assert.ok(tw.document.getElementById('sheet').classList.contains('open'));
+assert.equal(tw.document.getElementById('notice').textContent,tw.__copy('writeFirst'));
+tw.document.getElementById('dateInput').value='';
+tw.document.getElementById('timelinePublish').click();
+assert.ok(tw.document.getElementById('editModal').classList.contains('open'));
+assert.equal(tw.document.getElementById('notice').textContent,tw.__copy('addDate'));
 assert.deepEqual(tellErrors,[]);tellDom.window.close();
 process.stdout.write('DOM timeline handoff: passed (canvas mocked; visual/browser QA remains open)\n');

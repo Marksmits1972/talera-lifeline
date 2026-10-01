@@ -16,6 +16,8 @@ export const nl={
   invalidMemory:'Ongeldige herinnering.',memoryReadError:'Herinnering kon niet worden teruggelezen.',
   unsupportedPhoto:'Dit fotoformaat kan hier niet worden geopend. Kies een JPEG- of PNG-foto.',
   localOnly:'Deze proef gebruikt uitsluitend lokale inhoud.',choosePhotoDate:'Kies een foto en bevestig de datum.',
+  photoBusy:'De foto wordt nog bewaard. Wacht even en probeer opnieuw.',
+  addDate:'Voeg eerst de datum van je herinnering toe.',
   writeFirst:'Schrijf eerst je herinnering.',later:'Deze functie volgt in een volgende proefstap.',
   storageFull:'De lokale opslag is vol. Je eerdere herinneringen blijven bewaard.',missingPhoto:'Een lokale foto ontbreekt.'
 };

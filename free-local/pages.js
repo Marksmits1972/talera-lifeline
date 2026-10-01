@@ -14,7 +14,9 @@ export async function makePages() {
   // Replace the frozen UI's transport at its compatibility boundary. Never patch global fetch.
   tell=tell.replace(/\bfetch\(/g,'window.__taleraFreeApi(');
   tell=tell.replace('const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition||null;','const SpeechRecognition=null;');
-  tell=tell.replace(/  async function startStopRecording\(btn\)\{[^\n]*\}/,'  async function startStopRecording(btn){document.getElementById("sheetPreview").click();showNotice(window.__taleraT("audioLater"));}');
+  tell=tell.replace(/  async function startStopRecording\(btn\)\{[^\n]*\}/,'  async function startStopRecording(btn){window.__taleraFreeOpenText?.();showNotice(window.__taleraT("audioLater"));}');
+  tell=tell.replace('  measure();\n  setSheet(sheet.classList.contains', '  window.__taleraFreeOpenText=()=>{setSheet(true,true);storyText?.focus();};\n  if(preview)preview.addEventListener("click",window.__taleraFreeOpenText);\n  measure();\n  setSheet(sheet.classList.contains');
+  tell=tell.replace("if(closeButton)closeButton.addEventListener('click',()=>setSheet(false,true));","if(closeButton)closeButton.addEventListener('click',()=>{storyText?.dispatchEvent(new Event('change',{bubbles:true}));setSheet(false,true);});");
   tell=tell.replace('Math.max(0,12-(state.photos||[]).length)','Math.max(0,1-(state.photos||[]).length)');
   tell=tell.replace('photoCache.set(item.id,item.url);',"const savedBlob=await (await api('/api/storylab-clean/photo?id='+encodeURIComponent(item.id))).blob();const compactUrl=URL.createObjectURL(savedBlob);photoCache.set(item.id,compactUrl);URL.revokeObjectURL(item.url);const oldPreview=previewPhotoUrls.get(item.id);if(oldPreview)URL.revokeObjectURL(oldPreview);previewPhotoUrls.set(item.id,compactUrl);");
   tell=tell.replace('location.href=data.handoffUrl;',"localStorage.removeItem('talera.free.draft');location.href=data.handoffUrl;");
@@ -27,10 +29,10 @@ export async function makePages() {
   tell=tell.replace('Maximaal 12 foto’s','Deze eerste proef bewaart één foto per herinnering');
   tell=tell.replaceAll('Tik om te vertellen','Tik om je tekst te schrijven').replaceAll('Tik en vertel','Tik en schrijf');
   tell=tell.replaceAll('Vertel verder','Schrijf verder').replaceAll('Kijk naar je foto en vertel wat er gebeurde','Kijk naar je foto en schrijf wat er gebeurde');
-  tell=tell.replaceAll('Publiceer op tijdlijn','Op mijn tijdlijn');
+  tell=tell.replaceAll('Publiceer op tijdlijn','Op mijn tijdlijn').replaceAll('Plaats op tijdlijn','Op mijn tijdlijn');
   tell=tell.replaceAll('Upload niet gelukt · probeer opnieuw','Foto lokaal bewaren lukte niet · probeer opnieuw');
   tell=tell.replaceAll('Publiceren…','Lokaal bewaren…');
-  tell=tell.replace('</head>','<style>.photo-voice-sub{max-width:300px}</style></head>');
+  tell=tell.replace('</head>','<style>.photo-voice-sub{max-width:300px}.screen.has-photo .talera-publish-timeline{display:flex}</style></head>');
   // Every fixed string changed for this proof goes through the central NL catalog.
   tell=applyCatalog(tell);
 

@@ -1,4 +1,4 @@
-const TIMELINE_ORIGIN = 'https://talera-timeline-prototype.mark-a39.workers.dev';
+const TIMELINE_ORIGIN = '';
 
 export async function handleV9TimelinePublish(request, env) {
   const url = new URL(request.url);

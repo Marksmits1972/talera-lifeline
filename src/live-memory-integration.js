@@ -9,7 +9,7 @@ export const liveMemoryIntegrationStyle = String.raw`
 
 export const liveMemoryIntegrationScript = String.raw`
 (()=>{
-  const TELL_ORIGIN='https://xxory-test.mark-a39.workers.dev';
+  const TELL_ORIGIN=location.origin+'/tell';
   const CREDS_KEY='talera-linked-memory-credentials-v1';
   const AUTO_START_MS=2000;
   const AUTO_STEP_MS=2400;

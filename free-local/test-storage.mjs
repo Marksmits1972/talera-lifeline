@@ -35,7 +35,7 @@ test('generated UI scripts parse, make no fetch calls and disable cloud speech r
   for(const html of Object.values(pages)){
     for(const match of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
     assert.doesNotMatch(html,/\bfetch\(/);
-    assert.match(html,/type="module" src="\/local\/bridge.js"/);
+    assert.match(html,/type="module" src="\/local\/bridge.js(?:\?[^"]*)?"/);
   }
   assert.match(pages.tell,/const SpeechRecognition=null/);
   assert.match(htmlHeaders['content-security-policy'],/connect-src 'none'/);

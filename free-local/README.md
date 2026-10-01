@@ -71,3 +71,16 @@ De lokale proef mag pas na expliciete mobiele goedkeuring een nieuwe baseline wo
 - De echte cloudbrowserproef heeft fotoselectie, herladen, datum/tekst, publicatie en terugzien van de tekst op de tijdlijn bevestigd. Geen volledige netwerkaudit uitgevoerd. De gebruiker heeft ook een eigen foto en getypte herinnering op zijn iPhone-tijdlijn teruggezien.
 - Tekst, titel en datum worden als lokale IndexedDB-records bewaard, naast de fotoblobs. Losse tekstbestanden of een zichtbare telefoonmap worden niet aangemaakt. Export/import volgt later.
 - Het Free-tekstpaneel behoudt nu de gekozen tussenhoogte bij loslaten en vensterwijzigingen. DOM-regressietest geslaagd. Presentatiegebaren worden op pagehide/pageshow hersteld; de gemelde Safari-terugkeerfout en het nieuwe veeggevoel blijven open voor mobiele verificatie.
+
+## Reservekopieproef v1
+
+Volledige collectie exporteren en gecontroleerd terugzetten is nu gebouwd. Zie `docs/PROTOTYPE_FREE_BACKUP_SPEC.md` voor afspraken, formaat, limieten en mobiele acceptatie. De eerdere vermelding van export/import als nog te bouwen is hiermee vervangen. Audio, offline app-shell en mobiele backupacceptatie blijven open.
+
+Extra tests:
+
+```bash
+node free-local/test-backup.mjs
+node free-local/test-backup-ui.mjs
+```
+
+Dezelfde `FREE_INDEXEDDB_MODULE` en `FREE_JSDOM_MODULE` instellingen gelden als voor de eerdere tests.

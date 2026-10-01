@@ -32,6 +32,25 @@ async function transaction(storeNames, mode, action) {
   });
 }
 export const storage = {
+  async snapshot() {
+    return transaction(['stories','media'],'readonly',(tx,set)=>{
+      const result={stories:[],media:[]};set(result);
+      tx.objectStore('stories').getAll().onsuccess=e=>{result.stories=e.target.result;};
+      tx.objectStore('media').getAll().onsuccess=e=>{result.media=e.target.result;};
+    });
+  },
+  async restore(collection) {
+    const mediaIds=new Set(collection.media.map(item=>item.id));
+    if(mediaIds.size!==collection.media.length||new Set(collection.stories.map(item=>item.id)).size!==collection.stories.length)throw new Error(t('backupInvalid'));
+    for(const item of collection.media)if(!(item.blob instanceof Blob)||!item.blob.size||!(item.thumbnail instanceof Blob)||!item.thumbnail.size)throw new Error(t('backupInvalid'));
+    for(const story of collection.stories)if(!story.id||!Array.isArray(story.photos)||story.photos.some(photo=>!mediaIds.has(photo.id)))throw new Error(t('backupInvalid'));
+    // Clear and restore in one transaction; quota errors roll everything back.
+    await transaction(['stories','media'],'readwrite',tx=>{
+      tx.objectStore('stories').clear();tx.objectStore('media').clear();
+      for(const item of collection.media)tx.objectStore('media').put(item);
+      for(const story of collection.stories)tx.objectStore('stories').put(story);
+    });
+  },
   async story(id) {return transaction(['stories'],'readonly',(tx,set)=>{tx.objectStore('stories').get(id).onsuccess=e=>set(e.target.result);});},
   async stories() {return transaction(['stories'],'readonly',(tx,set)=>{tx.objectStore('stories').getAll().onsuccess=e=>set(e.target.result);});},
   async media(id) {return transaction(['media'],'readonly',(tx,set)=>{tx.objectStore('media').get(id).onsuccess=e=>set(e.target.result);});},

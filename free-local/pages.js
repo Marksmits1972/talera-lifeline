@@ -3,11 +3,11 @@ import {catalog,applyCatalog} from './texts.js';
 import {freeTellGestures,freeTimelineGestures} from './gestures.js';
 
 const CSP="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'none'";
-export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-local-photo-route-v1'};
+export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-backup-v1'};
 let pages;
 function boot(html) {
   html=html.replace(/<script(\s[^>]*)?>/g,'<script type="text/talera"$1>');
-  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js"></script></body>`);
+  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js?revision=backup-v1"></script></body>`);
 }
 export async function makePages() {
   if(pages)return pages;
@@ -35,6 +35,7 @@ export async function makePages() {
   tell=tell.replaceAll('Publiceren…','Lokaal bewaren…');
   tell=tell.replace('</head>','<style>.photo-voice-sub{max-width:300px}.screen.has-photo .talera-publish-timeline{display:flex}</style></head>');
   // Every fixed string changed for this proof goes through the central NL catalog.
+  tell=tell.replace('<div class="more-list">',`<div class="more-list"><button id="backupTellOpen" class="more-item" type="button"><span>${catalog.backupTitle}</span><span>›</span></button>`);
   tell=applyCatalog(freeTellGestures(tell));
 
   let timeline=await (await referenceWorker.fetch(new Request('https://local.invalid/'),{},{})).text();
@@ -51,7 +52,7 @@ export async function makePages() {
   timeline=timeline.replace('<html lang="nl">','<html lang="nl" class="free-loading">');
   timeline=timeline.replace('</head>',`<style>.free-loading .app{visibility:hidden}#freeEmpty{position:fixed;left:20px;right:20px;top:32%;z-index:30;display:grid;place-content:center;text-align:center;padding:20px;background:#F7F4EF;color:#0F2747;font-family:system-ui}#freeEmpty[hidden]{display:none}#freeEmpty a{color:#0F2747;padding:14px;font-weight:700}#freeEmpty p{max-width:330px;line-height:1.5}#freeEdit{position:fixed;right:18px;top:calc(260px + env(safe-area-inset-top));z-index:30;border:1px solid #fff;border-radius:50%;width:40px;height:40px;background:#F7F4EF;color:#0F2747}#freeError:empty{display:none}#freeError{padding:16px;position:fixed;top:15px;left:15px;right:15px;z-index:100;color:#0F2747;background:#F7F4EF}</style></head>`);
   timeline=timeline.replace('</body>',`<section id="freeEmpty" hidden><h1>TALERA</h1><p>${catalog.localNotice}</p><a href="/tell?new=1">${catalog.firstMemory}</a></section><button id="freeEdit" hidden aria-label="${catalog.editMemory}">✎</button><div id="freeError" role="alert"></div></body>`);
-  timeline=timeline.replace('</body>',`<dialog id="freeStorageInfo" aria-labelledby="freeStorageTitle"><h2 id="freeStorageTitle">${catalog.storageTitle}</h2><p>${catalog.pickerHelp}</p><p>${catalog.storageSteps}</p><p>${catalog.storageNext}</p><p>${catalog.storageWarning}</p><button id="freeStorageClose" type="button">${catalog.storageClose}</button></dialog><style>#freeStorageInfo{box-sizing:border-box;width:calc(100% - 32px);max-width:440px;max-height:80dvh;overflow:auto;border:0;border-radius:20px;padding:24px;background:#F7F4EF;color:#0F2747;font:15px/1.5 system-ui}#freeStorageInfo::backdrop{background:rgba(0,0,0,.5)}#freeStorageInfo h2{font-size:21px}#freeStorageClose{width:100%;padding:12px;border:0;border-radius:12px;background:#0F2747;color:white;font:inherit}</style></body>`);
+  timeline=timeline.replace('</body>',`<dialog id="freeStorageInfo" aria-labelledby="freeStorageTitle"><h2 id="freeStorageTitle">${catalog.storageTitle}</h2><p>${catalog.pickerHelp}</p><p>${catalog.storageSteps}</p><p>${catalog.storageNext}</p><p>${catalog.storageWarning}</p><button id="backupTimelineOpen" type="button">${catalog.backupTitle}</button><button id="freeStorageClose" type="button">${catalog.storageClose}</button></dialog><style>#freeStorageInfo{box-sizing:border-box;width:calc(100% - 32px);max-width:440px;max-height:80dvh;overflow:auto;border:0;border-radius:20px;padding:24px;background:#F7F4EF;color:#0F2747;font:15px/1.5 system-ui}#freeStorageInfo::backdrop{background:rgba(0,0,0,.5)}#freeStorageInfo h2{font-size:21px}#backupTimelineOpen{width:100%;padding:12px;border:0;border-radius:12px;background:#173851;color:white;font:inherit;margin-bottom:10px}#freeStorageClose{width:100%;padding:12px;border:0;border-radius:12px;background:#0F2747;color:white;font:inherit}</style></body>`);
   // No reference narrative should flash before the local store has been read.
   timeline=timeline.replace(/(<div class="story" id="memoryStory">)[\s\S]*?(<\/div>)/,'$1$2');
   timeline=applyCatalog(freeTimelineGestures(timeline));

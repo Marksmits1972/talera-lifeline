@@ -3,8 +3,10 @@ import storage from './storage.browser.js';
 import media from './media.browser.js';
 import bridge from './bridge.browser.js';
 import copy from './copy.browser.js';
+import backup from './backup.browser.js';
+import backupUi from './backup-ui.browser.js';
 import {nl} from './catalog.js';
-const assets={'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
+const assets={'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
 export default {async fetch(request){
   const url=new URL(request.url);
   if(!['GET','HEAD'].includes(request.method))return new Response('Local prototype: no server writes',{status:405});

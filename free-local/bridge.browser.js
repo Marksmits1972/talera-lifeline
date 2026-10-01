@@ -1,6 +1,7 @@
 import {storage} from '/local/storage.js';
 import {compactPhoto} from '/local/media.js';
 import {t} from '/local/copy.browser.js';
+import {installBackup} from '/local/backup-ui.js';
 const params=new URLSearchParams(location.hash.slice(1));
 let id=params.get('edit')||localStorage.getItem('talera.free.draft')||crypto.randomUUID();
 if(new URLSearchParams(location.search).get('new')==='1'){id=crypto.randomUUID();history.replaceState(null,'',location.pathname+location.hash);}
@@ -24,6 +25,7 @@ window.__taleraFreeApi=async function(path,options={}) {
         const next={...draft,...input,id,datePrecision:input.date?'day':'unknown',status:draft.status};
         // UI metadata is not allowed to overwrite stored blob properties.
         draft=await storage.save(next);
+        window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
         return Response.json(draft);
       });
     }
@@ -48,6 +50,14 @@ window.__taleraFreeApi=async function(path,options={}) {
   }catch(error){message(error.name==='QuotaExceededError'?t('storageFull'):error.message);return Response.json({error:error.message},{status:409});}
 };
 window.__taleraFreeStorage=storage;
+installBackup({storage,exclusive:serialized,beforeExport:async()=>{
+  await ready;await queue;
+  if(window.__taleraStoryLabMedia?.isUploading())throw new Error(t('photoBusy'));
+  if(location.pathname.startsWith('/tell')){
+    const response=await window.__taleraFreeApi('/api/storylab-clean/state',{method:'PUT',body:JSON.stringify({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value})});
+    if(!response.ok)throw new Error((await response.json()).error);
+  }
+}});
 if(location.pathname.startsWith('/tell')) {
   await ready.catch(()=>{});
   for(const script of document.querySelectorAll('script[type="text/talera"]')) {

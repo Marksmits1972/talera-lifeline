@@ -5,8 +5,9 @@ const pages=await makePages();
 createServer(async(req,res)=>{
   const path=new URL(req.url,'http://localhost').pathname;
   if(req.method!=='GET'){res.writeHead(405);res.end();return;}
+  if(path==='/local/catalog.js'){res.writeHead(200,{'content-type':'text/javascript'});res.end(await readFile(new URL('catalog.js',import.meta.url),'utf8'));return;}
   if(path==='/local/copy.browser.js'){res.writeHead(200,{'content-type':'text/javascript'});res.end(await readFile(new URL('copy.browser.js',import.meta.url),'utf8'));return;}
-  const match=path.match(/^\/local\/(storage|media|bridge)\.js$/);
+  const match=path.match(/^\/local\/(storage|media|bridge|backup|backup-ui)\.js$/);
   if(match){res.writeHead(200,{'content-type':'text/javascript'});res.end(await readFile(new URL(match[1]+'.browser.js',import.meta.url),'utf8'));return;}
   if(path==='/'||path==='/tell'||path==='/tell/'){res.writeHead(200,htmlHeaders);res.end(path==='/'?pages.timeline:pages.tell);return;}
   res.writeHead(404);res.end();

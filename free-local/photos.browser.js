@@ -20,7 +20,7 @@ export async function importPhotos(files,{getStory,existingFingerprints,commit,p
   const story=getStory(),list=Array.from(files||[]).filter(file=>file.type.startsWith('image/')||/\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(file.name));
   if(!list.length)throw new Error(t('noPhoto'));
   if(list.length+story.photos.length>photoLimit)throw new Error(t('photoLimit'));
-  const seen=new Set(await existingFingerprints());let done=0,duplicates=0,failed=0;
+  const seen=new Set(await existingFingerprints());let done=0,duplicates=0,failed=0,lastError='';
   for(const file of list){let url;
     try{
       if(file.size>64*1024*1024)throw new Error(t('photoTooLarge'));
@@ -28,8 +28,8 @@ export async function importPhotos(files,{getStory,existingFingerprints,commit,p
       url=URL.createObjectURL(file);preview(url);const media=await compactPhoto(file,crypto.randomUUID());
       const captureDate=await photoDate(file);
       await commit(media,{id:media.id,name:file.name||'foto',type:media.blob.type,createdAt:Date.now(),fingerprint,captureDate});seen.add(fingerprint);done++;
-    }catch(error){failed++;progress(done,duplicates,failed,list.length,error.message);}
-    finally{if(url)URL.revokeObjectURL(url);progress(done,duplicates,failed,list.length);}
+    }catch(error){failed++;lastError=error.name==='QuotaExceededError'?t('storageFull'):error.message;}
+    finally{if(url)URL.revokeObjectURL(url);progress(done,duplicates,failed,list.length,lastError);}
   }
   return {done,duplicates,failed};
 }

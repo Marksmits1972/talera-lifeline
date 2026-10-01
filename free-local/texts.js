@@ -1,4 +1,4 @@
-import {nl} from './copy.browser.js';
+import {nl} from './catalog.js';
 export const catalog=nl;
 export function applyCatalog(html){
   return html.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/g,(_,open,code,close)=>{

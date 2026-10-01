@@ -5,6 +5,13 @@
   "main": "src/reference-r19-combined-worker.js",
   "compatibility_date": "2026-09-08",
   "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "talera-r19-reference-db",
+      "database_id": "1ec3912f-57fe-4321-aa69-aa94a08b3368"
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "MEDIA",

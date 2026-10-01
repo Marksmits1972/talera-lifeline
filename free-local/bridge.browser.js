@@ -57,7 +57,8 @@ if(location.pathname.startsWith('/tell')) {
   save?.addEventListener('click',event=>{if(failed){event.stopImmediatePropagation();message(t('storageUnavailable'));}},true);
 }else {
   document.querySelector('.tell')?.addEventListener('click',()=>location.href='/tell?new=1',true);
-  document.querySelector('.more')?.closest('button')?.addEventListener('click',()=>{const info=document.getElementById('freeError');info.textContent=info.textContent?'':t('localNotice');});
+  document.querySelector('.more')?.closest('button')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').showModal());
+  document.getElementById('freeStorageClose')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').close());
   try {
     const stories=(await storage.stories()).filter(story=>story.status==='published').sort((a,b)=>a.date.localeCompare(b.date));
     const urls=[],photoBlobs=new Map();

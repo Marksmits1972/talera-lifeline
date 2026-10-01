@@ -1,6 +1,12 @@
 export const nl={
   audioLater:'Lokale audio volgt in de volgende proefstap. Je kunt nu je verhaal typen.',
   localNotice:'Je herinneringen staan op dit toestel. TALERA bewaart hiervan geen cloudkopie.',
+  pickerHelp:'Tik op + foto, kies één foto en bevestig in je fotobibliotheek met Voeg toe, Open of Gereed.',
+  storageTitle:'Foto’s op dit toestel',
+  storageSteps:'Je hoeft geen map aan te maken of maptoegang te geven. Na je keuze maakt TALERA automatisch een compacte kopie in de browseropslag. Je originele foto blijft in je fotobibliotheek.',
+  storageNext:'Voeg daarna een datum en tekst toe en tik op Op mijn tijdlijn. Open TALERA later op hetzelfde toestel en in dezelfde browser.',
+  storageWarning:'Gebruik een gewone Safari-tab, geen privétab. Wis je websitegegevens, dan kun je deze herinneringen verliezen. Er is nog geen reservekopie of overdracht naar een ander toestel.',
+  storageClose:'Begrepen',
   firstMemory:'Maak je eerste herinnering',editMemory:'Herinnering bewerken',
   write:'Tik om je tekst te schrijven',writePhoto:'Tik en schrijf',writeMore:'Schrijf verder',
   photoPrompt:'Kijk naar je foto en schrijf wat er gebeurde',saveTimeline:'Op mijn tijdlijn',saving:'Lokaal bewaren…',

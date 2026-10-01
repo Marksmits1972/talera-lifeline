@@ -19,6 +19,11 @@ export async function makePages() {
   tell=tell.replace('photoCache.set(item.id,item.url);',"const savedBlob=await (await api('/api/storylab-clean/photo?id='+encodeURIComponent(item.id))).blob();const compactUrl=URL.createObjectURL(savedBlob);photoCache.set(item.id,compactUrl);URL.revokeObjectURL(item.url);const oldPreview=previewPhotoUrls.get(item.id);if(oldPreview)URL.revokeObjectURL(oldPreview);previewPhotoUrls.set(item.id,compactUrl);");
   tell=tell.replace('location.href=data.handoffUrl;',"localStorage.removeItem('talera.free.draft');location.href=data.handoffUrl;");
   tell=tell.replace(/\bmultiple\b/g,'');
+  tell=tell.replace('accept="image/*,.heic,.heif"','accept="image/*"');
+  tell=tell.replace('Daarna kun je gewoon naar de foto kijken en je verhaal vertellen.',catalog.pickerHelp);
+  tell=tell.replace("if(!r.ok)throw new Error('upload '+r.status);","if(!r.ok){const failure=await r.json();throw new Error(failure.error||window.__taleraT('savePhotoError'));}");
+  tell=tell.replace('failed++;','failed++;showNotice(e.message||window.__taleraT("savePhotoError"));');
+  tell=tell.replace("if(failed)showNotice(failed===list.length?'Upload niet gelukt · probeer opnieuw':'Niet alle foto’s konden worden bewaard');",'');
   tell=tell.replace('Maximaal 12 foto’s','Deze eerste proef bewaart één foto per herinnering');
   tell=tell.replaceAll('Tik om te vertellen','Tik om je tekst te schrijven').replaceAll('Tik en vertel','Tik en schrijf');
   tell=tell.replaceAll('Vertel verder','Schrijf verder').replaceAll('Kijk naar je foto en vertel wat er gebeurde','Kijk naar je foto en schrijf wat er gebeurde');
@@ -43,6 +48,7 @@ export async function makePages() {
   timeline=timeline.replace('<html lang="nl">','<html lang="nl" class="free-loading">');
   timeline=timeline.replace('</head>',`<style>.free-loading .app{visibility:hidden}#freeEmpty{position:fixed;left:20px;right:20px;top:32%;z-index:30;display:grid;place-content:center;text-align:center;padding:20px;background:#F7F4EF;color:#0F2747;font-family:system-ui}#freeEmpty[hidden]{display:none}#freeEmpty a{color:#0F2747;padding:14px;font-weight:700}#freeEmpty p{max-width:330px;line-height:1.5}#freeEdit{position:fixed;right:18px;top:calc(260px + env(safe-area-inset-top));z-index:30;border:1px solid #fff;border-radius:50%;width:40px;height:40px;background:#F7F4EF;color:#0F2747}#freeError:empty{display:none}#freeError{padding:16px;position:fixed;top:15px;left:15px;right:15px;z-index:100;color:#0F2747;background:#F7F4EF}</style></head>`);
   timeline=timeline.replace('</body>',`<section id="freeEmpty" hidden><h1>TALERA</h1><p>${catalog.localNotice}</p><a href="/tell?new=1">${catalog.firstMemory}</a></section><button id="freeEdit" hidden aria-label="${catalog.editMemory}">✎</button><div id="freeError" role="alert"></div></body>`);
+  timeline=timeline.replace('</body>',`<dialog id="freeStorageInfo" aria-labelledby="freeStorageTitle"><h2 id="freeStorageTitle">${catalog.storageTitle}</h2><p>${catalog.pickerHelp}</p><p>${catalog.storageSteps}</p><p>${catalog.storageNext}</p><p>${catalog.storageWarning}</p><button id="freeStorageClose" type="button">${catalog.storageClose}</button></dialog><style>#freeStorageInfo{box-sizing:border-box;width:calc(100% - 32px);max-width:440px;max-height:80dvh;overflow:auto;border:0;border-radius:20px;padding:24px;background:#F7F4EF;color:#0F2747;font:15px/1.5 system-ui}#freeStorageInfo::backdrop{background:rgba(0,0,0,.5)}#freeStorageInfo h2{font-size:21px}#freeStorageClose{width:100%;padding:12px;border:0;border-radius:12px;background:#0F2747;color:white;font:inherit}</style></body>`);
   // No reference narrative should flash before the local store has been read.
   timeline=timeline.replace(/(<div class="story" id="memoryStory">)[\s\S]*?(<\/div>)/,'$1$2');
   timeline=applyCatalog(timeline);

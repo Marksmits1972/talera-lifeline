@@ -1,8 +1,18 @@
-// TALERA_DEPLOY_REV: listen-layer-r6-same-date-active-snap-20260912-0900
+// TALERA_REFERENCE_REV: complete-baseline-20260914
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "talera-timeline-prototype",
-  "main": "src/index.js",
+  "name": "talera-r19-reference",
+  "main": "src/reference-combined-worker.js",
   "compatibility_date": "2026-09-08",
-  "workers_dev": true
+  "workers_dev": true,
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "talera-r19-reference-media"
+    },
+    {
+      "binding": "SHARE_PREVIEWS",
+      "bucket_name": "talera-r19-reference-media"
+    }
+  ]
 }

@@ -19,7 +19,7 @@ import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 import { shareExperienceStyle, shareExperienceScript } from "./share-experience.js";
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
-const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
+const TELL_ORIGIN = "https://talera-r19-reference.mark-a39.workers.dev/tell";
 const TALERA_TIMELINE_DEPLOY_REV = "direct-memory-handoff-v11-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 

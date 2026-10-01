@@ -38,3 +38,6 @@ Interne integriteits-, recorder-, pakket-, UI- en shellcontroles zijn nodig voor
 | Mobiele Safari/PWA en Android, hoorbare playback, onderbreking, telefoonherstart, Bestanden | Nog te testen door gebruiker; geen mobiele baseline vastgelegd |
 
 Tijdens de live test blokkeerde een blijvende statusmelding tikken op de tijdlijnknop. De melding krijgt daarom pointer-events:none en verdwijnt na 4,5 seconden. De tekst/foto-route kon vóór die correctie met toetsenbediening wel worden afgerond. Een eerste meervoudige foto-import faalde zonder behouden fouttekst; daarop blijft de werkelijke fout nu zichtbaar. Herhaalde selectie en de duplicaatproef slaagden. De oorspronkelijke oorzaak van die eerste fout is niet bewezen.
+
+
+De reguliere updateknop wacht op het opslaan van de actuele tekst en blokkeert tijdens opname of foto-import. Intern bevestigd met een uitgestelde save. De route `/update` is een handmatige migratie voor eerdere offline-shells: eerst verhaal bewaren en andere TALERA-tabs sluiten, daarna wachten op volledig geïnstalleerde shell en activeren. Deze route wist geen database of media.

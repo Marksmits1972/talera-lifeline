@@ -1,4 +1,5 @@
-import {manifest,icon} from './app-assets.js';
+import {manifest,icon,updatePage} from './app-assets.js';
+import updateScript from './update.browser.js';
 import icon192 from './icon-192.png';
 import icon512 from './icon-512.png';
 import sw from './sw.browser.js';
@@ -17,6 +18,8 @@ const assets={'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/ex
 export default {async fetch(request){
   const url=new URL(request.url);
   if(!['GET','HEAD'].includes(request.method))return new Response('Local prototype: no server writes',{status:405});
+  if(url.pathname==='/update')return new Response(request.method==='HEAD'?null:updatePage,{headers:htmlHeaders});
+  if(url.pathname==='/app-update.js')return new Response(request.method==='HEAD'?null:updateScript,{headers:{'content-type':'text/javascript; charset=utf-8','cache-control':'no-store'}});
   if(['/icon-192.png','/icon-512.png'].includes(url.pathname))return new Response(request.method==='HEAD'?null:url.pathname==='/icon-192.png'?icon192:icon512,{headers:{'content-type':'image/png','cache-control':'no-store'}});
   if(url.pathname==='/manifest.webmanifest'||url.pathname==='/icon.svg'||url.pathname==='/sw.js')return new Response(request.method==='HEAD'?null:({'/manifest.webmanifest':manifest,'/icon.svg':icon,'/sw.js':sw}[url.pathname]),{headers:{'content-type':url.pathname==='/icon.svg'?'image/svg+xml':url.pathname==='/sw.js'?'text/javascript':'application/manifest+json','cache-control':'no-store'}});
   if(assets[url.pathname])return new Response(request.method==='HEAD'?null:assets[url.pathname],{headers:{'content-type':'text/javascript; charset=utf-8','cache-control':'no-store'}});

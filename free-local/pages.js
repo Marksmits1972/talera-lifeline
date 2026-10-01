@@ -4,13 +4,13 @@ import {catalog,applyCatalog} from './texts.js';
 import {freeTellGestures,freeTimelineGestures} from './gestures.js';
 
 const CSP="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'";
-export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-integrated-v1'};
+export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-integrated-v3'};
 let pages;
 function boot(html) {
   html=html.replace('</head>',`<style>${experienceCSS}</style></head>`);
   html=html.replace(/<script(\s[^>]*)?>/g,'<script type="text/talera"$1>');
   html=html.replace('</head>','<link rel="apple-touch-icon" href="/icon-192.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0F2747"><meta name="apple-mobile-web-app-capable" content="yes"></head>');
-  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js?revision=integrated-v1"></script></body>`);
+  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js?revision=integrated-v3"></script></body>`);
 }
 export async function makePages() {
   if(pages)return pages;
@@ -41,6 +41,7 @@ export async function makePages() {
   tell=tell.replace('<div class="more-list">',`<div class="more-list"><button id="freeDeviceOpen" class="more-item" type="button">${catalog.deviceTitle}</button><button id="freeDelete" class="more-item" type="button">${catalog.deleteMemory}</button><button id="backupTellOpen" class="more-item" type="button"><span>${catalog.backupTitle}</span><span>›</span></button>`);
   tell=tell.replace('<button id="saveEdit"', `<button id="freeUnknownDate" type="button">${catalog.unknownDate}</button><button id="saveEdit"`);
   tell=tell.replace("await api('/api/storylab-clean/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(state)}).catch(()=>{})", "const result=await api('/api/storylab-clean/state',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(state)});if(!result.ok)showNotice((await result.json()).error||window.__taleraT('storageUnavailable'))");
+  tell=tell.replace("if(!v)return 'Wanneer was dit?';","if(!v)return state.datePrecision==='unknown'?window.__taleraT('unknownDate'):'Wanneer was dit?';");
   tell=applyCatalog(freeTellGestures(tell));
 
   let timeline=await (await referenceWorker.fetch(new Request('https://local.invalid/'),{},{})).text();

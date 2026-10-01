@@ -11,7 +11,7 @@ localStorage.setItem('talera.free.draft',id);
 let draft={id,title:'',date:'',datePrecision:'unset',storyText:'',photos:[],createdAt:Date.now(),status:'draft'};
 let queue=Promise.resolve();
 let failed=false;
-function message(text) {const el=document.getElementById('notice');if(el){el.textContent=text;el.classList.add('show');}}
+function message(text) {const el=document.getElementById('notice');if(el){el.textContent=text;el.classList.add('show');clearTimeout(el.__freeNoticeTimer);el.__freeNoticeTimer=setTimeout(()=>el.classList.remove('show'),4500);}}
 function serialized(action){const next=queue.then(action);queue=next.catch(()=>{});return next;}
 const ready=storage.story(id).then(saved=>{if(saved)draft=saved;}).catch(error=>{failed=true;message(error.message);throw error;});
 // Compatibility boundary for the frozen UI. Responses are constructed on this device.

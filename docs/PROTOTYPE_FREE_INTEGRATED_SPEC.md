@@ -22,3 +22,19 @@ Offline wordt pas gemeld nadat de volledige vaste shell gecachet is. Updates act
 ## Bewijs en grenzen
 
 Interne integriteits-, recorder-, pakket-, UI- en shellcontroles zijn nodig voor publicatie. De daadwerkelijke iPhone-microfoon, hoorbare playback, bestandbewaring, offline/appwissel/telefoonherstart, PWA-context en Android blijven mobiele acceptatie tot werkelijk getest. Geen nieuwe baseline zonder mobiele gebruikersgoedkeuring.
+
+
+## Uitgevoerde controles op 1 oktober 2026
+
+| Onderdeel | Bewijs |
+|---|---|
+| Atomair bewaren van meerdere foto's en audio; onbekende datum | Intern geslaagd; quota/missende referenties beschadigen oude inhoud niet |
+| Recorder pauze/hervatten, finaliseren, checkpoints, onderbreking, weigering, opslagfout | Intern gesimuleerd en geslaagd; geen bewijs van hoorbare echte opname |
+| Reservekopie inclusief audio, foto/thumbnailbytes, tekst en metadata | Intern herstel uit zelfstandig bestand geslaagd; beschadiging afgewezen; v1 blijft leesbaar |
+| Begrensde import, exacte duplicaten, foutisolatie, EXIF versus lastModified | Intern geslaagd |
+| Offline-shell, navigatie, cache-opruiming en uitsluitend vaste codeverzoeken | Intern geslaagd; live scherm bevestigt cachevoorbereiding; werkelijk netwerk uit op telefoon nog open |
+| Twee foto’s, tekst, onbekende datum, tijdlijn, bladeren en heropenen | Live cloudbrowser bevestigd met niet-persoonlijke proefbeelden |
+| Microfoon ontbreekt | Live foutmelding bevestigd; deze testbrowser heeft geen microfoon |
+| Mobiele Safari/PWA en Android, hoorbare playback, onderbreking, telefoonherstart, Bestanden | Nog te testen door gebruiker; geen mobiele baseline vastgelegd |
+
+Tijdens de live test blokkeerde een blijvende statusmelding tikken op de tijdlijnknop. De melding krijgt daarom pointer-events:none en verdwijnt na 4,5 seconden. De tekst/foto-route kon vóór die correctie met toetsenbediening wel worden afgerond. Een eerste meervoudige foto-import faalde zonder behouden fouttekst; daarop blijft de werkelijke fout nu zichtbaar. Herhaalde selectie en de duplicaatproef slaagden. De oorspronkelijke oorzaak van die eerste fout is niet bewezen.

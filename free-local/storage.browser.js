@@ -1,0 +1,75 @@
+import {t} from './copy.browser.js';
+// Public storage interface. This module never sends network requests.
+const DB_NAME = 'talera-free-local-v1';
+let opening;
+function open() {
+  if (!opening) opening = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      db.createObjectStore('stories', {keyPath:'id'});
+      db.createObjectStore('media', {keyPath:'id'});
+    };
+    request.onerror = () => { opening = null; reject(request.error); };
+    request.onblocked = () => { opening = null; reject(new Error(t('closeTabs'))); };
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => {db.close(); opening = null;};
+      resolve(db);
+    };
+  });
+  return opening;
+}
+async function transaction(storeNames, mode, action) {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeNames, mode);
+    let result;
+    tx.oncomplete = () => resolve(result);
+    tx.onabort = tx.onerror = () => reject(tx.error || new Error(t('storageUnavailable')));
+    try { action(tx, value => { result = value; }); }
+    catch (error) { tx.abort(); reject(error); }
+  });
+}
+export const storage = {
+  async story(id) {return transaction(['stories'],'readonly',(tx,set)=>{tx.objectStore('stories').get(id).onsuccess=e=>set(e.target.result);});},
+  async stories() {return transaction(['stories'],'readonly',(tx,set)=>{tx.objectStore('stories').getAll().onsuccess=e=>set(e.target.result);});},
+  async media(id) {return transaction(['media'],'readonly',(tx,set)=>{tx.objectStore('media').get(id).onsuccess=e=>set(e.target.result);});},
+  async putMedia(media) {
+    if (!(media.blob instanceof Blob) || !media.blob.size || !(media.thumbnail instanceof Blob)) throw new Error(t('photoProcessingError'));
+    await transaction(['media'],'readwrite',tx=>tx.objectStore('media').put(media));
+    const saved = await this.media(media.id);
+    if (!saved || saved.blob.size !== media.blob.size) throw new Error(t('photoReadError'));
+    return saved;
+  },
+  async save(story) {
+    if (!story.id || !Array.isArray(story.photos)) throw new Error(t('invalidMemory'));
+    // Validate and write within one transaction: no published story can reference missing bytes.
+    await transaction(['stories','media'],'readwrite',tx=>{
+      const pending = story.photos.map(photo => tx.objectStore('media').get(photo.id));
+      let remaining = pending.length;
+      const commit = () => {
+        const previous=tx.objectStore('stories').get(story.id);
+        previous.onsuccess=()=>{
+          const ids=new Set(story.photos.map(p=>p.id));
+          for(const photo of previous.result?.photos||[])if(!ids.has(photo.id))tx.objectStore('media').delete(photo.id);
+          tx.objectStore('stories').put({...story,schemaVersion:1,updatedAt:Date.now()});
+        };
+      };
+      if (!remaining) commit();
+      for (const request of pending) request.onsuccess = () => {
+        if (!request.result?.blob?.size) {tx.abort();return;}
+        if (!--remaining) commit();
+      };
+    });
+    const saved = await this.story(story.id);
+    if (!saved || saved.photos.length !== story.photos.length) throw new Error(t('memoryReadError'));
+    return saved;
+  },
+  async delete(id) {
+    await transaction(['stories','media'],'readwrite',tx=>{
+      const request=tx.objectStore('stories').get(id);
+      request.onsuccess=()=>{for(const photo of request.result?.photos||[])tx.objectStore('media').delete(photo.id);tx.objectStore('stories').delete(id);};
+    });
+  }
+};

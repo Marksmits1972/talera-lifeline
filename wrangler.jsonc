@@ -1,14 +1,25 @@
-// TALERA_DEPLOY_REV: timeline-photo-carousel-polish-20260917-r2
+// TALERA_REFERENCE_REV: r19h2-carousel-complete-isolated-20261001
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "talera-timeline-prototype",
-  "main": "src/timeline-polish-worker.js",
+  "name": "talera-r19-reference",
+  "main": "src/reference-r19h2-carousel-combined-worker.js",
   "compatibility_date": "2026-09-08",
   "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "talera-r19-reference-db",
+      "database_id": "1ec3912f-57fe-4321-aa69-aa94a08b3368"
+    }
+  ],
   "r2_buckets": [
     {
+      "binding": "MEDIA",
+      "bucket_name": "talera-r19-reference-media"
+    },
+    {
       "binding": "SHARE_PREVIEWS",
-      "bucket_name": "xxory-test-media-eu"
+      "bucket_name": "talera-r19-reference-media"
     }
   ]
 }

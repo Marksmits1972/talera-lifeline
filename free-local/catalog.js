@@ -20,7 +20,7 @@ export const nl={
   storageTitle:'Foto’s op dit toestel',
   storageSteps:'Je hoeft geen map aan te maken of maptoegang te geven. Na je keuze maakt TALERA automatisch een compacte kopie in de browseropslag. Je originele foto blijft in je fotobibliotheek.',
   storageNext:'Voeg daarna een datum en tekst toe en tik op Op mijn tijdlijn. Open TALERA later op hetzelfde toestel en in dezelfde browser.',
-  storageWarning:'Gebruik een gewone Safari-tab, geen privétab. Wis je websitegegevens, dan kun je deze herinneringen verliezen. Er is nog geen reservekopie of overdracht naar een ander toestel.',
+  storageWarning:'Gebruik een gewone Safari-tab, geen privétab. Wis je websitegegevens, dan kun je deze herinneringen verliezen. Bewaar daarom een reservekopie via Meer → Reservekopie.',
   storageClose:'Begrepen',
   firstMemory:'Maak je eerste herinnering',editMemory:'Herinnering bewerken',
   write:'Tik om je tekst te schrijven',writePhoto:'Tik en schrijf',writeMore:'Schrijf verder',

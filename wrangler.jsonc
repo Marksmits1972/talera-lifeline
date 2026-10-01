@@ -1,4 +1,4 @@
-// TALERA_REFERENCE_REV: v79-approved-tell-baseline-20260910
+// TALERA_REFERENCE_REV: v79-approved-tell-baseline-20260910-trigger-20261001
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talera-r19-reference",

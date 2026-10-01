@@ -22,7 +22,7 @@ export const memoryPresentationControlsStyle = String.raw`
 
 export const memoryPresentationControlsScript = String.raw`
 (()=>{
-  const TELL_ORIGIN='https://xxory-test.mark-a39.workers.dev';
+  const TELL_ORIGIN=location.origin+'/tell';
   const runtime=window.__taleraTimelineRuntime;
   const memorySpace=document.querySelector('.memory-space');
   const storyScroll=document.getElementById('memoryStoryScroll');

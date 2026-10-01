@@ -42,14 +42,31 @@ export const storage = {
   async restore(collection) {
     const mediaIds=new Set(collection.media.map(item=>item.id));
     if(mediaIds.size!==collection.media.length||new Set(collection.stories.map(item=>item.id)).size!==collection.stories.length)throw new Error(t('backupInvalid'));
-    for(const item of collection.media)if(!(item.blob instanceof Blob)||!item.blob.size||!(item.thumbnail instanceof Blob)||!item.thumbnail.size)throw new Error(t('backupInvalid'));
-    for(const story of collection.stories)if(!story.id||!Array.isArray(story.photos)||story.photos.some(photo=>!mediaIds.has(photo.id)))throw new Error(t('backupInvalid'));
+    for(const item of collection.media)if(!(item.blob instanceof Blob)||!item.blob.size||(item.kind!=='audio'&&(!(item.thumbnail instanceof Blob)||!item.thumbnail.size)))throw new Error(t('backupInvalid'));
+    for(const story of collection.stories)if(!story.id||!Array.isArray(story.photos)||story.photos.some(photo=>!mediaIds.has(photo.id))||(story.audioId&&!mediaIds.has(story.audioId)))throw new Error(t('backupInvalid'));
     // Clear and restore in one transaction; quota errors roll everything back.
     await transaction(['stories','media'],'readwrite',tx=>{
       tx.objectStore('stories').clear();tx.objectStore('media').clear();
       for(const item of collection.media)tx.objectStore('media').put(item);
       for(const story of collection.stories)tx.objectStore('stories').put(story);
     });
+  },
+  async commitMedia(story, item) {
+    if(!story.id||!item.id||!(item.blob instanceof Blob)||!item.blob.size)throw new Error(t('storageUnavailable'));
+    if(item.kind!=='audio'&&(!(item.thumbnail instanceof Blob)||!item.thumbnail.size))throw new Error(t('photoProcessingError'));
+    await transaction(['stories','media'],'readwrite',tx=>{
+      const references=[...story.photos.map(photo=>photo.id),...(story.audioId?[story.audioId]:[])].filter(id=>id!==item.id);
+      for(const id of references){const check=tx.objectStore('media').get(id);check.onsuccess=()=>{if(!check.result?.blob?.size)tx.abort();};}
+      const previous=tx.objectStore('stories').get(story.id);
+      previous.onsuccess=()=>{
+        if(item.kind==='audio'&&previous.result?.audioId&&previous.result.audioId!==item.id)tx.objectStore('media').delete(previous.result.audioId);
+        tx.objectStore('media').put(item);
+        tx.objectStore('stories').put({...story,schemaVersion:1,updatedAt:Date.now()});
+      };
+    });
+    const saved=await this.media(item.id);
+    if(!saved||saved.blob.size!==item.blob.size)throw new Error(t('memoryReadError'));
+    return this.story(story.id);
   },
   async story(id) {return transaction(['stories'],'readonly',(tx,set)=>{tx.objectStore('stories').get(id).onsuccess=e=>set(e.target.result);});},
   async stories() {return transaction(['stories'],'readonly',(tx,set)=>{tx.objectStore('stories').getAll().onsuccess=e=>set(e.target.result);});},
@@ -65,13 +82,14 @@ export const storage = {
     if (!story.id || !Array.isArray(story.photos)) throw new Error(t('invalidMemory'));
     // Validate and write within one transaction: no published story can reference missing bytes.
     await transaction(['stories','media'],'readwrite',tx=>{
-      const pending = story.photos.map(photo => tx.objectStore('media').get(photo.id));
+      const pending = [...story.photos.map(photo=>photo.id),...(story.audioId?[story.audioId]:[])].map(id=>tx.objectStore('media').get(id));
       let remaining = pending.length;
       const commit = () => {
         const previous=tx.objectStore('stories').get(story.id);
         previous.onsuccess=()=>{
           const ids=new Set(story.photos.map(p=>p.id));
           for(const photo of previous.result?.photos||[])if(!ids.has(photo.id))tx.objectStore('media').delete(photo.id);
+          if(previous.result?.audioId&&previous.result.audioId!==story.audioId)tx.objectStore('media').delete(previous.result.audioId);
           tx.objectStore('stories').put({...story,schemaVersion:1,updatedAt:Date.now()});
         };
       };
@@ -88,7 +106,7 @@ export const storage = {
   async delete(id) {
     await transaction(['stories','media'],'readwrite',tx=>{
       const request=tx.objectStore('stories').get(id);
-      request.onsuccess=()=>{for(const photo of request.result?.photos||[])tx.objectStore('media').delete(photo.id);tx.objectStore('stories').delete(id);};
+      request.onsuccess=()=>{for(const photo of request.result?.photos||[])tx.objectStore('media').delete(photo.id);if(request.result?.audioId)tx.objectStore('media').delete(request.result.audioId);tx.objectStore('stories').delete(id);};
     });
   }
 };

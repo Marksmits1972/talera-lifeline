@@ -38,7 +38,7 @@ test('generated UI scripts parse, make no fetch calls and disable cloud speech r
     assert.match(html,/type="module" src="\/local\/bridge.js(?:\?[^"]*)?"/);
   }
   assert.match(pages.tell,/const SpeechRecognition=null/);
-  assert.match(htmlHeaders['content-security-policy'],/connect-src 'none'/);
+  assert.match(htmlHeaders['content-security-policy'],/connect-src 'self'/);
 });
 test('isolated deployment has no D1 or R2 bindings and does not route to legacy APIs',async()=>{
   const config=await readFile(new URL('./wrangler.jsonc',import.meta.url),'utf8');

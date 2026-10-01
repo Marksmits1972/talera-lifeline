@@ -1,3 +1,10 @@
+import {manifest,icon} from './app-assets.js';
+import icon192 from './icon-192.png';
+import icon512 from './icon-512.png';
+import sw from './sw.browser.js';
+import recorder from './recorder.browser.js';
+import photos from './photos.browser.js';
+import experience from './experience.browser.js';
 import {makePages,htmlHeaders} from './pages.js';
 import storage from './storage.browser.js';
 import media from './media.browser.js';
@@ -6,10 +13,12 @@ import copy from './copy.browser.js';
 import backup from './backup.browser.js';
 import backupUi from './backup-ui.browser.js';
 import {nl} from './catalog.js';
-const assets={'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
+const assets={'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/experience.js':experience,'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
 export default {async fetch(request){
   const url=new URL(request.url);
   if(!['GET','HEAD'].includes(request.method))return new Response('Local prototype: no server writes',{status:405});
+  if(['/icon-192.png','/icon-512.png'].includes(url.pathname))return new Response(request.method==='HEAD'?null:url.pathname==='/icon-192.png'?icon192:icon512,{headers:{'content-type':'image/png','cache-control':'no-store'}});
+  if(url.pathname==='/manifest.webmanifest'||url.pathname==='/icon.svg'||url.pathname==='/sw.js')return new Response(request.method==='HEAD'?null:({'/manifest.webmanifest':manifest,'/icon.svg':icon,'/sw.js':sw}[url.pathname]),{headers:{'content-type':url.pathname==='/icon.svg'?'image/svg+xml':url.pathname==='/sw.js'?'text/javascript':'application/manifest+json','cache-control':'no-store'}});
   if(assets[url.pathname])return new Response(request.method==='HEAD'?null:assets[url.pathname],{headers:{'content-type':'text/javascript; charset=utf-8','cache-control':'no-store'}});
   if(!['/','/tell','/tell/'].includes(url.pathname))return new Response('Not found',{status:404});
   const pages=await makePages();

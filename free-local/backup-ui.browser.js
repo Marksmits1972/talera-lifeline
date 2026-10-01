@@ -44,7 +44,7 @@ export function installBackup({storage,beforeExport,exclusive}){
     }catch(error){busy=false;status.textContent=t(error.name==='AbortError'?'backupCancelled':'backupShareFailed');buttons([['backupSave',save],['backupDownload',download,true],['backupClose',close,true]]);}
   }
   function showPrepared(){
-    description.textContent=t('backupReady');status.textContent='';detail.textContent=prepared.file.name+' · '+prepared.storyCount+' herinneringen · '+prepared.photoCount+' foto’s · '+(prepared.file.size/1024/1024).toFixed(1)+' MB';
+    description.textContent=t('backupReady');status.textContent='';detail.textContent=prepared.file.name+' · '+prepared.storyCount+' herinneringen · '+prepared.photoCount+' foto’s · '+(prepared.audioCount||0)+' opnames · '+(prepared.file.size/1024/1024).toFixed(1)+' MB';
     let share=false;try{share=Boolean(navigator.share&&navigator.canShare?.({files:[prepared.file]}));}catch{}
     steps.replaceChildren();steps.hidden=!(isIOS&&share);
     if(isIOS&&share){description.textContent=t('backupIOSReady');for(const key of ['backupIOSStep1','backupIOSStep2','backupIOSStep3']){const item=document.createElement('li');item.textContent=t(key);steps.append(item);}}
@@ -61,7 +61,7 @@ export function installBackup({storage,beforeExport,exclusive}){
     busy=true;imported=null;steps.hidden=true;status.textContent=t('backupChecking');buttons([]);
     try{
       imported=await readBackup(file);busy=false;description.textContent=t('backupReplace');status.textContent=t('backupImportReady')+date(imported.createdAt);
-      detail.textContent=imported.stories.length+' herinneringen · '+imported.media.length+' foto’s';
+      detail.textContent=imported.stories.length+' herinneringen · '+imported.media.filter(item=>item.kind!=='audio').length+' foto’s · '+imported.media.filter(item=>item.kind==='audio').length+' opnames';
       buttons([['backupApply',restore],['backupClose',close,true]]);
     }catch(error){busy=false;menu();status.textContent=error.message||t('backupInvalid');}
   };
@@ -72,7 +72,7 @@ export function installBackup({storage,beforeExport,exclusive}){
       await exclusive(()=>storage.restore(imported));
       localStorage.removeItem('talera.free.draft');localStorage.setItem('talera.free.backupIntroSeen','1');
       localStorage.removeItem('talera.free.backupConfirmed');localStorage.removeItem('talera.free.backupConfirmedAt');localStorage.setItem('talera.free.collectionChanged',String(Date.now()));
-      location.replace('/?revision=backup-v1');
+      location.replace('/?revision=integrated-v1');
     }catch(error){busy=false;menu();status.textContent=error.name==='QuotaExceededError'?t('storageFull'):error.message||t('backupFailure');}
   }
   dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
@@ -81,7 +81,7 @@ export function installBackup({storage,beforeExport,exclusive}){
   });
   window.addEventListener('talera-free-saved',event=>{
     localStorage.setItem('talera.free.collectionChanged',String(Date.now()));
-    if(event.detail?.hasPhotos&&!localStorage.getItem('talera.free.backupIntroSeen')){
+    if(event.detail?.hasPhotos&&event.detail?.complete&&!localStorage.getItem('talera.free.backupIntroSeen')){
       localStorage.setItem('talera.free.backupIntroSeen','1');menu(true);
     }
   });

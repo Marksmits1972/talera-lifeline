@@ -84,3 +84,12 @@ node free-local/test-backup-ui.mjs
 ```
 
 Dezelfde `FREE_INDEXEDDB_MODULE` en `FREE_JSDOM_MODULE` instellingen gelden als voor de eerdere tests.
+
+
+## Complete Free-proef — geïntegreerde bouw
+
+De opdracht van 1 oktober 2026 vervangt de eerdere fasebeperking: lokale audio, maximaal 12 foto's per herinnering, directe context, expliciet onbekende datum, tekst óf audio publiceren, terugluisteren, foto’s bladeren, bewerken/verwijderen, installatie/offline-shell, opslagmeting/persistentieverzoek en reservekopie v2 met audio. Zie `docs/PROTOTYPE_FREE_INTEGRATED_SPEC.md` voor modulegrenzen, acceptatie en de status van onderbrekingen. Versie-1 kopieën blijven leesbaar.
+
+Interne controles: `test-integrated.mjs`, de bestaande opslag-, DOM-, pakket- en UI-tests, plus Wrangler dry-run. Audio en oorspronkelijke foto's worden nooit naar de Worker gestuurd; het apparaat verwerkt ze. `connect-src self` is nu nodig voor de vaste offline-appcode; de Worker accepteert uitsluitend GET/HEAD en geen persoonlijke opslagroutes. De offline-shell bevat uitsluitend bekende appbestanden.
+
+Mobiele acceptatie blijft open: echte microfoon en hoorbare opname, Safari-formaten/oriëntatie, schermvergrendeling, appwissel, offline toevoegen na eerste cachefase, PWA/Safari-context, Bestanden-export/herstel inclusief audio, herstart en Android. Geteste recordergebeurtenissen zijn simulaties en bewijzen geen hoorbare opname op iPhone.

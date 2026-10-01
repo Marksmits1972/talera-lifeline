@@ -16,7 +16,7 @@ w.eval('const t=window.__t;const createBackup=window.__create;const readBackup=w
 const d=w.document;
 const button=label=>Array.from(d.querySelectorAll('#backupActions button')).find(b=>b.textContent===t(label));
 const waitFor=async test=>{for(let i=0;i<100;i++){if(test())return;await new Promise(r=>setTimeout(r,10));}throw new Error('UI test timeout');};
-w.dispatchEvent(new w.CustomEvent('talera-free-saved',{detail:{hasPhotos:true}}));
+w.dispatchEvent(new w.CustomEvent('talera-free-saved',{detail:{hasPhotos:true,complete:true}}));
 assert.ok(d.getElementById('freeBackup').open);
 assert.ok(d.getElementById('backupDescription').textContent.includes(t('backupIntro')));
 button('backupLater').click();assert.ok(!d.getElementById('freeBackup').open);

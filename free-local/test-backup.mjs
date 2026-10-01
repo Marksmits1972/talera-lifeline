@@ -27,6 +27,7 @@ const clean=new Uint8Array(await backup.file.arrayBuffer());
 const headerLength=new DataView(clean.buffer).getUint32(8);
 const header=JSON.parse(new TextDecoder().decode(clean.slice(12,12+headerLength)));
 async function altered(manifest){const encoded=new TextEncoder().encode(JSON.stringify(manifest));const n=new Uint8Array(4);new DataView(n.buffer).setUint32(0,encoded.length);return new Blob([clean.slice(0,8),n,encoded,clean.slice(12+headerLength)]);}
+assert.equal((await readBackup(await altered({...header,version:1}))).stories.length,2);
 await assert.rejects(readBackup(await altered({...header,version:99})));
 const bad=structuredClone(header);bad.stories[0].photos=[{id:'missing'}];
 await assert.rejects(readBackup(await altered(bad)));

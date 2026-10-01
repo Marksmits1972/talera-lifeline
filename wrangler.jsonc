@@ -1,14 +1,14 @@
-// TALERA_DEPLOY_REV: timeline-photo-carousel-polish-20260917-r2
+// TALERA_REFERENCE_REV: pre-unification-baseline-20260924-e6819f8
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "talera-timeline-prototype",
+  "name": "talera-r19-reference",
   "main": "src/timeline-polish-worker.js",
   "compatibility_date": "2026-09-08",
   "workers_dev": true,
   "r2_buckets": [
     {
       "binding": "SHARE_PREVIEWS",
-      "bucket_name": "xxory-test-media-eu"
+      "bucket_name": "talera-r19-reference-media"
     }
   ]
 }

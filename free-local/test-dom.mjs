@@ -28,6 +28,24 @@ await new Promise(resolve=>setTimeout(resolve,100));
 assert.equal(tw.document.getElementById('title').value,'Lokale proef');
 assert.equal(tw.document.getElementById('dateInput').value,'2021-04-10');
 assert.equal(tw.document.getElementById('storyText').value,'De tekst blijft hier.');
+// Drag to a middle position, release, then resize: no snap to open/closed.
+const panel=tw.document.getElementById('sheet');
+function touch(type,y){
+  const event=new tw.Event(type,{bubbles:true,cancelable:true});
+  Object.defineProperty(event,'touches',{value:type==='touchend'?[]:[{clientY:y}]});
+  Object.defineProperty(event,'changedTouches',{value:[{clientY:y}]});
+  panel.dispatchEvent(event);
+}
+const originalOffset=Number(panel.style.transform.match(/,([\d.]+)px/)[1]);
+touch('touchstart',600);touch('touchmove',400);touch('touchend',400);
+const heldOffset=Number(panel.style.transform.match(/,([\d.]+)px/)[1]);
+assert.ok(Math.abs(heldOffset-(originalOffset-200))<1);
+tw.dispatchEvent(new tw.Event('resize'));
+assert.equal(Number(panel.style.transform.match(/,([\d.]+)px/)[1]),heldOffset);
+tw.document.getElementById('storyText').value='De tekst blijft hier.';
+tw.document.getElementById('storyText').dispatchEvent(new tw.Event('input'));
+assert.equal(tw.document.getElementById('sheetPreview').textContent,'De tekst blijft hier.');
+tw.document.getElementById('sheetClose').click();
 // A photo-only draft must expose the next step instead of hiding publication.
 assert.ok((await makePages()).tell.includes('.screen.has-photo .talera-publish-timeline{display:flex}'));
 tw.document.getElementById('storyText').value='';

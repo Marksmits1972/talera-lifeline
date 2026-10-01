@@ -1,5 +1,6 @@
 import referenceWorker from '../src/reference-r19h2-carousel-combined-worker.js';
 import {catalog,applyCatalog} from './texts.js';
+import {freeTellGestures,freeTimelineGestures} from './gestures.js';
 
 const CSP="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'none'";
 export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-local-photo-route-v1'};
@@ -34,7 +35,7 @@ export async function makePages() {
   tell=tell.replaceAll('Publiceren…','Lokaal bewaren…');
   tell=tell.replace('</head>','<style>.photo-voice-sub{max-width:300px}.screen.has-photo .talera-publish-timeline{display:flex}</style></head>');
   // Every fixed string changed for this proof goes through the central NL catalog.
-  tell=applyCatalog(tell);
+  tell=applyCatalog(freeTellGestures(tell));
 
   let timeline=await (await referenceWorker.fetch(new Request('https://local.invalid/'),{},{})).text();
   // Keep the reference canvas, gestures and photo/text surfaces; remove remote service controllers.
@@ -53,7 +54,7 @@ export async function makePages() {
   timeline=timeline.replace('</body>',`<dialog id="freeStorageInfo" aria-labelledby="freeStorageTitle"><h2 id="freeStorageTitle">${catalog.storageTitle}</h2><p>${catalog.pickerHelp}</p><p>${catalog.storageSteps}</p><p>${catalog.storageNext}</p><p>${catalog.storageWarning}</p><button id="freeStorageClose" type="button">${catalog.storageClose}</button></dialog><style>#freeStorageInfo{box-sizing:border-box;width:calc(100% - 32px);max-width:440px;max-height:80dvh;overflow:auto;border:0;border-radius:20px;padding:24px;background:#F7F4EF;color:#0F2747;font:15px/1.5 system-ui}#freeStorageInfo::backdrop{background:rgba(0,0,0,.5)}#freeStorageInfo h2{font-size:21px}#freeStorageClose{width:100%;padding:12px;border:0;border-radius:12px;background:#0F2747;color:white;font:inherit}</style></body>`);
   // No reference narrative should flash before the local store has been read.
   timeline=timeline.replace(/(<div class="story" id="memoryStory">)[\s\S]*?(<\/div>)/,'$1$2');
-  timeline=applyCatalog(timeline);
+  timeline=applyCatalog(freeTimelineGestures(timeline));
   pages={tell:boot(tell),timeline:boot(timeline)};
   return pages;
 }

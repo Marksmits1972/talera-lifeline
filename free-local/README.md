@@ -63,3 +63,11 @@ node free-local/test-dom.mjs
 Nog te bouwen in volgende proefstappen: lokale audio, installatie als PWA, offline app-shell, lokale export/import, kleine bulkselectie, opslagmeter/persistentieverzoek en verdere datalevensloop-/belastingtests. Zonder export is deze eerste proef alleen geschikt voor testinhoud. Browseropslag is geen gegarandeerde reservekopie.
 
 De lokale proef mag pas na expliciete mobiele goedkeuring een nieuwe baseline worden. Rollback van de geïsoleerde Worker raakt de referentie en bestaande live Workers niet. Wis of verander de Free-origin niet bij updates: lokale gegevens zijn aan die origin en browsercontext gekoppeld.
+
+## Aanvullende voortgang 1 oktober 2026
+
+- De aparte Free-worker is gepubliceerd via Cloudflare Builds op `development/prototype-free`. URL: https://talera-free-local-prototype.mark-a39.workers.dev/. De eerdere publicatieblokkade hierboven beschrijft alleen de oorspronkelijke situatie.
+- De gebruiker heeft toestemming gegeven om updates van deze Free-testomgeving voortaan zelfstandig via de gekoppelde GitHub-verbinding te publiceren. De bevroren referentie blijft intact.
+- De echte cloudbrowserproef heeft fotoselectie, herladen, datum/tekst, publicatie en terugzien van de tekst op de tijdlijn bevestigd. Geen volledige netwerkaudit uitgevoerd. De gebruiker heeft ook een eigen foto en getypte herinnering op zijn iPhone-tijdlijn teruggezien.
+- Tekst, titel en datum worden als lokale IndexedDB-records bewaard, naast de fotoblobs. Losse tekstbestanden of een zichtbare telefoonmap worden niet aangemaakt. Export/import volgt later.
+- Het Free-tekstpaneel behoudt nu de gekozen tussenhoogte bij loslaten en vensterwijzigingen. DOM-regressietest geslaagd. Presentatiegebaren worden op pagehide/pageshow hersteld; de gemelde Safari-terugkeerfout en het nieuwe veeggevoel blijven open voor mobiele verificatie.

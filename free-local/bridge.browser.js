@@ -61,7 +61,7 @@ async function flushDraft(){
   }
 }
 installBackup({storage,exclusive:serialized,beforeExport:flushDraft});
-installDeviceExperience({beforeReload:flushDraft});
+installDeviceExperience({beforeReload:flushDraft,storage,exclusive:serialized});
 if(location.pathname.startsWith('/tell')) {
   await ready.catch(()=>{});
   for(const script of document.querySelectorAll('script[type="text/talera"]')) {

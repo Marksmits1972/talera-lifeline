@@ -44,5 +44,7 @@ export const nl={
   photoBusy:'De foto wordt nog bewaard. Wacht even en probeer opnieuw.',
   addDate:'Voeg eerst de datum van je herinnering toe.',
   writeFirst:'Schrijf eerst je herinnering.',later:'Deze functie volgt in een volgende proefstap.',
-  storageFull:'De lokale opslag is vol. Je eerdere herinneringen blijven bewaard.',missingPhoto:'Een lokale foto ontbreekt.'
+  storageFull:'De lokale opslag is vol. Je eerdere herinneringen blijven bewaard.',missingPhoto:'Een lokale foto ontbreekt.',
+  photoCompactError:'Deze foto kon niet klein genoeg worden bewaard. Probeer een andere foto.',
+  compactExisting:'Verklein bestaande fotokopieën',compactConfirm:'Maak eerst een reservekopie als je de huidige kwaliteit wilt behouden. TALERA vervangt alleen zijn eigen fotokopieën door kleinere versies. De fotobibliotheek wordt niet gewijzigd. Doorgaan?',compactBusy:'Fotokopieën verkleinen…',compactDone:'Fotokopieën verkleind. Nieuwe reservekopieën bevatten de kleinere bestanden.',
 };

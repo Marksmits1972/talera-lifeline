@@ -1,5 +1,6 @@
 import {t} from './copy.browser.js';
 import {createRecorder} from './recorder.js';
+import {compactCollection} from './media.js';
 export function installTellExperience({getStory,saveAudio,notice,exclusive,storage}){
   const root=document.createElement('section');root.id='freeAudio';root.setAttribute('aria-label',t('audioTitle'));
   root.innerHTML=`<p id="freeAudioStatus" role="status"></p><div class="free-audio-actions"><button id="freePause" hidden></button><button id="freeStop" hidden>${t('audioStop')}</button><button id="freeType">${t('typeInstead')}</button></div><audio id="freeAudioPlayer" controls preload="metadata" hidden></audio>`;
@@ -51,11 +52,17 @@ export function installTimelineExperience({runtime,storage,registerPhoto=()=>{},
   window.addEventListener('pagehide',clear);
   window.addEventListener('pageshow',event=>{if(event.persisted){selected='';runtime.writeMemory(runtime.currentMemory());}});
 }
-export async function installDeviceExperience({beforeReload=async()=>{}}={}){
+export async function installDeviceExperience({beforeReload=async()=>{},storage,exclusive=task=>task()}={}){
   const button=document.getElementById('freeDeviceOpen');if(!button)return;
-  const dialog=document.createElement('dialog');dialog.id='freeDevice';dialog.innerHTML=`<h2>${t('deviceTitle')}</h2><p>${t('deviceHelp')}</p><p id="freeOfflineStatus"></p><p id="freeStorageUsage"></p><button id="freePersist">${t('protectStorage')}</button><p>${t('storageWarning')}</p><button id="freeDeviceClose">${t('storageClose')}</button>`;document.body.append(dialog);
-  button.onclick=async()=>{document.getElementById('moreModal')?.classList.remove('open');document.getElementById('freeStorageInfo')?.close();dialog.showModal();try{const estimate=await navigator.storage?.estimate?.(),persisted=await navigator.storage?.persisted?.();dialog.querySelector('#freeStorageUsage').textContent=(estimate?Math.round(estimate.usage/1024/1024)+' MB '+t('storageUsed'):t('storageEstimateMissing'))+(persisted?' '+t('storageProtected'):'');}catch{}let cached=false;try{if(await caches.has('talera-free-integrated-v4')){const cache=await caches.open('talera-free-integrated-v4');cached=Boolean(await cache.match('/tell'))&&Boolean(await cache.match('/local/experience.js'));}}catch{}dialog.querySelector('#freeOfflineStatus').textContent=t(cached?'offlineReady':'offlinePending');};
+  const dialog=document.createElement('dialog');dialog.id='freeDevice';dialog.innerHTML=`<h2>${t('deviceTitle')}</h2><p>${t('deviceHelp')}</p><p id="freeOfflineStatus"></p><p id="freeStorageUsage"></p><button id="freePersist">${t('protectStorage')}</button><p>${t('storageWarning')}</p><button id="freeCompact">${t('compactExisting')}</button><p id="freeCompactStatus" role="status"></p><button id="freeDeviceClose">${t('storageClose')}</button>`;document.body.append(dialog);
+  button.onclick=async()=>{document.getElementById('moreModal')?.classList.remove('open');document.getElementById('freeStorageInfo')?.close();dialog.showModal();try{const estimate=await navigator.storage?.estimate?.(),persisted=await navigator.storage?.persisted?.();dialog.querySelector('#freeStorageUsage').textContent=(estimate?Math.round(estimate.usage/1024/1024)+' MB '+t('storageUsed'):t('storageEstimateMissing'))+(persisted?' '+t('storageProtected'):'');}catch{}let cached=false;try{if(await caches.has('talera-free-compact-v1')){const cache=await caches.open('talera-free-compact-v1');cached=Boolean(await cache.match('/tell'))&&Boolean(await cache.match('/local/experience.js'));}}catch{}dialog.querySelector('#freeOfflineStatus').textContent=t(cached?'offlineReady':'offlinePending');};
   dialog.querySelector('#freeDeviceClose').onclick=()=>dialog.close();dialog.querySelector('#freePersist').onclick=async()=>{let result=false;try{result=await navigator.storage?.persist?.();}catch{}dialog.querySelector('#freeStorageUsage').textContent=t(result?'storageProtected':'storageNotProtected');};
+  dialog.querySelector('#freeCompact').onclick=async()=>{
+    if(!storage||!confirm(t('compactConfirm')))return;
+    const button=dialog.querySelector('#freeCompact'),status=dialog.querySelector('#freeCompactStatus');button.disabled=true;
+    try{await beforeReload();status.textContent=t('compactBusy');const result=await exclusive(()=>compactCollection(storage));status.textContent=t('compactDone')+' '+Math.round(result.before/1024)+' → '+Math.round(result.after/1024)+' KB';}
+    catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+  };
   if('serviceWorker' in navigator){
     let requested=false;
     navigator.serviceWorker.addEventListener('controllerchange',()=>{if(requested)location.reload();});

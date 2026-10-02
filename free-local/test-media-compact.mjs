@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+await import(process.env.FREE_INDEXEDDB_MODULE||'fake-indexeddb/auto');
+import {storage} from './storage.browser.js';
+import {compactPhoto,compactCollection,mediaConfig} from './media.browser.js';
+// Controlled encoder exercises budgets, dimension fallback and malformed output.
+let calls=[],mode='detail';
+globalThis.Image=class{naturalWidth=4000;naturalHeight=3000;set src(value){if(value)queueMicrotask(()=>this.onload());}};
+globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({fillRect(){},drawImage(){}}),toBlob(fn,type,quality){calls.push({width:this.width,height:this.height,quality});const bytes=mode==='failure'?900000:mode==='small'?2000:Math.ceil(this.width*this.height*quality*0.5);fn(new Blob([new Uint8Array(bytes)],{type}));}})};
+const original=new Blob([new Uint8Array(8000000)],{type:'image/jpeg'}),copy=await compactPhoto(original,'photo');
+assert.ok(copy.blob.size<=mediaConfig.maxBytes);assert.ok(copy.thumbnail.size<=mediaConfig.thumbnailMaxBytes);assert.ok(copy.width<1280);assert.ok(Math.abs(copy.width/copy.height-4/3)<0.002);assert.equal(original.size,8000000);assert.equal(copy.sourceBytes,8000000);
+mode='small';calls=[];const small=await compactPhoto(original,'small');assert.equal(small.width,1280);assert.equal(calls.length,2);
+mode='failure';await assert.rejects(compactPhoto(original,'bad'),/klein genoeg/);
+mode='detail';
+await storage.putMedia({id:'old-photo',blob:original,thumbnail:new Blob([new Uint8Array(70000)],{type:'image/jpeg'}),width:4000,height:3000,sourceBytes:8000000,createdAt:1});
+await storage.save({id:'story',photos:[{id:'old-photo',name:'original.jpg',fingerprint:'test'}],title:'Keep title',date:'2020-06-10',storyText:'Keep text',status:'published'});
+await storage.commitMedia({...await storage.story('story'),audioId:'audio'},{id:'audio',kind:'audio',blob:new Blob(['unchanged voice'],{type:'audio/mp4'})});
+const storyBefore=await storage.story('story'),audioBefore=await storage.media('audio'),result=await compactCollection(storage);
+assert.equal(result.count,1);assert.ok(result.after<result.before);assert.deepEqual(await storage.story('story'),storyBefore);assert.equal(await (await storage.media('audio')).blob.text(),await audioBefore.blob.text());
+const saved=await storage.media('old-photo');assert.equal(saved.sourceBytes,8000000);assert.equal(saved.createdAt,1);assert.equal((await compactCollection(storage)).count,0);
+await assert.rejects(storage.replacePhotoCopies([{...saved,blob:new Blob(['changed'])},{...saved,id:'missing'}]));assert.equal((await storage.media('old-photo')).blob.size,saved.blob.size);
+console.log('Photo compression passed: byte budgets, difficult image fallback, bounded failure, original untouched, manual compaction preserves text/audio/IDs, atomic rollback and repeat no-op. Real image quality remains device acceptance.');

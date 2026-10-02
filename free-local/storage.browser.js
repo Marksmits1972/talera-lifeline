@@ -51,6 +51,12 @@ export const storage = {
       for(const story of collection.stories)tx.objectStore('stories').put(story);
     });
   },
+  async replacePhotoCopies(items) {
+    for(const item of items)if(item.kind==='audio'||!(item.blob instanceof Blob)||!item.blob.size||!(item.thumbnail instanceof Blob)||!item.thumbnail.size)throw new Error(t('photoProcessingError'));
+    await transaction(['media'],'readwrite',tx=>{
+      for(const item of items){const request=tx.objectStore('media').get(item.id);request.onsuccess=()=>{if(!request.result||request.result.kind==='audio')tx.abort();else tx.objectStore('media').put(item);};}
+    });
+  },
   async commitMedia(story, item) {
     if(!story.id||!item.id||!(item.blob instanceof Blob)||!item.blob.size)throw new Error(t('storageUnavailable'));
     if(item.kind!=='audio'&&(!(item.thumbnail instanceof Blob)||!item.thumbnail.size))throw new Error(t('photoProcessingError'));

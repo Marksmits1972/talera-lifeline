@@ -34,7 +34,7 @@ try{
     const r=await window.__taleraFreeApi('/api/storylab-clean/state');const s=await r.json();const m=await window.__taleraFreeStorage.media(s.photos[0].id);
     return {story:s,width:m.width,height:m.height,bytes:m.blob.size,thumbnailBytes:m.thumbnail.size,sourceBytes:m.sourceBytes};
   });
-  assert.equal(saved.width,1600);assert.equal(saved.height,1067);assert.ok(saved.bytes>0&&saved.thumbnailBytes>0);assert.equal(saved.story.date,'2021-04-10');
+  assert.ok(saved.width<=1280&&saved.height<=1280);assert.ok(saved.bytes<=128*1024&&saved.thumbnailBytes<=12*1024);assert.ok(saved.bytes>0&&saved.thumbnailBytes>0);assert.equal(saved.story.date,'2021-04-10');
   await page.locator('#timelinePublish').click();
   await page.waitForURL(origin+'/#story=*');
   await page.waitForFunction(()=>Boolean(window.__taleraTimelineRuntime));

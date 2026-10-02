@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const {JSDOM}=await import(process.env.FREE_JSDOM_MODULE||'jsdom');
+import {timelineStories,seasonTime,validTime,timeLabel} from './dates.browser.js';
+const records=[{id:'a',eventTime:seasonTime('zomer',2020),date:'',createdAt:1,postedAt:10,photos:[{id:'p1'},{id:'p2'}],storyText:'Een volledig verhaal',audioId:'audio'},{id:'b',eventTime:seasonTime('zomer',2020),date:'',createdAt:2,postedAt:20,photos:[{id:'p3'}],storyText:'Tweede verhaal',audioId:'audio2'}];
+assert.ok(validTime(records[0]));assert.equal(validTime({date:''}),false);
+const ordered=timelineStories(records);assert.ok(ordered[0].displayMs<ordered[1].displayMs);assert.equal(timeLabel(records[0]),'zomer 2020');
+assert.throws(()=>seasonTime('onbekend',2020));assert.throws(()=>seasonTime('zomer',0));
+const winter=timelineStories([{id:'winter',eventTime:seasonTime('winter',2020),createdAt:1}])[0];assert.equal(new Date(winter.displayMs).getFullYear(),2020);
+const dom=new JSDOM('<dialog id="freeStorageInfo"><p>Opslag</p></dialog><div id="memoryDate"></div><div id="memoryStoryScroll"></div>',{pretendToBeVisual:true});const w=dom.window;let plays=0,pauses=0,current,listener;const images=[];
+Object.assign(globalThis,{document:w.document,window:w,innerHeight:800,Audio:class{pause(){pauses++;}removeAttribute(){}async play(){plays++;}},PointerEvent:w.MouseEvent});
+const memories=records.map(s=>({storyId:s.id,fullStory:s.storyText,audioId:s.audioId}));current=memories[0];
+const code=(await readFile(new URL('./presentation.browser.js',import.meta.url),'utf8')).replace("'./dates.browser.js'",JSON.stringify(new URL('./dates.browser.js',import.meta.url).href));
+const {installPresentation}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+installPresentation({runtime:{subscribe:fn=>listener=fn,currentMemory:()=>current,settlePhoto:m=>images.push(m.image),writeMemory:m=>listener(m)},storage:{story:async id=>records.find(s=>s.id===id),media:async()=>({blob:new Blob(['data'])})}});
+await listener(current);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(w.document.getElementById('freeReadText').textContent,records[0].storyText);assert.equal(plays,0);
+w.document.getElementById('freeListenMode').click();await new Promise(resolve=>setTimeout(resolve,0));assert.equal(plays,1);
+current=memories[1];await listener(current);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(plays,2);
+const handle=w.document.getElementById('freeReadHandle');function pointer(type,y){const e=new w.MouseEvent(type,{bubbles:true,cancelable:true,clientX:10,clientY:y});Object.defineProperty(e,'pointerId',{value:1});handle.dispatchEvent(e);}
+pointer('pointerdown',700);pointer('pointermove',470);pointer('pointerup',470);assert.equal(w.document.getElementById('freeReader').style.height,'268px');w.dispatchEvent(new w.Event('resize'));assert.equal(w.document.getElementById('freeReader').style.height,'268px');
+w.dispatchEvent(new w.PageTransitionEvent('pageshow',{persisted:true}));await new Promise(resolve=>setTimeout(resolve,0));pointer('pointerdown',700);pointer('pointermove',500);pointer('pointerup',500);assert.equal(w.document.getElementById('freeReader').style.height,'238px');
+assert.equal(w.document.getElementById('freePhotoNav'),null);assert.equal(w.document.getElementById('freeListen'),null);w.dispatchEvent(new w.Event('pagehide'));dom.window.close();console.log('Presentation: held drag positions, restored-page drag, silent default, automatic listening on next story and season placement passed.');

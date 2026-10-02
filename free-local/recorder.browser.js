@@ -1,5 +1,5 @@
 import {t} from './copy.browser.js';
-export function createRecorder({save,onState=()=>{},onLevel=()=>{},onError=()=>{}}){
+export function createRecorder({save,onState=()=>{},onLevel=()=>{},onError=()=>{},onStream=()=>{}}){
   let recorder,stream,chunks=[],pending=Promise.resolve(),phase='idle',started=0,elapsed=0,id,context,analyser,frame,interrupted=false,failure=null,bytes=0,cancelled=false;
   const state=value=>{phase=value;onState(value);};
   const duration=()=>elapsed+(phase==='recording'?performance.now()-started:0);
@@ -23,7 +23,7 @@ export function createRecorder({save,onState=()=>{},onLevel=()=>{},onError=()=>{
       recorder.onerror=event=>{failure=event.error||new Error(t('audioFailed'));onError(failure);stop(true);};
       recorder.onstop=async()=>{release();await checkpoint(true);if(!bytes){state('error');onError(new Error(t('audioEmpty')));}else state(failure?'error':'saved');};
       stream.getAudioTracks().forEach(track=>{track.onended=()=>stop(true);track.onmute=()=>stop(true);});
-      recorder.start(5000);started=performance.now();state('recording');
+      recorder.start(5000);onStream(stream);started=performance.now();state('recording');
       try{const AudioContext=globalThis.AudioContext||globalThis.webkitAudioContext;context=new AudioContext();analyser=context.createAnalyser();analyser.fftSize=256;context.createMediaStreamSource(stream).connect(analyser);const buffer=new Uint8Array(analyser.fftSize);const meter=()=>{if(!context)return;analyser.getByteTimeDomainData(buffer);const level=Math.sqrt(buffer.reduce((n,v)=>n+(v-128)**2,0)/buffer.length)/128;onLevel(phase==='recording'?level:0);frame=requestAnimationFrame(meter);};meter();}catch{}
     }catch(error){release();state('error');throw new Error(t(error.name==='NotAllowedError'?'audioDenied':error.name==='NotFoundError'?'audioMissing':'audioFailed'));}
   }

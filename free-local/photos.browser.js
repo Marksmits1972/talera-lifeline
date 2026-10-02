@@ -1,6 +1,6 @@
 import {compactPhoto} from './media.js';
 import {t} from './copy.browser.js';
-export const photoLimit=12;
+
 export async function photoFingerprint(file){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');}
 // Only EXIF DateTimeOriginal counts as a camera date; file.lastModified never does.
 export async function photoDate(file){
@@ -19,7 +19,6 @@ export async function photoDate(file){
 export async function importPhotos(files,{getStory,existingFingerprints,commit,preview,progress}){
   const story=getStory(),list=Array.from(files||[]).filter(file=>file.type.startsWith('image/')||/\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(file.name));
   if(!list.length)throw new Error(t('noPhoto'));
-  if(list.length+story.photos.length>photoLimit)throw new Error(t('photoLimit'));
   const seen=new Set(await existingFingerprints());let done=0,duplicates=0,failed=0,lastError='';
   for(const file of list){let url;
     try{

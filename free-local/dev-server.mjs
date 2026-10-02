@@ -4,7 +4,7 @@ import {manifest,icon,updatePage} from './app-assets.js';
 import {makePages,htmlHeaders} from './pages.js';
 const pages=await makePages();
 createServer(async(req,res)=>{
-  const path=new URL(req.url,'http://localhost').pathname;
+  const path=new URL(req.url,'http://localhost').pathname.replace('.browser.js','.js');
   if(req.method!=='GET'){res.writeHead(405);res.end();return;}
   if(path==='/update'){res.writeHead(200,htmlHeaders);res.end(updatePage);return;}
   if(path==='/app-update.js'){res.writeHead(200,{'content-type':'text/javascript','cache-control':'no-store'});res.end(await readFile(new URL('update.browser.js',import.meta.url),'utf8'));return;}
@@ -12,7 +12,7 @@ createServer(async(req,res)=>{
   if(['/icon-192.png','/icon-512.png'].includes(path)){res.writeHead(200,{'content-type':'image/png'});res.end(await readFile(new URL(path.slice(1),import.meta.url)));return;}
   if(path==='/local/catalog.js'){res.writeHead(200,{'content-type':'text/javascript'});res.end(await readFile(new URL('catalog.js',import.meta.url),'utf8'));return;}
   if(path==='/local/copy.browser.js'){res.writeHead(200,{'content-type':'text/javascript'});res.end(await readFile(new URL('copy.browser.js',import.meta.url),'utf8'));return;}
-  const match=path.match(/^\/local\/(storage|media|bridge|backup|backup-ui|recorder|photos|experience)\.js$/);
+  const match=path.match(/^\/local\/(storage|media|bridge|backup|backup-ui|recorder|photos|experience|dates|presentation|speech|speech-worker|speech-worklet)\.js$/);
   if(match){res.writeHead(200,{'content-type':'text/javascript'});res.end(await readFile(new URL(match[1]+'.browser.js',import.meta.url),'utf8'));return;}
   if(path==='/'||path==='/tell'||path==='/tell/'){res.writeHead(200,htmlHeaders);res.end(path==='/'?pages.timeline:pages.tell);return;}
   res.writeHead(404);res.end();

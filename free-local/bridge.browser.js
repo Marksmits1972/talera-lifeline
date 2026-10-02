@@ -3,6 +3,7 @@ import {compactPhoto} from '/local/media.js';
 import {t} from '/local/copy.browser.js';
 import {importPhotos} from '/local/photos.js';
 import {installTellExperience,installTimelineExperience,installDeviceExperience} from '/local/experience.js';
+import {validTime,seasonTime,timelineStories} from '/local/dates.js';
 import {installBackup} from '/local/backup-ui.js';
 const params=new URLSearchParams(location.hash.slice(1));
 let id=params.get('edit')||localStorage.getItem('talera.free.draft')||crypto.randomUUID();
@@ -24,7 +25,7 @@ window.__taleraFreeApi=async function(path,options={}) {
       if(method==='GET') {await queue;return Response.json(draft);}
       if(method==='PUT')return await serialized(async()=>{
         const input=JSON.parse(options.body);
-        const next={...draft,...input,id,datePrecision:input.date?(input.datePrecision==='year'?'year':'day'):(input.datePrecision==='unknown'?'unknown':'unset'),status:draft.status};
+        const next={...draft,...input,eventTime:input.date?undefined:input.eventTime,id,datePrecision:input.date?(input.datePrecision==='year'?'year':'day'):(input.eventTime?.kind==='season'?'season':'unset'),status:draft.status};
         // UI metadata is not allowed to overwrite stored blob properties.
         draft=await storage.save(next);
         window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
@@ -43,9 +44,9 @@ window.__taleraFreeApi=async function(path,options={}) {
       if(method==='DELETE')return Response.json({ok:true});
     }
     if(url.pathname==='/api/storylab-clean/publish'&&method==='POST')return await serialized(async()=>{
-      if(!draft.photos.length||(!draft.date&&draft.datePrecision!=='unknown'))throw new Error(t('choosePhotoDate'));
+      if(!draft.photos.length||!validTime(draft))throw new Error(t('choosePhotoDate'));
       if(!draft.storyText.trim()&&!draft.audioId)throw new Error(t('writeFirst'));
-      draft=await storage.save({...draft,status:'published'});
+      draft=await storage.save({...draft,status:'published',postedAt:draft.postedAt||Date.now()});
       return Response.json({ok:true,handoffUrl:'/#story='+encodeURIComponent(id)});
     });
     throw new Error(t('later'));
@@ -74,17 +75,26 @@ if(location.pathname.startsWith('/tell')) {
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:true}}));
   })}).catch(error=>message(error.message)).finally(()=>window.__taleraStoryLabMedia.setState(draft));
   installTellExperience({getStory:()=>draft,storage,exclusive:serialized,notice:message,saveAudio:async audio=>{
-    draft=await storage.commitMedia({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,audioId:audio.id},audio);await window.__taleraStoryLabMedia.setState(draft);
+    draft=await storage.commitMedia({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,audioId:audio.id},audio);const latestText=document.getElementById('storyText').value;if(draft.storyText!==latestText)draft=await storage.save({...draft,storyText:latestText});await window.__taleraStoryLabMedia.setState(draft);
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
   }});
-  document.getElementById('freeUnknownDate')?.addEventListener('click',()=>serialized(async()=>{draft=await storage.save({...draft,date:'',datePrecision:'unknown'});await window.__taleraStoryLabMedia.setState(draft);document.getElementById('editModal').classList.remove('open');}));
+  const timeKind=document.getElementById('freeTimeKind'),seasonFields=document.getElementById('freeSeasonFields');
+  const syncTime=()=>{seasonFields.hidden=timeKind.value!=='season';document.getElementById('editDate').hidden=timeKind.value==='season';};
+  timeKind.onchange=syncTime;
+  document.getElementById('editBtn').addEventListener('click',()=>{timeKind.value=draft.eventTime?.kind==='season'?'season':'day';document.getElementById('freeSeason').value=draft.eventTime?.season||'voorjaar';document.getElementById('freeSeasonYear').value=draft.eventTime?.year||'';syncTime();});
+  document.getElementById('saveEdit').addEventListener('click',event=>{
+    event.stopImmediatePropagation();const date=timeKind.value==='day'?document.getElementById('editDate').value:'';
+    let eventTime;try{eventTime=timeKind.value==='season'?seasonTime(document.getElementById('freeSeason').value,Number(document.getElementById('freeSeasonYear').value)):undefined;if(!validTime({date,eventTime}))throw new Error('Kies een datum of een seizoen met jaartal.');}catch(error){message(error.message);return;}
+    serialized(async()=>{draft=await storage.save({...draft,title:document.getElementById('editTitle').value,date,eventTime,datePrecision:eventTime?'season':'day'});await window.__taleraStoryLabMedia.setState(draft);document.getElementById('editModal').classList.remove('open');}).catch(error=>message(error.message));
+  },true);
   const save=document.getElementById('timelinePublish');
   save?.addEventListener('click',event=>{
     const stop=key=>{event.stopImmediatePropagation();message(t(key));};
+    if(window.__taleraFreeSpeech?.busy()){event.stopImmediatePropagation();message('Je gesproken tekst wordt nog verwerkt.');return;}
     if(window.__taleraFreeRecording?.busy()){stop('audioFinishFirst');return;}
     if(failed){stop('storageUnavailable');return;}
     if(window.__taleraStoryLabMedia?.isUploading()){stop('photoBusy');return;}
-    if(!document.getElementById('dateInput').value&&draft.datePrecision!=='unknown'){
+    if(!validTime({...draft,date:document.getElementById('dateInput').value})){
       stop('addDate');document.getElementById('editBtn').click();document.getElementById('editDate').focus();return;
     }
     if(!document.getElementById('storyText').value.trim()&&!draft.audioId){
@@ -96,13 +106,13 @@ if(location.pathname.startsWith('/tell')) {
   document.querySelector('.more')?.closest('button')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').showModal());
   document.getElementById('freeStorageClose')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').close());
   try {
-    const stories=(await storage.stories()).filter(story=>story.status==='published').sort((a,b)=>Date.parse(a.date||new Date(a.createdAt||0).toISOString())-Date.parse(b.date||new Date(b.createdAt||0).toISOString()));
+    const stories=timelineStories((await storage.stories()).filter(story=>story.status==='published'));
     const urls=[],photoBlobs=new Map();
     window.__taleraFreePhotoResponse=async url=>photoBlobs.has(url)?new Response(photoBlobs.get(url)):new Response('',{status:404});
     window.__taleraFreeMemories=[];
     for(const story of stories) {
       const url='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-      window.__taleraFreeMemories.push({id:story.id,storyId:story.id,at:(story.date||new Date(story.createdAt||Date.now()).toISOString().slice(0,10))+'T12:00:00',ms:new Date((story.date||new Date(story.createdAt||Date.now()).toISOString().slice(0,10))+'T12:00:00').getTime(),audioId:story.audioId||'',datePrecision:story.datePrecision,story:story.title||story.storyText.slice(0,90)||t('audioTitle'),fullStory:story.storyText,image:url,photos:[url]});
+      window.__taleraFreeMemories.push({id:story.id,storyId:story.id,at:new Date(story.displayMs).toISOString(),ms:story.displayMs,audioId:story.audioId||'',datePrecision:story.datePrecision,story:story.title||story.storyText.slice(0,90)||t('audioTitle'),fullStory:story.storyText,image:url,photos:[url]});
     }
     if(!stories.length) {
       document.getElementById('freeEmpty').hidden=false;
@@ -122,3 +132,6 @@ if(location.pathname.startsWith('/tell')) {
     document.documentElement.classList.remove('free-loading');
   }catch(error){document.getElementById('freeError').textContent=error.message;document.documentElement.classList.remove('free-loading');}
 }
+
+function installCloseButtons(){for(const surface of document.querySelectorAll('dialog,.modal .card')){if(surface.querySelector('.free-close'))continue;const button=document.createElement('button');button.type='button';button.className='free-close';button.textContent='×';button.setAttribute('aria-label','Sluiten');button.onclick=()=>surface.tagName==='DIALOG'?(surface.dispatchEvent(new Event('cancel',{cancelable:true}))&&surface.close()):surface.closest('.modal').classList.remove('open');surface.prepend(button);}}
+installCloseButtons();new MutationObserver(installCloseButtons).observe(document.body,{childList:true});

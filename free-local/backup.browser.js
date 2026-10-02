@@ -1,3 +1,4 @@
+import {validTime,seasonTime} from './dates.browser.js';
 import {t} from './copy.browser.js';
 const MAGIC=new TextEncoder().encode('TALERA1\n');
 export const backupLimits=Object.freeze({bytes:256*1024*1024,header:4*1024*1024,items:10000});
@@ -11,17 +12,18 @@ function normalizeStories(stories,ids,audioIds=new Set()){
   const seen=new Set();
   return stories.map(s=>{
     const id=identifier(s.id);if(seen.has(id))throw invalid();seen.add(id);
-    if(!Array.isArray(s.photos)||s.photos.length>1000||!['draft','published'].includes(s.status))throw invalid();
+    if(!Array.isArray(s.photos)||s.photos.length>backupLimits.items||!['draft','published'].includes(s.status))throw invalid();
     const date=text(s.date||'',10);
     if(date&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date))throw invalid();
     const photos=s.photos.map(p=>{
       if(!ids.has(p.id))throw invalid();
       return {id:identifier(p.id),name:text(p.name||'foto',1000),type:text(p.type||'image/jpeg',100),createdAt:numeric(p.createdAt||0),fingerprint:text(p.fingerprint||'',64),captureDate:text(p.captureDate||'',10)};
     });
+    const eventTime=s.eventTime?.kind==='season'?seasonTime(s.eventTime.season,s.eventTime.year):undefined;
     const storyText=text(s.storyText||'');
     const audioId=s.audioId?identifier(s.audioId):'';if(audioId&&!audioIds.has(audioId))throw invalid();
-    if(s.status==='published'&&((!date&&s.datePrecision!=='unknown')||!photos.length||(!storyText.trim()&&!audioId)))throw invalid();
-    return {id,title:text(s.title||'',1000),date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
+    if(s.status==='published'&&((!validTime({date,eventTime})&&s.datePrecision!=='unknown')||!photos.length||(!storyText.trim()&&!audioId)))throw invalid();
+    return {id,eventTime,postedAt:numeric(s.postedAt||s.createdAt||0),title:text(s.title||'',1000),date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(eventTime?'season':s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
       createdAt:numeric(s.createdAt||0),updatedAt:numeric(s.updatedAt||0),schemaVersion:1,status:s.status,
       currentIndex:Math.min(Math.max(0,Number.isInteger(s.currentIndex)?s.currentIndex:0),Math.max(0,photos.length-1)),fit:s.fit==='contain'?'contain':'cover',audioId};
   });

@@ -40,3 +40,5 @@ assert.equal((await storage.story('published')).storyText,'Mijn volledige tekst'
 assert.equal(await (await storage.media(photo.id)).blob.text(),'photo bytes');
 const second=await createBackup(storage);assert.equal(second.storyCount,2);
 console.log('Backup tests passed: complete collection, drafts, photo/thumbnail bytes, independent-file restore, corruption/truncation/schema checks and rollback after queued deletion.');
+
+const seasonStory={...(await storage.story('published')),date:'',datePrecision:'season',eventTime:{kind:'season',season:'zomer',year:2020},postedAt:123};await storage.save(seasonStory);const seasonBackup=await createBackup(storage);const seasonRestored=(await readBackup(seasonBackup.file)).stories.find(s=>s.id==='published');assert.deepEqual(seasonRestored.eventTime,seasonStory.eventTime);assert.equal(seasonRestored.postedAt,123);console.log('Season and posting order survive backup roundtrip.');

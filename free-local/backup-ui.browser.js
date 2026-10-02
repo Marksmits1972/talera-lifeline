@@ -8,14 +8,17 @@ export function installBackup({storage,beforeExport,exclusive}){
   const description=dialog.querySelector('#backupDescription'),status=dialog.querySelector('#backupStatus'),detail=dialog.querySelector('#backupDetail'),actions=dialog.querySelector('#backupActions'),input=dialog.querySelector('#backupFile');
   const steps=dialog.querySelector('#backupSteps');
   const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
-  let prepared=null,imported=null,busy=false;
+  let prepared=null,imported=null,busy=false,pickerMode='restore';
+  function chooseFile(mode){pickerMode=mode;input.value='';input.click();}
   function buttons(items){actions.replaceChildren();for(const [label,fn,secondary] of items){const button=document.createElement('button');button.type='button';button.textContent=t(label);if(secondary)button.className='secondary';button.onclick=fn;actions.append(button);}}
   function date(value){return new Date(value).toLocaleString('nl-NL');}
   function open(){if(!dialog.open)dialog.showModal();}
   function close(){if(!busy)dialog.close();}
   function noteSaved(){
-    const last=localStorage.getItem('talera.free.backupConfirmed');
-    detail.textContent=last?t('backupConfirmed')+date(localStorage.getItem('talera.free.backupConfirmedAt')||last):t('backupNone');
+    const checked=localStorage.getItem('talera.free.backupVerified'),confirmed=localStorage.getItem('talera.free.backupConfirmed');
+    const verified=checked&&(!confirmed||Date.parse(checked)>=Date.parse(confirmed))?checked:null;
+    const last=verified||confirmed;
+    detail.textContent=last?t(verified?'backupVerified':'backupConfirmed')+date(localStorage.getItem(verified?'talera.free.backupVerifiedAt':'talera.free.backupConfirmedAt')||last):t('backupNone');
     const changed=localStorage.getItem('talera.free.collectionChanged');
     if(last&&changed&&Number(changed)>Date.parse(last))detail.textContent+=' '+t('backupOutdated');
   }
@@ -23,11 +26,11 @@ export function installBackup({storage,beforeExport,exclusive}){
     steps.hidden=true;
     description.textContent=intro?t('backupIntro')+' '+t('backupExplanation'):t('backupExplanation')+' '+t('backupSnapshot');
     status.textContent='';noteSaved();
-    buttons([['backupMake',prepare],['backupRestore',()=>input.click(),true],[intro?'backupLater':'backupClose',close,true]]);open();
+    buttons([['backupMake',prepare],['backupVerify',()=>chooseFile('verify'),true],['backupRestore',()=>chooseFile('restore'),true],[intro?'backupLater':'backupClose',close,true]]);open();
   }
   function confirmSaved(){
     status.textContent=t(isIOS&&!steps.hidden?'backupIOSConfirm':'backupConfirm');
-    buttons([['backupYes',()=>{
+    buttons([['backupVerify',()=>chooseFile('verifyPrepared')],['backupYes',()=>{
       // Confirmation is user-reported; the share API cannot prove a file was saved.
       localStorage.setItem('talera.free.backupConfirmed',prepared.createdAt);
       localStorage.setItem('talera.free.backupConfirmedAt',new Date().toISOString());
@@ -56,11 +59,26 @@ export function installBackup({storage,beforeExport,exclusive}){
     try{await beforeExport();prepared=await exclusive(()=>createBackup(storage));busy=false;showPrepared();}
     catch(error){busy=false;menu();status.textContent=error.message||t('backupFailure');}
   }
+  input.addEventListener('cancel',()=>{status.textContent=t('backupCheckCancelled');});
   input.onchange=async()=>{
     const file=input.files?.[0];input.value='';if(!file||busy)return;
     busy=true;imported=null;steps.hidden=true;status.textContent=t('backupChecking');buttons([]);
     try{
-      imported=await readBackup(file);busy=false;description.textContent=t('backupReplace');status.textContent=t('backupImportReady')+date(imported.createdAt);
+      imported=await readBackup(file);
+      if(pickerMode!=='restore'){
+        if(pickerMode==='verifyPrepared'){
+          if(!prepared||file.size!==prepared.file.size)throw new Error(t('backupDifferent'));
+          for(let offset=0;offset<file.size;offset+=1024*1024){
+            const a=new Uint8Array(await file.slice(offset,offset+1024*1024).arrayBuffer());
+            const b=new Uint8Array(await prepared.file.slice(offset,offset+1024*1024).arrayBuffer());
+            if(a.length!==b.length||a.some((value,index)=>value!==b[index]))throw new Error(t('backupDifferent'));
+          }
+        }
+        localStorage.setItem('talera.free.backupVerified',imported.createdAt);
+        localStorage.setItem('talera.free.backupVerifiedAt',new Date().toISOString());
+        imported=null;busy=false;menu();status.textContent=t('backupCheckSuccess');return;
+      }
+      busy=false;description.textContent=t('backupReplace');status.textContent=t('backupImportReady')+date(imported.createdAt);
       detail.textContent=imported.stories.length+' herinneringen · '+imported.media.filter(item=>item.kind!=='audio').length+' foto’s · '+imported.media.filter(item=>item.kind==='audio').length+' opnames';
       buttons([['backupApply',restore],['backupClose',close,true]]);
     }catch(error){busy=false;menu();status.textContent=error.message||t('backupInvalid');}
@@ -71,7 +89,7 @@ export function installBackup({storage,beforeExport,exclusive}){
       if(window.__taleraStoryLabMedia?.isUploading())throw new Error(t('photoBusy'));
       await exclusive(()=>storage.restore(imported));
       localStorage.removeItem('talera.free.draft');localStorage.setItem('talera.free.backupIntroSeen','1');
-      localStorage.removeItem('talera.free.backupConfirmed');localStorage.removeItem('talera.free.backupConfirmedAt');localStorage.setItem('talera.free.collectionChanged',String(Date.now()));
+      localStorage.removeItem('talera.free.backupVerified');localStorage.removeItem('talera.free.backupVerifiedAt');localStorage.removeItem('talera.free.backupConfirmed');localStorage.removeItem('talera.free.backupConfirmedAt');localStorage.setItem('talera.free.collectionChanged',String(Date.now()));
       location.replace('/?revision=integrated-v1');
     }catch(error){busy=false;menu();status.textContent=error.name==='QuotaExceededError'?t('storageFull'):error.message||t('backupFailure');}
   }

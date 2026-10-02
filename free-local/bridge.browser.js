@@ -25,7 +25,9 @@ window.__taleraFreeApi=async function(path,options={}) {
       if(method==='GET') {await queue;return Response.json(draft);}
       if(method==='PUT')return await serialized(async()=>{
         const input=JSON.parse(options.body);
-        const next={...draft,...input,eventTime:input.date?undefined:input.eventTime,id,datePrecision:input.date?(input.datePrecision==='year'?'year':'day'):(input.eventTime?.kind==='season'?'season':'unset'),status:draft.status};
+        const date=document.getElementById('dateInput')?.value??input.date;
+        const eventTime=date?undefined:(draft.eventTime||input.eventTime);
+        const next={...draft,...input,date,eventTime,id,datePrecision:date?(input.datePrecision==='year'?'year':'day'):(eventTime?.kind==='season'?'season':'unset'),status:draft.status};
         // UI metadata is not allowed to overwrite stored blob properties.
         draft=await storage.save(next);
         window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));

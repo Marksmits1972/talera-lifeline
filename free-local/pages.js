@@ -3,7 +3,7 @@ import {experienceCSS,quietCSS} from './app-assets.js';
 import {catalog,applyCatalog} from './texts.js';
 import {freeTellGestures,freeTimelineGestures} from './gestures.js';
 
-const CSP="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.hf.co https://cdn-lfs-eu-1.hf.co https://cas-bridge.xethub.hf.co; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'";
+const CSP="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.hf.co https://cdn-lfs-eu-1.hf.co https://cas-bridge.xethub.hf.co https://us.aws.cdn.hf.co; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'";
 export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-reader-speech-v1'};
 let pages;
 function boot(html) {

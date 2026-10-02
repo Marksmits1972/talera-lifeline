@@ -1,11 +1,12 @@
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
-import {manifest,icon,updatePage} from './app-assets.js';
+import {manifest,icon,updatePage,speechCheckPage} from './app-assets.js';
 import {makePages,htmlHeaders} from './pages.js';
 const pages=await makePages();
 createServer(async(req,res)=>{
   const path=new URL(req.url,'http://localhost').pathname.replace('.browser.js','.js');
   if(req.method!=='GET'){res.writeHead(405);res.end();return;}
+  if(path==='/speech-check'){res.writeHead(200,htmlHeaders);res.end(speechCheckPage);return;}
   if(path==='/update'){res.writeHead(200,htmlHeaders);res.end(updatePage);return;}
   if(path==='/app-update.js'){res.writeHead(200,{'content-type':'text/javascript','cache-control':'no-store'});res.end(await readFile(new URL('update.browser.js',import.meta.url),'utf8'));return;}
   if(['/manifest.webmanifest','/icon.svg','/sw.js'].includes(path)){res.writeHead(200,{'content-type':path==='/icon.svg'?'image/svg+xml':path==='/sw.js'?'text/javascript':'application/manifest+json'});res.end(path==='/sw.js'?await readFile(new URL('sw.browser.js',import.meta.url),'utf8'):path==='/icon.svg'?icon:manifest);return;}

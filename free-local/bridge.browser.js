@@ -27,7 +27,7 @@ window.__taleraFreeApi=async function(path,options={}) {
         const input=JSON.parse(options.body);
         const date=document.getElementById('dateInput')?.value??input.date;
         const eventTime=date?undefined:(draft.eventTime||input.eventTime);
-        const next={...draft,...input,date,eventTime,id,datePrecision:date?(input.datePrecision==='year'?'year':'day'):(eventTime?.kind==='season'?'season':'unset'),status:draft.status};
+        const next={...draft,...input,title:document.getElementById('title')?.value??input.title,storyText:document.getElementById('storyText')?.value??input.storyText,date,eventTime,id,datePrecision:date?(input.datePrecision==='year'?'year':'day'):(eventTime?.kind==='season'?'season':'unset'),status:draft.status};
         // UI metadata is not allowed to overwrite stored blob properties.
         draft=await storage.save(next);
         window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
@@ -77,7 +77,7 @@ if(location.pathname.startsWith('/tell')) {
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:true}}));
   })}).catch(error=>message(error.message)).finally(()=>window.__taleraStoryLabMedia.setState(draft));
   installTellExperience({getStory:()=>draft,storage,exclusive:serialized,notice:message,saveAudio:async audio=>{
-    draft=await storage.commitMedia({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,audioId:audio.id},audio);const latestText=document.getElementById('storyText').value;if(draft.storyText!==latestText)draft=await storage.save({...draft,storyText:latestText});await window.__taleraStoryLabMedia.setState(draft);
+    draft=await storage.commitMedia({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,audioId:audio.id},audio);const latestText=document.getElementById('storyText').value;if(draft.storyText!==latestText)draft=await storage.save({...draft,storyText:latestText});draft={...draft,storyText:document.getElementById('storyText').value};await window.__taleraStoryLabMedia.setState(draft);
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
   }});
   const timeKind=document.getElementById('freeTimeKind'),seasonFields=document.getElementById('freeSeasonFields');

@@ -3,7 +3,7 @@ import {compactPhoto} from '/local/media.js';
 import {t} from '/local/copy.browser.js';
 import {importPhotos} from '/local/photos.js';
 import {installTellExperience,installTimelineExperience,installDeviceExperience} from '/local/experience.js';
-import {validTime,seasonTime,timelineStories} from '/local/dates.js';
+import {validTime,seasonTime,timelineStories,timeLabel} from '/local/dates.js';
 import {installBackup} from '/local/backup-ui.js';
 const params=new URLSearchParams(location.hash.slice(1));
 let id=params.get('edit')||localStorage.getItem('talera.free.draft')||crypto.randomUUID();
@@ -86,7 +86,7 @@ if(location.pathname.startsWith('/tell')) {
   document.getElementById('editBtn').addEventListener('click',()=>{timeKind.value=draft.eventTime?.kind==='season'?'season':'day';document.getElementById('freeSeason').value=draft.eventTime?.season||'voorjaar';document.getElementById('freeSeasonYear').value=draft.eventTime?.year||'';syncTime();});
   document.getElementById('saveEdit').addEventListener('click',event=>{
     event.stopImmediatePropagation();const date=timeKind.value==='day'?document.getElementById('editDate').value:'';
-    let eventTime;try{eventTime=timeKind.value==='season'?seasonTime(document.getElementById('freeSeason').value,Number(document.getElementById('freeSeasonYear').value)):undefined;if(!validTime({date,eventTime}))throw new Error('Kies een datum of een seizoen met jaartal.');}catch(error){message(error.message);return;}
+    let eventTime;try{eventTime=timeKind.value==='season'?seasonTime(document.getElementById('freeSeason').value,Number(document.getElementById('freeSeasonYear').value)):undefined;if(!validTime({date,eventTime}))throw new Error('Kies een datum of een seizoen met jaartal.');const today=new Date();if(date&&date>today.toISOString().slice(0,10)||eventTime&&new Date(eventTime.year,{voorjaar:2,zomer:5,herfst:8,winter:-1}[eventTime.season],1)>today)throw new Error('Kies een datum of tijdvak dat al is begonnen.');}catch(error){message(error.message);return;}
     serialized(async()=>{draft=await storage.save({...draft,title:document.getElementById('editTitle').value,date,eventTime,datePrecision:eventTime?'season':'day'});await window.__taleraStoryLabMedia.setState(draft);document.getElementById('editModal').classList.remove('open');}).catch(error=>message(error.message));
   },true);
   const save=document.getElementById('timelinePublish');
@@ -114,7 +114,7 @@ if(location.pathname.startsWith('/tell')) {
     window.__taleraFreeMemories=[];
     for(const story of stories) {
       const url='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-      window.__taleraFreeMemories.push({id:story.id,storyId:story.id,at:new Date(story.displayMs).toISOString(),ms:story.displayMs,audioId:story.audioId||'',datePrecision:story.datePrecision,story:story.title||story.storyText.slice(0,90)||t('audioTitle'),fullStory:story.storyText,image:url,photos:[url]});
+      window.__taleraFreeMemories.push({id:story.id,storyId:story.id,at:new Date(story.displayMs).toISOString(),ms:story.displayMs,timeLabel:timeLabel(story),audioId:story.audioId||'',datePrecision:story.datePrecision,story:story.title||story.storyText.slice(0,90)||t('audioTitle'),fullStory:story.storyText,image:url,photos:[url]});
     }
     if(!stories.length) {
       document.getElementById('freeEmpty').hidden=false;

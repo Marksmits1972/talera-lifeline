@@ -1,7 +1,7 @@
 // Only public model/runtime downloads leave this worker. Waveforms stay in memory.
 let transcriber,pipeline,stage='runtime';
 const publicFetch=self.fetch.bind(self);self.fetch=async(input,options)=>{try{return await publicFetch(input,options);}catch(error){const url=new URL(typeof input==='string'?input:input.url);throw new Error('Public model download failed: '+url.origin+url.pathname+' ('+error.message+')');}};
-async function runtime(){if(pipeline)return;const library=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js');pipeline=library.pipeline;library.env.allowLocalModels=false;library.env.backends.onnx.wasm.numThreads=1;}
+async function runtime(){if(pipeline)return;const library=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js');pipeline=library.pipeline;library.env.allowLocalModels=false;library.env.remoteHost=self.location.origin+'/speech-model/';library.env.backends.onnx.wasm.numThreads=1;}
 self.onmessage=async({data})=>{try{
   await runtime();
   stage='model';

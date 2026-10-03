@@ -1,3 +1,4 @@
+import {modelDownload} from './model-download.js';
 import dates from './dates.browser.js';
 import presentation from './presentation.browser.js';
 import speech from './speech.browser.js';
@@ -23,6 +24,7 @@ const assets={'/local/dates.js':dates,'/local/dates.browser.js':dates,'/local/pr
 export default {async fetch(request){
   const url=new URL(request.url);
   if(!['GET','HEAD'].includes(request.method))return new Response('Local prototype: no server writes',{status:405});
+  const model=await modelDownload(request);if(model)return model;
   if(url.pathname==='/speech-check')return new Response(request.method==='HEAD'?null:speechCheckPage,{headers:htmlHeaders});
   if(url.pathname==='/update')return new Response(request.method==='HEAD'?null:updatePage,{headers:htmlHeaders});
   if(url.pathname==='/app-update.js')return new Response(request.method==='HEAD'?null:updateScript,{headers:{'content-type':'text/javascript; charset=utf-8','cache-control':'no-store'}});

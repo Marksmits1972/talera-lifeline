@@ -1,16 +1,16 @@
 import referenceWorker from '../src/reference-r19h2-carousel-combined-worker.js';
-import {experienceCSS,quietCSS} from './app-assets.js';
+import {experienceCSS,quietCSS,guidedCSS} from './app-assets.js';
 import {catalog,applyCatalog} from './texts.js';
 import {freeTellGestures,freeTimelineGestures} from './gestures.js';
 
 const CSP="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.hf.co https://cdn-lfs-eu-1.hf.co https://cas-bridge.xethub.hf.co https://us.aws.cdn.hf.co; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'";
-export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-reader-speech-v7'};
+export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-guided-reader-v8'};
 let pages;
 function boot(html) {
-  html=html.replace('</head>',`<style>${experienceCSS}${quietCSS}</style></head>`);
+  html=html.replace('</head>',`<style>${experienceCSS}${quietCSS}${guidedCSS}</style></head>`);
   html=html.replace(/<script(\s[^>]*)?>/g,'<script type="text/talera"$1>');
   html=html.replace('</head>','<link rel="apple-touch-icon" href="/icon-192.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0F2747"><meta name="apple-mobile-web-app-capable" content="yes"></head>');
-  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js?revision=reader-speech-v7"></script></body>`);
+  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js?revision=guided-reader-v8"></script></body>`);
 }
 export async function makePages() {
   if(pages)return pages;
@@ -24,6 +24,7 @@ export async function makePages() {
   tell=tell.replace('photoCache.set(item.id,item.url);',"const savedBlob=await (await api('/api/storylab-clean/photo?id='+encodeURIComponent(item.id))).blob();const compactUrl=URL.createObjectURL(savedBlob);photoCache.set(item.id,compactUrl);URL.revokeObjectURL(item.url);const oldPreview=previewPhotoUrls.get(item.id);if(oldPreview)URL.revokeObjectURL(oldPreview);previewPhotoUrls.set(item.id,compactUrl);");
   tell=tell.replace('location.href=data.handoffUrl;',"localStorage.removeItem('talera.free.draft');location.href=data.handoffUrl;");
 
+  tell=tell.replaceAll('!state.photos.length||!state.date','!state.date');
   tell=tell.replace('accept="image/*,.heic,.heif"','accept="image/*"');
   tell=tell.replace('Daarna kun je gewoon naar de foto kijken en je verhaal vertellen.',catalog.pickerHelp);
   tell=tell.replace("if(!r.ok)throw new Error('upload '+r.status);","if(!r.ok){const failure=await r.json();throw new Error(failure.error||window.__taleraT('savePhotoError'));}");
@@ -58,7 +59,7 @@ export async function makePages() {
   timeline=timeline.replace('const LIFE_START = Math.min(new Date(1976,8,6).getTime(),...MEMORIES_PLACEHOLDER);','const LIFE_START = Math.min(new Date(1976,8,6).getTime(),...window.__taleraFreeMemories.map(m=>new Date(m.at).getTime()));');
   timeline=timeline.replace('const LIFE_END = new Date(2026,8,6).getTime();','const LIFE_END = Math.max(Date.now(),...window.__taleraFreeMemories.map(m=>new Date(m.at).getTime()));');
   timeline=timeline.replace(/https:\/\/images\.unsplash\.com\/[^"'<>\s]+/g,'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-  timeline=timeline.replace('<html lang="nl">','<html lang="nl" class="free-loading">');
+  timeline=timeline.replace('<html lang="nl">','<html lang="nl" class="free-loading free-presentation">');
   timeline=timeline.replace('</head>',`<style>.free-loading .app{visibility:hidden}#freeEmpty{position:fixed;left:20px;right:20px;top:32%;z-index:30;display:grid;place-content:center;text-align:center;padding:20px;background:#F7F4EF;color:#0F2747;font-family:system-ui}#freeEmpty[hidden]{display:none}#freeEmpty a{color:#0F2747;padding:14px;font-weight:700}#freeEmpty p{max-width:330px;line-height:1.5}#freeEdit{position:fixed;right:18px;top:calc(260px + env(safe-area-inset-top));z-index:30;border:1px solid #fff;border-radius:50%;width:40px;height:40px;background:#F7F4EF;color:#0F2747}#freeError:empty{display:none}#freeError{padding:16px;position:fixed;top:15px;left:15px;right:15px;z-index:100;color:#0F2747;background:#F7F4EF}</style></head>`);
   timeline=timeline.replace('</body>',`<section id="freeEmpty" hidden><h1>TALERA</h1><p>${catalog.localNotice}</p><a href="/tell?new=1">${catalog.firstMemory}</a></section><button id="freeEdit" hidden aria-label="${catalog.editMemory}">✎</button><div id="freeError" role="alert"></div></body>`);
   timeline=timeline.replace('</body>',`<dialog id="freeStorageInfo" aria-labelledby="freeStorageTitle"><h2 id="freeStorageTitle">${catalog.storageTitle}</h2><p>${catalog.pickerHelp}</p><p>${catalog.storageSteps}</p><p>${catalog.storageNext}</p><p>${catalog.storageWarning}</p><button id="freeDeviceOpen" type="button">${catalog.deviceTitle}</button><button id="backupTimelineOpen" type="button">${catalog.backupTitle}</button><button id="freeStorageClose" type="button">${catalog.storageClose}</button></dialog><style>#freeStorageInfo{box-sizing:border-box;width:calc(100% - 32px);max-width:440px;max-height:80dvh;overflow:auto;border:0;border-radius:20px;padding:24px;background:#F7F4EF;color:#0F2747;font:15px/1.5 system-ui}#freeStorageInfo::backdrop{background:rgba(0,0,0,.5)}#freeStorageInfo h2{font-size:21px}#backupTimelineOpen{width:100%;padding:12px;border:0;border-radius:12px;background:#173851;color:white;font:inherit;margin-bottom:10px}#freeStorageClose{width:100%;padding:12px;border:0;border-radius:12px;background:#0F2747;color:white;font:inherit}</style></body>`);

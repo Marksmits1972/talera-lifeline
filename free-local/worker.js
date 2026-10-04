@@ -1,3 +1,6 @@
+import guided from './guided.browser.js';
+import title from './title.browser.js';
+import titleWorker from './title-worker.browser.js';
 import {modelDownload} from './model-download.js';
 import dates from './dates.browser.js';
 import presentation from './presentation.browser.js';
@@ -20,13 +23,13 @@ import copy from './copy.browser.js';
 import backup from './backup.browser.js';
 import backupUi from './backup-ui.browser.js';
 import {nl} from './catalog.js';
-const assets={'/local/dates.js':dates,'/local/dates.browser.js':dates,'/local/presentation.browser.js':presentation,'/local/speech.browser.js':speech,'/local/presentation.js':presentation,'/local/speech.js':speech,'/local/speech-worker.js':speech_worker,'/local/speech-worklet.js':speech_worklet,'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/experience.js':experience,'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
+const assets={'/local/guided.js':guided,'/local/title.js':title,'/local/title-worker.js':titleWorker,'/local/dates.js':dates,'/local/dates.browser.js':dates,'/local/presentation.browser.js':presentation,'/local/speech.browser.js':speech,'/local/presentation.js':presentation,'/local/speech.js':speech,'/local/speech-worker.js':speech_worker,'/local/speech-worklet.js':speech_worklet,'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/experience.js':experience,'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
 export default {async fetch(request){
   const url=new URL(request.url);
   if(!['GET','HEAD'].includes(request.method))return new Response('Local prototype: no server writes',{status:405});
   const model=await modelDownload(request);if(model)return model;
   if(url.pathname==='/speech-check')return new Response(request.method==='HEAD'?null:speechCheckPage,{headers:htmlHeaders});
-  if(url.pathname==='/update')return new Response(request.method==='HEAD'?null:updatePage,{headers:htmlHeaders});
+  if(url.pathname==='/update'){const pages=await makePages();return new Response(request.method==='HEAD'?null:pages.timeline.replace('</body>','<script type="module" src="/app-update.js"></script></body>'),{headers:htmlHeaders});}
   if(url.pathname==='/app-update.js')return new Response(request.method==='HEAD'?null:updateScript,{headers:{'content-type':'text/javascript; charset=utf-8','cache-control':'no-store'}});
   if(['/icon-192.png','/icon-512.png'].includes(url.pathname))return new Response(request.method==='HEAD'?null:url.pathname==='/icon-192.png'?icon192:icon512,{headers:{'content-type':'image/png','cache-control':'no-store'}});
   if(url.pathname==='/manifest.webmanifest'||url.pathname==='/icon.svg'||url.pathname==='/sw.js')return new Response(request.method==='HEAD'?null:({'/manifest.webmanifest':manifest,'/icon.svg':icon,'/sw.js':sw}[url.pathname]),{headers:{'content-type':url.pathname==='/icon.svg'?'image/svg+xml':url.pathname==='/sw.js'?'text/javascript':'application/manifest+json','cache-control':'no-store'}});

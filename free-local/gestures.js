@@ -21,6 +21,14 @@ export function freeTellGestures(html) {
   return html;
 }
 export function freeTimelineGestures(html) {
+  // Memories have a calendar date, not an hour. Keep the inherited calendar
+  // levels, but never enter the day/hour rulers (levels 4 and 5).
+  html=html.replaceAll('z=clamp(z,0,5);','z=clamp(z,0,3);')
+    .replaceAll('clamp(Math.round(zoomPos),0,5)','clamp(Math.round(zoomPos),0,3)')
+    .replaceAll('clamp(Math.round(visualZoomPos),0,5)','clamp(Math.round(visualZoomPos),0,3)')
+    .replaceAll('clamp(pinchStartZoom+Math.log(dist/pinchStartDist)*1.8,0,5)','clamp(pinchStartZoom+Math.log(dist/pinchStartDist)*1.8,0,3)')
+    .replaceAll('clamp(zoomPos-e.deltaY*.004,0,5)','clamp(zoomPos-e.deltaY*.004,0,3)')
+    .replace('    const major=i%2===0;', '    const labelEvery=Math.max(2,Math.ceil(76/((MS_DAY/(endMs-startMs))*w)));\n    const major=i%labelEvery===0;');
   return html.replace('  function settleFromRelease(dx,velocityPxMs){', `  // Safari may restore a page without delivering the interrupted gesture's end.
   function resetFreeGesture(){
     finishGestureTracking();

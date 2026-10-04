@@ -5,7 +5,7 @@ async function runtime(){if(pipeline)return;const library=await import('https://
 self.onmessage=async({data})=>{try{
   await runtime();
   stage='model';
-  if(!transcriber)transcriber=await pipeline('automatic-speech-recognition','Xenova/whisper-tiny',{dtype:'q8',device:'wasm',progress_callback:progress=>self.postMessage({kind:'progress',status:progress.status,progress:progress.progress})});
+  if(!transcriber)transcriber=await pipeline('automatic-speech-recognition','Xenova/whisper-base',{dtype:'q8',device:'wasm',progress_callback:progress=>self.postMessage({kind:'progress',status:progress.status,progress:progress.progress})});
   if(data.kind==='prepare'){self.postMessage({kind:'ready'});return;}
   stage='transcription';
   const result=await transcriber(data.samples,{language:'dutch',task:'transcribe',return_timestamps:false});

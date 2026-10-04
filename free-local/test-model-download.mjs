@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {modelDownload} from './model-download.js';
-const base='https://app.test/speech-model/Xenova/whisper-tiny/resolve/main/';
+const base='https://app.test/speech-model/Xenova/whisper-base/resolve/main/';
 let calls=0;
-const download=async(url,options)=>{calls++;assert.equal(url,'https://huggingface.co/Xenova/whisper-tiny/resolve/5332fcc35e32a33b86612b9a57a89be7906102b1/tokenizer.json');assert.deepEqual(options,{method:'GET',redirect:'follow'});return new Response('{"public":true}');};
+const download=async(url,options)=>{calls++;assert.equal(url,'https://huggingface.co/Xenova/whisper-base/resolve/64da57285918e20ea79ea5c88eed7197933abaa8/tokenizer.json');assert.deepEqual(options,{method:'GET',redirect:'follow'});return new Response('{"public":true}');};
 const result=await modelDownload(new Request(base+'tokenizer.json',{headers:{cookie:'must-not-forward'}}),download);assert.equal(result.status,200);assert.equal(await result.text(),'{"public":true}');
 for(const [path,method,status] of [['tokenizer.json','POST',405],['tokenizer.json?voice=private','GET',404],['audio.wav','GET',404],['../../other/model.bin','GET',404]])assert.equal((await modelDownload(new Request(base+path,{method}),download)).status,status);
 assert.equal(calls,1);assert.equal(await modelDownload(new Request('https://app.test/anything'),download),null);

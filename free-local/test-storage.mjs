@@ -9,7 +9,7 @@ test('stored bytes and metadata survive closing and reopening the database',asyn
   const blob=new Blob(['photo-bytes'],{type:'image/jpeg'});
   await storage.putMedia({id:'photo-a',blob,thumbnail:new Blob(['thumb'])});
   await storage.save({id:'story-a',photos:[{id:'photo-a'}],storyText:'My story',date:'2021-04-10',status:'published'});
-  const db=await new Promise(resolve=>{const request=indexedDB.open('talera-free-local-v1',1);request.onsuccess=()=>resolve(request.result);});
+  const db=await new Promise(resolve=>{const request=indexedDB.open('talera-free-local-v1',2);request.onsuccess=()=>resolve(request.result);});
   const persisted=await new Promise(resolve=>{db.transaction('stories').objectStore('stories').get('story-a').onsuccess=e=>resolve(e.target.result);});
   db.close();
   assert.equal(persisted.storyText,'My story');assert.equal(persisted.schemaVersion,1);

@@ -20,16 +20,20 @@ function normalizeStories(stories,ids,audioIds=new Set()){
       if(!ids.has(p.id))throw invalid();
       return {id:identifier(p.id),kind:p.kind==='video'?'video':'photo',duration:numeric(p.duration||0),name:text(p.name||'foto',1000),type:text(p.type||'image/jpeg',100),createdAt:numeric(p.createdAt||0),fingerprint:text(p.fingerprint||'',64),captureDate:text(p.captureDate||'',10)};
     });
-    const eventTime=s.eventTime?.kind==='season'?seasonTime(s.eventTime.season,s.eventTime.year):undefined;
+    const eventTime=s.eventTime?.kind==='season'?seasonTime(s.eventTime.season,s.eventTime.year):s.eventTime?.kind==='year'&&validTime({eventTime:s.eventTime})?{kind:'year',year:Number(s.eventTime.year)}:undefined;
     const storyText=text(s.storyText||'');
-    const audioId=s.audioId?identifier(s.audioId):'';if(audioId&&!audioIds.has(audioId))throw invalid();
+    const audioId=s.audioId?identifier(s.audioId):'';if(audioId&&!audioIds.has(audioId))throw invalid();const recordings=(s.audioIds||[]).map(identifier);if(recordings.length>backupLimits.items||recordings.some(id=>!audioIds.has(id)))throw invalid();
     if(s.status==='published'&&((!validTime({date,eventTime})&&s.datePrecision!=='unknown')||(!photos.length&&!storyText.trim()&&!audioId)))throw invalid();
     const analysis=s.analysis&&s.analysis.sourceText===storyText?cleanAnalysis(s.analysis,storyText):undefined;
     if(s.timelineOrder!==undefined&&!Number.isFinite(s.timelineOrder))throw invalid();
-    return {id,analysis,eventTime,timelineOrder:s.timelineOrder,postedAt:numeric(s.postedAt||s.createdAt||0),title:text(s.title||'',1000),titleSource:['ai','suggestion'].includes(s.titleSource)?s.titleSource:'manual',date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(eventTime?'season':s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
+    return {id,analysis,eventTime,timelineOrder:s.timelineOrder,postedAt:numeric(s.postedAt||s.createdAt||0),title:text(s.title||'',1000),titleSource:['ai','suggestion'].includes(s.titleSource)?s.titleSource:'manual',date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(eventTime?eventTime.kind:s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
       createdAt:numeric(s.createdAt||0),updatedAt:numeric(s.updatedAt||0),schemaVersion:1,status:s.status,
-      currentIndex:Math.min(Math.max(0,Number.isInteger(s.currentIndex)?s.currentIndex:0),Math.max(0,photos.length-1)),fit:s.fit==='contain'?'contain':'cover',audioId};
+      currentIndex:Math.min(Math.max(0,Number.isInteger(s.currentIndex)?s.currentIndex:0),Math.max(0,photos.length-1)),fit:s.fit==='contain'?'contain':'cover',audioId,audioIds:recordings,importBatchId:s.importBatchId?identifier(s.importBatchId):undefined};
   });
+}
+function normalizeImports(imports=[]){
+  if(!Array.isArray(imports)||imports.length>1)throw invalid();
+  return imports.map(i=>{if(i.id!=='last'||!Array.isArray(i.groups)||i.groups.length>25)throw invalid();return {id:'last',batchId:identifier(i.batchId),createdAt:numeric(i.createdAt),duplicates:numeric(i.duplicates||0),failures:[],groups:i.groups.map(g=>{if(!validTime(g.time)||!Array.isArray(g.photoIds)||g.photoIds.length>25)throw invalid();return {storyId:identifier(g.storyId),photoIds:g.photoIds.map(identifier),time:{date:g.time.date||'',eventTime:g.time.eventTime}};})};});
 }
 export async function createBackup(storage){
   const snapshot=await storage.snapshot();
@@ -50,7 +54,7 @@ export async function createBackup(storage){
     media.push(entry);
   }
   const createdAt=new Date().toISOString();
-  const header=new TextEncoder().encode(JSON.stringify({format:'TALERA Free',version:3,createdAt,stories,media}));
+  const header=new TextEncoder().encode(JSON.stringify({format:'TALERA Free',version:4,createdAt,stories,media,imports:normalizeImports(snapshot.imports)}));
   if(header.length>backupLimits.header||bytes+12+header.length>backupLimits.bytes)throw new Error(t('backupTooLarge'));
   const length=new Uint8Array(4);new DataView(length.buffer).setUint32(0,header.length);
   const file=new File([MAGIC,length,header,...parts],'TALERA-reservekopie-'+createdAt.replace(/[:.]/g,'-')+'.talera',{type:'application/octet-stream'});
@@ -63,7 +67,7 @@ export async function readBackup(file){
   const size=new DataView(prefix.buffer).getUint32(8);
   if(!size||size>backupLimits.header||12+size>file.size)throw invalid();
   let manifest;try{manifest=JSON.parse(await file.slice(12,12+size).text());}catch{throw invalid();}
-  if(manifest.format!=='TALERA Free'||![1,2,3].includes(manifest.version))throw new Error(t('backupUnsupported'));
+  if(manifest.format!=='TALERA Free'||![1,2,3,4].includes(manifest.version))throw new Error(t('backupUnsupported'));
   if(!Array.isArray(manifest.media)||manifest.media.length>backupLimits.items||!Number.isFinite(Date.parse(manifest.createdAt)))throw invalid();
   let offset=12+size;const media=[],ids=new Set(),photoIds=new Set(),audioIds=new Set();
   for(const item of manifest.media){
@@ -81,5 +85,5 @@ export async function readBackup(file){
   }
   if(offset!==file.size)throw invalid();
   const stories=normalizeStories(manifest.stories,photoIds,audioIds);
-  return {stories,media,createdAt:manifest.createdAt};
+  return {stories,media,imports:normalizeImports(manifest.imports),createdAt:manifest.createdAt};
 }

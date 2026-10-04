@@ -5,11 +5,12 @@ export const experienceCSS=`#freeUpdate{position:fixed;top:8px;left:50%;transfor
 export const updatePage=`<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TALERA — App bijwerken</title><style>body{margin:0;background:#f7f4ef;color:#0f2747;font:18px system-ui;padding:32px;line-height:1.5}main{max-width:480px;margin:12vh auto}button{background:#163b50;color:white;border:0;border-radius:24px;padding:18px 24px;font:700 18px system-ui;width:100%}button:disabled{opacity:.6}</style><main><h1>TALERA bijwerken</h1><p>Sla je verhaal op en sluit eerst de overige TALERA-tabbladen. Je lokaal bewaarde herinneringen blijven behouden.</p><button id="update">Open de nieuwste app</button><p id="status" role="status"></p></main><script src="/app-update.js"></script></html>`;
 
 export const quietCSS=`
-:root{--command-frost-feather:22px!important;--command-glass-tint:transparent!important;--command-glass-blur:4px!important;--command-glass-saturation:1!important}
+:root{--command-frost-feather:0px!important;--command-glass-tint:transparent!important;--command-glass-blur:4px!important;--command-glass-saturation:1!important}
 .free-presentation .photo-stage .example-photo{inset:0!important;left:0!important;top:0!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center!important;-webkit-mask-image:none!important;mask-image:none!important}
 .free-presentation .photo-backdrop,.free-presentation .photo-aligned-blur{display:none!important}
 .free-presentation main .timeline,.free-presentation main .timeline.is-active{background:transparent!important}
-.free-presentation main .timeline::before,.free-presentation main .timeline.is-timeline-engaged::before,.free-presentation main .timeline.is-timeline-afterglow::before{background:transparent!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;opacity:1!important}
+.free-presentation main .timeline::before,.free-presentation main .timeline.is-timeline-engaged::before,.free-presentation main .timeline.is-timeline-afterglow::before{background:transparent!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;opacity:1!important;height:100%!important;-webkit-mask-image:none!important;mask-image:none!important;border:0!important;box-shadow:none!important}
+.free-presentation nav::before{top:0!important;mask-image:none!important;-webkit-mask-image:none!important;background:transparent!important;border:0!important;box-shadow:none!important}
 .free-presentation .memory-space::before,.free-presentation .memory-caption,.free-presentation #memoryCaption{background:transparent!important}
 #memoryStoryMore{display:none!important}#memoryStoryScroll{overflow:hidden!important;touch-action:none!important}
 .free-presentation .memory-caption{padding-bottom:148px!important;text-shadow:0 1px 6px #0008!important}

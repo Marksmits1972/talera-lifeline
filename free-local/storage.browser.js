@@ -4,11 +4,12 @@ const DB_NAME = 'talera-free-local-v1';
 let opening;
 function open() {
   if (!opening) opening = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2);
     request.onupgradeneeded = () => {
       const db = request.result;
-      db.createObjectStore('stories', {keyPath:'id'});
-      db.createObjectStore('media', {keyPath:'id'});
+      if(!db.objectStoreNames.contains('stories'))db.createObjectStore('stories', {keyPath:'id'});
+      if(!db.objectStoreNames.contains('media'))db.createObjectStore('media', {keyPath:'id'});
+      if(!db.objectStoreNames.contains('imports'))db.createObjectStore('imports', {keyPath:'id'});
     };
     request.onerror = () => { opening = null; reject(request.error); };
     request.onblocked = () => { opening = null; reject(new Error(t('closeTabs'))); };
@@ -33,23 +34,47 @@ async function transaction(storeNames, mode, action) {
 }
 export const storage = {
   async snapshot() {
-    return transaction(['stories','media'],'readonly',(tx,set)=>{
-      const result={stories:[],media:[]};set(result);
+    return transaction(['stories','media','imports'],'readonly',(tx,set)=>{
+      const result={stories:[],media:[],imports:[]};set(result);
       tx.objectStore('stories').getAll().onsuccess=e=>{result.stories=e.target.result;};
       tx.objectStore('media').getAll().onsuccess=e=>{result.media=e.target.result;};
+      tx.objectStore('imports').getAll().onsuccess=e=>{result.imports=e.target.result;};
     });
   },
   async restore(collection) {
     const mediaIds=new Set(collection.media.map(item=>item.id));
     if(mediaIds.size!==collection.media.length||new Set(collection.stories.map(item=>item.id)).size!==collection.stories.length)throw new Error(t('backupInvalid'));
     for(const item of collection.media)if(!(item.blob instanceof Blob)||!item.blob.size||(item.kind!=='audio'&&(!(item.thumbnail instanceof Blob)||!item.thumbnail.size)))throw new Error(t('backupInvalid'));
-    for(const story of collection.stories)if(!story.id||!Array.isArray(story.photos)||story.photos.some(photo=>!mediaIds.has(photo.id))||(story.audioId&&!mediaIds.has(story.audioId)))throw new Error(t('backupInvalid'));
+    for(const story of collection.stories)if(!story.id||!Array.isArray(story.photos)||story.photos.some(photo=>!mediaIds.has(photo.id))||([story.audioId,...(story.audioIds||[])].filter(Boolean).some(id=>!mediaIds.has(id))))throw new Error(t('backupInvalid'));
     // Clear and restore in one transaction; quota errors roll everything back.
-    await transaction(['stories','media'],'readwrite',tx=>{
+    await transaction(['stories','media','imports'],'readwrite',tx=>{
       tx.objectStore('stories').clear();tx.objectStore('media').clear();
+      tx.objectStore('imports').clear();
+      for(const item of collection.imports||[])tx.objectStore('imports').put(item);
       for(const item of collection.media)tx.objectStore('media').put(item);
       for(const story of collection.stories)tx.objectStore('stories').put(story);
     });
+  },
+  async lastImport(){return transaction(['imports'],'readonly',(tx,set)=>{tx.objectStore('imports').get('last').onsuccess=e=>set(e.target.result);});},
+  // One transaction owns all transfers and deletes. Validate against the live collection.
+  async saveCollection(changes,media=[],expected={},importSummary){
+    let conflict=false;
+    await transaction(['stories','media','imports'],'readwrite',tx=>{
+      const stories=tx.objectStore('stories'),bytes=tx.objectStore('media');
+      const read=stories.getAll();read.onsuccess=()=>{
+        const current=new Map(read.result.map(s=>[s.id,s]));
+        for(const [id,revision] of Object.entries(expected))if(current.get(id)?.updatedAt!==revision){conflict=true;tx.abort();return;}
+        if(importSummary){const known=new Set(read.result.flatMap(s=>s.photos||[]).map(p=>p.fingerprint).filter(Boolean));for(const p of changes.flatMap(s=>s?.photos||[]))if(media.some(m=>m.id===p.id)&&known.has(p.fingerprint)){conflict=true;tx.abort();return;}}
+        const before=new Set(read.result.flatMap(s=>[...(s.photos||[]).map(p=>p.id),s.audioId,...(s.audioIds||[])].filter(Boolean)));
+        for(const item of media){if(!(item.blob instanceof Blob)||!item.blob.size||(item.kind!=='audio'&&(!(item.thumbnail instanceof Blob)||!item.thumbnail.size))){tx.abort();return;}bytes.put(item);}
+        for(const story of changes){if(!story?.id){tx.abort();return;}if(story.deleted){current.delete(story.id);stories.delete(story.id);}else{if(!Array.isArray(story.photos)){tx.abort();return;}const saved={...story,schemaVersion:1,updatedAt:Math.max(Date.now(),(current.get(story.id)?.updatedAt||0)+1)};current.set(story.id,saved);stories.put(saved);}}
+        const after=new Set([...current.values()].flatMap(s=>[...(s.photos||[]).map(p=>p.id),s.audioId,...(s.audioIds||[])].filter(Boolean)));
+        for(const id of after){const check=bytes.get(id);check.onsuccess=()=>{if(!check.result?.blob?.size)tx.abort();};}
+        for(const id of before)if(!after.has(id))bytes.delete(id);
+        if(importSummary)tx.objectStore('imports').put({...importSummary,id:'last'});
+      };
+    }).catch(error=>{if(conflict)throw Error('De verzameling is ondertussen gewijzigd. Open dit venster opnieuw; je bewaarde verhalen zijn behouden.');throw error;});
+    return Promise.all(changes.filter(s=>!s.deleted).map(s=>this.story(s.id)));
   },
   async replacePhotoCopies(items) {
     for(const item of items)if(item.kind==='audio'||!(item.blob instanceof Blob)||!item.blob.size||!(item.thumbnail instanceof Blob)||!item.thumbnail.size)throw new Error(t('photoProcessingError'));
@@ -85,53 +110,11 @@ export const storage = {
     return saved;
   },
   async save(story) {
-    if (!story.id || !Array.isArray(story.photos)) throw new Error(t('invalidMemory'));
-    // Validate and write within one transaction: no published story can reference missing bytes.
-    await transaction(['stories','media'],'readwrite',tx=>{
-      const pending = [...story.photos.map(photo=>photo.id),...(story.audioId?[story.audioId]:[])].map(id=>tx.objectStore('media').get(id));
-      let remaining = pending.length;
-      const commit = () => {
-        const previous=tx.objectStore('stories').get(story.id);
-        previous.onsuccess=()=>{
-          const ids=new Set(story.photos.map(p=>p.id));
-          for(const photo of previous.result?.photos||[])if(!ids.has(photo.id))tx.objectStore('media').delete(photo.id);
-          if(previous.result?.audioId&&previous.result.audioId!==story.audioId)tx.objectStore('media').delete(previous.result.audioId);
-          tx.objectStore('stories').put({...story,schemaVersion:1,updatedAt:Date.now()});
-        };
-      };
-      if (!remaining) commit();
-      for (const request of pending) request.onsuccess = () => {
-        if (!request.result?.blob?.size) {tx.abort();return;}
-        if (!--remaining) commit();
-      };
-    });
-    const saved = await this.story(story.id);
-    if (!saved || saved.photos.length !== story.photos.length) throw new Error(t('memoryReadError'));
-    return saved;
+    await this.saveCollection([story]);return this.story(story.id);
   },
   async saveEdit(story,media=[],expectedUpdatedAt){
-    if(!story.id||!Array.isArray(story.photos))throw new Error(t('invalidMemory'));
-    for(const item of media)if(!(item.blob instanceof Blob)||!item.blob.size||(item.kind!=='audio'&&(!(item.thumbnail instanceof Blob)||!item.thumbnail.size)))throw new Error(t('invalidMemory'));
-    let conflict=false;
-    await transaction(['stories','media'],'readwrite',tx=>{
-      const stories=tx.objectStore('stories'),bytes=tx.objectStore('media');
-      const previous=stories.get(story.id);
-      previous.onsuccess=()=>{
-        if(!previous.result||previous.result.updatedAt!==expectedUpdatedAt){conflict=true;tx.abort();return;}
-        const ids=new Set([...story.photos.map(p=>p.id),story.audioId].filter(Boolean));
-        for(const item of media)if(ids.has(item.id))bytes.put(item);
-        for(const id of ids){const request=bytes.get(id);request.onsuccess=()=>{if(!request.result?.blob?.size)tx.abort();};}
-        for(const photo of previous.result.photos)if(!ids.has(photo.id))bytes.delete(photo.id);
-        if(previous.result.audioId&&!ids.has(previous.result.audioId))bytes.delete(previous.result.audioId);
-        stories.put({...story,schemaVersion:1,updatedAt:Date.now()});
-      };
-    }).catch(error=>{if(conflict)throw new Error('Dit verhaal is ondertussen gewijzigd in een ander venster. Sluit dit venster en open het verhaal opnieuw.');throw error;});
-    return this.story(story.id);
+    await this.saveCollection([story],media,{[story.id]:expectedUpdatedAt});return this.story(story.id);
   },
-  async delete(id) {
-    await transaction(['stories','media'],'readwrite',tx=>{
-      const request=tx.objectStore('stories').get(id);
-      request.onsuccess=()=>{for(const photo of request.result?.photos||[])tx.objectStore('media').delete(photo.id);if(request.result?.audioId)tx.objectStore('media').delete(request.result.audioId);tx.objectStore('stories').delete(id);};
-    });
-  }
+  async delete(id) {await this.saveCollection([{id,deleted:true}]);}
+
 };

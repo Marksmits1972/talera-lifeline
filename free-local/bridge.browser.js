@@ -1,5 +1,6 @@
 import {chooseTime,installDateStyle} from '/local/date-picker.js';
 import {installOverview} from '/local/overview.js';
+import {installBulkImport} from '/local/bulk.js';
 import {installTimelineActions} from '/local/timeline-actions.js';
 import {storage} from '/local/storage.js';
 import {compactPhoto} from '/local/media.js';
@@ -126,13 +127,14 @@ if(location.pathname.startsWith('/tell')) {
 
   document.getElementById('freeStorageClose')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').close());
   try {
+    installBulkImport({storage,exclusive:serialized});
     const stories=timelineStories((await storage.stories()).filter(story=>story.status==='published'));
     const urls=[],photoBlobs=new Map();
     window.__taleraFreePhotoResponse=async url=>photoBlobs.has(url)?new Response(photoBlobs.get(url)):new Response('',{status:404});
     window.__taleraFreeMemories=[];
     for(const story of stories) {
       const url='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-      window.__taleraFreeMemories.push({id:story.id,storyId:story.id,at:new Date(story.displayMs).toISOString(),ms:story.displayMs,timeLabel:timeLabel(story),audioId:story.audioId||'',datePrecision:story.datePrecision,story:story.title||story.storyText.slice(0,90)||t('audioTitle'),fullStory:story.storyText,image:url,photos:[url]});
+      window.__taleraFreeMemories.push({id:story.id,storyId:story.id,at:new Date(story.displayMs).toISOString(),ms:story.displayMs,timeLabel:timeLabel(story),audioId:story.audioId||'',audioIds:story.audioIds||[],datePrecision:story.datePrecision,story:story.title||story.storyText.slice(0,90)||'',fullStory:story.storyText,image:url,photos:[url]});
     }
     if(!stories.length) {
       document.getElementById('freeEmpty').hidden=false;

@@ -122,7 +122,7 @@ if(location.pathname.startsWith('/tell')) {
     }
   },true);
 }else {
-  document.querySelector('.tell')?.addEventListener('click',()=>location.href='/tell?new=1',true);
+  document.querySelector('.tell')?.addEventListener('click',()=>{const at=window.__taleraTimelineRuntime?.centerMs();location.href='/tell?new=1'+(at?'&at='+new Date(Math.min(at,Date.now())).toISOString().slice(0,10):'');},true);
 
   document.getElementById('freeStorageClose')?.addEventListener('click',()=>document.getElementById('freeStorageInfo').close());
   try {
@@ -154,5 +154,5 @@ if(location.pathname.startsWith('/tell')) {
   }catch(error){document.getElementById('freeError').textContent=error.message;document.documentElement.classList.remove('free-loading');}
 }
 
-function installCloseButtons(){for(const surface of document.querySelectorAll('dialog,.modal .card')){if(surface.querySelector('.free-close'))continue;const button=document.createElement('button');button.type='button';button.className='free-close';button.textContent='×';button.setAttribute('aria-label','Sluiten');button.onclick=()=>surface.tagName==='DIALOG'?(surface.dispatchEvent(new Event('cancel',{cancelable:true}))&&surface.close()):surface.closest('.modal').classList.remove('open');surface.prepend(button);}}
+function installCloseButtons(){for(const surface of document.querySelectorAll('dialog,.modal .card')){if(surface.id==='freeStoryMenu'||surface.querySelector('.free-close'))continue;const button=document.createElement('button');button.type='button';button.className='free-close';button.textContent='×';button.setAttribute('aria-label','Sluiten');button.onclick=()=>surface.tagName==='DIALOG'?(surface.dispatchEvent(new Event('cancel',{cancelable:true}))&&surface.close()):surface.closest('.modal').classList.remove('open');surface.prepend(button);}}
 installCloseButtons();new MutationObserver(installCloseButtons).observe(document.body,{childList:true});

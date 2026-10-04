@@ -109,6 +109,25 @@ export const storage = {
     if (!saved || saved.photos.length !== story.photos.length) throw new Error(t('memoryReadError'));
     return saved;
   },
+  async saveEdit(story,media=[],expectedUpdatedAt){
+    if(!story.id||!Array.isArray(story.photos))throw new Error(t('invalidMemory'));
+    for(const item of media)if(!(item.blob instanceof Blob)||!item.blob.size||(item.kind!=='audio'&&(!(item.thumbnail instanceof Blob)||!item.thumbnail.size)))throw new Error(t('invalidMemory'));
+    let conflict=false;
+    await transaction(['stories','media'],'readwrite',tx=>{
+      const stories=tx.objectStore('stories'),bytes=tx.objectStore('media');
+      const previous=stories.get(story.id);
+      previous.onsuccess=()=>{
+        if(!previous.result||previous.result.updatedAt!==expectedUpdatedAt){conflict=true;tx.abort();return;}
+        const ids=new Set([...story.photos.map(p=>p.id),story.audioId].filter(Boolean));
+        for(const item of media)if(ids.has(item.id))bytes.put(item);
+        for(const id of ids){const request=bytes.get(id);request.onsuccess=()=>{if(!request.result?.blob?.size)tx.abort();};}
+        for(const photo of previous.result.photos)if(!ids.has(photo.id))bytes.delete(photo.id);
+        if(previous.result.audioId&&!ids.has(previous.result.audioId))bytes.delete(previous.result.audioId);
+        stories.put({...story,schemaVersion:1,updatedAt:Date.now()});
+      };
+    }).catch(error=>{if(conflict)throw new Error('Dit verhaal is ondertussen gewijzigd in een ander venster. Sluit dit venster en open het verhaal opnieuw.');throw error;});
+    return this.story(story.id);
+  },
   async delete(id) {
     await transaction(['stories','media'],'readwrite',tx=>{
       const request=tx.objectStore('stories').get(id);

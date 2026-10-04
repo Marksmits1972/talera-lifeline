@@ -4,13 +4,13 @@ import {catalog,applyCatalog} from './texts.js';
 import {freeTellGestures,freeTimelineGestures} from './gestures.js';
 
 const CSP="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.hf.co https://cdn-lfs-eu-1.hf.co https://cas-bridge.xethub.hf.co https://us.aws.cdn.hf.co; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'";
-export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-story-editor-v16'};
+export const htmlHeaders={'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':CSP,'referrer-policy':'no-referrer','x-talera-free-revision':'free-photo-import-v17'};
 let pages;
 function boot(html) {
   html=html.replace('</head>',`<style>${experienceCSS}${quietCSS}${guidedCSS}</style></head>`);
   html=html.replace(/<script(\s[^>]*)?>/g,'<script type="text/talera"$1>');
   html=html.replace('</head>','<link rel="apple-touch-icon" href="/icon-192.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0F2747"><meta name="apple-mobile-web-app-capable" content="yes"></head>');
-  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js?revision=story-editor-v16"></script></body>`);
+  return html.replace('</body>',`<script>window.__taleraTexts=${JSON.stringify(catalog).replace(/</g,'\\u003c')};window.__taleraT=k=>window.__taleraTexts[k]||k;</script><script type="module" src="/local/bridge.js?revision=photo-import-v17"></script></body>`);
 }
 export async function makePages() {
   if(pages)return pages;
@@ -31,6 +31,7 @@ export async function makePages() {
   tell=tell.replace('failed++;','failed++;showNotice(e.message||window.__taleraT("savePhotoError"));');
   tell=tell.replace("if(failed)showNotice(failed===list.length?'Upload niet gelukt · probeer opnieuw':'Niet alle foto’s konden worden bewaard');",'');
   tell=tell.replace(/  async function addFiles\(files\)\{[\s\S]*?\n  async function removePhotoById/, '  async function addFiles(files){mediaUploading++;try{await window.__taleraFreeAddPhotos(files);}finally{mediaUploading=Math.max(0,mediaUploading-1);photoInput.value="";signalMedia();}}\n  async function removePhotoById');
+  tell=tell.replace("photoInput.value='';await addFiles(chosen)","await addFiles(chosen)");
   tell=tell.replace('    setIndex:(index)=>', '    setState:async(next)=>{Object.assign(state,next);title.value=state.title||"";dateInput.value=state.date||"";dateText.textContent=formatDate(state.date);storyText.value=state.storyText||"";await renderPhoto();signalMedia();},\n    setIndex:(index)=>');
   tell=tell.replaceAll('Tik om te vertellen','Tik om je tekst te schrijven').replaceAll('Tik en vertel','Tik en schrijf');
   tell=tell.replaceAll('Vertel verder','Schrijf verder').replaceAll('Kijk naar je foto en vertel wat er gebeurde','Kijk naar je foto en schrijf wat er gebeurde');

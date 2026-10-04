@@ -16,14 +16,14 @@ export async function photoDate(file){
     }if(size<2)break;p+=2+size;}
   }catch{}return '';
 }
-export async function importPhotos(files,{getStory,existingFingerprints,commit,preview,progress}){
+export async function importPhotos(files,{getStory,commit,preview,progress,onDuplicate=async()=>{}}){
   const story=getStory(),list=Array.from(files||[]).filter(file=>file.type.startsWith('image/')||/\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(file.name));
   if(!list.length)throw new Error(t('noPhoto'));
-  const seen=new Set(await existingFingerprints());let done=0,duplicates=0,failed=0,lastError='';
+  const existing=new Map(story.photos.filter(p=>p.fingerprint).map(p=>[p.fingerprint,p]));const seen=new Set(existing.keys());let done=0,duplicates=0,failed=0,lastError='';
   for(const file of list){let url;
     try{
       if(file.size>64*1024*1024)throw new Error(t('photoTooLarge'));
-      const fingerprint=await photoFingerprint(file);if(seen.has(fingerprint)){duplicates++;continue;}
+      const fingerprint=await photoFingerprint(file);if(seen.has(fingerprint)){duplicates++;if(existing.has(fingerprint))await onDuplicate(existing.get(fingerprint));continue;}
       url=URL.createObjectURL(file);preview(url);const media=await compactPhoto(file,crypto.randomUUID());
       const captureDate=await photoDate(file);
       await commit(media,{id:media.id,name:file.name||'foto',type:media.blob.type,createdAt:Date.now(),fingerprint,captureDate});seen.add(fingerprint);done++;

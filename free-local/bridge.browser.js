@@ -48,7 +48,7 @@ window.__taleraFreeApi=async function(path,options={}) {
     }
     if(url.pathname==='/api/storylab-clean/publish'&&method==='POST')return await serialized(async()=>{
       if(!validTime(draft))throw new Error('Kies een datum of een seizoen met jaartal.');
-      if(!draft.storyText.trim()&&!draft.audioId)throw new Error(t('writeFirst'));
+      if(!draft.photos.length&&!draft.storyText.trim()&&!draft.audioId)throw new Error(t('writeFirst'));
       draft=await storage.save({...draft,status:'published',postedAt:draft.postedAt||Date.now()});
       return Response.json({ok:true,handoffUrl:'/#story='+encodeURIComponent(id)});
     });
@@ -71,7 +71,7 @@ if(location.pathname.startsWith('/tell')) {
   for(const script of document.querySelectorAll('script[type="text/talera"]')) {
     const running=document.createElement('script');running.textContent=script.textContent;document.body.appendChild(running);
   }
-  window.__taleraFreeAddPhotos=files=>importPhotos(files,{getStory:()=>draft,existingFingerprints:async()=>(await storage.stories()).flatMap(story=>story.photos.map(photo=>photo.fingerprint).filter(Boolean)),preview:url=>{document.getElementById('bgPhoto').src=url;document.getElementById('screen').classList.add('has-photo');},progress:(done,duplicates,failures,total,error)=>message(error||`${done} / ${total} ${t('photoProgress')}${duplicates?' · '+duplicates+' '+t('photoDuplicate'):''}${failures?' · '+failures+' '+t('photoFailedCount'):''}`),commit:(media,photo)=>serialized(async()=>{
+  window.__taleraFreeAddPhotos=files=>importPhotos(files,{getStory:()=>draft,onDuplicate:photo=>serialized(async()=>{draft=await storage.save({...draft,currentIndex:draft.photos.findIndex(p=>p.id===photo.id)});await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));}),preview:url=>{document.getElementById('bgPhoto').src=url;document.getElementById('screen').classList.add('has-photo');},progress:(done,duplicates,failures,total,error)=>message(error||`${done} / ${total} ${t('photoProgress')}${duplicates?' · '+duplicates+' '+t('photoDuplicate'):''}${failures?' · '+failures+' '+t('photoFailedCount'):''}`),commit:(media,photo)=>serialized(async()=>{
     const next={...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,photos:[...draft.photos,photo],currentIndex:draft.photos.length};
     draft=await storage.commitMedia(next,media);await window.__taleraStoryLabMedia.setState(draft);
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:true}}));
@@ -101,7 +101,7 @@ if(location.pathname.startsWith('/tell')) {
     if(!validTime({...draft,date:document.getElementById('dateInput').value})){
       stop('addDate');document.getElementById('editBtn').click();document.getElementById('editDate').focus();return;
     }
-    if(!document.getElementById('storyText').value.trim()&&!draft.audioId){
+    if(!draft.photos.length&&!document.getElementById('storyText').value.trim()&&!draft.audioId){
       stop('writeFirst');window.__taleraFreeOpenText?.();
     }
   },true);

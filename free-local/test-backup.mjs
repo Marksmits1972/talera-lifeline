@@ -45,3 +45,5 @@ const seasonStory={...(await storage.story('published')),date:'',datePrecision:'
 await storage.save({id:'text-only',title:'Zonder foto',titleSource:'ai',date:'2020-06-10',storyText:'Een verhaal zonder foto.',photos:[],status:'published'});
 const textBackup=await readBackup((await createBackup(storage)).file);const textStory=textBackup.stories.find(s=>s.id==='text-only');assert.equal(textStory.storyText,'Een verhaal zonder foto.');assert.equal(textStory.photos.length,0);assert.equal(textStory.titleSource,'ai');await storage.restore(textBackup);assert.equal((await storage.story('text-only')).status,'published');
 console.log('Published text-only story and title source survive independent backup restore.');
+
+await storage.save({id:'photo-only',title:'Mijn herinnering',date:'2020-06-10',storyText:'',photos:[{id:photo.id}],status:'published'});assert.equal((await readBackup((await createBackup(storage)).file)).stories.find(s=>s.id==='photo-only').photos.length,1);

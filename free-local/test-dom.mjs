@@ -47,12 +47,7 @@ tw.document.getElementById('storyText').value='De tekst blijft hier.';
 tw.document.getElementById('storyText').dispatchEvent(new tw.Event('input'));
 assert.equal(tw.document.getElementById('sheetPreview').textContent,'De tekst blijft hier.');
 tw.document.getElementById('sheetClose').click();
-// A photo-only draft must expose the next step instead of hiding publication.
-assert.ok((await makePages()).tell.includes('.screen.has-photo .talera-publish-timeline{display:flex}'));
-tw.document.getElementById('storyText').value='';
-tw.document.getElementById('timelinePublish').click();
-assert.ok(tw.document.getElementById('sheet').classList.contains('open'));
-assert.equal(tw.document.getElementById('notice').textContent,tw.__copy('writeFirst'));
+// A photo is now sufficient content. Still require a time and never offer unknown date.
 tw.document.getElementById('dateInput').value='';
 tw.document.getElementById('timelinePublish').click();
 assert.ok(tw.document.getElementById('editModal').classList.contains('open'));

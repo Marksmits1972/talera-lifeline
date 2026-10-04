@@ -21,7 +21,7 @@ const bytes=new Uint8Array(100),view=new DataView(bytes.buffer);bytes.set([255,2
 assert.equal(await photoDate(new File([bytes],'exif.jpg',{type:'image/jpeg'})),'2020-06-10');
 const swSource=await readFile(new URL('./sw.browser.js',import.meta.url),'utf8'),listeners={},stored=new Map(),removed=[],outgoing=[];
 const cache={addAll:async paths=>{for(const path of paths)stored.set(path,path);},match:async path=>stored.get(path)};
-vm.runInNewContext(swSource,{URL,self:{location:{origin:'https://local.test'},clients:{claim:async()=>{}},addEventListener:(event,fn)=>listeners[event]=fn},caches:{open:async()=>cache,keys:async()=>['unrelated-app','talera-free-old','talera-free-story-media-v11'],delete:async name=>removed.push(name)},fetch:async request=>{outgoing.push(request);return 'network';}});
+vm.runInNewContext(swSource,{URL,self:{location:{origin:'https://local.test'},clients:{claim:async()=>{}},addEventListener:(event,fn)=>listeners[event]=fn},caches:{open:async()=>cache,keys:async()=>['unrelated-app','talera-free-old','talera-free-story-media-v12'],delete:async name=>removed.push(name)},fetch:async request=>{outgoing.push(request);return 'network';}});
 let pending;listeners.install({waitUntil:p=>pending=p});await pending;assert.ok(stored.has('/tell'));assert.ok(stored.has('/local/recorder.js'));
 listeners.activate({waitUntil:p=>pending=p});await pending;assert.deepEqual(removed,['talera-free-old']);
 listeners.fetch({request:{url:'https://local.test/tell?new=1',method:'GET'},respondWith:p=>pending=p});assert.equal(await pending,'/tell');assert.equal(outgoing.length,0);

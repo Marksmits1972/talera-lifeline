@@ -12,6 +12,7 @@ export async function prepareVideo(file,id){
 export function videoNarration(video,narration,wanted=()=>true){
   let resume=false;const start=()=>{resume=resume||Boolean(narration&&!narration.paused);narration?.pause();};
   const end=()=>{if(resume&&wanted())narration?.play().catch(()=>{});resume=false;};
+  const guard=()=>{if(!video.paused&&!video.ended){resume=true;narration.pause();}};narration?.addEventListener?.('play',guard);
   video.addEventListener('play',start);video.addEventListener('ended',end);
-  return {start,end,cancel:()=>{resume=false;video.pause();},release:()=>{video.pause();end();video.removeEventListener('play',start);video.removeEventListener('ended',end);}};
+  return {start,end,cancel:()=>{resume=false;video.pause();},release:()=>{video.pause();end();video.removeEventListener('play',start);video.removeEventListener('ended',end);narration?.removeEventListener?.('play',guard);}};
 }

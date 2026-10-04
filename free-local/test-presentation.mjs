@@ -7,7 +7,7 @@ assert.ok(validTime(records[0]));assert.equal(validTime({date:''}),false);
 const ordered=timelineStories(records);assert.ok(ordered[0].displayMs<ordered[1].displayMs);assert.equal(timeLabel(records[0]),'zomer 2020');
 assert.throws(()=>seasonTime('onbekend',2020));assert.throws(()=>seasonTime('zomer',0));
 const winter=timelineStories([{id:'winter',eventTime:seasonTime('winter',2020),createdAt:1}])[0];assert.equal(new Date(winter.displayMs).getFullYear(),2020);
-const dom=new JSDOM('<dialog id="freeStorageInfo"><p>Opslag</p></dialog><div id="memoryDate"></div><div class="app"><div id="memoryStoryScroll"></div></div>',{pretendToBeVisual:true});const w=dom.window;let plays=0,pauses=0,current,listener;const images=[];
+const dom=new JSDOM('<dialog id="freeStorageInfo"><p>Opslag</p></dialog><div id="memoryDate"></div><div class="app"><article id="memoryStoryScroll"></article></div>',{pretendToBeVisual:true});const w=dom.window;let plays=0,pauses=0,current,listener;const images=[];
 Object.assign(globalThis,{document:w.document,window:w,innerHeight:800,Audio:class{pause(){pauses++;}removeAttribute(){}async play(){plays++;}},PointerEvent:w.MouseEvent});
 const memories=records.map(s=>({storyId:s.id,fullStory:s.storyText,audioId:s.audioId}));current=memories[0];
 const code=(await readFile(new URL('./presentation.browser.js',import.meta.url),'utf8')).replace("'./video.browser.js'",JSON.stringify(new URL('./video.browser.js',import.meta.url).href)).replace("'./dates.browser.js'",JSON.stringify(new URL('./dates.browser.js',import.meta.url).href));

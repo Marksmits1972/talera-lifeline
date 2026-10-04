@@ -23,7 +23,7 @@ const swSource=await readFile(new URL('./sw.browser.js',import.meta.url),'utf8')
 const cache={addAll:async paths=>{for(const path of paths)stored.set(path,path);},match:async path=>stored.get(path)};
 vm.runInNewContext(swSource,{URL,self:{location:{origin:'https://local.test'},clients:{claim:async()=>{}},addEventListener:(event,fn)=>listeners[event]=fn},caches:{open:async()=>cache,keys:async()=>['unrelated-app','talera-free-old','talera-free-story-media-v13'],delete:async name=>removed.push(name)},fetch:async request=>{outgoing.push(request);return 'network';}});
 let pending;listeners.install({waitUntil:p=>pending=p});await pending;assert.ok(stored.has('/tell'));assert.ok(stored.has('/local/recorder.js'));
-listeners.activate({waitUntil:p=>pending=p});await pending;assert.deepEqual(removed,['talera-free-old']);
+listeners.activate({waitUntil:p=>pending=p});await pending;assert.deepEqual(removed,['talera-free-old','talera-free-story-media-v13']);
 listeners.fetch({request:{url:'https://local.test/tell?new=1',method:'GET'},respondWith:p=>pending=p});assert.equal(await pending,'/tell');assert.equal(outgoing.length,0);
 let intercepted=false;for(const request of [{url:'https://local.test/api/story',method:'POST'},{url:'https://external.test/anything',method:'GET'},{url:'https://local.test/private-story-content',method:'GET'}])listeners.fetch({request,respondWith:()=>intercepted=true});assert.equal(intercepted,false);
 for(const name of ['bridge','recorder','experience','photos','backup','backup-ui','storage','media']){const code=await readFile(new URL('./'+name+'.browser.js',import.meta.url),'utf8');assert.doesNotMatch(code,/\bfetch\s*\(|sendBeacon|XMLHttpRequest|WebSocket/);}

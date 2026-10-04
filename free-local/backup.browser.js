@@ -25,7 +25,8 @@ function normalizeStories(stories,ids,audioIds=new Set()){
     const audioId=s.audioId?identifier(s.audioId):'';if(audioId&&!audioIds.has(audioId))throw invalid();
     if(s.status==='published'&&((!validTime({date,eventTime})&&s.datePrecision!=='unknown')||(!photos.length&&!storyText.trim()&&!audioId)))throw invalid();
     const analysis=s.analysis&&s.analysis.sourceText===storyText?cleanAnalysis(s.analysis,storyText):undefined;
-    return {id,analysis,eventTime,postedAt:numeric(s.postedAt||s.createdAt||0),title:text(s.title||'',1000),titleSource:['ai','suggestion'].includes(s.titleSource)?s.titleSource:'manual',date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(eventTime?'season':s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
+    if(s.timelineOrder!==undefined&&!Number.isFinite(s.timelineOrder))throw invalid();
+    return {id,analysis,eventTime,timelineOrder:s.timelineOrder,postedAt:numeric(s.postedAt||s.createdAt||0),title:text(s.title||'',1000),titleSource:['ai','suggestion'].includes(s.titleSource)?s.titleSource:'manual',date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(eventTime?'season':s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
       createdAt:numeric(s.createdAt||0),updatedAt:numeric(s.updatedAt||0),schemaVersion:1,status:s.status,
       currentIndex:Math.min(Math.max(0,Number.isInteger(s.currentIndex)?s.currentIndex:0),Math.max(0,photos.length-1)),fit:s.fit==='contain'?'contain':'cover',audioId};
   });

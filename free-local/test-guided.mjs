@@ -11,7 +11,7 @@ installGuidedTell({getStory:()=>draft,flush:async()=>{},saveTitle:async(title,cu
 assert.equal(document.getElementById('title').hidden,true);assert.equal(document.querySelector('.date').hidden,true);assert.equal(document.getElementById('timelinePublish').hidden,true);
 document.getElementById('freeSkipPhoto').click();assert.equal(document.getElementById('screen').dataset.freeStep,'story');
 const field=document.getElementById('storyText');field.value='Een wandeling door het bos.';field.dispatchEvent(new window.Event('input'));assert.equal(document.getElementById('freeReview').hidden,false);
-document.getElementById('freeReview').click();await new Promise(r=>setTimeout(r,0));assert.equal(document.getElementById('title').hidden,false);assert.equal(document.getElementById('editTitle').value,'');assert.equal(document.getElementById('freeTitleRetry'),null);
+document.getElementById('freeReview').click();await new Promise(r=>setTimeout(r,0));assert.equal(document.getElementById('freeReview').disabled,true);assert.equal(document.getElementById('editTitle').value,'');assert.equal(document.getElementById('freeTitleRetry'),null);
 const edit=document.getElementById('editTitle');edit.value='Mijn eigen titel';edit.dispatchEvent(new window.Event('input'));resolveTitle({title:'Wandeling door het bos',analysis:{sourceText:field.value}});await new Promise(r=>setTimeout(r,0));assert.equal(edit.value,'Mijn eigen titel');assert.equal(saves,0);
 // A fresh photo alone unlocks review, but does not expose title/date until review.
 draft={photos:[{id:'photo'}],title:'',status:'draft'};field.value='';document.getElementById('screen').dataset.freeStep='photo';

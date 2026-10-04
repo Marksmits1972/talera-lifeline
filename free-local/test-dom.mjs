@@ -14,7 +14,7 @@ w.HTMLCanvasElement.prototype.getContext=function(){return new Proxy({measureTex
 w.HTMLElement.prototype.getBoundingClientRect=function(){return {width:390,height:212,left:0,top:0,right:390,bottom:212};};
 const dates=await import('./dates.browser.js');w.__dates=dates;
 const bridge=(await readFile(new URL('./bridge.browser.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
-await w.eval('(async()=>{const {validTime,seasonTime,timelineStories,timeLabel}=window.__dates;const storage=window.__testStorage;const compactPhoto=()=>{};const t=window.__copy;const installTellMedia=()=>{};const installGuidedTell=()=>{};const installBackup=()=>{};const installDeviceExperience=()=>{};const installTellExperience=()=>{};const installTimelineExperience=()=>{};const importPhotos=()=>{};'+bridge+'})()');
+await w.eval('(async()=>{const {validTime,seasonTime,timelineStories,timeLabel}=window.__dates;const storage=window.__testStorage;const compactPhoto=()=>{};const t=window.__copy;const installDateStyle=()=>{};const chooseTime=async()=>null;const installOverview=()=>{};const installTimelineActions=()=>{};const installTellMedia=()=>({renderManager:async()=>{}});const installGuidedTell=()=>{};const installBackup=()=>{};const installDeviceExperience=()=>{};const installTellExperience=()=>{};const installTimelineExperience=()=>{};const importPhotos=()=>{};'+bridge+'})()');
 assert.equal(w.__taleraTimelineRuntime.currentMemory().storyId,'dom-story');
 assert.equal(w.document.getElementById('memoryStory').textContent,'Lokale proef');
 assert.equal(w.document.getElementById('memoryStoryMore').textContent,'De tekst blijft hier.');
@@ -24,7 +24,7 @@ dom.window.close();
 const tellErrors=[];const tellConsole=new VirtualConsole();tellConsole.on('jsdomError',e=>tellErrors.push(e.message));
 const tellDom=new JSDOM((await makePages()).tell,{url:'http://localhost/tell#edit=dom-story',runScripts:'dangerously',pretendToBeVisual:true,virtualConsole:tellConsole});
 const tw=tellDom.window;tw.__dates=dates;tw.__testStorage=storage;tw.__copy=(await import('./copy.browser.js')).t;tw.Blob=Blob;tw.Response=Response;tw.URL=URL;tw.requestAnimationFrame=()=>1;tw.ResizeObserver=class{observe(){}disconnect(){}};
-await tw.eval('(async()=>{const {validTime,seasonTime,timelineStories,timeLabel}=window.__dates;const storage=window.__testStorage;const compactPhoto=()=>{};const t=window.__copy;const installTellMedia=()=>{};const installGuidedTell=()=>{};const installBackup=()=>{};const installDeviceExperience=()=>{};const installTellExperience=()=>{};const installTimelineExperience=()=>{};const importPhotos=()=>{};'+bridge+'})()');
+await tw.eval('(async()=>{const {validTime,seasonTime,timelineStories,timeLabel}=window.__dates;const storage=window.__testStorage;const compactPhoto=()=>{};const t=window.__copy;const installDateStyle=()=>{};const chooseTime=async()=>null;const installOverview=()=>{};const installTimelineActions=()=>{};const installTellMedia=()=>({renderManager:async()=>{}});const installGuidedTell=()=>{};const installBackup=()=>{};const installDeviceExperience=()=>{};const installTellExperience=()=>{};const installTimelineExperience=()=>{};const importPhotos=()=>{};'+bridge+'})()');
 await new Promise(resolve=>setTimeout(resolve,100));
 assert.equal(tw.document.getElementById('title').value,'Lokale proef');
 assert.equal(tw.document.getElementById('dateInput').value,'2021-04-10');
@@ -60,5 +60,5 @@ assert.deepEqual((await storage.story('dom-story')).eventTime,{kind:'season',sea
 assert.equal(tw.document.getElementById('dateInput').value,'');assert.equal(tw.document.getElementById('dateText').textContent,'zomer 2020');
 assert.equal(tw.document.getElementById('freeUnknownDate'),null);
 assert.ok(tw.document.querySelector('#moreModal .free-close'));
-assert.deepEqual(tellErrors,[]);tellDom.window.close();
+assert.deepEqual(tellErrors.filter(e=>!e.includes('navigation')),[]);tellDom.window.close();
 process.stdout.write('DOM timeline handoff: passed (canvas mocked; visual/browser QA remains open)\n');

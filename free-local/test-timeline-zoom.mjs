@@ -5,6 +5,8 @@ const html=(await makePages()).timeline;
 assert.match(html,/clamp\(pinchStartZoom\+Math\.log\(dist\/pinchStartDist\)\*1\.8,0,3\)/);
 assert.match(html,/clamp\(zoomPos-e\.deltaY\*\.004,0,3\)/);
 assert.match(html,/clamp\(Math\.round\(visualZoomPos\),0,3\)/);
+assert.match(html,/window\.addEventListener\("pointerup",pointerEnd\)/);
+assert.match(html,/lostpointercapture/);
 assert.match(html,/const labelEvery=Math\.max\(2,Math\.ceil\(76/);
 const span=html.match(/function spanForZoom\(z\) \{[\s\S]*?\n\}/)[0];
 const context=vm.createContext({Math,LEVELS:[{spanDays:5478},{spanDays:730},{spanDays:91.31},{spanDays:14},{spanDays:1}],clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),lerp:(a,b,t)=>a+(b-a)*t});

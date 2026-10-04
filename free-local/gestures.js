@@ -21,6 +21,9 @@ export function freeTellGestures(html) {
   return html;
 }
 export function freeTimelineGestures(html) {
+  // End pointer ownership even if Safari ends the drag outside the ruler.
+  html=html.replace('function pointerEnd(e) {','function pointerEnd(e) {\n  if(!pointers.has(e.pointerId))return;')
+    .replace('surface.addEventListener(\"pointercancel\",pointerEnd);','surface.addEventListener(\"pointercancel\",pointerEnd);\nwindow.addEventListener(\"pointerup\",pointerEnd);\nwindow.addEventListener(\"pointercancel\",pointerEnd);\nsurface.addEventListener(\"lostpointercapture\",pointerEnd);');
   // Memories have a calendar date, not an hour. Keep the inherited calendar
   // levels, but never enter the day/hour rulers (levels 4 and 5).
   html=html.replaceAll('z=clamp(z,0,5);','z=clamp(z,0,3);')

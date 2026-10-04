@@ -4,7 +4,7 @@ import vm from 'node:vm';
 const moduleSource=await readFile(new URL('./photos.browser.js',import.meta.url),'utf8');
 let concurrent=0,maxConcurrent=0;
 globalThis.__testCompact=async(file,id)=>{concurrent++;maxConcurrent=Math.max(maxConcurrent,concurrent);await new Promise(resolve=>setTimeout(resolve,1));concurrent--;if(file.name==='broken.jpg')throw Error('bad image');return {id,blob:file,thumbnail:file};};
-const source=moduleSource.replace("import {compactPhoto} from './media.js';",'const compactPhoto=globalThis.__testCompact;').replace("'./copy.browser.js'",JSON.stringify(new URL('./copy.browser.js',import.meta.url).href));
+const source=moduleSource.replace("'./video.js'",JSON.stringify(new URL('./video.browser.js',import.meta.url).href)).replace("import {compactPhoto} from './media.js';",'const compactPhoto=globalThis.__testCompact;').replace("'./copy.browser.js'",JSON.stringify(new URL('./copy.browser.js',import.meta.url).href));
 const {importPhotos,photoDate,photoFingerprint}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const one=new File(['one'],'one.jpg',{type:'image/jpeg'}),same=new File(['one'],'same.jpg',{type:'image/jpeg'}),two=new File(['two'],'two.jpg',{type:'image/jpeg'}),broken=new File(['bad'],'broken.jpg',{type:'image/jpeg'});
 const committed=[],progress=[];
@@ -21,7 +21,7 @@ const bytes=new Uint8Array(100),view=new DataView(bytes.buffer);bytes.set([255,2
 assert.equal(await photoDate(new File([bytes],'exif.jpg',{type:'image/jpeg'})),'2020-06-10');
 const swSource=await readFile(new URL('./sw.browser.js',import.meta.url),'utf8'),listeners={},stored=new Map(),removed=[],outgoing=[];
 const cache={addAll:async paths=>{for(const path of paths)stored.set(path,path);},match:async path=>stored.get(path)};
-vm.runInNewContext(swSource,{URL,self:{location:{origin:'https://local.test'},clients:{claim:async()=>{}},addEventListener:(event,fn)=>listeners[event]=fn},caches:{open:async()=>cache,keys:async()=>['unrelated-app','talera-free-old','talera-free-guided-reader-v10'],delete:async name=>removed.push(name)},fetch:async request=>{outgoing.push(request);return 'network';}});
+vm.runInNewContext(swSource,{URL,self:{location:{origin:'https://local.test'},clients:{claim:async()=>{}},addEventListener:(event,fn)=>listeners[event]=fn},caches:{open:async()=>cache,keys:async()=>['unrelated-app','talera-free-old','talera-free-story-media-v11'],delete:async name=>removed.push(name)},fetch:async request=>{outgoing.push(request);return 'network';}});
 let pending;listeners.install({waitUntil:p=>pending=p});await pending;assert.ok(stored.has('/tell'));assert.ok(stored.has('/local/recorder.js'));
 listeners.activate({waitUntil:p=>pending=p});await pending;assert.deepEqual(removed,['talera-free-old']);
 listeners.fetch({request:{url:'https://local.test/tell?new=1',method:'GET'},respondWith:p=>pending=p});assert.equal(await pending,'/tell');assert.equal(outgoing.length,0);

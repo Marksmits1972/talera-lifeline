@@ -4,6 +4,7 @@ import {t} from '/local/copy.browser.js';
 import {importPhotos} from '/local/photos.js';
 import {installTellExperience,installTimelineExperience,installDeviceExperience} from '/local/experience.js';
 import {validTime,seasonTime,timelineStories,timeLabel} from '/local/dates.js';
+import {installTellMedia} from '/local/tell-media.js';
 import {installGuidedTell} from '/local/guided.js';
 import {installBackup} from '/local/backup-ui.js';
 const params=new URLSearchParams(location.hash.slice(1));
@@ -30,6 +31,7 @@ window.__taleraFreeApi=async function(path,options={}) {
         const eventTime=date?undefined:(draft.eventTime||input.eventTime);
         const next={...draft,...input,title:document.getElementById('title')?.value??input.title,titleSource:(document.getElementById('title')?.value??input.title)!==draft.title?'manual':draft.titleSource,storyText:document.getElementById('storyText')?.value??input.storyText,date,eventTime,id,datePrecision:date?(input.datePrecision==='year'?'year':'day'):(eventTime?.kind==='season'?'season':'unset'),status:draft.status};
         // UI metadata is not allowed to overwrite stored blob properties.
+        if(next.storyText!==draft.storyText)delete next.analysis;
         draft=await storage.save(next);
         window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
         return Response.json(draft);
@@ -42,7 +44,7 @@ window.__taleraFreeApi=async function(path,options={}) {
         await storage.putMedia(compact);
         return Response.json({ok:true,bytes:compact.blob.size,thumbnailBytes:compact.thumbnail.size});
       });
-      if(method==='GET') {const media=await storage.media(mediaId);return media?new Response(media.blob):new Response('',{status:404});}
+      if(method==='GET') {const media=await storage.media(mediaId);return media?new Response(media.kind==='video'?media.thumbnail:media.blob):new Response('',{status:404});}
       // The inherited UI removes the reference next; commit that before deleting bytes.
       if(method==='DELETE')return Response.json({ok:true});
     }
@@ -80,7 +82,8 @@ if(location.pathname.startsWith('/tell')) {
     draft=await storage.commitMedia({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,audioId:audio.id},audio);const latestText=document.getElementById('storyText').value;if(draft.storyText!==latestText)draft=await storage.save({...draft,storyText:latestText});draft={...draft,storyText:document.getElementById('storyText').value};await window.__taleraStoryLabMedia.setState(draft);
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
   }});
-  installGuidedTell({getStory:()=>draft,flush:flushDraft,notice:message,saveTitle:(title,current,titleSource='ai')=>serialized(async()=>{if(!current())return false;draft=await storage.save({...draft,title,titleSource});return current();})});
+  installTellMedia({getStory:()=>draft,storage,notice:message,remove:id=>serialized(async()=>{const photos=draft.photos.filter(p=>p.id!==id);draft=await storage.save({...draft,title:document.getElementById('title').value,storyText:document.getElementById('storyText').value,photos,currentIndex:Math.min(draft.currentIndex||0,Math.max(0,photos.length-1))});await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));})});
+  installGuidedTell({getStory:()=>draft,flush:flushDraft,notice:message,saveAnalysis:(analysis,current)=>serialized(async()=>{if(!current())return false;draft=await storage.save({...draft,analysis});return current();}),saveTitle:(title,current,titleSource='ai')=>serialized(async()=>{if(!current())return false;draft=await storage.save({...draft,title,titleSource});return current();})});
   setTimeout(()=>window.dispatchEvent(new Event('talera-guided-ready')),250);
   const timeKind=document.getElementById('freeTimeKind'),seasonFields=document.getElementById('freeSeasonFields');
   const syncTime=()=>{seasonFields.hidden=timeKind.value!=='season';document.getElementById('editDate').hidden=timeKind.value==='season';};

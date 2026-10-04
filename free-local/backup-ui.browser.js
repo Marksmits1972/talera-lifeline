@@ -47,7 +47,7 @@ export function installBackup({storage,beforeExport,exclusive}){
     }catch(error){busy=false;status.textContent=t(error.name==='AbortError'?'backupCancelled':'backupShareFailed');buttons([['backupSave',save],['backupDownload',download,true],['backupClose',close,true]]);}
   }
   function showPrepared(){
-    description.textContent=t('backupReady');status.textContent='';detail.textContent=prepared.file.name+' · '+prepared.storyCount+' herinneringen · '+prepared.photoCount+' foto’s · '+(prepared.audioCount||0)+' opnames · '+(prepared.file.size/1024/1024).toFixed(1)+' MB';
+    description.textContent=t('backupReady');status.textContent='';detail.textContent=prepared.file.name+' · '+prepared.storyCount+' herinneringen · '+prepared.photoCount+' foto’s · '+(prepared.videoCount||0)+' video’s · '+(prepared.audioCount||0)+' opnames · '+(prepared.file.size/1024/1024).toFixed(1)+' MB';
     let share=false;try{share=Boolean(navigator.share&&navigator.canShare?.({files:[prepared.file]}));}catch{}
     steps.replaceChildren();steps.hidden=!(isIOS&&share);
     if(isIOS&&share){description.textContent=t('backupIOSReady');for(const key of ['backupIOSStep1','backupIOSStep2','backupIOSStep3']){const item=document.createElement('li');item.textContent=t(key);steps.append(item);}}

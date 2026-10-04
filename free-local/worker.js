@@ -1,3 +1,6 @@
+import video from './video.browser.js';
+import tellMedia from './tell-media.browser.js';
+import analysis from './analysis.browser.js';
 import guided from './guided.browser.js';
 import title from './title.browser.js';
 import titleWorker from './title-worker.browser.js';
@@ -23,7 +26,7 @@ import copy from './copy.browser.js';
 import backup from './backup.browser.js';
 import backupUi from './backup-ui.browser.js';
 import {nl} from './catalog.js';
-const assets={'/local/guided.js':guided,'/local/title.js':title,'/local/title-worker.js':titleWorker,'/local/dates.js':dates,'/local/dates.browser.js':dates,'/local/presentation.browser.js':presentation,'/local/speech.browser.js':speech,'/local/presentation.js':presentation,'/local/speech.js':speech,'/local/speech-worker.js':speech_worker,'/local/speech-worklet.js':speech_worklet,'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/experience.js':experience,'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
+const assets={'/local/video.js':video,'/local/video.browser.js':video,'/local/tell-media.js':tellMedia,'/local/analysis.js':analysis,'/local/analysis.browser.js':analysis,'/local/guided.js':guided,'/local/title.js':title,'/local/title-worker.js':titleWorker,'/local/dates.js':dates,'/local/dates.browser.js':dates,'/local/presentation.browser.js':presentation,'/local/speech.browser.js':speech,'/local/presentation.js':presentation,'/local/speech.js':speech,'/local/speech-worker.js':speech_worker,'/local/speech-worklet.js':speech_worklet,'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/experience.js':experience,'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
 export default {async fetch(request){
   const url=new URL(request.url);
   if(!['GET','HEAD'].includes(request.method))return new Response('Local prototype: no server writes',{status:405});

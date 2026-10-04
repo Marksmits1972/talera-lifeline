@@ -41,7 +41,7 @@ export async function compactPhoto(file,id) {
 export async function compactCollection(storage){
   const snapshot=await storage.snapshot(),replacements=[];let before=0,after=0;
   for(const item of snapshot.media){
-    if(item.kind==='audio')continue;
+    if(item.kind==='audio'||item.kind==='video')continue;
     const oldSize=item.blob.size+item.thumbnail.size;before+=oldSize;
     if(item.width<=mediaConfig.maxSide&&item.height<=mediaConfig.maxSide&&item.blob.size<=mediaConfig.maxBytes&&item.thumbnail.size<=mediaConfig.thumbnailMaxBytes){after+=oldSize;continue;}
     const compact=await compactPhoto(item.blob,item.id),newSize=compact.blob.size+compact.thumbnail.size;

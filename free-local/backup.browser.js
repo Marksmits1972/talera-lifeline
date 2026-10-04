@@ -1,3 +1,4 @@
+import {cleanAnalysis} from './analysis.browser.js';
 import {validTime,seasonTime} from './dates.browser.js';
 import {t} from './copy.browser.js';
 const MAGIC=new TextEncoder().encode('TALERA1\n');
@@ -17,13 +18,14 @@ function normalizeStories(stories,ids,audioIds=new Set()){
     if(date&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date))throw invalid();
     const photos=s.photos.map(p=>{
       if(!ids.has(p.id))throw invalid();
-      return {id:identifier(p.id),name:text(p.name||'foto',1000),type:text(p.type||'image/jpeg',100),createdAt:numeric(p.createdAt||0),fingerprint:text(p.fingerprint||'',64),captureDate:text(p.captureDate||'',10)};
+      return {id:identifier(p.id),kind:p.kind==='video'?'video':'photo',duration:numeric(p.duration||0),name:text(p.name||'foto',1000),type:text(p.type||'image/jpeg',100),createdAt:numeric(p.createdAt||0),fingerprint:text(p.fingerprint||'',64),captureDate:text(p.captureDate||'',10)};
     });
     const eventTime=s.eventTime?.kind==='season'?seasonTime(s.eventTime.season,s.eventTime.year):undefined;
     const storyText=text(s.storyText||'');
     const audioId=s.audioId?identifier(s.audioId):'';if(audioId&&!audioIds.has(audioId))throw invalid();
     if(s.status==='published'&&((!validTime({date,eventTime})&&s.datePrecision!=='unknown')||(!photos.length&&!storyText.trim()&&!audioId)))throw invalid();
-    return {id,eventTime,postedAt:numeric(s.postedAt||s.createdAt||0),title:text(s.title||'',1000),titleSource:['ai','suggestion'].includes(s.titleSource)?s.titleSource:'manual',date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(eventTime?'season':s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
+    const analysis=s.analysis&&s.analysis.sourceText===storyText?cleanAnalysis(s.analysis,storyText):undefined;
+    return {id,analysis,eventTime,postedAt:numeric(s.postedAt||s.createdAt||0),title:text(s.title||'',1000),titleSource:['ai','suggestion'].includes(s.titleSource)?s.titleSource:'manual',date,datePrecision:date?(s.datePrecision==='year'?'year':'day'):(eventTime?'season':s.datePrecision==='unset'?'unset':'unknown'),storyText,note:text(s.note||''),photos,
       createdAt:numeric(s.createdAt||0),updatedAt:numeric(s.updatedAt||0),schemaVersion:1,status:s.status,
       currentIndex:Math.min(Math.max(0,Number.isInteger(s.currentIndex)?s.currentIndex:0),Math.max(0,photos.length-1)),fit:s.fit==='contain'?'contain':'cover',audioId};
   });
@@ -38,7 +40,7 @@ export async function createBackup(storage){
   const stories=normalizeStories(snapshot.stories,photoIds,audioIds),parts=[],media=[];
   let bytes=0;
   for(const item of snapshot.media){
-    const entry={kind:item.kind==='audio'?'audio':'photo',duration:item.duration||0,incomplete:Boolean(item.incomplete),id:item.id,width:item.width||0,height:item.height||0,sourceBytes:item.sourceBytes||0,createdAt:item.createdAt||0};
+    const entry={kind:item.kind==='audio'?'audio':item.kind==='video'?'video':'photo',duration:item.duration||0,incomplete:Boolean(item.incomplete),id:item.id,width:item.width||0,height:item.height||0,sourceBytes:item.sourceBytes||0,createdAt:item.createdAt||0};
     for(const key of item.kind==='audio'?['blob']:['blob','thumbnail']){
       const blob=item[key];if(!(blob instanceof Blob)||!blob.size)throw invalid();
       bytes+=blob.size;if(bytes>backupLimits.bytes)throw new Error(t('backupTooLarge'));
@@ -47,11 +49,11 @@ export async function createBackup(storage){
     media.push(entry);
   }
   const createdAt=new Date().toISOString();
-  const header=new TextEncoder().encode(JSON.stringify({format:'TALERA Free',version:2,createdAt,stories,media}));
+  const header=new TextEncoder().encode(JSON.stringify({format:'TALERA Free',version:3,createdAt,stories,media}));
   if(header.length>backupLimits.header||bytes+12+header.length>backupLimits.bytes)throw new Error(t('backupTooLarge'));
   const length=new Uint8Array(4);new DataView(length.buffer).setUint32(0,header.length);
   const file=new File([MAGIC,length,header,...parts],'TALERA-reservekopie-'+createdAt.replace(/[:.]/g,'-')+'.talera',{type:'application/octet-stream'});
-  return {file,createdAt,storyCount:stories.length,photoCount:photoIds.size,audioCount:audioIds.size};
+  return {file,createdAt,storyCount:stories.length,photoCount:snapshot.media.filter(m=>m.kind!=='audio'&&m.kind!=='video').length,videoCount:snapshot.media.filter(m=>m.kind==='video').length,audioCount:audioIds.size};
 }
 export async function readBackup(file){
   if(!file||file.size<12||file.size>backupLimits.bytes)throw new Error(file?.size>backupLimits.bytes?t('backupTooLarge'):t('backupInvalid'));
@@ -60,17 +62,17 @@ export async function readBackup(file){
   const size=new DataView(prefix.buffer).getUint32(8);
   if(!size||size>backupLimits.header||12+size>file.size)throw invalid();
   let manifest;try{manifest=JSON.parse(await file.slice(12,12+size).text());}catch{throw invalid();}
-  if(manifest.format!=='TALERA Free'||![1,2].includes(manifest.version))throw new Error(t('backupUnsupported'));
+  if(manifest.format!=='TALERA Free'||![1,2,3].includes(manifest.version))throw new Error(t('backupUnsupported'));
   if(!Array.isArray(manifest.media)||manifest.media.length>backupLimits.items||!Number.isFinite(Date.parse(manifest.createdAt)))throw invalid();
   let offset=12+size;const media=[],ids=new Set(),photoIds=new Set(),audioIds=new Set();
   for(const item of manifest.media){
     const id=identifier(item.id);if(ids.has(id))throw invalid();ids.add(id);
-    if(manifest.version===1&&item.kind==='audio')throw invalid();
+    if(!['photo','audio','video',undefined].includes(item.kind)||manifest.version<3&&item.kind==='video'||manifest.version===1&&item.kind==='audio')throw invalid();
     (item.kind==='audio'?audioIds:photoIds).add(id);
-    const result={kind:item.kind==='audio'?'audio':'photo',duration:numeric(item.duration||0),incomplete:Boolean(item.incomplete),id,width:numeric(item.width),height:numeric(item.height),sourceBytes:numeric(item.sourceBytes),createdAt:numeric(item.createdAt)};
+    const result={kind:item.kind==='audio'?'audio':item.kind==='video'?'video':'photo',duration:numeric(item.duration||0),incomplete:Boolean(item.incomplete),id,width:numeric(item.width),height:numeric(item.height),sourceBytes:numeric(item.sourceBytes),createdAt:numeric(item.createdAt)};
     for(const key of item.kind==='audio'?['blob']:['blob','thumbnail']){
       const desc=item[key];
-      if(!desc||!Number.isSafeInteger(desc.size)||desc.size<=0||offset+desc.size>file.size||!(item.kind==='audio'?/^audio\/(mp4|webm|ogg|mpeg|wav|aac)(;[^\r\n]*)?$/:/^image\/(jpeg|png|webp|gif|avif)$/).test(desc.type)||!/^[a-f0-9]{64}$/.test(desc.sha256))throw invalid();
+      if(!desc||!Number.isSafeInteger(desc.size)||desc.size<=0||offset+desc.size>file.size||!(item.kind==='audio'?/^audio\/(mp4|webm|ogg|mpeg|wav|aac)(;[^\r\n]*)?$/:item.kind==='video'&&key==='blob'?/^video\/(mp4|webm|quicktime|ogg)(;[^\r\n]*)?$/:/^image\/(jpeg|png|webp|gif|avif)$/).test(desc.type)||!/^[a-f0-9]{64}$/.test(desc.sha256))throw invalid();
       const blob=file.slice(offset,offset+desc.size,desc.type);offset+=desc.size;
       if(await hash(blob)!==desc.sha256)throw invalid();result[key]=blob;
     }

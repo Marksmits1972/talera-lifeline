@@ -1,3 +1,4 @@
+import {prepareVideo} from './video.js';
 import {compactPhoto} from './media.js';
 import {t} from './copy.browser.js';
 
@@ -17,16 +18,18 @@ export async function photoDate(file){
   }catch{}return '';
 }
 export async function importPhotos(files,{getStory,commit,preview,progress,onDuplicate=async()=>{}}){
-  const story=getStory(),list=Array.from(files||[]).filter(file=>file.type.startsWith('image/')||/\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(file.name));
+  const story=getStory(),list=Array.from(files||[]).filter(file=>file.type.startsWith('image/')||file.type.startsWith('video/')||/\.(mp4|mov|webm|m4v)$/i.test(file.name)||/\.(heic|heif|jpe?g|png|webp|gif|avif)$/i.test(file.name));
   if(!list.length)throw new Error(t('noPhoto'));
   const existing=new Map(story.photos.filter(p=>p.fingerprint).map(p=>[p.fingerprint,p]));const seen=new Set(existing.keys());let done=0,duplicates=0,failed=0,lastError='';
   for(const file of list){let url;
     try{
       if(file.size>64*1024*1024)throw new Error(t('photoTooLarge'));
       const fingerprint=await photoFingerprint(file);if(seen.has(fingerprint)){duplicates++;if(existing.has(fingerprint))await onDuplicate(existing.get(fingerprint));continue;}
-      url=URL.createObjectURL(file);preview(url);const media=await compactPhoto(file,crypto.randomUUID());
+      const isVideo=file.type.startsWith('video/')||/\.(mp4|mov|webm|m4v)$/i.test(file.name);
+      if(!isVideo){url=URL.createObjectURL(file);preview(url);}
+      const media=await (isVideo?prepareVideo:compactPhoto)(file,crypto.randomUUID());
       const captureDate=await photoDate(file);
-      await commit(media,{id:media.id,name:file.name||'foto',type:media.blob.type,createdAt:Date.now(),fingerprint,captureDate});seen.add(fingerprint);done++;
+      await commit(media,{id:media.id,kind:media.kind||'photo',duration:media.duration||0,name:file.name||'foto',type:media.blob.type,createdAt:Date.now(),fingerprint,captureDate});seen.add(fingerprint);done++;
     }catch(error){failed++;lastError=error.name==='QuotaExceededError'?t('storageFull'):error.message;}
     finally{if(url)URL.revokeObjectURL(url);progress(done,duplicates,failed,list.length,lastError);}
   }

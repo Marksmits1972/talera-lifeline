@@ -1,12 +1,12 @@
 import {prepareVideo} from './video.js';
-import {compactPhoto} from './media.js';
+import {compactPhoto,mediaTimeout} from './media.js';
 import {t} from './copy.browser.js';
 
-export async function photoFingerprint(file){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');}
+export async function photoFingerprint(file){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await mediaTimeout(file.arrayBuffer(),'Dit bestand kon niet worden gelezen. Download het eerst in Foto’s en probeer opnieuw.'))),b=>b.toString(16).padStart(2,'0')).join('');}
 // Only EXIF DateTimeOriginal counts as a camera date; file.lastModified never does.
 export async function photoDate(file){
   try{
-    const bytes=new Uint8Array(await file.slice(0,256*1024).arrayBuffer()),view=new DataView(bytes.buffer);
+    const bytes=new Uint8Array(await mediaTimeout(file.slice(0,256*1024).arrayBuffer(),'Fotodatum lezen duurde te lang.',5000)),view=new DataView(bytes.buffer);
     for(let p=2;p+10<bytes.length;){if(bytes[p]!==255)break;const marker=bytes[p+1],size=view.getUint16(p+2);if(marker===225&&String.fromCharCode(...bytes.slice(p+4,p+10))==='Exif\0\0'){
       const base=p+10,little=view.getUint16(base)===0x4949;
       const read16=o=>view.getUint16(base+o,little),read32=o=>view.getUint32(base+o,little);
@@ -22,6 +22,7 @@ export async function importPhotos(files,{getStory,commit,preview,progress,onDup
   if(!list.length)throw new Error(t('noPhoto'));
   const existing=new Map(story.photos.filter(p=>p.fingerprint).map(p=>[p.fingerprint,p]));const seen=new Set(existing.keys());let done=0,duplicates=0,failed=0,lastError='';
   for(const file of list){let url;
+    progress(done,duplicates,failed,list.length,`Bezig met ${file.name||'je bestand'}…`);
     try{
       if(file.size>64*1024*1024)throw new Error(t('photoTooLarge'));
       const fingerprint=await photoFingerprint(file);if(seen.has(fingerprint)){duplicates++;if(existing.has(fingerprint))await onDuplicate(existing.get(fingerprint));continue;}
@@ -30,7 +31,7 @@ export async function importPhotos(files,{getStory,commit,preview,progress,onDup
       const media=await (isVideo?prepareVideo:compactPhoto)(file,crypto.randomUUID());
       const captureDate=await photoDate(file);
       await commit(media,{id:media.id,kind:media.kind||'photo',duration:media.duration||0,name:file.name||'foto',type:media.blob.type,createdAt:Date.now(),fingerprint,captureDate});seen.add(fingerprint);done++;
-    }catch(error){failed++;lastError=error.name==='QuotaExceededError'?t('storageFull'):error.message;}
+    }catch(error){failed++;lastError=error.name==='QuotaExceededError'?t('storageFull'):`${file.name||'Dit bestand'}: ${error.message}`;}
     finally{if(url)URL.revokeObjectURL(url);progress(done,duplicates,failed,list.length,lastError);}
   }
   return {done,duplicates,failed};

@@ -4,12 +4,13 @@ import vm from 'node:vm';
 const moduleSource=await readFile(new URL('./photos.browser.js',import.meta.url),'utf8');
 let concurrent=0,maxConcurrent=0;
 globalThis.__testCompact=async(file,id)=>{concurrent++;maxConcurrent=Math.max(maxConcurrent,concurrent);await new Promise(resolve=>setTimeout(resolve,1));concurrent--;if(file.name==='broken.jpg')throw Error('bad image');return {id,blob:file,thumbnail:file};};
-const source=moduleSource.replace("'./video.js'",JSON.stringify(new URL('./video.browser.js',import.meta.url).href)).replace("import {compactPhoto} from './media.js';",'const compactPhoto=globalThis.__testCompact;').replace("'./copy.browser.js'",JSON.stringify(new URL('./copy.browser.js',import.meta.url).href));
+globalThis.__testTimeout=(await import('./media.browser.js')).mediaTimeout;
+const source=moduleSource.replace("'./video.js'",JSON.stringify(new URL('./video.browser.js',import.meta.url).href)).replace("import {compactPhoto,mediaTimeout} from './media.js';",'const compactPhoto=globalThis.__testCompact;const mediaTimeout=globalThis.__testTimeout;').replace("'./copy.browser.js'",JSON.stringify(new URL('./copy.browser.js',import.meta.url).href));
 const {importPhotos,photoDate,photoFingerprint}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const one=new File(['one'],'one.jpg',{type:'image/jpeg'}),same=new File(['one'],'same.jpg',{type:'image/jpeg'}),two=new File(['two'],'two.jpg',{type:'image/jpeg'}),broken=new File(['bad'],'broken.jpg',{type:'image/jpeg'});
 const committed=[],progress=[];
 const result=await importPhotos([one,same,broken,two],{getStory:()=>({photos:[]}),existingFingerprints:async()=>[],commit:async(item,photo)=>committed.push(photo),preview:()=>{},progress:(...values)=>progress.push(values)});
-assert.equal(maxConcurrent,1);assert.equal(result.done,2);assert.equal(result.duplicates,1);assert.equal(result.failed,1);assert.equal(committed.length,2);assert.ok(progress.some(values=>values[4]==='bad image'));
+assert.equal(maxConcurrent,1);assert.equal(result.done,2);assert.equal(result.duplicates,1);assert.equal(result.failed,1);assert.equal(committed.length,2);assert.ok(progress.some(values=>values[4].endsWith('bad image')));
 // The same original may be selected for a different memory. Collection-wide fingerprints must not hide it.
 const fingerprint=await photoFingerprint(one);let reused;
 const another=await importPhotos([one],{getStory:()=>({photos:[]}),existingFingerprints:async()=>[fingerprint],commit:async()=>{},preview:()=>{},progress:()=>{}});assert.equal(another.done,1);assert.equal(another.duplicates,0);

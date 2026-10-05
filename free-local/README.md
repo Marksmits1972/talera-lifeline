@@ -1,3 +1,9 @@
+## Gemengde foto- en videoselectie (v27)
+
+Video decoder is attached to the document and explicitly loaded. Metadata seeks a first frame; loadeddata, canplay or seeked can complete preparation. Failed decoders clear listeners and release the element and URL. File reads, photo decoding and canvas encoding have bounded waits. Progress names the current file; per-file failures preserve the remaining selection.
+
+Regression covers a decoder that never emits loadeddata, cleanup on unsupported video, bounded waits and an invalid photo followed by a valid photo. Real iPhone HEIC/iCloud selection remains device acceptance.
+
 ## Foto’s vooraf klaarzetten (v26)
 
 De presentatie gebruikt de al geladen verhaalmetadata en een gedeelde fotocache van maximaal twaalf foto’s. De eerste foto van het vorige en volgende verhaal en de volgende foto binnen het huidige verhaal worden vooraf opgehaald en gedecodeerd. Gelijktijdige aanvragen voor dezelfde foto delen één leesactie. Iedere tik wijzigt de gewenste foto direct, ook tijdens het laden. Verouderde laadresultaten mogen de huidige keuze niet overschrijven. De actieve foto blijft behouden bij het opruimen van de cache; tijdelijke URL’s worden vrijgegeven bij definitief sluiten. Terugkeren via de browsergeschiedenis behoudt de cache.

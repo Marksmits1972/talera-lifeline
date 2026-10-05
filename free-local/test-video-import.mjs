@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {prepareVideo} from './video.browser.js';
+import {mediaTimeout} from './media.browser.js';
+let attached=false,removed=false,mode='seek',video;
+globalThis.document={body:{append(v){attached=true;}},createElement(tag){if(tag==='canvas')return {getContext:()=>({drawImage(){}}),toBlob:fn=>fn(new Blob(['poster'],{type:'image/jpeg'}))};video={style:{},readyState:0,videoWidth:640,videoHeight:360,duration:4,setAttribute(){},removeAttribute(){},pause(){},remove(){removed=true;},load(){if(!this.src)return;queueMicrotask(()=>{if(mode==='error')this.onerror?.();else this.onloadedmetadata?.();});},set currentTime(value){this.readyState=2;queueMicrotask(()=>this.onseeked?.());}};return video;}};
+const file=new Blob(['video'],{type:'video/mp4'});
+const media=await prepareVideo(file,'video');assert.ok(attached&&removed);assert.equal(media.kind,'video');assert.equal(media.duration,4);assert.ok(media.thumbnail.size);assert.equal(video.onseeked,null);
+mode='error';removed=false;await assert.rejects(prepareVideo(file,'bad'),/niet ondersteund/);assert.ok(removed);assert.equal(video.onerror,null);
+await assert.rejects(mediaTimeout(new Promise(()=>{}),'timeout',5),/timeout/);
+console.log('Video import: attached iOS decoder, metadata/seek without loadeddata, error cleanup and bounded waits passed.');

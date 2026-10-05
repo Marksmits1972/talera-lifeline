@@ -27,12 +27,13 @@ import experience from './experience.browser.js';
 import {makePages,htmlHeaders} from './pages.js';
 import storage from './storage.browser.js';
 import media from './media.browser.js';
+import draft from './draft.browser.js';
 import bridge from './bridge.browser.js';
 import copy from './copy.browser.js';
 import backup from './backup.browser.js';
 import backupUi from './backup-ui.browser.js';
 import {nl} from './catalog.js';
-const assets={'/local/bulk.js':bulk,'/local/organizer.js':organizer,'/local/story-editor.js':storyEditor,'/local/date-picker.js':datePicker,'/local/overview.js':overview,'/local/timeline-actions.js':timelineActions,'/local/video.js':video,'/local/video.browser.js':video,'/local/tell-media.js':tellMedia,'/local/analysis.js':analysis,'/local/analysis.browser.js':analysis,'/local/guided.js':guided,'/local/title.js':title,'/local/title-worker.js':titleWorker,'/local/dates.js':dates,'/local/dates.browser.js':dates,'/local/presentation.browser.js':presentation,'/local/speech.browser.js':speech,'/local/presentation.js':presentation,'/local/speech.js':speech,'/local/speech-worker.js':speech_worker,'/local/speech-worklet.js':speech_worklet,'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/experience.js':experience,'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
+const assets={'/local/draft.js':draft,'/local/bulk.js':bulk,'/local/organizer.js':organizer,'/local/story-editor.js':storyEditor,'/local/date-picker.js':datePicker,'/local/overview.js':overview,'/local/timeline-actions.js':timelineActions,'/local/video.js':video,'/local/video.browser.js':video,'/local/tell-media.js':tellMedia,'/local/analysis.js':analysis,'/local/analysis.browser.js':analysis,'/local/guided.js':guided,'/local/title.js':title,'/local/title-worker.js':titleWorker,'/local/dates.js':dates,'/local/dates.browser.js':dates,'/local/presentation.browser.js':presentation,'/local/speech.browser.js':speech,'/local/presentation.js':presentation,'/local/speech.js':speech,'/local/speech-worker.js':speech_worker,'/local/speech-worklet.js':speech_worklet,'/local/recorder.js':recorder,'/local/photos.js':photos,'/local/experience.js':experience,'/local/backup.js':backup,'/local/backup-ui.js':backupUi,'/local/catalog.js':`export const nl=${JSON.stringify(nl)};`,'/local/storage.js':storage,'/local/media.js':media,'/local/bridge.js':bridge,'/local/copy.browser.js':copy};
 export default {async fetch(request){
   const url=new URL(request.url);
   if(!['GET','HEAD'].includes(request.method))return new Response('Local prototype: no server writes',{status:405});

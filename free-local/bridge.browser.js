@@ -1,3 +1,4 @@
+import {createDraft} from '/local/draft.js';
 import {chooseTime,installDateStyle} from '/local/date-picker.js';
 import {installOverview} from '/local/overview.js';
 import {installBulkImport} from '/local/bulk.js';
@@ -16,12 +17,20 @@ const params=new URLSearchParams(location.hash.slice(1));
 let id=params.get('edit')||localStorage.getItem('talera.free.draft')||crypto.randomUUID();
 if(new URLSearchParams(location.search).get('new')==='1'){id=crypto.randomUUID();history.replaceState(null,'',location.pathname+location.hash);}
 localStorage.setItem('talera.free.draft',id);
+// Read-only projection of the central concept for the compatibility adapter.
 let draft={id,title:'',date:initialDate&&validTime({date:initialDate})&&initialDate<=new Date().toISOString().slice(0,10)?initialDate:'',datePrecision:initialDate?'day':'unset',storyText:'',photos:[],createdAt:Date.now(),status:'draft'};
+const concept=createDraft(draft,value=>{draft=value;});
+async function persistDraft(next,media){return concept.save((snapshot,first)=>media&&first?storage.commitMedia(snapshot,media):storage.save(snapshot),next,media?['photos','audioId']:[]);}
+function captureFields(){
+  const title=document.getElementById('title'),date=document.getElementById('dateInput'),text=document.getElementById('storyText');
+  if(!title||!date||!text)return;
+  concept.patch({title:title.value,titleSource:title.value!==draft.title?'manual':draft.titleSource,storyText:text.value,date:date.value,eventTime:date.value?undefined:draft.eventTime,datePrecision:date.value?(draft.datePrecision==='year'?'year':'day'):(draft.eventTime?.kind==='season'?'season':'unset')});
+}
 let queue=Promise.resolve();
 let failed=false;
 function message(text) {const el=document.getElementById('notice');if(el){el.textContent=text;el.classList.add('show');clearTimeout(el.__freeNoticeTimer);el.__freeNoticeTimer=setTimeout(()=>el.classList.remove('show'),4500);}}
 function serialized(action){const next=queue.then(action);queue=next.catch(()=>{});return next;}
-const ready=storage.story(id).then(saved=>{if(saved)draft=saved;}).catch(error=>{failed=true;message(error.message);throw error;});
+const ready=storage.story(id).then(saved=>{if(saved)concept.hydrate(saved);}).catch(error=>{failed=true;message(error.message);throw error;});
 // Compatibility boundary for the frozen UI. Responses are constructed on this device.
 window.__taleraFreeApi=async function(path,options={}) {
   try {
@@ -32,12 +41,11 @@ window.__taleraFreeApi=async function(path,options={}) {
       if(method==='GET') {await queue;return Response.json(draft);}
       if(method==='PUT')return await serialized(async()=>{
         const input=JSON.parse(options.body);
-        const date=document.getElementById('dateInput')?.value??input.date;
-        const eventTime=date?undefined:(draft.eventTime||input.eventTime);
-        const next={...draft,...input,title:document.getElementById('title')?.value??input.title,titleSource:(document.getElementById('title')?.value??input.title)!==draft.title?'manual':draft.titleSource,storyText:document.getElementById('storyText')?.value??input.storyText,date,eventTime,id,datePrecision:date?(input.datePrecision==='year'?'year':'day'):(eventTime?.kind==='season'?'season':'unset'),status:draft.status};
-        // UI metadata is not allowed to overwrite stored blob properties.
-        if(next.storyText!==draft.storyText)delete next.analysis;
-        draft=await storage.save(next);
+        captureFields();
+        // The inherited UI may send a delayed snapshot. It only owns the
+        // selected index/fit; photos, audio, title and time belong to the concept.
+        const currentIndex=Math.max(0,Math.min(Number(input.currentIndex)||0,Math.max(0,draft.photos.length-1)));
+        await persistDraft({...draft,currentIndex,fit:input.fit||draft.fit});
         window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
         return Response.json(draft);
       });
@@ -51,12 +59,12 @@ window.__taleraFreeApi=async function(path,options={}) {
       });
       if(method==='GET') {const media=await storage.media(mediaId);return media?new Response(media.kind==='video'?media.thumbnail:media.blob):new Response('',{status:404});}
       // The inherited UI removes the reference next; commit that before deleting bytes.
-      if(method==='DELETE')return Response.json({ok:true});
+      if(method==='DELETE')return await serialized(async()=>{const photos=draft.photos.filter(photo=>photo.id!==mediaId);await persistDraft({...draft,photos,currentIndex:Math.min(draft.currentIndex||0,Math.max(0,photos.length-1))});return Response.json({ok:true});});
     }
     if(url.pathname==='/api/storylab-clean/publish'&&method==='POST')return await serialized(async()=>{
       if(!validTime(draft))throw new Error('Kies een datum of een seizoen met jaartal.');
       if(!draft.photos.length&&!draft.storyText.trim()&&!draft.audioId)throw new Error(t('writeFirst'));
-      draft=await storage.save({...draft,status:'published',postedAt:draft.postedAt||Date.now()});
+      await persistDraft({...draft,status:'published',postedAt:draft.postedAt||Date.now()});
       return Response.json({ok:true,handoffUrl:'/#story='+encodeURIComponent(id)});
     });
     throw new Error(t('later'));
@@ -78,20 +86,22 @@ if(location.pathname.startsWith('/tell')) {
   for(const script of document.querySelectorAll('script[type="text/talera"]')) {
     const running=document.createElement('script');running.textContent=script.textContent;document.body.appendChild(running);
   }
-  window.__taleraFreeAddPhotos=async files=>{await ready;const selected=Array.from(files||[]);message('Je geselecteerde foto’s verwerken…');return importPhotos(selected,{getStory:()=>draft,onDuplicate:photo=>serialized(async()=>{draft=await storage.save({...draft,currentIndex:draft.photos.findIndex(p=>p.id===photo.id)});await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));}),preview:url=>{document.getElementById('bgPhoto').src=url;document.getElementById('screen').classList.add('has-photo');},progress:(done,duplicates,failures,total,error)=>message(error||`${done} / ${total} ${t('photoProgress')}${duplicates?' · '+duplicates+' '+t('photoDuplicate'):''}${failures?' · '+failures+' '+t('photoFailedCount'):''}`),commit:(media,photo)=>serialized(async()=>{
-    const next={...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,photos:[...draft.photos,photo],currentIndex:draft.photos.length};
-    draft=await storage.commitMedia(next,media);await window.__taleraStoryLabMedia.setState(draft);
+  for(const field of ['title','dateInput','storyText'])for(const event of ['input','change'])document.getElementById(field)?.addEventListener(event,captureFields,{capture:true});
+  window.__taleraFreeSelectPhoto=index=>concept.patch({currentIndex:index});
+  window.__taleraFreeAddPhotos=async files=>{await ready;const selected=Array.from(files||[]);message('Je geselecteerde foto’s verwerken…');return importPhotos(selected,{getStory:()=>draft,onDuplicate:photo=>serialized(async()=>{await persistDraft({...draft,currentIndex:draft.photos.findIndex(p=>p.id===photo.id)});await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));}),preview:url=>{document.getElementById('bgPhoto').src=url;document.getElementById('screen').classList.add('has-photo');},progress:(done,duplicates,failures,total,error)=>message(error||`${done} / ${total} ${t('photoProgress')}${duplicates?' · '+duplicates+' '+t('photoDuplicate'):''}${failures?' · '+failures+' '+t('photoFailedCount'):''}`),commit:(media,photo)=>serialized(async()=>{
+    const next={...draft,photos:[...draft.photos,photo],currentIndex:draft.photos.length};
+    await persistDraft(next,media);await window.__taleraStoryLabMedia.setState(draft);
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:true}}));
   })}).catch(error=>message(error.message)).finally(()=>window.__taleraStoryLabMedia.setState(draft));};
   installTellExperience({getStory:()=>draft,storage,exclusive:serialized,notice:message,saveAudio:async audio=>{
-    draft=await storage.commitMedia({...draft,title:document.getElementById('title').value,date:document.getElementById('dateInput').value,storyText:document.getElementById('storyText').value,audioId:audio.id},audio);const latestText=document.getElementById('storyText').value;if(draft.storyText!==latestText)draft=await storage.save({...draft,storyText:latestText});draft={...draft,storyText:document.getElementById('storyText').value};await window.__taleraStoryLabMedia.setState(draft);
+    await persistDraft({...draft,audioId:audio.id},audio);await window.__taleraStoryLabMedia.setState(draft);
     window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:draft.photos.length>0}}));
   }});
-  const mediaController=installTellMedia({getStory:()=>draft,storage,notice:message,remove:id=>serialized(async()=>{const photos=draft.photos.filter(p=>p.id!==id);draft=await storage.save({...draft,title:document.getElementById('title').value,storyText:document.getElementById('storyText').value,photos,currentIndex:Math.min(draft.currentIndex||0,Math.max(0,photos.length-1))});await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));})});
-  installGuidedTell({getStory:()=>draft,flush:flushDraft,notice:message,saveAnalysis:(analysis,current)=>serialized(async()=>{if(!current())return false;draft=await storage.save({...draft,analysis});return current();}),saveTitle:(title,current,titleSource='ai')=>serialized(async()=>{if(!current())return false;draft=await storage.save({...draft,title,titleSource});return current();})});
+  const mediaController=installTellMedia({getStory:()=>draft,storage,notice:message,remove:id=>serialized(async()=>{const photos=draft.photos.filter(p=>p.id!==id);await persistDraft({...draft,photos,currentIndex:Math.min(draft.currentIndex||0,Math.max(0,photos.length-1))});await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));})});
+  installGuidedTell({getStory:()=>draft,flush:flushDraft,notice:message,saveAnalysis:(analysis,current)=>serialized(async()=>{if(!current())return false;await persistDraft({...draft,analysis});return current();}),saveTitle:(title,current,titleSource='ai')=>serialized(async()=>{if(!current())return false;await persistDraft({...draft,title,titleSource});return current();})});
   if(initialDate&&validTime({date:initialDate})){const position=document.createElement('p');position.id='freeSuggestedDate';position.textContent='Nieuw verhaal bij '+timeLabel({date:initialDate});document.getElementById('freeGuide').append(position);}
   installDateStyle();
-  const saveOverview=patch=>serialized(async()=>{const next={...draft,...patch};if(next.storyText!==draft.storyText)delete next.analysis;draft=await storage.save(next);await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));});
+  const saveOverview=patch=>serialized(async()=>{const next={...draft,...patch};if(next.storyText!==draft.storyText)delete next.analysis;await persistDraft(next);await window.__taleraStoryLabMedia.setState(draft);window.dispatchEvent(new Event('talera-free-saved'));});
   installOverview({getStory:()=>draft,save:saveOverview,media:mediaController,storage,notice:message});
   setTimeout(()=>window.dispatchEvent(new Event('talera-guided-ready')),250);
   const timeKind=document.getElementById('freeTimeKind'),seasonFields=document.getElementById('freeSeasonFields');
@@ -106,7 +116,7 @@ if(location.pathname.startsWith('/tell')) {
   document.getElementById('saveEdit').addEventListener('click',event=>{
     event.stopImmediatePropagation();const date=timeKind.value==='day'?document.getElementById('editDate').value:'';
     let eventTime;try{eventTime=timeKind.value==='season'?seasonTime(document.getElementById('freeSeason').value,Number(document.getElementById('freeSeasonYear').value)):undefined;if(!validTime({date,eventTime}))throw new Error('Kies een datum of een seizoen met jaartal.');const today=new Date();if(date&&date>today.toISOString().slice(0,10)||eventTime&&new Date(eventTime.year,{voorjaar:2,zomer:5,herfst:8,winter:-1}[eventTime.season],1)>today)throw new Error('Kies een datum of tijdvak dat al is begonnen.');}catch(error){message(error.message);return;}
-    serialized(async()=>{draft=await storage.save({...draft,title:document.getElementById('editTitle').value,titleSource:document.getElementById('editTitle').value!==draft.title?'manual':draft.titleSource,date,eventTime,datePrecision:eventTime?'season':'day'});await window.__taleraStoryLabMedia.setState(draft);document.getElementById('editModal').classList.remove('open');document.getElementById('timelinePublish').click();}).catch(error=>message(error.message));
+    serialized(async()=>{await persistDraft({...draft,title:document.getElementById('editTitle').value,titleSource:document.getElementById('editTitle').value!==draft.title?'manual':draft.titleSource,date,eventTime,datePrecision:eventTime?'season':'day'});await window.__taleraStoryLabMedia.setState(draft);document.getElementById('editModal').classList.remove('open');document.getElementById('timelinePublish').click();}).catch(error=>message(error.message));
   },true);
   const save=document.getElementById('timelinePublish');
   save?.addEventListener('click',event=>{

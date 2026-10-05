@@ -1,3 +1,9 @@
+## Opschonen stap 2 — centraal verhaalconcept (v24)
+
+Tekst, titel, datum en media worden nu beheerd door `draft.browser.js`. De oude vertelinterface gebruikt alleen een projectie daarvan. Invoer wordt direct in het concept verwerkt; vertraagde opslag kan nieuwere invoer niet terugzetten. Een gewijzigde tekst maakt eerdere analyse ongeldig. Ongewijzigde saves slaan extra IndexedDB-transacties over. De bestaande opslagindeling en herinneringen blijven behouden.
+
+Regressiecontrole: vertraging tijdens media-opslag, verder inspreken/typen, handmatige titel, verouderde fotosnapshots, herhaald opslaan zonder wijzigingen en opnieuw proberen na een opslagfout. De volgende stap is het samenbrengen van de overlappende stijlen.
+
 # TALERA Free — lokale fotoproef
 
 ## Opschonen — stap 1, 5 oktober 2026

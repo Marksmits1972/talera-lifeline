@@ -9,6 +9,8 @@ export const quietCSS=`
 .free-presentation .photo-stage .example-photo{inset:0!important;left:0!important;top:0!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center!important;-webkit-mask-image:none!important;mask-image:none!important}
 .free-presentation .photo-backdrop,.free-presentation .photo-aligned-blur{display:none!important}
 .free-presentation main .timeline,.free-presentation main .timeline.is-active{background:transparent!important}
+/* The date starts 42px before the timeline bottom. End the blur 12px
+   above that badge: retain the ruler labels, leave the date over sharp photo. */
 .free-presentation main .timeline::before,.free-presentation main .timeline.is-timeline-engaged::before,.free-presentation main .timeline.is-timeline-afterglow::before{background:transparent!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;opacity:1!important;height:calc(100% - 54px)!important;-webkit-mask-image:none!important;mask-image:none!important;border:0!important;box-shadow:none!important}
 .free-presentation nav::before{top:0!important;mask-image:none!important;-webkit-mask-image:none!important;background:transparent!important;border:0!important;box-shadow:none!important}
 .free-presentation .memory-space::before,.free-presentation .memory-caption,.free-presentation #memoryCaption{background:transparent!important}

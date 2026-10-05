@@ -1,4 +1,5 @@
-export const presentationControllerScript = String.raw`
+export function createPresentationControllerScript({nativePhotoLayout=false,timelineFeedback=true}={}) {
+return String.raw`
 (()=>{
   const timeline=document.querySelector('.timeline');
   const stage=document.getElementById('photoStage');
@@ -13,6 +14,10 @@ export const presentationControllerScript = String.raw`
     document.head.appendChild(style);
   }
 
+  ${nativePhotoLayout ? `
+  // Free uses native object-fit: cover. No sizing writes or blur-image copies.
+  function fitNode(img){return Boolean(img&&img.complete&&img.naturalWidth&&img.naturalHeight);}
+  ` : String.raw`
   /* Visual photo fitting only — never changes timeline state. */
   function ensureAlignedBlur(img){
     const layer=img&&img.closest('.photo-layer');
@@ -79,7 +84,9 @@ export const presentationControllerScript = String.raw`
   });
   window.addEventListener('resize',fitAll,{passive:true});
   if(window.ResizeObserver&&stage){new ResizeObserver(fitAll).observe(stage);}
+  `}
 
+  ${timelineFeedback ? String.raw`
   /* Timeline visual wake/sleep only. Timeline navigation remains owned by the
      proven timeline motor in the base prototype. */
   if(timeline){
@@ -102,6 +109,7 @@ export const presentationControllerScript = String.raw`
     timeline.addEventListener('wheel',()=>{wake();rest(900);},{passive:true});
     rest(400);
   }
+  ` : ''}
 
   /* ---------------------------------------------------------
      CONTINUOUS PHOTO STRIP ENGINE — one gesture owner, three reusable pages.
@@ -548,3 +556,5 @@ export const presentationControllerScript = String.raw`
   },{passive:true});
 })();
 `;
+}
+export const presentationControllerScript=createPresentationControllerScript();

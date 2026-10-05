@@ -75,7 +75,8 @@ export const timelineVisualStateStyle = timelineAdaptiveContrastStyle + String.r
 }
 `;
 
-export const timelineVisualStateScript = timelineAdaptiveContrastScript + String.raw`
+export function createTimelineVisualStateScript({carouselWatchdog=true}={}) {
+return timelineAdaptiveContrastScript + String.raw`
 (()=>{
   const timeline=document.querySelector('.timeline');
   if(!timeline)return;
@@ -147,6 +148,7 @@ export const timelineVisualStateScript = timelineAdaptiveContrastScript + String
   window.addEventListener('pagehide',forceRest,{passive:true});
 })();
 
+${carouselWatchdog ? String.raw`
 /* Photo-carousel watchdog.
    The live-memory integration already owns the normal automatic carousel and the
    presentation controller owns finger-following swipes. This small watchdog only
@@ -212,4 +214,7 @@ export const timelineVisualStateScript = timelineAdaptiveContrastScript + String
     show(memory,index+1);
   },WATCH_MS);
 })();
+` : ''}
 `;
+}
+export const timelineVisualStateScript=createTimelineVisualStateScript();

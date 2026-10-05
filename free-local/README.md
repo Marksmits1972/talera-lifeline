@@ -1,5 +1,20 @@
 # TALERA Free — lokale fotoproef
 
+## Opschonen — stap 1, 5 oktober 2026
+
+Free kiest expliciete varianten van de gedeelde presentatiecontrollers. De oude
+foto-uitlijning (metingen, inline afmetingen, extra blurbeelden en layout-observers)
+wordt niet meer uitgevoerd: Free gebruikt de bestaande `object-fit: cover`-regels.
+De dubbele wake/sleep-regeling vervalt; tijdlijnfeedback heeft één eigenaar.
+De historische carrousel-watchdog wordt niet meer gestart voor lokale verhalen.
+De bestaande swipe-motor en de historische standaardvarianten blijven behouden.
+Controlleraansluitingen worden bij paginaopbouw gecontroleerd op precies één match.
+
+`test-controller-structure.mjs` controleert dat laden en resize geen oude
+layoutbewerkingen starten, naast de bestaande interactie- en opslagtests.
+Dit vermindert overbodig werk; een gemeten snelheidswinst op iPhone is hiermee
+nog niet aangetoond. CSS-samenvoeging en één gedeelde conceptstatus volgen apart.
+
 Bron: bevroren `reference/prototype-free-final-r19h2-20261001`, commit `0738ade7fafb68c3ae85675a68f8d4f8c09526ef`.
 
 Dit is de eerste afzonderlijke proefroute: één foto → compacte lokale kopie en thumbnail → datum en handmatige tekst → lokaal opslaan → juiste positie op de bestaande tijdlijn → heropenen/bewerken. De originele bestanden in de fotobibliotheek worden nooit gewijzigd.

@@ -2,7 +2,7 @@
 
 Video decoder is attached to the document and explicitly loaded. Metadata seeks a first frame; loadeddata, canplay or seeked can complete preparation. Failed decoders clear listeners and release the element and URL. File reads, photo decoding and canvas encoding have bounded waits. Progress names the current file; per-file failures preserve the remaining selection.
 
-Regression covers a decoder that never emits loadeddata, cleanup on unsupported video, bounded waits and an invalid photo followed by a valid photo. Real iPhone HEIC/iCloud selection remains device acceptance.
+Regression covers a decoder that never emits loadeddata, cleanup on unsupported video, bounded waits and an invalid photo followed by a valid photo. All 21 regression scripts and the Workers deployment dry run pass. Real iPhone HEIC/iCloud selection remains device acceptance.
 
 ## Foto’s vooraf klaarzetten (v26)
 

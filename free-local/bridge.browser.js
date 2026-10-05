@@ -154,7 +154,7 @@ if(location.pathname.startsWith('/tell')) {
       }
       const runtime=window.__taleraTimelineRuntime;
       installTimelineActions({runtime,storage,exclusive:serialized,notice:text=>document.getElementById('freeError').textContent=text});
-      installTimelineExperience({runtime,storage,registerPhoto:(url,blob)=>photoBlobs.set(url,blob),releasePhoto:url=>photoBlobs.delete(url)});
+      installTimelineExperience({runtime,storage,stories,getMemories:()=>window.__taleraFreeMemories,registerPhoto:(url,blob)=>photoBlobs.set(url,blob),releasePhoto:url=>photoBlobs.delete(url)});
       const target=runtime.findMemory({storyId:new URLSearchParams(location.hash.slice(1)).get('story')})||window.__taleraFreeMemories.at(-1);
       runtime.setCenter(new Date(target.at).getTime());runtime.writeMemory(target);runtime.draw();
       window.dispatchEvent(new CustomEvent('talera-free-saved',{detail:{hasPhotos:true,complete:true}}));

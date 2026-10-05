@@ -1,3 +1,7 @@
+## Foto’s vooraf klaarzetten (v26)
+
+De presentatie gebruikt de al geladen verhaalmetadata en een gedeelde fotocache van maximaal twaalf foto’s. De eerste foto van het vorige en volgende verhaal en de volgende foto binnen het huidige verhaal worden vooraf opgehaald en gedecodeerd. Gelijktijdige aanvragen voor dezelfde foto delen één leesactie. Iedere tik wijzigt de gewenste foto direct, ook tijdens het laden. Verouderde laadresultaten mogen de huidige keuze niet overschrijven. De actieve foto blijft behouden bij het opruimen van de cache; tijdelijke URL’s worden vrijgegeven bij definitief sluiten. Terugkeren via de browsergeschiedenis behoudt de cache.
+
 ## Opschonen stap 2 — centraal verhaalconcept (v24)
 
 Tekst, titel, datum en media worden nu beheerd door `draft.browser.js`. De oude vertelinterface gebruikt alleen een projectie daarvan. Invoer wordt direct in het concept verwerkt; vertraagde opslag kan nieuwere invoer niet terugzetten. Een gewijzigde tekst maakt eerdere analyse ongeldig. Ongewijzigde saves slaan extra IndexedDB-transacties over. De bestaande opslagindeling en herinneringen blijven behouden.

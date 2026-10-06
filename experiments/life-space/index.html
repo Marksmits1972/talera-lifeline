@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d141a">
-<title>Talera — Life Space + Timeline</title>
+<title>Talera — Life Globe / Photo Galaxy</title>
 <style>
 :root{
   --safeT:env(safe-area-inset-top,0px);
@@ -20,16 +20,30 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a1015;col
 body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
-#bg{position:absolute;inset:-8%;background-position:center;background-size:cover;filter:blur(16px) saturate(.55) brightness(.20);transform:scale(1.16);transition:background-image .5s ease}
+#bg{position:absolute;inset:-8%;background:
+  radial-gradient(circle at 52% 43%,rgba(50,83,105,.20),transparent 22%),
+  radial-gradient(circle at 18% 68%,rgba(90,61,116,.12),transparent 26%),
+  radial-gradient(circle at 84% 72%,rgba(35,87,104,.13),transparent 25%),
+  radial-gradient(circle at 50% 52%,rgba(10,18,25,.32),rgba(3,6,10,.78) 62%,#010306 100%);
+  transform:scale(1.08);overflow:hidden}
+#bg:before{content:"";position:absolute;inset:0;opacity:.58;background-image:
+  radial-gradient(circle at 9% 16%,rgba(255,255,255,.55) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 22% 76%,rgba(194,223,240,.38) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 34% 31%,rgba(255,255,255,.34) 0 1px,transparent 1.4px),
+  radial-gradient(circle at 47% 87%,rgba(255,255,255,.30) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 57% 12%,rgba(196,220,237,.42) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 69% 58%,rgba(255,255,255,.35) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 78% 23%,rgba(255,255,255,.50) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 91% 81%,rgba(191,220,238,.38) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 14% 49%,rgba(255,255,255,.25) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 63% 38%,rgba(255,255,255,.23) 0 1px,transparent 1.4px);
+  filter:blur(.15px)}
 #bg:after{content:"";position:absolute;inset:0;background:
- radial-gradient(circle at 52% 44%,rgba(78,111,132,.16),transparent 22%),
- radial-gradient(circle at 19% 70%,rgba(96,73,122,.10),transparent 28%),
- radial-gradient(circle at 82% 73%,rgba(42,92,108,.10),transparent 24%),
- radial-gradient(circle at 50% 48%,rgba(13,23,31,.12),rgba(5,8,12,.58) 62%,rgba(2,4,7,.93) 100%)}
+  radial-gradient(ellipse at center,transparent 0 34%,rgba(2,5,8,.12) 55%,rgba(1,3,5,.68) 100%)}
 #world{position:absolute;inset:0;overflow:hidden;touch-action:none}
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.memoryEcho{position:absolute;width:54px;height:42px;border-radius:8px;overflow:hidden;background:#23313a;border:1px solid rgba(255,255,255,.08);box-shadow:0 5px 18px rgba(0,0,0,.22);will-change:transform,opacity;opacity:0}
-.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.25px) saturate(.66) brightness(.76)}
+.memoryEcho{position:absolute;width:48px;height:36px;border-radius:6px;overflow:hidden;background:#1c2931;border:1px solid rgba(255,255,255,.06);box-shadow:0 4px 14px rgba(0,0,0,.19);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.45px) saturate(.58) brightness(.68)}
 .memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.18))}
 
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
@@ -203,121 +217,73 @@ const ALL_MEMORIES=[...MEMORIES,...EXTRA_MEMORIES];
 
 
 
-// One continuous chronological field. There are no age boxes or decade boundaries.
-// Age determines direction continuously; local story density determines how thick the
-// field becomes and how far its local centre shifts outward.
+// TALERA LIFE GLOBE
+// Time runs from north (early life) to south (later life).
+// Around each latitude, memories can occupy any longitude. The globe is invisible:
+// only the photo system reveals its curvature. Horizontal movement can therefore
+// rotate forever without making the beginning and end of life touch each other.
 const baseData=ALL_MEMORIES.map((s,i)=>{
   const ms=new Date(s.at).getTime();
   return {...s,i,ms,age:ageFromMs(ms)};
 }).sort((a,b)=>a.ms-b.ms);
 
-function densityAtAge(age){
-  // Gaussian density prevents a hard 29/30/31 boundary even if age 30 is extremely busy.
-  const sigma=1.55;
-  let d=0;
-  for(const s of baseData){
-    const q=(s.age-age)/sigma;
-    d+=Math.exp(-.5*q*q);
-  }
-  return d;
-}
-const DENSITIES=baseData.map(s=>densityAtAge(s.age));
-const DENSITY_MIN=Math.min(...DENSITIES);
-const DENSITY_MAX=Math.max(...DENSITIES);
 const LIFE_YEARS=Math.max(1,(LIFE_END-LIFE_START)/(365.2425*DAY));
+const GLOBE_LAT_LIMIT=1.285; // ~73.6 degrees; avoids pole singularities.
+const GOLDEN_ANGLE=2.399963229728653;
+const SPHERE_RADIUS=285+72*Math.log1p(baseData.length/42);
 
-function densityNormAtAge(age){
-  const d=densityAtAge(age);
-  const raw=(d-DENSITY_MIN)/Math.max(.0001,DENSITY_MAX-DENSITY_MIN);
-  return clamp(raw,0,1);
+function wrapLon(a){
+  const tau=Math.PI*2;
+  return ((a+Math.PI)%tau+tau)%tau-Math.PI;
 }
-
-// Collection size changes the physical size of the whole life, but sub-linearly.
-// 25–50 memories stay intentionally compact; hundreds and thousands get more room.
-const COLLECTION_RADIUS=180+96*Math.log1p(baseData.length/25);
-const COLLECTION_THICKNESS=34+18*Math.log1p(baseData.length/25);
-
-function fieldAngleAtAge(age){
+function sphereLatAtAge(age){
   const t=clamp(age/LIFE_YEARS,0,1);
-  return -2.48+t*Math.PI*1.73;
+  return lerp(GLOBE_LAT_LIMIT,-GLOBE_LAT_LIMIT,t);
 }
-function fieldThicknessAtAge(age){
-  return COLLECTION_THICKNESS+178*Math.sqrt(densityNormAtAge(age));
+function ageAtSphereLat(lat){
+  const t=clamp((GLOBE_LAT_LIMIT-lat)/(GLOBE_LAT_LIMIT*2),0,1);
+  return t*LIFE_YEARS;
 }
-function fieldCenterAtAge(age){
-  const t=clamp(age/LIFE_YEARS,0,1);
-  const angle=fieldAngleAtAge(age);
-  const thickness=fieldThicknessAtAge(age);
-  // Dense periods shift their navigational centre outward, but the centreline
-  // itself is gently warped so chronology never renders as a visible ring/path.
-  const radius=COLLECTION_RADIUS+thickness*.34;
-  const warpX=(Math.sin(t*Math.PI*3.1+0.55)*58 + Math.sin(t*Math.PI*6.3+1.7)*26);
-  const warpY=(Math.sin(t*Math.PI*2.5+2.1)*52 + Math.sin(t*Math.PI*5.4+0.2)*22);
-  return {
-    x:Math.cos(angle)*radius + warpX,
-    y:Math.sin(angle)*radius*.78 + warpY,
-    angle,
-    radius,
-    thickness,
-    densityNorm:densityNormAtAge(age)
-  };
+function angularLonDistance(a,b){
+  return Math.abs(wrapLon(a-b));
 }
 
 const data=baseData.map((s,i)=>{
-  const center=fieldCenterAtAge(s.age);
-  const dNorm=center.densityNorm;
-  const thickness=center.thickness;
-
-  // Two deterministic layers of scatter make a cloud rather than a ribbon.
-  const a1=fract(s.id+19)*Math.PI*2;
-  const a2=fract(s.id+71)*Math.PI*2;
-  const r1=Math.sqrt(fract(s.id+33))*thickness*.88;
-  const r2=Math.sqrt(fract(s.id+121))*thickness*.38;
-  const localX=Math.cos(a1)*r1 + Math.cos(a2)*r2;
-  const localY=Math.sin(a1)*r1*.84 + Math.sin(a2)*r2*1.08;
-
-  // A small age-dependent drift makes neighbouring dates overlap instead of
-  // drawing a clean chronological edge between them.
-  const driftX=Math.sin(s.age*.91+1.3)*thickness*.16;
-  const driftY=Math.sin(s.age*1.17+2.2)*thickness*.14;
-  const x=center.x+localX+driftX;
-  const y=center.y+localY+driftY;
-
-  // Sparse regions reveal stories earlier; dense regions progressively unpack.
-  const reveal=.20+.58*fract(s.id+91)+.12*dNorm;
-  const representative=fract(s.id+211); // stable priority for semantic zoom
-  return {...s,x,y,z:.82+fract(s.id+70)*.38,reveal,density:dNorm,thickness,representative};
+  const baseLat=sphereLatAtAge(s.age);
+  // Tiny latitude jitter prevents mechanical rows, while chronology remains obvious.
+  const lat=clamp(baseLat+(fract(s.id+41)-.5)*.052,-GLOBE_LAT_LIMIT,GLOBE_LAT_LIMIT);
+  // Stable longitudes distribute one life-period all around the globe.
+  const band=Math.floor(s.age*1.35);
+  const lon=wrapLon(i*GOLDEN_ANGLE + band*.31 + (fract(s.id+73)-.5)*1.15);
+  // A subtle radial shell variation makes the photo field feel volumetric,
+  // without breaking the underlying globe.
+  const shell=1+(fract(s.id+117)-.5)*.085;
+  return {
+    ...s,
+    lat,lon,shell,
+    z:.82+fract(s.id+70)*.38,
+    reveal:.24+.56*fract(s.id+91),
+    representative:fract(s.id+211)
+  };
 });
 
-// The fully zoomed-out state is a true whole-life overview, not merely
-// the current neighborhood rendered smaller.
-const DATA_BOUNDS=data.reduce((b,s)=>({
-  minX:Math.min(b.minX,s.x),maxX:Math.max(b.maxX,s.x),
-  minY:Math.min(b.minY,s.y),maxY:Math.max(b.maxY,s.y)
-}),{minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity});
-const OVERVIEW_CENTER={
-  x:(DATA_BOUNDS.minX+DATA_BOUNDS.maxX)/2,
-  y:(DATA_BOUNDS.minY+DATA_BOUNDS.maxY)/2
-};
-const WORLD_WIDTH=DATA_BOUNDS.maxX-DATA_BOUNDS.minX;
-const WORLD_HEIGHT=DATA_BOUNDS.maxY-DATA_BOUNDS.minY;
-const CAMERA_MARGIN=460;
-function clampCamX(x){return clamp(x,DATA_BOUNDS.minX-CAMERA_MARGIN,DATA_BOUNDS.maxX+CAMERA_MARGIN)}
-function clampCamY(y){return clamp(y,DATA_BOUNDS.minY-CAMERA_MARGIN,DATA_BOUNDS.maxY+CAMERA_MARGIN)}
 function fitOverviewScale(){
-  const usableW=Math.max(300,W-46);
-  const usableH=Math.max(430,H-230);
-  return clamp(Math.min(usableW/(WORLD_WIDTH+250),usableH/(WORLD_HEIGHT+270)),.12,.30);
+  const responsive=Math.min(W/430,Math.max(.72,(H-150)/720));
+  return clamp(.58*responsive,.52,.66);
 }
+
 const overviewAnchorAges=[5,17,30,42,54];
 const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
   let best=0,bd=Infinity;
-  data.forEach((s,i)=>{const d=Math.abs(s.age-age);if(d<bd){bd=d;best=i}});
+  data.forEach((s,i)=>{
+    const d=Math.abs(s.age-age);
+    if(d<bd){bd=d;best=i}
+  });
   return best;
 }).filter((v,i,a)=>a.indexOf(v)===i);
 const OVERVIEW_ANCHOR_SET=new Set(OVERVIEW_ANCHORS);
 
-// With 150+ memories we load images only when the card is actually relevant.
+// With 150+ memories// With 150+ memories we load images only when the card is actually relevant.
 function thumbUrl(s){
   return s.synthetic?s.image:s.image.replace("w=1400","w=620");
 }
@@ -339,7 +305,7 @@ const nodes=data.map(s=>{
   world.appendChild(el);return el;
 });
 
-const ECHO_COUNT=30;
+const ECHO_COUNT=54;
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
   el.className="memoryEcho";
@@ -352,7 +318,7 @@ const echoAssignments=new Array(ECHO_COUNT).fill(-1);
 
 let W=1,H=1;
 let active=data.length-1;
-const cam={x:data[active].x,y:data[active].y,s:SPACE_MAX};
+const cam={x:data[active].lon,y:data[active].lat,s:SPACE_MAX}; // x=longitude, y=latitude
 let timeCenter=data[active].ms;
 let timelineSpanYears=15;
 let timelineUser=false;
@@ -361,10 +327,56 @@ let renderedCards=[];
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
-function screenPoint(x,y){return{x:(x-cam.x)*cam.s+W/2,y:(y-cam.y)*cam.s+H/2}}
-function worldPoint(x,y){return{x:cam.x+(x-W/2)/cam.s,y:cam.y+(y-H/2)/cam.s}}
+function clampCamX(x){return wrapLon(x)}
+function clampCamY(y){return clamp(y,-GLOBE_LAT_LIMIT,GLOBE_LAT_LIMIT)}
+
+function cameraBasis(){
+  const lon=cam.x,lat=cam.y;
+  const co=Math.cos(lon),so=Math.sin(lon),cl=Math.cos(lat),sl=Math.sin(lat);
+  return {
+    forward:{x:cl*co,y:sl,z:cl*so},
+    right:{x:-so,y:0,z:co},
+    up:{x:-sl*co,y:cl,z:-sl*so}
+  };
+}
+function projectMemory(s){
+  const co=Math.cos(s.lon),so=Math.sin(s.lon),cl=Math.cos(s.lat),sl=Math.sin(s.lat);
+  const shell=s.shell||1;
+  const p={x:cl*co*shell,y:sl*shell,z:cl*so*shell};
+  const b=cameraBasis();
+  const vx=p.x*b.right.x+p.y*b.right.y+p.z*b.right.z;
+  const vy=p.x*b.up.x+p.y*b.up.y+p.z*b.up.z;
+  const vz=p.x*b.forward.x+p.y*b.forward.y+p.z*b.forward.z;
+
+  const top=(timelineShell?.getBoundingClientRect().height||126)+8;
+  const bottom=H-72;
+  const cy=(top+bottom)/2;
+  const basePx=Math.min(W*.69,Math.max(210,(bottom-top)*.47));
+  const zoom=Math.max(.72,cam.s/SPACE_MIN);
+  const spherePx=basePx*zoom;
+  const perspective=1/(1.13-.24*clamp(vz,-1,1));
+
+  return {
+    x:W/2+vx*spherePx*perspective,
+    y:cy-vy*spherePx*perspective,
+    facing:vz,
+    depth:clamp((vz+1)/2,0,1),
+    perspective
+  };
+}
+function angularDistanceToCamera(s){
+  const co=Math.cos(s.lon),so=Math.sin(s.lon),cl=Math.cos(s.lat),sl=Math.sin(s.lat);
+  const b=cameraBasis();
+  const dot=cl*co*b.forward.x+sl*b.forward.y+cl*so*b.forward.z;
+  return Math.acos(clamp(dot,-1,1));
+}
 function nearestMemoryToWorld(){
-  let best=0,bd=Infinity;data.forEach((s,i)=>{const d=Math.hypot(s.x-cam.x,s.y-cam.y);if(d<bd){bd=d;best=i}});return best;
+  let best=0,bd=Infinity;
+  data.forEach((s,i)=>{
+    const d=angularDistanceToCamera(s);
+    if(d<bd){bd=d;best=i}
+  });
+  return best;
 }
 function nearestMemoryToTime(ms=timeCenter){
   let lo=0,hi=data.length-1;
@@ -372,10 +384,25 @@ function nearestMemoryToTime(ms=timeCenter){
   if(lo>0&&Math.abs(data[lo-1].ms-ms)<Math.abs(data[lo].ms-ms))return lo-1;
   return lo;
 }
-function setBg(i){const u=data[i].image;bg.style.backgroundImage="url('"+u+"')";presentationImg.src=u}
+function nearestMemoryToFocus(){
+  const span=Math.max(365*DAY,timelineSpanMs());
+  let best=0,score=Infinity;
+  data.forEach((s,i)=>{
+    const temporal=Math.abs(s.ms-timeCenter)/span;
+    const angular=angularDistanceToCamera(s);
+    const q=temporal*.78+angular*.64;
+    if(q<score){score=q;best=i}
+  });
+  return best;
+}
+function setBg(i){
+  // The universe remains a space backdrop. A photograph only becomes the
+  // background once the actual story presentation takes over.
+  presentationImg.src=data[i].image;
+}
 function toastMsg(t){toast.textContent=t;toast.classList.add("on");clearTimeout(toastMsg.t);toastMsg.t=setTimeout(()=>toast.classList.remove("on"),900)}
 function presentationAlpha(){return smooth(1.16,1.92,cam.s)}
-function overviewBlendForScale(s=cam.s){return 1-smooth(.22,.50,s)}
+function overviewBlendForScale(s=cam.s){return 1-smooth(SPACE_MIN+.035,SPACE_MIN+.30,s)}
 function spanYearsForScale(s=cam.s){
   const t=clamp((s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
   const shaped=t*t*(3-2*t);
@@ -385,7 +412,6 @@ function scaleForSpanYears(years){
   const target=Math.log(clamp(years,1/365.2425,54));
   const lo=Math.log(54),hi=Math.log(1/365.2425);
   const shaped=clamp((target-lo)/(hi-lo),0,1);
-  // Invert smoothstep numerically; inexpensive and stable for this UI.
   let a=0,b=1;
   for(let i=0;i<18;i++){const m=(a+b)/2,v=m*m*(3-2*m);if(v<shaped)a=m;else b=m}
   return lerp(SPACE_MIN,SPACE_MAX,(a+b)/2);
@@ -394,78 +420,52 @@ function syncSpanFromSpace(){
   timelineSpanYears=spanYearsForScale(cam.s);
   spanTarget=timelineSpanYears;
 }
-function syncSpaceScaleFromSpan(){
-  cam.s=scaleForSpanYears(timelineSpanYears);
-}
+function syncSpaceScaleFromSpan(){cam.s=scaleForSpanYears(timelineSpanYears)}
 function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
 function clampTime(ms){return clamp(ms,LIFE_START,LIFE_END)}
 function setCam(x,y,s){
-  cam.x=clampCamX(x);cam.y=clampCamY(y);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);
+  cam.x=wrapLon(x);cam.y=clampCamY(y);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);
   syncSpanFromSpace();
-  if(!timelineUser) syncTimeFromSpace();
+  if(!timelineUser)syncTimeFromSpace();
   render();
 }
-function zoomAround(px,py,newScale){const wp=worldPoint(px,py),ns=clamp(newScale,SPACE_MIN,SPACE_MAX);setCam(wp.x-(px-W/2)/ns,wp.y-(py-H/2)/ns,ns)}
+function zoomAround(px,py,newScale){
+  // Zoom is intentionally simple on the globe: direction stays stable;
+  // the story under a real pinch is handled by the gesture code below.
+  cam.s=clamp(newScale,SPACE_MIN,SPACE_MAX);
+  syncSpanFromSpace();render();
+}
 function focusStory(i){
-  active=clamp(i,0,data.length-1);timeCenter=data[active].ms;
-  cam.x=data[active].x;cam.y=data[active].y;cam.s=SPACE_MAX;setBg(active);hint.style.display="none";render();
+  active=clamp(i,0,data.length-1);
+  timeCenter=data[active].ms;
+  cam.x=data[active].lon;cam.y=data[active].lat;cam.s=SPACE_MAX;
+  setBg(active);hint.style.display="none";render();
 }
 function wide(){
-  cam.x=OVERVIEW_CENTER.x;cam.y=OVERVIEW_CENTER.y;cam.s=SPACE_MIN;
-  syncSpanFromSpace();
+  // Return to a whole-life globe without resetting the longitude the user discovered.
+  cam.y=0;cam.s=SPACE_MIN;
+  syncSpanFromSpace();syncTimeFromSpace();
   hint.style.display="none";toastMsg("Hele leven");render();
 }
-function ageNearestFieldPoint(x,y){
-  let bestAge=0,bestD=Infinity;
-  // Coarse search over the continuous chronological backbone.
-  for(let age=0;age<=LIFE_YEARS;age+=.35){
-    const p=fieldCenterAtAge(age);
-    const dx=p.x-x,dy=p.y-y,d=dx*dx+dy*dy;
-    if(d<bestD){bestD=d;bestAge=age}
-  }
-  // Refine locally so the date moves continuously even through a huge density bulge.
-  let lo=Math.max(0,bestAge-.55),hi=Math.min(LIFE_YEARS,bestAge+.55);
-  for(let k=0;k<11;k++){
-    const a=lo+(hi-lo)/3,b=hi-(hi-lo)/3;
-    const pa=fieldCenterAtAge(a),pb=fieldCenterAtAge(b);
-    const da=(pa.x-x)*(pa.x-x)+(pa.y-y)*(pa.y-y);
-    const db=(pb.x-x)*(pb.x-x)+(pb.y-y)*(pb.y-y);
-    if(da<db)hi=b;else lo=a;
-  }
-  return (lo+hi)/2;
-}
 function syncTimeFromSpace(){
-  const age=ageNearestFieldPoint(cam.x,cam.y);
+  const age=ageAtSphereLat(cam.y);
   timeCenter=clampTime(LIFE_START+age*365.2425*DAY);
 }
 function worldCenterForTime(ms){
-  const targetAge=ageFromMs(ms);
-  const spine=fieldCenterAtAge(targetAge);
-  const sigmaYears=clamp(timelineSpanYears*.13,.32,2.8);
-  let x=0,y=0,den=0;
-  for(const s of data){
-    const q=(s.age-targetAge)/sigmaYears;
-    if(Math.abs(q)>4)continue;
-    const w=Math.exp(-.5*q*q);
-    x+=s.x*w;y+=s.y*w;den+=w;
-  }
-  if(den<=.0001)return{x:spine.x,y:spine.y};
-  const contentX=x/den,contentY=y/den;
-  // Content may gently shift the centre, but can never overpower chronology.
-  const pull=.16+.22*spine.densityNorm;
-  return{x:lerp(spine.x,contentX,pull),y:lerp(spine.y,contentY,pull)};
+  // Timeline moves north/south. Longitude is deliberately preserved so the
+  // user can stay in the same side of the life globe while changing age.
+  return{x:cam.x,y:sphereLatAtAge(ageFromMs(ms))};
 }
 function driveSpaceFromTime(ms,instant=false){
   timeCenter=clampTime(ms);
   const p=worldCenterForTime(timeCenter);
-  if(instant){cam.x=p.x;cam.y=p.y}
-  else {cam.x=lerp(cam.x,p.x,.34);cam.y=lerp(cam.y,p.y,.34)}
-  // Timeline navigation should show context rather than forcing presentation.
-  if(cam.s>1.28) cam.s=lerp(cam.s,1.08,.28);
+  if(instant)cam.y=p.y;
+  else cam.y=lerp(cam.y,p.y,.34);
+  if(cam.s>1.28)cam.s=lerp(cam.s,1.08,.28);
   render();
 }
 
-/* ------------------- ACTIVE TIMELINE ------------------- */
+/* ------------------- ACTIVE TIMELINE ------------------- *//* ------------------- ACTIVE TIMELINE ------------------- */
 let timelineTouches=new Map();
 let tlDrag=null,tlPinch=null;
 let tlVelocity=0,tlLastX=0,tlLastT=0;

@@ -5,49 +5,37 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d141a">
-<title>Talera — Magnetic Life Space</title>
+<title>Talera — Life Space + Timeline</title>
 <style>
 :root{
   --safeT:env(safe-area-inset-top,0px);
   --safeB:env(safe-area-inset-bottom,0px);
-  --glass:rgba(8,14,19,.42);
-  --border:rgba(255,255,255,.14);
+  --glass:rgba(8,14,19,.46);
+  --border:rgba(255,255,255,.15);
   --muted:rgba(255,255,255,.68);
+  --accent:#fff0ae;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a1015;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;overscroll-behavior:none}
 body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
-#bg{position:absolute;inset:-8%;background-position:center;background-size:cover;filter:blur(9px) saturate(.72) brightness(.34);transform:scale(1.12);transition:background-image .35s ease}
+#bg{position:absolute;inset:-8%;background-position:center;background-size:cover;filter:blur(9px) saturate(.72) brightness(.34);transform:scale(1.12);transition:background-image .32s ease}
 #bg:after{content:"";position:absolute;inset:0;background:
- radial-gradient(circle at 50% 48%,rgba(18,29,36,.03),rgba(7,11,15,.28) 57%,rgba(3,6,9,.8) 100%),
- linear-gradient(180deg,rgba(7,12,17,.02),rgba(7,12,17,.43))}
+ radial-gradient(circle at 50% 48%,rgba(18,29,36,.025),rgba(7,11,15,.28) 58%,rgba(3,6,9,.8) 100%),
+ linear-gradient(180deg,rgba(7,12,17,.015),rgba(7,12,17,.44))}
 #world{position:absolute;inset:0;overflow:hidden;touch-action:none}
 
-/* Soft directional cues only. They do not define regions or zoom layers. */
-#directionField{position:absolute;z-index:3;inset:0;pointer-events:none}
-.dir{position:absolute;font-size:10px;color:rgba(255,255,255,.24);letter-spacing:.01em;text-shadow:0 1px 8px rgba(0,0,0,.58);transition:opacity .18s,transform .18s}
-.dir strong{display:block;font-size:12px;color:rgba(255,255,255,.38);font-weight:720}
-.dir small{font-size:8.5px}
-#d0{left:16px;top:23%} #d1{left:43%;top:15%}
-#d2{right:15px;top:25%;text-align:right} #d3{right:13px;bottom:30%;text-align:right}
-#d4{left:39%;bottom:20%;text-align:center} #d5{left:15px;bottom:31%}
-
-/* Memory cards stay fixed in world space. The viewport may only pull them toward the screen edge. */
-.memory{position:absolute;width:126px;height:166px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 50px rgba(0,0,0,.31);transform-origin:center;will-change:transform,opacity;pointer-events:none;transition:box-shadow .12s}
+.memory{position:absolute;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 50px rgba(0,0,0,.31);transform-origin:center;will-change:transform,opacity;pointer-events:none}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#26343b}
-.memoryShade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 37%,rgba(0,0,0,.81) 100%)}
+.memoryShade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 36%,rgba(0,0,0,.82) 100%)}
 .memoryCopy{position:absolute;left:10px;right:10px;bottom:10px;text-shadow:0 2px 8px rgba(0,0,0,.78)}
-.memoryText{font-size:10.5px;line-height:1.17;font-weight:710;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.memoryDate{font-size:8.7px;color:rgba(255,255,255,.7);margin-top:5px}
-.memory.nearest{outline:1.5px solid rgba(255,255,255,.87);outline-offset:2px}
-.memory.magnetic{box-shadow:0 16px 44px rgba(0,0,0,.38),0 0 0 1px rgba(255,244,196,.12)}
-.memory.anchor{width:172px;height:218px;border-radius:23px}
-.memory.anchor .memoryText{font-size:12px}
-.memory.anchor .memoryDate{font-size:9.3px}
+.memoryText{font-size:10.6px;line-height:1.16;font-weight:710;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.memoryDate{font-size:8.8px;color:rgba(255,255,255,.7);margin-top:5px}
+.memory.nearest{outline:1.5px solid rgba(255,255,255,.9);outline-offset:2px}
+.memory.magnetic{box-shadow:0 17px 46px rgba(0,0,0,.42),0 0 0 1px rgba(255,240,174,.12)}
 
-/* One story presentation smoothly dissolves into the same spatial world. */
+/* Presentation becomes the first point on the same zoom continuum. */
 #presentation{position:absolute;z-index:18;inset:0;pointer-events:none;opacity:1;will-change:opacity}
 #presentation img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #presentationVeil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.02) 32%,rgba(0,0,0,.13) 56%,rgba(0,0,0,.82) 100%)}
@@ -55,31 +43,29 @@ button{font:inherit;color:inherit}
 #presentationText{font-size:27px;line-height:1.05;font-weight:760;letter-spacing:-.03em}
 #presentationDate{font-size:12px;margin-top:10px;color:rgba(255,255,255,.79)}
 
-#top{position:absolute;z-index:70;left:11px;right:11px;top:calc(9px + var(--safeT));height:73px;border-radius:21px;padding:10px 12px;background:var(--glass);border:1px solid var(--border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);pointer-events:none}
-#topRow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+/* Active Talera timeline. */
+#timelineShell{position:absolute;z-index:80;left:11px;right:11px;top:calc(9px + var(--safeT));height:112px;border-radius:23px;background:var(--glass);border:1px solid var(--border);backdrop-filter:blur(17px);-webkit-backdrop-filter:blur(17px);overflow:hidden;touch-action:none}
+#timelineTop{height:34px;display:flex;align-items:center;justify-content:space-between;padding:8px 13px 0;pointer-events:none}
 #mode{font-size:12px;font-weight:760}
-#where{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
-#lifeBar{position:relative;height:27px;margin-top:7px}
-#lifeLine{position:absolute;left:0;right:0;top:12px;height:1px;background:rgba(255,255,255,.24)}
-#lifeLabels span{position:absolute;top:2px;transform:translateX(-50%);font-size:8px;color:rgba(255,255,255,.46)}
-#lifeWindow{position:absolute;top:4px;height:17px;border:1.5px solid rgba(255,255,255,.82);border-radius:10px;background:rgba(255,255,255,.065);min-width:6px}
-#lifeNeedle{position:absolute;top:1px;height:23px;width:2px;background:#fff0ae;box-shadow:0 0 8px rgba(255,240,174,.7);transform:translateX(-50%)}
+#focusDate{font-size:10px;color:var(--muted);white-space:nowrap}
+#timelineCanvas{position:absolute;left:0;right:0;top:31px;width:100%;height:80px;touch-action:none}
+#needle{position:absolute;z-index:3;left:50%;top:42px;width:2px;height:55px;background:var(--accent);box-shadow:0 0 9px rgba(255,240,174,.7);transform:translateX(-50%);pointer-events:none}
+#needleCap{position:absolute;z-index:3;left:50%;top:51px;width:34px;height:34px;border:1.5px solid rgba(255,255,255,.84);border-radius:999px;transform:translateX(-50%);pointer-events:none}
+#timelineHint{position:absolute;z-index:4;left:50%;bottom:4px;transform:translateX(-50%);font-size:8px;color:rgba(255,255,255,.42);pointer-events:none;white-space:nowrap;opacity:.8}
 
 #hint{position:absolute;z-index:75;left:50%;bottom:calc(72px + var(--safeB));transform:translateX(-50%);width:min(90vw,440px);padding:10px 13px;border-radius:16px;background:rgba(5,10,14,.48);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;line-height:1.35;text-align:center;color:rgba(255,255,255,.9);pointer-events:none}
 #controls{position:absolute;z-index:78;left:11px;right:11px;bottom:calc(11px + var(--safeB));display:flex;align-items:center;justify-content:space-between;gap:7px}
 .group{display:flex;gap:7px}
 .btn{border:1px solid rgba(255,255,255,.15);background:rgba(5,10,14,.47);border-radius:999px;padding:9px 11px;font-size:11px;font-weight:720;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 #zoomRead{font-size:10px;color:rgba(255,255,255,.72);min-width:44px;text-align:center}
-#toast{position:absolute;z-index:95;left:50%;top:calc(91px + var(--safeT));transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(4,8,11,.73);font-size:10px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
+#toast{position:absolute;z-index:95;left:50%;top:calc(128px + var(--safeT));transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(4,8,11,.73);font-size:10px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
 #toast.on{opacity:1}
-
 #magnetDebug{position:absolute;z-index:2;inset:0;pointer-events:none;opacity:0}
 .debug #magnetDebug{opacity:1}
 #magnetRing{position:absolute;border:1px dashed rgba(255,244,196,.25);border-radius:24px}
-.debugLine{position:absolute;height:1px;transform-origin:0 50%;background:rgba(255,244,196,.19)}
 
 @media(min-width:700px){
- #app{width:430px;height:min(900px,100vh);left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);border-radius:36px;box-shadow:0 35px 100px rgba(0,0,0,.5)}
+  #app{width:430px;height:min(900px,100vh);left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);border-radius:36px;box-shadow:0 35px 100px rgba(0,0,0,.5)}
 }
 </style>
 </head>
@@ -88,36 +74,26 @@ button{font:inherit;color:inherit}
   <div id="bg"></div>
   <div id="world"><div id="magnetDebug"><div id="magnetRing"></div></div></div>
 
-  <div id="directionField">
-    <div class="dir" id="d0"><strong>↖ Jeugd</strong><small>0–10</small></div>
-    <div class="dir" id="d1"><strong>↑ Tieners</strong><small>10–20</small></div>
-    <div class="dir" id="d2"><strong>Twintigers ↗</strong><small>20–30</small></div>
-    <div class="dir" id="d3"><strong>Dertigers →</strong><small>30–40</small></div>
-    <div class="dir" id="d4"><strong>↓ Veertigers</strong><small>40–50</small></div>
-    <div class="dir" id="d5"><strong>↙ Vijftigers</strong><small>50+</small></div>
-  </div>
-
   <div id="presentation">
     <img id="presentationImg" alt="">
     <div id="presentationVeil"></div>
     <div id="presentationCopy"><div id="presentationText"></div><div id="presentationDate"></div></div>
   </div>
 
-  <div id="top">
-    <div id="topRow"><span id="mode">Presentatie</span><span id="where"></span></div>
-    <div id="lifeBar">
-      <div id="lifeLine"></div><div id="lifeLabels"></div><div id="lifeWindow"></div><div id="lifeNeedle"></div>
-    </div>
+  <div id="timelineShell">
+    <div id="timelineTop"><span id="mode">Presentatie</span><span id="focusDate"></span></div>
+    <canvas id="timelineCanvas"></canvas>
+    <div id="needleCap"></div><div id="needle"></div>
+    <div id="timelineHint">sleep langzaam voor detail · sneller voor grote sprongen · knijp voor schaal</div>
   </div>
 
-  <div id="hint">Swipe links/rechts voor het volgende verhaal. <b>Knijp langzaam samen</b>: dit verhaal blijft je anker terwijl de ruimte eromheen verschijnt.</div>
+  <div id="hint">Gebruik de <b>tijdbalk bovenin</b> om gericht door je leven te bewegen, of zoek vrij met je vingers tussen de verhalen.</div>
 
   <div id="controls">
     <div class="group"><button class="btn" id="storyBtn">Verhaal</button><button class="btn" id="wideBtn">Ruimte</button></div>
     <span id="zoomRead">100%</span>
     <div class="group"><button class="btn" id="minusBtn">−</button><button class="btn" id="plusBtn">+</button><button class="btn" id="fieldBtn">Magneet</button></div>
   </div>
-
   <div id="toast"></div>
 </div>
 
@@ -125,291 +101,389 @@ button{font:inherit;color:inherit}
 const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer alleen naar school. Vooral die veel te grote tas is blijven hangen.","image":"https://images.unsplash.com/photo-1778142867112-ac896c976245?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":2,"at":"1983-12-24T18:10:00","story":"Kerst bij opa en oma, met iedereen veel te dicht rond één tafel.","image":"https://images.unsplash.com/photo-1774688168997-2a82d06a6188?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":3,"at":"1985-07-18T11:30:00","story":"Een middag aan het water waarop de zomer eindeloos leek te duren.","image":"https://images.unsplash.com/photo-1779518083320-b7b21edc8d2b?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":4,"at":"1987-04-30T13:15:00","story":"Koninginnedag in de stad. Overal muziek, kleedjes en muntjes in mijn zak.","image":"https://images.unsplash.com/photo-1784654433247-a52f3f204509?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":5,"at":"1989-08-12T16:40:00","story":"De vakantie waarop ik voor het eerst echt zelf op ontdekking ging.","image":"https://images.unsplash.com/photo-1783995343989-23f10b526f46?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":6,"at":"1991-06-01T20:05:00","story":"Een lange avond buiten met vrienden. Niemand wilde als eerste naar huis.","image":"https://images.unsplash.com/photo-1780329904432-e022b066526b?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":7,"at":"1993-09-06T08:15:00","story":"Nieuwe school, nieuwe gezichten en vooral doen alsof ik niet zenuwachtig was.","image":"https://images.unsplash.com/photo-1780329935489-b7b4d5d834e4?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":8,"at":"1994-07-22T19:00:00","story":"De eerste avond van een vakantie die achteraf veel belangrijker bleek dan gedacht.","image":"https://images.unsplash.com/photo-1786048079501-7243455ab7aa?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":9,"at":"1995-07-23T09:20:00","story":"Vroeg wakker, brood halen en daarna zonder plan op pad.","image":"https://images.unsplash.com/photo-1780329912791-05c5a05d4eeb?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":10,"at":"1995-07-24T14:10:00","story":"Een onverwachte omweg werd uiteindelijk het mooiste deel van de dag.","image":"https://images.unsplash.com/photo-1780992632886-9f1af7aec50a?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":11,"at":"1995-07-25T21:30:00","story":"Met z'n allen buiten blijven zitten tot het echt donker was.","image":"https://images.unsplash.com/photo-1781750428131-cc7848996d90?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":12,"at":"1996-01-01T00:20:00","story":"Nieuwjaarsnacht. Het gevoel dat er ineens van alles mogelijk was.","image":"https://images.unsplash.com/photo-1769117438403-4d22358c8132?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":13,"at":"1997-05-17T17:45:00","story":"Een kleine overwinning waar ik toen veel trotser op was dan ik liet merken.","image":"https://images.unsplash.com/photo-1760115112683-3bedf5bc68a7?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":14,"at":"1998-10-04T12:00:00","story":"Een zondagse wandeling die later vooral door één gesprek is blijven hangen.","image":"https://images.unsplash.com/photo-1767595666159-48794b9e9a7e?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":15,"at":"2000-03-12T10:30:00","story":"De sleutel van mijn eerste eigen plek in mijn hand.","image":"https://images.unsplash.com/photo-1769421162757-a07a7c942c3c?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":16,"at":"2001-06-30T18:50:00","story":"Een tuin vol mensen en het besef dat een nieuwe fase echt begonnen was.","image":"https://images.unsplash.com/photo-1770563182237-915707b86c9e?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":17,"at":"2002-07-01T08:40:00","story":"De ochtend erna: koffie, rommel en vooral heel veel nagenieten.","image":"https://images.unsplash.com/photo-1752650143275-fb7ef0c27dfc?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":18,"at":"2003-11-08T16:15:00","story":"Een regenachtige dag die onverwacht gezellig werd.","image":"https://images.unsplash.com/photo-1760574761811-9f6861243d35?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":19,"at":"2005-04-19T13:30:00","story":"Een besluit genomen waar ik weken tegenaan had gehikt.","image":"https://images.unsplash.com/photo-1783904984083-19d6dd72aa11?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":20,"at":"2006-09-16T07:10:00","story":"Heel vroeg vertrekken met een auto vol spullen en veel te weinig koffie.","image":"https://images.unsplash.com/photo-1774800879603-dced24dee8f7?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":21,"at":"2007-09-17T10:00:00","story":"De eerste wandeldag. Alles voelde nog nieuw en een beetje onwennig.","image":"https://images.unsplash.com/photo-1769415000137-dec30081dd2d?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":22,"at":"2007-09-18T16:20:00","story":"Moe aankomen en toch nog uren napraten over de dag.","image":"https://images.unsplash.com/photo-1752650143569-fdde2123653d?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":23,"at":"2008-12-31T23:50:00","story":"Tien minuten voor middernacht leek iedereen ineens tegelijk stil te worden.","image":"https://images.unsplash.com/photo-1776893019497-4ccb79f5b14a?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":24,"at":"2010-05-22T12:25:00","story":"Een lunch die uitliep tot ver in de middag.","image":"https://images.unsplash.com/photo-1758613171233-f4e9a58a558a?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":25,"at":"2011-08-14T09:45:00","story":"De ochtendmist trok langzaam weg en ineens lag het hele landschap open.","image":"https://images.unsplash.com/photo-1782212790904-5b658b182ffc?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":26,"at":"2012-08-15T11:10:00","story":"Zonder haast door een onbekend dorp gelopen.","image":"https://images.unsplash.com/photo-1761839271800-f44070ff0eb9?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":27,"at":"2012-08-16T15:35:00","story":"Een terras gevonden waar we uiteindelijk veel langer bleven dan gepland.","image":"https://images.unsplash.com/photo-1770564512486-c2f7cd3f853b?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":28,"at":"2013-02-09T17:10:00","story":"Sneeuw buiten, warme keuken binnen en nergens heen hoeven.","image":"https://images.unsplash.com/photo-1716326570220-94f51bc44a4b?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":29,"at":"2014-06-21T09:05:00","story":"De langste dag van het jaar begon met koffie in de zon.","image":"https://images.unsplash.com/photo-1774101200315-8ac504fa0fd4?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":30,"at":"2015-06-22T08:30:00","story":"Op pad voordat de rest van de wereld echt wakker leek.","image":"https://images.unsplash.com/photo-1752658655009-103dfbb44202?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":31,"at":"2015-06-23T12:40:00","story":"Een uitzicht waarvoor iedereen vanzelf even stil werd.","image":"https://images.unsplash.com/photo-1661006116755-0f7f7b1db2b8?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":32,"at":"2015-06-24T19:25:00","story":"Eten aan een lange tafel en verhalen die steeds groter werden.","image":"https://images.unsplash.com/photo-1772999454277-9c0534108022?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":33,"at":"2016-10-01T14:50:00","story":"Een doos oude foto's teruggevonden en een hele middag kwijtgeraakt aan kijken.","image":"https://images.unsplash.com/photo-1773688199519-0633dac25e3a?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":34,"at":"2017-12-09T18:15:00","story":"Een winteravond met lichtjes, dikke jassen en warme chocolademelk.","image":"https://images.unsplash.com/photo-1773020933473-cbd09ae7e7b2?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":35,"at":"2018-05-05T11:55:00","story":"Een vrije dag zonder programma. Precies wat nodig was.","image":"https://images.unsplash.com/photo-1661855147912-c1c6fbb528ab?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":36,"at":"2019-04-27T15:20:00","story":"De stad vol kleur, muziek en mensen die nergens haast mee hadden.","image":"https://images.unsplash.com/photo-1779009112686-f83ec7aaf8be?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":37,"at":"2020-03-15T20:00:00","story":"Een vreemde stille avond waarop ineens duidelijk werd dat alles anders werd.","image":"https://images.unsplash.com/photo-1700044219623-b7ebd931d209?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":38,"at":"2020-06-12T17:35:00","story":"Na lange tijd weer samen buiten zitten voelde bijna als vakantie.","image":"https://images.unsplash.com/photo-1741866987680-5e3d7f052b87?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":39,"at":"2021-04-10T08:30:00","story":"Vroeg op pad. De lucht was helder en de dag lag nog helemaal open.","image":"https://images.unsplash.com/photo-1706024035693-2e95790c1234?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":40,"at":"2021-04-10T10:30:00","story":"Koffie onderweg, precies op het moment dat de zon doorbrak.","image":"https://images.unsplash.com/photo-1766267163372-9dfbe3afe9ea?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":41,"at":"2021-04-10T13:00:00","story":"Een lange lunch waar niemand haast had om weer verder te gaan.","image":"https://images.unsplash.com/photo-1641033549116-27ad27c78e94?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":42,"at":"2021-04-10T18:30:00","story":"Aan het einde van dezelfde dag nog één foto gemaakt voor we naar binnen gingen.","image":"https://images.unsplash.com/photo-1700044211746-2d697af7c7d5?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":43,"at":"2021-07-19T16:05:00","story":"Een onverwachte duik in het water omdat het veel warmer was dan voorspeld.","image":"https://images.unsplash.com/photo-1772204191370-be84926662ee?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":44,"at":"2022-09-03T10:15:00","story":"Een route gekozen zonder precies te weten waar hij zou eindigen.","image":"https://images.unsplash.com/photo-1772790985980-c2633e301b51?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":45,"at":"2023-05-12T19:10:00","story":"De avond voor vertrek alles nog één keer opnieuw ingepakt.","image":"https://images.unsplash.com/photo-1777904257177-f520bc1b10c3?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":46,"at":"2023-05-13T08:05:00","story":"De eerste kilometers. Altijd weer dat fijne gevoel van onderweg zijn.","image":"https://images.unsplash.com/photo-1776613049786-0054c719b453?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":47,"at":"2024-01-20T14:30:00","story":"Een gewone zaterdag die door één goed gesprek bijzonder werd.","image":"https://images.unsplash.com/photo-1774194647558-713c89f149d8?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":48,"at":"2024-08-28T17:20:00","story":"Laat in de zomer nog één lange avond buiten.","image":"https://images.unsplash.com/photo-1755809732667-9ff30c2cae9e?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":49,"at":"2025-11-02T12:15:00","story":"Een oude plek opnieuw bezocht en gemerkt hoeveel er ondertussen veranderd was.","image":"https://images.unsplash.com/photo-1768511771143-73e862326f04?auto=format&fit=max&fm=jpg&q=76&w=1400"},{"id":50,"at":"2026-09-06T09:15:00","story":"Terugkijken op al die losse momenten die samen langzaam een leven beginnen te vormen.","image":"https://images.unsplash.com/photo-1772033085549-032412902a23?auto=format&fit=max&fm=jpg&q=76&w=1400"}];
 (() => {
 "use strict";
+
 const app=document.getElementById("app"),world=document.getElementById("world"),bg=document.getElementById("bg");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
-const modeEl=document.getElementById("mode"),whereEl=document.getElementById("where"),lifeWindow=document.getElementById("lifeWindow"),lifeNeedle=document.getElementById("lifeNeedle"),zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
+const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),modeEl=document.getElementById("mode"),focusDate=document.getElementById("focusDate");
+const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
 
-const BIRTH=1972,END=2026;
-const MIN_SCALE=.20,MAX_SCALE=2.0;
-const SWIPE_SCALE=1.68;
+const BIRTH_YEAR=1972,END_YEAR=2026;
+const LIFE_START=new Date(BIRTH_YEAR,0,1).getTime();
+const LIFE_END=new Date(END_YEAR,11,31,23,59,59).getTime();
+const LIFE_MS=LIFE_END-LIFE_START;
+const DAY=86400000;
+const SPACE_MIN=.20,SPACE_MAX=2.0,SWIPE_SPACE=1.66;
 
-// Soft bearings; chronology influences direction but never creates hard areas.
+// Chronological bearings are broad overlapping spatial clouds, not labelled zones.
 const BEARINGS=[
- {from:0,to:10,name:"Jeugd",x:-820,y:-500},
- {from:10,to:20,name:"Tienerjaren",x:-100,y:-760},
- {from:20,to:30,name:"Twintiger jaren",x:740,y:-490},
- {from:30,to:40,name:"Dertiger jaren",x:840,y:260},
- {from:40,to:50,name:"Veertiger jaren",x:120,y:760},
- {from:50,to:60,name:"Vijftiger jaren",x:-750,y:430}
+ {from:0,to:10,x:-760,y:-470},
+ {from:10,to:20,x:-90,y:-700},
+ {from:20,to:30,x:680,y:-450},
+ {from:30,to:40,x:770,y:240},
+ {from:40,to:50,x:110,y:700},
+ {from:50,to:60,x:-690,y:410}
 ];
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
 const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
 const fract=n=>{const x=Math.sin(n*79.271+4.91)*43758.5453;return x-Math.floor(x)};
-const ageOf=s=>{const d=new Date(s.at);return(d.getFullYear()-BIRTH)+d.getMonth()/12+d.getDate()/365};
-const dateLabel=s=>new Date(s.at).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+const ageFromMs=ms=>(ms-LIFE_START)/(365.2425*DAY);
+const ageOf=s=>ageFromMs(new Date(s.at).getTime());
 const shortDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{month:"short",year:"numeric"});
+const fullDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
 const bearingForAge=a=>BEARINGS.find((b,i)=>a>=b.from&&(a<b.to||i===BEARINGS.length-1))||BEARINGS[BEARINGS.length-1];
 
-// More compact world than v3: still spatial, but no giant dead oceans.
 const data=MEMORIES.map((s,i)=>{
- const age=ageOf(s),b=bearingForAge(age),u=clamp((age-b.from)/(b.to-b.from),0,1);
- const ang=(u-.5)*1.65+(fract(s.id+2)-.5)*1.0;
- const spread=100+u*210+fract(s.id+33)*270;
- const cross=(fract(s.id+19)-.5)*360;
- const x=b.x+Math.cos(ang)*spread+cross*.32;
- const y=b.y+Math.sin(ang)*spread*.72+cross*.60;
- const anchor=(i===0||i===5||i===14||i===23||i===32||i===38||i===44||i===49);
- const reveal=anchor ? .22+.07*fract(s.id+7) : .30+.68*fract(s.id+91);
- return {...s,i,age,bearing:b,x,y,z:.82+fract(s.id+70)*.38,anchor,reveal};
-});
+  const ms=new Date(s.at).getTime(),age=ageOf(s),b=bearingForAge(age),u=clamp((age-b.from)/(b.to-b.from),0,1);
+  const ang=(u-.5)*1.55+(fract(s.id+2)-.5)*.92;
+  const spread=95+u*195+fract(s.id+33)*240;
+  const cross=(fract(s.id+19)-.5)*330;
+  const x=b.x+Math.cos(ang)*spread+cross*.30;
+  const y=b.y+Math.sin(ang)*spread*.70+cross*.58;
+  return {...s,i,ms,age,x,y,z:.82+fract(s.id+70)*.38,reveal:.27+.55*fract(s.id+91)};
+}).sort((a,b)=>a.ms-b.ms);
 
-[1972,1980,1990,2000,2010,2020,2026].forEach(y=>{
- const span=document.createElement("span");span.style.left=((y-BIRTH)/(END-BIRTH)*100)+"%";span.textContent=y;document.getElementById("lifeLabels").appendChild(span);
-});
+// Preload all thumbnails immediately; only 50 in this prototype.
+data.forEach(s=>{const im=new Image();im.src=s.image.replace("w=1400","w=620")});
 
 const nodes=data.map(s=>{
- const el=document.createElement("article");
- el.className="memory"+(s.anchor?" anchor":"");
- el.innerHTML='<img alt=""><div class="memoryShade"></div><div class="memoryCopy"><div class="memoryText"></div><div class="memoryDate"></div></div>';
- const img=el.querySelector("img");
- img.src=s.image.replace("w=1400","w=620");
- img.loading="eager";
- if(s.anchor) img.fetchPriority="high";
- img.onerror=()=>img.style.opacity=".15";
- el.querySelector(".memoryText").textContent=s.story;
- el.querySelector(".memoryDate").textContent=shortDate(s);
- el.addEventListener("click",e=>{e.stopPropagation();focusStory(s.i)});
- world.appendChild(el);
- return el;
+  const el=document.createElement("article");
+  el.className="memory";
+  el.innerHTML='<img alt=""><div class="memoryShade"></div><div class="memoryCopy"><div class="memoryText"></div><div class="memoryDate"></div></div>';
+  const img=el.querySelector("img");img.src=s.image.replace("w=1400","w=620");img.loading="eager";img.onerror=()=>img.style.opacity=".15";
+  el.querySelector(".memoryText").textContent=s.story;el.querySelector(".memoryDate").textContent=shortDate(s);
+  el.addEventListener("click",e=>{e.stopPropagation();focusStory(s.i)});
+  world.appendChild(el);return el;
 });
 
-// Light prefetch of the first screen and anchors.
-data.filter((s,i)=>s.anchor||i>40).forEach(s=>{const im=new Image();im.src=s.image.replace("w=1400","w=820")});
-
-let W=1,H=1,active=data.length-1;
-const cam={x:data[active].x,y:data[active].y,s:MAX_SCALE};
-let magneticIds=new Set();
-let lastMagneticIds=new Set();
+let W=1,H=1;
+let active=data.length-1;
+const cam={x:data[active].x,y:data[active].y,s:SPACE_MAX};
+let timeCenter=data[active].ms;
+let timelineSpanYears=15;
+let timelineUser=false;
+let lastMagneticIds=new Set(),magneticIds=new Set();
 
 function screenPoint(x,y){return{x:(x-cam.x)*cam.s+W/2,y:(y-cam.y)*cam.s+H/2}}
 function worldPoint(x,y){return{x:cam.x+(x-W/2)/cam.s,y:cam.y+(y-H/2)/cam.s}}
-function nearestMemory(){
- let best=0,dist=Infinity;
- data.forEach((s,i)=>{const d=Math.hypot(s.x-cam.x,s.y-cam.y);if(d<dist){dist=d;best=i}});
- return best;
+function nearestMemoryToWorld(){
+  let best=0,bd=Infinity;data.forEach((s,i)=>{const d=Math.hypot(s.x-cam.x,s.y-cam.y);if(d<bd){bd=d;best=i}});return best;
 }
-function estimateAge(){
- const sorted=data.map(s=>({s,d:Math.hypot(s.x-cam.x,s.y-cam.y)})).sort((a,b)=>a.d-b.d).slice(0,6);
- let num=0,den=0;sorted.forEach(o=>{const w=1/(80+o.d);num+=o.s.age*w;den+=w});
- return den?num/den:data[nearestMemory()].age;
-}
-function nearestBearing(){
- let best=BEARINGS[0],dist=Infinity;BEARINGS.forEach(b=>{const d=Math.hypot(b.x-cam.x,b.y-cam.y);if(d<dist){dist=d;best=b}});return best;
+function nearestMemoryToTime(ms=timeCenter){
+  let lo=0,hi=data.length-1;
+  while(lo<hi){const mid=(lo+hi)>>1;if(data[mid].ms<ms)lo=mid+1;else hi=mid}
+  if(lo>0&&Math.abs(data[lo-1].ms-ms)<Math.abs(data[lo].ms-ms))return lo-1;
+  return lo;
 }
 function setBg(i){const u=data[i].image;bg.style.backgroundImage="url('"+u+"')";presentationImg.src=u}
 function toastMsg(t){toast.textContent=t;toast.classList.add("on");clearTimeout(toastMsg.t);toastMsg.t=setTimeout(()=>toast.classList.remove("on"),900)}
-function setCam(x,y,s){cam.x=clamp(x,-1700,1700);cam.y=clamp(y,-1350,1350);cam.s=clamp(s,MIN_SCALE,MAX_SCALE);render()}
-function zoomAround(px,py,newScale){const wp=worldPoint(px,py),ns=clamp(newScale,MIN_SCALE,MAX_SCALE);setCam(wp.x-(px-W/2)/ns,wp.y-(py-H/2)/ns,ns)}
-function focusStory(i){active=clamp(i,0,data.length-1);setBg(active);setCam(data[active].x,data[active].y,MAX_SCALE);hint.style.display="none"}
-function wide(){setCam(-10,10,.24);hint.style.display="none";toastMsg("Hele levensruimte")}
-function ageToPct(a){return clamp(a/60*100,0,100)}
-
-function presentationAlpha(){
- // Long, gentle dissolve instead of a threshold jump.
- return smooth(1.18,1.92,cam.s);
+function presentationAlpha(){return smooth(1.16,1.92,cam.s)}
+function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
+function clampTime(ms){const half=timelineSpanMs()/2;return clamp(ms,LIFE_START+Math.min(half,LIFE_MS/2),LIFE_END-Math.min(half,LIFE_MS/2))}
+function setCam(x,y,s){cam.x=clamp(x,-1600,1600);cam.y=clamp(y,-1250,1250);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);if(!timelineUser) syncTimeFromSpace();render()}
+function zoomAround(px,py,newScale){const wp=worldPoint(px,py),ns=clamp(newScale,SPACE_MIN,SPACE_MAX);setCam(wp.x-(px-W/2)/ns,wp.y-(py-H/2)/ns,ns)}
+function focusStory(i){
+  active=clamp(i,0,data.length-1);timeCenter=data[active].ms;
+  cam.x=data[active].x;cam.y=data[active].y;cam.s=SPACE_MAX;setBg(active);hint.style.display="none";render();
+}
+function wide(){cam.s=.27;syncTimeFromSpace();hint.style.display="none";toastMsg("Vrije levensruimte");render()}
+function syncTimeFromSpace(){
+  const idx=nearestMemoryToWorld(),n=data[idx];
+  // Weighted blend of a few closest stories makes the timeline move smoothly during spatial panning.
+  const nearby=data.map(s=>({s,d:Math.hypot(s.x-cam.x,s.y-cam.y)})).sort((a,b)=>a.d-b.d).slice(0,5);
+  let num=0,den=0;nearby.forEach(o=>{const w=1/(55+o.d);num+=o.s.ms*w;den+=w});
+  if(den) timeCenter=clampTime(num/den); else timeCenter=n.ms;
+}
+function worldCenterForTime(ms){
+  // Interpolate between chronological memories, then lightly average nearby dates.
+  let idx=nearestMemoryToTime(ms);
+  let candidates=data.slice(Math.max(0,idx-3),Math.min(data.length,idx+4));
+  let x=0,y=0,den=0;
+  const sigma=Math.max(timelineSpanMs()*.20,365*DAY);
+  candidates.forEach(s=>{
+    const dt=(s.ms-ms)/sigma,w=Math.exp(-.5*dt*dt)+.02;
+    x+=s.x*w;y+=s.y*w;den+=w;
+  });
+  if(!den)return{x:data[idx].x,y:data[idx].y};
+  return{x:x/den,y:y/den};
+}
+function driveSpaceFromTime(ms,instant=false){
+  timeCenter=clampTime(ms);
+  const p=worldCenterForTime(timeCenter);
+  if(instant){cam.x=p.x;cam.y=p.y}
+  else {cam.x=lerp(cam.x,p.x,.34);cam.y=lerp(cam.y,p.y,.34)}
+  // Timeline navigation should show context rather than forcing presentation.
+  if(cam.s>1.28) cam.s=lerp(cam.s,1.08,.28);
+  render();
 }
 
-function chooseMagneticSet(rawPositions,alpha){
- if(alpha>.92){magneticIds=new Set([active]);return}
- const topInset=108,bottomInset=83,leftInset=18,rightInset=18;
- const visible=[];
- const ranked=[];
- rawPositions.forEach((p,i)=>{
-   const s=data[i];
-   const natural=p.x>leftInset+40&&p.x<W-rightInset-40&&p.y>topInset+35&&p.y<H-bottomInset-45;
-   if(natural&&p.revealOpacity>.08) visible.push(i);
-   const d=Math.hypot(s.x-cam.x,s.y-cam.y);
-   ranked.push({i,d,natural,score:d-(s.anchor?90:0)});
- });
- ranked.sort((a,b)=>a.score-b.score||a.i-b.i);
+/* ------------------- ACTIVE TIMELINE ------------------- */
+let timelineTouches=new Map();
+let tlDrag=null,tlPinch=null;
+let tlVelocity=0,tlLastX=0,tlLastT=0;
+let spanTarget=timelineSpanYears;
 
- // Four is the floor; natural density can be much higher.
- const minVisible=cam.s<.38?5:4;
- const chosen=new Set(visible);
+function timelineLocalX(clientX){const r=timelineShell.getBoundingClientRect();return clientX-r.left}
+function chooseSpanForVelocity(v){
+  // Completely continuous: calm movement narrows the ruler, fast movement widens it.
+  // 0 px/ms ~= 3 years; >= 1.0 px/ms ~= almost whole life.
+  const t=clamp(v/1.0,0,1);
+  const curved=t*t*(3-2*t);
+  return 3 + curved*48;
+}
+function reanchorTimeline(x){
+  tlDrag={x,center:timeCenter,span:timelineSpanYears};
+}
+function updateTimelineSpanToward(target,dt){
+  spanTarget=clamp(target,.8,54);
+  const a=1-Math.exp(-dt/180);
+  timelineSpanYears=lerp(timelineSpanYears,spanTarget,a);
+  timeCenter=clampTime(timeCenter);
+}
+function timelinePointerDown(e){
+  e.preventDefault();e.stopPropagation();
+  timelineShell.setPointerCapture&&timelineShell.setPointerCapture(e.pointerId);
+  timelineTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  timelineUser=true;hint.style.display="none";
+  if(timelineTouches.size===1){
+    const x=timelineLocalX(e.clientX);reanchorTimeline(x);tlLastX=x;tlLastT=performance.now();tlVelocity=0;spanTarget=timelineSpanYears;
+  }else if(timelineTouches.size===2){
+    const p=[...timelineTouches.values()],r=timelineShell.getBoundingClientRect();
+    const d=Math.max(20,Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y)),mid=(p[0].x+p[1].x)/2-r.left;
+    tlPinch={d,span:timelineSpanYears,center:timeCenter,mid};
+  }
+}
+function timelinePointerMove(e){
+  if(!timelineTouches.has(e.pointerId))return;
+  e.preventDefault();e.stopPropagation();
+  timelineTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const r=timelineShell.getBoundingClientRect();
+  if(timelineTouches.size===1&&tlDrag){
+    const x=timelineLocalX(e.clientX),now=performance.now(),dxSeg=x-tlLastX,dt=clamp(now-tlLastT,8,60);
+    const inst=Math.abs(dxSeg)/dt,a=1-Math.exp(-dt/(inst>tlVelocity?75:300));
+    tlVelocity=tlVelocity?lerp(tlVelocity,inst,a):inst;
+    const desired=chooseSpanForVelocity(tlVelocity);
+    const before=timelineSpanYears;
+    updateTimelineSpanToward(desired,dt);
+    if(Math.abs(timelineSpanYears-before)>.025) reanchorTimeline(x);
+    const dx=x-tlDrag.x;
+    const ms=tlDrag.center-(dx/r.width)*(tlDrag.span*365.2425*DAY);
+    driveSpaceFromTime(ms,false);
+    tlLastX=x;tlLastT=now;
+  } else if(timelineTouches.size===2&&tlPinch){
+    const p=[...timelineTouches.values()];
+    const d=Math.max(20,Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y));
+    const mid=(p[0].x+p[1].x)/2-r.left;
+    const ratio=d/tlPinch.d;
+    const oldSpan=tlPinch.span,newSpan=clamp(oldSpan/ratio,.8,54);
+    const oldRel=tlPinch.mid/r.width-.5;
+    const anchor=tlPinch.center+oldRel*oldSpan*365.2425*DAY;
+    const newRel=mid/r.width-.5;
+    timelineSpanYears=newSpan;spanTarget=newSpan;
+    timeCenter=clampTime(anchor-newRel*newSpan*365.2425*DAY);
+    driveSpaceFromTime(timeCenter,false);
+  }
+}
+function timelinePointerEnd(e){
+  if(timelineTouches.has(e.pointerId))timelineTouches.delete(e.pointerId);
+  e.preventDefault();e.stopPropagation();
+  if(timelineTouches.size===0){
+    timelineUser=false;tlDrag=null;tlPinch=null;tlVelocity=0;
+    // settle camera exactly at the selected time without snapping the time itself
+    const p=worldCenterForTime(timeCenter);cam.x=lerp(cam.x,p.x,.55);cam.y=lerp(cam.y,p.y,.55);render();
+  }else if(timelineTouches.size===1){
+    const p=[...timelineTouches.values()][0],x=timelineLocalX(p.x);reanchorTimeline(x);tlLastX=x;tlLastT=performance.now();tlVelocity=0;
+  }
+}
+timelineShell.addEventListener("pointerdown",timelinePointerDown,{passive:false});
+timelineShell.addEventListener("pointermove",timelinePointerMove,{passive:false});
+timelineShell.addEventListener("pointerup",timelinePointerEnd,{passive:false});
+timelineShell.addEventListener("pointercancel",timelinePointerEnd,{passive:false});
 
- // Hysteresis: retain previously magnetized stories if they are still reasonably nearby.
- for(const id of lastMagneticIds){
-   if(chosen.size>=minVisible)break;
-   const rank=ranked.findIndex(r=>r.i===id);
-   if(rank>=0&&rank<minVisible+5) chosen.add(id);
- }
- for(const r of ranked){
-   if(chosen.size>=minVisible)break;
-   chosen.add(r.i);
- }
- magneticIds=chosen;
- lastMagneticIds=new Set(chosen);
+function chooseTickStep(spanYears){
+  if(spanYears>35)return{years:10,minor:5};
+  if(spanYears>16)return{years:5,minor:1};
+  if(spanYears>7)return{years:2,minor:1};
+  if(spanYears>3)return{years:1,minor:.25};
+  if(spanYears>1.3)return{months:3,minorMonths:1};
+  return{months:1,minorDays:14};
+}
+function drawTimeline(){
+  const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.5),w=r.width,h=r.height;
+  if(!w||!h)return;
+  canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  const span=timelineSpanMs(),start=timeCenter-span/2,end=timeCenter+span/2,axisY=42;
+  ctx.strokeStyle="rgba(255,255,255,.27)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,axisY+.5);ctx.lineTo(w,axisY+.5);ctx.stroke();
+
+  // memory beacons
+  data.forEach(s=>{
+    if(s.ms<start||s.ms>end)return;
+    const x=(s.ms-start)/(end-start)*w;
+    ctx.strokeStyle="rgba(255,240,174,.34)";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(x,axisY-2);ctx.lineTo(x,axisY-10);ctx.stroke();
+    ctx.fillStyle="rgba(255,240,174,.67)";ctx.beginPath();ctx.arc(x,axisY-11,1.8,0,Math.PI*2);ctx.fill();
+  });
+
+  const cfg=chooseTickStep(timelineSpanYears);
+  const drawTick=(ms,major,label)=>{
+    if(ms<start||ms>end)return;
+    const x=(ms-start)/(end-start)*w;
+    ctx.strokeStyle=major?"rgba(255,255,255,.5)":"rgba(255,255,255,.2)";
+    ctx.lineWidth=major?1.25:1;ctx.beginPath();ctx.moveTo(x,axisY-(major?8:4));ctx.lineTo(x,axisY+(major?8:4));ctx.stroke();
+    if(major&&label){ctx.fillStyle="rgba(255,255,255,.62)";ctx.font="10px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(label,x,axisY+22)}
+  };
+
+  if(cfg.years){
+    const sy=new Date(start).getFullYear()-1,ey=new Date(end).getFullYear()+1;
+    for(let y=sy;y<=ey;y++){
+      const ms=new Date(y,0,1).getTime(),major=y%cfg.years===0;
+      if(major||cfg.minor===1)drawTick(ms,major,major?String(y):"");
+    }
+  } else {
+    let d=new Date(start);d=new Date(d.getFullYear(),d.getMonth(),1);
+    for(let guard=0;guard<120;guard++){
+      const ms=d.getTime();if(ms>end)break;
+      const major=cfg.months?d.getMonth()%cfg.months===0:true;
+      drawTick(ms,major,major?d.toLocaleDateString("nl-NL",{month:"short",year:timelineSpanYears<1.3?"2-digit":undefined}):"");
+      d=new Date(d.getFullYear(),d.getMonth()+1,1);
+    }
+  }
 }
 
-function pullToViewport(p,i){
- const top=112,bottom=88,left=16,right=16;
- const xMin=left+54,xMax=W-right-54,yMin=top+58,yMax=H-bottom-62;
- let x=p.x,y=p.y,magnetic=false;
- if(x<xMin||x>xMax||y<yMin||y>yMax){
-   magnetic=true;
-   // Preserve the true direction from screen center while pulling to the nearest safe edge.
-   const dx=p.x-W/2,dy=p.y-H/2;
-   const tx=dx===0?9999:(dx>0?(xMax-W/2)/dx:(xMin-W/2)/dx);
-   const ty=dy===0?9999:(dy>0?(yMax-H/2)/dy:(yMin-H/2)/dy);
-   let t=Math.min(Math.abs(tx),Math.abs(ty));
-   if(!Number.isFinite(t))t=1;
-   t=clamp(t,0,1);
-   x=W/2+dx*t;y=H/2+dy*t;
- }
- return{x,y,magnetic};
+/* ------------------- MAGNETIC SPACE ------------------- */
+function chooseMagneticSet(raw,alpha){
+  if(alpha>.94){magneticIds=new Set([active]);return}
+  const natural=[],ranked=[];
+  raw.forEach((p,i)=>{
+    const inside=p.x>62&&p.x<W-62&&p.y>145&&p.y<H-125&&p.opacity>.07;
+    if(inside)natural.push(i);
+    const temporal=Math.abs(data[i].ms-timeCenter)/Math.max(timelineSpanMs(),365*DAY);
+    const spatial=Math.hypot(data[i].x-cam.x,data[i].y-cam.y)/900;
+    ranked.push({i,score:temporal*.82+spatial*.38});
+  });
+  ranked.sort((a,b)=>a.score-b.score||a.i-b.i);
+  const minVisible=4,maxGuide=6,chosen=new Set(natural.slice(0,10));
+  for(const id of lastMagneticIds){if(chosen.size>=minVisible)break;const rank=ranked.findIndex(r=>r.i===id);if(rank>=0&&rank<maxGuide+4)chosen.add(id)}
+  for(const r of ranked){if(chosen.size>=minVisible)break;chosen.add(r.i)}
+  magneticIds=chosen;lastMagneticIds=new Set(chosen);
 }
-
+function pullToViewport(p){
+  const xMin=62,xMax=W-62,yMin=148,yMax=H-128;
+  let x=p.x,y=p.y,magnetic=false;
+  if(x<xMin||x>xMax||y<yMin||y>yMax){
+    magnetic=true;const dx=p.x-W/2,dy=p.y-H/2;
+    const tx=dx===0?9999:(dx>0?(xMax-W/2)/dx:(xMin-W/2)/dx);
+    const ty=dy===0?9999:(dy>0?(yMax-H/2)/dy:(yMin-H/2)/dy);
+    const t=clamp(Math.min(Math.abs(tx),Math.abs(ty)),0,1);
+    x=W/2+dx*t;y=H/2+dy*t;
+  }
+  return{x,y,magnetic};
+}
 function render(){
- const alpha=presentationAlpha();
- active=nearestMemory();
- const near=data[active],bearing=nearestBearing(),centerAge=estimateAge();
+  active=nearestMemoryToTime(timeCenter);
+  const alpha=presentationAlpha(),near=data[active];
+  presentation.style.opacity=alpha.toFixed(3);
+  presentationText.textContent=near.story;presentationDate.textContent=fullDate(near);
+  presentationCopy.style.opacity=String(clamp((alpha-.10)/.9,0,1));
+  presentationCopy.style.transform="translateY("+((1-alpha)*18)+"px)";
+  if(alpha>.48)setBg(active);else{
+    const idx=nearestMemoryToWorld();setBg(idx);
+  }
 
- presentation.style.opacity=alpha.toFixed(3);
- presentationText.textContent=near.story;
- presentationDate.textContent=dateLabel(near);
- presentationCopy.style.opacity=String(clamp((alpha-.15)/.85,0,1));
- presentationCopy.style.transform="translateY("+((1-alpha)*22)+"px)";
- if(alpha>.55)setBg(active); else {
-   const same=data.filter(s=>s.bearing===bearing);
-   let rep=same[0]||near,bd=Infinity;
-   same.forEach(s=>{const d=Math.hypot(s.x-cam.x,s.y-cam.y);if(d<bd){bd=d;rep=s}});
-   setBg(rep.i);
- }
+  modeEl.textContent=alpha>.86?"Presentatie":timelineUser?"Tijd zoeken":cam.s>.82?"Dichtbij":"Verkennen";
+  focusDate.textContent=new Date(timeCenter).toLocaleDateString("nl-NL",timelineSpanYears<2?{day:"numeric",month:"short",year:"numeric"}:{month:"short",year:"numeric"});
+  zoomRead.textContent=Math.round(cam.s/SPACE_MAX*100)+"%";
 
- let mode="Levensruimte";
- if(alpha>.86)mode="Presentatie";
- else if(cam.s>.95)mode="Dichtbij";
- else if(cam.s>.48)mode="Verkennen";
- modeEl.textContent=mode;
- whereEl.textContent=alpha>.86?dateLabel(near):bearing.name+" · rond "+Math.round(centerAge)+" jaar";
- zoomRead.textContent=Math.round(cam.s/MAX_SCALE*100)+"%";
+  const raw=data.map((s,i)=>{
+    const q=screenPoint(s.x,s.y);
+    const dt=Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()/2,365*DAY*.4);
+    const temporal=Math.exp(-.5*dt*dt);
+    const worldDist=Math.hypot(s.x-cam.x,s.y-cam.y);
+    const local=1-clamp(worldDist/900,0,1);
+    const reveal=smooth(s.reveal-.16-local*.16,s.reveal+.17-local*.16,cam.s);
+    return{x:q.x,y:q.y,temporal,reveal,opacity:reveal*(.14+.86*temporal)};
+  });
+  chooseMagneticSet(raw,alpha);
 
- const visibleYears=clamp(8/cam.s,2,60);
- const l=ageToPct(centerAge-visibleYears/2),r=ageToPct(centerAge+visibleYears/2);
- lifeWindow.style.left=l+"%";lifeWindow.style.width=Math.max(1,r-l)+"%";lifeNeedle.style.left=ageToPct(centerAge)+"%";
+  const relevance=data.map((s,i)=>({i,score:raw[i].temporal*.74+(1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/950,0,1))*.26})).sort((a,b)=>b.score-a.score);
+  const hero1=relevance[0]?.i,hero2=relevance[1]?.i;
 
- document.querySelectorAll(".dir").forEach((el,i)=>{
-   const b=BEARINGS[i],d=Math.hypot(b.x-cam.x,b.y-cam.y),strength=1-clamp(d/1700,0,1);
-   const overview=1-smooth(.75,1.5,cam.s);
-   el.style.opacity=String((.12+.5*strength)*overview);
-   el.style.transform="scale("+(0.94+.08*strength)+")";
- });
+  data.forEach((s,i)=>{
+    const r=raw[i],mag=magneticIds.has(i)&&alpha<.96,placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
+    const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260;
+    const centerFocus=.28+.72*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.02),0,1));
+    let opacity=(1-alpha)*r.opacity*centerFocus;
+    if(mag)opacity=Math.max(opacity,.30*(1-alpha)+.12);
+    if(!onscreen&&!mag)opacity=0;
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.8);
 
- const rawPositions=data.map((s,i)=>{
-   const q=screenPoint(s.x,s.y);
-   const distWorld=Math.hypot(s.x-cam.x,s.y-cam.y);
-   const distScreen=Math.hypot(q.x-W/2,q.y-H/2);
-   const localBoost=(1-clamp(distWorld/900,0,1))*.22;
-   const revealOpacity=smooth(s.reveal-.18-localBoost,s.reveal+.18-localBoost,cam.s);
-   return{x:q.x,y:q.y,distWorld,distScreen,revealOpacity};
- });
+    let scale=(.46+cam.s*.43)*(.84+s.z*.16);
+    if(i===hero1)scale*=1.48;
+    else if(i===hero2)scale*=1.22;
+    else scale*=.82;
+    if(placed.magnetic)scale*=.93;
+    if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48;
+    scale=clamp(scale,.45,1.58);
 
- chooseMagneticSet(rawPositions,alpha);
+    el=nodes[i];
+    el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
+    el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
+    el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";
+    el.classList.toggle("nearest",i===active&&alpha<.6);el.classList.toggle("magnetic",placed.magnetic);
+  });
 
- data.forEach((s,i)=>{
-   const el=nodes[i],raw=rawPositions[i];
-   const magnet=magneticIds.has(i)&&alpha<.95;
-   const placed=magnet?pullToViewport(raw,i):{x:raw.x,y:raw.y,magnetic:false};
-   const onscreen=placed.x>-240&&placed.x<W+240&&placed.y>-280&&placed.y<H+280;
-   const focus=.25+.75*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.05),0,1));
-   let opacity=(1-alpha)*raw.revealOpacity*focus;
+  magnetRing.style.left="16px";magnetRing.style.right="16px";magnetRing.style.top="140px";magnetRing.style.bottom="92px";
+  drawTimeline();
 
-   // Magnetic floor: selected stories remain visible even when naturally outside the viewport.
-   if(magnet) opacity=Math.max(opacity,.36*(1-alpha)+.12);
-   if(!onscreen&&!magnet)opacity=0;
-
-   // Current story persists underneath presentation, creating a visual morph instead of a jump.
-   if(i===active){
-     const currentFloor=(1-alpha)*.72;
-     opacity=Math.max(opacity,currentFloor);
-   }
-
-   const depth=.82+s.z*.18;
-   let scale=(s.anchor?1:.77)*(.47+cam.s*.45)*depth;
-   // Current card grows while presentation fades, bridging the two states.
-   if(i===active) scale*=1+smooth(1.05,1.78,cam.s)*.75;
-   if(placed.magnetic) scale*=.9;
-   scale=clamp(scale,.40,s.anchor?1.45:1.38);
-
-   el.style.opacity=opacity.toFixed(3);
-   el.style.pointerEvents=opacity>.16?"auto":"none";
-   el.style.zIndex=String(300+Math.round(s.z*100)+(i===active?100:0)+(placed.magnetic?20:0));
-   const hw=s.anchor?86:63,hh=s.anchor?109:83;
-   el.style.transform="translate3d("+(placed.x-hw)+"px,"+(placed.y-hh)+"px,0) scale("+scale+")";
-   el.classList.toggle("nearest",i===active&&alpha<.6);
-   el.classList.toggle("magnetic",placed.magnetic);
- });
-
- // Debug: visible safe area of the magnetic viewport.
- magnetRing.style.left="16px";magnetRing.style.right="16px";magnetRing.style.top="112px";magnetRing.style.bottom="88px";
-
- hint.innerHTML=alpha>.82
-   ? 'Knijp <b>langzaam samen</b>. Dit verhaal blijft staan terwijl de eerste nabije herinneringen eromheen verschijnen.'
-   : magneticIds.size<=5
-     ? '<b>Het scherm werkt als magneet.</b> Ook in rustige stukken blijven de dichtstbijzijnde herinneringen richting geven.'
-     : '<b>Vrij bewegen.</b> In een dichter levensgebied verschijnen vanzelf meer verhalen; in rustige gebieden blijven er minimaal enkele zichtbaar.';
+  hint.innerHTML=timelineUser
+    ? '<b>De tijdbalk stuurt nu de ruimte.</b> Rustig slepen verfijnt de tijd; sneller bewegen vergroot automatisch je zoekbereik.'
+    : alpha>.82
+      ? 'Knijp uit het verhaal of <b>pak de tijdbalk bovenin</b> om direct naar een andere periode te reizen.'
+      : '<b>Twee wegen, één positie:</b> zoek vrij tussen de foto’s of stuur gericht met de tijdlijn.';
 }
-
-function resize(){const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);render()}
+function resize(){
+  const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);
+  const cr=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.5);canvas.width=Math.max(1,Math.round(cr.width*dpr));canvas.height=Math.max(1,Math.round(cr.height*dpr));
+  render();
+}
 window.addEventListener("resize",resize,{passive:true});
 window.visualViewport&&visualViewport.addEventListener("resize",resize,{passive:true});
 
-// Stable iPhone pinch/pan, no snap on release.
+/* ------------------- SPACE TOUCH ------------------- */
 let touch=null;
 function localTouch(t){const r=app.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top}}
 function dist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
 function mid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
-
 app.addEventListener("touchstart",e=>{
- if(e.target.closest("button"))return;
- e.preventDefault();hint.style.display="none";
- if(e.touches.length===1){
-   const p=localTouch(e.touches[0]);touch={kind:"one",start:p,last:p,cx:cam.x,cy:cam.y,s:cam.s,active};
- }else if(e.touches.length>=2){
-   const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b),wp=worldPoint(m.x,m.y);
-   touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y};
- }
+  if(e.target.closest("button,#timelineShell"))return;
+  e.preventDefault();hint.style.display="none";
+  if(e.touches.length===1){const p=localTouch(e.touches[0]);touch={kind:"one",start:p,last:p,cx:cam.x,cy:cam.y,s:cam.s,active}}
+  else if(e.touches.length>=2){const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b),wp=worldPoint(m.x,m.y);touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y}}
 },{passive:false});
-
 app.addEventListener("touchmove",e=>{
- if(!touch)return;
- e.preventDefault();
- if(e.touches.length>=2){
-   const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
-   if(touch.kind!=="pinch"){
-     const wp=worldPoint(m.x,m.y);touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y};
-   }
-   const ns=clamp(touch.s*(dist(a,b)/touch.d),MIN_SCALE,MAX_SCALE);
-   setCam(touch.wx-(m.x-W/2)/ns,touch.wy-(m.y-H/2)/ns,ns);
- }else if(e.touches.length===1&&touch.kind==="one"&&cam.s<SWIPE_SCALE){
-   const p=localTouch(e.touches[0]),dx=p.x-touch.start.x,dy=p.y-touch.start.y;
-   setCam(touch.cx-dx/touch.s,touch.cy-dy/touch.s,touch.s);touch.last=p;
- }
+  if(!touch)return;e.preventDefault();
+  if(e.touches.length>=2){
+    const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
+    if(touch.kind!=="pinch"){const wp=worldPoint(m.x,m.y);touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y}}
+    const ns=clamp(touch.s*(dist(a,b)/touch.d),SPACE_MIN,SPACE_MAX);
+    cam.x=touch.wx-(m.x-W/2)/ns;cam.y=touch.wy-(m.y-H/2)/ns;cam.s=ns;syncTimeFromSpace();render();
+  }else if(e.touches.length===1&&touch.kind==="one"&&cam.s<SWIPE_SPACE){
+    const p=localTouch(e.touches[0]),dx=p.x-touch.start.x,dy=p.y-touch.start.y;
+    cam.x=clamp(touch.cx-dx/touch.s,-1600,1600);cam.y=clamp(touch.cy-dy/touch.s,-1250,1250);syncTimeFromSpace();touch.last=p;render();
+  }
 },{passive:false});
-
 app.addEventListener("touchend",e=>{
- if(!touch)return;
- e.preventDefault();
- if(e.touches.length===0&&touch.kind==="one"&&touch.s>=SWIPE_SCALE){
-   const p=touch.last||touch.start,dx=p.x-touch.start.x,dy=p.y-touch.start.y;
-   if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2)focusStory(touch.active+(dx<0?1:-1));
- }
- touch=null;
+  if(!touch)return;e.preventDefault();
+  if(e.touches.length===0&&touch.kind==="one"&&touch.s>=SWIPE_SPACE){
+    const p=touch.last||touch.start,dx=p.x-touch.start.x,dy=p.y-touch.start.y;
+    if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2)focusStory(touch.active+(dx<0?1:-1));
+  }
+  touch=null;
 },{passive:false});
 app.addEventListener("touchcancel",()=>touch=null,{passive:false});
 
-document.getElementById("storyBtn").onclick=()=>focusStory(active);
+document.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToTime(timeCenter));
 document.getElementById("wideBtn").onclick=wide;
 document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.82);
 document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.22);

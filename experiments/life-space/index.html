@@ -163,8 +163,12 @@ const data=MEMORIES.map((s,i)=>{
   const ang=(u-.5)*1.55+(fract(s.id+2)-.5)*.92;
   const spread=95+u*195+fract(s.id+33)*240;
   const cross=(fract(s.id+19)-.5)*330;
-  const x=b.x+Math.cos(ang)*spread+cross*.30;
-  const y=b.y+Math.sin(ang)*spread*.70+cross*.58;
+  const rawX=b.x+Math.cos(ang)*spread+cross*.30;
+  const rawY=b.y+Math.sin(ang)*spread*.70+cross*.58;
+  // The life-space stays spatial, but is deliberately compact enough that
+  // a user can feel neighbouring periods instead of crossing dead oceans.
+  const x=rawX*.76;
+  const y=rawY*.76;
   return {...s,i,ms,age,x,y,z:.82+fract(s.id+70)*.38,reveal:.27+.55*fract(s.id+91)};
 }).sort((a,b)=>a.ms-b.ms);
 
@@ -266,10 +270,18 @@ function wide(){
 }
 function syncTimeFromSpace(){
   const idx=nearestMemoryToWorld(),n=data[idx];
-  // Weighted blend of a few closest stories makes the timeline move smoothly during spatial panning.
-  const nearby=data.map(s=>({s,d:Math.hypot(s.x-cam.x,s.y-cam.y)})).sort((a,b)=>a.d-b.d).slice(0,5);
-  let num=0,den=0;nearby.forEach(o=>{const w=1/(55+o.d);num+=o.s.ms*w;den+=w});
-  if(den) timeCenter=clampTime(num/den); else timeCenter=n.ms;
+  // Continuous field: every story contributes a little. This makes the date
+  // drift smoothly while panning instead of jumping from cluster to cluster.
+  const viewportWorld=Math.max(W,H)/Math.max(cam.s,.20);
+  const sigma=clamp(viewportWorld*.34,180,820);
+  let num=0,den=0;
+  data.forEach(s=>{
+    const d=Math.hypot(s.x-cam.x,s.y-cam.y);
+    const q=d/sigma;
+    const w=Math.exp(-.5*q*q)+.0005;
+    num+=s.ms*w;den+=w;
+  });
+  timeCenter=den?clampTime(num/den):n.ms;
 }
 function worldCenterForTime(ms){
   // Interpolate between chronological memories, then lightly average nearby dates.
@@ -475,8 +487,8 @@ function drawTimeline(){
 function chooseMagneticSet(raw,alpha){
   const overview=overviewBlendForScale();
   if(overview>.52){
-    magneticIds=new Set(OVERVIEW_ANCHORS);
-    lastMagneticIds=new Set(OVERVIEW_ANCHORS);
+    magneticIds=new Set();
+    lastMagneticIds=new Set();
     return;
   }
   if(alpha>.94){magneticIds=new Set([active]);return}
@@ -513,7 +525,8 @@ function render(){
   presentationText.textContent=near.story;presentationDate.textContent=fullDate(near);
   presentationCopy.style.opacity=String(clamp((alpha-.10)/.9,0,1));
   presentationCopy.style.transform="translateY("+((1-alpha)*18)+"px)";
-  if(alpha>.48)setBg(active);else{
+  if(alpha>.48)setBg(active);
+  else if(overview<.65){
     const idx=nearestMemoryToWorld();setBg(idx);
   }
 
@@ -522,32 +535,34 @@ function render(){
 
   const raw=data.map((s,i)=>{
     const q=screenPoint(s.x,s.y);
-    const dt=Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()/2,365*DAY*.4);
-    const temporalLocal=Math.exp(-.5*dt*dt);
-    const overviewRelevance=OVERVIEW_ANCHOR_SET.has(i)?1:.045;
-    const temporal=lerp(temporalLocal,overviewRelevance,overview);
     const worldDist=Math.hypot(s.x-cam.x,s.y-cam.y);
-    const local=1-clamp(worldDist/900,0,1);
-    let reveal=smooth(s.reveal-.16-local*.16,s.reveal+.17-local*.16,cam.s);
+    const local=1-clamp(worldDist/780,0,1);
+    let reveal=smooth(s.reveal-.20-local*.20,s.reveal+.16-local*.20,cam.s);
     if(OVERVIEW_ANCHOR_SET.has(i)) reveal=Math.max(reveal,overview);
-    return{x:q.x,y:q.y,temporal,reveal,opacity:reveal*(.14+.86*temporal)};
+    // Fixed-world behaviour: photos do not disappear merely because the
+    // timeline centre changes. They enter/leave because the camera moves.
+    const spatialPresence=.22+.78*local;
+    return{x:q.x,y:q.y,temporal:1,reveal,opacity:reveal*spatialPresence};
   });
   chooseMagneticSet(raw,alpha);
 
-  const relevance=data.map((s,i)=>({i,score:raw[i].temporal*.74+(1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/950,0,1))*.26})).sort((a,b)=>b.score-a.score);
+  const relevance=data.map((s,i)=>({
+    i,
+    score:1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/900,0,1)
+  })).sort((a,b)=>b.score-a.score);
   const hero1=overview>.55 ? null : (spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i);
   const hero2=overview>.55 ? null : relevance.find(r=>r.i!==hero1)?.i;
   renderedCards=[];
 
   data.forEach((s,i)=>{
-    const r=raw[i],mag=magneticIds.has(i)&&alpha<.96,placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
+    const r=raw[i],mag=magneticIds.has(i)&&alpha<.96&&overview<.52,placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
     const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260;
     const centerFocus=.28+.72*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.02),0,1));
     let opacity=(1-alpha)*r.opacity*centerFocus;
     if(mag)opacity=Math.max(opacity,.30*(1-alpha)+.12);
     if(!onscreen&&!mag)opacity=0;
     if(i===active)opacity=Math.max(opacity,(1-alpha)*.8*(1-overview));
-    if(OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.84);
+    if(OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.92);
 
     let scale=(.46+cam.s*.43)*(.84+s.z*.16);
     if(i===hero1){
@@ -564,7 +579,7 @@ function render(){
     if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48*(1-overview);
     if(OVERVIEW_ANCHOR_SET.has(i)){
       const anchorOrder=OVERVIEW_ANCHORS.indexOf(i);
-      const overviewScale=1.02+((anchorOrder===0||anchorOrder===OVERVIEW_ANCHORS.length-1)?0.10:0);
+      const overviewScale=1.16+((anchorOrder===0||anchorOrder===OVERVIEW_ANCHORS.length-1)?0.10:0);
       scale=lerp(scale,overviewScale,overview);
     }else{
       scale*=1-overview*.42;
@@ -609,7 +624,8 @@ function storyAtScreenPoint(p){
     const d=Math.hypot(r.x-p.x,r.y-p.y);
     if(d<bd){bd=d;best=i}
   });
-  return bd<=125?best:null;
+  const radius=overviewBlendForScale()>.45?185:125;
+  return bd<=radius?best:null;
 }
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
@@ -655,36 +671,48 @@ app.addEventListener("touchmove",e=>{
     if(touch.target!=null&&zoomingIn){
       const target=data[touch.target];
       // Zooming IN honours the exact story under the fingers.
-      const nextS=lerp(cam.s,ns,.48);
+      const nextS=ns;
       cam.x=target.x-(m.x-W/2)/nextS;
       cam.y=target.y-(m.y-H/2)/nextS;
       cam.s=nextS;
       syncSpanFromSpace();
-      timeCenter=lerp(timeCenter,target.ms,.14);
+      timeCenter=lerp(timeCenter,target.ms,.10);
     }else{
-      // Zooming OUT deliberately releases the story. As scale approaches the
-      // minimum, the camera glides toward the centre of the entire life-space.
       spatialPinchTarget=null;
       const fx=touch.freeWx??touch.wx,fy=touch.freeWy??touch.wy;
-      const localX=fx-(m.x-W/2)/ns;
-      const localY=fy-(m.y-H/2)/ns;
-      const ov=overviewBlendForScale(ns);
-      cam.x=lerp(cam.x,lerp(localX,OVERVIEW_CENTER.x,ov),.58);
-      cam.y=lerp(cam.y,lerp(localY,OVERVIEW_CENTER.y,ov),.58);
-      cam.s=lerp(cam.s,ns,.58);
-      syncSpanFromSpace();
-      if(ov<.58) syncTimeFromSpace();
+      const zoomingOut=rawRatio<1;
+      if(!zoomingOut){
+        // Map contract: whatever world point sits between the fingers stays
+        // there. Direction is therefore felt from the first millimetre.
+        cam.s=ns;
+        cam.x=fx-(m.x-W/2)/cam.s;
+        cam.y=fy-(m.y-H/2)/cam.s;
+        syncSpanFromSpace();
+        syncTimeFromSpace();
+      }else{
+        // Only zooming OUT may gently return to the whole-life framing.
+        const localX=fx-(m.x-W/2)/ns;
+        const localY=fy-(m.y-H/2)/ns;
+        const ov=overviewBlendForScale(ns);
+        cam.s=ns;
+        cam.x=lerp(localX,OVERVIEW_CENTER.x,ov*.72);
+        cam.y=lerp(localY,OVERVIEW_CENTER.y,ov*.72);
+        syncSpanFromSpace();
+        if(ov<.72)syncTimeFromSpace();
+      }
     }
     render();
   }else if(e.touches.length===1&&touch.kind==="one"){
     const p=localTouch(e.touches[0]);
-    touch.last=p;
     if(cam.s<SWIPE_SPACE){
-      const dx=p.x-touch.start.x,dy=p.y-touch.start.y;
-      cam.x=clamp(touch.cx-dx/touch.s,-1600,1600);
-      cam.y=clamp(touch.cy-dy/touch.s,-1250,1250);
-      syncSpanFromSpace();syncTimeFromSpace();render();
+      const dx=p.x-touch.last.x,dy=p.y-touch.last.y;
+      cam.x=clamp(cam.x-dx/cam.s,-1600,1600);
+      cam.y=clamp(cam.y-dy/cam.s,-1250,1250);
+      syncSpanFromSpace();
+      syncTimeFromSpace();
+      render();
     }
+    touch.last=p;
   }
 },{passive:false});
 app.addEventListener("touchend",e=>{

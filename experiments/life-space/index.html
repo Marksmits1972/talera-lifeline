@@ -79,7 +79,7 @@ button{font:inherit;color:inherit}
 .memory.magnetic{box-shadow:0 17px 46px rgba(0,0,0,.42),0 0 0 1px rgba(255,240,174,.12)}
 
 /* Presentation becomes the first point on the same zoom continuum. */
-#presentation{position:absolute;z-index:18;inset:0;pointer-events:none;opacity:1;will-change:opacity}
+#presentation{position:absolute;z-index:18;inset:0;pointer-events:none;opacity:1;will-change:opacity,transform;transform-origin:center}
 .storyMorph{position:absolute!important;z-index:70!important;margin:0!important;pointer-events:none!important;transform:none!important;transform-origin:center!important;will-change:left,top,width,height,border-radius,box-shadow;transition:left .54s cubic-bezier(.20,.72,.18,1),top .54s cubic-bezier(.20,.72,.18,1),width .54s cubic-bezier(.20,.72,.18,1),height .54s cubic-bezier(.20,.72,.18,1),border-radius .54s cubic-bezier(.20,.72,.18,1),box-shadow .54s ease!important}
 .storyMorph .memoryCopy{transition:opacity .22s ease!important}
 .storyMorph .memoryShade{transition:opacity .26s ease!important}
@@ -476,12 +476,19 @@ function zoomAround(px,py,newScale){
 }
 let storyOpenRaf=0;
 let storyMorphNode=null;
+let spaceReturnState=null;
 
+function resetPresentationDrag(animate=false){
+  presentation.style.transition=animate?"transform .20s ease":"";
+  presentation.style.transform="";
+  if(animate)setTimeout(()=>{presentation.style.transition=""},220);
+}
 function clearStoryMorph(){
   if(storyMorphNode){storyMorphNode.remove();storyMorphNode=null}
   world.style.transition="";
   world.style.opacity="";
   world.style.filter="";
+  resetPresentationDrag(false);
 }
 function focusStory(i){
   cancelAnimationFrame(storyOpenRaf);
@@ -504,6 +511,19 @@ function openStorySmooth(i){
   hint.style.display="none";
   ensureCardImage(targetIndex);
   setBg(targetIndex);
+
+  // Remember the exact universe view so the same card can later be sent
+  // back to the exact place it came from.
+  if(cam.s<SWIPE_SPACE){
+    spaceReturnState={
+      storyIndex:targetIndex,
+      camX:cam.x,
+      camY:cam.y,
+      camS:cam.s,
+      timeCenter,
+      centerMs:typeof centerMs!=="undefined"?centerMs:timeCenter
+    };
+  }
 
   const appRect=app.getBoundingClientRect();
   const sourceRect=source.getBoundingClientRect();
@@ -572,6 +592,118 @@ function openStorySmooth(i){
     }
   });
 }
+function closeStorySmooth(i=active){
+  const targetIndex=clamp(i,0,data.length-1);
+  const target=data[targetIndex];
+  if(!target)return;
+
+  stopGlobeInertia();
+  cancelAnimationFrame(storyOpenRaf);
+  clearStoryMorph();
+  ensureCardImage(targetIndex);
+  hint.style.display="none";
+
+  const appRect=app.getBoundingClientRect();
+  const source=nodes[targetIndex];
+  const clone=source.cloneNode(true);
+  clone.classList.add("storyMorph");
+  clone.classList.remove("nearest","magnetic");
+  clone.style.left="0px";
+  clone.style.top="0px";
+  clone.style.width=appRect.width+"px";
+  clone.style.height=appRect.height+"px";
+  clone.style.borderRadius="0px";
+  clone.style.opacity="1";
+  clone.style.boxShadow="0 0 0 rgba(0,0,0,0)";
+  clone.querySelectorAll("img").forEach(img=>{
+    img.loading="eager";
+    img.src=target.image;
+    img.style.opacity="1";
+  });
+  const cloneCopy=clone.querySelector(".memoryCopy");
+  const cloneShade=clone.querySelector(".memoryShade");
+  if(cloneCopy)cloneCopy.style.opacity="0";
+  if(cloneShade)cloneShade.style.opacity=".18";
+  app.appendChild(clone);
+  storyMorphNode=clone;
+
+  // Restore the exact space view when returning to the same story. If the
+  // user swiped to another story in presentation, use the same zoom level but
+  // centre the universe around that new memory.
+  const exact=spaceReturnState&&spaceReturnState.storyIndex===targetIndex;
+  const returnScale=spaceReturnState
+    ? clamp(spaceReturnState.camS,SPACE_MIN,SWIPE_SPACE-.08)
+    : Math.max(SPACE_MIN,Math.min(.82,SWIPE_SPACE-.12));
+
+  if(exact){
+    cam.x=spaceReturnState.camX;
+    cam.y=spaceReturnState.camY;
+    cam.s=returnScale;
+    timeCenter=spaceReturnState.timeCenter;
+    if(typeof centerMs!=="undefined")centerMs=spaceReturnState.centerMs;
+  }else{
+    cam.x=target.lon;
+    cam.y=target.lat;
+    cam.s=returnScale;
+    timeCenter=target.ms;
+    if(typeof centerMs!=="undefined")centerMs=timeCenter;
+  }
+
+  // Force the returning story to be represented while we measure its true
+  // destination in the photo universe.
+  active=targetIndex;
+  spatialPinchTarget=targetIndex;
+  spatialPinchStrength=0;
+  world.style.transition="none";
+  world.style.opacity=".14";
+  world.style.filter="blur(3px)";
+  render();
+
+  const destination=nodes[targetIndex].getBoundingClientRect();
+  nodes[targetIndex].style.visibility="hidden";
+
+  // Presentation is now covered by the full-screen clone. Bring the universe
+  // back while the same photo flies home.
+  presentation.style.opacity="0";
+  world.style.transition="opacity .54s ease,filter .54s ease";
+
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      if(storyMorphNode!==clone)return;
+      world.style.opacity="1";
+      world.style.filter="none";
+      clone.style.left=(destination.left-appRect.left)+"px";
+      clone.style.top=(destination.top-appRect.top)+"px";
+      clone.style.width=destination.width+"px";
+      clone.style.height=destination.height+"px";
+      clone.style.borderRadius=getComputedStyle(nodes[targetIndex]).borderRadius||"18px";
+      clone.style.boxShadow=getComputedStyle(nodes[targetIndex]).boxShadow;
+      if(cloneCopy)cloneCopy.style.opacity="1";
+      if(cloneShade)cloneShade.style.opacity="1";
+    });
+  });
+
+  let closeStartedAt=0;
+  storyOpenRaf=requestAnimationFrame(function settle(now){
+    if(!closeStartedAt)closeStartedAt=now;
+    if(now-closeStartedAt<555){
+      storyOpenRaf=requestAnimationFrame(settle);
+      return;
+    }
+
+    nodes[targetIndex].style.visibility="";
+    spatialPinchTarget=null;
+    spatialPinchStrength=0;
+    storyMorphNode=null;
+    clone.remove();
+    world.style.transition="";
+    world.style.opacity="";
+    world.style.filter="";
+    presentation.style.opacity="";
+    render();
+  });
+}
+
 function wide(){
   // Return to a whole-life globe without resetting the longitude the user discovered.
   cam.y=0;cam.s=SPACE_MIN;
@@ -1339,11 +1471,11 @@ function startGlobeInertia(vLon,vLat){
     render();
 
     // Map-like inertial friction: fast flicks travel, soft pushes settle nearby.
-    const decay=Math.exp(-dt/610);
+    const decay=Math.exp(-dt/430);
     vLon*=decay;
     vLat*=decay;
 
-    if(lived<1900&&Math.hypot(vLon,vLat)>.000018){
+    if(lived<1350&&Math.hypot(vLon,vLat)>.000024){
       globeInertiaRaf=requestAnimationFrame(frame);
     }else{
       globeInertiaRaf=0;
@@ -1427,6 +1559,13 @@ app.addEventListener("touchmove",e=>{
     const p=localTouch(e.touches[0]);
     touch.travel=Math.max(touch.travel,dist(touch.start,p));
 
+    if(touch.s>=SWIPE_SPACE){
+      const dy=Math.max(0,p.y-touch.start.y);
+      const pull=clamp(dy/240,0,1);
+      presentation.style.transition="none";
+      presentation.style.transform="translate3d(0,"+(dy*.16).toFixed(1)+"px,0) scale("+(1-pull*.035).toFixed(4)+")";
+    }
+
     if(touch.s<SWIPE_SPACE){
       const now=performance.now();
       const dt=clamp(now-touch.lastT,8,48);
@@ -1477,12 +1616,25 @@ app.addEventListener("touchend",e=>{
     return;
   }
 
-  // Presentation keeps the familiar previous/next story swipe.
+  // Presentation: swipe down sends the photo back into the universe.
+  // Horizontal swipes still move exactly one story at a time.
   if(e.touches.length===0&&finished.kind==="one"&&finished.s>=SWIPE_SPACE){
-    const p=finished.last||finished.start,dx=p.x-finished.start.x,dy=p.y-finished.start.y;
+    const p=finished.last||finished.start;
+    const dx=p.x-finished.start.x,dy=p.y-finished.start.y;
+
+    touch=null;spatialPinchTarget=null;spatialPinchStrength=0;
+
+    if(dy>62&&dy>Math.abs(dx)*1.05){
+      resetPresentationDrag(false);
+      closeStorySmooth(finished.active);
+      return;
+    }
+
+    resetPresentationDrag(true);
     if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2){
       focusStory(finished.active+(dx<0?1:-1));
     }
+    return;
   }
 
   if(e.touches.length===0&&finished.kind==="pinch"&&finished.target!=null&&cam.s>finished.s){

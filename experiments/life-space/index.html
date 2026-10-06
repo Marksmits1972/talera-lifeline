@@ -164,6 +164,8 @@ let timeCenter=data[active].ms;
 let timelineSpanYears=15;
 let timelineUser=false;
 let lastMagneticIds=new Set(),magneticIds=new Set();
+let renderedCards=[];
+let spatialPinchTarget=null;
 
 function screenPoint(x,y){return{x:(x-cam.x)*cam.s+W/2,y:(y-cam.y)*cam.s+H/2}}
 function worldPoint(x,y){return{x:cam.x+(x-W/2)/cam.s,y:cam.y+(y-H/2)/cam.s}}
@@ -406,7 +408,9 @@ function render(){
   chooseMagneticSet(raw,alpha);
 
   const relevance=data.map((s,i)=>({i,score:raw[i].temporal*.74+(1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/950,0,1))*.26})).sort((a,b)=>b.score-a.score);
-  const hero1=relevance[0]?.i,hero2=relevance[1]?.i;
+  const hero1=spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i;
+  const hero2=relevance.find(r=>r.i!==hero1)?.i;
+  renderedCards=[];
 
   data.forEach((s,i)=>{
     const r=raw[i],mag=magneticIds.has(i)&&alpha<.96,placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
@@ -430,6 +434,7 @@ function render(){
     el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
     el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);el.classList.toggle("magnetic",placed.magnetic);
+    renderedCards[i]={x:placed.x,y:placed.y,opacity,magnetic:placed.magnetic};
   });
 
   magnetRing.style.left="16px";magnetRing.style.right="16px";magnetRing.style.top="140px";magnetRing.style.bottom="92px";
@@ -454,19 +459,63 @@ let touch=null;
 function localTouch(t){const r=app.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top}}
 function dist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
 function mid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+function storyAtScreenPoint(p){
+  let best=null,bd=Infinity;
+  renderedCards.forEach((r,i)=>{
+    if(!r||r.opacity<.13)return;
+    const d=Math.hypot(r.x-p.x,r.y-p.y);
+    if(d<bd){bd=d;best=i}
+  });
+  return bd<=125?best:null;
+}
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
   e.preventDefault();hint.style.display="none";
   if(e.touches.length===1){const p=localTouch(e.touches[0]);touch={kind:"one",start:p,last:p,cx:cam.x,cy:cam.y,s:cam.s,active}}
-  else if(e.touches.length>=2){const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b),wp=worldPoint(m.x,m.y);touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y}}
+  else if(e.touches.length>=2){
+    const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
+    const target=storyAtScreenPoint(m);
+    spatialPinchTarget=target;
+    if(target!=null){
+      const s=data[target];
+      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y};
+    }else{
+      const wp=worldPoint(m.x,m.y);
+      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:wp.x,wy:wp.y};
+    }
+  }
 },{passive:false});
 app.addEventListener("touchmove",e=>{
   if(!touch)return;e.preventDefault();
   if(e.touches.length>=2){
     const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
-    if(touch.kind!=="pinch"){const wp=worldPoint(m.x,m.y);touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y}}
+    if(touch.kind!=="pinch"){
+      const target=storyAtScreenPoint(m);
+      spatialPinchTarget=target;
+      if(target!=null){
+        const s=data[target];
+        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y};
+      }else{
+        const wp=worldPoint(m.x,m.y);
+        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:wp.x,wy:wp.y};
+      }
+    }
     const ns=clamp(touch.s*(dist(a,b)/touch.d),SPACE_MIN,SPACE_MAX);
-    cam.x=touch.wx-(m.x-W/2)/ns;cam.y=touch.wy-(m.y-H/2)/ns;cam.s=ns;syncTimeFromSpace();render();
+    if(touch.target!=null){
+      const target=data[touch.target];
+      // Fundamental spatial contract:
+      // the story under the fingers remains under the fingers while zooming.
+      cam.x=target.x-(m.x-W/2)/ns;
+      cam.y=target.y-(m.y-H/2)/ns;
+      cam.s=ns;
+      timeCenter=lerp(timeCenter,target.ms,.34);
+    }else{
+      cam.x=touch.wx-(m.x-W/2)/ns;
+      cam.y=touch.wy-(m.y-H/2)/ns;
+      cam.s=ns;
+      syncTimeFromSpace();
+    }
+    render();
   }else if(e.touches.length===1&&touch.kind==="one"&&cam.s<SWIPE_SPACE){
     const p=localTouch(e.touches[0]),dx=p.x-touch.start.x,dy=p.y-touch.start.y;
     cam.x=clamp(touch.cx-dx/touch.s,-1600,1600);cam.y=clamp(touch.cy-dy/touch.s,-1250,1250);syncTimeFromSpace();touch.last=p;render();
@@ -478,9 +527,17 @@ app.addEventListener("touchend",e=>{
     const p=touch.last||touch.start,dx=p.x-touch.start.x,dy=p.y-touch.start.y;
     if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2)focusStory(touch.active+(dx<0?1:-1));
   }
+  if(e.touches.length===0&&touch.kind==="pinch"&&touch.target!=null){
+    const target=data[touch.target];
+    timeCenter=target.ms;
+    active=touch.target;
+    // Do not jump the camera: only make the chosen story the semantic focus.
+  }
   touch=null;
+  spatialPinchTarget=null;
+  render();
 },{passive:false});
-app.addEventListener("touchcancel",()=>touch=null,{passive:false});
+app.addEventListener("touchcancel",()=>{touch=null;spatialPinchTarget=null;render()},{passive:false});
 
 document.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToTime(timeCenter));
 document.getElementById("wideBtn").onclick=wide;

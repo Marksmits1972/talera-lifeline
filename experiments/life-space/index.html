@@ -892,129 +892,139 @@ function resize(){function resize(){
 window.addEventListener("resize",resize,{passive:true});
 window.visualViewport&&visualViewport.addEventListener("resize",resize,{passive:true});
 
-/* ------------------- SPACE TOUCH ------------------- */
+/* ------------------- LIFE GLOBE TOUCH ------------------- */
 let touch=null;
 function localTouch(t){const r=app.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top}}
 function dist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
 function mid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+function lerpLon(a,b,t){return wrapLon(a+wrapLon(b-a)*t)}
+
 function storyAtScreenPoint(p){
   let best=null,bd=Infinity;
   renderedCards.forEach((r,i)=>{
-    if(!r||r.opacity<.13)return;
+    if(!r||!r.selected||r.opacity<.20)return;
     const d=Math.hypot(r.x-p.x,r.y-p.y);
     if(d<bd){bd=d;best=i}
   });
-  const radius=overviewBlendForScale()>.45?185:125;
+  const radius=overviewBlendForScale()>.45?170:125;
   return bd<=radius?best:null;
 }
+
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
   e.preventDefault();hint.style.display="none";
-  if(e.touches.length===1){const p=localTouch(e.touches[0]);touch={kind:"one",start:p,last:p,cx:cam.x,cy:cam.y,s:cam.s,active}}
-  else if(e.touches.length>=2){
+
+  if(e.touches.length===1){
+    const p=localTouch(e.touches[0]);
+    touch={kind:"one",start:p,last:p,lon:cam.x,lat:cam.y,s:cam.s,active};
+  }else if(e.touches.length>=2){
     const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
     const target=storyAtScreenPoint(m);
-    spatialPinchTarget=target;
-    spatialPinchStrength=0;
-    const free=worldPoint(m.x,m.y);
-    if(target!=null){
-      const s=data[target];
-      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y,freeWx:free.x,freeWy:free.y};
-    }else{
-      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:free.x,wy:free.y,freeWx:free.x,freeWy:free.y};
-    }
+    spatialPinchTarget=target;spatialPinchStrength=0;
+    touch={
+      kind:"pinch",
+      d:Math.max(10,dist(a,b)),
+      s:cam.s,
+      lon:cam.x,
+      lat:cam.y,
+      target,
+      mid:m
+    };
   }
 },{passive:false});
+
 app.addEventListener("touchmove",e=>{
-  if(!touch)return;e.preventDefault();
+  if(!touch)return;
+  e.preventDefault();
+
   if(e.touches.length>=2){
     const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
+
     if(touch.kind!=="pinch"){
       const target=storyAtScreenPoint(m);
-      spatialPinchTarget=target;
-      spatialPinchStrength=0;
-      const free=worldPoint(m.x,m.y);
-      if(target!=null){
-        const s=data[target];
-        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y,freeWx:free.x,freeWy:free.y};
-      }else{
-        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:free.x,wy:free.y,freeWx:free.x,freeWy:free.y};
-      }
+      spatialPinchTarget=target;spatialPinchStrength=0;
+      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,lon:cam.x,lat:cam.y,target,mid:m};
     }
+
     const rawRatio=dist(a,b)/touch.d;
-    // Damped pinch response: spreading fingers still zooms toward the same place,
-    // but requires a larger gesture for the same scale change.
-    const gentleRatio=Math.pow(rawRatio,.54);
+    const gentleRatio=Math.pow(rawRatio,.58);
     const ns=clamp(touch.s*gentleRatio,SPACE_MIN,SPACE_MAX);
-    spatialPinchStrength=clamp(Math.abs(Math.log(Math.max(.001,gentleRatio)))*1.45,0,1);
     const zoomingIn=rawRatio>=1;
+    spatialPinchStrength=clamp(Math.abs(Math.log(Math.max(.001,gentleRatio)))*1.6,0,1);
+
+    cam.s=ns;
+
     if(touch.target!=null&&zoomingIn){
+      // Rotate the globe toward exactly the story held between the fingers.
+      // This preserves the "what I see is where I zoom" contract.
       const target=data[touch.target];
-      // Zooming IN honours the exact story under the fingers.
-      const nextS=ns;
-      cam.x=target.x-(m.x-W/2)/nextS;
-      cam.y=target.y-(m.y-H/2)/nextS;
-      cam.s=nextS;
-      syncSpanFromSpace();
-      timeCenter=lerp(timeCenter,target.ms,.10);
+      const commit=smooth(.06,.80,spatialPinchStrength);
+      cam.x=lerpLon(touch.lon,target.lon,commit*.88);
+      cam.y=lerp(touch.lat,target.lat,commit*.88);
+      timeCenter=lerp(timeCenter,target.ms,.10+.26*commit);
     }else{
-      spatialPinchTarget=null;
-      const fx=touch.freeWx??touch.wx,fy=touch.freeWy??touch.wy;
-      const zoomingOut=rawRatio<1;
-      if(!zoomingOut){
-        // Map contract: whatever world point sits between the fingers stays
-        // there. Direction is therefore felt from the first millimetre.
-        cam.s=ns;
-        cam.x=fx-(m.x-W/2)/cam.s;
-        cam.y=fy-(m.y-H/2)/cam.s;
-        syncSpanFromSpace();
-        syncTimeFromSpace();
-      }else{
-        // Only zooming OUT may gently return to the whole-life framing.
-        const localX=fx-(m.x-W/2)/ns;
-        const localY=fy-(m.y-H/2)/ns;
-        const ov=overviewBlendForScale(ns);
-        cam.s=ns;
-        cam.x=lerp(localX,OVERVIEW_CENTER.x,ov*.72);
-        cam.y=lerp(localY,OVERVIEW_CENTER.y,ov*.72);
-        syncSpanFromSpace();
-        if(ov<.72)syncTimeFromSpace();
-      }
+      // A free pinch keeps the current globe direction stable.
+      cam.x=touch.lon;cam.y=touch.lat;
+      syncTimeFromSpace();
     }
+
+    syncSpanFromSpace();
     render();
-  }else if(e.touches.length===1&&touch.kind==="one"){
+    return;
+  }
+
+  if(e.touches.length===1&&touch.kind==="one"){
     const p=localTouch(e.touches[0]);
-    if(cam.s<SWIPE_SPACE){
+
+    // Story presentation keeps the familiar previous/next swipe.
+    if(touch.s<SWIPE_SPACE){
       const dx=p.x-touch.last.x,dy=p.y-touch.last.y;
-      cam.x=clampCamX(cam.x-dx/cam.s);
-      cam.y=clampCamY(cam.y-dy/cam.s);
+      const nav=1/Math.max(.60,cam.s);
+      const contentFactor=Math.sqrt(330/SPHERE_RADIUS);
+
+      // Horizontal = rotation around the axis. wrapLon makes it literally endless.
+      cam.x=wrapLon(cam.x-dx*.0068*nav*contentFactor);
+
+      // Vertical = travel over the life axis. There are real endpoints:
+      // north = early life, south = later life.
+      cam.y=clampCamY(cam.y+dy*.0047*nav*contentFactor);
+
       syncSpanFromSpace();
       syncTimeFromSpace();
       render();
     }
+
     touch.last=p;
   }
 },{passive:false});
+
 app.addEventListener("touchend",e=>{
-  if(!touch)return;e.preventDefault();
+  if(!touch)return;
+  e.preventDefault();
+
   if(e.touches.length===0&&touch.kind==="one"&&touch.s>=SWIPE_SPACE){
     const p=touch.last||touch.start,dx=p.x-touch.start.x,dy=p.y-touch.start.y;
-    if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2)focusStory(touch.active+(dx<0?1:-1));
+    if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2){
+      focusStory(touch.active+(dx<0?1:-1));
+    }
   }
+
   if(e.touches.length===0&&touch.kind==="pinch"&&touch.target!=null&&cam.s>touch.s){
     const target=data[touch.target];
-    const commit=smooth(.28,.88,spatialPinchStrength);
-    timeCenter=lerp(timeCenter,target.ms,.18+.42*commit);
-    if(commit>.56) active=touch.target;
+    const commit=smooth(.30,.88,spatialPinchStrength);
+    timeCenter=lerp(timeCenter,target.ms,.24+.50*commit);
+    if(commit>.58)active=touch.target;
   }
-  touch=null;
-  spatialPinchTarget=null;
-  spatialPinchStrength=0;
+
+  touch=null;spatialPinchTarget=null;spatialPinchStrength=0;
   render();
 },{passive:false});
-app.addEventListener("touchcancel",()=>{touch=null;spatialPinchTarget=null;spatialPinchStrength=0;render()},{passive:false});
 
-document.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToTime(timeCenter));
+app.addEventListener("touchcancel",()=>{
+  touch=null;spatialPinchTarget=null;spatialPinchStrength=0;render();
+},{passive:false});
+
+document.getElementById("storyBtn").onclickdocument.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToTime(timeCenter));
 document.getElementById("wideBtn").onclick=wide;
 document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.82);
 document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.22);

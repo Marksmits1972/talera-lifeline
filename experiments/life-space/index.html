@@ -141,6 +141,14 @@ const DAY=86400000;
 let SPACE_MIN=.20;
 const SPACE_MAX=2.0,SWIPE_SPACE=1.66;
 
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+const fract=n=>{const x=Math.sin(n*79.271+4.91)*43758.5453;return x-Math.floor(x)};
+const ageFromMs=ms=>(ms-LIFE_START)/(365.2425*DAY);
+const shortDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{month:"short",year:"numeric"});
+const fullDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+
 
 // 100 deterministic prototype memories. Their distribution is deliberately uneven:
 // sparse early years, a very dense band around age 30, and mixed density later.

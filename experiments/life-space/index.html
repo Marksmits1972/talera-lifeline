@@ -144,6 +144,24 @@ const data=MEMORIES.map((s,i)=>{
   return {...s,i,ms,age,x,y,z:.82+fract(s.id+70)*.38,reveal:.27+.55*fract(s.id+91)};
 }).sort((a,b)=>a.ms-b.ms);
 
+// The fully zoomed-out state is a true whole-life overview, not merely
+// the current neighborhood rendered smaller.
+const DATA_BOUNDS=data.reduce((b,s)=>({
+  minX:Math.min(b.minX,s.x),maxX:Math.max(b.maxX,s.x),
+  minY:Math.min(b.minY,s.y),maxY:Math.max(b.maxY,s.y)
+}),{minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity});
+const OVERVIEW_CENTER={
+  x:(DATA_BOUNDS.minX+DATA_BOUNDS.maxX)/2,
+  y:(DATA_BOUNDS.minY+DATA_BOUNDS.maxY)/2
+};
+const overviewAnchorAges=[10,25,40,54];
+const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
+  let best=0,bd=Infinity;
+  data.forEach((s,i)=>{const d=Math.abs(s.age-age);if(d<bd){bd=d;best=i}});
+  return best;
+}).filter((v,i,a)=>a.indexOf(v)===i);
+const OVERVIEW_ANCHOR_SET=new Set(OVERVIEW_ANCHORS);
+
 // Preload all thumbnails immediately; only 50 in this prototype.
 data.forEach(s=>{const im=new Image();im.src=s.image.replace("w=1400","w=620")});
 
@@ -182,6 +200,7 @@ function nearestMemoryToTime(ms=timeCenter){
 function setBg(i){const u=data[i].image;bg.style.backgroundImage="url('"+u+"')";presentationImg.src=u}
 function toastMsg(t){toast.textContent=t;toast.classList.add("on");clearTimeout(toastMsg.t);toastMsg.t=setTimeout(()=>toast.classList.remove("on"),900)}
 function presentationAlpha(){return smooth(1.16,1.92,cam.s)}
+function overviewBlendForScale(s=cam.s){return 1-smooth(.22,.50,s)}
 function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
 function clampTime(ms){return clamp(ms,LIFE_START,LIFE_END)}
 function setCam(x,y,s){cam.x=clamp(x,-1600,1600);cam.y=clamp(y,-1250,1250);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);if(!timelineUser) syncTimeFromSpace();render()}
@@ -190,7 +209,10 @@ function focusStory(i){
   active=clamp(i,0,data.length-1);timeCenter=data[active].ms;
   cam.x=data[active].x;cam.y=data[active].y;cam.s=SPACE_MAX;setBg(active);hint.style.display="none";render();
 }
-function wide(){cam.s=.27;syncTimeFromSpace();hint.style.display="none";toastMsg("Vrije levensruimte");render()}
+function wide(){
+  cam.x=OVERVIEW_CENTER.x;cam.y=OVERVIEW_CENTER.y;cam.s=SPACE_MIN;
+  hint.style.display="none";toastMsg("Hele leven");render();
+}
 function syncTimeFromSpace(){
   const idx=nearestMemoryToWorld(),n=data[idx];
   // Weighted blend of a few closest stories makes the timeline move smoothly during spatial panning.
@@ -315,7 +337,14 @@ function drawTimeline(){
   const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.5),w=r.width,h=r.height;
   if(!w||!h)return;
   canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-  const span=timelineSpanMs(),start=timeCenter-span/2,end=timeCenter+span/2,axisY=42;
+  const overview=overviewBlendForScale();
+  const localSpan=timelineSpanMs();
+  const fullSpan=LIFE_MS;
+  const span=lerp(localSpan,fullSpan,overview);
+  const localCenter=timeCenter;
+  const lifeCenter=(LIFE_START+LIFE_END)/2;
+  const drawCenter=lerp(localCenter,lifeCenter,overview);
+  const start=drawCenter-span/2,end=drawCenter+span/2,axisY=42;
   ctx.strokeStyle="rgba(255,255,255,.27)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,axisY+.5);ctx.lineTo(w,axisY+.5);ctx.stroke();
 
   // memory beacons
@@ -355,6 +384,12 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- */
 function chooseMagneticSet(raw,alpha){
+  const overview=overviewBlendForScale();
+  if(overview>.52){
+    magneticIds=new Set(OVERVIEW_ANCHORS);
+    lastMagneticIds=new Set(OVERVIEW_ANCHORS);
+    return;
+  }
   if(alpha>.94){magneticIds=new Set([active]);return}
   const natural=[],ranked=[];
   raw.forEach((p,i)=>{
@@ -384,7 +419,7 @@ function pullToViewport(p){
 }
 function render(){
   active=nearestMemoryToTime(timeCenter);
-  const alpha=presentationAlpha(),near=data[active];
+  const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];
   presentation.style.opacity=alpha.toFixed(3);
   presentationText.textContent=near.story;presentationDate.textContent=fullDate(near);
   presentationCopy.style.opacity=String(clamp((alpha-.10)/.9,0,1));
@@ -393,24 +428,29 @@ function render(){
     const idx=nearestMemoryToWorld();setBg(idx);
   }
 
-  modeEl.textContent=alpha>.86?"Presentatie":timelineUser?"Tijd zoeken":cam.s>.82?"Dichtbij":"Verkennen";
-  focusDate.textContent=new Date(timeCenter).toLocaleDateString("nl-NL",timelineSpanYears<2?{day:"numeric",month:"short",year:"numeric"}:{month:"short",year:"numeric"});
+  modeEl.textContent=alpha>.86?"Presentatie":overview>.72?"Hele leven":timelineUser?"Tijd zoeken":cam.s>.82?"Dichtbij":"Verkennen";
+  focusDate.textContent=overview>.72
+    ? BIRTH_YEAR+"–"+END_YEAR
+    : new Date(timeCenter).toLocaleDateString("nl-NL",timelineSpanYears<2?{day:"numeric",month:"short",year:"numeric"}:{month:"short",year:"numeric"});
   zoomRead.textContent=Math.round(cam.s/SPACE_MAX*100)+"%";
 
   const raw=data.map((s,i)=>{
     const q=screenPoint(s.x,s.y);
     const dt=Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()/2,365*DAY*.4);
-    const temporal=Math.exp(-.5*dt*dt);
+    const temporalLocal=Math.exp(-.5*dt*dt);
+    const overviewRelevance=OVERVIEW_ANCHOR_SET.has(i)?1:.045;
+    const temporal=lerp(temporalLocal,overviewRelevance,overview);
     const worldDist=Math.hypot(s.x-cam.x,s.y-cam.y);
     const local=1-clamp(worldDist/900,0,1);
-    const reveal=smooth(s.reveal-.16-local*.16,s.reveal+.17-local*.16,cam.s);
+    let reveal=smooth(s.reveal-.16-local*.16,s.reveal+.17-local*.16,cam.s);
+    if(OVERVIEW_ANCHOR_SET.has(i)) reveal=Math.max(reveal,overview);
     return{x:q.x,y:q.y,temporal,reveal,opacity:reveal*(.14+.86*temporal)};
   });
   chooseMagneticSet(raw,alpha);
 
   const relevance=data.map((s,i)=>({i,score:raw[i].temporal*.74+(1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/950,0,1))*.26})).sort((a,b)=>b.score-a.score);
-  const hero1=spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i;
-  const hero2=relevance.find(r=>r.i!==hero1)?.i;
+  const hero1=overview>.55 ? null : (spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i);
+  const hero2=overview>.55 ? null : relevance.find(r=>r.i!==hero1)?.i;
   renderedCards=[];
 
   data.forEach((s,i)=>{
@@ -420,7 +460,8 @@ function render(){
     let opacity=(1-alpha)*r.opacity*centerFocus;
     if(mag)opacity=Math.max(opacity,.30*(1-alpha)+.12);
     if(!onscreen&&!mag)opacity=0;
-    if(i===active)opacity=Math.max(opacity,(1-alpha)*.8);
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.8*(1-overview));
+    if(OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.84);
 
     let scale=(.46+cam.s*.43)*(.84+s.z*.16);
     if(i===hero1){
@@ -434,8 +475,16 @@ function render(){
       scale*=.88;
     }
     if(placed.magnetic)scale*=.93;
-    if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48;
-    scale=clamp(scale,.45,1.58);
+    if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48*(1-overview);
+    if(OVERVIEW_ANCHOR_SET.has(i)){
+      const anchorOrder=OVERVIEW_ANCHORS.indexOf(i);
+      const overviewScale=1.02+((anchorOrder===0||anchorOrder===OVERVIEW_ANCHORS.length-1)?0.10:0);
+      scale=lerp(scale,overviewScale,overview);
+    }else{
+      scale*=1-overview*.42;
+      opacity*=1-overview*.72;
+    }
+    scale=clamp(scale,.42,1.58);
 
     const el=nodes[i];
     el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
@@ -485,12 +534,12 @@ app.addEventListener("touchstart",e=>{
     const target=storyAtScreenPoint(m);
     spatialPinchTarget=target;
     spatialPinchStrength=0;
+    const free=worldPoint(m.x,m.y);
     if(target!=null){
       const s=data[target];
-      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y};
+      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y,freeWx:free.x,freeWy:free.y};
     }else{
-      const wp=worldPoint(m.x,m.y);
-      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:wp.x,wy:wp.y};
+      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:free.x,wy:free.y,freeWx:free.x,freeWy:free.y};
     }
   }
 },{passive:false});
@@ -502,12 +551,12 @@ app.addEventListener("touchmove",e=>{
       const target=storyAtScreenPoint(m);
       spatialPinchTarget=target;
       spatialPinchStrength=0;
+      const free=worldPoint(m.x,m.y);
       if(target!=null){
         const s=data[target];
-        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y};
+        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y,freeWx:free.x,freeWy:free.y};
       }else{
-        const wp=worldPoint(m.x,m.y);
-        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:wp.x,wy:wp.y};
+        touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:free.x,wy:free.y,freeWx:free.x,freeWy:free.y};
       }
     }
     const rawRatio=dist(a,b)/touch.d;
@@ -516,24 +565,37 @@ app.addEventListener("touchmove",e=>{
     const gentleRatio=Math.pow(rawRatio,.54);
     const ns=clamp(touch.s*gentleRatio,SPACE_MIN,SPACE_MAX);
     spatialPinchStrength=clamp(Math.abs(Math.log(Math.max(.001,gentleRatio)))*1.45,0,1);
-    if(touch.target!=null){
+    const zoomingIn=rawRatio>=1;
+    if(touch.target!=null&&zoomingIn){
       const target=data[touch.target];
-      // Keep the chosen story geometrically under the midpoint, but move the
-      // semantic/time focus much more slowly so surrounding stories don't pop.
+      // Zooming IN honours the exact story under the fingers.
       cam.x=target.x-(m.x-W/2)/ns;
       cam.y=target.y-(m.y-H/2)/ns;
       cam.s=lerp(cam.s,ns,.58);
       timeCenter=lerp(timeCenter,target.ms,.10);
     }else{
-      cam.x=lerp(cam.x,touch.wx-(m.x-W/2)/ns,.58);
-      cam.y=lerp(cam.y,touch.wy-(m.y-H/2)/ns,.58);
+      // Zooming OUT deliberately releases the story. As scale approaches the
+      // minimum, the camera glides toward the centre of the entire life-space.
+      spatialPinchTarget=null;
+      const fx=touch.freeWx??touch.wx,fy=touch.freeWy??touch.wy;
+      const localX=fx-(m.x-W/2)/ns;
+      const localY=fy-(m.y-H/2)/ns;
+      const ov=overviewBlendForScale(ns);
+      cam.x=lerp(cam.x,lerp(localX,OVERVIEW_CENTER.x,ov),.58);
+      cam.y=lerp(cam.y,lerp(localY,OVERVIEW_CENTER.y,ov),.58);
       cam.s=lerp(cam.s,ns,.58);
-      syncTimeFromSpace();
+      if(ov<.58) syncTimeFromSpace();
     }
     render();
-  }else if(e.touches.length===1&&touch.kind==="one"&&cam.s<SWIPE_SPACE){
-    const p=localTouch(e.touches[0]),dx=p.x-touch.start.x,dy=p.y-touch.start.y;
-    cam.x=clamp(touch.cx-dx/touch.s,-1600,1600);cam.y=clamp(touch.cy-dy/touch.s,-1250,1250);syncTimeFromSpace();touch.last=p;render();
+  }else if(e.touches.length===1&&touch.kind==="one"){
+    const p=localTouch(e.touches[0]);
+    touch.last=p;
+    if(cam.s<SWIPE_SPACE){
+      const dx=p.x-touch.start.x,dy=p.y-touch.start.y;
+      cam.x=clamp(touch.cx-dx/touch.s,-1600,1600);
+      cam.y=clamp(touch.cy-dy/touch.s,-1250,1250);
+      syncTimeFromSpace();render();
+    }
   }
 },{passive:false});
 app.addEventListener("touchend",e=>{
@@ -542,7 +604,7 @@ app.addEventListener("touchend",e=>{
     const p=touch.last||touch.start,dx=p.x-touch.start.x,dy=p.y-touch.start.y;
     if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2)focusStory(touch.active+(dx<0?1:-1));
   }
-  if(e.touches.length===0&&touch.kind==="pinch"&&touch.target!=null){
+  if(e.touches.length===0&&touch.kind==="pinch"&&touch.target!=null&&cam.s>touch.s){
     const target=data[touch.target];
     const commit=smooth(.28,.88,spatialPinchStrength);
     timeCenter=lerp(timeCenter,target.ms,.18+.42*commit);

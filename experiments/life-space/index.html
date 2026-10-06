@@ -19,17 +19,19 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a1015;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;overscroll-behavior:none}
 body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
-#app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
-#bg{position:absolute;inset:-8%;background-position:center;background-size:cover;filter:blur(16px) saturate(.55) brightness(.20);transform:scale(1.16);transition:background-image .5s ease}
+#app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#05080d;-webkit-user-select:none;user-select:none}
+#bg{position:absolute;inset:-10%;background-position:center;background-size:cover;filter:blur(30px) saturate(.42) brightness(.12);transform:scale(1.2);opacity:.48;transition:background-image .55s ease}
 #bg:after{content:"";position:absolute;inset:0;background:
- radial-gradient(circle at 52% 44%,rgba(78,111,132,.16),transparent 22%),
- radial-gradient(circle at 19% 70%,rgba(96,73,122,.10),transparent 28%),
- radial-gradient(circle at 82% 73%,rgba(42,92,108,.10),transparent 24%),
- radial-gradient(circle at 50% 48%,rgba(13,23,31,.12),rgba(5,8,12,.58) 62%,rgba(2,4,7,.93) 100%)}
-#world{position:absolute;inset:0;overflow:hidden;touch-action:none}
+ radial-gradient(ellipse at 50% 46%,rgba(74,105,128,.16),transparent 26%),
+ radial-gradient(ellipse at 18% 72%,rgba(80,62,111,.08),transparent 34%),
+ radial-gradient(ellipse at 84% 30%,rgba(37,78,98,.08),transparent 30%),
+ radial-gradient(circle at 50% 48%,rgba(4,8,14,.22),rgba(2,5,9,.72) 64%,rgba(1,2,5,.97) 100%)}
+#world{position:absolute;inset:0;overflow:hidden;touch-action:none;perspective:900px}
+#world:before{content:"";position:absolute;inset:11% -18% -8%;pointer-events:none;background:radial-gradient(ellipse at center,rgba(73,103,121,.07),transparent 48%);filter:blur(10px)}
+#world:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 48%,transparent 42%,rgba(0,0,0,.20) 72%,rgba(0,0,0,.50) 100%)}
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.memoryEcho{position:absolute;width:54px;height:42px;border-radius:8px;overflow:hidden;background:#23313a;border:1px solid rgba(255,255,255,.08);box-shadow:0 5px 18px rgba(0,0,0,.22);will-change:transform,opacity;opacity:0}
-.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.25px) saturate(.66) brightness(.76)}
+.memoryEcho{position:absolute;width:46px;height:34px;border-radius:7px;overflow:hidden;background:#17232d;border:1px solid rgba(255,255,255,.055);box-shadow:0 4px 18px rgba(0,0,0,.30);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.45px) saturate(.58) brightness(.62)}
 .memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.18))}
 
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
@@ -114,7 +116,7 @@ button{font:inherit;color:inherit}
     <canvas id="timelineCanvas"></canvas>
     <div id="needle"></div>
     <div id="focusBlock"><span id="focusRange">1972–2026</span></div>
-    <div id="timelineHint">sleep door de tijd · knijp voor schaal</div>
+    <div id="timelineHint">omhoog/omlaag = tijd · links/rechts = rond je leven</div>
   </div>
 
   <div id="hint">Gebruik de <b>tijdbalk bovenin</b> om gericht door je leven te bewegen, of zoek vrij met je vingers tussen de verhalen.</div>
@@ -203,16 +205,16 @@ const ALL_MEMORIES=[...MEMORIES,...EXTRA_MEMORIES];
 
 
 
-// One continuous chronological field. There are no age boxes or decade boundaries.
-// Age determines direction continuously; local story density determines how thick the
-// field becomes and how far its local centre shifts outward.
-const baseData=ALL_MEMORIES.map((s,i)=>{
+// LIFE GLOBE
+// Time runs from north to south. Longitude wraps forever around the invisible globe.
+// The globe grows sub-linearly with the size of the collection, so more memories
+// create more navigable surface without turning the interface into a wall of cards.
+const baseData=ALL_MEMORIES.map(s=>{
   const ms=new Date(s.at).getTime();
-  return {...s,i,ms,age:ageFromMs(ms)};
-}).sort((a,b)=>a.ms-b.ms);
+  return {...s,ms,age:ageFromMs(ms)};
+}).sort((a,b)=>a.ms-b.ms).map((s,i)=>({...s,i}));
 
 function densityAtAge(age){
-  // Gaussian density prevents a hard 29/30/31 boundary even if age 30 is extremely busy.
   const sigma=1.55;
   let d=0;
   for(const s of baseData){
@@ -232,82 +234,63 @@ function densityNormAtAge(age){
   return clamp(raw,0,1);
 }
 
-// Collection size changes the physical size of the whole life, but sub-linearly.
-// 25–50 memories stay intentionally compact; hundreds and thousands get more room.
-const COLLECTION_RADIUS=180+96*Math.log1p(baseData.length/25);
-const COLLECTION_THICKNESS=34+18*Math.log1p(baseData.length/25);
+const GLOBE_RADIUS=218+42*Math.log1p(baseData.length/45);
+const GLOBE_CIRCUMFERENCE=Math.PI*2*GLOBE_RADIUS;
+const AGE_HEIGHT=760+128*Math.log1p(baseData.length/45);
+const GLOBE_DIAMETER=GLOBE_RADIUS*2;
 
-function fieldAngleAtAge(age){
-  const t=clamp(age/LIFE_YEARS,0,1);
-  return -2.48+t*Math.PI*1.73;
+function wrapLon(x){
+  x%=GLOBE_CIRCUMFERENCE;
+  return x<0?x+GLOBE_CIRCUMFERENCE:x;
 }
-function fieldThicknessAtAge(age){
-  return COLLECTION_THICKNESS+178*Math.sqrt(densityNormAtAge(age));
+function wrapDelta(dx){
+  dx%=GLOBE_CIRCUMFERENCE;
+  if(dx>GLOBE_CIRCUMFERENCE/2)dx-=GLOBE_CIRCUMFERENCE;
+  if(dx<-GLOBE_CIRCUMFERENCE/2)dx+=GLOBE_CIRCUMFERENCE;
+  return dx;
 }
-function fieldCenterAtAge(age){
-  const t=clamp(age/LIFE_YEARS,0,1);
-  const angle=fieldAngleAtAge(age);
-  const thickness=fieldThicknessAtAge(age);
-  // Dense periods shift their navigational centre outward, but the centreline
-  // itself is gently warped so chronology never renders as a visible ring/path.
-  const radius=COLLECTION_RADIUS+thickness*.34;
-  const warpX=(Math.sin(t*Math.PI*3.1+0.55)*58 + Math.sin(t*Math.PI*6.3+1.7)*26);
-  const warpY=(Math.sin(t*Math.PI*2.5+2.1)*52 + Math.sin(t*Math.PI*5.4+0.2)*22);
+function ageToWorldY(age){
+  return lerp(-AGE_HEIGHT/2,AGE_HEIGHT/2,clamp(age/LIFE_YEARS,0,1));
+}
+function worldYToAge(y){
+  return clamp((y+AGE_HEIGHT/2)/AGE_HEIGHT,0,1)*LIFE_YEARS;
+}
+function lonForMemory(s){
+  // Stable, deliberately non-grid-like distribution around every age band.
+  const base=fract(s.id*1.731+s.age*.137);
+  const drift=.08*Math.sin(s.age*.47+fract(s.id+11)*Math.PI*2);
+  return wrapLon((base+drift)*GLOBE_CIRCUMFERENCE);
+}
+
+const data=baseData.map(s=>{
+  const density=densityNormAtAge(s.age);
+  const verticalScatter=(fract(s.id+127)-.5)*(16+30*Math.sqrt(density));
   return {
-    x:Math.cos(angle)*radius + warpX,
-    y:Math.sin(angle)*radius*.78 + warpY,
-    angle,
-    radius,
-    thickness,
-    densityNorm:densityNormAtAge(age)
+    ...s,
+    x:lonForMemory(s),
+    y:ageToWorldY(s.age)+verticalScatter,
+    z:.18+.82*fract(s.id+70),
+    reveal:.20+.55*fract(s.id+91)+.10*density,
+    density,
+    thickness:34+90*Math.sqrt(density),
+    representative:fract(s.id+211)
   };
-}
-
-const data=baseData.map((s,i)=>{
-  const center=fieldCenterAtAge(s.age);
-  const dNorm=center.densityNorm;
-  const thickness=center.thickness;
-
-  // Two deterministic layers of scatter make a cloud rather than a ribbon.
-  const a1=fract(s.id+19)*Math.PI*2;
-  const a2=fract(s.id+71)*Math.PI*2;
-  const r1=Math.sqrt(fract(s.id+33))*thickness*.88;
-  const r2=Math.sqrt(fract(s.id+121))*thickness*.38;
-  const localX=Math.cos(a1)*r1 + Math.cos(a2)*r2;
-  const localY=Math.sin(a1)*r1*.84 + Math.sin(a2)*r2*1.08;
-
-  // A small age-dependent drift makes neighbouring dates overlap instead of
-  // drawing a clean chronological edge between them.
-  const driftX=Math.sin(s.age*.91+1.3)*thickness*.16;
-  const driftY=Math.sin(s.age*1.17+2.2)*thickness*.14;
-  const x=center.x+localX+driftX;
-  const y=center.y+localY+driftY;
-
-  // Sparse regions reveal stories earlier; dense regions progressively unpack.
-  const reveal=.20+.58*fract(s.id+91)+.12*dNorm;
-  const representative=fract(s.id+211); // stable priority for semantic zoom
-  return {...s,x,y,z:.82+fract(s.id+70)*.38,reveal,density:dNorm,thickness,representative};
 });
 
-// The fully zoomed-out state is a true whole-life overview, not merely
-// the current neighborhood rendered smaller.
 const DATA_BOUNDS=data.reduce((b,s)=>({
-  minX:Math.min(b.minX,s.x),maxX:Math.max(b.maxX,s.x),
+  minX:0,maxX:GLOBE_CIRCUMFERENCE,
   minY:Math.min(b.minY,s.y),maxY:Math.max(b.maxY,s.y)
-}),{minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity});
-const OVERVIEW_CENTER={
-  x:(DATA_BOUNDS.minX+DATA_BOUNDS.maxX)/2,
-  y:(DATA_BOUNDS.minY+DATA_BOUNDS.maxY)/2
-};
-const WORLD_WIDTH=DATA_BOUNDS.maxX-DATA_BOUNDS.minX;
-const WORLD_HEIGHT=DATA_BOUNDS.maxY-DATA_BOUNDS.minY;
-const CAMERA_MARGIN=460;
-function clampCamX(x){return clamp(x,DATA_BOUNDS.minX-CAMERA_MARGIN,DATA_BOUNDS.maxX+CAMERA_MARGIN)}
-function clampCamY(y){return clamp(y,DATA_BOUNDS.minY-CAMERA_MARGIN,DATA_BOUNDS.maxY+CAMERA_MARGIN)}
+}),{minY:Infinity,maxY:-Infinity});
+const OVERVIEW_CENTER={x:data[data.length-1]?.x||0,y:0};
+const WORLD_WIDTH=GLOBE_DIAMETER;
+const WORLD_HEIGHT=AGE_HEIGHT;
+const CAMERA_MARGIN=AGE_HEIGHT*.08;
+function clampCamX(x){return wrapLon(x)}
+function clampCamY(y){return clamp(y,-AGE_HEIGHT/2-CAMERA_MARGIN,AGE_HEIGHT/2+CAMERA_MARGIN)}
 function fitOverviewScale(){
-  const usableW=Math.max(300,W-46);
-  const usableH=Math.max(430,H-230);
-  return clamp(Math.min(usableW/(WORLD_WIDTH+250),usableH/(WORLD_HEIGHT+270)),.12,.30);
+  const usableW=Math.max(300,W-42);
+  const usableH=Math.max(430,H-226);
+  return clamp(Math.min(usableW/(WORLD_WIDTH+90),usableH/(WORLD_HEIGHT+120)),.18,.36);
 }
 const overviewAnchorAges=[5,17,30,42,54];
 const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
@@ -339,7 +322,7 @@ const nodes=data.map(s=>{
   world.appendChild(el);return el;
 });
 
-const ECHO_COUNT=30;
+const ECHO_COUNT=48;
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
   el.className="memoryEcho";
@@ -361,10 +344,38 @@ let renderedCards=[];
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
-function screenPoint(x,y){return{x:(x-cam.x)*cam.s+W/2,y:(y-cam.y)*cam.s+H/2}}
-function worldPoint(x,y){return{x:cam.x+(x-W/2)/cam.s,y:cam.y+(y-H/2)/cam.s}}
+function screenPoint(x,y){
+  const dx=wrapDelta(x-cam.x);
+  const angle=dx/GLOBE_RADIUS;
+  const cosine=Math.cos(angle);
+  const front=(cosine+1)/2;
+  const visibility=smooth(-.08,.28,cosine);
+  const depthScale=.36+.64*front;
+  const sx=W/2+Math.sin(angle)*GLOBE_RADIUS*cam.s*1.06;
+  const verticalScale=cam.s*(.72+.28*front);
+  const curveDrop=(1-front)*18*cam.s;
+  return{x:sx,y:(y-cam.y)*verticalScale+H/2+curveDrop,front,visibility,depthScale,angle};
+}
+function worldPoint(x,y){
+  const denom=Math.max(1,GLOBE_RADIUS*cam.s*1.06);
+  const angle=Math.asin(clamp((x-W/2)/denom,-.985,.985));
+  const front=(Math.cos(angle)+1)/2;
+  const lon=wrapLon(cam.x+angle*GLOBE_RADIUS);
+  const verticalScale=cam.s*(.72+.28*front);
+  return{x:lon,y:cam.y+(y-H/2)/Math.max(.001,verticalScale)};
+}
+function globeDistance(x1,y1,x2,y2){
+  return Math.hypot(wrapDelta(x1-x2),y1-y2);
+}
 function nearestMemoryToWorld(){
-  let best=0,bd=Infinity;data.forEach((s,i)=>{const d=Math.hypot(s.x-cam.x,s.y-cam.y);if(d<bd){bd=d;best=i}});return best;
+  let best=0,bd=Infinity;
+  data.forEach((s,i)=>{
+    const r=screenPoint(s.x,s.y);
+    if(r.visibility<.04)return;
+    const d=globeDistance(s.x,s.y,cam.x,cam.y)/(Math.max(.35,r.front));
+    if(d<bd){bd=d;best=i}
+  });
+  return best;
 }
 function nearestMemoryToTime(ms=timeCenter){
   let lo=0,hi=data.length-1;
@@ -415,53 +426,20 @@ function wide(){
   syncSpanFromSpace();
   hint.style.display="none";toastMsg("Hele leven");render();
 }
-function ageNearestFieldPoint(x,y){
-  let bestAge=0,bestD=Infinity;
-  // Coarse search over the continuous chronological backbone.
-  for(let age=0;age<=LIFE_YEARS;age+=.35){
-    const p=fieldCenterAtAge(age);
-    const dx=p.x-x,dy=p.y-y,d=dx*dx+dy*dy;
-    if(d<bestD){bestD=d;bestAge=age}
-  }
-  // Refine locally so the date moves continuously even through a huge density bulge.
-  let lo=Math.max(0,bestAge-.55),hi=Math.min(LIFE_YEARS,bestAge+.55);
-  for(let k=0;k<11;k++){
-    const a=lo+(hi-lo)/3,b=hi-(hi-lo)/3;
-    const pa=fieldCenterAtAge(a),pb=fieldCenterAtAge(b);
-    const da=(pa.x-x)*(pa.x-x)+(pa.y-y)*(pa.y-y);
-    const db=(pb.x-x)*(pb.x-x)+(pb.y-y)*(pb.y-y);
-    if(da<db)hi=b;else lo=a;
-  }
-  return (lo+hi)/2;
-}
 function syncTimeFromSpace(){
-  const age=ageNearestFieldPoint(cam.x,cam.y);
+  const age=worldYToAge(cam.y);
   timeCenter=clampTime(LIFE_START+age*365.2425*DAY);
 }
 function worldCenterForTime(ms){
-  const targetAge=ageFromMs(ms);
-  const spine=fieldCenterAtAge(targetAge);
-  const sigmaYears=clamp(timelineSpanYears*.13,.32,2.8);
-  let x=0,y=0,den=0;
-  for(const s of data){
-    const q=(s.age-targetAge)/sigmaYears;
-    if(Math.abs(q)>4)continue;
-    const w=Math.exp(-.5*q*q);
-    x+=s.x*w;y+=s.y*w;den+=w;
-  }
-  if(den<=.0001)return{x:spine.x,y:spine.y};
-  const contentX=x/den,contentY=y/den;
-  // Content may gently shift the centre, but can never overpower chronology.
-  const pull=.16+.22*spine.densityNorm;
-  return{x:lerp(spine.x,contentX,pull),y:lerp(spine.y,contentY,pull)};
+  return{x:cam.x,y:ageToWorldY(ageFromMs(ms))};
 }
 function driveSpaceFromTime(ms,instant=false){
   timeCenter=clampTime(ms);
-  const p=worldCenterForTime(timeCenter);
-  if(instant){cam.x=p.x;cam.y=p.y}
-  else {cam.x=lerp(cam.x,p.x,.34);cam.y=lerp(cam.y,p.y,.34)}
-  // Timeline navigation should show context rather than forcing presentation.
-  if(cam.s>1.28) cam.s=lerp(cam.s,1.08,.28);
+  const targetY=ageToWorldY(ageFromMs(timeCenter));
+  if(instant)cam.y=clampCamY(targetY);
+  else cam.y=clampCamY(lerp(cam.y,targetY,.42));
+  // Timeline navigation shows context and preserves the current longitude.
+  if(cam.s>1.28)cam.s=lerp(cam.s,1.08,.28);
   render();
 }
 
@@ -644,12 +622,8 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- */
 function visibleBudgetForScale(){
-  // Calm universe rule: a handful of real stories, never a wall of cards.
   const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
-  if(z<.12)return 5;
-  if(z<.32)return 6;
-  if(z<.58)return 7;
-  return 8;
+  return z<.14?5:6;
 }
 function chooseVisibleRepresentatives(raw,alpha){
   if(alpha>.92)return new Set([active]);
@@ -660,27 +634,31 @@ function chooseVisibleRepresentatives(raw,alpha){
 
   data.forEach((s,i)=>{
     const r=raw[i];
-    const nearScreen=r.x>-170&&r.x<W+170&&r.y>100&&r.y<H+170;
-    if(!nearScreen&&overview<.65)return;
-    const worldD=Math.hypot(s.x-cam.x,s.y-cam.y);
+    const nearScreen=r.x>-190&&r.x<W+190&&r.y>95&&r.y<H+180&&r.visibility>.035;
+    if(!nearScreen&&overview<.72)return;
+    const worldD=globeDistance(s.x,s.y,cam.x,cam.y);
     const screenD=Math.hypot(r.x-W/2,r.y-H/2);
-    const spatial=1-clamp(worldD/1050,0,1);
-    const centre=1-clamp(screenD/(Math.max(W,H)*.82),0,1);
+    const spatial=1-clamp(worldD/980,0,1);
+    const centre=1-clamp(screenD/(Math.max(W,H)*.86),0,1);
     const ageD=Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs(),365*DAY);
     const temporal=Math.exp(-.5*ageD*ageD);
-    const overviewAnchor=OVERVIEW_ANCHOR_SET.has(i)?2.2:0;
+    const overviewAnchor=OVERVIEW_ANCHOR_SET.has(i)?1.4:0;
     const targetBoost=spatialPinchTarget===i?3.0:0;
-    const activeBoost=i===active?1.8:0;
-    const stable=.25*(1-s.representative);
-    const score=spatial*.72+centre*.34+temporal*.34+stable+overviewAnchor*overview+targetBoost+activeBoost;
-    candidates.push({i,score,x:r.x,y:r.y});
+    const activeBoost=i===active?1.45:0;
+    const stable=.20*(1-s.representative);
+    const timeWeight=lerp(.34,.08,overview);
+    const score=spatial*.64+centre*.30+temporal*timeWeight+r.front*.52+stable+overviewAnchor*overview+targetBoost+activeBoost;
+    candidates.push({i,score,x:r.x,y:r.y,front:r.front});
   });
   candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
 
   const chosen=new Set();
   // At overview explicitly preserve broad life orientation.
   if(overview>.50){
-    for(const i of OVERVIEW_ANCHORS)chosen.add(i);
+    for(const i of OVERVIEW_ANCHORS){
+      if(chosen.size>=5)break;
+      if(raw[i]?.visibility>.16)chosen.add(i);
+    }
   }
   if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
   chosen.add(active);
@@ -719,7 +697,7 @@ function chooseMagneticSet(raw,alpha){
   if(alpha>.94){magneticIds=new Set([active]);return}
   const natural=[],ranked=[];
   raw.forEach((p,i)=>{
-    const inside=p.x>62&&p.x<W-62&&p.y>145&&p.y<H-125&&p.opacity>.07;
+    const inside=p.x>62&&p.x<W-62&&p.y>145&&p.y<H-125&&p.opacity>.07&&p.visibility>.10;
     if(inside)natural.push(i);
     const spatial=Math.hypot(data[i].x-cam.x,data[i].y-cam.y)/900;
     ranked.push({i,score:spatial});
@@ -743,24 +721,24 @@ function pullToViewport(p){
   return{x,y,magnetic};
 }
 function renderEchoField(raw,visibleSet,alpha){
-  // These are not cards to navigate; they are only evidence that the life is much larger.
-  // Prefer nearby but currently-unselected stories and keep them small/faint.
+  // The photo-system is atmosphere, not another navigation layer.
+  // The same life wraps behind the sharp stories in several apparent depths.
   const overview=overviewBlendForScale();
   const candidates=data.map((s,i)=>{
     const r=raw[i];
-    if(visibleSet.has(i))return null;
-    const onscreen=r.x>-90&&r.x<W+90&&r.y>120&&r.y<H+100;
+    if(visibleSet.has(i)||r.visibility<.025)return null;
+    const onscreen=r.x>-130&&r.x<W+130&&r.y>90&&r.y<H+150;
     if(!onscreen)return null;
-    const worldD=Math.hypot(s.x-cam.x,s.y-cam.y);
-    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.25,365*DAY*2),2));
-    const spatial=1-clamp(worldD/1250,0,1);
-    const stable=.18*(1-s.representative);
-    return{i,score:spatial*.72+temporal*.38+stable,x:r.x,y:r.y};
+    const worldD=globeDistance(s.x,s.y,cam.x,cam.y);
+    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.7,365*DAY*4),2));
+    const spatial=1-clamp(worldD/1500,0,1);
+    const stable=.12*(1-s.representative);
+    return{i,score:spatial*.48+temporal*.22+r.front*.44+stable,x:r.x,y:r.y,front:r.front,depth:r.depthScale};
   }).filter(Boolean).sort((a,b)=>b.score-a.score||a.i-b.i);
 
-  const targetCount=Math.round(lerp(18,ECHO_COUNT,1-overview*.35));
+  const targetCount=Math.round(lerp(30,ECHO_COUNT,1-overview*.22));
   const chosen=[];
-  const gap=42;
+  const gap=26;
   for(const cand of candidates){
     if(chosen.length>=targetCount)break;
     let near=false;
@@ -780,28 +758,30 @@ function renderEchoField(raw,visibleSet,alpha){
     const s=data[cand.i];
     if(echoAssignments[slot]!==cand.i){
       echoAssignments[slot]=cand.i;
-      const img=el.querySelector("img");
-      img.src=thumbUrl(s);
+      el.querySelector("img").src=thumbUrl(s);
     }
-    const size=.62+.42*fract(s.id+901);
-    const jitterX=(fract(s.id+933)-.5)*24;
-    const jitterY=(fract(s.id+967)-.5)*20;
-    const x=cand.x+jitterX,y=cand.y+jitterY;
+    const distanceLayer=.16+.84*fract(s.id+1201);
+    const parallax=.42+.58*distanceLayer;
+    const jitterX=(fract(s.id+933)-.5)*42;
+    const jitterY=(fract(s.id+967)-.5)*34;
+    const x=W/2+(cand.x-W/2)*parallax+jitterX;
+    const y=H/2+(cand.y-H/2)*parallax+jitterY;
     const edge=Math.min(
-      clamp((x+70)/130,0,1),
-      clamp((W+70-x)/130,0,1),
-      clamp((y-95)/100,0,1),
-      clamp((H+80-y)/120,0,1)
+      clamp((x+70)/120,0,1),
+      clamp((W+70-x)/120,0,1),
+      clamp((y-90)/95,0,1),
+      clamp((H+70-y)/110,0,1)
     );
-    const op=(1-alpha)*(.10+.13*cand.score)*edge;
-    el.style.opacity=clamp(op,.035,.25).toFixed(3);
-    el.style.transform="translate3d("+(x-27)+"px,"+(y-21)+"px,0) scale("+size.toFixed(3)+")";
-    el.style.zIndex=String(40+slot);
+    const scale=(.22+.62*distanceLayer)*(.72+.28*cand.front);
+    const op=(1-alpha)*(.028+.105*cand.score)*edge*(.58+.42*distanceLayer);
+    el.style.opacity=clamp(op,.018,.145).toFixed(3);
+    el.style.transform="translate3d("+(x-23)+"px,"+(y-17)+"px,0) scale("+scale.toFixed(3)+")";
+    el.style.zIndex=String(18+Math.round(distanceLayer*70));
   }
 }
 
 function render(){
-  active=spatialPinchTarget!=null ? spatialPinchTarget : nearestMemoryToTime(timeCenter);
+  active=spatialPinchTarget!=null ? spatialPinchTarget : nearestMemoryToWorld();
   const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];
   presentation.style.opacity=alpha.toFixed(3);
   presentationText.textContent=near.story;presentationDate.textContent=fullDate(near);
@@ -817,15 +797,17 @@ function render(){
 
   const raw=data.map((s,i)=>{
     const q=screenPoint(s.x,s.y);
-    const worldDist=Math.hypot(s.x-cam.x,s.y-cam.y);
-    const localRadius=Math.max(430,COLLECTION_RADIUS*2.15);
+    const worldDist=globeDistance(s.x,s.y,cam.x,cam.y);
+    const localRadius=Math.max(430,GLOBE_RADIUS*2.45);
     const local=1-clamp(worldDist/localRadius,0,1);
     let reveal=smooth(s.reveal-.20-local*.20,s.reveal+.16-local*.20,cam.s);
-    if(OVERVIEW_ANCHOR_SET.has(i)) reveal=Math.max(reveal,overview);
-    // Fixed-world behaviour: photos do not disappear merely because the
-    // timeline centre changes. They enter/leave because the camera moves.
-    const spatialPresence=.22+.78*local;
-    return{x:q.x,y:q.y,temporal:1,reveal,opacity:reveal*spatialPresence};
+    if(OVERVIEW_ANCHOR_SET.has(i))reveal=Math.max(reveal,overview*.72);
+    const spatialPresence=.18+.82*local;
+    return{
+      x:q.x,y:q.y,temporal:1,reveal,
+      opacity:reveal*spatialPresence*q.visibility,
+      front:q.front,visibility:q.visibility,depthScale:q.depthScale,angle:q.angle
+    };
   });
   const visibleSet=chooseVisibleRepresentatives(raw,alpha);
   renderEchoField(raw,visibleSet,alpha);
@@ -835,7 +817,7 @@ function render(){
     i,
     score:
       (visibleSet.has(i)?2:0)+
-      (1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/900,0,1))+
+      (1-clamp(globeDistance(s.x,s.y,cam.x,cam.y)/900,0,1))+
       Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*.55,DAY),2))*.55
   })).filter(r=>visibleSet.has(r.i)).sort((a,b)=>b.score-a.score);
   const hero1=spatialPinchTarget!=null?spatialPinchTarget:relevance[0]?.i;
@@ -847,7 +829,7 @@ function render(){
     const selected=visibleSet.has(i);
     const mag=magneticIds.has(i)&&alpha<.96&&overview<.52;
     const r=raw[i],placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
-    const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260;
+    const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260&&r.visibility>.025;
     const rank=roleRank.has(i)?roleRank.get(i):99;
     const centerFocus=.50+.50*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.08),0,1));
 
@@ -861,7 +843,8 @@ function render(){
     }
     if(mag&&!selected)opacity=Math.max(opacity,.16*(1-alpha));
     if(!onscreen&&!mag)opacity=0;
-    if(i===active)opacity=Math.max(opacity,(1-alpha)*.96);
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.96*r.visibility);
+    opacity*=r.visibility;
 
     // One clear anchor, a couple of supporting stories, then smaller context.
     let scale;
@@ -871,7 +854,7 @@ function render(){
     else scale=.70+.10*fract(s.id+701);
 
     const zoomBreath=lerp(.82,1.08,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
-    scale*=zoomBreath;
+    scale*=zoomBreath*r.depthScale;
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
     if(placed.magnetic)scale*=.94;
     if(overview>.58&&OVERVIEW_ANCHOR_SET.has(i))scale=Math.max(scale,.94);
@@ -880,7 +863,7 @@ function render(){
     if(selected&&(opacity>.025||OVERVIEW_ANCHOR_SET.has(i)||i===active))ensureCardImage(i);
     const el=nodes[i];
     el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.20?"auto":"none";
-    el.style.zIndex=String(i===hero1?900:i===hero2?790:620-Math.min(160,rank*12)+(placed.magnetic?8:0));
+    el.style.zIndex=String((i===hero1?900:i===hero2?790:620-Math.min(160,rank*12)) + Math.round(r.front*70) + (placed.magnetic?8:0));
     el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);el.classList.toggle("magnetic",placed.magnetic);
     renderedCards[i]={x:placed.x,y:placed.y,opacity,magnetic:placed.magnetic,selected};
@@ -893,7 +876,7 @@ function render(){
     ? '<b>De tijdbalk stuurt nu de ruimte.</b> Rustig slepen verfijnt de tijd; sneller bewegen vergroot automatisch je zoekbereik.'
     : alpha>.82
       ? 'Knijp uit het verhaal of <b>pak de tijdbalk bovenin</b> om direct naar een andere periode te reizen.'
-      : '<b>Beweeg vrij door je leven.</b> De heldere foto’s zijn dichtbij; de kleine flarden laten zien hoeveel er nog om je heen ligt.';
+      : '<b>Draai rond je levensbol.</b> Links/rechts loopt eindeloos door; omhoog/omlaag beweegt door de tijd. De verre fotoflarden vormen je foto-stelsel.';
 }
 function resize(){
   const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);
@@ -969,8 +952,8 @@ app.addEventListener("touchmove",e=>{
       const target=data[touch.target];
       // Zooming IN honours the exact story under the fingers.
       const nextS=ns;
-      cam.x=target.x-(m.x-W/2)/nextS;
-      cam.y=target.y-(m.y-H/2)/nextS;
+      cam.x=clampCamX(target.x-(m.x-W/2)/nextS);
+      cam.y=clampCamY(target.y-(m.y-H/2)/nextS);
       cam.s=nextS;
       syncSpanFromSpace();
       timeCenter=lerp(timeCenter,target.ms,.10);
@@ -982,8 +965,8 @@ app.addEventListener("touchmove",e=>{
         // Map contract: whatever world point sits between the fingers stays
         // there. Direction is therefore felt from the first millimetre.
         cam.s=ns;
-        cam.x=fx-(m.x-W/2)/cam.s;
-        cam.y=fy-(m.y-H/2)/cam.s;
+        cam.x=clampCamX(fx-(m.x-W/2)/cam.s);
+        cam.y=clampCamY(fy-(m.y-H/2)/cam.s);
         syncSpanFromSpace();
         syncTimeFromSpace();
       }else{
@@ -992,8 +975,8 @@ app.addEventListener("touchmove",e=>{
         const localY=fy-(m.y-H/2)/ns;
         const ov=overviewBlendForScale(ns);
         cam.s=ns;
-        cam.x=lerp(localX,OVERVIEW_CENTER.x,ov*.72);
-        cam.y=lerp(localY,OVERVIEW_CENTER.y,ov*.72);
+        cam.x=clampCamX(lerp(localX,OVERVIEW_CENTER.x,ov*.38));
+        cam.y=clampCamY(lerp(localY,OVERVIEW_CENTER.y,ov*.72));
         syncSpanFromSpace();
         if(ov<.72)syncTimeFromSpace();
       }
@@ -1003,7 +986,7 @@ app.addEventListener("touchmove",e=>{
     const p=localTouch(e.touches[0]);
     if(cam.s<SWIPE_SPACE){
       const dx=p.x-touch.last.x,dy=p.y-touch.last.y;
-      cam.x=clampCamX(cam.x-dx/cam.s);
+      cam.x=clampCamX(cam.x-dx/(cam.s*.92));
       cam.y=clampCamY(cam.y-dy/cam.s);
       syncSpanFromSpace();
       syncTimeFromSpace();

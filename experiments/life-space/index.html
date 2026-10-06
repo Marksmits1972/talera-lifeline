@@ -412,7 +412,7 @@ function worldCenterForTime(ms){
   let x=0,y=0,den=0;
   for(const s of data){
     const q=(s.age-targetAge)/sigmaYears;
-    if(Math.abs(q)>4)return;
+    if(Math.abs(q)>4)continue;
     const w=Math.exp(-.5*q*q);
     x+=s.x*w;y+=s.y*w;den+=w;
   }

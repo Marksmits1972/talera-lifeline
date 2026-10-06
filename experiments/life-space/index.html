@@ -375,11 +375,11 @@ function scaleForSpanYears(years){
   return lerp(SPACE_MIN,SPACE_MAX,(a+b)/2);
 }
 function syncSpanFromSpace(){
-  // Intentionally empty: spatial zoom and timeline search gear are two
-  // controls for the same life position, but the original timeline keeps
-  // its own proven scale/gear behaviour.
+  // Photo-space zoom never rewrites the Free timeline's search gear.
 }
-function syncSpaceScaleFromSpan(){ /* owned by original timeline gear */ }
+function syncSpaceScaleFromSpan(){
+  // Free timeline scale never rewrites photo card zoom.
+}
 function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
 function clampTime(ms){return clamp(ms,LIFE_START,LIFE_END)}
 function setCam(x,y,s){
@@ -443,6 +443,8 @@ function driveSpaceFromTime(ms,instant=false){
   const p=worldCenterForTime(timeCenter);
   if(instant){cam.x=p.x;cam.y=p.y}
   else {cam.x=lerp(cam.x,p.x,.34);cam.y=lerp(cam.y,p.y,.34)}
+  // Timeline navigation should show context rather than forcing presentation.
+  if(cam.s>1.28) cam.s=lerp(cam.s,1.08,.28);
   render();
 }
 
@@ -921,13 +923,8 @@ function render(){
     i,
     score:1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/900,0,1)
   })).sort((a,b)=>b.score-a.score);
-  const selectedRelevance=relevance.filter(r=>visibleSet.has(r.i));
-  const hero1=overview>.55 ? OVERVIEW_ANCHORS[0] : (spatialPinchTarget!=null ? spatialPinchTarget : selectedRelevance[0]?.i);
-  const hero2=overview>.55 ? OVERVIEW_ANCHORS[OVERVIEW_ANCHORS.length-1] : selectedRelevance.find(r=>r.i!==hero1)?.i;
-  const roleRank=new Map();
-  selectedRelevance.forEach((r,rank)=>roleRank.set(r.i,rank));
-  if(hero1!=null)roleRank.set(hero1,0);
-  if(hero2!=null&&!roleRank.has(hero2))roleRank.set(hero2,1);
+  const hero1=overview>.55 ? null : (spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i);
+  const hero2=overview>.55 ? null : relevance.find(r=>r.i!==hero1)?.i;
   renderedCards=[];
 
   data.forEach((s,i)=>{
@@ -935,46 +932,40 @@ function render(){
     const mag=magneticIds.has(i)&&alpha<.96&&overview<.52;
     const r=raw[i],placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
     const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260;
-    const rank=roleRank.has(i)?roleRank.get(i):99;
-    const isFront=selected&&(i===hero1||rank===0);
-    const isSecond=selected&&(i===hero2||rank===1);
-    const isMiddle=selected&&rank>=2&&rank<=5;
-    const isBack=selected&&rank>5;
-
-    let opacity=0;
-    if(selected){
-      if(isFront)opacity=.99;
-      else if(isSecond)opacity=.94;
-      else if(isMiddle)opacity=clamp(.82-rank*.025,.68,.80);
-      else opacity=.34;
-      opacity*=1-alpha*.94;
-    }
-    if(mag&&!selected)opacity=Math.max(opacity,.22*(1-alpha));
+    const centerFocus=.28+.72*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.02),0,1));
+    let opacity=(1-alpha)*r.opacity*centerFocus*(selected?1:0);
+    if(mag)opacity=Math.max(opacity,.30*(1-alpha)+.12);
     if(!onscreen&&!mag)opacity=0;
-    if(i===active)opacity=Math.max(opacity,(1-alpha)*.96);
-    if(selected&&OVERVIEW_ANCHOR_SET.has(i))opacity=Math.max(opacity,overview*.96);
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.8*(1-overview));
+    if(selected&&OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.92);
 
-    // Size is semantic: two clear foreground anchors, recognisable middle layer,
-    // and smaller context cards. No more same-size transparent tile soup.
-    let scale;
-    if(isFront)scale=1.34;
-    else if(isSecond)scale=1.16;
-    else if(isMiddle)scale=.90-.035*Math.min(3,rank-2);
-    else scale=.62;
-
-    const zoomScale=lerp(.78,1.08,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
-    scale*=zoomScale;
-    if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
-    if(placed.magnetic)scale*=.92;
-    if(overview>.55&&OVERVIEW_ANCHOR_SET.has(i))scale=Math.max(scale,1.02);
-    scale=clamp(scale,.46,1.52);
+    let scale=(.46+cam.s*.43)*(.84+s.z*.16);
+    if(i===hero1){
+      const boost=spatialPinchTarget===i
+        ? 1 + .34*smooth(.08,.92,spatialPinchStrength)
+        : 1.26;
+      scale*=boost;
+    } else if(i===hero2) {
+      scale*=1.12;
+    } else {
+      scale*=.88;
+    }
+    if(placed.magnetic)scale*=.93;
+    if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48*(1-overview);
+    if(OVERVIEW_ANCHOR_SET.has(i)){
+      const anchorOrder=OVERVIEW_ANCHORS.indexOf(i);
+      const overviewScale=1.16+((anchorOrder===0||anchorOrder===OVERVIEW_ANCHORS.length-1)?0.10:0);
+      scale=lerp(scale,overviewScale,overview);
+    }else{
+      scale*=1-overview*.42;
+      opacity*=1-overview*.72;
+    }
+    scale=clamp(scale,.42,1.58);
 
     if(selected&&(opacity>.025||OVERVIEW_ANCHOR_SET.has(i)||i===active))ensureCardImage(i);
     const el=nodes[i];
-    el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.20?"auto":"none";
-    const layerZ=isFront?900:isSecond?780:isMiddle?600-rank*8:390-rank;
-    el.style.zIndex=String(layerZ+(placed.magnetic?10:0));
-    el.style.filter=isFront||isSecond?"none":isMiddle?"brightness(.92) saturate(.92)":"brightness(.72) saturate(.72)";
+    el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
+    el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
     el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);el.classList.toggle("magnetic",placed.magnetic);
     renderedCards[i]={x:placed.x,y:placed.y,opacity,magnetic:placed.magnetic,selected};

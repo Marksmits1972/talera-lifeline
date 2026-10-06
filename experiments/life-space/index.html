@@ -239,13 +239,17 @@ function fieldThicknessAtAge(age){
   return COLLECTION_THICKNESS+178*Math.sqrt(densityNormAtAge(age));
 }
 function fieldCenterAtAge(age){
+  const t=clamp(age/LIFE_YEARS,0,1);
   const angle=fieldAngleAtAge(age);
   const thickness=fieldThicknessAtAge(age);
-  // Dense periods shift their navigational centre outward into the thicker shell.
-  const radius=COLLECTION_RADIUS+thickness*.42;
+  // Dense periods shift their navigational centre outward, but the centreline
+  // itself is gently warped so chronology never renders as a visible ring/path.
+  const radius=COLLECTION_RADIUS+thickness*.34;
+  const warpX=(Math.sin(t*Math.PI*3.1+0.55)*58 + Math.sin(t*Math.PI*6.3+1.7)*26);
+  const warpY=(Math.sin(t*Math.PI*2.5+2.1)*52 + Math.sin(t*Math.PI*5.4+0.2)*22);
   return {
-    x:Math.cos(angle)*radius,
-    y:Math.sin(angle)*radius*.84,
+    x:Math.cos(angle)*radius + warpX,
+    y:Math.sin(angle)*radius*.78 + warpY,
     angle,
     radius,
     thickness,
@@ -257,14 +261,26 @@ const data=baseData.map((s,i)=>{
   const center=fieldCenterAtAge(s.age);
   const dNorm=center.densityNorm;
   const thickness=center.thickness;
-  const radialJitter=(fract(s.id+19)-.5)*thickness*.92;
-  const tangentJitter=(fract(s.id+33)-.5)*(34+thickness*.48);
-  const radius=center.radius+radialJitter;
-  const x=Math.cos(center.angle)*radius-Math.sin(center.angle)*tangentJitter;
-  const y=(Math.sin(center.angle)*radius+Math.cos(center.angle)*tangentJitter)*.84;
-  // Sparse regions reveal stories earlier; dense regions progressively unpack during zoom.
-  const reveal=.22+.62*fract(s.id+91)+.10*dNorm;
-  return {...s,x,y,z:.82+fract(s.id+70)*.38,reveal,density:dNorm,thickness};
+
+  // Two deterministic layers of scatter make a cloud rather than a ribbon.
+  const a1=fract(s.id+19)*Math.PI*2;
+  const a2=fract(s.id+71)*Math.PI*2;
+  const r1=Math.sqrt(fract(s.id+33))*thickness*.88;
+  const r2=Math.sqrt(fract(s.id+121))*thickness*.38;
+  const localX=Math.cos(a1)*r1 + Math.cos(a2)*r2;
+  const localY=Math.sin(a1)*r1*.84 + Math.sin(a2)*r2*1.08;
+
+  // A small age-dependent drift makes neighbouring dates overlap instead of
+  // drawing a clean chronological edge between them.
+  const driftX=Math.sin(s.age*.91+1.3)*thickness*.16;
+  const driftY=Math.sin(s.age*1.17+2.2)*thickness*.14;
+  const x=center.x+localX+driftX;
+  const y=center.y+localY+driftY;
+
+  // Sparse regions reveal stories earlier; dense regions progressively unpack.
+  const reveal=.20+.58*fract(s.id+91)+.12*dNorm;
+  const representative=fract(s.id+211); // stable priority for semantic zoom
+  return {...s,x,y,z:.82+fract(s.id+70)*.38,reveal,density:dNorm,thickness,representative};
 });
 
 // The fully zoomed-out state is a true whole-life overview, not merely
@@ -610,6 +626,79 @@ function drawTimeline(){
 }
 
 /* ------------------- MAGNETIC SPACE ------------------- */
+function visibleBudgetForScale(){
+  // The library may contain thousands of memories; the viewport never tries
+  // to render them all. Detail grows continuously with zoom.
+  const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
+  if(z<.08)return 5;
+  if(z<.20)return 7;
+  if(z<.38)return 10;
+  if(z<.58)return 14;
+  if(z<.76)return 19;
+  return 26;
+}
+function chooseVisibleRepresentatives(raw,alpha){
+  if(alpha>.92)return new Set([active]);
+
+  const budget=visibleBudgetForScale();
+  const overview=overviewBlendForScale();
+  const candidates=[];
+
+  data.forEach((s,i)=>{
+    const r=raw[i];
+    const nearScreen=r.x>-170&&r.x<W+170&&r.y>100&&r.y<H+170;
+    if(!nearScreen&&overview<.65)return;
+    const worldD=Math.hypot(s.x-cam.x,s.y-cam.y);
+    const screenD=Math.hypot(r.x-W/2,r.y-H/2);
+    const spatial=1-clamp(worldD/1050,0,1);
+    const centre=1-clamp(screenD/(Math.max(W,H)*.82),0,1);
+    const ageD=Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs(),365*DAY);
+    const temporal=Math.exp(-.5*ageD*ageD);
+    const overviewAnchor=OVERVIEW_ANCHOR_SET.has(i)?2.2:0;
+    const targetBoost=spatialPinchTarget===i?3.0:0;
+    const activeBoost=i===active?1.8:0;
+    const stable=.25*(1-s.representative);
+    const score=spatial*.72+centre*.34+temporal*.34+stable+overviewAnchor*overview+targetBoost+activeBoost;
+    candidates.push({i,score,x:r.x,y:r.y});
+  });
+  candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
+
+  const chosen=new Set();
+  // At overview explicitly preserve broad life orientation.
+  if(overview>.50){
+    for(const i of OVERVIEW_ANCHORS)chosen.add(i);
+  }
+  if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
+  chosen.add(active);
+
+  // Greedy screen-space spacing: prevent the "wall of cards" while keeping
+  // denser areas visibly richer than sparse ones.
+  const placed=[];
+  for(const i of chosen){
+    const r=raw[i]; if(r)placed.push({x:r.x,y:r.y});
+  }
+  const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
+  const minGap=lerp(118,62,z);
+  for(const cand of candidates){
+    if(chosen.size>=budget)break;
+    if(chosen.has(cand.i))continue;
+    let nearest=Infinity;
+    for(const p of placed)nearest=Math.min(nearest,Math.hypot(cand.x-p.x,cand.y-p.y));
+    // Dense local areas may pack a little tighter at deeper zoom.
+    const densityAllowance=1-data[cand.i].density*.18;
+    if(nearest<minGap*densityAllowance)continue;
+    chosen.add(cand.i);
+    placed.push({x:cand.x,y:cand.y});
+  }
+
+  // If spacing left us under budget, fill with strongest candidates.
+  for(const cand of candidates){
+    if(chosen.size>=budget)break;
+    chosen.add(cand.i);
+  }
+  return chosen;
+}
+
 function chooseMagneticSet(raw,alpha){
   const overview=overviewBlendForScale();
   if(overview>.52){
@@ -626,8 +715,7 @@ function chooseMagneticSet(raw,alpha){
     ranked.push({i,score:spatial});
   });
   ranked.sort((a,b)=>a.score-b.score||a.i-b.i);
-  const hereDensity=densityNormAtAge(ageFromMs(timeCenter));
-  const minVisible=4,maxGuide=7,chosen=new Set(natural.slice(0,hereDensity>.55?16:10));
+  const minVisible=3,maxGuide=6,chosen=new Set(natural.slice(0,6));
   for(const id of lastMagneticIds){if(chosen.size>=minVisible)break;const rank=ranked.findIndex(r=>r.i===id);if(rank>=0&&rank<maxGuide+4)chosen.add(id)}
   for(const r of ranked){if(chosen.size>=minVisible)break;chosen.add(r.i)}
   magneticIds=chosen;lastMagneticIds=new Set(chosen);
@@ -662,7 +750,8 @@ function render(){
   const raw=data.map((s,i)=>{
     const q=screenPoint(s.x,s.y);
     const worldDist=Math.hypot(s.x-cam.x,s.y-cam.y);
-    const local=1-clamp(worldDist/780,0,1);
+    const localRadius=Math.max(430,COLLECTION_RADIUS*2.15);
+    const local=1-clamp(worldDist/localRadius,0,1);
     let reveal=smooth(s.reveal-.20-local*.20,s.reveal+.16-local*.20,cam.s);
     if(OVERVIEW_ANCHOR_SET.has(i)) reveal=Math.max(reveal,overview);
     // Fixed-world behaviour: photos do not disappear merely because the
@@ -670,6 +759,7 @@ function render(){
     const spatialPresence=.22+.78*local;
     return{x:q.x,y:q.y,temporal:1,reveal,opacity:reveal*spatialPresence};
   });
+  const visibleSet=chooseVisibleRepresentatives(raw,alpha);
   chooseMagneticSet(raw,alpha);
 
   const relevance=data.map((s,i)=>({
@@ -681,14 +771,16 @@ function render(){
   renderedCards=[];
 
   data.forEach((s,i)=>{
-    const r=raw[i],mag=magneticIds.has(i)&&alpha<.96&&overview<.52,placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
+    const selected=visibleSet.has(i);
+    const mag=magneticIds.has(i)&&alpha<.96&&overview<.52;
+    const r=raw[i],placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
     const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260;
     const centerFocus=.28+.72*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.02),0,1));
-    let opacity=(1-alpha)*r.opacity*centerFocus;
+    let opacity=(1-alpha)*r.opacity*centerFocus*(selected?1:0);
     if(mag)opacity=Math.max(opacity,.30*(1-alpha)+.12);
     if(!onscreen&&!mag)opacity=0;
     if(i===active)opacity=Math.max(opacity,(1-alpha)*.8*(1-overview));
-    if(OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.92);
+    if(selected&&OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.92);
 
     let scale=(.46+cam.s*.43)*(.84+s.z*.16);
     if(i===hero1){
@@ -713,13 +805,13 @@ function render(){
     }
     scale=clamp(scale,.42,1.58);
 
-    if(opacity>.025||OVERVIEW_ANCHOR_SET.has(i)||i===active)ensureCardImage(i);
+    if(selected&&(opacity>.025||OVERVIEW_ANCHOR_SET.has(i)||i===active))ensureCardImage(i);
     const el=nodes[i];
     el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
     el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
     el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);el.classList.toggle("magnetic",placed.magnetic);
-    renderedCards[i]={x:placed.x,y:placed.y,opacity,magnetic:placed.magnetic};
+    renderedCards[i]={x:placed.x,y:placed.y,opacity,magnetic:placed.magnetic,selected};
   });
 
   magnetRing.style.left="16px";magnetRing.style.right="16px";magnetRing.style.top="140px";magnetRing.style.bottom="92px";

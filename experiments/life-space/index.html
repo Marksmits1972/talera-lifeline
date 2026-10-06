@@ -148,7 +148,7 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 
 
 
-const app=document.getElementById("app"),world=document.getElementById("world"),bg=document.getElementById("bg");
+const app=document.getElementById("app"),world=document.getElementById("world"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
 const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
 const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
@@ -878,7 +878,7 @@ function render(){
       ? 'Knijp uit het verhaal om terug te keren naar het <b>foto-stelsel</b>.'
       : '<b>Foto-stelsel:</b> links/rechts draait de levensbol eindeloos · omhoog/omlaag beweegt door je leven.';
 }
-function resize(){function resize(){
+function resize(){
   const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);
   const oldMin=SPACE_MIN;
   SPACE_MIN=fitOverviewScale();
@@ -1024,7 +1024,7 @@ app.addEventListener("touchcancel",()=>{
   touch=null;spatialPinchTarget=null;spatialPinchStrength=0;render();
 },{passive:false});
 
-document.getElementById("storyBtn").onclickdocument.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToTime(timeCenter));
+document.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToFocus());
 document.getElementById("wideBtn").onclick=wide;
 document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.82);
 document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.22);

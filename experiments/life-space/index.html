@@ -46,14 +46,14 @@ button{font:inherit;color:inherit}
 /* Original Talera timeline language: one continuous ruler with a fixed centre needle. */
 #timelineShell{
   position:absolute;z-index:80;left:0;right:0;top:0;
-  height:clamp(176px,22dvh,206px);
+  height:clamp(116px,16dvh,138px);
   padding-top:var(--safeT);
   overflow:hidden;touch-action:none;user-select:none;
   background:linear-gradient(180deg,rgba(255,254,252,.94) 0%,rgba(220,234,246,.70) 100%);
   border-bottom:1px solid rgba(15,39,71,.10);
   backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px);
 }
-#timelineCanvas{position:absolute;left:0;right:0;top:calc(8px + var(--safeT));width:100%;height:calc(100% - 8px - var(--safeT));touch-action:none}
+#timelineCanvas{position:absolute;left:0;right:0;top:calc(24px + var(--safeT));width:100%;height:calc(100% - 24px - var(--safeT));touch-action:none}
 #needle{
   position:absolute;z-index:3;left:50%;top:calc(11px + var(--safeT));bottom:8px;width:2px;
   transform:translateX(-1px);pointer-events:none;
@@ -65,17 +65,16 @@ button{font:inherit;color:inherit}
   box-shadow:0 0 0 4px rgba(231,169,139,.18),0 0 0 7px rgba(91,143,185,.07);
 }
 #focusBlock{
-  position:absolute;z-index:5;left:50%;top:calc(15px + var(--safeT));transform:translateX(-50%);
+  position:absolute;z-index:5;left:50%;top:calc(16px + var(--safeT));transform:translateX(-50%);
   border-radius:999px;color:#0F2747;background:rgba(255,254,252,.95);
   border:1px solid rgba(91,143,185,.20);white-space:nowrap;pointer-events:none;
-  box-shadow:0 4px 14px rgba(15,39,71,.06);
-  font-size:11px;font-weight:650;letter-spacing:.01em;
-  will-change:font-size,padding,opacity;
+  box-shadow:0 5px 18px rgba(15,39,71,.07);
+  will-change:font-size,padding,transform,opacity;
 }
 #focusRange{display:block;font-weight:700;letter-spacing:.005em;line-height:1}
 #timelineHint{
-  position:absolute;z-index:4;left:50%;bottom:5px;transform:translateX(-50%);
-  font-size:8px;color:rgba(15,39,71,.34);pointer-events:none;white-space:nowrap;
+  position:absolute;z-index:4;left:50%;bottom:4px;transform:translateX(-50%);
+  font-size:8px;color:rgba(15,39,71,.40);pointer-events:none;white-space:nowrap;
 }
 
 #hint{position:absolute;z-index:75;left:50%;bottom:calc(72px + var(--safeB));transform:translateX(-50%);width:min(90vw,440px);padding:10px 13px;border-radius:16px;background:rgba(5,10,14,.48);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;line-height:1.35;text-align:center;color:rgba(255,255,255,.9);pointer-events:none}
@@ -375,10 +374,11 @@ function scaleForSpanYears(years){
   return lerp(SPACE_MIN,SPACE_MAX,(a+b)/2);
 }
 function syncSpanFromSpace(){
-  // Photo-space zoom never rewrites the Free timeline's search gear.
+  timelineSpanYears=spanYearsForScale(cam.s);
+  spanTarget=timelineSpanYears;
 }
 function syncSpaceScaleFromSpan(){
-  // Free timeline scale never rewrites photo card zoom.
+  cam.s=scaleForSpanYears(timelineSpanYears);
 }
 function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
 function clampTime(ms){return clamp(ms,LIFE_START,LIFE_END)}
@@ -448,339 +448,182 @@ function driveSpaceFromTime(ms,instant=false){
   render();
 }
 
-/* ------------------- ORIGINAL TALERA TIMELINE ------------------- */
-const MS_DAY=DAY;
-const DAYS_YEAR=365.2425;
-const LEVELS=[
-  {name:"15 jaar",spanDays:DAYS_YEAR*15},
-  {name:"2 jaar",spanDays:DAYS_YEAR*2},
-  {name:"3 maanden",spanDays:91.31},
-  {name:"2 weken",spanDays:14},
-  {name:"1 dag",spanDays:1},
-  {name:"24 uur",spanDays:1}
-];
+/* ------------------- ACTIVE TIMELINE ------------------- */
+let timelineTouches=new Map();
+let tlDrag=null,tlPinch=null;
+let tlVelocity=0,tlLastX=0,tlLastT=0;
+let spanTarget=timelineSpanYears;
 
-const EVENT_OFFSETS=data.map(m=>(m.ms-LIFE_START)/MS_DAY);
-const TOTAL_DAYS=Math.ceil((LIFE_END-LIFE_START)/MS_DAY)+2;
-const dayCounts=new Uint16Array(TOTAL_DAYS);
-for(const o of EVENT_OFFSETS){
-  const day=Math.floor(o);
-  if(day>=0&&day<TOTAL_DAYS)dayCounts[day]++;
+function timelineLocalX(clientX){const r=timelineShell.getBoundingClientRect();return clientX-r.left}
+function chooseSpanForVelocity(v){
+  // Completely continuous: calm movement narrows the ruler, fast movement widens it.
+  // 0 px/ms ~= 3 years; >= 1.0 px/ms ~= almost whole life.
+  const t=clamp(v/1.0,0,1);
+  const curved=t*t*(3-2*t);
+  return 3 + curved*48;
 }
-
-let zoomPos=0;
-let visualZoomPos=0;
-let timelineRaf=0;
-let timelineSnapTimer=0;
-timelineUser=false;
-
-function spanForZoom(z){
-  z=clamp(z,0,5);
-  if(z>=4)return 1;
-  const i=Math.floor(z),t=z-i;
-  return Math.exp(lerp(Math.log(LEVELS[i].spanDays),Math.log(LEVELS[i+1].spanDays),t));
+function reanchorTimeline(x){
+  tlDrag={x,center:timeCenter,span:timelineSpanYears};
 }
-function timelineActiveLevel(){
-  return clamp(Math.round(visualZoomPos),0,5);
-}
-function timelineBounds(){
-  const span=spanForZoom(visualZoomPos);
-  const half=span*MS_DAY/2;
-  return[timeCenter-half,timeCenter+half,span];
-}
-function keepTimelineCenterValid(){
-  const span=spanForZoom(zoomPos);
-  const half=span*MS_DAY/2;
-  const minCenter=LIFE_START+Math.min(half,(LIFE_END-LIFE_START)/2);
-  timeCenter=clamp(timeCenter,minCenter,LIFE_END);
-  timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;
-}
-function ageAt(ms){return(ms-LIFE_START)/MS_DAY/DAYS_YEAR}
-
-function rr(x,y,w,h,r){
-  r=Math.min(r,w/2,h/2);
-  ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
-}
-function aggregatePerDay(a,b){
-  const i0=clamp(Math.floor(a),0,TOTAL_DAYS),i1=clamp(Math.ceil(b),0,TOTAL_DAYS);
-  if(i1<=i0)return 0;
-  let n=0;for(let i=i0;i<i1;i++)n+=dayCounts[i];
-  return n/(i1-i0);
-}
-function densityBucket(level){return[60,7,1,1,1,null][level]}
-function drawDensity(level,startMs,endMs,w,axisY){
-  const startDay=(startMs-LIFE_START)/MS_DAY,endDay=(endMs-LIFE_START)/MS_DAY;
-  if(level===5){
-    const stacks=new Map();
-    for(const o of EVENT_OFFSETS){
-      if(o<startDay||o>endDay)continue;
-      const x=((LIFE_START+o*MS_DAY-startMs)/(endMs-startMs))*w;
-      const slot=Math.floor(o*48),s=stacks.get(slot)||0;stacks.set(slot,s+1);
-      ctx.fillStyle="rgba(91,143,185,.88)";
-      ctx.beginPath();ctx.arc(x,axisY-9-s*7,2.8,0,Math.PI*2);ctx.fill();
-    }
-    return;
-  }
-  const bucket=densityBucket(level),visible=endDay-startDay;
-  let bs=Math.floor(startDay/bucket)*bucket;
-  for(;bs<endDay;bs+=bucket){
-    const be=bs+bucket,rate=aggregatePerDay(bs,be);
-    if(rate<=0)continue;
-    const intensity=1-Math.exp(-rate/(level===0?.055:.48));
-    const mid=(bs+be)/2,x=((LIFE_START+mid*MS_DAY-startMs)/(endMs-startMs))*w;
-    const bw=Math.max(level<2?2.2:3.2,bucket/visible*w*.64),bh=5+intensity*56;
-    ctx.fillStyle=`rgba(91,143,185,${(.24+intensity*.66).toFixed(3)})`;
-    rr(x-bw/2,axisY-bh,bw,bh,Math.min(4,bw/2));ctx.fill();
-  }
-}
-function drawMemoryBeacons(level,startMs,endMs,w,axisY){
-  const configs=[
-    {stem:8,width:1.8,alpha:.46,r:1.8},
-    {stem:13,width:2.4,alpha:.58,r:2.0},
-    {stem:20,width:3.0,alpha:.68,r:2.2},
-    {stem:27,width:3.5,alpha:.75,r:2.5},
-    {stem:34,width:4.0,alpha:.82,r:2.8},
-    {stem:0,width:0,alpha:0,r:0}
-  ];
-  if(level===5)return;
-  const cfg=configs[level];
-  for(const m of data){
-    if(m.ms<startMs||m.ms>endMs)continue;
-    const x=((m.ms-startMs)/(endMs-startMs))*w;
-    ctx.strokeStyle=`rgba(91,143,185,${cfg.alpha})`;ctx.lineWidth=cfg.width;ctx.lineCap="round";
-    ctx.beginPath();ctx.moveTo(x,axisY-3);ctx.lineTo(x,axisY-cfg.stem);ctx.stroke();
-    ctx.fillStyle=`rgba(91,143,185,${Math.min(.92,cfg.alpha+.12)})`;
-    ctx.beginPath();ctx.arc(x,axisY-cfg.stem,cfg.r,0,Math.PI*2);ctx.fill();
-  }
-}
-function timelineTick(x,axisY,major,label="",sub="",strongSub=false){
-  if(x<-55||x>canvas.clientWidth+55)return;
-  ctx.strokeStyle=major?"rgba(15,39,71,.66)":"rgba(62,74,89,.24)";
-  ctx.lineWidth=major?1.5:1;ctx.beginPath();ctx.moveTo(x,axisY-(major?11:5));ctx.lineTo(x,axisY+(major?10:5));ctx.stroke();
-  if(major&&label){
-    ctx.textAlign="center";ctx.fillStyle="rgba(15,39,71,.90)";
-    ctx.font="700 13px -apple-system,BlinkMacSystemFont,sans-serif";ctx.fillText(label,x,axisY+22);
-    if(sub){
-      ctx.fillStyle=strongSub?"rgba(15,39,71,.82)":"rgba(62,74,89,.58)";
-      ctx.font=strongSub?"650 11.5px -apple-system,BlinkMacSystemFont,sans-serif":"11px -apple-system,BlinkMacSystemFont,sans-serif";
-      ctx.fillText(sub,x,axisY+34);
-    }
-  }
-}
-function drawLevel0(startMs,endMs,w,axisY){
-  const first=Math.floor(ageAt(startMs)),last=Math.ceil(ageAt(endMs));
-  for(let age=first;age<=last;age++){
-    if(age<0||age>70)continue;
-    const ms=LIFE_START+age*DAYS_YEAR*MS_DAY,x=((ms-startMs)/(endMs-startMs))*w;
-    const major=age%5===0;
-    timelineTick(x,axisY,major,major?`${age} jaar`:"",major?String(new Date(ms).getFullYear()):"");
-  }
-}
-function drawLevel1(startMs,endMs,w,axisY){
-  let d=new Date(startMs),y=d.getFullYear(),m=d.getMonth()-1;
-  for(let guard=0;guard<40;guard++){
-    m++;if(m>11){m=0;y++}
-    const ms=new Date(y,m,1).getTime();if(ms>endMs)break;
-    const major=m%3===0,x=((ms-startMs)/(endMs-startMs))*w;
-    timelineTick(x,axisY,major,major?new Date(ms).toLocaleDateString("nl-NL",{month:"short"}):"",major?String(y):"",true);
-  }
-}
-function drawLevel2(startMs,endMs,w,axisY){
-  let month=new Date(new Date(startMs).getFullYear(),new Date(startMs).getMonth(),1);
-  while(month.getTime()<=endMs){
-    const ms=month.getTime(),x=((ms-startMs)/(endMs-startMs))*w;
-    timelineTick(x,axisY,true,month.toLocaleDateString("nl-NL",{month:"short"}),String(month.getFullYear()));
-    month=new Date(month.getFullYear(),month.getMonth()+1,1);
-  }
-  let monday=new Date(startMs);monday.setHours(0,0,0,0);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
-  for(let ms=monday.getTime();ms<=endMs;ms+=7*MS_DAY){
-    const x=((ms-startMs)/(endMs-startMs))*w;timelineTick(x,axisY,false);
-  }
-}
-function drawLevel3(startMs,endMs,w,axisY){
-  let d=new Date(startMs);d=new Date(d.getFullYear(),d.getMonth(),d.getDate());let i=0;
-  for(let ms=d.getTime();ms<=endMs;ms+=MS_DAY,i++){
-    const x=((ms-startMs)/(endMs-startMs))*w,major=i%2===0,dt=new Date(ms);
-    timelineTick(x,axisY,major,major?dt.toLocaleDateString("nl-NL",{weekday:"short",day:"numeric"}):"",major?dt.toLocaleDateString("nl-NL",{month:"short"}):"");
-  }
-}
-function drawLevel4(startMs,endMs,w,axisY){
-  const s=new Date(startMs),dayStart=new Date(s.getFullYear(),s.getMonth(),s.getDate(),0,0,0,0).getTime();
-  const points=[[dayStart,"00:00","nacht"],[dayStart+6*3600000,"06:00","ochtend"],[dayStart+12*3600000,"12:00","middag"],[dayStart+18*3600000,"18:00","avond"],[dayStart+24*3600000,"24:00","volgende dag"]];
-  for(const [ms,label,sub] of points){const x=((ms-startMs)/(endMs-startMs))*w;timelineTick(x,axisY,true,label,sub)}
-}
-function drawLevel5(startMs,endMs,w,axisY){
-  let d=new Date(startMs);d.setSeconds(0,0);d.setMinutes(d.getMinutes()<30?0:30);
-  for(let ms=d.getTime();ms<=endMs;ms+=30*60000){
-    const dt=new Date(ms),major=dt.getMinutes()===0,x=((ms-startMs)/(endMs-startMs))*w;
-    timelineTick(x,axisY,major,major?dt.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}):"");
-  }
-}
-function drawScale(level,startMs,endMs,w,axisY){
-  ctx.strokeStyle="rgba(91,143,185,.44)";ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(0,axisY+.5);ctx.lineTo(w,axisY+.5);ctx.stroke();
-  if(level===0)drawLevel0(startMs,endMs,w,axisY);
-  else if(level===1)drawLevel1(startMs,endMs,w,axisY);
-  else if(level===2)drawLevel2(startMs,endMs,w,axisY);
-  else if(level===3)drawLevel3(startMs,endMs,w,axisY);
-  else if(level===4)drawLevel4(startMs,endMs,w,axisY);
-  else drawLevel5(startMs,endMs,w,axisY);
-}
-function updateFocusBlockOriginal(level){
-  const nearNow=Math.abs(timeCenter-LIFE_END)<60000;
-  let label;
-  if(nearNow)label="vandaag";
-  else if(level===5)label=new Date(timeCenter).toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"});
-  else label=new Date(timeCenter).toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"});
-  focusRange.textContent=label;
-
-  // Keep the previously agreed visual hierarchy: clear at wide view, subtle near a story.
-  const close=smooth(.75,1.72,cam.s);
-  focusBlock.style.fontSize=lerp(14.5,10.5,close).toFixed(1)+"px";
-  focusBlock.style.padding=lerp(6.5,4,close).toFixed(1)+"px "+lerp(13,8,close).toFixed(1)+"px";
-  focusBlock.style.opacity=String(lerp(.98,.80,close));
-}
-function drawTimeline(){
-  const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.4),w=r.width,h=r.height;
-  if(!w||!h)return;
-  canvas.width=Math.max(1,Math.round(w*dpr));canvas.height=Math.max(1,Math.round(h*dpr));
-  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-
-  const [startMs,endMs]=timelineBounds();
-  const axisY=h-48;
-  const level=timelineActiveLevel();
-  timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;
-
-  drawDensity(level,startMs,endMs,w,axisY);
-  drawMemoryBeacons(level,startMs,endMs,w,axisY);
-  drawScale(level,startMs,endMs,w,axisY);
-  updateFocusBlockOriginal(level);
-}
-
-// Exact original free/reference search gears.
-const timelinePointers=new Map();
-let dragStartX=0,dragStartCenter=0,dragSpanDays=spanForZoom(zoomPos);
-let pinchStartDist=0,pinchStartZoom=0,pinchStartCenter=0,pinchStartMidX=0;
-let visualScaleRaf=0,visualScaleTransitioning=false,visualIntentLevel=0,visualIntentSince=performance.now(),visualGearHoldUntil=0;
-let scaleLastX=0,scaleLastT=0,searchVelocity=0,gestureUsedPinch=false;
-const VISUAL_AUTO_MAX_ZOOM=1;
-const VISUAL_GEAR_HOLD_MS=1200;
-const VISUAL_ZOOM_IN_DWELL_MS=[0,750];
-const VISUAL_ZOOM_OUT_DWELL_MS=170;
-
-function visualStageForZoom(z){return clamp(Math.round(Math.min(z,VISUAL_AUTO_MAX_ZOOM)),0,VISUAL_AUTO_MAX_ZOOM)}
-function visualTargetForLevel(level){return clamp(level,0,VISUAL_AUTO_MAX_ZOOM)}
-function dragSpanForCurrentVisual(){return visualZoomPos>=.82?spanForZoom(visualZoomPos):spanForZoom(zoomPos)}
-function reanchorDragAt(x,spanDays=dragSpanForCurrentVisual()){dragStartX=x;dragStartCenter=timeCenter;dragSpanDays=spanDays}
-function visualLevelForSpeed(speed){return Math.max(0,speed)>=.60?0:1}
-function resetVisualIntent(now=performance.now()){visualIntentLevel=visualStageForZoom(visualZoomPos);visualIntentSince=now}
-function cancelVisualScaleAnimation(){cancelAnimationFrame(visualScaleRaf);visualScaleRaf=0;visualScaleTransitioning=false}
-function animateVisualScaleTo(target,duration){
-  cancelVisualScaleAnimation();
-  const from=visualZoomPos,start=performance.now();visualScaleTransitioning=true;
-  function frame(now){
-    const t=clamp((now-start)/duration,0,1);
-    visualZoomPos=lerp(from,target,1-Math.pow(1-t,3));
-    timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;
-    render();
-    if(t<1)visualScaleRaf=requestAnimationFrame(frame);
-    else{
-      visualZoomPos=target;visualScaleTransitioning=false;
-      const settledAt=performance.now();visualIntentLevel=visualStageForZoom(target);visualIntentSince=settledAt;visualGearHoldUntil=settledAt+VISUAL_GEAR_HOLD_MS;
-      if(timelinePointers.size===1){
-        const span=target>=.82?spanForZoom(target):spanForZoom(zoomPos);
-        reanchorDragAt(scaleLastX,span);
-      }
-      render();
-    }
-  }
-  visualScaleRaf=requestAnimationFrame(frame);
-}
-function considerVisualScale(speed,now){
-  if(visualScaleTransitioning||timelinePointers.size!==1)return;
-  const current=visualStageForZoom(visualZoomPos),desired=visualLevelForSpeed(speed);
-  if(desired===current){visualIntentLevel=current;visualIntentSince=now;return}
-  const strongOverview=desired===0&&current>0&&speed>=.85;
-  if(desired!==visualIntentLevel){visualIntentLevel=desired;visualIntentSince=strongOverview?now:Math.max(now,visualGearHoldUntil);return}
-  if(now<visualGearHoldUntil&&!strongOverview)return;
-  if(desired<current){
-    const dwell=strongOverview?90:VISUAL_ZOOM_OUT_DWELL_MS;
-    if(now-visualIntentSince<dwell)return;
-    animateVisualScaleTo(visualTargetForLevel(desired),260);return;
-  }
-  const next=Math.min(VISUAL_AUTO_MAX_ZOOM,current+1);
-  if(now-visualIntentSince<VISUAL_ZOOM_IN_DWELL_MS[next])return;
-  animateVisualScaleTo(visualTargetForLevel(next),360);
+function updateTimelineSpanToward(target,dt){
+  spanTarget=clamp(target,1/365.2425,54);
+  const a=1-Math.exp(-dt/180);
+  timelineSpanYears=lerp(timelineSpanYears,spanTarget,a);
+  syncSpaceScaleFromSpan();
+  timeCenter=clampTime(timeCenter);
 }
 function timelinePointerDown(e){
-  if(e.target.closest("button"))return;
-  e.preventDefault();e.stopPropagation();timelineUser=true;hint.style.display="none";
+  e.preventDefault();e.stopPropagation();
   timelineShell.setPointerCapture&&timelineShell.setPointerCapture(e.pointerId);
-  timelinePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(timelinePointers.size===1){
-    reanchorDragAt(e.clientX);scaleLastX=e.clientX;scaleLastT=performance.now();searchVelocity=0;resetVisualIntent(scaleLastT);gestureUsedPinch=false;
-  }else if(timelinePointers.size===2){
-    gestureUsedPinch=true;cancelVisualScaleAnimation();visualZoomPos=zoomPos;visualGearHoldUntil=0;
-    const p=[...timelinePointers.values()];
-    pinchStartDist=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);
-    pinchStartZoom=zoomPos;pinchStartCenter=timeCenter;pinchStartMidX=(p[0].x+p[1].x)/2;
+  timelineTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  timelineUser=true;hint.style.display="none";
+  if(timelineTouches.size===1){
+    const x=timelineLocalX(e.clientX);reanchorTimeline(x);tlLastX=x;tlLastT=performance.now();tlVelocity=0;spanTarget=timelineSpanYears;
+  }else if(timelineTouches.size===2){
+    const p=[...timelineTouches.values()],r=timelineShell.getBoundingClientRect();
+    const d=Math.max(20,Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y)),mid=(p[0].x+p[1].x)/2-r.left;
+    tlPinch={d,span:timelineSpanYears,center:timeCenter,mid};
   }
 }
 function timelinePointerMove(e){
-  if(!timelinePointers.has(e.pointerId))return;
-  e.preventDefault();e.stopPropagation();timelinePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(!timelineTouches.has(e.pointerId))return;
+  e.preventDefault();e.stopPropagation();
+  timelineTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
   const r=timelineShell.getBoundingClientRect();
-  if(timelinePointers.size===1){
-    const now=performance.now(),segmentDx=e.clientX-scaleLastX,dt=clamp(now-scaleLastT,8,48);
-    const instantVelocity=Math.abs(segmentDx)/dt,velocityTau=instantVelocity>searchVelocity?70:380;
-    const velocityAlpha=1-Math.exp(-dt/velocityTau);
-    searchVelocity=searchVelocity===0?instantVelocity:lerp(searchVelocity,instantVelocity,velocityAlpha);
-
-    const dx=e.clientX-dragStartX;
-    timeCenter=dragStartCenter-(dx/r.width)*dragSpanDays*MS_DAY;
-    scaleLastX=e.clientX;scaleLastT=now;
-    considerVisualScale(searchVelocity,now);
-    keepTimelineCenterValid();
-    driveSpaceFromTime(timeCenter,false);
-  }else if(timelinePointers.size===2){
-    const p=[...timelinePointers.values()];
-    const dist=Math.max(20,Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y)),mid=(p[0].x+p[1].x)/2;
-    zoomPos=clamp(pinchStartZoom+Math.log(dist/pinchStartDist)*1.8,0,5);visualZoomPos=zoomPos;
-    const oldSpan=spanForZoom(pinchStartZoom),newSpan=spanForZoom(zoomPos);
-    const oldRel=(pinchStartMidX-r.left)/r.width-.5,anchor=pinchStartCenter+oldRel*oldSpan*MS_DAY,newRel=(mid-r.left)/r.width-.5;
-    timeCenter=anchor-newRel*newSpan*MS_DAY;
-    keepTimelineCenterValid();
+  if(timelineTouches.size===1&&tlDrag){
+    const x=timelineLocalX(e.clientX),now=performance.now(),dxSeg=x-tlLastX,dt=clamp(now-tlLastT,8,60);
+    const inst=Math.abs(dxSeg)/dt,a=1-Math.exp(-dt/(inst>tlVelocity?75:300));
+    tlVelocity=tlVelocity?lerp(tlVelocity,inst,a):inst;
+    const desired=chooseSpanForVelocity(tlVelocity);
+    updateTimelineSpanToward(desired,dt);
+    // The time itself keeps following the finger every frame. The only thing
+    // that changes with speed is how much time one pixel represents.
+    const ms=timeCenter-(dxSeg/r.width)*(timelineSpanYears*365.2425*DAY);
+    driveSpaceFromTime(ms,false);
+    tlLastX=x;tlLastT=now;
+  } else if(timelineTouches.size===2&&tlPinch){
+    const p=[...timelineTouches.values()];
+    const d=Math.max(20,Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y));
+    const mid=(p[0].x+p[1].x)/2-r.left;
+    const ratio=d/tlPinch.d;
+    const oldSpan=tlPinch.span,newSpan=clamp(oldSpan/ratio,1/365.2425,54);
+    const oldRel=tlPinch.mid/r.width-.5;
+    const anchor=tlPinch.center+oldRel*oldSpan*365.2425*DAY;
+    const newRel=mid/r.width-.5;
+    timelineSpanYears=newSpan;spanTarget=newSpan;
+    syncSpaceScaleFromSpan();
+    timeCenter=clampTime(anchor-newRel*newSpan*365.2425*DAY);
     driveSpaceFromTime(timeCenter,false);
   }
-}
-function scheduleTimelineSnap(syncVisual=false){
-  clearTimeout(timelineSnapTimer);
-  timelineSnapTimer=setTimeout(()=>animateTimelineZoomTo(Math.round(zoomPos),280,syncVisual),170);
-}
-function animateTimelineZoomTo(target,duration,syncVisual=false){
-  cancelAnimationFrame(timelineRaf);
-  const from=zoomPos,start=performance.now();if(syncVisual)cancelVisualScaleAnimation();
-  function frame(now){
-    const t=clamp((now-start)/duration,0,1);zoomPos=lerp(from,target,1-Math.pow(1-t,3));
-    if(syncVisual)visualZoomPos=zoomPos;
-    keepTimelineCenterValid();render();
-    if(t<1)timelineRaf=requestAnimationFrame(frame);
-  }
-  timelineRaf=requestAnimationFrame(frame);
 }
 function timelinePointerEnd(e){
-  if(timelinePointers.has(e.pointerId))timelinePointers.delete(e.pointerId);
+  if(timelineTouches.has(e.pointerId))timelineTouches.delete(e.pointerId);
   e.preventDefault();e.stopPropagation();
-  if(timelinePointers.size===0){
-    timelineUser=false;searchVelocity=0;scheduleTimelineSnap(gestureUsedPinch);
-  }else if(timelinePointers.size===1){
-    const p=[...timelinePointers.values()][0];reanchorDragAt(p.x);scaleLastX=p.x;scaleLastT=performance.now();searchVelocity=0;resetVisualIntent(scaleLastT);
+  if(timelineTouches.size===0){
+    timelineUser=false;tlDrag=null;tlPinch=null;tlVelocity=0;
+    // settle camera exactly at the selected time without snapping the time itself
+    const p=worldCenterForTime(timeCenter);cam.x=lerp(cam.x,p.x,.55);cam.y=lerp(cam.y,p.y,.55);render();
+  }else if(timelineTouches.size===1){
+    const p=[...timelineTouches.values()][0],x=timelineLocalX(p.x);reanchorTimeline(x);tlLastX=x;tlLastT=performance.now();tlVelocity=0;
   }
 }
 timelineShell.addEventListener("pointerdown",timelinePointerDown,{passive:false});
 timelineShell.addEventListener("pointermove",timelinePointerMove,{passive:false});
 timelineShell.addEventListener("pointerup",timelinePointerEnd,{passive:false});
 timelineShell.addEventListener("pointercancel",timelinePointerEnd,{passive:false});
+
+function chooseTickStep(spanYears){
+  if(spanYears>35)return{years:10,minor:5};
+  if(spanYears>16)return{years:5,minor:1};
+  if(spanYears>7)return{years:2,minor:1};
+  if(spanYears>3)return{years:1,minor:.25};
+  if(spanYears>1.3)return{months:3,minorMonths:1};
+  return{months:1,minorDays:14};
+}
+function visibleTimeBounds(){
+  const overview=overviewBlendForScale();
+  if(overview>.72)return[LIFE_START,LIFE_END];
+  const half=timelineSpanMs()/2;
+  return[clamp(timeCenter-half,LIFE_START,LIFE_END),clamp(timeCenter+half,LIFE_START,LIFE_END)];
+}
+function formatFocusRange(){
+  const [start,end]=visibleTimeBounds();
+  const spanDays=Math.max(1,(end-start)/DAY);
+  const a=new Date(start),b=new Date(end);
+  if(overviewBlendForScale()>.72)return BIRTH_YEAR+"–"+END_YEAR;
+  if(spanDays>365*7)return a.getFullYear()+"–"+b.getFullYear();
+  if(spanDays>365*1.6){
+    if(a.getFullYear()===b.getFullYear())return String(a.getFullYear());
+    return a.getFullYear()+"–"+b.getFullYear();
+  }
+  if(spanDays>120){
+    const ma=a.toLocaleDateString("nl-NL",{month:"short"});
+    const mb=b.toLocaleDateString("nl-NL",{month:"short",year:"numeric"});
+    return ma+" – "+mb;
+  }
+  if(spanDays>10){
+    const sameMonth=a.getMonth()===b.getMonth()&&a.getFullYear()===b.getFullYear();
+    if(sameMonth)return a.getDate()+"–"+b.getDate()+" "+b.toLocaleDateString("nl-NL",{month:"long",year:"numeric"});
+    return a.toLocaleDateString("nl-NL",{day:"numeric",month:"short"})+" – "+b.toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"});
+  }
+  return new Date(timeCenter).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+}
+function updateFocusBlock(){
+  const overview=overviewBlendForScale();
+  const close=smooth(.70,1.70,cam.s);
+  focusRange.textContent=formatFocusRange();
+  // Wide view: clear and easy to read. Close to one story: smaller and quieter.
+  const font=lerp(17,10.5,close);
+  const px=lerp(16,8,close),py=lerp(8,4,close);
+  focusBlock.style.fontSize=font.toFixed(2)+"px";
+  focusBlock.style.padding=py.toFixed(1)+"px "+px.toFixed(1)+"px";
+  focusBlock.style.opacity=String(lerp(.98,.78,close));
+  focusBlock.style.transform="translateX(-50%) scale("+lerp(1.02,.94,close).toFixed(3)+")";
+}
+
+function drawTimeline(){
+  const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.5),w=r.width,h=r.height;
+  if(!w||!h)return;
+  canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  const overview=overviewBlendForScale();
+  const range=visibleTimeBounds();
+  const start=range[0],end=range[1],span=Math.max(DAY,end-start),axisY=42;
+  ctx.strokeStyle="rgba(91,143,185,.44)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,axisY+.5);ctx.lineTo(w,axisY+.5);ctx.stroke();
+
+  // memory beacons
+  data.forEach(s=>{
+    if(s.ms<start||s.ms>end)return;
+    const x=(s.ms-start)/(end-start)*w;
+    ctx.strokeStyle="rgba(91,143,185,.52)";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(x,axisY-2);ctx.lineTo(x,axisY-10);ctx.stroke();
+    ctx.fillStyle="rgba(91,143,185,.82)";ctx.beginPath();ctx.arc(x,axisY-11,1.8,0,Math.PI*2);ctx.fill();
+  });
+
+  const cfg=chooseTickStep(timelineSpanYears);
+  const drawTick=(ms,major,label)=>{
+    if(ms<start||ms>end)return;
+    const x=(ms-start)/(end-start)*w;
+    ctx.strokeStyle=major?"rgba(15,39,71,.62)":"rgba(62,74,89,.24)";
+    ctx.lineWidth=major?1.25:1;ctx.beginPath();ctx.moveTo(x,axisY-(major?8:4));ctx.lineTo(x,axisY+(major?8:4));ctx.stroke();
+    if(major&&label){ctx.fillStyle="rgba(15,39,71,.86)";ctx.font="10px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(label,x,axisY+22)}
+  };
+
+  if(cfg.years){
+    const sy=new Date(start).getFullYear()-1,ey=new Date(end).getFullYear()+1;
+    for(let y=sy;y<=ey;y++){
+      const ms=new Date(y,0,1).getTime(),major=y%cfg.years===0;
+      if(major||cfg.minor===1)drawTick(ms,major,major?String(y):"");
+    }
+  } else {
+    let d=new Date(start);d=new Date(d.getFullYear(),d.getMonth(),1);
+    for(let guard=0;guard<120;guard++){
+      const ms=d.getTime();if(ms>end)break;
+      const major=cfg.months?d.getMonth()%cfg.months===0:true;
+      drawTick(ms,major,major?d.toLocaleDateString("nl-NL",{month:"short",year:timelineSpanYears<1.3?"2-digit":undefined}):"");
+      d=new Date(d.getFullYear(),d.getMonth()+1,1);
+    }
+  }
+}
 
 /* ------------------- MAGNETIC SPACE ------------------- */
 function visibleBudgetForScale(){
@@ -1124,7 +967,7 @@ document.getElementById("fieldBtn").onclick=()=>app.classList.toggle("debug");
 
 OVERVIEW_ANCHORS.forEach(ensureCardImage);
 for(let i=Math.max(0,active-5);i<=Math.min(data.length-1,active+5);i++)ensureCardImage(i);
-timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;resize();setBg(active);render();
+syncSpanFromSpace();resize();setBg(active);render();
 })();
 </script>
 </body>

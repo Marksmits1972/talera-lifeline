@@ -4,82 +4,85 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#10161c">
-<title>Talera — Levensatlas proef</title>
+<meta name="theme-color" content="#0d141a">
+<title>Talera — Continuous Life Space</title>
 <style>
 :root{
   --safeT:env(safe-area-inset-top,0px);
   --safeB:env(safe-area-inset-bottom,0px);
-  --glass:rgba(8,14,19,.48);
-  --line:rgba(255,255,255,.15);
-  --muted:rgba(255,255,255,.7);
+  --glass:rgba(8,14,19,.43);
+  --border:rgba(255,255,255,.14);
+  --muted:rgba(255,255,255,.68);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1015;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;overscroll-behavior:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a1015;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;overscroll-behavior:none}
 body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
-#app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0c1218;-webkit-user-select:none;user-select:none}
-#atmosphere{position:absolute;inset:-7%;background-size:cover;background-position:center;filter:blur(7px) saturate(.72) brightness(.38);transform:scale(1.1);transition:background-image .35s ease,filter .25s ease}
-#atmosphere::after{content:"";position:absolute;inset:0;background:
- radial-gradient(circle at 50% 46%,rgba(16,25,31,.03),rgba(6,10,14,.34) 57%,rgba(4,7,10,.78) 100%),
- linear-gradient(180deg,rgba(8,13,18,.08),rgba(8,13,18,.45))}
-#space{position:absolute;inset:0;overflow:hidden;touch-action:none}
+#app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
+#bg{position:absolute;inset:-8%;background-position:center;background-size:cover;filter:blur(9px) saturate(.7) brightness(.34);transform:scale(1.12);transition:background-image .45s ease,filter .25s ease}
+#bg:after{content:"";position:absolute;inset:0;background:
+  radial-gradient(circle at 50% 48%,rgba(18,29,36,.03),rgba(7,11,15,.27) 57%,rgba(3,6,9,.8) 100%),
+  linear-gradient(180deg,rgba(7,12,17,.03),rgba(7,12,17,.42))}
+#world{position:absolute;inset:0;overflow:hidden;touch-action:none}
 
-/* Large stable life regions. They are landmarks, never rails. */
-.region{position:absolute;width:310px;height:210px;transform-origin:center;will-change:transform,opacity;pointer-events:none}
-.regionHalo{position:absolute;inset:-48px;border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,255,255,.09),rgba(255,255,255,.025) 48%,transparent 72%);filter:blur(2px)}
-.regionCard{position:absolute;inset:16px;border-radius:28px;overflow:hidden;border:1px solid rgba(255,255,255,.16);background:rgba(12,20,26,.56);box-shadow:0 28px 75px rgba(0,0,0,.24);backdrop-filter:blur(11px);-webkit-backdrop-filter:blur(11px);pointer-events:auto}
-.regionCard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55;filter:saturate(.78)}
-.regionShade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,7,10,.08) 20%,rgba(3,7,10,.25) 48%,rgba(3,7,10,.82) 100%)}
-.regionCopy{position:absolute;left:18px;right:18px;bottom:16px;text-shadow:0 2px 10px rgba(0,0,0,.65)}
-.regionAge{font-size:11px;color:rgba(255,255,255,.74);letter-spacing:.02em}
-.regionTitle{font-size:24px;line-height:1.02;font-weight:760;letter-spacing:-.025em;margin-top:3px}
-.regionMeta{font-size:10px;margin-top:7px;color:rgba(255,255,255,.7)}
-.region.current .regionCard{outline:2px solid rgba(255,244,196,.92);outline-offset:3px}
+/* Soft directional life compass — spatial orientation only, never a menu. */
+#directionField{position:absolute;z-index:4;inset:0;pointer-events:none;opacity:.88}
+.dir{position:absolute;font-size:11px;color:rgba(255,255,255,.42);letter-spacing:.01em;text-shadow:0 1px 8px rgba(0,0,0,.55);transition:opacity .2s,transform .2s}
+.dir strong{display:block;font-size:13px;color:rgba(255,255,255,.62);font-weight:740}
+.dir small{font-size:9px}
+#d0{left:17px;top:22%}
+#d1{left:42%;top:14%}
+#d2{right:17px;top:24%;text-align:right}
+#d3{right:13px;bottom:29%;text-align:right}
+#d4{left:39%;bottom:19%;text-align:center}
+#d5{left:16px;bottom:30%}
 
-/* Individual memories become visible progressively. */
-.memory{position:absolute;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#263139;border:1px solid rgba(255,255,255,.17);box-shadow:0 18px 48px rgba(0,0,0,.32);will-change:transform,opacity;transform-origin:center;pointer-events:none}
+/* Memories: no region cards, no stage boundaries. */
+.memory{position:absolute;width:128px;height:168px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 50px rgba(0,0,0,.31);transform-origin:center;will-change:transform,opacity;pointer-events:none}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.memoryShade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(0,0,0,.8) 100%)}
-.memoryCopy{position:absolute;left:10px;right:10px;bottom:10px;text-shadow:0 2px 8px rgba(0,0,0,.75)}
-.memoryText{font-size:11px;line-height:1.18;font-weight:700;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.memoryDate{font-size:9px;color:rgba(255,255,255,.72);margin-top:5px}
-.memory.nearest{outline:1.5px solid rgba(255,255,255,.8);outline-offset:2px}
+.memoryShade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 37%,rgba(0,0,0,.81) 100%)}
+.memoryCopy{position:absolute;left:10px;right:10px;bottom:10px;text-shadow:0 2px 8px rgba(0,0,0,.78)}
+.memoryText{font-size:10.6px;line-height:1.17;font-weight:710;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.memoryDate{font-size:8.8px;color:rgba(255,255,255,.7);margin-top:5px}
+.memory.nearest{outline:1.5px solid rgba(255,255,255,.86);outline-offset:2px}
 
-/* Presentation mode remains the simple Talera story mode. */
-#presentation{position:absolute;z-index:15;inset:0;opacity:0;pointer-events:none;transition:opacity .18s ease}
+/* Big anchors are simply memories with more visual weight; still part of the same continuum. */
+.memory.anchor{width:188px;height:236px;border-radius:24px}
+.memory.anchor .memoryText{font-size:12.8px;line-height:1.15}
+.memory.anchor .memoryDate{font-size:9.5px}
+
+/* Presentation remains the familiar one-story mode. */
+#presentation{position:absolute;z-index:18;inset:0;opacity:0;pointer-events:none;transition:opacity .16s ease}
 #presentation.show{opacity:1}
 #presentation img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-#presentationVeil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.03) 30%,rgba(0,0,0,.14) 56%,rgba(0,0,0,.82) 100%)}
+#presentationVeil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.02) 32%,rgba(0,0,0,.13) 56%,rgba(0,0,0,.82) 100%)}
 #presentationCopy{position:absolute;left:22px;right:22px;bottom:calc(91px + var(--safeB));text-shadow:0 2px 11px rgba(0,0,0,.7)}
 #presentationText{font-size:27px;line-height:1.05;font-weight:760;letter-spacing:-.03em}
 #presentationDate{font-size:12px;margin-top:10px;color:rgba(255,255,255,.79)}
 
-/* Life compass: chronology is orientation, not steering. */
-#compass{position:absolute;z-index:60;left:11px;right:11px;top:calc(9px + var(--safeT));height:78px;border-radius:21px;padding:10px 11px;background:var(--glass);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);pointer-events:none}
-#compassTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
-#compassMode{font-size:12px;font-weight:760}
-#compassWhere{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
-#phaseStrip{height:35px;display:flex;gap:4px;align-items:end;margin-top:6px}
-.phaseSeg{position:relative;height:22px;flex:1;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);overflow:hidden}
-.phaseSeg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.09),transparent)}
-.phaseSeg.active{background:rgba(255,244,196,.2);border-color:rgba(255,244,196,.62)}
-.phaseLabel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:8px;color:rgba(255,255,255,.72);white-space:nowrap}
-.phaseSeg.active .phaseLabel{color:#fff8d7;font-weight:760}
+/* Top indicator: orientation only. */
+#top{position:absolute;z-index:70;left:11px;right:11px;top:calc(9px + var(--safeT));height:73px;border-radius:21px;padding:10px 12px;background:var(--glass);border:1px solid var(--border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);pointer-events:none}
+#topRow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+#mode{font-size:12px;font-weight:760}
+#where{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+#lifeBar{position:relative;height:27px;margin-top:7px}
+#lifeLine{position:absolute;left:0;right:0;top:12px;height:1px;background:rgba(255,255,255,.24)}
+#lifeLabels span{position:absolute;top:2px;transform:translateX(-50%);font-size:8px;color:rgba(255,255,255,.46)}
+#lifeWindow{position:absolute;top:4px;height:17px;border:1.5px solid rgba(255,255,255,.82);border-radius:10px;background:rgba(255,255,255,.065);min-width:6px}
+#lifeNeedle{position:absolute;top:1px;height:23px;width:2px;background:#fff0ae;box-shadow:0 0 8px rgba(255,240,174,.7);transform:translateX(-50%)}
 
-#hint{position:absolute;z-index:64;left:50%;bottom:calc(72px + var(--safeB));transform:translateX(-50%);width:min(90vw,440px);padding:10px 13px;border-radius:16px;background:rgba(5,10,14,.5);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;line-height:1.35;text-align:center;color:rgba(255,255,255,.9);pointer-events:none}
-#controls{position:absolute;z-index:68;left:11px;right:11px;bottom:calc(11px + var(--safeB));display:flex;align-items:center;justify-content:space-between;gap:7px}
+#hint{position:absolute;z-index:75;left:50%;bottom:calc(72px + var(--safeB));transform:translateX(-50%);width:min(90vw,440px);padding:10px 13px;border-radius:16px;background:rgba(5,10,14,.48);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;line-height:1.35;text-align:center;color:rgba(255,255,255,.9);pointer-events:none}
+#controls{position:absolute;z-index:78;left:11px;right:11px;bottom:calc(11px + var(--safeB));display:flex;align-items:center;justify-content:space-between;gap:7px}
 .group{display:flex;gap:7px}
-.btn{border:1px solid rgba(255,255,255,.15);background:rgba(5,10,14,.48);border-radius:999px;padding:9px 11px;font-size:11px;font-weight:720;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-#zoomRead{font-size:10px;color:rgba(255,255,255,.72);min-width:42px;text-align:center}
-#toast{position:absolute;z-index:90;left:50%;top:calc(96px + var(--safeT));transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(5,10,14,.72);font-size:10px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
+.btn{border:1px solid rgba(255,255,255,.15);background:rgba(5,10,14,.47);border-radius:999px;padding:9px 11px;font-size:11px;font-weight:720;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#zoomRead{font-size:10px;color:rgba(255,255,255,.72);min-width:44px;text-align:center}
+#toast{position:absolute;z-index:95;left:50%;top:calc(91px + var(--safeT));transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(4,8,11,.73);font-size:10px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
 #toast.on{opacity:1}
 
-/* Optional debug areas make the spatial model inspectable without a line. */
-#debugLayer{position:absolute;z-index:2;inset:0;pointer-events:none;opacity:0}
-.debug #debugLayer{opacity:1}
-.debugCircle{position:absolute;border:1px dashed rgba(255,255,255,.17);border-radius:50%;background:rgba(255,255,255,.015)}
-.debugName{position:absolute;font-size:10px;color:rgba(255,255,255,.35)}
+/* Optional field visualization for us only. */
+#fieldDebug{position:absolute;z-index:2;inset:0;pointer-events:none;opacity:0}
+.debug #fieldDebug{opacity:1}
+.fieldBlob{position:absolute;width:610px;height:460px;border-radius:50%;border:1px dashed rgba(255,255,255,.12);background:radial-gradient(ellipse at center,rgba(255,255,255,.025),transparent 68%)}
 
 @media(min-width:700px){
   #app{width:430px;height:min(900px,100vh);left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);border-radius:36px;box-shadow:0 35px 100px rgba(0,0,0,.5)}
@@ -88,9 +91,16 @@ button{font:inherit;color:inherit}
 </head>
 <body>
 <div id="app">
-  <div id="atmosphere"></div>
-  <div id="space">
-    <div id="debugLayer"></div>
+  <div id="bg"></div>
+  <div id="world"><div id="fieldDebug"></div></div>
+
+  <div id="directionField">
+    <div class="dir" id="d0"><strong>↖ Jeugd</strong><small>0–10</small></div>
+    <div class="dir" id="d1"><strong>↑ Tieners</strong><small>10–20</small></div>
+    <div class="dir" id="d2"><strong>Twintigers ↗</strong><small>20–30</small></div>
+    <div class="dir" id="d3"><strong>Dertigers →</strong><small>30–40</small></div>
+    <div class="dir" id="d4"><strong>↓ Veertigers</strong><small>40–50</small></div>
+    <div class="dir" id="d5"><strong>↙ Vijftigers</strong><small>50+</small></div>
   </div>
 
   <div id="presentation" class="show">
@@ -102,26 +112,28 @@ button{font:inherit;color:inherit}
     </div>
   </div>
 
-  <div id="compass">
-    <div id="compassTop">
-      <span id="compassMode">Presentatie</span>
-      <span id="compassWhere"></span>
+  <div id="top">
+    <div id="topRow"><span id="mode">Presentatie</span><span id="where"></span></div>
+    <div id="lifeBar">
+      <div id="lifeLine"></div>
+      <div id="lifeLabels"></div>
+      <div id="lifeWindow"></div>
+      <div id="lifeNeedle"></div>
     </div>
-    <div id="phaseStrip"></div>
   </div>
 
-  <div id="hint">Swipe links/rechts voor een volgend verhaal. <b>Knijp samen</b> om het levensoverzicht te openen.</div>
+  <div id="hint">Swipe links/rechts voor het volgende verhaal. <b>Knijp samen</b> om zonder sprong uit te zoomen.</div>
 
   <div id="controls">
     <div class="group">
       <button class="btn" id="storyBtn">Verhaal</button>
-      <button class="btn" id="atlasBtn">Atlas</button>
+      <button class="btn" id="wideBtn">Ruimte</button>
     </div>
     <span id="zoomRead">100%</span>
     <div class="group">
       <button class="btn" id="minusBtn">−</button>
       <button class="btn" id="plusBtn">+</button>
-      <button class="btn" id="areasBtn">Gebieden</button>
+      <button class="btn" id="fieldBtn">Veld</button>
     </div>
   </div>
 
@@ -134,264 +146,244 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 "use strict";
 
 const app=document.getElementById("app");
-const space=document.getElementById("space");
-const atmosphere=document.getElementById("atmosphere");
+const world=document.getElementById("world");
+const bg=document.getElementById("bg");
 const presentation=document.getElementById("presentation");
 const presentationImg=document.getElementById("presentationImg");
 const presentationText=document.getElementById("presentationText");
 const presentationDate=document.getElementById("presentationDate");
-const compassMode=document.getElementById("compassMode");
-const compassWhere=document.getElementById("compassWhere");
-const phaseStrip=document.getElementById("phaseStrip");
-const hint=document.getElementById("hint");
+const modeEl=document.getElementById("mode");
+const whereEl=document.getElementById("where");
+const lifeWindow=document.getElementById("lifeWindow");
+const lifeNeedle=document.getElementById("lifeNeedle");
 const zoomRead=document.getElementById("zoomRead");
+const hint=document.getElementById("hint");
 const toast=document.getElementById("toast");
-const debugLayer=document.getElementById("debugLayer");
+const fieldDebug=document.getElementById("fieldDebug");
 
-const BIRTH=1972;
-const MIN_SCALE=.24;
-const MAX_SCALE=1.9;
-const PRESENT_SCALE=1.48;
+const BIRTH=1972, END=2026;
+const MIN_SCALE=.18, MAX_SCALE=2.0, PRESENT_SCALE=1.58;
 
-// Stable atlas landmarks. Chronology runs clockwise, but there is no visible route.
-const PHASES=[
-  {key:"child",from:0,to:10,title:"Jeugd",short:"0–10",x:-1020,y:-560},
-  {key:"teen",from:10,to:20,title:"Tienerjaren",short:"10–20",x:190,y:-900},
-  {key:"twenties",from:20,to:30,title:"Twintiger jaren",short:"20–30",x:1160,y:-220},
-  {key:"thirties",from:30,to:40,title:"Dertiger jaren",short:"30–40",x:840,y:890},
-  {key:"forties",from:40,to:50,title:"Veertiger jaren",short:"40–50",x:-330,y:1060},
-  {key:"fifties",from:50,to:60,title:"Vijftiger jaren",short:"50–60",x:-1240,y:300}
+// Soft spatial bearings. They overlap heavily; these are attraction fields, not regions.
+const BEARINGS=[
+  {from:0,to:10,name:"Jeugd",x:-1180,y:-720},
+  {from:10,to:20,name:"Tienerjaren",x:-150,y:-1050},
+  {from:20,to:30,name:"Twintiger jaren",x:1040,y:-720},
+  {from:30,to:40,name:"Dertiger jaren",x:1220,y:350},
+  {from:40,to:50,name:"Veertiger jaren",x:180,y:1060},
+  {from:50,to:60,name:"Vijftiger jaren",x:-1080,y:620}
 ];
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const fract=n=>{const x=Math.sin(n*81.731+7.17)*43758.5453;return x-Math.floor(x)};
+const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+const fract=n=>{const x=Math.sin(n*79.271+4.91)*43758.5453;return x-Math.floor(x)};
 const ageOf=s=>{
   const d=new Date(s.at);
   return (d.getFullYear()-BIRTH)+(d.getMonth()/12)+(d.getDate()/365);
 };
 const dateLabel=s=>new Date(s.at).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
 const shortDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{month:"short",year:"numeric"});
-const phaseForAge=a=>PHASES.find((p,i)=>a>=p.from&&(a<p.to||i===PHASES.length-1))||PHASES[PHASES.length-1];
+const bearingForAge=a=>BEARINGS.find((b,i)=>a>=b.from&&(a<b.to||i===BEARINGS.length-1))||BEARINGS[BEARINGS.length-1];
 
+// Build a broad cloud for each period.
+// Chronology influences direction, but stories are distributed over a large 2D field.
 const data=MEMORIES.map((s,i)=>{
-  const age=ageOf(s);
-  const phase=phaseForAge(age);
-  const t=clamp((age-phase.from)/(phase.to-phase.from),0,1);
-  // A broad cloud around each phase landmark. Time subtly rotates through the cloud,
-  // but the user never travels along a single path.
-  const baseAngle=(-.9 + t*1.8) + (fract(s.id+13)-.5)*.55;
-  const radius=110 + 260*t + fract(s.id+77)*210;
-  const x=phase.x + Math.cos(baseAngle)*radius + (fract(s.id+2)-.5)*260;
-  const y=phase.y + Math.sin(baseAngle)*radius*.72 + (fract(s.id+5)-.5)*330;
-  return {...s,i,age,phaseKey:phase.key,x,y,z:.8+fract(s.id+90)*.45};
+  const age=ageOf(s),b=bearingForAge(age);
+  const u=clamp((age-b.from)/(b.to-b.from),0,1);
+  const ang=(u-.5)*1.9+(fract(s.id+2)-.5)*1.2;
+  const spread=160+u*300+fract(s.id+33)*420;
+  const cross=(fract(s.id+19)-.5)*560;
+  const x=b.x+Math.cos(ang)*spread + cross*.34;
+  const y=b.y+Math.sin(ang)*spread*.76 + cross*.66;
+  const anchor=(i===0||i===5||i===14||i===23||i===32||i===38||i===44||i===49);
+  // Each memory has its own continuous reveal point. There are no shared zoom levels.
+  // Important/representative memories surface earlier; others appear gradually.
+  const reveal=anchor ? .20+.08*fract(s.id+7) : .33+.82*fract(s.id+91);
+  return {...s,i,age,bearing:b,x,y,z:.8+fract(s.id+70)*.45,anchor,reveal};
 });
 
-PHASES.forEach(p=>{
-  p.items=data.filter(s=>s.phaseKey===p.key);
-  p.rep=p.items[Math.max(0,Math.floor((p.items.length-1)*.55))]||data[0];
+// Build time indicator labels.
+[1972,1980,1990,2000,2010,2020,2026].forEach(y=>{
+  const span=document.createElement("span");
+  span.style.left=((y-BIRTH)/(END-BIRTH)*100)+"%";
+  span.textContent=y;
+  document.getElementById("lifeLabels").appendChild(span);
 });
 
-// Build phase strip.
-PHASES.forEach(p=>{
-  const seg=document.createElement("div");
-  seg.className="phaseSeg";
-  seg.dataset.key=p.key;
-  seg.innerHTML='<span class="phaseLabel">'+p.short+'</span>';
-  phaseStrip.appendChild(seg);
+// Debug fields.
+BEARINGS.forEach(b=>{
+  const blob=document.createElement("div");
+  blob.className="fieldBlob";
+  fieldDebug.appendChild(blob);
+  b.blob=blob;
 });
 
-// Build large region landmarks.
-const regionNodes=PHASES.map((p,idx)=>{
-  const el=document.createElement("section");
-  el.className="region";
-  el.dataset.key=p.key;
-  el.innerHTML=
-    '<div class="regionHalo"></div>'+
-    '<button class="regionCard" type="button">'+
-      '<img alt="">'+
-      '<div class="regionShade"></div>'+
-      '<div class="regionCopy">'+
-        '<div class="regionAge">'+p.from+'–'+p.to+' jaar</div>'+
-        '<div class="regionTitle">'+p.title+'</div>'+
-        '<div class="regionMeta">'+p.items.length+' verhalen · tik of zoom hierheen</div>'+
-      '</div>'+
-    '</button>';
-  el.querySelector("img").src=p.rep.image;
-  el.querySelector(".regionCard").addEventListener("click",e=>{
-    e.stopPropagation();
-    focusPhase(idx);
-  });
-  space.appendChild(el);
-
-  const dbg=document.createElement("div");
-  dbg.className="debugCircle";
-  dbg.style.width="640px";dbg.style.height="470px";
-  debugLayer.appendChild(dbg);
-  const name=document.createElement("div");
-  name.className="debugName";name.textContent=p.title+" "+p.short;
-  debugLayer.appendChild(name);
-  p.dbg=dbg;p.dbgName=name;
-  return el;
-});
-
-// Build individual story cards.
-const memoryNodes=data.map(s=>{
+// Build memory cards.
+const nodes=data.map(s=>{
   const el=document.createElement("article");
-  el.className="memory";
+  el.className="memory"+(s.anchor?" anchor":"");
   el.innerHTML='<img alt=""><div class="memoryShade"></div><div class="memoryCopy"><div class="memoryText"></div><div class="memoryDate"></div></div>';
   const img=el.querySelector("img");
   img.src=s.image;
-  img.onerror=()=>img.style.opacity=".18";
+  img.onerror=()=>img.style.opacity=".15";
   el.querySelector(".memoryText").textContent=s.story;
   el.querySelector(".memoryDate").textContent=shortDate(s);
   el.addEventListener("click",e=>{
     e.stopPropagation();
-    if(cam.s>.56) focusStory(s.i);
-    else focusPhase(PHASES.findIndex(p=>p.key===s.phaseKey));
+    if(cam.s>.58) focusStory(s.i);
+    else zoomToward(s.x,s.y,Math.min(.9,cam.s*2.15));
   });
-  space.appendChild(el);
+  world.appendChild(el);
   return el;
 });
 
 let W=1,H=1;
 let active=data.length-1;
-let activePhase=PHASES.findIndex(p=>p.key===data[active].phaseKey);
 const cam={x:data[active].x,y:data[active].y,s:MAX_SCALE};
 
-function screenPoint(x,y){
-  return {x:(x-cam.x)*cam.s+W/2,y:(y-cam.y)*cam.s+H/2};
-}
-function worldPoint(x,y){
-  return {x:cam.x+(x-W/2)/cam.s,y:cam.y+(y-H/2)/cam.s};
-}
+function screenPoint(x,y){return{x:(x-cam.x)*cam.s+W/2,y:(y-cam.y)*cam.s+H/2}}
+function worldPoint(x,y){return{x:cam.x+(x-W/2)/cam.s,y:cam.y+(y-H/2)/cam.s}}
 function nearestMemory(){
   let best=0,dist=Infinity;
   data.forEach((s,i)=>{
-    const d=Math.hypot((s.x-cam.x)*.9,s.y-cam.y);
+    const d=Math.hypot(s.x-cam.x,s.y-cam.y);
     if(d<dist){dist=d;best=i}
   });
   return best;
 }
-function nearestPhase(){
-  let best=0,dist=Infinity;
-  PHASES.forEach((p,i)=>{
-    const d=Math.hypot(p.x-cam.x,p.y-cam.y);
-    if(d<dist){dist=d;best=i}
+function nearestBearing(){
+  let best=BEARINGS[0],dist=Infinity;
+  BEARINGS.forEach(b=>{
+    const d=Math.hypot(b.x-cam.x,b.y-cam.y);
+    if(d<dist){dist=d;best=b}
   });
   return best;
 }
 function presentMode(){return cam.s>=PRESENT_SCALE}
-function setAtmosphere(i){
-  const url=data[i].image;
-  atmosphere.style.backgroundImage="url('"+url+"')";
-  presentationImg.src=url;
+
+function setBg(i){
+  const u=data[i].image;
+  bg.style.backgroundImage="url('"+u+"')";
+  presentationImg.src=u;
 }
-function showToast(text){
-  toast.textContent=text;toast.classList.add("on");
-  clearTimeout(showToast.t);
-  showToast.t=setTimeout(()=>toast.classList.remove("on"),1000);
+function toastMsg(t){
+  toast.textContent=t;toast.classList.add("on");
+  clearTimeout(toastMsg.t);
+  toastMsg.t=setTimeout(()=>toast.classList.remove("on"),950);
 }
 function setCam(x,y,s){
-  cam.x=clamp(x,-2100,2100);
-  cam.y=clamp(y,-1650,1650);
+  cam.x=clamp(x,-2200,2200);
+  cam.y=clamp(y,-1800,1800);
   cam.s=clamp(s,MIN_SCALE,MAX_SCALE);
   render();
 }
 function zoomAround(px,py,newScale){
-  const w=worldPoint(px,py),ns=clamp(newScale,MIN_SCALE,MAX_SCALE);
-  setCam(w.x-(px-W/2)/ns,w.y-(py-H/2)/ns,ns);
+  const wp=worldPoint(px,py),ns=clamp(newScale,MIN_SCALE,MAX_SCALE);
+  setCam(wp.x-(px-W/2)/ns,wp.y-(py-H/2)/ns,ns);
+}
+function zoomToward(x,y,newScale){
+  setCam(x,y,newScale);
+  hint.style.display="none";
 }
 function focusStory(i){
   active=clamp(i,0,data.length-1);
-  const s=data[active];
-  setAtmosphere(active);
-  setCam(s.x,s.y,MAX_SCALE);
+  setBg(active);
+  setCam(data[active].x,data[active].y,MAX_SCALE);
   hint.style.display="none";
 }
-function focusPhase(i){
-  activePhase=clamp(i,0,PHASES.length-1);
-  const p=PHASES[activePhase];
-  setCam(p.x,p.y,.72);
+function wide(){
+  setCam(-20,30,.205);
   hint.style.display="none";
-  showToast(p.title+" · "+p.short+" jaar");
+  toastMsg("Hele levensruimte");
 }
-function atlas(){
-  // Center the whole atlas rather than a chronological midpoint.
-  setCam(-80,70,.265);
-  hint.style.display="none";
-  showToast("Vrij levensoverzicht");
-}
+function ageToPct(a){return clamp(a/60*100,0,100)}
+
 function render(){
   const isPresent=presentMode();
   active=nearestMemory();
-  activePhase=nearestPhase();
-  const phase=PHASES[activePhase];
-  const activeStory=data[active];
+  const near=data[active];
+  const bearing=nearestBearing();
 
   presentation.classList.toggle("show",isPresent);
   if(isPresent){
-    presentationText.textContent=activeStory.story;
-    presentationDate.textContent=dateLabel(activeStory);
-    setAtmosphere(active);
-  }else{
-    // Background follows the nearby life area, not every tiny pan movement.
-    setAtmosphere(phase.rep.i);
+    presentationText.textContent=near.story;
+    presentationDate.textContent=dateLabel(near);
+    setBg(active);
+  } else {
+    const candidates=data.filter(s=>s.bearing===bearing);
+    const rep=candidates.reduce((best,s)=>Math.hypot(s.x-cam.x,s.y-cam.y)<Math.hypot(best.x-cam.x,best.y-cam.y)?s:best,candidates[0]||near);
+    setBg(rep.i);
   }
 
-  let mode="Levensatlas";
+  let mode="Levensruimte";
   if(isPresent) mode="Presentatie";
-  else if(cam.s>.92) mode="Verhalen";
-  else if(cam.s>.48) mode=phase.title;
-  compassMode.textContent=mode;
-  compassWhere.textContent=isPresent
-    ? dateLabel(activeStory)
-    : phase.title+" · ongeveer "+Math.round(activeStory.age)+" jaar";
-
-  [...phaseStrip.children].forEach((el,i)=>el.classList.toggle("active",i===activePhase));
+  else if(cam.s>.95) mode="Dichtbij";
+  else if(cam.s>.48) mode="Verkennen";
+  modeEl.textContent=mode;
+  whereEl.textContent=isPresent ? dateLabel(near) : bearing.name+" · rond "+Math.round(near.age)+" jaar";
   zoomRead.textContent=Math.round(cam.s/MAX_SCALE*100)+"%";
 
-  const regionVis=clamp((.95-cam.s)/.55,0,1);
-  regionNodes.forEach((el,i)=>{
-    const p=PHASES[i],q=screenPoint(p.x,p.y);
-    const dist=Math.hypot(q.x-W/2,q.y-H/2);
-    const near=1-clamp(dist/Math.max(W,H)*.7,0,1);
-    const scale=clamp(.62+(1-cam.s)*.3, .48, 1.05);
-    el.style.transform="translate3d("+(q.x-155)+"px,"+(q.y-105)+"px,0) scale("+scale+")";
-    el.style.opacity=(regionVis*(.38+.62*near)).toFixed(3);
-    el.style.pointerEvents=regionVis>.12?"auto":"none";
-    el.classList.toggle("current",i===activePhase);
-    p.dbg.style.left=(q.x-320)+"px";p.dbg.style.top=(q.y-235)+"px";
-    p.dbg.style.transform="scale("+Math.max(.35,cam.s*.72)+")";
-    p.dbgName.style.left=(q.x-36)+"px";p.dbgName.style.top=(q.y-245)+"px";
+  // Continuous time-window estimate based on zoom only.
+  const visibleYears=clamp(7.5/cam.s,2,60);
+  const centerAge=near.age;
+  const l=ageToPct(centerAge-visibleYears/2),r=ageToPct(centerAge+visibleYears/2);
+  lifeWindow.style.left=l+"%";lifeWindow.style.width=Math.max(1,r-l)+"%";
+  lifeNeedle.style.left=ageToPct(centerAge)+"%";
+
+  // Direction labels gently emphasize the bearing you are moving toward.
+  document.querySelectorAll(".dir").forEach((el,i)=>{
+    const b=BEARINGS[i],d=Math.hypot(b.x-cam.x,b.y-cam.y);
+    const strength=1-clamp(d/2200,0,1);
+    el.style.opacity=String(.24+.68*strength);
+    el.style.transform="scale("+(0.94+.08*strength)+")";
   });
 
-  // Progressive semantic density:
-  // far away -> landmarks; mid -> representative stories; close -> all stories.
-  const storyVis=clamp((cam.s-.34)/.42,0,1);
+  // No shared zoom boundaries. Every card uses its own reveal value and proximity weighting.
   data.forEach((s,i)=>{
-    const el=memoryNodes[i],q=screenPoint(s.x,s.y);
-    const dx=q.x-W/2,dy=q.y-H/2;
-    const onscreen=q.x>-190&&q.x<W+190&&q.y>-230&&q.y<H+230;
-    const phaseDistance=Math.abs(PHASES.findIndex(p=>p.key===s.phaseKey)-activePhase);
-    let density=1;
-    if(cam.s<.54) density=(i%4===0||s.phaseKey===phase.key&&i%2===0)?1:0;
-    else if(cam.s<.78) density=(i%2===0||s.phaseKey===phase.key)?1:0;
-    const near=1-clamp(Math.hypot(dx,dy)/(Math.max(W,H)*.88),0,1);
-    const opacity=isPresent?0:(onscreen?storyVis*density*(.22+.78*near):0);
-    const depth=.76+s.z*.24;
-    const scale=clamp((.5+cam.s*.43)*depth,.48,1.2);
+    const el=nodes[i],q=screenPoint(s.x,s.y);
+    const distWorld=Math.hypot(s.x-cam.x,s.y-cam.y);
+    const distScreen=Math.hypot(q.x-W/2,q.y-H/2);
+    const onscreen=q.x>-260&&q.x<W+260&&q.y>-310&&q.y<H+310;
+
+    // Continuous semantic visibility:
+    // scale gradually reveals each story, and being near the user's chosen direction
+    // brings it forward a little earlier.
+    const localBoost=(1-clamp(distWorld/1250,0,1))*.20;
+    const revealScore=smooth(s.reveal-.18-localBoost,s.reveal+.18-localBoost,cam.s);
+    const screenFocus=.27+.73*(1-clamp(distScreen/(Math.max(W,H)*1.08),0,1));
+    let opacity=isPresent?0:(onscreen?revealScore*screenFocus:0);
+
+    // At the very widest view anchors remain as the overall life constellation.
+    if(s.anchor&&!isPresent){
+      const anchorFloor=smooth(.17,.31,.42-cam.s);
+      opacity=Math.max(opacity,.36*anchorFloor*screenFocus);
+    }
+
+    const depth=.8+s.z*.2;
+    const base=s.anchor?1.0:.76;
+    const scale=clamp(base*(.48+cam.s*.48)*depth,.38,s.anchor?1.12:1.0);
+
     el.style.opacity=opacity.toFixed(3);
     el.style.pointerEvents=opacity>.13?"auto":"none";
-    el.style.zIndex=String(300+Math.round(s.z*100)+(i===active?60:0));
-    el.style.transform="translate3d("+(q.x-66)+"px,"+(q.y-87)+"px,0) scale("+scale+")";
-    el.classList.toggle("nearest",i===active&&!isPresent&&cam.s>.72);
+    el.style.zIndex=String(300+Math.round(s.z*100)+(i===active?80:0));
+    const halfW=s.anchor?94:64,halfH=s.anchor?118:84;
+    el.style.transform="translate3d("+(q.x-halfW)+"px,"+(q.y-halfH)+"px,0) scale("+scale+")";
+    el.classList.toggle("nearest",i===active&&!isPresent&&cam.s>.68);
+  });
+
+  // Debug attraction fields.
+  BEARINGS.forEach(b=>{
+    const q=screenPoint(b.x,b.y);
+    b.blob.style.left=(q.x-305)+"px";
+    b.blob.style.top=(q.y-230)+"px";
+    b.blob.style.transform="scale("+Math.max(.35,cam.s*.72)+")";
   });
 
   hint.innerHTML=isPresent
-    ? 'Swipe links/rechts. <b>Knijp samen</b> om uit dit verhaal te stappen.'
-    : cam.s<.4
-      ? '<b>Vrij bewegen:</b> jeugd, tienerjaren en latere fases liggen als vaste gebieden om je heen. Zoom naar waar je heen wilt.'
-      : '<b>Sleep alle kanten op.</b> De tijd vertelt waar je bent, maar bepaalt niet welke richting je moet bewegen.';
+    ? 'Swipe links/rechts. <b>Knijp samen</b> om zonder stap uit dit verhaal te komen.'
+    : cam.s<.32
+      ? '<b>Kies een richting.</b> De grotere beelden zijn ankers; terwijl je erheen beweegt verschijnen steeds meer herinneringen.'
+      : '<b>Vrij pannen en continu zoomen.</b> Er bestaan hier geen zoomlagen: verhalen komen één voor één geleidelijk tevoorschijn.';
 }
 
 function resize(){
@@ -402,14 +394,14 @@ function resize(){
 window.addEventListener("resize",resize,{passive:true});
 window.visualViewport&&visualViewport.addEventListener("resize",resize,{passive:true});
 
-// Touch engine: explicit Safari touch handling.
-let touchState=null;
+// Safari touch engine with stable focal-point pinch. No snapping at gesture end.
+let touch=null;
 function localTouch(t){
   const r=app.getBoundingClientRect();
-  return {x:t.clientX-r.left,y:t.clientY-r.top};
+  return{x:t.clientX-r.left,y:t.clientY-r.top};
 }
-function tdist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
-function tmid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+function dist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
+function mid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
 
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button"))return;
@@ -417,51 +409,50 @@ app.addEventListener("touchstart",e=>{
   hint.style.display="none";
   if(e.touches.length===1){
     const p=localTouch(e.touches[0]);
-    touchState={kind:"one",start:p,last:p,cx:cam.x,cy:cam.y,s:cam.s,active};
+    touch={kind:"one",start:p,last:p,cx:cam.x,cy:cam.y,s:cam.s,active};
   }else if(e.touches.length>=2){
-    const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),mid=tmid(a,b);
-    const w=worldPoint(mid.x,mid.y);
-    touchState={kind:"pinch",d:Math.max(10,tdist(a,b)),s:cam.s,wx:w.x,wy:w.y};
+    const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b),wp=worldPoint(m.x,m.y);
+    touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y};
   }
 },{passive:false});
 
 app.addEventListener("touchmove",e=>{
-  if(!touchState)return;
+  if(!touch)return;
   e.preventDefault();
   if(e.touches.length>=2){
-    const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),mid=tmid(a,b);
-    if(touchState.kind!=="pinch"){
-      const w=worldPoint(mid.x,mid.y);
-      touchState={kind:"pinch",d:Math.max(10,tdist(a,b)),s:cam.s,wx:w.x,wy:w.y};
+    const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
+    if(touch.kind!=="pinch"){
+      const wp=worldPoint(m.x,m.y);
+      touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,wx:wp.x,wy:wp.y};
     }
-    const ns=clamp(touchState.s*(tdist(a,b)/touchState.d),MIN_SCALE,MAX_SCALE);
-    setCam(touchState.wx-(mid.x-W/2)/ns,touchState.wy-(mid.y-H/2)/ns,ns);
-  }else if(e.touches.length===1&&touchState.kind==="one"&&!presentMode()){
+    const ns=clamp(touch.s*(dist(a,b)/touch.d),MIN_SCALE,MAX_SCALE);
+    setCam(touch.wx-(m.x-W/2)/ns,touch.wy-(m.y-H/2)/ns,ns);
+  }else if(e.touches.length===1&&touch.kind==="one"&&!presentMode()){
     const p=localTouch(e.touches[0]);
-    const dx=p.x-touchState.start.x,dy=p.y-touchState.start.y;
-    setCam(touchState.cx-dx/touchState.s,touchState.cy-dy/touchState.s,touchState.s);
-    touchState.last=p;
+    const dx=p.x-touch.start.x,dy=p.y-touch.start.y;
+    setCam(touch.cx-dx/touch.s,touch.cy-dy/touch.s,touch.s);
+    touch.last=p;
   }
 },{passive:false});
 
 app.addEventListener("touchend",e=>{
-  if(!touchState)return;
+  if(!touch)return;
   e.preventDefault();
-  if(e.touches.length===0&&touchState.kind==="one"&&touchState.s>=PRESENT_SCALE){
-    const p=touchState.last||touchState.start;
-    const dx=p.x-touchState.start.x,dy=p.y-touchState.start.y;
+  if(e.touches.length===0&&touch.kind==="one"&&touch.s>=PRESENT_SCALE){
+    const p=touch.last||touch.start;
+    const dx=p.x-touch.start.x,dy=p.y-touch.start.y;
     if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2){
-      focusStory(touchState.active+(dx<0?1:-1));
+      focusStory(touch.active+(dx<0?1:-1));
     }
   }
-  touchState=null;
+  touch=null;
 },{passive:false});
-app.addEventListener("touchcancel",()=>touchState=null,{passive:false});
+app.addEventListener("touchcancel",()=>touch=null,{passive:false});
 
-// Mouse/pointer support for desktop testing.
+// Desktop panning.
 let mouse=null;
 app.addEventListener("pointerdown",e=>{
-  if(e.pointerType==="touch"||e.target.closest("button"))return;
+  if(e.pointerType==="touch"||e.target.closest("button")||e.button!==0)return;
   mouse={x:e.clientX,y:e.clientY,cx:cam.x,cy:cam.y,s:cam.s};
 });
 app.addEventListener("pointermove",e=>{
@@ -471,13 +462,13 @@ app.addEventListener("pointermove",e=>{
 window.addEventListener("pointerup",()=>mouse=null);
 
 document.getElementById("storyBtn").onclick=()=>focusStory(active);
-document.getElementById("atlasBtn").onclick=atlas;
-document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.7);
-document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.42);
-document.getElementById("areasBtn").onclick=()=>app.classList.toggle("debug");
+document.getElementById("wideBtn").onclick=wide;
+document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.78);
+document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.28);
+document.getElementById("fieldBtn").onclick=()=>app.classList.toggle("debug");
 
 resize();
-setAtmosphere(active);
+setBg(active);
 render();
 })();
 </script>

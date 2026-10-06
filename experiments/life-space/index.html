@@ -627,75 +627,117 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- */
 function visibleBudgetForScale(){
-  // The library may contain thousands of memories; the viewport never tries
-  // to render them all. Detail grows continuously with zoom.
-  const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
-  if(z<.08)return 5;
-  if(z<.20)return 7;
-  if(z<.38)return 10;
-  if(z<.58)return 14;
-  if(z<.76)return 19;
-  return 26;
+  // The timeline window is the primary information filter.
+  // Even with thousands of memories, the viewport remains deliberately calm.
+  const years=Math.max(1/365.2425,timelineSpanYears);
+  if(years>=20)return 7;
+  if(years>=8)return 8;
+  if(years>=4)return 9;
+  if(years>=1.5)return 10;
+  if(years>=.35)return 11;
+  return 12;
 }
 function chooseVisibleRepresentatives(raw,alpha){
   if(alpha>.92)return new Set([active]);
 
   const budget=visibleBudgetForScale();
   const overview=overviewBlendForScale();
+  const halfWindow=Math.max(timelineSpanMs()/2,DAY*.5);
+  const softWindow=halfWindow*1.35;
   const candidates=[];
 
   data.forEach((s,i)=>{
     const r=raw[i];
-    const nearScreen=r.x>-170&&r.x<W+170&&r.y>100&&r.y<H+170;
-    if(!nearScreen&&overview<.65)return;
+    const dt=Math.abs(s.ms-timeCenter);
+    // Primary rule: what is visible belongs to the time window the user is
+    // currently looking through. A soft fringe prevents hard pop-in at edges.
+    if(dt>softWindow && !OVERVIEW_ANCHOR_SET.has(i) && spatialPinchTarget!==i)return;
+
+    const nearScreen=r.x>-150&&r.x<W+150&&r.y>105&&r.y<H+145;
+    if(!nearScreen&&overview<.62&&spatialPinchTarget!==i)return;
+
+    const temporal=Math.exp(-.5*Math.pow(dt/Math.max(halfWindow*.62,DAY*.35),2));
     const worldD=Math.hypot(s.x-cam.x,s.y-cam.y);
     const screenD=Math.hypot(r.x-W/2,r.y-H/2);
     const spatial=1-clamp(worldD/1050,0,1);
-    const centre=1-clamp(screenD/(Math.max(W,H)*.82),0,1);
-    const ageD=Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs(),365*DAY);
-    const temporal=Math.exp(-.5*ageD*ageD);
-    const overviewAnchor=OVERVIEW_ANCHOR_SET.has(i)?2.2:0;
-    const targetBoost=spatialPinchTarget===i?3.0:0;
-    const activeBoost=i===active?1.8:0;
-    const stable=.25*(1-s.representative);
-    const score=spatial*.72+centre*.34+temporal*.34+stable+overviewAnchor*overview+targetBoost+activeBoost;
-    candidates.push({i,score,x:r.x,y:r.y});
+    const centre=1-clamp(screenD/(Math.max(W,H)*.86),0,1);
+    const edgeFade=dt<=halfWindow?1:1-clamp((dt-halfWindow)/(softWindow-halfWindow),0,1);
+
+    const overviewAnchor=OVERVIEW_ANCHOR_SET.has(i)?2.0*overview:0;
+    const targetBoost=spatialPinchTarget===i?3.2:0;
+    const activeBoost=i===active?2.0:0;
+    const stable=.18*(1-s.representative);
+    const score=(temporal*.72+spatial*.48+centre*.24+stable+overviewAnchor+targetBoost+activeBoost)*(.72+.28*edgeFade);
+    candidates.push({i,score,x:r.x,y:r.y,dt});
   });
   candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
 
   const chosen=new Set();
-  // At overview explicitly preserve broad life orientation.
-  if(overview>.50){
-    for(const i of OVERVIEW_ANCHORS)chosen.add(i);
+  if(overview>.58){
+    // Whole-life view: a few broad anchors only.
+    for(const i of OVERVIEW_ANCHORS){
+      if(chosen.size>=Math.min(5,budget))break;
+      chosen.add(i);
+    }
   }
   if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
   chosen.add(active);
 
-  // Greedy screen-space spacing: prevent the "wall of cards" while keeping
-  // denser areas visibly richer than sparse ones.
+  // Spread representatives over the screen. We select from spatial sectors,
+  // rather than filling the budget with several almost-identical positions.
+  const sectorCols=3,sectorRows=3;
+  const sectorUse=new Map();
   const placed=[];
   for(const i of chosen){
-    const r=raw[i]; if(r)placed.push({x:r.x,y:r.y});
+    const r=raw[i];
+    if(r)placed.push({x:r.x,y:r.y});
   }
+
   const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
-  const minGap=lerp(118,62,z);
+  const minGap=lerp(128,76,z);
+
+  function sectorKey(x,y){
+    const col=clamp(Math.floor(x/Math.max(1,W)*sectorCols),0,sectorCols-1);
+    const row=clamp(Math.floor((y-115)/Math.max(1,H-190)*sectorRows),0,sectorRows-1);
+    return row*sectorCols+col;
+  }
+  for(const i of chosen){
+    const r=raw[i];if(!r)continue;
+    const key=sectorKey(r.x,r.y);
+    sectorUse.set(key,(sectorUse.get(key)||0)+1);
+  }
+
+  // First pass: favour empty/quiet screen regions and sufficient spacing.
+  for(const cand of candidates){
+    if(chosen.size>=budget)break;
+    if(chosen.has(cand.i))continue;
+
+    let nearest=Infinity;
+    for(const p of placed)nearest=Math.min(nearest,Math.hypot(cand.x-p.x,cand.y-p.y));
+    const key=sectorKey(cand.x,cand.y);
+    const used=sectorUse.get(key)||0;
+    const densityAllowance=1-data[cand.i].density*.12;
+
+    if(nearest<minGap*densityAllowance)continue;
+    if(used>=2)continue;
+
+    chosen.add(cand.i);
+    placed.push({x:cand.x,y:cand.y});
+    sectorUse.set(key,used+1);
+  }
+
+  // Second pass is deliberately conservative: only add well-spaced cards.
+  // We do NOT force the viewport to reach its maximum count.
   for(const cand of candidates){
     if(chosen.size>=budget)break;
     if(chosen.has(cand.i))continue;
     let nearest=Infinity;
     for(const p of placed)nearest=Math.min(nearest,Math.hypot(cand.x-p.x,cand.y-p.y));
-    // Dense local areas may pack a little tighter at deeper zoom.
-    const densityAllowance=1-data[cand.i].density*.18;
-    if(nearest<minGap*densityAllowance)continue;
+    if(nearest<minGap*.72)continue;
     chosen.add(cand.i);
     placed.push({x:cand.x,y:cand.y});
   }
 
-  // If spacing left us under budget, fill with strongest candidates.
-  for(const cand of candidates){
-    if(chosen.size>=budget)break;
-    chosen.add(cand.i);
-  }
   return chosen;
 }
 
@@ -715,7 +757,7 @@ function chooseMagneticSet(raw,alpha){
     ranked.push({i,score:spatial});
   });
   ranked.sort((a,b)=>a.score-b.score||a.i-b.i);
-  const minVisible=3,maxGuide=6,chosen=new Set(natural.slice(0,6));
+  const minVisible=3,maxGuide=5,chosen=new Set(natural.slice(0,4));
   for(const id of lastMagneticIds){if(chosen.size>=minVisible)break;const rank=ranked.findIndex(r=>r.i===id);if(rank>=0&&rank<maxGuide+4)chosen.add(id)}
   for(const r of ranked){if(chosen.size>=minVisible)break;chosen.add(r.i)}
   magneticIds=chosen;lastMagneticIds=new Set(chosen);
@@ -764,10 +806,17 @@ function render(){
 
   const relevance=data.map((s,i)=>({
     i,
-    score:1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/900,0,1)
-  })).sort((a,b)=>b.score-a.score);
-  const hero1=overview>.55 ? null : (spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i);
-  const hero2=overview>.55 ? null : relevance.find(r=>r.i!==hero1)?.i;
+    score:
+      (visibleSet.has(i)?1.5:0)+
+      (1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/900,0,1))+
+      Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*.42,DAY),2))*.65
+  })).filter(r=>visibleSet.has(r.i)).sort((a,b)=>b.score-a.score);
+
+  const hero1=overview>.62
+    ? OVERVIEW_ANCHORS.find(i=>visibleSet.has(i))
+    : (spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i);
+  const hero2=relevance.find(r=>r.i!==hero1)?.i;
+  const visualRank=new Map(relevance.map((r,rank)=>[r.i,rank]));
   renderedCards=[];
 
   data.forEach((s,i)=>{
@@ -775,40 +824,49 @@ function render(){
     const mag=magneticIds.has(i)&&alpha<.96&&overview<.52;
     const r=raw[i],placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
     const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260;
-    const centerFocus=.28+.72*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.02),0,1));
-    let opacity=(1-alpha)*r.opacity*centerFocus*(selected?1:0);
-    if(mag)opacity=Math.max(opacity,.30*(1-alpha)+.12);
-    if(!onscreen&&!mag)opacity=0;
-    if(i===active)opacity=Math.max(opacity,(1-alpha)*.8*(1-overview));
-    if(selected&&OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.92);
+    const rank=visualRank.has(i)?visualRank.get(i):99;
+    const isHero=i===hero1;
+    const isSecond=i===hero2;
+    const isFront=selected&&(isHero||isSecond||rank===2);
+    const isMiddle=selected&&rank>=3&&rank<=6;
 
-    let scale=(.46+cam.s*.43)*(.84+s.z*.16);
-    if(i===hero1){
-      const boost=spatialPinchTarget===i
-        ? 1 + .34*smooth(.08,.92,spatialPinchStrength)
-        : 1.26;
-      scale*=boost;
-    } else if(i===hero2) {
-      scale*=1.12;
-    } else {
-      scale*=.88;
+    let opacity=0;
+    if(selected){
+      // Front photographs are genuinely readable, not translucent ghosts.
+      if(isHero)opacity=.99;
+      else if(isSecond)opacity=.94;
+      else if(rank===2)opacity=.90;
+      else if(isMiddle)opacity=.78;
+      else opacity=.62;
+
+      // Presentation overlay itself may still fade the spatial layer.
+      opacity*=1-alpha*.93;
     }
-    if(placed.magnetic)scale*=.93;
-    if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48*(1-overview);
-    if(OVERVIEW_ANCHOR_SET.has(i)){
-      const anchorOrder=OVERVIEW_ANCHORS.indexOf(i);
-      const overviewScale=1.16+((anchorOrder===0||anchorOrder===OVERVIEW_ANCHORS.length-1)?0.10:0);
-      scale=lerp(scale,overviewScale,overview);
-    }else{
-      scale*=1-overview*.42;
-      opacity*=1-overview*.72;
-    }
-    scale=clamp(scale,.42,1.58);
+    if(mag&&!selected)opacity=Math.max(opacity,.18*(1-alpha));
+    if(!onscreen&&!mag)opacity=0;
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.94);
+    if(selected&&OVERVIEW_ANCHOR_SET.has(i))opacity=Math.max(opacity,overview*.94);
+
+    // Deliberate size variation gives the field rhythm and direction.
+    const baseZoom=lerp(.78,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
+    let scale;
+    if(isHero)scale=1.28;
+    else if(isSecond)scale=1.08;
+    else if(rank===2)scale=.98;
+    else if(isMiddle)scale=.82+.05*fract(s.id+501);
+    else scale=.66+.08*fract(s.id+601);
+    scale*=baseZoom;
+
+    if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
+    if(placed.magnetic)scale*=.94;
+    if(overview>.62&&OVERVIEW_ANCHOR_SET.has(i))scale=Math.max(scale,.98+.14*fract(s.id+702));
+    scale=clamp(scale,.48,1.50);
 
     if(selected&&(opacity>.025||OVERVIEW_ANCHOR_SET.has(i)||i===active))ensureCardImage(i);
     const el=nodes[i];
-    el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
-    el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
+    el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.22?"auto":"none";
+    const layerZ=isHero?920:isSecond?840:rank===2?780:isMiddle?620-rank*6:430-rank;
+    el.style.zIndex=String(layerZ+(placed.magnetic?8:0));
     el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);el.classList.toggle("magnetic",placed.magnetic);
     renderedCards[i]={x:placed.x,y:placed.y,opacity,magnetic:placed.magnetic,selected};

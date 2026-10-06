@@ -43,15 +43,39 @@ button{font:inherit;color:inherit}
 #presentationText{font-size:27px;line-height:1.05;font-weight:760;letter-spacing:-.03em}
 #presentationDate{font-size:12px;margin-top:10px;color:rgba(255,255,255,.79)}
 
-/* Active Talera timeline. */
-#timelineShell{position:absolute;z-index:80;left:11px;right:11px;top:calc(9px + var(--safeT));height:112px;border-radius:23px;background:var(--glass);border:1px solid var(--border);backdrop-filter:blur(17px);-webkit-backdrop-filter:blur(17px);overflow:hidden;touch-action:none}
-#timelineTop{height:34px;display:flex;align-items:center;justify-content:space-between;padding:8px 13px 0;pointer-events:none}
-#mode{font-size:12px;font-weight:760}
-#focusDate{font-size:10px;color:var(--muted);white-space:nowrap}
-#timelineCanvas{position:absolute;left:0;right:0;top:31px;width:100%;height:80px;touch-action:none}
-#needle{position:absolute;z-index:3;left:50%;top:42px;width:2px;height:55px;background:var(--accent);box-shadow:0 0 9px rgba(255,240,174,.7);transform:translateX(-50%);pointer-events:none}
-#needleCap{position:absolute;z-index:3;left:50%;top:51px;width:34px;height:34px;border:1.5px solid rgba(255,255,255,.84);border-radius:999px;transform:translateX(-50%);pointer-events:none}
-#timelineHint{position:absolute;z-index:4;left:50%;bottom:4px;transform:translateX(-50%);font-size:8px;color:rgba(255,255,255,.42);pointer-events:none;white-space:nowrap;opacity:.8}
+/* Original Talera timeline language: one continuous ruler with a fixed centre needle. */
+#timelineShell{
+  position:absolute;z-index:80;left:0;right:0;top:0;
+  height:clamp(116px,16dvh,138px);
+  padding-top:var(--safeT);
+  overflow:hidden;touch-action:none;user-select:none;
+  background:linear-gradient(180deg,rgba(255,254,252,.94) 0%,rgba(220,234,246,.70) 100%);
+  border-bottom:1px solid rgba(15,39,71,.10);
+  backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px);
+}
+#timelineCanvas{position:absolute;left:0;right:0;top:calc(24px + var(--safeT));width:100%;height:calc(100% - 24px - var(--safeT));touch-action:none}
+#needle{
+  position:absolute;z-index:3;left:50%;top:calc(11px + var(--safeT));bottom:8px;width:2px;
+  transform:translateX(-1px);pointer-events:none;
+  background:linear-gradient(180deg,rgba(15,39,71,.05),#0F2747 15%,#0F2747 88%,rgba(15,39,71,.05));
+}
+#needle::before{
+  content:"";position:absolute;left:50%;top:0;width:10px;height:10px;border-radius:50%;
+  transform:translate(-50%,-50%);background:#E7A98B;
+  box-shadow:0 0 0 4px rgba(231,169,139,.18),0 0 0 7px rgba(91,143,185,.07);
+}
+#focusBlock{
+  position:absolute;z-index:5;left:50%;top:calc(16px + var(--safeT));transform:translateX(-50%);
+  border-radius:999px;color:#0F2747;background:rgba(255,254,252,.95);
+  border:1px solid rgba(91,143,185,.20);white-space:nowrap;pointer-events:none;
+  box-shadow:0 5px 18px rgba(15,39,71,.07);
+  will-change:font-size,padding,transform,opacity;
+}
+#focusRange{display:block;font-weight:700;letter-spacing:.005em;line-height:1}
+#timelineHint{
+  position:absolute;z-index:4;left:50%;bottom:4px;transform:translateX(-50%);
+  font-size:8px;color:rgba(15,39,71,.40);pointer-events:none;white-space:nowrap;
+}
 
 #hint{position:absolute;z-index:75;left:50%;bottom:calc(72px + var(--safeB));transform:translateX(-50%);width:min(90vw,440px);padding:10px 13px;border-radius:16px;background:rgba(5,10,14,.48);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;line-height:1.35;text-align:center;color:rgba(255,255,255,.9);pointer-events:none}
 #controls{position:absolute;z-index:78;left:11px;right:11px;bottom:calc(11px + var(--safeB));display:flex;align-items:center;justify-content:space-between;gap:7px}
@@ -80,11 +104,11 @@ button{font:inherit;color:inherit}
     <div id="presentationCopy"><div id="presentationText"></div><div id="presentationDate"></div></div>
   </div>
 
-  <div id="timelineShell">
-    <div id="timelineTop"><span id="mode">Presentatie</span><span id="focusDate"></span></div>
+  <div id="timelineShell" aria-label="Talera levenslijn">
     <canvas id="timelineCanvas"></canvas>
-    <div id="needleCap"></div><div id="needle"></div>
-    <div id="timelineHint">sleep langzaam voor detail · sneller voor grote sprongen · knijp voor schaal</div>
+    <div id="needle"></div>
+    <div id="focusBlock"><span id="focusRange">1972–2026</span></div>
+    <div id="timelineHint">sleep door de tijd · knijp voor schaal</div>
   </div>
 
   <div id="hint">Gebruik de <b>tijdbalk bovenin</b> om gericht door je leven te bewegen, of zoek vrij met je vingers tussen de verhalen.</div>
@@ -104,7 +128,7 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 
 const app=document.getElementById("app"),world=document.getElementById("world"),bg=document.getElementById("bg");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
-const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),modeEl=document.getElementById("mode"),focusDate=document.getElementById("focusDate");
+const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
 const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
 
 const BIRTH_YEAR=1972,END_YEAR=2026;
@@ -201,9 +225,35 @@ function setBg(i){const u=data[i].image;bg.style.backgroundImage="url('"+u+"')";
 function toastMsg(t){toast.textContent=t;toast.classList.add("on");clearTimeout(toastMsg.t);toastMsg.t=setTimeout(()=>toast.classList.remove("on"),900)}
 function presentationAlpha(){return smooth(1.16,1.92,cam.s)}
 function overviewBlendForScale(s=cam.s){return 1-smooth(.22,.50,s)}
+function spanYearsForScale(s=cam.s){
+  const t=clamp((s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
+  const shaped=t*t*(3-2*t);
+  return Math.exp(lerp(Math.log(54),Math.log(1/365.2425),shaped));
+}
+function scaleForSpanYears(years){
+  const target=Math.log(clamp(years,1/365.2425,54));
+  const lo=Math.log(54),hi=Math.log(1/365.2425);
+  const shaped=clamp((target-lo)/(hi-lo),0,1);
+  // Invert smoothstep numerically; inexpensive and stable for this UI.
+  let a=0,b=1;
+  for(let i=0;i<18;i++){const m=(a+b)/2,v=m*m*(3-2*m);if(v<shaped)a=m;else b=m}
+  return lerp(SPACE_MIN,SPACE_MAX,(a+b)/2);
+}
+function syncSpanFromSpace(){
+  timelineSpanYears=spanYearsForScale(cam.s);
+  spanTarget=timelineSpanYears;
+}
+function syncSpaceScaleFromSpan(){
+  cam.s=scaleForSpanYears(timelineSpanYears);
+}
 function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
 function clampTime(ms){return clamp(ms,LIFE_START,LIFE_END)}
-function setCam(x,y,s){cam.x=clamp(x,-1600,1600);cam.y=clamp(y,-1250,1250);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);if(!timelineUser) syncTimeFromSpace();render()}
+function setCam(x,y,s){
+  cam.x=clamp(x,-1600,1600);cam.y=clamp(y,-1250,1250);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);
+  syncSpanFromSpace();
+  if(!timelineUser) syncTimeFromSpace();
+  render();
+}
 function zoomAround(px,py,newScale){const wp=worldPoint(px,py),ns=clamp(newScale,SPACE_MIN,SPACE_MAX);setCam(wp.x-(px-W/2)/ns,wp.y-(py-H/2)/ns,ns)}
 function focusStory(i){
   active=clamp(i,0,data.length-1);timeCenter=data[active].ms;
@@ -211,6 +261,7 @@ function focusStory(i){
 }
 function wide(){
   cam.x=OVERVIEW_CENTER.x;cam.y=OVERVIEW_CENTER.y;cam.s=SPACE_MIN;
+  syncSpanFromSpace();
   hint.style.display="none";toastMsg("Hele leven");render();
 }
 function syncTimeFromSpace(){
@@ -261,9 +312,10 @@ function reanchorTimeline(x){
   tlDrag={x,center:timeCenter,span:timelineSpanYears};
 }
 function updateTimelineSpanToward(target,dt){
-  spanTarget=clamp(target,.8,54);
+  spanTarget=clamp(target,1/365.2425,54);
   const a=1-Math.exp(-dt/180);
   timelineSpanYears=lerp(timelineSpanYears,spanTarget,a);
+  syncSpaceScaleFromSpan();
   timeCenter=clampTime(timeCenter);
 }
 function timelinePointerDown(e){
@@ -300,11 +352,12 @@ function timelinePointerMove(e){
     const d=Math.max(20,Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y));
     const mid=(p[0].x+p[1].x)/2-r.left;
     const ratio=d/tlPinch.d;
-    const oldSpan=tlPinch.span,newSpan=clamp(oldSpan/ratio,.8,54);
+    const oldSpan=tlPinch.span,newSpan=clamp(oldSpan/ratio,1/365.2425,54);
     const oldRel=tlPinch.mid/r.width-.5;
     const anchor=tlPinch.center+oldRel*oldSpan*365.2425*DAY;
     const newRel=mid/r.width-.5;
     timelineSpanYears=newSpan;spanTarget=newSpan;
+    syncSpaceScaleFromSpan();
     timeCenter=clampTime(anchor-newRel*newSpan*365.2425*DAY);
     driveSpaceFromTime(timeCenter,false);
   }
@@ -333,36 +386,72 @@ function chooseTickStep(spanYears){
   if(spanYears>1.3)return{months:3,minorMonths:1};
   return{months:1,minorDays:14};
 }
+function visibleTimeBounds(){
+  const overview=overviewBlendForScale();
+  if(overview>.72)return[LIFE_START,LIFE_END];
+  const half=timelineSpanMs()/2;
+  return[clamp(timeCenter-half,LIFE_START,LIFE_END),clamp(timeCenter+half,LIFE_START,LIFE_END)];
+}
+function formatFocusRange(){
+  const [start,end]=visibleTimeBounds();
+  const spanDays=Math.max(1,(end-start)/DAY);
+  const a=new Date(start),b=new Date(end);
+  if(overviewBlendForScale()>.72)return BIRTH_YEAR+"–"+END_YEAR;
+  if(spanDays>365*7)return a.getFullYear()+"–"+b.getFullYear();
+  if(spanDays>365*1.6){
+    if(a.getFullYear()===b.getFullYear())return String(a.getFullYear());
+    return a.getFullYear()+"–"+b.getFullYear();
+  }
+  if(spanDays>120){
+    const ma=a.toLocaleDateString("nl-NL",{month:"short"});
+    const mb=b.toLocaleDateString("nl-NL",{month:"short",year:"numeric"});
+    return ma+" – "+mb;
+  }
+  if(spanDays>10){
+    const sameMonth=a.getMonth()===b.getMonth()&&a.getFullYear()===b.getFullYear();
+    if(sameMonth)return a.getDate()+"–"+b.getDate()+" "+b.toLocaleDateString("nl-NL",{month:"long",year:"numeric"});
+    return a.toLocaleDateString("nl-NL",{day:"numeric",month:"short"})+" – "+b.toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"});
+  }
+  return new Date(timeCenter).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+}
+function updateFocusBlock(){
+  const overview=overviewBlendForScale();
+  const close=smooth(.70,1.70,cam.s);
+  focusRange.textContent=formatFocusRange();
+  // Wide view: clear and easy to read. Close to one story: smaller and quieter.
+  const font=lerp(17,10.5,close);
+  const px=lerp(16,8,close),py=lerp(8,4,close);
+  focusBlock.style.fontSize=font.toFixed(2)+"px";
+  focusBlock.style.padding=py.toFixed(1)+"px "+px.toFixed(1)+"px";
+  focusBlock.style.opacity=String(lerp(.98,.78,close));
+  focusBlock.style.transform="translateX(-50%) scale("+lerp(1.02,.94,close).toFixed(3)+")";
+}
+
 function drawTimeline(){
   const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.5),w=r.width,h=r.height;
   if(!w||!h)return;
   canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
   const overview=overviewBlendForScale();
-  const localSpan=timelineSpanMs();
-  const fullSpan=LIFE_MS;
-  const span=lerp(localSpan,fullSpan,overview);
-  const localCenter=timeCenter;
-  const lifeCenter=(LIFE_START+LIFE_END)/2;
-  const drawCenter=lerp(localCenter,lifeCenter,overview);
-  const start=drawCenter-span/2,end=drawCenter+span/2,axisY=42;
-  ctx.strokeStyle="rgba(255,255,255,.27)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,axisY+.5);ctx.lineTo(w,axisY+.5);ctx.stroke();
+  const range=visibleTimeBounds();
+  const start=range[0],end=range[1],span=Math.max(DAY,end-start),axisY=42;
+  ctx.strokeStyle="rgba(91,143,185,.44)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,axisY+.5);ctx.lineTo(w,axisY+.5);ctx.stroke();
 
   // memory beacons
   data.forEach(s=>{
     if(s.ms<start||s.ms>end)return;
     const x=(s.ms-start)/(end-start)*w;
-    ctx.strokeStyle="rgba(255,240,174,.34)";ctx.lineWidth=1.5;
+    ctx.strokeStyle="rgba(91,143,185,.52)";ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(x,axisY-2);ctx.lineTo(x,axisY-10);ctx.stroke();
-    ctx.fillStyle="rgba(255,240,174,.67)";ctx.beginPath();ctx.arc(x,axisY-11,1.8,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="rgba(91,143,185,.82)";ctx.beginPath();ctx.arc(x,axisY-11,1.8,0,Math.PI*2);ctx.fill();
   });
 
   const cfg=chooseTickStep(timelineSpanYears);
   const drawTick=(ms,major,label)=>{
     if(ms<start||ms>end)return;
     const x=(ms-start)/(end-start)*w;
-    ctx.strokeStyle=major?"rgba(255,255,255,.5)":"rgba(255,255,255,.2)";
+    ctx.strokeStyle=major?"rgba(15,39,71,.62)":"rgba(62,74,89,.24)";
     ctx.lineWidth=major?1.25:1;ctx.beginPath();ctx.moveTo(x,axisY-(major?8:4));ctx.lineTo(x,axisY+(major?8:4));ctx.stroke();
-    if(major&&label){ctx.fillStyle="rgba(255,255,255,.62)";ctx.font="10px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(label,x,axisY+22)}
+    if(major&&label){ctx.fillStyle="rgba(15,39,71,.86)";ctx.font="10px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(label,x,axisY+22)}
   };
 
   if(cfg.years){
@@ -418,7 +507,7 @@ function pullToViewport(p){
   return{x,y,magnetic};
 }
 function render(){
-  active=nearestMemoryToTime(timeCenter);
+  active=spatialPinchTarget!=null ? spatialPinchTarget : nearestMemoryToTime(timeCenter);
   const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];
   presentation.style.opacity=alpha.toFixed(3);
   presentationText.textContent=near.story;presentationDate.textContent=fullDate(near);
@@ -428,10 +517,7 @@ function render(){
     const idx=nearestMemoryToWorld();setBg(idx);
   }
 
-  modeEl.textContent=alpha>.86?"Presentatie":overview>.72?"Hele leven":timelineUser?"Tijd zoeken":cam.s>.82?"Dichtbij":"Verkennen";
-  focusDate.textContent=overview>.72
-    ? BIRTH_YEAR+"–"+END_YEAR
-    : new Date(timeCenter).toLocaleDateString("nl-NL",timelineSpanYears<2?{day:"numeric",month:"short",year:"numeric"}:{month:"short",year:"numeric"});
+  updateFocusBlock();
   zoomRead.textContent=Math.round(cam.s/SPACE_MAX*100)+"%";
 
   const raw=data.map((s,i)=>{
@@ -569,10 +655,12 @@ app.addEventListener("touchmove",e=>{
     if(touch.target!=null&&zoomingIn){
       const target=data[touch.target];
       // Zooming IN honours the exact story under the fingers.
-      cam.x=target.x-(m.x-W/2)/ns;
-      cam.y=target.y-(m.y-H/2)/ns;
-      cam.s=lerp(cam.s,ns,.58);
-      timeCenter=lerp(timeCenter,target.ms,.10);
+      const nextS=lerp(cam.s,ns,.48);
+      cam.x=target.x-(m.x-W/2)/nextS;
+      cam.y=target.y-(m.y-H/2)/nextS;
+      cam.s=nextS;
+      syncSpanFromSpace();
+      timeCenter=lerp(timeCenter,target.ms,.14);
     }else{
       // Zooming OUT deliberately releases the story. As scale approaches the
       // minimum, the camera glides toward the centre of the entire life-space.
@@ -584,6 +672,7 @@ app.addEventListener("touchmove",e=>{
       cam.x=lerp(cam.x,lerp(localX,OVERVIEW_CENTER.x,ov),.58);
       cam.y=lerp(cam.y,lerp(localY,OVERVIEW_CENTER.y,ov),.58);
       cam.s=lerp(cam.s,ns,.58);
+      syncSpanFromSpace();
       if(ov<.58) syncTimeFromSpace();
     }
     render();
@@ -594,7 +683,7 @@ app.addEventListener("touchmove",e=>{
       const dx=p.x-touch.start.x,dy=p.y-touch.start.y;
       cam.x=clamp(touch.cx-dx/touch.s,-1600,1600);
       cam.y=clamp(touch.cy-dy/touch.s,-1250,1250);
-      syncTimeFromSpace();render();
+      syncSpanFromSpace();syncTimeFromSpace();render();
     }
   }
 },{passive:false});
@@ -623,7 +712,7 @@ document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.82);
 document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.22);
 document.getElementById("fieldBtn").onclick=()=>app.classList.toggle("debug");
 
-resize();setBg(active);render();
+syncSpanFromSpace();resize();setBg(active);render();
 })();
 </script>
 </body>

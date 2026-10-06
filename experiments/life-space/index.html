@@ -80,6 +80,9 @@ button{font:inherit;color:inherit}
 
 /* Presentation becomes the first point on the same zoom continuum. */
 #presentation{position:absolute;z-index:18;inset:0;pointer-events:none;opacity:1;will-change:opacity}
+.storyMorph{position:absolute!important;z-index:70!important;margin:0!important;pointer-events:none!important;transform:none!important;transform-origin:center!important;will-change:left,top,width,height,border-radius,box-shadow;transition:left .54s cubic-bezier(.20,.72,.18,1),top .54s cubic-bezier(.20,.72,.18,1),width .54s cubic-bezier(.20,.72,.18,1),height .54s cubic-bezier(.20,.72,.18,1),border-radius .54s cubic-bezier(.20,.72,.18,1),box-shadow .54s ease!important}
+.storyMorph .memoryCopy{transition:opacity .22s ease!important}
+.storyMorph .memoryShade{transition:opacity .26s ease!important}
 #presentation img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #presentationVeil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.02) 32%,rgba(0,0,0,.13) 56%,rgba(0,0,0,.82) 100%)}
 #presentationCopy{position:absolute;left:22px;right:22px;bottom:calc(91px + var(--safeB));text-shadow:0 2px 11px rgba(0,0,0,.7);will-change:opacity,transform}
@@ -472,48 +475,102 @@ function zoomAround(px,py,newScale){
   render();
 }
 let storyOpenRaf=0;
+let storyMorphNode=null;
+
+function clearStoryMorph(){
+  if(storyMorphNode){storyMorphNode.remove();storyMorphNode=null}
+  world.style.transition="";
+  world.style.opacity="";
+  world.style.filter="";
+}
 function focusStory(i){
   cancelAnimationFrame(storyOpenRaf);
+  clearStoryMorph();
   active=clamp(i,0,data.length-1);
   timeCenter=data[active].ms;
+  if(typeof centerMs!=="undefined")centerMs=timeCenter;
   cam.x=data[active].lon;cam.y=data[active].lat;cam.s=SPACE_MAX;
   setBg(active);hint.style.display="none";render();
 }
 function openStorySmooth(i){
   const targetIndex=clamp(i,0,data.length-1);
   const target=data[targetIndex];
-  if(!target)return;
+  const source=nodes[targetIndex];
+  if(!target||!source)return;
 
+  stopGlobeInertia();
   cancelAnimationFrame(storyOpenRaf);
+  clearStoryMorph();
   hint.style.display="none";
+  ensureCardImage(targetIndex);
+  setBg(targetIndex);
 
-  const fromLon=cam.x,fromLat=cam.y,fromScale=cam.s,fromTime=timeCenter;
-  const start=performance.now();
-  const duration=560;
-  spatialPinchTarget=targetIndex;
+  const appRect=app.getBoundingClientRect();
+  const sourceRect=source.getBoundingClientRect();
 
-  function frame(now){
-    const t=clamp((now-start)/duration,0,1);
-    const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
-    cam.x=lerpLon(fromLon,target.lon,e);
-    cam.y=lerp(fromLat,target.lat,e);
-    cam.s=lerp(fromScale,SPACE_MAX,e);
-    timeCenter=lerp(fromTime,target.ms,e);
-    spatialPinchStrength=e;
-    active=targetIndex;
-    setBg(targetIndex);
-    render();
-
-    if(t<1){
-      storyOpenRaf=requestAnimationFrame(frame);
-    }else{
-      cam.x=target.lon;cam.y=target.lat;cam.s=SPACE_MAX;
-      timeCenter=target.ms;active=targetIndex;
-      spatialPinchTarget=null;spatialPinchStrength=0;
-      render();
-    }
+  // If the card is somehow not measurable, fall back to the same target,
+  // never to another story.
+  if(sourceRect.width<8||sourceRect.height<8){
+    focusStory(targetIndex);return;
   }
-  storyOpenRaf=requestAnimationFrame(frame);
+
+  const clone=source.cloneNode(true);
+  clone.classList.add("storyMorph");
+  clone.classList.remove("nearest","magnetic");
+  clone.style.left=(sourceRect.left-appRect.left)+"px";
+  clone.style.top=(sourceRect.top-appRect.top)+"px";
+  clone.style.width=sourceRect.width+"px";
+  clone.style.height=sourceRect.height+"px";
+  clone.style.opacity="1";
+  clone.style.borderRadius=getComputedStyle(source).borderRadius||"18px";
+  clone.style.boxShadow=getComputedStyle(source).boxShadow;
+  clone.querySelectorAll("img").forEach(img=>{img.loading="eager";img.style.opacity="1"});
+  app.appendChild(clone);
+  storyMorphNode=clone;
+
+  world.style.transition="opacity .52s ease,filter .52s ease";
+  world.style.opacity=".16";
+  world.style.filter="blur(3px)";
+
+  spatialPinchTarget=targetIndex;
+  active=targetIndex;
+  timeCenter=target.ms;
+  if(typeof centerMs!=="undefined")centerMs=timeCenter;
+
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      if(storyMorphNode!==clone)return;
+      clone.style.left="0px";
+      clone.style.top="0px";
+      clone.style.width=appRect.width+"px";
+      clone.style.height=appRect.height+"px";
+      clone.style.borderRadius="0px";
+      clone.style.boxShadow="0 0 0 rgba(0,0,0,0)";
+      const copy=clone.querySelector(".memoryCopy");
+      const shade=clone.querySelector(".memoryShade");
+      if(copy)copy.style.opacity="0";
+      if(shade)shade.style.opacity=".18";
+    });
+  });
+
+  storyOpenRaf=requestAnimationFrame(function settle(now){
+    if(!openStorySmooth.startedAt)openStorySmooth.startedAt=now;
+    const elapsed=now-openStorySmooth.startedAt;
+    if(elapsed<545){
+      storyOpenRaf=requestAnimationFrame(settle);
+      return;
+    }
+    openStorySmooth.startedAt=0;
+    spatialPinchTarget=null;spatialPinchStrength=0;
+    cam.x=target.lon;cam.y=target.lat;cam.s=SPACE_MAX;
+    active=targetIndex;timeCenter=target.ms;
+    if(typeof centerMs!=="undefined")centerMs=timeCenter;
+    render();
+    if(storyMorphNode===clone){
+      clone.style.opacity="0";
+      setTimeout(()=>{if(storyMorphNode===clone)clearStoryMorph()},90);
+    }
+  });
 }
 function wide(){
   // Return to a whole-life globe without resetting the longitude the user discovered.
@@ -524,6 +581,9 @@ function wide(){
 function syncTimeFromSpace(){
   const age=ageAtSphereLat(cam.y);
   timeCenter=clampTime(LIFE_START+age*365.2425*DAY);
+  // Space navigation and timeline are two views of the same life position.
+  // This updates only the centre date; it does not alter Free timeline mechanics.
+  if(typeof centerMs!=="undefined")centerMs=timeCenter;
 }
 function worldCenterForTime(ms){
   // Timeline moves north/south. Longitude is deliberately preserved so the
@@ -1130,6 +1190,7 @@ function renderEchoField(raw,visibleSet,alpha){
 }
 
 function render(){
+  if(!timelineUser&&typeof centerMs!=="undefined")centerMs=timeCenter;
   active=spatialPinchTarget!=null?spatialPinchTarget:nearestMemoryToFocus();
   const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];
 

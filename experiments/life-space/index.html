@@ -301,7 +301,7 @@ const nodes=data.map(s=>{
   el.innerHTML='<img alt=""><div class="memoryShade"></div><div class="memoryCopy"><div class="memoryText"></div><div class="memoryDate"></div></div>';
   const img=el.querySelector("img");img.loading="lazy";img.decoding="async";img.onerror=()=>img.style.opacity=".15";
   el.querySelector(".memoryText").textContent=s.story;el.querySelector(".memoryDate").textContent=shortDate(s);
-  el.addEventListener("click",e=>{e.stopPropagation();focusStory(s.i)});
+  el.addEventListener("click",e=>{e.stopPropagation();openStorySmooth(s.i)});
   world.appendChild(el);return el;
 });
 
@@ -435,11 +435,50 @@ function zoomAround(px,py,newScale){
   cam.s=clamp(newScale,SPACE_MIN,SPACE_MAX);
   syncSpanFromSpace();render();
 }
+let storyOpenRaf=0;
 function focusStory(i){
+  cancelAnimationFrame(storyOpenRaf);
   active=clamp(i,0,data.length-1);
   timeCenter=data[active].ms;
   cam.x=data[active].lon;cam.y=data[active].lat;cam.s=SPACE_MAX;
   setBg(active);hint.style.display="none";render();
+}
+function openStorySmooth(i){
+  const targetIndex=clamp(i,0,data.length-1);
+  const target=data[targetIndex];
+  if(!target)return;
+
+  cancelAnimationFrame(storyOpenRaf);
+  hint.style.display="none";
+
+  const fromLon=cam.x,fromLat=cam.y,fromScale=cam.s,fromTime=timeCenter;
+  const start=performance.now();
+  const duration=560;
+  spatialPinchTarget=targetIndex;
+
+  function frame(now){
+    const t=clamp((now-start)/duration,0,1);
+    const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    cam.x=lerpLon(fromLon,target.lon,e);
+    cam.y=lerp(fromLat,target.lat,e);
+    cam.s=lerp(fromScale,SPACE_MAX,e);
+    timeCenter=lerp(fromTime,target.ms,e);
+    spatialPinchStrength=e;
+    active=targetIndex;
+    setBg(targetIndex);
+    render();
+
+    if(t<1){
+      storyOpenRaf=requestAnimationFrame(frame);
+    }else{
+      cam.x=target.lon;cam.y=target.lat;cam.s=SPACE_MAX;
+      timeCenter=target.ms;active=targetIndex;
+      spatialPinchTarget=null;spatialPinchStrength=0;
+      syncSpanFromSpace();
+      render();
+    }
+  }
+  storyOpenRaf=requestAnimationFrame(frame);
 }
 function wide(){
   // Return to a whole-life globe without resetting the longitude the user discovered.

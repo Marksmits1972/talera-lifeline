@@ -21,11 +21,11 @@ body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
 #bg{position:absolute;inset:-8%;background:
-  radial-gradient(circle at 48% 39%,rgba(112,151,177,.30),transparent 23%),
-  radial-gradient(circle at 18% 67%,rgba(116,84,143,.18),transparent 30%),
-  radial-gradient(circle at 84% 72%,rgba(58,122,142,.18),transparent 29%),
-  radial-gradient(circle at 72% 18%,rgba(198,176,126,.08),transparent 22%),
-  radial-gradient(circle at 50% 50%,rgba(15,29,39,.54),rgba(6,12,18,.83) 66%,#02060a 100%);
+  radial-gradient(ellipse at 49% 42%,rgba(101,145,173,.34),transparent 25%),
+  radial-gradient(ellipse at 20% 70%,rgba(73,89,141,.22),transparent 32%),
+  radial-gradient(ellipse at 82% 65%,rgba(139,86,77,.15),transparent 31%),
+  radial-gradient(ellipse at 72% 22%,rgba(187,144,103,.08),transparent 25%),
+  linear-gradient(145deg,#091725 0%,#0c2030 38%,#102638 58%,#101d2b 76%,#080f18 100%);
   transform:scale(1.08);overflow:hidden}
 #bg:before{content:"";position:absolute;inset:0;opacity:.74;background-image:
   radial-gradient(circle at 9% 16%,rgba(255,255,255,.55) 0 1px,transparent 1.5px),
@@ -40,13 +40,19 @@ button{font:inherit;color:inherit}
   radial-gradient(circle at 63% 38%,rgba(255,255,255,.23) 0 1px,transparent 1.4px);
   filter:blur(.15px)}
 #bg:after{content:"";position:absolute;inset:0;background:
-  linear-gradient(118deg,transparent 0 34%,rgba(136,176,198,.055) 42%,transparent 50%),
-  linear-gradient(72deg,transparent 0 58%,rgba(207,186,137,.035) 66%,transparent 74%),
-  radial-gradient(ellipse at center,rgba(26,48,61,.10) 0 28%,transparent 48%,rgba(1,4,7,.46) 100%)}
+  linear-gradient(118deg,transparent 0 31%,rgba(137,184,207,.065) 41%,transparent 52%),
+  linear-gradient(72deg,transparent 0 57%,rgba(207,163,132,.045) 66%,transparent 77%),
+  radial-gradient(ellipse at 50% 48%,rgba(42,78,98,.11) 0 24%,transparent 55%,rgba(2,7,11,.34) 100%)}
 #world{position:absolute;inset:0;overflow:hidden;touch-action:none}
+#world:before{content:"";position:absolute;z-index:0;inset:0;pointer-events:none;opacity:.82;background:
+  radial-gradient(circle at 14% 21%,rgba(196,225,240,.20) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 73% 17%,rgba(255,213,173,.16) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 86% 54%,rgba(205,230,241,.16) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 27% 77%,rgba(255,221,190,.12) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 56% 63%,rgba(202,229,242,.13) 0 1px,transparent 1.4px)}
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.memoryEcho{position:absolute;width:56px;height:42px;border-radius:7px;overflow:hidden;background:#1c2931;border:1px solid rgba(255,255,255,.10);box-shadow:0 5px 18px rgba(0,0,0,.22),0 0 16px rgba(114,167,198,.055);will-change:transform,opacity;opacity:0;transform-origin:center}
-.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.16px) saturate(.88) brightness(.88)}
+.memoryEcho{position:absolute;width:58px;height:44px;border-radius:7px;overflow:hidden;background:#1c2931;border:1px solid rgba(255,255,255,.11);box-shadow:0 5px 18px rgba(0,0,0,.20),0 0 17px rgba(128,178,205,.07);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.10px) saturate(.94) brightness(.92)}
 .memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.08))}
 
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
@@ -55,7 +61,7 @@ button{font:inherit;color:inherit}
 .memoryCopy{position:absolute;left:10px;right:10px;bottom:10px;text-shadow:0 2px 8px rgba(0,0,0,.78)}
 .memoryText{font-size:10.6px;line-height:1.16;font-weight:710;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .memoryDate{font-size:8.8px;color:rgba(255,255,255,.7);margin-top:5px}
-.memory.nearest{outline:1.5px solid rgba(255,255,255,.9);outline-offset:2px}
+.memory.nearest{outline:1px solid rgba(255,255,255,.72);outline-offset:2px}
 .memory.magnetic{box-shadow:0 17px 46px rgba(0,0,0,.42),0 0 0 1px rgba(255,240,174,.12)}
 
 /* Presentation becomes the first point on the same zoom continuum. */
@@ -308,7 +314,7 @@ const nodes=data.map(s=>{
   world.appendChild(el);return el;
 });
 
-const ECHO_COUNT=54;
+const ECHO_COUNT=72;
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
   el.className="memoryEcho";
@@ -343,29 +349,31 @@ function cameraBasis(){
   };
 }
 function projectMemory(s){
-  const co=Math.cos(s.lon),so=Math.sin(s.lon),cl=Math.cos(s.lat),sl=Math.sin(s.lat);
-  const shell=s.shell||1;
-  const p={x:cl*co*shell,y:sl*shell,z:cl*so*shell};
-  const b=cameraBasis();
-  const vx=p.x*b.right.x+p.y*b.right.y+p.z*b.right.z;
-  const vy=p.x*b.up.x+p.y*b.up.y+p.z*b.up.z;
-  const vz=p.x*b.forward.x+p.y*b.forward.y+p.z*b.forward.z;
-
-  const top=(timelineShell?.getBoundingClientRect().height||126)+8;
-  const bottom=H-72;
+  // The sphere remains the invisible navigation model, but the screen uses a
+  // local panoramic/tangent projection. This prevents the memories from
+  // revealing a literal circular shell.
+  const top=(timelineShell?.getBoundingClientRect().height||126)+12;
+  const bottom=H-78;
+  const usable=Math.max(220,bottom-top);
   const cy=(top+bottom)/2;
-  const basePx=Math.min(W*.69,Math.max(210,(bottom-top)*.47));
-  const zoom=Math.max(.72,cam.s/SPACE_MIN);
-  const spherePx=basePx*zoom;
-  const perspective=1/(1.13-.24*clamp(vz,-1,1));
 
-  return {
-    x:W/2+vx*spherePx*perspective,
-    y:cy-vy*spherePx*perspective,
-    facing:vz,
-    depth:clamp((vz+1)/2,0,1),
-    perspective
-  };
+  const lonDelta=wrapLon(s.lon-cam.x);
+  const latDelta=s.lat-cam.y;
+  const zoom=Math.max(.74,cam.s/SPACE_MIN);
+
+  // tanh keeps the space effectively endless horizontally while softly
+  // compressing the far sides instead of drawing a visible globe edge.
+  const xNorm=Math.tanh(lonDelta*.78);
+  const yNorm=Math.tanh(latDelta*1.38);
+  const x=W/2+xNorm*(W*.57)*zoom;
+  const y=cy-yNorm*(usable*.48)*zoom;
+
+  const distance=Math.hypot(lonDelta*.50,latDelta*1.18);
+  const shellLift=((s.shell||1)-1)*1.9;
+  const depth=clamp(1-distance*.34+shellLift,0,1);
+  const facing=clamp(1-distance*.42,-.35,1);
+
+  return {x,y,facing,depth,perspective:lerp(.82,1.06,depth)};
 }
 function angularDistanceToCamera(s){
   const co=Math.cos(s.lon),so=Math.sin(s.lon),cl=Math.cos(s.lat),sl=Math.sin(s.lat);
@@ -917,72 +925,117 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- *//* ------------------- MAGNETIC SPACE ------------------- */
 function visibleBudgetForScale(){
-  // Five or six clear stories is the hard ceiling of the globe view.
+  // The life-space should normally contain five readable memories.
+  // Very close to presentation it naturally collapses toward the chosen story.
   const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
-  return z<.22?5:6;
+  if(z>.82)return 3;
+  return 5;
 }
 
 function chooseVisibleRepresentatives(raw,alpha){
   if(alpha>.92)return new Set([active]);
 
   const budget=visibleBudgetForScale();
-  const overview=overviewBlendForScale();
-  const candidates=[];
+  const temporalBase=Math.max(timelineSpanMs(),180*DAY);
+  let clearWindow=Math.max(240*DAY,temporalBase*.72);
+  const maxWindow=Math.max(3.2*365.2425*DAY,temporalBase*1.2);
+  let candidates=[];
 
-  data.forEach((s,i)=>{
-    const r=raw[i];
-    if(r.facing<-.035 && spatialPinchTarget!==i)return;
-    const nearScreen=r.x>-150&&r.x<W+150&&r.y>105&&r.y<H+130;
-    if(!nearScreen&&spatialPinchTarget!==i)return;
+  // Expand only as much as necessary to obtain a useful set. We never jump
+  // decades merely to fill the screen.
+  for(let pass=0;pass<5;pass++){
+    candidates=[];
+    data.forEach((s,i)=>{
+      const r=raw[i];
+      const dt=Math.abs(s.ms-timeCenter);
+      if(dt>clearWindow&&spatialPinchTarget!==i)return;
+      const nearScreen=r.x>-W*.35&&r.x<W*1.35&&r.y>90&&r.y<H+120;
+      if(!nearScreen&&spatialPinchTarget!==i)return;
 
-    const temporalWindow=Math.max(timelineSpanMs(),120*DAY);
-    const dt=Math.abs(s.ms-timeCenter);
-    const clearWindow=Math.max(100*DAY,temporalWindow*.68);
-    if(dt>clearWindow && spatialPinchTarget!==i)return;
-    const temporal=Math.exp(-.5*Math.pow(dt/(temporalWindow*.40),2));
-    const face=smooth(-.04,.92,r.facing);
-    const centre=1-clamp(Math.hypot(r.x-W/2,r.y-H*.52)/(Math.max(W,H)*.80),0,1);
-    const targetBoost=spatialPinchTarget===i?4:0;
-    const stable=.22*(1-s.representative);
-    const broad=overview*(.22+.25*(1-Math.abs(s.age-LIFE_YEARS*.5)/(LIFE_YEARS*.5)));
-    const score=face*.88+temporal*.56+centre*.26+stable+broad+targetBoost;
-    candidates.push({i,score,x:r.x,y:r.y,facing:r.facing});
-  });
-  candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
+      const temporal=Math.exp(-.5*Math.pow(dt/Math.max(DAY,clearWindow*.48),2));
+      const depth=clamp(r.depth,0,1);
+      const centre=1-clamp(Math.hypot(r.x-W/2,r.y-H*.53)/(Math.max(W,H)*.84),0,1);
+      const targetBoost=spatialPinchTarget===i?5:0;
+      const score=temporal*1.34+depth*.42+centre*.18+.10*(1-s.representative)+targetBoost;
+      candidates.push({i,score,x:r.x,y:r.y,dt});
+    });
+    if(candidates.length>=budget||clearWindow>=maxWindow)break;
+    clearWindow=Math.min(maxWindow,clearWindow*1.52);
+  }
+  candidates.sort((a,b)=>b.score-a.score||a.dt-b.dt||a.i-b.i);
 
   const chosen=new Set();
   if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
-  if(raw[active]?.facing>-.02)chosen.add(active);
+  if(raw[active]&&Math.abs(data[active].ms-timeCenter)<=clearWindow)chosen.add(active);
 
-  const placed=[];
-  for(const i of chosen){
-    const r=raw[i];if(r)placed.push({x:r.x,y:r.y});
-  }
-  const minGap=overview>.55?128:148;
-
-  // Strong spacing is intentional: empty space is part of the design.
-  for(const cand of candidates){
-    if(chosen.size>=budget)break;
-    if(chosen.has(cand.i))continue;
-    let nearest=Infinity;
-    for(const p of placed)nearest=Math.min(nearest,Math.hypot(cand.x-p.x,cand.y-p.y));
-    if(nearest<minGap)continue;
-    chosen.add(cand.i);
-    placed.push({x:cand.x,y:cand.y});
-  }
-
-  // If the sphere curvature leaves us with too few cards, relax slightly but never stack.
-  if(chosen.size<Math.min(4,budget)){
+  // Greedy diversity: prefer strong time matches, but avoid selecting five
+  // memories from exactly the same small patch of screen.
+  while(chosen.size<budget){
+    let best=null,bestValue=-Infinity;
     for(const cand of candidates){
-      if(chosen.size>=Math.min(4,budget))break;
       if(chosen.has(cand.i))continue;
-      let nearest=Infinity;
-      for(const p of placed)nearest=Math.min(nearest,Math.hypot(cand.x-p.x,cand.y-p.y));
-      if(nearest<92)continue;
-      chosen.add(cand.i);placed.push({x:cand.x,y:cand.y});
+      let minD=Infinity;
+      for(const i of chosen){
+        const q=raw[i];
+        if(q)minD=Math.min(minD,Math.hypot(cand.x-q.x,cand.y-q.y));
+      }
+      const diversity=chosen.size?clamp(minD/180,0,1):1;
+      const value=cand.score+diversity*.34;
+      if(value>bestValue){bestValue=value;best=cand}
     }
+    if(!best)break;
+    chosen.add(best.i);
   }
   return chosen;
+}
+
+// The magnetic layer is allowed to compose the *screen*, never to change which
+// memory the user is actually navigating toward.
+function composeForeground(raw,visibleSet){
+  const map=new Map();
+  const top=(timelineShell?.getBoundingClientRect().height||126)+64;
+  const bottom=H-118;
+  const minX=58,maxX=W-58,minY=top,maxY=Math.max(top+120,bottom);
+
+  for(const i of visibleSet){
+    const r=raw[i];
+    map.set(i,{
+      x:clamp(r.x,minX,maxX),
+      y:clamp(r.y,minY,maxY),
+      homeX:clamp(r.x,minX,maxX),
+      homeY:clamp(r.y,minY,maxY)
+    });
+  }
+
+  const ids=[...map.keys()];
+  const desiredGap=Math.min(154,Math.max(116,W*.31));
+
+  // Gentle repulsion gives us four/five distinct memories without arranging
+  // them into a visible grid. Each photo remains close to its true projection.
+  for(let step=0;step<7;step++){
+    for(let a=0;a<ids.length;a++){
+      for(let b=a+1;b<ids.length;b++){
+        const pa=map.get(ids[a]),pb=map.get(ids[b]);
+        let dx=pb.x-pa.x,dy=pb.y-pa.y;
+        let d=Math.hypot(dx,dy);
+        if(d<1){dx=((ids[b]-ids[a])%3)-1;dy=1;d=Math.hypot(dx,dy)}
+        if(d>=desiredGap)continue;
+        const push=(desiredGap-d)*.19;
+        const ux=dx/d,uy=dy/d;
+        pa.x-=ux*push;pa.y-=uy*push;
+        pb.x+=ux*push;pb.y+=uy*push;
+      }
+    }
+    for(const i of ids){
+      const p=map.get(i);
+      // weak spring home: composition, not teleportation
+      p.x=lerp(p.x,p.homeX,.07);
+      p.y=lerp(p.y,p.homeY,.07);
+      p.x=clamp(p.x,minX,maxX);
+      p.y=clamp(p.y,minY,maxY);
+    }
+  }
+  return map;
 }
 
 function chooseMagneticSet(){
@@ -993,29 +1046,27 @@ function chooseMagneticSet(){
 function pullToViewport(p){return{x:p.x,y:p.y,magnetic:false}}
 
 function renderEchoField(raw,visibleSet,alpha){
-  // The echo field is the photo-galaxy: dozens of distant memories reveal
-  // curvature and depth, but never compete with the 5–6 navigable stories.
-  const overview=overviewBlendForScale();
   const candidates=[];
 
   data.forEach((s,i)=>{
     if(visibleSet.has(i))return;
     const r=raw[i];
-    if(r.facing<-.26)return;
-    if(r.x<-80||r.x>W+80||r.y<95||r.y>H+90)return;
-    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.45,365*DAY*3),2));
-    const depth=smooth(-.24,.96,r.facing);
-    const score=depth*.74+temporal*.25+.10*(1-s.representative);
-    candidates.push({i,score,x:r.x,y:r.y,facing:r.facing,depth:r.depth});
+    if(r.x<-100||r.x>W+100||r.y<90||r.y>H+95)return;
+
+    const temporal=Math.exp(-.5*Math.pow(
+      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.55,365*DAY*4.5),2
+    ));
+    const depth=clamp(r.depth,0,1);
+    const score=depth*.58+temporal*.34+.08*(1-s.representative);
+    candidates.push({i,score,x:r.x,y:r.y,depth});
   });
   candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
 
-  const targetCount=Math.round(lerp(34,ECHO_COUNT,1-overview*.30));
   const chosen=[];
   for(const cand of candidates){
-    if(chosen.length>=targetCount)break;
+    if(chosen.length>=ECHO_COUNT)break;
     let tooClose=false;
-    const localGap=lerp(24,44,smooth(-.2,.9,cand.facing));
+    const localGap=lerp(18,34,cand.depth);
     for(const p of chosen){
       if(Math.hypot(cand.x-p.x,cand.y-p.y)<localGap){tooClose=true;break}
     }
@@ -1032,15 +1083,16 @@ function renderEchoField(raw,visibleSet,alpha){
       echoAssignments[slot]=cand.i;
       el.querySelector("img").src=thumbUrl(s);
     }
-    const d=smooth(-.25,1,cand.facing);
-    const random=.82+.36*fract(s.id+901);
-    const size=lerp(.30,1.02,d)*random;
-    const op=(1-alpha)*lerp(.065,.29,d)*(.80+.20*cand.score);
+
+    const d=clamp(cand.depth,0,1);
+    const random=.80+.40*fract(s.id+901);
+    const size=lerp(.34,1.08,d)*random;
+    const op=(1-alpha)*lerp(.075,.30,d)*(.82+.18*cand.score);
     const img=el.querySelector("img");
-    img.style.filter="blur("+lerp(.72,.05,d).toFixed(2)+"px) saturate("+lerp(.72,1.02,d).toFixed(2)+") brightness("+lerp(.70,.98,d).toFixed(2)+")";
-    el.style.opacity=clamp(op,.045,.31).toFixed(3);
-    el.style.transform="translate3d("+(cand.x-28)+"px,"+(cand.y-21)+"px,0) scale("+size.toFixed(3)+")";
-    el.style.zIndex=String(30+Math.round(d*90));
+    img.style.filter="blur("+lerp(.58,.04,d).toFixed(2)+"px) saturate("+lerp(.76,1.02,d).toFixed(2)+") brightness("+lerp(.72,.98,d).toFixed(2)+")";
+    el.style.opacity=clamp(op,.052,.32).toFixed(3);
+    el.style.transform="translate3d("+(cand.x-29)+"px,"+(cand.y-22)+"px,0) scale("+size.toFixed(3)+")";
+    el.style.zIndex=String(28+Math.round(d*110));
   }
 }
 
@@ -1073,59 +1125,50 @@ function render(){
   const visibleSet=chooseVisibleRepresentatives(raw,alpha);
   renderEchoField(raw,visibleSet,alpha);
   chooseMagneticSet(raw,alpha);
+  const composed=composeForeground(raw,visibleSet);
 
   const relevance=[...visibleSet].map(i=>{
-    const s=data[i],r=raw[i];
-    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*.55,DAY),2));
-    const face=smooth(-.02,.96,r.facing);
-    const centre=1-clamp(Math.hypot(r.x-W/2,r.y-H*.52)/(Math.max(W,H)*.72),0,1);
-    return{i,score:face*.95+temporal*.48+centre*.28+(i===spatialPinchTarget?3:0)};
+    const s=data[i],r=raw[i],p=composed.get(i)||r;
+    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*.58,DAY),2));
+    const centre=1-clamp(Math.hypot(p.x-W/2,p.y-H*.53)/(Math.max(W,H)*.78),0,1);
+    return{i,score:temporal*.86+r.depth*.38+centre*.20+(i===spatialPinchTarget?3:0)};
   }).sort((a,b)=>b.score-a.score);
 
   const hero1=spatialPinchTarget!=null?spatialPinchTarget:relevance[0]?.i;
-  const hero2=relevance.find(r=>r.i!==hero1)?.i;
   const roleRank=new Map(relevance.map((r,rank)=>[r.i,rank]));
   renderedCards=[];
 
   data.forEach((s,i)=>{
     const selected=visibleSet.has(i);
-    const r=raw[i];
-    const onscreen=r.x>-220&&r.x<W+220&&r.y>-240&&r.y<H+220;
+    const r=raw[i],p=composed.get(i)||r;
     const rank=roleRank.has(i)?roleRank.get(i):99;
-    const depth=smooth(-.03,.98,r.facing);
+    const depth=clamp(r.depth,0,1);
 
     let opacity=0;
     if(selected){
-      if(i===hero1)opacity=.995;
-      else if(i===hero2)opacity=.94;
-      else if(rank===2)opacity=.88;
-      else opacity=.78;
-      opacity*=lerp(.72,1,depth)*(1-alpha*.94);
+      opacity=[.99,.96,.93,.90,.87,.84][Math.min(rank,5)]||.84;
+      opacity*=lerp(.88,1,depth)*(1-alpha*.94);
     }
-    if(!onscreen||r.facing<-.055)opacity=0;
     if(i===active&&selected)opacity=Math.max(opacity,(1-alpha)*.96);
 
-    // Curvature creates the size hierarchy first; role adds just a little emphasis.
-    let scale=lerp(.54,1.10,depth);
-    if(i===hero1)scale*=1.20;
-    else if(i===hero2)scale*=1.05;
-    else if(rank===2)scale*=.96;
-    else scale*=.82+.08*fract(s.id+701);
-
-    const zoomBreath=lerp(.82,1.06,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
+    // Five memories should read as a group, not one hero plus four leftovers.
+    let scale=lerp(.72,1.02,depth);
+    const rankScale=[1.08,1.02,.98,.94,.91,.88][Math.min(rank,5)]||.88;
+    scale*=rankScale;
+    const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
-    if(spatialPinchTarget===i)scale*=1+.22*smooth(.08,.92,spatialPinchStrength);
-    scale=clamp(scale,.46,1.46);
+    if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
+    scale=clamp(scale,.64,1.18);
 
     if(selected&&opacity>.025)ensureCardImage(i);
     const el=nodes[i];
     el.style.opacity=opacity.toFixed(3);
     el.style.pointerEvents=opacity>.24?"auto":"none";
-    el.style.zIndex=String(520+Math.round(depth*260)+(i===hero1?180:i===hero2?90:0)-Math.min(90,rank*8));
-    el.style.transform="translate3d("+(r.x-66)+"px,"+(r.y-87)+"px,0) scale("+scale.toFixed(3)+")";
+    el.style.zIndex=String(540+Math.round(depth*180)+(i===hero1?70:0)-Math.min(45,rank*7));
+    el.style.transform="translate3d("+(p.x-66)+"px,"+(p.y-87)+"px,0) scale("+scale.toFixed(3)+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);
     el.classList.remove("magnetic");
-    renderedCards[i]={x:r.x,y:r.y,opacity,magnetic:false,selected};
+    renderedCards[i]={x:p.x,y:p.y,opacity,magnetic:false,selected};
   });
 
   magnetRing.style.left="16px";magnetRing.style.right="16px";magnetRing.style.top="140px";magnetRing.style.bottom="92px";
@@ -1135,7 +1178,7 @@ function render(){
     ? '<b>De tijdbalk beweegt over de levensas.</b> Je longitude blijft staan terwijl je door de jaren gaat.'
     : alpha>.82
       ? 'Knijp uit het verhaal om terug te keren naar het <b>foto-stelsel</b>.'
-      : '<b>Foto-stelsel:</b> links/rechts draait de levensbol eindeloos · omhoog/omlaag beweegt door je leven.';
+      : '<b>Foto-stelsel:</b> beweeg vrij tussen de herinneringen · tik op een foto om het verhaal te openen.';
 }
 function resize(){
   const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);

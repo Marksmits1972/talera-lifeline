@@ -20,13 +20,19 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a1015;col
 body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
-#bg{position:absolute;inset:-8%;background-position:center;background-size:cover;filter:blur(9px) saturate(.72) brightness(.34);transform:scale(1.12);transition:background-image .32s ease}
+#bg{position:absolute;inset:-8%;background-position:center;background-size:cover;filter:blur(16px) saturate(.55) brightness(.20);transform:scale(1.16);transition:background-image .5s ease}
 #bg:after{content:"";position:absolute;inset:0;background:
- radial-gradient(circle at 50% 48%,rgba(18,29,36,.025),rgba(7,11,15,.28) 58%,rgba(3,6,9,.8) 100%),
- linear-gradient(180deg,rgba(7,12,17,.015),rgba(7,12,17,.44))}
+ radial-gradient(circle at 52% 44%,rgba(78,111,132,.16),transparent 22%),
+ radial-gradient(circle at 19% 70%,rgba(96,73,122,.10),transparent 28%),
+ radial-gradient(circle at 82% 73%,rgba(42,92,108,.10),transparent 24%),
+ radial-gradient(circle at 50% 48%,rgba(13,23,31,.12),rgba(5,8,12,.58) 62%,rgba(2,4,7,.93) 100%)}
 #world{position:absolute;inset:0;overflow:hidden;touch-action:none}
+#echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.memoryEcho{position:absolute;width:54px;height:42px;border-radius:8px;overflow:hidden;background:#23313a;border:1px solid rgba(255,255,255,.08);box-shadow:0 5px 18px rgba(0,0,0,.22);will-change:transform,opacity;opacity:0}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.25px) saturate(.66) brightness(.76)}
+.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.18))}
 
-.memory{position:absolute;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 50px rgba(0,0,0,.31);transform-origin:center;will-change:transform,opacity;pointer-events:none}
+.memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#26343b}
 .memoryShade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 36%,rgba(0,0,0,.82) 100%)}
 .memoryCopy{position:absolute;left:10px;right:10px;bottom:10px;text-shadow:0 2px 8px rgba(0,0,0,.78)}
@@ -96,7 +102,7 @@ button{font:inherit;color:inherit}
 <body>
 <div id="app">
   <div id="bg"></div>
-  <div id="world"><div id="magnetDebug"><div id="magnetRing"></div></div></div>
+  <div id="world"><div id="echoLayer"></div><div id="magnetDebug"><div id="magnetRing"></div></div></div>
 
   <div id="presentation">
     <img id="presentationImg" alt="">
@@ -332,6 +338,17 @@ const nodes=data.map(s=>{
   el.addEventListener("click",e=>{e.stopPropagation();focusStory(s.i)});
   world.appendChild(el);return el;
 });
+
+const ECHO_COUNT=30;
+const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
+  const el=document.createElement("div");
+  el.className="memoryEcho";
+  el.innerHTML='<img alt="">';
+  echoLayer.appendChild(el);
+  return el;
+});
+const echoAssignments=new Array(ECHO_COUNT).fill(-1);
+
 
 let W=1,H=1;
 let active=data.length-1;
@@ -627,15 +644,12 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- */
 function visibleBudgetForScale(){
-  // The library may contain thousands of memories; the viewport never tries
-  // to render them all. Detail grows continuously with zoom.
+  // Calm universe rule: a handful of real stories, never a wall of cards.
   const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
-  if(z<.08)return 5;
-  if(z<.20)return 7;
-  if(z<.38)return 10;
-  if(z<.58)return 14;
-  if(z<.76)return 19;
-  return 26;
+  if(z<.12)return 5;
+  if(z<.32)return 6;
+  if(z<.58)return 7;
+  return 8;
 }
 function chooseVisibleRepresentatives(raw,alpha){
   if(alpha>.92)return new Set([active]);
@@ -678,7 +692,7 @@ function chooseVisibleRepresentatives(raw,alpha){
     const r=raw[i]; if(r)placed.push({x:r.x,y:r.y});
   }
   const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
-  const minGap=lerp(118,62,z);
+  const minGap=lerp(156,94,z);
   for(const cand of candidates){
     if(chosen.size>=budget)break;
     if(chosen.has(cand.i))continue;
@@ -691,11 +705,7 @@ function chooseVisibleRepresentatives(raw,alpha){
     placed.push({x:cand.x,y:cand.y});
   }
 
-  // If spacing left us under budget, fill with strongest candidates.
-  for(const cand of candidates){
-    if(chosen.size>=budget)break;
-    chosen.add(cand.i);
-  }
+  // Empty space is allowed. Never fill the final slots by stacking cards.
   return chosen;
 }
 
@@ -732,6 +742,64 @@ function pullToViewport(p){
   }
   return{x,y,magnetic};
 }
+function renderEchoField(raw,visibleSet,alpha){
+  // These are not cards to navigate; they are only evidence that the life is much larger.
+  // Prefer nearby but currently-unselected stories and keep them small/faint.
+  const overview=overviewBlendForScale();
+  const candidates=data.map((s,i)=>{
+    const r=raw[i];
+    if(visibleSet.has(i))return null;
+    const onscreen=r.x>-90&&r.x<W+90&&r.y>120&&r.y<H+100;
+    if(!onscreen)return null;
+    const worldD=Math.hypot(s.x-cam.x,s.y-cam.y);
+    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.25,365*DAY*2),2));
+    const spatial=1-clamp(worldD/1250,0,1);
+    const stable=.18*(1-s.representative);
+    return{i,score:spatial*.72+temporal*.38+stable,x:r.x,y:r.y};
+  }).filter(Boolean).sort((a,b)=>b.score-a.score||a.i-b.i);
+
+  const targetCount=Math.round(lerp(18,ECHO_COUNT,1-overview*.35));
+  const chosen=[];
+  const gap=42;
+  for(const cand of candidates){
+    if(chosen.length>=targetCount)break;
+    let near=false;
+    for(const p of chosen){
+      if(Math.hypot(cand.x-p.x,cand.y-p.y)<gap){near=true;break}
+    }
+    if(!near)chosen.push(cand);
+  }
+
+  for(let slot=0;slot<ECHO_COUNT;slot++){
+    const el=echoNodes[slot],cand=chosen[slot];
+    if(!cand){
+      el.style.opacity="0";
+      echoAssignments[slot]=-1;
+      continue;
+    }
+    const s=data[cand.i];
+    if(echoAssignments[slot]!==cand.i){
+      echoAssignments[slot]=cand.i;
+      const img=el.querySelector("img");
+      img.src=thumbUrl(s);
+    }
+    const size=.62+.42*fract(s.id+901);
+    const jitterX=(fract(s.id+933)-.5)*24;
+    const jitterY=(fract(s.id+967)-.5)*20;
+    const x=cand.x+jitterX,y=cand.y+jitterY;
+    const edge=Math.min(
+      clamp((x+70)/130,0,1),
+      clamp((W+70-x)/130,0,1),
+      clamp((y-95)/100,0,1),
+      clamp((H+80-y)/120,0,1)
+    );
+    const op=(1-alpha)*(.10+.13*cand.score)*edge;
+    el.style.opacity=clamp(op,.035,.25).toFixed(3);
+    el.style.transform="translate3d("+(x-27)+"px,"+(y-21)+"px,0) scale("+size.toFixed(3)+")";
+    el.style.zIndex=String(40+slot);
+  }
+}
+
 function render(){
   active=spatialPinchTarget!=null ? spatialPinchTarget : nearestMemoryToTime(timeCenter);
   const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];
@@ -760,14 +828,19 @@ function render(){
     return{x:q.x,y:q.y,temporal:1,reveal,opacity:reveal*spatialPresence};
   });
   const visibleSet=chooseVisibleRepresentatives(raw,alpha);
+  renderEchoField(raw,visibleSet,alpha);
   chooseMagneticSet(raw,alpha);
 
   const relevance=data.map((s,i)=>({
     i,
-    score:1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/900,0,1)
-  })).sort((a,b)=>b.score-a.score);
-  const hero1=overview>.55 ? null : (spatialPinchTarget!=null ? spatialPinchTarget : relevance[0]?.i);
-  const hero2=overview>.55 ? null : relevance.find(r=>r.i!==hero1)?.i;
+    score:
+      (visibleSet.has(i)?2:0)+
+      (1-clamp(Math.hypot(s.x-cam.x,s.y-cam.y)/900,0,1))+
+      Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*.55,DAY),2))*.55
+  })).filter(r=>visibleSet.has(r.i)).sort((a,b)=>b.score-a.score);
+  const hero1=spatialPinchTarget!=null?spatialPinchTarget:relevance[0]?.i;
+  const hero2=relevance.find(r=>r.i!==hero1)?.i;
+  const roleRank=new Map(relevance.map((r,rank)=>[r.i,rank]));
   renderedCards=[];
 
   data.forEach((s,i)=>{
@@ -775,40 +848,39 @@ function render(){
     const mag=magneticIds.has(i)&&alpha<.96&&overview<.52;
     const r=raw[i],placed=mag?pullToViewport(r):{x:r.x,y:r.y,magnetic:false};
     const onscreen=placed.x>-220&&placed.x<W+220&&placed.y>-260&&placed.y<H+260;
-    const centerFocus=.28+.72*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.02),0,1));
-    let opacity=(1-alpha)*r.opacity*centerFocus*(selected?1:0);
-    if(mag)opacity=Math.max(opacity,.30*(1-alpha)+.12);
-    if(!onscreen&&!mag)opacity=0;
-    if(i===active)opacity=Math.max(opacity,(1-alpha)*.8*(1-overview));
-    if(selected&&OVERVIEW_ANCHOR_SET.has(i)) opacity=Math.max(opacity,overview*.92);
+    const rank=roleRank.has(i)?roleRank.get(i):99;
+    const centerFocus=.50+.50*(1-clamp(Math.hypot(placed.x-W/2,placed.y-H/2)/(Math.max(W,H)*1.08),0,1));
 
-    let scale=(.46+cam.s*.43)*(.84+s.z*.16);
-    if(i===hero1){
-      const boost=spatialPinchTarget===i
-        ? 1 + .34*smooth(.08,.92,spatialPinchStrength)
-        : 1.26;
-      scale*=boost;
-    } else if(i===hero2) {
-      scale*=1.12;
-    } else {
-      scale*=.88;
+    let opacity=0;
+    if(selected){
+      if(i===hero1)opacity=.99;
+      else if(i===hero2)opacity=.94;
+      else if(rank===2)opacity=.88;
+      else opacity=.76;
+      opacity*=centerFocus*(1-alpha*.93);
     }
-    if(placed.magnetic)scale*=.93;
-    if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48*(1-overview);
-    if(OVERVIEW_ANCHOR_SET.has(i)){
-      const anchorOrder=OVERVIEW_ANCHORS.indexOf(i);
-      const overviewScale=1.16+((anchorOrder===0||anchorOrder===OVERVIEW_ANCHORS.length-1)?0.10:0);
-      scale=lerp(scale,overviewScale,overview);
-    }else{
-      scale*=1-overview*.42;
-      opacity*=1-overview*.72;
-    }
-    scale=clamp(scale,.42,1.58);
+    if(mag&&!selected)opacity=Math.max(opacity,.16*(1-alpha));
+    if(!onscreen&&!mag)opacity=0;
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.96);
+
+    // One clear anchor, a couple of supporting stories, then smaller context.
+    let scale;
+    if(i===hero1)scale=1.28;
+    else if(i===hero2)scale=1.02;
+    else if(rank===2)scale=.91;
+    else scale=.70+.10*fract(s.id+701);
+
+    const zoomBreath=lerp(.82,1.08,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
+    scale*=zoomBreath;
+    if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
+    if(placed.magnetic)scale*=.94;
+    if(overview>.58&&OVERVIEW_ANCHOR_SET.has(i))scale=Math.max(scale,.94);
+    scale=clamp(scale,.50,1.46);
 
     if(selected&&(opacity>.025||OVERVIEW_ANCHOR_SET.has(i)||i===active))ensureCardImage(i);
     const el=nodes[i];
-    el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
-    el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
+    el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.20?"auto":"none";
+    el.style.zIndex=String(i===hero1?900:i===hero2?790:620-Math.min(160,rank*12)+(placed.magnetic?8:0));
     el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);el.classList.toggle("magnetic",placed.magnetic);
     renderedCards[i]={x:placed.x,y:placed.y,opacity,magnetic:placed.magnetic,selected};
@@ -821,7 +893,7 @@ function render(){
     ? '<b>De tijdbalk stuurt nu de ruimte.</b> Rustig slepen verfijnt de tijd; sneller bewegen vergroot automatisch je zoekbereik.'
     : alpha>.82
       ? 'Knijp uit het verhaal of <b>pak de tijdbalk bovenin</b> om direct naar een andere periode te reizen.'
-      : '<b>Één doorlopend leven:</b> rustige periodes blijven compact; drukke periodes waaieren vloeiend breder uit.';
+      : '<b>Beweeg vrij door je leven.</b> De heldere foto’s zijn dichtbij; de kleine flarden laten zien hoeveel er nog om je heen ligt.';
 }
 function resize(){
   const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);

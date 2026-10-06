@@ -553,14 +553,14 @@ function openStorySmooth(i){
     });
   });
 
+  let morphStartedAt=0;
   storyOpenRaf=requestAnimationFrame(function settle(now){
-    if(!openStorySmooth.startedAt)openStorySmooth.startedAt=now;
-    const elapsed=now-openStorySmooth.startedAt;
+    if(!morphStartedAt)morphStartedAt=now;
+    const elapsed=now-morphStartedAt;
     if(elapsed<545){
       storyOpenRaf=requestAnimationFrame(settle);
       return;
     }
-    openStorySmooth.startedAt=0;
     spatialPinchTarget=null;spatialPinchStrength=0;
     cam.x=target.lon;cam.y=target.lat;cam.s=SPACE_MAX;
     active=targetIndex;timeCenter=target.ms;
@@ -881,6 +881,7 @@ function considerVisualScale(speed,now){
 
 timelineShell.addEventListener("pointerdown",e=>{
   if(e.target.closest("button"))return;
+  stopGlobeInertia();
   e.preventDefault();e.stopPropagation();
   userIsMoving=true;timelineUser=true;hint.style.display="none";
   timelineShell.setPointerCapture&&timelineShell.setPointerCapture(e.pointerId);
@@ -1289,6 +1290,8 @@ window.visualViewport&&visualViewport.addEventListener("resize",resize,{passive:
 
 /* ------------------- LIFE GLOBE TOUCH ------------------- */
 let touch=null;
+let globeInertiaRaf=0;
+
 function localTouch(t){const r=app.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top}}
 function dist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
 function mid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
@@ -1301,17 +1304,73 @@ function storyAtScreenPoint(p){
     const d=Math.hypot(r.x-p.x,r.y-p.y);
     if(d<bd){bd=d;best=i}
   });
-  const radius=overviewBlendForScale()>.45?170:125;
+  const radius=overviewBlendForScale()>.45?105:88;
   return bd<=radius?best:null;
+}
+
+function stopGlobeInertia(){
+  cancelAnimationFrame(globeInertiaRaf);
+  globeInertiaRaf=0;
+}
+
+function startGlobeInertia(vLon,vLat){
+  stopGlobeInertia();
+  if(cam.s>=SWIPE_SPACE)return;
+
+  vLon=clamp(vLon,-.0034,.0034);
+  vLat=clamp(vLat,-.00235,.00235);
+  if(Math.hypot(vLon,vLat)<.000055)return;
+
+  let last=performance.now();
+  let lived=0;
+
+  function frame(now){
+    const dt=clamp(now-last,8,34);
+    last=now;lived+=dt;
+
+    cam.x=wrapLon(cam.x+vLon*dt);
+
+    const wantedY=cam.y+vLat*dt;
+    const nextY=clampCamY(wantedY);
+    if(nextY!==wantedY)vLat=0;
+    cam.y=nextY;
+
+    syncTimeFromSpace();
+    render();
+
+    // Map-like inertial friction: fast flicks travel, soft pushes settle nearby.
+    const decay=Math.exp(-dt/610);
+    vLon*=decay;
+    vLat*=decay;
+
+    if(lived<1900&&Math.hypot(vLon,vLat)>.000018){
+      globeInertiaRaf=requestAnimationFrame(frame);
+    }else{
+      globeInertiaRaf=0;
+    }
+  }
+  globeInertiaRaf=requestAnimationFrame(frame);
 }
 
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
+  stopGlobeInertia();
   e.preventDefault();hint.style.display="none";
 
   if(e.touches.length===1){
     const p=localTouch(e.touches[0]);
-    touch={kind:"one",start:p,last:p,lon:cam.x,lat:cam.y,s:cam.s,active};
+    const card=e.target.closest(".memory");
+    const directIndex=card?nodes.indexOf(card):-1;
+    const tapTarget=directIndex>=0?directIndex:storyAtScreenPoint(p);
+    touch={
+      kind:"one",
+      start:p,last:p,
+      lon:cam.x,lat:cam.y,s:cam.s,active,
+      tapTarget,
+      travel:0,
+      lastT:performance.now(),
+      vLon:0,vLat:0
+    };
   }else if(e.touches.length>=2){
     const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
     const target=storyAtScreenPoint(m);
@@ -1346,19 +1405,16 @@ app.addEventListener("touchmove",e=>{
     const ns=clamp(touch.s*gentleRatio,SPACE_MIN,SPACE_MAX);
     const zoomingIn=rawRatio>=1;
     spatialPinchStrength=clamp(Math.abs(Math.log(Math.max(.001,gentleRatio)))*1.6,0,1);
-
     cam.s=ns;
 
     if(touch.target!=null&&zoomingIn){
-      // Rotate the globe toward exactly the story held between the fingers.
-      // This preserves the "what I see is where I zoom" contract.
       const target=data[touch.target];
       const commit=smooth(.06,.80,spatialPinchStrength);
       cam.x=lerpLon(touch.lon,target.lon,commit*.88);
       cam.y=lerp(touch.lat,target.lat,commit*.88);
       timeCenter=lerp(timeCenter,target.ms,.10+.26*commit);
+      if(typeof centerMs!=="undefined")centerMs=timeCenter;
     }else{
-      // A free pinch keeps the current globe direction stable.
       cam.x=touch.lon;cam.y=touch.lat;
       syncTimeFromSpace();
     }
@@ -1369,22 +1425,29 @@ app.addEventListener("touchmove",e=>{
 
   if(e.touches.length===1&&touch.kind==="one"){
     const p=localTouch(e.touches[0]);
+    touch.travel=Math.max(touch.travel,dist(touch.start,p));
 
-    // Story presentation keeps the familiar previous/next swipe.
     if(touch.s<SWIPE_SPACE){
+      const now=performance.now();
+      const dt=clamp(now-touch.lastT,8,48);
       const dx=p.x-touch.last.x,dy=p.y-touch.last.y;
       const nav=1/Math.max(.60,cam.s);
       const contentFactor=Math.sqrt(330/SPHERE_RADIUS);
 
-      // Horizontal = rotation around the axis. wrapLon makes it literally endless.
-      cam.x=wrapLon(cam.x-dx*.0068*nav*contentFactor);
+      const dLon=-dx*.0068*nav*contentFactor;
+      const dLat=dy*.0047*nav*contentFactor;
 
-      // Vertical = travel over the life axis. There are real endpoints:
-      // north = early life, south = later life.
-      cam.y=clampCamY(cam.y+dy*.0047*nav*contentFactor);
+      cam.x=wrapLon(cam.x+dLon);
+      cam.y=clampCamY(cam.y+dLat);
+
+      const instLon=dLon/dt,instLat=dLat/dt;
+      const velocityAlpha=1-Math.exp(-dt/62);
+      touch.vLon=lerp(touch.vLon,instLon,velocityAlpha);
+      touch.vLat=lerp(touch.vLat,instLat,velocityAlpha);
 
       syncTimeFromSpace();
       render();
+      touch.lastT=now;
     }
 
     touch.last=p;
@@ -1395,18 +1458,39 @@ app.addEventListener("touchend",e=>{
   if(!touch)return;
   e.preventDefault();
 
-  if(e.touches.length===0&&touch.kind==="one"&&touch.s>=SWIPE_SPACE){
-    const p=touch.last||touch.start,dx=p.x-touch.start.x,dy=p.y-touch.start.y;
+  const finished=touch;
+
+  // Space: a still tap opens exactly that card; a drag can continue with momentum.
+  if(e.touches.length===0&&finished.kind==="one"&&finished.s<SWIPE_SPACE){
+    const p=finished.last||finished.start;
+    const moved=Math.max(finished.travel||0,dist(finished.start,p));
+
+    touch=null;spatialPinchTarget=null;spatialPinchStrength=0;
+
+    if(moved<=14&&finished.tapTarget!=null){
+      openStorySmooth(finished.tapTarget);
+      return;
+    }
+
+    render();
+    if(moved>7)startGlobeInertia(finished.vLon,finished.vLat);
+    return;
+  }
+
+  // Presentation keeps the familiar previous/next story swipe.
+  if(e.touches.length===0&&finished.kind==="one"&&finished.s>=SWIPE_SPACE){
+    const p=finished.last||finished.start,dx=p.x-finished.start.x,dy=p.y-finished.start.y;
     if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)*1.2){
-      focusStory(touch.active+(dx<0?1:-1));
+      focusStory(finished.active+(dx<0?1:-1));
     }
   }
 
-  if(e.touches.length===0&&touch.kind==="pinch"&&touch.target!=null&&cam.s>touch.s){
-    const target=data[touch.target];
+  if(e.touches.length===0&&finished.kind==="pinch"&&finished.target!=null&&cam.s>finished.s){
+    const target=data[finished.target];
     const commit=smooth(.30,.88,spatialPinchStrength);
     timeCenter=lerp(timeCenter,target.ms,.24+.50*commit);
-    if(commit>.58)active=touch.target;
+    if(typeof centerMs!=="undefined")centerMs=timeCenter;
+    if(commit>.58)active=finished.target;
   }
 
   touch=null;spatialPinchTarget=null;spatialPinchStrength=0;

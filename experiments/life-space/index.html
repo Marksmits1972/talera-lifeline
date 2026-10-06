@@ -180,7 +180,7 @@ function setBg(i){const u=data[i].image;bg.style.backgroundImage="url('"+u+"')";
 function toastMsg(t){toast.textContent=t;toast.classList.add("on");clearTimeout(toastMsg.t);toastMsg.t=setTimeout(()=>toast.classList.remove("on"),900)}
 function presentationAlpha(){return smooth(1.16,1.92,cam.s)}
 function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
-function clampTime(ms){const half=timelineSpanMs()/2;return clamp(ms,LIFE_START+Math.min(half,LIFE_MS/2),LIFE_END-Math.min(half,LIFE_MS/2))}
+function clampTime(ms){return clamp(ms,LIFE_START,LIFE_END)}
 function setCam(x,y,s){cam.x=clamp(x,-1600,1600);cam.y=clamp(y,-1250,1250);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);if(!timelineUser) syncTimeFromSpace();render()}
 function zoomAround(px,py,newScale){const wp=worldPoint(px,py),ns=clamp(newScale,SPACE_MIN,SPACE_MAX);setCam(wp.x-(px-W/2)/ns,wp.y-(py-H/2)/ns,ns)}
 function focusStory(i){
@@ -264,11 +264,10 @@ function timelinePointerMove(e){
     const inst=Math.abs(dxSeg)/dt,a=1-Math.exp(-dt/(inst>tlVelocity?75:300));
     tlVelocity=tlVelocity?lerp(tlVelocity,inst,a):inst;
     const desired=chooseSpanForVelocity(tlVelocity);
-    const before=timelineSpanYears;
     updateTimelineSpanToward(desired,dt);
-    if(Math.abs(timelineSpanYears-before)>.025) reanchorTimeline(x);
-    const dx=x-tlDrag.x;
-    const ms=tlDrag.center-(dx/r.width)*(tlDrag.span*365.2425*DAY);
+    // The time itself keeps following the finger every frame. The only thing
+    // that changes with speed is how much time one pixel represents.
+    const ms=timeCenter-(dxSeg/r.width)*(timelineSpanYears*365.2425*DAY);
     driveSpaceFromTime(ms,false);
     tlLastX=x;tlLastT=now;
   } else if(timelineTouches.size===2&&tlPinch){
@@ -426,7 +425,7 @@ function render(){
     if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48;
     scale=clamp(scale,.45,1.58);
 
-    el=nodes[i];
+    const el=nodes[i];
     el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
     el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
     el.style.transform="translate3d("+(placed.x-66)+"px,"+(placed.y-87)+"px,0) scale("+scale+")";

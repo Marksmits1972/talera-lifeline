@@ -166,6 +166,7 @@ let timelineUser=false;
 let lastMagneticIds=new Set(),magneticIds=new Set();
 let renderedCards=[];
 let spatialPinchTarget=null;
+let spatialPinchStrength=0;
 
 function screenPoint(x,y){return{x:(x-cam.x)*cam.s+W/2,y:(y-cam.y)*cam.s+H/2}}
 function worldPoint(x,y){return{x:cam.x+(x-W/2)/cam.s,y:cam.y+(y-H/2)/cam.s}}
@@ -422,9 +423,16 @@ function render(){
     if(i===active)opacity=Math.max(opacity,(1-alpha)*.8);
 
     let scale=(.46+cam.s*.43)*(.84+s.z*.16);
-    if(i===hero1)scale*=1.48;
-    else if(i===hero2)scale*=1.22;
-    else scale*=.82;
+    if(i===hero1){
+      const boost=spatialPinchTarget===i
+        ? 1 + .34*smooth(.08,.92,spatialPinchStrength)
+        : 1.26;
+      scale*=boost;
+    } else if(i===hero2) {
+      scale*=1.12;
+    } else {
+      scale*=.88;
+    }
     if(placed.magnetic)scale*=.93;
     if(i===active)scale*=1+smooth(1.05,1.82,cam.s)*.48;
     scale=clamp(scale,.45,1.58);
@@ -476,6 +484,7 @@ app.addEventListener("touchstart",e=>{
     const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
     const target=storyAtScreenPoint(m);
     spatialPinchTarget=target;
+    spatialPinchStrength=0;
     if(target!=null){
       const s=data[target];
       touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y};
@@ -492,6 +501,7 @@ app.addEventListener("touchmove",e=>{
     if(touch.kind!=="pinch"){
       const target=storyAtScreenPoint(m);
       spatialPinchTarget=target;
+      spatialPinchStrength=0;
       if(target!=null){
         const s=data[target];
         touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target,wx:s.x,wy:s.y};
@@ -500,19 +510,24 @@ app.addEventListener("touchmove",e=>{
         touch={kind:"pinch",d:Math.max(10,dist(a,b)),s:cam.s,target:null,wx:wp.x,wy:wp.y};
       }
     }
-    const ns=clamp(touch.s*(dist(a,b)/touch.d),SPACE_MIN,SPACE_MAX);
+    const rawRatio=dist(a,b)/touch.d;
+    // Damped pinch response: spreading fingers still zooms toward the same place,
+    // but requires a larger gesture for the same scale change.
+    const gentleRatio=Math.pow(rawRatio,.54);
+    const ns=clamp(touch.s*gentleRatio,SPACE_MIN,SPACE_MAX);
+    spatialPinchStrength=clamp(Math.abs(Math.log(Math.max(.001,gentleRatio)))*1.45,0,1);
     if(touch.target!=null){
       const target=data[touch.target];
-      // Fundamental spatial contract:
-      // the story under the fingers remains under the fingers while zooming.
+      // Keep the chosen story geometrically under the midpoint, but move the
+      // semantic/time focus much more slowly so surrounding stories don't pop.
       cam.x=target.x-(m.x-W/2)/ns;
       cam.y=target.y-(m.y-H/2)/ns;
-      cam.s=ns;
-      timeCenter=lerp(timeCenter,target.ms,.34);
+      cam.s=lerp(cam.s,ns,.58);
+      timeCenter=lerp(timeCenter,target.ms,.10);
     }else{
-      cam.x=touch.wx-(m.x-W/2)/ns;
-      cam.y=touch.wy-(m.y-H/2)/ns;
-      cam.s=ns;
+      cam.x=lerp(cam.x,touch.wx-(m.x-W/2)/ns,.58);
+      cam.y=lerp(cam.y,touch.wy-(m.y-H/2)/ns,.58);
+      cam.s=lerp(cam.s,ns,.58);
       syncTimeFromSpace();
     }
     render();
@@ -529,15 +544,16 @@ app.addEventListener("touchend",e=>{
   }
   if(e.touches.length===0&&touch.kind==="pinch"&&touch.target!=null){
     const target=data[touch.target];
-    timeCenter=target.ms;
-    active=touch.target;
-    // Do not jump the camera: only make the chosen story the semantic focus.
+    const commit=smooth(.28,.88,spatialPinchStrength);
+    timeCenter=lerp(timeCenter,target.ms,.18+.42*commit);
+    if(commit>.56) active=touch.target;
   }
   touch=null;
   spatialPinchTarget=null;
+  spatialPinchStrength=0;
   render();
 },{passive:false});
-app.addEventListener("touchcancel",()=>{touch=null;spatialPinchTarget=null;render()},{passive:false});
+app.addEventListener("touchcancel",()=>{touch=null;spatialPinchTarget=null;spatialPinchStrength=0;render()},{passive:false});
 
 document.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToTime(timeCenter));
 document.getElementById("wideBtn").onclick=wide;

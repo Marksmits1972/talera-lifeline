@@ -155,7 +155,7 @@ const fullDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{day:"numeric",month
 // This lets us test whether one continuous field can absorb strong local differences.
 const EXTRA_MEMORIES=(()=>{
   const specs=[
-    [8,3,12],[10,13,20],[12,21,27],[28,28.4,31.6],
+    [8,3,12],[10,13,20],[12,21,27],[28,29.65,30.35],
     [15,31.6,38],[12,39,45],[10,46,51],[5,52,54]
   ];
   const snippets=[
@@ -220,23 +220,48 @@ const DENSITY_MIN=Math.min(...DENSITIES);
 const DENSITY_MAX=Math.max(...DENSITIES);
 const LIFE_YEARS=Math.max(1,(LIFE_END-LIFE_START)/(365.2425*DAY));
 
-// Overall world size grows sub-linearly with collection size.
-// ~25 memories stays compact; hundreds/thousands progressively open the field.
-const COLLECTION_RADIUS=280+185*Math.log1p(baseData.length/20);
+function densityNormAtAge(age){
+  const d=densityAtAge(age);
+  const raw=(d-DENSITY_MIN)/Math.max(.0001,DENSITY_MAX-DENSITY_MIN);
+  return clamp(raw,0,1);
+}
+
+// Collection size changes the physical size of the whole life, but sub-linearly.
+// 25–50 memories stay intentionally compact; hundreds and thousands get more room.
+const COLLECTION_RADIUS=180+96*Math.log1p(baseData.length/25);
+const COLLECTION_THICKNESS=34+18*Math.log1p(baseData.length/25);
+
+function fieldAngleAtAge(age){
+  const t=clamp(age/LIFE_YEARS,0,1);
+  return -2.48+t*Math.PI*1.73;
+}
+function fieldThicknessAtAge(age){
+  return COLLECTION_THICKNESS+178*Math.sqrt(densityNormAtAge(age));
+}
+function fieldCenterAtAge(age){
+  const angle=fieldAngleAtAge(age);
+  const thickness=fieldThicknessAtAge(age);
+  // Dense periods shift their navigational centre outward into the thicker shell.
+  const radius=COLLECTION_RADIUS+thickness*.42;
+  return {
+    x:Math.cos(angle)*radius,
+    y:Math.sin(angle)*radius*.84,
+    angle,
+    radius,
+    thickness,
+    densityNorm:densityNormAtAge(age)
+  };
+}
 
 const data=baseData.map((s,i)=>{
-  const t=clamp(s.age/LIFE_YEARS,0,1);
-  // Roughly one circular journey through life, with a small opening between start/end.
-  const angle=-2.48+t*Math.PI*1.73;
-  const dNorm=(DENSITIES[i]-DENSITY_MIN)/Math.max(.0001,DENSITY_MAX-DENSITY_MIN);
-  const thickness=72+250*Math.sqrt(dNorm);
-  // This is the user's moving local centre: denser time bands sit farther outward.
-  const localCentreRadius=COLLECTION_RADIUS+thickness*.38;
+  const center=fieldCenterAtAge(s.age);
+  const dNorm=center.densityNorm;
+  const thickness=center.thickness;
   const radialJitter=(fract(s.id+19)-.5)*thickness*.92;
-  const tangentJitter=(fract(s.id+33)-.5)*(54+thickness*.36);
-  const radius=localCentreRadius+radialJitter;
-  const x=Math.cos(angle)*radius-Math.sin(angle)*tangentJitter;
-  const y=(Math.sin(angle)*radius+Math.cos(angle)*tangentJitter)*.84;
+  const tangentJitter=(fract(s.id+33)-.5)*(34+thickness*.48);
+  const radius=center.radius+radialJitter;
+  const x=Math.cos(center.angle)*radius-Math.sin(center.angle)*tangentJitter;
+  const y=(Math.sin(center.angle)*radius+Math.cos(center.angle)*tangentJitter)*.84;
   // Sparse regions reveal stories earlier; dense regions progressively unpack during zoom.
   const reveal=.22+.62*fract(s.id+91)+.10*dNorm;
   return {...s,x,y,z:.82+fract(s.id+70)*.38,reveal,density:dNorm,thickness};
@@ -357,35 +382,45 @@ function wide(){
   syncSpanFromSpace();
   hint.style.display="none";toastMsg("Hele leven");render();
 }
+function ageNearestFieldPoint(x,y){
+  let bestAge=0,bestD=Infinity;
+  // Coarse search over the continuous chronological backbone.
+  for(let age=0;age<=LIFE_YEARS;age+=.35){
+    const p=fieldCenterAtAge(age);
+    const dx=p.x-x,dy=p.y-y,d=dx*dx+dy*dy;
+    if(d<bestD){bestD=d;bestAge=age}
+  }
+  // Refine locally so the date moves continuously even through a huge density bulge.
+  let lo=Math.max(0,bestAge-.55),hi=Math.min(LIFE_YEARS,bestAge+.55);
+  for(let k=0;k<11;k++){
+    const a=lo+(hi-lo)/3,b=hi-(hi-lo)/3;
+    const pa=fieldCenterAtAge(a),pb=fieldCenterAtAge(b);
+    const da=(pa.x-x)*(pa.x-x)+(pa.y-y)*(pa.y-y);
+    const db=(pb.x-x)*(pb.x-x)+(pb.y-y)*(pb.y-y);
+    if(da<db)hi=b;else lo=a;
+  }
+  return (lo+hi)/2;
+}
 function syncTimeFromSpace(){
-  const idx=nearestMemoryToWorld(),n=data[idx];
-  // Continuous field: every story contributes a little. This makes the date
-  // drift smoothly while panning instead of jumping from cluster to cluster.
-  const viewportWorld=Math.max(W,H)/Math.max(cam.s,.20);
-  const sigma=clamp(viewportWorld*.34,180,820);
-  let num=0,den=0;
-  data.forEach(s=>{
-    const d=Math.hypot(s.x-cam.x,s.y-cam.y);
-    const q=d/sigma;
-    const w=Math.exp(-.5*q*q)+.0005;
-    num+=s.ms*w;den+=w;
-  });
-  timeCenter=den?clampTime(num/den):n.ms;
+  const age=ageNearestFieldPoint(cam.x,cam.y);
+  timeCenter=clampTime(LIFE_START+age*365.2425*DAY);
 }
 function worldCenterForTime(ms){
-  // Continuous density-weighted centre: crowded periods get their own broad centre,
-  // while neighbouring years always blend into it rather than hitting a border.
   const targetAge=ageFromMs(ms);
-  const sigmaYears=clamp(timelineSpanYears*.16,.38,4.2);
+  const spine=fieldCenterAtAge(targetAge);
+  const sigmaYears=clamp(timelineSpanYears*.13,.32,2.8);
   let x=0,y=0,den=0;
   for(const s of data){
     const q=(s.age-targetAge)/sigmaYears;
+    if(Math.abs(q)>4)return;
     const w=Math.exp(-.5*q*q);
     x+=s.x*w;y+=s.y*w;den+=w;
   }
-  if(den>.0001)return{x:x/den,y:y/den};
-  const idx=nearestMemoryToTime(ms);
-  return{x:data[idx].x,y:data[idx].y};
+  if(den<=.0001)return{x:spine.x,y:spine.y};
+  const contentX=x/den,contentY=y/den;
+  // Content may gently shift the centre, but can never overpower chronology.
+  const pull=.16+.22*spine.densityNorm;
+  return{x:lerp(spine.x,contentX,pull),y:lerp(spine.y,contentY,pull)};
 }
 function driveSpaceFromTime(ms,instant=false){
   timeCenter=clampTime(ms);
@@ -587,12 +622,12 @@ function chooseMagneticSet(raw,alpha){
   raw.forEach((p,i)=>{
     const inside=p.x>62&&p.x<W-62&&p.y>145&&p.y<H-125&&p.opacity>.07;
     if(inside)natural.push(i);
-    const temporal=Math.abs(data[i].ms-timeCenter)/Math.max(timelineSpanMs(),365*DAY);
     const spatial=Math.hypot(data[i].x-cam.x,data[i].y-cam.y)/900;
-    ranked.push({i,score:temporal*.82+spatial*.38});
+    ranked.push({i,score:spatial});
   });
   ranked.sort((a,b)=>a.score-b.score||a.i-b.i);
-  const minVisible=4,maxGuide=6,chosen=new Set(natural.slice(0,10));
+  const hereDensity=densityNormAtAge(ageFromMs(timeCenter));
+  const minVisible=4,maxGuide=7,chosen=new Set(natural.slice(0,hereDensity>.55?16:10));
   for(const id of lastMagneticIds){if(chosen.size>=minVisible)break;const rank=ranked.findIndex(r=>r.i===id);if(rank>=0&&rank<maxGuide+4)chosen.add(id)}
   for(const r of ranked){if(chosen.size>=minVisible)break;chosen.add(r.i)}
   magneticIds=chosen;lastMagneticIds=new Set(chosen);
@@ -694,7 +729,7 @@ function render(){
     ? '<b>De tijdbalk stuurt nu de ruimte.</b> Rustig slepen verfijnt de tijd; sneller bewegen vergroot automatisch je zoekbereik.'
     : alpha>.82
       ? 'Knijp uit het verhaal of <b>pak de tijdbalk bovenin</b> om direct naar een andere periode te reizen.'
-      : '<b>Twee wegen, één positie:</b> zoek vrij tussen de foto’s of stuur gericht met de tijdlijn.';
+      : '<b>Één doorlopend leven:</b> rustige periodes blijven compact; drukke periodes waaieren vloeiend breder uit.';
 }
 function resize(){
   const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);

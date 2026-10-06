@@ -126,6 +126,8 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 (() => {
 "use strict";
 
+
+
 const app=document.getElementById("app"),world=document.getElementById("world"),bg=document.getElementById("bg");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
 const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
@@ -136,41 +138,101 @@ const LIFE_START=new Date(BIRTH_YEAR,0,1).getTime();
 const LIFE_END=new Date(END_YEAR,11,31,23,59,59).getTime();
 const LIFE_MS=LIFE_END-LIFE_START;
 const DAY=86400000;
-const SPACE_MIN=.20,SPACE_MAX=2.0,SWIPE_SPACE=1.66;
+let SPACE_MIN=.20;
+const SPACE_MAX=2.0,SWIPE_SPACE=1.66;
 
-// Chronological bearings are broad overlapping spatial clouds, not labelled zones.
-const BEARINGS=[
- {from:0,to:10,x:-760,y:-470},
- {from:10,to:20,x:-90,y:-700},
- {from:20,to:30,x:680,y:-450},
- {from:30,to:40,x:770,y:240},
- {from:40,to:50,x:110,y:700},
- {from:50,to:60,x:-690,y:410}
-];
 
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const lerp=(a,b,t)=>a+(b-a)*t;
-const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
-const fract=n=>{const x=Math.sin(n*79.271+4.91)*43758.5453;return x-Math.floor(x)};
-const ageFromMs=ms=>(ms-LIFE_START)/(365.2425*DAY);
-const ageOf=s=>ageFromMs(new Date(s.at).getTime());
-const shortDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{month:"short",year:"numeric"});
-const fullDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
-const bearingForAge=a=>BEARINGS.find((b,i)=>a>=b.from&&(a<b.to||i===BEARINGS.length-1))||BEARINGS[BEARINGS.length-1];
+// 100 deterministic prototype memories. Their distribution is deliberately uneven:
+// sparse early years, a very dense band around age 30, and mixed density later.
+// This lets us test whether one continuous field can absorb strong local differences.
+const EXTRA_MEMORIES=(()=>{
+  const specs=[
+    [8,3,12],[10,13,20],[12,21,27],[28,28.4,31.6],
+    [15,31.6,38],[12,39,45],[10,46,51],[5,52,54]
+  ];
+  const snippets=[
+    "Een gewoon moment dat later toch is blijven hangen.",
+    "Even onderweg gestopt en zonder reden een foto gemaakt.",
+    "Een middag waarop alles net wat lichter voelde.",
+    "Met mensen om me heen waar ik toen veel mee optrok.",
+    "Een klein uitstapje dat uiteindelijk een heel verhaal werd.",
+    "Thuis, niets bijzonders, en juist daarom herkenbaar.",
+    "Een dag buiten waarvan vooral het licht is bijgebleven.",
+    "Een onverwacht moment dat ik later graag terugzag.",
+    "Samen op pad zonder precies te weten waar we zouden eindigen.",
+    "Zo'n beeld dat meteen een hele periode terugbrengt."
+  ];
+  const out=[];
+  let n=0;
+  for(const [count,a0,a1] of specs){
+    for(let j=0;j<count;j++){
+      n++;
+      const q=(j+.35+fract(n*2.31)*.30)/count;
+      const age=a0+(a1-a0)*q;
+      let ms=LIFE_START+age*365.2425*DAY;
+      const d=new Date(ms);
+      d.setHours(8+Math.floor(fract(n+17)*12),Math.floor(fract(n+43)*60),0,0);
+      ms=clamp(d.getTime(),LIFE_START,LIFE_END);
+      const id=1000+n;
+      out.push({
+        id,
+        at:new Date(ms).toISOString(),
+        story:snippets[(n*7)%snippets.length],
+        image:"https://picsum.photos/seed/talera-life-"+String(id)+"/720/960",
+        synthetic:true
+      });
+    }
+  }
+  return out;
+})();
+const ALL_MEMORIES=[...MEMORIES,...EXTRA_MEMORIES];
 
-const data=MEMORIES.map((s,i)=>{
-  const ms=new Date(s.at).getTime(),age=ageOf(s),b=bearingForAge(age),u=clamp((age-b.from)/(b.to-b.from),0,1);
-  const ang=(u-.5)*1.55+(fract(s.id+2)-.5)*.92;
-  const spread=95+u*195+fract(s.id+33)*240;
-  const cross=(fract(s.id+19)-.5)*330;
-  const rawX=b.x+Math.cos(ang)*spread+cross*.30;
-  const rawY=b.y+Math.sin(ang)*spread*.70+cross*.58;
-  // The life-space stays spatial, but is deliberately compact enough that
-  // a user can feel neighbouring periods instead of crossing dead oceans.
-  const x=rawX*.76;
-  const y=rawY*.76;
-  return {...s,i,ms,age,x,y,z:.82+fract(s.id+70)*.38,reveal:.27+.55*fract(s.id+91)};
+
+
+// One continuous chronological field. There are no age boxes or decade boundaries.
+// Age determines direction continuously; local story density determines how thick the
+// field becomes and how far its local centre shifts outward.
+const baseData=ALL_MEMORIES.map((s,i)=>{
+  const ms=new Date(s.at).getTime();
+  return {...s,i,ms,age:ageFromMs(ms)};
 }).sort((a,b)=>a.ms-b.ms);
+
+function densityAtAge(age){
+  // Gaussian density prevents a hard 29/30/31 boundary even if age 30 is extremely busy.
+  const sigma=1.55;
+  let d=0;
+  for(const s of baseData){
+    const q=(s.age-age)/sigma;
+    d+=Math.exp(-.5*q*q);
+  }
+  return d;
+}
+const DENSITIES=baseData.map(s=>densityAtAge(s.age));
+const DENSITY_MIN=Math.min(...DENSITIES);
+const DENSITY_MAX=Math.max(...DENSITIES);
+const LIFE_YEARS=Math.max(1,(LIFE_END-LIFE_START)/(365.2425*DAY));
+
+// Overall world size grows sub-linearly with collection size.
+// ~25 memories stays compact; hundreds/thousands progressively open the field.
+const COLLECTION_RADIUS=280+185*Math.log1p(baseData.length/20);
+
+const data=baseData.map((s,i)=>{
+  const t=clamp(s.age/LIFE_YEARS,0,1);
+  // Roughly one circular journey through life, with a small opening between start/end.
+  const angle=-2.48+t*Math.PI*1.73;
+  const dNorm=(DENSITIES[i]-DENSITY_MIN)/Math.max(.0001,DENSITY_MAX-DENSITY_MIN);
+  const thickness=72+250*Math.sqrt(dNorm);
+  // This is the user's moving local centre: denser time bands sit farther outward.
+  const localCentreRadius=COLLECTION_RADIUS+thickness*.38;
+  const radialJitter=(fract(s.id+19)-.5)*thickness*.92;
+  const tangentJitter=(fract(s.id+33)-.5)*(54+thickness*.36);
+  const radius=localCentreRadius+radialJitter;
+  const x=Math.cos(angle)*radius-Math.sin(angle)*tangentJitter;
+  const y=(Math.sin(angle)*radius+Math.cos(angle)*tangentJitter)*.84;
+  // Sparse regions reveal stories earlier; dense regions progressively unpack during zoom.
+  const reveal=.22+.62*fract(s.id+91)+.10*dNorm;
+  return {...s,x,y,z:.82+fract(s.id+70)*.38,reveal,density:dNorm,thickness};
+});
 
 // The fully zoomed-out state is a true whole-life overview, not merely
 // the current neighborhood rendered smaller.
@@ -182,7 +244,17 @@ const OVERVIEW_CENTER={
   x:(DATA_BOUNDS.minX+DATA_BOUNDS.maxX)/2,
   y:(DATA_BOUNDS.minY+DATA_BOUNDS.maxY)/2
 };
-const overviewAnchorAges=[10,25,40,54];
+const WORLD_WIDTH=DATA_BOUNDS.maxX-DATA_BOUNDS.minX;
+const WORLD_HEIGHT=DATA_BOUNDS.maxY-DATA_BOUNDS.minY;
+const CAMERA_MARGIN=460;
+function clampCamX(x){return clamp(x,DATA_BOUNDS.minX-CAMERA_MARGIN,DATA_BOUNDS.maxX+CAMERA_MARGIN)}
+function clampCamY(y){return clamp(y,DATA_BOUNDS.minY-CAMERA_MARGIN,DATA_BOUNDS.maxY+CAMERA_MARGIN)}
+function fitOverviewScale(){
+  const usableW=Math.max(300,W-46);
+  const usableH=Math.max(430,H-230);
+  return clamp(Math.min(usableW/(WORLD_WIDTH+250),usableH/(WORLD_HEIGHT+270)),.12,.30);
+}
+const overviewAnchorAges=[5,17,30,42,54];
 const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
   let best=0,bd=Infinity;
   data.forEach((s,i)=>{const d=Math.abs(s.age-age);if(d<bd){bd=d;best=i}});
@@ -190,14 +262,23 @@ const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
 }).filter((v,i,a)=>a.indexOf(v)===i);
 const OVERVIEW_ANCHOR_SET=new Set(OVERVIEW_ANCHORS);
 
-// Preload all thumbnails immediately; only 50 in this prototype.
-data.forEach(s=>{const im=new Image();im.src=s.image.replace("w=1400","w=620")});
+// With 150+ memories we load images only when the card is actually relevant.
+function thumbUrl(s){
+  return s.synthetic?s.image:s.image.replace("w=1400","w=620");
+}
+const loadedCards=new Set();
+function ensureCardImage(i){
+  if(loadedCards.has(i))return;
+  loadedCards.add(i);
+  const img=nodes[i]?.querySelector("img");
+  if(img)img.src=thumbUrl(data[i]);
+}
 
 const nodes=data.map(s=>{
   const el=document.createElement("article");
   el.className="memory";
   el.innerHTML='<img alt=""><div class="memoryShade"></div><div class="memoryCopy"><div class="memoryText"></div><div class="memoryDate"></div></div>';
-  const img=el.querySelector("img");img.src=s.image.replace("w=1400","w=620");img.loading="eager";img.onerror=()=>img.style.opacity=".15";
+  const img=el.querySelector("img");img.loading="lazy";img.decoding="async";img.onerror=()=>img.style.opacity=".15";
   el.querySelector(".memoryText").textContent=s.story;el.querySelector(".memoryDate").textContent=shortDate(s);
   el.addEventListener("click",e=>{e.stopPropagation();focusStory(s.i)});
   world.appendChild(el);return el;
@@ -253,7 +334,7 @@ function syncSpaceScaleFromSpan(){
 function timelineSpanMs(){return timelineSpanYears*365.2425*DAY}
 function clampTime(ms){return clamp(ms,LIFE_START,LIFE_END)}
 function setCam(x,y,s){
-  cam.x=clamp(x,-1600,1600);cam.y=clamp(y,-1250,1250);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);
+  cam.x=clampCamX(x);cam.y=clampCamY(y);cam.s=clamp(s,SPACE_MIN,SPACE_MAX);
   syncSpanFromSpace();
   if(!timelineUser) syncTimeFromSpace();
   render();
@@ -284,17 +365,19 @@ function syncTimeFromSpace(){
   timeCenter=den?clampTime(num/den):n.ms;
 }
 function worldCenterForTime(ms){
-  // Interpolate between chronological memories, then lightly average nearby dates.
-  let idx=nearestMemoryToTime(ms);
-  let candidates=data.slice(Math.max(0,idx-3),Math.min(data.length,idx+4));
+  // Continuous density-weighted centre: crowded periods get their own broad centre,
+  // while neighbouring years always blend into it rather than hitting a border.
+  const targetAge=ageFromMs(ms);
+  const sigmaYears=clamp(timelineSpanYears*.16,.38,4.2);
   let x=0,y=0,den=0;
-  const sigma=Math.max(timelineSpanMs()*.20,365*DAY);
-  candidates.forEach(s=>{
-    const dt=(s.ms-ms)/sigma,w=Math.exp(-.5*dt*dt)+.02;
+  for(const s of data){
+    const q=(s.age-targetAge)/sigmaYears;
+    const w=Math.exp(-.5*q*q);
     x+=s.x*w;y+=s.y*w;den+=w;
-  });
-  if(!den)return{x:data[idx].x,y:data[idx].y};
-  return{x:x/den,y:y/den};
+  }
+  if(den>.0001)return{x:x/den,y:y/den};
+  const idx=nearestMemoryToTime(ms);
+  return{x:data[idx].x,y:data[idx].y};
 }
 function driveSpaceFromTime(ms,instant=false){
   timeCenter=clampTime(ms);
@@ -587,6 +670,7 @@ function render(){
     }
     scale=clamp(scale,.42,1.58);
 
+    if(opacity>.025||OVERVIEW_ANCHOR_SET.has(i)||i===active)ensureCardImage(i);
     const el=nodes[i];
     el.style.opacity=opacity.toFixed(3);el.style.pointerEvents=opacity>.16?"auto":"none";
     el.style.zIndex=String(300+Math.round(s.z*100)+(i===hero1?120:i===hero2?70:0)+(placed.magnetic?20:0));
@@ -606,7 +690,13 @@ function render(){
 }
 function resize(){
   const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);
-  const cr=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.5);canvas.width=Math.max(1,Math.round(cr.width*dpr));canvas.height=Math.max(1,Math.round(cr.height*dpr));
+  const oldMin=SPACE_MIN;
+  SPACE_MIN=fitOverviewScale();
+  if(cam.s<=oldMin+.015)cam.s=SPACE_MIN;
+  else cam.s=Math.max(cam.s,SPACE_MIN);
+  const cr=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2.5);
+  canvas.width=Math.max(1,Math.round(cr.width*dpr));canvas.height=Math.max(1,Math.round(cr.height*dpr));
+  syncSpanFromSpace();
   render();
 }
 window.addEventListener("resize",resize,{passive:true});
@@ -706,8 +796,8 @@ app.addEventListener("touchmove",e=>{
     const p=localTouch(e.touches[0]);
     if(cam.s<SWIPE_SPACE){
       const dx=p.x-touch.last.x,dy=p.y-touch.last.y;
-      cam.x=clamp(cam.x-dx/cam.s,-1600,1600);
-      cam.y=clamp(cam.y-dy/cam.s,-1250,1250);
+      cam.x=clampCamX(cam.x-dx/cam.s);
+      cam.y=clampCamY(cam.y-dy/cam.s);
       syncSpanFromSpace();
       syncTimeFromSpace();
       render();
@@ -740,6 +830,8 @@ document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.82);
 document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.22);
 document.getElementById("fieldBtn").onclick=()=>app.classList.toggle("debug");
 
+OVERVIEW_ANCHORS.forEach(ensureCardImage);
+for(let i=Math.max(0,active-5);i<=Math.min(data.length-1,active+5);i++)ensureCardImage(i);
 syncSpanFromSpace();resize();setBg(active);render();
 })();
 </script>

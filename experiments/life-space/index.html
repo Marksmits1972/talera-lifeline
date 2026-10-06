@@ -21,12 +21,13 @@ body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
 #bg{position:absolute;inset:-8%;background:
-  radial-gradient(circle at 52% 43%,rgba(50,83,105,.20),transparent 22%),
-  radial-gradient(circle at 18% 68%,rgba(90,61,116,.12),transparent 26%),
-  radial-gradient(circle at 84% 72%,rgba(35,87,104,.13),transparent 25%),
-  radial-gradient(circle at 50% 52%,rgba(10,18,25,.32),rgba(3,6,10,.78) 62%,#010306 100%);
+  radial-gradient(circle at 48% 39%,rgba(112,151,177,.30),transparent 23%),
+  radial-gradient(circle at 18% 67%,rgba(116,84,143,.18),transparent 30%),
+  radial-gradient(circle at 84% 72%,rgba(58,122,142,.18),transparent 29%),
+  radial-gradient(circle at 72% 18%,rgba(198,176,126,.08),transparent 22%),
+  radial-gradient(circle at 50% 50%,rgba(15,29,39,.54),rgba(6,12,18,.83) 66%,#02060a 100%);
   transform:scale(1.08);overflow:hidden}
-#bg:before{content:"";position:absolute;inset:0;opacity:.58;background-image:
+#bg:before{content:"";position:absolute;inset:0;opacity:.74;background-image:
   radial-gradient(circle at 9% 16%,rgba(255,255,255,.55) 0 1px,transparent 1.5px),
   radial-gradient(circle at 22% 76%,rgba(194,223,240,.38) 0 1px,transparent 1.6px),
   radial-gradient(circle at 34% 31%,rgba(255,255,255,.34) 0 1px,transparent 1.4px),
@@ -39,12 +40,14 @@ button{font:inherit;color:inherit}
   radial-gradient(circle at 63% 38%,rgba(255,255,255,.23) 0 1px,transparent 1.4px);
   filter:blur(.15px)}
 #bg:after{content:"";position:absolute;inset:0;background:
-  radial-gradient(ellipse at center,transparent 0 34%,rgba(2,5,8,.12) 55%,rgba(1,3,5,.68) 100%)}
+  linear-gradient(118deg,transparent 0 34%,rgba(136,176,198,.055) 42%,transparent 50%),
+  linear-gradient(72deg,transparent 0 58%,rgba(207,186,137,.035) 66%,transparent 74%),
+  radial-gradient(ellipse at center,rgba(26,48,61,.10) 0 28%,transparent 48%,rgba(1,4,7,.46) 100%)}
 #world{position:absolute;inset:0;overflow:hidden;touch-action:none}
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.memoryEcho{position:absolute;width:48px;height:36px;border-radius:6px;overflow:hidden;background:#1c2931;border:1px solid rgba(255,255,255,.06);box-shadow:0 4px 14px rgba(0,0,0,.19);will-change:transform,opacity;opacity:0;transform-origin:center}
-.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.45px) saturate(.58) brightness(.68)}
-.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.18))}
+.memoryEcho{position:absolute;width:56px;height:42px;border-radius:7px;overflow:hidden;background:#1c2931;border:1px solid rgba(255,255,255,.10);box-shadow:0 5px 18px rgba(0,0,0,.22),0 0 16px rgba(114,167,198,.055);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.16px) saturate(.88) brightness(.88)}
+.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.08))}
 
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#26343b}
@@ -385,14 +388,23 @@ function nearestMemoryToTime(ms=timeCenter){
   return lo;
 }
 function nearestMemoryToFocus(){
-  const span=Math.max(365*DAY,timelineSpanMs());
-  let best=0,score=Infinity;
-  data.forEach((s,i)=>{
-    const temporal=Math.abs(s.ms-timeCenter)/span;
-    const angular=angularDistanceToCamera(s);
-    const q=temporal*.78+angular*.64;
-    if(q<score){score=q;best=i}
-  });
+  // The timeline date is authoritative. First find stories near that date,
+  // then choose the one on the most reachable side of the globe.
+  let windowMs=Math.max(120*DAY,timelineSpanMs()*.46);
+  let candidates=[];
+  for(let pass=0;pass<5;pass++){
+    candidates=data.map((s,i)=>({s,i,dt:Math.abs(s.ms-timeCenter)})).filter(v=>v.dt<=windowMs);
+    if(candidates.length)break;
+    windowMs*=1.8;
+  }
+  if(!candidates.length)return nearestMemoryToTime(timeCenter);
+  let best=candidates[0].i,score=Infinity;
+  for(const v of candidates){
+    const temporal=v.dt/Math.max(DAY,windowMs);
+    const angular=angularDistanceToCamera(v.s)/Math.PI;
+    const q=temporal*3.4+angular*.42;
+    if(q<score){score=q;best=v.i}
+  }
   return best;
 }
 function setBg(i){
@@ -701,8 +713,11 @@ function chooseVisibleRepresentatives(raw,alpha){
     const nearScreen=r.x>-150&&r.x<W+150&&r.y>105&&r.y<H+130;
     if(!nearScreen&&spatialPinchTarget!==i)return;
 
-    const temporalWindow=Math.max(timelineSpanMs(),365*DAY*1.3);
-    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/(temporalWindow*.56),2));
+    const temporalWindow=Math.max(timelineSpanMs(),120*DAY);
+    const dt=Math.abs(s.ms-timeCenter);
+    const clearWindow=Math.max(100*DAY,temporalWindow*.68);
+    if(dt>clearWindow && spatialPinchTarget!==i)return;
+    const temporal=Math.exp(-.5*Math.pow(dt/(temporalWindow*.40),2));
     const face=smooth(-.04,.92,r.facing);
     const centre=1-clamp(Math.hypot(r.x-W/2,r.y-H*.52)/(Math.max(W,H)*.80),0,1);
     const targetBoost=spatialPinchTarget===i?4:0;
@@ -716,23 +731,6 @@ function chooseVisibleRepresentatives(raw,alpha){
   const chosen=new Set();
   if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
   if(raw[active]?.facing>-.02)chosen.add(active);
-
-  // Wide overview: sample different ages on the visible hemisphere, not fixed longitudes.
-  if(overview>.55){
-    for(const targetAge of overviewAnchorAges){
-      let best=null,bestScore=Infinity;
-      for(const cand of candidates){
-        if(chosen.has(cand.i))continue;
-        const s=data[cand.i];
-        const ageD=Math.abs(s.age-targetAge);
-        const lonD=angularLonDistance(s.lon,cam.x);
-        const q=ageD+lonD*2.2;
-        if(q<bestScore){bestScore=q;best=cand.i}
-      }
-      if(best!=null)chosen.add(best);
-      if(chosen.size>=budget)break;
-    }
-  }
 
   const placed=[];
   for(const i of chosen){
@@ -813,13 +811,13 @@ function renderEchoField(raw,visibleSet,alpha){
       el.querySelector("img").src=thumbUrl(s);
     }
     const d=smooth(-.25,1,cand.facing);
-    const random=.78+.42*fract(s.id+901);
-    const size=lerp(.18,.92,d)*random;
-    const op=(1-alpha)*lerp(.028,.20,d)*(.76+.24*cand.score);
+    const random=.82+.36*fract(s.id+901);
+    const size=lerp(.30,1.02,d)*random;
+    const op=(1-alpha)*lerp(.065,.29,d)*(.80+.20*cand.score);
     const img=el.querySelector("img");
-    img.style.filter="blur("+lerp(1.35,.18,d).toFixed(2)+"px) saturate("+lerp(.42,.72,d).toFixed(2)+") brightness("+lerp(.48,.80,d).toFixed(2)+")";
-    el.style.opacity=clamp(op,.018,.22).toFixed(3);
-    el.style.transform="translate3d("+(cand.x-24)+"px,"+(cand.y-18)+"px,0) scale("+size.toFixed(3)+")";
+    img.style.filter="blur("+lerp(.72,.05,d).toFixed(2)+"px) saturate("+lerp(.72,1.02,d).toFixed(2)+") brightness("+lerp(.70,.98,d).toFixed(2)+")";
+    el.style.opacity=clamp(op,.045,.31).toFixed(3);
+    el.style.transform="translate3d("+(cand.x-28)+"px,"+(cand.y-21)+"px,0) scale("+size.toFixed(3)+")";
     el.style.zIndex=String(30+Math.round(d*90));
   }
 }

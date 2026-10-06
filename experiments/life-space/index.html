@@ -43,17 +43,31 @@ button{font:inherit;color:inherit}
   linear-gradient(118deg,transparent 0 31%,rgba(137,184,207,.065) 41%,transparent 52%),
   linear-gradient(72deg,transparent 0 57%,rgba(207,163,132,.045) 66%,transparent 77%),
   radial-gradient(ellipse at 50% 48%,rgba(42,78,98,.11) 0 24%,transparent 55%,rgba(2,7,11,.34) 100%)}
-#world{position:absolute;inset:0;overflow:hidden;touch-action:none}
-#world:before{content:"";position:absolute;z-index:0;inset:0;pointer-events:none;opacity:.82;background:
-  radial-gradient(circle at 14% 21%,rgba(196,225,240,.20) 0 1px,transparent 1.6px),
-  radial-gradient(circle at 73% 17%,rgba(255,213,173,.16) 0 1px,transparent 1.5px),
-  radial-gradient(circle at 86% 54%,rgba(205,230,241,.16) 0 1px,transparent 1.5px),
-  radial-gradient(circle at 27% 77%,rgba(255,221,190,.12) 0 1px,transparent 1.5px),
-  radial-gradient(circle at 56% 63%,rgba(202,229,242,.13) 0 1px,transparent 1.4px)}
+#world{position:absolute;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
+#world:before{content:"";position:absolute;z-index:0;inset:0;pointer-events:none;opacity:.94;background:
+  radial-gradient(circle at 7% 13%,rgba(220,239,249,.30) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 18% 41%,rgba(180,217,238,.20) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 31% 76%,rgba(255,221,190,.18) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 48% 24%,rgba(210,234,247,.22) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 59% 67%,rgba(201,228,242,.22) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 73% 17%,rgba(255,213,173,.22) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 86% 54%,rgba(205,230,241,.22) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 94% 81%,rgba(255,222,194,.16) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 42% 88%,rgba(202,229,242,.16) 0 1px,transparent 1.6px)}
+#world:after{content:"";position:absolute;z-index:0;inset:-10%;pointer-events:none;opacity:.86;filter:blur(18px);background:
+  radial-gradient(ellipse at 18% 32%,rgba(64,127,165,.22),transparent 29%),
+  radial-gradient(ellipse at 76% 34%,rgba(176,113,91,.13),transparent 27%),
+  radial-gradient(ellipse at 52% 70%,rgba(63,117,148,.17),transparent 31%),
+  linear-gradient(112deg,transparent 0 39%,rgba(149,194,217,.06) 47%,transparent 55%);
+  animation:taleraSpaceDrift 18s ease-in-out infinite alternate}
+@keyframes taleraSpaceDrift{
+  from{transform:translate3d(-1.5%,-.6%,0) scale(1)}
+  to{transform:translate3d(1.6%,1%,0) scale(1.035)}
+}
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.memoryEcho{position:absolute;width:58px;height:44px;border-radius:7px;overflow:hidden;background:#1c2931;border:1px solid rgba(255,255,255,.11);box-shadow:0 5px 18px rgba(0,0,0,.20),0 0 17px rgba(128,178,205,.07);will-change:transform,opacity;opacity:0;transform-origin:center}
-.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.10px) saturate(.94) brightness(.92)}
-.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.08))}
+.memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.15);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 20px rgba(129,184,213,.10);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.06px) saturate(1) brightness(1)}
+.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(0,0,0,.035))}
 
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#26343b}
@@ -314,7 +328,7 @@ const nodes=data.map(s=>{
   world.appendChild(el);return el;
 });
 
-const ECHO_COUNT=72;
+const ECHO_COUNT=96;
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
   el.className="memoryEcho";
@@ -1047,26 +1061,37 @@ function pullToViewport(p){return{x:p.x,y:p.y,magnetic:false}}
 
 function renderEchoField(raw,visibleSet,alpha){
   const candidates=[];
+  const centreY=H*.54;
 
   data.forEach((s,i)=>{
     if(visibleSet.has(i))return;
     const r=raw[i];
-    if(r.x<-100||r.x>W+100||r.y<90||r.y>H+95)return;
+    const d=clamp(r.depth,0,1);
+
+    // Far memories move less and are gently spread sideways/up-down. That makes
+    // them read as layers in space instead of as one dark flat curtain.
+    const parallax=lerp(.34,.92,d);
+    const scatterX=(fract(s.id+1301)-.5)*W*lerp(.34,.10,d);
+    const scatterY=(fract(s.id+1499)-.5)*H*lerp(.22,.07,d);
+    const x=W/2+(r.x-W/2)*parallax+scatterX;
+    const y=centreY+(r.y-centreY)*parallax+scatterY;
+
+    if(x<-95||x>W+95||y<92||y>H+100)return;
 
     const temporal=Math.exp(-.5*Math.pow(
-      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.55,365*DAY*4.5),2
+      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.7,365*DAY*5),2
     ));
-    const depth=clamp(r.depth,0,1);
-    const score=depth*.58+temporal*.34+.08*(1-s.representative);
-    candidates.push({i,score,x:r.x,y:r.y,depth});
+    const score=d*.44+temporal*.22+.22*(1-s.representative)+.12*fract(s.id+1781);
+    candidates.push({i,score,x,y,depth:d});
   });
+
   candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
 
   const chosen=[];
   for(const cand of candidates){
     if(chosen.length>=ECHO_COUNT)break;
     let tooClose=false;
-    const localGap=lerp(18,34,cand.depth);
+    const localGap=lerp(14,29,cand.depth);
     for(const p of chosen){
       if(Math.hypot(cand.x-p.x,cand.y-p.y)<localGap){tooClose=true;break}
     }
@@ -1078,6 +1103,7 @@ function renderEchoField(raw,visibleSet,alpha){
     if(!cand){
       el.style.opacity="0";echoAssignments[slot]=-1;continue;
     }
+
     const s=data[cand.i];
     if(echoAssignments[slot]!==cand.i){
       echoAssignments[slot]=cand.i;
@@ -1085,14 +1111,21 @@ function renderEchoField(raw,visibleSet,alpha){
     }
 
     const d=clamp(cand.depth,0,1);
-    const random=.80+.40*fract(s.id+901);
-    const size=lerp(.34,1.08,d)*random;
-    const op=(1-alpha)*lerp(.075,.30,d)*(.82+.18*cand.score);
+    const random=.78+.44*fract(s.id+901);
+    const size=lerp(.38,1.22,d)*random;
+    const op=(1-alpha)*lerp(.10,.40,d)*(.84+.16*cand.score);
+    const blur=lerp(.42,0,d);
+    const sat=lerp(.82,1.08,d);
+    const bright=lerp(.82,1.08,d);
     const img=el.querySelector("img");
-    img.style.filter="blur("+lerp(.58,.04,d).toFixed(2)+"px) saturate("+lerp(.76,1.02,d).toFixed(2)+") brightness("+lerp(.72,.98,d).toFixed(2)+")";
-    el.style.opacity=clamp(op,.052,.32).toFixed(3);
-    el.style.transform="translate3d("+(cand.x-29)+"px,"+(cand.y-22)+"px,0) scale("+size.toFixed(3)+")";
-    el.style.zIndex=String(28+Math.round(d*110));
+    img.style.filter="blur("+blur.toFixed(2)+"px) saturate("+sat.toFixed(2)+") brightness("+bright.toFixed(2)+")";
+    el.style.opacity=clamp(op,.075,.42).toFixed(3);
+    el.style.transform="translate3d("+(cand.x-31)+"px,"+(cand.y-23)+"px,0) scale("+size.toFixed(3)+")";
+    el.style.zIndex=String(25+Math.round(d*118));
+    const warm=fract(s.id+2077)>.62;
+    el.style.boxShadow=warm
+      ?"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(227,166,118,"+(0.035+.06*d).toFixed(3)+")"
+      :"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(122,184,216,"+(0.04+.07*d).toFixed(3)+")";
   }
 }
 

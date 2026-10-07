@@ -820,6 +820,7 @@ let timelineUser=false;
 let lastMagneticIds=new Set(),magneticIds=new Set();
 let renderedCards=new Map();
 let stableForegroundSet=new Set();
+let foregroundLastRoleRank=new Map();
 let stableHeroIndex=null;
 
 // Visual entry state prevents a newly-selected photo from materialising in the
@@ -1891,16 +1892,19 @@ function chooseVisibleRepresentatives(raw,alpha,foregroundRoles=[]){
     if(i!=null&&data[i])chosen.add(i);
   }
 
-  // Hysteresis for the clear foreground: once a photo has earned a place,
-  // keep it until it is comfortably outside the useful time/screen envelope.
-  // This prevents dense libraries from choosing a different card every frame.
+  // Hysteresis for the clear foreground: a large photo should not disappear
+  // merely because a new story has just become more relevant. Keep up to two
+  // outgoing cards alive until they have travelled well beyond the viewport.
+  const lingerBudget=budget+2;
   for(const i of stableForegroundSet){
-    if(chosen.size>=budget)break;
+    if(chosen.size>=lingerBudget)break;
     if(chosen.has(i)||!data[i]||!raw[i])continue;
     const r=raw[i];
     const dt=Math.abs(data[i].ms-timeCenter);
-    const looseTime=dt<=clearWindow*1.35;
-    const looseScreen=r.x>-W*.55&&r.x<W*1.55&&r.y>35&&r.y<H+180;
+    const looseTime=dt<=clearWindow*2.20;
+    const looseScreen=
+      r.x>-W*.78&&r.x<W*1.78&&
+      r.y>-40&&r.y<H+260;
     if(looseTime&&looseScreen)chosen.add(i);
   }
 
@@ -2235,6 +2239,10 @@ function render(){
   const composed=composeForeground(raw,visibleSet);
 
   const roleRank=new Map(foregroundRoles.map((i,rank)=>[i,rank]));
+  for(const [i,rank] of roleRank)foregroundLastRoleRank.set(i,rank);
+  for(const i of [...foregroundLastRoleRank.keys()]){
+    if(!visibleSet.has(i))foregroundLastRoleRank.delete(i);
+  }
   renderedCards.clear();
 
   // A photo that has left the foreground gets a fresh edge-entry next time.
@@ -2248,7 +2256,9 @@ function render(){
   for(const i of visibleSet){
     const s=data[i];
     const r=raw[i],p=composed.get(i)||r;
-    const rank=roleRank.has(i)?roleRank.get(i):99;
+    const rank=roleRank.has(i)
+      ?roleRank.get(i)
+      :(foregroundLastRoleRank.has(i)?Math.max(1,foregroundLastRoleRank.get(i)):99);
     const depth=clamp(r.depth,0,1);
 
     const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;

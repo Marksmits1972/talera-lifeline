@@ -1462,7 +1462,7 @@ function render(){
   if(alpha>.34)setBg(active);
 
   updateFocusBlock();
-  zoomRead.textContent=Math.round(cam.s/SPACE_MAX*100)+"%";
+  if(zoomRead)zoomRead.textContent=Math.round(cam.s/SPACE_MAX*100)+"%";
 
   const raw=data.map((s,i)=>{
     const q=projectMemory(s);

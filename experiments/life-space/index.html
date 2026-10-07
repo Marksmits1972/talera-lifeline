@@ -319,21 +319,50 @@ const baseData=ALL_MEMORIES.map((s,i)=>{
 const LIFE_YEARS=Math.max(1,(LIFE_END-LIFE_START)/(365.2425*DAY));
 const GLOBE_LAT_LIMIT=1.285; // ~73.6 degrees; avoids pole singularities.
 const GOLDEN_ANGLE=2.399963229728653;
+
+// The world grows with the amount of material instead of cramming more photos
+// into the same physical space. 150 memories is the current reference density.
 const WORLD_REFERENCE_COUNT=150;
-const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.72,3);
+const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,2.8);
 const SPHERE_RADIUS=395*WORLD_DENSITY_SCALE;
+
+// Time stays chronologically correct, but visually empty eras take less room on
+// the globe. This keeps a sparse life compact while a dense life naturally grows.
+const MEMORY_AGES=baseData.map(s=>s.age);
+const TIME_DENSITY_BLEND=.58;
+
+function memoryFractionAtAge(age){
+  let lo=0,hi=MEMORY_AGES.length;
+  while(lo<hi){
+    const mid=(lo+hi)>>1;
+    if(MEMORY_AGES[mid]<=age)lo=mid+1;
+    else hi=mid;
+  }
+  return MEMORY_AGES.length?lo/MEMORY_AGES.length:clamp(age/LIFE_YEARS,0,1);
+}
+function spatialProgressForAge(age){
+  const chronological=clamp(age/LIFE_YEARS,0,1);
+  const populated=memoryFractionAtAge(age);
+  return lerp(chronological,populated,TIME_DENSITY_BLEND);
+}
 
 function wrapLon(a){
   const tau=Math.PI*2;
   return ((a+Math.PI)%tau+tau)%tau-Math.PI;
 }
 function sphereLatAtAge(age){
-  const t=clamp(age/LIFE_YEARS,0,1);
+  const t=spatialProgressForAge(age);
   return lerp(GLOBE_LAT_LIMIT,-GLOBE_LAT_LIMIT,t);
 }
 function ageAtSphereLat(lat){
-  const t=clamp((GLOBE_LAT_LIMIT-lat)/(GLOBE_LAT_LIMIT*2),0,1);
-  return t*LIFE_YEARS;
+  const target=clamp((GLOBE_LAT_LIMIT-lat)/(GLOBE_LAT_LIMIT*2),0,1);
+  let lo=0,hi=LIFE_YEARS;
+  for(let i=0;i<22;i++){
+    const mid=(lo+hi)/2;
+    if(spatialProgressForAge(mid)<target)lo=mid;
+    else hi=mid;
+  }
+  return (lo+hi)/2;
 }
 function angularLonDistance(a,b){
   return Math.abs(wrapLon(a-b));

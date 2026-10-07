@@ -453,8 +453,13 @@ const GOLDEN_ANGLE=2.399963229728653;
 // The world grows with the amount of material instead of cramming more photos
 // into the same physical space. 150 memories is the current reference density.
 const WORLD_REFERENCE_COUNT=150;
-const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,6);
+const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,10);
 const SPHERE_RADIUS=395*WORLD_DENSITY_SCALE;
+
+// Direct manipulation is tied to distance travelled over the outer photo shell,
+// not to a fixed angular rotation. A larger world therefore rotates fewer
+// radians for the same finger movement; a smaller world rotates more.
+const SHELL_ANGULAR_GAIN=1/WORLD_DENSITY_SCALE;
 
 // Time stays chronologically correct, but visually empty eras take less room on
 // the globe. This keeps a sparse life compact while a dense life naturally grows.
@@ -1804,27 +1809,29 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
   stopGlobeInertia();
   if(cam.s>=SWIPE_SPACE)return;
 
-  const launchIntent=clamp(Math.hypot(vLon/.0068,vLat/.0047),0,1.2);
+  const shellLon=Math.abs(vLon)/SHELL_ANGULAR_GAIN;
+  const shellLat=Math.abs(vLat)/SHELL_ANGULAR_GAIN;
+  const launchIntent=clamp(Math.hypot(shellLon/.0068,shellLat/.0047),0,1.2);
   syncTimelineVisualFromSpace(launchIntent,34,performance.now());
 
   // Speed should be visible in the photo field, not explode the life date.
-  // A harder horizontal flick gets a little extra launch; a second push in
-  // the same horizontal direction adds to the rolling motion already present.
-  const freshLon=Math.abs(vLon);
+  // Boost and carry are judged by shell speed, while angular speed automatically
+  // shrinks as the world radius grows.
+  const freshLon=shellLon;
   const launchBoost=lerp(1,1.42,smooth(.00055,.0027,freshLon));
   vLon*=launchBoost;
 
-  if(Math.abs(carryLon)>.00002&&Math.sign(carryLon)===Math.sign(vLon)){
-    const carryStrength=.78*smooth(.00010,.0028,Math.abs(carryLon));
+  const shellCarryLon=Math.abs(carryLon)/SHELL_ANGULAR_GAIN;
+  if(shellCarryLon>.00002&&Math.sign(carryLon)===Math.sign(vLon)){
+    const carryStrength=.78*smooth(.00010,.0028,shellCarryLon);
     vLon+=carryLon*carryStrength;
   }
 
   // Vertical inertia is deliberately conservative: north/south is life time.
-  // The finger can still move through time directly, but release momentum may
-  // only coast a little and never stacks from a second push.
-  vLon=clamp(vLon,-.0074,.0074);
-  vLat=clamp(vLat,-.00038,.00038);
-  if(Math.hypot(vLon,vLat)<.000055)return;
+  // Limits are shell-relative too, so a large globe does not gain a faster coast.
+  vLon=clamp(vLon,-.0074*SHELL_ANGULAR_GAIN,.0074*SHELL_ANGULAR_GAIN);
+  vLat=clamp(vLat,-.00038*SHELL_ANGULAR_GAIN,.00038*SHELL_ANGULAR_GAIN);
+  if(Math.hypot(vLon,vLat)<.000055*SHELL_ANGULAR_GAIN)return;
 
   globeMomentumLon=vLon;
   globeMomentumLat=vLat;
@@ -1851,7 +1858,7 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
     globeMomentumLon*=Math.exp(-dt/300);
     globeMomentumLat*=Math.exp(-dt/180);
 
-    if(lived<1050&&Math.hypot(globeMomentumLon,globeMomentumLat)>.000028){
+    if(lived<1050&&Math.hypot(globeMomentumLon,globeMomentumLat)>.000028*SHELL_ANGULAR_GAIN){
       globeInertiaRaf=requestAnimationFrame(frame);
     }else{
       globeInertiaRaf=0;
@@ -1985,8 +1992,8 @@ app.addEventListener("touchmove",e=>{
       const horizontalGain=lerp(.56,1.06,gear)*lerp(1,.76,precisionWeight);
       const verticalGain=lerp(.16,.72,gear)*lerp(1,.60,precisionWeight);
 
-      const dLon=-dx*.0068*nav*contentFactor*horizontalGain;
-      const dLat=dy*.0047*nav*contentFactor*verticalGain;
+      const dLon=-dx*.0068*nav*contentFactor*horizontalGain*SHELL_ANGULAR_GAIN;
+      const dLat=dy*.0047*nav*contentFactor*verticalGain*SHELL_ANGULAR_GAIN;
 
       cam.x=wrapLon(cam.x+dLon);
       cam.y=clampCamY(cam.y+dLat);

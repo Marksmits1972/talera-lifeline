@@ -291,42 +291,143 @@ function spaceFxLoop(now){
 // sparse early years, a very dense band around age 30, and mixed density later.
 // This lets us test whether one continuous field can absorb strong local differences.
 const EXTRA_MEMORIES=(()=>{
-  const specs=[
-    [8,3,12],[10,13,20],[12,21,27],[28,29.65,30.35],
-    [15,31.6,38],[12,39,45],[10,46,51],[5,52,54]
+  // Stress-test dataset: exactly 1000 memories total, while preserving the
+  // original reference memories. Synthetic photos are unique seeded sources
+  // and remain lazy-loaded so the browser never downloads all 1000 at once.
+  const TARGET_TOTAL_MEMORIES=1000;
+  const targetExtra=Math.max(0,TARGET_TOTAL_MEMORIES-MEMORIES.length);
+
+  // Uneven life-density on purpose: some sparse periods, some very dense ones.
+  // This is closer to a real photo library than an evenly spaced test grid.
+  const bands=[
+    {a0:.4,a1:5.5,w:4},
+    {a0:5.5,a1:11,w:5},
+    {a0:11,a1:17,w:6},
+    {a0:17,a1:23,w:8},
+    {a0:23,a1:28,w:10},
+    {a0:28,a1:32,w:17},
+    {a0:32,a1:37,w:14},
+    {a0:37,a1:42,w:12},
+    {a0:42,a1:47,w:10},
+    {a0:47,a1:51,w:8},
+    {a0:51,a1:54.9,w:6}
   ];
-  const snippets=[
-    "Een gewoon moment dat later toch is blijven hangen.",
-    "Even onderweg gestopt en zonder reden een foto gemaakt.",
-    "Een middag waarop alles net wat lichter voelde.",
-    "Met mensen om me heen waar ik toen veel mee optrok.",
-    "Een klein uitstapje dat uiteindelijk een heel verhaal werd.",
-    "Thuis, niets bijzonders, en juist daarom herkenbaar.",
-    "Een dag buiten waarvan vooral het licht is bijgebleven.",
-    "Een onverwacht moment dat ik later graag terugzag.",
-    "Samen op pad zonder precies te weten waar we zouden eindigen.",
-    "Zo'n beeld dat meteen een hele periode terugbrengt."
+  const totalWeight=bands.reduce((sum,b)=>sum+b.w,0);
+
+  const starters=[
+    "Een gewoon moment dat later toch is blijven hangen",
+    "Even onderweg gestopt en zonder reden een foto gemaakt",
+    "Een middag waarop alles net wat lichter voelde",
+    "Met mensen om me heen waar ik toen veel mee optrok",
+    "Een klein uitstapje dat uiteindelijk een heel verhaal werd",
+    "Thuis, niets bijzonders, en juist daarom herkenbaar",
+    "Een dag buiten waarvan vooral het licht is bijgebleven",
+    "Een onverwacht moment dat ik later graag terugzag",
+    "Samen op pad zonder precies te weten waar we zouden eindigen",
+    "Zo'n beeld dat meteen een hele periode terugbrengt",
+    "Een ochtend die heel gewoon begon en toch bleef hangen",
+    "Onderweg ergens koffie gedronken en langer blijven zitten",
+    "Een korte wandeling waar uiteindelijk veel uit voortkwam",
+    "Een ontmoeting die toen klein leek maar later belangrijk werd",
+    "Een vrije dag waarop we nergens haast voor hadden",
+    "Gewoon even naar buiten en uiteindelijk uren weggebleven",
+    "Een plek waar ik later nog vaak aan terug moest denken",
+    "Een foto gemaakt zonder te weten waarom juist toen",
+    "Samen gelachen om iets wat inmiddels niemand meer weet",
+    "Een stille avond waarop alles even op zijn plek viel",
+    "Een weekend waarin er meer gebeurde dan vooraf gepland",
+    "Een tussenstop die achteraf het leukste deel bleek",
+    "Een dag die vooral door één klein detail is blijven hangen",
+    "Een periode waarin alles tegelijk leek te veranderen",
+    "Een vertrouwd moment dat pas later bijzonder werd",
+    "Een onverwachte omweg waar we geen spijt van kregen",
+    "Een gewone zondag die uiteindelijk helemaal niet gewoon was",
+    "Een paar uur samen waar ik nog vaak aan terugdenk",
+    "Een beeld waarvan ik de sfeer meteen weer herken",
+    "Een klein avontuur vlak bij huis",
+    "Een dag waarop niemand echt wist wat het plan was",
+    "Een moment dat precies bij die tijd in mijn leven hoort"
   ];
-  const out=[];
-  let n=0;
-  for(const [count,a0,a1] of specs){
-    for(let j=0;j<count;j++){
-      n++;
-      const q=(j+.35+fract(n*2.31)*.30)/count;
-      const age=a0+(a1-a0)*q;
-      let ms=LIFE_START+age*365.2425*DAY;
-      const d=new Date(ms);
-      d.setHours(8+Math.floor(fract(n+17)*12),Math.floor(fract(n+43)*60),0,0);
-      ms=clamp(d.getTime(),LIFE_START,LIFE_END);
-      const id=1000+n;
-      out.push({
-        id,
-        at:new Date(ms).toISOString(),
-        story:snippets[(n*7)%snippets.length],
-        image:"https://picsum.photos/seed/talera-life-"+String(id)+"/720/960",
-        synthetic:true
-      });
+
+  const endings=[
+    "en vooral de rust ervan herinner ik me nog.",
+    "waarbij juist het kleine detail is blijven hangen.",
+    "en achteraf bleek dat precies genoeg.",
+    "waarvan de sfeer meteen weer terugkomt als ik dit zie.",
+    "en iedereen leek die dag net wat meer tijd te hebben.",
+    "dat later veel vaker ter sprake kwam dan verwacht.",
+    "waar ik toen nauwelijks bij stilstond.",
+    "en ineens weet ik weer precies hoe die dag voelde.",
+    "waarvan ik vooral het licht en de geluiden nog weet.",
+    "en precies daarom hoort dit beeld bij die periode.",
+    "dat toen heel vanzelfsprekend voelde.",
+    "waarbij we uiteindelijk veel langer bleven dan gepland.",
+    "en ergens onderweg veranderde de hele dag.",
+    "waar ik nu anders naar kijk dan toen.",
+    "dat één van die kleine ankerpunten in mijn geheugen werd.",
+    "waarvan ik bijna was vergeten dat het gebeurd was.",
+    "en toch kan ik me dat ene moment nog scherp herinneren.",
+    "waarbij niemand een camera nodig dacht te hebben behalve ik.",
+    "dat later symbool werd voor een hele fase.",
+    "waarvan vooral de mensen eromheen belangrijk waren.",
+    "en achteraf was juist dat ongeplande het mooiste.",
+    "dat precies laat zien hoe het leven toen voelde.",
+    "waarbij tijd even geen rol leek te spelen.",
+    "en ik weet nog precies waarom ik toen moest lachen.",
+    "waarvan de betekenis pas veel later duidelijk werd.",
+    "dat nog steeds meteen een gesprek oproept.",
+    "waar alles eigenlijk heel eenvoudig was.",
+    "dat ik waarschijnlijk nooit bewust had willen bewaren.",
+    "waarbij één blik genoeg was om elkaar te begrijpen.",
+    "en dat beeld brengt de rest vanzelf weer terug.",
+    "waar ik nog steeds een warm gevoel bij krijg.",
+    "dat gewoon onderdeel werd van ons verhaal."
+  ];
+
+  function bandForFraction(u){
+    let acc=0;
+    for(const band of bands){
+      acc+=band.w/totalWeight;
+      if(u<=acc)return band;
     }
+    return bands[bands.length-1];
+  }
+
+  const out=[];
+  for(let n=0;n<targetExtra;n++){
+    const sequence=(n+.5)/Math.max(1,targetExtra);
+    const band=bandForFraction(sequence);
+
+    // Scatter deterministically inside the chosen life period instead of
+    // creating mechanical rows or one giant dense date cluster.
+    const q=clamp(
+      .04+.92*fract((n+1)*2.317 + Math.floor(sequence*97)*.71),
+      .02,.98
+    );
+    const age=band.a0+(band.a1-band.a0)*q;
+    let ms=LIFE_START+age*365.2425*DAY;
+    const d=new Date(ms);
+    d.setHours(
+      7+Math.floor(fract(n+17)*15),
+      Math.floor(fract(n+43)*60),
+      Math.floor(fract(n+79)*60),
+      0
+    );
+    ms=clamp(d.getTime(),LIFE_START,LIFE_END);
+
+    const id=10000+n;
+    const storyIndex=n%(starters.length*endings.length);
+    const story=
+      starters[storyIndex%starters.length]+", "+
+      endings[Math.floor(storyIndex/starters.length)%endings.length];
+
+    out.push({
+      id,
+      at:new Date(ms).toISOString(),
+      story,
+      image:"https://picsum.photos/seed/talera-1000-"+String(id)+"/720/960",
+      synthetic:true
+    });
   }
   return out;
 })();
@@ -431,7 +532,7 @@ const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
 }).filter((v,i,a)=>a.indexOf(v)===i);
 const OVERVIEW_ANCHOR_SET=new Set(OVERVIEW_ANCHORS);
 
-// With 150+ memories// With 150+ memories we load images only when the card is actually relevant.
+// With large libraries we load images only when a card is actually relevant.
 function thumbUrl(s){
   return s.synthetic?s.image:s.image.replace("w=1400","w=620");
 }

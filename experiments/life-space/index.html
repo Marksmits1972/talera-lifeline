@@ -1069,6 +1069,8 @@ let visualIntentSince=performance.now();
 let visualGearHoldUntil=0;
 let scaleLastX=0,scaleLastT=0,searchVelocity=0;
 let gestureUsedPinch=false;
+let spaceVisualIntentLevel=Math.round(Math.min(visualZoomPos,1));
+let spaceVisualIntentSince=performance.now();
 
 const VISUAL_AUTO_MAX_ZOOM=1;
 const VISUAL_GEAR_HOLD_MS=1200;
@@ -1116,15 +1118,38 @@ function animateVisualScaleTo(target,duration){
   visualScaleRaf=requestAnimationFrame(frame);
 }
 function syncTimelineVisualFromSpace(speed,dt,now=performance.now()){
-  // Slow globe motion means "search precisely"; fast motion means "travel".
-  // Use only the two automatic Free gears (overview <-> 2-year search).
-  const target=1-smooth(.085,.38,Math.max(0,speed));
+  // Globe and timeline share one navigation intent, but the timeline must never
+  // sit halfway between its two automatic gears: that creates unreadable mixed labels.
   if(visualScaleTransitioning)cancelVisualScaleAnimation();
 
-  const tau=target>visualZoomPos?150:105;
-  const a=1-Math.exp(-Math.max(8,dt)/tau);
-  visualZoomPos=lerp(visualZoomPos,target,a);
-  if(Math.abs(visualZoomPos-target)<.012)visualZoomPos=target;
+  const current=visualStageForZoom(visualZoomPos);
+  const s=Math.max(0,speed);
+
+  // Hysteresis: the middle band keeps the current gear so tiny speed changes do
+  // not make the timeline chatter between overview and precise search.
+  let desired=current;
+  if(s>=.34)desired=0;       // clearly travelling
+  else if(s<=.16)desired=1;  // clearly searching precisely
+
+  if(desired===current){
+    spaceVisualIntentLevel=current;
+    spaceVisualIntentSince=now;
+    if(visualZoomPos!==current)visualZoomPos=current;
+  }else{
+    if(desired!==spaceVisualIntentLevel){
+      spaceVisualIntentLevel=desired;
+      spaceVisualIntentSince=now;
+      return;
+    }
+
+    // Coarsening should react quickly; precision gets a short confirmation
+    // delay so an accidental momentary slowdown does not open the fine scale.
+    const dwell=desired===0?85:240;
+    if(now-spaceVisualIntentSince<dwell)return;
+
+    visualZoomPos=desired; // snap to a valid gear; never render an in-between scale
+    spaceVisualIntentSince=now;
+  }
 
   timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;
   visualIntentLevel=visualStageForZoom(visualZoomPos);

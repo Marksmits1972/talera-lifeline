@@ -761,7 +761,9 @@ function preloadNearbyMemories(){
 }
 
 
-const ECHO_COUNT=96;
+const ECHO_REFERENCE_RATIO=1.25;
+const ECHO_DENSITY_FACTOR=clamp(ELLIPSE_VERTICAL_RATIO/ECHO_REFERENCE_RATIO,1,1.22);
+const ECHO_COUNT=Math.round(96*ECHO_DENSITY_FACTOR);
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
   el.className="memoryEcho";
@@ -1293,18 +1295,36 @@ function drawMemoryBeacons(level,startMs,endMs,w,axisY){
     ctx.beginPath();ctx.arc(x,axisY-cfg.stem,cfg.r,0,Math.PI*2);ctx.fill();
   }
 }
+let timelineLastLabelRight=-Infinity;
 function tick(x,axisY,major,label="",sub="",strongSub=false){
   if(x<-55||x>canvas.clientWidth+55)return;
   ctx.strokeStyle=major?"rgba(15,39,71,.66)":"rgba(62,74,89,.24)";
   ctx.lineWidth=major?1.5:1;
   ctx.beginPath();ctx.moveTo(x,axisY-(major?11:5));ctx.lineTo(x,axisY+(major?10:5));ctx.stroke();
+
   if(major&&label){
-    ctx.textAlign="center";ctx.fillStyle="rgba(15,39,71,.90)";
-    ctx.font="700 13px Inter,-apple-system,sans-serif";ctx.fillText(label,x,axisY+22);
+    ctx.textAlign="center";
+    ctx.font="700 13px Inter,-apple-system,sans-serif";
+    const labelWidth=ctx.measureText(label).width;
+    let subWidth=0;
     if(sub){
-      ctx.fillStyle=strongSub?"rgba(15,39,71,.82)":"rgba(62,74,89,.58)";
       ctx.font=strongSub?"650 11.5px Inter,-apple-system,sans-serif":"11px Inter,-apple-system,sans-serif";
-      ctx.fillText(sub,x,axisY+34);
+      subWidth=ctx.measureText(sub).width;
+    }
+    const width=Math.max(labelWidth,subWidth);
+    const left=x-width/2,right=x+width/2;
+    const room=left>timelineLastLabelRight+7;
+
+    if(room){
+      ctx.fillStyle="rgba(15,39,71,.90)";
+      ctx.font="700 13px Inter,-apple-system,sans-serif";
+      ctx.fillText(label,x,axisY+22);
+      if(sub){
+        ctx.fillStyle=strongSub?"rgba(15,39,71,.82)":"rgba(62,74,89,.58)";
+        ctx.font=strongSub?"650 11.5px Inter,-apple-system,sans-serif":"11px Inter,-apple-system,sans-serif";
+        ctx.fillText(sub,x,axisY+34);
+      }
+      timelineLastLabelRight=right;
     }
   }
 }
@@ -1362,6 +1382,7 @@ function drawLevel5(startMs,endMs,w,axisY){
   }
 }
 function drawScale(level,startMs,endMs,w,axisY){
+  timelineLastLabelRight=-Infinity;
   ctx.strokeStyle="rgba(91,143,185,.44)";ctx.lineWidth=1.2;
   ctx.beginPath();ctx.moveTo(0,axisY+.5);ctx.lineTo(w,axisY+.5);ctx.stroke();
   if(level===0)drawLevel0(startMs,endMs,w,axisY);
@@ -1612,51 +1633,64 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- *//* ------------------- MAGNETIC SPACE ------------------- */
 function foregroundStoryRoles(raw){
-  const hero=active;
+  const hero=nearestMemoryToTime(timeCenter);
   if(hero==null||!data[hero])return [];
 
-  const heroRaw=raw[hero];
-  const scanPerSide=18;
+  const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;
+  const scanPerSide=90;
 
   function pickSide(direction,count){
-    const options=[];
+    const readable=[];
+    const approaching=[];
+
     for(let step=1;step<=scanPerSide;step++){
       const i=hero+direction*step;
       if(i<0||i>=data.length)break;
       const q=raw[i];
       if(!q)continue;
 
-      const screenDistance=heroRaw
-        ?Math.hypot(q.x-heroRaw.x,q.y-heroRaw.y)/Math.max(W,H)
-        :1;
-      const score=step*.10+screenDistance*.72;
-      options.push({i,score,step});
+      const onScreen=
+        q.x>-34&&q.x<W+34&&
+        q.y>timelineBottom-18&&q.y<H+44;
+      const nearScreen=
+        q.x>-W*.32&&q.x<W*1.32&&
+        q.y>timelineBottom-110&&q.y<H+135;
+
+      if(onScreen)readable.push({i,step});
+      else if(nearScreen)approaching.push({i,step});
+
+      if(readable.length>=count)break;
     }
-    options.sort((a,b)=>a.score-b.score||a.step-b.step);
-    return options.slice(0,count).map(v=>v.i);
+
+    return [...readable,...approaching]
+      .sort((a,b)=>a.step-b.step)
+      .slice(0,count)
+      .map(v=>v.i);
   }
 
-  const supports=[
-    ...pickSide(-1,2),
-    ...pickSide(1,2)
-  ].filter((i,pos,arr)=>i!==hero&&arr.indexOf(i)===pos);
+  const before=pickSide(-1,2);
+  const after=pickSide(1,2);
+  const supports=[...before,...after]
+    .filter((i,pos,arr)=>i!==hero&&arr.indexOf(i)===pos);
 
-  // Keep the support order chronologically close to the needle-led hero.
-  supports.sort((a,b)=>
-    Math.abs(data[a].ms-data[hero].ms)-Math.abs(data[b].ms-data[hero].ms)
-  );
-
-  const roles=[hero,...supports];
-
-  // At the very beginning/end of a life one side may have fewer stories.
-  // Fill any missing readable slots from the nearest chronological records.
-  for(let step=1;roles.length<5&&step<data.length;step++){
-    for(const i of [hero-step,hero+step]){
-      if(i>=0&&i<data.length&&!roles.includes(i))roles.push(i);
-      if(roles.length>=5)break;
+  // Fill edge cases from the nearest chronological neighbours that are still
+  // in the broad approach zone. They retain their real projected path and fade.
+  if(supports.length<4){
+    for(let step=1;step<=scanPerSide&&supports.length<4;step++){
+      for(const i of [hero-step,hero+step]){
+        if(i<0||i>=data.length||supports.includes(i))continue;
+        const q=raw[i];
+        if(!q)continue;
+        const nearScreen=
+          q.x>-W*.42&&q.x<W*1.42&&
+          q.y>timelineBottom-135&&q.y<H+165;
+        if(nearScreen)supports.push(i);
+        if(supports.length>=4)break;
+      }
     }
   }
-  return roles.slice(0,5);
+
+  return [hero,...supports.slice(0,4)];
 }
 
 function visibleBudgetForScale(){
@@ -1827,7 +1861,10 @@ function renderEchoField(raw,visibleSet,alpha){
     const scatterX=(fract(s.id+1301)-.5)*W*lerp(.34,.10,d);
     const scatterY=(fract(s.id+1499)-.5)*H*lerp(.22,.07,d);
     const x=W/2+(r.x-W/2)*parallax+scatterX;
-    const y=centreY+(r.y-centreY)*parallax+scatterY;
+    const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
+    const y=centreY+
+      (r.y-centreY)*parallax*echoVerticalCompensation+
+      scatterY;
 
     if(x<-95||x>W+95||y<92||y>H+100)return;
 
@@ -1844,7 +1881,7 @@ function renderEchoField(raw,visibleSet,alpha){
   for(const cand of candidates){
     if(chosen.length>=ECHO_COUNT)break;
     let tooClose=false;
-    const localGap=lerp(14,29,cand.depth);
+    const localGap=lerp(13,27,cand.depth);
     for(const p of chosen){
       if(Math.hypot(cand.x-p.x,cand.y-p.y)<localGap){tooClose=true;break}
     }
@@ -1972,13 +2009,13 @@ function render(){
     // Exactly one story leads the scene. Four chronological neighbours remain
     // readable; everything else supports the wider photo universe.
     let scale=lerp(.72,1.02,depth);
-    const rankScale=[1.38,1.06,1.04,1.02,1.00,.87][Math.min(rank,5)]||.87;
+    const rankScale=[1.46,1.12,1.10,1.08,1.06,.87][Math.min(rank,5)]||.87;
     scale*=rankScale;
     const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
     scale*=lerp(.86,1,smooth(.08,.92,edgeReveal));
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
-    scale=clamp(scale,.64,1.34);
+    scale=clamp(scale,.64,1.44);
 
     const el=memoryNode(i,true);
     if(opacity>.025)ensureCardImage(i);

@@ -27,6 +27,11 @@ button{font:inherit;color:inherit}
 #spaceCanvas{position:absolute;z-index:1;inset:0;width:100%;height:100%;pointer-events:none}
 #world{position:absolute;z-index:2;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
 
+#farEchoLayer{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.farMemoryEcho{position:absolute;width:46px;height:34px;border-radius:5px;overflow:hidden;background:#1b2d38;border:1px solid rgba(255,255,255,.14);box-shadow:0 3px 12px rgba(0,0,0,.12),0 0 14px rgba(129,184,213,.08);will-change:transform,opacity;opacity:0;transform-origin:center}
+.farMemoryEcho img{width:100%;height:100%;object-fit:cover;filter:saturate(1.12) brightness(1.03) contrast(1.08)}
+.farMemoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.03))}
+
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.19);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 20px rgba(129,184,213,.10);will-change:transform,opacity;opacity:0;transform-origin:center}
 .memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.03px) saturate(1.08) brightness(1.02) contrast(1.05)}
@@ -107,7 +112,7 @@ button{font:inherit;color:inherit}
 <div id="app">
   <div id="bg"></div>
   <canvas id="spaceCanvas" aria-hidden="true"></canvas>
-  <div id="world"><div id="echoLayer"></div><div id="magnetDebug"><div id="magnetRing"></div></div></div>
+  <div id="world"><div id="farEchoLayer"></div><div id="echoLayer"></div><div id="magnetDebug"><div id="magnetRing"></div></div></div>
 
   <div id="presentation">
     <img id="presentationImg" alt="">
@@ -135,7 +140,7 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 
 
 
-const app=document.getElementById("app"),world=document.getElementById("world"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg"),spaceCanvas=document.getElementById("spaceCanvas"),spaceCtx=spaceCanvas.getContext("2d");
+const app=document.getElementById("app"),world=document.getElementById("world"),farEchoLayer=document.getElementById("farEchoLayer"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg"),spaceCanvas=document.getElementById("spaceCanvas"),spaceCtx=spaceCanvas.getContext("2d");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
 const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
 const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
@@ -763,6 +768,13 @@ function preloadNearbyMemories(){
 
 const ECHO_REFERENCE_RATIO=1.25;
 const ECHO_DENSITY_FACTOR=clamp(ELLIPSE_VERTICAL_RATIO/ECHO_REFERENCE_RATIO,1,1.22);
+
+// Three visual depth bands. The front cards use the full camera motion.
+// The middle layer moves at 70%, while the tiny far layer moves at 30%.
+const FOREGROUND_PARALLAX=1.00;
+const MIDDLE_PARALLAX=.70;
+const FAR_PARALLAX=.30;
+
 const ECHO_COUNT=Math.round(96*ECHO_DENSITY_FACTOR);
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
@@ -772,6 +784,16 @@ const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   return el;
 });
 const echoAssignments=new Array(ECHO_COUNT).fill(-1);
+
+const FAR_ECHO_COUNT=7;
+const farEchoNodes=Array.from({length:FAR_ECHO_COUNT},()=>{
+  const el=document.createElement("div");
+  el.className="farMemoryEcho";
+  el.innerHTML='<img alt="">';
+  farEchoLayer.appendChild(el);
+  return el;
+});
+const farEchoAssignments=new Array(FAR_ECHO_COUNT).fill(-1);
 
 
 let W=1,H=1;
@@ -1633,7 +1655,10 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- *//* ------------------- MAGNETIC SPACE ------------------- */
 function foregroundStoryRoles(raw){
-  const hero=nearestMemoryToTime(timeCenter);
+  // The story that is actually closest to the current space focus becomes the
+  // large foreground card immediately. This makes the big photo "pop" sooner
+  // while the timeline still limits which period can become active.
+  const hero=(active!=null&&data[active])?active:nearestMemoryToTime(timeCenter);
   if(hero==null||!data[hero])return [];
 
   const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;
@@ -1855,15 +1880,14 @@ function renderEchoField(raw,visibleSet,alpha){
     const r=raw[i];
     const d=clamp(r.depth,0,1);
 
-    // Far memories move less and are gently spread sideways/up-down. That makes
-    // them read as layers in space instead of as one dark flat curtain.
-    const parallax=lerp(.34,.92,d);
-    const scatterX=(fract(s.id+1301)-.5)*W*lerp(.34,.10,d);
-    const scatterY=(fract(s.id+1499)-.5)*H*lerp(.22,.07,d);
-    const x=W/2+(r.x-W/2)*parallax+scatterX;
+    // Middle depth band: deliberately slower than the foreground.
+    // Front : middle = 10 : 7.
+    const scatterX=(fract(s.id+1301)-.5)*W*lerp(.26,.08,d);
+    const scatterY=(fract(s.id+1499)-.5)*H*lerp(.17,.05,d);
+    const x=W/2+(r.x-W/2)*MIDDLE_PARALLAX+scatterX;
     const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
     const y=centreY+
-      (r.y-centreY)*parallax*echoVerticalCompensation+
+      (r.y-centreY)*MIDDLE_PARALLAX*echoVerticalCompensation+
       scatterY;
 
     if(x<-95||x>W+95||y<92||y>H+100)return;
@@ -1950,6 +1974,78 @@ function renderEchoField(raw,visibleSet,alpha){
       ?"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(227,166,118,"+(0.035+.06*d).toFixed(3)+")"
       :"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(122,184,216,"+(0.04+.07*d).toFixed(3)+")";
   }
+
+  return new Set(chosen.map(c=>c.i));
+}
+
+function renderFarEchoField(raw,visibleSet,middleSet,alpha){
+  const centreY=H*.54;
+  const candidates=[];
+
+  data.forEach((s,i)=>{
+    if(visibleSet.has(i)||middleSet.has(i))return;
+    const r=raw[i];
+    const d=clamp(r.depth,0,1);
+
+    // Third layer: tiny photographic "stars". They retain real image colour,
+    // but travel at only 30% of the foreground motion.
+    const scatterX=(fract(s.id+3109)-.5)*W*.54;
+    const scatterY=(fract(s.id+3251)-.5)*H*.42;
+    const x=W/2+(r.x-W/2)*FAR_PARALLAX+scatterX;
+    const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
+    const y=centreY+
+      (r.y-centreY)*FAR_PARALLAX*echoVerticalCompensation+
+      scatterY;
+
+    if(x<-60||x>W+60||y<100||y>H+60)return;
+
+    const temporal=Math.exp(-.5*Math.pow(
+      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*2.2,365*DAY*8),2
+    ));
+    const farBias=1-d;
+    const score=farBias*.46+temporal*.20+.22*(1-s.representative)+.12*fract(s.id+3413);
+    candidates.push({i,score,x,y,depth:d});
+  });
+
+  candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
+
+  const chosen=[];
+  for(const cand of candidates){
+    if(chosen.length>=FAR_ECHO_COUNT)break;
+    let tooClose=false;
+    for(const p of chosen){
+      if(Math.hypot(cand.x-p.x,cand.y-p.y)<52){tooClose=true;break}
+    }
+    if(!tooClose)chosen.push(cand);
+  }
+
+  for(let slot=0;slot<FAR_ECHO_COUNT;slot++){
+    const el=farEchoNodes[slot],cand=chosen[slot];
+    if(!cand){
+      el.style.opacity="0";
+      farEchoAssignments[slot]=-1;
+      continue;
+    }
+
+    const s=data[cand.i];
+    if(farEchoAssignments[slot]!==cand.i){
+      farEchoAssignments[slot]=cand.i;
+      const img=el.querySelector("img");
+      img.src=thumbUrl(s);
+      img.decoding="async";
+    }
+
+    const d=clamp(cand.depth,0,1);
+    const random=.86+.28*fract(s.id+3511);
+    const size=lerp(.42,.68,d)*random;
+    const opacity=(1-alpha)*lerp(.22,.32,d);
+
+    const img=el.querySelector("img");
+    img.style.filter="blur(.02px) saturate(1.12) brightness(1.03) contrast(1.08)";
+    el.style.opacity=clamp(opacity,.16,.31).toFixed(3);
+    el.style.transform="translate3d("+(cand.x-23)+"px,"+(cand.y-17)+"px,0) scale("+size.toFixed(3)+")";
+    el.style.zIndex="1";
+  }
 }
 
 function render(){
@@ -1981,7 +2077,8 @@ function render(){
 
   const foregroundRoles=foregroundStoryRoles(raw);
   const visibleSet=chooseVisibleRepresentatives(raw,alpha,foregroundRoles);
-  renderEchoField(raw,visibleSet,alpha);
+  const middleSet=renderEchoField(raw,visibleSet,alpha);
+  renderFarEchoField(raw,visibleSet,middleSet,alpha);
   chooseMagneticSet(raw,alpha);
   const composed=composeForeground(raw,visibleSet);
 

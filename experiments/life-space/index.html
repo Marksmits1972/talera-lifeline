@@ -454,12 +454,30 @@ const GOLDEN_ANGLE=2.399963229728653;
 // into the same physical space. 150 memories is the current reference density.
 const WORLD_REFERENCE_COUNT=150;
 const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,10);
-const SPHERE_RADIUS=395*WORLD_DENSITY_SCALE;
+const SHELL_REFERENCE_RADIUS=395;
+const SPHERE_RADIUS=SHELL_REFERENCE_RADIUS*WORLD_DENSITY_SCALE;
+const TAU=Math.PI*2;
+const GLOBE_CIRCUMFERENCE=TAU*SPHERE_RADIUS;
 
-// Direct manipulation is tied to distance travelled over the outer photo shell,
-// not to a fixed angular rotation. A larger world therefore rotates fewer
-// radians for the same finger movement; a smaller world rotates more.
-const SHELL_ANGULAR_GAIN=1/Math.sqrt(WORLD_DENSITY_SCALE);
+// Human input is defined as distance travelled over the outer photo shell.
+// Circumference is only used afterwards to translate that distance into the
+// internal sphere rotation required by the current world size.
+function shellDistanceToRotation(distance){
+  return (distance/GLOBE_CIRCUMFERENCE)*TAU;
+}
+function rotationToShellDistance(rotation){
+  return (rotation/TAU)*GLOBE_CIRCUMFERENCE;
+}
+
+// Ergonomic finger->surface calibration. These are surface-distance values,
+// not angular values and therefore do not change with the amount of memories.
+const SHELL_DRAG_X_PER_PX=2.455;
+const SHELL_DRAG_Y_PER_PX=1.698;
+const SHELL_MAX_COAST_X=2.95;
+const SHELL_MAX_COAST_Y=.15;
+const SHELL_STOP_SPEED=.020;
+const SHELL_COAST_DECAY_MS=480;
+const SHELL_TIME_DECAY_MS=180;
 
 // Time stays chronologically correct, but visually empty eras take less room on
 // the globe. This keeps a sparse life compact while a dense life naturally grows.
@@ -639,17 +657,51 @@ function ensureCardImage(i){
   }
 }
 
-function preloadNearbyMemories(){
-  // Only preload a very small neighbourhood while the user is searching slowly.
-  // Fast travel performs no speculative photo loading.
-  const movingFast=touch&&touch.kind==="one"&&(touch.dragSpeed||0)>.18;
-  if(movingFast)return;
-
-  const centre=nearestMemoryToTime(timeCenter);
-  for(let d=1;d<=4;d++){
-    preloadThumb(centre-d);
-    preloadThumb(centre+d);
+let lastShellPreloadAt=0;
+function currentShellVelocity(){
+  if(touch&&touch.kind==="one"){
+    return{x:touch.vShellLon||0,y:touch.vShellLat||0};
   }
+  if(globeInertiaRaf){
+    return{x:globeMomentumShellLon||0,y:globeMomentumShellLat||0};
+  }
+  return{x:0,y:0};
+}
+
+function preloadNearbyMemories(){
+  const now=performance.now();
+  if(now-lastShellPreloadAt<140)return;
+  lastShellPreloadAt=now;
+
+  const velocity=currentShellVelocity();
+  const speed=Math.hypot(velocity.x,velocity.y);
+  const lookAhead=clamp(220+speed*620,220,1500);
+  const moving=speed>.035;
+  const candidates=[];
+
+  data.forEach((s,i)=>{
+    if(preloadedThumbs.has(i))return;
+
+    const dx=rotationToShellDistance(wrapLon(s.lon-cam.x));
+    const dy=rotationToShellDistance(s.lat-cam.y);
+    const distance=Math.hypot(dx,dy);
+    if(distance>lookAhead)return;
+
+    // During motion, favor memories lying ahead on the current surface path.
+    // At rest, simply warm a small local ring around the user's position.
+    let forward=1;
+    if(moving){
+      forward=(dx*velocity.x+dy*velocity.y)/(Math.max(.001,distance*speed));
+      if(forward<-.12)return;
+    }
+
+    const timePenalty=Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs(),365*DAY);
+    const score=distance/lookAhead+timePenalty*.16-(moving?forward*.30:0);
+    candidates.push({i,score});
+  });
+
+  candidates.sort((a,b)=>a.score-b.score);
+  for(let n=0;n<Math.min(6,candidates.length);n++)preloadThumb(candidates[n].i);
 }
 
 
@@ -749,8 +801,9 @@ function nearestMemoryToFocus(){
   let best=candidates[0].i,score=Infinity;
   for(const v of candidates){
     const temporal=v.dt/Math.max(DAY,windowMs);
-    const angular=angularDistanceToCamera(v.s)/Math.PI;
-    const q=temporal*3.4+angular*.42;
+    const shellDistance=rotationToShellDistance(angularDistanceToCamera(v.s));
+    const shellProximity=clamp(shellDistance/(Math.PI*SHELL_REFERENCE_RADIUS),0,4);
+    const q=temporal*3.4+shellProximity*.42;
     if(q<score){score=q;best=v.i}
   }
   return best;
@@ -1864,7 +1917,7 @@ window.visualViewport&&visualViewport.addEventListener("resize",resize,{passive:
 /* ------------------- LIFE GLOBE TOUCH ------------------- */
 let touch=null;
 let globeInertiaRaf=0;
-let globeMomentumLon=0,globeMomentumLat=0;
+let globeMomentumShellLon=0,globeMomentumShellLat=0;
 
 function localTouch(t){const r=app.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top}}
 function dist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
@@ -1886,41 +1939,39 @@ function stopGlobeInertia(keepMomentum=false){
   cancelAnimationFrame(globeInertiaRaf);
   globeInertiaRaf=0;
   if(!keepMomentum){
-    globeMomentumLon=0;
-    globeMomentumLat=0;
+    globeMomentumShellLon=0;
+    globeMomentumShellLat=0;
   }
 }
 
-function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
+function startGlobeInertia(vShellLon,vShellLat,carryShellLon=0,carryShellLat=0){
   stopGlobeInertia();
   if(cam.s>=SWIPE_SPACE)return;
 
-  const shellLon=Math.abs(vLon)/SHELL_ANGULAR_GAIN;
-  const shellLat=Math.abs(vLat)/SHELL_ANGULAR_GAIN;
-  const launchIntent=clamp(Math.hypot(shellLon/.0068,shellLat/.0047),0,1.2);
+  // Convert surface speed back to the equivalent finger speed only for the
+  // existing "travel vs precise search" intent. World size never enters here.
+  const fingerEqX=Math.abs(vShellLon)/SHELL_DRAG_X_PER_PX;
+  const fingerEqY=Math.abs(vShellLat)/SHELL_DRAG_Y_PER_PX;
+  const launchIntent=clamp(Math.hypot(fingerEqX,fingerEqY),0,1.2);
   syncTimelineVisualFromSpace(launchIntent,34,performance.now());
 
-  // Speed should be visible in the photo field, not explode the life date.
-  // Boost and carry are judged by shell speed, while angular speed automatically
-  // shrinks as the world radius grows.
-  const freshLon=shellLon;
-  const launchBoost=lerp(1,1.42,smooth(.00055,.0027,freshLon));
-  vLon*=launchBoost;
+  // A deliberate flick may add energy, but that energy is measured entirely
+  // in shell distance per millisecond.
+  const launchBoost=lerp(1,1.42,smooth(.09,.44,fingerEqX));
+  vShellLon*=launchBoost;
 
-  const shellCarryLon=Math.abs(carryLon)/SHELL_ANGULAR_GAIN;
-  if(shellCarryLon>.00002&&Math.sign(carryLon)===Math.sign(vLon)){
-    const carryStrength=.78*smooth(.00010,.0028,shellCarryLon);
-    vLon+=carryLon*carryStrength;
+  const carryEq=Math.abs(carryShellLon)/SHELL_DRAG_X_PER_PX;
+  if(carryEq>.016&&Math.sign(carryShellLon)===Math.sign(vShellLon)){
+    const carryStrength=.78*smooth(.016,.45,carryEq);
+    vShellLon+=carryShellLon*carryStrength;
   }
 
-  // Vertical inertia is deliberately conservative: north/south is life time.
-  // Limits are shell-relative too, so a large globe does not gain a faster coast.
-  vLon=clamp(vLon,-.0074*SHELL_ANGULAR_GAIN,.0074*SHELL_ANGULAR_GAIN);
-  vLat=clamp(vLat,-.00038*SHELL_ANGULAR_GAIN,.00038*SHELL_ANGULAR_GAIN);
-  if(Math.hypot(vLon,vLat)<.000055*SHELL_ANGULAR_GAIN)return;
+  vShellLon=clamp(vShellLon,-SHELL_MAX_COAST_X,SHELL_MAX_COAST_X);
+  vShellLat=clamp(vShellLat,-SHELL_MAX_COAST_Y,SHELL_MAX_COAST_Y);
+  if(Math.hypot(vShellLon,vShellLat)<SHELL_STOP_SPEED)return;
 
-  globeMomentumLon=vLon;
-  globeMomentumLat=vLat;
+  globeMomentumShellLon=vShellLon;
+  globeMomentumShellLat=vShellLat;
 
   let last=performance.now();
   let lived=0;
@@ -1929,36 +1980,39 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
     const dt=clamp(now-last,8,34);
     last=now;lived+=dt;
 
-    cam.x=wrapLon(cam.x+globeMomentumLon*dt);
+    // First travel a distance over the shell; circumference then determines
+    // the internal rotation necessary to realize exactly that travel.
+    const lonTravel=globeMomentumShellLon*dt;
+    const latTravel=globeMomentumShellLat*dt;
+    cam.x=wrapLon(cam.x+shellDistanceToRotation(lonTravel));
 
-    const wantedY=cam.y+globeMomentumLat*dt;
+    const wantedY=cam.y+shellDistanceToRotation(latTravel);
     const nextY=clampCamY(wantedY);
-    if(nextY!==wantedY)globeMomentumLat=0;
+    if(nextY!==wantedY)globeMomentumShellLat=0;
     cam.y=nextY;
 
     syncTimeFromSpace();
     render();
 
-    // Horizontal rolling keeps the familiar brake; time-axis momentum damps
-    // more quickly so browsing remains controllable.
-    globeMomentumLon*=Math.exp(-dt/480);
-    globeMomentumLat*=Math.exp(-dt/180);
+    // Surface friction is size-independent. The resulting angular braking is
+    // automatically stronger or weaker because circumference handles conversion.
+    globeMomentumShellLon*=Math.exp(-dt/SHELL_COAST_DECAY_MS);
+    globeMomentumShellLat*=Math.exp(-dt/SHELL_TIME_DECAY_MS);
 
-    if(lived<1500&&Math.hypot(globeMomentumLon,globeMomentumLat)>.000020*SHELL_ANGULAR_GAIN){
+    if(lived<2600&&Math.hypot(globeMomentumShellLon,globeMomentumShellLat)>SHELL_STOP_SPEED){
       globeInertiaRaf=requestAnimationFrame(frame);
     }else{
       globeInertiaRaf=0;
-      globeMomentumLon=0;
-      globeMomentumLat=0;
+      globeMomentumShellLon=0;
+      globeMomentumShellLat=0;
     }
   }
   globeInertiaRaf=requestAnimationFrame(frame);
 }
-
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
-  const carryLon=globeInertiaRaf?globeMomentumLon:0;
-  const carryLat=0;
+  const carryShellLon=globeInertiaRaf?globeMomentumShellLon:0;
+  const carryShellLat=0;
   stopGlobeInertia(true);
   e.preventDefault();hint.style.display="none";
 
@@ -1975,9 +2029,9 @@ app.addEventListener("touchstart",e=>{
       tapTarget,
       travel:0,
       lastT:performance.now(),
-      vLon:0,vLat:0,
+      vShellLon:0,vShellLat:0,
       dragSpeed:0,
-      carryLon,carryLat
+      carryShellLon,carryShellLat
     };
   }else if(e.touches.length>=2){
     if(cam.s<SWIPE_SPACE){
@@ -2061,7 +2115,6 @@ app.addEventListener("touchmove",e=>{
       const dt=clamp(now-touch.lastT,8,48);
       const dx=p.x-touch.last.x,dy=p.y-touch.last.y;
       const nav=1/Math.max(.60,cam.s);
-      const contentFactor=Math.sqrt(330/SPHERE_RADIUS);
 
       // One gesture, three natural gears:
       // slow = precision under the thumb, normal = direct navigation,
@@ -2078,16 +2131,17 @@ app.addEventListener("touchmove",e=>{
       const horizontalGain=lerp(.56,1.06,gear)*lerp(1,.76,precisionWeight);
       const verticalGain=lerp(.16,.72,gear)*lerp(1,.60,precisionWeight);
 
-      const dLon=-dx*.0068*nav*contentFactor*horizontalGain*SHELL_ANGULAR_GAIN;
-      const dLat=dy*.0047*nav*contentFactor*verticalGain*SHELL_ANGULAR_GAIN;
+      // The finger moves a concrete distance over the outer shell. Only after
+      // that do we ask the current circumference how much sphere rotation it needs.
+      const dShellLon=-dx*SHELL_DRAG_X_PER_PX*nav*horizontalGain;
+      const dShellLat=dy*SHELL_DRAG_Y_PER_PX*nav*verticalGain;
+      cam.x=wrapLon(cam.x+shellDistanceToRotation(dShellLon));
+      cam.y=clampCamY(cam.y+shellDistanceToRotation(dShellLat));
 
-      cam.x=wrapLon(cam.x+dLon);
-      cam.y=clampCamY(cam.y+dLat);
-
-      const instLon=dLon/dt,instLat=dLat/dt;
+      const instShellLon=dShellLon/dt,instShellLat=dShellLat/dt;
       const velocityAlpha=1-Math.exp(-dt/62);
-      touch.vLon=lerp(touch.vLon,instLon,velocityAlpha);
-      touch.vLat=lerp(touch.vLat,instLat,velocityAlpha);
+      touch.vShellLon=lerp(touch.vShellLon,instShellLon,velocityAlpha);
+      touch.vShellLat=lerp(touch.vShellLat,instShellLat,velocityAlpha);
 
       syncTimeFromSpace();
       render();
@@ -2112,14 +2166,14 @@ app.addEventListener("touchend",e=>{
     touch=null;spatialPinchTarget=null;spatialPinchStrength=0;
 
     if(moved<=14&&finished.tapTarget!=null){
-      globeMomentumLon=0;globeMomentumLat=0;
+      globeMomentumShellLon=0;globeMomentumShellLat=0;
       openStorySmooth(finished.tapTarget);
       return;
     }
 
     render();
-    if(moved>7)startGlobeInertia(finished.vLon,finished.vLat,finished.carryLon||0,finished.carryLat||0);
-    else{globeMomentumLon=0;globeMomentumLat=0}
+    if(moved>7)startGlobeInertia(finished.vShellLon,finished.vShellLat,finished.carryShellLon||0,finished.carryShellLat||0);
+    else{globeMomentumShellLon=0;globeMomentumShellLat=0}
     return;
   }
 

@@ -1633,64 +1633,61 @@ function drawTimeline(){
 
 /* ------------------- MAGNETIC SPACE ------------------- *//* ------------------- MAGNETIC SPACE ------------------- */
 function foregroundStoryRoles(raw){
-  const hero=nearestMemoryToTime(timeCenter);
-  if(hero==null||!data[hero])return [];
+  const needleHero=nearestMemoryToTime(timeCenter);
+  if(needleHero==null||!data[needleHero])return [];
 
   const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;
   const scanPerSide=90;
 
-  function pickSide(direction,count){
-    const readable=[];
-    const approaching=[];
+  function readability(i){
+    const q=raw[i];
+    if(!q)return 0;
 
+    // A card only earns a large/readable role once its own projected centre has
+    // travelled far enough into the viewport. Until then it keeps the existing
+    // edgeReveal approach and remains a small supporting story.
+    const xIn=Math.min(
+      smooth(-16,96,q.x),
+      1-smooth(W-96,W+16,q.x)
+    );
+    const yIn=Math.min(
+      smooth(timelineBottom-20,timelineBottom+72,q.y),
+      1-smooth(H-88,H+26,q.y)
+    );
+    return clamp(Math.min(xIn,yIn),0,1);
+  }
+
+  // The memory nearest the needle remains the preferred hero, but we never
+  // enlarge it while it is still hanging off-screen. In that case the nearest
+  // chronologically adjacent story that is already readable temporarily leads.
+  let hero=needleHero;
+  if(readability(hero)<.34){
+    let best=null,bestStep=Infinity,bestRead=0;
     for(let step=1;step<=scanPerSide;step++){
-      const i=hero+direction*step;
-      if(i<0||i>=data.length)break;
-      const q=raw[i];
-      if(!q)continue;
-
-      const onScreen=
-        q.x>-34&&q.x<W+34&&
-        q.y>timelineBottom-18&&q.y<H+44;
-      const nearScreen=
-        q.x>-W*.32&&q.x<W*1.32&&
-        q.y>timelineBottom-110&&q.y<H+135;
-
-      if(onScreen)readable.push({i,step});
-      else if(nearScreen)approaching.push({i,step});
-
-      if(readable.length>=count)break;
-    }
-
-    return [...readable,...approaching]
-      .sort((a,b)=>a.step-b.step)
-      .slice(0,count)
-      .map(v=>v.i);
-  }
-
-  const before=pickSide(-1,2);
-  const after=pickSide(1,2);
-  const supports=[...before,...after]
-    .filter((i,pos,arr)=>i!==hero&&arr.indexOf(i)===pos);
-
-  // Fill edge cases from the nearest chronological neighbours that are still
-  // in the broad approach zone. They retain their real projected path and fade.
-  if(supports.length<4){
-    for(let step=1;step<=scanPerSide&&supports.length<4;step++){
-      for(const i of [hero-step,hero+step]){
-        if(i<0||i>=data.length||supports.includes(i))continue;
-        const q=raw[i];
-        if(!q)continue;
-        const nearScreen=
-          q.x>-W*.42&&q.x<W*1.42&&
-          q.y>timelineBottom-135&&q.y<H+165;
-        if(nearScreen)supports.push(i);
-        if(supports.length>=4)break;
+      for(const i of [needleHero-step,needleHero+step]){
+        if(i<0||i>=data.length)continue;
+        const r=readability(i);
+        if(r<.46)continue;
+        if(step<bestStep||(step===bestStep&&r>bestRead)){
+          best=i;bestStep=step;bestRead=r;
+        }
       }
+      if(best!=null&&step>bestStep+3)break;
+    }
+    if(best!=null)hero=best;
+  }
+
+  const supports=[];
+  for(let step=1;step<=scanPerSide&&supports.length<4;step++){
+    for(const i of [needleHero-step,needleHero+step]){
+      if(i<0||i>=data.length||i===hero||supports.includes(i))continue;
+      if(readability(i)<.40)continue;
+      supports.push(i);
+      if(supports.length>=4)break;
     }
   }
 
-  return [hero,...supports.slice(0,4)];
+  return [hero,...supports];
 }
 
 function visibleBudgetForScale(){
@@ -1739,10 +1736,17 @@ function chooseVisibleRepresentatives(raw,alpha,foregroundRoles=[]){
   const chosen=new Set();
   if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
 
-  // Timeline hierarchy has first claim on the readable foreground:
-  // one needle-led hero plus up to four chronological neighbours.
+  // Timeline hierarchy has first claim only for stories that have genuinely
+  // reached the readable viewport. Chronological neighbours outside it stay on
+  // their natural projected path instead of being forced onto an edge.
+  const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;
   for(const i of foregroundRoles){
-    if(i!=null&&data[i])chosen.add(i);
+    const r=raw[i];
+    if(i==null||!data[i]||!r)continue;
+    const readable=
+      r.x>-42&&r.x<W+42&&
+      r.y>timelineBottom-36&&r.y<H+58;
+    if(readable)chosen.add(i);
   }
 
   // Hysteresis for the clear foreground: once a photo has earned a place,
@@ -2010,10 +2014,11 @@ function render(){
     // readable; everything else supports the wider photo universe.
     let scale=lerp(.72,1.02,depth);
     const rankScale=[1.56,1.20,1.18,1.16,1.14,.87][Math.min(rank,5)]||.87;
-    scale*=rankScale;
+    const roleGrowth=smooth(.30,.84,edgeReveal);
+    scale*=lerp(1,rankScale,roleGrowth);
     const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
-    scale*=lerp(.86,1,smooth(.08,.92,edgeReveal));
+    scale*=lerp(.84,1,smooth(.08,.92,edgeReveal));
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
     scale=clamp(scale,.64,1.54);
 

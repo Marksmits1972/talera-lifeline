@@ -27,6 +27,11 @@ button{font:inherit;color:inherit}
 #spaceCanvas{position:absolute;z-index:1;inset:0;width:100%;height:100%;pointer-events:none}
 #world{position:absolute;z-index:2;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
 
+#deepEchoLayer{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.memoryStar{position:absolute;width:34px;height:25px;border-radius:5px;overflow:hidden;background:#1a2a33;border:1px solid rgba(255,255,255,.10);box-shadow:0 3px 12px rgba(0,0,0,.14),0 0 16px rgba(126,184,214,.07);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryStar img{width:100%;height:100%;object-fit:cover;filter:blur(.22px) saturate(.88) brightness(.86)}
+.memoryStar:after{content:"";position:absolute;inset:0;background:rgba(12,26,35,.08)}
+
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.15);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 20px rgba(129,184,213,.10);will-change:transform,opacity;opacity:0;transform-origin:center}
 .memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.06px) saturate(1) brightness(1)}
@@ -107,7 +112,7 @@ button{font:inherit;color:inherit}
 <div id="app">
   <div id="bg"></div>
   <canvas id="spaceCanvas" aria-hidden="true"></canvas>
-  <div id="world"><div id="echoLayer"></div><div id="magnetDebug"><div id="magnetRing"></div></div></div>
+  <div id="world"><div id="deepEchoLayer"></div><div id="echoLayer"></div><div id="magnetDebug"><div id="magnetRing"></div></div></div>
 
   <div id="presentation">
     <img id="presentationImg" alt="">
@@ -135,7 +140,7 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 
 
 
-const app=document.getElementById("app"),world=document.getElementById("world"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg"),spaceCanvas=document.getElementById("spaceCanvas"),spaceCtx=spaceCanvas.getContext("2d");
+const app=document.getElementById("app"),world=document.getElementById("world"),deepEchoLayer=document.getElementById("deepEchoLayer"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg"),spaceCanvas=document.getElementById("spaceCanvas"),spaceCtx=spaceCanvas.getContext("2d");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
 const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
 const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
@@ -763,6 +768,16 @@ function preloadNearbyMemories(){
 
 const ECHO_REFERENCE_RATIO=1.25;
 const ECHO_DENSITY_FACTOR=clamp(ELLIPSE_VERTICAL_RATIO/ECHO_REFERENCE_RATIO,1,1.22);
+const DEEP_ECHO_COUNT=6;
+const deepEchoNodes=Array.from({length:DEEP_ECHO_COUNT},(_,slot)=>{
+  const el=document.createElement("div");
+  el.className="memoryStar";
+  el.innerHTML='<img alt="">';
+  deepEchoLayer.appendChild(el);
+  return el;
+});
+const deepEchoAssignments=new Array(DEEP_ECHO_COUNT).fill(-1);
+
 const ECHO_COUNT=Math.round(96*ECHO_DENSITY_FACTOR);
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
@@ -1850,6 +1865,98 @@ function chooseMagneticSet(){
 }
 function pullToViewport(p){return{x:p.x,y:p.y,magnetic:false}}
 
+function renderDeepEchoField(raw,visibleSet,alpha){
+  const candidates=[];
+  const centreY=H*.54;
+  const occupied=new Set(echoAssignments.filter(i=>i>=0));
+
+  data.forEach((s,i)=>{
+    if(visibleSet.has(i)||occupied.has(i))return;
+    const r=raw[i];
+    const d=clamp(r.depth,0,1);
+
+    // This shell sits deliberately much farther away than the normal echoes.
+    // Low parallax makes the images drift with the world like photographic stars.
+    const parallax=lerp(.12,.28,d);
+    const scatterX=(fract(s.id+3101)-.5)*W*.34;
+    const scatterY=(fract(s.id+3299)-.5)*H*.28;
+    const x=W/2+(r.x-W/2)*parallax+scatterX;
+    const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
+    const y=centreY+
+      (r.y-centreY)*parallax*echoVerticalCompensation+
+      scatterY;
+
+    if(x<-40||x>W+40||y<105||y>H+55)return;
+
+    const temporal=Math.exp(-.5*Math.pow(
+      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*2.8,365*DAY*9),2
+    ));
+    const far=1-d;
+    const score=far*.50+temporal*.16+.34*fract(s.id+3541);
+    candidates.push({i,score,x,y,depth:d});
+  });
+
+  candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
+
+  const chosen=[];
+  for(const cand of candidates){
+    if(chosen.length>=DEEP_ECHO_COUNT)break;
+    let tooClose=false;
+    for(const p of chosen){
+      if(Math.hypot(cand.x-p.x,cand.y-p.y)<62){tooClose=true;break}
+    }
+    if(!tooClose)chosen.push(cand);
+  }
+
+  const chosenById=new Map(chosen.map(c=>[c.i,c]));
+  const slots=new Array(DEEP_ECHO_COUNT).fill(null);
+  const used=new Set();
+
+  // Preserve assignments when possible so the far stars never flicker.
+  for(let slot=0;slot<DEEP_ECHO_COUNT;slot++){
+    const current=deepEchoAssignments[slot];
+    const cand=chosenById.get(current);
+    if(cand){
+      slots[slot]=cand;
+      used.add(current);
+    }
+  }
+
+  let next=0;
+  for(let slot=0;slot<DEEP_ECHO_COUNT;slot++){
+    if(slots[slot])continue;
+    while(next<chosen.length&&used.has(chosen[next].i))next++;
+    if(next<chosen.length){
+      slots[slot]=chosen[next];
+      used.add(chosen[next].i);
+      next++;
+    }
+  }
+
+  for(let slot=0;slot<DEEP_ECHO_COUNT;slot++){
+    const el=deepEchoNodes[slot],cand=slots[slot];
+    if(!cand){
+      el.style.opacity="0";
+      deepEchoAssignments[slot]=-1;
+      continue;
+    }
+
+    const s=data[cand.i];
+    if(deepEchoAssignments[slot]!==cand.i){
+      deepEchoAssignments[slot]=cand.i;
+      el.querySelector("img").src=thumbUrl(s);
+    }
+
+    const random=.70+.38*fract(s.id+3701);
+    const size=lerp(.62,.88,clamp(cand.depth,0,1))*random;
+    const op=(1-alpha)*(.12+.10*fract(s.id+3889));
+    el.style.opacity=clamp(op,.07,.21).toFixed(3);
+    el.style.transform=
+      "translate3d("+(cand.x-17)+"px,"+(cand.y-12.5)+"px,0) scale("+size.toFixed(3)+")";
+    el.style.zIndex="1";
+  }
+}
+
 function renderEchoField(raw,visibleSet,alpha){
   const candidates=[];
   const centreY=H*.54;
@@ -1980,6 +2087,7 @@ function render(){
   const foregroundRoles=foregroundStoryRoles(raw);
   const visibleSet=chooseVisibleRepresentatives(raw,alpha,foregroundRoles);
   renderEchoField(raw,visibleSet,alpha);
+  renderDeepEchoField(raw,visibleSet,alpha);
   chooseMagneticSet(raw,alpha);
   const composed=composeForeground(raw,visibleSet);
 

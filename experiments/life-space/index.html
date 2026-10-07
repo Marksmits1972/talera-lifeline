@@ -788,7 +788,7 @@ const MIDDLE_CAMERA_RATE_Y=.30;
 const FAR_CAMERA_RATE_X=.26;
 const FAR_CAMERA_RATE_Y=.22;
 
-const ECHO_COUNT=Math.round(96*ECHO_DENSITY_FACTOR);
+const ECHO_COUNT=14;
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   const el=document.createElement("div");
   el.className="memoryEcho";
@@ -819,6 +819,7 @@ let timelineSpanYears=15;
 let timelineUser=false;
 let lastMagneticIds=new Set(),magneticIds=new Set();
 let renderedCards=new Map();
+let renderedEchoCards=new Map();
 let stableForegroundSet=new Set();
 let foregroundLastRoleRank=new Map();
 let stableHeroIndex=null;
@@ -1031,11 +1032,17 @@ function focusStory(i){
   cam.x=data[active].lon;cam.y=data[active].lat;cam.s=SPACE_MAX;
   setBg(active);hint.style.display="none";render();
 }
+function echoNodeForMemory(i){
+  const slot=echoAssignments.indexOf(i);
+  return slot>=0?echoNodes[slot]:null;
+}
+
 function openStorySmooth(i){
   const targetIndex=clamp(i,0,data.length-1);
   const target=data[targetIndex];
-  const source=memoryNode(targetIndex,false);
-  if(!target||!source)return;
+  if(!target)return;
+  const source=memoryNode(targetIndex,false)||echoNodeForMemory(targetIndex);
+  if(!source){focusStory(targetIndex);return;}
 
   stopGlobeInertia();
   cancelAnimationFrame(storyOpenRaf);
@@ -2036,53 +2043,64 @@ function chooseMagneticSet(){
 }
 function pullToViewport(p){return{x:p.x,y:p.y,magnetic:false}}
 
+function chronologicalLayerIndices(excluded,beforeCount,afterCount,targetTotal=beforeCount+afterCount){
+  const blocked=excluded instanceof Set?excluded:new Set(excluded||[]);
+  const centre=nearestMemoryToTime(timeCenter);
+  const result=[];
+  const used=new Set(blocked);
+
+  function take(direction,count){
+    let taken=0;
+    for(let step=1;step<data.length&&taken<count;step++){
+      const i=centre+direction*step;
+      if(i<0||i>=data.length)continue;
+      if(used.has(i))continue;
+      used.add(i);
+      result.push(i);
+      taken++;
+    }
+  }
+
+  take(-1,beforeCount);
+  take(1,afterCount);
+
+  if(result.length<targetTotal){
+    const extras=data
+      .map((story,i)=>({i,dt:Math.abs(story.ms-timeCenter)}))
+      .filter(v=>!used.has(v.i))
+      .sort((a,b)=>a.dt-b.dt||a.i-b.i);
+    for(const extra of extras){
+      if(result.length>=targetTotal)break;
+      used.add(extra.i);
+      result.push(extra.i);
+    }
+  }
+  return result.slice(0,targetTotal);
+}
+
 function renderEchoField(raw,visibleSet,alpha){
-  const candidates=[];
+  renderedEchoCards.clear();
   const centreY=H*.54;
+  const chronologicalIds=chronologicalLayerIndices(visibleSet,7,7,ECHO_COUNT);
+  const candidates=[];
 
-  data.forEach((s,i)=>{
-    if(visibleSet.has(i))return;
-    const r=projectMemoryAt(s,middleCam.x,middleCam.y);
+  for(const i of chronologicalIds){
+    const story=data[i];
+    if(!story)continue;
+    const r=projectMemoryAt(story,middleCam.x,middleCam.y);
     const d=clamp(r.depth,0,1);
-
-    // True reverse parallax: this entire layer uses a camera that travels
-    // opposite to the foreground camera at 10% of its speed.
-    const scatterX=(fract(s.id+1301)-.5)*W*lerp(.26,.08,d);
-    const scatterY=(fract(s.id+1499)-.5)*H*lerp(.17,.05,d);
+    const scatterX=(fract(story.id+1301)-.5)*W*lerp(.26,.08,d);
+    const scatterY=(fract(story.id+1499)-.5)*H*lerp(.17,.05,d);
     const x=r.x+scatterX;
     const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
-    const y=centreY+
-      (r.y-centreY)*echoVerticalCompensation+
-      scatterY;
-
-    if(x<-95||x>W+95||y<92||y>H+100)return;
-
-    const temporal=Math.exp(-.5*Math.pow(
-      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.7,365*DAY*5),2
-    ));
-    const score=d*.44+temporal*.22+.22*(1-s.representative)+.12*fract(s.id+1781);
-    candidates.push({i,score,x,y,depth:d});
-  });
-
-  candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
-
-  const chosen=[];
-  for(const cand of candidates){
-    if(chosen.length>=ECHO_COUNT)break;
-    let tooClose=false;
-    const localGap=lerp(13,27,cand.depth);
-    for(const p of chosen){
-      if(Math.hypot(cand.x-p.x,cand.y-p.y)<localGap){tooClose=true;break}
-    }
-    if(!tooClose)chosen.push(cand);
+    const y=centreY+(r.y-centreY)*echoVerticalCompensation+scatterY;
+    candidates.push({i,x,y,depth:d});
   }
 
   const candidateById=new Map(candidates.map(c=>[c.i,c]));
   const slotCandidates=new Array(ECHO_COUNT).fill(null);
   const usedIds=new Set();
 
-  // Preserve an existing photo for as long as its real path remains in the
-  // broad candidate field. Ranking changes alone may no longer replace it.
   for(let slot=0;slot<ECHO_COUNT;slot++){
     const current=echoAssignments[slot];
     const cand=candidateById.get(current);
@@ -2092,14 +2110,13 @@ function renderEchoField(raw,visibleSet,alpha){
     }
   }
 
-  // Fill only genuinely free slots with newly chosen echoes.
   let next=0;
   for(let slot=0;slot<ECHO_COUNT;slot++){
     if(slotCandidates[slot])continue;
-    while(next<chosen.length&&usedIds.has(chosen[next].i))next++;
-    if(next<chosen.length){
-      slotCandidates[slot]=chosen[next];
-      usedIds.add(chosen[next].i);
+    while(next<candidates.length&&usedIds.has(candidates[next].i))next++;
+    if(next<candidates.length){
+      slotCandidates[slot]=candidates[next];
+      usedIds.add(candidates[next].i);
       next++;
     }
   }
@@ -2107,51 +2124,62 @@ function renderEchoField(raw,visibleSet,alpha){
   for(let slot=0;slot<ECHO_COUNT;slot++){
     const el=echoNodes[slot],cand=slotCandidates[slot];
     if(!cand){
-      el.style.opacity="0";echoAssignments[slot]=-1;continue;
+      el.style.opacity="0";
+      echoAssignments[slot]=-1;
+      continue;
     }
 
-    const s=data[cand.i];
+    const story=data[cand.i];
     if(echoAssignments[slot]!==cand.i){
       echoAssignments[slot]=cand.i;
       echoAssignmentStartedAt[slot]=performance.now();
-      el.querySelector("img").src=thumbUrl(s);
+      const img=el.querySelector("img");
+      img.src=thumbUrl(story);
+      img.decoding="async";
     }
 
     const d=clamp(cand.depth,0,1);
-    const random=.78+.44*fract(s.id+901);
+    const random=.78+.44*fract(story.id+901);
     const size=lerp(.38,1.22,d)*random;
-
-    // Distant memories must still read as photographs. Keep their small scale
-    // for depth, but preserve enough colour, contrast and image information
-    // that they never collapse into vague blue/grey patches.
-    // Match the foreground photo treatment instead of dimming this layer.
-    // Depth now comes primarily from size and motion, not from washed-out colour.
-    const op=(1-alpha)*lerp(.88,1,d)*(.98+.02*cand.score);
+    const opacity=(1-alpha)*lerp(.88,1,d);
     const assignmentAge=performance.now()-echoAssignmentStartedAt[slot];
     const assignmentReveal=smooth(0,1,assignmentAge/320);
     if(assignmentReveal<.999)requestSceneTransitionFrame();
 
     const img=el.querySelector("img");
     img.style.filter="contrast(1.07) saturate(1.045) brightness(1)";
-    el.style.opacity=(clamp(op,.82,1)*assignmentReveal).toFixed(3);
+    const finalOpacity=clamp(opacity,.82,1)*assignmentReveal;
+    el.style.opacity=finalOpacity.toFixed(3);
     el.style.borderColor="rgba(255,255,255,"+lerp(.24,.19,d).toFixed(3)+")";
     el.style.transform="translate3d("+(cand.x-31)+"px,"+(cand.y-23)+"px,0) scale("+size.toFixed(3)+")";
     el.style.zIndex=String(25+Math.round(d*118));
-    const warm=fract(s.id+2077)>.62;
+    const warm=fract(story.id+2077)>.62;
     el.style.boxShadow=warm
       ?"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(227,166,118,"+(0.035+.06*d).toFixed(3)+")"
       :"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(122,184,216,"+(0.04+.07*d).toFixed(3)+")";
+
+    if(finalOpacity>.20&&cand.x>-70&&cand.x<W+70&&cand.y>70&&cand.y<H+70){
+      renderedEchoCards.set(cand.i,{
+        x:cand.x,
+        y:cand.y,
+        opacity:finalOpacity,
+        hitRadius:clamp(29+size*12,31,46),
+        slot
+      });
+    }
   }
 
-  return new Set(chosen.map(c=>c.i));
+  return new Set(candidates.map(c=>c.i));
 }
 
 function renderFarEchoField(raw,visibleSet,middleSet,alpha){
   const centreY=H*.54;
   const candidates=[];
+  const excluded=new Set([...visibleSet,...middleSet]);
+  const farIds=new Set(chronologicalLayerIndices(excluded,4,3,FAR_ECHO_COUNT));
 
   data.forEach((s,i)=>{
-    if(visibleSet.has(i)||middleSet.has(i))return;
+    if(!farIds.has(i))return;
     const r=projectMemoryAt(s,farCam.x,farCam.y);
     const d=clamp(r.depth,0,1);
 
@@ -2428,7 +2456,18 @@ function storyAtScreenPoint(p){
     if(d<bd){bd=d;best=i}
   }
   const radius=overviewBlendForScale()>.45?105:88;
-  return bd<=radius?best:null;
+  if(bd<=radius)return best;
+
+  let echoBest=null,echoDistance=Infinity;
+  for(const [i,r] of renderedEchoCards){
+    if(!r||r.opacity<.20)continue;
+    const d=Math.hypot(r.x-p.x,r.y-p.y);
+    if(d<=r.hitRadius&&d<echoDistance){
+      echoDistance=d;
+      echoBest=i;
+    }
+  }
+  return echoBest;
 }
 
 function stopGlobeInertia(keepMomentum=false){

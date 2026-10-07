@@ -491,13 +491,10 @@ function shellSurfaceDistanceFromCamera(s){
 
 // Ergonomic finger->surface calibration. These are surface-distance values,
 // not angular values and therefore do not change with the amount of memories.
-const SHELL_DRAG_X_PER_PX=2.455;
-const SHELL_DRAG_Y_PER_PX=1.698;
-const SHELL_MAX_COAST_X=2.95;
-const SHELL_MAX_COAST_Y=.15*ELLIPSE_VERTICAL_RATIO;
+const SHELL_DRAG_PER_PX=2.455;
+const SHELL_MAX_COAST=2.95;
 const SHELL_STOP_SPEED=.020;
 const SHELL_COAST_DECAY_MS=480;
-const SHELL_TIME_DECAY_MS=180*ELLIPSE_VERTICAL_RATIO;
 
 // Time stays chronologically correct, but visually empty eras take less room on
 // the globe. This keeps a sparse life compact while a dense life naturally grows.
@@ -1970,26 +1967,28 @@ function startGlobeInertia(vShellLon,vShellLat,carryShellLon=0,carryShellLat=0){
   stopGlobeInertia();
   if(cam.s>=SWIPE_SPACE)return;
 
-  // Convert surface speed back to the equivalent finger speed only for the
-  // existing "travel vs precise search" intent. World size never enters here.
-  const fingerEqX=Math.abs(vShellLon)/SHELL_DRAG_X_PER_PX;
-  const fingerEqY=Math.abs(vShellLat)/SHELL_DRAG_Y_PER_PX;
+  // Gesture speed is observed only as the real shell velocity the finger built.
+  // There is no extra launch multiplier and no special vertical brake.
+  const fingerEqX=Math.abs(vShellLon)/SHELL_DRAG_PER_PX;
+  const fingerEqY=Math.abs(vShellLat)/SHELL_DRAG_PER_PX;
   const launchIntent=clamp(Math.hypot(fingerEqX,fingerEqY),0,1.2);
   syncTimelineVisualFromSpace(launchIntent,34,performance.now());
 
-  // A deliberate flick may add energy, but that energy is measured entirely
-  // in shell distance per millisecond.
-  const launchBoost=lerp(1,1.42,smooth(.09,.44,fingerEqX));
-  vShellLon*=launchBoost;
-
-  const carryEq=Math.abs(carryShellLon)/SHELL_DRAG_X_PER_PX;
-  if(carryEq>.016&&Math.sign(carryShellLon)===Math.sign(vShellLon)){
-    const carryStrength=.78*smooth(.016,.45,carryEq);
+  // A second push in the same direction can add to the existing roll on either
+  // axis. Both axes use exactly the same rule; ellipse geometry handles time.
+  const carryEqX=Math.abs(carryShellLon)/SHELL_DRAG_PER_PX;
+  if(carryEqX>.016&&Math.sign(carryShellLon)===Math.sign(vShellLon)){
+    const carryStrength=.78*smooth(.016,.45,carryEqX);
     vShellLon+=carryShellLon*carryStrength;
   }
+  const carryEqY=Math.abs(carryShellLat)/SHELL_DRAG_PER_PX;
+  if(carryEqY>.016&&Math.sign(carryShellLat)===Math.sign(vShellLat)){
+    const carryStrength=.78*smooth(.016,.45,carryEqY);
+    vShellLat+=carryShellLat*carryStrength;
+  }
 
-  vShellLon=clamp(vShellLon,-SHELL_MAX_COAST_X,SHELL_MAX_COAST_X);
-  vShellLat=clamp(vShellLat,-SHELL_MAX_COAST_Y,SHELL_MAX_COAST_Y);
+  vShellLon=clamp(vShellLon,-SHELL_MAX_COAST,SHELL_MAX_COAST);
+  vShellLat=clamp(vShellLat,-SHELL_MAX_COAST,SHELL_MAX_COAST);
   if(Math.hypot(vShellLon,vShellLat)<SHELL_STOP_SPEED)return;
 
   globeMomentumShellLon=vShellLon;
@@ -2019,7 +2018,7 @@ function startGlobeInertia(vShellLon,vShellLat,carryShellLon=0,carryShellLat=0){
     // Surface friction is size-independent. The resulting angular braking is
     // automatically stronger or weaker because circumference handles conversion.
     globeMomentumShellLon*=Math.exp(-dt/SHELL_COAST_DECAY_MS);
-    globeMomentumShellLat*=Math.exp(-dt/SHELL_TIME_DECAY_MS);
+    globeMomentumShellLat*=Math.exp(-dt/SHELL_COAST_DECAY_MS);
 
     if(lived<2600&&Math.hypot(globeMomentumShellLon,globeMomentumShellLat)>SHELL_STOP_SPEED){
       globeInertiaRaf=requestAnimationFrame(frame);
@@ -2034,7 +2033,7 @@ function startGlobeInertia(vShellLon,vShellLat,carryShellLon=0,carryShellLat=0){
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
   const carryShellLon=globeInertiaRaf?globeMomentumShellLon:0;
-  const carryShellLat=0;
+  const carryShellLat=globeInertiaRaf?globeMomentumShellLat:0;
   stopGlobeInertia(true);
   e.preventDefault();hint.style.display="none";
 
@@ -2150,13 +2149,13 @@ app.addEventListener("touchmove",e=>{
       const timelinePrecision=smooth(.48,.96,visualZoomPos);
       const precisionWeight=(1-gear)*timelinePrecision;
 
-      const horizontalGain=lerp(.56,1.06,gear)*lerp(1,.76,precisionWeight);
-      const verticalGain=lerp(.16,.72,gear)*lerp(1,.60,precisionWeight);
+      const shellGain=lerp(.56,1.06,gear)*lerp(1,.76,precisionWeight);
 
-      // The finger moves a concrete distance over the outer shell. Only after
-      // that do we ask the current circumference how much sphere rotation it needs.
-      const dShellLon=-dx*SHELL_DRAG_X_PER_PX*nav*horizontalGain;
-      const dShellLat=dy*SHELL_DRAG_Y_PER_PX*nav*verticalGain;
+      // Both directions move the same concrete distance over the shell.
+      // The 25% longer vertical ellipse converts that distance into less
+      // north/south rotation, creating more physical room for life time.
+      const dShellLon=-dx*SHELL_DRAG_PER_PX*nav*shellGain;
+      const dShellLat=dy*SHELL_DRAG_PER_PX*nav*shellGain;
       cam.x=wrapLon(cam.x+shellLonDistanceToRotation(dShellLon));
       cam.y=clampCamY(cam.y+shellLatDistanceToRotation(dShellLat,cam.y));
 

@@ -37,7 +37,7 @@ button{font:inherit;color:inherit}
 .memoryEcho img{width:100%;height:100%;object-fit:cover;filter:contrast(1.07) saturate(1.045) brightness(1)}
 .memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.006),rgba(0,0,0,.006))}
 
-.memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
+.memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none;transition:opacity .18s ease-out}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#26343b}
 .memoryShade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 36%,rgba(0,0,0,.82) 100%)}
 .memoryCopy{position:absolute;left:10px;right:10px;bottom:10px;text-shadow:0 2px 8px rgba(0,0,0,.78)}
@@ -796,6 +796,7 @@ const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
   return el;
 });
 const echoAssignments=new Array(ECHO_COUNT).fill(-1);
+const echoAssignmentStartedAt=new Array(ECHO_COUNT).fill(0);
 
 const FAR_ECHO_COUNT=7;
 const farEchoNodes=Array.from({length:FAR_ECHO_COUNT},()=>{
@@ -806,6 +807,7 @@ const farEchoNodes=Array.from({length:FAR_ECHO_COUNT},()=>{
   return el;
 });
 const farEchoAssignments=new Array(FAR_ECHO_COUNT).fill(-1);
+const farEchoAssignmentStartedAt=new Array(FAR_ECHO_COUNT).fill(0);
 
 
 let W=1,H=1;
@@ -818,6 +820,37 @@ let lastMagneticIds=new Set(),magneticIds=new Set();
 let renderedCards=new Map();
 let stableForegroundSet=new Set();
 let stableHeroIndex=null;
+
+// Visual entry state prevents a newly-selected photo from materialising in the
+// middle of the field. New foreground cards travel in from their nearest edge.
+const foregroundEntryState=new Map();
+const FOREGROUND_ENTRY_MS=560;
+let sceneTransitionRaf=0;
+function requestSceneTransitionFrame(){
+  if(sceneTransitionRaf)return;
+  sceneTransitionRaf=requestAnimationFrame(()=>{
+    sceneTransitionRaf=0;
+    render();
+  });
+}
+function foregroundEntryOffset(x,y){
+  const top=(timelineShell?.getBoundingClientRect().height||126)+22;
+  const bottom=H-76;
+
+  // If its real projected path is already outside the viewport, leave it there:
+  // it will cross the edge naturally as the world moves.
+  if(x<0||x>W||y<top||y>bottom)return{x:0,y:0};
+
+  const choices=[
+    {d:x,x:-92-x,y:0},
+    {d:W-x,x:W+92-x,y:0},
+    {d:y-top,x:0,y:top-110-y},
+    {d:bottom-y,x:0,y:bottom+110-y}
+  ];
+  choices.sort((a,b)=>a.d-b.d);
+  return{x:choices[0].x,y:choices[0].y};
+}
+
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
@@ -1997,15 +2030,15 @@ function renderEchoField(raw,visibleSet,alpha){
     if(!tooClose)chosen.push(cand);
   }
 
-  const chosenById=new Map(chosen.map(c=>[c.i,c]));
+  const candidateById=new Map(candidates.map(c=>[c.i,c]));
   const slotCandidates=new Array(ECHO_COUNT).fill(null);
   const usedIds=new Set();
 
-  // First preserve existing slot->photo assignments whenever that photo is
-  // still wanted. A small ranking change must not replace 96 image sources.
+  // Preserve an existing photo for as long as its real path remains in the
+  // broad candidate field. Ranking changes alone may no longer replace it.
   for(let slot=0;slot<ECHO_COUNT;slot++){
     const current=echoAssignments[slot];
-    const cand=chosenById.get(current);
+    const cand=candidateById.get(current);
     if(cand){
       slotCandidates[slot]=cand;
       usedIds.add(current);
@@ -2033,6 +2066,7 @@ function renderEchoField(raw,visibleSet,alpha){
     const s=data[cand.i];
     if(echoAssignments[slot]!==cand.i){
       echoAssignments[slot]=cand.i;
+      echoAssignmentStartedAt[slot]=performance.now();
       el.querySelector("img").src=thumbUrl(s);
     }
 
@@ -2046,9 +2080,13 @@ function renderEchoField(raw,visibleSet,alpha){
     // Match the foreground photo treatment instead of dimming this layer.
     // Depth now comes primarily from size and motion, not from washed-out colour.
     const op=(1-alpha)*lerp(.88,1,d)*(.98+.02*cand.score);
+    const assignmentAge=performance.now()-echoAssignmentStartedAt[slot];
+    const assignmentReveal=smooth(0,1,assignmentAge/320);
+    if(assignmentReveal<.999)requestSceneTransitionFrame();
+
     const img=el.querySelector("img");
     img.style.filter="contrast(1.07) saturate(1.045) brightness(1)";
-    el.style.opacity=clamp(op,.82,1).toFixed(3);
+    el.style.opacity=(clamp(op,.82,1)*assignmentReveal).toFixed(3);
     el.style.borderColor="rgba(255,255,255,"+lerp(.24,.19,d).toFixed(3)+")";
     el.style.transform="translate3d("+(cand.x-31)+"px,"+(cand.y-23)+"px,0) scale("+size.toFixed(3)+")";
     el.style.zIndex=String(25+Math.round(d*118));
@@ -2101,8 +2139,32 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
     if(!tooClose)chosen.push(cand);
   }
 
+  const farCandidateById=new Map(candidates.map(c=>[c.i,c]));
+  const farSlotCandidates=new Array(FAR_ECHO_COUNT).fill(null);
+  const farUsedIds=new Set();
+
   for(let slot=0;slot<FAR_ECHO_COUNT;slot++){
-    const el=farEchoNodes[slot],cand=chosen[slot];
+    const current=farEchoAssignments[slot];
+    const cand=farCandidateById.get(current);
+    if(cand){
+      farSlotCandidates[slot]=cand;
+      farUsedIds.add(current);
+    }
+  }
+
+  let farNext=0;
+  for(let slot=0;slot<FAR_ECHO_COUNT;slot++){
+    if(farSlotCandidates[slot])continue;
+    while(farNext<chosen.length&&farUsedIds.has(chosen[farNext].i))farNext++;
+    if(farNext<chosen.length){
+      farSlotCandidates[slot]=chosen[farNext];
+      farUsedIds.add(chosen[farNext].i);
+      farNext++;
+    }
+  }
+
+  for(let slot=0;slot<FAR_ECHO_COUNT;slot++){
+    const el=farEchoNodes[slot],cand=farSlotCandidates[slot];
     if(!cand){
       el.style.opacity="0";
       farEchoAssignments[slot]=-1;
@@ -2112,6 +2174,7 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
     const s=data[cand.i];
     if(farEchoAssignments[slot]!==cand.i){
       farEchoAssignments[slot]=cand.i;
+      farEchoAssignmentStartedAt[slot]=performance.now();
       const img=el.querySelector("img");
       img.src=thumbUrl(s);
       img.decoding="async";
@@ -2121,10 +2184,13 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
     const random=.86+.28*fract(s.id+3511);
     const size=lerp(.42,.68,d)*random;
     const opacity=(1-alpha)*lerp(.25,.35,d);
+    const assignmentAge=performance.now()-farEchoAssignmentStartedAt[slot];
+    const assignmentReveal=smooth(0,1,assignmentAge/360);
+    if(assignmentReveal<.999)requestSceneTransitionFrame();
 
     const img=el.querySelector("img");
     img.style.filter="blur(.01px) saturate(1.18) brightness(1.06) contrast(1.10)";
-    el.style.opacity=clamp(opacity,.19,.34).toFixed(3);
+    el.style.opacity=(clamp(opacity,.19,.34)*assignmentReveal).toFixed(3);
     el.style.transform="translate3d("+(cand.x-23)+"px,"+(cand.y-17)+"px,0) scale("+size.toFixed(3)+")";
     el.style.zIndex="1";
   }
@@ -2168,6 +2234,11 @@ function render(){
   const roleRank=new Map(foregroundRoles.map((i,rank)=>[i,rank]));
   renderedCards.clear();
 
+  // A photo that has left the foreground gets a fresh edge-entry next time.
+  for(const i of [...foregroundEntryState.keys()]){
+    if(!visibleSet.has(i))foregroundEntryState.delete(i);
+  }
+
   // Keep only the current readable foreground stories as real DOM elements.
   releaseUnusedMemoryNodes(visibleSet);
 
@@ -2203,6 +2274,22 @@ function render(){
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
     scale=clamp(scale,.64,1.54);
 
+    let entry=foregroundEntryState.get(i);
+    if(!entry){
+      const offset=foregroundEntryOffset(p.x,p.y);
+      entry={startedAt:performance.now(),dx:offset.x,dy:offset.y};
+      foregroundEntryState.set(i,entry);
+    }
+    const entryT=clamp((performance.now()-entry.startedAt)/FOREGROUND_ENTRY_MS,0,1);
+    const entryEase=1-Math.pow(1-entryT,3);
+    const entryOpacity=smooth(0,.72,entryT);
+    const entryX=p.x+entry.dx*(1-entryEase);
+    const entryY=p.y+entry.dy*(1-entryEase);
+    if(entryT<.999)requestSceneTransitionFrame();
+
+    opacity*=entryOpacity;
+    scale*=lerp(.90,1,entryEase);
+
     const el=memoryNode(i,true);
     if(opacity>.025)ensureCardImage(i);
     const img=el.querySelector("img");
@@ -2214,7 +2301,7 @@ function render(){
     el.style.opacity=opacity.toFixed(3);
     el.style.pointerEvents=opacity>.24?"auto":"none";
     el.style.zIndex=String(540+Math.round(depth*180)+(rank===0?118:rank<5?42:0)-Math.min(30,rank*4));
-    el.style.transform="translate3d("+(p.x-66)+"px,"+(p.y-87)+"px,0) scale("+scale.toFixed(3)+")";
+    el.style.transform="translate3d("+(entryX-66)+"px,"+(entryY-87)+"px,0) scale("+scale.toFixed(3)+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);
     el.classList.remove("magnetic");
     renderedCards.set(i,{x:p.x,y:p.y,opacity,magnetic:false,selected:true});

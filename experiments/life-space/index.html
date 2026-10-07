@@ -28,9 +28,9 @@ button{font:inherit;color:inherit}
 #world{position:absolute;z-index:2;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
 
 #farEchoLayer{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.farMemoryEcho{position:absolute;width:46px;height:34px;border-radius:5px;overflow:hidden;background:#1b2d38;border:1px solid rgba(255,255,255,.14);box-shadow:0 3px 12px rgba(0,0,0,.12),0 0 14px rgba(129,184,213,.08);will-change:transform,opacity;opacity:0;transform-origin:center}
-.farMemoryEcho img{width:100%;height:100%;object-fit:cover;filter:saturate(1.12) brightness(1.03) contrast(1.08)}
-.farMemoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.03))}
+.farMemoryEcho{position:absolute;width:46px;height:34px;border-radius:5px;overflow:hidden;background:#1b2d38;border:1px solid rgba(255,255,255,.17);box-shadow:0 3px 12px rgba(0,0,0,.12),0 0 12px rgba(129,184,213,.06);will-change:transform,opacity;opacity:0;transform-origin:center}
+.farMemoryEcho img{width:100%;height:100%;object-fit:cover;filter:saturate(1.18) brightness(1.06) contrast(1.10)}
+.farMemoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.012),rgba(0,0,0,.018))}
 
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.24);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 16px rgba(129,184,213,.07);will-change:transform,opacity;opacity:0;transform-origin:center}
@@ -778,11 +778,14 @@ const ECHO_DENSITY_FACTOR=clamp(ELLIPSE_VERTICAL_RATIO/ECHO_REFERENCE_RATIO,1,1.
 
 // Three visual depth bands use independent virtual cameras.
 // Foreground camera = 100% of the hand movement.
-// Middle camera = -10%, so its photographs visibly travel in the opposite direction.
-// Far camera = 30%, so the tiny photographs continue slowly in the normal direction.
+// Middle camera: horizontal motion is deliberately reversed and made strong
+// enough to be unmistakable; vertical motion stays almost still.
+// Far camera continues slowly in the normal direction.
 const FOREGROUND_CAMERA_RATE=1.00;
-const MIDDLE_CAMERA_RATE=-.10;
-const FAR_CAMERA_RATE=.30;
+const MIDDLE_CAMERA_RATE_X=-.22;
+const MIDDLE_CAMERA_RATE_Y=.04;
+const FAR_CAMERA_RATE_X=.26;
+const FAR_CAMERA_RATE_Y=.22;
 
 const ECHO_COUNT=Math.round(96*ECHO_DENSITY_FACTOR);
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
@@ -833,10 +836,10 @@ function syncDepthCameras(){
     middleCam.x=cam.x;middleCam.y=cam.y;
     farCam.x=cam.x;farCam.y=cam.y;
   }else{
-    middleCam.x=wrapLon(middleCam.x+dx*MIDDLE_CAMERA_RATE);
-    middleCam.y=clampCamY(middleCam.y+dy*MIDDLE_CAMERA_RATE);
-    farCam.x=wrapLon(farCam.x+dx*FAR_CAMERA_RATE);
-    farCam.y=clampCamY(farCam.y+dy*FAR_CAMERA_RATE);
+    middleCam.x=wrapLon(middleCam.x+dx*MIDDLE_CAMERA_RATE_X);
+    middleCam.y=clampCamY(middleCam.y+dy*MIDDLE_CAMERA_RATE_Y);
+    farCam.x=wrapLon(farCam.x+dx*FAR_CAMERA_RATE_X);
+    farCam.y=clampCamY(farCam.y+dy*FAR_CAMERA_RATE_Y);
   }
 
   lastLayerSourceCamX=cam.x;
@@ -2072,11 +2075,11 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
     const d=clamp(cand.depth,0,1);
     const random=.86+.28*fract(s.id+3511);
     const size=lerp(.42,.68,d)*random;
-    const opacity=(1-alpha)*lerp(.22,.32,d);
+    const opacity=(1-alpha)*lerp(.25,.35,d);
 
     const img=el.querySelector("img");
-    img.style.filter="blur(.02px) saturate(1.12) brightness(1.03) contrast(1.08)";
-    el.style.opacity=clamp(opacity,.16,.31).toFixed(3);
+    img.style.filter="blur(.01px) saturate(1.18) brightness(1.06) contrast(1.10)";
+    el.style.opacity=clamp(opacity,.19,.34).toFixed(3);
     el.style.transform="translate3d("+(cand.x-23)+"px,"+(cand.y-17)+"px,0) scale("+size.toFixed(3)+")";
     el.style.zIndex="1";
   }

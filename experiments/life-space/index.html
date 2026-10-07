@@ -1266,27 +1266,31 @@ function composeForeground(raw,visibleSet){
   const map=new Map();
   const top=(timelineShell?.getBoundingClientRect().height||126)+64;
   const bottom=H-118;
-  const minX=58,maxX=W-58,minY=top,maxY=Math.max(top+120,bottom);
+  const outerMinX=-96,outerMaxX=W+96;
+  const outerMinY=top-112,outerMaxY=H+96;
 
   for(const i of visibleSet){
     const r=raw[i];
-    map.set(i,{
-      x:clamp(r.x,minX,maxX),
-      y:clamp(r.y,minY,maxY),
-      homeX:clamp(r.x,minX,maxX),
-      homeY:clamp(r.y,minY,maxY)
-    });
+    // Keep the story on its real projected path. It may live just outside the
+    // viewport and physically roll in; only absurdly distant positions are capped.
+    const homeX=clamp(r.x,outerMinX,outerMaxX);
+    const homeY=clamp(r.y,outerMinY,outerMaxY);
+    map.set(i,{x:homeX,y:homeY,homeX,homeY});
   }
 
   const ids=[...map.keys()];
   const desiredGap=Math.min(154,Math.max(116,W*.31));
 
-  // Gentle repulsion gives us four/five distinct memories without arranging
-  // them into a visible grid. Each photo remains close to its true projection.
+  // Repulsion only becomes meaningful once cards are near the actual viewport.
+  // Outside cards therefore keep their true approach path instead of teleporting in.
   for(let step=0;step<7;step++){
     for(let a=0;a<ids.length;a++){
       for(let b=a+1;b<ids.length;b++){
         const pa=map.get(ids[a]),pb=map.get(ids[b]);
+        const aNear=pa.x>-46&&pa.x<W+46&&pa.y>top-55&&pa.y<bottom+70;
+        const bNear=pb.x>-46&&pb.x<W+46&&pb.y>top-55&&pb.y<bottom+70;
+        if(!aNear&&!bNear)continue;
+
         let dx=pb.x-pa.x,dy=pb.y-pa.y;
         let d=Math.hypot(dx,dy);
         if(d<1){dx=((ids[b]-ids[a])%3)-1;dy=1;d=Math.hypot(dx,dy)}
@@ -1299,11 +1303,10 @@ function composeForeground(raw,visibleSet){
     }
     for(const i of ids){
       const p=map.get(i);
-      // weak spring home: composition, not teleportation
       p.x=lerp(p.x,p.homeX,.07);
       p.y=lerp(p.y,p.homeY,.07);
-      p.x=clamp(p.x,minX,maxX);
-      p.y=clamp(p.y,minY,maxY);
+      p.x=clamp(p.x,outerMinX,outerMaxX);
+      p.y=clamp(p.y,outerMinY,outerMaxY);
     }
   }
   return map;
@@ -1435,10 +1438,21 @@ function render(){
     const rank=roleRank.has(i)?roleRank.get(i):99;
     const depth=clamp(r.depth,0,1);
 
+    const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;
+    const edgeX=Math.min(
+      smooth(-104,42,r.x),
+      1-smooth(W-42,W+104,r.x)
+    );
+    const edgeY=Math.min(
+      smooth(timelineBottom-106,timelineBottom+36,r.y),
+      1-smooth(H-72,H+106,r.y)
+    );
+    const edgeReveal=clamp(Math.min(edgeX,edgeY),0,1);
+
     let opacity=0;
     if(selected){
       opacity=[1,1,.94,.89,.85,.81][Math.min(rank,5)]||.81;
-      opacity*=lerp(.88,1,depth)*(1-alpha*.94);
+      opacity*=lerp(.88,1,depth)*(1-alpha*.94)*edgeReveal;
     }
     if(i===active&&selected)opacity=Math.max(opacity,(1-alpha)*.96);
 
@@ -1448,6 +1462,7 @@ function render(){
     scale*=rankScale;
     const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
+    scale*=lerp(.86,1,smooth(.08,.92,edgeReveal));
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
     scale=clamp(scale,.64,1.34);
 

@@ -60,7 +60,7 @@ button{font:inherit;color:inherit}
 /* Original Talera timeline language: one continuous ruler with a fixed centre needle. */
 #timelineShell{
   position:absolute;z-index:80;left:0;right:0;top:0;
-  height:clamp(116px,16dvh,138px);
+  height:clamp(102px,13.5dvh,118px);
   padding-top:var(--safeT);
   overflow:hidden;touch-action:none;user-select:none;
   background:linear-gradient(180deg,rgba(255,254,252,.94) 0%,rgba(220,234,246,.70) 100%);
@@ -1804,7 +1804,7 @@ function drawTimeline(){
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
 
   const [startMs,endMs]=bounds();
-  const axisY=h-64;
+  const axisY=h-50;
   const level=activeLevel();
   drawDensity(level,startMs,endMs,w,axisY);
   drawMemoryBeacons(level,startMs,endMs,w,axisY);

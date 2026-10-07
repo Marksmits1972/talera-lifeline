@@ -776,13 +776,13 @@ function preloadNearbyMemories(){
 const ECHO_REFERENCE_RATIO=1.25;
 const ECHO_DENSITY_FACTOR=clamp(ELLIPSE_VERTICAL_RATIO/ECHO_REFERENCE_RATIO,1,1.22);
 
-// Three visual depth bands. The foreground follows the finger directly.
-// To avoid one large mass moving in lockstep, the middle layer now drifts
-// gently in the opposite direction at only 10% of the foreground speed.
-// The tiny far layer keeps its slow 30% forward drift.
-const FOREGROUND_PARALLAX=1.00;
-const MIDDLE_PARALLAX=-.10;
-const FAR_PARALLAX=.30;
+// Three visual depth bands use independent virtual cameras.
+// Foreground camera = 100% of the hand movement.
+// Middle camera = -10%, so its photographs visibly travel in the opposite direction.
+// Far camera = 30%, so the tiny photographs continue slowly in the normal direction.
+const FOREGROUND_CAMERA_RATE=1.00;
+const MIDDLE_CAMERA_RATE=-.10;
+const FAR_CAMERA_RATE=.30;
 
 const ECHO_COUNT=Math.round(96*ECHO_DENSITY_FACTOR);
 const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
@@ -817,6 +817,32 @@ let stableForegroundSet=new Set();
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
+// Independent camera tracks make parallax real instead of merely scaling the
+// already-projected screen coordinates. That guarantees true counter-motion.
+const middleCam={x:cam.x,y:cam.y};
+const farCam={x:cam.x,y:cam.y};
+let lastLayerSourceCamX=cam.x,lastLayerSourceCamY=cam.y;
+
+function syncDepthCameras(){
+  const dx=wrapLon(cam.x-lastLayerSourceCamX);
+  const dy=cam.y-lastLayerSourceCamY;
+
+  // Large jumps are programmatic navigation (opening/closing/focusing a story),
+  // not a hand-driven pan. Re-anchor the depth cameras instead of throwing them.
+  if(Math.abs(dx)>.48||Math.abs(dy)>.34){
+    middleCam.x=cam.x;middleCam.y=cam.y;
+    farCam.x=cam.x;farCam.y=cam.y;
+  }else{
+    middleCam.x=wrapLon(middleCam.x+dx*MIDDLE_CAMERA_RATE);
+    middleCam.y=clampCamY(middleCam.y+dy*MIDDLE_CAMERA_RATE);
+    farCam.x=wrapLon(farCam.x+dx*FAR_CAMERA_RATE);
+    farCam.y=clampCamY(farCam.y+dy*FAR_CAMERA_RATE);
+  }
+
+  lastLayerSourceCamX=cam.x;
+  lastLayerSourceCamY=cam.y;
+}
+
 function clampCamX(x){return wrapLon(x)}
 function clampCamY(y){return clamp(y,-GLOBE_LAT_LIMIT,GLOBE_LAT_LIMIT)}
 
@@ -829,21 +855,18 @@ function cameraBasis(){
     up:{x:-sl*co,y:cl,z:-sl*so}
   };
 }
-function projectMemory(s){
-  // The sphere remains the invisible navigation model, but the screen uses a
-  // local panoramic/tangent projection. This prevents the memories from
-  // revealing a literal circular shell.
+function projectMemoryAt(s,cameraX,cameraY){
+  // The sphere remains the invisible navigation model, but every depth band can
+  // now observe it through its own virtual camera.
   const top=(timelineShell?.getBoundingClientRect().height||126)+12;
   const bottom=H-78;
   const usable=Math.max(220,bottom-top);
   const cy=(top+bottom)/2;
 
-  const lonDelta=wrapLon(s.lon-cam.x);
-  const latDelta=s.lat-cam.y;
+  const lonDelta=wrapLon(s.lon-cameraX);
+  const latDelta=s.lat-cameraY;
   const zoom=Math.max(.74,cam.s/SPACE_MIN)*WORLD_DENSITY_SCALE;
 
-  // tanh keeps the space effectively endless horizontally while softly
-  // compressing the far sides instead of drawing a visible globe edge.
   const xNorm=Math.tanh(lonDelta*.78);
   const yNorm=Math.tanh(latDelta*1.38);
   const x=W/2+xNorm*(W*.57)*zoom;
@@ -855,6 +878,9 @@ function projectMemory(s){
   const facing=clamp(1-distance*.42,-.35,1);
 
   return {x,y,facing,depth,perspective:lerp(.82,1.06,depth)};
+}
+function projectMemory(s){
+  return projectMemoryAt(s,cam.x,cam.y);
 }
 function angularDistanceToCamera(s){
   const co=Math.cos(s.lon),so=Math.sin(s.lon),cl=Math.cos(s.lat),sl=Math.sin(s.lat);
@@ -1886,18 +1912,17 @@ function renderEchoField(raw,visibleSet,alpha){
 
   data.forEach((s,i)=>{
     if(visibleSet.has(i))return;
-    const r=raw[i];
+    const r=projectMemoryAt(s,middleCam.x,middleCam.y);
     const d=clamp(r.depth,0,1);
 
-    // Middle depth band: a very slow counter-motion.
-    // Front : middle = +10 : -1. This breaks the "single moving wall" feeling
-    // without making the background restless.
+    // True reverse parallax: this entire layer uses a camera that travels
+    // opposite to the foreground camera at 10% of its speed.
     const scatterX=(fract(s.id+1301)-.5)*W*lerp(.26,.08,d);
     const scatterY=(fract(s.id+1499)-.5)*H*lerp(.17,.05,d);
-    const x=W/2+(r.x-W/2)*MIDDLE_PARALLAX+scatterX;
+    const x=r.x+scatterX;
     const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
     const y=centreY+
-      (r.y-centreY)*MIDDLE_PARALLAX*echoVerticalCompensation+
+      (r.y-centreY)*echoVerticalCompensation+
       scatterY;
 
     if(x<-95||x>W+95||y<92||y>H+100)return;
@@ -1994,17 +2019,16 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
 
   data.forEach((s,i)=>{
     if(visibleSet.has(i)||middleSet.has(i))return;
-    const r=raw[i];
+    const r=projectMemoryAt(s,farCam.x,farCam.y);
     const d=clamp(r.depth,0,1);
 
-    // Third layer: tiny photographic "stars". They retain real image colour,
-    // but travel at only 30% of the foreground motion.
+    // Third layer uses its own slow 30% camera in the normal direction.
     const scatterX=(fract(s.id+3109)-.5)*W*.54;
     const scatterY=(fract(s.id+3251)-.5)*H*.42;
-    const x=W/2+(r.x-W/2)*FAR_PARALLAX+scatterX;
+    const x=r.x+scatterX;
     const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
     const y=centreY+
-      (r.y-centreY)*FAR_PARALLAX*echoVerticalCompensation+
+      (r.y-centreY)*echoVerticalCompensation+
       scatterY;
 
     if(x<-60||x>W+60||y<100||y>H+60)return;
@@ -2059,6 +2083,7 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
 }
 
 function render(){
+  syncDepthCameras();
   if(!timelineUser&&typeof centerMs!=="undefined")centerMs=timeCenter;
   active=spatialPinchTarget!=null?spatialPinchTarget:nearestMemoryToFocus();
   const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];

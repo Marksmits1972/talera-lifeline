@@ -778,12 +778,12 @@ const ECHO_DENSITY_FACTOR=clamp(ELLIPSE_VERTICAL_RATIO/ECHO_REFERENCE_RATIO,1,1.
 
 // Three visual depth bands use independent virtual cameras.
 // Foreground camera = 100% of the hand movement.
-// Middle camera: horizontal motion is deliberately reversed and made strong
-// enough to be unmistakable; vertical motion stays almost still.
-// Far camera continues slowly in the normal direction.
+// All depth bands now travel in the same direction.
+// The middle layer follows at 30% of foreground speed, while the far layer
+// remains a little slower again for depth without counter-motion.
 const FOREGROUND_CAMERA_RATE=1.00;
-const MIDDLE_CAMERA_RATE_X=-.22;
-const MIDDLE_CAMERA_RATE_Y=.04;
+const MIDDLE_CAMERA_RATE_X=.30;
+const MIDDLE_CAMERA_RATE_Y=.30;
 const FAR_CAMERA_RATE_X=.26;
 const FAR_CAMERA_RATE_Y=.22;
 

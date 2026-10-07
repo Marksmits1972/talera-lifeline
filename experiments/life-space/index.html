@@ -531,9 +531,11 @@ function shellSurfaceDistanceFromCamera(s){
   return Math.hypot(dx,dy);
 }
 
-// Ergonomic finger->surface calibration. These are surface-distance values,
-// not angular values and therefore do not change with the amount of memories.
-const SHELL_DRAG_PER_PX=2.455;
+// Ergonomic finger->surface calibration. The previous 2.455 value made the
+// foreground outrun the finger once the 10/7/3 depth bands were introduced.
+// 1.72 is ~70% of that travel: the front layer now follows the hand directly,
+// while the middle (0.70) and far (0.30) bands visibly lag behind it.
+const SHELL_DRAG_PER_PX=1.72;
 const SHELL_MAX_COAST=2.95;
 const SHELL_STOP_SPEED=.020;
 const SHELL_COAST_DECAY_MS=480;

@@ -22,7 +22,7 @@ button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
 #bg{
   position:absolute;z-index:0;inset:0;
-  background:radial-gradient(circle at 52% 40%,#1d3b4d 0%,#123041 42%,#0a202d 72%,#06131c 100%);
+  background:radial-gradient(circle at 52% 40%,#224457 0%,#153648 42%,#0c2432 72%,#071720 100%);
 }
 #spaceCanvas{position:absolute;z-index:1;inset:0;width:100%;height:100%;pointer-events:none}
 #world{position:absolute;z-index:2;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
@@ -201,9 +201,9 @@ function drawSpaceFx(now=performance.now()){
 
   // Fresh ambient depth: lighter blue/teal, still calm and unobtrusive.
   let g=ctx.createRadialGradient(W*.54,H*.46,10,W*.54,H*.46,Math.max(W,H)*.74);
-  g.addColorStop(0,"rgba(86,158,187,.18)");
-  g.addColorStop(.34,"rgba(49,113,145,.10)");
-  g.addColorStop(.72,"rgba(21,67,93,.04)");
+  g.addColorStop(0,"rgba(91,166,196,.205)");
+  g.addColorStop(.34,"rgba(53,121,154,.115)");
+  g.addColorStop(.72,"rgba(24,73,101,.05)");
   g.addColorStop(1,"rgba(0,0,0,0)");
   ctx.fillStyle=g;
   ctx.fillRect(0,top,W,usable);
@@ -220,6 +220,17 @@ function drawSpaceFx(now=performance.now()){
   glow.addColorStop(1,"rgba(70,130,160,0)");
   ctx.fillStyle=glow;
   ctx.fillRect(0,top,W,usable);
+
+  // One faint moving cool haze gives the background a little more life
+  // without reading as a visible effect layer.
+  const hx=W*(.74+.018*Math.sin(cam.x*.38));
+  const hy=top+usable*(.34+.014*Math.cos(cam.y*1.1));
+  const haze=ctx.createRadialGradient(hx,hy,0,hx,hy,Math.max(W,H)*.42);
+  haze.addColorStop(0,"rgba(105,190,216,.055)");
+  haze.addColorStop(.48,"rgba(75,151,184,.025)");
+  haze.addColorStop(1,"rgba(70,130,160,0)");
+  ctx.fillStyle=haze;
+  ctx.fillRect(0,top,W,usable);
   ctx.restore();
 
   // Three-dimensional star field. Near points react more strongly to navigation.
@@ -228,8 +239,8 @@ function drawSpaceFx(now=performance.now()){
     const x=wrap01(s.x-lonTurn*(.055+.16*s.z)+drift)*W;
     const y=top+wrap01(s.y+latTurn*(.035+.10*s.z)+drift*.22)*usable;
     const pulse=.90+.10*Math.sin(now*.0011+s.x*19+s.y*11);
-    const a=s.alpha*lerp(.34,.78,s.z)*pulse;
-    const radius=s.size*lerp(.52,1.12,s.z);
+    const a=s.alpha*lerp(.38,.84,s.z)*pulse;
+    const radius=s.size*lerp(.54,1.16,s.z);
     ctx.fillStyle=s.warm
       ?"rgba(245,224,194,"+a.toFixed(3)+")"
       :"rgba(214,239,248,"+a.toFixed(3)+")";

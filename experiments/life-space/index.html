@@ -1390,6 +1390,7 @@ window.visualViewport&&visualViewport.addEventListener("resize",resize,{passive:
 /* ------------------- LIFE GLOBE TOUCH ------------------- */
 let touch=null;
 let globeInertiaRaf=0;
+let globeMomentumLon=0,globeMomentumLat=0;
 
 function localTouch(t){const r=app.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top}}
 function dist(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
@@ -1407,18 +1408,39 @@ function storyAtScreenPoint(p){
   return bd<=radius?best:null;
 }
 
-function stopGlobeInertia(){
+function stopGlobeInertia(keepMomentum=false){
   cancelAnimationFrame(globeInertiaRaf);
   globeInertiaRaf=0;
+  if(!keepMomentum){
+    globeMomentumLon=0;
+    globeMomentumLat=0;
+  }
 }
 
-function startGlobeInertia(vLon,vLat){
+function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
   stopGlobeInertia();
   if(cam.s>=SWIPE_SPACE)return;
 
-  vLon=clamp(vLon,-.0034,.0034);
-  vLat=clamp(vLat,-.00235,.00235);
+  // A second push in roughly the same direction adds to the motion already
+  // present, like giving a rolling ball another shove.
+  const freshMag=Math.hypot(vLon,vLat);
+  const carryMag=Math.hypot(carryLon,carryLat);
+  if(freshMag>.00001&&carryMag>.00001){
+    const alignment=(vLon*carryLon+vLat*carryLat)/(freshMag*carryMag);
+    if(alignment>.12){
+      const add=.72*clamp((alignment-.12)/.88,0,1);
+      vLon+=carryLon*add;
+      vLat+=carryLat*add;
+    }
+  }
+
+  // Gentle pushes stay gentle; faster flicks are allowed to launch faster.
+  vLon=clamp(vLon,-.0048,.0048);
+  vLat=clamp(vLat,-.00315,.00315);
   if(Math.hypot(vLon,vLat)<.000055)return;
+
+  globeMomentumLon=vLon;
+  globeMomentumLat=vLat;
 
   let last=performance.now();
   let lived=0;
@@ -1427,25 +1449,27 @@ function startGlobeInertia(vLon,vLat){
     const dt=clamp(now-last,8,34);
     last=now;lived+=dt;
 
-    cam.x=wrapLon(cam.x+vLon*dt);
+    cam.x=wrapLon(cam.x+globeMomentumLon*dt);
 
-    const wantedY=cam.y+vLat*dt;
+    const wantedY=cam.y+globeMomentumLat*dt;
     const nextY=clampCamY(wantedY);
-    if(nextY!==wantedY)vLat=0;
+    if(nextY!==wantedY)globeMomentumLat=0;
     cam.y=nextY;
 
     syncTimeFromSpace();
     render();
 
-    // Same fling response, but with a heavier world that settles sooner.
+    // Same heavy braking as before; only the launch speed can now vary more.
     const decay=Math.exp(-dt/300);
-    vLon*=decay;
-    vLat*=decay;
+    globeMomentumLon*=decay;
+    globeMomentumLat*=decay;
 
-    if(lived<1050&&Math.hypot(vLon,vLat)>.000028){
+    if(lived<1050&&Math.hypot(globeMomentumLon,globeMomentumLat)>.000028){
       globeInertiaRaf=requestAnimationFrame(frame);
     }else{
       globeInertiaRaf=0;
+      globeMomentumLon=0;
+      globeMomentumLat=0;
     }
   }
   globeInertiaRaf=requestAnimationFrame(frame);
@@ -1453,7 +1477,9 @@ function startGlobeInertia(vLon,vLat){
 
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
-  stopGlobeInertia();
+  const carryLon=globeInertiaRaf?globeMomentumLon:0;
+  const carryLat=globeInertiaRaf?globeMomentumLat:0;
+  stopGlobeInertia(true);
   e.preventDefault();hint.style.display="none";
 
   if(e.touches.length===1){
@@ -1468,7 +1494,8 @@ app.addEventListener("touchstart",e=>{
       tapTarget,
       travel:0,
       lastT:performance.now(),
-      vLon:0,vLat:0
+      vLon:0,vLat:0,
+      carryLon,carryLat
     };
   }else if(e.touches.length>=2){
     const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
@@ -1574,12 +1601,14 @@ app.addEventListener("touchend",e=>{
     touch=null;spatialPinchTarget=null;spatialPinchStrength=0;
 
     if(moved<=14&&finished.tapTarget!=null){
+      globeMomentumLon=0;globeMomentumLat=0;
       openStorySmooth(finished.tapTarget);
       return;
     }
 
     render();
-    if(moved>7)startGlobeInertia(finished.vLon,finished.vLat);
+    if(moved>7)startGlobeInertia(finished.vLon,finished.vLat,finished.carryLon||0,finished.carryLat||0);
+    else{globeMomentumLon=0;globeMomentumLat=0}
     return;
   }
 

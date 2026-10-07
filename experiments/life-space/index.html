@@ -1115,6 +1115,23 @@ function animateVisualScaleTo(target,duration){
   }
   visualScaleRaf=requestAnimationFrame(frame);
 }
+function syncTimelineVisualFromSpace(speed,dt,now=performance.now()){
+  // Slow globe motion means "search precisely"; fast motion means "travel".
+  // Use only the two automatic Free gears (overview <-> 2-year search).
+  const target=1-smooth(.085,.38,Math.max(0,speed));
+  if(visualScaleTransitioning)cancelVisualScaleAnimation();
+
+  const tau=target>visualZoomPos?150:105;
+  const a=1-Math.exp(-Math.max(8,dt)/tau);
+  visualZoomPos=lerp(visualZoomPos,target,a);
+  if(Math.abs(visualZoomPos-target)<.012)visualZoomPos=target;
+
+  timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;
+  visualIntentLevel=visualStageForZoom(visualZoomPos);
+  visualIntentSince=now;
+  visualGearHoldUntil=0;
+}
+
 function considerVisualScale(speed,now){
   if(visualScaleTransitioning||pointers.size!==1)return;
   const current=visualStageForZoom(visualZoomPos),desired=visualLevelForSpeed(speed);
@@ -1596,6 +1613,9 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
   stopGlobeInertia();
   if(cam.s>=SWIPE_SPACE)return;
 
+  const launchIntent=clamp(Math.hypot(vLon/.0068,vLat/.0047),0,1.2);
+  syncTimelineVisualFromSpace(launchIntent,34,performance.now());
+
   // Speed should be visible in the photo field, not explode the life date.
   // A harder horizontal flick gets a little extra launch; a second push in
   // the same horizontal direction adds to the rolling motion already present.
@@ -1659,6 +1679,7 @@ app.addEventListener("touchstart",e=>{
   e.preventDefault();hint.style.display="none";
 
   if(e.touches.length===1){
+    if(cam.s<SWIPE_SPACE)cancelVisualScaleAnimation();
     const p=localTouch(e.touches[0]);
     const card=e.target.closest(".memory");
     const directIndex=card?nodes.indexOf(card):-1;
@@ -1764,10 +1785,14 @@ app.addEventListener("touchmove",e=>{
       const instFingerSpeed=Math.hypot(dx,dy)/dt;
       const speedAlpha=1-Math.exp(-dt/70);
       touch.dragSpeed=lerp(touch.dragSpeed||0,instFingerSpeed,speedAlpha);
-      const gear=smooth(.035,.30,touch.dragSpeed);
+      syncTimelineVisualFromSpace(touch.dragSpeed,dt,now);
 
-      const horizontalGain=lerp(.56,1.06,gear);
-      const verticalGain=lerp(.16,.72,gear);
+      const gear=smooth(.035,.30,touch.dragSpeed);
+      const timelinePrecision=smooth(.48,.96,visualZoomPos);
+      const precisionWeight=(1-gear)*timelinePrecision;
+
+      const horizontalGain=lerp(.56,1.06,gear)*lerp(1,.76,precisionWeight);
+      const verticalGain=lerp(.16,.72,gear)*lerp(1,.60,precisionWeight);
 
       const dLon=-dx*.0068*nav*contentFactor*horizontalGain;
       const dLat=dy*.0047*nav*contentFactor*verticalGain;

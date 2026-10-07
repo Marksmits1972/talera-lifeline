@@ -1739,18 +1739,21 @@ function foregroundStoryRoles(raw){
   // the best nearby story that is already travelling through the visible field.
   // Hold that hero until it is comfortably gone so the large card does not flicker.
   const nearestTimeIndex=nearestMemoryToTime(timeCenter);
+  const heroMotion=currentShellVelocity();
+  const heroMotionTotal=Math.abs(heroMotion.x)+Math.abs(heroMotion.y)+.0001;
+  const heroVertical=smooth(.38,.78,Math.abs(heroMotion.y)/heroMotionTotal);
   const heroWindow=Math.min(
-    Math.max(timelineSpanMs()*.58,420*DAY),
-    4.2*365.2425*DAY
+    Math.max(timelineSpanMs()*.58,420*DAY)*lerp(1,1.75,heroVertical),
+    6.4*365.2425*DAY
   );
 
   function heroUsable(i,loose=false){
     if(i==null||!data[i]||!raw[i])return false;
     if(Math.abs(data[i].ms-timeCenter)>heroWindow*(loose?1.25:1))return false;
     const q=raw[i];
-    const xPad=loose?W*.20:26;
-    const topPad=loose?90:18;
-    const bottomPad=loose?115:44;
+    const xPad=loose?W*lerp(.20,.34,heroVertical):lerp(26,W*.12,heroVertical);
+    const topPad=loose?lerp(90,170,heroVertical):lerp(18,70,heroVertical);
+    const bottomPad=loose?lerp(115,205,heroVertical):lerp(44,105,heroVertical);
     return q.x>-xPad&&q.x<W+xPad&&
       q.y>timelineBottom-topPad&&q.y<H+bottomPad;
   }
@@ -1855,9 +1858,18 @@ function chooseVisibleRepresentatives(raw,alpha,foregroundRoles=[]){
   }
 
   const budget=visibleBudgetForScale();
+
+  const motion=currentShellVelocity();
+  const motionTotal=Math.abs(motion.x)+Math.abs(motion.y)+.0001;
+  const verticalShare=Math.abs(motion.y)/motionTotal;
+  const verticalTravel=smooth(.38,.78,verticalShare);
+
+  // A vertical hand movement crosses chronology much faster than a horizontal
+  // movement crosses longitude. Keep a wider temporal reservoir so the visible
+  // foreground can still behave like the same calm stream of large photos.
   const temporalBase=Math.max(timelineSpanMs(),180*DAY);
-  let clearWindow=Math.max(240*DAY,temporalBase*.72);
-  const maxWindow=Math.max(3.2*365.2425*DAY,temporalBase*1.2);
+  let clearWindow=Math.max(240*DAY,temporalBase*.72)*lerp(1,2.10,verticalTravel);
+  const maxWindow=Math.max(3.2*365.2425*DAY,temporalBase*1.2)*lerp(1,1.70,verticalTravel);
   let candidates=[];
 
   // Expand only as much as necessary to obtain a useful set. We never jump
@@ -1895,16 +1907,17 @@ function chooseVisibleRepresentatives(raw,alpha,foregroundRoles=[]){
   // Hysteresis for the clear foreground: a large photo should not disappear
   // merely because a new story has just become more relevant. Keep up to two
   // outgoing cards alive until they have travelled well beyond the viewport.
-  const lingerBudget=budget+2;
+  const lingerBudget=budget+2+Math.round(verticalTravel*2);
   for(const i of stableForegroundSet){
     if(chosen.size>=lingerBudget)break;
     if(chosen.has(i)||!data[i]||!raw[i])continue;
     const r=raw[i];
     const dt=Math.abs(data[i].ms-timeCenter);
-    const looseTime=dt<=clearWindow*2.20;
+    const looseTime=dt<=clearWindow*lerp(2.20,2.85,verticalTravel);
     const looseScreen=
       r.x>-W*.78&&r.x<W*1.78&&
-      r.y>-40&&r.y<H+260;
+      r.y>lerp(-40,-150,verticalTravel)&&
+      r.y<H+lerp(260,380,verticalTravel);
     if(looseTime&&looseScreen)chosen.add(i);
   }
 
@@ -2262,13 +2275,29 @@ function render(){
     const depth=clamp(r.depth,0,1);
 
     const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;
+    const revealMotion=currentShellVelocity();
+    const revealMotionTotal=Math.abs(revealMotion.x)+Math.abs(revealMotion.y)+.0001;
+    const revealVertical=smooth(.38,.78,Math.abs(revealMotion.y)/revealMotionTotal);
+
     const edgeX=Math.min(
       smooth(-104,42,r.x),
       1-smooth(W-42,W+104,r.x)
     );
+
+    // During vertical travel, start revealing sooner above/below the viewport
+    // and keep fading later. This gives large cards the same calm crossing time
+    // that they already have during horizontal movement.
     const edgeY=Math.min(
-      smooth(timelineBottom-106,timelineBottom+36,r.y),
-      1-smooth(H-72,H+106,r.y)
+      smooth(
+        lerp(timelineBottom-106,timelineBottom-190,revealVertical),
+        lerp(timelineBottom+36,timelineBottom+72,revealVertical),
+        r.y
+      ),
+      1-smooth(
+        lerp(H-72,H-145,revealVertical),
+        lerp(H+106,H+205,revealVertical),
+        r.y
+      )
     );
     const edgeReveal=clamp(Math.min(edgeX,edgeY),0,1);
 

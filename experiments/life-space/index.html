@@ -26,6 +26,11 @@ button{font:inherit;color:inherit}
 }
 #world{position:absolute;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
 
+#echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.15);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 20px rgba(129,184,213,.10);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.06px) saturate(1) brightness(1)}
+.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(0,0,0,.035))}
+
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#26343b}
 .memoryShade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 36%,rgba(0,0,0,.82) 100%)}
@@ -99,7 +104,7 @@ button{font:inherit;color:inherit}
 <body>
 <div id="app">
   <div id="bg"></div>
-  <div id="world"><div id="magnetDebug"><div id="magnetRing"></div></div></div>
+  <div id="world"><div id="echoLayer"></div><div id="magnetDebug"><div id="magnetRing"></div></div></div>
 
   <div id="presentation">
     <img id="presentationImg" alt="">
@@ -131,7 +136,7 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 
 
 
-const app=document.getElementById("app"),world=document.getElementById("world"),bg=document.getElementById("bg");
+const app=document.getElementById("app"),world=document.getElementById("world"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
 const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
 const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
@@ -287,6 +292,17 @@ const nodes=data.map(s=>{
   el.addEventListener("click",e=>{e.stopPropagation();openStorySmooth(s.i)});
   world.appendChild(el);return el;
 });
+
+
+const ECHO_COUNT=96;
+const echoNodes=Array.from({length:ECHO_COUNT},(_,slot)=>{
+  const el=document.createElement("div");
+  el.className="memoryEcho";
+  el.innerHTML='<img alt="">';
+  echoLayer.appendChild(el);
+  return el;
+});
+const echoAssignments=new Array(ECHO_COUNT).fill(-1);
 
 
 let W=1,H=1;
@@ -1199,6 +1215,76 @@ function chooseMagneticSet(){
 }
 function pullToViewport(p){return{x:p.x,y:p.y,magnetic:false}}
 
+function renderEchoField(raw,visibleSet,alpha){
+  const candidates=[];
+  const centreY=H*.54;
+
+  data.forEach((s,i)=>{
+    if(visibleSet.has(i))return;
+    const r=raw[i];
+    const d=clamp(r.depth,0,1);
+
+    // Far memories move less and are gently spread sideways/up-down. That makes
+    // them read as layers in space instead of as one dark flat curtain.
+    const parallax=lerp(.34,.92,d);
+    const scatterX=(fract(s.id+1301)-.5)*W*lerp(.34,.10,d);
+    const scatterY=(fract(s.id+1499)-.5)*H*lerp(.22,.07,d);
+    const x=W/2+(r.x-W/2)*parallax+scatterX;
+    const y=centreY+(r.y-centreY)*parallax+scatterY;
+
+    if(x<-95||x>W+95||y<92||y>H+100)return;
+
+    const temporal=Math.exp(-.5*Math.pow(
+      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.7,365*DAY*5),2
+    ));
+    const score=d*.44+temporal*.22+.22*(1-s.representative)+.12*fract(s.id+1781);
+    candidates.push({i,score,x,y,depth:d});
+  });
+
+  candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
+
+  const chosen=[];
+  for(const cand of candidates){
+    if(chosen.length>=ECHO_COUNT)break;
+    let tooClose=false;
+    const localGap=lerp(14,29,cand.depth);
+    for(const p of chosen){
+      if(Math.hypot(cand.x-p.x,cand.y-p.y)<localGap){tooClose=true;break}
+    }
+    if(!tooClose)chosen.push(cand);
+  }
+
+  for(let slot=0;slot<ECHO_COUNT;slot++){
+    const el=echoNodes[slot],cand=chosen[slot];
+    if(!cand){
+      el.style.opacity="0";echoAssignments[slot]=-1;continue;
+    }
+
+    const s=data[cand.i];
+    if(echoAssignments[slot]!==cand.i){
+      echoAssignments[slot]=cand.i;
+      el.querySelector("img").src=thumbUrl(s);
+    }
+
+    const d=clamp(cand.depth,0,1);
+    const random=.78+.44*fract(s.id+901);
+    const size=lerp(.38,1.22,d)*random;
+    const op=(1-alpha)*lerp(.10,.40,d)*(.84+.16*cand.score);
+    const blur=lerp(.42,0,d);
+    const sat=lerp(.82,1.08,d);
+    const bright=lerp(.82,1.08,d);
+    const img=el.querySelector("img");
+    img.style.filter="blur("+blur.toFixed(2)+"px) saturate("+sat.toFixed(2)+") brightness("+bright.toFixed(2)+")";
+    el.style.opacity=clamp(op,.075,.42).toFixed(3);
+    el.style.transform="translate3d("+(cand.x-31)+"px,"+(cand.y-23)+"px,0) scale("+size.toFixed(3)+")";
+    el.style.zIndex=String(25+Math.round(d*118));
+    const warm=fract(s.id+2077)>.62;
+    el.style.boxShadow=warm
+      ?"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(227,166,118,"+(0.035+.06*d).toFixed(3)+")"
+      :"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(122,184,216,"+(0.04+.07*d).toFixed(3)+")";
+  }
+}
+
 function render(){
   if(!timelineUser&&typeof centerMs!=="undefined")centerMs=timeCenter;
   active=spatialPinchTarget!=null?spatialPinchTarget:nearestMemoryToFocus();
@@ -1227,6 +1313,7 @@ function render(){
   });
 
   const visibleSet=chooseVisibleRepresentatives(raw,alpha);
+  renderEchoField(raw,visibleSet,alpha);
   chooseMagneticSet(raw,alpha);
   const composed=composeForeground(raw,visibleSet);
 

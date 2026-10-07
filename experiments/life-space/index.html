@@ -776,10 +776,12 @@ function preloadNearbyMemories(){
 const ECHO_REFERENCE_RATIO=1.25;
 const ECHO_DENSITY_FACTOR=clamp(ELLIPSE_VERTICAL_RATIO/ECHO_REFERENCE_RATIO,1,1.22);
 
-// Three visual depth bands. The front cards use the full camera motion.
-// The middle layer moves at 70%, while the tiny far layer moves at 30%.
+// Three visual depth bands. The foreground follows the finger directly.
+// To avoid one large mass moving in lockstep, the middle layer now drifts
+// gently in the opposite direction at only 10% of the foreground speed.
+// The tiny far layer keeps its slow 30% forward drift.
 const FOREGROUND_PARALLAX=1.00;
-const MIDDLE_PARALLAX=.70;
+const MIDDLE_PARALLAX=-.10;
 const FAR_PARALLAX=.30;
 
 const ECHO_COUNT=Math.round(96*ECHO_DENSITY_FACTOR);
@@ -1887,8 +1889,9 @@ function renderEchoField(raw,visibleSet,alpha){
     const r=raw[i];
     const d=clamp(r.depth,0,1);
 
-    // Middle depth band: deliberately slower than the foreground.
-    // Front : middle = 10 : 7.
+    // Middle depth band: a very slow counter-motion.
+    // Front : middle = +10 : -1. This breaks the "single moving wall" feeling
+    // without making the background restless.
     const scatterX=(fract(s.id+1301)-.5)*W*lerp(.26,.08,d);
     const scatterY=(fract(s.id+1499)-.5)*H*lerp(.17,.05,d);
     const x=W/2+(r.x-W/2)*MIDDLE_PARALLAX+scatterX;

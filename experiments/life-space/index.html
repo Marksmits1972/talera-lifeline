@@ -21,10 +21,11 @@ body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
 #bg{
-  position:absolute;inset:0;
-  background:radial-gradient(circle at 50% 40%,#142938 0%,#0d1b26 44%,#081118 76%,#05090d 100%);
+  position:absolute;z-index:0;inset:0;
+  background:radial-gradient(circle at 52% 42%,#142a39 0%,#0c1b26 46%,#071119 76%,#04080c 100%);
 }
-#world{position:absolute;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
+#spaceCanvas{position:absolute;z-index:1;inset:0;width:100%;height:100%;pointer-events:none}
+#world{position:absolute;z-index:2;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
 
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.15);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 20px rgba(129,184,213,.10);will-change:transform,opacity;opacity:0;transform-origin:center}
@@ -104,6 +105,7 @@ button{font:inherit;color:inherit}
 <body>
 <div id="app">
   <div id="bg"></div>
+  <canvas id="spaceCanvas" aria-hidden="true"></canvas>
   <div id="world"><div id="echoLayer"></div><div id="magnetDebug"><div id="magnetRing"></div></div></div>
 
   <div id="presentation">
@@ -136,7 +138,7 @@ const MEMORIES=[{"id":1,"at":"1982-05-14T15:20:00","story":"De eerste keer allee
 
 
 
-const app=document.getElementById("app"),world=document.getElementById("world"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg");
+const app=document.getElementById("app"),world=document.getElementById("world"),echoLayer=document.getElementById("echoLayer"),bg=document.getElementById("bg"),spaceCanvas=document.getElementById("spaceCanvas"),spaceCtx=spaceCanvas.getContext("2d");
 const presentation=document.getElementById("presentation"),presentationImg=document.getElementById("presentationImg"),presentationText=document.getElementById("presentationText"),presentationDate=document.getElementById("presentationDate"),presentationCopy=document.getElementById("presentationCopy");
 const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
 const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
@@ -156,6 +158,121 @@ const fract=n=>{const x=Math.sin(n*79.271+4.91)*43758.5453;return x-Math.floor(x
 const ageFromMs=ms=>(ms-LIFE_START)/(365.2425*DAY);
 const shortDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{month:"short",year:"numeric"});
 const fullDate=s=>new Date(s.at).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+
+// One clean space renderer. Stars, depth and the soft light beam all live in
+// this single canvas, so the atmosphere can evolve without stacking CSS layers.
+const SPACE_STARS=Array.from({length:118},(_,i)=>({
+  x:fract(i*1.731+11),
+  y:fract(i*2.417+37),
+  z:.12+.88*fract(i*3.103+71),
+  size:.45+1.35*fract(i*5.019+13),
+  alpha:.16+.50*fract(i*7.271+29),
+  warm:fract(i*9.113+53)>.86
+}));
+const SPACE_DUST=Array.from({length:28},(_,i)=>({
+  x:fract(i*4.117+91),
+  y:fract(i*6.313+17),
+  z:.18+.72*fract(i*8.029+43),
+  size:1.4+3.8*fract(i*2.711+67),
+  alpha:.018+.045*fract(i*5.901+19)
+}));
+let spaceDpr=1,spaceFxLast=0,spaceFxRaf=0;
+
+function wrap01(v){return ((v%1)+1)%1}
+function resizeSpaceFx(){
+  spaceDpr=Math.min(devicePixelRatio||1,1.8);
+  spaceCanvas.width=Math.max(1,Math.round(W*spaceDpr));
+  spaceCanvas.height=Math.max(1,Math.round(H*spaceDpr));
+  spaceCtx.setTransform(spaceDpr,0,0,spaceDpr,0,0);
+}
+function drawSpaceFx(now=performance.now()){
+  if(!W||!H)return;
+  const ctx=spaceCtx;
+  ctx.setTransform(spaceDpr,0,0,spaceDpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const top=(timelineShell?.getBoundingClientRect().height||126);
+  const usable=Math.max(220,H-top);
+  const t=now*.000025;
+  const lonTurn=cam.x/(Math.PI*2);
+  const latTurn=cam.y/(GLOBE_LAT_LIMIT*2);
+
+  // Deep cool glow: gives the space a centre without becoming a visible object.
+  let g=ctx.createRadialGradient(W*.55,H*.48,8,W*.55,H*.48,Math.max(W,H)*.72);
+  g.addColorStop(0,"rgba(58,116,151,.13)");
+  g.addColorStop(.38,"rgba(31,76,108,.055)");
+  g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle=g;ctx.fillRect(0,top,W,usable);
+
+  // A broad warm/cool shaft of light, inspired by the original concept image.
+  const sx=W*(.14+.025*Math.sin(cam.x*.7));
+  const sy=top+usable*(.10+.018*Math.sin(cam.y*1.9));
+  ctx.save();
+  ctx.globalCompositeOperation="screen";
+  ctx.filter="blur(10px)";
+  const beam=ctx.createLinearGradient(sx,sy,W*.78,H*.78);
+  beam.addColorStop(0,"rgba(255,230,181,.18)");
+  beam.addColorStop(.28,"rgba(189,220,235,.105)");
+  beam.addColorStop(.72,"rgba(116,177,207,.035)");
+  beam.addColorStop(1,"rgba(80,137,170,0)");
+  ctx.fillStyle=beam;
+  ctx.beginPath();
+  ctx.moveTo(sx-18,sy-10);
+  ctx.lineTo(sx+26,sy+8);
+  ctx.lineTo(W*1.02,H*.88);
+  ctx.lineTo(W*.60,H*.72);
+  ctx.closePath();
+  ctx.fill();
+  ctx.filter="none";
+
+  const sourceGlow=ctx.createRadialGradient(sx,sy,0,sx,sy,Math.max(W,H)*.30);
+  sourceGlow.addColorStop(0,"rgba(255,238,202,.24)");
+  sourceGlow.addColorStop(.20,"rgba(203,226,238,.10)");
+  sourceGlow.addColorStop(1,"rgba(130,188,215,0)");
+  ctx.fillStyle=sourceGlow;
+  ctx.fillRect(0,top,W,usable);
+  ctx.restore();
+
+  // Three-dimensional star field. Near points react more strongly to navigation,
+  // so the background has real parallax instead of reading as wallpaper.
+  for(const s of SPACE_STARS){
+    const drift=t*(.025+.07*s.z);
+    const x=wrap01(s.x-lonTurn*(.055+.16*s.z)+drift)*W;
+    const y=top+wrap01(s.y+latTurn*(.035+.10*s.z)+drift*.22)*usable;
+    const pulse=.82+.18*Math.sin(now*.0012+s.x*19+s.y*11);
+    const a=s.alpha*lerp(.42,1,s.z)*pulse;
+    const radius=s.size*lerp(.58,1.26,s.z);
+    ctx.fillStyle=s.warm
+      ?"rgba(255,222,183,"+a.toFixed(3)+")"
+      :"rgba(214,238,249,"+a.toFixed(3)+")";
+    ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();
+
+    if(s.z>.79){
+      ctx.strokeStyle="rgba(205,234,248,"+(a*.18).toFixed(3)+")";
+      ctx.lineWidth=.55;
+      ctx.beginPath();ctx.moveTo(x-radius*2.2,y);ctx.lineTo(x+radius*2.2,y);ctx.stroke();
+    }
+  }
+
+  // A handful of larger, very soft particles make the foreground atmosphere breathe.
+  for(const d of SPACE_DUST){
+    const x=wrap01(d.x-lonTurn*(.018+.055*d.z)-t*.018)*W;
+    const y=top+wrap01(d.y+latTurn*(.018+.04*d.z)+t*.006)*usable;
+    const dg=ctx.createRadialGradient(x,y,0,x,y,d.size*4.2);
+    dg.addColorStop(0,"rgba(181,220,239,"+d.alpha.toFixed(3)+")");
+    dg.addColorStop(1,"rgba(181,220,239,0)");
+    ctx.fillStyle=dg;
+    ctx.fillRect(x-d.size*4.2,y-d.size*4.2,d.size*8.4,d.size*8.4);
+  }
+}
+function spaceFxLoop(now){
+  if(now-spaceFxLast>40){
+    spaceFxLast=now;
+    drawSpaceFx(now);
+  }
+  spaceFxRaf=requestAnimationFrame(spaceFxLoop);
+}
+
 
 
 // 100 deterministic prototype memories. Their distribution is deliberately uneven:
@@ -1376,6 +1493,7 @@ function render(){
 }
 function resize(){
   const r=app.getBoundingClientRect();W=Math.max(1,r.width);H=Math.max(1,r.height);
+  resizeSpaceFx();
   const oldMin=SPACE_MIN;
   SPACE_MIN=fitOverviewScale();
   if(cam.s<=oldMin+.015)cam.s=SPACE_MIN;
@@ -1674,6 +1792,7 @@ centerMs=timeCenter;
 visualZoomPos=zoomPos;
 timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;
 resize();setBg(active);render();
+spaceFxRaf=requestAnimationFrame(spaceFxLoop);
 })();
 </script>
 </body>

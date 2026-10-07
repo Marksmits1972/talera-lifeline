@@ -238,20 +238,20 @@ function drawSpaceFx(now=performance.now()){
   const sunY=top+usable*(.20+.008*Math.cos(cam.y*.8));
   ctx.save();
   ctx.globalCompositeOperation="screen";
-  const sunHalo=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,Math.max(W,H)*.26);
-  sunHalo.addColorStop(0,"rgba(255,236,196,.085)");
-  sunHalo.addColorStop(.10,"rgba(255,225,177,.055)");
-  sunHalo.addColorStop(.38,"rgba(222,209,171,.022)");
+  const sunHalo=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,Math.max(W,H)*.31);
+  sunHalo.addColorStop(0,"rgba(255,236,196,.115)");
+  sunHalo.addColorStop(.11,"rgba(255,225,177,.070)");
+  sunHalo.addColorStop(.42,"rgba(222,209,171,.026)");
   sunHalo.addColorStop(1,"rgba(210,190,150,0)");
   ctx.fillStyle=sunHalo;
   ctx.fillRect(0,top,W,usable);
 
-  const sunCore=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,18);
-  sunCore.addColorStop(0,"rgba(255,245,216,.16)");
-  sunCore.addColorStop(.28,"rgba(255,230,186,.085)");
+  const sunCore=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,22);
+  sunCore.addColorStop(0,"rgba(255,245,216,.20)");
+  sunCore.addColorStop(.30,"rgba(255,230,186,.10)");
   sunCore.addColorStop(1,"rgba(255,220,170,0)");
   ctx.fillStyle=sunCore;
-  ctx.fillRect(sunX-22,sunY-22,44,44);
+  ctx.fillRect(sunX-28,sunY-28,56,56);
   ctx.restore();
 
   // Three-dimensional star field. Near points react more strongly to navigation.

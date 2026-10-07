@@ -140,11 +140,17 @@ const presentation=document.getElementById("presentation"),presentationImg=docum
 const timelineShell=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),focusBlock=document.getElementById("focusBlock"),focusRange=document.getElementById("focusRange");
 const zoomRead=document.getElementById("zoomRead"),hint=document.getElementById("hint"),toast=document.getElementById("toast"),magnetRing=document.getElementById("magnetRing");
 
-const BIRTH_YEAR=1972,END_YEAR=2026;
-const LIFE_START=new Date(BIRTH_YEAR,0,1).getTime();
-const LIFE_END=new Date(END_YEAR,11,31,23,59,59).getTime();
-const LIFE_MS=LIFE_END-LIFE_START;
+const BIRTH_YEAR=1972,DEFAULT_END_YEAR=2026;
 const DAY=86400000;
+const lifeYearsParam=Number(new URLSearchParams(location.search).get("lifeYears"));
+const TEST_LIFE_YEARS=Number.isFinite(lifeYearsParam)&&lifeYearsParam>=1
+  ?Math.min(120,Math.round(lifeYearsParam))
+  :null;
+const LIFE_START=new Date(BIRTH_YEAR,0,1).getTime();
+const LIFE_END=TEST_LIFE_YEARS==null
+  ?new Date(DEFAULT_END_YEAR,11,31,23,59,59).getTime()
+  :new Date(BIRTH_YEAR+TEST_LIFE_YEARS,0,1).getTime()-1;
+const LIFE_MS=LIFE_END-LIFE_START;
 let SPACE_MIN=.20;
 const SPACE_MAX=2.0,SWIPE_SPACE=1.66;
 const SPACE_VIEW_SCALE=1.08;
@@ -295,10 +301,17 @@ const EXTRA_MEMORIES=(()=>{
   // original reference memories. Synthetic photos are unique seeded sources
   // and remain lazy-loaded so the browser never downloads all 1000 at once.
   const TARGET_TOTAL_MEMORIES=3000;
-  const targetExtra=Math.max(0,TARGET_TOTAL_MEMORIES-MEMORIES.length);
+  const inRangeReferenceCount=MEMORIES.reduce((n,s)=>{
+    const ms=new Date(s.at).getTime();
+    return n+(ms>=LIFE_START&&ms<=LIFE_END?1:0);
+  },0);
+  const targetExtra=Math.max(0,TARGET_TOTAL_MEMORIES-inRangeReferenceCount);
+  const simulatedLifeYears=Math.max(1,(LIFE_END-LIFE_START)/(365.2425*DAY));
+  const bandReferenceYears=55;
 
   // Uneven life-density on purpose: some sparse periods, some very dense ones.
-  // This is closer to a real photo library than an evenly spaced test grid.
+  // Band ages below describe the current ~55-year reference life. For a 10-year
+  // or 80-year simulation the entire density pattern scales with life duration.
   const bands=[
     {a0:.4,a1:5.5,w:4},
     {a0:5.5,a1:11,w:5},
@@ -404,7 +417,8 @@ const EXTRA_MEMORIES=(()=>{
       .04+.92*fract((n+1)*2.317 + Math.floor(sequence*97)*.71),
       .02,.98
     );
-    const age=band.a0+(band.a1-band.a0)*q;
+    const referenceAge=band.a0+(band.a1-band.a0)*q;
+    const age=(referenceAge/bandReferenceYears)*simulatedLifeYears;
     let ms=LIFE_START+age*365.2425*DAY;
     const d=new Date(ms);
     d.setHours(
@@ -432,7 +446,13 @@ const EXTRA_MEMORIES=(()=>{
   }
   return out;
 })();
-const ALL_MEMORIES=[...MEMORIES,...EXTRA_MEMORIES];
+const ALL_MEMORIES=[
+  ...MEMORIES.filter(s=>{
+    const ms=new Date(s.at).getTime();
+    return ms>=LIFE_START&&ms<=LIFE_END;
+  }),
+  ...EXTRA_MEMORIES
+];
 
 
 
@@ -455,7 +475,22 @@ const GOLDEN_ANGLE=2.399963229728653;
 const WORLD_REFERENCE_COUNT=150;
 const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,10);
 const SHELL_REFERENCE_RADIUS=395;
-const ELLIPSE_VERTICAL_RATIO=1.25;
+const ELLIPSE_CIRCLE_UNTIL_YEARS=10;
+const ELLIPSE_REFERENCE_LIFE_YEARS=55;
+const ELLIPSE_REFERENCE_VERTICAL_RATIO=1.25;
+const ELLIPSE_MAX_VERTICAL_RATIO=1.65;
+function ellipseRatioForLifeYears(years){
+  if(years<=ELLIPSE_CIRCLE_UNTIL_YEARS)return 1;
+  const growthPerYear=
+    (ELLIPSE_REFERENCE_VERTICAL_RATIO-1)/
+    (ELLIPSE_REFERENCE_LIFE_YEARS-ELLIPSE_CIRCLE_UNTIL_YEARS);
+  return clamp(
+    1+(years-ELLIPSE_CIRCLE_UNTIL_YEARS)*growthPerYear,
+    1,
+    ELLIPSE_MAX_VERTICAL_RATIO
+  );
+}
+const ELLIPSE_VERTICAL_RATIO=ellipseRatioForLifeYears(LIFE_YEARS);
 const ELLIPSE_HORIZONTAL_RADIUS=SHELL_REFERENCE_RADIUS*WORLD_DENSITY_SCALE;
 const ELLIPSE_VERTICAL_RADIUS=ELLIPSE_HORIZONTAL_RADIUS*ELLIPSE_VERTICAL_RATIO;
 const TAU=Math.PI*2;
@@ -562,7 +597,7 @@ function fitOverviewScale(){
   return clamp(.58*responsive,.52,.66);
 }
 
-const overviewAnchorAges=[5,17,30,42,54];
+const overviewAnchorAges=[5,17,30,42,54].map(age=>age/55*LIFE_YEARS);
 const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
   let best=0,bd=Infinity;
   data.forEach((s,i)=>{

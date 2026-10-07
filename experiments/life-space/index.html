@@ -2081,12 +2081,14 @@ function chronologicalLayerIndices(excluded,beforeCount,afterCount,targetTotal=b
 function renderEchoField(raw,visibleSet,alpha){
   renderedEchoCards.clear();
   const centreY=H*.54;
-  const chronologicalIds=chronologicalLayerIndices(visibleSet,7,7,ECHO_COUNT);
+  const centre=nearestMemoryToTime(timeCenter);
   const candidates=[];
+  const used=new Set(visibleSet);
 
-  for(const i of chronologicalIds){
+  function candidateFor(i){
     const story=data[i];
-    if(!story)continue;
+    if(!story||used.has(i))return null;
+
     const r=projectMemoryAt(story,middleCam.x,middleCam.y);
     const d=clamp(r.depth,0,1);
     const scatterX=(fract(story.id+1301)-.5)*W*lerp(.26,.08,d);
@@ -2094,7 +2096,44 @@ function renderEchoField(raw,visibleSet,alpha){
     const x=r.x+scatterX;
     const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
     const y=centreY+(r.y-centreY)*echoVerticalCompensation+scatterY;
-    candidates.push({i,x,y,depth:d});
+
+    // The chronological neighbours may live anywhere around the globe.
+    // Only promote neighbours that are actually close enough to cross the screen.
+    if(x<-84||x>W+84||y<92||y>H+72)return null;
+    return {i,x,y,depth:d};
+  }
+
+  function takeDirection(direction,count){
+    let taken=0;
+    for(let step=1;step<data.length&&taken<count;step++){
+      const i=centre+direction*step;
+      if(i<0||i>=data.length)break;
+      const cand=candidateFor(i);
+      if(!cand)continue;
+      candidates.push(cand);
+      used.add(i);
+      taken++;
+    }
+  }
+
+  // Keep the intended chronological structure: seven before and seven after,
+  // but scan far enough along the timeline to find ones that are spatially visible.
+  takeDirection(-1,7);
+  takeDirection(1,7);
+
+  // At the start/end of a life, or on an awkward longitude, fill any remaining
+  // slots with the nearest visible chronological neighbours from either side.
+  if(candidates.length<ECHO_COUNT){
+    for(let step=1;step<data.length&&candidates.length<ECHO_COUNT;step++){
+      for(const i of [centre-step,centre+step]){
+        if(i<0||i>=data.length)continue;
+        const cand=candidateFor(i);
+        if(!cand)continue;
+        candidates.push(cand);
+        used.add(i);
+        if(candidates.length>=ECHO_COUNT)break;
+      }
+    }
   }
 
   const candidateById=new Map(candidates.map(c=>[c.i,c]));
@@ -2174,44 +2213,56 @@ function renderEchoField(raw,visibleSet,alpha){
 
 function renderFarEchoField(raw,visibleSet,middleSet,alpha){
   const centreY=H*.54;
-  const candidates=[];
+  const centre=nearestMemoryToTime(timeCenter);
   const excluded=new Set([...visibleSet,...middleSet]);
-  const farIds=new Set(chronologicalLayerIndices(excluded,4,3,FAR_ECHO_COUNT));
+  const candidates=[];
+  const used=new Set(excluded);
 
-  data.forEach((s,i)=>{
-    if(!farIds.has(i))return;
+  function candidateFor(i){
+    const s=data[i];
+    if(!s||used.has(i))return null;
+
     const r=projectMemoryAt(s,farCam.x,farCam.y);
     const d=clamp(r.depth,0,1);
-
-    // Third layer uses its own slow 30% camera in the normal direction.
     const scatterX=(fract(s.id+3109)-.5)*W*.54;
     const scatterY=(fract(s.id+3251)-.5)*H*.42;
     const x=r.x+scatterX;
     const echoVerticalCompensation=Math.min(1,ECHO_REFERENCE_RATIO/ELLIPSE_VERTICAL_RATIO);
-    const y=centreY+
-      (r.y-centreY)*echoVerticalCompensation+
-      scatterY;
+    const y=centreY+(r.y-centreY)*echoVerticalCompensation+scatterY;
 
-    if(x<-60||x>W+60||y<100||y>H+60)return;
+    // Deep photos must still be visibly present. Scan chronology until a photo
+    // actually lands in the visual field instead of reserving off-screen slots.
+    if(x<-66||x>W+66||y<106||y>H+58)return null;
+    return {i,x,y,depth:d};
+  }
 
-    const temporal=Math.exp(-.5*Math.pow(
-      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*2.2,365*DAY*8),2
-    ));
-    const farBias=1-d;
-    const score=farBias*.46+temporal*.20+.22*(1-s.representative)+.12*fract(s.id+3413);
-    candidates.push({i,score,x,y,depth:d});
-  });
-
-  candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
-
-  const chosen=[];
-  for(const cand of candidates){
-    if(chosen.length>=FAR_ECHO_COUNT)break;
-    let tooClose=false;
-    for(const p of chosen){
-      if(Math.hypot(cand.x-p.x,cand.y-p.y)<52){tooClose=true;break}
+  function takeDirection(direction,count){
+    let taken=0;
+    for(let step=1;step<data.length&&taken<count;step++){
+      const i=centre+direction*step;
+      if(i<0||i>=data.length)break;
+      const cand=candidateFor(i);
+      if(!cand)continue;
+      candidates.push(cand);
+      used.add(i);
+      taken++;
     }
-    if(!tooClose)chosen.push(cand);
+  }
+
+  takeDirection(-1,4);
+  takeDirection(1,3);
+
+  if(candidates.length<FAR_ECHO_COUNT){
+    for(let step=1;step<data.length&&candidates.length<FAR_ECHO_COUNT;step++){
+      for(const i of [centre-step,centre+step]){
+        if(i<0||i>=data.length)continue;
+        const cand=candidateFor(i);
+        if(!cand)continue;
+        candidates.push(cand);
+        used.add(i);
+        if(candidates.length>=FAR_ECHO_COUNT)break;
+      }
+    }
   }
 
   const farCandidateById=new Map(candidates.map(c=>[c.i,c]));
@@ -2230,10 +2281,10 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
   let farNext=0;
   for(let slot=0;slot<FAR_ECHO_COUNT;slot++){
     if(farSlotCandidates[slot])continue;
-    while(farNext<chosen.length&&farUsedIds.has(chosen[farNext].i))farNext++;
-    if(farNext<chosen.length){
-      farSlotCandidates[slot]=chosen[farNext];
-      farUsedIds.add(chosen[farNext].i);
+    while(farNext<candidates.length&&farUsedIds.has(candidates[farNext].i))farNext++;
+    if(farNext<candidates.length){
+      farSlotCandidates[slot]=candidates[farNext];
+      farUsedIds.add(candidates[farNext].i);
       farNext++;
     }
   }
@@ -2258,14 +2309,14 @@ function renderFarEchoField(raw,visibleSet,middleSet,alpha){
     const d=clamp(cand.depth,0,1);
     const random=.86+.28*fract(s.id+3511);
     const size=lerp(.42,.68,d)*random;
-    const opacity=(1-alpha)*lerp(.25,.35,d);
+    const opacity=(1-alpha)*lerp(.36,.50,d);
     const assignmentAge=performance.now()-farEchoAssignmentStartedAt[slot];
     const assignmentReveal=smooth(0,1,assignmentAge/360);
     if(assignmentReveal<.999)requestSceneTransitionFrame();
 
     const img=el.querySelector("img");
     img.style.filter="blur(.01px) saturate(1.18) brightness(1.06) contrast(1.10)";
-    el.style.opacity=(clamp(opacity,.19,.34)*assignmentReveal).toFixed(3);
+    el.style.opacity=(clamp(opacity,.32,.52)*assignmentReveal).toFixed(3);
     el.style.transform="translate3d("+(cand.x-23)+"px,"+(cand.y-17)+"px,0) scale("+size.toFixed(3)+")";
     el.style.zIndex="1";
   }

@@ -531,11 +531,12 @@ function shellSurfaceDistanceFromCamera(s){
   return Math.hypot(dx,dy);
 }
 
-// Ergonomic finger->surface calibration. The previous 2.455 value made the
-// foreground outrun the finger once the 10/7/3 depth bands were introduced.
-// 1.72 is ~70% of that travel: the front layer now follows the hand directly,
-// while the middle (0.70) and far (0.30) bands visibly lag behind it.
-const SHELL_DRAG_PER_PX=1.72;
+// Finger control is anchored to the foreground cards. The former 1.72 gain
+// made the large front photos travel roughly three times too fast, which made
+// the 30% middle layer feel like the layer attached to the finger.
+// Lowering the shell gain makes the large foreground photos track the hand;
+// middle and far layers remain slower parallax followers.
+const SHELL_DRAG_PER_PX=.56;
 
 // Drag stays direct under the finger, but a released "push" must not launch the
 // foreground like a slingshot. Lower top speed + longer decay = calmer motion

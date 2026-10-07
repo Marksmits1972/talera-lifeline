@@ -2449,25 +2449,32 @@ function mid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
 function lerpLon(a,b,t){return wrapLon(a+wrapLon(b-a)*t)}
 
 function storyAtScreenPoint(p){
-  let best=null,bd=Infinity;
+  // Compare foreground and second-layer targets by how precisely the finger
+  // lands inside each touch zone. A direct tap on a small recognised echo can
+  // therefore beat the broad comfort radius of a nearby large card.
+  let best=null,bestScore=Infinity;
+  const foregroundRadius=overviewBlendForScale()>.45?105:88;
+
   for(const [i,r] of renderedCards){
     if(!r||!r.selected||r.opacity<.20)continue;
     const d=Math.hypot(r.x-p.x,r.y-p.y);
-    if(d<bd){bd=d;best=i}
+    const score=d/foregroundRadius;
+    if(score<=1&&score<bestScore){
+      bestScore=score;
+      best=i;
+    }
   }
-  const radius=overviewBlendForScale()>.45?105:88;
-  if(bd<=radius)return best;
 
-  let echoBest=null,echoDistance=Infinity;
   for(const [i,r] of renderedEchoCards){
     if(!r||r.opacity<.20)continue;
     const d=Math.hypot(r.x-p.x,r.y-p.y);
-    if(d<=r.hitRadius&&d<echoDistance){
-      echoDistance=d;
-      echoBest=i;
+    const score=d/r.hitRadius;
+    if(score<=1&&score<bestScore){
+      bestScore=score;
+      best=i;
     }
   }
-  return echoBest;
+  return best;
 }
 
 function stopGlobeInertia(keepMomentum=false){

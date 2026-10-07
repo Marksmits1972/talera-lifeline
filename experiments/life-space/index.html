@@ -1470,12 +1470,12 @@ function startGlobeInertia(vLon,vLat){
     syncTimeFromSpace();
     render();
 
-    // Map-like inertial friction: fast flicks travel, soft pushes settle nearby.
-    const decay=Math.exp(-dt/430);
+    // Same fling response, but with a heavier world that settles sooner.
+    const decay=Math.exp(-dt/300);
     vLon*=decay;
     vLat*=decay;
 
-    if(lived<1350&&Math.hypot(vLon,vLat)>.000024){
+    if(lived<1050&&Math.hypot(vLon,vLat)>.000028){
       globeInertiaRaf=requestAnimationFrame(frame);
     }else{
       globeInertiaRaf=0;

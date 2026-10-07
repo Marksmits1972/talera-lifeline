@@ -412,12 +412,6 @@ let timelineSpanYears=15;
 let timelineUser=false;
 let lastMagneticIds=new Set(),magneticIds=new Set();
 let renderedCards=[];
-let previousVisibleSet=new Set();
-let visibleSetReady=false;
-const cardEntryStates=new Map();
-let cardEntryRaf=0;
-let lastRenderCamX=cam.x,lastRenderCamY=cam.y;
-let entryMotionX=0,entryMotionY=0,entryMotionAt=0;
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
@@ -1315,69 +1309,6 @@ function composeForeground(raw,visibleSet){
   return map;
 }
 
-function updateEntryMotion(now){
-  const dx=wrapLon(cam.x-lastRenderCamX);
-  const dy=cam.y-lastRenderCamY;
-  lastRenderCamX=cam.x;
-  lastRenderCamY=cam.y;
-
-  // Convert camera motion to the side from which new screen content should enter.
-  // Longitude + means cards travel left, so new cards arrive from the right.
-  // Latitude + means cards travel down, so new cards arrive from the top.
-  const vx=dx*Math.max(320,W);
-  const vy=-dy*Math.max(420,H);
-  const mag=Math.hypot(vx,vy);
-  if(mag>.018){
-    entryMotionX=vx/mag;
-    entryMotionY=vy/mag;
-    entryMotionAt=now;
-  }
-}
-
-function updateCardEntries(visibleSet,composed,now){
-  if(!visibleSetReady){
-    previousVisibleSet=new Set(visibleSet);
-    visibleSetReady=true;
-    return;
-  }
-
-  for(const i of [...cardEntryStates.keys()]){
-    if(!visibleSet.has(i))cardEntryStates.delete(i);
-  }
-
-  for(const i of visibleSet){
-    if(previousVisibleSet.has(i)||cardEntryStates.has(i))continue;
-    const p=composed.get(i);
-    if(!p)continue;
-
-    let fromX=p.x,fromY=p.y;
-    const directional=now-entryMotionAt<620;
-
-    if(directional){
-      const top=(timelineShell?.getBoundingClientRect().height||126)+18;
-      if(Math.abs(entryMotionX)>=Math.abs(entryMotionY)*.82){
-        fromX=entryMotionX>=0?W+92:-92;
-        fromY=clamp(p.y+entryMotionY*54,top-70,H+70);
-      }else{
-        fromY=entryMotionY>=0?H+104:top-104;
-        fromX=clamp(p.x+entryMotionX*68,-90,W+90);
-      }
-    }
-
-    cardEntryStates.set(i,{started:now,fromX,fromY});
-  }
-
-  previousVisibleSet=new Set(visibleSet);
-}
-
-function keepCardEntriesAnimating(){
-  if(!cardEntryStates.size||cardEntryRaf)return;
-  cardEntryRaf=requestAnimationFrame(()=>{
-    cardEntryRaf=0;
-    render();
-  });
-}
-
 function chooseMagneticSet(){
   // No screen-space magnet on the globe. A photo stays where it actually is
   // on the sphere, so everything the user sees remains spatially trustworthy.
@@ -1456,8 +1387,6 @@ function renderEchoField(raw,visibleSet,alpha){
 }
 
 function render(){
-  const renderNow=performance.now();
-  updateEntryMotion(renderNow);
   if(!timelineUser&&typeof centerMs!=="undefined")centerMs=timeCenter;
   active=spatialPinchTarget!=null?spatialPinchTarget:nearestMemoryToFocus();
   const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];
@@ -1488,7 +1417,6 @@ function render(){
   renderEchoField(raw,visibleSet,alpha);
   chooseMagneticSet(raw,alpha);
   const composed=composeForeground(raw,visibleSet);
-  updateCardEntries(visibleSet,composed,renderNow);
 
   const relevance=[...visibleSet].map(i=>{
     const s=data[i],r=raw[i],p=composed.get(i)||r;
@@ -1523,18 +1451,6 @@ function render(){
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
     scale=clamp(scale,.64,1.34);
 
-    let drawX=p.x,drawY=p.y;
-    const entry=selected?cardEntryStates.get(i):null;
-    if(entry){
-      const t=clamp((renderNow-entry.started)/300,0,1);
-      const ease=1-Math.pow(1-t,3);
-      drawX=lerp(entry.fromX,p.x,ease);
-      drawY=lerp(entry.fromY,p.y,ease);
-      opacity*=smooth(0,1,t);
-      scale*=lerp(.90,1,ease);
-      if(t>=1)cardEntryStates.delete(i);
-    }
-
     if(selected&&opacity>.025)ensureCardImage(i);
     const el=nodes[i];
     const img=el.querySelector("img");
@@ -1542,15 +1458,14 @@ function render(){
     el.style.opacity=opacity.toFixed(3);
     el.style.pointerEvents=opacity>.24?"auto":"none";
     el.style.zIndex=String(540+Math.round(depth*180)+(rank===0?105:rank===1?72:0)-Math.min(45,rank*7));
-    el.style.transform="translate3d("+(drawX-66)+"px,"+(drawY-87)+"px,0) scale("+scale.toFixed(3)+")";
+    el.style.transform="translate3d("+(p.x-66)+"px,"+(p.y-87)+"px,0) scale("+scale.toFixed(3)+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);
     el.classList.remove("magnetic");
-    renderedCards[i]={x:drawX,y:drawY,opacity,magnetic:false,selected};
+    renderedCards[i]={x:p.x,y:p.y,opacity,magnetic:false,selected};
   });
 
   magnetRing.style.left="16px";magnetRing.style.right="16px";magnetRing.style.top="140px";magnetRing.style.bottom="92px";
   drawTimeline();
-  keepCardEntriesAnimating();
 
   hint.innerHTML=timelineUser
     ? '<b>De tijdbalk beweegt over de levensas.</b> Je longitude blijft staan terwijl je door de jaren gaat.'

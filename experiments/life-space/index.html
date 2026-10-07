@@ -1743,17 +1743,22 @@ function foregroundStoryRoles(raw){
   const heroMotionTotal=Math.abs(heroMotion.x)+Math.abs(heroMotion.y)+.0001;
   const heroVertical=smooth(.38,.78,Math.abs(heroMotion.y)/heroMotionTotal);
   const heroWindow=Math.min(
-    Math.max(timelineSpanMs()*.58,420*DAY)*lerp(1,1.75,heroVertical),
-    6.4*365.2425*DAY
+    Math.max(timelineSpanMs()*.64,500*DAY)*lerp(1,1.90,heroVertical),
+    7.5*365.2425*DAY
   );
 
   function heroUsable(i,loose=false){
     if(i==null||!data[i]||!raw[i])return false;
-    if(Math.abs(data[i].ms-timeCenter)>heroWindow*(loose?1.25:1))return false;
+
+    // The dominant card gets a much wider hold window while the user travels
+    // vertically through time. Previously it lost rank 0 too quickly, often
+    // before it had finished crossing the readable centre of the screen.
+    const heroHold=loose?lerp(1.45,2.65,heroVertical):1;
+    if(Math.abs(data[i].ms-timeCenter)>heroWindow*heroHold)return false;
     const q=raw[i];
-    const xPad=loose?W*lerp(.20,.34,heroVertical):lerp(26,W*.12,heroVertical);
-    const topPad=loose?lerp(90,170,heroVertical):lerp(18,70,heroVertical);
-    const bottomPad=loose?lerp(115,205,heroVertical):lerp(44,105,heroVertical);
+    const xPad=loose?W*lerp(.24,.42,heroVertical):lerp(30,W*.15,heroVertical);
+    const topPad=loose?lerp(110,220,heroVertical):lerp(24,82,heroVertical);
+    const bottomPad=loose?lerp(135,260,heroVertical):lerp(52,122,heroVertical);
     return q.x>-xPad&&q.x<W+xPad&&
       q.y>timelineBottom-topPad&&q.y<H+bottomPad;
   }

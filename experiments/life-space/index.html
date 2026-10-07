@@ -476,10 +476,10 @@ const WORLD_REFERENCE_COUNT=150;
 const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,10);
 const SHELL_REFERENCE_RADIUS=395;
 const ELLIPSE_BASE_LIFE_YEARS=10;
-const ELLIPSE_BASE_VERTICAL_RATIO=1.15;
+const ELLIPSE_BASE_VERTICAL_RATIO=1.12;
 const ELLIPSE_REFERENCE_LIFE_YEARS=55;
-const ELLIPSE_REFERENCE_VERTICAL_RATIO=1.38;
-const ELLIPSE_MAX_VERTICAL_RATIO=1.80;
+const ELLIPSE_REFERENCE_VERTICAL_RATIO=1.30;
+const ELLIPSE_MAX_VERTICAL_RATIO=1.63;
 function ellipseRatioForLifeYears(years){
   if(years<=ELLIPSE_BASE_LIFE_YEARS)return ELLIPSE_BASE_VERTICAL_RATIO;
   const growthPerYear=
@@ -2278,8 +2278,8 @@ app.addEventListener("touchmove",e=>{
       const shellGain=lerp(.56,1.06,gear)*lerp(1,.76,precisionWeight);
 
       // Both directions move the same concrete distance over the shell.
-      // The 25% longer vertical ellipse converts that distance into less
-      // north/south rotation, creating more physical room for life time.
+      // The age-driven vertical ellipse converts that distance into less
+      // north/south rotation, creating proportionate physical room for life time.
       const dShellLon=-dx*SHELL_DRAG_PER_PX*nav*shellGain;
       const dShellLat=dy*SHELL_DRAG_PER_PX*nav*shellGain;
       cam.x=wrapLon(cam.x+shellLonDistanceToRotation(dShellLon));

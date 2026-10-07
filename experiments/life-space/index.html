@@ -1041,8 +1041,11 @@ function openStorySmooth(i){
   const targetIndex=clamp(i,0,data.length-1);
   const target=data[targetIndex];
   if(!target)return;
-  const source=memoryNode(targetIndex,false)||echoNodeForMemory(targetIndex);
+  const visibleEcho=renderedEchoCards.has(targetIndex)?echoNodeForMemory(targetIndex):null;
+  const visibleForeground=renderedCards.has(targetIndex)?memoryNode(targetIndex,false):null;
+  const source=visibleEcho||visibleForeground||memoryNode(targetIndex,false)||echoNodeForMemory(targetIndex);
   if(!source){focusStory(targetIndex);return;}
+  const sourceLayer=visibleEcho?"middle":"foreground";
 
   stopGlobeInertia();
   cancelAnimationFrame(storyOpenRaf);
@@ -1051,21 +1054,36 @@ function openStorySmooth(i){
   ensureCardImage(targetIndex);
   setBg(targetIndex);
 
-  // Remember the exact universe view so the same card can later be sent
-  // back to the exact place it came from.
+  const appRect=app.getBoundingClientRect();
+  const sourceRect=source.getBoundingClientRect();
+
+  // Remember not only the camera but also which depth layer the story came
+  // from. A second-layer story must be able to travel back into that exact
+  // layer instead of being forced through a temporary foreground position.
   if(cam.s<SWIPE_SPACE){
     spaceReturnState={
       storyIndex:targetIndex,
+      sourceLayer,
+      sourceRect:{
+        left:sourceRect.left-appRect.left,
+        top:sourceRect.top-appRect.top,
+        width:sourceRect.width,
+        height:sourceRect.height
+      },
       camX:cam.x,
       camY:cam.y,
       camS:cam.s,
+      middleCamX:middleCam.x,
+      middleCamY:middleCam.y,
+      farCamX:farCam.x,
+      farCamY:farCam.y,
       timeCenter,
-      centerMs:typeof centerMs!=="undefined"?centerMs:timeCenter
+      centerMs:typeof centerMs!=="undefined"?centerMs:timeCenter,
+      stableHeroIndex,
+      stableForeground:[...stableForegroundSet],
+      foregroundRanks:[...foregroundLastRoleRank.entries()]
     };
   }
-
-  const appRect=app.getBoundingClientRect();
-  const sourceRect=source.getBoundingClientRect();
 
   // If the card is somehow not measurable, fall back to the same target,
   // never to another story.
@@ -1172,14 +1190,24 @@ function closeStorySmooth(i=active){
   // user swiped to another story in presentation, use the same zoom level but
   // centre the universe around that new memory.
   const exact=spaceReturnState&&spaceReturnState.storyIndex===targetIndex;
-  const returnScale=SPACE_VIEW_SCALE;
+  const returnLayer=exact?(spaceReturnState.sourceLayer||"foreground"):"foreground";
+  const returnScale=exact?clamp(spaceReturnState.camS,SPACE_MIN,SWIPE_SPACE-.01):SPACE_VIEW_SCALE;
 
   if(exact){
     cam.x=spaceReturnState.camX;
     cam.y=spaceReturnState.camY;
     cam.s=returnScale;
+    middleCam.x=spaceReturnState.middleCamX??cam.x;
+    middleCam.y=spaceReturnState.middleCamY??cam.y;
+    farCam.x=spaceReturnState.farCamX??cam.x;
+    farCam.y=spaceReturnState.farCamY??cam.y;
+    lastLayerSourceCamX=cam.x;
+    lastLayerSourceCamY=cam.y;
     timeCenter=spaceReturnState.timeCenter;
     if(typeof centerMs!=="undefined")centerMs=spaceReturnState.centerMs;
+    stableHeroIndex=spaceReturnState.stableHeroIndex??null;
+    stableForegroundSet=new Set(spaceReturnState.stableForeground||[]);
+    foregroundLastRoleRank=new Map(spaceReturnState.foregroundRanks||[]);
   }else{
     cam.x=target.lon;
     cam.y=target.lat;
@@ -1188,20 +1216,36 @@ function closeStorySmooth(i=active){
     if(typeof centerMs!=="undefined")centerMs=timeCenter;
   }
 
-  // Force the returning story to be represented while we measure its true
-  // destination in the photo universe.
+  // Rebuild the space first. Foreground stories may still be forced into the
+  // readable layer, but a story opened from layer two is deliberately allowed
+  // to reappear in layer two so the reverse motion has a real destination.
   active=targetIndex;
-  spatialPinchTarget=targetIndex;
+  spatialPinchTarget=returnLayer==="middle"?null:targetIndex;
   spatialPinchStrength=0;
   world.style.transition="none";
   world.style.opacity=".14";
   world.style.filter="blur(3px)";
   render();
 
-  const destinationNode=memoryNode(targetIndex,false);
-  if(!destinationNode)return;
-  const destination=destinationNode.getBoundingClientRect();
-  destinationNode.style.visibility="hidden";
+  let destinationNode=returnLayer==="middle"
+    ?echoNodeForMemory(targetIndex)
+    :memoryNode(targetIndex,false);
+
+  // The saved rectangle is a safety net for one-frame assignment changes. It
+  // still sends the photo to exactly the place the user originally tapped.
+  const savedRect=exact?spaceReturnState.sourceRect:null;
+  const destination=destinationNode
+    ?destinationNode.getBoundingClientRect()
+    :savedRect
+      ?{
+          left:appRect.left+savedRect.left,
+          top:appRect.top+savedRect.top,
+          width:savedRect.width,
+          height:savedRect.height
+        }
+      :null;
+  if(!destination)return;
+  if(destinationNode)destinationNode.style.visibility="hidden";
 
   // Presentation is now covered by the full-screen clone. Bring the universe
   // back while the same photo flies home.
@@ -1217,10 +1261,12 @@ function closeStorySmooth(i=active){
       clone.style.top=(destination.top-appRect.top)+"px";
       clone.style.width=destination.width+"px";
       clone.style.height=destination.height+"px";
-      clone.style.borderRadius=getComputedStyle(destinationNode).borderRadius||"18px";
-      clone.style.boxShadow=getComputedStyle(destinationNode).boxShadow;
-      if(cloneCopy)cloneCopy.style.opacity="1";
-      if(cloneShade)cloneShade.style.opacity="1";
+      clone.style.borderRadius=destinationNode
+        ?(getComputedStyle(destinationNode).borderRadius||"18px")
+        :(returnLayer==="middle"?"7px":"18px");
+      clone.style.boxShadow=destinationNode?getComputedStyle(destinationNode).boxShadow:"none";
+      if(cloneCopy)cloneCopy.style.opacity=returnLayer==="middle"?"0":"1";
+      if(cloneShade)cloneShade.style.opacity=returnLayer==="middle"?"0":"1";
     });
   });
 
@@ -1232,7 +1278,9 @@ function closeStorySmooth(i=active){
       return;
     }
 
-    const restoredNode=memoryNode(targetIndex,false);
+    const restoredNode=returnLayer==="middle"
+      ?echoNodeForMemory(targetIndex)
+      :memoryNode(targetIndex,false);
     if(restoredNode)restoredNode.style.visibility="";
     spatialPinchTarget=null;
     spatialPinchStrength=0;

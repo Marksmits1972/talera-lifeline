@@ -1421,22 +1421,23 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
   stopGlobeInertia();
   if(cam.s>=SWIPE_SPACE)return;
 
-  // A second push in roughly the same direction adds to the motion already
-  // present, like giving a rolling ball another shove.
-  const freshMag=Math.hypot(vLon,vLat);
-  const carryMag=Math.hypot(carryLon,carryLat);
-  if(freshMag>.00001&&carryMag>.00001){
-    const alignment=(vLon*carryLon+vLat*carryLat)/(freshMag*carryMag);
-    if(alignment>.12){
-      const add=.72*clamp((alignment-.12)/.88,0,1);
-      vLon+=carryLon*add;
-      vLat+=carryLat*add;
-    }
+  // Speed should be visible in the photo field, not explode the life date.
+  // A harder horizontal flick gets a little extra launch; a second push in
+  // the same horizontal direction adds to the rolling motion already present.
+  const freshLon=Math.abs(vLon);
+  const launchBoost=lerp(1,1.42,smooth(.00055,.0027,freshLon));
+  vLon*=launchBoost;
+
+  if(Math.abs(carryLon)>.00002&&Math.sign(carryLon)===Math.sign(vLon)){
+    const carryStrength=.78*smooth(.00010,.0028,Math.abs(carryLon));
+    vLon+=carryLon*carryStrength;
   }
 
-  // Gentle pushes stay gentle; faster flicks are allowed to launch faster.
-  vLon=clamp(vLon,-.0048,.0048);
-  vLat=clamp(vLat,-.00315,.00315);
+  // Vertical inertia is deliberately conservative: north/south is life time.
+  // The finger can still move through time directly, but release momentum may
+  // only coast a little and never stacks from a second push.
+  vLon=clamp(vLon,-.0074,.0074);
+  vLat=clamp(vLat,-.00038,.00038);
   if(Math.hypot(vLon,vLat)<.000055)return;
 
   globeMomentumLon=vLon;
@@ -1459,10 +1460,10 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
     syncTimeFromSpace();
     render();
 
-    // Same heavy braking as before; only the launch speed can now vary more.
-    const decay=Math.exp(-dt/300);
-    globeMomentumLon*=decay;
-    globeMomentumLat*=decay;
+    // Horizontal rolling keeps the familiar brake; time-axis momentum damps
+    // more quickly so browsing remains controllable.
+    globeMomentumLon*=Math.exp(-dt/300);
+    globeMomentumLat*=Math.exp(-dt/180);
 
     if(lived<1050&&Math.hypot(globeMomentumLon,globeMomentumLat)>.000028){
       globeInertiaRaf=requestAnimationFrame(frame);
@@ -1478,7 +1479,7 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
 app.addEventListener("touchstart",e=>{
   if(e.target.closest("button,#timelineShell"))return;
   const carryLon=globeInertiaRaf?globeMomentumLon:0;
-  const carryLat=globeInertiaRaf?globeMomentumLat:0;
+  const carryLat=0;
   stopGlobeInertia(true);
   e.preventDefault();hint.style.display="none";
 

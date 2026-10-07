@@ -1373,22 +1373,24 @@ function render(){
 
     let opacity=0;
     if(selected){
-      opacity=[.99,.96,.93,.90,.87,.84][Math.min(rank,5)]||.84;
+      opacity=[1,.99,.97,.90,.86,.82][Math.min(rank,5)]||.82;
       opacity*=lerp(.88,1,depth)*(1-alpha*.94);
     }
     if(i===active&&selected)opacity=Math.max(opacity,(1-alpha)*.96);
 
-    // Five memories should read as a group, not one hero plus four leftovers.
+    // Two or three memories sit clearly in the foreground; the others support them.
     let scale=lerp(.72,1.02,depth);
-    const rankScale=[1.08,1.02,.98,.94,.91,.88][Math.min(rank,5)]||.88;
+    const rankScale=[1.18,1.12,1.07,.94,.90,.87][Math.min(rank,5)]||.87;
     scale*=rankScale;
     const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
-    scale=clamp(scale,.64,1.18);
+    scale=clamp(scale,.64,1.24);
 
     if(selected&&opacity>.025)ensureCardImage(i);
     const el=nodes[i];
+    const img=el.querySelector("img");
+    if(img)img.style.filter=rank<3?"contrast(1.035) saturate(1.025)":"contrast(.985) saturate(.97)";
     el.style.opacity=opacity.toFixed(3);
     el.style.pointerEvents=opacity>.24?"auto":"none";
     el.style.zIndex=String(540+Math.round(depth*180)+(i===hero1?70:0)-Math.min(45,rank*7));

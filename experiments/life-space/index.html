@@ -533,27 +533,84 @@ const OVERVIEW_ANCHORS=overviewAnchorAges.map(age=>{
 }).filter((v,i,a)=>a.indexOf(v)===i);
 const OVERVIEW_ANCHOR_SET=new Set(OVERVIEW_ANCHORS);
 
-// With large libraries we load images only when a card is actually relevant.
+// With large libraries, data can contain thousands of memories while only a
+// handful of real DOM cards exist. Foreground cards are virtualized and created
+// only when they are actually part of the current view.
 function thumbUrl(s){
   return s.synthetic?s.image:s.image.replace("w=1400","w=620");
 }
-const loadedCards=new Set();
-function ensureCardImage(i){
-  if(loadedCards.has(i))return;
-  loadedCards.add(i);
-  const img=nodes[i]?.querySelector("img");
-  if(img)img.src=thumbUrl(data[i]);
-}
 
-const nodes=data.map(s=>{
+const nodes=new Map();
+const preloadedThumbs=new Set();
+
+function createMemoryNode(i){
+  const s=data[i];
+  if(!s)return null;
   const el=document.createElement("article");
   el.className="memory";
+  el.dataset.memoryIndex=String(i);
   el.innerHTML='<img alt=""><div class="memoryShade"></div><div class="memoryCopy"><div class="memoryText"></div><div class="memoryDate"></div></div>';
-  const img=el.querySelector("img");img.loading="lazy";img.decoding="async";img.onerror=()=>img.style.opacity=".15";
-  el.querySelector(".memoryText").textContent=s.story;el.querySelector(".memoryDate").textContent=shortDate(s);
-  el.addEventListener("click",e=>{e.stopPropagation();openStorySmooth(s.i)});
-  world.appendChild(el);return el;
-});
+  const img=el.querySelector("img");
+  img.loading="lazy";
+  img.decoding="async";
+  img.onerror=()=>img.style.opacity=".15";
+  el.querySelector(".memoryText").textContent=s.story;
+  el.querySelector(".memoryDate").textContent=shortDate(s);
+  el.addEventListener("click",e=>{
+    e.stopPropagation();
+    const index=Number(el.dataset.memoryIndex);
+    if(Number.isInteger(index))openStorySmooth(index);
+  });
+  world.appendChild(el);
+  nodes.set(i,el);
+  return el;
+}
+
+function memoryNode(i,create=true){
+  let el=nodes.get(i)||null;
+  if(!el&&create)el=createMemoryNode(i);
+  return el;
+}
+
+function releaseUnusedMemoryNodes(keepSet){
+  for(const [i,el] of nodes){
+    if(keepSet.has(i))continue;
+    el.remove();
+    nodes.delete(i);
+  }
+}
+
+function preloadThumb(i){
+  if(i<0||i>=data.length||preloadedThumbs.has(i))return;
+  preloadedThumbs.add(i);
+  const img=new Image();
+  img.decoding="async";
+  img.src=thumbUrl(data[i]);
+}
+
+function ensureCardImage(i){
+  const el=memoryNode(i,true);
+  if(!el)return;
+  const img=el.querySelector("img");
+  if(img&&!img.dataset.loaded){
+    img.dataset.loaded="1";
+    img.src=thumbUrl(data[i]);
+    preloadedThumbs.add(i);
+  }
+}
+
+function preloadNearbyMemories(){
+  // Only preload a very small neighbourhood while the user is searching slowly.
+  // Fast travel performs no speculative photo loading.
+  const movingFast=touch&&touch.kind==="one"&&(touch.dragSpeed||0)>.18;
+  if(movingFast)return;
+
+  const centre=nearestMemoryToTime(timeCenter);
+  for(let d=1;d<=4;d++){
+    preloadThumb(centre-d);
+    preloadThumb(centre+d);
+  }
+}
 
 
 const ECHO_COUNT=96;
@@ -574,7 +631,7 @@ let timeCenter=data[active].ms;
 let timelineSpanYears=15;
 let timelineUser=false;
 let lastMagneticIds=new Set(),magneticIds=new Set();
-let renderedCards=[];
+let renderedCards=new Map();
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
@@ -727,7 +784,7 @@ function focusStory(i){
 function openStorySmooth(i){
   const targetIndex=clamp(i,0,data.length-1);
   const target=data[targetIndex];
-  const source=nodes[targetIndex];
+  const source=memoryNode(targetIndex,false);
   if(!target||!source)return;
 
   stopGlobeInertia();
@@ -829,7 +886,9 @@ function closeStorySmooth(i=active){
   hint.style.display="none";
 
   const appRect=app.getBoundingClientRect();
-  const source=nodes[targetIndex];
+  const source=memoryNode(targetIndex,true);
+  if(!source)return;
+  ensureCardImage(targetIndex);
   const clone=source.cloneNode(true);
   clone.classList.add("storyMorph");
   clone.classList.remove("nearest","magnetic");
@@ -882,8 +941,10 @@ function closeStorySmooth(i=active){
   world.style.filter="blur(3px)";
   render();
 
-  const destination=nodes[targetIndex].getBoundingClientRect();
-  nodes[targetIndex].style.visibility="hidden";
+  const destinationNode=memoryNode(targetIndex,false);
+  if(!destinationNode)return;
+  const destination=destinationNode.getBoundingClientRect();
+  destinationNode.style.visibility="hidden";
 
   // Presentation is now covered by the full-screen clone. Bring the universe
   // back while the same photo flies home.
@@ -899,8 +960,8 @@ function closeStorySmooth(i=active){
       clone.style.top=(destination.top-appRect.top)+"px";
       clone.style.width=destination.width+"px";
       clone.style.height=destination.height+"px";
-      clone.style.borderRadius=getComputedStyle(nodes[targetIndex]).borderRadius||"18px";
-      clone.style.boxShadow=getComputedStyle(nodes[targetIndex]).boxShadow;
+      clone.style.borderRadius=getComputedStyle(destinationNode).borderRadius||"18px";
+      clone.style.boxShadow=getComputedStyle(destinationNode).boxShadow;
       if(cloneCopy)cloneCopy.style.opacity="1";
       if(cloneShade)cloneShade.style.opacity="1";
     });
@@ -914,7 +975,8 @@ function closeStorySmooth(i=active){
       return;
     }
 
-    nodes[targetIndex].style.visibility="";
+    const restoredNode=memoryNode(targetIndex,false);
+    if(restoredNode)restoredNode.style.visibility="";
     spatialPinchTarget=null;
     spatialPinchStrength=0;
     storyMorphNode=null;
@@ -1634,10 +1696,13 @@ function render(){
 
   const hero1=spatialPinchTarget!=null?spatialPinchTarget:relevance[0]?.i;
   const roleRank=new Map(relevance.map((r,rank)=>[r.i,rank]));
-  renderedCards=[];
+  renderedCards.clear();
 
-  data.forEach((s,i)=>{
-    const selected=visibleSet.has(i);
+  // Keep only the current readable foreground stories as real DOM elements.
+  releaseUnusedMemoryNodes(visibleSet);
+
+  for(const i of visibleSet){
+    const s=data[i];
     const r=raw[i],p=composed.get(i)||r;
     const rank=roleRank.has(i)?roleRank.get(i):99;
     const depth=clamp(r.depth,0,1);
@@ -1653,12 +1718,9 @@ function render(){
     );
     const edgeReveal=clamp(Math.min(edgeX,edgeY),0,1);
 
-    let opacity=0;
-    if(selected){
-      opacity=[1,1,.94,.89,.85,.81][Math.min(rank,5)]||.81;
-      opacity*=lerp(.88,1,depth)*(1-alpha*.94)*edgeReveal;
-    }
-    if(i===active&&selected)opacity=Math.max(opacity,(1-alpha)*.96);
+    let opacity=[1,1,.94,.89,.85,.81][Math.min(rank,5)]||.81;
+    opacity*=lerp(.88,1,depth)*(1-alpha*.94)*edgeReveal;
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.96);
 
     // One or two memories lead the scene; the remaining cards support them.
     let scale=lerp(.72,1.02,depth);
@@ -1670,8 +1732,8 @@ function render(){
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
     scale=clamp(scale,.64,1.34);
 
-    if(selected&&opacity>.025)ensureCardImage(i);
-    const el=nodes[i];
+    const el=memoryNode(i,true);
+    if(opacity>.025)ensureCardImage(i);
     const img=el.querySelector("img");
     if(img)img.style.filter=rank<2?"contrast(1.055) saturate(1.035)":"contrast(.985) saturate(.97)";
     el.style.opacity=opacity.toFixed(3);
@@ -1680,8 +1742,10 @@ function render(){
     el.style.transform="translate3d("+(p.x-66)+"px,"+(p.y-87)+"px,0) scale("+scale.toFixed(3)+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);
     el.classList.remove("magnetic");
-    renderedCards[i]={x:p.x,y:p.y,opacity,magnetic:false,selected};
-  });
+    renderedCards.set(i,{x:p.x,y:p.y,opacity,magnetic:false,selected:true});
+  }
+
+  preloadNearbyMemories();
 
   magnetRing.style.left="16px";magnetRing.style.right="16px";magnetRing.style.top="140px";magnetRing.style.bottom="92px";
   drawTimeline();
@@ -1718,11 +1782,11 @@ function lerpLon(a,b,t){return wrapLon(a+wrapLon(b-a)*t)}
 
 function storyAtScreenPoint(p){
   let best=null,bd=Infinity;
-  renderedCards.forEach((r,i)=>{
-    if(!r||!r.selected||r.opacity<.20)return;
+  for(const [i,r] of renderedCards){
+    if(!r||!r.selected||r.opacity<.20)continue;
     const d=Math.hypot(r.x-p.x,r.y-p.y);
     if(d<bd){bd=d;best=i}
-  });
+  }
   const radius=overviewBlendForScale()>.45?105:88;
   return bd<=radius?best:null;
 }
@@ -1809,8 +1873,8 @@ app.addEventListener("touchstart",e=>{
     if(cam.s<SWIPE_SPACE)cancelVisualScaleAnimation();
     const p=localTouch(e.touches[0]);
     const card=e.target.closest(".memory");
-    const directIndex=card?nodes.indexOf(card):-1;
-    const tapTarget=directIndex>=0?directIndex:storyAtScreenPoint(p);
+    const directIndex=card?Number(card.dataset.memoryIndex):-1;
+    const tapTarget=Number.isInteger(directIndex)&&directIndex>=0?directIndex:storyAtScreenPoint(p);
     touch={
       kind:"one",
       start:p,last:p,
@@ -2021,8 +2085,8 @@ if(minusBtn)minusBtn.onclick=()=>{};
 if(plusBtn)plusBtn.onclick=()=>{};
 if(fieldBtn)fieldBtn.onclick=()=>app.classList.toggle("debug");
 
-OVERVIEW_ANCHORS.forEach(ensureCardImage);
-for(let i=Math.max(0,active-5);i<=Math.min(data.length-1,active+5);i++)ensureCardImage(i);
+OVERVIEW_ANCHORS.forEach(preloadThumb);
+for(let i=Math.max(0,active-5);i<=Math.min(data.length-1,active+5);i++)preloadThumb(i);
 centerMs=timeCenter;
 visualZoomPos=zoomPos;
 timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;

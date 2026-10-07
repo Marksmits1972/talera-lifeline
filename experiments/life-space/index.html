@@ -536,9 +536,14 @@ function shellSurfaceDistanceFromCamera(s){
 // 1.72 is ~70% of that travel: the front layer now follows the hand directly,
 // while the middle (0.70) and far (0.30) bands visibly lag behind it.
 const SHELL_DRAG_PER_PX=1.72;
-const SHELL_MAX_COAST=2.95;
-const SHELL_STOP_SPEED=.020;
-const SHELL_COAST_DECAY_MS=480;
+
+// Drag stays direct under the finger, but a released "push" must not launch the
+// foreground like a slingshot. Lower top speed + longer decay = calmer motion
+// that still travels a useful distance after a firm flick.
+const SHELL_MAX_COAST=1.55;
+const SHELL_STOP_SPEED=.018;
+const SHELL_COAST_DECAY_MS=760;
+const SHELL_RELEASE_DAMPING=.58;
 
 // Time stays chronologically correct, but visually empty eras take less room on
 // the globe. This keeps a sparse life compact while a dense life naturally grows.
@@ -2205,18 +2210,22 @@ function startGlobeInertia(vShellLon,vShellLat,carryShellLon=0,carryShellLat=0){
   const launchIntent=clamp(Math.hypot(fingerEqX,fingerEqY),0,1.2);
   syncTimelineVisualFromSpace(launchIntent,34,performance.now());
 
-  // A second push in the same direction can add to the existing roll on either
-  // axis. Both axes use exactly the same rule; ellipse geometry handles time.
+  // A second push may still add momentum, but only gently. This keeps repeated
+  // flicks useful without letting them build into a very fast spin.
   const carryEqX=Math.abs(carryShellLon)/SHELL_DRAG_PER_PX;
   if(carryEqX>.016&&Math.sign(carryShellLon)===Math.sign(vShellLon)){
-    const carryStrength=.78*smooth(.016,.45,carryEqX);
+    const carryStrength=.34*smooth(.016,.45,carryEqX);
     vShellLon+=carryShellLon*carryStrength;
   }
   const carryEqY=Math.abs(carryShellLat)/SHELL_DRAG_PER_PX;
   if(carryEqY>.016&&Math.sign(carryShellLat)===Math.sign(vShellLat)){
-    const carryStrength=.78*smooth(.016,.45,carryEqY);
+    const carryStrength=.34*smooth(.016,.45,carryEqY);
     vShellLat+=carryShellLat*carryStrength;
   }
+
+  // Reduce only the released fling. Direct finger tracking above is untouched.
+  vShellLon*=SHELL_RELEASE_DAMPING;
+  vShellLat*=SHELL_RELEASE_DAMPING;
 
   vShellLon=clamp(vShellLon,-SHELL_MAX_COAST,SHELL_MAX_COAST);
   vShellLat=clamp(vShellLat,-SHELL_MAX_COAST,SHELL_MAX_COAST);

@@ -578,8 +578,8 @@ function memoryNode(i,create=true){
 }
 
 const nodeLastVisibleAt=new Map();
-const NODE_LINGER_MS=850;
-const MAX_MEMORY_NODES=28;
+const NODE_LINGER_MS=1400;
+const MAX_MEMORY_NODES=32;
 
 function releaseUnusedMemoryNodes(keepSet,now=performance.now()){
   for(const i of keepSet)nodeLastVisibleAt.set(i,now);
@@ -672,6 +672,7 @@ let timelineSpanYears=15;
 let timelineUser=false;
 let lastMagneticIds=new Set(),magneticIds=new Set();
 let renderedCards=new Map();
+let stableForegroundSet=new Set();
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
@@ -1510,7 +1511,10 @@ function visibleBudgetForScale(){
 }
 
 function chooseVisibleRepresentatives(raw,alpha){
-  if(alpha>.92)return new Set([active]);
+  if(alpha>.92){
+    stableForegroundSet=new Set([active]);
+    return new Set(stableForegroundSet);
+  }
 
   const budget=visibleBudgetForScale();
   const temporalBase=Math.max(timelineSpanMs(),180*DAY);
@@ -1543,10 +1547,28 @@ function chooseVisibleRepresentatives(raw,alpha){
 
   const chosen=new Set();
   if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
-  if(raw[active]&&Math.abs(data[active].ms-timeCenter)<=clearWindow)chosen.add(active);
 
-  // Greedy diversity: prefer strong time matches, but avoid selecting five
-  // memories from exactly the same small patch of screen.
+  // Hysteresis for the clear foreground: once a photo has earned a place,
+  // keep it until it is comfortably outside the useful time/screen envelope.
+  // This prevents dense libraries from choosing a different card every frame.
+  for(const i of stableForegroundSet){
+    if(chosen.size>=budget)break;
+    if(chosen.has(i)||!data[i]||!raw[i])continue;
+    const r=raw[i];
+    const dt=Math.abs(data[i].ms-timeCenter);
+    const looseTime=dt<=clearWindow*1.35;
+    const looseScreen=r.x>-W*.55&&r.x<W*1.55&&r.y>35&&r.y<H+180;
+    if(looseTime&&looseScreen)chosen.add(i);
+  }
+
+  // On the first frame, seed the stable set with the current focus. Afterwards
+  // the candidate ranking may change without immediately replacing the scene.
+  if(chosen.size===0&&raw[active]&&Math.abs(data[active].ms-timeCenter)<=clearWindow){
+    chosen.add(active);
+  }
+
+  // Fill only genuinely empty slots. Diversity still keeps cards from piling
+  // into one small screen patch.
   while(chosen.size<budget){
     let best=null,bestValue=-Infinity;
     for(const cand of candidates){
@@ -1563,6 +1585,8 @@ function chooseVisibleRepresentatives(raw,alpha){
     if(!best)break;
     chosen.add(best.i);
   }
+
+  stableForegroundSet=new Set(chosen);
   return chosen;
 }
 
@@ -1917,10 +1941,10 @@ function startGlobeInertia(vLon,vLat,carryLon=0,carryLat=0){
 
     // Horizontal rolling keeps the familiar brake; time-axis momentum damps
     // more quickly so browsing remains controllable.
-    globeMomentumLon*=Math.exp(-dt/300);
+    globeMomentumLon*=Math.exp(-dt/480);
     globeMomentumLat*=Math.exp(-dt/180);
 
-    if(lived<1050&&Math.hypot(globeMomentumLon,globeMomentumLat)>.000028*SHELL_ANGULAR_GAIN){
+    if(lived<1500&&Math.hypot(globeMomentumLon,globeMomentumLat)>.000020*SHELL_ANGULAR_GAIN){
       globeInertiaRaf=requestAnimationFrame(frame);
     }else{
       globeInertiaRaf=0;

@@ -34,7 +34,7 @@ button{font:inherit;color:inherit}
 
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.24);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 16px rgba(129,184,213,.07);will-change:transform,opacity;opacity:0;transform-origin:center}
-.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.01px) saturate(1.16) brightness(1.08) contrast(1.11)}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.005px) saturate(1.20) brightness(1.10) contrast(1.14)}
 .memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.012),rgba(0,0,0,.015))}
 
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
@@ -1996,15 +1996,15 @@ function renderEchoField(raw,visibleSet,alpha){
     // Distant memories must still read as photographs. Keep their small scale
     // for depth, but preserve enough colour, contrast and image information
     // that they never collapse into vague blue/grey patches.
-    const op=(1-alpha)*lerp(.30,.50,d)*(.90+.10*cand.score);
-    const blur=lerp(.035,0,d);
-    const sat=lerp(1.18,1.14,d);
-    const bright=lerp(1.09,1.10,d);
-    const contrast=lerp(1.13,1.08,d);
+    const op=(1-alpha)*lerp(.33,.53,d)*(.91+.09*cand.score);
+    const blur=lerp(.016,0,d);
+    const sat=lerp(1.22,1.17,d);
+    const bright=lerp(1.10,1.11,d);
+    const contrast=lerp(1.16,1.10,d);
     const img=el.querySelector("img");
     img.style.filter="blur("+blur.toFixed(3)+"px) saturate("+sat.toFixed(2)+") brightness("+bright.toFixed(2)+") contrast("+contrast.toFixed(2)+")";
-    el.style.opacity=clamp(op,.24,.52).toFixed(3);
-    el.style.borderColor="rgba(255,255,255,"+lerp(.28,.22,d).toFixed(3)+")";
+    el.style.opacity=clamp(op,.28,.56).toFixed(3);
+    el.style.borderColor="rgba(255,255,255,"+lerp(.30,.24,d).toFixed(3)+")";
     el.style.transform="translate3d("+(cand.x-31)+"px,"+(cand.y-23)+"px,0) scale("+size.toFixed(3)+")";
     el.style.zIndex=String(25+Math.round(d*118));
     const warm=fract(s.id+2077)>.62;

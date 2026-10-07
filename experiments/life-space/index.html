@@ -822,7 +822,24 @@ let renderedCards=new Map();
 let renderedEchoCards=new Map();
 let stableForegroundSet=new Set();
 let foregroundLastRoleRank=new Map();
+let stableSpotlightIndex=null;
+let spotlightCandidateIndex=null;
+let spotlightCandidateSince=0;
 let stableHeroIndex=null;
+let heroCandidateIndex=null;
+let heroCandidateSince=0;
+let roleDwellTimer=0;
+
+const SPOTLIGHT_DWELL_MS=900;
+const HERO_DWELL_MS=460;
+
+function scheduleRoleDwellRefresh(delay){
+  clearTimeout(roleDwellTimer);
+  roleDwellTimer=setTimeout(()=>{
+    roleDwellTimer=0;
+    render();
+  },Math.max(18,delay));
+}
 
 // Visual entry state prevents a newly-selected photo from materialising in the
 // middle of the field. New foreground cards travel in from their nearest edge.
@@ -1079,7 +1096,12 @@ function openStorySmooth(i){
       farCamY:farCam.y,
       timeCenter,
       centerMs:typeof centerMs!=="undefined"?centerMs:timeCenter,
+      stableSpotlightIndex,
+      spotlightCandidateIndex,
+      spotlightCandidateSince,
       stableHeroIndex,
+      heroCandidateIndex,
+      heroCandidateSince,
       stableForeground:[...stableForegroundSet],
       foregroundRanks:[...foregroundLastRoleRank.entries()]
     };
@@ -1205,7 +1227,12 @@ function closeStorySmooth(i=active){
     lastLayerSourceCamY=cam.y;
     timeCenter=spaceReturnState.timeCenter;
     if(typeof centerMs!=="undefined")centerMs=spaceReturnState.centerMs;
+    stableSpotlightIndex=spaceReturnState.stableSpotlightIndex??null;
+    spotlightCandidateIndex=spaceReturnState.spotlightCandidateIndex??null;
+    spotlightCandidateSince=spaceReturnState.spotlightCandidateSince||0;
     stableHeroIndex=spaceReturnState.stableHeroIndex??null;
+    heroCandidateIndex=spaceReturnState.heroCandidateIndex??null;
+    heroCandidateSince=spaceReturnState.heroCandidateSince||0;
     stableForegroundSet=new Set(spaceReturnState.stableForeground||[]);
     foregroundLastRoleRank=new Map(spaceReturnState.foregroundRanks||[]);
   }else{
@@ -1787,13 +1814,10 @@ function drawTimeline(){
 /* ------------------- MAGNETIC SPACE ------------------- *//* ------------------- MAGNETIC SPACE ------------------- */
 function foregroundStoryRoles(raw){
   const timelineBottom=(timelineShell?.getBoundingClientRect().height||126)+22;
-  const scanPerSide=90;
-
-  // Keep one genuinely large photo present much more often. Instead of making
-  // the currently-active story large even when it is mostly off-screen, choose
-  // the best nearby story that is already travelling through the visible field.
-  // Hold that hero until it is comfortably gone so the large card does not flicker.
+  const scanPerSide=110;
   const nearestTimeIndex=nearestMemoryToTime(timeCenter);
+  const now=performance.now();
+
   const heroMotion=currentShellVelocity();
   const heroMotionTotal=Math.abs(heroMotion.x)+Math.abs(heroMotion.y)+.0001;
   const heroVertical=smooth(.38,.78,Math.abs(heroMotion.y)/heroMotionTotal);
@@ -1802,64 +1826,124 @@ function foregroundStoryRoles(raw){
     7.5*365.2425*DAY
   );
 
-  function heroUsable(i,loose=false){
+  function roleUsable(i,loose=false){
     if(i==null||!data[i]||!raw[i])return false;
-
-    // The dominant card gets a much wider hold window while the user travels
-    // vertically through time. Previously it lost rank 0 too quickly, often
-    // before it had finished crossing the readable centre of the screen.
-    const heroHold=loose?lerp(1.45,2.65,heroVertical):1;
-    if(Math.abs(data[i].ms-timeCenter)>heroWindow*heroHold)return false;
+    const hold=loose?lerp(1.55,2.75,heroVertical):1;
+    if(Math.abs(data[i].ms-timeCenter)>heroWindow*hold)return false;
     const q=raw[i];
-    const xPad=loose?W*lerp(.24,.42,heroVertical):lerp(30,W*.15,heroVertical);
-    const topPad=loose?lerp(110,220,heroVertical):lerp(24,82,heroVertical);
-    const bottomPad=loose?lerp(135,260,heroVertical):lerp(52,122,heroVertical);
+    const xPad=loose?W*lerp(.28,.48,heroVertical):lerp(36,W*.17,heroVertical);
+    const topPad=loose?lerp(125,235,heroVertical):lerp(28,88,heroVertical);
+    const bottomPad=loose?lerp(150,280,heroVertical):lerp(58,128,heroVertical);
     return q.x>-xPad&&q.x<W+xPad&&
       q.y>timelineBottom-topPad&&q.y<H+bottomPad;
   }
 
-  let hero=null;
-  if(heroUsable(stableHeroIndex,true)){
-    hero=stableHeroIndex;
-  }else{
-    let bestScore=Infinity;
-    const start=Math.max(0,nearestTimeIndex-120);
-    const end=Math.min(data.length-1,nearestTimeIndex+120);
+  // The top spotlight is driven primarily by time: from the stories that are
+  // actually able to cross this view, choose the one closest to the needle.
+  function nearestNeedleCandidate(excluded=null){
+    let best=null,bestDt=Infinity,bestCentre=Infinity;
+    const start=Math.max(0,nearestTimeIndex-150);
+    const end=Math.min(data.length-1,nearestTimeIndex+150);
 
     for(let i=start;i<=end;i++){
-      if(!heroUsable(i,false))continue;
+      if(i===excluded||!roleUsable(i,false))continue;
       const q=raw[i];
-      const temporal=Math.abs(data[i].ms-timeCenter)/Math.max(DAY,heroWindow);
+      const dt=Math.abs(data[i].ms-timeCenter);
       const centre=Math.hypot(
         (q.x-W/2)/Math.max(1,W),
         (q.y-H*.56)/Math.max(1,H)
       );
-      const horizontalCentre=Math.abs(q.x-W/2)/Math.max(1,W*.5);
-      const depthPenalty=(1-clamp(q.depth,0,1))*.12;
-      const score=
-        temporal*lerp(.62,.40,heroVertical)+
-        centre*.32+
-        horizontalCentre*.44*heroVertical+
-        depthPenalty;
-      if(score<bestScore){
-        bestScore=score;
-        hero=i;
+      if(dt<bestDt-1||(Math.abs(dt-bestDt)<=1&&centre<bestCentre)){
+        best=i;bestDt=dt;bestCentre=centre;
       }
+    }
+    return best;
+  }
+
+  const spotlightCandidate=nearestNeedleCandidate();
+
+  if(stableSpotlightIndex==null||!roleUsable(stableSpotlightIndex,true)){
+    stableSpotlightIndex=spotlightCandidate??nearestTimeIndex;
+    spotlightCandidateIndex=null;
+    spotlightCandidateSince=0;
+  }else if(spotlightCandidate!=null&&spotlightCandidate!==stableSpotlightIndex){
+    if(spotlightCandidateIndex!==spotlightCandidate){
+      spotlightCandidateIndex=spotlightCandidate;
+      spotlightCandidateSince=now;
+    }else{
+      const waited=now-spotlightCandidateSince;
+      if(waited>=SPOTLIGHT_DWELL_MS){
+        stableSpotlightIndex=spotlightCandidate;
+        spotlightCandidateIndex=null;
+        spotlightCandidateSince=0;
+      }else{
+        scheduleRoleDwellRefresh(SPOTLIGHT_DWELL_MS-waited);
+      }
+    }
+  }else{
+    spotlightCandidateIndex=null;
+    spotlightCandidateSince=0;
+  }
+
+  let spotlight=stableSpotlightIndex;
+  if(spotlight==null||!data[spotlight])spotlight=nearestTimeIndex;
+
+  // The second dominant role may refresh sooner. It still prefers chronology,
+  // but gets a small centre/depth preference so it remains a strong readable card.
+  let dominantCandidate=null;
+  let dominantScore=Infinity;
+  const start=Math.max(0,nearestTimeIndex-140);
+  const end=Math.min(data.length-1,nearestTimeIndex+140);
+  for(let i=start;i<=end;i++){
+    if(i===spotlight||!roleUsable(i,false))continue;
+    const q=raw[i];
+    const temporal=Math.abs(data[i].ms-timeCenter)/Math.max(DAY,heroWindow);
+    const centre=Math.hypot(
+      (q.x-W/2)/Math.max(1,W),
+      (q.y-H*.56)/Math.max(1,H)
+    );
+    const depthPenalty=(1-clamp(q.depth,0,1))*.12;
+    const score=temporal*.58+centre*.34+depthPenalty;
+    if(score<dominantScore){
+      dominantScore=score;
+      dominantCandidate=i;
     }
   }
 
-  if(hero==null){
-    hero=(active!=null&&data[active])?active:nearestTimeIndex;
+  if(stableHeroIndex===spotlight)stableHeroIndex=null;
+  if(stableHeroIndex==null||!roleUsable(stableHeroIndex,true)){
+    stableHeroIndex=dominantCandidate;
+    heroCandidateIndex=null;
+    heroCandidateSince=0;
+  }else if(dominantCandidate!=null&&dominantCandidate!==stableHeroIndex){
+    if(heroCandidateIndex!==dominantCandidate){
+      heroCandidateIndex=dominantCandidate;
+      heroCandidateSince=now;
+    }else{
+      const waited=now-heroCandidateSince;
+      if(waited>=HERO_DWELL_MS){
+        stableHeroIndex=dominantCandidate;
+        heroCandidateIndex=null;
+        heroCandidateSince=0;
+      }else{
+        scheduleRoleDwellRefresh(HERO_DWELL_MS-waited);
+      }
+    }
+  }else{
+    heroCandidateIndex=null;
+    heroCandidateSince=0;
   }
-  stableHeroIndex=hero;
-  if(hero==null||!data[hero])return [];
+
+  let dominant=stableHeroIndex;
+  if(dominant===spotlight)dominant=null;
+  if(dominant==null)dominant=nearestNeedleCandidate(spotlight);
 
   function pickSide(direction,count){
     const pool=[];
-
     for(let step=1;step<=scanPerSide;step++){
-      const i=hero+direction*step;
+      const i=spotlight+direction*step;
       if(i<0||i>=data.length)break;
+      if(i===dominant)continue;
       const q=raw[i];
       if(!q)continue;
 
@@ -1867,9 +1951,8 @@ function foregroundStoryRoles(raw){
         q.x>-34&&q.x<W+34&&
         q.y>timelineBottom-18&&q.y<H+44;
       const nearScreen=
-        q.x>-W*.32&&q.x<W*1.32&&
-        q.y>timelineBottom-110&&q.y<H+135;
-
+        q.x>-W*.34&&q.x<W*1.34&&
+        q.y>timelineBottom-120&&q.y<H+150;
       if(!onScreen&&!nearScreen)continue;
 
       const horizontalCentre=Math.abs(q.x-W/2)/Math.max(1,W*.5);
@@ -1889,34 +1972,32 @@ function foregroundStoryRoles(raw){
   const before=pickSide(-1,2);
   const after=pickSide(1,2);
   const supports=[...before,...after]
-    .filter((i,pos,arr)=>i!==hero&&arr.indexOf(i)===pos);
+    .filter((i,pos,arr)=>i!==spotlight&&i!==dominant&&arr.indexOf(i)===pos);
 
-  // Fill edge cases from the nearest chronological neighbours that are still
-  // in the broad approach zone. They retain their real projected path and fade.
   if(supports.length<4){
     for(let step=1;step<=scanPerSide&&supports.length<4;step++){
-      for(const i of [hero-step,hero+step]){
-        if(i<0||i>=data.length||supports.includes(i))continue;
+      for(const i of [spotlight-step,spotlight+step]){
+        if(i<0||i>=data.length||i===dominant||supports.includes(i))continue;
         const q=raw[i];
         if(!q)continue;
         const nearScreen=
-          q.x>-W*.42&&q.x<W*1.42&&
-          q.y>timelineBottom-135&&q.y<H+165;
+          q.x>-W*.44&&q.x<W*1.44&&
+          q.y>timelineBottom-145&&q.y<H+175;
         if(nearScreen)supports.push(i);
         if(supports.length>=4)break;
       }
     }
   }
 
-  return [hero,...supports.slice(0,4)];
+  return [spotlight,...(dominant!=null?[dominant]:[]),...supports.slice(0,4)];
 }
 
 function visibleBudgetForScale(){
-  // One dominant story + four readable chronological neighbours.
+  // One extra-dominant spotlight + one dominant story + four readable supports.
   // Very close to presentation the existing morph still takes over naturally.
   const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
   if(z>.92)return 3;
-  return 5;
+  return 6;
 }
 
 function chooseVisibleRepresentatives(raw,alpha,foregroundRoles=[]){
@@ -2031,7 +2112,7 @@ function composeForeground(raw,visibleSet,foregroundRoles=[]){
   const motionTotal=Math.abs(motion.x)+Math.abs(motion.y)+.0001;
   const verticalFlow=smooth(.34,.76,Math.abs(motion.y)/motionTotal);
   const roleRank=new Map(foregroundRoles.map((i,rank)=>[i,rank]));
-  const verticalLanes=[.50,.34,.66,.43,.57];
+  const verticalLanes=[.50,.38,.64,.31,.69,.48];
 
   for(const i of visibleSet){
     const r=raw[i];
@@ -2042,7 +2123,7 @@ function composeForeground(raw,visibleSet,foregroundRoles=[]){
     const rank=roleRank.get(i);
     if(verticalFlow>.001&&rank!=null&&rank<verticalLanes.length){
       const laneX=W*verticalLanes[rank];
-      const laneStrength=verticalFlow*(rank===0?.78:.58);
+      const laneStrength=verticalFlow*(rank===0?.84:rank===1?.72:.56);
       homeX=lerp(homeX,laneX,laneStrength);
     }
 
@@ -2455,20 +2536,20 @@ function render(){
     );
     const edgeReveal=clamp(Math.min(edgeX,edgeY),0,1);
 
-    let opacity=[1,.97,.95,.93,.91,.80][Math.min(rank,5)]||.80;
+    let opacity=[1,.985,.97,.95,.93,.91,.80][Math.min(rank,6)]||.80;
     opacity*=lerp(.88,1,depth)*(1-alpha*.94)*edgeReveal;
     if(i===active)opacity=Math.max(opacity,(1-alpha)*.98);
 
-    // Exactly one story leads the scene. Four chronological neighbours remain
-    // readable; everything else supports the wider photo universe.
+    // Two-step hierarchy: the needle-led spotlight is ~10% larger than the
+    // existing dominant card, followed by four still-readable large supports.
     let scale=lerp(.72,1.02,depth);
-    const rankScale=[1.58,1.22,1.20,1.18,1.16,.87][Math.min(rank,5)]||.87;
+    const rankScale=[1.74,1.58,1.22,1.20,1.18,1.16,.87][Math.min(rank,6)]||.87;
     scale*=rankScale;
     const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
     scale*=lerp(.86,1,smooth(.08,.92,edgeReveal));
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
-    scale=clamp(scale,.64,1.54);
+    scale=clamp(scale,.64,1.84);
 
     let entry=foregroundEntryState.get(i);
     if(!entry){
@@ -2499,13 +2580,19 @@ function render(){
     if(opacity>.025)ensureCardImage(i);
     const img=el.querySelector("img");
     if(img)img.style.filter=rank===0
-      ?"contrast(1.07) saturate(1.045)"
-      :rank<5
-        ?"contrast(1.02) saturate(1.01)"
-        :"contrast(.985) saturate(.97)";
+      ?"contrast(1.08) saturate(1.055)"
+      :rank===1
+        ?"contrast(1.07) saturate(1.045)"
+        :rank<6
+          ?"contrast(1.02) saturate(1.01)"
+          :"contrast(.985) saturate(.97)";
     el.style.opacity=opacity.toFixed(3);
     el.style.pointerEvents=opacity>.24?"auto":"none";
-    el.style.zIndex=String(540+Math.round(depth*180)+(rank===0?118:rank<5?42:0)-Math.min(30,rank*4));
+    el.style.zIndex=String(
+      540+Math.round(depth*180)+
+      (rank===0?142:rank===1?92:rank<6?42:0)-
+      Math.min(30,rank*4)
+    );
     el.style.transform="translate3d("+(entryX-66)+"px,"+(entryY-87)+"px,0) scale("+scale.toFixed(3)+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);
     el.classList.remove("magnetic");

@@ -20,32 +20,54 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a1015;col
 body{position:fixed;inset:0}
 button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
-#bg{position:absolute;inset:-5%;
-  background-image:
-    linear-gradient(180deg,rgba(4,13,21,.32),rgba(6,18,27,.49) 52%,rgba(3,10,16,.64)),
-    linear-gradient(105deg,rgba(8,29,43,.22),transparent 48%,rgba(18,29,37,.16)),
-    url("data:image/jpeg;base64,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[... truncated ...]");
-  background-size:cover;
-  background-position:56% 52%;
-  filter:saturate(.74) brightness(.76) contrast(.96);
-  transform:translate3d(0,0,0) scale(1.12);
-  transform-origin:center;
-  will-change:transform;
-  overflow:hidden}
-#bg:before{content:"";position:absolute;inset:0;pointer-events:none;background:
-  radial-gradient(ellipse at 50% 47%,transparent 0 40%,rgba(2,8,13,.20) 74%,rgba(1,5,9,.43) 100%)}
-#bg:after{content:"";position:absolute;inset:0;pointer-events:none;background:
-  linear-gradient(180deg,rgba(8,23,33,.08),rgba(8,23,33,.18) 58%,rgba(2,8,13,.34)),
-  radial-gradient(circle at 17% 26%,rgba(188,223,241,.10) 0 1px,transparent 1.7px),
-  radial-gradient(circle at 76% 31%,rgba(255,215,181,.08) 0 1px,transparent 1.5px),
-  radial-gradient(circle at 64% 72%,rgba(195,226,241,.08) 0 1px,transparent 1.5px)}
+#bg{position:absolute;inset:-8%;background:
+  radial-gradient(ellipse at 49% 42%,rgba(101,145,173,.34),transparent 25%),
+  radial-gradient(ellipse at 20% 70%,rgba(73,89,141,.22),transparent 32%),
+  radial-gradient(ellipse at 82% 65%,rgba(139,86,77,.15),transparent 31%),
+  radial-gradient(ellipse at 72% 22%,rgba(187,144,103,.08),transparent 25%),
+  linear-gradient(145deg,#091725 0%,#0c2030 38%,#102638 58%,#101d2b 76%,#080f18 100%);
+  transform:scale(1.08);overflow:hidden}
+#bg:before{content:"";position:absolute;inset:0;opacity:.74;background-image:
+  radial-gradient(circle at 9% 16%,rgba(255,255,255,.55) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 22% 76%,rgba(194,223,240,.38) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 34% 31%,rgba(255,255,255,.34) 0 1px,transparent 1.4px),
+  radial-gradient(circle at 47% 87%,rgba(255,255,255,.30) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 57% 12%,rgba(196,220,237,.42) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 69% 58%,rgba(255,255,255,.35) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 78% 23%,rgba(255,255,255,.50) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 91% 81%,rgba(191,220,238,.38) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 14% 49%,rgba(255,255,255,.25) 0 1px,transparent 1.5px),
+  radial-gradient(circle at 63% 38%,rgba(255,255,255,.23) 0 1px,transparent 1.4px);
+  filter:blur(.15px)}
+#bg:after{content:"";position:absolute;inset:0;background:
+  linear-gradient(118deg,transparent 0 31%,rgba(137,184,207,.065) 41%,transparent 52%),
+  linear-gradient(72deg,transparent 0 57%,rgba(207,163,132,.045) 66%,transparent 77%),
+  radial-gradient(ellipse at 50% 48%,rgba(42,78,98,.11) 0 24%,transparent 55%,rgba(2,7,11,.34) 100%)}
 #world{position:absolute;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
+#world:before{content:"";position:absolute;z-index:0;inset:0;pointer-events:none;opacity:.94;background:
+  radial-gradient(circle at 7% 13%,rgba(220,239,249,.30) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 18% 41%,rgba(180,217,238,.20) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 31% 76%,rgba(255,221,190,.18) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 48% 24%,rgba(210,234,247,.22) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 59% 67%,rgba(201,228,242,.22) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 73% 17%,rgba(255,213,173,.22) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 86% 54%,rgba(205,230,241,.22) 0 1px,transparent 1.7px),
+  radial-gradient(circle at 94% 81%,rgba(255,222,194,.16) 0 1px,transparent 1.6px),
+  radial-gradient(circle at 42% 88%,rgba(202,229,242,.16) 0 1px,transparent 1.6px)}
+#world:after{content:"";position:absolute;z-index:0;inset:-10%;pointer-events:none;opacity:.86;filter:blur(18px);background:
+  radial-gradient(ellipse at 18% 32%,rgba(64,127,165,.22),transparent 29%),
+  radial-gradient(ellipse at 76% 34%,rgba(176,113,91,.13),transparent 27%),
+  radial-gradient(ellipse at 52% 70%,rgba(63,117,148,.17),transparent 31%),
+  linear-gradient(112deg,transparent 0 39%,rgba(149,194,217,.06) 47%,transparent 55%);
+  animation:taleraSpaceDrift 18s ease-in-out infinite alternate}
+@keyframes taleraSpaceDrift{
+  from{transform:translate3d(-1.5%,-.6%,0) scale(1)}
   to{transform:translate3d(1.6%,1%,0) scale(1.035)}
 }
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.memoryEcho{position:absolute;width:68px;height:51px;border-radius:8px;overflow:hidden;background:#1c2931;border:1px solid rgba(255,255,255,.18);box-shadow:0 5px 19px rgba(0,0,0,.24);will-change:transform,opacity;opacity:0;transform-origin:center}
-.memoryEcho img{width:100%;height:100%;object-fit:cover}
-.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(0,0,0,.08))}
+.memoryEcho{position:absolute;width:62px;height:46px;border-radius:7px;overflow:hidden;background:#20313b;border:1px solid rgba(255,255,255,.15);box-shadow:0 5px 18px rgba(0,0,0,.16),0 0 20px rgba(129,184,213,.10);will-change:transform,opacity;opacity:0;transform-origin:center}
+.memoryEcho img{width:100%;height:100%;object-fit:cover;filter:blur(.06px) saturate(1) brightness(1)}
+.memoryEcho:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(0,0,0,.035))}
 
 .memory{position:absolute;z-index:3;width:132px;height:174px;border-radius:18px;overflow:hidden;background:#26343b;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.38);transform-origin:center;will-change:transform,opacity;pointer-events:none}
 .memory img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#26343b}
@@ -416,7 +438,7 @@ function setBg(i){
   presentationImg.src=data[i].image;
 }
 function toastMsg(t){toast.textContent=t;toast.classList.add("on");clearTimeout(toastMsg.t);toastMsg.t=setTimeout(()=>toast.classList.remove("on"),900)}
-function presentationAlpha(){return smooth(1.54,1.94,cam.s)}
+function presentationAlpha(){return smooth(1.16,1.92,cam.s)}
 function overviewBlendForScale(s=cam.s){return 1-smooth(SPACE_MIN+.035,SPACE_MIN+.30,s)}
 function spanYearsForScale(s=cam.s){
   const t=clamp((s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
@@ -1178,38 +1200,34 @@ function chooseVisibleRepresentatives(raw,alpha){
 // memory the user is actually navigating toward.
 function composeForeground(raw,visibleSet){
   const map=new Map();
-  const top=(timelineShell?.getBoundingClientRect().height||126)+36;
-  const bottom=H-96;
-  const minX=-18,maxX=W+18,minY=top,maxY=Math.max(top+150,bottom);
-  const zoomOpen=1-clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
+  const top=(timelineShell?.getBoundingClientRect().height||126)+64;
+  const bottom=H-118;
+  const minX=58,maxX=W-58,minY=top,maxY=Math.max(top+120,bottom);
 
   for(const i of visibleSet){
-    const r=raw[i],s=data[i];
-    const driftStrength=lerp(30,74,zoomOpen);
-    const bx=(fract(s.id+311)-.5)*driftStrength*2;
-    const by=(fract(s.id+487)-.5)*driftStrength*1.75;
-    const edgeBias=(fract(s.id+733)-.5)*W*.10;
-    const homeX=clamp(r.x+bx+edgeBias,minX,maxX);
-    const homeY=clamp(r.y+by,minY,maxY);
-    map.set(i,{x:homeX,y:homeY,homeX,homeY});
+    const r=raw[i];
+    map.set(i,{
+      x:clamp(r.x,minX,maxX),
+      y:clamp(r.y,minY,maxY),
+      homeX:clamp(r.x,minX,maxX),
+      homeY:clamp(r.y,minY,maxY)
+    });
   }
 
   const ids=[...map.keys()];
-  const desiredGap=Math.min(144,Math.max(108,W*.29));
+  const desiredGap=Math.min(154,Math.max(116,W*.31));
 
-  for(let step=0;step<6;step++){
+  // Gentle repulsion gives us four/five distinct memories without arranging
+  // them into a visible grid. Each photo remains close to its true projection.
+  for(let step=0;step<7;step++){
     for(let a=0;a<ids.length;a++){
       for(let b=a+1;b<ids.length;b++){
-        const ia=ids[a],ib=ids[b],pa=map.get(ia),pb=map.get(ib);
+        const pa=map.get(ids[a]),pb=map.get(ids[b]);
         let dx=pb.x-pa.x,dy=pb.y-pa.y;
         let d=Math.hypot(dx,dy);
-        if(d<1){
-          const ang=fract(ia*17+ib*31)*Math.PI*2;
-          dx=Math.cos(ang);dy=Math.sin(ang);d=1;
-        }
-        const pairGap=desiredGap*(.86+.24*fract(ia+ib+991));
-        if(d>=pairGap)continue;
-        const push=(pairGap-d)*.15;
+        if(d<1){dx=((ids[b]-ids[a])%3)-1;dy=1;d=Math.hypot(dx,dy)}
+        if(d>=desiredGap)continue;
+        const push=(desiredGap-d)*.19;
         const ux=dx/d,uy=dy/d;
         pa.x-=ux*push;pa.y-=uy*push;
         pb.x+=ux*push;pb.y+=uy*push;
@@ -1217,8 +1235,9 @@ function composeForeground(raw,visibleSet){
     }
     for(const i of ids){
       const p=map.get(i);
-      p.x=lerp(p.x,p.homeX,.10);
-      p.y=lerp(p.y,p.homeY,.10);
+      // weak spring home: composition, not teleportation
+      p.x=lerp(p.x,p.homeX,.07);
+      p.y=lerp(p.y,p.homeY,.07);
       p.x=clamp(p.x,minX,maxX);
       p.y=clamp(p.y,minY,maxY);
     }
@@ -1242,19 +1261,21 @@ function renderEchoField(raw,visibleSet,alpha){
     const r=raw[i];
     const d=clamp(r.depth,0,1);
 
-    const layer=fract(s.id+1229);
-    const parallax=lerp(.26,.84,d);
-    const scatterX=(fract(s.id+1301)-.5)*W*lerp(.48,.12,d);
-    const scatterY=(fract(s.id+1499)-.5)*H*lerp(.30,.08,d);
+    // Far memories move less and are gently spread sideways/up-down. That makes
+    // them read as layers in space instead of as one dark flat curtain.
+    const parallax=lerp(.34,.92,d);
+    const scatterX=(fract(s.id+1301)-.5)*W*lerp(.34,.10,d);
+    const scatterY=(fract(s.id+1499)-.5)*H*lerp(.22,.07,d);
     const x=W/2+(r.x-W/2)*parallax+scatterX;
     const y=centreY+(r.y-centreY)*parallax+scatterY;
 
-    if(x<-115||x>W+115||y<82||y>H+115)return;
+    if(x<-95||x>W+95||y<92||y>H+100)return;
 
-    const dt=Math.abs(s.ms-timeCenter);
-    const temporal=Math.exp(-.5*Math.pow(dt/Math.max(timelineSpanMs()*2.0,365*DAY*6),2));
-    const score=temporal*.36+d*.24+.24*(1-s.representative)+.16*layer;
-    candidates.push({i,score,x,y,depth:d,layer});
+    const temporal=Math.exp(-.5*Math.pow(
+      Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*1.7,365*DAY*5),2
+    ));
+    const score=d*.44+temporal*.22+.22*(1-s.representative)+.12*fract(s.id+1781);
+    candidates.push({i,score,x,y,depth:d});
   });
 
   candidates.sort((a,b)=>b.score-a.score||a.i-b.i);
@@ -1263,7 +1284,7 @@ function renderEchoField(raw,visibleSet,alpha){
   for(const cand of candidates){
     if(chosen.length>=ECHO_COUNT)break;
     let tooClose=false;
-    const localGap=lerp(12,25,cand.depth);
+    const localGap=lerp(14,29,cand.depth);
     for(const p of chosen){
       if(Math.hypot(cand.x-p.x,cand.y-p.y)<localGap){tooClose=true;break}
     }
@@ -1283,25 +1304,26 @@ function renderEchoField(raw,visibleSet,alpha){
     }
 
     const d=clamp(cand.depth,0,1);
-    const random=.78+.48*fract(s.id+901);
-    const size=lerp(.42,1.25,d)*random;
-    const op=(1-alpha)*lerp(.16,.48,d)*(.86+.14*cand.score);
-    const blur=lerp(.34,0,d);
-    const sat=lerp(.78,1.02,d);
-    const bright=lerp(.72,.96,d);
+    const random=.78+.44*fract(s.id+901);
+    const size=lerp(.38,1.22,d)*random;
+    const op=(1-alpha)*lerp(.10,.40,d)*(.84+.16*cand.score);
+    const blur=lerp(.42,0,d);
+    const sat=lerp(.82,1.08,d);
+    const bright=lerp(.82,1.08,d);
     const img=el.querySelector("img");
     img.style.filter="blur("+blur.toFixed(2)+"px) saturate("+sat.toFixed(2)+") brightness("+bright.toFixed(2)+")";
-    el.style.opacity=clamp(op,.12,.50).toFixed(3);
-    el.style.transform="translate3d("+(cand.x-34)+"px,"+(cand.y-25.5)+"px,0) scale("+size.toFixed(3)+")";
-    el.style.zIndex=String(25+Math.round(d*116));
+    el.style.opacity=clamp(op,.075,.42).toFixed(3);
+    el.style.transform="translate3d("+(cand.x-31)+"px,"+(cand.y-23)+"px,0) scale("+size.toFixed(3)+")";
+    el.style.zIndex=String(25+Math.round(d*118));
+    const warm=fract(s.id+2077)>.62;
+    el.style.boxShadow=warm
+      ?"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(227,166,118,"+(0.035+.06*d).toFixed(3)+")"
+      :"0 5px 18px rgba(0,0,0,.15),0 0 "+Math.round(12+18*d)+"px rgba(122,184,216,"+(0.04+.07*d).toFixed(3)+")";
   }
 }
 
 function render(){
   if(!timelineUser&&typeof centerMs!=="undefined")centerMs=timeCenter;
-  const bgShiftX=Math.sin(cam.x)*8;
-  const bgShiftY=clamp(cam.y/GLOBE_LAT_LIMIT,-1,1)*6;
-  bg.style.transform="translate3d("+bgShiftX.toFixed(1)+"px,"+bgShiftY.toFixed(1)+"px,0) scale(1.12)";
   active=spatialPinchTarget!=null?spatialPinchTarget:nearestMemoryToFocus();
   const alpha=presentationAlpha(),overview=overviewBlendForScale(),near=data[active];
 

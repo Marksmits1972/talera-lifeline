@@ -475,18 +475,20 @@ const GOLDEN_ANGLE=2.399963229728653;
 const WORLD_REFERENCE_COUNT=150;
 const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,10);
 const SHELL_REFERENCE_RADIUS=395;
-const ELLIPSE_CIRCLE_UNTIL_YEARS=10;
+const ELLIPSE_BASE_LIFE_YEARS=10;
+const ELLIPSE_BASE_VERTICAL_RATIO=1.15;
 const ELLIPSE_REFERENCE_LIFE_YEARS=55;
-const ELLIPSE_REFERENCE_VERTICAL_RATIO=1.25;
-const ELLIPSE_MAX_VERTICAL_RATIO=1.65;
+const ELLIPSE_REFERENCE_VERTICAL_RATIO=1.38;
+const ELLIPSE_MAX_VERTICAL_RATIO=1.80;
 function ellipseRatioForLifeYears(years){
-  if(years<=ELLIPSE_CIRCLE_UNTIL_YEARS)return 1;
+  if(years<=ELLIPSE_BASE_LIFE_YEARS)return ELLIPSE_BASE_VERTICAL_RATIO;
   const growthPerYear=
-    (ELLIPSE_REFERENCE_VERTICAL_RATIO-1)/
-    (ELLIPSE_REFERENCE_LIFE_YEARS-ELLIPSE_CIRCLE_UNTIL_YEARS);
+    (ELLIPSE_REFERENCE_VERTICAL_RATIO-ELLIPSE_BASE_VERTICAL_RATIO)/
+    (ELLIPSE_REFERENCE_LIFE_YEARS-ELLIPSE_BASE_LIFE_YEARS);
   return clamp(
-    1+(years-ELLIPSE_CIRCLE_UNTIL_YEARS)*growthPerYear,
-    1,
+    ELLIPSE_BASE_VERTICAL_RATIO+
+      (years-ELLIPSE_BASE_LIFE_YEARS)*growthPerYear,
+    ELLIPSE_BASE_VERTICAL_RATIO,
     ELLIPSE_MAX_VERTICAL_RATIO
   );
 }
@@ -1609,15 +1611,63 @@ function drawTimeline(){
 }
 
 /* ------------------- MAGNETIC SPACE ------------------- *//* ------------------- MAGNETIC SPACE ------------------- */
+function foregroundStoryRoles(raw){
+  const hero=active;
+  if(hero==null||!data[hero])return [];
+
+  const heroRaw=raw[hero];
+  const scanPerSide=18;
+
+  function pickSide(direction,count){
+    const options=[];
+    for(let step=1;step<=scanPerSide;step++){
+      const i=hero+direction*step;
+      if(i<0||i>=data.length)break;
+      const q=raw[i];
+      if(!q)continue;
+
+      const screenDistance=heroRaw
+        ?Math.hypot(q.x-heroRaw.x,q.y-heroRaw.y)/Math.max(W,H)
+        :1;
+      const score=step*.10+screenDistance*.72;
+      options.push({i,score,step});
+    }
+    options.sort((a,b)=>a.score-b.score||a.step-b.step);
+    return options.slice(0,count).map(v=>v.i);
+  }
+
+  const supports=[
+    ...pickSide(-1,2),
+    ...pickSide(1,2)
+  ].filter((i,pos,arr)=>i!==hero&&arr.indexOf(i)===pos);
+
+  // Keep the support order chronologically close to the needle-led hero.
+  supports.sort((a,b)=>
+    Math.abs(data[a].ms-data[hero].ms)-Math.abs(data[b].ms-data[hero].ms)
+  );
+
+  const roles=[hero,...supports];
+
+  // At the very beginning/end of a life one side may have fewer stories.
+  // Fill any missing readable slots from the nearest chronological records.
+  for(let step=1;roles.length<5&&step<data.length;step++){
+    for(const i of [hero-step,hero+step]){
+      if(i>=0&&i<data.length&&!roles.includes(i))roles.push(i);
+      if(roles.length>=5)break;
+    }
+  }
+  return roles.slice(0,5);
+}
+
 function visibleBudgetForScale(){
-  // The life-space should normally contain five readable memories.
-  // Very close to presentation it naturally collapses toward the chosen story.
+  // One dominant story + four readable chronological neighbours.
+  // Very close to presentation the existing morph still takes over naturally.
   const z=clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1);
-  if(z>.82)return 3;
+  if(z>.92)return 3;
   return 5;
 }
 
-function chooseVisibleRepresentatives(raw,alpha){
+function chooseVisibleRepresentatives(raw,alpha,foregroundRoles=[]){
   if(alpha>.92){
     stableForegroundSet=new Set([active]);
     return new Set(stableForegroundSet);
@@ -1654,6 +1704,12 @@ function chooseVisibleRepresentatives(raw,alpha){
 
   const chosen=new Set();
   if(spatialPinchTarget!=null)chosen.add(spatialPinchTarget);
+
+  // Timeline hierarchy has first claim on the readable foreground:
+  // one needle-led hero plus up to four chronological neighbours.
+  for(const i of foregroundRoles){
+    if(i!=null&&data[i])chosen.add(i);
+  }
 
   // Hysteresis for the clear foreground: once a photo has earned a place,
   // keep it until it is comfortably outside the useful time/screen envelope.
@@ -1880,20 +1936,13 @@ function render(){
     };
   });
 
-  const visibleSet=chooseVisibleRepresentatives(raw,alpha);
+  const foregroundRoles=foregroundStoryRoles(raw);
+  const visibleSet=chooseVisibleRepresentatives(raw,alpha,foregroundRoles);
   renderEchoField(raw,visibleSet,alpha);
   chooseMagneticSet(raw,alpha);
   const composed=composeForeground(raw,visibleSet);
 
-  const relevance=[...visibleSet].map(i=>{
-    const s=data[i],r=raw[i],p=composed.get(i)||r;
-    const temporal=Math.exp(-.5*Math.pow(Math.abs(s.ms-timeCenter)/Math.max(timelineSpanMs()*.58,DAY),2));
-    const centre=1-clamp(Math.hypot(p.x-W/2,p.y-H*.53)/(Math.max(W,H)*.78),0,1);
-    return{i,score:temporal*.86+r.depth*.38+centre*.20+(i===spatialPinchTarget?3:0)};
-  }).sort((a,b)=>b.score-a.score);
-
-  const hero1=spatialPinchTarget!=null?spatialPinchTarget:relevance[0]?.i;
-  const roleRank=new Map(relevance.map((r,rank)=>[r.i,rank]));
+  const roleRank=new Map(foregroundRoles.map((i,rank)=>[i,rank]));
   renderedCards.clear();
 
   // Keep only the current readable foreground stories as real DOM elements.
@@ -1916,13 +1965,14 @@ function render(){
     );
     const edgeReveal=clamp(Math.min(edgeX,edgeY),0,1);
 
-    let opacity=[1,1,.94,.89,.85,.81][Math.min(rank,5)]||.81;
+    let opacity=[1,.97,.95,.93,.91,.80][Math.min(rank,5)]||.80;
     opacity*=lerp(.88,1,depth)*(1-alpha*.94)*edgeReveal;
-    if(i===active)opacity=Math.max(opacity,(1-alpha)*.96);
+    if(i===active)opacity=Math.max(opacity,(1-alpha)*.98);
 
-    // One or two memories lead the scene; the remaining cards support them.
+    // Exactly one story leads the scene. Four chronological neighbours remain
+    // readable; everything else supports the wider photo universe.
     let scale=lerp(.72,1.02,depth);
-    const rankScale=[1.30,1.21,1.03,.94,.90,.87][Math.min(rank,5)]||.87;
+    const rankScale=[1.38,1.06,1.04,1.02,1.00,.87][Math.min(rank,5)]||.87;
     scale*=rankScale;
     const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
@@ -1933,10 +1983,14 @@ function render(){
     const el=memoryNode(i,true);
     if(opacity>.025)ensureCardImage(i);
     const img=el.querySelector("img");
-    if(img)img.style.filter=rank<2?"contrast(1.055) saturate(1.035)":"contrast(.985) saturate(.97)";
+    if(img)img.style.filter=rank===0
+      ?"contrast(1.07) saturate(1.045)"
+      :rank<5
+        ?"contrast(1.02) saturate(1.01)"
+        :"contrast(.985) saturate(.97)";
     el.style.opacity=opacity.toFixed(3);
     el.style.pointerEvents=opacity>.24?"auto":"none";
-    el.style.zIndex=String(540+Math.round(depth*180)+(rank===0?105:rank===1?72:0)-Math.min(45,rank*7));
+    el.style.zIndex=String(540+Math.round(depth*180)+(rank===0?118:rank<5?42:0)-Math.min(30,rank*4));
     el.style.transform="translate3d("+(p.x-66)+"px,"+(p.y-87)+"px,0) scale("+scale.toFixed(3)+")";
     el.classList.toggle("nearest",i===active&&alpha<.6);
     el.classList.remove("magnetic");

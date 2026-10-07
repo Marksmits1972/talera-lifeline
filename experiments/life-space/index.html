@@ -39,7 +39,7 @@ button{font:inherit;color:inherit}
   radial-gradient(circle at 17% 26%,rgba(188,223,241,.10) 0 1px,transparent 1.7px),
   radial-gradient(circle at 76% 31%,rgba(255,215,181,.08) 0 1px,transparent 1.5px),
   radial-gradient(circle at 64% 72%,rgba(195,226,241,.08) 0 1px,transparent 1.5px)}
-#world{position:absolute#world{position:absolute;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
+#world{position:absolute;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
   to{transform:translate3d(1.6%,1%,0) scale(1.035)}
 }
 #echoLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
@@ -1226,7 +1226,7 @@ function composeForeground(raw,visibleSet){
   return map;
 }
 
-function chooseMagneticSet(){function chooseMagneticSet(){
+function chooseMagneticSet(){
   // No screen-space magnet on the globe. A photo stays where it actually is
   // on the sphere, so everything the user sees remains spatially trustworthy.
   magneticIds=new Set();lastMagneticIds=new Set();

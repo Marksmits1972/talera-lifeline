@@ -2009,13 +2009,13 @@ function render(){
     // Exactly one story leads the scene. Four chronological neighbours remain
     // readable; everything else supports the wider photo universe.
     let scale=lerp(.72,1.02,depth);
-    const rankScale=[1.46,1.12,1.10,1.08,1.06,.87][Math.min(rank,5)]||.87;
+    const rankScale=[1.56,1.20,1.18,1.16,1.14,.87][Math.min(rank,5)]||.87;
     scale*=rankScale;
     const zoomBreath=lerp(.86,1.04,clamp((cam.s-SPACE_MIN)/(SPACE_MAX-SPACE_MIN),0,1));
     scale*=zoomBreath;
     scale*=lerp(.86,1,smooth(.08,.92,edgeReveal));
     if(spatialPinchTarget===i)scale*=1+.18*smooth(.08,.92,spatialPinchStrength);
-    scale=clamp(scale,.64,1.44);
+    scale=clamp(scale,.64,1.54);
 
     const el=memoryNode(i,true);
     if(opacity>.025)ensureCardImage(i);

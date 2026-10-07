@@ -746,8 +746,10 @@ function keepCenterValid(){
 function syncGlobeFromFreeTimeline(){
   timeCenter=clampTime(centerMs);
   timelineSpanYears=spanForZoom(visualZoomPos)/DAYS_YEAR;
-  // Timeline navigation changes latitude/date only. Longitude and globe zoom stay put.
+  // Timeline navigation changes latitude/date while keeping longitude stable.
+  // When the timeline is actively moved from presentation, ease back into the universe.
   cam.y=sphereLatAtAge(ageFromMs(timeCenter));
+  if(userIsMoving&&cam.s>1.28)cam.s=lerp(cam.s,1.08,.28);
 }
 function commitFreeTimeline(){
   syncGlobeFromFreeTimeline();

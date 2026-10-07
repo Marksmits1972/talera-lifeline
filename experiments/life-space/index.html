@@ -87,7 +87,7 @@ button{font:inherit;color:inherit}
 }
 
 #hint{position:absolute;z-index:75;left:50%;bottom:calc(72px + var(--safeB));transform:translateX(-50%);width:min(90vw,440px);padding:10px 13px;border-radius:16px;background:rgba(5,10,14,.48);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;line-height:1.35;text-align:center;color:rgba(255,255,255,.9);pointer-events:none}
-#controls{position:absolute;z-index:78;left:11px;right:11px;bottom:calc(11px + var(--safeB));display:flex;align-items:center;justify-content:space-between;gap:7px}
+#controls{display:none}
 .group{display:flex;gap:7px}
 .btn{border:1px solid rgba(255,255,255,.15);background:rgba(5,10,14,.47);border-radius:999px;padding:9px 11px;font-size:11px;font-weight:720;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 #zoomRead{display:none}
@@ -119,16 +119,12 @@ button{font:inherit;color:inherit}
     <canvas id="timelineCanvas"></canvas>
     <div id="needle"></div>
     <div id="focusBlock"><span id="focusRange">1972–2026</span></div>
-    <div id="timelineHint">sleep door de tijd · knijp voor schaal</div>
+
   </div>
 
   <div id="hint">Gebruik de <b>tijdbalk bovenin</b> om gericht door je leven te bewegen, of zoek vrij met je vingers tussen de verhalen.</div>
 
-  <div id="controls">
-    <div class="group"><button class="btn" id="storyBtn">Verhaal</button><button class="btn" id="wideBtn">Ruimte</button></div>
-    <span id="zoomRead">100%</span>
-    <div class="group"><button class="btn" id="minusBtn">−</button><button class="btn" id="plusBtn">+</button><button class="btn" id="fieldBtn">Magneet</button></div>
-  </div>
+
   <div id="toast"></div>
 </div>
 
@@ -1862,11 +1858,16 @@ app.addEventListener("touchcancel",()=>{
   touch=null;spatialPinchTarget=null;spatialPinchStrength=0;render();
 },{passive:false});
 
-document.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToFocus());
-document.getElementById("wideBtn").onclick=wide;
-document.getElementById("minusBtn").onclick=()=>{};
-document.getElementById("plusBtn").onclick=()=>{};
-document.getElementById("fieldBtn").onclick=()=>app.classList.toggle("debug");
+const storyBtn=document.getElementById("storyBtn");
+const wideBtn=document.getElementById("wideBtn");
+const minusBtn=document.getElementById("minusBtn");
+const plusBtn=document.getElementById("plusBtn");
+const fieldBtn=document.getElementById("fieldBtn");
+if(storyBtn)storyBtn.onclick=()=>focusStory(nearestMemoryToFocus());
+if(wideBtn)wideBtn.onclick=wide;
+if(minusBtn)minusBtn.onclick=()=>{};
+if(plusBtn)plusBtn.onclick=()=>{};
+if(fieldBtn)fieldBtn.onclick=()=>app.classList.toggle("debug");
 
 OVERVIEW_ANCHORS.forEach(ensureCardImage);
 for(let i=Math.max(0,active-5);i<=Math.min(data.length-1,active+5);i++)ensureCardImage(i);

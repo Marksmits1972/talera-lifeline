@@ -294,7 +294,7 @@ const EXTRA_MEMORIES=(()=>{
   // Stress-test dataset: exactly 1000 memories total, while preserving the
   // original reference memories. Synthetic photos are unique seeded sources
   // and remain lazy-loaded so the browser never downloads all 1000 at once.
-  const TARGET_TOTAL_MEMORIES=1000;
+  const TARGET_TOTAL_MEMORIES=3000;
   const targetExtra=Math.max(0,TARGET_TOTAL_MEMORIES-MEMORIES.length);
 
   // Uneven life-density on purpose: some sparse periods, some very dense ones.
@@ -419,7 +419,8 @@ const EXTRA_MEMORIES=(()=>{
     const storyIndex=n%(starters.length*endings.length);
     const story=
       starters[storyIndex%starters.length]+", "+
-      endings[Math.floor(storyIndex/starters.length)%endings.length];
+      endings[Math.floor(storyIndex/starters.length)%endings.length]+
+      " ("+String(n+1)+")";
 
     out.push({
       id,
@@ -452,7 +453,7 @@ const GOLDEN_ANGLE=2.399963229728653;
 // The world grows with the amount of material instead of cramming more photos
 // into the same physical space. 150 memories is the current reference density.
 const WORLD_REFERENCE_COUNT=150;
-const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,2.8);
+const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,6);
 const SPHERE_RADIUS=395*WORLD_DENSITY_SCALE;
 
 // Time stays chronologically correct, but visually empty eras take less room on

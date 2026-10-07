@@ -90,7 +90,8 @@ button{font:inherit;color:inherit}
 #controls{position:absolute;z-index:78;left:11px;right:11px;bottom:calc(11px + var(--safeB));display:flex;align-items:center;justify-content:space-between;gap:7px}
 .group{display:flex;gap:7px}
 .btn{border:1px solid rgba(255,255,255,.15);background:rgba(5,10,14,.47);border-radius:999px;padding:9px 11px;font-size:11px;font-weight:720;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-#zoomRead{font-size:10px;color:rgba(255,255,255,.72);min-width:44px;text-align:center}
+#zoomRead{display:none}
+#minusBtn,#plusBtn{display:none}
 #toast{position:absolute;z-index:95;left:50%;top:calc(128px + var(--safeT));transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(4,8,11,.73);font-size:10px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
 #toast.on{opacity:1}
 #magnetDebug{position:absolute;z-index:2;inset:0;pointer-events:none;opacity:0}
@@ -150,6 +151,7 @@ const LIFE_MS=LIFE_END-LIFE_START;
 const DAY=86400000;
 let SPACE_MIN=.20;
 const SPACE_MAX=2.0,SWIPE_SPACE=1.66;
+const SPACE_VIEW_SCALE=1.08;
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -317,7 +319,9 @@ const baseData=ALL_MEMORIES.map((s,i)=>{
 const LIFE_YEARS=Math.max(1,(LIFE_END-LIFE_START)/(365.2425*DAY));
 const GLOBE_LAT_LIMIT=1.285; // ~73.6 degrees; avoids pole singularities.
 const GOLDEN_ANGLE=2.399963229728653;
-const SPHERE_RADIUS=285+72*Math.log1p(baseData.length/42);
+const WORLD_REFERENCE_COUNT=150;
+const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.72,3);
+const SPHERE_RADIUS=395*WORLD_DENSITY_SCALE;
 
 function wrapLon(a){
   const tau=Math.PI*2;
@@ -438,7 +442,7 @@ function projectMemory(s){
 
   const lonDelta=wrapLon(s.lon-cam.x);
   const latDelta=s.lat-cam.y;
-  const zoom=Math.max(.74,cam.s/SPACE_MIN);
+  const zoom=Math.max(.74,cam.s/SPACE_MIN)*WORLD_DENSITY_SCALE;
 
   // tanh keeps the space effectively endless horizontally while softly
   // compressing the far sides instead of drawing a visible globe edge.
@@ -693,9 +697,7 @@ function closeStorySmooth(i=active){
   // user swiped to another story in presentation, use the same zoom level but
   // centre the universe around that new memory.
   const exact=spaceReturnState&&spaceReturnState.storyIndex===targetIndex;
-  const returnScale=spaceReturnState
-    ? clamp(spaceReturnState.camS,SPACE_MIN,SWIPE_SPACE-.08)
-    : Math.max(SPACE_MIN,Math.min(.82,SWIPE_SPACE-.12));
+  const returnScale=SPACE_VIEW_SCALE;
 
   if(exact){
     cam.x=spaceReturnState.camX;
@@ -767,8 +769,8 @@ function closeStorySmooth(i=active){
 }
 
 function wide(){
-  // Return to a whole-life globe without resetting the longitude the user discovered.
-  cam.y=0;cam.s=SPACE_MIN;
+  // Return to the fixed globe view without resetting the longitude the user discovered.
+  cam.y=0;cam.s=SPACE_VIEW_SCALE;
   syncTimeFromSpace();
   hint.style.display="none";toastMsg("Hele leven");render();
 }
@@ -1137,6 +1139,7 @@ function pointerEnd(e){
   e.preventDefault();e.stopPropagation();
   if(pointers.size===0){
     userIsMoving=false;timelineUser=false;
+    if(cam.s<SWIPE_SPACE)cam.s=SPACE_VIEW_SCALE;
     scheduleSnap(gestureUsedPinch);searchVelocity=0;
     commitFreeTimeline();
   }else if(pointers.size===1){
@@ -1615,18 +1618,23 @@ app.addEventListener("touchstart",e=>{
       carryLon,carryLat
     };
   }else if(e.touches.length>=2){
-    const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
-    const target=storyAtScreenPoint(m);
-    spatialPinchTarget=target;spatialPinchStrength=0;
-    touch={
-      kind:"pinch",
-      d:Math.max(10,dist(a,b)),
-      s:cam.s,
-      lon:cam.x,
-      lat:cam.y,
-      target,
-      mid:m
-    };
+    if(cam.s<SWIPE_SPACE){
+      spatialPinchTarget=null;spatialPinchStrength=0;
+      touch={kind:"spaceNoZoom",s:SPACE_VIEW_SCALE};
+    }else{
+      const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
+      const target=storyAtScreenPoint(m);
+      spatialPinchTarget=target;spatialPinchStrength=0;
+      touch={
+        kind:"pinch",
+        d:Math.max(10,dist(a,b)),
+        s:cam.s,
+        lon:cam.x,
+        lat:cam.y,
+        target,
+        mid:m
+      };
+    }
   }
 },{passive:false});
 
@@ -1635,6 +1643,15 @@ app.addEventListener("touchmove",e=>{
   e.preventDefault();
 
   if(e.touches.length>=2){
+    // No pinch zoom on the life globe. A pinch that started in presentation
+    // may still be used to leave the story; the timeline has its own handler.
+    if(touch.kind==="spaceNoZoom"||(touch.kind!=="pinch"&&cam.s<SWIPE_SPACE)){
+      touch={kind:"spaceNoZoom",s:SPACE_VIEW_SCALE};
+      spatialPinchTarget=null;spatialPinchStrength=0;
+      cam.s=SPACE_VIEW_SCALE;
+      return;
+    }
+
     const a=localTouch(e.touches[0]),b=localTouch(e.touches[1]),m=mid(a,b);
 
     if(touch.kind!=="pinch"){
@@ -1768,6 +1785,13 @@ app.addEventListener("touchend",e=>{
     if(typeof centerMs!=="undefined")centerMs=timeCenter;
     if(commit>.58)active=finished.target;
   }
+  if(e.touches.length===0&&finished.kind==="pinch"&&finished.s>=SWIPE_SPACE&&cam.s<SWIPE_SPACE){
+    cam.s=SPACE_VIEW_SCALE;
+    syncTimeFromSpace();
+  }
+  if(e.touches.length===0&&finished.kind==="spaceNoZoom"){
+    cam.s=SPACE_VIEW_SCALE;
+  }
 
   touch=null;spatialPinchTarget=null;spatialPinchStrength=0;
   render();
@@ -1779,8 +1803,8 @@ app.addEventListener("touchcancel",()=>{
 
 document.getElementById("storyBtn").onclick=()=>focusStory(nearestMemoryToFocus());
 document.getElementById("wideBtn").onclick=wide;
-document.getElementById("minusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*.82);
-document.getElementById("plusBtn").onclick=()=>zoomAround(W/2,H/2,cam.s*1.22);
+document.getElementById("minusBtn").onclick=()=>{};
+document.getElementById("plusBtn").onclick=()=>{};
 document.getElementById("fieldBtn").onclick=()=>app.classList.toggle("debug");
 
 OVERVIEW_ANCHORS.forEach(ensureCardImage);

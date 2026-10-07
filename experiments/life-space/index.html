@@ -1774,8 +1774,13 @@ function foregroundStoryRoles(raw){
         (q.x-W/2)/Math.max(1,W),
         (q.y-H*.56)/Math.max(1,H)
       );
+      const horizontalCentre=Math.abs(q.x-W/2)/Math.max(1,W*.5);
       const depthPenalty=(1-clamp(q.depth,0,1))*.12;
-      const score=temporal*.62+centre*.32+depthPenalty;
+      const score=
+        temporal*lerp(.62,.40,heroVertical)+
+        centre*.32+
+        horizontalCentre*.44*heroVertical+
+        depthPenalty;
       if(score<bestScore){
         bestScore=score;
         hero=i;
@@ -1790,8 +1795,7 @@ function foregroundStoryRoles(raw){
   if(hero==null||!data[hero])return [];
 
   function pickSide(direction,count){
-    const readable=[];
-    const approaching=[];
+    const pool=[];
 
     for(let step=1;step<=scanPerSide;step++){
       const i=hero+direction*step;
@@ -1806,14 +1810,18 @@ function foregroundStoryRoles(raw){
         q.x>-W*.32&&q.x<W*1.32&&
         q.y>timelineBottom-110&&q.y<H+135;
 
-      if(onScreen)readable.push({i,step});
-      else if(nearScreen)approaching.push({i,step});
+      if(!onScreen&&!nearScreen)continue;
 
-      if(readable.length>=count)break;
+      const horizontalCentre=Math.abs(q.x-W/2)/Math.max(1,W*.5);
+      const score=
+        step*lerp(1,.58,heroVertical)+
+        horizontalCentre*22*heroVertical+
+        (onScreen?0:7);
+      pool.push({i,score});
     }
 
-    return [...readable,...approaching]
-      .sort((a,b)=>a.step-b.step)
+    return pool
+      .sort((a,b)=>a.score-b.score||a.i-b.i)
       .slice(0,count)
       .map(v=>v.i);
   }
@@ -1952,18 +1960,32 @@ function chooseVisibleRepresentatives(raw,alpha,foregroundRoles=[]){
 
 // The magnetic layer is allowed to compose the *screen*, never to change which
 // memory the user is actually navigating toward.
-function composeForeground(raw,visibleSet){
+function composeForeground(raw,visibleSet,foregroundRoles=[]){
   const map=new Map();
   const top=(timelineShell?.getBoundingClientRect().height||126)+64;
   const bottom=H-118;
   const outerMinX=-96,outerMaxX=W+96;
   const outerMinY=top-112,outerMaxY=H+96;
 
+  const motion=currentShellVelocity();
+  const motionTotal=Math.abs(motion.x)+Math.abs(motion.y)+.0001;
+  const verticalFlow=smooth(.34,.76,Math.abs(motion.y)/motionTotal);
+  const roleRank=new Map(foregroundRoles.map((i,rank)=>[i,rank]));
+  const verticalLanes=[.50,.34,.66,.43,.57];
+
   for(const i of visibleSet){
     const r=raw[i];
-    // Keep the story on its real projected path. It may live just outside the
-    // viewport and physically roll in; only absurdly distant positions are capped.
-    const homeX=clamp(r.x,outerMinX,outerMaxX);
+    // Horizontal browsing keeps the true projected path. During vertical time
+    // travel, only the readable foreground is gently guided into a broad centre
+    // corridor so the large photographs actually cross the viewing area.
+    let homeX=clamp(r.x,outerMinX,outerMaxX);
+    const rank=roleRank.get(i);
+    if(verticalFlow>.001&&rank!=null&&rank<verticalLanes.length){
+      const laneX=W*verticalLanes[rank];
+      const laneStrength=verticalFlow*(rank===0?.78:.58);
+      homeX=lerp(homeX,laneX,laneStrength);
+    }
+
     const homeY=clamp(r.y,outerMinY,outerMaxY);
     map.set(i,{x:homeX,y:homeY,homeX,homeY});
   }
@@ -2249,7 +2271,7 @@ function render(){
   const middleSet=renderEchoField(raw,visibleSet,alpha);
   renderFarEchoField(raw,visibleSet,middleSet,alpha);
   chooseMagneticSet(raw,alpha);
-  const composed=composeForeground(raw,visibleSet);
+  const composed=composeForeground(raw,visibleSet,foregroundRoles);
 
   const roleRank=new Map(foregroundRoles.map((i,rank)=>[i,rank]));
   for(const [i,rank] of roleRank)foregroundLastRoleRank.set(i,rank);
@@ -2280,8 +2302,8 @@ function render(){
     const revealVertical=smooth(.38,.78,Math.abs(revealMotion.y)/revealMotionTotal);
 
     const edgeX=Math.min(
-      smooth(-104,42,r.x),
-      1-smooth(W-42,W+104,r.x)
+      smooth(-104,42,p.x),
+      1-smooth(W-42,W+104,p.x)
     );
 
     // During vertical travel, start revealing sooner above/below the viewport
@@ -2291,12 +2313,12 @@ function render(){
       smooth(
         lerp(timelineBottom-106,timelineBottom-190,revealVertical),
         lerp(timelineBottom+36,timelineBottom+72,revealVertical),
-        r.y
+        p.y
       ),
       1-smooth(
         lerp(H-72,H-145,revealVertical),
         lerp(H+106,H+205,revealVertical),
-        r.y
+        p.y
       )
     );
     const edgeReveal=clamp(Math.min(edgeX,edgeY),0,1);

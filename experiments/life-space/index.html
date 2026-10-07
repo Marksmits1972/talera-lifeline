@@ -824,7 +824,9 @@ let stableHeroIndex=null;
 // Visual entry state prevents a newly-selected photo from materialising in the
 // middle of the field. New foreground cards travel in from their nearest edge.
 const foregroundEntryState=new Map();
-const FOREGROUND_ENTRY_MS=560;
+const FOREGROUND_ENTRY_PX_PER_SEC=150;
+const FOREGROUND_ENTRY_MIN_MS=700;
+const FOREGROUND_ENTRY_MAX_MS=1800;
 let sceneTransitionRaf=0;
 function requestSceneTransitionFrame(){
   if(sceneTransitionRaf)return;
@@ -2277,18 +2279,27 @@ function render(){
     let entry=foregroundEntryState.get(i);
     if(!entry){
       const offset=foregroundEntryOffset(p.x,p.y);
-      entry={startedAt:performance.now(),dx:offset.x,dy:offset.y};
+      const distance=Math.hypot(offset.x,offset.y);
+      const duration=clamp(
+        distance/FOREGROUND_ENTRY_PX_PER_SEC*1000,
+        FOREGROUND_ENTRY_MIN_MS,
+        FOREGROUND_ENTRY_MAX_MS
+      );
+      entry={startedAt:performance.now(),dx:offset.x,dy:offset.y,duration};
       foregroundEntryState.set(i,entry);
     }
-    const entryT=clamp((performance.now()-entry.startedAt)/FOREGROUND_ENTRY_MS,0,1);
-    const entryEase=1-Math.pow(1-entryT,3);
+
+    // Constant-speed entry: no ease-out burst, no catch-up sprint.
+    // A card simply keeps gliding from the edge toward its real path.
+    const entryT=clamp((performance.now()-entry.startedAt)/entry.duration,0,1);
+    const entryEase=entryT;
     const entryOpacity=smooth(0,.72,entryT);
     const entryX=p.x+entry.dx*(1-entryEase);
     const entryY=p.y+entry.dy*(1-entryEase);
     if(entryT<.999)requestSceneTransitionFrame();
 
     opacity*=entryOpacity;
-    scale*=lerp(.90,1,entryEase);
+    scale*=lerp(.92,1,entryEase);
 
     const el=memoryNode(i,true);
     if(opacity>.025)ensureCardImage(i);

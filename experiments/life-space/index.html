@@ -1496,6 +1496,7 @@ app.addEventListener("touchstart",e=>{
       travel:0,
       lastT:performance.now(),
       vLon:0,vLat:0,
+      dragSpeed:0,
       carryLon,carryLat
     };
   }else if(e.touches.length>=2){
@@ -1568,8 +1569,19 @@ app.addEventListener("touchmove",e=>{
       const nav=1/Math.max(.60,cam.s);
       const contentFactor=Math.sqrt(330/SPHERE_RADIUS);
 
-      const dLon=-dx*.0068*nav*contentFactor;
-      const dLat=dy*.0047*nav*contentFactor;
+      // One gesture, three natural gears:
+      // slow = precision under the thumb, normal = direct navigation,
+      // fast = full-speed push that can continue into inertia.
+      const instFingerSpeed=Math.hypot(dx,dy)/dt;
+      const speedAlpha=1-Math.exp(-dt/70);
+      touch.dragSpeed=lerp(touch.dragSpeed||0,instFingerSpeed,speedAlpha);
+      const gear=smooth(.035,.30,touch.dragSpeed);
+
+      const horizontalGain=lerp(.56,1.06,gear);
+      const verticalGain=lerp(.16,.72,gear);
+
+      const dLon=-dx*.0068*nav*contentFactor*horizontalGain;
+      const dLat=dy*.0047*nav*contentFactor*verticalGain;
 
       cam.x=wrapLon(cam.x+dLon);
       cam.y=clampCamY(cam.y+dLat);

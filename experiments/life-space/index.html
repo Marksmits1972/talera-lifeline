@@ -459,7 +459,7 @@ const SPHERE_RADIUS=395*WORLD_DENSITY_SCALE;
 // Direct manipulation is tied to distance travelled over the outer photo shell,
 // not to a fixed angular rotation. A larger world therefore rotates fewer
 // radians for the same finger movement; a smaller world rotates more.
-const SHELL_ANGULAR_GAIN=1/WORLD_DENSITY_SCALE;
+const SHELL_ANGULAR_GAIN=1/Math.sqrt(WORLD_DENSITY_SCALE);
 
 // Time stays chronologically correct, but visually empty eras take less room on
 // the globe. This keeps a sparse life compact while a dense life naturally grows.
@@ -577,11 +577,46 @@ function memoryNode(i,create=true){
   return el;
 }
 
-function releaseUnusedMemoryNodes(keepSet){
+const nodeLastVisibleAt=new Map();
+const NODE_LINGER_MS=850;
+const MAX_MEMORY_NODES=28;
+
+function releaseUnusedMemoryNodes(keepSet,now=performance.now()){
+  for(const i of keepSet)nodeLastVisibleAt.set(i,now);
+
+  const removable=[];
   for(const [i,el] of nodes){
     if(keepSet.has(i))continue;
-    el.remove();
-    nodes.delete(i);
+
+    // Keep the already-decoded card around briefly. If it becomes relevant
+    // again during the same pass, the browser does not rebuild/repaint it.
+    el.style.opacity="0";
+    el.style.pointerEvents="none";
+
+    const last=nodeLastVisibleAt.get(i)||0;
+    removable.push({i,el,last,expired:now-last>NODE_LINGER_MS});
+  }
+
+  // Normal cleanup after the linger window.
+  for(const item of removable){
+    if(!item.expired)continue;
+    item.el.remove();
+    nodes.delete(item.i);
+    nodeLastVisibleAt.delete(item.i);
+  }
+
+  // Hard safety cap for long sessions: keep the newest inactive cards.
+  if(nodes.size>MAX_MEMORY_NODES){
+    const leftovers=[...nodes.entries()]
+      .filter(([i])=>!keepSet.has(i))
+      .map(([i,el])=>({i,el,last:nodeLastVisibleAt.get(i)||0}))
+      .sort((a,b)=>a.last-b.last);
+    while(nodes.size>MAX_MEMORY_NODES&&leftovers.length){
+      const item=leftovers.shift();
+      item.el.remove();
+      nodes.delete(item.i);
+      nodeLastVisibleAt.delete(item.i);
+    }
   }
 }
 
@@ -1629,8 +1664,35 @@ function renderEchoField(raw,visibleSet,alpha){
     if(!tooClose)chosen.push(cand);
   }
 
+  const chosenById=new Map(chosen.map(c=>[c.i,c]));
+  const slotCandidates=new Array(ECHO_COUNT).fill(null);
+  const usedIds=new Set();
+
+  // First preserve existing slot->photo assignments whenever that photo is
+  // still wanted. A small ranking change must not replace 96 image sources.
   for(let slot=0;slot<ECHO_COUNT;slot++){
-    const el=echoNodes[slot],cand=chosen[slot];
+    const current=echoAssignments[slot];
+    const cand=chosenById.get(current);
+    if(cand){
+      slotCandidates[slot]=cand;
+      usedIds.add(current);
+    }
+  }
+
+  // Fill only genuinely free slots with newly chosen echoes.
+  let next=0;
+  for(let slot=0;slot<ECHO_COUNT;slot++){
+    if(slotCandidates[slot])continue;
+    while(next<chosen.length&&usedIds.has(chosen[next].i))next++;
+    if(next<chosen.length){
+      slotCandidates[slot]=chosen[next];
+      usedIds.add(chosen[next].i);
+      next++;
+    }
+  }
+
+  for(let slot=0;slot<ECHO_COUNT;slot++){
+    const el=echoNodes[slot],cand=slotCandidates[slot];
     if(!cand){
       el.style.opacity="0";echoAssignments[slot]=-1;continue;
     }

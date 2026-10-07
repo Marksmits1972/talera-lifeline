@@ -22,7 +22,7 @@ button{font:inherit;color:inherit}
 #app{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#0b1117;-webkit-user-select:none;user-select:none}
 #bg{
   position:absolute;z-index:0;inset:0;
-  background:radial-gradient(circle at 52% 42%,#142a39 0%,#0c1b26 46%,#071119 76%,#04080c 100%);
+  background:radial-gradient(circle at 52% 40%,#1d3b4d 0%,#123041 42%,#0a202d 72%,#06131c 100%);
 }
 #spaceCanvas{position:absolute;z-index:1;inset:0;width:100%;height:100%;pointer-events:none}
 #world{position:absolute;z-index:2;inset:0;overflow:hidden;touch-action:none;isolation:isolate}
@@ -197,72 +197,54 @@ function drawSpaceFx(now=performance.now()){
   const lonTurn=cam.x/(Math.PI*2);
   const latTurn=cam.y/(GLOBE_LAT_LIMIT*2);
 
-  // Deep cool glow: gives the space a centre without becoming a visible object.
-  let g=ctx.createRadialGradient(W*.55,H*.48,8,W*.55,H*.48,Math.max(W,H)*.72);
-  g.addColorStop(0,"rgba(58,116,151,.13)");
-  g.addColorStop(.38,"rgba(31,76,108,.055)");
+  // Fresh ambient depth: lighter blue/teal, still calm and unobtrusive.
+  let g=ctx.createRadialGradient(W*.54,H*.46,10,W*.54,H*.46,Math.max(W,H)*.74);
+  g.addColorStop(0,"rgba(86,158,187,.18)");
+  g.addColorStop(.34,"rgba(49,113,145,.10)");
+  g.addColorStop(.72,"rgba(21,67,93,.04)");
   g.addColorStop(1,"rgba(0,0,0,0)");
-  ctx.fillStyle=g;ctx.fillRect(0,top,W,usable);
+  ctx.fillStyle=g;
+  ctx.fillRect(0,top,W,usable);
 
-  // A broad warm/cool shaft of light, inspired by the original concept image.
-  const sx=W*(.14+.025*Math.sin(cam.x*.7));
-  const sy=top+usable*(.10+.018*Math.sin(cam.y*1.9));
+  // Soft diffuse side glow instead of a visible stripe or fantasy beam.
+  const sx=W*(.18+.018*Math.sin(cam.x*.55));
+  const sy=top+usable*(.18+.012*Math.sin(cam.y*1.4));
   ctx.save();
   ctx.globalCompositeOperation="screen";
-  ctx.filter="blur(10px)";
-  const beam=ctx.createLinearGradient(sx,sy,W*.78,H*.78);
-  beam.addColorStop(0,"rgba(255,230,181,.18)");
-  beam.addColorStop(.28,"rgba(189,220,235,.105)");
-  beam.addColorStop(.72,"rgba(116,177,207,.035)");
-  beam.addColorStop(1,"rgba(80,137,170,0)");
-  ctx.fillStyle=beam;
-  ctx.beginPath();
-  ctx.moveTo(sx-18,sy-10);
-  ctx.lineTo(sx+26,sy+8);
-  ctx.lineTo(W*1.02,H*.88);
-  ctx.lineTo(W*.60,H*.72);
-  ctx.closePath();
-  ctx.fill();
-  ctx.filter="none";
-
-  const sourceGlow=ctx.createRadialGradient(sx,sy,0,sx,sy,Math.max(W,H)*.30);
-  sourceGlow.addColorStop(0,"rgba(255,238,202,.24)");
-  sourceGlow.addColorStop(.20,"rgba(203,226,238,.10)");
-  sourceGlow.addColorStop(1,"rgba(130,188,215,0)");
-  ctx.fillStyle=sourceGlow;
+  const glow=ctx.createRadialGradient(sx,sy,0,sx,sy,Math.max(W,H)*.50);
+  glow.addColorStop(0,"rgba(241,232,204,.105)");
+  glow.addColorStop(.24,"rgba(196,225,236,.085)");
+  glow.addColorStop(.58,"rgba(115,184,210,.035)");
+  glow.addColorStop(1,"rgba(70,130,160,0)");
+  ctx.fillStyle=glow;
   ctx.fillRect(0,top,W,usable);
   ctx.restore();
 
-  // Three-dimensional star field. Near points react more strongly to navigation,
-  // so the background has real parallax instead of reading as wallpaper.
+  // Three-dimensional star field. Near points react more strongly to navigation.
   for(const s of SPACE_STARS){
     const drift=t*(.025+.07*s.z);
     const x=wrap01(s.x-lonTurn*(.055+.16*s.z)+drift)*W;
     const y=top+wrap01(s.y+latTurn*(.035+.10*s.z)+drift*.22)*usable;
-    const pulse=.82+.18*Math.sin(now*.0012+s.x*19+s.y*11);
-    const a=s.alpha*lerp(.42,1,s.z)*pulse;
-    const radius=s.size*lerp(.58,1.26,s.z);
+    const pulse=.90+.10*Math.sin(now*.0011+s.x*19+s.y*11);
+    const a=s.alpha*lerp(.34,.78,s.z)*pulse;
+    const radius=s.size*lerp(.52,1.12,s.z);
     ctx.fillStyle=s.warm
-      ?"rgba(255,222,183,"+a.toFixed(3)+")"
-      :"rgba(214,238,249,"+a.toFixed(3)+")";
-    ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();
-
-    if(s.z>.79){
-      ctx.strokeStyle="rgba(205,234,248,"+(a*.18).toFixed(3)+")";
-      ctx.lineWidth=.55;
-      ctx.beginPath();ctx.moveTo(x-radius*2.2,y);ctx.lineTo(x+radius*2.2,y);ctx.stroke();
-    }
+      ?"rgba(245,224,194,"+a.toFixed(3)+")"
+      :"rgba(214,239,248,"+a.toFixed(3)+")";
+    ctx.beginPath();
+    ctx.arc(x,y,radius,0,Math.PI*2);
+    ctx.fill();
   }
 
-  // A handful of larger, very soft particles make the foreground atmosphere breathe.
+  // A few soft particles near the viewer for depth, intentionally restrained.
   for(const d of SPACE_DUST){
     const x=wrap01(d.x-lonTurn*(.018+.055*d.z)-t*.018)*W;
     const y=top+wrap01(d.y+latTurn*(.018+.04*d.z)+t*.006)*usable;
-    const dg=ctx.createRadialGradient(x,y,0,x,y,d.size*4.2);
-    dg.addColorStop(0,"rgba(181,220,239,"+d.alpha.toFixed(3)+")");
-    dg.addColorStop(1,"rgba(181,220,239,0)");
+    const dg=ctx.createRadialGradient(x,y,0,x,y,d.size*3.5);
+    dg.addColorStop(0,"rgba(184,224,240,"+(d.alpha*.72).toFixed(3)+")");
+    dg.addColorStop(1,"rgba(184,224,240,0)");
     ctx.fillStyle=dg;
-    ctx.fillRect(x-d.size*4.2,y-d.size*4.2,d.size*8.4,d.size*8.4);
+    ctx.fillRect(x-d.size*3.5,y-d.size*3.5,d.size*7,d.size*7);
   }
 }
 function spaceFxLoop(now){

@@ -455,18 +455,38 @@ const GOLDEN_ANGLE=2.399963229728653;
 const WORLD_REFERENCE_COUNT=150;
 const WORLD_DENSITY_SCALE=clamp(Math.sqrt(Math.max(1,baseData.length)/WORLD_REFERENCE_COUNT),.60,10);
 const SHELL_REFERENCE_RADIUS=395;
-const SPHERE_RADIUS=SHELL_REFERENCE_RADIUS*WORLD_DENSITY_SCALE;
+const ELLIPSE_VERTICAL_RATIO=1.25;
+const ELLIPSE_HORIZONTAL_RADIUS=SHELL_REFERENCE_RADIUS*WORLD_DENSITY_SCALE;
+const ELLIPSE_VERTICAL_RADIUS=ELLIPSE_HORIZONTAL_RADIUS*ELLIPSE_VERTICAL_RATIO;
 const TAU=Math.PI*2;
-const GLOBE_CIRCUMFERENCE=TAU*SPHERE_RADIUS;
+const GLOBE_EQUATOR_CIRCUMFERENCE=TAU*ELLIPSE_HORIZONTAL_RADIUS;
 
 // Human input is defined as distance travelled over the outer photo shell.
-// Circumference is only used afterwards to translate that distance into the
-// internal sphere rotation required by the current world size.
-function shellDistanceToRotation(distance){
-  return (distance/GLOBE_CIRCUMFERENCE)*TAU;
+// Horizontal travel follows the equator. Vertical travel follows the stretched
+// ellipse meridian, whose local arc length changes with latitude.
+function shellLonDistanceToRotation(distance){
+  return (distance/GLOBE_EQUATOR_CIRCUMFERENCE)*TAU;
 }
-function rotationToShellDistance(rotation){
-  return (rotation/TAU)*GLOBE_CIRCUMFERENCE;
+function rotationToShellLonDistance(rotation){
+  return (rotation/TAU)*GLOBE_EQUATOR_CIRCUMFERENCE;
+}
+function ellipseMeridianRadiusAt(lat){
+  const a=ELLIPSE_HORIZONTAL_RADIUS,b=ELLIPSE_VERTICAL_RADIUS;
+  const sn=Math.sin(lat),cs=Math.cos(lat);
+  return Math.sqrt((a*sn)*(a*sn)+(b*cs)*(b*cs));
+}
+function shellLatDistanceToRotation(distance,lat){
+  return distance/ellipseMeridianRadiusAt(lat);
+}
+function rotationToShellLatDistance(rotation,midLat){
+  return rotation*ellipseMeridianRadiusAt(midLat);
+}
+function shellSurfaceDistanceFromCamera(s){
+  const dLon=wrapLon(s.lon-cam.x);
+  const dLat=s.lat-cam.y;
+  const dx=rotationToShellLonDistance(dLon);
+  const dy=rotationToShellLatDistance(dLat,(s.lat+cam.y)/2);
+  return Math.hypot(dx,dy);
 }
 
 // Ergonomic finger->surface calibration. These are surface-distance values,
@@ -474,10 +494,10 @@ function rotationToShellDistance(rotation){
 const SHELL_DRAG_X_PER_PX=2.455;
 const SHELL_DRAG_Y_PER_PX=1.698;
 const SHELL_MAX_COAST_X=2.95;
-const SHELL_MAX_COAST_Y=.15;
+const SHELL_MAX_COAST_Y=.15*ELLIPSE_VERTICAL_RATIO;
 const SHELL_STOP_SPEED=.020;
 const SHELL_COAST_DECAY_MS=480;
-const SHELL_TIME_DECAY_MS=180;
+const SHELL_TIME_DECAY_MS=180*ELLIPSE_VERTICAL_RATIO;
 
 // Time stays chronologically correct, but visually empty eras take less room on
 // the globe. This keeps a sparse life compact while a dense life naturally grows.
@@ -682,8 +702,10 @@ function preloadNearbyMemories(){
   data.forEach((s,i)=>{
     if(preloadedThumbs.has(i))return;
 
-    const dx=rotationToShellDistance(wrapLon(s.lon-cam.x));
-    const dy=rotationToShellDistance(s.lat-cam.y);
+    const dLon=wrapLon(s.lon-cam.x);
+    const dLat=s.lat-cam.y;
+    const dx=rotationToShellLonDistance(dLon);
+    const dy=rotationToShellLatDistance(dLat,(s.lat+cam.y)/2);
     const distance=Math.hypot(dx,dy);
     if(distance>lookAhead)return;
 
@@ -758,9 +780,9 @@ function projectMemory(s){
   const xNorm=Math.tanh(lonDelta*.78);
   const yNorm=Math.tanh(latDelta*1.38);
   const x=W/2+xNorm*(W*.57)*zoom;
-  const y=cy-yNorm*(usable*.48)*zoom;
+  const y=cy-yNorm*(usable*.48)*zoom*ELLIPSE_VERTICAL_RATIO;
 
-  const distance=Math.hypot(lonDelta*.50,latDelta*1.18);
+  const distance=Math.hypot(lonDelta*.50,latDelta*1.18*ELLIPSE_VERTICAL_RATIO);
   const shellLift=((s.shell||1)-1)*1.9;
   const depth=clamp(1-distance*.34+shellLift,0,1);
   const facing=clamp(1-distance*.42,-.35,1);
@@ -801,7 +823,7 @@ function nearestMemoryToFocus(){
   let best=candidates[0].i,score=Infinity;
   for(const v of candidates){
     const temporal=v.dt/Math.max(DAY,windowMs);
-    const shellDistance=rotationToShellDistance(angularDistanceToCamera(v.s));
+    const shellDistance=shellSurfaceDistanceFromCamera(v.s);
     const shellProximity=clamp(shellDistance/(Math.PI*SHELL_REFERENCE_RADIUS),0,4);
     const q=temporal*3.4+shellProximity*.42;
     if(q<score){score=q;best=v.i}
@@ -1984,9 +2006,9 @@ function startGlobeInertia(vShellLon,vShellLat,carryShellLon=0,carryShellLat=0){
     // the internal rotation necessary to realize exactly that travel.
     const lonTravel=globeMomentumShellLon*dt;
     const latTravel=globeMomentumShellLat*dt;
-    cam.x=wrapLon(cam.x+shellDistanceToRotation(lonTravel));
+    cam.x=wrapLon(cam.x+shellLonDistanceToRotation(lonTravel));
 
-    const wantedY=cam.y+shellDistanceToRotation(latTravel);
+    const wantedY=cam.y+shellLatDistanceToRotation(latTravel,cam.y);
     const nextY=clampCamY(wantedY);
     if(nextY!==wantedY)globeMomentumShellLat=0;
     cam.y=nextY;
@@ -2135,8 +2157,8 @@ app.addEventListener("touchmove",e=>{
       // that do we ask the current circumference how much sphere rotation it needs.
       const dShellLon=-dx*SHELL_DRAG_X_PER_PX*nav*horizontalGain;
       const dShellLat=dy*SHELL_DRAG_Y_PER_PX*nav*verticalGain;
-      cam.x=wrapLon(cam.x+shellDistanceToRotation(dShellLon));
-      cam.y=clampCamY(cam.y+shellDistanceToRotation(dShellLat));
+      cam.x=wrapLon(cam.x+shellLonDistanceToRotation(dShellLon));
+      cam.y=clampCamY(cam.y+shellLatDistanceToRotation(dShellLat,cam.y));
 
       const instShellLon=dShellLon/dt,instShellLat=dShellLat/dt;
       const velocityAlpha=1-Math.exp(-dt/62);

@@ -53,7 +53,7 @@ const generated=Array.from({length:2950},(_,i)=>{
 });
 const data=[...REFERENCE_MEMORIES.filter(s=>{let t=Date.parse(s.at);return t>=START&&t<=END}),...generated].map(s=>({...s,ms:Date.parse(s.at)})).sort((a,b)=>a.ms-b.ms||a.id-b.id);
 const n=data.length,app=document.getElementById("app"),carousel=document.getElementById("carousel"),strip=document.getElementById("stripShell"),track=document.getElementById("carouselTrack"),thumbTrack=document.getElementById("stripTrack"),timeline=document.getElementById("timelineShell"),canvas=document.getElementById("timelineCanvas"),ctx=canvas.getContext("2d"),presentation=document.getElementById("presentation"),morph=document.getElementById("morph");
-let pos=n-1,velocity=0,lastTime=0,raf=0,drag=null,opened=false,activeIndex=n-1,zoom=0,travelled=false;
+let pos=n-1,velocity=0,lastTime=0,raf=0,drag=null,opened=false,activeIndex=-1,zoom=0,travelled=false;
 const slideNodes=new Map(),thumbNodes=new Map();
 const date=s=>new Date(s.ms).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
 const nearest=()=>clamp(Math.round(pos),0,n-1);

@@ -95,6 +95,7 @@ function transition(open){if(morphing)return;morphing=true;const i=nearest(),src
 // Fullscreen is the actual r19h2 TALERA screen, not a recreated photo screen.
 const nativePresentation=document.getElementById("nativePresentation");
 let lastNativeIndex=-1;
+let nativeStoriesLoaded=false;
 function readyNative(){
   try{return nativePresentation.contentWindow?.__taleraTimelineRuntime||null}catch(e){return null}
 }
@@ -103,7 +104,11 @@ function syncNative(index){
   const memory=data[clamp(index,0,n-1)];
   // Add only the selected prototype image/story to the isolated r19h2 runtime.
   // Existing r19h2 presentation, navigation and menus stay unmodified.
-  runtime.registerMemory({id:900000+index,storyId:"business-demo-"+index,ms:memory.ms,at:memory.at,story:memory.story,fullStory:memory.story,title:memory.story,image:memory.image,photos:[memory.image],_photoIndex:0});
+  if(!nativeStoriesLoaded&&typeof runtime.registerMemories==="function"){
+    const imported=data.map((item,i)=>({id:900000+i,storyId:"business-demo-"+i,ms:item.ms,at:item.at,story:item.story,fullStory:item.story,title:item.story,image:item.image,photos:[item.image],_photoIndex:0}));
+    runtime.registerMemories(imported);
+    nativeStoriesLoaded=true;
+  }
   runtime.setCenter(memory.ms);
   // Commit the selected memory to r19h2 immediately, not only after a gesture.
   const selected=runtime.findMemory({storyId:"business-demo-"+index});

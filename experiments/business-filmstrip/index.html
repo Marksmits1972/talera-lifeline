@@ -105,8 +105,18 @@ function syncNative(index){
   // Existing r19h2 presentation, navigation and menus stay unmodified.
   runtime.registerMemory({id:900000+index,storyId:"business-demo-"+index,ms:memory.ms,at:memory.at,story:memory.story,title:memory.story,image:memory.image,photos:[memory.image],_photoIndex:0});
   runtime.setCenter(memory.ms);
-  runtime.settleNearestPhoto();
+  // Commit the selected memory to r19h2 immediately, not only after a gesture.
+  const selected=runtime.findMemory({storyId:"business-demo-"+index});
+  if(selected){
+    runtime.writeMemory(selected);
+    runtime.settlePhoto(selected);
+  }
   runtime.draw();
+  requestAnimationFrame(()=>{if(opened&&nearest()===index){
+    runtime.setCenter(memory.ms);
+    if(selected){runtime.writeMemory(selected);runtime.settlePhoto(selected)}
+    runtime.draw();
+  }});
   lastNativeIndex=index;
 }
 function openStory(){

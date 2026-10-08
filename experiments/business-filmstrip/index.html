@@ -8,7 +8,7 @@
 #needle{position:absolute;left:50%;top:calc(11px + var(--top));bottom:8px;width:2px;background:linear-gradient(180deg,rgba(15,39,71,.05),#0f2747 15%,#0f2747 88%,rgba(15,39,71,.05));transform:translateX(-1px);pointer-events:none}
 #needle:before{content:"";position:absolute;left:50%;top:0;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);background:#e7a98b;box-shadow:0 0 0 4px rgba(231,169,139,.18)}
 #focusBlock{position:absolute;left:50%;top:calc(16px + var(--top));transform:translateX(-50%);font-size:15px;font-weight:700;padding:7px 14px;white-space:nowrap;background:rgba(255,254,252,.96);border:1px solid rgba(91,143,185,.20);color:#0f2747;border-radius:99px;pointer-events:none;box-shadow:0 5px 18px rgba(15,39,71,.07)}
-#browse{position:absolute;inset:clamp(190px,24dvh,212px) 0 0;background:#111b24;display:flex;flex-direction:column;overflow:hidden;touch-action:none;transition:opacity .24s}
+#browse{position:absolute;z-index:31;inset:clamp(190px,24dvh,212px) 0 0;background:#111b24;display:flex;flex-direction:column;overflow:hidden;touch-action:none;transition:opacity .24s}
 #carousel{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;touch-action:none}
 #carouselTrack{position:absolute;inset:0;touch-action:none}
 .slide{position:absolute;top:50%;left:50%;width:min(90vw,620px);height:96%;border-radius:13px;overflow:hidden;background:#253b49;box-shadow:0 16px 44px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);transform-origin:center;will-change:transform,opacity;pointer-events:none}
@@ -26,7 +26,7 @@
 #presentation{position:absolute;z-index:10;inset:0;overflow:hidden;background:#090f15;opacity:0;pointer-events:none;transition:opacity .19s}
 #presentation.open{opacity:1;pointer-events:auto}
 #nativePresentation{position:absolute;z-index:30;inset:0;width:100%;height:100%;border:0;background:#f7f4ef;display:block;clip-path:inset(0 0 calc(100% - clamp(190px,24dvh,212px)) 0)}
-#nativePresentation.open{clip-path:none}
+#nativePresentation.open{clip-path:none;z-index:40}
 #app:not(.presenting) #timelineShell{display:none}
 #app.presenting #browse{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 #app.presenting #timelineShell,#app.presenting #help,#app.presenting #presentation{display:none!important}
@@ -38,7 +38,7 @@
 #presentation.open~#timelineShell{opacity:0;pointer-events:none}
 #morph{position:fixed;z-index:20;overflow:hidden;border-radius:17px;pointer-events:none;display:none;background:#263845;will-change:left,top,width,height,border-radius}
 #morph img{width:100%;height:100%;object-fit:cover}
-#help{position:absolute;z-index:6;left:50%;bottom:calc(10px + var(--bottom));transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.45);white-space:nowrap;pointer-events:none}
+#help{display:none;position:absolute;z-index:6;left:50%;bottom:calc(10px + var(--bottom));transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.45);white-space:nowrap;pointer-events:none}
 </style></head><body><main id="app"><section id="browse"><div id="carousel"><div id="carouselTrack"></div></div><div id="meta"><span id="activeDate"></span><span id="counter"></span></div><div id="stripShell"><div id="stripTrack"></div></div></section>
 <div id="presentation"><img id="presentImg" alt=""><div id="presentShade"></div><div id="presentCopy"><div id="presentTitle"></div><div id="presentDate"></div></div></div>
 <iframe id="nativePresentation" title="TALERA r19h2 presentatie" src="/r19" loading="lazy"></iframe>

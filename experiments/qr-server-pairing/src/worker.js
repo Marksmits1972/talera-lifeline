@@ -22,7 +22,7 @@ export class PairSession {
    return json({ok:true,replayed:transition.replayed,revision:transition.session.presentationVersion||0});
   }
   if(u.pathname==="/command"&&req.method==="POST"){if(!phone||!prev.connected)return json({error:"Niet toegestaan"},403);const b=await req.json();if(!Number.isInteger(b.photo)||b.photo<0||b.photo>3)return json({error:"Ongeldige foto"},400);prev.photo=b.photo;await this.storage.put("pair",prev);return json({ok:true})}
-  if(u.pathname==="/disconnect"&&req.method==="POST"){prev.connected=false;prev.phone=null;prev.code=null;await this.storage.put("pair",prev);return json({ok:true})}
+  if(u.pathname==="/disconnect"&&req.method==="POST"){prev.connected=false;prev.phone=null;prev.code=null;prev.presentation=null;prev.presentationSeq=0;prev.presentationVersion=0;await this.storage.put("pair",prev);return json({ok:true})}
   return json({error:"Niet gevonden"},404);
  }
 }

@@ -841,13 +841,13 @@ function scheduleRoleDwellRefresh(delay){
   },Math.max(18,delay));
 }
 
-// Visual entry state prevents a newly-selected photo from materialising in the
-// middle of the field. New foreground cards travel in from their nearest edge.
+// Foreground cards now join the moving world at their real projected position.
+// There is no second "catch-up" animation from the edge anymore. A tiny reveal
+// keeps new cards from popping, while a push makes that reveal almost immediate.
 const foregroundEntryState=new Map();
-const FOREGROUND_ENTRY_PX_PER_SEC=170;
-const FOREGROUND_ENTRY_MIN_MS=620;
-const FOREGROUND_ENTRY_MAX_MS=1550;
-const FOREGROUND_ENTRY_PUSH_BOOST=1.22;
+const FOREGROUND_ENTRY_REVEAL_MS=120;
+const FOREGROUND_ENTRY_PUSH_REVEAL_MS=70;
+const FOREGROUND_ENTRY_SCALE_START=.965;
 let sceneTransitionRaf=0;
 function requestSceneTransitionFrame(){
   if(sceneTransitionRaf)return;
@@ -856,24 +856,6 @@ function requestSceneTransitionFrame(){
     render();
   });
 }
-function foregroundEntryOffset(x,y){
-  const top=(timelineShell?.getBoundingClientRect().height||126)+22;
-  const bottom=H-76;
-
-  // If its real projected path is already outside the viewport, leave it there:
-  // it will cross the edge naturally as the world moves.
-  if(x<0||x>W||y<top||y>bottom)return{x:0,y:0};
-
-  const choices=[
-    {d:x,x:-92-x,y:0},
-    {d:W-x,x:W+92-x,y:0},
-    {d:y-top,x:0,y:top-110-y},
-    {d:bottom-y,x:0,y:bottom+110-y}
-  ];
-  choices.sort((a,b)=>a.d-b.d);
-  return{x:choices[0].x,y:choices[0].y};
-}
-
 let spatialPinchTarget=null;
 let spatialPinchStrength=0;
 
@@ -2554,40 +2536,30 @@ function render(){
 
     let entry=foregroundEntryState.get(i);
     if(!entry){
-      const offset=foregroundEntryOffset(p.x,p.y);
-      const distance=Math.hypot(offset.x,offset.y);
-
-      // Calm browsing stays only a little quicker than before. During a push or
-      // coast, entry speed gets a modest extra boost so new large cards keep up
-      // with the moving field instead of visibly arriving late.
       const entryMotion=currentShellVelocity();
       const fingerEquivalentSpeed=
         Math.hypot(entryMotion.x,entryMotion.y)/Math.max(.001,SHELL_DRAG_PER_PX);
-      const pushBoost=lerp(
-        1,
-        FOREGROUND_ENTRY_PUSH_BOOST,
-        smooth(.10,.55,fingerEquivalentSpeed)
+      const pushAmount=smooth(.08,.50,fingerEquivalentSpeed);
+      const duration=lerp(
+        FOREGROUND_ENTRY_REVEAL_MS,
+        FOREGROUND_ENTRY_PUSH_REVEAL_MS,
+        pushAmount
       );
-      const duration=clamp(
-        distance/(FOREGROUND_ENTRY_PX_PER_SEC*pushBoost)*1000,
-        FOREGROUND_ENTRY_MIN_MS,
-        FOREGROUND_ENTRY_MAX_MS
-      );
-      entry={startedAt:performance.now(),dx:offset.x,dy:offset.y,duration};
+      entry={startedAt:performance.now(),duration};
       foregroundEntryState.set(i,entry);
     }
 
-    // Constant-speed entry: no ease-out burst, no catch-up sprint.
-    // A card simply keeps gliding from the edge toward its real path.
+    // Crucial: the card starts immediately on its true world position. It does
+    // not launch a second motion from a screen edge after the user's push.
+    // Only opacity/scale settle very briefly, so navigation never has to wait.
     const entryT=clamp((performance.now()-entry.startedAt)/entry.duration,0,1);
-    const entryEase=entryT;
-    const entryOpacity=smooth(0,.72,entryT);
-    const entryX=p.x+entry.dx*(1-entryEase);
-    const entryY=p.y+entry.dy*(1-entryEase);
+    const entryOpacity=smooth(0,.68,entryT);
+    const entryX=p.x;
+    const entryY=p.y;
     if(entryT<.999)requestSceneTransitionFrame();
 
     opacity*=entryOpacity;
-    scale*=lerp(.92,1,entryEase);
+    scale*=lerp(FOREGROUND_ENTRY_SCALE_START,1,entryT);
 
     const el=memoryNode(i,true);
     if(opacity>.025)ensureCardImage(i);

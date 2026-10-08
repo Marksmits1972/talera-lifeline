@@ -103,7 +103,7 @@ function syncNative(index){
   const memory=data[clamp(index,0,n-1)];
   // Add only the selected prototype image/story to the isolated r19h2 runtime.
   // Existing r19h2 presentation, navigation and menus stay unmodified.
-  runtime.registerMemory({id:900000+index,storyId:"business-demo-"+index,ms:memory.ms,at:memory.at,story:memory.story,title:memory.story,image:memory.image,photos:[memory.image],_photoIndex:0});
+  runtime.registerMemory({id:900000+index,storyId:"business-demo-"+index,ms:memory.ms,at:memory.at,story:memory.story,fullStory:memory.story,title:memory.story,image:memory.image,photos:[memory.image],_photoIndex:0});
   runtime.setCenter(memory.ms);
   // Commit the selected memory to r19h2 immediately, not only after a gesture.
   const selected=runtime.findMemory({storyId:"business-demo-"+index});

@@ -23,3 +23,6 @@ Based on existing server-backed main branch (xxory-test uses Cloudflare D1 and R
 4. Embedded QR flow opening the ORIGINAL phone presentation, not a new remote.
 5. Two-way synchronization and direct media retrieval with ACL checks.
 6. iPhone + desktop integration and failure-mode tests.
+
+## Cloudflare GitHub deployment (confirmed 2026-10-08)
+Worker: talera-qr-test; production branch: experiment/qr-server-pairing-20261008; root directory: /; deploy command: npx wrangler deploy --config experiments/qr-server-pairing/wrangler.jsonc. First deployment only serves a harmless bootstrap page and /health; no D1/R2 bindings yet.

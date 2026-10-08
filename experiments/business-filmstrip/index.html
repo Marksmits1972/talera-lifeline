@@ -103,6 +103,51 @@ let nativeStoriesLoaded=false;
 let nativeTimelineGesture=false;
 let nativeTimelineHoldUntil=0;
 let timelineLastCenter=NaN;
+let timelineSamples=[],timelineMomentumRaf=0,timelineFlick=null;
+function stopTimelineMomentum(){
+  if(timelineMomentumRaf)cancelAnimationFrame(timelineMomentumRaf);
+  timelineMomentumRaf=0;
+}
+function coastOriginalTimeline(){
+  stopTimelineMomentum();
+  if(timelineSamples.length<2)return;
+  const last=timelineSamples[timelineSamples.length-1];
+  const first=timelineSamples.find(p=>last.t-p.t<=125)||timelineSamples[0];
+  const dt=Math.max(16,last.t-first.t),delta=last.ms-first.ms;
+  let speed=delta/dt; // timeline milliseconds moved per real millisecond
+  const span=Math.abs(data[n-1].ms-data[0].ms);
+  const minimum=span/20000; // Slow, intentional drags stop precisely on release.
+  if(Math.abs(speed)<minimum)return;
+  const now=performance.now();
+  const prior=timelineFlick;
+  if(prior&&now-prior.t<850&&Math.sign(prior.speed)===Math.sign(speed)){
+    speed=Math.sign(speed)*Math.min(Math.abs(speed)*1.8,Math.abs(speed)+Math.abs(prior.speed)*.7);
+  }
+  timelineFlick={speed,t:now};
+  // Native r19h2 remains the source of truth; only its centre is advanced.
+  const runtime=readyNative();if(!runtime)return;
+  const limit=span/1300;
+  speed=clamp(speed,-limit,limit);
+  let prev=performance.now(),v=speed;
+  const step=t=>{
+    if(opened||nativeTimelineGesture){timelineMomentumRaf=0;return}
+    const elapsed=Math.min(42,t-prev);prev=t;
+    const next=clamp(runtime.centerMs()+v*elapsed,data[0].ms,data[n-1].ms);
+    runtime.setCenter(next);runtime.draw();
+    pos=clamp(positionForTime(runtime.centerMs()),0,n-1);
+    nativeTimelineHoldUntil=t+140;
+    render();
+    v*=Math.exp(-elapsed/550);
+    if(Math.abs(v)>minimum*.25&&next>data[0].ms&&next<data[n-1].ms){
+      timelineMomentumRaf=requestAnimationFrame(step);
+    }else{
+      timelineMomentumRaf=0;
+      nativeTimelineHoldUntil=performance.now()+250;
+    }
+  };
+  timelineMomentumRaf=requestAnimationFrame(step);
+}
+
 function syncNativeTimelineFromBrowse(){
   if(opened||nativeTimelineGesture||performance.now()<nativeTimelineHoldUntil||!nativeStoriesLoaded)return;
   const runtime=readyNative();if(!runtime)return;
@@ -115,6 +160,10 @@ function watchOriginalTimeline(){
   const runtime=readyNative();
   if(!opened&&runtime&&nativeStoriesLoaded){
     const current=runtime.centerMs();
+    if(nativeTimelineGesture&&Number.isFinite(current)){
+      timelineSamples.push({t:performance.now(),ms:current});
+      if(timelineSamples.length>18)timelineSamples.shift();
+    }
     if((nativeTimelineGesture||performance.now()<nativeTimelineHoldUntil)&&Number.isFinite(current)&&Math.abs(current-timelineLastCenter)>100){
       pos=clamp(positionForTime(current),0,n-1);render();
     }
@@ -177,8 +226,8 @@ nativePresentation.addEventListener("load",()=>{
     const doc=nativePresentation.contentDocument;
     const timeline=doc.querySelector('.timeline');
     if(timeline){
-      timeline.addEventListener('pointerdown',()=>{nativeTimelineGesture=true;nativeTimelineHoldUntil=Infinity;cancelMotion()},{capture:true});
-      const done=()=>{nativeTimelineGesture=false;nativeTimelineHoldUntil=performance.now()+900;const runtime=readyNative();if(runtime){pos=clamp(positionForTime(runtime.centerMs()),0,n-1);render()}};
+      timeline.addEventListener('pointerdown',()=>{stopTimelineMomentum();timelineSamples=[];nativeTimelineGesture=true;nativeTimelineHoldUntil=Infinity;cancelMotion()},{capture:true});
+      const done=()=>{nativeTimelineGesture=false;nativeTimelineHoldUntil=performance.now()+900;const runtime=readyNative();if(runtime){timelineSamples.push({t:performance.now(),ms:runtime.centerMs()});pos=clamp(positionForTime(runtime.centerMs()),0,n-1);render()}coastOriginalTimeline()};
       timeline.addEventListener('pointerup',done,{capture:true});
       timeline.addEventListener('pointercancel',done,{capture:true});
     }

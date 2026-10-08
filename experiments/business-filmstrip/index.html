@@ -139,6 +139,10 @@ function closeStory(){
   if(runtime){const nativeMemory=runtime.currentMemory();if(nativeMemory&&String(nativeMemory.storyId||"").startsWith("business-demo-")){const idx=Number(String(nativeMemory.storyId).slice(14));if(Number.isInteger(idx)&&idx>=0&&idx<n)pos=idx;}}
   opened=false;nativePresentation.classList.remove("open");app.classList.remove("presenting");render();
 }
+window.addEventListener("message",event=>{
+  if(event.origin!==location.origin||event.source!==nativePresentation.contentWindow)return;
+  if(event.data?.type==="talera-business-return"&&opened)closeStory();
+});
 nativePresentation.addEventListener("load",()=>{
   try{
     const doc=nativePresentation.contentDocument;

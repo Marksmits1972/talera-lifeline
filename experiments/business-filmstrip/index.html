@@ -212,6 +212,7 @@ function openStory(){
   cancelMotion();pos=nearest();render();opened=true;
   app.classList.add("presenting");
   nativePresentation.classList.add("open");
+  try{nativePresentation.contentDocument.documentElement.classList.remove("business-browse")}catch(e){}
   const launch=()=>syncNative(nearest());
   if(readyNative())launch();
   else nativePresentation.addEventListener("load",launch,{once:true});
@@ -220,7 +221,7 @@ function closeStory(){
   if(!opened)return;
   const runtime=readyNative();
   if(runtime){const nativeMemory=runtime.currentMemory();if(nativeMemory&&String(nativeMemory.storyId||"").startsWith("business-demo-")){const idx=Number(String(nativeMemory.storyId).slice(14));if(Number.isInteger(idx)&&idx>=0&&idx<n)pos=idx;}}
-  opened=false;nativePresentation.classList.remove("open");app.classList.remove("presenting");render();
+  opened=false;nativePresentation.classList.remove("open");app.classList.remove("presenting");try{nativePresentation.contentDocument.documentElement.classList.add("business-browse")}catch(e){}render();
 }
 window.addEventListener("message",event=>{
   if(event.origin!==location.origin||event.source!==nativePresentation.contentWindow)return;
@@ -230,6 +231,7 @@ nativePresentation.addEventListener("load",()=>{
   // The original r19h2 timeline is the single timeline controller in browse and presentation.
   try{
     const doc=nativePresentation.contentDocument;
+    doc.documentElement.classList.toggle("business-browse",!opened);
     const timeline=doc.querySelector('.timeline');
     if(timeline){
       timeline.addEventListener('pointerdown',()=>{stopTimelineMomentum();timelineSamples=[];nativeTimelineGesture=true;nativeTimelineHoldUntil=Infinity;cancelMotion()},{capture:true});

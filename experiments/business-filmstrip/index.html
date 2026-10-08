@@ -8,7 +8,7 @@
 #needle{position:absolute;left:50%;top:calc(11px + var(--top));bottom:8px;width:2px;background:linear-gradient(180deg,rgba(15,39,71,.05),#0f2747 15%,#0f2747 88%,rgba(15,39,71,.05));transform:translateX(-1px);pointer-events:none}
 #needle:before{content:"";position:absolute;left:50%;top:0;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);background:#e7a98b;box-shadow:0 0 0 4px rgba(231,169,139,.18)}
 #focusBlock{position:absolute;left:50%;top:calc(16px + var(--top));transform:translateX(-50%);font-size:15px;font-weight:700;padding:7px 14px;white-space:nowrap;background:rgba(255,254,252,.96);border:1px solid rgba(91,143,185,.20);color:#0f2747;border-radius:99px;pointer-events:none;box-shadow:0 5px 18px rgba(15,39,71,.07)}
-#browse{position:absolute;inset:clamp(102px,13.5dvh,118px) 0 0;display:flex;flex-direction:column;overflow:hidden;touch-action:none;transition:opacity .24s}
+#browse{position:absolute;inset:clamp(190px,24dvh,212px) 0 0;display:flex;flex-direction:column;overflow:hidden;touch-action:none;transition:opacity .24s}
 #carousel{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;touch-action:none}
 #carouselTrack{position:absolute;inset:0;touch-action:none}
 .slide{position:absolute;top:50%;left:50%;width:min(78vw,460px);height:88%;border-radius:17px;overflow:hidden;background:#253b49;box-shadow:0 16px 44px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);transform-origin:center;will-change:transform,opacity;pointer-events:none}
@@ -25,8 +25,9 @@
 .thumb img{width:100%;height:100%;object-fit:cover}.thumb.active{border:2px solid #f2e3c3;box-shadow:0 0 0 2px rgba(242,227,195,.15)}
 #presentation{position:absolute;z-index:10;inset:0;overflow:hidden;background:#090f15;opacity:0;pointer-events:none;transition:opacity .19s}
 #presentation.open{opacity:1;pointer-events:auto}
-#nativePresentation{position:absolute;z-index:30;inset:0;width:100%;height:100%;border:0;background:#f7f4ef;display:none}
-#nativePresentation.open{display:block}
+#nativePresentation{position:absolute;z-index:30;inset:0;width:100%;height:100%;border:0;background:#f7f4ef;display:block;clip-path:inset(0 0 calc(100% - clamp(190px,24dvh,212px)) 0)}
+#nativePresentation.open{clip-path:none}
+#app:not(.presenting) #timelineShell{display:none}
 #app.presenting #browse{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 #app.presenting #timelineShell,#app.presenting #help,#app.presenting #presentation{display:none!important}
 #app.presenting #help{opacity:0;visibility:hidden;pointer-events:none}
@@ -79,7 +80,7 @@ else if(lv===1||lv===2){let d=new Date(start),m=new Date(d.getFullYear(),d.getMo
 else if(lv===3){let d=new Date(start);d.setHours(0,0,0,0);for(let k=0;k<18;k++){let ms=d.getTime()+k*DAY;if(ms>end)break;tick(xp(ms),y,k%2===0,k%2===0?new Date(ms).toLocaleDateString("nl-NL",{weekday:"short",day:"numeric"}):"")}}
 else{let step=lv===4?6*3600000:30*60000;let first=Math.ceil(start/step)*step;for(let ms=first;ms<end;ms+=step){let dt=new Date(ms),major=lv===4||dt.getMinutes()===0;tick(xp(ms),y,major,major?dt.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}):"")}}
 const label=document.getElementById("focusBlock");label.textContent=lv===5?new Date(center).toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}):new Date(center).toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"});}
-function render(){pos=clamp(pos,0,n-1);const i=nearest();drawBand(slideNodes,track,3);drawBand(thumbNodes,thumbTrack,11,true);if(i!==activeIndex){activeIndex=i;document.getElementById("activeDate").textContent=date(data[i]);document.getElementById("counter").textContent=(i+1).toLocaleString("nl-NL")+" / "+n.toLocaleString("nl-NL")}visualTime=timeAt(pos);drawTimeline();preload(i)}
+function render(){pos=clamp(pos,0,n-1);const i=nearest();drawBand(slideNodes,track,3);drawBand(thumbNodes,thumbTrack,11,true);if(i!==activeIndex){activeIndex=i;document.getElementById("activeDate").textContent=date(data[i]);document.getElementById("counter").textContent=(i+1).toLocaleString("nl-NL")+" / "+n.toLocaleString("nl-NL")}visualTime=timeAt(pos);drawTimeline();preload(i);syncNativeTimelineFromBrowse()}
 const cache=new Set();
 function preload(i){for(let j=Math.max(0,i-3);j<=Math.min(n-1,i+3);j++){if(cache.has(j))continue;cache.add(j);const im=new Image();im.src=photo(j)}if(cache.size>140)cache.clear()}
 function request(){if(!raf)raf=requestAnimationFrame(frame)}
@@ -99,6 +100,29 @@ function transition(open){if(morphing)return;morphing=true;const i=nearest(),src
 const nativePresentation=document.getElementById("nativePresentation");
 let lastNativeIndex=-1;
 let nativeStoriesLoaded=false;
+let nativeTimelineGesture=false;
+let timelineLastCenter=NaN;
+function syncNativeTimelineFromBrowse(){
+  if(opened||nativeTimelineGesture||!nativeStoriesLoaded)return;
+  const runtime=readyNative();if(!runtime)return;
+  const target=timeAt(pos);
+  if(Math.abs(runtime.centerMs()-target)>1000){
+    runtime.setCenter(target);runtime.draw();
+  }
+}
+function watchOriginalTimeline(){
+  const runtime=readyNative();
+  if(!opened&&runtime&&nativeStoriesLoaded){
+    const current=runtime.centerMs();
+    if(nativeTimelineGesture&&Number.isFinite(current)&&Math.abs(current-timelineLastCenter)>100){
+      pos=clamp(positionForTime(current),0,n-1);render();
+    }
+    timelineLastCenter=current;
+  }
+  requestAnimationFrame(watchOriginalTimeline);
+}
+requestAnimationFrame(watchOriginalTimeline);
+
 function readyNative(){
   try{return nativePresentation.contentWindow?.__taleraTimelineRuntime||null}catch(e){return null}
 }
@@ -145,6 +169,20 @@ function closeStory(){
 window.addEventListener("message",event=>{
   if(event.origin!==location.origin||event.source!==nativePresentation.contentWindow)return;
   if(event.data?.type==="talera-business-return"&&opened)closeStory();
+});
+nativePresentation.addEventListener("load",()=>{
+  // The original r19h2 timeline is the single timeline controller in browse and presentation.
+  try{
+    const doc=nativePresentation.contentDocument;
+    const timeline=doc.querySelector('.timeline');
+    if(timeline){
+      timeline.addEventListener('pointerdown',()=>{nativeTimelineGesture=true;cancelMotion()},{capture:true});
+      const done=()=>{nativeTimelineGesture=false;const runtime=readyNative();if(runtime){pos=clamp(positionForTime(runtime.centerMs()),0,n-1);render()}};
+      timeline.addEventListener('pointerup',done,{capture:true});
+      timeline.addEventListener('pointercancel',done,{capture:true});
+    }
+    syncNative(nearest());
+  }catch(err){console.warn('Business timeline sync',err)}
 });
 nativePresentation.addEventListener("load",()=>{
   try{

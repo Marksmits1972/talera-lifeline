@@ -8,7 +8,7 @@
 #needle{position:absolute;left:50%;top:calc(11px + var(--top));bottom:8px;width:2px;background:linear-gradient(180deg,rgba(15,39,71,.05),#0f2747 15%,#0f2747 88%,rgba(15,39,71,.05));transform:translateX(-1px);pointer-events:none}
 #needle:before{content:"";position:absolute;left:50%;top:0;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);background:#e7a98b;box-shadow:0 0 0 4px rgba(231,169,139,.18)}
 #focusBlock{position:absolute;left:50%;top:calc(16px + var(--top));transform:translateX(-50%);font-size:15px;font-weight:700;padding:7px 14px;white-space:nowrap;background:rgba(255,254,252,.96);border:1px solid rgba(91,143,185,.20);color:#0f2747;border-radius:99px;pointer-events:none;box-shadow:0 5px 18px rgba(15,39,71,.07)}
-#browse{position:absolute;z-index:31;inset:clamp(190px,24dvh,212px) 0 0;background:#111b24;display:flex;flex-direction:column;overflow:hidden;touch-action:none;transition:opacity .24s}
+#browse{position:absolute;z-index:31;top:var(--business-timeline-height,clamp(190px,24dvh,212px));left:0;right:0;bottom:0;background:#111b24;display:flex;flex-direction:column;overflow:hidden;touch-action:none;transition:opacity .24s}
 #carousel{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;touch-action:none}
 #carouselTrack{position:absolute;inset:0;touch-action:none}
 .slide{position:absolute;top:50%;left:50%;width:min(90vw,620px);height:96%;border-radius:13px;overflow:hidden;background:#253b49;box-shadow:0 16px 44px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);transform-origin:center;will-change:transform,opacity;pointer-events:none}
@@ -98,6 +98,16 @@ let morphing=false;
 function transition(open){if(morphing)return;morphing=true;const i=nearest(),src=slideNodes.get(i),srcRect=src?.getBoundingClientRect(),full={left:0,top:0,width:innerWidth,height:innerHeight};const start=srcRect?{left:srcRect.left,top:srcRect.top,width:srcRect.width,height:srcRect.height}:full;let from=open?start:full,to=open?full:start;const img=morph.querySelector("img");img.src=data[i].image;morph.style.display="block";morph.style.transition="none";Object.assign(morph.style,{left:from.left+"px",top:from.top+"px",width:from.width+"px",height:from.height+"px",borderRadius:open?"17px":"0px"});app.classList.toggle("presenting",open);presentation.classList.toggle("open",open);presentation.style.visibility=open?"hidden":"visible";requestAnimationFrame(()=>requestAnimationFrame(()=>{morph.style.transition="left .42s cubic-bezier(.2,.72,.18,1),top .42s cubic-bezier(.2,.72,.18,1),width .42s cubic-bezier(.2,.72,.18,1),height .42s cubic-bezier(.2,.72,.18,1),border-radius .42s";Object.assign(morph.style,{left:to.left+"px",top:to.top+"px",width:to.width+"px",height:to.height+"px",borderRadius:open?"0px":"17px"})}));setTimeout(()=>{morph.style.display="none";presentation.style.visibility="";morphing=false},450)}
 // Fullscreen is the actual r19h2 TALERA screen, not a recreated photo screen.
 const nativePresentation=document.getElementById("nativePresentation");
+function alignBusinessTimeline(){
+  try{
+    const timeline=nativePresentation.contentDocument?.querySelector('.timeline');
+    if(!timeline)return;
+    const height=Math.max(0,Math.min(innerHeight,timeline.getBoundingClientRect().bottom));
+    if(height>70)app.style.setProperty('--business-timeline-height',height+'px');
+  }catch(e){}
+}
+window.addEventListener('resize',alignBusinessTimeline);
+
 let lastNativeIndex=-1;
 let nativeStoriesLoaded=false;
 let nativeTimelineGesture=false;
@@ -232,6 +242,7 @@ nativePresentation.addEventListener("load",()=>{
   try{
     const doc=nativePresentation.contentDocument;
     doc.documentElement.classList.toggle("business-browse",!opened);
+    requestAnimationFrame(alignBusinessTimeline);
     const timeline=doc.querySelector('.timeline');
     if(timeline){
       timeline.addEventListener('pointerdown',()=>{stopTimelineMomentum();timelineSamples=[];nativeTimelineGesture=true;nativeTimelineHoldUntil=Infinity;cancelMotion()},{capture:true});

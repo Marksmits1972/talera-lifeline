@@ -1822,36 +1822,6 @@ function foregroundStoryRoles(raw){
   const heroMotion=currentShellVelocity();
   const heroMotionTotal=Math.abs(heroMotion.x)+Math.abs(heroMotion.y)+.0001;
   const heroVertical=smooth(.38,.78,Math.abs(heroMotion.y)/heroMotionTotal);
-  const fingerEquivalentSpeed=heroMotionTotal/Math.max(.001,SHELL_DRAG_PER_PX);
-  const lookAheadMs=lerp(240,560,smooth(.04,.52,fingerEquivalentSpeed));
-  const lookAheadCamX=wrapLon(
-    cam.x+shellLonDistanceToRotation(heroMotion.x*lookAheadMs)
-  );
-  const lookAheadCamY=clampCamY(
-    cam.y+shellLatDistanceToRotation(heroMotion.y*lookAheadMs,cam.y)
-  );
-  const lookAheadCache=new Map();
-
-  function distanceToReadableField(q){
-    if(!q)return Infinity;
-    const left=0,right=W;
-    const top=timelineBottom,bottom=H-78;
-    const dx=q.x<left?left-q.x:q.x>right?q.x-right:0;
-    const dy=q.y<top?top-q.y:q.y>bottom?q.y-bottom:0;
-    return Math.hypot(dx,dy);
-  }
-
-  function approachingProjection(i){
-    if(heroMotionTotal<.006||!data[i]||!raw[i])return null;
-    if(lookAheadCache.has(i))return lookAheadCache.get(i);
-    const future=projectMemoryAt(data[i],lookAheadCamX,lookAheadCamY);
-    const approaching=
-      distanceToReadableField(future)+8<distanceToReadableField(raw[i]);
-    const result=approaching?future:null;
-    lookAheadCache.set(i,result);
-    return result;
-  }
-
   const heroWindow=Math.min(
     Math.max(timelineSpanMs()*.64,500*DAY)*lerp(1,1.90,heroVertical),
     7.5*365.2425*DAY
@@ -1862,16 +1832,11 @@ function foregroundStoryRoles(raw){
     const hold=loose?lerp(1.55,2.75,heroVertical):1;
     if(Math.abs(data[i].ms-timeCenter)>heroWindow*hold)return false;
     const q=raw[i];
-    const future=approachingProjection(i);
     const xPad=loose?W*lerp(.28,.48,heroVertical):lerp(36,W*.17,heroVertical);
     const topPad=loose?lerp(125,235,heroVertical):lerp(28,88,heroVertical);
     const bottomPad=loose?lerp(150,280,heroVertical):lerp(58,128,heroVertical);
-
-    const inEnvelope=p=>p&&
-      p.x>-xPad&&p.x<W+xPad&&
-      p.y>timelineBottom-topPad&&p.y<H+bottomPad;
-
-    return inEnvelope(q)||inEnvelope(future);
+    return q.x>-xPad&&q.x<W+xPad&&
+      q.y>timelineBottom-topPad&&q.y<H+bottomPad;
   }
 
   // The top spotlight is driven primarily by time: from the stories that are
@@ -1884,17 +1849,11 @@ function foregroundStoryRoles(raw){
     for(let i=start;i<=end;i++){
       if(i===excluded||!roleUsable(i,false))continue;
       const q=raw[i];
-      const future=approachingProjection(i);
       const dt=Math.abs(data[i].ms-timeCenter);
-      const centreNow=Math.hypot(
+      const centre=Math.hypot(
         (q.x-W/2)/Math.max(1,W),
         (q.y-H*.56)/Math.max(1,H)
       );
-      const centreFuture=future?Math.hypot(
-        (future.x-W/2)/Math.max(1,W),
-        (future.y-H*.56)/Math.max(1,H)
-      ):Infinity;
-      const centre=Math.min(centreNow,centreFuture);
       if(dt<bestDt-1||(Math.abs(dt-bestDt)<=1&&centre<bestCentre)){
         best=i;bestDt=dt;bestCentre=centre;
       }
@@ -1939,17 +1898,11 @@ function foregroundStoryRoles(raw){
   for(let i=start;i<=end;i++){
     if(i===spotlight||!roleUsable(i,false))continue;
     const q=raw[i];
-    const future=approachingProjection(i);
     const temporal=Math.abs(data[i].ms-timeCenter)/Math.max(DAY,heroWindow);
-    const centreNow=Math.hypot(
+    const centre=Math.hypot(
       (q.x-W/2)/Math.max(1,W),
       (q.y-H*.56)/Math.max(1,H)
     );
-    const centreFuture=future?Math.hypot(
-      (future.x-W/2)/Math.max(1,W),
-      (future.y-H*.56)/Math.max(1,H)
-    ):Infinity;
-    const centre=Math.min(centreNow,centreFuture);
     const depthPenalty=(1-clamp(q.depth,0,1))*.12;
     const score=temporal*.58+centre*.34+depthPenalty;
     if(score<dominantScore){
@@ -1994,29 +1947,20 @@ function foregroundStoryRoles(raw){
       if(i===dominant)continue;
       const q=raw[i];
       if(!q)continue;
-      const future=approachingProjection(i);
 
-      const isOnScreen=p=>p&&
-        p.x>-34&&p.x<W+34&&
-        p.y>timelineBottom-18&&p.y<H+44;
-      const isNearScreen=p=>p&&
-        p.x>-W*.34&&p.x<W*1.34&&
-        p.y>timelineBottom-120&&p.y<H+150;
+      const onScreen=
+        q.x>-34&&q.x<W+34&&
+        q.y>timelineBottom-18&&q.y<H+44;
+      const nearScreen=
+        q.x>-W*.34&&q.x<W*1.34&&
+        q.y>timelineBottom-120&&q.y<H+150;
+      if(!onScreen&&!nearScreen)continue;
 
-      const onScreen=isOnScreen(q);
-      const futureOnScreen=isOnScreen(future);
-      const nearScreen=isNearScreen(q)||isNearScreen(future);
-      if(!onScreen&&!futureOnScreen&&!nearScreen)continue;
-
-      const horizontalCentreNow=Math.abs(q.x-W/2)/Math.max(1,W*.5);
-      const horizontalCentreFuture=future
-        ?Math.abs(future.x-W/2)/Math.max(1,W*.5)
-        :Infinity;
-      const horizontalCentre=Math.min(horizontalCentreNow,horizontalCentreFuture);
+      const horizontalCentre=Math.abs(q.x-W/2)/Math.max(1,W*.5);
       const score=
         step*lerp(1,.58,heroVertical)+
         horizontalCentre*22*heroVertical+
-        (onScreen?0:futureOnScreen?2:6);
+        (onScreen?0:7);
       pool.push({i,score});
     }
 
@@ -2037,11 +1981,10 @@ function foregroundStoryRoles(raw){
         if(i<0||i>=data.length||i===dominant||supports.includes(i))continue;
         const q=raw[i];
         if(!q)continue;
-        const future=approachingProjection(i);
-        const nearScreen=p=>p&&
-          p.x>-W*.44&&p.x<W*1.44&&
-          p.y>timelineBottom-145&&p.y<H+175;
-        if(nearScreen(q)||nearScreen(future))supports.push(i);
+        const nearScreen=
+          q.x>-W*.44&&q.x<W*1.44&&
+          q.y>timelineBottom-145&&q.y<H+175;
+        if(nearScreen)supports.push(i);
         if(supports.length>=4)break;
       }
     }

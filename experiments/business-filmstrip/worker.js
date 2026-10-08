@@ -8,6 +8,13 @@ html,body{overscroll-behavior-y:none}
 <script id="business-return-gesture">
 (()=>{
   if(window.top===window)return;
+  const returnButton=document.createElement('button');
+  returnButton.type='button';
+  returnButton.textContent='↓ Terug naar filmstrip';
+  returnButton.setAttribute('aria-label','Terug naar Business Filmstrip');
+  Object.assign(returnButton.style,{position:'fixed',right:'12px',top:'calc(env(safe-area-inset-top, 0px) + 128px)',zIndex:'2147483647',padding:'10px 12px',borderRadius:'24px',background:'#0f2747',color:'#fff',border:'1px solid #fff',fontSize:'12px',boxShadow:'0 3px 12px #0005',touchAction:'manipulation'});
+  returnButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'talera-business-return'},location.origin)});
+  document.body.appendChild(returnButton);
   let start=null;
   const ignored=el=>!!el?.closest?.('.timeline,nav,button,input,textarea,select,[contenteditable="true"]');
   window.addEventListener('touchstart',e=>{

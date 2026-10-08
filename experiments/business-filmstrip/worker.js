@@ -7,6 +7,13 @@ html.business-browse,html.business-browse body,html.business-browse .app,html.bu
 html.business-browse .timeline{background:#dde3e8!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 html.business-browse .timeline::before,html.business-browse .timeline::after{background:transparent!important}
 html.business-browse .memory-space,html.business-browse nav{visibility:hidden!important}
+/* Only show the original timeline, never the old photograph or overlays. */
+html.business-browse main{display:block!important;position:relative!important}
+html.business-browse .timeline{position:absolute!important;top:0!important;left:0!important;right:0!important;height:clamp(190px,24dvh,212px)!important;overflow:hidden!important;z-index:1!important}
+html.business-browse main > :not(.timeline){visibility:hidden!important;pointer-events:none!important}
+html.business-browse .app > nav{display:none!important}
+html.business-browse .zoom-hint,html.business-browse .photo-stage,html.business-browse .memory-caption{display:none!important}
+
 html,body{overscroll-behavior-y:none}
 </style>
 <script id="business-return-gesture">

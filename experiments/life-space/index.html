@@ -848,6 +848,7 @@ const foregroundEntryState=new Map();
 const FOREGROUND_ENTRY_REVEAL_MS=120;
 const FOREGROUND_ENTRY_PUSH_REVEAL_MS=70;
 const FOREGROUND_ENTRY_SCALE_START=.965;
+const FOREGROUND_VERTICAL_PREROLL_PX=420;
 let sceneTransitionRaf=0;
 function requestSceneTransitionFrame(){
   if(sceneTransitionRaf)return;
@@ -1815,8 +1816,9 @@ function foregroundStoryRoles(raw){
     if(Math.abs(data[i].ms-timeCenter)>heroWindow*hold)return false;
     const q=raw[i];
     const xPad=loose?W*lerp(.28,.48,heroVertical):lerp(36,W*.17,heroVertical);
-    const topPad=loose?lerp(125,235,heroVertical):lerp(28,88,heroVertical);
-    const bottomPad=loose?lerp(150,280,heroVertical):lerp(58,128,heroVertical);
+    const preroll=FOREGROUND_VERTICAL_PREROLL_PX*(loose?1.12:1);
+    const topPad=(loose?lerp(125,235,heroVertical):lerp(28,88,heroVertical))+preroll;
+    const bottomPad=(loose?lerp(150,280,heroVertical):lerp(58,128,heroVertical))+preroll;
     return q.x>-xPad&&q.x<W+xPad&&
       q.y>timelineBottom-topPad&&q.y<H+bottomPad;
   }
@@ -1935,7 +1937,8 @@ function foregroundStoryRoles(raw){
         q.y>timelineBottom-18&&q.y<H+44;
       const nearScreen=
         q.x>-W*.34&&q.x<W*1.34&&
-        q.y>timelineBottom-120&&q.y<H+150;
+        q.y>timelineBottom-(120+FOREGROUND_VERTICAL_PREROLL_PX)&&
+        q.y<H+150+FOREGROUND_VERTICAL_PREROLL_PX;
       if(!onScreen&&!nearScreen)continue;
 
       const horizontalCentre=Math.abs(q.x-W/2)/Math.max(1,W*.5);
@@ -1965,7 +1968,8 @@ function foregroundStoryRoles(raw){
         if(!q)continue;
         const nearScreen=
           q.x>-W*.44&&q.x<W*1.44&&
-          q.y>timelineBottom-145&&q.y<H+175;
+          q.y>timelineBottom-(145+FOREGROUND_VERTICAL_PREROLL_PX)&&
+          q.y<H+175+FOREGROUND_VERTICAL_PREROLL_PX;
         if(nearScreen)supports.push(i);
         if(supports.length>=4)break;
       }
@@ -2089,7 +2093,7 @@ function composeForeground(raw,visibleSet,foregroundRoles=[]){
   const top=(timelineShell?.getBoundingClientRect().height||126)+64;
   const bottom=H-118;
   const outerMinX=-96,outerMaxX=W+96;
-  const outerMinY=top-112,outerMaxY=H+96;
+  const outerMinY=top-280,outerMaxY=H+240;
 
   const motion=currentShellVelocity();
   const motionTotal=Math.abs(motion.x)+Math.abs(motion.y)+.0001;

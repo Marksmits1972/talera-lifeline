@@ -25,6 +25,8 @@
 .thumb img{width:100%;height:100%;object-fit:cover}.thumb.active{border:2px solid #f2e3c3;box-shadow:0 0 0 2px rgba(242,227,195,.15)}
 #presentation{position:absolute;z-index:10;inset:0;overflow:hidden;background:#090f15;opacity:0;pointer-events:none;transition:opacity .19s}
 #presentation.open{opacity:1;pointer-events:auto}
+#nativePresentation{position:absolute;z-index:30;inset:0;width:100%;height:100%;border:0;background:#f7f4ef;display:none}
+#nativePresentation.open{display:block}
 #app.presenting #browse{opacity:0;visibility:hidden;pointer-events:none}
 #app.presenting #help{opacity:0;visibility:hidden;pointer-events:none}
 #presentImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
@@ -37,6 +39,7 @@
 #help{position:absolute;z-index:6;left:50%;bottom:calc(10px + var(--bottom));transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.45);white-space:nowrap;pointer-events:none}
 </style></head><body><main id="app"><section id="browse"><div id="carousel"><div id="carouselTrack"></div></div><div id="meta"><span id="activeDate"></span><span id="counter"></span></div><div id="stripShell"><div id="stripTrack"></div></div></section>
 <div id="presentation"><img id="presentImg" alt=""><div id="presentShade"></div><div id="presentCopy"><div id="presentTitle"></div><div id="presentDate"></div></div></div>
+<iframe id="nativePresentation" title="TALERA r19h2 presentatie" src="/r19" loading="lazy"></iframe>
 <div id="timelineShell" aria-label="TALERA-tijdlijn"><canvas id="timelineCanvas"></canvas><div id="needle"></div><div id="focusBlock">1972–2026</div></div>
 <div id="help">Sleep over de foto’s, filmstrip of tijdlijn · tik op de middelste foto</div></main><div id="morph"><img alt=""></div>
 <script>
@@ -88,8 +91,50 @@ function release(e){if(!drag||e.pointerId!==drag.id)return;const d=drag;drag=nul
 app.addEventListener("pointerup",release);app.addEventListener("pointercancel",release);
 let morphing=false;
 function transition(open){if(morphing)return;morphing=true;const i=nearest(),src=slideNodes.get(i),srcRect=src?.getBoundingClientRect(),full={left:0,top:0,width:innerWidth,height:innerHeight};const start=srcRect?{left:srcRect.left,top:srcRect.top,width:srcRect.width,height:srcRect.height}:full;let from=open?start:full,to=open?full:start;const img=morph.querySelector("img");img.src=data[i].image;morph.style.display="block";morph.style.transition="none";Object.assign(morph.style,{left:from.left+"px",top:from.top+"px",width:from.width+"px",height:from.height+"px",borderRadius:open?"17px":"0px"});app.classList.toggle("presenting",open);presentation.classList.toggle("open",open);presentation.style.visibility=open?"hidden":"visible";requestAnimationFrame(()=>requestAnimationFrame(()=>{morph.style.transition="left .42s cubic-bezier(.2,.72,.18,1),top .42s cubic-bezier(.2,.72,.18,1),width .42s cubic-bezier(.2,.72,.18,1),height .42s cubic-bezier(.2,.72,.18,1),border-radius .42s";Object.assign(morph.style,{left:to.left+"px",top:to.top+"px",width:to.width+"px",height:to.height+"px",borderRadius:open?"0px":"17px"})}));setTimeout(()=>{morph.style.display="none";presentation.style.visibility="";morphing=false},450)}
-function openStory(){if(opened||morphing)return;cancelMotion();pos=nearest();render();const s=data[nearest()];document.getElementById("presentImg").src=s.image;document.getElementById("presentTitle").textContent=s.story;document.getElementById("presentDate").textContent=date(s);opened=true;transition(true)}
-function closeStory(){if(!opened||morphing)return;opened=false;transition(false)}
+// Fullscreen is the actual r19h2 TALERA screen, not a recreated photo screen.
+const nativePresentation=document.getElementById("nativePresentation");
+let lastNativeIndex=-1;
+function readyNative(){
+  try{return nativePresentation.contentWindow?.__taleraTimelineRuntime||null}catch(e){return null}
+}
+function syncNative(index){
+  const runtime=readyNative();if(!runtime)return;
+  const memory=data[clamp(index,0,n-1)];
+  // Add only the selected prototype image/story to the isolated r19h2 runtime.
+  // Existing r19h2 presentation, navigation and menus stay unmodified.
+  runtime.registerMemory({id:900000+index,storyId:"business-demo-"+index,ms:memory.ms,at:memory.at,story:memory.story,title:memory.story,image:memory.image,photos:[memory.image],_photoIndex:0});
+  runtime.setCenter(memory.ms);
+  runtime.settleNearestPhoto();
+  runtime.draw();
+  lastNativeIndex=index;
+}
+function openStory(){
+  if(opened)return;
+  cancelMotion();pos=nearest();render();opened=true;
+  nativePresentation.classList.add("open");
+  const launch=()=>syncNative(nearest());
+  if(readyNative())launch();
+  else nativePresentation.addEventListener("load",launch,{once:true});
+}
+function closeStory(){
+  if(!opened)return;
+  const runtime=readyNative();
+  if(runtime){const nativeMemory=runtime.currentMemory();if(nativeMemory&&String(nativeMemory.storyId||"").startsWith("business-demo-")){const idx=Number(String(nativeMemory.storyId).slice(14));if(Number.isInteger(idx)&&idx>=0&&idx<n)pos=idx;}}
+  opened=false;nativePresentation.classList.remove("open");render();
+}
+nativePresentation.addEventListener("load",()=>{
+  try{
+    const doc=nativePresentation.contentDocument;
+    let gesture=null;
+    doc.addEventListener("pointerdown",e=>{gesture={x:e.clientX,y:e.clientY,id:e.pointerId};},{capture:true});
+    doc.addEventListener("pointerup",e=>{
+      if(!gesture||gesture.id!==e.pointerId)return;
+      const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;gesture=null;
+      if(dy>85&&dy>Math.abs(dx)*1.25)closeStory();
+    },{capture:true});
+  }catch(e){console.warn("Native r19h2 gesture bridge",e)}
+});
+
 let pTouch=null;
 presentation.addEventListener("pointerdown",e=>{if(!opened)return;pTouch={id:e.pointerId,x:e.clientX,y:e.clientY};presentation.setPointerCapture(e.pointerId)});
 presentation.addEventListener("pointerup",e=>{if(!pTouch||pTouch.id!==e.pointerId)return;let dx=e.clientX-pTouch.x,dy=e.clientY-pTouch.y;pTouch=null;if(dy>65&&Math.abs(dy)>Math.abs(dx)*.8){closeStory();return}if(Math.abs(dx)>55){pos=clamp(nearest()+(dx<0?1:-1),0,n-1);render();const s=data[nearest()];document.getElementById("presentImg").src=s.image;document.getElementById("presentTitle").textContent=s.story;document.getElementById("presentDate").textContent=date(s)}});

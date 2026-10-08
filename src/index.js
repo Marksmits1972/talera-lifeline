@@ -75,6 +75,19 @@ window.__taleraTimelineRuntime={
     taleraRebuildDensity();
     return memory;
   },
+  registerMemories(memories){
+    if(taleraRecipientLock||!Array.isArray(memories))return 0;
+    const incoming=memories.filter(m=>m&&Number.isFinite(m.ms));
+    // One atomic update avoids thousands of expensive density recalculations.
+    const ids=new Set(incoming.map(m=>String(m.storyId)));
+    for(let i=MEMORIES.length-1;i>=0;i--){
+      if(ids.has(String(MEMORIES[i].storyId)))MEMORIES.splice(i,1);
+    }
+    MEMORIES.push(...incoming);
+    MEMORIES.sort((a,b)=>a.ms-b.ms);
+    taleraRebuildDensity();
+    return incoming.length;
+  },
   restrictToMemory(memory){
     if(!memory)return null;
     taleraRecipientLock=true;

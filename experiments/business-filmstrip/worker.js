@@ -10,9 +10,10 @@ html,body{overscroll-behavior-y:none}
   if(window.top===window)return;
   const returnButton=document.createElement('button');
   returnButton.type='button';
-  returnButton.textContent='↓ Terug naar filmstrip';
+  returnButton.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg>';
   returnButton.setAttribute('aria-label','Terug naar Business Filmstrip');
-  Object.assign(returnButton.style,{position:'fixed',right:'12px',top:'calc(env(safe-area-inset-top, 0px) + 128px)',zIndex:'2147483647',padding:'10px 12px',borderRadius:'24px',background:'#0f2747',color:'#fff',border:'1px solid #fff',fontSize:'12px',boxShadow:'0 3px 12px #0005',touchAction:'manipulation'});
+  returnButton.title='Terug naar filmstrip';
+  Object.assign(returnButton.style,{position:'fixed',right:'30px',bottom:'calc(270px + env(safe-area-inset-bottom, 0px))',zIndex:'2147483647',width:'76px',height:'76px',display:'flex',alignItems:'center',justifyContent:'center',padding:'0',borderRadius:'50%',background:'#315f87',color:'#fff',border:'2px solid rgba(255,255,255,.82)',fontSize:'24px',boxShadow:'0 5px 18px #0005',touchAction:'manipulation'});
   returnButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'talera-business-return'},location.origin)});
   document.body.appendChild(returnButton);
   let start=null;

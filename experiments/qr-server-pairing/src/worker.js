@@ -1,17 +1,28 @@
+import { applyPresentationUpdate } from './presentation-session.js';
+
 const random=(n)=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>x.toString(16).padStart(2,"0")).join("");
 const json=(v,status=200)=>Response.json(v,{status,headers:{"cache-control":"no-store"}});
 export class PairSession {
  constructor(state,env){this.storage=state.storage}
  async fetch(req){
   const u=new URL(req.url),prev=await this.storage.get("pair");
-  if(u.pathname==="/init"&&req.method==="POST"){if(prev)return json({error:"Reeds gemaakt"},409);const b=await req.json();await this.storage.put("pair",{player:b.player,code:b.code,expires:Date.now()+120000,phone:null,connected:false,photo:0});return json({ok:true})}
+  if(u.pathname==="/init"&&req.method==="POST"){if(prev)return json({error:"Reeds gemaakt"},409);const b=await req.json();await this.storage.put("pair",{player:b.player,code:b.code,expires:Date.now()+120000,phone:null,connected:false,photo:0,presentation:null,presentationSeq:0,presentationVersion:0});return json({ok:true})}
   if(!prev)return json({error:"Onbekende sessie"},404);
   if(u.pathname==="/claim"&&req.method==="POST"){const b=await req.json();if(prev.expires<Date.now()||prev.code!==b.code||prev.connected)return json({error:"QR-code is verlopen of al gebruikt"},410);prev.phone=random(24);prev.code=null;prev.connected=true;await this.storage.put("pair",prev);return json({secret:prev.phone,photo:prev.photo})}
   const token=req.headers.get("x-pair-secret");const player=token===prev.player,phone=!!prev.phone&&token===prev.phone;
   if(!player&&!phone)return json({error:"Geen toegang"},403);
-  if(u.pathname==="/state")return json({connected:prev.connected,photo:prev.photo,expired:!prev.connected&&Date.now()>prev.expires});
+  if(u.pathname==="/state")return json({connected:prev.connected,photo:prev.photo,expired:!prev.connected&&Date.now()>prev.expires,presentation:prev.presentation||null,presentationVersion:prev.presentationVersion||0});
+  if(u.pathname==="/presentation"&&req.method==="POST"){
+   if(!phone||!prev.connected)return json({error:"Niet toegestaan"},403);
+   let body;
+   try{body=await req.json()}catch{return json({error:"Ongeldige opdracht"},400)}
+   const transition=applyPresentationUpdate(prev,body);
+   if(!transition.ok)return json({error:transition.error},transition.status);
+   if(!transition.replayed)await this.storage.put("pair",transition.session);
+   return json({ok:true,replayed:transition.replayed,revision:transition.session.presentationVersion||0});
+  }
   if(u.pathname==="/command"&&req.method==="POST"){if(!phone||!prev.connected)return json({error:"Niet toegestaan"},403);const b=await req.json();if(!Number.isInteger(b.photo)||b.photo<0||b.photo>3)return json({error:"Ongeldige foto"},400);prev.photo=b.photo;await this.storage.put("pair",prev);return json({ok:true})}
-  if(u.pathname==="/disconnect"&&req.method==="POST"){prev.connected=false;prev.phone=null;prev.code=null;await this.storage.put("pair",prev);return json({ok:true})}
+  if(u.pathname==="/disconnect"&&req.method==="POST"){prev.connected=false;prev.phone=null;prev.code=null;prev.presentation=null;prev.presentationSeq=0;prev.presentationVersion=0;await this.storage.put("pair",prev);return json({ok:true})}
   return json({error:"Niet gevonden"},404);
  }
 }
@@ -25,6 +36,6 @@ export default {async fetch(req,env){
  if(p==="/api/session"&&req.method==="POST"){const id=random(16),secret=random(24),code=random(24),obj=env.PAIR_SESSIONS.get(env.PAIR_SESSIONS.idFromName(id));await obj.fetch("https://internal/init",{method:"POST",body:JSON.stringify({player:secret,code})});return json({id,secret,code})}
  if(p==="/api/claim"&&req.method==="POST"){const b=await req.json();if(!/^[a-f0-9]{32}$/.test(b.id||"")||!/^[a-f0-9]{48}$/.test(b.code||""))return json({error:"Ongeldige koppelcode"},400);return env.PAIR_SESSIONS.get(env.PAIR_SESSIONS.idFromName(b.id)).fetch("https://internal/claim",{method:"POST",body:JSON.stringify({code:b.code})})}
  const m=p.match(/^\/api\/state\/([a-f0-9]{32})$/);if(m&&req.method==="GET")return env.PAIR_SESSIONS.get(env.PAIR_SESSIONS.idFromName(m[1])).fetch(new Request("https://internal/state",{headers:req.headers}));
- if((p==="/api/command"||p==="/api/disconnect")&&req.method==="POST"){const b=await req.json();if(!/^[a-f0-9]{32}$/.test(b.id||""))return json({error:"Ongeldige sessie"},400);const endpoint=p==="/api/command"?"/command":"/disconnect";return env.PAIR_SESSIONS.get(env.PAIR_SESSIONS.idFromName(b.id)).fetch("https://internal"+endpoint,{method:"POST",headers:req.headers,body:JSON.stringify(b)})}
+ if((p==="/api/command"||p==="/api/disconnect"||p==="/api/presentation")&&req.method==="POST"){const b=await req.json();if(!/^[a-f0-9]{32}$/.test(b.id||""))return json({error:"Ongeldige sessie"},400);const endpoint=p==="/api/command"?"/command":p==="/api/presentation"?"/presentation":"/disconnect";return env.PAIR_SESSIONS.get(env.PAIR_SESSIONS.idFromName(b.id)).fetch("https://internal"+endpoint,{method:"POST",headers:req.headers,body:JSON.stringify(b)})}
  return json({error:"Niet gevonden"},404);
 }};

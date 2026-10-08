@@ -1,0 +1,25 @@
+name: QR presentation bridge (isolated)
+on:
+  push:
+    branches:
+      - feature/qr-real-presentation-bridge-20261008
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qr-presentation-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify Cloudflare worker and session parser
+        run: |
+          node --check experiments/qr-server-pairing/src/worker.js
+          node --check experiments/qr-server-pairing/src/presentation-session.js
+      - name: QR integration protocol regression
+        run: node --test test/qr-presentation-session.test.mjs

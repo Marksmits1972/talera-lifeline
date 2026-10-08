@@ -5,6 +5,49 @@ export const presentationControllerScript = String.raw`
   const story=document.getElementById('memoryStoryScroll');
   const photos=Array.from(document.querySelectorAll('.example-photo'));
 
+  // Business-only: exit directly from the r19h2 photo surface.
+  // Keep this in the native presentation controller so pointer capture by the
+  // original horizontal photo swipe system cannot hide the gesture.
+  if(window.parent!==window && story){
+    let exitTouch=null,exitPointer=null,exitSent=false;
+    const sendExit=()=>{
+      if(exitSent)return;
+      exitSent=true;
+      window.parent.postMessage({type:'talera-business-return'},location.origin);
+    };
+    const down=(x,y)=>{exitSent=false;return {x,y};};
+    const check=(start,x,y)=>{
+      if(!start||exitSent)return;
+      const dx=x-start.x,dy=y-start.y;
+      if(dy>65&&dy>Math.abs(dx)*1.18)sendExit();
+    };
+    story.addEventListener('touchstart',e=>{
+      if(e.touches.length!==1){exitTouch=null;return;}
+      const t=e.touches[0];exitTouch=down(t.clientX,t.clientY);
+    },{capture:true,passive:true});
+    story.addEventListener('touchmove',e=>{
+      if(e.touches.length!==1)return;
+      const t=e.touches[0];check(exitTouch,t.clientX,t.clientY);
+    },{capture:true,passive:true});
+    story.addEventListener('touchend',e=>{
+      if(exitTouch&&e.changedTouches.length){
+        const t=e.changedTouches[0];check(exitTouch,t.clientX,t.clientY);
+      }
+      exitTouch=null;
+    },{capture:true,passive:true});
+    story.addEventListener('touchcancel',()=>{exitTouch=null},{capture:true,passive:true});
+    story.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='touch')return;
+      exitPointer={id:e.pointerId,...down(e.clientX,e.clientY)};
+    },{capture:true,passive:true});
+    story.addEventListener('pointermove',e=>{
+      if(exitPointer&&exitPointer.id===e.pointerId)check(exitPointer,e.clientX,e.clientY);
+    },{capture:true,passive:true});
+    story.addEventListener('pointerup',e=>{
+      if(exitPointer?.id===e.pointerId){check(exitPointer,e.clientX,e.clientY);exitPointer=null;}
+    },{capture:true,passive:true});
+  }
+
   /* Timeline readout tuning only. */
   if(!document.getElementById('talera-timeline-readout-tuning')){
     const style=document.createElement('style');

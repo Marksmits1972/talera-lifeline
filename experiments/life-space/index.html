@@ -844,9 +844,10 @@ function scheduleRoleDwellRefresh(delay){
 // Visual entry state prevents a newly-selected photo from materialising in the
 // middle of the field. New foreground cards travel in from their nearest edge.
 const foregroundEntryState=new Map();
-const FOREGROUND_ENTRY_PX_PER_SEC=150;
-const FOREGROUND_ENTRY_MIN_MS=700;
-const FOREGROUND_ENTRY_MAX_MS=1800;
+const FOREGROUND_ENTRY_PX_PER_SEC=170;
+const FOREGROUND_ENTRY_MIN_MS=620;
+const FOREGROUND_ENTRY_MAX_MS=1550;
+const FOREGROUND_ENTRY_PUSH_BOOST=1.22;
 let sceneTransitionRaf=0;
 function requestSceneTransitionFrame(){
   if(sceneTransitionRaf)return;
@@ -2555,8 +2556,20 @@ function render(){
     if(!entry){
       const offset=foregroundEntryOffset(p.x,p.y);
       const distance=Math.hypot(offset.x,offset.y);
+
+      // Calm browsing stays only a little quicker than before. During a push or
+      // coast, entry speed gets a modest extra boost so new large cards keep up
+      // with the moving field instead of visibly arriving late.
+      const entryMotion=currentShellVelocity();
+      const fingerEquivalentSpeed=
+        Math.hypot(entryMotion.x,entryMotion.y)/Math.max(.001,SHELL_DRAG_PER_PX);
+      const pushBoost=lerp(
+        1,
+        FOREGROUND_ENTRY_PUSH_BOOST,
+        smooth(.10,.55,fingerEquivalentSpeed)
+      );
       const duration=clamp(
-        distance/FOREGROUND_ENTRY_PX_PER_SEC*1000,
+        distance/(FOREGROUND_ENTRY_PX_PER_SEC*pushBoost)*1000,
         FOREGROUND_ENTRY_MIN_MS,
         FOREGROUND_ENTRY_MAX_MS
       );

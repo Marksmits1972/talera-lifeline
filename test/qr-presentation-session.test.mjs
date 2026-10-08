@@ -104,4 +104,6 @@ test('QR Player can read but only paired phone can change a real-memory cursor',
   const disconnect = await pair.fetch(request('/disconnect', 'POST', {}, phoneSecret));
   assert.equal(disconnect.status, 200);
   assert.equal((await pair.fetch(request('/presentation', 'POST', { ...cursor, seq: 2 }, phoneSecret))).status, 403);
+  const afterDisconnect = await pair.fetch(request('/state', 'GET', null, 'player-secret'));
+  assert.equal((await afterDisconnect.json()).presentation, null);
 });

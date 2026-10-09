@@ -26,3 +26,11 @@ Based on existing server-backed main branch (xxory-test uses Cloudflare D1 and R
 
 ## Cloudflare GitHub deployment (confirmed 2026-10-08)
 Worker: talera-qr-test; production branch: experiment/qr-server-pairing-20261008; root directory: /; deploy command: npx wrangler deploy --config experiments/qr-server-pairing/wrangler.jsonc. First deployment only serves a harmless bootstrap page and /health; no D1/R2 bindings yet.
+
+## 2026-10-09 — Native R19h2 presentation test milestone
+- The QR Worker serves the actual frozen R19h2 presentation at `/presentation` and offers an unpaired visual preview at `/r19-preview`.
+- Exact core R19h2 timeline/presentation source files were mirrored from `reference/prototype-free-final-r19h2-20261001` *into this QR-only branch*. The frozen branch was not changed.
+- On phone QR claim, browser switches to the full native presentation. Desktop automatically switches to the same native presentation. No standalone remote-control screen in the paired flow.
+- Connected phone shares the native timeline center timestamp through Cloudflare Durable Object. Desktop applies the selection with the native R19 runtime.
+- This is still a demo: no new user account, D1/R2 paid-storage binding, authenticated personal media, automatic media-index syncing, or private-photo authorization. The Tell route is deliberately disabled in the QR Worker until the backend is connected securely.
+- Test QR and presentation synchrony with iPhone Safari and desktop separately; successful GitHub commits alone do not establish Cloudflare deployment or device-level success.

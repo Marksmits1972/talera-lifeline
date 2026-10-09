@@ -49,3 +49,12 @@ Worker: talera-qr-test; production branch: experiment/qr-server-pairing-20261008
 - De tv volgt verdere scrollbewegingen binnen de tekstkolom. Bij het sluiten van het tekstvlak op de telefoon verdwijnt de tv-tekstkolom en wordt het bestaande goedgekeurde, schermvullende tv-beeld hersteld.
 - Gebruikers wijzigen de tekst uitsluitend op de telefoon. De tv leest de tekst uit de bestaande R19-presentatie op basis van dezelfde geselecteerde herinnering; de QR-sessie draagt hier alleen leesstatus/progressie, geen persoonlijke verhaalinhoud.
 - Dit is een visuele en functionele proef, pas als goedgekeurd als iPhone+desktop de weergave en scrollpositie in de praktijk bevestigen. Verander het bevroren R19h2, Life Space of Business Filmstrip niet.
+
+## 2026-10-09 — Revised TV story panel proportions and motion (experiment)
+- User reviewed desktop + iPhone screenshots. Left story column was too wide and photo did not fill available right display area.
+- Target story column: ~25% less width than first reading-mode layout, now 27vw (responsive clamp 310–520px) instead of 36vw. Compact padding and type preserve readability.
+- Full-screen photo remains the primary visual; in reading mode recompute the right-hand available photo viewport to occupy all space beside the panel, rather than offsetting the original full-size photo and leaving a blank band. Landscape photos fill via cover; portrait photos stay fully visible over a blurred image background (refine crop if needed based on tests).
+- The entire story column is laid out at final width before it enters; animate fixed-width panel from the left using a smooth ~620ms ease, with photo reflow synchronized. Do not animate the text column's width from narrow to wide.
+- Subsequent vertical reading on the iPhone scrolls the TV story body. Normalize phone scroll using the native reading threshold of 56px and actual scrollable height, not the initial photo-air height (which could exceed maximum scroll and pin progress at zero).
+- Do not add buttons or independently editable TV story controls; telephone retains interaction ownership.
+- Re-evaluate actual responsiveness and any cropping after iPhone+desktop test. This is not a change to approved unpaired TV presentation.

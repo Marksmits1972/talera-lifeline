@@ -17,12 +17,10 @@ import { timelineGlassLayerStyle } from "./timeline-glass-layer.js";
 import { timelinePhotoSelectionScript } from "./timeline-photo-selection.js";
 import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 import { shareExperienceStyle, shareExperienceScript } from "./share-experience.js";
-import { desktopPresentationStyle, desktopPresentationScript } from "./desktop-presentation.js";
-import { taleraTellStyle, taleraTellScript } from "./talera-tell.js";
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
-const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
-const TALERA_TIMELINE_DEPLOY_REV = "single-owner-ios-capture-v18-20260929";
+const TELL_ORIGIN = "https://talera-r19-reference.mark-a39.workers.dev/tell";
+const TALERA_TIMELINE_DEPLOY_REV = "direct-memory-handoff-v11-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
@@ -60,8 +58,6 @@ window.__taleraTimelineRuntime={
   },
   activeMemoryId(){return activeMemoryId},
   centerMs(){return centerMs},
-  bounds(){return bounds()},
-  memories(){return MEMORIES.slice()},
   isMoving(){return userIsMoving},
   registerMemory(memory){
     if(!memory)return null;
@@ -159,8 +155,8 @@ const listenButtonOutlineStyle = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style><style id="talera-desktop-presentation">${desktopPresentationStyle}</style><style id="talera-native-tell">${taleraTellStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script><script id="talera-desktop-presentation-controller">${desktopPresentationScript}</script><script id="talera-native-tell-controller">${taleraTellScript}</script></body>`);
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style></head>`)
+  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script></body>`);
 
 function escapeMeta(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({

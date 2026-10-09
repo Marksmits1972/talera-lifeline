@@ -1,6 +1,7 @@
 import r19Worker from "../../../src/reference-r19h2-carousel-combined-worker.js";
 import { QR_BRIDGE_JS } from "./bridge.js";
 import { desktopPresentationStyle, desktopPresentationScript } from "../../../src/desktop-presentation.js";
+import { TV_READING_STYLE, TV_READING_SCRIPT } from "./tv-reading.js";
 const random=(n)=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>x.toString(16).padStart(2,"0")).join("");
 const json=(v,status=200)=>Response.json(v,{status,headers:{"cache-control":"no-store"}});
 export class PairSession {
@@ -64,7 +65,7 @@ export default {async fetch(req,env){
    const header=new Headers(original.headers);
    header.delete("content-length");header.set("cache-control","no-store");
    header.set("x-talera-native-presentation","r19h2-qr-isolated");
-   return new Response(originalHtml.replace("</head>",tvBootstrap+"</head>").replace("</body>",extra+"</body>"),{status:original.status,headers:header});
+   return new Response(originalHtml.replace("</head>",tvBootstrap+'<style id="talera-qr-tv-reading-style">'+TV_READING_STYLE+"</style></head>").replace("</body>",'<script id="talera-qr-tv-reading-script">'+TV_READING_SCRIPT+"</script>"+extra+"</body>"),{status:original.status,headers:header});
  }
  if(p==="/tell"||p.startsWith("/tell/"))return new Response('<!doctype html><html lang="nl"><meta name="viewport" content="width=device-width, initial-scale=1"><body style="background:#f0f3f5;color:#17304a;font:17px system-ui;padding:40px;max-width:640px;margin:auto"><h1>TALERA r19 — QR-test</h1><p>Je ziet de echte r19-presentatie. Verhalen opslaan en persoonlijke cloudbibliotheken worden pas in de volgende beveiligde bouwfase aangesloten.</p><p><a href="/presentation">Terug naar presentatie</a></p></body></html>',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
 

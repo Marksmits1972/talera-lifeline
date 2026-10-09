@@ -1,3 +1,5 @@
+import r19Worker from "../../../src/reference-r19h2-carousel-combined-worker.js";
+import { QR_BRIDGE_JS } from "./bridge.js";
 const random=(n)=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>x.toString(16).padStart(2,"0")).join("");
 const json=(v,status=200)=>Response.json(v,{status,headers:{"cache-control":"no-store"}});
 export class PairSession {
@@ -20,6 +22,21 @@ const APP="const $=id=>document.getElementById(id);\nlet pairing=\"\",secret=\"\
 export default {async fetch(req,env){
  const u=new URL(req.url),p=u.pathname;
  if(p==="/health")return json({status:"qr-demo",service:"talera-qr-test"});
+
+ if(p==="/qr-bridge.js")return new Response(QR_BRIDGE_JS,{headers:{"content-type":"text/javascript; charset=utf-8","cache-control":"no-store"}});
+ if((p==="/presentation"||p==="/r19-preview")&&req.method==="GET"){
+   const originalUrl=new URL(req.url);originalUrl.pathname="/";originalUrl.search="";
+   const original=await r19Worker.fetch(new Request(originalUrl.toString(),req),env,{waitUntil:()=>{}});
+   const originalHtml=await original.text();
+   if(!originalHtml.includes("</body>"))return original;
+   const extra=p==="/presentation"?'<script src="/qr-bridge.js"></script>':'';
+   const header=new Headers(original.headers);
+   header.delete("content-length");header.set("cache-control","no-store");
+   header.set("x-talera-native-presentation","r19h2-qr-isolated");
+   return new Response(originalHtml.replace("</body>",extra+"</body>"),{status:original.status,headers:header});
+ }
+ if(p==="/tell"||p.startsWith("/tell/"))return new Response('<!doctype html><html lang="nl"><meta name="viewport" content="width=device-width, initial-scale=1"><body style="background:#f0f3f5;color:#17304a;font:17px system-ui;padding:40px;max-width:640px;margin:auto"><h1>TALERA r19 — QR-test</h1><p>Je ziet de echte r19-presentatie. Verhalen opslaan en persoonlijke cloudbibliotheken worden pas in de volgende beveiligde bouwfase aangesloten.</p><p><a href="/presentation">Terug naar presentatie</a></p></body></html>',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
+
  if(p==="/"||p==="/connect")return new Response(HTML,{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff"}});
  if(p==="/app.js")return new Response(APP,{headers:{"content-type":"text/javascript;charset=utf-8","cache-control":"no-store"}});
  if(p==="/api/session"&&req.method==="POST"){const id=random(16),secret=random(24),code=random(24),obj=env.PAIR_SESSIONS.get(env.PAIR_SESSIONS.idFromName(id));await obj.fetch("https://internal/init",{method:"POST",body:JSON.stringify({player:secret,code})});return json({id,secret,code})}

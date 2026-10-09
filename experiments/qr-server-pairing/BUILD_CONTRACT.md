@@ -34,3 +34,10 @@ Worker: talera-qr-test; production branch: experiment/qr-server-pairing-20261008
 - Connected phone shares the native timeline center timestamp through Cloudflare Durable Object. Desktop applies the selection with the native R19 runtime.
 - This is still a demo: no new user account, D1/R2 paid-storage binding, authenticated personal media, automatic media-index syncing, or private-photo authorization. The Tell route is deliberately disabled in the QR Worker until the backend is connected securely.
 - Test QR and presentation synchrony with iPhone Safari and desktop separately; successful GitHub commits alone do not establish Cloudflare deployment or device-level success.
+
+## 2026-10-09 — Correct approved TV composition
+- Approval reference found at `src/desktop-presentation.js` (approved TV presentation, 29 Sep 2026, already used in the historical main presentation composition).
+- Keep ordinary native r19h2 presentation on iPhone; apply the exact approved large-screen TV CSS and classification script only to paired `role=player` browser.
+- `/r19-preview` now deliberately previews that approved TV composition on a desktop without QR pairing.
+- TV visual rules: full-bleed photography for landscape, top picture-overlaid timeline, story heading at lower center, no Listen prompt, share controls, ordinary navigation, or editor UI.
+- The Durable Object session and QR scan/claim/confirmation workflow are unchanged by this update.

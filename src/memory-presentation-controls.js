@@ -17,11 +17,8 @@ export const memoryPresentationControlsStyle = String.raw`
 .talera-memory-edit .edit-symbol{font-size:17px;line-height:1}
 .memory-space.is-listening .memory-sheet .story-more{opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease}
 .memory-space.is-listening.is-reading-during-listen .memory-sheet .story-more{opacity:1;transform:translateY(0)}
-.talera-audio-consent{position:absolute;z-index:18;left:50%;bottom:148px;transform:translateX(-50%);width:min(318px,calc(100% - 32px));min-height:58px;border:1px solid rgba(255,255,255,.48);border-radius:18px;display:flex;align-items:stretch;color:#fff;background:rgba(15,39,71,.82);box-shadow:0 10px 30px rgba(6,18,30,.25);backdrop-filter:blur(14px) saturate(1.12);-webkit-backdrop-filter:blur(14px) saturate(1.12);font-size:13px;font-weight:720;line-height:1.18;text-align:left;text-shadow:0 1px 5px rgba(6,18,30,.28);overflow:hidden}
+.talera-audio-consent{position:absolute;z-index:18;left:50%;bottom:148px;transform:translateX(-50%);width:min(318px,calc(100% - 32px));min-height:58px;padding:10px 14px;border:1px solid rgba(255,255,255,.48);border-radius:18px;display:flex;align-items:center;justify-content:center;gap:10px;color:#fff;background:rgba(15,39,71,.82);box-shadow:0 10px 30px rgba(6,18,30,.25);backdrop-filter:blur(14px) saturate(1.12);-webkit-backdrop-filter:blur(14px) saturate(1.12);font-size:13px;font-weight:720;line-height:1.18;text-align:left;text-shadow:0 1px 5px rgba(6,18,30,.28)}
 .talera-audio-consent[hidden]{display:none!important}
-.talera-audio-consent-main{flex:1;min-width:0;border:0;padding:10px 6px 10px 14px;display:flex;align-items:center;gap:10px;color:inherit;background:transparent;text-align:left;font:inherit;text-shadow:inherit}
-.talera-audio-consent-close{width:44px;min-width:44px;border:0;background:transparent;color:#fff;font:500 25px/1 system-ui;opacity:.82}
-.talera-audio-consent-close:active{opacity:1;background:rgba(255,255,255,.08)}
 .talera-audio-consent .consent-speaker{font-size:21px;line-height:1}
 .talera-audio-consent .consent-copy{display:flex;flex-direction:column;gap:2px}
 .talera-audio-consent small{font-size:10px;font-weight:520;color:rgba(255,255,255,.76)}
@@ -42,25 +39,23 @@ export const memoryPresentationControlsStyle = String.raw`
 
 export const memoryPresentationControlsScript = String.raw`
 (()=>{
-  const UNIFIED_TIMELINE=location.pathname==='/timeline'||location.pathname==='/timeline/';
-  const TELL_ORIGIN=UNIFIED_TIMELINE?location.origin:'https://xxory-test.mark-a39.workers.dev';
-  const TELL_ROUTE=UNIFIED_TIMELINE?'/tell':'/';
+  const TELL_ORIGIN=location.origin+'/tell';
   const runtime=window.__taleraTimelineRuntime;
   const memorySpace=document.querySelector('.memory-space');
   const storyScroll=document.getElementById('memoryStoryScroll');
   if(!runtime||!memorySpace)return;
 
-  const consent=document.createElement('div');
+  const consent=document.createElement('button');
+  consent.type='button';
   consent.className='talera-audio-consent';
-  consent.innerHTML='<button type="button" class="talera-audio-consent-main" aria-label="Automatisch luisteren inschakelen"><span class="consent-speaker" aria-hidden="true">◖)))</span><span class="consent-copy">Automatisch luisteren inschakelen<small>Tik één keer om geluid toe te staan</small></span></button><button type="button" class="talera-audio-consent-close" aria-label="Niet nu">×</button>';
+  consent.setAttribute('aria-label','Automatisch luisteren inschakelen');
+  consent.innerHTML='<span class="consent-speaker" aria-hidden="true">◖)))</span><span class="consent-copy">Automatisch luisteren inschakelen<small>Tik één keer om geluid toe te staan</small></span>';
   memorySpace.appendChild(consent);
-  const consentMain=consent.querySelector('.talera-audio-consent-main');
-  const consentClose=consent.querySelector('.talera-audio-consent-close');
 
   const oldTell=document.querySelector('.tell');
   if(oldTell){
     const fresh=oldTell.cloneNode(true);oldTell.replaceWith(fresh);
-    fresh.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeManager();stopAudio(true);location.href=TELL_ORIGIN+TELL_ROUTE+'?new=1&at='+encodeURIComponent(new Date(runtime.centerMs()).toISOString())},true);
+    fresh.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeManager();stopAudio(true);location.href=TELL_ORIGIN+'/?new=1&at='+encodeURIComponent(new Date(runtime.centerMs()).toISOString())},true);
   }
 
   const tools=document.createElement('div');
@@ -82,9 +77,6 @@ export const memoryPresentationControlsScript = String.raw`
   const AUTO_START_DELAY=360;
   let activeStoryId='',activeToken='',activeHasAudio=false,loading=false,loadFailed=false,renderEpoch=0;
   let autoStartTimer=null,autoStableSince=0,autoBlocked=false,manualSuppressed=false,audioEnabled=false;
-  const CONSENT_DISMISSED_KEY='talera.audio-consent-dismissed';
-  let consentDismissed=sessionStorage.getItem(CONSENT_DISMISSED_KEY)==='1';
-  if(consentDismissed)consent.hidden=true;
 
   function tokenFor(m){return m&&m._manageToken||''}
   function usable(m){return Boolean(m&&m._taleraLive&&m.storyId&&tokenFor(m))}
@@ -92,7 +84,7 @@ export const memoryPresentationControlsScript = String.raw`
   function showAudio(v){audioButton.hidden=!v}
   function editUrl(memory,mode=''){
     const query=new URLSearchParams();query.set('edit',memory.storyId);if(mode)query.set('manage',mode);
-    return TELL_ORIGIN+TELL_ROUTE+'?'+query.toString()+'#token='+encodeURIComponent(tokenFor(memory));
+    return TELL_ORIGIN+'/?'+query.toString()+'#token='+encodeURIComponent(tokenFor(memory));
   }
   function notifyOverlay(open){document.dispatchEvent(new CustomEvent('talera:overlay-change',{detail:{open:Boolean(open),source:'memory-manager'}}))}
   function closeManager(){if(manager.hidden)return;manager.hidden=true;notifyOverlay(false)}
@@ -168,7 +160,7 @@ export const memoryPresentationControlsScript = String.raw`
       autoBlocked=false;loadFailed=false;setUi();return true;
     }catch(e){
       if(fromAuto&&e&&e.name==='NotAllowedError'){
-        autoBlocked=true;audioEnabled=false;loadFailed=false;if(!consentDismissed)consent.hidden=false;
+        autoBlocked=true;audioEnabled=false;loadFailed=false;consent.hidden=false;
       }else{
         loadFailed=true;
         console.warn('TALERA audio kon niet starten',e);
@@ -221,9 +213,8 @@ export const memoryPresentationControlsScript = String.raw`
     manualSuppressed=false;scheduleAutoStart(renderEpoch);
   });
 
-  function enableListening(){
-    cancelAutoStart();
-    consentDismissed=false;sessionStorage.removeItem(CONSENT_DISMISSED_KEY);
+  consent.addEventListener('click',e=>{
+    e.preventDefault();e.stopPropagation();cancelAutoStart();
     audioEnabled=true;autoBlocked=false;manualSuppressed=false;consent.hidden=true;
     if(activeHasAudio&&!loading&&!loadFailed&&audio.src){playNow(false);return}
     try{
@@ -232,32 +223,13 @@ export const memoryPresentationControlsScript = String.raw`
         const context=new AudioContextClass();const buffer=context.createBuffer(1,1,22050);const source=context.createBufferSource();source.buffer=buffer;source.connect(context.destination);source.start(0);if(context.state==='suspended')context.resume();setTimeout(()=>{try{context.close()}catch(err){}},180);
       }
     }catch(err){}
-  }
-  function disableListening(){
-    cancelAutoStart();
-    stopAudio(false);
-    audioEnabled=false;autoBlocked=false;manualSuppressed=true;
-    consentDismissed=true;consent.hidden=true;
-    sessionStorage.setItem(CONSENT_DISMISSED_KEY,'1');
-  }
-  window.__taleraAudioControls={
-    isEnabled:()=>Boolean(audioEnabled&&!consentDismissed),
-    enable:enableListening,
-    disable:disableListening
-  };
-  consentMain.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();enableListening()});
-  consentClose.addEventListener('click',e=>{
-    e.preventDefault();e.stopPropagation();cancelAutoStart();
-    consentDismissed=true;manualSuppressed=true;consent.hidden=true;
-    sessionStorage.setItem(CONSENT_DISMISSED_KEY,'1');
   });
-  document.addEventListener('talera:enable-listening',enableListening);
 
   audioButton.addEventListener('click',async e=>{
     e.preventDefault();e.stopPropagation();cancelAutoStart();
     if(loading)return;
     if(!audio.paused){manualSuppressed=true;audio.pause();return}
-    consentDismissed=false;sessionStorage.removeItem(CONSENT_DISMISSED_KEY);manualSuppressed=false;autoBlocked=false;audioEnabled=true;consent.hidden=true;
+    manualSuppressed=false;autoBlocked=false;audioEnabled=true;consent.hidden=true;
     if(loadFailed||!audio.src){const ok=await prepare(activeStoryId,activeToken,renderEpoch,true);if(ok)playNow(false);return}
     playNow(false);
   });

@@ -13,10 +13,10 @@
 export const bottomCommandLayerStyle = String.raw`
 :root{
   --command-bar-height:76px;
-  --command-frost-feather:34px;
-  --command-glass-tint:rgba(15,39,71,.045);
-  --command-glass-blur:7px;
-  --command-glass-saturation:1.02;
+  --command-frost-feather:78px;
+  --command-glass-tint:rgba(15,39,71,.075);
+  --command-glass-blur:14px;
+  --command-glass-saturation:1.12;
   --command-label:rgba(255,255,255,.90);
   --command-label-shadow:rgba(6,18,30,.42);
   --command-home:#315f87;

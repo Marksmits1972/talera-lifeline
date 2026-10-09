@@ -7,13 +7,28 @@ export class PairSession {
  constructor(state,env){this.storage=state.storage}
  async fetch(req){
   const u=new URL(req.url),prev=await this.storage.get("pair");
-  if(u.pathname==="/init"&&req.method==="POST"){if(prev)return json({error:"Reeds gemaakt"},409);const b=await req.json();await this.storage.put("pair",{player:b.player,code:b.code,expires:Date.now()+120000,phone:null,connected:false,photo:0,memoryMs:null,revision:0});return json({ok:true})}
+  if(u.pathname==="/init"&&req.method==="POST"){if(prev)return json({error:"Reeds gemaakt"},409);const b=await req.json();await this.storage.put("pair",{player:b.player,code:b.code,expires:Date.now()+120000,phone:null,connected:false,photo:0,memoryMs:null,reading:false,readProgress:0,revision:0});return json({ok:true})}
   if(!prev)return json({error:"Onbekende sessie"},404);
   if(u.pathname==="/claim"&&req.method==="POST"){const b=await req.json();if(prev.expires<Date.now()||prev.code!==b.code||prev.connected)return json({error:"QR-code is verlopen of al gebruikt"},410);prev.phone=random(24);prev.code=null;prev.connected=true;prev.revision++;await this.storage.put("pair",prev);return json({secret:prev.phone,photo:prev.photo,memoryMs:prev.memoryMs})}
   const token=req.headers.get("x-pair-secret");const player=token===prev.player,phone=!!prev.phone&&token===prev.phone;
   if(!player&&!phone)return json({error:"Geen toegang"},403);
-  if(u.pathname==="/state")return json({connected:prev.connected,photo:prev.photo,memoryMs:prev.memoryMs,revision:prev.revision,expired:!prev.connected&&Date.now()>prev.expires});
-  if(u.pathname==="/command"&&req.method==="POST"){if(!phone||!prev.connected)return json({error:"Niet toegestaan"},403);const b=await req.json();if(Number.isFinite(b.memoryMs)&&b.memoryMs>0&&b.memoryMs<4102444800000){prev.memoryMs=b.memoryMs}else if(Number.isInteger(b.photo)&&b.photo>=0&&b.photo<=3){prev.photo=b.photo}else{return json({error:"Ongeldige selectie"},400)}prev.revision++;await this.storage.put("pair",prev);return json({ok:true,revision:prev.revision})}
+  if(u.pathname==="/state")return json({connected:prev.connected,photo:prev.photo,memoryMs:prev.memoryMs,reading:Boolean(prev.reading),readProgress:Number(prev.readProgress)||0,revision:prev.revision,expired:!prev.connected&&Date.now()>prev.expires});
+  if(u.pathname==="/command"&&req.method==="POST"){
+   if(!phone||!prev.connected)return json({error:"Niet toegestaan"},403);
+   const b=await req.json();
+   let updated=false;
+   if(Number.isFinite(b.memoryMs)&&b.memoryMs>0&&b.memoryMs<4102444800000){
+     prev.memoryMs=b.memoryMs;updated=true;
+   }
+   if(Number.isInteger(b.photo)&&b.photo>=0&&b.photo<=3){prev.photo=b.photo;updated=true}
+   if(typeof b.reading==="boolean"){prev.reading=b.reading;updated=true}
+   if(Number.isFinite(b.readProgress)&&b.readProgress>=0&&b.readProgress<=1){
+     prev.readProgress=b.readProgress;updated=true;
+   }
+   if(!updated)return json({error:"Ongeldige selectie"},400);
+   prev.revision++;await this.storage.put("pair",prev);
+   return json({ok:true,revision:prev.revision});
+  }
   if(u.pathname==="/disconnect"&&req.method==="POST"){prev.connected=false;prev.phone=null;prev.code=null;await this.storage.put("pair",prev);return json({ok:true})}
   return json({error:"Niet gevonden"},404);
  }

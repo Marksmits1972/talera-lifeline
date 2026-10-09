@@ -41,3 +41,11 @@ Worker: talera-qr-test; production branch: experiment/qr-server-pairing-20261008
 - `/r19-preview` now deliberately previews that approved TV composition on a desktop without QR pairing.
 - TV visual rules: full-bleed photography for landscape, top picture-overlaid timeline, story heading at lower center, no Listen prompt, share controls, ordinary navigation, or editor UI.
 - The Durable Object session and QR scan/claim/confirmation workflow are unchanged by this update.
+
+## 2026-10-09 — Experiment: verhaaltekst van telefoon naar TV
+- Functionele bedoeling: telefoon blijft de gewone R19-presentatie met de natuurlijke verticale story swipe. Geen extra afstandsbediening.
+- Bij een echte upward read swipe in `#memoryStoryScroll`: deel de leesstatus en genormaliseerde leespositie met de gekoppelde Cloudflare Durable Object-sessie. Kleine onbedoelde scrollbewegingen worden genegeerd.
+- Op het gekoppelde grote scherm verschijnt links een lichte, rustige tekstkolom met dezelfde geselecteerde titel en verhaaltekst; de foto verschuift naar de rechterkant en blijft door `object-fit:contain` in haar geheel zichtbaar.
+- De tv volgt verdere scrollbewegingen binnen de tekstkolom. Bij het sluiten van het tekstvlak op de telefoon verdwijnt de tv-tekstkolom en wordt het bestaande goedgekeurde, schermvullende tv-beeld hersteld.
+- Gebruikers wijzigen de tekst uitsluitend op de telefoon. De tv leest de tekst uit de bestaande R19-presentatie op basis van dezelfde geselecteerde herinnering; de QR-sessie draagt hier alleen leesstatus/progressie, geen persoonlijke verhaalinhoud.
+- Dit is een visuele en functionele proef, pas als goedgekeurd als iPhone+desktop de weergave en scrollpositie in de praktijk bevestigen. Verander het bevroren R19h2, Life Space of Business Filmstrip niet.

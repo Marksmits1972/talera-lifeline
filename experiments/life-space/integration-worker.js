@@ -58,6 +58,10 @@ body.present #back{display:flex}
  }
  document.getElementById('back').addEventListener('click',back);
  window.addEventListener('keydown',e=>{if(e.key==='Escape')back()});
+ r19.addEventListener('load',()=>{
+   ready=false;
+   try{r19.contentWindow.postMessage({type:'talera-combine-ping'},location.origin)}catch(e){}
+ });
  window.addEventListener('message',e=>{
    if(e.origin!==location.origin||!e.data||typeof e.data!=='object')return;
    if(e.source===space.contentWindow){
@@ -83,6 +87,10 @@ const SPACE_BRIDGE=String.raw`<script id="talera-combine-space-bridge">
    if(!m)return original(i);
    window.parent.postMessage({type:'talera-combine-open',id:m.id},location.origin);
  };
+ const openButton=document.getElementById('storyBtn');
+ if(openButton&&typeof nearestMemoryToFocus==='function'){
+   openButton.onclick=()=>window.openStorySmooth(nearestMemoryToFocus());
+ }
  window.addEventListener('message',e=>{
    if(e.origin===location.origin&&e.source===window.parent&&e.data?.type==='talera-combine-back')window.focus();
  });
@@ -95,7 +103,11 @@ const R19_BRIDGE=String.raw`<script id="talera-combine-r19-bridge">
  const runtime=window.__taleraTimelineRuntime;
  if(!runtime)return;
  window.addEventListener('message',e=>{
-   if(e.origin!==location.origin||e.source!==window.parent||e.data?.type!=='talera-combine-select')return;
+   if(e.origin!==location.origin||e.source!==window.parent)return;
+   if(e.data?.type==='talera-combine-ping'){
+     window.parent.postMessage({type:'talera-combine-ready'},location.origin);return;
+   }
+   if(e.data?.type!=='talera-combine-select')return;
    const id=Number(e.data.id);
    if(!Number.isInteger(id)||id<1||id>50)return;
    const memory=runtime.findMemory({memoryId:String(id)});

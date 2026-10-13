@@ -58,7 +58,6 @@ body.present #back{display:flex}
  }
  document.getElementById('back').addEventListener('click',back);
  window.addEventListener('keydown',e=>{if(e.key==='Escape')back()});
- r19.addEventListener('load',()=>{ready=false});
  window.addEventListener('message',e=>{
    if(e.origin!==location.origin||!e.data||typeof e.data!=='object')return;
    if(e.source===space.contentWindow){

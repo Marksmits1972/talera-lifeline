@@ -302,10 +302,9 @@ function spaceFxLoop(now){
 // sparse early years, a very dense band around age 30, and mixed density later.
 // This lets us test whether one continuous field can absorb strong local differences.
 const EXTRA_MEMORIES=(()=>{
-  // Stress-test dataset: exactly 1000 memories total, while preserving the
-  // original reference memories. Synthetic photos are unique seeded sources
-  // and remain lazy-loaded so the browser never downloads all 1000 at once.
-  const TARGET_TOTAL_MEMORIES=3000;
+  // Integration test: use the original 50 reference memories only.
+  // High-volume (3000 memory) performance testing stays in the frozen baseline.
+  const TARGET_TOTAL_MEMORIES=50;
   const inRangeReferenceCount=MEMORIES.reduce((n,s)=>{
     const ms=new Date(s.at).getTime();
     return n+(ms>=LIFE_START&&ms<=LIFE_END?1:0);

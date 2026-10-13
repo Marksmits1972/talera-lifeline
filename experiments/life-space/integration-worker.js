@@ -125,7 +125,12 @@ export default {
    const backend=path==='/tell'||path.startsWith('/tell/')||
       path.startsWith('/api/')||path.startsWith('/storylab');
    if(request.method!=='GET'&&request.method!=='HEAD'){
-     return backend?r19Worker.fetch(request,env,ctx):new Response('Method Not Allowed',{status:405});
+     // Read-only experiment: never forward writes to original r19 or Story Lab.
+     // Enable saving only after configuring separate test D1/R2 resources.
+     return new Response(backend?'Demo is alleen-lezen: opslaan is nog niet aangesloten.':'Method Not Allowed',{
+       status:backend?403:405,
+       headers:{'content-type':'text/plain; charset=utf-8','cache-control':'no-store'}
+     });
    }
    if(path==='/'||path==='/index.html')return htmlResponse(HOST,request);
    if(path==='/space'||path==='/space/'){

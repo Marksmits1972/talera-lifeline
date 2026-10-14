@@ -75,14 +75,19 @@ jobs:
           TEST_URL: ${{ vars.TALERA_LIFELINE_TEST_URL }}
         run: |
           TEST_URL="${TEST_URL:-https://talera-r19-lifeline-main-dev.mark-a39.workers.dev}"
+          echo "Checking freshly deployed worker endpoint availability: $TEST_URL"
+          sleep 3
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/" -o /tmp/talera-lifeline-home.html
           grep -q 'TALERA — Mijn levenslijn' /tmp/talera-lifeline-home.html
           grep -q 'rel="manifest"' /tmp/talera-lifeline-home.html
-          curl --fail --silent --show-error "$TEST_URL/manifest.webmanifest" -o /tmp/talera-lifeline-manifest.json
+          echo "Checking manifest.webmanifest"
+          curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors "$TEST_URL/manifest.webmanifest" -o /tmp/talera-lifeline-manifest.json
           grep -q '"display":"standalone"' /tmp/talera-lifeline-manifest.json
-          curl --fail --silent --show-error "$TEST_URL/pwa-192.png" -o /tmp/talera-lifeline-icon.png
+          echo "Checking pwa-192.png"
+          curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors "$TEST_URL/pwa-192.png" -o /tmp/talera-lifeline-icon.png
           test "$(file --mime-type -b /tmp/talera-lifeline-icon.png)" = "image/png"
-          curl --fail --silent --show-error "$TEST_URL/sw.js" -o /tmp/talera-lifeline-sw.js
+          echo "Checking sw.js"
+          curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors "$TEST_URL/sw.js" -o /tmp/talera-lifeline-sw.js
           grep -q 'addEventListener' /tmp/talera-lifeline-sw.js
           grep -q "installGesture(ageLane,'year')" /tmp/talera-lifeline-home.html
           grep -q "installGesture(monthLane,'month')" /tmp/talera-lifeline-home.html

@@ -144,7 +144,7 @@ const d=dateFromMonthIndex(drag.targetMonth),a=midnight(d.getFullYear(),d.getMon
 const group=visible.filter(m=>m.id!==drag.id&&m.virtualMs>=a&&m.virtualMs<b);
 return {array:group,index:clamp(drag.anchor||0,0,Math.max(0,group.length-1))}}
 function drawStories(){const h=storyGear.clientHeight,c=h/2,rendered=storiesForRender(),arr=rendered.array,index=rendered.index;let out='';
-const first=Math.max(0,Math.floor(index)-5),last=Math.min(arr.length-1,Math.ceil(index)+5),n=nearestIndex(focusMs,visible);
+const centerI=Math.round(index),first=Math.max(0,centerI-3),last=Math.min(arr.length-1,centerI+3),n=nearestIndex(focusMs,visible);
 for(let i=first;i<=last;i++){const m=arr[i],top=c+(i-index)*STORY_PX-33;if(top< -75||top>h+15)continue;
 out+='<div class="story-row '+(visible[n]&&visible[n].id===m.id?'nearest ':'')+(drag&&drag.id===m.id?'dragged':'')+'" style="top:'+top+'px" data-memory-id="'+m.id+'"><button class="story-card" tabindex="-1" aria-label="'+safe(label(m)+': '+m.story)+'"><img draggable="false" src="'+safe(m.image)+'" alt=""><span class="words"><strong>'+safe(label(m))+'</strong><small>'+safe(m.story)+'</small></span></button></div>'}
 STORIES.innerHTML=out;

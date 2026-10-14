@@ -1,10 +1,10 @@
 // TALERA: new life-line home screen paired with ORIGINAL r19h2.
 // This worker is deliberately isolated and read-only. Never publish under the r19 reference Worker name.
 import r19Worker from "../../src/reference-r19h2-carousel-combined-worker.js";
-import HOME_HTML from "./visual-v3.html";
+import HOME_HTML from "./visual-v4.html";
 import { DEMO_MEMORIES } from "./demo-memories.js";
 
-const VERSION="talera-lifeline-visual-v3-connected-20261014";
+const VERSION="talera-lifeline-v4-scrolling-filtered-demo-20261014";
 // Screenshot-faithful illustration; only this isolated demo uses the image.
 // The approved RH19 presentation implementation is never edited.
 const VISUAL_PREVIEW_PHOTO=(String(HOME_HTML).match(/<img class="preview-image" src="(data:image\/jpeg;base64,[^"]+)"/)||[])[1]||"";
@@ -53,6 +53,31 @@ body nav[aria-label="TALERA navigatie"]{visibility:hidden!important}
  selectOriginal();
 })();
 </script>`;
+const lifelineSessionBridge=String.raw`<script id="talera-lifeline-session-handoff">
+(function(){
+ // Isolated read-only demo, using tab-specific state, never writing to original RH19.
+ if(new URLSearchParams(location.search).get('visual')!=='lifeline')return;
+ let data=null;
+ try{data=JSON.parse(sessionStorage.getItem('taleraVisualMemoryHandoff')||'null')}catch(e){}
+ if(!data||!/^20\d\d-\d\d-\d\d$/.test(data.at||'')||typeof data.title!=='string')return;
+ let attempts=0;
+ function show(){
+   const runtime=window.__taleraTimelineRuntime;
+   if(!runtime){if(++attempts<60)setTimeout(show,70);return}
+   const ms=new Date(data.at+'T12:00:00').getTime();
+   if(!Number.isFinite(ms))return;
+   const photo=typeof data.image==='string'&&/^(data:image\/|https:\/\/)/.test(data.image)?data.image:'';
+   const title=String(data.title).slice(0,160),summary=String(data.summary||title).slice(0,3000);
+   const memory={id:51001,at:data.at+'T12:00:00',ms,
+     story:summary,fullStory:summary,image:photo,photos:photo?[photo]:[],_photoIndex:0};
+   runtime.registerMemory(memory);
+   runtime.setCenter(memory.ms);
+   runtime.writeMemory(memory);
+   runtime.draw();
+ }
+ show();
+})();
+</script>`;
 const tellBridge=String.raw`<style id="talera-independent-tell-navigation">
 #taleraTellNav{position:fixed;z-index:2147483640;top:calc(7px + env(safe-area-inset-top,0px));left:10px;right:10px;
  display:flex;justify-content:space-around;gap:6px;align-items:center;max-width:520px;margin:auto;
@@ -68,7 +93,7 @@ const tellBridge=String.raw`<style id="talera-independent-tell-navigation">
 function addBridge(html, request){
   // Only the dedicated test worker is decorated; the original RH19 files are untouched.
   if(!html.includes("</body>"))return html;
-  let enhanced=html.replace("</body>",bridge+"</body>");
+  let enhanced=html.replace("</body>",bridge+lifelineSessionBridge+"</body>");
   const visual=new URL(request.url).searchParams.get("visual");
   if(visual==="weekend-amsterdam" && VISUAL_PREVIEW_PHOTO){
     // The screenshot's Amsterdam story is only an illustration, not one of RH19's 50 memories.

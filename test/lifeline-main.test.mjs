@@ -105,8 +105,19 @@ test('Approved visual layout retained and connected to all three TALERA pages',(
   assert.match(visualV3,/<a href="\/tell" class="nav-item">/);
   assert.match(visualV3,/<a href="\/" class="nav-item selected" aria-current="page">/);
   assert.match(visualV3,/<a href="\/present\?visual=weekend-amsterdam" class="nav-item">/);
-  assert.match(worker,/import HOME_HTML from "\.\/visual-v3\.html"/);
+  assert.match(worker,/import HOME_HTML from "\.\/visual-v4\.html"/);
   assert.match(worker,/id="talera-visual-demo-handoff"/);
   assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
   assert.match(worker,/return reply\(addBridge\(await r\.text\(\),request\)/);
+});
+
+const visualV4=read('../experiments/lifeline-main/visual-v4.html');
+test('The approved lifeline now has synchronized year, month, story and tag interactions',()=>{
+ for(const c of ['class="ages"','class="detail"','class="preview"'])assert.ok(visualV4.includes(c),c);
+ for(const k of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')","state.filter.add(tag)","taleraVisualMemoryHandoff","const img=new Image()"])assert.ok(visualV4.includes(k),k);
+ assert.match(worker,/id="talera-lifeline-session-handoff"/);
+ assert.match(worker,/bridge\+lifelineSessionBridge/);
+ const script=visualV4.match(/<script>([\s\S]*?)<\/script>/);
+ assert.ok(script);
+ assert.doesNotThrow(()=>new vm.Script(script[1],{filename:'visual-v4.js'}));
 });

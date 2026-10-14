@@ -192,17 +192,17 @@ element.addEventListener('keydown',e=>{if(!['ArrowUp','ArrowDown','PageUp','Page
 if(lane==='year')focusAt(fromYearFloat(yearFloat(focusMs)+n*step),'year',true);if(lane==='month')focusAt(fromMonthFloat(monthFloat(focusMs)+n*step),'month',true);if(lane==='story'&&visible.length)focusAt(msAtIndex(Math.round(fractionalIndex(focusMs,visible))+n*step,visible),'story',true)})}
 attachGear(yearGear,'year');attachGear(monthGear,'month');attachGear(storyGear,'story');
 function startDrag(id,x,y){const m=items.find(a=>a.id===id);if(!m)return;
-drag={id,monthReference:focusMs,targetMonth:null,anchor:0,insertIndex:0,pointerX:x,pointerY:y,raf:0};
+drag={id,monthReference:focusMs,targetMonth:null,enteredMonth:false,anchor:0,insertIndex:0,pointerX:x,pointerY:y,raf:0};
 const ghost=$('dragGhost');ghost.querySelector('img').src=m.image;ghost.querySelector('span').textContent=label(m);ghost.style.display='block';
-$('dragHint').style.display='block';$('dragHint').textContent='Sleep naar de maanden en dan tussen twee verhalen';moveDrag(x,y)}
+$('dragHint').style.display='block';$('dragHint').textContent='Sleep naar de maanden en dan tussen twee verhalen';moveDrag(x,y);drag.raf=requestAnimationFrame(autoScrollDrag)}
 function placeGhost(x,y){const ghost=$('dragGhost');ghost.style.left=Math.min(innerWidth-137,Math.max(7,x+17))+'px';ghost.style.top=Math.min(innerHeight-140,Math.max(7,y-60))+'px'}
 function dragMonthItems(){if(!drag||drag.targetMonth===null)return[];const d=dateFromMonthIndex(drag.targetMonth),a=midnight(d.getFullYear(),d.getMonth(),1),b=midnight(d.getFullYear(),d.getMonth()+1,1);return visible.filter(m=>m.id!==drag.id&&m.virtualMs>=a&&m.virtualMs<b)}
 function moveDrag(x,y){if(!drag)return;drag.pointerX=x;drag.pointerY=y;placeGhost(x,y);
 const mr=monthGear.getBoundingClientRect(),sr=storyGear.getBoundingClientRect();
-if(x>=mr.left&&x<=mr.right&&y>=mr.top&&y<=mr.bottom){const mo=pointerMonth(y,drag.monthReference);if(drag.targetMonth!==mo){drag.targetMonth=mo;drag.anchor=0;drag.insertIndex=0;const d=dateFromMonthIndex(mo);focusMs=clamp(midnight(d.getFullYear(),d.getMonth(),15),lifeStart,lifeEnd)}
+if(x>=mr.left&&x<=mr.right&&y>=mr.top&&y<=mr.bottom){drag.enteredMonth=true;const mo=pointerMonth(y,drag.monthReference);if(drag.targetMonth!==mo){drag.targetMonth=mo;drag.anchor=0;drag.insertIndex=0;const d=dateFromMonthIndex(mo);focusMs=clamp(midnight(d.getFullYear(),d.getMonth(),15),lifeStart,lifeEnd)}
 $('dragHint').textContent='Maand gekozen — sleep nu naar rechts tussen de verhalen'}
 else if(x>=sr.left&&x<=sr.right&&y>=sr.top&&y<=sr.bottom){
-if(drag.targetMonth===null){drag.targetMonth=Math.floor(monthFloat(focusMs));drag.anchor=0}
+if(drag.targetMonth===null){const dragged=items.find(v=>v.id===drag.id);drag.targetMonth=Math.floor(monthFloat(dragged?dragged.virtualMs:focusMs));drag.anchor=0}
 const group=dragMonthItems(),local=(y-(sr.top+sr.height/2))/STORY_PX;
 drag.insertIndex=clamp(Math.round(drag.anchor+local+.5),0,group.length);
 $('dragHint').textContent=group.length?'Laat los tussen de juiste verhalen':'Laat los om de herinnering in deze maand te plaatsen'}
@@ -214,7 +214,7 @@ const mr=monthGear.getBoundingClientRect(),sr=storyGear.getBoundingClientRect(),
 if(valid){const m=items.find(v=>v.id===current.id),group=dragMonthItems(),target=dateFromMonthIndex(mo),start=midnight(target.getFullYear(),target.getMonth(),1),end=midnight(target.getFullYear(),target.getMonth()+1,1),i=clamp(current.insertIndex,0,group.length);
 const before=group[i-1],after=group[i],a=before?before.virtualMs:start,b=after?after.virtualMs:end;
 if(m&&b>a){const original={id:m.id,precision:m.precision,year:m.year,month:m.month,season:m.season,manualMs:m.manualMs,edited:m.edited};
-undoState=original;m.year=target.getFullYear();m.month=target.getMonth();m.season=null;m.precision='month';m.manualMs=a+(b-a)/2;m.edited=true;
+undoState=original;const placed=a+(b-a)/2;const allowed=interval(m);const keepPrecision=!current.enteredMonth&&m.precision!=='exact'&&placed>=allowed[0]&&placed<allowed[1];if(!keepPrecision){m.year=target.getFullYear();m.month=target.getMonth();m.season=null;m.precision='month'}m.manualMs=placed;m.edited=true;
 layoutMemories();saveOverrides();focusMs=m.virtualMs;showUndo()}}
 cancelDrag();focusAt(focusMs,'story',true)}
 function cancelDrag(){if(!drag)return;cancelAnimationFrame(drag.raf);drag=null;$('dragGhost').style.display='none';$('dragHint').style.display='none';$('dropGuide').style.display='none';schedule()}

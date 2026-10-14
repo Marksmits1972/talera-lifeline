@@ -45,3 +45,7 @@ Routes: / voor nieuwe hoofdpagina, /api/demo-memories voor de 50 demo-items, /pr
 
 ## Beperkingen / acceptatietest
 Nog geen echte Cloudflare-live-link, Safari/iPhone-handtest of duurzame serveropslag bevestigd. Demo-versleepwijzigingen zitten alleen in localStorage op de testtelefoon. Er is een eigen test-D1/R2 nodig voor echte opslag. Test op iPhone vooral het snel/langzaam scrollen, positie zonder vastklikken, wisselen bij lege jaren, meerdere tags, grof gedateerde verhalen, slepen/Undo, behoud na herladen, alle 50 previews, RH19-presentatie en de terugknop.
+
+## Deployment activation
+
+De afzonderlijke GitHub Actions deploy wordt na het instellen van de beveiligde repository secrets en de expliciete variable geactiveerd via een wijziging op deze werkbranch. De beschermde R19H2-basis blijft onaangeroerd.

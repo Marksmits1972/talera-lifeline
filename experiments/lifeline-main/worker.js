@@ -1,10 +1,14 @@
 // TALERA: new life-line home screen paired with ORIGINAL r19h2.
 // This worker is deliberately isolated and read-only. Never publish under the r19 reference Worker name.
 import r19Worker from "../../src/reference-r19h2-carousel-combined-worker.js";
-import HOME_HTML from "./visual-v4.html";
+import HOME_HTML from "./visual-v5-fullscreen.html";
 import { DEMO_MEMORIES } from "./demo-memories.js";
+import { PWA_ICONS } from "./pwa-icons.js";
 
-const VERSION="talera-lifeline-v4-scrolling-filtered-demo-20261014";
+const VERSION="talera-lifeline-v5-fullscreen-pwa-20261014";
+const PWA_MANIFEST=JSON.stringify({name:"TALERA — Mijn levenslijn",short_name:"TALERA",description:"Door je leven reizen en herinneringen beleven",id:"/",start_url:"/",scope:"/",display:"standalone",background_color:"#ffffff",theme_color:"#ffffff",icons:[{src:"/pwa-192.png",sizes:"192x192",type:"image/png",purpose:"any maskable"},{src:"/pwa-512.png",sizes:"512x512",type:"image/png",purpose:"any maskable"}]});
+const PWA_SW=String.raw`self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));self.addEventListener("fetch",event=>{if(event.request.mode!=="navigate")return;event.respondWith(fetch(event.request).catch(()=>new Response("<!doctype html><html lang=nl><meta name=viewport content=width=device-width,initial-scale=1><title>TALERA offline</title><body style=font-family:system-ui;padding:2rem><h1>TALERA</h1><p>Je bent offline. Probeer opnieuw wanneer je verbinding hebt.</p></body></html>",{status:503,headers:{"content-type":"text/html; charset=utf-8"}})))});`;
+
 // Screenshot-faithful illustration; only this isolated demo uses the image.
 // The approved RH19 presentation implementation is never edited.
 const VISUAL_PREVIEW_PHOTO=(String(HOME_HTML).match(/<img class="preview-image" src="(data:image\/jpeg;base64,[^"]+)"/)||[])[1]||"";
@@ -134,6 +138,13 @@ export default {
     // No writes to reference D1/R2, no matter which client route is called.
     if(method!=="GET"&&method!=="HEAD")
       return reply("Dit is een alleen-lezen proefversie. Opslaan en publiceren zijn nog niet gekoppeld.",method,"text/plain; charset=utf-8",403);
+    if(path==="/manifest.webmanifest")return reply(PWA_MANIFEST,method,"application/manifest+json; charset=utf-8");
+    if(path==="/sw.js")return reply(PWA_SW,method,"text/javascript; charset=utf-8");
+    const icon=path.match(/^\/(?:pwa-(192|512)|apple-touch-icon)\.png$/);
+    if(icon){
+      const size=icon[1]||"180",bin=atob(PWA_ICONS[size]);
+      return reply(Uint8Array.from(bin,c=>c.charCodeAt(0)),method,"image/png");
+    }
     if(path==="/"||path==="/index.html")return reply(String(HOME_HTML),method,"text/html; charset=utf-8");
     if(path==="/api/demo-memories"){
       return reply(JSON.stringify(DEMO_MEMORIES),method,"application/json; charset=utf-8");

@@ -76,7 +76,14 @@ jobs:
         run: |
           TEST_URL="${TEST_URL:-https://talera-r19-lifeline-main-dev.mark-a39.workers.dev}"
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/" -o /tmp/talera-lifeline-home.html
-          grep -q 'TALERA — Levenslijn' /tmp/talera-lifeline-home.html
+          grep -q 'TALERA — Mijn levenslijn' /tmp/talera-lifeline-home.html
+          grep -q 'rel="manifest"' /tmp/talera-lifeline-home.html
+          curl --fail --silent --show-error "$TEST_URL/manifest.webmanifest" -o /tmp/talera-lifeline-manifest.json
+          grep -q '"display":"standalone"' /tmp/talera-lifeline-manifest.json
+          curl --fail --silent --show-error "$TEST_URL/pwa-192.png" -o /tmp/talera-lifeline-icon.png
+          test "$(file --mime-type -b /tmp/talera-lifeline-icon.png)" = "image/png"
+          curl --fail --silent --show-error "$TEST_URL/sw.js" -o /tmp/talera-lifeline-sw.js
+          grep -q 'addEventListener' /tmp/talera-lifeline-sw.js
           grep -q "installGesture(ageLane,'year')" /tmp/talera-lifeline-home.html
           grep -q "installGesture(monthLane,'month')" /tmp/talera-lifeline-home.html
           grep -q "installGesture(storyLane,'story')" /tmp/talera-lifeline-home.html

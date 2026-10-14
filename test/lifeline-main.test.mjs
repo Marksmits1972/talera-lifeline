@@ -121,3 +121,19 @@ test('The approved lifeline now has synchronized year, month, story and tag inte
  assert.ok(script);
  assert.doesNotThrow(()=>new vm.Script(script[1],{filename:'visual-v4.js'}));
 });
+
+const visualV5=read('../experiments/lifeline-main/visual-v5-fullscreen.html');
+test('Fullscreen TALERA PWA fills the real viewport and preserves the interactive life design',()=>{
+ assert.match(visualV5,/\.viewport\{position:relative;width:100%;max-width:none;height:100vh;height:100svh;height:100dvh;min-height:0/);
+ assert.doesNotMatch(visualV5,/width:min\(100%,430px\)/);
+ assert.doesNotMatch(visualV5,/height:min\(850px,calc\(100vh - 40px\)\)/);
+ for(const item of ['class="ages"','class="detail"','class="preview"',"installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')","state.filter.add(tag)"])assert.ok(visualV5.includes(item),item);
+ for(const key of ['rel="manifest"','apple-mobile-web-app-capable','safe-area-inset-top','safe-area-inset-bottom','navigator.serviceWorker.register'])assert.ok(visualV5.includes(key),key);
+ const matches=[...visualV5.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+ assert.ok(matches.length>=2);
+ for(const m of matches)assert.doesNotThrow(()=>new vm.Script(m[1]));
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v5-fullscreen\.html"/);
+ assert.match(worker,/path==="\/manifest\.webmanifest"/);
+ assert.match(worker,/path==="\/sw\.js"/);
+ assert.match(worker,/apple-touch-icon/);
+});

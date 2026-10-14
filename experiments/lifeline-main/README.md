@@ -49,3 +49,12 @@ Nog geen echte Cloudflare-live-link, Safari/iPhone-handtest of duurzame serverop
 ## Deployment activation
 
 De afzonderlijke GitHub Actions deploy wordt na het instellen van de beveiligde repository secrets en de expliciete variable geactiveerd via een wijziging op deze werkbranch. De beschermde R19H2-basis blijft onaangeroerd.
+
+## v5 — Volledig scherm / PWA-basis (14 oktober 2026)
+
+- De goedgekeurde interactieve levenslijn draait nu zonder ingekaderd telefoonvenster: volledige browserbreedte en volledige bruikbare viewporthoogte, zowel op telefoon als op pc.
+- Voor standalone gebruik op iPhone worden de iOS safe areas gerespecteerd; het scherm toont geen externe browserbalk wanneer het via Safari → Deel → Zet op beginscherm geopend wordt.
+- `/manifest.webmanifest` en PNG-icons (180/192/512) ondersteunen installeren op het beginscherm.
+- `/sw.js` is strikt *network-first* zonder cache van herinneringen of pagina's, zodat nieuwe testversies niet door een oud appcache blijven hangen. Offline wordt alleen een simpele foutmelding getoond.
+- Levenslijn, Presentatie en Vertellen houden hun eigen routes (`/`, `/present`, `/tell`); het bestaande RH19 en de vertelcode zijn niet gewijzigd.
+- De oorspronkelijke v4 blijft veilig bestaan in `visual-v4.html`; nieuwe actuele startpagina is `visual-v5-fullscreen.html`.

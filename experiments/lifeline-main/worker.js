@@ -17,7 +17,7 @@ function targetRequest(request,path){
   return new Request(url.toString(),request);
 }
 // Separate page: the unmodified RH19 presentation remains its own route.
-const bridge=String.raw\`<style id="talera-independent-presentation-navigation">
+const bridge=String.raw`<style id="talera-independent-presentation-navigation">
 body nav[aria-label="TALERA navigatie"]{visibility:hidden!important}
 #taleraPageNav{position:fixed;z-index:2147483640;bottom:0;left:0;right:0;max-width:880px;margin:auto;
  display:flex;align-items:center;justify-content:space-around;gap:7px;min-height:calc(60px + env(safe-area-inset-bottom,0px));
@@ -49,8 +49,8 @@ body nav[aria-label="TALERA navigatie"]{visibility:hidden!important}
  }
  selectOriginal();
 })();
-</script>\`;
-const tellBridge=String.raw\`<style id="talera-independent-tell-navigation">
+</script>`;
+const tellBridge=String.raw`<style id="talera-independent-tell-navigation">
 #taleraTellNav{position:fixed;z-index:2147483640;top:calc(7px + env(safe-area-inset-top,0px));left:10px;right:10px;
  display:flex;justify-content:space-around;gap:6px;align-items:center;max-width:520px;margin:auto;
  padding:6px;background:#fffdfaf5;color:#0f2747;border:1px solid #d4dde5;border-radius:25px;
@@ -61,7 +61,7 @@ const tellBridge=String.raw\`<style id="talera-independent-tell-navigation">
 </style>
 <nav id="taleraTellNav" aria-label="Hoofdpagina's van TALERA">
 <a href="/">⌂ Levenslijn</a><a href="/present">▣ Presenteren</a><span aria-current="page">✎ Vertellen</span>
-</nav>\`;
+</nav>`;
 function addBridge(html){
   // Inject only on the isolated /present route. The original RH19 files remain unchanged.
   if(!html.includes("</body>"))return html;

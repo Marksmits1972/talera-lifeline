@@ -1,0 +1,24 @@
+name: TALERA LifeLine isolated checks
+on:
+  push:
+    branches:
+      - work/r19h2-lifeline-main-20261014
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check LifeLine original memory parity, contracts and embedded syntax
+        run: node --test test/lifeline-main.test.mjs
+      - name: Check Worker syntax
+        run: node --check experiments/lifeline-main/worker.js
+      - name: Bundle isolated Worker without publishing
+        run: npx wrangler deploy --dry-run --config experiments/lifeline-main/wrangler.jsonc --outdir /tmp/talera-lifeline-build

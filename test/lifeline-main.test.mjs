@@ -95,3 +95,18 @@ test('Three independently routed pages and direct photo-to-presentation navigati
   assert.match(worker,/id="taleraTellNav"/);
   assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
 });
+
+const visualV3=read('../experiments/lifeline-main/visual-v3.html');
+test('Approved visual layout retained and connected to all three TALERA pages',()=>{
+  assert.match(visualV3,/class="ages"/);
+  assert.match(visualV3,/class="detail"/);
+  assert.match(visualV3,/class="preview"/);
+  assert.match(visualV3,/class="preview-image-wrap" href="\/present\?visual=weekend-amsterdam"/);
+  assert.match(visualV3,/<a href="\/tell" class="nav-item">/);
+  assert.match(visualV3,/<a href="\/" class="nav-item selected" aria-current="page">/);
+  assert.match(visualV3,/<a href="\/present\?visual=weekend-amsterdam" class="nav-item">/);
+  assert.match(worker,/import HOME_HTML from "\.\/visual-v3\.html"/);
+  assert.match(worker,/id="talera-visual-demo-handoff"/);
+  assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
+  assert.match(worker,/return reply\(addBridge\(await r\.text\(\),request\)/);
+});

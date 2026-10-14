@@ -1,10 +1,13 @@
 // TALERA: new life-line home screen paired with ORIGINAL r19h2.
 // This worker is deliberately isolated and read-only. Never publish under the r19 reference Worker name.
 import r19Worker from "../../src/reference-r19h2-carousel-combined-worker.js";
-import HOME_HTML from "./index.html";
+import HOME_HTML from "./visual-v3.html";
 import { DEMO_MEMORIES } from "./demo-memories.js";
 
-const VERSION="talera-lifeline-main-r19h2-dev-20261014";
+const VERSION="talera-lifeline-visual-v3-connected-20261014";
+// Screenshot-faithful illustration; only this isolated demo uses the image.
+// The approved RH19 presentation implementation is never edited.
+const VISUAL_PREVIEW_PHOTO=(String(HOME_HTML).match(/<img class="preview-image" src="(data:image\/jpeg;base64,[^"]+)"/)||[])[1]||"";
 function reply(body,method,contentType,status=200){
   return new Response(method==="HEAD"?null:body,{status,headers:{
     "content-type":contentType,"cache-control":"no-store","x-talera-build":VERSION,
@@ -62,10 +65,43 @@ const tellBridge=String.raw`<style id="talera-independent-tell-navigation">
 <nav id="taleraTellNav" aria-label="Hoofdpagina's van TALERA">
 <a href="/">⌂ Levenslijn</a><a href="/present">▣ Presenteren</a><span aria-current="page">✎ Vertellen</span>
 </nav>`;
-function addBridge(html){
-  // Inject only on the isolated /present route. The original RH19 files remain unchanged.
+function addBridge(html, request){
+  // Only the dedicated test worker is decorated; the original RH19 files are untouched.
   if(!html.includes("</body>"))return html;
-  return html.replace("</body>",bridge+"</body>");
+  let enhanced=html.replace("</body>",bridge+"</body>");
+  const visual=new URL(request.url).searchParams.get("visual");
+  if(visual==="weekend-amsterdam" && VISUAL_PREVIEW_PHOTO){
+    // The screenshot's Amsterdam story is only an illustration, not one of RH19's 50 memories.
+    // Register a temporary in-browser preview so that tapping the photo shows that SAME
+    // story and photo on the established RH19 presentation screen, without saving data.
+    const handoff=String.raw`<script id="talera-visual-demo-handoff">
+(function(){
+ const image=__TALERA_VISUAL_IMAGE__;
+ const memory={
+   id:51001, at:"2024-05-12T12:00:00",
+   ms:new Date("2024-05-12T12:00:00").getTime(),
+   story:"Weekend in Amsterdam",
+   fullStory:"Een spontaan weekendje weg met Lisa. Door de Jordaan, goed eten, veel gelachen en de mooiste zonsondergang aan de grachten.",
+   image:image, photos:[image], _photoIndex:0
+ };
+ let attempts=0;
+ function showVisualMemory(){
+   const runtime=window.__taleraTimelineRuntime;
+   if(!runtime){
+     if(++attempts<60)setTimeout(showVisualMemory,70);
+     return;
+   }
+   runtime.registerMemory(memory);
+   runtime.setCenter(memory.ms);
+   runtime.writeMemory(memory);
+   runtime.draw();
+ }
+ showVisualMemory();
+})();
+</script>`.replace("__TALERA_VISUAL_IMAGE__",JSON.stringify(VISUAL_PREVIEW_PHOTO));
+    enhanced=enhanced.replace("</body>",handoff+"</body>");
+  }
+  return enhanced;
 }
 export default {
   async fetch(request,env,ctx){
@@ -80,7 +116,7 @@ export default {
     if(path==="/present"||path==="/present/"){
       const r=await r19Worker.fetch(targetRequest(request,"/"),env,ctx);
       if(method==="HEAD"||!r.ok||!(r.headers.get("content-type")||"").includes("text/html"))return r;
-      return reply(addBridge(await r.text()),method,"text/html; charset=utf-8",r.status);
+      return reply(addBridge(await r.text(),request),method,"text/html; charset=utf-8",r.status);
     }
     if(path==="/tell"||path==="/tell/"||path==="/storylab-clean"||path==="/storylab-clean/"){
       const r=await r19Worker.fetch(targetRequest(request,path),env,ctx);

@@ -1,0 +1,87 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { DEMO_MEMORIES } from '../experiments/lifeline-main/demo-memories.js';
+
+const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
+const html=read('../experiments/lifeline-main/index.html');
+const worker=read('../experiments/lifeline-main/worker.js');
+const config=JSON.parse(read('../experiments/lifeline-main/wrangler.jsonc'));
+
+function originalRh19Memories(){
+  const out=[];
+  for(let i=3;i<=6;i++){
+    const raw=read('../src/html/chunk'+i+'.js');
+    const part=raw.slice(raw.indexOf('[')+1,raw.lastIndexOf(']')).replace(/,\s*$/,'');
+    const lines=JSON.parse('['+part+']');
+    for(const line of lines){
+      const m=line.trim().match(/^\{id:\s*(\d+),\s*at:("(?:\\.|[^"\\])*"),\s*story:("(?:\\.|[^"\\])*"),\s*fullStory:("(?:\\.|[^"\\])*"),\s*image:("(?:\\.|[^"\\])*")\},?$/);
+      if(m)out.push({id:Number(m[1]),at:JSON.parse(m[2]),story:JSON.parse(m[3]),fullStory:JSON.parse(m[4]),image:JSON.parse(m[5])});
+    }
+  }
+  return out.sort((a,b)=>a.id-b.id);
+}
+
+test('TALERA: original approved RH19 memories retained with exact dates photos and texts',()=>{
+  const original=originalRh19Memories();
+  assert.equal(original.length,50);
+  assert.equal(DEMO_MEMORIES.length,50);
+  for(let i=0;i<50;i++){
+    const clone=DEMO_MEMORIES[i];
+    for(const key of ['id','at','story','fullStory','image'])assert.equal(clone[key],original[i][key],key+' ID '+(i+1));
+    assert.equal(clone.precision,'exact');
+    assert.ok(Array.isArray(clone.tags));
+  }
+});
+
+test('TALERA: embedded main page JavaScript is syntactically valid',()=>{
+  const match=html.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(match,'main app JS must be embedded');
+  assert.doesNotThrow(()=>new vm.Script(match[1],{filename:'lifeline-main.js'}));
+});
+
+test('TALERA: years months seven stories marker and synchronization exist',()=>{
+  for(const id of ['yearGear','monthGear','storyGear','centerReadout','needle','previewImage','openStory','filterOptions','undoButton']){
+    assert.ok(html.includes('id="'+id+'"'),id);
+  }
+  assert.match(html,/centerI-3/);
+  assert.match(html,/centerI\+3/);
+  assert.match(html,/fromYearFloat\(yearFloat/);
+  assert.match(html,/fromMonthFloat\(monthFloat/);
+  assert.match(html,/msAtIndex\(/);
+  assert.match(html,/focusAt\(m\.virtualMs/);
+});
+
+test('TALERA: date precision and matching tags are not invented by navigation',()=>{
+  assert.match(html,/p==='year'/);
+  assert.match(html,/p==='season'/);
+  assert.match(html,/p==='month'/);
+  assert.match(html,/if\(s==='winter'\)return \[midnight\(y-1,11,1\),midnight\(y,2,1\)\]/);
+  assert.match(html,/group\.length\+1/);
+  assert.match(html,/m\.tags\.some\(t=>filters\.has\(t\)\)/);
+  assert.doesNotMatch(html,/filters\.every/);
+});
+
+test('TALERA: drag editing has month selection ordering undo and local persistence',()=>{
+  assert.match(html,/setPointerCapture/);
+  assert.match(html,/startDrag\(g\.storyId/);
+  assert.match(html,/pointerMonth\(y,drag\.monthReference\)/);
+  assert.match(html,/current\.enteredMonth/);
+  assert.match(html,/m\.precision='month'/);
+  assert.match(html,/m\.manualMs=placed/);
+  assert.match(html,/showUndo\(\)/);
+  assert.match(html,/localStorage\.setItem\(STORAGE/);
+  assert.match(html,/drag\.raf=requestAnimationFrame\(autoScrollDrag\)/);
+});
+
+test('TALERA: new Worker uses RH19 untouched and disallows writes',()=>{
+  assert.equal(config.name,'talera-r19-lifeline-main-dev');
+  assert.equal(config.main,'worker.js');
+  assert.ok(!('d1_databases' in config));
+  assert.ok(!('r2_buckets' in config));
+  assert.match(worker,/import r19Worker from "\.\.\/\.\.\/src\/reference-r19h2-carousel-combined-worker\.js"/);
+  assert.match(worker,/if\(path==="\/present"/);
+  assert.match(worker,/if\(path==="\/tell"/);
+  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
+});

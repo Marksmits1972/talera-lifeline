@@ -77,6 +77,9 @@ jobs:
           TEST_URL="${TEST_URL:-https://talera-r19-lifeline-main-dev.mark-a39.workers.dev}"
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/" -o /tmp/talera-lifeline-home.html
           grep -q 'TALERA — Levenslijn' /tmp/talera-lifeline-home.html
+          grep -q "installGesture(ageLane,'year')" /tmp/talera-lifeline-home.html
+          grep -q "installGesture(monthLane,'month')" /tmp/talera-lifeline-home.html
+          grep -q "installGesture(storyLane,'story')" /tmp/talera-lifeline-home.html
           grep -q 'href="/tell"' /tmp/talera-lifeline-home.html
           grep -q 'href="/present?visual=weekend-amsterdam"' /tmp/talera-lifeline-home.html
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/api/demo-memories" -o /tmp/talera-lifeline-memories.json
@@ -84,6 +87,8 @@ jobs:
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/present?visual=weekend-amsterdam" -o /tmp/talera-lifeline-present.html
           grep -q 'taleraPageNav' /tmp/talera-lifeline-present.html
           grep -q 'talera-visual-demo-handoff' /tmp/talera-lifeline-present.html
+          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/present?visual=lifeline" -o /tmp/talera-lifeline-dynamic-presentation.html
+          grep -q 'talera-lifeline-session-handoff' /tmp/talera-lifeline-dynamic-presentation.html
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/tell" -o /tmp/talera-lifeline-tell.html
           grep -q 'taleraTellNav' /tmp/talera-lifeline-tell.html
           echo "All three independent routes and demo API respond."

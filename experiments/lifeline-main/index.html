@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F7F4EF">
+<title>TALERA — Mijn levenslijn</title>
+<style>
+:root{--ink:#0F2747;--blue:#5B8FB9;--light:#DCEAF6;--paper:#F7F4EF;--warm:#E7A98B;--hair:rgba(15,39,71,.12)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font-family:"Avenir Next",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+#app{height:100dvh;display:flex;flex-direction:column;max-width:880px;margin:auto;overflow:hidden;background:var(--paper);box-shadow:0 0 28px #11263a0b}
+header{height:60px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:10px 18px 7px;border-bottom:1px solid var(--hair)}
+.brand{font-size:15px;font-weight:820;letter-spacing:.29em}.kicker{font-size:10px;color:#687988;margin-top:3px;letter-spacing:.08em;text-transform:uppercase}
+.header-actions{display:flex;gap:7px;align-items:center}
+.icon-button{background:#fffefa;border:1px solid var(--hair);color:var(--ink);border-radius:24px;min-height:36px;padding:0 11px;font-size:12px;font-weight:650}
+.icon-button[aria-pressed=true]{background:var(--light)}
+#filterCount{font-size:11px;color:#426b91}
+.topline{min-height:46px;flex:0 0 auto;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:9px}
+.topline .headline{font-weight:760;font-size:18px;letter-spacing:-.025em}.topline .sub{font-size:11px;color:#637486;text-align:right}
+#gearStage{flex:1 1 auto;min-height:235px;position:relative;display:grid;grid-template-columns:23% 27% 50%;overflow:hidden;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);background:linear-gradient(125deg,#fffefd 0%,#eef5fa 100%)}
+.gear{position:relative;min-width:0;overflow:hidden;touch-action:none;user-select:none;cursor:grab}
+.gear:active{cursor:grabbing}.gear+.gear{border-left:1px solid rgba(15,39,71,.10)}
+.gear-label{position:absolute;top:7px;left:9px;z-index:6;padding:4px 7px;border-radius:7px;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#537088;background:#ffffffdc;pointer-events:none}
+#years,#months,#stories{position:absolute;inset:0;overflow:hidden}
+.year-row,.month-row,.story-row{position:absolute;left:0;right:0;will-change:transform;pointer-events:none}
+.year-row,.month-row{display:flex;align-items:center;justify-content:center;gap:6px;font-variant-numeric:tabular-nums}
+.year-row{height:43px;font-size:17px;font-weight:660}.month-row{height:39px;font-size:12px;font-weight:600}
+.year-row .event-dot,.month-row .event-dot{width:5px;height:5px;flex:0 0 5px;background:var(--warm);border-radius:50%}
+.year-row.quiet,.month-row.quiet{opacity:.36}.year-row.active,.month-row.active{color:#0F2747;font-weight:830}
+.month-row.selected{background:#e0edf9;border-radius:9px}
+#needle{position:absolute;left:0;right:0;top:50%;height:2px;background:linear-gradient(90deg,#e7a98b 0%,#e7a98b 51%,#b67a61 100%);z-index:7;pointer-events:none;box-shadow:0 0 0 2px #f7f4ef5f}
+#needle:after{content:"";position:absolute;left:50%;top:-5px;width:12px;height:12px;background:var(--warm);border-radius:50%;border:2px solid white;transform:translateX(-50%);box-shadow:0 2px 8px #0f27473a}
+#centerReadout{position:absolute;left:50%;top:calc(50% - 29px);transform:translateX(-50%);z-index:9;background:#fffefa;border:1px solid #dbb6a3;border-radius:12px;padding:3px 7px;font-size:10px;font-weight:750;white-space:nowrap;pointer-events:none;box-shadow:0 2px 9px #0f274710}
+.story-row{height:66px;padding:3px 5px 3px 7px;pointer-events:auto}
+.story-card{display:flex;gap:7px;align-items:center;width:100%;height:60px;border:1px solid var(--hair);border-radius:10px;background:#fffefaef;box-shadow:0 1px 5px #0f274710;text-align:left;padding:4px;color:var(--ink);touch-action:none;user-select:none;overflow:hidden}
+.story-card img{flex:0 0 52px;width:52px;height:50px;border-radius:7px;object-fit:cover}
+.story-card .words{min-width:0}.story-card strong{display:block;font-size:10.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.story-card small{display:block;font-size:9px;line-height:1.25;color:#62788a;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.story-row.nearest .story-card{border-color:#ce9478;background:#fff7f0;box-shadow:0 1px 7px #e7a98b42}
+.story-row.dragged .story-card{opacity:.28}
+#emptyInStage{position:absolute;right:0;top:50%;width:50%;transform:translateY(-50%);padding:14px;text-align:center;font-size:12px;color:#678;pointer-events:none}
+#dropGuide{position:absolute;right:0;width:50%;height:3px;z-index:11;background:var(--warm);box-shadow:0 0 0 2px white;pointer-events:none;display:none}
+#preview{height:clamp(200px,31dvh,315px);flex:0 0 auto;min-height:185px;display:flex;flex-direction:column;position:relative;background:#e6e8e8;overflow:hidden}
+#previewImage,#previewBlur{position:absolute;inset:0;width:100%;height:100%}#previewBlur{object-fit:cover;filter:blur(22px) brightness(.8);transform:scale(1.16)}#previewImage{object-fit:contain}
+#preview:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 27%,rgba(9,25,39,.14) 45%,rgba(9,25,39,.80) 100%);pointer-events:none}
+#previewInfo{position:absolute;z-index:2;bottom:14px;left:17px;right:15px;color:white;text-shadow:0 1px 5px #0e253e8a}
+#previewDate{font-size:12px;font-weight:750;letter-spacing:.02em}#previewTitle{font-size:16px;font-weight:750;line-height:1.32;margin-top:4px;max-width:47ch}
+#previewActions{display:flex;gap:8px;align-items:center;margin-top:9px}
+#openStory{border:1px solid #ffffff9c;border-radius:20px;background:#fffefa;color:var(--ink);padding:7px 12px;font-weight:750;font-size:12px}
+#storyCounter{font-size:11px;color:#fffd}
+#previewEmpty{position:absolute;inset:0;display:grid;place-items:center;padding:22px;text-align:center;color:#6b7986;background:var(--paper);font-size:13px;z-index:3}
+#previewEmpty[hidden],#emptyInStage[hidden]{display:none}
+.bottom-nav{flex:0 0 61px;min-height:61px;display:flex;align-items:center;justify-content:space-around;gap:10px;border-top:1px solid var(--hair);background:#fffdfa}
+.bottom-nav a{min-width:80px;text-align:center;text-decoration:none;color:var(--ink);font-size:11px;font-weight:650;padding:8px;border-radius:16px}
+.bottom-nav a.current{background:var(--light);font-weight:800}.bottom-nav a.tell{background:var(--ink);color:white;border-radius:28px}
+#filters{position:absolute;z-index:30;left:10px;right:10px;top:61px;max-width:840px;margin:auto;border:1px solid var(--hair);border-radius:17px;background:#fffefa;box-shadow:0 14px 42px #0f27473a;padding:15px}
+#filters[hidden]{display:none}.filters-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:750;font-size:14px}
+#filterOptions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.tag{border:1px solid #c9d8e3;border-radius:20px;padding:8px 12px;background:white;color:var(--ink);font-size:12px}
+.tag[aria-pressed=true]{background:#dceaf6;border-color:#5b8fb9;font-weight:750}
+.filter-foot{display:flex;justify-content:space-between;align-items:center;color:#6d7d8a;font-size:11px}
+#dragGhost{position:fixed;z-index:99;pointer-events:none;width:124px;padding:5px;background:#fffefa;border:2px solid var(--warm);border-radius:12px;box-shadow:0 11px 35px #0f274755;display:none}
+#dragGhost img{width:100%;height:88px;object-fit:cover;border-radius:7px}
+#dragGhost span{font-size:10px;display:block;color:var(--ink);padding:4px}
+#dragHint{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:100;background:var(--ink);color:white;border-radius:20px;padding:9px 15px;font-size:12px;max-width:94vw;text-align:center;display:none;box-shadow:0 3px 15px #0f274744}
+#undoToast{position:fixed;bottom:75px;left:50%;transform:translateX(-50%);background:#142f49;color:white;border-radius:13px;padding:10px 13px;z-index:35;display:none;gap:14px;align-items:center;font-size:12px;white-space:nowrap;box-shadow:0 4px 18px #0f27473a}
+#undoButton{color:#f2b79a;border:0;background:transparent;font-weight:800}
+#status{position:absolute;left:-9999px}
+@media(max-width:400px){header{height:57px}.brand{font-size:14px}.topline{min-height:42px}.topline .headline{font-size:16px}.gear-label{font-size:9px;padding:4px}.year-row{font-size:15px}.month-row{font-size:11px}.story-card img{flex-basis:44px;width:44px}.story-card strong{font-size:10px}.story-card small{font-size:8.5px}#preview{height:28dvh}}
+@media(max-height:680px){#preview{height:27dvh;min-height:150px}header{height:50px}.topline{min-height:36px}.bottom-nav{flex-basis:54px;min-height:54px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><div><div class="brand">TALERA</div><div class="kicker">Mijn leven, mijn verhalen</div></div><div class="header-actions"><span id="filterCount"></span><button class="icon-button" id="filterToggle" aria-expanded="false">☷ Filteren</button></div></header>
+<div class="topline"><div class="headline">Mijn levenslijn</div><div class="sub">Beweeg door de jaren en ontdek je herinneringen</div></div>
+<div id="gearStage" aria-label="Drie gekoppelde tijdlijnen">
+ <div class="gear" id="yearGear" aria-label="Scroll door de jaren" tabindex="0"><div class="gear-label">Jaren</div><div id="years"></div></div>
+ <div class="gear" id="monthGear" aria-label="Scroll door de maanden" tabindex="0"><div class="gear-label">Maanden</div><div id="months"></div></div>
+ <div class="gear" id="storyGear" aria-label="Scroll door de verhalen; houd foto vast om te verplaatsen" tabindex="0"><div class="gear-label">Verhalen</div><div id="stories"></div></div>
+ <div id="needle"></div><div id="centerReadout"></div><div id="dropGuide"></div><div id="emptyInStage" hidden>Geen herinneringen voor dit filter. De tijdlijn blijft gewoon doorlopen.</div>
+</div>
+<section id="preview" aria-label="Dichtstbijzijnde herinnering"><img id="previewBlur" alt=""><img id="previewImage" alt="Foto bij de geselecteerde herinnering"><div id="previewInfo"><div id="previewDate"></div><div id="previewTitle"></div><div id="previewActions"><button id="openStory">Bekijk het verhaal →</button><span id="storyCounter"></span></div></div><div id="previewEmpty" hidden>Geen herinneringen gevonden. Je kunt verder door de jaren bladeren of de filters aanpassen.</div></section>
+<nav class="bottom-nav" aria-label="Hoofdnavigatie"><a href="/tell" class="tell">✎ Vertellen</a><a href="/" class="current" aria-current="page">⌂ Levenslijn</a><a href="/present" id="presentationLink">▣ Presenteren</a></nav>
+</div>
+<section id="filters" hidden aria-label="Filter op kenmerken"><div class="filters-heading"><span>Welke herinneringen wil je zien?</span><button class="icon-button" id="closeFilters" aria-label="Sluit filters">Sluiten</button></div><div id="filterOptions"></div><div class="filter-foot"><span>Meerdere kenmerken: alle overeenkomsten worden getoond.</span><button class="icon-button" id="clearFilters">Wis filters</button></div></section>
+<div id="dragGhost" aria-hidden="true"><img alt=""><span></span></div>
+<div id="dragHint" aria-live="polite"></div><div id="undoToast" role="status">Herinnering verplaatst <button id="undoButton">Ongedaan maken</button></div><div id="status" aria-live="polite"></div>
+<script>
+(function(){
+'use strict';
+const DAY=86400000, YEAR_PX=86, MONTH_PX=70, STORY_PX=67;
+const monthNames=['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+const seasonNames={spring:'voorjaar',summer:'zomer',autumn:'herfst',winter:'winter'};
+const $=id=>document.getElementById(id);
+const YEARS=$('years'), MONTHS=$('months'), STORIES=$('stories');
+const stage=$('gearStage'), yearGear=$('yearGear'), monthGear=$('monthGear'), storyGear=$('storyGear');
+let items=[],visible=[],focusMs=Date.now(),lifeStart=0,lifeEnd=Date.now(),filters=new Set();
+let movingLane='',frame=0,previewTimer=0,shownPreviewId=null,gesture=null,drag=null,undoState=null,undoTimer=0;
+const STORAGE='talera-lifeline-main-demo-v1';
+function clamp(n,min,max){return Math.max(min,Math.min(max,n))}
+function midnight(y,m,d){return new Date(y,m,d||1).getTime()}
+function mIndex(d){return d.getFullYear()*12+d.getMonth()}
+function yFromMonth(n){return Math.floor(n/12)}
+function dateFromMonthIndex(n){return new Date(yFromMonth(n),((n%12)+12)%12,1)}
+function monthFloat(ms){const d=new Date(ms),start=midnight(d.getFullYear(),d.getMonth(),1),end=midnight(d.getFullYear(),d.getMonth()+1,1);return mIndex(d)+(ms-start)/(end-start)}
+function yearFloat(ms){const d=new Date(ms),start=midnight(d.getFullYear(),0,1),end=midnight(d.getFullYear()+1,0,1);return d.getFullYear()+(ms-start)/(end-start)}
+function fromMonthFloat(f){const i=Math.floor(f),d=dateFromMonthIndex(i),a=d.getTime(),b=midnight(d.getFullYear(),d.getMonth()+1,1);return a+(f-i)*(b-a)}
+function fromYearFloat(f){const y=Math.floor(f),a=midnight(y,0,1),b=midnight(y+1,0,1);return a+(f-y)*(b-a)}
+function localDate(ms){return new Date(ms).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'})}
+function label(m){const p=m.precision||'exact';if(p==='year')return String(m.year);if(p==='season')return (seasonNames[m.season]||m.season)+' '+m.year;if(p==='month')return monthNames[m.month]+' '+m.year;return localDate(m.virtualMs)}
+function interval(m){const p=m.precision||'exact',y=Number(m.year);if(p==='year')return [midnight(y,0,1),midnight(y+1,0,1)];
+if(p==='month')return [midnight(y,m.month,1),midnight(y,m.month+1,1)];
+if(p==='season'){const s=m.season; if(s==='winter')return [midnight(y-1,11,1),midnight(y,2,1)];if(s==='spring')return [midnight(y,2,1),midnight(y,5,1)];if(s==='summer')return [midnight(y,5,1),midnight(y,8,1)];return [midnight(y,8,1),midnight(y,11,1)]}
+const t=new Date(m.at).getTime();return [t,t+1]}
+function groupKey(m){return (m.precision||'exact')+'|'+m.year+'|'+(m.season||'')+'|'+(m.month??'')}
+function layoutMemories(){const grouped=new Map();items.forEach((m,i)=>{m._sourceIndex=i;if(m.precision==='exact'){m.virtualMs=new Date(m.at).getTime();return}if(Number.isFinite(m.manualMs)){m.virtualMs=m.manualMs;return}const k=groupKey(m);if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(m)});
+for(const group of grouped.values()){const [a,b]=interval(group[0]);group.sort((x,y)=>(x.order||x.id)-(y.order||y.id));group.forEach((m,i)=>{m.virtualMs=a+(b-a)*(i+1)/(group.length+1)})}
+items.sort((a,b)=>a.virtualMs-b.virtualMs||a.id-b.id);
+visible=items.filter(m=>!filters.size||m.tags.some(t=>filters.has(t)));visible.sort((a,b)=>a.virtualMs-b.virtualMs||a.id-b.id);
+}
+function saveOverrides(){try{localStorage.setItem(STORAGE,JSON.stringify(items.filter(m=>m.edited).map(m=>({id:m.id,precision:m.precision,year:m.year,month:m.month,season:m.season,manualMs:m.manualMs,edited:true}))))}catch(e){}}
+function restoreOverrides(){try{const entries=JSON.parse(localStorage.getItem(STORAGE)||'[]');if(!Array.isArray(entries))return;entries.forEach(x=>{const m=items.find(v=>v.id===x.id);if(!m||!x.edited)return;if(!['exact','year','month','season'].includes(x.precision))return;m.precision=x.precision;m.year=x.year;m.month=x.month;m.season=x.season;m.manualMs=Number.isFinite(x.manualMs)?x.manualMs:null;m.edited=true})}catch(e){}}
+function nearestIndex(ms,array){if(!array.length)return -1;let lo=0,hi=array.length;while(lo<hi){const mid=(lo+hi)>>1;if(array[mid].virtualMs<ms)lo=mid+1;else hi=mid}if(lo===0)return 0;if(lo>=array.length)return array.length-1;return ms-array[lo-1].virtualMs<=array[lo].virtualMs-ms?lo-1:lo}
+function fractionalIndex(ms,array){if(!array.length)return 0;if(array.length===1)return 0;let lo=0,hi=array.length;while(lo<hi){const mid=(lo+hi)>>1;if(array[mid].virtualMs<ms)lo=mid+1;else hi=mid}if(lo<=0)return 0;if(lo>=array.length)return array.length-1;const a=array[lo-1].virtualMs,b=array[lo].virtualMs;return lo-1+clamp((ms-a)/Math.max(1,b-a),0,1)}
+function msAtIndex(f,array){if(!array.length)return focusMs;f=clamp(f,0,array.length-1);const i=Math.floor(f),t=f-i;return array[i].virtualMs+(array[Math.min(i+1,array.length-1)].virtualMs-array[i].virtualMs)*t}
+function focusAt(ms,lane,final){focusMs=clamp(ms,lifeStart,lifeEnd);movingLane=lane||'';schedule();if(final)renderPreview(true);else{clearTimeout(previewTimer);previewTimer=setTimeout(()=>renderPreview(false),lane==='year'?200:lane==='month'?115:80)}}
+function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;render()})}
+function safe(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function drawYears(){const h=yearGear.clientHeight,c=h/2,where=yearFloat(focusMs);let out='';const low=Math.floor(where-h/YEAR_PX/2)-1,high=Math.ceil(where+h/YEAR_PX/2)+1;
+for(let y=low;y<=high;y++){if(midnight(y+1,0,1)<lifeStart||midnight(y,0,1)>lifeEnd)continue;const cy=c+(y+.5-where)*YEAR_PX;const exists=visible.some(m=>m.virtualMs>=midnight(y,0,1)&&m.virtualMs<midnight(y+1,0,1));
+out+='<div class="year-row '+(!exists?'quiet ':'')+(Math.round(where)===y?'active':'')+'" style="top:'+(cy-21)+'px"><span>'+y+'</span>'+(exists?'<i class="event-dot"></i>':'')+'</div>'}
+YEARS.innerHTML=out}
+function drawMonths(){const h=monthGear.clientHeight,c=h/2,where=monthFloat(focusMs);let out='';const low=Math.floor(where-h/MONTH_PX/2)-1,high=Math.ceil(where+h/MONTH_PX/2)+1;
+for(let i=low;i<=high;i++){const d=dateFromMonthIndex(i),y=d.getFullYear(),m=d.getMonth(),cy=c+(i+.5-where)*MONTH_PX;if(midnight(y,m+1,1)<lifeStart||midnight(y,m,1)>lifeEnd)continue;
+const exists=visible.some(x=>x.virtualMs>=midnight(y,m,1)&&x.virtualMs<midnight(y,m+1,1));const selected=drag&&drag.targetMonth===i;
+out+='<div class="month-row '+(!exists?'quiet ':'')+(selected?'selected ':'')+(Math.floor(where)===i?'active':'')+'" style="top:'+(cy-19)+'px"><span>'+monthNames[m].slice(0,3)+' '+y+'</span>'+(exists?'<i class="event-dot"></i>':'')+'</div>'}
+MONTHS.innerHTML=out}
+function storiesForRender(){if(!drag||drag.targetMonth===null)return {array:visible,index:fractionalIndex(focusMs,visible)};
+const d=dateFromMonthIndex(drag.targetMonth),a=midnight(d.getFullYear(),d.getMonth(),1),b=midnight(d.getFullYear(),d.getMonth()+1,1);
+const group=visible.filter(m=>m.id!==drag.id&&m.virtualMs>=a&&m.virtualMs<b);
+return {array:group,index:clamp(drag.anchor||0,0,Math.max(0,group.length-1))}}
+function drawStories(){const h=storyGear.clientHeight,c=h/2,rendered=storiesForRender(),arr=rendered.array,index=rendered.index;let out='';
+const first=Math.max(0,Math.floor(index)-5),last=Math.min(arr.length-1,Math.ceil(index)+5),n=nearestIndex(focusMs,visible);
+for(let i=first;i<=last;i++){const m=arr[i],top=c+(i-index)*STORY_PX-33;if(top< -75||top>h+15)continue;
+out+='<div class="story-row '+(visible[n]&&visible[n].id===m.id?'nearest ':'')+(drag&&drag.id===m.id?'dragged':'')+'" style="top:'+top+'px" data-memory-id="'+m.id+'"><button class="story-card" tabindex="-1" aria-label="'+safe(label(m)+': '+m.story)+'"><img draggable="false" src="'+safe(m.image)+'" alt=""><span class="words"><strong>'+safe(label(m))+'</strong><small>'+safe(m.story)+'</small></span></button></div>'}
+STORIES.innerHTML=out;
+$('emptyInStage').hidden=!!arr.length;
+if(drag&&drag.targetMonth!==null){const insert=clamp(drag.insertIndex??arr.length,0,arr.length);$('dropGuide').style.display='block';$('dropGuide').style.top=(c+(insert-index-.5)*STORY_PX)+'px'}else $('dropGuide').style.display='none';
+}
+function render(){drawYears();drawMonths();drawStories();const d=new Date(focusMs);$('centerReadout').textContent=monthNames[d.getMonth()].slice(0,3)+' '+d.getFullYear();
+if(drag)$('centerReadout').textContent=drag.targetMonth===null?'Verplaatsen…':monthNames[dateFromMonthIndex(drag.targetMonth).getMonth()]+' '+dateFromMonthIndex(drag.targetMonth).getFullYear();
+}
+function renderPreview(force){if(!visible.length){$('previewEmpty').hidden=false;$('previewInfo').hidden=true;$('previewImage').style.display='none';$('previewBlur').style.display='none';$('storyCounter').textContent='';shownPreviewId=null;return}
+$('previewEmpty').hidden=true;$('previewInfo').hidden=false;$('previewImage').style.display='';$('previewBlur').style.display='';
+const i=nearestIndex(focusMs,visible),m=visible[i];if(!m||(!force&&shownPreviewId===m.id))return;
+shownPreviewId=m.id;$('previewImage').src=m.image;$('previewBlur').src=m.image;$('previewDate').textContent=label(m);$('previewTitle').textContent=m.story;
+$('storyCounter').textContent=(i+1)+' van '+visible.length+' verhalen';$('openStory').dataset.memoryId=m.id;$('presentationLink').href='/present?memory='+encodeURIComponent(m.id);
+}
+function renderFilters(){const values=Array.from(new Set(items.flatMap(x=>x.tags))).sort((a,b)=>a.localeCompare(b,'nl'));$('filterOptions').innerHTML=values.map(tag=>'<button type="button" class="tag" aria-pressed="'+filters.has(tag)+'" data-tag="'+safe(tag)+'">'+safe(tag)+'</button>').join('');
+$('filterCount').textContent=filters.size?filters.size+' actief':''}
+function applyFilters(){layoutMemories();renderFilters();schedule();renderPreview(true);$('status').textContent=visible.length+' herinneringen zichtbaar';}
+$('filterToggle').onclick=()=>{$('filters').hidden=!$('filters').hidden;$('filterToggle').setAttribute('aria-expanded',String(!$('filters').hidden))};
+$('closeFilters').onclick=()=>{$('filters').hidden=true;$('filterToggle').setAttribute('aria-expanded','false')};
+$('clearFilters').onclick=()=>{filters.clear();applyFilters()};
+$('filterOptions').onclick=e=>{const b=e.target.closest('[data-tag]');if(!b)return;const t=b.dataset.tag;if(filters.has(t))filters.delete(t);else filters.add(t);applyFilters()};
+$('openStory').onclick=()=>{const id=Number($('openStory').dataset.memoryId);if(!id)return;rememberFocus();location.href='/present?memory='+id};
+$('presentationLink').addEventListener('click',rememberFocus);
+function rememberFocus(){try{sessionStorage.setItem('talera-lifeline-focus',String(focusMs))}catch(e){}}
+function pointerMonth(y,reference){const bounds=monthGear.getBoundingClientRect();const f=monthFloat(reference)+(y-(bounds.top+bounds.height/2))/MONTH_PX;return Math.floor(f)}
+function pointerGestureDown(lane,e){if(e.button!==0&&e.pointerType!=='touch')return;if(drag)return;
+const g={lane,id:e.pointerId,y:e.clientY,x:e.clientX,startY:e.clientY,startX:e.clientX,startMs:focusMs,moved:false,storyIndex:fractionalIndex(focusMs,visible),timer:null};
+gesture=g;e.currentTarget.setPointerCapture(e.pointerId);
+if(lane==='story'){const row=e.target.closest('[data-memory-id]');if(row){g.storyId=Number(row.dataset.memoryId);g.timer=setTimeout(()=>{if(gesture===g&&!g.moved)startDrag(g.storyId,e.clientX,e.clientY)},380)}}
+}
+function pointerGestureMove(e){if(!gesture||gesture.id!==e.pointerId)return;const g=gesture;
+if(drag){moveDrag(e.clientX,e.clientY);return}
+const dx=e.clientX-g.startX,dy=e.clientY-g.startY;if(Math.hypot(dx,dy)>9){g.moved=true;clearTimeout(g.timer)}
+if(g.lane==='year'){focusAt(fromYearFloat(yearFloat(g.startMs)-(dy/YEAR_PX)),'year',false)}
+else if(g.lane==='month'){focusAt(fromMonthFloat(monthFloat(g.startMs)-(dy/MONTH_PX)),'month',false)}
+else if(g.lane==='story'&&visible.length){focusAt(msAtIndex(g.storyIndex-dy/STORY_PX,visible),'story',false)}
+}
+function pointerGestureUp(e){if(!gesture||gesture.id!==e.pointerId)return;const g=gesture;clearTimeout(g.timer);
+if(drag){finishDrag(e.clientX,e.clientY)}else if(!g.moved&&g.storyId){const m=items.find(x=>x.id===g.storyId);if(m)focusAt(m.virtualMs,'story',true)}
+else focusAt(focusMs,g.lane,true);gesture=null}
+function attachGear(element,lane){element.addEventListener('pointerdown',e=>pointerGestureDown(lane,e));element.addEventListener('pointermove',pointerGestureMove);element.addEventListener('pointerup',pointerGestureUp);element.addEventListener('pointercancel',e=>{if(drag){cancelDrag()}if(gesture){clearTimeout(gesture.timer);gesture=null}focusAt(focusMs,lane,true)});
+element.addEventListener('wheel',e=>{e.preventDefault();let delta=clamp(e.deltaY,-220,220);if(lane==='year')focusAt(fromYearFloat(yearFloat(focusMs)+delta/YEAR_PX),'year',true);if(lane==='month')focusAt(fromMonthFloat(monthFloat(focusMs)+delta/MONTH_PX),'month',true);if(lane==='story'&&visible.length)focusAt(msAtIndex(fractionalIndex(focusMs,visible)+delta/STORY_PX,visible),'story',true)},{passive:false});
+element.addEventListener('keydown',e=>{if(!['ArrowUp','ArrowDown','PageUp','PageDown'].includes(e.key))return;e.preventDefault();const n=e.key==='ArrowUp'?-1:1,step=e.key.startsWith('Page')?5:1;
+if(lane==='year')focusAt(fromYearFloat(yearFloat(focusMs)+n*step),'year',true);if(lane==='month')focusAt(fromMonthFloat(monthFloat(focusMs)+n*step),'month',true);if(lane==='story'&&visible.length)focusAt(msAtIndex(Math.round(fractionalIndex(focusMs,visible))+n*step,visible),'story',true)})}
+attachGear(yearGear,'year');attachGear(monthGear,'month');attachGear(storyGear,'story');
+function startDrag(id,x,y){const m=items.find(a=>a.id===id);if(!m)return;
+drag={id,monthReference:focusMs,targetMonth:null,anchor:0,insertIndex:0,pointerX:x,pointerY:y,raf:0};
+const ghost=$('dragGhost');ghost.querySelector('img').src=m.image;ghost.querySelector('span').textContent=label(m);ghost.style.display='block';
+$('dragHint').style.display='block';$('dragHint').textContent='Sleep naar de maanden en dan tussen twee verhalen';moveDrag(x,y)}
+function placeGhost(x,y){const ghost=$('dragGhost');ghost.style.left=Math.min(innerWidth-137,Math.max(7,x+17))+'px';ghost.style.top=Math.min(innerHeight-140,Math.max(7,y-60))+'px'}
+function dragMonthItems(){if(!drag||drag.targetMonth===null)return[];const d=dateFromMonthIndex(drag.targetMonth),a=midnight(d.getFullYear(),d.getMonth(),1),b=midnight(d.getFullYear(),d.getMonth()+1,1);return visible.filter(m=>m.id!==drag.id&&m.virtualMs>=a&&m.virtualMs<b)}
+function moveDrag(x,y){if(!drag)return;drag.pointerX=x;drag.pointerY=y;placeGhost(x,y);
+const mr=monthGear.getBoundingClientRect(),sr=storyGear.getBoundingClientRect();
+if(x>=mr.left&&x<=mr.right&&y>=mr.top&&y<=mr.bottom){const mo=pointerMonth(y,drag.monthReference);if(drag.targetMonth!==mo){drag.targetMonth=mo;drag.anchor=0;drag.insertIndex=0;const d=dateFromMonthIndex(mo);focusMs=clamp(midnight(d.getFullYear(),d.getMonth(),15),lifeStart,lifeEnd)}
+$('dragHint').textContent='Maand gekozen — sleep nu naar rechts tussen de verhalen'}
+else if(x>=sr.left&&x<=sr.right&&y>=sr.top&&y<=sr.bottom){
+if(drag.targetMonth===null){drag.targetMonth=Math.floor(monthFloat(focusMs));drag.anchor=0}
+const group=dragMonthItems(),local=(y-(sr.top+sr.height/2))/STORY_PX;
+drag.insertIndex=clamp(Math.round(drag.anchor+local+.5),0,group.length);
+$('dragHint').textContent=group.length?'Laat los tussen de juiste verhalen':'Laat los om de herinnering in deze maand te plaatsen'}
+schedule();
+}
+function autoScrollDrag(){if(!drag)return;const r=storyGear.getBoundingClientRect(),x=drag.pointerX,y=drag.pointerY;if(drag.targetMonth!==null&&x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){const group=dragMonthItems();if(group.length>1){let delta=0;if(y<r.top+60)delta=-.07;else if(y>r.bottom-60)delta=.07;if(delta){drag.anchor=clamp(drag.anchor+delta,0,group.length-1);const local=(y-(r.top+r.height/2))/STORY_PX;drag.insertIndex=clamp(Math.round(drag.anchor+local+.5),0,group.length);schedule()}}}drag.raf=requestAnimationFrame(autoScrollDrag)}
+function finishDrag(x,y){if(!drag)return;const current=drag,mo=current.targetMonth;
+const mr=monthGear.getBoundingClientRect(),sr=storyGear.getBoundingClientRect(),valid=mo!==null&&y>=stage.getBoundingClientRect().top&&y<=stage.getBoundingClientRect().bottom&&x>=mr.left&&x<=sr.right;
+if(valid){const m=items.find(v=>v.id===current.id),group=dragMonthItems(),target=dateFromMonthIndex(mo),start=midnight(target.getFullYear(),target.getMonth(),1),end=midnight(target.getFullYear(),target.getMonth()+1,1),i=clamp(current.insertIndex,0,group.length);
+const before=group[i-1],after=group[i],a=before?before.virtualMs:start,b=after?after.virtualMs:end;
+if(m&&b>a){const original={id:m.id,precision:m.precision,year:m.year,month:m.month,season:m.season,manualMs:m.manualMs,edited:m.edited};
+undoState=original;m.year=target.getFullYear();m.month=target.getMonth();m.season=null;m.precision='month';m.manualMs=a+(b-a)/2;m.edited=true;
+layoutMemories();saveOverrides();focusMs=m.virtualMs;showUndo()}}
+cancelDrag();focusAt(focusMs,'story',true)}
+function cancelDrag(){if(!drag)return;cancelAnimationFrame(drag.raf);drag=null;$('dragGhost').style.display='none';$('dragHint').style.display='none';$('dropGuide').style.display='none';schedule()}
+function showUndo(){$('undoToast').style.display='flex';clearTimeout(undoTimer);undoTimer=setTimeout(()=>{$('undoToast').style.display='none';undoState=null},7000)}
+$('undoButton').onclick=()=>{if(!undoState)return;const m=items.find(x=>x.id===undoState.id);if(!m)return;Object.assign(m,undoState);layoutMemories();saveOverrides();focusAt(m.virtualMs,'story',true);undoState=null;clearTimeout(undoTimer);$('undoToast').style.display='none'};
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){if(drag)cancelDrag();$('filters').hidden=true;$('filterToggle').setAttribute('aria-expanded','false')}});
+window.addEventListener('resize',schedule);document.addEventListener('visibilitychange',()=>{if(document.hidden&&drag)cancelDrag()});
+fetch('/api/demo-memories',{cache:'no-store'}).then(res=>{if(!res.ok)throw Error('Herinneringen niet beschikbaar');return res.json()}).then(data=>{
+if(!Array.isArray(data)||data.length!==50)throw Error('Demo set incompleet');
+items=data.map(m=>Object.assign({},m,{year:new Date(m.at).getFullYear(),month:new Date(m.at).getMonth(),season:null,manualMs:null,edited:false,tags:Array.isArray(m.tags)?m.tags:[]}));
+restoreOverrides();layoutMemories();lifeStart=midnight(1976,8,6);lifeEnd=Math.max(midnight(2026,9,14),...items.map(m=>m.virtualMs));const previous=Number(sessionStorage.getItem('talera-lifeline-focus'));focusMs=clamp(Number.isFinite(previous)&&previous>lifeStart?previous:lifeEnd,lifeStart,lifeEnd);
+renderFilters();focusAt(focusMs,'year',true);$('status').textContent='Levenslijn gereed — '+items.length+' herinneringen';
+}).catch(err=>{$('previewEmpty').hidden=false;$('previewEmpty').textContent='Kon de herinneringen niet laden. Vernieuw de pagina.';$('status').textContent=String(err)});
+})();
+</script>
+</body>
+</html>

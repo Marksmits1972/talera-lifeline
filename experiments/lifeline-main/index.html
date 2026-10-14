@@ -134,7 +134,7 @@ function drawYears(){const h=yearGear.clientHeight,c=h/2,where=yearFloat(focusMs
 for(let y=low;y<=high;y++){if(midnight(y+1,0,1)<lifeStart||midnight(y,0,1)>lifeEnd)continue;const cy=c+(y+.5-where)*YEAR_PX;const exists=visible.some(m=>m.virtualMs>=midnight(y,0,1)&&m.virtualMs<midnight(y+1,0,1));
 out+='<div class="year-row '+(!exists?'quiet ':'')+(Math.round(where)===y?'active':'')+'" style="top:'+(cy-21)+'px"><span>'+y+'</span>'+(exists?'<i class="event-dot"></i>':'')+'</div>'}
 YEARS.innerHTML=out}
-function drawMonths(){const h=monthGear.clientHeight,c=h/2,where=monthFloat(focusMs);let out='';const low=Math.floor(where-h/MONTH_PX/2)-1,high=Math.ceil(where+h/MONTH_PX/2)+1;
+function drawMonths(){const h=monthGear.clientHeight,c=h/2,where=monthFloat(drag?drag.monthReference:focusMs);let out='';const low=Math.floor(where-h/MONTH_PX/2)-1,high=Math.ceil(where+h/MONTH_PX/2)+1;
 for(let i=low;i<=high;i++){const d=dateFromMonthIndex(i),y=d.getFullYear(),m=d.getMonth(),cy=c+(i+.5-where)*MONTH_PX;if(midnight(y,m+1,1)<lifeStart||midnight(y,m,1)>lifeEnd)continue;
 const exists=visible.some(x=>x.virtualMs>=midnight(y,m,1)&&x.virtualMs<midnight(y,m+1,1));const selected=drag&&drag.targetMonth===i;
 out+='<div class="month-row '+(!exists?'quiet ':'')+(selected?'selected ':'')+(Math.floor(where)===i?'active':'')+'" style="top:'+(cy-19)+'px"><span>'+monthNames[m].slice(0,3)+' '+y+'</span>'+(exists?'<i class="event-dot"></i>':'')+'</div>'}
@@ -170,7 +170,7 @@ $('filterOptions').onclick=e=>{const b=e.target.closest('[data-tag]');if(!b)retu
 $('openStory').onclick=()=>{const id=Number($('openStory').dataset.memoryId);if(!id)return;rememberFocus();location.href='/present?memory='+id};
 $('presentationLink').addEventListener('click',rememberFocus);
 function rememberFocus(){try{sessionStorage.setItem('talera-lifeline-focus',String(focusMs))}catch(e){}}
-function pointerMonth(y,reference){const bounds=monthGear.getBoundingClientRect();const f=monthFloat(reference)+(y-(bounds.top+bounds.height/2))/MONTH_PX;return Math.floor(f)}
+function pointerMonth(y,reference){const bounds=monthGear.getBoundingClientRect();const f=monthFloat(reference)+(y-(bounds.top+bounds.height/2))/MONTH_PX;return clamp(Math.floor(f),Math.floor(monthFloat(lifeStart)),Math.floor(monthFloat(lifeEnd)))}
 function pointerGestureDown(lane,e){if(e.button!==0&&e.pointerType!=='touch')return;if(drag)return;
 const g={lane,id:e.pointerId,y:e.clientY,x:e.clientX,startY:e.clientY,startX:e.clientX,startMs:focusMs,moved:false,storyIndex:fractionalIndex(focusMs,visible),timer:null};
 gesture=g;e.currentTarget.setPointerCapture(e.pointerId);

@@ -85,3 +85,13 @@ test('TALERA: new Worker uses RH19 untouched and disallows writes',()=>{
   assert.match(worker,/if\(path==="\/tell"/);
   assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
 });
+
+test('Three independently routed pages and direct photo-to-presentation navigation',()=>{
+  assert.match(html,/<a id="preview" href="\/present"/);
+  assert.match(html,/\$\('preview'\)\.href='\/present\?memory='/);
+  assert.match(html,/\$\('preview'\)\.addEventListener\('click',rememberFocus\)/);
+  assert.match(html,/<nav class="bottom-nav"[^>]*>.*href="\/tell".*href="\/present"/);
+  assert.match(worker,/id="taleraPageNav"/);
+  assert.match(worker,/id="taleraTellNav"/);
+  assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
+});

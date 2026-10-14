@@ -74,10 +74,9 @@ jobs:
         env:
           TEST_URL: ${{ vars.TALERA_LIFELINE_TEST_URL }}
         run: |
-          if [ -z "$TEST_URL" ]; then
-            echo "Set TALERA_LIFELINE_TEST_URL variable to enable automated public URL verification."
-            exit 0
-          fi
-          curl --fail --silent --show-error "$TEST_URL/" | grep -q 'Mijn levenslijn'
-          curl --fail --silent --show-error "$TEST_URL/api/demo-memories" | grep -q '"id":50'
-          echo "Test homepage and demo API both responding."
+          TEST_URL="${TEST_URL:-https://talera-r19-lifeline-main-dev.mark-a39.workers.dev}"
+          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/" | grep -q 'Mijn levenslijn'
+          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/api/demo-memories" | grep -q '"id":50'
+          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/present?memory=1" | grep -q 'taleraPageNav'
+          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/tell" | grep -q 'taleraTellNav'
+          echo "All three independent routes and demo API respond."

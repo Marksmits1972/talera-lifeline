@@ -42,13 +42,13 @@ header{height:60px;flex:0 0 auto;display:flex;align-items:center;justify-content
 .story-row.dragged .story-card{opacity:.28}
 #emptyInStage{position:absolute;right:0;top:50%;width:50%;transform:translateY(-50%);padding:14px;text-align:center;font-size:12px;color:#678;pointer-events:none}
 #dropGuide{position:absolute;right:0;width:50%;height:3px;z-index:11;background:var(--warm);box-shadow:0 0 0 2px white;pointer-events:none;display:none}
-#preview{height:clamp(200px,31dvh,315px);flex:0 0 auto;min-height:185px;display:flex;flex-direction:column;position:relative;background:#e6e8e8;overflow:hidden}
+#preview{text-decoration:none;color:inherit;cursor:pointer;height:clamp(200px,31dvh,315px);flex:0 0 auto;min-height:185px;display:flex;flex-direction:column;position:relative;background:#e6e8e8;overflow:hidden}
 #previewImage,#previewBlur{position:absolute;inset:0;width:100%;height:100%}#previewBlur{object-fit:cover;filter:blur(22px) brightness(.8);transform:scale(1.16)}#previewImage{object-fit:contain}
 #preview:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 27%,rgba(9,25,39,.14) 45%,rgba(9,25,39,.80) 100%);pointer-events:none}
 #previewInfo{position:absolute;z-index:2;bottom:14px;left:17px;right:15px;color:white;text-shadow:0 1px 5px #0e253e8a}
 #previewDate{font-size:12px;font-weight:750;letter-spacing:.02em}#previewTitle{font-size:16px;font-weight:750;line-height:1.32;margin-top:4px;max-width:47ch}
 #previewActions{display:flex;gap:8px;align-items:center;margin-top:9px}
-#openStory{border:1px solid #ffffff9c;border-radius:20px;background:#fffefa;color:var(--ink);padding:7px 12px;font-weight:750;font-size:12px}
+#openStory{display:inline-block;border:1px solid #ffffff9c;border-radius:20px;background:#fffefa;color:var(--ink);padding:7px 12px;font-weight:750;font-size:12px}
 #storyCounter{font-size:11px;color:#fffd}
 #previewEmpty{position:absolute;inset:0;display:grid;place-items:center;padding:22px;text-align:center;color:#6b7986;background:var(--paper);font-size:13px;z-index:3}
 #previewEmpty[hidden],#emptyInStage[hidden]{display:none}
@@ -83,7 +83,7 @@ header{height:60px;flex:0 0 auto;display:flex;align-items:center;justify-content
  <div class="gear" id="storyGear" aria-label="Scroll door de verhalen; houd foto vast om te verplaatsen" tabindex="0"><div class="gear-label">Verhalen</div><div id="stories"></div></div>
  <div id="needle"></div><div id="centerReadout"></div><div id="dropGuide"></div><div id="emptyInStage" hidden>Geen herinneringen voor dit filter. De tijdlijn blijft gewoon doorlopen.</div>
 </div>
-<section id="preview" aria-label="Dichtstbijzijnde herinnering"><img id="previewBlur" alt=""><img id="previewImage" alt="Foto bij de geselecteerde herinnering"><div id="previewInfo"><div id="previewDate"></div><div id="previewTitle"></div><div id="previewActions"><button id="openStory">Bekijk het verhaal →</button><span id="storyCounter"></span></div></div><div id="previewEmpty" hidden>Geen herinneringen gevonden. Je kunt verder door de jaren bladeren of de filters aanpassen.</div></section>
+<a id="preview" href="/present" aria-label="Open geselecteerde herinnering op de aparte presentatiepagina"><img id="previewBlur" alt=""><img id="previewImage" alt="Grote foto van de geselecteerde herinnering"><div id="previewInfo"><div id="previewDate"></div><div id="previewTitle"></div><div id="previewActions"><span id="openStory">Tik op de foto om te presenteren ↗</span><span id="storyCounter"></span></div></div><div id="previewEmpty" hidden>Geen herinneringen gevonden. Je kunt verder door de jaren bladeren of de filters aanpassen.</div></a>
 <nav class="bottom-nav" aria-label="Hoofdnavigatie"><a href="/tell" class="tell">✎ Vertellen</a><a href="/" class="current" aria-current="page">⌂ Levenslijn</a><a href="/present" id="presentationLink">▣ Presenteren</a></nav>
 </div>
 <section id="filters" hidden aria-label="Filter op kenmerken"><div class="filters-heading"><span>Welke herinneringen wil je zien?</span><button class="icon-button" id="closeFilters" aria-label="Sluit filters">Sluiten</button></div><div id="filterOptions"></div><div class="filter-foot"><span>Meerdere kenmerken: alle overeenkomsten worden getoond.</span><button class="icon-button" id="clearFilters">Wis filters</button></div></section>
@@ -154,11 +154,11 @@ if(drag&&drag.targetMonth!==null){const insert=clamp(drag.insertIndex??arr.lengt
 function render(){drawYears();drawMonths();drawStories();const d=new Date(focusMs);$('centerReadout').textContent=monthNames[d.getMonth()].slice(0,3)+' '+d.getFullYear();
 if(drag)$('centerReadout').textContent=drag.targetMonth===null?'Verplaatsen…':monthNames[dateFromMonthIndex(drag.targetMonth).getMonth()]+' '+dateFromMonthIndex(drag.targetMonth).getFullYear();
 }
-function renderPreview(force){if(!visible.length){$('previewEmpty').hidden=false;$('previewInfo').hidden=true;$('previewImage').style.display='none';$('previewBlur').style.display='none';$('storyCounter').textContent='';shownPreviewId=null;return}
+function renderPreview(force){if(!visible.length){$('preview').removeAttribute('href');$('previewEmpty').hidden=false;$('previewInfo').hidden=true;$('previewImage').style.display='none';$('previewBlur').style.display='none';$('storyCounter').textContent='';shownPreviewId=null;return}
 $('previewEmpty').hidden=true;$('previewInfo').hidden=false;$('previewImage').style.display='';$('previewBlur').style.display='';
 const i=nearestIndex(focusMs,visible),m=visible[i];if(!m||(!force&&shownPreviewId===m.id))return;
 shownPreviewId=m.id;$('previewImage').src=m.image;$('previewBlur').src=m.image;$('previewDate').textContent=label(m);$('previewTitle').textContent=m.story;
-$('storyCounter').textContent=(i+1)+' van '+visible.length+' verhalen';$('openStory').dataset.memoryId=m.id;$('presentationLink').href='/present?memory='+encodeURIComponent(m.id);
+$('storyCounter').textContent=(i+1)+' van '+visible.length+' verhalen';$('preview').href='/present?memory='+encodeURIComponent(m.id);$('preview').setAttribute('aria-label','Presenteer herinnering van '+label(m));$('presentationLink').href='/present?memory='+encodeURIComponent(m.id);
 }
 function renderFilters(){const values=Array.from(new Set(items.flatMap(x=>x.tags))).sort((a,b)=>a.localeCompare(b,'nl'));$('filterOptions').innerHTML=values.map(tag=>'<button type="button" class="tag" aria-pressed="'+filters.has(tag)+'" data-tag="'+safe(tag)+'">'+safe(tag)+'</button>').join('');
 $('filterCount').textContent=filters.size?filters.size+' actief':''}
@@ -167,7 +167,7 @@ $('filterToggle').onclick=()=>{$('filters').hidden=!$('filters').hidden;$('filte
 $('closeFilters').onclick=()=>{$('filters').hidden=true;$('filterToggle').setAttribute('aria-expanded','false')};
 $('clearFilters').onclick=()=>{filters.clear();applyFilters()};
 $('filterOptions').onclick=e=>{const b=e.target.closest('[data-tag]');if(!b)return;const t=b.dataset.tag;if(filters.has(t))filters.delete(t);else filters.add(t);applyFilters()};
-$('openStory').onclick=()=>{const id=Number($('openStory').dataset.memoryId);if(!id)return;rememberFocus();location.href='/present?memory='+id};
+$('preview').addEventListener('click',rememberFocus);
 $('presentationLink').addEventListener('click',rememberFocus);
 function rememberFocus(){try{sessionStorage.setItem('talera-lifeline-focus',String(focusMs))}catch(e){}}
 function pointerMonth(y,reference){const bounds=monthGear.getBoundingClientRect();const f=monthFloat(reference)+(y-(bounds.top+bounds.height/2))/MONTH_PX;return clamp(Math.floor(f),Math.floor(monthFloat(lifeStart)),Math.floor(monthFloat(lifeEnd)))}

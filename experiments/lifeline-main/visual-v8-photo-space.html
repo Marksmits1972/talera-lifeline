@@ -292,7 +292,7 @@ if(saved&&Number.isFinite(saved.yearFloat)&&Number.isFinite(saved.monthIndex)){
  state.filter=new Set(Array.isArray(saved.filter)?saved.filter.filter(x=>tags.includes(x)):['Vakanties']);
 }
 const filtered=()=>memories.filter(x=>!state.filter.size||x.tags.some(t=>state.filter.has(t)));
-const dateOf=m=>{const d=new Date(m.ms);return `${d.getDate()} ${ML[m.month]} ${m.year}`};
+const dateOf=m=>{const d=new Date(m.ms);if(m.datePrecision==='year')return String(m.year);if(m.datePrecision==='month')return ML[m.month]+' '+m.year;if(m.datePrecision==='period'&&m.dateEnd){const e=new Date(m.dateEnd+'T12:00:00');if(Number.isFinite(e.getTime()))return d.getDate()+' '+ML[m.month]+' '+m.year+' – '+e.getDate()+' '+ML[e.getMonth()]+' '+e.getFullYear()}return d.getDate()+' '+ML[m.month]+' '+m.year};
 const esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const nowYear=()=>Math.max(minYear,Math.min(maxYear,Math.round(state.yearFloat)));
 const activeMonth=()=>Math.max(minYear*12,Math.min(maxYear*12+11,Math.round(state.monthIndex)));
@@ -555,7 +555,7 @@ window.__taleraLifelineDemo={
   minYear=Math.min(minYear,year);maxYear=Math.max(maxYear,year);
   const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':imageUrl?'photo':'text';
   const m=example(meta.id,meta.date,meta.title,meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',imageUrl||null,['Mijn verhalen'],type);
-  m.localId=meta.id;memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
+  m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
   const focus=new URLSearchParams(location.search).get('local');
   if(focus===meta.id){state.filter.clear();state.selectedId=m.id;state.yearFloat=m.year;state.monthIndex=m.year*12+m.month;renderNavigation();setPreview(m.id);save()}
   else {renderNavigation();updateTop()}

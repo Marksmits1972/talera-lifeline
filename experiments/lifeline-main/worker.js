@@ -1,11 +1,14 @@
 // TALERA: new life-line home screen paired with ORIGINAL r19h2.
 // This worker is deliberately isolated and read-only. Never publish under the r19 reference Worker name.
 import r19Worker from "../../src/reference-r19h2-carousel-combined-worker.js";
-import HOME_HTML from "./visual-v7-photo-balance.html";
+import HOME_HTML from "./visual-v8-photo-space.html";
+import { MEMORY_STORE_SCRIPT } from "./memory-store.js";
+import { TELL_PAGE_HTML } from "./tell-local-page.js";
+import { PRESENT_LOCAL_HTML } from "./present-local-page.js";
 import { DEMO_MEMORIES } from "./demo-memories.js";
 import { PWA_ICONS } from "./pwa-icons.js";
 
-const VERSION="talera-lifeline-v7-photo-balance-20261015";
+const VERSION="talera-lifeline-v8-ondevice-media-20261015";
 const PWA_MANIFEST=JSON.stringify({name:"TALERA — Mijn levenslijn",short_name:"TALERA",description:"Door je leven reizen en herinneringen beleven",id:"/",start_url:"/",scope:"/",display:"standalone",background_color:"#ffffff",theme_color:"#ffffff",icons:[{src:"/pwa-192.png",sizes:"192x192",type:"image/png",purpose:"any maskable"},{src:"/pwa-512.png",sizes:"512x512",type:"image/png",purpose:"any maskable"}]});
 const PWA_SW=String.raw`self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));self.addEventListener("fetch",event=>{if(event.request.mode!=="navigate")return;event.respondWith(fetch(event.request).catch(()=>new Response("<!doctype html><html lang=nl><meta name=viewport content=width=device-width,initial-scale=1><title>TALERA offline</title><body style=font-family:system-ui;padding:2rem><h1>TALERA</h1><p>Je bent offline. Probeer opnieuw wanneer je verbinding hebt.</p></body></html>",{status:503,headers:{"content-type":"text/html; charset=utf-8"}})))});`;
 
@@ -145,16 +148,21 @@ export default {
       const size=icon[1]||"180",bin=atob(PWA_ICONS[size]);
       return reply(Uint8Array.from(bin,c=>c.charCodeAt(0)),method,"image/png");
     }
-    if(path==="/"||path==="/index.html")return reply(String(HOME_HTML),method,"text/html; charset=utf-8");
+    if(path==="/"||path==="/index.html")return reply(String(HOME_HTML).replace("<script>",MEMORY_STORE_SCRIPT+"<script>"),method,"text/html; charset=utf-8");
     if(path==="/api/demo-memories"){
       return reply(JSON.stringify(DEMO_MEMORIES),method,"application/json; charset=utf-8");
     }
     if(path==="/present"||path==="/present/"){
+      if(url.searchParams.has("local"))return reply(PRESENT_LOCAL_HTML.replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT),method,"text/html; charset=utf-8");
       const r=await r19Worker.fetch(targetRequest(request,"/"),env,ctx);
       if(method==="HEAD"||!r.ok||!(r.headers.get("content-type")||"").includes("text/html"))return r;
       return reply(addBridge(await r.text(),request),method,"text/html; charset=utf-8",r.status);
     }
-    if(path==="/tell"||path==="/tell/"||path==="/storylab-clean"||path==="/storylab-clean/"){
+    if(path==="/tell"||path==="/tell/"){
+      const tell=String(TELL_PAGE_HTML).replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT).replace('<nav aria-label="Hoofdnavigatie">','<nav id="taleraTellNav" aria-label="Hoofdnavigatie">');
+      return reply(tell,method,"text/html; charset=utf-8");
+    }
+    if(path==="/storylab-clean"||path==="/storylab-clean/"){
       const r=await r19Worker.fetch(targetRequest(request,path),env,ctx);
       if(method==="HEAD"||!r.ok||!(r.headers.get("content-type")||"").includes("text/html"))return r;
       const warning=String.raw`<div role="status" style="position:fixed;z-index:2147483639;left:8px;right:8px;top:calc(59px + env(safe-area-inset-top,0px));padding:7px 9px;text-align:center;border-radius:12px;background:#0f2747e8;color:#fff;font:600 11px sans-serif;pointer-events:none">Proefversie: opslaan en publiceren zijn uitgeschakeld.</div>`;

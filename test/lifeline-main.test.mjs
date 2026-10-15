@@ -132,7 +132,7 @@ test('Fullscreen TALERA PWA fills the real viewport and preserves the interactiv
  const matches=[...visualV5.matchAll(/<script>([\s\S]*?)<\/script>/g)];
  assert.ok(matches.length>=2);
  for(const m of matches)assert.doesNotThrow(()=>new vm.Script(m[1]));
- assert.match(worker,/import HOME_HTML from "\.\/visual-v6-swipe-stable\.html"/);
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v7-photo-balance\.html"/);
  assert.match(worker,/path==="\/manifest\.webmanifest"/);
  assert.match(worker,/path==="\/sw\.js"/);
  assert.match(worker,/apple-touch-icon/);
@@ -150,7 +150,7 @@ test('iPhone swipes navigate inside TALERA instead of scrolling the main documen
  for(const lane of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')"])assert.ok(visualV6.includes(lane),lane);
  const scripts=[...visualV6.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.ok(scripts.length>=2);
  for(const script of scripts)assert.doesNotThrow(()=>new vm.Script(script[1]));
- assert.match(worker,/import HOME_HTML from "\.\/visual-v6-swipe-stable\.html"/);
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v7-photo-balance\.html"/);
 });
 
 const visualV7=read('../experiments/lifeline-main/visual-v7-photo-balance.html');

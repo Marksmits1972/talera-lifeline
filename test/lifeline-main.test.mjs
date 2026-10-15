@@ -210,11 +210,53 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v8-ondevice-media-20261015"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v9-brand-auto-update-20261015"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(PRESENT_LOCAL_HTML/);
  assert.match(worker,/TELL_PAGE_HTML/);
  assert.match(worker,/MEMORY_STORE_SCRIPT/);
  assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));
  assert.match(worker,/import r19Worker from "\.\.\/\.\.\/src\/reference-r19h2-carousel-combined-worker\.js"/);
+});
+
+
+const brandSource=read('../experiments/lifeline-main/pwa-brand.js');
+const updateSource=read('../experiments/lifeline-main/pwa-update.js');
+test('V9: approved 179×174 TALERA logo from Drive is unchanged and available to iOS',()=>{
+ const marker='export const BRAND_PNG_BASE64=';
+ const start=brandSource.indexOf(marker);
+ assert.ok(start>=0);
+ const part=brandSource.slice(start+marker.length).split(';\n')[0];
+ const b64=JSON.parse(part),png=Buffer.from(b64,'base64');
+ assert.equal(png.length,30371);
+ assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ assert.equal(png.readUInt32BE(16),179);
+ assert.equal(png.readUInt32BE(20),174);
+ assert.match(brandSource,/BRAND_ICON_SVG/);
+ assert.match(worker,/path==="\/talera-brand-v9\.png"/);
+ assert.match(worker,/path==="\/apple-touch-icon\.png"/);
+ assert.match(worker,/path==="\/talera-brand-v9\.svg"/);
+ assert.match(worker,/rel="apple-touch-icon" href="\/talera-brand-v9\.png"/);
+ assert.match(worker,/src:"\/talera-brand-v9\.svg"/);
+});
+test('V9: network-first update watcher refreshes only safe timeline and retains private data',()=>{
+ const code=exportedHtml(updateSource,'PWA_UPDATE_SCRIPT');
+ assert.match(code,/fetch\('\/api\/version\?check='/);
+ assert.match(code,/visibilitychange/);
+ assert.match(code,/pageshow/);
+ assert.match(code,/document\.visibilityState==='visible'/);
+ assert.match(code,/const safeHome=\(location\.pathname==='\/'/);
+ assert.match(code,/sessionStorage\.setItem\(repeatKey/);
+ assert.match(code,/location\.reload\(\)/);
+ assert.doesNotMatch(code,/indexedDB\.deleteDatabase|localStorage\.clear|sessionStorage\.clear|caches\.delete|unregister\(/);
+ checkScripts(code,'pwa-update');
+ assert.match(worker,/if\(path==="\/api\/version"\)/);
+ assert.match(worker,/localOnly:true/);
+ assert.match(worker,/function pwaShell\(html\)/);
+ assert.match(worker,/pwaShell\(String\(HOME_HTML\)/);
+ assert.match(worker,/pwaShell\(tell\)/);
+ assert.match(worker,/pwaShell\(PRESENT_LOCAL_HTML/);
+ assert.match(worker,/pwaShell\(addBridge/);
+ assert.match(worker,/cache-control":"no-store"/);
+ assert.match(worker,/start_url:"\/"/);
 });

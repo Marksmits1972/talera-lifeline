@@ -105,7 +105,7 @@ test('Approved visual layout retained and connected to all three TALERA pages',(
   assert.match(visualV3,/<a href="\/tell" class="nav-item">/);
   assert.match(visualV3,/<a href="\/" class="nav-item selected" aria-current="page">/);
   assert.match(visualV3,/<a href="\/present\?visual=weekend-amsterdam" class="nav-item">/);
-  assert.match(worker,/import HOME_HTML from "\.\/visual-v7-photo-balance\.html"/);
+  assert.match(worker,/import HOME_HTML from "\.\/visual-v8-photo-space\.html"/);
   assert.match(worker,/id="talera-visual-demo-handoff"/);
   assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
   assert.match(worker,/return reply\(addBridge\(await r\.text\(\),request\)/);
@@ -132,7 +132,7 @@ test('Fullscreen TALERA PWA fills the real viewport and preserves the interactiv
  const matches=[...visualV5.matchAll(/<script>([\s\S]*?)<\/script>/g)];
  assert.ok(matches.length>=2);
  for(const m of matches)assert.doesNotThrow(()=>new vm.Script(m[1]));
- assert.match(worker,/import HOME_HTML from "\.\/visual-v7-photo-balance\.html"/);
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v8-photo-space\.html"/);
  assert.match(worker,/path==="\/manifest\.webmanifest"/);
  assert.match(worker,/path==="\/sw\.js"/);
  assert.match(worker,/apple-touch-icon/);
@@ -150,7 +150,7 @@ test('iPhone swipes navigate inside TALERA instead of scrolling the main documen
  for(const lane of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')"])assert.ok(visualV6.includes(lane),lane);
  const scripts=[...visualV6.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.ok(scripts.length>=2);
  for(const script of scripts)assert.doesNotThrow(()=>new vm.Script(script[1]));
- assert.match(worker,/import HOME_HTML from "\.\/visual-v7-photo-balance\.html"/);
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v8-photo-space\.html"/);
 });
 
 const visualV7=read('../experiments/lifeline-main/visual-v7-photo-balance.html');
@@ -174,4 +174,47 @@ test('V7: fluid month movement and calmer gesture, compatible with RH19 handoff'
  const scripts=[...visualV7.matchAll(/<script>([\s\S]*?)<\/script>/g)];
  assert.ok(scripts.length>=1);
  for(const m of scripts)assert.doesNotThrow(()=>new vm.Script(m[1],{filename:'visual-v7.js'}));
+});
+
+
+const visualV8=read('../experiments/lifeline-main/visual-v8-photo-space.html');
+const bridgeModule=read('../experiments/lifeline-main/memory-store.js');
+const tellModule=read('../experiments/lifeline-main/tell-local-page.js');
+const presentModule=read('../experiments/lifeline-main/present-local-page.js');
+function exportedHtml(code,name){
+ const start='export const '+name+' = ';
+ assert.ok(code.startsWith(start),name);
+ return JSON.parse(code.slice(start.length).trim().replace(/;$/,''));
+}
+function checkScripts(html,name){
+ const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+ assert.ok(scripts.length>=1,name+' has script');
+ for(const m of scripts)assert.doesNotThrow(()=>new vm.Script(m[1],{filename:name}));
+}
+test('V8: bigger lifetime photographs with unobstructed month and photo preview',()=>{
+ assert.match(visualV8,/\.age-info small\{display:none\}/);
+ assert.match(visualV8,/\.age-photo\{display:block;flex:1 1 auto;width:auto;max-width:none/);
+ assert.match(visualV8,/object-position:50% 40%/);
+ assert.match(visualV8,/\.story-list\{left:74px;right:6px;top:28px/);
+ for(const lane of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')"])assert.ok(visualV8.includes(lane),lane);
+ checkScripts(visualV8,'visual-v8');
+});
+test('V8: each media belongs to one private on-device memory and one timeline date',()=>{
+ const js=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ const present=exportedHtml(presentModule,'PRESENT_LOCAL_HTML');
+ for(const k of ["indexedDB.open","objectStoreNames.contains('stories')","objectStoreNames.contains('files')","kind:kind","async function save","async function list","async function mediaUrl"])assert.ok(js.includes(k),k);
+ for(const k of ['id="files"','accept="image/*,video/*"','MediaRecorder','id="birthYear"','store.save(','location.replace(','__MEMORY_STORE__'])assert.ok(tell.includes(k),k);
+ for(const k of ['id="gallery"','id="audio"','id="text"','store.get(id)','store.mediaUrl(entry.key)','__MEMORY_STORE__'])assert.ok(present.includes(k),k);
+ for(const k of ['addLocalMemory(meta,imageUrl)','?local=','meta.items?.some','store.list()','Mijn verhalen'])assert.ok(visualV8.includes(k),k);
+ checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
+});
+test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
+ assert.match(worker,/const VERSION="talera-lifeline-v8-ondevice-media-20261015"/);
+ assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
+ assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(PRESENT_LOCAL_HTML/);
+ assert.match(worker,/TELL_PAGE_HTML/);
+ assert.match(worker,/MEMORY_STORE_SCRIPT/);
+ assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));
+ assert.match(worker,/import r19Worker from "\.\.\/\.\.\/src\/reference-r19h2-carousel-combined-worker\.js"/);
 });

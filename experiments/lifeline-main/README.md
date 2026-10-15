@@ -82,3 +82,15 @@ De afzonderlijke GitHub Actions deploy wordt na het instellen van de beveiligde 
 - **Status:** codekandidaat. GitHub CI en live deploy volgen automatisch; echte mobiele acceptatie door de gebruiker blijft nodig.
 
 **Terugval:** `backup/lifeline-pwa-v6-before-visual-balance-20261015` (en in dezelfde map `visual-v6-swipe-stable.html`).
+
+## V8 — grotere leeftijdsfoto's en verbonden multimedia-test (15 oktober 2026)
+
+- **Actuele startpagina:** `visual-v8-photo-space.html`. V7 is afzonderlijk beschermd in `backup/lifeline-v7-before-multimedia-20261015`; de V7-bron blijft in de map staan.
+- Leeftijdsfoto's krijgen meer van de bestaande linkerkolom, door leeftijdlabels compacter te maken in plaats van de maand- en herinneringskolom ruimte af te nemen.
+- Nieuwe `/tell`-testpagina: titel, datum, plaats, vrije tekst, optioneel geboortejaar, selectie van foto's en video's op iPhone, microfoonopname (MediaRecorder) met terugluisteren.
+- Testherinneringen worden als één record in de browser-IndexedDB vastgelegd met aparte Blob-bestanden per foto, video en audio. **Deze lokale opslag is geen cloud-back-up en synchroniseert niet tussen apparaten.**
+- Nieuwe herinneringen worden onder het kenmerk **Mijn verhalen** op hun gekozen datum in de bestaande V8-tijdlijn ingevoegd. Leeftijdsfoto's kiezen bij voorkeur een foto uit dat levensjaar.
+- Aanraken van een eigen herinnering opent `/present?local=ID`: presentatie met foto/video-carousel, optionele audio en verhaaltekst. De bestaande RH19-demopresentatie blijft onveranderd.
+- De test-Worker blijft **GET/HEAD-only** en heeft **geen D1/R2-binding**. De bestaande live omgeving, RH19-bronnen en persoonlijke opslag worden niet gewijzigd; deze eerste bouwronde test uitsluitend de UI- en gegevensketen.
+- **Vervolg voor volledige productfunctionaliteit:** aparte beveiligde D1/R2-configuratie met gebruikersauthenticatie, autorisatie per herinnering, uploadcontrole, media streaming, quota, back-up/restore en end-to-end tests. Niet stilzwijgend het bestaande R2/D1-account openen.
+- **Belangrijk bij testen:** alleen wegwerp-testbestanden gebruiken. Bij wissen van Safari/PWA-sitegegevens of verwijderen van de PWA kan lokale data verdwijnen. Een verhaal op iPhone verschijnt niet op de TV/andere browser voordat veilige synchronisatie klaar is.

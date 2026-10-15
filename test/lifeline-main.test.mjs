@@ -210,7 +210,7 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v9-brand-auto-update-20261015"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v10-media-first-tell-20261015"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
  assert.match(worker,/TELL_PAGE_HTML/);
@@ -259,4 +259,65 @@ test('V9: network-first update watcher refreshes only safe timeline and retains 
  assert.match(worker,/pwaShell\(addBridge/);
  assert.match(worker,/cache-control":"no-store"/);
  assert.match(worker,/start_url:"\/"/);
+});
+
+
+test('V10: media-first storytelling sequence and large visual voice studio',()=>{
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ const head=tell.indexOf('id="mediaSection"'),voice=tell.indexOf('id="voiceSection"'),detail=tell.indexOf('Maak je herinnering compleet');
+ assert.ok(head>=0&&voice>head&&detail>voice,'Media → speech → details order');
+ for(const id of ['mediaStage','strip','files','start','studio','studioStage','studioPrev','studioNext','stop','story','datePrecision','aiTitle','save']){
+  assert.ok(tell.includes('id="'+id+'"'),'missing '+id);
+ }
+ assert.match(tell,/grid-template-rows:auto minmax\(0,1fr\) auto/);
+ assert.match(tell,/#studio\{position:fixed/);
+ assert.match(tell,/height:100dvh/);
+ assert.match(tell,/recording\.start\(1000\)/);
+ assert.match(tell,/if\(recording&&recording\.state==='recording'\)/);
+ assert.match(tell,/function jump\(n\)/);
+ assert.match(tell,/setStudio\(true,true\)/);
+ assert.match(tell,/touchend/);
+ assert.match(tell,/const maxMedia=10/);
+ assert.match(tell,/crypto\.subtle/);
+ assert.match(tell,/digest\('SHA-256'/);
+ assert.match(tell,/URL\.revokeObjectURL/);
+ assert.match(tell,/setPointerCapture/);
+ assert.match(tell,/elementFromPoint/);
+ assert.match(tell,/media\.splice\(from,1\)/);
+ assert.match(tell,/if\(voice\)uploads\.push\(voice\)/);
+ assert.match(tell,/media\.map\(x=>x\.file\)/);
+ assert.match(tell,/if\(e\.data\?\.size\)chunks\.push/);
+ assert.match(tell,/audio\/mp4/);
+});
+test('V10: transcription is literal browser opt-in and manual editing; no pretend AI title',()=>{
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ assert.match(tell,/id="autoTranscribe"/);
+ assert.match(tell,/window\.SpeechRecognition\|\|window\.webkitSpeechRecognition/);
+ assert.match(tell,/recognizer\.lang='nl-NL'/);
+ assert.match(tell,/recognizer\.onresult/);
+ assert.match(tell,/e\.results\[i\]\.isFinal/);
+ assert.match(tell,/\$\('story'\)\.value=recognitionText/);
+ assert.match(tell,/getUserMedia\(\{audio:true\}\)/);
+ assert.match(tell,/id="aiTitle"[^>]+disabled/);
+ assert.doesNotMatch(tell,/fetch\(['"]\/api\/ai/);
+ assert.match(tell,/De geluidsopname wordt apart bewaard/);
+ assert.match(tell,/herkenningsdienst van je browser kan hierbij je stem verwerken/);
+});
+test('V10: date precision roundtrips through local storage, timeline and presentation',()=>{
+ const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ const present=exportedHtml(presentModule,'PRESENT_LOCAL_HTML');
+ assert.match(store,/datePrecision:precision/);
+ assert.match(store,/dateEnd:precision==='period'\?dateEnd:null/);
+ assert.match(store,/mediaUploads\.length>10/);
+ assert.match(store,/voiceUploads\.length>1/);
+ for(const x of ["value=\"exact\"","value=\"month\"","value=\"year\"","value=\"period\"","id=\"dateFrom\"","id=\"dateTo\""])assert.ok(tell.includes(x),x);
+ assert.match(tell,/datePrecision:time\.datePrecision,dateEnd:time\.dateEnd/);
+ assert.match(visualV8,/m\.datePrecision=meta\.datePrecision/);
+ assert.match(visualV8,/m\.dateEnd=meta\.dateEnd/);
+ assert.match(visualV8,/if\(m\.datePrecision==='year'\)/);
+ assert.match(visualV8,/if\(m\.datePrecision==='month'\)/);
+ assert.match(present,/data\.datePrecision==='year'/);
+ assert.match(present,/data\.datePrecision==='period'/);
+ checkScripts(tell,'v10-tell');checkScripts(present,'v10-presentation');checkScripts(store,'v10-storage');checkScripts(visualV8,'v10-timeline');
 });

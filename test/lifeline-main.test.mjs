@@ -319,5 +319,7 @@ test('V10: date precision roundtrips through local storage, timeline and present
  assert.match(visualV8,/if\(m\.datePrecision==='month'\)/);
  assert.match(present,/data\.datePrecision==='year'/);
  assert.match(present,/data\.datePrecision==='period'/);
+ assert.match(present,/items\.findIndex\(item=>item\.kind==='photo'\)/);
+ assert.match(tell,/item===cover\(\)/);
  checkScripts(tell,'v10-tell');checkScripts(present,'v10-presentation');checkScripts(store,'v10-storage');checkScripts(visualV8,'v10-timeline');
 });

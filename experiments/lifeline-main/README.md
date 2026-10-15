@@ -67,3 +67,18 @@ De afzonderlijke GitHub Actions deploy wordt na het instellen van de beveiligde 
 - Onbedoeld verslepen van losse foto's is uitgeschakeld. Bestaand ontwerp, voorbeeldherinneringen, PWA en ELP/RH19-koppelingen blijven gelijk.
 - **Beperking:** ChatGPT's ingebouwde browser kan als externe vensterlaag alsnog met een systeemgebaar wegschuiven. Gebruik daarom de bestaande installeerbare TALERA-PWA via Safari → Delen → Zet op beginscherm.
 - Terugvalversie blijft bewaard in `visual-v5-fullscreen.html`.
+
+## V7 — Fotobalans, leesbaarheid en rust (15 oktober 2026)
+
+- **Nieuwe actuele PWA-home:** `visual-v7-photo-balance.html`. V6 blijft ongewijzigd aanwezig als snelle visuele terugval; bovendien staat vóór deze bouwronde een eigen backup-branch.
+- De levensfasekolom is op mobiele schermen smaller, maar de leeftijdsfoto's blijven herkenbaar en krijgen duidelijke kaders. De herinneringspreview wint effectieve hoogte.
+- De maanden staan in een eigen, beter leesbare strook; verhaalkaartjes beginnen pas ná die strook en hebben geen conflicterende tekst-overlap.
+- Herinneringstitels mogen twee regels innemen; hoofdmeta (datum/plaats) krijgt meer contrast zonder onnodig groot te worden.
+- De grote herinneringsfoto blijft beeldbepalend; het beschrijvingspaneel is compact maar leesbaar en begrenst lange tekst netjes.
+- Bij scrollen volgt de maandenschaal de fractionele vingerbeweging; het onrustige versnellen/afrollen na loslaten wordt gedempt. Door story drag ontstane ghost clicks worden onderdrukt.
+- De eerder kapotte compacte CSS-mediaquery voor korte mobiele schermen is hersteld.
+- De ongewijzigde RH19-presentatie, vertelpagina, bestaande demogegevens en PWA-installatieroute blijven gekoppeld.
+- Tests zijn uitgebreid met fotobalans, leesbaarheid, syntaxis, swipegedrag en presentatiehandoff.
+- **Status:** codekandidaat. GitHub CI en live deploy volgen automatisch; echte mobiele acceptatie door de gebruiker blijft nodig.
+
+**Terugval:** `backup/lifeline-pwa-v6-before-visual-balance-20261015` (en in dezelfde map `visual-v6-swipe-stable.html`).

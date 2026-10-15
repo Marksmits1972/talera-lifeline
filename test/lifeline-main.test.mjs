@@ -105,7 +105,7 @@ test('Approved visual layout retained and connected to all three TALERA pages',(
   assert.match(visualV3,/<a href="\/tell" class="nav-item">/);
   assert.match(visualV3,/<a href="\/" class="nav-item selected" aria-current="page">/);
   assert.match(visualV3,/<a href="\/present\?visual=weekend-amsterdam" class="nav-item">/);
-  assert.match(worker,/import HOME_HTML from "\.\/visual-v6-swipe-stable\.html"/);
+  assert.match(worker,/import HOME_HTML from "\.\/visual-v7-photo-balance\.html"/);
   assert.match(worker,/id="talera-visual-demo-handoff"/);
   assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
   assert.match(worker,/return reply\(addBridge\(await r\.text\(\),request\)/);
@@ -151,4 +151,27 @@ test('iPhone swipes navigate inside TALERA instead of scrolling the main documen
  const scripts=[...visualV6.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.ok(scripts.length>=2);
  for(const script of scripts)assert.doesNotThrow(()=>new vm.Script(script[1]));
  assert.match(worker,/import HOME_HTML from "\.\/visual-v6-swipe-stable\.html"/);
+});
+
+const visualV7=read('../experiments/lifeline-main/visual-v7-photo-balance.html');
+test('V7: photos take priority, calendar and mini-stories no longer overlap',()=>{
+ assert.match(visualV7,/\.ages\{width:31\.5%;flex:0 0 31\.5%\}/);
+ assert.match(visualV7,/\.story-list\{left:74px;right:6px;top:28px/);
+ assert.match(visualV7,/\.detail-list\{flex:0 0 clamp\(235px,40%,325px\)/);
+ assert.match(visualV7,/\.story-name\{display:-webkit-box;-webkit-line-clamp:2/);
+ assert.match(visualV7,/\.preview-description\{min-height:0/);
+ assert.match(visualV7,/\.preview-meta\{display:flex;flex-wrap:wrap/);
+ assert.match(visualV7,/\.month-mark\.active\{color:#0866d5/);
+ assert.match(visualV7,/\.preview-image\{object-fit:cover/);
+});
+test('V7: fluid month movement and calmer gesture, compatible with RH19 handoff',()=>{
+ assert.match(visualV7,/continuousMonth=state\.monthIndex/);
+ assert.match(visualV7,/mi-continuousMonth/);
+ assert.match(visualV7,/storySuppressClickUntil/);
+ assert.match(visualV7,/\>54\)\{scrollStories/);
+ assert.match(visualV7,/const units=was\.v\/measure\(\)\*10/);
+ for(const x of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')",'taleraVisualMemoryHandoff'])assert.ok(visualV7.includes(x),x);
+ const scripts=[...visualV7.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+ assert.ok(scripts.length>=1);
+ for(const m of scripts)assert.doesNotThrow(()=>new vm.Script(m[1],{filename:'visual-v7.js'}));
 });

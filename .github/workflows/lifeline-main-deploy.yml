@@ -103,11 +103,16 @@ jobs:
           grep -q 'talera-lifeline-session-handoff' /tmp/talera-lifeline-dynamic-presentation.html
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/tell" -o /tmp/talera-lifeline-tell.html
           grep -q 'taleraTellNav' /tmp/talera-lifeline-tell.html
+          grep -q 'id="studioStage"' /tmp/talera-lifeline-tell.html
+          grep -q 'id="datePrecision"' /tmp/talera-lifeline-tell.html
+          grep -q 'const maxMedia=10' /tmp/talera-lifeline-tell.html
+          grep -q 'id="mediaStage"' /tmp/talera-lifeline-tell.html
+          grep -q 'id="aiTitle"' /tmp/talera-lifeline-tell.html
           echo "Checking V9 approved logo, PWA update script and new version API"
           grep -q 'talera-brand-v9.png' /tmp/talera-lifeline-home.html
           grep -q 'talera-version-check-v9' /tmp/talera-lifeline-home.html
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/api/version" -o /tmp/talera-lifeline-version.json
-          grep -q 'talera-lifeline-v9-brand-auto-update-20261015' /tmp/talera-lifeline-version.json
+          grep -q 'talera-lifeline-v10-media-first-tell-20261015' /tmp/talera-lifeline-version.json
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.png" -o /tmp/talera-lifeline-brand.png
           test "$(file --mime-type -b /tmp/talera-lifeline-brand.png)" = "image/png"
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.svg" -o /tmp/talera-lifeline-brand.svg

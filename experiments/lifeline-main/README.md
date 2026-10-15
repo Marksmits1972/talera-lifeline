@@ -58,3 +58,12 @@ De afzonderlijke GitHub Actions deploy wordt na het instellen van de beveiligde 
 - `/sw.js` is strikt *network-first* zonder cache van herinneringen of pagina's, zodat nieuwe testversies niet door een oud appcache blijven hangen. Offline wordt alleen een simpele foutmelding getoond.
 - Levenslijn, Presentatie en Vertellen houden hun eigen routes (`/`, `/present`, `/tell`); het bestaande RH19 en de vertelcode zijn niet gewijzigd.
 - De oorspronkelijke v4 blijft veilig bestaan in `visual-v4.html`; nieuwe actuele startpagina is `visual-v5-fullscreen.html`.
+
+## v6 — Swipe-stabiliteit (15 oktober 2026)
+
+- De body staat vast aan het iPhone-scherm; een verticale veegbeweging verplaatst niet meer de hele webpagina.
+- Jaar-, maand- en herinneringsspoor blijven los bedienbaar met vinger, muis en toetsenbord. Zoom met twee vingers blijft toegestaan.
+- Een iOS/WKWebView-vangnet voorkomt native eenvinger-bewegen van de pagina; na pointercancel start geen ongewenste momentumbeweging.
+- Onbedoeld verslepen van losse foto's is uitgeschakeld. Bestaand ontwerp, voorbeeldherinneringen, PWA en ELP/RH19-koppelingen blijven gelijk.
+- **Beperking:** ChatGPT's ingebouwde browser kan als externe vensterlaag alsnog met een systeemgebaar wegschuiven. Gebruik daarom de bestaande installeerbare TALERA-PWA via Safari → Delen → Zet op beginscherm.
+- Terugvalversie blijft bewaard in `visual-v5-fullscreen.html`.

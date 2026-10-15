@@ -105,7 +105,7 @@ test('Approved visual layout retained and connected to all three TALERA pages',(
   assert.match(visualV3,/<a href="\/tell" class="nav-item">/);
   assert.match(visualV3,/<a href="\/" class="nav-item selected" aria-current="page">/);
   assert.match(visualV3,/<a href="\/present\?visual=weekend-amsterdam" class="nav-item">/);
-  assert.match(worker,/import HOME_HTML from "\.\/visual-v5-fullscreen\.html"/);
+  assert.match(worker,/import HOME_HTML from "\.\/visual-v6-swipe-stable\.html"/);
   assert.match(worker,/id="talera-visual-demo-handoff"/);
   assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
   assert.match(worker,/return reply\(addBridge\(await r\.text\(\),request\)/);
@@ -122,7 +122,7 @@ test('The approved lifeline now has synchronized year, month, story and tag inte
  assert.doesNotThrow(()=>new vm.Script(script[1],{filename:'visual-v4.js'}));
 });
 
-const visualV5=read('../experiments/lifeline-main/visual-v5-fullscreen.html');
+const visualV5=read('../experiments/lifeline-main/visual-v6-swipe-stable.html');
 test('Fullscreen TALERA PWA fills the real viewport and preserves the interactive life design',()=>{
  assert.match(visualV5,/\.viewport\{position:relative;width:100%;max-width:none;height:100vh;height:100svh;height:100dvh;min-height:0/);
  assert.doesNotMatch(visualV5,/width:min\(100%,430px\)/);
@@ -132,8 +132,23 @@ test('Fullscreen TALERA PWA fills the real viewport and preserves the interactiv
  const matches=[...visualV5.matchAll(/<script>([\s\S]*?)<\/script>/g)];
  assert.ok(matches.length>=2);
  for(const m of matches)assert.doesNotThrow(()=>new vm.Script(m[1]));
- assert.match(worker,/import HOME_HTML from "\.\/visual-v5-fullscreen\.html"/);
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v6-swipe-stable\.html"/);
  assert.match(worker,/path==="\/manifest\.webmanifest"/);
  assert.match(worker,/path==="\/sw\.js"/);
  assert.match(worker,/apple-touch-icon/);
+});
+
+const visualV6=read('../experiments/lifeline-main/visual-v6-swipe-stable.html');
+test('iPhone swipes navigate inside TALERA instead of scrolling the main document',()=>{
+ assert.match(visualV6,/body\{display:block;position:fixed;inset:0;overscroll-behavior:none;touch-action:pan-x pinch-zoom\}/);
+ assert.match(visualV6,/\.viewport\{[^}]*overscroll-behavior:none;touch-action:pan-x pinch-zoom\}/);
+ assert.match(visualV6,/\.ages,\.months,\.story-list\{overscroll-behavior:contain;touch-action:pan-x pinch-zoom\}/);
+ assert.match(visualV6,/node\.style\.touchAction='pan-x pinch-zoom'/);
+ assert.match(visualV6,/screenRoot\.addEventListener\('touchmove',[\s\S]*?ev\.preventDefault\(\);[\s\S]*?passive:false/);
+ assert.match(visualV6,/if\(!touchOrigin\|\|ev\.touches\.length!==1\|\|!ev\.cancelable\)return/);
+ assert.match(visualV6,/node\.addEventListener\('pointercancel',ev=>\{/);
+ for(const lane of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')"])assert.ok(visualV6.includes(lane),lane);
+ const scripts=[...visualV6.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.ok(scripts.length>=2);
+ for(const script of scripts)assert.doesNotThrow(()=>new vm.Script(script[1]));
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v6-swipe-stable\.html"/);
 });

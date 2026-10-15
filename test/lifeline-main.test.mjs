@@ -108,7 +108,7 @@ test('Approved visual layout retained and connected to all three TALERA pages',(
   assert.match(worker,/import HOME_HTML from "\.\/visual-v8-photo-space\.html"/);
   assert.match(worker,/id="talera-visual-demo-handoff"/);
   assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
-  assert.match(worker,/return reply\(addBridge\(await r\.text\(\),request\)/);
+  assert.match(worker,/return reply\(pwaShell\(addBridge\(await r\.text\(\),request\)\)/);
 });
 
 const visualV4=read('../experiments/lifeline-main/visual-v4.html');
@@ -212,7 +212,7 @@ test('V8: each media belongs to one private on-device memory and one timeline da
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
  assert.match(worker,/const VERSION="talera-lifeline-v9-brand-auto-update-20261015"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
- assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(PRESENT_LOCAL_HTML/);
+ assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
  assert.match(worker,/TELL_PAGE_HTML/);
  assert.match(worker,/MEMORY_STORE_SCRIPT/);
  assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));

@@ -612,7 +612,7 @@ test('Phone display variant preserves original photos for later full-resolution 
  assert.match(store,/canvas\.toBlob\(resolve,'image\/jpeg',PHONE_JPEG_QUALITY\)/);
  assert.match(store,/async function displayUrl\(key\)/);
  assert.match(store,/tx\.objectStore\('files'\)\.put\(\{key:files\[j\]\.key,blob:uploads\[j\]\}\)/);
- assert.match(store,/key:files\[j\]\.key\+PHONE_VARIANT,blob:phoneCopies\[j\]/);
+ assert.match(store,/key:files\[k\]\.key\+PHONE_VARIANT,blob:phoneCopies\[k\]/);
  assert.match(store,/window\.TaleraMemories=\{save:save,list:list,get:get,blob:blob,mediaUrl:mediaUrl,displayUrl:displayUrl/);
  assert.match(adapter,/store\.displayUrl\?store\.displayUrl\(item\.key\):store\.mediaUrl\(item\.key\)/);
  assert.match(visualV8,/store\.displayUrl\?store\.displayUrl\(photo\.key\):store\.mediaUrl\(photo\.key\)/);

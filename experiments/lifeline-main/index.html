@@ -117,12 +117,12 @@ if(p==='month')return [midnight(y,m.month,1),midnight(y,m.month+1,1)];
 if(p==='season'){const s=m.season; if(s==='winter')return [midnight(y-1,11,1),midnight(y,2,1)];if(s==='spring')return [midnight(y,2,1),midnight(y,5,1)];if(s==='summer')return [midnight(y,5,1),midnight(y,8,1)];return [midnight(y,8,1),midnight(y,11,1)]}
 const t=new Date(m.at).getTime();return [t,t+1]}
 function groupKey(m){return (m.precision||'exact')+'|'+m.year+'|'+(m.season||'')+'|'+(m.month??'')}
-function layoutMemories(){const grouped=new Map();items.forEach((m,i)=>{m._sourceIndex=i;if(m.precision==='exact'){m.virtualMs=new Date(m.at).getTime();return}if(Number.isFinite(m.manualMs)){m.virtualMs=m.manualMs;return}const k=groupKey(m);if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(m)});
+function layoutMemories(){const grouped=new Map();items.forEach((m,i)=>{m._sourceIndex=i;if(Number.isFinite(m.manualMs)){m.virtualMs=m.manualMs;return}if(m.precision==='exact'){m.virtualMs=new Date(m.at).getTime();return}const k=groupKey(m);if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(m)});
 for(const group of grouped.values()){const [a,b]=interval(group[0]);group.sort((x,y)=>(x.order||x.id)-(y.order||y.id));group.forEach((m,i)=>{m.virtualMs=a+(b-a)*(i+1)/(group.length+1)})}
 items.sort((a,b)=>a.virtualMs-b.virtualMs||a.id-b.id);
 visible=items.filter(m=>!filters.size||m.tags.some(t=>filters.has(t)));visible.sort((a,b)=>a.virtualMs-b.virtualMs||a.id-b.id);
 }
-function saveOverrides(){try{localStorage.setItem(STORAGE,JSON.stringify(items.filter(m=>m.edited).map(m=>({id:m.id,precision:m.precision,year:m.year,month:m.month,season:m.season,manualMs:m.manualMs,edited:true}))))}catch(e){}}
+function saveOverrides(){try{localStorage.setItem(STORAGE,JSON.stringify(items.filter(m=>m.edited&&!m.localId).map(m=>({id:m.id,precision:m.precision,year:m.year,month:m.month,season:m.season,manualMs:m.manualMs,edited:true}))))}catch(e){}}
 function restoreOverrides(){try{const entries=JSON.parse(localStorage.getItem(STORAGE)||'[]');if(!Array.isArray(entries))return;entries.forEach(x=>{const m=items.find(v=>v.id===x.id);if(!m||!x.edited)return;if(!['exact','year','month','season'].includes(x.precision))return;m.precision=x.precision;m.year=x.year;m.month=x.month;m.season=x.season;m.manualMs=Number.isFinite(x.manualMs)?x.manualMs:null;m.edited=true})}catch(e){}}
 function nearestIndex(ms,array){if(!array.length)return -1;let lo=0,hi=array.length;while(lo<hi){const mid=(lo+hi)>>1;if(array[mid].virtualMs<ms)lo=mid+1;else hi=mid}if(lo===0)return 0;if(lo>=array.length)return array.length-1;return ms-array[lo-1].virtualMs<=array[lo].virtualMs-ms?lo-1:lo}
 function fractionalIndex(ms,array){if(!array.length)return 0;if(array.length===1)return 0;let lo=0,hi=array.length;while(lo<hi){const mid=(lo+hi)>>1;if(array[mid].virtualMs<ms)lo=mid+1;else hi=mid}if(lo<=0)return 0;if(lo>=array.length)return array.length-1;const a=array[lo-1].virtualMs,b=array[lo].virtualMs;return lo-1+clamp((ms-a)/Math.max(1,b-a),0,1)}
@@ -158,7 +158,7 @@ function renderPreview(force){if(!visible.length){$('preview').removeAttribute('
 $('previewEmpty').hidden=true;$('previewInfo').hidden=false;$('previewImage').style.display='';$('previewBlur').style.display='';
 const i=nearestIndex(focusMs,visible),m=visible[i];if(!m||(!force&&shownPreviewId===m.id))return;
 shownPreviewId=m.id;$('previewImage').src=m.image;$('previewBlur').src=m.image;$('previewDate').textContent=label(m);$('previewTitle').textContent=m.story;
-$('storyCounter').textContent=(i+1)+' van '+visible.length+' verhalen';$('preview').href='/present?memory='+encodeURIComponent(m.id);$('preview').setAttribute('aria-label','Presenteer herinnering van '+label(m));$('presentationLink').href='/present?memory='+encodeURIComponent(m.id);
+$('storyCounter').textContent=(i+1)+' van '+visible.length+' verhalen';$('preview').href=m.localId?'/present?local='+encodeURIComponent(m.localId):'/present?memory='+encodeURIComponent(m.id);$('preview').setAttribute('aria-label','Presenteer herinnering van '+label(m));$('presentationLink').href=m.localId?'/present?local='+encodeURIComponent(m.localId):'/present?memory='+encodeURIComponent(m.id);
 }
 function renderFilters(){const values=Array.from(new Set(items.flatMap(x=>x.tags))).sort((a,b)=>a.localeCompare(b,'nl'));$('filterOptions').innerHTML=values.map(tag=>'<button type="button" class="tag" aria-pressed="'+filters.has(tag)+'" data-tag="'+safe(tag)+'">'+safe(tag)+'</button>').join('');
 $('filterCount').textContent=filters.size?filters.size+' actief':''}
@@ -192,14 +192,21 @@ element.addEventListener('keydown',e=>{if(!['ArrowUp','ArrowDown','PageUp','Page
 if(lane==='year')focusAt(fromYearFloat(yearFloat(focusMs)+n*step),'year',true);if(lane==='month')focusAt(fromMonthFloat(monthFloat(focusMs)+n*step),'month',true);if(lane==='story'&&visible.length)focusAt(msAtIndex(Math.round(fractionalIndex(focusMs,visible))+n*step,visible),'story',true)})}
 attachGear(yearGear,'year');attachGear(monthGear,'month');attachGear(storyGear,'story');
 function startDrag(id,x,y){const m=items.find(a=>a.id===id);if(!m)return;
-drag={id,monthReference:focusMs,targetMonth:null,enteredMonth:false,anchor:0,insertIndex:0,pointerX:x,pointerY:y,raf:0};
+drag={id,monthReference:focusMs,yearReference:focusMs,targetYear:null,targetMonth:null,enteredMonth:false,anchor:0,insertIndex:0,pointerX:x,pointerY:y,raf:0};
 const ghost=$('dragGhost');ghost.querySelector('img').src=m.image;ghost.querySelector('span').textContent=label(m);ghost.style.display='block';
 $('dragHint').style.display='block';$('dragHint').textContent='Sleep naar de maanden en dan tussen twee verhalen';moveDrag(x,y);drag.raf=requestAnimationFrame(autoScrollDrag)}
 function placeGhost(x,y){const ghost=$('dragGhost');ghost.style.left=Math.min(innerWidth-137,Math.max(7,x+17))+'px';ghost.style.top=Math.min(innerHeight-140,Math.max(7,y-60))+'px'}
 function dragMonthItems(){if(!drag||drag.targetMonth===null)return[];const d=dateFromMonthIndex(drag.targetMonth),a=midnight(d.getFullYear(),d.getMonth(),1),b=midnight(d.getFullYear(),d.getMonth()+1,1);return visible.filter(m=>m.id!==drag.id&&m.virtualMs>=a&&m.virtualMs<b)}
 function moveDrag(x,y){if(!drag)return;drag.pointerX=x;drag.pointerY=y;placeGhost(x,y);
-const mr=monthGear.getBoundingClientRect(),sr=storyGear.getBoundingClientRect();
-if(x>=mr.left&&x<=mr.right&&y>=mr.top&&y<=mr.bottom){drag.enteredMonth=true;const mo=pointerMonth(y,drag.monthReference);if(drag.targetMonth!==mo){drag.targetMonth=mo;drag.anchor=0;drag.insertIndex=0;const d=dateFromMonthIndex(mo);focusMs=clamp(midnight(d.getFullYear(),d.getMonth(),15),lifeStart,lifeEnd)}
+const yr=yearGear.getBoundingClientRect(),mr=monthGear.getBoundingClientRect(),sr=storyGear.getBoundingClientRect();
+if(x>=yr.left&&x<=yr.right&&y>=yr.top&&y<=yr.bottom){
+ const delta=(y-(yr.top+yr.height/2))/YEAR_PX;
+ const year=clamp(Math.floor(yearFloat(drag.yearReference)+delta),new Date(lifeStart).getFullYear(),new Date(lifeEnd).getFullYear());
+ drag.targetYear=year;drag.targetMonth=null;
+ drag.monthReference=midnight(year,5,15);focusMs=clamp(drag.monthReference,lifeStart,lifeEnd);
+ $('dragHint').textContent='Jaar '+year+' gekozen — sleep naar de maanden';
+}
+else if(x>=mr.left&&x<=mr.right&&y>=mr.top&&y<=mr.bottom){drag.enteredMonth=true;const mo=pointerMonth(y,drag.monthReference);drag.targetYear=dateFromMonthIndex(mo).getFullYear();if(drag.targetMonth!==mo){drag.targetMonth=mo;drag.anchor=0;drag.insertIndex=0;const d=dateFromMonthIndex(mo);focusMs=clamp(midnight(d.getFullYear(),d.getMonth(),15),lifeStart,lifeEnd)}
 $('dragHint').textContent='Maand gekozen — sleep nu naar rechts tussen de verhalen'}
 else if(x>=sr.left&&x<=sr.right&&y>=sr.top&&y<=sr.bottom){
 if(drag.targetMonth===null){const dragged=items.find(v=>v.id===drag.id);drag.targetMonth=Math.floor(monthFloat(dragged?dragged.virtualMs:focusMs));drag.anchor=0}
@@ -208,24 +215,55 @@ drag.insertIndex=clamp(Math.round(drag.anchor+local+.5),0,group.length);
 $('dragHint').textContent=group.length?'Laat los tussen de juiste verhalen':'Laat los om de herinnering in deze maand te plaatsen'}
 schedule();
 }
-function autoScrollDrag(){if(!drag)return;const r=storyGear.getBoundingClientRect(),x=drag.pointerX,y=drag.pointerY;if(drag.targetMonth!==null&&x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){const group=dragMonthItems();if(group.length>1){let delta=0;if(y<r.top+60)delta=-.07;else if(y>r.bottom-60)delta=.07;if(delta){drag.anchor=clamp(drag.anchor+delta,0,group.length-1);const local=(y-(r.top+r.height/2))/STORY_PX;drag.insertIndex=clamp(Math.round(drag.anchor+local+.5),0,group.length);schedule()}}}drag.raf=requestAnimationFrame(autoScrollDrag)}
+function autoScrollDrag(){if(!drag)return;
+const yr=yearGear.getBoundingClientRect(),mr=monthGear.getBoundingClientRect();
+const r=storyGear.getBoundingClientRect(),x=drag.pointerX,y=drag.pointerY;
+if(x>=yr.left&&x<=yr.right&&y>=yr.top&&y<=yr.bottom){
+ const step=y<yr.top+55?-0.12:y>yr.bottom-55?0.12:0;
+ if(step){drag.yearReference=clamp(fromYearFloat(yearFloat(drag.yearReference)+step),lifeStart,lifeEnd);moveDrag(x,y)}
+}
+if(x>=mr.left&&x<=mr.right&&y>=mr.top&&y<=mr.bottom){
+ const step=y<mr.top+55?-0.14:y>mr.bottom-55?0.14:0;
+ if(step){drag.monthReference=clamp(fromMonthFloat(monthFloat(drag.monthReference)+step),lifeStart,lifeEnd);moveDrag(x,y)}
+}
+if(drag.targetMonth!==null&&x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){const group=dragMonthItems();if(group.length>1){let delta=0;if(y<r.top+60)delta=-.07;else if(y>r.bottom-60)delta=.07;if(delta){drag.anchor=clamp(drag.anchor+delta,0,group.length-1);const local=(y-(r.top+r.height/2))/STORY_PX;drag.insertIndex=clamp(Math.round(drag.anchor+local+.5),0,group.length);schedule()}}}drag.raf=requestAnimationFrame(autoScrollDrag)}
 function finishDrag(x,y){if(!drag)return;const current=drag,mo=current.targetMonth;
 const mr=monthGear.getBoundingClientRect(),sr=storyGear.getBoundingClientRect(),valid=mo!==null&&y>=stage.getBoundingClientRect().top&&y<=stage.getBoundingClientRect().bottom&&x>=mr.left&&x<=sr.right;
 if(valid){const m=items.find(v=>v.id===current.id),group=dragMonthItems(),target=dateFromMonthIndex(mo),start=midnight(target.getFullYear(),target.getMonth(),1),end=midnight(target.getFullYear(),target.getMonth()+1,1),i=clamp(current.insertIndex,0,group.length);
 const before=group[i-1],after=group[i],a=before?before.virtualMs:start,b=after?after.virtualMs:end;
-if(m&&b>a){const original={id:m.id,precision:m.precision,year:m.year,month:m.month,season:m.season,manualMs:m.manualMs,edited:m.edited};
-undoState=original;const placed=a+(b-a)/2;const allowed=interval(m);const keepPrecision=!current.enteredMonth&&m.precision!=='exact'&&placed>=allowed[0]&&placed<allowed[1];if(!keepPrecision){m.year=target.getFullYear();m.month=target.getMonth();m.season=null;m.precision='month'}m.manualMs=placed;m.edited=true;
+if(m&&b>a){const original={id:m.id,precision:m.precision,year:m.year,month:m.month,season:m.season,manualMs:m.manualMs,at:m.at,edited:m.edited};
+undoState=original;const placed=a+(b-a)/2;m.year=new Date(placed).getFullYear();m.month=new Date(placed).getMonth();m.season=null;m.precision='exact';m.at=new Date(placed).toISOString();m.manualMs=placed;m.edited=true;if(m.localId&&window.TaleraMemories?.updatePosition)window.TaleraMemories.updatePosition(m.localId,placed).catch(err=>{$('status').textContent='Datum niet opgeslagen: '+err.message});
 layoutMemories();saveOverrides();focusMs=m.virtualMs;showUndo()}}
 cancelDrag();focusAt(focusMs,'story',true)}
 function cancelDrag(){if(!drag)return;cancelAnimationFrame(drag.raf);drag=null;$('dragGhost').style.display='none';$('dragHint').style.display='none';$('dropGuide').style.display='none';schedule()}
 function showUndo(){$('undoToast').style.display='flex';clearTimeout(undoTimer);undoTimer=setTimeout(()=>{$('undoToast').style.display='none';undoState=null},7000)}
-$('undoButton').onclick=()=>{if(!undoState)return;const m=items.find(x=>x.id===undoState.id);if(!m)return;Object.assign(m,undoState);layoutMemories();saveOverrides();focusAt(m.virtualMs,'story',true);undoState=null;clearTimeout(undoTimer);$('undoToast').style.display='none'};
+$('undoButton').onclick=()=>{if(!undoState)return;const m=items.find(x=>x.id===undoState.id);if(!m)return;Object.assign(m,undoState);if(m.localId&&Number.isFinite(m.manualMs))window.TaleraMemories?.updatePosition(m.localId,m.manualMs).catch(()=>{$('status').textContent='Terugdraaien kon niet worden opgeslagen.'});layoutMemories();saveOverrides();focusAt(m.virtualMs,'story',true);undoState=null;clearTimeout(undoTimer);$('undoToast').style.display='none'};
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){if(drag)cancelDrag();$('filters').hidden=true;$('filterToggle').setAttribute('aria-expanded','false')}});
 window.addEventListener('resize',schedule);document.addEventListener('visibilitychange',()=>{if(document.hidden&&drag)cancelDrag()});
-fetch('/api/demo-memories',{cache:'no-store'}).then(res=>{if(!res.ok)throw Error('Herinneringen niet beschikbaar');return res.json()}).then(data=>{
+fetch('/api/demo-memories',{cache:'no-store'}).then(res=>{if(!res.ok)throw Error('Herinneringen niet beschikbaar');return res.json()}).then(async data=>{
 if(!Array.isArray(data)||data.length!==50)throw Error('Demo set incompleet');
 items=data.map(m=>Object.assign({},m,{year:new Date(m.at).getFullYear(),month:new Date(m.at).getMonth(),season:null,manualMs:null,edited:false,tags:Array.isArray(m.tags)?m.tags:[]}));
-restoreOverrides();layoutMemories();lifeStart=midnight(1976,8,6);lifeEnd=Math.max(midnight(2026,9,14),...items.map(m=>m.virtualMs));const previous=Number(sessionStorage.getItem('talera-lifeline-focus'));focusMs=clamp(Number.isFinite(previous)&&previous>lifeStart?previous:lifeEnd,lifeStart,lifeEnd);
+if(window.TaleraMemories){
+ try{
+  const locals=await window.TaleraMemories.list();
+  const mapped=await Promise.all(locals.map(async entry=>{
+   let code=0;for(const c of entry.id)code=(Math.imul(code,31)+c.charCodeAt(0))|0;
+   const stamp=Number.isFinite(entry.sortMs)?entry.sortMs:new Date(entry.date+'T12:00:00').getTime();
+   if(!Number.isFinite(stamp))return null;
+   const cover=(entry.items||[]).find(f=>f.kind==='photo');
+   let image=cover?await window.TaleraMemories.mediaUrl(cover.key).catch(()=>null):null;
+   if(!image)image='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="350"><rect width="100%" height="100%" fill="#29516e"/></svg>');
+   if(image.startsWith('blob:'))window.addEventListener('pagehide',()=>URL.revokeObjectURL(image),{once:true});
+   const day=new Date(stamp);
+   return {id:1000000+(code>>>0),localId:entry.id,source:'pwa-local',at:day.toISOString(),year:day.getFullYear(),month:day.getMonth(),season:null,manualMs:stamp,
+     precision:'exact',edited:false,story:entry.title||'Mijn herinnering',fullStory:entry.text||'',image,tags:[]};
+  }));
+  items.push(...mapped.filter(Boolean));
+ }catch(err){$('status').textContent='Lokale herinneringen konden niet worden gelezen: '+err.message}
+}
+restoreOverrides();layoutMemories();
+lifeStart=midnight(Math.min(new Date().getFullYear(),...items.map(m=>new Date(m.virtualMs).getFullYear())),0,1);
+lifeEnd=Date.now();const previous=Number(sessionStorage.getItem('talera-lifeline-focus'));focusMs=clamp(Number.isFinite(previous)&&previous>lifeStart?previous:lifeEnd,lifeStart,lifeEnd);
 renderFilters();focusAt(focusMs,'year',true);$('status').textContent='Levenslijn gereed — '+items.length+' herinneringen';
 }).catch(err=>{$('previewEmpty').hidden=false;$('previewEmpty').textContent='Kon de herinneringen niet laden. Vernieuw de pagina.';$('status').textContent=String(err)});
 })();

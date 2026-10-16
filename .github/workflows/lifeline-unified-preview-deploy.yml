@@ -79,5 +79,5 @@ jobs:
           curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/tell" -o /tmp/talera-unified-tell.html
           grep -q 'talera-memory-store-v1' /tmp/talera-unified-tell.html
           grep -q 'taleraTellNav' /tmp/talera-unified-tell.html
-          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" | grep -q 'shared-memory-register'
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" | grep -q 'phone-display-unified-nav'
           echo "ISOLATED PREVIEW VERIFIED; installed iPhone app untouched."

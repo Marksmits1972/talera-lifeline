@@ -77,8 +77,9 @@ export const presentationControllerScript = String.raw`
     const containScale=Math.min(boxW/img.naturalWidth,boxH/img.naturalHeight);
     const containW=img.naturalWidth*containScale;
     const containH=img.naturalHeight*containScale;
-    const targetH=Math.min(boxH,Math.max(containH,boxH*.68));
-    const zoom=Math.min(1.82,Math.max(1,targetH/containH));
+    // Keep the actual image as the sharp foreground. Never enlarge it merely
+    // to cover more of the stage; the separate atmospheric backdrop may blur.
+    const zoom=1;
     const h=containH*zoom;
     const w=containW*zoom;
     const left=(boxW-w)/2;

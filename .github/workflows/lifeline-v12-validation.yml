@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - feature/talera-v12-free-20261016
+  pull_request:
+    branches:
+      - work/r19h2-lifeline-main-20261014
   workflow_dispatch:
 permissions:
   contents: read

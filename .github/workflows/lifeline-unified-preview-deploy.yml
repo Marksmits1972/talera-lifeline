@@ -1,0 +1,75 @@
+name: TALERA RH19 Unified — isolated preview only
+
+on:
+  push:
+    branches:
+      - work/v13-unified-rh19-memory-adapter-20261016
+    paths:
+      - 'experiments/lifeline-main/**'
+      - 'src/**'
+      - 'test/lifeline-main.test.mjs'
+      - '.github/workflows/lifeline-unified-preview-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-rh19-unified-preview-only
+  cancel-in-progress: false
+
+jobs:
+  isolated-preview:
+    name: Test and deploy a separate preview Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    if: vars.TALERA_LIFELINE_DEPLOY_ENABLED == 'true'
+    environment: talera-lifeline-development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate isolated target and branch
+        run: |
+          test "$GITHUB_REF" = 'refs/heads/work/v13-unified-rh19-memory-adapter-20261016'
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const c=JSON.parse(fs.readFileSync('experiments/lifeline-main/wrangler-unified-preview.jsonc','utf8'));
+          if(c.name!=='talera-r19-lifeline-unified-preview-dev'||c.main!=='worker.js'||c.routes||c.d1_databases||c.r2_buckets)throw Error('Unsafe preview configuration');
+          const worker=fs.readFileSync('experiments/lifeline-main/worker.js','utf8');
+          if(worker.includes('deleteDatabase(')||worker.includes('localStorage.clear('))throw Error('Unsafe local data operation');
+          JS
+      - name: Run complete RH19 and 1,000-memory tests
+        run: |
+          node --test test/lifeline-main.test.mjs
+          node --check experiments/lifeline-main/worker.js
+      - name: Verify credentials configured
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CF_TOKEN"
+          test -n "$CF_ACCOUNT"
+      - name: Deploy this preview only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')"
+          npx wrangler deploy --config experiments/lifeline-main/wrangler-unified-preview.jsonc
+      - name: Smoke check without reading user media
+        run: |
+          set -euo pipefail
+          BASE='https://talera-r19-lifeline-unified-preview-dev.mark-a39.workers.dev'
+          sleep 3
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/" -o /tmp/talera-unified-home.html
+          grep -q 'TALERA' /tmp/talera-unified-home.html
+          grep -q 'talera-local-timeline-integration' /tmp/talera-unified-home.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/present?local=local-smoke-test" -o /tmp/talera-unified-present.html
+          grep -q 'talera-local-memory-adapter' /tmp/talera-unified-present.html
+          grep -q 'memoryStoryScroll' /tmp/talera-unified-present.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" | grep -q 'unified-rh19-adapter'
+          echo "ISOLATED PREVIEW VERIFIED; installed iPhone app untouched."

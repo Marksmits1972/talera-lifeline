@@ -11,7 +11,7 @@ import { DEMO_MEMORIES } from "./demo-memories.js";
 import { PWA_ICONS } from "./pwa-icons.js";
 import { BRAND_PNG_BASE64, BRAND_ICON_SVG } from "./pwa-brand.js";
 import { PWA_UPDATE_SCRIPT } from "./pwa-update.js";
-import { FREE_TELL_POLISH_STYLE } from "./iphone-v13-corrections.js";
+import { FREE_TELL_POLISH_STYLE } from "./free-tell-polish.js";
 import { LOCAL_RH19_ADAPTER } from "./local-rh19-adapter.js";
 
 const VERSION="talera-lifeline-v13-unified-rh19-adapter-20261016-r2";

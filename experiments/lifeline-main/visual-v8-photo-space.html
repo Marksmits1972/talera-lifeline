@@ -594,7 +594,7 @@ window.__taleraLifelineDemo={
  const MAX_THUMBS=48;
  let rows=[];
  async function preload(ids){
-  const missing=ids.filter(id=>!requested.has(id)).slice(0,24);
+  const missing=ids.filter(id=>!requested.has(id)).slice(0,10);
   missing.forEach(id=>requested.add(id));
   const covers=[];
   for(const id of missing){
@@ -618,7 +618,7 @@ window.__taleraLifelineDemo={
   const nearest=rows.filter(r=>Math.abs(Number(r.date.slice(0,4))-year)<=2);
   const selection=runtime.getState().selectedId;
   nearest.sort((a,b)=>a.id===selection?-1:b.id===selection?1:Math.abs(Number(a.date.slice(0,4))-year)-Math.abs(Number(b.date.slice(0,4))-year));
-  void preload(nearest.slice(0,24).map(r=>r.id));
+  void preload(nearest.slice(0,10).map(r=>r.id));
  }
  document.addEventListener('talera:home-year',e=>nearYear(Number(e.detail?.year)||new Date().getFullYear()));
  document.addEventListener('talera:home-select',e=>{if(e.detail?.id)void preload([e.detail.id])});

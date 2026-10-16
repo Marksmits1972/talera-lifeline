@@ -601,7 +601,7 @@ window.__taleraLifelineDemo={
    const row=rows.find(r=>r.id===id);
    const photo=row?.items?.find(x=>x.kind==='photo');
    if(!photo)continue;
-   try{const src=await store.mediaUrl(photo.key);if(src){urls.set(id,src);covers.push({id,src})}}catch(error){requested.delete(id)}
+   try{const src=await (store.displayUrl?store.displayUrl(photo.key):store.mediaUrl(photo.key));if(src){urls.set(id,src);covers.push({id,src})}}catch(error){requested.delete(id)}
   }
   runtime.applyLocalCovers(covers);
   const removed=[];

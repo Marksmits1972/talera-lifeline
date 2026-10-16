@@ -527,57 +527,63 @@ test('V13 presentation: preserve native RH19 photo fitting and three-page swipe 
  const local=read('../experiments/lifeline-main/iphone-v13-corrections.js');
  assert.match(local,/const nativeState=book.state.bind\(book\)/);
  assert.match(local,/const nativeStep=book.step.bind\(book\)/);
- assert.match(local,/runtime.writeMemory\(m\)/);
+ assert.match(local,/runtime.writeMemory\(memory\)/);
  assert.match(local,/_photoIndex=i/);
- assert.match(local,/if\(hasVideo\)\{/);
+ assert.match(local,/if\(frame.kind==='video'\)\{/);
  assert.doesNotMatch(local,/document.addEventListener\('touchend'/);
 });
 
 
-test('V13 native photo-book handoff offers correct neighboring local photographs without a second viewer',()=>{
+
+test('V13 Free: native photo-book can tap and swipe through local media with no extra counter',()=>{
  const correction=read('../experiments/lifeline-main/iphone-v13-corrections.js');
  const context=vm.createContext({});
  vm.runInContext(correction.replaceAll('export const ','const ')+String.fromCharCode(10)+
   'this.handoff=LOCAL_PRESENTATION_HANDOFF',context);
- const scriptStart=context.handoff.indexOf('<script id=');
- assert.ok(scriptStart>=0);
- const scriptClose=context.handoff.indexOf('</script>',scriptStart);
- assert.ok(scriptClose>scriptStart);
- const embedded=[null,context.handoff.slice(context.handoff.indexOf('>',scriptStart)+1,scriptClose)];
- assert.ok(embedded);
- const script=embedded[1];
- const nativeSnippet=script.slice(script.indexOf('const nativeState=book.state.bind(book);'),
-    script.indexOf('document.body.classList.add(',script.indexOf('const nativeState=book.state.bind(book);')));
- assert.ok(nativeSnippet.includes('previous:i>0?{image:m.photos[i-1]}:around.previous'));
- assert.ok(nativeSnippet.includes('next:i<m.photos.length-1?{image:m.photos[i+1]}:around.next'));
- assert.ok(nativeSnippet.includes('runtime.writeMemory(m)'));
- const memory={id:51001,_taleraLocal:true,_taleraHasVideo:false,_photoIndex:0,photos:['foto-1','foto-2','foto-3'],image:'foto-1'};
- let writes=0,draws=0;
- const runtime={currentMemory:()=>memory,writeMemory:()=>{writes++},draw:()=>{draws++}};
- const older={image:'oude-herinnering'},newer={image:'volgende-herinnering'};
- let nativeMoves=0;
- const book={state(){return {index:7,current:null,previous:older,next:newer}},step(direction){nativeMoves+=direction;return true}};
- vm.runInNewContext('(()=>{'+nativeSnippet+'})()', {book,runtime,Math});
+ const source=context.handoff;
+ const from=source.indexOf('<script id=');
+ const to=source.indexOf('</script>',from);
+ const script=source.slice(source.indexOf('>',from)+1,to);
+ const code=script.slice(script.indexOf('const nativeState=book.state.bind(book);'),
+   script.indexOf("document.body.classList.add(",script.indexOf('const nativeState=book.state.bind(book);')));
+ assert.ok(code.includes('previous:i>0?{image:sequence[i-1]}:around.previous'));
+ assert.ok(code.includes('next:i<frames.length-1?{image:sequence[i+1]}:around.next'));
+ const frames=['foto-1','foto-2','foto-3'].map(src=>({kind:'photo',src}));
+ const sequence=frames.map(f=>f.src);
+ const memory={id:51001,_taleraLocal:true,_photoIndex:0,photos:sequence,image:sequence[0]};
+ const older={image:'vorige-herinnering'},newer={image:'volgende-herinnering'};
+ const runtime={currentMemory:()=>memory};
+ let swaps=0,clearVideos=0;
+ const showFrame=i=>{memory._photoIndex=((i%sequence.length)+sequence.length)%sequence.length;memory.image=sequence[memory._photoIndex];swaps++;return true};
+ const book={state(){return {index:7,current:memory,previous:older,next:newer}},step(){return true}};
+ const window={};
+ vm.runInNewContext('(()=>{'+code+'})()', {frames,sequence,memory,runtime,book,showFrame,removeVideo:()=>{clearVideos++},window,Math});
  assert.equal(book.state().current.image,'foto-1');
  assert.equal(book.state().previous,older);
  assert.equal(book.state().next.image,'foto-2');
- assert.equal(book.step(1),true);
+ assert.equal(window.__taleraLocalAdvance(1),true); // first tap
  assert.equal(memory.image,'foto-2');
- assert.equal(book.state().previous.image,'foto-1');
- assert.equal(book.state().next.image,'foto-3');
+ assert.equal(window.__taleraLocalAdvance(1),true); // second tap
+ assert.equal(memory.image,'foto-3');
+ assert.equal(window.__taleraLocalAdvance(1),true); // tap loops within memory
+ assert.equal(memory.image,'foto-1');
+ assert.equal(book.step(1),true); // native RH19 swipe
+ assert.equal(memory.image,'foto-2');
  assert.equal(book.step(1),true);
  assert.equal(memory.image,'foto-3');
- assert.equal(book.step(1),true);
- assert.equal(nativeMoves,1);
+ assert.equal(book.step(1),true); // swipe now leaves the memory
  assert.equal(book.state().next,newer);
- assert.equal(book.step(-1),true);
- assert.equal(memory.image,'foto-2');
- assert.equal(writes,3);
- assert.equal(draws,3);
- assert.equal(book.step(-1),true);
- assert.equal(memory.image,'foto-1');
- assert.equal(book.step(-1),true);
- assert.equal(nativeMoves,0);
- assert.equal(writes,4);
- assert.equal(draws,4);
+ assert.equal(swaps,5);
+ assert.equal(clearVideos,1);
+ assert.doesNotMatch(source,/className='talera-local-controls'|className="talera-local-controls"/);
+ assert.doesNotMatch(source,/van '\+frames\.length/);
+ assert.doesNotMatch(source,/id=["']bulkEditor/);
+ assert.match(source,/frame.kind==='video'/);
+ assert.match(source,/stage.addEventListener\('click'/);
+ assert.match(source,/audioUrl/);
+ assert.doesNotMatch(source,/indexedDB\.deleteDatabase|localStorage\.clear|sessionStorage\.clear/);
+ const live=read('../src/live-memory-integration.js');
+ assert.match(live,/if\(memory&&memory\._taleraLocal\)/);
+ assert.match(live,/window\.__taleraLocalAdvance\?\.\(1\)/);
+ assert.match(live,/memory\._photoLoading\|\|!Array\.isArray/); // still protects non-Free loading
 });

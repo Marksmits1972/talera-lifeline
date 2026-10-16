@@ -324,9 +324,10 @@ test('V10: date precision roundtrips through local storage, timeline and present
 
 const bulkCode=read('../experiments/lifeline-main/bulk-free.js');
 test('V11 Free: bulk import can select twenty-five photos and shows separated memory cards in Tell',()=>{
- const styles=exportedHtml(bulkCode.split('\n')[0]+';','BULK_FREE_STYLE');
- const markup=exportedHtml('export const BULK_FREE_MARKUP = '+bulkCode.split('\n')[1].slice('export const BULK_FREE_MARKUP = '.length),'BULK_FREE_MARKUP');
- const script=exportedHtml('export const BULK_FREE_SCRIPT = '+bulkCode.split('\n')[2].slice('export const BULK_FREE_SCRIPT = '.length),'BULK_FREE_SCRIPT');
+ const [styleLine,markupLine,scriptLine]=bulkCode.trim().split('\n');
+ const styles=exportedHtml(styleLine,'BULK_FREE_STYLE');
+ const markup=exportedHtml(markupLine,'BULK_FREE_MARKUP');
+ const script=exportedHtml(scriptLine,'BULK_FREE_SCRIPT');
  assert.match(worker,/import \{ BULK_FREE_STYLE, BULK_FREE_MARKUP, BULK_FREE_SCRIPT \} from "\.\/bulk-free\.js"/);
  assert.match(worker,/\.replace\('<section class="card" id="mediaSection"',BULK_FREE_MARKUP/);
  assert.match(worker,/\.replace\("<\/body>",BULK_FREE_SCRIPT/);

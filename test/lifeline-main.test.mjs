@@ -255,7 +255,7 @@ test('V9: network-first update watcher refreshes only safe timeline and retains 
  assert.match(worker,/function pwaShell\(html\)/);
  assert.match(worker,/pwaShell\(String\(HOME_HTML\)/);
  assert.match(worker,/pwaShell\(tell\)/);
- assert.match(worker,/pwaShell\(PRESENT_LOCAL_HTML/);
+ assert.match(worker,/MEMORY_STORE_SCRIPT\+LOCAL_PRESENTATION_HANDOFF/);
  assert.match(worker,/pwaShell\(addBridge/);
  assert.match(worker,/cache-control":"no-store"/);
  assert.match(worker,/start_url:"\/"/);
@@ -484,8 +484,8 @@ test('V13 iPhone corrections: local memories open in the native RH19 presentatio
  const module={exports:{}};
  const result={};
  const context=vm.createContext({...result});
- vm.runInContext(source.replaceAll('export const ','const ')+
-  '\\nthis.__polish={FREE_TELL_POLISH_STYLE,LOCAL_PRESENTATION_HANDOFF}',context);
+ vm.runInContext(source.replaceAll('export const ','const ')+String.fromCharCode(10)+
+  'this.__polish={FREE_TELL_POLISH_STYLE,LOCAL_PRESENTATION_HANDOFF}',context);
  const css=context.__polish.FREE_TELL_POLISH_STYLE;
  const handoff=context.__polish.LOCAL_PRESENTATION_HANDOFF;
  assert.match(worker,/LOCAL_PRESENTATION_HANDOFF/);

@@ -393,7 +393,7 @@ function updateLinks(m){
 function queueSettle(delay=330){
  clearTimeout(state.settle);state.settle=setTimeout(()=>{
   const m=nearestForCurrent();if(m)state.selectedId=m.id;
-  renderStories();if(m){preview.classList.remove('no-results');setPreview(m.id)}
+  renderStories();if(m){preview.classList.remove('no-results');setPreview(m.id);document.dispatchEvent(new CustomEvent('talera:home-select',{detail:{id:m.id}}))}
   else{preview.classList.add('no-results');previewTitle.replaceChildren(document.createTextNode('Geen herinneringen'));previewText.textContent='Kies een ander kenmerk om weer herinneringen te zien.';previewImage.style.display='none'}save();
  },delay);
 }

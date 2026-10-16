@@ -7,15 +7,14 @@ import { TELL_PAGE_HTML } from "./tell-local-page.js";
 import { BULK_FREE_STYLE, BULK_FREE_MARKUP, BULK_FREE_SCRIPT } from "./bulk-free.js";
 import { FREE_DATE_PICKER } from "./free-date-picker.js";
 import { TIMELINE_REPOSITION_SCRIPT } from "./timeline-reposition.js";
-import { PRESENTATION_REPOSITION_SCRIPT } from "./presentation-reposition.js";
-import { PRESENT_LOCAL_HTML } from "./present-local-page.js";
 import { DEMO_MEMORIES } from "./demo-memories.js";
 import { PWA_ICONS } from "./pwa-icons.js";
 import { BRAND_PNG_BASE64, BRAND_ICON_SVG } from "./pwa-brand.js";
 import { PWA_UPDATE_SCRIPT } from "./pwa-update.js";
-import { FREE_TELL_POLISH_STYLE, LOCAL_PRESENTATION_HANDOFF } from "./iphone-v13-corrections.js";
+import { FREE_TELL_POLISH_STYLE } from "./iphone-v13-corrections.js";
+import { LOCAL_RH19_ADAPTER } from "./local-rh19-adapter.js";
 
-const VERSION="talera-lifeline-v13-nine-corrections-20261016-iphone-polish-r1";
+const VERSION="talera-lifeline-v13-unified-rh19-adapter-20261016-r2";
 const PWA_MANIFEST=JSON.stringify({name:"TALERA — Mijn levenslijn",short_name:"TALERA",description:"Door je leven reizen en herinneringen beleven",id:"/",start_url:"/",scope:"/",display:"standalone",background_color:"#ffffff",theme_color:"#ffffff",icons:[{src:"/talera-brand-v9.svg",sizes:"any",type:"image/svg+xml",purpose:"any"},{src:"/pwa-192.png",sizes:"192x192",type:"image/png",purpose:"any"},{src:"/pwa-512.png",sizes:"512x512",type:"image/png",purpose:"any"}]});
 const PWA_SW=String.raw`self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));self.addEventListener("fetch",event=>{if(event.request.mode!=="navigate")return;event.respondWith(fetch(event.request).catch(()=>new Response("<!doctype html><html lang=nl><meta name=viewport content=width=device-width,initial-scale=1><title>TALERA offline</title><body style=font-family:system-ui;padding:2rem><h1>TALERA</h1><p>Je bent offline. Probeer opnieuw wanneer je verbinding hebt.</p></body></html>",{status:503,headers:{"content-type":"text/html; charset=utf-8"}})))});`;
 
@@ -169,7 +168,7 @@ export default {
       const size=icon[1]||"180",bin=atob(PWA_ICONS[size]);
       return reply(Uint8Array.from(bin,c=>c.charCodeAt(0)),method,"image/png");
     }
-    if(path==="/"||path==="/index.html")return reply(pwaShell(String(HOME_HTML).replace("<script>",MEMORY_STORE_SCRIPT+"<script>").replace("</body>",TIMELINE_REPOSITION_SCRIPT+'<script id="talera-photo-route-v13">document.addEventListener("click",function(e){const a=e.target.closest(".preview-image-wrap");if(!a)return;const id=a.dataset.selectedId;if(id&&id.startsWith("local-"))a.href="/present?local="+encodeURIComponent(id)},true)</script>'+"</body>")),method,"text/html; charset=utf-8");
+    if(path==="/"||path==="/index.html")return reply(pwaShell(String(HOME_HTML).replace("<script>",MEMORY_STORE_SCRIPT+"<script>").replace("</body>",TIMELINE_REPOSITION_SCRIPT+"</body>")),method,"text/html; charset=utf-8");
     if(path==="/api/demo-memories"){
       return reply(JSON.stringify(DEMO_MEMORIES),method,"application/json; charset=utf-8");
     }
@@ -177,7 +176,8 @@ export default {
       const r=await r19Worker.fetch(targetRequest(request,"/"),env,ctx);
       if(method==="HEAD"||!r.ok||!(r.headers.get("content-type")||"").includes("text/html"))return r;
       let presentation=addBridge(await r.text(),request);
-      if(url.searchParams.has("local"))presentation=presentation.replace("</body>",MEMORY_STORE_SCRIPT+LOCAL_PRESENTATION_HANDOFF+"</body>");
+      // One adapter for all locally stored memories; RH19 remains the renderer.
+      presentation=presentation.replace("</body>",MEMORY_STORE_SCRIPT+LOCAL_RH19_ADAPTER+"</body>");
       return reply(pwaShell(presentation),method,"text/html; charset=utf-8",r.status);
     }
     if(path==="/tell"||path==="/tell/"){

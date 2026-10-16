@@ -415,7 +415,7 @@ test('V12: persistent on-device retime changes date, precision and time without 
  assert.match(store,/updated=\{\.\.\.old,date:date,time:time,datePrecision:precision,dateEnd:null/);
  assert.match(store,/tx\.objectStore\('stories'\)\.put\(updated\)/);
  assert.match(store,/validDate\(date\)/);
- assert.match(store,/date>.*localToday\(\)/);
+ assert.match(store,/day<=localToday\(\)/);
  assert.match(visualV8,/strong\.textContent=String\(yearAt\)/);
  assert.doesNotMatch(visualV8,/strong\.textContent=String\(age\)/);
  assert.match(visualV8,/maxYear=new Date\(\)\.getFullYear\(\)/);

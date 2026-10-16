@@ -119,7 +119,7 @@ jobs:
           grep -q 'talera-brand-v9.png' /tmp/talera-lifeline-home.html
           grep -q 'talera-version-check-v9' /tmp/talera-lifeline-home.html
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/api/version" -o /tmp/talera-lifeline-version.json
-          grep -q 'talera-lifeline-v12-free-revision-20261016' /tmp/talera-lifeline-version.json
+          grep -q 'talera-lifeline-v13-nine-corrections-20261016' /tmp/talera-lifeline-version.json
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.png" -o /tmp/talera-lifeline-brand.png
           test "$(file --mime-type -b /tmp/talera-lifeline-brand.png)" = "image/png"
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.svg" -o /tmp/talera-lifeline-brand.svg

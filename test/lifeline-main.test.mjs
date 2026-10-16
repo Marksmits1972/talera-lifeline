@@ -210,7 +210,7 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v12-free-revision-20261016"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v13-nine-corrections-20261016"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
  assert.match(worker,/TELL_PAGE_HTML/);
@@ -341,7 +341,7 @@ test('V11 Free: bulk import can select twenty-five photos and shows separated me
  assert.match(script,/0x9003/);
  assert.match(script,/async function capture\(file\)/);
  assert.match(script,/photos\.sort\(/);
- assert.match(script,/g\.date!==p\.date\|\|g\.photos\.length>=mediaLimit/);
+ assert.match(script,/photos\.length>mediaLimit&&g\.date!==p\.date/);
  assert.match(script,/function reposition\(d\)/);
  assert.match(script,/if\(src!==dst&&dst\.photos\.length>=mediaLimit\)/);
  assert.match(script,/if\(!src\.photos\.length&&!src\.voice&&/);
@@ -404,7 +404,7 @@ test('V12: all six photos stay on screen in one full-screen grid, with confirm a
  assert.match(bulk,/setPointerCapture/);
  assert.match(bulk,/if\(source!==dest&&dest\.photos\.length>=6\)/);
  assert.match(bulk,/g\.photos\.splice\(i,1\)/);
- assert.match(bulk,/g\.photos\.slice\(0,3\)/);
+ assert.match(bulk,/g\.photos\.forEach\(\(item,i\)=>strip\.appendChild\(tile/);
  assert.match(bulk,/setBusy\(true/);
  assert.match(bulk,/De microfoon staat uit/);
  checkScripts(bulk,'v12-free-bulk');
@@ -433,4 +433,47 @@ test('V12: year/month/story drag and presentation memory drag compile and call r
  }
  assert.match(worker,/TIMELINE_REPOSITION_SCRIPT/);
  assert.match(worker,/PRESENTATION_REPOSITION_SCRIPT/);
+});
+
+test('V13 Free: directly entering presentation, persistent gestures and clear navigation',()=>{
+ const src=read('../experiments/lifeline-main/presentation-reposition.js');
+ const code=exportedHtml(src,'PRESENTATION_REPOSITION_SCRIPT');
+ assert.match(code,/touch-action:none/);
+ assert.match(code,/gallery.addEventListener\('pointerdown'/);
+ assert.match(code,/document.getElementById\(dx<0\?'next':'prev'\)/);
+ assert.match(code,/store.retime\(currentId/);
+ assert.match(code,/-webkit-touch-callout:none/);
+ assert.match(code,/z-index:20000/);
+ assert.match(worker,/talera-photo-route-v13/);
+ checkScripts(code,'presentation-v13');
+});
+test('V13 Free: photo import visibly previews all six and merges user-chosen groups',()=>{
+ const style=exportedHtml(bulkCode.trim().split('\n')[0],'BULK_FREE_STYLE');
+ const markup=exportedHtml(bulkCode.trim().split('\n')[1],'BULK_FREE_MARKUP');
+ const js=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ assert.match(markup,/id="bulkTopCounter"/);
+ assert.match(style,/grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+ assert.match(js,/⇢ Samenvoegen/);
+ assert.match(js,/t\.photos\.push\(\.\.\.g\.photos\)/);
+ assert.match(js,/photos\.length<=mediaLimit&&groups\.length===1/);
+ checkScripts(js,'bulk-v13');
+ const source=js.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
+ const logic=source.slice(source.indexOf('function organize(photos){'),source.indexOf('function tile('));
+ const organize=new Function('photos',`let groups=[],nextId=1;const mediaLimit=6;const uniqueId=()=>String(nextId++);${logic};organize(photos);return groups`);
+ const groups=organize(Array.from({length:5},(_,i)=>({id:String(i),date:'2000-01-'+String(i+1).padStart(2,'0'),time:null,originalIndex:i})));
+ assert.equal(groups.length,1);assert.equal(groups[0].date,null);assert.equal(groups[0].photos.length,5);
+});
+test('V13 Free: simple date choices are wired and valid JavaScript',()=>{
+ const picker=exportedHtml(read('../experiments/lifeline-main/free-date-picker.js'),'FREE_DATE_PICKER');
+ for(const name of ['Exacte datum','Maand + jaar','Alleen jaartal','Seizoen + jaar'])assert.ok(picker.includes(name),name);
+ assert.match(picker,/type='date'/);
+ assert.match(picker,/date\.max=maxYear/);
+ assert.match(worker,/FREE_DATE_PICKER/);
+ checkScripts(picker,'date-picker-v13');
+});
+test('V13: local browser data remains private and never cleared for an update',()=>{
+ const code=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ assert.match(code,/indexedDB.open/);
+ assert.doesNotMatch(worker,/indexedDB.deleteDatabase|localStorage.clear|caches.delete/);
+ assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));
 });

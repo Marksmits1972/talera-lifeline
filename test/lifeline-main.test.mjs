@@ -97,26 +97,25 @@ test('Three independently routed pages and direct photo-to-presentation navigati
 });
 
 const visualV3=read('../experiments/lifeline-main/visual-v3.html');
-test('Approved visual layout retained and connected to all three TALERA pages',()=>{
-  assert.match(visualV3,/class="ages"/);
-  assert.match(visualV3,/class="detail"/);
-  assert.match(visualV3,/class="preview"/);
-  assert.match(visualV3,/class="preview-image-wrap" href="\/present\?visual=weekend-amsterdam"/);
-  assert.match(visualV3,/<a href="\/tell" class="nav-item">/);
-  assert.match(visualV3,/<a href="\/" class="nav-item selected" aria-current="page">/);
-  assert.match(visualV3,/<a href="\/present\?visual=weekend-amsterdam" class="nav-item">/);
-  assert.match(worker,/import HOME_HTML from "\.\/visual-v8-photo-space\.html"/);
-  assert.match(worker,/id="talera-visual-demo-handoff"/);
-  assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
-  assert.match(worker,/return reply\(pwaShell\(presentation\)/);
+test('Approved visual layout is retained, while RH19 reference photos are shared by ID',()=>{
+ for(const id of ['class="ages"','class="detail"','class="preview"'])assert.ok(visualV3.includes(id),id);
+ assert.match(worker,/import HOME_HTML from "\.\/visual-v8-photo-space\.html"/);
+ assert.match(worker,/REFERENCE_CATALOG_SCRIPT/);
+ assert.match(worker,/JSON\.stringify\(DEMO_MEMORIES\)/);
+ assert.match(visualV8,/window\.__taleraReferenceMemories/);
+ assert.match(visualV8,/example\('ref-'\+record\.id/);
+ assert.match(visualV8,/item\.fullStory=record\.fullStory/);
+ assert.doesNotMatch(worker,/VISUAL_PREVIEW_PHOTO|lifelineSessionBridge|talera-visual-demo-handoff|id:51001/);
+ assert.match(worker,/return reply\(pwaShell\(presentation\)/);
 });
 
 const visualV4=read('../experiments/lifeline-main/visual-v4.html');
-test('The approved lifeline now has synchronized year, month, story and tag interactions',()=>{
+test('The historical gesture design stays intact, without the old session handoff in the Worker',()=>{
  for(const c of ['class="ages"','class="detail"','class="preview"'])assert.ok(visualV4.includes(c),c);
- for(const k of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')","state.filter.add(tag)","taleraVisualMemoryHandoff","const img=new Image()"])assert.ok(visualV4.includes(k),k);
- assert.match(worker,/id="talera-lifeline-session-handoff"/);
- assert.match(worker,/bridge\+lifelineSessionBridge/);
+ for(const k of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')","state.filter.add(tag)","const img=new Image()"])assert.ok(visualV4.includes(k),k);
+ assert.match(worker,/bridge\+memoryNavigation/);
+ assert.match(worker,/talera-memory-id-navigation/);
+ assert.doesNotMatch(worker,/lifelineSessionBridge|talera-lifeline-session-handoff/);
  const script=visualV4.match(/<script>([\s\S]*?)<\/script>/);
  assert.ok(script);
  assert.doesNotThrow(()=>new vm.Script(script[1],{filename:'visual-v4.js'}));
@@ -206,11 +205,11 @@ test('V8: private media store feeds one RH19 presentation adapter',()=>{
  for(const k of ["indexedDB.open","objectStoreNames.contains('stories')","objectStoreNames.contains('files')","kind:kind","async function save","async function list","async function mediaUrl"])assert.ok(js.includes(k),k);
  for(const k of ['id="files"','accept="image/*,video/*"','MediaRecorder','id="moment"','store.save(','location.replace(','__MEMORY_STORE__'])assert.ok(tell.includes(k),k);
  for(const k of ['store.list()','runtime.registerMemories(memories)','store.mediaUrl(item.key)'])assert.ok(adapter.includes(k),k);
- for(const k of ['addLocalMemories(rows)','?local=','meta.items?.some','store.list()','Mijn verhalen'])assert.ok(visualV8.includes(k),k);
+ for(const k of ['addLocalMemories(rows)','?memory=','meta.items?.some','store.list()','Mijn verhalen'])assert.ok(visualV8.includes(k),k);
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(adapter,'unified-adapter');
 });
 test('V8: RH19 reference is unchanged and only a safe local adapter is wired',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v13-unified-rh19-adapter-20261016-r2"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v13-shared-memory-register-20261016-r3"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/presentation=presentation.replace\("<\/body>",MEMORY_STORE_SCRIPT\+LOCAL_RH19_ADAPTER/);
  assert.match(worker,/TELL_PAGE_HTML/);
@@ -540,7 +539,7 @@ test('V13: 50, 100 and 1,000 distinct local memories load in one RH19 batch with
    subscribe:fn=>handlers.push(fn)
   };
   const w={TaleraMemories:store,__taleraTimelineRuntime:runtime,addEventListener(){}};
-  const context={window:w,location:{search:n===1000?'?local=local-test-987':''},URLSearchParams,
+  const context={window:w,location:{search:n===1000?'?memory=local-test-987':''},URLSearchParams,
    URL:{revokeObjectURL(){}},document:{getElementById(){return null}},console,encodeURIComponent};
   await vm.runInNewContext(script,context);
   assert.equal(batch.length,n,'memory count '+n);
@@ -550,4 +549,42 @@ test('V13: 50, 100 and 1,000 distinct local memories load in one RH19 batch with
   assert.equal(mediaReads,n===1000?1:0,'only selected media is requested');
   if(n===1000){assert.equal(selected.storyId,'local-test-987');assert.equal(selected.photos[0],'blob:file-987');}
  }
+});
+
+test('One memory identity travels Tell -> Timeline -> original RH19 -> Timeline',()=>{
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ const adapter=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
+ const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ assert.match(tell,/location\.replace\('\/\?memory='\+encodeURIComponent\(saved\.id\)\)/);
+ assert.match(visualV8,/previewLink\.href='\/present\?memory='\+encodeURIComponent\(m\.localId\|\|m\.refId\)/);
+ assert.match(visualV8,/const focusedId=new URLSearchParams\(location\.search\)\.get\('memory'\)/);
+ assert.match(visualV8,/const focus=search\.get\('memory'\)\|\|search\.get\('local'\)/);
+ assert.match(adapter,/const routeId=route\.get\('memory'\)/);
+ assert.match(adapter,/const currentId=routeId\?\.startsWith\('local-'\)\?routeId:route\.get\('local'\)/);
+ assert.match(adapter,/const selected=currentId\?byId\.get\('pwa:'\+currentId\):null/);
+ assert.match(worker,/const id=Number\(new URLSearchParams\(location\.search\)\.get\('memory'\)\)/);
+ assert.match(worker,/this\.href='\/\?memory='\+encodeURIComponent\(id\)/);
+ assert.match(worker,/this\.href='\/tell\?edit='\+encodeURIComponent\(m\.storyId\)/);
+ assert.match(store,/window\.TaleraMemories=\{save:save,list:list,get:get,blob:blob,mediaUrl:mediaUrl/);
+ assert.doesNotMatch(visualV8,/sessionStorage\.setItem\('taleraVisualMemoryHandoff'/);
+ assert.doesNotMatch(worker,/sessionStorage\.getItem\('taleraVisualMemoryHandoff'/);
+ assert.doesNotMatch(worker,/PRESENT_LOCAL_HTML|PRESENTATION_REPOSITION_SCRIPT|LOCAL_PRESENTATION_HANDOFF/);
+ assert.doesNotMatch(worker,/indexedDB\.deleteDatabase|localStorage\.clear|sessionStorage\.clear/);
+});
+
+test('Original 50 RH19 records retain their full white-sheet story and exact photo identity',()=>{
+ const original=originalRh19Memories();
+ const ids=new Set(original.map(x=>String(x.id)));
+ assert.equal(ids.size,50);
+ assert.deepEqual([...ids].slice(0,3),['1','2','3']);
+ assert.ok(original.every(m=>m.fullStory.startsWith(m.story)));
+ assert.ok(DEMO_MEMORIES.every((m,i)=>m.id===original[i].id&&m.image===original[i].image&&m.fullStory===original[i].fullStory));
+ const mark=read('../src/html/chunk2.js');
+ assert.match(mark,/memory-story-scroll/);
+ assert.match(mark,/memory-sheet is-visible/);
+ assert.match(mark,/memoryCaption/);
+ assert.match(mark,/memoryStoryScroll/);
+ const doc=read('../src/html/chunk7.js');
+ assert.match(doc,/memoryStoryMore\.textContent = remainder/);
+ assert.match(doc,/memoryStoryScroll\.scrollTop = 0/);
 });

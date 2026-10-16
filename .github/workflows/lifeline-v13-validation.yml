@@ -1,0 +1,44 @@
+name: TALERA V13 nine corrections
+on:
+  push:
+    branches: [feature/talera-v13-nine-corrections-20261016]
+  pull_request:
+    branches: [work/r19h2-lifeline-main-20261014]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check experiments/lifeline-main/worker.js
+      - run: node --test test/lifeline-main.test.mjs
+      - name: Validate V13 UI routes and scripts without browser persistence reset
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import vm from 'node:vm';
+          const base='experiments/lifeline-main/';
+          const read=n=>fs.readFileSync(base+n,'utf8');
+          const decoded=(n,k)=>JSON.parse(read(n).split('export const '+k+' = ')[1].split(';\n')[0]);
+          const tell=decoded('tell-local-page.js','TELL_PAGE_HTML');
+          const present=decoded('present-local-page.js','PRESENT_LOCAL_HTML');
+          const bulk=decoded('bulk-free.js','BULK_FREE_SCRIPT');
+          const markup=decoded('bulk-free.js','BULK_FREE_MARKUP');
+          const modules=['timeline-reposition.js','presentation-reposition.js','memory-store.js'];
+          for(const [name,doc] of [['tell',tell],['present',present],['bulk',bulk],...modules.map(n=>[n,decoded(n,({ 'timeline-reposition.js':'TIMELINE_REPOSITION_SCRIPT','presentation-reposition.js':'PRESENTATION_REPOSITION_SCRIPT','memory-store.js':'MEMORY_STORE_SCRIPT'})[n])])]){
+            const scripts=[...doc.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+            if(!scripts.length)throw new Error('Missing JS '+name);
+            for(const s of scripts)new vm.Script(s[1],{filename:name});
+          }
+          for(const id of ['dateModes','yearPick','seasonPick','seasonYearPick','monthPick','exactPick'])if(!tell.includes('id="'+id+'"'))throw Error('Date picker '+id);
+          if(!present.includes('talera-v13-present-layout')||!markup.includes('bulkPickerCounter')||!bulk.includes('function combine(')||!bulk.includes('photos.length<=mediaLimit'))throw Error('V13 improvement missing');
+          const worker=read('worker.js');
+          if(!worker.includes('TIMELINE_REPOSITION_SCRIPT')||!worker.includes('PRESENTATION_REPOSITION_SCRIPT'))throw Error('Navigation missing');
+          if(/indexedDB\.deleteDatabase|localStorage\.clear|caches\.delete/.test([tell,present,bulk,...modules.map(n=>read(n))].join('')))throw Error('Prohibited user data wipe');
+          JS

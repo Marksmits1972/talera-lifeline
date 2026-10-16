@@ -588,3 +588,16 @@ test('Original 50 RH19 records retain their full white-sheet story and exact pho
  assert.match(doc,/memoryStoryMore\.textContent = remainder/);
  assert.match(doc,/memoryStoryScroll\.scrollTop = 0/);
 });
+
+test('iPhone RH19 navigation stays compact, high-contrast and outside native presentation code',()=>{
+ assert.match(worker,/#taleraPageNav\{[\s\S]*?background:rgba\(255,254,252,\.98\)!important/);
+ assert.match(worker,/#taleraPageNav a\[aria-current="page"\]\{[\s\S]*?background:#0f2747!important;color:#fff!important/);
+ assert.match(worker,/#taleraPageNav a\{[\s\S]*?height:44px!important/);
+ assert.match(worker,/aria-label="Hoofdpagina's van TALERA"/);
+ assert.match(worker,/<span>Levenslijn<\/span>/);
+ assert.match(worker,/<span>Presenteren<\/span>/);
+ assert.match(worker,/<span>Vertellen<\/span>/);
+ assert.match(worker,/safe-area-inset-bottom/);
+ assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
+ assert.doesNotMatch(worker,/PRESENTATION_REPOSITION_SCRIPT|LOCAL_PRESENTATION_HANDOFF/);
+});

@@ -397,7 +397,7 @@ function queueSettle(delay=330){
   else{preview.classList.add('no-results');previewTitle.replaceChildren(document.createTextNode('Geen herinneringen'));previewText.textContent='Kies een ander kenmerk om weer herinneringen te zien.';previewImage.style.display='none'}save();
  },delay);
 }
-function renderNavigation(lane){renderAges();renderMonths();renderStories();if(lane)queueSettle(lane==='year'?370:lane==='month'?300:180)}
+function renderNavigation(lane){renderAges();renderMonths();renderStories();document.dispatchEvent(new CustomEvent('talera:home-year',{detail:{year:nowYear()}}));if(lane)queueSettle(lane==='year'?370:lane==='month'?300:180)}
 function selectYear(year){
  state.yearFloat=Math.max(minYear,Math.min(maxYear,Math.round(year)));
  const old=activeMonth()%12;state.monthIndex=Math.round(state.yearFloat)*12+old;
@@ -411,7 +411,7 @@ function selectMonth(idx){
 function selectMemory(id){
  const m=pickById(id);if(!m||!filtered().some(x=>x.id===id))return;
  clearTimeout(state.settle);state.selectedId=id;state.yearFloat=m.year;state.monthIndex=m.year*12+m.month;
- renderNavigation();setPreview(id);save();
+ renderNavigation();setPreview(id);save();document.dispatchEvent(new CustomEvent('talera:home-select',{detail:{id}}));
 }
 function scrollStories(amount){
  const f=filtered();if(!f.length)return;
@@ -549,16 +549,34 @@ save();
 window.__taleraLifelineDemo={
  getState:()=>({year:nowYear(),month:activeMonth(),selectedId:state.selectedId,visible:filtered().length,filters:[...state.filter]}),
  selectYear,selectMonth,selectMemory,
- addLocalMemory(meta,imageUrl){
-  if(!meta||!/^\d{4}-\d{2}-\d{2}$/.test(meta.date)||!meta.id||memories.some(m=>m.localId===meta.id))return;
-  const year=Number(meta.date.slice(0,4));if(year<1900||year>2100)return;
-  minYear=Math.min(minYear,year);maxYear=Math.max(maxYear,year);
-  const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':imageUrl?'photo':'text';
-  const m=example(meta.id,meta.date,meta.title,meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',imageUrl||null,['Mijn verhalen'],type);
-  m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Date.parse(meta.date+'T'+(meta.time||'12:00:00'));memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
+ addLocalMemories(rows){
+  if(!Array.isArray(rows))return 0;
+  const inserted=[];
+  for(const meta of rows){
+   if(!meta||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(meta.date||'')||!meta.id||memories.some(m=>m.localId===meta.id)||inserted.some(m=>m.localId===meta.id))continue;
+   const year=Number(meta.date.slice(0,4));if(year<1900||year>new Date().getFullYear())continue;
+   const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':meta.items?.some(x=>x.kind==='photo')?'photo':'text';
+   const m=example(meta.id,meta.date,meta.title||'Mijn herinnering',meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',null,['Mijn verhalen'],type);
+   m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Date.parse(meta.date+'T'+(meta.time||'12:00:00'));inserted.push(m);
+   minYear=Math.min(minYear,year);maxYear=Math.max(maxYear,year);
+  }
+  if(!inserted.length)return 0;
+  memories.push(...inserted);memories.sort((a,b)=>a.ms-b.ms);
   const focus=new URLSearchParams(location.search).get('local');
-  if(focus===meta.id){state.filter.clear();state.selectedId=m.id;state.yearFloat=Math.min(maxYear,Math.max(minYear,m.year));state.monthIndex=Math.round(state.yearFloat)*12+m.month;renderNavigation();setPreview(m.id);save()}
-  else {renderNavigation();updateTop()}
+  const chosen=inserted.find(m=>m.localId===focus);
+  if(chosen){state.filter.clear();state.selectedId=chosen.id;state.yearFloat=chosen.year;state.monthIndex=chosen.year*12+chosen.month}
+  renderNavigation();updateTop();
+  if(chosen){state.shownId='';setPreview(chosen.id);save()}
+  return inserted.length;
+ },
+ applyLocalCovers(covers){
+  if(!Array.isArray(covers)||!covers.length)return;
+  let changed=false,selected=false;
+  for(const item of covers){
+    const m=memories.find(x=>x.localId===item.id);
+    if(m&&item.src&&m.image!==item.src){m.image=item.src;changed=true;if(state.selectedId===m.id)selected=true}
+  }
+  if(changed){renderAges();renderStories();if(selected){state.shownId='';setPreview(state.selectedId)}}
  },
  setBirthYear(y){renderAges()}
 };
@@ -566,17 +584,38 @@ window.__taleraLifelineDemo={
 
 </script><script id="talera-local-timeline-integration">
 (function(){
-const store=window.TaleraMemories,runtime=window.__taleraLifelineDemo;if(!store||!runtime)return;
-const urls=[];
-store.list().then(async function(rows){
- for(const row of rows){
-  const first=(row.items||[]).find(x=>x.kind==='photo');let src=null;
-  if(first){try{src=await store.mediaUrl(first.key);if(src)urls.push(src)}catch(e){}}
-  runtime.addLocalMemory(row,src);
+ const store=window.TaleraMemories,runtime=window.__taleraLifelineDemo;
+ if(!store||!runtime)return;
+ const urls=new Map(),requested=new Set();
+ let rows=[];
+ async function preload(ids){
+  const missing=ids.filter(id=>!requested.has(id)).slice(0,24);
+  missing.forEach(id=>requested.add(id));
+  const covers=[];
+  for(const id of missing){
+   const row=rows.find(r=>r.id===id);
+   const photo=row?.items?.find(x=>x.kind==='photo');
+   if(!photo)continue;
+   try{const src=await store.mediaUrl(photo.key);if(src){urls.set(id,src);covers.push({id,src})}}catch(error){requested.delete(id)}
+  }
+  runtime.applyLocalCovers(covers);
  }
- const by=store.birthday();if(by)runtime.setBirthYear(by);
-}).catch(function(error){console.warn('Lokale herinneringen niet geladen:',error)});
-window.addEventListener('pagehide',function(){urls.forEach(function(u){URL.revokeObjectURL(u)})});
+ function nearYear(year){
+  // Only request thumbnails in the visible five-year band; never all 1,000.
+  const nearest=rows.filter(r=>Math.abs(Number(r.date.slice(0,4))-year)<=2);
+  const selection=runtime.getState().selectedId;
+  nearest.sort((a,b)=>a.id===selection?-1:b.id===selection?1:Math.abs(Number(a.date.slice(0,4))-year)-Math.abs(Number(b.date.slice(0,4))-year));
+  void preload(nearest.slice(0,24).map(r=>r.id));
+ }
+ document.addEventListener('talera:home-year',e=>nearYear(Number(e.detail?.year)||new Date().getFullYear()));
+ document.addEventListener('talera:home-select',e=>{if(e.detail?.id)void preload([e.detail.id])});
+ store.list().then(list=>{
+  rows=list;
+  runtime.addLocalMemories(list);
+  const by=store.birthday();if(by)runtime.setBirthYear(by);
+  nearYear(Number(runtime.getState().year)||new Date().getFullYear());
+ }).catch(error=>console.warn('Lokale herinneringen niet geladen:',error));
+ window.addEventListener('pagehide',()=>{for(const url of urls.values())URL.revokeObjectURL(url)},{once:true});
 })();
 </script><script>
 if ('serviceWorker' in navigator && location.protocol==='https:') {

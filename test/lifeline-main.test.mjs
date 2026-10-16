@@ -67,7 +67,7 @@ test('TALERA: drag editing has month selection ordering undo and local persisten
   assert.match(html,/setPointerCapture/);
   assert.match(html,/startDrag\(g\.storyId/);
   assert.match(html,/pointerMonth\(y,drag\.monthReference\)/);
-  assert.match(html,/current\.enteredMonth/);
+  assert.match(html,/current\.insertIndex/);
   assert.match(html,/m\.precision='exact'/);
   assert.match(html,/m\.manualMs=placed/);
   assert.match(html,/showUndo\(\)/);

@@ -474,7 +474,7 @@ test('V13: local browser data remains private and never cleared for an update',(
 
 
 test('V13: local photos are records in native RH19 rather than custom carousel',()=>{
- const style=read('../experiments/lifeline-main/iphone-v13-corrections.js');
+ const style=read('../experiments/lifeline-main/free-tell-polish.js');
  const adapter=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
  assert.match(style,/FREE_TELL_POLISH_STYLE/);
  assert.doesNotMatch(style,/LOCAL_PRESENTATION_HANDOFF/);

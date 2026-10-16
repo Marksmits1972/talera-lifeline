@@ -86,14 +86,16 @@ test('TALERA: new Worker uses RH19 untouched and disallows writes',()=>{
   assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
 });
 
-test('Three independently routed pages and direct photo-to-presentation navigation',()=>{
-  assert.match(html,/<a id="preview" href="\/present"/);
-  assert.match(html,/\$\('preview'\)\.href='\/present\?memory='/);
-  assert.match(html,/\$\('preview'\)\.addEventListener\('click',rememberFocus\)/);
-  assert.match(html,/<nav class="bottom-nav"[^>]*>.*href="\/tell".*href="\/present"/);
-  assert.match(worker,/id="taleraPageNav"/);
-  assert.match(worker,/id="taleraTellNav"/);
-  assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
+test('Three routes keep native RH19, all reuse one TALERA footer',()=>{
+ assert.match(html,/<a id="preview" href="\/present"/);
+ assert.match(html,/\$\('preview'\)\.href='\/present\?memory='/);
+ assert.match(html,/\$\('preview'\)\.addEventListener\('click',rememberFocus\)/);
+ assert.match(html,/<nav class="bottom-nav"[^>]*>.*href="\/tell".*href="\/present"/);
+ assert.match(worker,/function unifiedFooter\(page\)/);
+ assert.match(worker,/const ORIGINAL_TIMELINE_NAV=/);
+ assert.match(worker,/unifiedFooter\("present"\)/);
+ assert.match(worker,/unifiedFooter\('tell'\)/);
+ assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
 });
 
 const visualV3=read('../experiments/lifeline-main/visual-v3.html');
@@ -209,7 +211,7 @@ test('V8: private media store feeds one RH19 presentation adapter',()=>{
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(adapter,'unified-adapter');
 });
 test('V8: RH19 reference is unchanged and only a safe local adapter is wired',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v13-shared-memory-register-20261016-r3"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v13-phone-display-unified-nav-20261016-r4"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/presentation=presentation.replace\("<\/body>",MEMORY_STORE_SCRIPT\+LOCAL_RH19_ADAPTER/);
  assert.match(worker,/TELL_PAGE_HTML/);
@@ -589,15 +591,49 @@ test('Original 50 RH19 records retain their full white-sheet story and exact pho
  assert.match(doc,/memoryStoryScroll\.scrollTop = 0/);
 });
 
-test('iPhone RH19 navigation stays compact, high-contrast and outside native presentation code',()=>{
- assert.match(worker,/#taleraPageNav\{[\s\S]*?background:rgba\(255,254,252,\.98\)!important/);
- assert.match(worker,/#taleraPageNav a\[aria-current="page"\]\{[\s\S]*?background:#0f2747!important;color:#fff!important/);
- assert.match(worker,/#taleraPageNav a\{[\s\S]*?height:44px!important/);
- assert.match(worker,/aria-label="Hoofdpagina's van TALERA"/);
- assert.match(worker,/<span>Levenslijn<\/span>/);
- assert.match(worker,/<span>Presenteren<\/span>/);
- assert.match(worker,/<span>Vertellen<\/span>/);
+test('iPhone navigation faithfully uses timeline icons, active pill and opaque no-blur footer',()=>{
+ assert.match(worker,/const ORIGINAL_TIMELINE_NAV=/);
+ assert.match(worker,/function unifiedFooter\(page\)/);
+ assert.match(worker,/#taleraPageNav\.bottom-nav,#taleraTellNav\.bottom-nav/);
+ assert.match(worker,/background:#fff!important/);
+ assert.match(worker,/backdrop-filter:none!important;-webkit-backdrop-filter:none!important/);
+ assert.match(worker,/#taleraPageNav \.nav-item\.selected::before/);
+ assert.match(worker,/background:#e6f1fd!important/);
  assert.match(worker,/safe-area-inset-bottom/);
  assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
  assert.doesNotMatch(worker,/PRESENTATION_REPOSITION_SCRIPT|LOCAL_PRESENTATION_HANDOFF/);
+});
+
+test('Phone display variant preserves original photos for later full-resolution TV use',()=>{
+ const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ const adapter=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
+ assert.match(store,/var PHONE_EDGE=1440,PHONE_JPEG_QUALITY=\.78,PHONE_VARIANT=':phone-v1'/);
+ assert.match(store,/ctx\.drawImage\(image,0,0,canvas\.width,canvas\.height\)/);
+ assert.match(store,/canvas\.toBlob\(resolve,'image\/jpeg',PHONE_JPEG_QUALITY\)/);
+ assert.match(store,/async function displayUrl\(key\)/);
+ assert.match(store,/tx\.objectStore\('files'\)\.put\(\{key:files\[j\]\.key,blob:uploads\[j\]\}\)/);
+ assert.match(store,/key:files\[j\]\.key\+PHONE_VARIANT,blob:phoneCopies\[j\]/);
+ assert.match(store,/window\.TaleraMemories=\{save:save,list:list,get:get,blob:blob,mediaUrl:mediaUrl,displayUrl:displayUrl/);
+ assert.match(adapter,/store\.displayUrl\?store\.displayUrl\(item\.key\):store\.mediaUrl\(item\.key\)/);
+ assert.match(visualV8,/store\.displayUrl\?store\.displayUrl\(photo\.key\):store\.mediaUrl\(photo\.key\)/);
+ assert.doesNotMatch(store,/deleteDatabase\(|localStorage\.clear\(/);
+ checkScripts(store,'mobile-renditions');
+});
+test('One live nav template produces the same Vertel / Tijdlijn / Presentatie in each route',()=>{
+ const begin=worker.indexOf('const ORIGINAL_TIMELINE_NAV=');
+ const end=worker.indexOf('const bridge=String.raw',begin);
+ assert.ok(begin>0&&end>begin);
+ const navigators=new Function('HOME_HTML',worker.slice(begin,end)+'\nreturn [unifiedFooter("tell"),unifiedFooter("timeline"),unifiedFooter("present")];')(visualV8);
+ for(let i=0;i<navigators.length;i++){
+  const h=navigators[i];
+  assert.match(h,/Vertel<\/span>/);
+  assert.match(h,/Tijdlijn<\/span>/);
+  assert.match(h,/Presentatie<\/span>/);
+  assert.match(h,/class="nav-icon"/);
+  assert.equal((h.match(/aria-current="page"/g)||[]).length,1);
+  assert.equal((h.match(/<a href=/g)||[]).length,3);
+  assert.ok(h.indexOf('Vertel</span>')<h.indexOf('Tijdlijn</span>')&&h.indexOf('Tijdlijn</span>')<h.indexOf('Presentatie</span>'));
+ }
+ assert.match(navigators[0],/id="taleraTellNav"/);
+ assert.match(navigators[2],/id="taleraPageNav"/);
 });

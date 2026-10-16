@@ -108,7 +108,7 @@ test('Approved visual layout retained and connected to all three TALERA pages',(
   assert.match(worker,/import HOME_HTML from "\.\/visual-v8-photo-space\.html"/);
   assert.match(worker,/id="talera-visual-demo-handoff"/);
   assert.match(worker,/const VISUAL_PREVIEW_PHOTO=/);
-  assert.match(worker,/return reply\(pwaShell\(addBridge\(await r\.text\(\),request\)\)/);
+  assert.match(worker,/return reply\(pwaShell\(presentation\)/);
 });
 
 const visualV4=read('../experiments/lifeline-main/visual-v4.html');
@@ -210,9 +210,9 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v13-nine-corrections-20261016"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v13-nine-corrections-20261016-iphone-polish-r1"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
- assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
+ assert.match(worker,/if\(url.searchParams.has\("local"\)\)presentation=presentation.replace/);
  assert.match(worker,/TELL_PAGE_HTML/);
  assert.match(worker,/MEMORY_STORE_SCRIPT/);
  assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));
@@ -453,7 +453,7 @@ test('V13 Free: photo import visibly previews all six and merges user-chosen gro
  const js=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
  assert.match(markup,/id="bulkTopCounter"/);
  assert.match(style,/grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
- assert.match(js,/⇢ Samenvoegen/);
+ assert.match(js,/merge.hidden=!eligible.length/);
  assert.match(js,/t\.photos\.push\(\.\.\.g\.photos\)/);
  assert.match(js,/photos\.length<=mediaLimit&&groups\.length===1/);
  checkScripts(js,'bulk-v13');
@@ -476,4 +476,48 @@ test('V13: local browser data remains private and never cleared for an update',(
  assert.match(code,/indexedDB.open/);
  assert.doesNotMatch(worker,/indexedDB.deleteDatabase|localStorage.clear|caches.delete/);
  assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));
+});
+
+
+test('V13 iPhone corrections: local memories open in the native RH19 presentation, not the dark detail page',()=>{
+ const source=read('../experiments/lifeline-main/iphone-v13-corrections.js');
+ const module={exports:{}};
+ const result={};
+ const context=vm.createContext({...result});
+ vm.runInContext(source.replaceAll('export const ','const ')+
+  '\\nthis.__polish={FREE_TELL_POLISH_STYLE,LOCAL_PRESENTATION_HANDOFF}',context);
+ const css=context.__polish.FREE_TELL_POLISH_STYLE;
+ const handoff=context.__polish.LOCAL_PRESENTATION_HANDOFF;
+ assert.match(worker,/LOCAL_PRESENTATION_HANDOFF/);
+ assert.match(worker,/MEMORY_STORE_SCRIPT\+LOCAL_PRESENTATION_HANDOFF/);
+ assert.doesNotMatch(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
+ assert.match(handoff,/runtime.restrictToMemory\(memory\)/);
+ assert.match(handoff,/await store.get\(id\)/);
+ assert.match(handoff,/await store.mediaUrl\(item.key\)/);
+ assert.match(handoff,/touchend/);
+ assert.match(handoff,/entry.kind==='video'/);
+ assert.match(css,/\.intro\{display:none/);
+ const client=handoff.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+ assert.ok(client);
+ assert.doesNotThrow(()=>new vm.Script(client[1]));
+ assert.doesNotMatch(handoff,/indexedDB.deleteDatabase|localStorage.clear|sessionStorage.clear/);
+});
+test('V13 iPhone corrections: one visual overview, conditional merging, compact editor and visible microphone',()=>{
+ const css=exportedHtml(bulkCode.trim().split('\n')[0],'BULK_FREE_STYLE');
+ const js=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ assert.match(js,/eligible=groups.filter\(t=>t.id!==g.id&&t.photos.length\+g.photos.length<=mediaLimit/);
+ assert.match(js,/merge.hidden=!eligible.length/);
+ assert.match(js,/details.append\(actions,tit,txt\)/);
+ assert.match(js,/cell.onclick=\(\)=>openEditor\(g.id\)/);
+ assert.match(js,/split.textContent='＋ Splits herinnering'/);
+ assert.match(css,/#bulkEditorGrid\{flex:0 0 auto!important;height:min\(33dvh,256px\)/);
+ assert.match(css,/#bulkStudio\{top:0!important;bottom:calc\(70px/);
+ assert.match(css,/#bulkStop\{background:#c44655/);
+ assert.match(js,/recorder.start\(1000\)/);
+ checkScripts(js,'bulk-polish-v13');
+});
+test('V13 iPhone corrections: RH19 fitting no longer upscales foreground photos',()=>{
+ const code=read('../src/presentation-controller.js');
+ assert.match(code,/const zoom=1;/);
+ assert.doesNotMatch(code,/Math.max\(containH,boxH\*\.68\)/);
 });

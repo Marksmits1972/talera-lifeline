@@ -551,9 +551,10 @@ window.__taleraLifelineDemo={
  selectYear,selectMonth,selectMemory,
  addLocalMemories(rows){
   if(!Array.isArray(rows))return 0;
-  const inserted=[];
+  const inserted=[],seen=new Set(memories.map(m=>m.localId).filter(Boolean));
   for(const meta of rows){
-   if(!meta||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(meta.date||'')||!meta.id||memories.some(m=>m.localId===meta.id)||inserted.some(m=>m.localId===meta.id))continue;
+   if(!meta||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(meta.date||'')||!meta.id||seen.has(meta.id))continue;
+   seen.add(meta.id);
    const year=Number(meta.date.slice(0,4));if(year<1900||year>new Date().getFullYear())continue;
    const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':meta.items?.some(x=>x.kind==='photo')?'photo':'text';
    const m=example(meta.id,meta.date,meta.title||'Mijn herinnering',meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',null,['Mijn verhalen'],type);
@@ -568,6 +569,12 @@ window.__taleraLifelineDemo={
   renderNavigation();updateTop();
   if(chosen){state.shownId='';setPreview(chosen.id);save()}
   return inserted.length;
+ },
+ clearLocalCovers(ids){
+  if(!Array.isArray(ids)||!ids.length)return;
+  const dropping=new Set(ids);
+  for(const m of memories)if(m.localId&&dropping.has(m.localId))m.image=null;
+  renderAges();renderStories();
  },
  applyLocalCovers(covers){
   if(!Array.isArray(covers)||!covers.length)return;
@@ -587,6 +594,7 @@ window.__taleraLifelineDemo={
  const store=window.TaleraMemories,runtime=window.__taleraLifelineDemo;
  if(!store||!runtime)return;
  const urls=new Map(),requested=new Set();
+ const MAX_THUMBS=48;
  let rows=[];
  async function preload(ids){
   const missing=ids.filter(id=>!requested.has(id)).slice(0,24);
@@ -599,6 +607,14 @@ window.__taleraLifelineDemo={
    try{const src=await store.mediaUrl(photo.key);if(src){urls.set(id,src);covers.push({id,src})}}catch(error){requested.delete(id)}
   }
   runtime.applyLocalCovers(covers);
+  const removed=[];
+  while(urls.size>MAX_THUMBS){
+   const selected=runtime.getState().selectedId;
+   const id=[...urls.keys()].find(key=>key!==selected);
+   if(!id)break;
+   URL.revokeObjectURL(urls.get(id));urls.delete(id);requested.delete(id);removed.push(id);
+  }
+  if(removed.length)runtime.clearLocalCovers(removed);
  }
  function nearYear(year){
   // Only request thumbnails in the visible five-year band; never all 1,000.

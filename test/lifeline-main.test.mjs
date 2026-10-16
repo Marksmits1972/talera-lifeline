@@ -210,7 +210,7 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v12-free-revision-20261016"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v13-nine-corrections-20261016"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
  assert.match(worker,/TELL_PAGE_HTML/);

@@ -258,7 +258,7 @@ if(!years||!ageLane||!monthLane||!storyLane||!category||!menu||!previewLink)retu
 const M=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
 const ML=['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
 let birthYear=(window.TaleraMemories&&window.TaleraMemories.birthday())||2002; // 2002 is the fictional demo fallback only.
-let minYear=2022,maxYear=2027;
+let minYear=2022,maxYear=new Date().getFullYear();
 const yearImages=$$('.age-photo').map(x=>x.src);
 const storyImages=$$('.story-list .story img').map(x=>x.src);
 const heroImage=previewImage.src;
@@ -291,7 +291,7 @@ if(saved&&Number.isFinite(saved.yearFloat)&&Number.isFinite(saved.monthIndex)){
  state.selectedId=typeof saved.selectedId==='string'?saved.selectedId:state.selectedId;
  state.filter=new Set(Array.isArray(saved.filter)?saved.filter.filter(x=>tags.includes(x)):['Vakanties']);
 }
-const filtered=()=>memories.filter(x=>!state.filter.size||x.tags.some(t=>state.filter.has(t)));
+const filtered=()=>memories.filter(x=>x.ms<=Date.now()&&(!state.filter.size||x.tags.some(t=>state.filter.has(t))));
 const dateOf=m=>{const d=new Date(m.ms);if(m.datePrecision==='year')return String(m.year);if(m.datePrecision==='month')return ML[m.month]+' '+m.year;if(m.datePrecision==='period'&&m.dateEnd){const e=new Date(m.dateEnd+'T12:00:00');if(Number.isFinite(e.getTime()))return d.getDate()+' '+ML[m.month]+' '+m.year+' – '+e.getDate()+' '+ML[e.getMonth()]+' '+e.getFullYear()}return d.getDate()+' '+ML[m.month]+' '+m.year};
 const esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const nowYear=()=>Math.max(minYear,Math.min(maxYear,Math.round(state.yearFloat)));
@@ -324,8 +324,8 @@ function renderAges(){
  ageRows.forEach((row,i)=>{
    const yearAt=start+i,age=yearAt-birthYear,photo=$('.age-photo',row),strong=$('strong',row),pin=$('.age-pin',row);
    row.dataset.year=String(yearAt);row.setAttribute('role','button');row.setAttribute('tabindex','0');
-   row.setAttribute('aria-label','Ga naar leeftijd '+age+', jaar '+yearAt);
-   strong.textContent=String(age);
+   row.setAttribute('aria-label','Ga naar jaar '+yearAt);
+   strong.textContent=String(yearAt);
    const p=yearPhoto(yearAt,visible);
    if(p.src){if(photo.getAttribute('src')!==p.src)photo.src=p.src;photo.style.visibility='visible';photo.style.opacity=p.has?'1':'.48'}
    else photo.style.visibility='hidden';
@@ -552,10 +552,12 @@ window.__taleraLifelineDemo={
  addLocalMemory(meta,imageUrl){
   if(!meta||!/^\d{4}-\d{2}-\d{2}$/.test(meta.date)||!meta.id||memories.some(m=>m.localId===meta.id))return;
   const year=Number(meta.date.slice(0,4));if(year<1900||year>2100)return;
-  minYear=Math.min(minYear,year);maxYear=Math.max(maxYear,year);
+  minYear=Math.min(minYear,year);maxYear=new Date().getFullYear();
   const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':imageUrl?'photo':'text';
   const m=example(meta.id,meta.date,meta.title,meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',imageUrl||null,['Mijn verhalen'],type);
-  m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
+  m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;
+  if(Number.isFinite(meta.sortMs)){m.ms=meta.sortMs;const d=new Date(m.ms);m.year=d.getFullYear();m.month=d.getMonth()}
+  memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
   const focus=new URLSearchParams(location.search).get('local');
   if(focus===meta.id){state.filter.clear();state.selectedId=m.id;state.yearFloat=m.year;state.monthIndex=m.year*12+m.month;renderNavigation();setPreview(m.id);save()}
   else {renderNavigation();updateTop()}

@@ -258,31 +258,27 @@ const years=$('.ages-list'),ageLane=$('.ages'),monthLane=$('.months'),monthLine=
 if(!years||!ageLane||!monthLane||!storyLane||!category||!menu||!previewLink)return;
 const M=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
 const ML=['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
-let minYear=2022,maxYear=new Date().getFullYear(); // Free: calendar years
+let minYear=2022,maxYear=new Date().getFullYear(); // Calendar years, expanded by shared reference and local stories
 const yearImages=$$('.age-photo').map(x=>x.src);
 const storyImages=$$('.story-list .story img').map(x=>x.src);
 const heroImage=previewImage.src;
 const example=(id,iso,title,place,summary,image,tags,type='photo')=>({id,at:iso,title,place,summary,image,tags,type,
   year:Number(iso.slice(0,4)),month:Number(iso.slice(5,7))-1,ms:Date.parse(iso+'T12:00:00')});
-const memories=[
- example('first-trip','2022-07-16','De eerste verre reis','Italië','De zomer dat alles nog open leek te liggen.',yearImages[0],['Vakanties','Reizen','Vrienden']),
- example('family-evening','2022-12-22','Een avond met familie','Thuis','Samen aan tafel, verhalen die steeds opnieuw verteld worden.',yearImages[1],['Familie']),
- example('school-days','2023-02-18','Nieuwe plannen','School','Er begon een heel nieuw hoofdstuk.',yearImages[1],['School','Vrienden'],'text'),
- example('sunset-city','2023-09-04','Op reis met vrienden','Stad','Een weekend om nog lang over na te praten.',yearImages[2],['Vakanties','Vrienden']),
- example('weekend-amsterdam','2024-05-12','Weekend in Amsterdam','Amsterdam','Een spontaan weekendje weg met Lisa. Door de Jordaan, goed eten, veel gelachen en de mooiste zonsondergang aan de grachten.',heroImage,['Vakanties','Reizen','Vrienden']),
- example('hiking-alps','2024-07-19','Hiken in de Alpen','Zell am See, Oostenrijk','Samen de bergen in, steeds weer een uitzicht dat je stil maakt.',storyImages[1],['Vakanties','Reizen']),
- example('sunset-sea','2024-09-03','Zonsondergang aan zee','Zandvoort','Nog even blijven tot de zon helemaal verdwenen is.',storyImages[2],['Vakanties','Vrienden']),
- example('first-job','2024-11-15','Een nieuwe werkplek','Werk','De eerste dag was spannend, maar het voelde meteen goed.',yearImages[3],['Werk'],'text'),
- example('horse-riding','2025-03-14','Een middag paardrijden','Manege','Een vertrouwd geluid van hoeven en het gevoel van buiten zijn.',yearImages[3],['Paardrijden','Vrienden']),
- example('summer-holiday','2025-08-10','Samen op vakantie','Zuid-Frankrijk','Lange zomeravonden en heerlijk niets hoeven.',yearImages[4],['Vakanties','Reizen','Familie']),
- example('good-news','2025-12-02','Goed nieuws van thuis','Thuis','Sommige woorden wil je bewaren omdat ze zo veel betekenen.',null,['Familie'],'text'),
- example('city-trip','2026-05-04','Een dag op pad','Amsterdam','Een korte reis, toch voelde het als vakantie.',yearImages[4],['Vakanties','Reizen']),
- example('friends','2026-09-01','Samen terugkijken','Thuis','Wat een verzameling mooie kleine momenten.',yearImages[5],['Familie','Vrienden']),
- example('new-chapter','2027-01-10','Een nieuw begin','Thuis','Nieuwe verhalen wachten om verteld te worden.',yearImages[5],['Werk'],'text')
-].filter(m=>m.ms<=Date.now()).sort((a,b)=>a.ms-b.ms);
+// Same immutable RH19 reference catalog as the presentation, not a second demo list.
+const references=Array.isArray(window.__taleraReferenceMemories)?window.__taleraReferenceMemories:[];
+const memories=references.map(record=>{
+ const iso=String(record.at).slice(0,10);
+ const title=String(record.story||'Herinnering').split(/[.!?](?:\\s|$)/)[0].slice(0,90);
+ const tags=(record.tags||[]).map(t=>t==='Vakantie'?'Vakanties':t);
+ const item=example('ref-'+record.id,iso,title,'',record.story,record.image,tags);
+ item.refId=record.id;item.fullStory=record.fullStory;
+ item.ms=new Date(record.at).getTime();
+ return item;
+}).filter(m=>Number.isFinite(m.ms)).sort((a,b)=>a.ms-b.ms);
+if(memories.length)minYear=Math.min(minYear,...memories.map(m=>m.year));
 const tags=['Vakanties','Familie','Vrienden','Paardrijden','Reizen','School','Werk','Mijn verhalen'];
 const iconByTag=Object.fromEntries($$('.option',menu).map(n=>[n.textContent.trim(),$('.option-icon',n)?.innerHTML||'']));
-const state={yearFloat:2024,monthIndex:2024*12+4,selectedId:'weekend-amsterdam',shownId:'weekend-amsterdam',
+const state={yearFloat:2026,monthIndex:2026*12+8,selectedId:memories.length?memories[memories.length-1].id:'',shownId:'',
  filter:new Set(),drag:null,raf:0,settle:0,photoToken:0,gestureMoved:false};
 const saved=(()=>{try{return JSON.parse(sessionStorage.getItem('taleraVisualTimelineV4')||'null')}catch{return null}})();
 if(saved&&Number.isFinite(saved.yearFloat)&&Number.isFinite(saved.monthIndex)){
@@ -290,6 +286,11 @@ if(saved&&Number.isFinite(saved.yearFloat)&&Number.isFinite(saved.monthIndex)){
  state.monthIndex=Math.max(minYear*12,Math.min(maxYear*12+11,saved.monthIndex));
  state.selectedId=typeof saved.selectedId==='string'?saved.selectedId:state.selectedId;
  state.filter=new Set();
+}
+const focusedId=new URLSearchParams(location.search).get('memory');
+if(focusedId?.startsWith('ref-')&&memories.some(m=>m.id===focusedId)){
+ const m=memories.find(m=>m.id===focusedId);
+ state.selectedId=m.id;state.yearFloat=m.year;state.monthIndex=m.year*12+m.month;
 }
 const filtered=()=>memories.filter(x=>!state.filter.size||x.tags.some(t=>state.filter.has(t)));
 const dateOf=m=>{const d=new Date(m.ms);if(m.datePrecision==='year')return String(m.year);if(m.datePrecision==='month')return ML[m.month]+' '+m.year;if(m.datePrecision==='season')return (m.seasonLabel||'seizoen')+' '+m.year;if(m.datePrecision==='period'&&m.dateEnd){const e=new Date(m.dateEnd+'T12:00:00');if(Number.isFinite(e.getTime()))return d.getDate()+' '+ML[m.month]+' '+m.year+' – '+e.getDate()+' '+ML[e.getMonth()]+' '+e.getFullYear()}return d.getDate()+' '+ML[m.month]+' '+m.year};
@@ -386,7 +387,8 @@ function setPreview(id){
  updateLinks(m);
 }
 function updateLinks(m){
- previewLink.href=m.localId?'/present?local='+encodeURIComponent(m.localId):'/present?visual=lifeline';previewLink.dataset.selectedId=m.id;
+ // Only the shared memory identity crosses pages. RH19 reads its own full record.
+ previewLink.href='/present?memory='+encodeURIComponent(m.localId||m.refId);previewLink.dataset.selectedId=m.id;
  previewLink.setAttribute('aria-label','Open '+m.title+' in de presentatie');
  const bottom=$('.bottom-nav .nav-item:last-child');if(bottom)bottom.href=previewLink.href;
 }
@@ -507,22 +509,16 @@ category.addEventListener('click',()=>{menu.hidden=!menu.hidden;category.setAttr
 document.addEventListener('pointerdown',ev=>{if(!menu.hidden&&!menu.contains(ev.target)&&!category.contains(ev.target)){menu.hidden=true;category.setAttribute('aria-expanded','false')}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){menu.hidden=true;category.setAttribute('aria-expanded','false')}});
 storyLane.addEventListener('click',ev=>{if(performance.now()<(state.storySuppressClickUntil||0)){ev.preventDefault();return}const btn=ev.target.closest('[data-id]');if(btn)selectMemory(btn.dataset.id)});
-function makeHandoff(){
- const m=pickById(state.selectedId);if(!m)return;
- if(m.localId)return;save();try{sessionStorage.setItem('taleraVisualMemoryHandoff',JSON.stringify({id:m.id,at:m.at,
-  title:m.title,place:m.place,summary:m.summary,image:m.image||'',type:m.type}))}catch{}
-}
-previewLink.addEventListener('click',makeHandoff);
-$('.bottom-nav .nav-item:last-child')?.addEventListener('click',makeHandoff);
+// No sessionStorage photo/story copies: the URL carries only the memory ID.
 const hamburger=$('.hamburger');
 const quick=document.createElement('div');quick.id='taleraQuickNav';quick.hidden=true;
-quick.innerHTML='<a href="/">⌂ Tijdlijn</a><a href="/tell">✎ Vertellen</a><a href="/present?visual=lifeline">▣ Presenteren</a><button type="button" id="clearLifeFilter">Wis kenmerken</button>';
+quick.innerHTML='<a href="/">⌂ Tijdlijn</a><a href="/tell">✎ Vertellen</a><a href="/present">▣ Presenteren</a><button type="button" id="clearLifeFilter">Wis kenmerken</button>';
 $('.viewport').appendChild(quick);
 hamburger.setAttribute('aria-label','Open het navigatiemenu');
 hamburger.setAttribute('aria-expanded','false');
 hamburger.addEventListener('click',()=>{quick.hidden=!quick.hidden;hamburger.setAttribute('aria-expanded',String(!quick.hidden))});
 $('#clearLifeFilter').addEventListener('click',()=>{state.filter.clear();updateTop();queueSettle(100);renderNavigation();quick.hidden=true;hamburger.setAttribute('aria-expanded','false')});
-quick.querySelector('[href^="/present"]').addEventListener('click',makeHandoff);
+quick.querySelector('[href^="/present"]').addEventListener('click',e=>{const m=pickById(state.selectedId);if(m)e.currentTarget.href='/present?memory='+encodeURIComponent(m.localId||m.refId)});
 installGesture(ageLane,'year');installGesture(monthLane,'month');installGesture(storyLane,'story');
 // iOS/WebView fallback: suppress one-finger vertical page movement, preserve pinch.
 let touchOrigin=null;
@@ -542,7 +538,7 @@ ageLane.setAttribute('tabindex','0');monthLane.setAttribute('tabindex','0');stor
 // Only retain initial screenshot assets as pictures; all controls now derive from state.
 updateTop();renderNavigation();
 const chosen=pickById(state.selectedId),result=chosen&&filtered().some(m=>m.id===chosen.id)?chosen:nearestForCurrent();
-if(result){state.selectedId=result.id;if(result.id!=='weekend-amsterdam')setPreview(result.id);else updateLinks(result)}
+if(result){state.selectedId=result.id;setPreview(result.id)}
 renderStories();
 menu.hidden=true;category.setAttribute('aria-expanded','false');
 save();
@@ -563,7 +559,8 @@ window.__taleraLifelineDemo={
   }
   if(!inserted.length)return 0;
   memories.push(...inserted);memories.sort((a,b)=>a.ms-b.ms);
-  const focus=new URLSearchParams(location.search).get('local');
+  const search=new URLSearchParams(location.search);
+  const focus=search.get('memory')||search.get('local');
   const chosen=inserted.find(m=>m.localId===focus);
   if(chosen){state.filter.clear();state.selectedId=chosen.id;state.yearFloat=chosen.year;state.monthIndex=chosen.year*12+chosen.month}
   renderNavigation();updateTop();

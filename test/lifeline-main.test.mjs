@@ -537,7 +537,11 @@ test('V13 native photo-book handoff offers correct neighboring local photographs
  const context=vm.createContext({});
  vm.runInContext(correction.replaceAll('export const ','const ')+String.fromCharCode(10)+
   'this.handoff=LOCAL_PRESENTATION_HANDOFF',context);
- const embedded=context.handoff.match(/<script[^>]*>([\\s\\S]*?)<\\/script>/);
+ const scriptStart=context.handoff.indexOf('<script id=');
+ assert.ok(scriptStart>=0);
+ const scriptClose=context.handoff.indexOf('</script>',scriptStart);
+ assert.ok(scriptClose>scriptStart);
+ const embedded=[null,context.handoff.slice(context.handoff.indexOf('>',scriptStart)+1,scriptClose)];
  assert.ok(embedded);
  const script=embedded[1];
  const nativeSnippet=script.slice(script.indexOf('const nativeState=book.state.bind(book);'),

@@ -1,0 +1,34 @@
+name: TALERA V13 nine corrections
+on:
+  push:
+    branches:
+      - fix/talera-v12-nine-points-20261016
+  pull_request:
+    branches:
+      - work/r19h2-lifeline-main-20261014
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    name: Test Free fixes without deploying
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit and behavioral regressions
+        run: node --test test/lifeline-main.test.mjs
+      - name: Worker JavaScript syntax
+        run: node --check experiments/lifeline-main/worker.js
+      - name: Guard unchanged production and local data
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const config=JSON.parse(fs.readFileSync('experiments/lifeline-main/wrangler.jsonc','utf8'));
+          if(config.name!=='talera-r19-lifeline-main-dev'||config.d1_databases||config.r2_buckets||config.routes)throw Error('Unexpected Worker target or cloud binding');
+          const worker=fs.readFileSync('experiments/lifeline-main/worker.js','utf8');
+          if(worker.includes('deleteDatabase(')||worker.includes('localStorage.clear('))throw Error('Unsafe user-data operation');
+          JS

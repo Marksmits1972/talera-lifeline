@@ -68,8 +68,9 @@ jobs:
           curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/" -o /tmp/talera-unified-home.html
           grep -q 'TALERA' /tmp/talera-unified-home.html
           grep -q 'talera-local-timeline-integration' /tmp/talera-unified-home.html
-          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/present?local=local-smoke-test" -o /tmp/talera-unified-present.html
+          grep -q 'talera-reference-catalog' /tmp/talera-unified-home.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/present?memory=local-smoke-test" -o /tmp/talera-unified-present.html
           grep -q 'talera-local-memory-adapter' /tmp/talera-unified-present.html
           grep -q 'memoryStoryScroll' /tmp/talera-unified-present.html
-          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" | grep -q 'unified-rh19-adapter'
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" | grep -q 'shared-memory-register'
           echo "ISOLATED PREVIEW VERIFIED; installed iPhone app untouched."

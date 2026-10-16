@@ -68,7 +68,7 @@ test('TALERA: drag editing has month selection ordering undo and local persisten
   assert.match(html,/startDrag\(g\.storyId/);
   assert.match(html,/pointerMonth\(y,drag\.monthReference\)/);
   assert.match(html,/current\.enteredMonth/);
-  assert.match(html,/m\.precision='month'/);
+  assert.match(html,/m\.precision='exact'/);
   assert.match(html,/m\.manualMs=placed/);
   assert.match(html,/showUndo\(\)/);
   assert.match(html,/localStorage\.setItem\(STORAGE/);
@@ -88,7 +88,7 @@ test('TALERA: new Worker uses RH19 untouched and disallows writes',()=>{
 
 test('Three independently routed pages and direct photo-to-presentation navigation',()=>{
   assert.match(html,/<a id="preview" href="\/present"/);
-  assert.match(html,/\$\('preview'\)\.href='\/present\?memory='/);
+  assert.match(html,/\$\('preview'\)\.href=m\.localId\?/);
   assert.match(html,/\$\('preview'\)\.addEventListener\('click',rememberFocus\)/);
   assert.match(html,/<nav class="bottom-nav"[^>]*>.*href="\/tell".*href="\/present"/);
   assert.match(worker,/id="taleraPageNav"/);
@@ -210,9 +210,9 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v11-free-bulk-import-20261016"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v12-free-20261016"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
- assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
+ assert.match(worker,/if\(url.searchParams.has\("local"\)\)/);
  assert.match(worker,/TELL_PAGE_HTML/);
  assert.match(worker,/MEMORY_STORE_SCRIPT/);
  assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));
@@ -255,7 +255,7 @@ test('V9: network-first update watcher refreshes only safe timeline and retains 
  assert.match(worker,/function pwaShell\(html\)/);
  assert.match(worker,/pwaShell\(String\(HOME_HTML\)/);
  assert.match(worker,/pwaShell\(tell\)/);
- assert.match(worker,/pwaShell\(PRESENT_LOCAL_HTML/);
+ assert.match(worker,/pwaShell\(local\)/);
  assert.match(worker,/pwaShell\(addBridge/);
  assert.match(worker,/cache-control":"no-store"/);
  assert.match(worker,/start_url:"\/"/);
@@ -332,10 +332,10 @@ test('V11 Free: bulk import can select twenty-five photos and shows separated me
  assert.match(worker,/\.replace\('<section class="card" id="mediaSection"',BULK_FREE_MARKUP/);
  assert.match(worker,/\.replace\("<\/body>",BULK_FREE_SCRIPT/);
  for(const id of ['bulkFiles','bulkPanel','bulkGroups','bulkSaveAll','bulkReturn','bulkStudio','bulkStage','bulkRecord','bulkStop'])assert.ok(markup.includes('id="'+id+'"'),id);
- assert.match(markup,/accept="image\/\*"/);
+ assert.match(markup,/accept="image\/\*,video\/\*"/);
  assert.match(markup,/type="file"[^>]*multiple/);
  assert.match(script,/const mediaLimit=6,batchLimit=25/);
- assert.match(script,/if\(files\.length>batchLimit\)/);
+ assert.match(script,/selection\.slice\(0,batchLimit\)/);
  assert.match(script,/groups\.length\+' herinnering'/);
  assert.match(script,/const day=m\[1\]\+'-'\+m\[2\]/);
  assert.match(script,/0x9003/);

@@ -4,13 +4,14 @@ import r19Worker from "../../src/reference-r19h2-carousel-combined-worker.js";
 import HOME_HTML from "./visual-v8-photo-space.html";
 import { MEMORY_STORE_SCRIPT } from "./memory-store.js";
 import { TELL_PAGE_HTML } from "./tell-local-page.js";
+import { BULK_FREE_STYLE, BULK_FREE_MARKUP, BULK_FREE_SCRIPT } from "./bulk-free.js";
 import { PRESENT_LOCAL_HTML } from "./present-local-page.js";
 import { DEMO_MEMORIES } from "./demo-memories.js";
 import { PWA_ICONS } from "./pwa-icons.js";
 import { BRAND_PNG_BASE64, BRAND_ICON_SVG } from "./pwa-brand.js";
 import { PWA_UPDATE_SCRIPT } from "./pwa-update.js";
 
-const VERSION="talera-lifeline-v10-media-first-tell-20261015";
+const VERSION="talera-lifeline-v11-free-bulk-import-20261016";
 const PWA_MANIFEST=JSON.stringify({name:"TALERA — Mijn levenslijn",short_name:"TALERA",description:"Door je leven reizen en herinneringen beleven",id:"/",start_url:"/",scope:"/",display:"standalone",background_color:"#ffffff",theme_color:"#ffffff",icons:[{src:"/talera-brand-v9.svg",sizes:"any",type:"image/svg+xml",purpose:"any"},{src:"/pwa-192.png",sizes:"192x192",type:"image/png",purpose:"any"},{src:"/pwa-512.png",sizes:"512x512",type:"image/png",purpose:"any"}]});
 const PWA_SW=String.raw`self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));self.addEventListener("fetch",event=>{if(event.request.mode!=="navigate")return;event.respondWith(fetch(event.request).catch(()=>new Response("<!doctype html><html lang=nl><meta name=viewport content=width=device-width,initial-scale=1><title>TALERA offline</title><body style=font-family:system-ui;padding:2rem><h1>TALERA</h1><p>Je bent offline. Probeer opnieuw wanneer je verbinding hebt.</p></body></html>",{status:503,headers:{"content-type":"text/html; charset=utf-8"}})))});`;
 
@@ -175,7 +176,12 @@ export default {
       return reply(pwaShell(addBridge(await r.text(),request)),method,"text/html; charset=utf-8",r.status);
     }
     if(path==="/tell"||path==="/tell/"){
-      const tell=String(TELL_PAGE_HTML).replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT).replace('<nav aria-label="Hoofdnavigatie">','<nav id="taleraTellNav" aria-label="Hoofdnavigatie">');
+      const tell=String(TELL_PAGE_HTML)
+        .replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT)
+        .replace("</head>",'<style id="talera-free-bulk-style">'+BULK_FREE_STYLE+"</style></head>")
+        .replace('<section class="card" id="mediaSection"',BULK_FREE_MARKUP+'<section class="card" id="mediaSection"')
+        .replace('<nav aria-label="Hoofdnavigatie">','<nav id="taleraTellNav" aria-label="Hoofdnavigatie">')
+        .replace("</body>",BULK_FREE_SCRIPT+"</body>");
       return reply(pwaShell(tell),method,"text/html; charset=utf-8");
     }
     if(path==="/storylab-clean"||path==="/storylab-clean/"){

@@ -268,7 +268,7 @@ const example=(id,iso,title,place,summary,image,tags,type='photo')=>({id,at:iso,
 const references=Array.isArray(window.__taleraReferenceMemories)?window.__taleraReferenceMemories:[];
 const memories=references.map(record=>{
  const iso=String(record.at).slice(0,10);
- const title=String(record.story||'Herinnering').split(/[.!?](?:\\s|$)/)[0].slice(0,90);
+ const title=String(record.story||'Herinnering').split(/[.!?](?:\s|$)/)[0].slice(0,90);
  const tags=(record.tags||[]).map(t=>t==='Vakantie'?'Vakanties':t);
  const item=example('ref-'+record.id,iso,title,'',record.story,record.image,tags);
  item.refId=record.id;item.fullStory=record.fullStory;

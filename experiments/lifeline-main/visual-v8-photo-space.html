@@ -323,7 +323,7 @@ function renderAges(){
  const start=year-2,ageRows=$$('.age-row',years);
  ageRows.forEach((row,i)=>{
    const yearAt=start+i,photo=$('.age-photo',row),strong=$('strong',row),pin=$('.age-pin',row);
-   row.dataset.year=String(yearAt);row.setAttribute('role','button');row.setAttribute('tabindex','0');
+   row.dataset.year=String(yearAt);row.style.visibility=yearAt<minYear||yearAt>maxYear?'hidden':'visible';row.setAttribute('role','button');row.setAttribute('tabindex','0');
    row.setAttribute('aria-label','Ga naar jaar '+yearAt);
    strong.textContent=String(yearAt);
    const p=yearPhoto(yearAt,visible);
@@ -557,7 +557,7 @@ window.__taleraLifelineDemo={
   const m=example(meta.id,meta.date,meta.title,meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',imageUrl||null,['Mijn verhalen'],type);
   m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Date.parse(meta.date+'T'+(meta.time||'12:00:00'));memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
   const focus=new URLSearchParams(location.search).get('local');
-  if(focus===meta.id){state.filter.clear();state.selectedId=m.id;state.yearFloat=m.year;state.monthIndex=m.year*12+m.month;renderNavigation();setPreview(m.id);save()}
+  if(focus===meta.id){state.filter.clear();state.selectedId=m.id;state.yearFloat=Math.min(maxYear,Math.max(minYear,m.year));state.monthIndex=Math.round(state.yearFloat)*12+m.month;renderNavigation();setPreview(m.id);save()}
   else {renderNavigation();updateTop()}
  },
  setBirthYear(y){renderAges()}

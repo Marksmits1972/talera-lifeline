@@ -1,0 +1,27 @@
+name: TALERA Free V12 validation
+on:
+  push:
+    branches:
+      - feature/talera-v12-free-20261016
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: V12 isolated regression suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/lifeline-main.test.mjs
+      - run: node --check experiments/lifeline-main/worker.js
+      - name: Guard Cloudflare reference
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const config=JSON.parse(readFileSync('experiments/lifeline-main/wrangler.jsonc','utf8'));
+          if(config.name!=='talera-r19-lifeline-main-dev'||config.d1_databases||config.r2_buckets||config.routes)throw Error('Unexpected deployment target');
+          JS

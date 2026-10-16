@@ -210,7 +210,7 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v10-media-first-tell-20261015"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v11-free-bulk-import-20261016"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
  assert.match(worker,/TELL_PAGE_HTML/);
@@ -266,7 +266,7 @@ test('V10: media-first storytelling sequence and large visual voice studio',()=>
  const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
  const head=tell.indexOf('id="mediaSection"'),voice=tell.indexOf('id="voiceSection"'),detail=tell.indexOf('Maak je herinnering compleet');
  assert.ok(head>=0&&voice>head&&detail>voice,'Media → speech → details order');
- for(const id of ['mediaStage','strip','files','start','studio','studioStage','studioPrev','studioNext','stop','story','datePrecision','aiTitle','save']){
+ for(const id of ['mediaStage','strip','files','start','studio','studioStage','studioPrev','studioNext','stop','story','datePrecision','save']){
   assert.ok(tell.includes('id="'+id+'"'),'missing '+id);
  }
  assert.match(tell,/grid-template-rows:auto minmax\(0,1fr\) auto/);
@@ -277,7 +277,7 @@ test('V10: media-first storytelling sequence and large visual voice studio',()=>
  assert.match(tell,/function jump\(n\)/);
  assert.match(tell,/setStudio\(true,true\)/);
  assert.match(tell,/touchend/);
- assert.match(tell,/const maxMedia=10/);
+ assert.match(tell,/const maxMedia=6/);
  assert.match(tell,/crypto\.subtle/);
  assert.match(tell,/digest\('SHA-256'/);
  assert.match(tell,/URL\.revokeObjectURL/);
@@ -289,19 +289,16 @@ test('V10: media-first storytelling sequence and large visual voice studio',()=>
  assert.match(tell,/if\(e\.data\?\.size\)chunks\.push/);
  assert.match(tell,/audio\/mp4/);
 });
-test('V10: transcription is literal browser opt-in and manual editing; no pretend AI title',()=>{
+test('V11 Free: microphone, user-authored text and no automatic AI or recognition',()=>{
  const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
- assert.match(tell,/id="autoTranscribe"/);
- assert.match(tell,/window\.SpeechRecognition\|\|window\.webkitSpeechRecognition/);
- assert.match(tell,/recognizer\.lang='nl-NL'/);
- assert.match(tell,/recognizer\.onresult/);
- assert.match(tell,/e\.results\[i\]\.isFinal/);
- assert.match(tell,/\$\('story'\)\.value=recognitionText/);
+ assert.doesNotMatch(tell,/id="autoTranscribe"|SpeechRecognition|webkitSpeechRecognition|recognizer/);
+ assert.match(tell,/\$\('story'\)\.value=data\.text/);
+ assert.match(tell,/async function openForEditing\(\)/);
  assert.match(tell,/getUserMedia\(\{audio:true\}\)/);
- assert.match(tell,/id="aiTitle"[^>]+disabled/);
+ assert.doesNotMatch(tell,/id="aiTitle"/);
  assert.doesNotMatch(tell,/fetch\(['"]\/api\/ai/);
  assert.match(tell,/De geluidsopname wordt apart bewaard/);
- assert.match(tell,/herkenningsdienst van je browser kan hierbij je stem verwerken/);
+ assert.match(tell,/In Free schrijven we je woorden niet automatisch over/);
 });
 test('V10: date precision roundtrips through local storage, timeline and presentation',()=>{
  const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
@@ -309,7 +306,7 @@ test('V10: date precision roundtrips through local storage, timeline and present
  const present=exportedHtml(presentModule,'PRESENT_LOCAL_HTML');
  assert.match(store,/datePrecision:precision/);
  assert.match(store,/dateEnd:precision==='period'\?dateEnd:null/);
- assert.match(store,/mediaUploads\.length>10/);
+ assert.match(store,/mediaUploads\.length>6/);
  assert.match(store,/voiceUploads\.length>1/);
  for(const x of ["value=\"exact\"","value=\"month\"","value=\"year\"","value=\"period\"","id=\"dateFrom\"","id=\"dateTo\""])assert.ok(tell.includes(x),x);
  assert.match(tell,/datePrecision:time\.datePrecision,dateEnd:time\.dateEnd/);
@@ -322,4 +319,50 @@ test('V10: date precision roundtrips through local storage, timeline and present
  assert.match(present,/items\.findIndex\(item=>item\.kind==='photo'\)/);
  assert.match(tell,/item===cover\(\)/);
  checkScripts(tell,'v10-tell');checkScripts(present,'v10-presentation');checkScripts(store,'v10-storage');checkScripts(visualV8,'v10-timeline');
+});
+
+
+const bulkCode=read('../experiments/lifeline-main/bulk-free.js');
+test('V11 Free: bulk import can select twenty-five photos and shows separated memory cards in Tell',()=>{
+ const styles=exportedHtml(bulkCode.split('\n')[0]+';','BULK_FREE_STYLE');
+ const markup=exportedHtml('export const BULK_FREE_MARKUP = '+bulkCode.split('\n')[1].slice('export const BULK_FREE_MARKUP = '.length),'BULK_FREE_MARKUP');
+ const script=exportedHtml('export const BULK_FREE_SCRIPT = '+bulkCode.split('\n')[2].slice('export const BULK_FREE_SCRIPT = '.length),'BULK_FREE_SCRIPT');
+ assert.match(worker,/import \{ BULK_FREE_STYLE, BULK_FREE_MARKUP, BULK_FREE_SCRIPT \} from "\.\/bulk-free\.js"/);
+ assert.match(worker,/\.replace\('<section class="card" id="mediaSection"',BULK_FREE_MARKUP/);
+ assert.match(worker,/\.replace\("<\/body>",BULK_FREE_SCRIPT/);
+ for(const id of ['bulkFiles','bulkPanel','bulkGroups','bulkSaveAll','bulkReturn','bulkStudio','bulkStage','bulkRecord','bulkStop'])assert.ok(markup.includes('id="'+id+'"'),id);
+ assert.match(markup,/accept="image\/\*"/);
+ assert.match(markup,/type="file"[^>]*multiple/);
+ assert.match(script,/const mediaLimit=6,batchLimit=25/);
+ assert.match(script,/if\(files\.length>batchLimit\)/);
+ assert.match(script,/groups\.length\+' herinnering'/);
+ assert.match(script,/const day=m\[1\]\+'-'\+m\[2\]/);
+ assert.match(script,/0x9003/);
+ assert.match(script,/async function capture\(file\)/);
+ assert.match(script,/photos\.sort\(/);
+ assert.match(script,/g\.date!==p\.date\|\|g\.photos\.length>=mediaLimit/);
+ assert.match(script,/function reposition\(d\)/);
+ assert.match(script,/if\(src!==dst&&dst\.photos\.length>=mediaLimit\)/);
+ assert.match(script,/if\(!src\.photos\.length\)groups=groups\.filter/);
+ assert.match(script,/setPointerCapture/);
+ assert.match(script,/elementFromPoint/);
+ assert.match(script,/getUserMedia\(\{audio:true\}\)/);
+ assert.match(script,/if\(g\.voice\)uploads\.push\(g\.voice\)/);
+ assert.match(script,/store\.save\(/);
+ assert.match(script,/\/tell\?edit=/);
+ assert.doesNotMatch(script,/fetch\(|SpeechRecognition|openai|anthropic|AI-titel/);
+ assert.match(styles,/#bulkStudio\{position:fixed/);
+ checkScripts(script,'bulk-free-v11');
+});
+test('V11 Free: local storage can safely reopen an existing memory without losing originals',()=>{
+ const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ assert.match(store,/async function save\(input,uploads,editId\)/);
+ assert.match(store,/var existing=editId\?await get\(editId\):null/);
+ assert.match(store,/createdAt:existing\?existing\.createdAt/);
+ assert.match(store,/if\(existing\)for\(var k=0;k</);
+ assert.match(store,/tx\.objectStore\('files'\)\.delete/);
+ assert.match(tell,/store\.blob\(item\.key\)/);
+ assert.match(tell,/uploads,editId\|\|undefined/);
+ assert.match(tell,/const maxMedia=6/);
 });

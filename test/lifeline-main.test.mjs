@@ -367,3 +367,26 @@ test('V11 Free: local storage can safely reopen an existing memory without losin
  assert.match(tell,/uploads,editId\|\|undefined/);
  assert.match(tell,/const maxMedia=6/);
 });
+
+
+test('V11 Free: actual date/time sorting splits twelve photos into two six-photo groups',()=>{
+ const bulk=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ const script=bulk.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
+ const logic=script.slice(script.indexOf('function organize(photos){'),script.indexOf('function tile('));
+ const arrange=new Function('photos',\`let groups=[],nextId=1;const mediaLimit=6;const uniqueId=()=>String(nextId++);\${logic};organize(photos);return groups\`);
+ const twelve=Array.from({length:12},(_,i)=>({id:'p'+i,date:'2001-04-02',time:String(19-i).padStart(2,'0')+':00:00',originalIndex:i}));
+ const g=arrange(twelve);
+ assert.equal(g.length,2);assert.equal(g[0].photos.length,6);assert.equal(g[1].photos.length,6);
+ assert.deepEqual(g[0].photos.map(p=>p.time),['08:00:00','09:00:00','10:00:00','11:00:00','12:00:00','13:00:00']);
+ const many=Array.from({length:25},(_,i)=>({id:String(i),date:'2000-01-'+String(i+1).padStart(2,'0'),time:'10:00:00',originalIndex:i}));
+ const single=arrange(many);assert.equal(single.length,25);assert.ok(single.every(group=>group.photos.length===1));
+});
+test('V11 Free: no-day photos stay undated instead of acquiring a made-up date',()=>{
+ const bulk=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ const script=bulk.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
+ const logic=script.slice(script.indexOf('function organize(photos){'),script.indexOf('function tile('));
+ const arrange=new Function('photos',\`let groups=[],nextId=1;const mediaLimit=6;const uniqueId=()=>String(nextId++);\${logic};organize(photos);return groups\`);
+ const group=arrange(Array.from({length:7},(_,i)=>({id:String(i),date:null,time:null,originalIndex:i})));
+ assert.equal(group.length,2);assert.ok(group.every(x=>x.date===null));
+ assert.deepEqual(group.map(x=>x.photos.length),[6,1]);
+});

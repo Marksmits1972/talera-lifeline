@@ -404,7 +404,10 @@ test('V12: all six photos stay on screen in one full-screen grid, with confirm a
  assert.match(bulk,/setPointerCapture/);
  assert.match(bulk,/if\(source!==dest&&dest\.photos\.length>=6\)/);
  assert.match(bulk,/g\.photos\.splice\(i,1\)/);
- assert.match(bulk,/g\.photos\.slice\(0,3\)/);
+ assert.match(bulk,/g\.photos\.entries\(\)/);
+ assert.match(bulk,/function combine\(sourceId,destId\)/);
+ assert.match(bulk,/photos\.length<=mediaLimit/);
+ assert.match(css,/--bulk-cols/);
  assert.match(bulk,/setBusy\(true/);
  assert.match(bulk,/De microfoon staat uit/);
  checkScripts(bulk,'v12-free-bulk');
@@ -412,7 +415,8 @@ test('V12: all six photos stay on screen in one full-screen grid, with confirm a
 test('V12: persistent on-device retime changes date, precision and time without preserving stale date',()=>{
  const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
  assert.match(store,/async function retime\(id,change\)/);
- assert.match(store,/updated=\{\.\.\.old,date:date,time:time,datePrecision:precision,dateEnd:null/);
+ assert.match(store,/updated=\{\.\.\.old,date:date,time:time,sortMs:canonical,datePrecision:precision,dateEnd:null/);
+ assert.match(store,/canonicalSort/);
  assert.match(store,/tx\.objectStore\('stories'\)\.put\(updated\)/);
  assert.match(store,/validDate\(date\)/);
  assert.match(store,/day<=localToday\(\)/);
@@ -433,4 +437,22 @@ test('V12: year/month/story drag and presentation memory drag compile and call r
  }
  assert.match(worker,/TIMELINE_REPOSITION_SCRIPT/);
  assert.match(worker,/PRESENTATION_REPOSITION_SCRIPT/);
+});
+
+test('V13: simple manual date picker and persistent millisecond order',()=>{
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ const stored=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ const present=exportedHtml(presentModule,'PRESENT_LOCAL_HTML');
+ const overview=exportedHtml(bulkCode.trim().split('\n')[1],'BULK_FREE_MARKUP');
+ const bulk=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ for(const id of ['dateModes','yearPick','seasonPick','seasonYearPick','monthPick','exactPick'])assert.ok(tell.includes('id="'+id+'"'),id);
+ for(const mode of ['year','season','month','exact'])assert.ok(tell.includes('data-precision="'+mode+'"'),mode);
+ assert.match(tell,/function choosePrecision/);
+ assert.match(tell,/function syncDateChoice/);
+ assert.match(overview,/id="bulkPickerCounter"/);
+ assert.match(bulk,/function combine\(sourceId,destId\)/);
+ assert.match(bulk,/from\.photos\.length\+to\.photos\.length>mediaLimit/);
+ assert.match(bulk,/groups=groups\.filter\(g=>g!==from\)/);
+ assert.match(stored,/sortMs:canonicalSort/);
+ assert.match(present,/talera-v13-present-layout/);
 });

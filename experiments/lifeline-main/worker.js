@@ -14,7 +14,7 @@ import { PWA_UPDATE_SCRIPT } from "./pwa-update.js";
 import { FREE_TELL_POLISH_STYLE } from "./free-tell-polish.js";
 import { LOCAL_RH19_ADAPTER } from "./local-rh19-adapter.js";
 
-const VERSION="talera-lifeline-v13-shared-memory-register-20261016-r3";
+const VERSION="talera-lifeline-v13-phone-display-unified-nav-20261016-r4";
 const PWA_MANIFEST=JSON.stringify({name:"TALERA — Mijn levenslijn",short_name:"TALERA",description:"Door je leven reizen en herinneringen beleven",id:"/",start_url:"/",scope:"/",display:"standalone",background_color:"#ffffff",theme_color:"#ffffff",icons:[{src:"/talera-brand-v9.svg",sizes:"any",type:"image/svg+xml",purpose:"any"},{src:"/pwa-192.png",sizes:"192x192",type:"image/png",purpose:"any"},{src:"/pwa-512.png",sizes:"512x512",type:"image/png",purpose:"any"}]});
 const PWA_SW=String.raw`self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));self.addEventListener("fetch",event=>{if(event.request.mode!=="navigate")return;event.respondWith(fetch(event.request).catch(()=>new Response("<!doctype html><html lang=nl><meta name=viewport content=width=device-width,initial-scale=1><title>TALERA offline</title><body style=font-family:system-ui;padding:2rem><h1>TALERA</h1><p>Je bent offline. Probeer opnieuw wanneer je verbinding hebt.</p></body></html>",{status:503,headers:{"content-type":"text/html; charset=utf-8"}})))});`;
 
@@ -41,47 +41,68 @@ function targetRequest(request,path){
   return new Request(url.toString(),request);
 }
 // Separate page: the unmodified RH19 presentation remains its own route.
-const bridge=String.raw`<style id="talera-independent-presentation-navigation">
-/* Keep the approved RH19 photo/story controls unchanged. Only the
-   independent three-page footer is restyled for readable iPhone navigation. */
+const NAVIGATION_STYLE=String.raw`<style id="talera-unified-navigation">
+/* Exact three-tab structure and iconography from the approved timeline. */
 body nav[aria-label="TALERA navigatie"]{visibility:hidden!important}
-#taleraPageNav{
- position:fixed!important;z-index:2147483640!important;bottom:0!important;left:0!important;right:0!important;
+#taleraPageNav.bottom-nav,#taleraTellNav.bottom-nav{
  width:100%!important;max-width:880px!important;margin:0 auto!important;
- display:flex!important;align-items:center!important;justify-content:space-between!important;gap:6px!important;
- height:auto!important;min-height:calc(56px + env(safe-area-inset-bottom,0px))!important;max-height:none!important;
- padding:5px 10px calc(5px + env(safe-area-inset-bottom,0px))!important;
- box-sizing:border-box!important;overflow:visible!important;
- background:rgba(255,254,252,.98)!important;border-top:1px solid #cad5e0!important;
- box-shadow:0 -5px 18px rgba(15,39,71,.14)!important;
- opacity:1!important;visibility:visible!important;filter:none!important;
- font:750 12px/1.1 -apple-system,BlinkMacSystemFont,sans-serif!important;
+ display:flex!important;align-items:center!important;justify-content:space-around!important;
+ height:calc(65px + env(safe-area-inset-bottom,0px))!important;
+ min-height:calc(65px + env(safe-area-inset-bottom,0px))!important;
+ max-height:none!important;
+ padding:0 7px calc(3px + env(safe-area-inset-bottom,0px))!important;
+ border:0!important;border-top:1px solid #e8e9ef!important;
+ background:#fff!important;opacity:1!important;visibility:visible!important;
+ box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+ filter:none!important;overflow:visible!important;box-sizing:border-box!important
 }
-#taleraPageNav a{
- display:flex!important;flex:1 1 0!important;min-width:0!important;height:44px!important;
- align-items:center!important;justify-content:center!important;gap:5px!important;
- border:1px solid transparent!important;border-radius:13px!important;
- padding:0 4px!important;margin:0!important;
- text-align:center!important;white-space:nowrap!important;text-decoration:none!important;
- background:#f3f6f9!important;color:#0f2747!important;
- opacity:1!important;visibility:visible!important;filter:none!important;text-shadow:none!important;
- font:750 12px/1.1 -apple-system,BlinkMacSystemFont,sans-serif!important;
+#taleraPageNav.bottom-nav{position:fixed!important;z-index:2147483640!important;bottom:0!important;left:0!important;right:0!important}
+#taleraTellNav.bottom-nav{position:relative!important;z-index:5!important;flex:0 0 auto!important}
+#taleraPageNav .nav-item,#taleraTellNav .nav-item{
+ position:relative!important;display:flex!important;flex:1 1 0!important;
+ flex-direction:column!important;justify-content:center!important;align-items:center!important;
+ gap:4px!important;min-width:0!important;height:100%!important;min-height:0!important;
+ padding:0!important;margin:0!important;text-decoration:none!important;
+ background:transparent!important;border:0!important;border-radius:0!important;
+ font:650 11px/1.2 -apple-system,BlinkMacSystemFont,sans-serif!important;
+ color:#67758b!important;opacity:1!important;visibility:visible!important;
+ text-shadow:none!important;filter:none!important
 }
-#taleraPageNav a span:first-child{font-size:16px!important;line-height:1!important}
-#taleraPageNav a[aria-current="page"]{
- background:#0f2747!important;color:#fff!important;border-color:#0f2747!important;
- box-shadow:0 2px 7px rgba(15,39,71,.18)!important;
+#taleraPageNav .nav-item.selected,#taleraTellNav .nav-item.selected{
+ color:#2478ca!important;font-weight:780!important
 }
-#taleraPageNav a:focus-visible{outline:3px solid #e7a98b!important;outline-offset:1px!important}
-@media(max-width:350px){#taleraPageNav{gap:4px!important;padding-left:6px!important;padding-right:6px!important}
- #taleraPageNav a{gap:3px!important;font-size:11px!important}}
-</style>
-<nav id="taleraPageNav" aria-label="Hoofdpagina's van TALERA">
-<a href="/"><span aria-hidden="true">⌂</span><span>Levenslijn</span></a>
-<a href="/present" aria-current="page"><span aria-hidden="true">▣</span><span>Presenteren</span></a>
-<a href="/tell"><span aria-hidden="true">✎</span><span>Vertellen</span></a>
-</nav>
-<script id="talera-lifeline-r19-bridge">
+#taleraPageNav .nav-item.selected::before,#taleraTellNav .nav-item.selected::before{
+ content:''!important;position:absolute!important;top:6px!important;
+ width:95%!important;max-width:130px!important;height:26px!important;
+ background:#e6f1fd!important;border-radius:18px!important;
+ box-shadow:none!important;z-index:0!important
+}
+#taleraPageNav .nav-icon,#taleraTellNav .nav-icon{
+ height:23px!important;position:relative!important;z-index:1!important;
+ font-size:21px!important;line-height:23px!important;color:inherit!important
+}
+#taleraPageNav .nav-item span:last-child,#taleraTellNav .nav-item span:last-child{
+ position:relative!important;z-index:1!important;color:inherit!important
+}
+#taleraPageNav .nav-item:focus-visible,#taleraTellNav .nav-item:focus-visible{
+ outline:2px solid #2478ca!important;outline-offset:-3px!important;border-radius:10px!important
+}
+</style>`;
+const ORIGINAL_TIMELINE_NAV=(String(HOME_HTML).match(/<nav class="bottom-nav" aria-label="Hoofdnavigatie TALERA">[\s\S]*?<\/nav>/)||[])[0]||'';
+function unifiedFooter(page){
+ const original=[...ORIGINAL_TIMELINE_NAV.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map(match=>match[0]);
+ if(original.length!==3)throw Error('De oorspronkelijke TALERA-navigatie ontbreekt.');
+ const selected=page==='tell'?0:page==='timeline'?1:2;
+ const links=original.map((html,index)=>{
+  let link=html.replace(/class="nav-item(?: selected)?"/,'class="nav-item'+(index===selected?' selected':'')+'"');
+  link=link.replace(/ aria-current="page"/g,'');
+  if(index===selected)link=link.replace('class="nav-item selected"','class="nav-item selected" aria-current="page"');
+  return link.replace('href="/present?visual=weekend-amsterdam"','href="/present"');
+ });
+ const id=page==='tell'?'taleraTellNav':'taleraPageNav';
+ return '<nav class="bottom-nav" id="'+id+'" aria-label="Hoofdnavigatie TALERA">'+links.join('')+'</nav>';
+}
+const bridge=String.raw`<script id="talera-lifeline-r19-bridge">
 (function(){
  const id=Number(new URLSearchParams(location.search).get('memory'));
  if(!Number.isInteger(id)||id<1||id>50)return;
@@ -134,7 +155,7 @@ const tellBridge=String.raw`<style id="talera-independent-tell-navigation">
 function addBridge(html){
   // RH19 handles its own story and photo rendering. The wrapper adds only
   // three-page navigation and an exact reference-ID selector.
-  return html.includes("</body>")?html.replace("</body>",bridge+memoryNavigation+"</body>"):html;
+  return html.includes("</body>")?html.replace("</body>",NAVIGATION_STYLE+unifiedFooter("present")+bridge+memoryNavigation+"</body>"):html;
 }
 export default {
   async fetch(request,env,ctx){
@@ -172,8 +193,8 @@ export default {
         .replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT)
         .replace("</head>",'<style id="talera-free-bulk-style">'+BULK_FREE_STYLE+"</style>"+FREE_TELL_POLISH_STYLE+"</head>")
         .replace('<section class="card" id="mediaSection"',BULK_FREE_MARKUP+'<section class="card" id="mediaSection"')
-        .replace('<nav aria-label="Hoofdnavigatie">','<nav id="taleraTellNav" aria-label="Hoofdnavigatie">')
-        .replace("</body>",BULK_FREE_SCRIPT+FREE_DATE_PICKER+"</body>");
+        .replace(/<nav aria-label="Hoofdnavigatie">[\s\S]*?<\/nav>/,unifiedFooter('tell'))
+        .replace("</body>",BULK_FREE_SCRIPT+FREE_DATE_PICKER+NAVIGATION_STYLE+"</body>");
       return reply(pwaShell(tell),method,"text/html; charset=utf-8");
     }
     if(path==="/storylab-clean"||path==="/storylab-clean/"){

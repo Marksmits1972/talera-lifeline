@@ -204,13 +204,13 @@ test('V8: each media belongs to one private on-device memory and one timeline da
  const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
  const present=exportedHtml(presentModule,'PRESENT_LOCAL_HTML');
  for(const k of ["indexedDB.open","objectStoreNames.contains('stories')","objectStoreNames.contains('files')","kind:kind","async function save","async function list","async function mediaUrl"])assert.ok(js.includes(k),k);
- for(const k of ['id="files"','accept="image/*,video/*"','MediaRecorder','id="birthYear"','store.save(','location.replace(','__MEMORY_STORE__'])assert.ok(tell.includes(k),k);
+ for(const k of ['id="files"','accept="image/*,video/*"','MediaRecorder','id="moment"','store.save(','location.replace(','__MEMORY_STORE__'])assert.ok(tell.includes(k),k);
  for(const k of ['id="gallery"','id="audio"','id="text"','store.get(id)','store.mediaUrl(entry.key)','__MEMORY_STORE__'])assert.ok(present.includes(k),k);
  for(const k of ['addLocalMemory(meta,imageUrl)','?local=','meta.items?.some','store.list()','Mijn verhalen'])assert.ok(visualV8.includes(k),k);
  checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
 });
 test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v11-free-bulk-import-20261016"/);
+ assert.match(worker,/const VERSION="talera-lifeline-v12-free-revision-20261016"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
  assert.match(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
  assert.match(worker,/TELL_PAGE_HTML/);
@@ -266,7 +266,7 @@ test('V10: media-first storytelling sequence and large visual voice studio',()=>
  const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
  const head=tell.indexOf('id="mediaSection"'),voice=tell.indexOf('id="voiceSection"'),detail=tell.indexOf('Maak je herinnering compleet');
  assert.ok(head>=0&&voice>head&&detail>voice,'Media → speech → details order');
- for(const id of ['mediaStage','strip','files','start','studio','studioStage','studioPrev','studioNext','stop','story','datePrecision','save']){
+ for(const id of ['mediaStage','strip','files','start','studio','studioStage','studioPrev','studioNext','stop','story','moment','save']){
   assert.ok(tell.includes('id="'+id+'"'),'missing '+id);
  }
  assert.match(tell,/grid-template-rows:auto minmax\(0,1fr\) auto/);
@@ -308,7 +308,7 @@ test('V10: date precision roundtrips through local storage, timeline and present
  assert.match(store,/dateEnd:precision==='period'\?dateEnd:null/);
  assert.match(store,/mediaUploads\.length>6/);
  assert.match(store,/voiceUploads\.length>1/);
- for(const x of ["value=\"exact\"","value=\"month\"","value=\"year\"","value=\"period\"","id=\"dateFrom\"","id=\"dateTo\""])assert.ok(tell.includes(x),x);
+ for(const x of ['id="moment"','function parsedMoment(value)','const seasons=','localToday()'])assert.ok(tell.includes(x),x);
  assert.match(tell,/datePrecision:time\.datePrecision,dateEnd:time\.dateEnd/);
  assert.match(visualV8,/m\.datePrecision=meta\.datePrecision/);
  assert.match(visualV8,/m\.dateEnd=meta\.dateEnd/);
@@ -332,10 +332,10 @@ test('V11 Free: bulk import can select twenty-five photos and shows separated me
  assert.match(worker,/\.replace\('<section class="card" id="mediaSection"',BULK_FREE_MARKUP/);
  assert.match(worker,/\.replace\("<\/body>",BULK_FREE_SCRIPT/);
  for(const id of ['bulkFiles','bulkPanel','bulkGroups','bulkSaveAll','bulkReturn','bulkStudio','bulkStage','bulkRecord','bulkStop'])assert.ok(markup.includes('id="'+id+'"'),id);
- assert.match(markup,/accept="image\/\*"/);
+ assert.match(markup,/accept="image\/\*,video\/\*"/);
  assert.match(markup,/type="file"[^>]*multiple/);
  assert.match(script,/const mediaLimit=6,batchLimit=25/);
- assert.match(script,/if\(files\.length>batchLimit\)/);
+ assert.match(script,/files\.slice\(0,batchLimit\)/);
  assert.match(script,/groups\.length\+' herinnering'/);
  assert.match(script,/const day=m\[1\]\+'-'\+m\[2\]/);
  assert.match(script,/0x9003/);
@@ -389,4 +389,48 @@ test('V11 Free: no-day photos stay undated instead of acquiring a made-up date',
  const group=arrange(Array.from({length:7},(_,i)=>({id:String(i),date:null,time:null,originalIndex:i})));
  assert.equal(group.length,2);assert.ok(group.every(x=>x.date===null));
  assert.deepEqual(group.map(x=>x.photos.length),[6,1]);
+});
+
+test('V12: all six photos stay on screen in one full-screen grid, with confirm and rollback',()=>{
+ const bulk=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ const css=exportedHtml(bulkCode.trim().split('\n')[0],'BULK_FREE_STYLE');
+ const markup=exportedHtml(bulkCode.trim().split('\n')[1],'BULK_FREE_MARKUP');
+ assert.match(css,/#bulkEditorGrid\{min-height:0;flex:1;display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-rows:repeat\(2,minmax\(0,1fr\)\)/);
+ for(const id of ['bulkEditor','bulkEditorGrid','bulkEditorCancel','bulkEditorOK','bulkEditorTargets','bulkEditorAdd','bulkBusy','bulkSpinner'])assert.match(markup,new RegExp('id="'+id+'"'));
+ assert.match(bulk,/function openEditor\(id\)/);
+ assert.match(bulk,/function editorStop\(cancel\)/);
+ assert.match(bulk,/function finishEditor\(ok\)/);
+ assert.match(bulk,/elementFromPoint/);
+ assert.match(bulk,/setPointerCapture/);
+ assert.match(bulk,/if\(source!==dest&&dest\.photos\.length>=6\)/);
+ assert.match(bulk,/g\.photos\.splice\(i,1\)/);
+ assert.match(bulk,/g\.photos\.slice\(0,3\)/);
+ assert.match(bulk,/setBusy\(true/);
+ assert.match(bulk,/De microfoon staat uit/);
+ checkScripts(bulk,'v12-free-bulk');
+});
+test('V12: persistent on-device retime changes date, precision and time without preserving stale date',()=>{
+ const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ assert.match(store,/async function retime\(id,change\)/);
+ assert.match(store,/updated=\{\.\.\.old,date:date,time:time,datePrecision:precision,dateEnd:null/);
+ assert.match(store,/tx\.objectStore\('stories'\)\.put\(updated\)/);
+ assert.match(store,/validDate\(date\)/);
+ assert.match(store,/date>.*localToday\(\)/);
+ assert.match(visualV8,/strong\.textContent=String\(yearAt\)/);
+ assert.doesNotMatch(visualV8,/strong\.textContent=String\(age\)/);
+ assert.match(visualV8,/maxYear=new Date\(\)\.getFullYear\(\)/);
+});
+test('V12: year/month/story drag and presentation memory drag compile and call retime',()=>{
+ const drag=read('../experiments/lifeline-main/timeline-reposition.js');
+ const presentDrag=read('../experiments/lifeline-main/presentation-reposition.js');
+ for(const [raw,key] of [[drag,'TIMELINE_REPOSITION_SCRIPT'],[presentDrag,'PRESENTATION_REPOSITION_SCRIPT']]){
+  const code=exportedHtml(raw,key);
+  assert.match(code,/store\.retime\(/);
+  assert.match(code,/pointerdown/);
+  assert.match(code,/pointermove/);
+  assert.match(code,/pointerup/);
+  checkScripts(code,key);
+ }
+ assert.match(worker,/TIMELINE_REPOSITION_SCRIPT/);
+ assert.match(worker,/PRESENTATION_REPOSITION_SCRIPT/);
 });

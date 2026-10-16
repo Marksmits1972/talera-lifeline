@@ -494,8 +494,9 @@ test('V13 iPhone corrections: local memories open in the native RH19 presentatio
  assert.match(handoff,/runtime.restrictToMemory\(memory\)/);
  assert.match(handoff,/await store.get\(id\)/);
  assert.match(handoff,/await store.mediaUrl\(item.key\)/);
- assert.match(handoff,/touchend/);
- assert.match(handoff,/entry.kind==='photo'/);
+ assert.match(handoff,/book.state=function/);
+ assert.match(handoff,/book.step=function/);
+ assert.match(handoff,/frame.kind==='photo'/);
  assert.match(handoff,/createElement\('video'\)/);
  assert.match(css,/\.intro\{display:none/);
  const client=handoff.match(/<script[^>]*>([\s\S]*?)<\/script>/);
@@ -517,8 +518,54 @@ test('V13 iPhone corrections: one visual overview, conditional merging, compact 
  assert.match(js,/recorder.start\(1000\)/);
  checkScripts(js,'bulk-polish-v13');
 });
-test('V13 iPhone corrections: RH19 fitting no longer upscales foreground photos',()=>{
+test('V13 presentation: preserve native RH19 photo fitting and three-page swipe engine',()=>{
  const code=read('../src/presentation-controller.js');
- assert.match(code,/const zoom=1;/);
- assert.doesNotMatch(code,/Math.max\(containH,boxH\*\.68\)/);
+ assert.match(code,/const targetH=Math.min\(boxH,Math.max\(containH,boxH\*\.68\)\)/);
+ assert.match(code,/const zoom=Math.min\(1\.82,Math.max\(1,targetH\/containH\)\)/);
+ const local=read('../experiments/lifeline-main/iphone-v13-corrections.js');
+ assert.match(local,/const nativeState=book.state.bind\(book\)/);
+ assert.match(local,/const nativeStep=book.step.bind\(book\)/);
+ assert.match(local,/runtime.writeMemory\(m\)/);
+ assert.match(local,/_photoIndex=i/);
+ assert.match(local,/if\(hasVideo\)\{/);
+ assert.doesNotMatch(local,/document.addEventListener\('touchend'/);
+});
+
+
+test('V13 native photo-book handoff offers correct neighboring local photographs without a second viewer',()=>{
+ const correction=read('../experiments/lifeline-main/iphone-v13-corrections.js');
+ const context=vm.createContext({});
+ vm.runInContext(correction.replaceAll('export const ','const ')+String.fromCharCode(10)+
+  'this.handoff=LOCAL_PRESENTATION_HANDOFF',context);
+ const scriptStart=context.handoff.indexOf('<script id=');
+ assert.ok(scriptStart>=0);
+ const scriptClose=context.handoff.indexOf('</script>',scriptStart);
+ assert.ok(scriptClose>scriptStart);
+ const embedded=[null,context.handoff.slice(context.handoff.indexOf('>',scriptStart)+1,scriptClose)];
+ assert.ok(embedded);
+ const script=embedded[1];
+ const nativeSnippet=script.slice(script.indexOf('const nativeState=book.state.bind(book);'),
+    script.indexOf('document.body.classList.add(',script.indexOf('const nativeState=book.state.bind(book);')));
+ assert.ok(nativeSnippet.includes('previous:i>0?{image:m.photos[i-1]}:null'));
+ assert.ok(nativeSnippet.includes('next:i<m.photos.length-1?{image:m.photos[i+1]}:null'));
+ assert.ok(nativeSnippet.includes('runtime.writeMemory(m)'));
+ const memory={id:51001,_taleraLocal:true,_taleraHasVideo:false,_photoIndex:0,photos:['foto-1','foto-2','foto-3'],image:'foto-1'};
+ let writes=0,draws=0;
+ const runtime={currentMemory:()=>memory,writeMemory:()=>{writes++},draw:()=>{draws++}};
+ const book={state(){return {index:7,current:null}},step(){return false}};
+ vm.runInNewContext('(()=>{'+nativeSnippet+'})()', {book,runtime,Math});
+ assert.equal(book.state().current.image,'foto-1');
+ assert.equal(book.state().previous,null);
+ assert.equal(book.state().next.image,'foto-2');
+ assert.equal(book.step(1),true);
+ assert.equal(memory.image,'foto-2');
+ assert.equal(book.state().previous.image,'foto-1');
+ assert.equal(book.state().next.image,'foto-3');
+ assert.equal(book.step(1),true);
+ assert.equal(memory.image,'foto-3');
+ assert.equal(book.step(1),false);
+ assert.equal(book.step(-1),true);
+ assert.equal(memory.image,'foto-2');
+ assert.equal(writes,3);
+ assert.equal(draws,3);
 });

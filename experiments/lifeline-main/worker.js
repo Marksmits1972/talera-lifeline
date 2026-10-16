@@ -13,8 +13,9 @@ import { DEMO_MEMORIES } from "./demo-memories.js";
 import { PWA_ICONS } from "./pwa-icons.js";
 import { BRAND_PNG_BASE64, BRAND_ICON_SVG } from "./pwa-brand.js";
 import { PWA_UPDATE_SCRIPT } from "./pwa-update.js";
+import { FREE_TELL_POLISH_STYLE, LOCAL_PRESENTATION_HANDOFF } from "./iphone-v13-corrections.js";
 
-const VERSION="talera-lifeline-v13-nine-corrections-20261016";
+const VERSION="talera-lifeline-v13-nine-corrections-20261016-iphone-polish-r1";
 const PWA_MANIFEST=JSON.stringify({name:"TALERA — Mijn levenslijn",short_name:"TALERA",description:"Door je leven reizen en herinneringen beleven",id:"/",start_url:"/",scope:"/",display:"standalone",background_color:"#ffffff",theme_color:"#ffffff",icons:[{src:"/talera-brand-v9.svg",sizes:"any",type:"image/svg+xml",purpose:"any"},{src:"/pwa-192.png",sizes:"192x192",type:"image/png",purpose:"any"},{src:"/pwa-512.png",sizes:"512x512",type:"image/png",purpose:"any"}]});
 const PWA_SW=String.raw`self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));self.addEventListener("fetch",event=>{if(event.request.mode!=="navigate")return;event.respondWith(fetch(event.request).catch(()=>new Response("<!doctype html><html lang=nl><meta name=viewport content=width=device-width,initial-scale=1><title>TALERA offline</title><body style=font-family:system-ui;padding:2rem><h1>TALERA</h1><p>Je bent offline. Probeer opnieuw wanneer je verbinding hebt.</p></body></html>",{status:503,headers:{"content-type":"text/html; charset=utf-8"}})))});`;
 
@@ -173,15 +174,16 @@ export default {
       return reply(JSON.stringify(DEMO_MEMORIES),method,"application/json; charset=utf-8");
     }
     if(path==="/present"||path==="/present/"){
-      if(url.searchParams.has("local"))return reply(pwaShell(PRESENT_LOCAL_HTML.replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT).replace("</body>",PRESENTATION_REPOSITION_SCRIPT+"</body>")),method,"text/html; charset=utf-8");
       const r=await r19Worker.fetch(targetRequest(request,"/"),env,ctx);
       if(method==="HEAD"||!r.ok||!(r.headers.get("content-type")||"").includes("text/html"))return r;
-      return reply(pwaShell(addBridge(await r.text(),request)),method,"text/html; charset=utf-8",r.status);
+      let presentation=addBridge(await r.text(),request);
+      if(url.searchParams.has("local"))presentation=presentation.replace("</body>",MEMORY_STORE_SCRIPT+LOCAL_PRESENTATION_HANDOFF+"</body>");
+      return reply(pwaShell(presentation),method,"text/html; charset=utf-8",r.status);
     }
     if(path==="/tell"||path==="/tell/"){
       const tell=String(TELL_PAGE_HTML)
         .replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT)
-        .replace("</head>",'<style id="talera-free-bulk-style">'+BULK_FREE_STYLE+"</style></head>")
+        .replace("</head>",'<style id="talera-free-bulk-style">'+BULK_FREE_STYLE+"</style>"+FREE_TELL_POLISH_STYLE+"</head>")
         .replace('<section class="card" id="mediaSection"',BULK_FREE_MARKUP+'<section class="card" id="mediaSection"')
         .replace('<nav aria-label="Hoofdnavigatie">','<nav id="taleraTellNav" aria-label="Hoofdnavigatie">')
         .replace("</body>",BULK_FREE_SCRIPT+FREE_DATE_PICKER+"</body>");

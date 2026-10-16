@@ -234,11 +234,12 @@ export const liveMemoryIntegrationScript = String.raw`
     memory.image=memory.photos[memory._photoIndex];
     settleVisiblePhoto(memory);
     renderDots(memory);
+    if(memory._taleraLocal&&window.__taleraLocalFrameChanged)window.__taleraLocalFrameChanged(memory);
     if(manual)scheduleAuto(memory);
   }
   function scheduleAuto(memory){
     clearAuto();
-    if(!memory||memory._photoLoading||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
+    if(!memory||memory._taleraLocal||memory._photoLoading||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
     autoStartTimer=setTimeout(()=>{
       showPhoto(memory,(memory._photoIndex||0)+1,false);
       autoInterval=setInterval(()=>{
@@ -272,13 +273,8 @@ export const liveMemoryIntegrationScript = String.raw`
       if(e.defaultPrevented)return;
       if(e.target.closest('button,nav,.timeline'))return;
       const memory=currentMemory();
-      // Imported Free media follow this same approved RH19 tap interaction.
-      // The local-loading flag suppresses auto-play, not deliberate user taps.
-      if(memory&&memory._taleraLocal){
-        if(e.target.closest('video,audio'))return;
-        if(window.__taleraLocalAdvance?.(1)){e.preventDefault();e.stopPropagation()}
-        return;
-      }
+      // Identical RH19 tap handling for originals, linked and local memories.
+      if(e.target.closest('video,audio'))return;
       if(!memory||memory._photoLoading||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
       e.preventDefault();e.stopPropagation();
       showPhoto(memory,(memory._photoIndex||0)+1,true);

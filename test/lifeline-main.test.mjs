@@ -456,3 +456,17 @@ test('V13: simple manual date picker and persistent millisecond order',()=>{
  assert.match(stored,/sortMs:canonicalSort/);
  assert.match(present,/talera-v13-present-layout/);
 });
+
+test('V13: one memory for up to six photos even when the dates differ',()=>{
+ const bulk=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ const js=bulk.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
+ const logic=js.slice(js.indexOf('function organize(photos){'),js.indexOf('function tile('));
+ const arrange=new Function('photos',`let groups=[],nextId=1;const mediaLimit=6;const uniqueId=()=>String(nextId++);${logic};organize(photos);return groups`);
+ const mixed=Array.from({length:6},(_,i)=>({id:'q'+i,date:'1995-03-'+String(i+1).padStart(2,'0'),time:'14:00:00',originalIndex:i}));
+ const one=arrange(mixed);
+ assert.equal(one.length,1);
+ assert.equal(one[0].photos.length,6);
+ assert.equal(one[0].date,null,'unknown combined date must be user-selected');
+ const more=arrange(Array.from({length:25},(_,i)=>({id:'v'+i,date:'2000-02-14',time:String(i).padStart(2,'0')+':00:00',originalIndex:i})));
+ assert.deepEqual(more.map(x=>x.photos.length),[6,6,6,6,1]);
+});

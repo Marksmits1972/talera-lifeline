@@ -180,7 +180,7 @@ test('V7: fluid month movement and calmer gesture, compatible with RH19 handoff'
 const visualV8=read('../experiments/lifeline-main/visual-v8-photo-space.html');
 const bridgeModule=read('../experiments/lifeline-main/memory-store.js');
 const tellModule=read('../experiments/lifeline-main/tell-local-page.js');
-const presentModule=read('../experiments/lifeline-main/present-local-page.js');
+const adapterModule=read('../experiments/lifeline-main/local-rh19-adapter.js');
 function exportedHtml(code,name){
  const start='export const '+name+' = ';
  assert.ok(code.startsWith(start),name);
@@ -199,20 +199,20 @@ test('V8: bigger lifetime photographs with unobstructed month and photo preview'
  for(const lane of ["installGesture(ageLane,'year')","installGesture(monthLane,'month')","installGesture(storyLane,'story')"])assert.ok(visualV8.includes(lane),lane);
  checkScripts(visualV8,'visual-v8');
 });
-test('V8: each media belongs to one private on-device memory and one timeline date',()=>{
+test('V8: private media store feeds one RH19 presentation adapter',()=>{
  const js=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
  const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
- const present=exportedHtml(presentModule,'PRESENT_LOCAL_HTML');
+ const adapter=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
  for(const k of ["indexedDB.open","objectStoreNames.contains('stories')","objectStoreNames.contains('files')","kind:kind","async function save","async function list","async function mediaUrl"])assert.ok(js.includes(k),k);
  for(const k of ['id="files"','accept="image/*,video/*"','MediaRecorder','id="moment"','store.save(','location.replace(','__MEMORY_STORE__'])assert.ok(tell.includes(k),k);
- for(const k of ['id="gallery"','id="audio"','id="text"','store.get(id)','store.mediaUrl(entry.key)','__MEMORY_STORE__'])assert.ok(present.includes(k),k);
- for(const k of ['addLocalMemory(meta,imageUrl)','?local=','meta.items?.some','store.list()','Mijn verhalen'])assert.ok(visualV8.includes(k),k);
- checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(present,'present');
+ for(const k of ['store.list()','runtime.registerMemories(memories)','store.mediaUrl(item.key)'])assert.ok(adapter.includes(k),k);
+ for(const k of ['addLocalMemories(rows)','?local=','meta.items?.some','store.list()','Mijn verhalen'])assert.ok(visualV8.includes(k),k);
+ checkScripts(js,'store');checkScripts(tell,'tell');checkScripts(adapter,'unified-adapter');
 });
-test('V8: the existing reference stays untouched and no Cloudflare storage write is exposed',()=>{
- assert.match(worker,/const VERSION="talera-lifeline-v13-nine-corrections-20261016-iphone-polish-r1"/);
+test('V8: RH19 reference is unchanged and only a safe local adapter is wired',()=>{
+ assert.match(worker,/const VERSION="talera-lifeline-v13-unified-rh19-adapter-20261016-r2"/);
  assert.match(worker,/if\(method!=="GET"&&method!=="HEAD"\)/);
- assert.match(worker,/if\(url.searchParams.has\("local"\)\)presentation=presentation.replace/);
+ assert.match(worker,/presentation=presentation.replace\("<\/body>",MEMORY_STORE_SCRIPT\+LOCAL_RH19_ADAPTER/);
  assert.match(worker,/TELL_PAGE_HTML/);
  assert.match(worker,/MEMORY_STORE_SCRIPT/);
  assert.ok(!('d1_databases' in config)&&!('r2_buckets' in config));
@@ -255,7 +255,7 @@ test('V9: network-first update watcher refreshes only safe timeline and retains 
  assert.match(worker,/function pwaShell\(html\)/);
  assert.match(worker,/pwaShell\(String\(HOME_HTML\)/);
  assert.match(worker,/pwaShell\(tell\)/);
- assert.match(worker,/MEMORY_STORE_SCRIPT\+LOCAL_PRESENTATION_HANDOFF/);
+ assert.match(worker,/MEMORY_STORE_SCRIPT\+LOCAL_RH19_ADAPTER/);
  assert.match(worker,/pwaShell\(presentation/);
  assert.match(worker,/cache-control":"no-store"/);
  assert.match(worker,/start_url:"\/"/);
@@ -300,10 +300,10 @@ test('V11 Free: microphone, user-authored text and no automatic AI or recognitio
  assert.match(tell,/De geluidsopname wordt apart bewaard/);
  assert.match(tell,/In Free schrijven we je woorden niet automatisch over/);
 });
-test('V10: date precision roundtrips through local storage, timeline and presentation',()=>{
+test('V10: date precision remains in local storage and timeline, never migrated',()=>{
  const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
  const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
- const present=exportedHtml(presentModule,'PRESENT_LOCAL_HTML');
+ const adapter=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
  assert.match(store,/datePrecision:precision/);
  assert.match(store,/dateEnd:precision==='period'\?dateEnd:null/);
  assert.match(store,/mediaUploads\.length>6/);
@@ -314,11 +314,10 @@ test('V10: date precision roundtrips through local storage, timeline and present
  assert.match(visualV8,/m\.dateEnd=meta\.dateEnd/);
  assert.match(visualV8,/if\(m\.datePrecision==='year'\)/);
  assert.match(visualV8,/if\(m\.datePrecision==='month'\)/);
- assert.match(present,/data\.datePrecision==='year'/);
- assert.match(present,/data\.datePrecision==='period'/);
- assert.match(present,/items\.findIndex\(item=>item\.kind==='photo'\)/);
+ assert.match(adapter,/const at=row\.date\+'T'/);
+ assert.match(adapter,/storyId:row\.id/);
  assert.match(tell,/item===cover\(\)/);
- checkScripts(tell,'v10-tell');checkScripts(present,'v10-presentation');checkScripts(store,'v10-storage');checkScripts(visualV8,'v10-timeline');
+ checkScripts(tell,'v10-tell');checkScripts(adapter,'v10-adapter');checkScripts(store,'v10-storage');checkScripts(visualV8,'v10-timeline');
 });
 
 
@@ -420,32 +419,27 @@ test('V12: persistent on-device retime changes date, precision and time without 
  assert.doesNotMatch(visualV8,/strong\.textContent=String\(age\)/);
  assert.match(visualV8,/maxYear=new Date\(\)\.getFullYear\(\)/);
 });
-test('V12: year/month/story drag and presentation memory drag compile and call retime',()=>{
+test('V12: year/month/story drag remains isolated from RH19 presentation',()=>{
  const drag=read('../experiments/lifeline-main/timeline-reposition.js');
- const presentDrag=read('../experiments/lifeline-main/presentation-reposition.js');
- for(const [raw,key] of [[drag,'TIMELINE_REPOSITION_SCRIPT'],[presentDrag,'PRESENTATION_REPOSITION_SCRIPT']]){
-  const code=exportedHtml(raw,key);
-  assert.match(code,/store\.retime\(/);
-  assert.match(code,/pointerdown/);
-  assert.match(code,/pointermove/);
-  assert.match(code,/pointerup/);
-  checkScripts(code,key);
- }
+ const code=exportedHtml(drag,'TIMELINE_REPOSITION_SCRIPT');
+ assert.match(code,/store\.retime\(/);
+ assert.match(code,/pointerdown/);
+ assert.match(code,/pointermove/);
+ assert.match(code,/pointerup/);
+ checkScripts(code,'TIMELINE_REPOSITION_SCRIPT');
  assert.match(worker,/TIMELINE_REPOSITION_SCRIPT/);
- assert.match(worker,/PRESENTATION_REPOSITION_SCRIPT/);
+ assert.doesNotMatch(worker,/PRESENTATION_REPOSITION_SCRIPT|PRESENT_LOCAL_HTML/);
 });
 
-test('V13 Free: directly entering presentation, persistent gestures and clear navigation',()=>{
- const src=read('../experiments/lifeline-main/presentation-reposition.js');
- const code=exportedHtml(src,'PRESENTATION_REPOSITION_SCRIPT');
- assert.match(code,/touch-action:none/);
- assert.match(code,/gallery.addEventListener\('pointerdown'/);
- assert.match(code,/document.getElementById\(dx<0\?'next':'prev'\)/);
- assert.match(code,/store.retime\(currentId/);
- assert.match(code,/-webkit-touch-callout:none/);
- assert.match(code,/z-index:20000/);
- assert.match(worker,/talera-photo-route-v13/);
- checkScripts(code,'presentation-v13');
+test('V13: direct route uses unmodified RH19 renderer and only one adapter',()=>{
+ const code=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
+ assert.match(worker,/LOCAL_RH19_ADAPTER/);
+ assert.doesNotMatch(worker,/LOCAL_PRESENTATION_HANDOFF/);
+ assert.match(code,/runtime\.registerMemories\(memories\)/);
+ assert.match(code,/runtime\.setCenter\(selected\.ms\)/);
+ assert.match(code,/runtime\.writeMemory\(selected\)/);
+ assert.doesNotMatch(code,/talera-local-controls|Vorig verhaal|Volgend verhaal|book\.state=function|book\.step=function/);
+ checkScripts(code,'unified-rh19');
 });
 test('V13 Free: photo import visibly previews all six and merges user-chosen groups',()=>{
  const style=exportedHtml(bulkCode.trim().split('\n')[0],'BULK_FREE_STYLE');
@@ -479,32 +473,21 @@ test('V13: local browser data remains private and never cleared for an update',(
 });
 
 
-test('V13 iPhone corrections: local memories open in the native RH19 presentation, not the dark detail page',()=>{
- const source=read('../experiments/lifeline-main/iphone-v13-corrections.js');
- const module={exports:{}};
- const result={};
- const context=vm.createContext({...result});
- vm.runInContext(source.replaceAll('export const ','const ')+String.fromCharCode(10)+
-  'this.__polish={FREE_TELL_POLISH_STYLE,LOCAL_PRESENTATION_HANDOFF}',context);
- const css=context.__polish.FREE_TELL_POLISH_STYLE;
- const handoff=context.__polish.LOCAL_PRESENTATION_HANDOFF;
- assert.match(worker,/LOCAL_PRESENTATION_HANDOFF/);
- assert.match(worker,/MEMORY_STORE_SCRIPT\+LOCAL_PRESENTATION_HANDOFF/);
- assert.doesNotMatch(worker,/if\(url.searchParams.has\("local"\)\)return reply\(pwaShell\(PRESENT_LOCAL_HTML/);
- assert.match(handoff,/runtime.registerMemory\(memory\)/);
- assert.match(handoff,/runtime.setCenter\(memory.ms\)/);
- assert.doesNotMatch(handoff,/runtime.restrictToMemory\(memory\)/);
- assert.match(handoff,/await store.get\(id\)/);
- assert.match(handoff,/await store.mediaUrl\(item.key\)/);
- assert.match(handoff,/book.state=function/);
- assert.match(handoff,/book.step=function/);
- assert.match(handoff,/frame.kind==='photo'/);
- assert.match(handoff,/createElement\('video'\)/);
- assert.match(css,/\.intro\{display:none/);
- const client=handoff.match(/<script[^>]*>([\s\S]*?)<\/script>/);
- assert.ok(client);
- assert.doesNotThrow(()=>new vm.Script(client[1]));
- assert.doesNotMatch(handoff,/indexedDB.deleteDatabase|localStorage.clear|sessionStorage.clear/);
+test('V13: local photos are records in native RH19 rather than custom carousel',()=>{
+ const style=read('../experiments/lifeline-main/iphone-v13-corrections.js');
+ const adapter=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
+ assert.match(style,/FREE_TELL_POLISH_STYLE/);
+ assert.doesNotMatch(style,/LOCAL_PRESENTATION_HANDOFF/);
+ assert.match(worker,/MEMORY_STORE_SCRIPT\+LOCAL_RH19_ADAPTER/);
+ assert.match(adapter,/id:'pwa:'\+row\.id/);
+ assert.match(adapter,/storyId:row\.id/);
+ assert.match(adapter,/runtime\.registerMemories\(memories\)/);
+ assert.match(adapter,/runtime\.setCenter\(selected\.ms\)/);
+ assert.match(adapter,/MAX_LOADED=10/);
+ assert.match(adapter,/URL\.revokeObjectURL/);
+ assert.doesNotMatch(adapter,/restrictToMemory|gallery|__taleraLocalAdvance/);
+ assert.doesNotMatch(adapter,/indexedDB\.deleteDatabase|localStorage\.clear|sessionStorage\.clear/);
+ checkScripts(adapter,'rh19-adapter');
 });
 test('V13 iPhone corrections: one visual overview, conditional merging, compact editor and visible microphone',()=>{
  const css=exportedHtml(bulkCode.trim().split('\n')[0],'BULK_FREE_STYLE');
@@ -520,70 +503,51 @@ test('V13 iPhone corrections: one visual overview, conditional merging, compact 
  assert.match(js,/recorder.start\(1000\)/);
  checkScripts(js,'bulk-polish-v13');
 });
-test('V13 presentation: preserve native RH19 photo fitting and three-page swipe engine',()=>{
+test('V13: RH19 preserves original fitting, gesture engine and native tap logic',()=>{
  const code=read('../src/presentation-controller.js');
+ const live=read('../src/live-memory-integration.js');
  assert.match(code,/const targetH=Math.min\(boxH,Math.max\(containH,boxH\*\.68\)\)/);
  assert.match(code,/const zoom=Math.min\(1\.82,Math.max\(1,targetH\/containH\)\)/);
- const local=read('../experiments/lifeline-main/iphone-v13-corrections.js');
- assert.match(local,/const nativeState=book.state.bind\(book\)/);
- assert.match(local,/const nativeStep=book.step.bind\(book\)/);
- assert.match(local,/runtime.writeMemory\(memory\)/);
- assert.match(local,/_photoIndex=i/);
- assert.match(local,/if\(frame.kind==='video'\)\{/);
- assert.doesNotMatch(local,/document.addEventListener\('touchend'/);
+ assert.match(code,/function prepareStrip\(/);
+ assert.match(code,/const moved=book\.step\(direction\)/);
+ assert.match(live,/if\(memory\._taleraLocal&&window\.__taleraLocalFrameChanged\)/);
+ assert.match(live,/if\(!memory\|\|memory\._taleraLocal\|\|memory\._photoLoading/);
+ assert.doesNotMatch(live,/__taleraLocalAdvance/);
 });
 
 
 
-test('V13 Free: native photo-book can tap and swipe through local media with no extra counter',()=>{
- const correction=read('../experiments/lifeline-main/iphone-v13-corrections.js');
- const context=vm.createContext({});
- vm.runInContext(correction.replaceAll('export const ','const ')+String.fromCharCode(10)+
-  'this.handoff=LOCAL_PRESENTATION_HANDOFF',context);
- const source=context.handoff;
- const from=source.indexOf('<script id=');
- const to=source.indexOf('</script>',from);
- const script=source.slice(source.indexOf('>',from)+1,to);
- const code=script.slice(script.indexOf('const nativeState=book.state.bind(book);'),
-   script.indexOf("document.body.classList.add(",script.indexOf('const nativeState=book.state.bind(book);')));
- assert.ok(code.includes('previous:i>0?{image:sequence[i-1]}:around.previous'));
- assert.ok(code.includes('next:i<frames.length-1?{image:sequence[i+1]}:around.next'));
- const frames=['foto-1','foto-2','foto-3'].map(src=>({kind:'photo',src}));
- const sequence=frames.map(f=>f.src);
- const memory={id:51001,_taleraLocal:true,_photoIndex:0,photos:sequence,image:sequence[0]};
- const older={image:'vorige-herinnering'},newer={image:'volgende-herinnering'};
- const runtime={currentMemory:()=>memory};
- let swaps=0,clearVideos=0;
- const showFrame=i=>{memory._photoIndex=((i%sequence.length)+sequence.length)%sequence.length;memory.image=sequence[memory._photoIndex];swaps++;return true};
- const book={state(){return {index:7,current:memory,previous:older,next:newer}},step(){return true}};
- const window={};
- vm.runInNewContext('(()=>{'+code+'})()', {frames,sequence,memory,runtime,book,showFrame,removeVideo:()=>{clearVideos++},window,Math});
- assert.equal(book.state().current.image,'foto-1');
- assert.equal(book.state().previous,older);
- assert.equal(book.state().next.image,'foto-2');
- assert.equal(window.__taleraLocalAdvance(1),true); // first tap
- assert.equal(memory.image,'foto-2');
- assert.equal(window.__taleraLocalAdvance(1),true); // second tap
- assert.equal(memory.image,'foto-3');
- assert.equal(window.__taleraLocalAdvance(1),true); // tap loops within memory
- assert.equal(memory.image,'foto-1');
- assert.equal(book.step(1),true); // native RH19 swipe
- assert.equal(memory.image,'foto-2');
- assert.equal(book.step(1),true);
- assert.equal(memory.image,'foto-3');
- assert.equal(book.step(1),true); // swipe now leaves the memory
- assert.equal(book.state().next,newer);
- assert.equal(swaps,5);
- assert.equal(clearVideos,1);
- assert.doesNotMatch(source,/className='talera-local-controls'|className="talera-local-controls"/);
- assert.doesNotMatch(source,/van '\+frames\.length/);
- assert.doesNotMatch(source,/id=["']bulkEditor/);
- assert.match(source,/frame.kind==='video'/);
- assert.match(source,/stage.addEventListener\('click'/);
- assert.match(source,/audioUrl/);
- assert.doesNotMatch(source,/indexedDB\.deleteDatabase|localStorage\.clear|sessionStorage\.clear/);
- const live=read('../src/live-memory-integration.js');
- assert.match(live,/if\(memory&&memory\._taleraLocal\)/);
- assert.match(live,/window\.__taleraLocalAdvance\?\.\(1\)/);
- assert.match(live,/memory\._photoLoading\|\|!Array\.isArray/); // still protects non-Free loading
+test('V13: 50, 100 and 1,000 distinct local memories load in one RH19 batch with lazy photos',async()=>{
+ const adapter=exportedHtml(adapterModule,'LOCAL_RH19_ADAPTER');
+ const embedded=adapter.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+ assert.ok(embedded);
+ const script=embedded[1];
+ for(const n of [50,100,1000]){
+  const rows=Array.from({length:n},(_,i)=>({
+   id:'local-test-'+i,title:'Vakantie '+i,date:'2000-07-'+String(i%28+1).padStart(2,'0'),
+   time:'12:00:00',text:'Herinnering '+i,
+   items:[{kind:'photo',key:'file-'+i}]
+  }));
+  let batch=[],mediaReads=0,selected=null;
+  const handlers=[];
+  const store={list:async()=>rows,mediaUrl:async key=>{mediaReads++;return 'blob:'+key}};
+  const runtime={
+   registerMemories:items=>{batch=items;return items.length},
+   currentMemory:()=>selected,
+   setCenter(){},
+   writeMemory:m=>{selected=m;for(const h of handlers)h(m)},
+   draw(){},
+   subscribe:fn=>handlers.push(fn)
+  };
+  const w={TaleraMemories:store,__taleraTimelineRuntime:runtime,addEventListener(){}};
+  const context={window:w,location:{search:n===1000?'?local=local-test-987':''},URLSearchParams,
+   URL:{revokeObjectURL(){}},document:{getElementById(){return null}},console,encodeURIComponent};
+  await vm.runInNewContext(script,context);
+  assert.equal(batch.length,n,'memory count '+n);
+  assert.equal(new Set(batch.map(m=>m.id)).size,n,'unique identity '+n);
+  assert.ok(batch.every(m=>m.storyId.startsWith('local-test-')));
+  assert.ok(batch.every(m=>m.id.startsWith('pwa:local-test-')));
+  assert.equal(mediaReads,n===1000?1:0,'only selected media is requested');
+  if(n===1000){assert.equal(selected.storyId,'local-test-987');assert.equal(selected.photos[0],'blob:file-987');}
+ }
 });

@@ -42,17 +42,44 @@ function targetRequest(request,path){
 }
 // Separate page: the unmodified RH19 presentation remains its own route.
 const bridge=String.raw`<style id="talera-independent-presentation-navigation">
+/* Keep the approved RH19 photo/story controls unchanged. Only the
+   independent three-page footer is restyled for readable iPhone navigation. */
 body nav[aria-label="TALERA navigatie"]{visibility:hidden!important}
-#taleraPageNav{position:fixed;z-index:2147483640;bottom:0;left:0;right:0;max-width:880px;margin:auto;
- display:flex;align-items:center;justify-content:space-around;gap:7px;min-height:calc(60px + env(safe-area-inset-bottom,0px));
- padding:7px 12px calc(7px + env(safe-area-inset-bottom,0px));
- background:#fffdfa;border-top:1px solid rgba(15,39,71,.14);
- font:650 12px -apple-system,BlinkMacSystemFont,sans-serif;box-sizing:border-box}
-#taleraPageNav a{display:block;flex:1;text-decoration:none;text-align:center;padding:12px 5px;border-radius:18px;color:#0f2747}
-#taleraPageNav a[aria-current="page"]{background:#dceaf6;font-weight:800}
+#taleraPageNav{
+ position:fixed!important;z-index:2147483640!important;bottom:0!important;left:0!important;right:0!important;
+ width:100%!important;max-width:880px!important;margin:0 auto!important;
+ display:flex!important;align-items:center!important;justify-content:space-between!important;gap:6px!important;
+ height:auto!important;min-height:calc(56px + env(safe-area-inset-bottom,0px))!important;max-height:none!important;
+ padding:5px 10px calc(5px + env(safe-area-inset-bottom,0px))!important;
+ box-sizing:border-box!important;overflow:visible!important;
+ background:rgba(255,254,252,.98)!important;border-top:1px solid #cad5e0!important;
+ box-shadow:0 -5px 18px rgba(15,39,71,.14)!important;
+ opacity:1!important;visibility:visible!important;filter:none!important;
+ font:750 12px/1.1 -apple-system,BlinkMacSystemFont,sans-serif!important;
+}
+#taleraPageNav a{
+ display:flex!important;flex:1 1 0!important;min-width:0!important;height:44px!important;
+ align-items:center!important;justify-content:center!important;gap:5px!important;
+ border:1px solid transparent!important;border-radius:13px!important;
+ padding:0 4px!important;margin:0!important;
+ text-align:center!important;white-space:nowrap!important;text-decoration:none!important;
+ background:#f3f6f9!important;color:#0f2747!important;
+ opacity:1!important;visibility:visible!important;filter:none!important;text-shadow:none!important;
+ font:750 12px/1.1 -apple-system,BlinkMacSystemFont,sans-serif!important;
+}
+#taleraPageNav a span:first-child{font-size:16px!important;line-height:1!important}
+#taleraPageNav a[aria-current="page"]{
+ background:#0f2747!important;color:#fff!important;border-color:#0f2747!important;
+ box-shadow:0 2px 7px rgba(15,39,71,.18)!important;
+}
+#taleraPageNav a:focus-visible{outline:3px solid #e7a98b!important;outline-offset:1px!important}
+@media(max-width:350px){#taleraPageNav{gap:4px!important;padding-left:6px!important;padding-right:6px!important}
+ #taleraPageNav a{gap:3px!important;font-size:11px!important}}
 </style>
 <nav id="taleraPageNav" aria-label="Hoofdpagina's van TALERA">
-<a href="/">⌂ Levenslijn</a><a href="/present" aria-current="page">▣ Presenteren</a><a href="/tell">✎ Vertellen</a>
+<a href="/"><span aria-hidden="true">⌂</span><span>Levenslijn</span></a>
+<a href="/present" aria-current="page"><span aria-hidden="true">▣</span><span>Presenteren</span></a>
+<a href="/tell"><span aria-hidden="true">✎</span><span>Vertellen</span></a>
 </nav>
 <script id="talera-lifeline-r19-bridge">
 (function(){

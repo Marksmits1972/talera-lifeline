@@ -284,6 +284,9 @@ const tags=['Vakanties','Familie','Vrienden','Paardrijden','Reizen','School','We
 const iconByTag=Object.fromEntries($$('.option',menu).map(n=>[n.textContent.trim(),$('.option-icon',n)?.innerHTML||'']));
 const state={yearFloat:2024,monthIndex:2024*12+4,selectedId:'weekend-amsterdam',shownId:'weekend-amsterdam',
  filter:new Set(['Vakanties']),drag:null,raf:0,settle:0,photoToken:0,gestureMoved:false};
+const v12DateOverrides=(()=>{try{return JSON.parse(localStorage.getItem('talera-v12-demo-dates')||'{}')}catch{return {}}})();
+memories.forEach(m=>{const value=v12DateOverrides[m.id];if(!Number.isFinite(value)||value>Date.now())return;const d=new Date(value);m.ms=value;m.at=d.toISOString();m.year=d.getFullYear();m.month=d.getMonth();m.datePrecision='exact'});
+memories.sort((a,b)=>a.ms-b.ms);
 const saved=(()=>{try{return JSON.parse(sessionStorage.getItem('taleraVisualTimelineV4')||'null')}catch{return null}})();
 if(saved&&Number.isFinite(saved.yearFloat)&&Number.isFinite(saved.monthIndex)){
  state.yearFloat=Math.max(minYear,Math.min(maxYear,saved.yearFloat));
@@ -420,6 +423,69 @@ function scrollStories(amount){
  if(next)selectMemory(next.id);
 }
 // One gesture is temporarily the source of truth. The other two tracks follow.
+
+let v12Move=null,v12Ticker=null;
+function v12DragCleanup(){
+ if(v12Ticker){clearInterval(v12Ticker);v12Ticker=null}
+ if(v12Move?.ghost)v12Move.ghost.remove();
+ v12Move=null;state.v12Drag=null;
+}
+function v12DragStart(id,e){
+ const m=memories.find(x=>x.id===id);if(!m)return;
+ state.filter.clear();updateTop();
+ const ghost=document.createElement('div');ghost.id='v12DragGhost';
+ ghost.style.cssText='position:fixed;z-index:2147483643;width:110px;max-width:34vw;background:#163d61;color:#fff;border:2px solid #7bb3e5;border-radius:14px;padding:7px;pointer-events:none;box-shadow:0 8px 24px #13345666;font-size:12px;font-weight:700;text-align:center';
+ const photo=document.createElement('img');photo.src=m.image||'';photo.alt='';photo.style.cssText='display:block;width:100%;height:72px;object-fit:contain;border-radius:8px';
+ const copy=document.createElement('div');copy.textContent=m.title;ghost.append(photo,copy);document.body.appendChild(ghost);
+ v12Move={id,pointer:e.pointerId,ghost,year:m.year,month:m.year*12+m.month,slot:0,lastY:e.clientY,x:e.clientX,y:e.clientY,lane:'story'};
+ state.v12Drag=true;
+ const list=memories.filter(x=>x.year===m.year&&x.month===m.month&&x.id!==id).sort((a,b)=>a.ms-b.ms);
+ v12Move.slot=list.filter(x=>x.ms<m.ms).length;
+ v12DragMove(e);
+}
+function v12DragMove(e){
+ const d=v12Move;if(!d||d.pointer!==e.pointerId)return;
+ e.preventDefault();d.x=e.clientX;d.y=e.clientY;d.ghost.style.left=Math.max(2,Math.min(innerWidth-116,e.clientX+12))+'px';d.ghost.style.top=Math.max(10,Math.min(innerHeight-130,e.clientY-105))+'px';
+ const y=ageLane.getBoundingClientRect(),m=monthLane.getBoundingClientRect(),st=storyLane.getBoundingClientRect();
+ const prev=d.lane;d.lane=e.clientX<y.right?'year':e.clientX<m.right?'month':'story';
+ if(d.lane==='year'){
+  const by=Math.round((e.clientY-(y.top+y.height/2))/(y.height/6));
+  d.year=Math.max(minYear,Math.min(maxYear,Math.round(state.yearFloat)+by));
+  d.month=d.year*12+5;
+  state.yearFloat=d.year;state.monthIndex=d.month;d.ghost.title='Jaar '+d.year;
+ }else if(d.lane==='month'){
+  const relative=Math.round((e.clientY-(m.top+m.height/2))/(Math.max(25,m.height*.0675)));
+  const month=Math.max(d.year*12,Math.min(d.year*12+11,d.year*12+5+relative));
+  d.month=month;state.monthIndex=month;state.yearFloat=Math.floor(month/12);
+  d.ghost.title='Maand '+(month%12+1);
+ }else{
+  if(prev!=='story'){d.slot=0}
+  const targetYear=Math.floor(d.month/12),targetMonth=(d.month%12+12)%12;
+  const list=memories.filter(x=>x.id!==d.id&&x.year===targetYear&&x.month===targetMonth).sort((a,b)=>a.ms-b.ms);
+  const offset=Math.round((e.clientY-(st.top+st.height/2))/Math.max(46,st.height/3));
+  d.slot=Math.max(0,Math.min(list.length,Math.floor(list.length/2)+offset));
+  d.ghost.title='Positie '+(d.slot+1);
+ }
+ cancelAnimationFrame(state.raf);renderNavigation();
+}
+async function v12DragFinish(e){
+ const d=v12Move;if(!d||d.pointer!==e.pointerId)return;
+ const m=memories.find(x=>x.id===d.id);
+ const year=Math.floor(d.month/12),month=(d.month%12+12)%12;
+ const all=memories.filter(x=>x.id!==d.id&&x.year===year&&x.month===month).sort((a,b)=>a.ms-b.ms);
+ const slot=d.lane==='story'?d.slot:all.filter(x=>x.ms<m.ms).length;
+ const begin=new Date(year,month,1).getTime(),end=Math.min(Date.now(),new Date(year,month+1,1).getTime()-1);
+ const left=all[slot-1]?.ms??begin,right=all[slot]?.ms??end;
+ const midpoint=left+(right-left)/2;
+ v12DragCleanup();
+ if(!(Number.isFinite(midpoint)&&midpoint>left&&midpoint<right&&midpoint<=Date.now())){console.warn('Geen chronologische plaats tussen gekozen verhalen');return}
+ try{
+  if(m.localId&&window.TaleraMemories?.updatePosition)await window.TaleraMemories.updatePosition(m.localId,midpoint);
+  else {v12DateOverrides[m.id]=midpoint;localStorage.setItem('talera-v12-demo-dates',JSON.stringify(v12DateOverrides))}
+  m.ms=midpoint;m.at=new Date(midpoint).toISOString();m.year=new Date(midpoint).getFullYear();m.month=new Date(midpoint).getMonth();m.datePrecision='exact';m.dateEnd=null;
+  memories.sort((a,b)=>a.ms-b.ms);selectMemory(m.id);setPreview(m.id);save()
+ }catch(err){console.warn('Verplaatsen niet opgeslagen:',err)}
+}
 function installGesture(node,lane){
  node.style.touchAction='pan-x pinch-zoom';
  let g=null;
@@ -428,13 +494,15 @@ function installGesture(node,lane){
   if(ev.pointerType==='mouse'&&ev.button!==0)return;
   if(ev.target.closest('a'))return;
   g={id:ev.pointerId,y:ev.clientY,startY:ev.clientY,when:performance.now(),v:0,startTarget:ev.target,
-     year:state.yearFloat,month:state.monthIndex,moved:false};
+     year:state.yearFloat,month:state.monthIndex,moved:false,timer:null};
+  if(lane==='story'){const node=ev.target.closest('[data-id]');if(node){g.storyId=node.dataset.id;g.timer=setTimeout(()=>{if(g&&!g.moved&&g.storyId)v12DragStart(g.storyId,ev)},350)}}
   try{node.setPointerCapture(ev.pointerId)}catch{}
  });
  node.addEventListener('pointermove',ev=>{
   if(!g||g.id!==ev.pointerId)return;
+  if(v12Move){v12DragMove(ev);return}
   const dy=ev.clientY-g.y,elapsed=Math.max(10,performance.now()-g.when);
-  if(Math.abs(ev.clientY-g.startY)>7)g.moved=true;
+  if(Math.abs(ev.clientY-g.startY)>7){g.moved=true;clearTimeout(g.timer)}
   if(!g.moved)return;
   g.v=(dy/elapsed)*.65+g.v*.35;g.y=ev.clientY;g.when=performance.now();
   if(lane==='year'){
@@ -452,7 +520,8 @@ function installGesture(node,lane){
  });
  function end(ev){
   if(!g||g.id!==ev.pointerId)return;
-  const was=g;g=null;
+  const was=g;g=null;clearTimeout(was.timer);
+  if(v12Move){v12DragFinish(ev);return}
   if(!was.moved){
    const row=was.startTarget.closest('[data-year]');
    const month=was.startTarget.closest('[data-month]');
@@ -480,7 +549,7 @@ function installGesture(node,lane){
  node.addEventListener('pointercancel',ev=>{
   // Never start false inertial movement if iOS intercepts the gesture.
   if(!g||g.id!==ev.pointerId)return;
-  g=null;cancelAnimationFrame(state.raf);
+  clearTimeout(g.timer);g=null;if(v12Move)v12DragCleanup();cancelAnimationFrame(state.raf);
   if(lane!=='story')renderNavigation(lane);
  });
  node.addEventListener('wheel',ev=>{

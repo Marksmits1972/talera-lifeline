@@ -104,19 +104,22 @@ jobs:
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/tell" -o /tmp/talera-lifeline-tell.html
           grep -q 'taleraTellNav' /tmp/talera-lifeline-tell.html
           grep -q 'id="studioStage"' /tmp/talera-lifeline-tell.html
-          grep -q 'id="datePrecision"' /tmp/talera-lifeline-tell.html
+          grep -q 'id="moment"' /tmp/talera-lifeline-tell.html
           grep -q 'const maxMedia=6' /tmp/talera-lifeline-tell.html
           grep -q 'id="mediaStage"' /tmp/talera-lifeline-tell.html
           grep -q 'id="bulkFiles"' /tmp/talera-lifeline-tell.html
           grep -q 'id="bulkGroups"' /tmp/talera-lifeline-tell.html
           grep -q 'talera-bulk-free-v11' /tmp/talera-lifeline-tell.html
+          grep -q 'id="bulkEditorGrid"' /tmp/talera-lifeline-tell.html
+          grep -q 'id="bulkSpinner"' /tmp/talera-lifeline-tell.html
+          grep -q 'id="bulkStudio"' /tmp/talera-lifeline-tell.html
           grep -q 'const mediaLimit=6,batchLimit=25' /tmp/talera-lifeline-tell.html
           ! grep -q 'id="aiTitle"' /tmp/talera-lifeline-tell.html
           echo "Checking V9 approved logo, PWA update script and new version API"
           grep -q 'talera-brand-v9.png' /tmp/talera-lifeline-home.html
           grep -q 'talera-version-check-v9' /tmp/talera-lifeline-home.html
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/api/version" -o /tmp/talera-lifeline-version.json
-          grep -q 'talera-lifeline-v11-free-bulk-import-20261016' /tmp/talera-lifeline-version.json
+          grep -q 'talera-lifeline-v12-free-revision-20261016' /tmp/talera-lifeline-version.json
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.png" -o /tmp/talera-lifeline-brand.png
           test "$(file --mime-type -b /tmp/talera-lifeline-brand.png)" = "image/png"
           curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.svg" -o /tmp/talera-lifeline-brand.svg

@@ -344,7 +344,7 @@ test('V11 Free: bulk import can select twenty-five photos and shows separated me
  assert.match(script,/g\.date!==p\.date\|\|g\.photos\.length>=mediaLimit/);
  assert.match(script,/function reposition\(d\)/);
  assert.match(script,/if\(src!==dst&&dst\.photos\.length>=mediaLimit\)/);
- assert.match(script,/if\(!src\.photos\.length\)groups=groups\.filter/);
+ assert.match(script,/if\(!src\.photos\.length&&!src\.voice&&/);
  assert.match(script,/setPointerCapture/);
  assert.match(script,/elementFromPoint/);
  assert.match(script,/getUserMedia\(\{audio:true\}\)/);

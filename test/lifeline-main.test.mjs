@@ -390,3 +390,24 @@ test('V11 Free: no-day photos stay undated instead of acquiring a made-up date',
  assert.equal(group.length,2);assert.ok(group.every(x=>x.date===null));
  assert.deepEqual(group.map(x=>x.photos.length),[6,1]);
 });
+
+test('V12: unified bulk editor, midpoint memory writes, calendar timeline and presentation flow',()=>{
+ const markup=exportedHtml(bulkCode.trim().split('\n')[1],'BULK_FREE_MARKUP');
+ const script=exportedHtml(bulkCode.trim().split('\n')[2],'BULK_FREE_SCRIPT');
+ const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ for(const name of ['bulkEditor','bulkEditorGrid','bulkEditorDone','bulkLoading'])assert.ok(markup.includes(name),name);
+ for(const name of ['function beginGroupDrag','function groupDragEnd','function openEditor','function editorMove','function busy'])assert.ok(script.includes(name),name);
+ assert.ok(tell.includes('id="v12DateText"'));
+ assert.ok(tell.includes('function v12Interpret'));
+ assert.ok(store.includes('async function updatePosition'));
+ assert.ok(store.includes('sortMs:value'));
+ assert.ok(visualV8.includes('strong.textContent=String(yearAt)'));
+ assert.ok(visualV8.includes('function v12DragFinish'));
+ assert.ok(worker.includes('PRESENTATION_V12_SCRIPT'));
+ const presentCode=read('../experiments/lifeline-main/presentation-v12.js');
+ const scriptLine=presentCode.trim().split('\n')[1];
+ const presentation=exportedHtml(scriptLine,'PRESENTATION_V12_SCRIPT');
+ assert.ok(presentation.includes('store.updatePosition(id,midpoint)'));
+ checkScripts(presentation,'presentation-v12');
+});

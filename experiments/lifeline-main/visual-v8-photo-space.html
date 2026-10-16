@@ -555,7 +555,7 @@ window.__taleraLifelineDemo={
   minYear=Math.min(minYear,year);maxYear=Math.max(maxYear,year);
   const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':imageUrl?'photo':'text';
   const m=example(meta.id,meta.date,meta.title,meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',imageUrl||null,['Mijn verhalen'],type);
-  m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Date.parse(meta.date+'T'+(meta.time||'12:00:00'));memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
+  m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Number.isFinite(meta.sortMs)?meta.sortMs:Date.parse(meta.date+'T'+(meta.time||'12:00:00'));memories.push(m);memories.sort((a,b)=>a.ms-b.ms);
   const focus=new URLSearchParams(location.search).get('local');
   if(focus===meta.id){state.filter.clear();state.selectedId=m.id;state.yearFloat=Math.min(maxYear,Math.max(minYear,m.year));state.monthIndex=Math.round(state.yearFloat)*12+m.month;renderNavigation();setPreview(m.id);save()}
   else {renderNavigation();updateTop()}

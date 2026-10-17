@@ -1,0 +1,72 @@
+name: TALERA i18n — isolated architecture check
+
+on:
+  push:
+    branches:
+      - work/talera-central-i18n-20261017
+    paths:
+      - 'experiments/lifeline-main/**'
+      - 'test/lifeline-*.test.mjs'
+      - '.github/workflows/lifeline-i18n-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-i18n-architecture-preview-only
+  cancel-in-progress: false
+
+jobs:
+  isolated-i18n-check:
+    name: Test five language catalogs and original RH19 integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    environment: talera-lifeline-development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate target and original memory safety
+        run: |
+          test "$GITHUB_REF" = 'refs/heads/work/talera-central-i18n-20261017'
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const c=JSON.parse(fs.readFileSync('experiments/lifeline-main/wrangler-i18n-preview.jsonc','utf8'));
+          if(c.name!=='talera-r19-lifeline-i18n-preview-dev'||c.main!=='worker.js'||c.routes||c.d1_databases||c.r2_buckets)throw Error('Unsafe Worker deployment configuration');
+          const worker=fs.readFileSync('experiments/lifeline-main/worker.js','utf8');
+          if(worker.includes('indexedDB.deleteDatabase(')||worker.includes('localStorage.clear('))throw Error('Unsafe memory operations');
+          JS
+      - name: Test existing RH19 plus central language architecture
+        run: |
+          node --test test/lifeline-main.test.mjs test/lifeline-i18n.test.mjs
+          node --check experiments/lifeline-main/worker.js
+          node --check experiments/lifeline-main/i18n.js
+          for f in experiments/lifeline-main/locales/*.js; do node --check "$f"; done
+      - name: Publish separate i18n preview only
+        if: vars.TALERA_LIFELINE_DEPLOY_ENABLED == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler deploy --config experiments/lifeline-main/wrangler-i18n-preview.jsonc
+      - name: Smoke check all UI routes on separate origin
+        if: vars.TALERA_LIFELINE_DEPLOY_ENABLED == 'true'
+        run: |
+          set -euo pipefail
+          BASE='https://talera-r19-lifeline-i18n-preview-dev.mark-a39.workers.dev'
+          sleep 3
+          for path in "/" "/tell" "/present?memory=50"; do
+            curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE$path" | grep -q 'talera-i18n-bootstrap'
+          done
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/" | grep -q 'data-i18n="nav.timeline"'
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/tell" | grep -q 'data-i18n="tell.heading"'
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" | grep -q 'phone-display-unified-nav'
+          echo "Only separate i18n preview was published; installed iPhone PWA remains untouched."

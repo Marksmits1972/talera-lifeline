@@ -62,3 +62,13 @@ test('native RH19 uses the shared dynamic life bounds for density and navigation
  assert.match(adapter,/runtime\.setBirthYear\?\.\(store\.birthday\?\.\(\)\)/);
  assert.doesNotMatch(index,/lifeEnd:.*2026/);
 });
+
+test('birth-year profile is editable in the existing menu, not a second memory store',()=>{
+ const page=readFileSync(new URL('../experiments/lifeline-main/visual-v8-photo-space.html',import.meta.url),'utf8');
+ const store=readFileSync(new URL('../experiments/lifeline-main/memory-store.js',import.meta.url),'utf8');
+ assert.match(page,/id="taleraBirthYear"/);
+ assert.match(page,/data-i18n="profile.birthYear"/);
+ assert.match(page,/store\.setBirthday\(year\)/);
+ assert.match(page,/setBirthYear\(store\.birthday\(\)\)/);
+ assert.match(store,/talera-dev-birthyear-v1/);
+});

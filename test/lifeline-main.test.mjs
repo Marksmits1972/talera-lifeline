@@ -333,7 +333,7 @@ test('V11 Free: bulk import can select twenty-five photos and shows separated me
  const markup=exportedHtml(markupLine,'BULK_FREE_MARKUP');
  const script=exportedHtml(scriptLine,'BULK_FREE_SCRIPT');
  assert.match(worker,/import \{ BULK_FREE_STYLE, BULK_FREE_MARKUP, BULK_FREE_SCRIPT \} from "\.\/bulk-free\.js"/);
- assert.match(worker,/\.replace\('<section class="card" id="mediaSection"',BULK_FREE_MARKUP/);
+ assert.match(worker,/\.replace\("<!--TALERA_TELL_BULK-->",BULK_FREE_MARKUP\)/);
  assert.match(worker,/\.replace\("<\/body>",BULK_FREE_SCRIPT/);
  for(const id of ['bulkFiles','bulkPanel','bulkGroups','bulkSaveAll','bulkReturn','bulkStudio','bulkStage','bulkRecord','bulkStop'])assert.ok(markup.includes('id="'+id+'"'),id);
  assert.match(markup,/accept="image\/\*,video\/\*"/);

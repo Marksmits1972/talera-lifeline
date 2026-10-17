@@ -1,6 +1,6 @@
 // Single source of truth for the three-page TALERA footer.
 // This pure component owns markup and visual tokens; page behavior stays in each page.
-const NAVIGATION_STYLE=String.raw`<style id="talera-unified-navigation">
+export const NAVIGATION_STYLE=String.raw`<style id="talera-unified-navigation">
 /* Exact three-tab structure and iconography from the approved timeline. */
 body nav[aria-label="TALERA navigatie"]{visibility:hidden!important}
 #taleraPageNav.bottom-nav,#taleraTellNav.bottom-nav{

@@ -59,6 +59,6 @@ test('native RH19 uses the shared dynamic life bounds for density and navigation
  assert.match(html7,/initialLifeRange=window\.TaleraLifeRange\(MEMORIES,null\)/);
  assert.match(home,/function updateLifeBounds\(\)/);
  assert.match(home,/window\.TaleraLifeRange\(memories,profileBirthYear\)/);
- assert.match(adapter,/runtime\.setBirthYear\(store\.birthday\(\)\)/);
+ assert.match(adapter,/runtime\.setBirthYear\?\.\(store\.birthday\?\.\(\)\)/);
  assert.doesNotMatch(index,/lifeEnd:.*2026/);
 });

@@ -1,6 +1,6 @@
 # TALERA V13 — architectuur-opschoning en releasepoort
 
-Status: **gedeeltelijk opgeschoond; NIET definitief goedgekeurd / niet uitgerold**.
+Status: **dynamische tijdsgrenzen, geboortejaarinstelling en ontdubbelde RH19-voorbeeldcatalogus automatisch getest; overige eisen nog niet af. NIET definitief goedgekeurd / niet uitgerold**.
 
 ## Leidende minimale architectuur
 
@@ -22,8 +22,8 @@ Status: **gedeeltelijk opgeschoond; NIET definitief goedgekeurd / niet uitgerold
 ## Openstaande architectuurschuld — niet verbergen of wegtesten
 
 **Prioriteit A.**
-- De originele 50 RH19-demogegevens zijn zowel in `src/html/chunk3..6.js` als in `demo-memories.js` opgenomen. Test bevestigt gelijke data, maar dat is nog **dubbel bronbeheer**. Eén canonieke data-export vereist een afzonderlijke RH19-snapshotcontrole vóór het schrappen van de duplicaatbron.
-- RH19 gebruikt nu vaste datumgrenzen **06-09-1976 t/m 06-09-2026**, terwijl de nieuwere tijdlijn breder gaat. Alle herinneringen in geldige datums daarbuiten kunnen daardoor niet vanzelf correct in RH19 positioneren. Eerst tijdsmodel ontwerpen en reproductietests (1900, heden, >2026) zonder de goedgekeurde foto-/swipe-layout aan te tasten.
+- **GEREALISEERD:** De originele 50 RH19-voorbeeldherinneringen staan nu alleen in `src/reference-memories.js`; RH19 en de telefoon delen deze bron. Golden snapshot-hash `5805a021` test ID, datum, oorspronkelijk verhaal en foto; de oude import is een re-export.
+- **GEREALISEERD IN CODE, IPHONE-ACCEPTATIE OPEN:** RH19 en de telefoontijdlijn gebruiken `src/life-range.js`, start = vroegste herinnering of eerder geboortejaar, einde = vandaag. RH19's dichtheidsweergave wordt bij nieuwe herinneringen opnieuw berekend. De maximale zichtbare overzichtszoom en het gedrag bij tientallen jaren moeten nog visueel worden getest.
 - De tijdlijn, IndexedDB en RH19 gebruiken nog verschillende objectvormen en een adapter. Behoud één canonieke opgeslagen record; beperk noodzakelijke omzetting tot een expliciet RH19-presentation-inputcontract. Verwijder alle overige duplicerende adapters en state-paden alleen mét bewezen gelijk gedrag.
 - Vanwege de bestaande RH19-HTML is een legacy `</body>`-invoegpunt op `/present` nog aanwezig. Dit mag pas verdwijnen wanneer RH19 zelf een formele éénmalige uitbreidingsplaats heeft zonder de referentiepresentatie te wijzigen.
 
@@ -43,3 +43,12 @@ Status: **gedeeltelijk opgeschoond; NIET definitief goedgekeurd / niet uitgerold
 - De gebruiker keurt de bediening inclusief witte RH19-verhaalplaat, fotografie en pagina-navigatie op dezelfde PWA-origin goed.
 - Nooit cookies, cache, IndexedDB, app of media verwijderen om een software-update te laten werken.
 - Pas ná acceptatie merge naar de bestaande PWA-branch, met behoud van een herstelbare Git-commit. Een groene CI is **niet** hetzelfde als een geslaagde iPhone-gebruikerstest.
+
+
+## iPhone Free-herstel: platformspecifieke blokkade, geen valse veiligheid
+
+- Het bestaande IndexedDB en de OPFS-map van een web-app zijn beide opslag binnen hetzelfde WebKit-/origin-kader. De WebKit-opslagregels kunnen onder ruimte- of bewaarcondities ook zo'n map samen met IndexedDB laten verdwijnen. Een automatisch aangemaakte OPFS-kopie is daarom **niet** de onafhankelijke iPhone-back-up die we de gebruiker willen beloven. Bron: https://webkit.org/blog/14403/updates-to-storage-policy/ en https://webkit.org/blog/12257/the-file-system-access-api-with-origin-private-file-system/ .
+- iOS Safari biedt de web-app momenteel niet de vereiste standaard `showDirectoryPicker` om buiten de app zelfstandig naar een permanent gekozen map in Bestanden te schrijven. Bron: https://openpwa.net/reference/capabilities/file-system-access/ .
+- Een werkbare Free-back-up moet dus aantoonbaar exporteren naar een door de gebruiker opgeslagen bestand (Bestanden/ander medium), mét veilige import/herstel en ongewijzigde originele media; of later via een daarvoor geschikte native iOS-integratie. **Niet doen alsof dit al automatisch kan.**
+- Er wordt **geen nieuwe duplicerende on-device database** aangemaakt als surrogaat voor een externe back-up. Dit zou opslag verdubbelen zonder de beloofde onafhankelijkheid.
+- Premium kan later een apart beveiligd Cloudflare-opslagmiddel bieden volgens hetzelfde canonieke herinneringscontract, met herstel en export na beëindiging.

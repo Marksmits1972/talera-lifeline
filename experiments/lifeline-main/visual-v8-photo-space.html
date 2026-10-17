@@ -257,7 +257,7 @@ const t=(key,vars)=>window.TaleraI18n?.t(key,vars)||key;
 const monthLabel=(index,style='long')=>new Intl.DateTimeFormat(window.TaleraI18n?.locale()||'nl-NL',{month:style}).format(new Date(2020,index,15));
 const tagKeys={Vakanties:'timeline.vacations',Familie:'timeline.family',Vrienden:'timeline.friends',Paardrijden:'timeline.horseRiding',Reizen:'timeline.travel',School:'timeline.school',Werk:'timeline.work','Mijn verhalen':'timeline.myStories'};
 const tagLabel=tag=>t(tagKeys[tag]||tag);
-let minYear=2022,maxYear=new Date().getFullYear(); // Calendar years, expanded by shared reference and local stories
+let minYear=new Date().getFullYear(),maxYear=minYear; // Recalculated from the same range model as RH19
 const yearImages=$$('.age-photo').map(x=>x.src);
 const storyImages=$$('.story-list .story img').map(x=>x.src);
 const heroImage=previewImage.src;
@@ -274,7 +274,12 @@ const memories=references.map(record=>{
  item.ms=new Date(record.at).getTime();
  return item;
 }).filter(m=>Number.isFinite(m.ms)).sort((a,b)=>a.ms-b.ms);
-if(memories.length)minYear=Math.min(minYear,...memories.map(m=>m.year));
+let profileBirthYear=null;
+function updateLifeBounds(){
+ const range=window.TaleraLifeRange(memories,profileBirthYear);
+ minYear=range.startYear;maxYear=range.endYear;
+}
+updateLifeBounds();
 const tags=['Vakanties','Familie','Vrienden','Paardrijden','Reizen','School','Werk','Mijn verhalen'];
 const iconByTag=Object.fromEntries($$('.option',menu).map(n=>[n.textContent.trim(),$('.option-icon',n)?.innerHTML||'']));
 const state={yearFloat:2026,monthIndex:2026*12+8,selectedId:memories.length?memories[memories.length-1].id:'',shownId:'',
@@ -566,10 +571,11 @@ window.__taleraLifelineDemo={
    const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':meta.items?.some(x=>x.kind==='photo')?'photo':'text';
    const m=example(meta.id,meta.date,meta.title||'Mijn herinnering',meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',null,['Mijn verhalen'],type);
    m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Date.parse(meta.date+'T'+(meta.time||'12:00:00'));inserted.push(m);
-   minYear=Math.min(minYear,year);maxYear=Math.max(maxYear,year);
+
   }
   if(!inserted.length)return 0;
   memories.push(...inserted);memories.sort((a,b)=>a.ms-b.ms);
+  updateLifeBounds();
   const search=new URLSearchParams(location.search);
   const focus=search.get('memory')||search.get('local');
   const chosen=inserted.find(m=>m.localId===focus);
@@ -593,7 +599,14 @@ window.__taleraLifelineDemo={
   }
   if(changed){renderAges();renderStories();if(selected){state.shownId='';setPreview(state.selectedId)}}
  },
- setBirthYear(y){renderAges()}
+ setBirthYear(y){
+  const value=Number(y);
+  profileBirthYear=Number.isInteger(value)&&value>=1000&&value<=new Date().getFullYear()?value:null;
+  updateLifeBounds();
+  state.yearFloat=Math.max(minYear,Math.min(maxYear,state.yearFloat));
+  state.monthIndex=Math.max(minYear*12,Math.min(maxYear*12+11,state.monthIndex));
+  renderNavigation();save();
+ }
 };
 })();
 

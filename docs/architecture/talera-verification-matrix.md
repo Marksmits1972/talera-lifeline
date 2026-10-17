@@ -1,6 +1,6 @@
 # TALERA — architectuurtoets tegenover de goedgekeurde Ontwerpvisie 1.0
 
-**Werkstatus 17 oktober 2026:** audit gestart, gedeeltelijke correcties uitgevoerd, niet productie- of iPhone-vrijgegeven.
+**Werkstatus 17 oktober 2026:** dynamische datumgrenzen en één oorspronkelijke referentiecatalogus geïmplementeerd en automatisch getest; onafhankelijke Free-back-up, profielinterface, Premium en de echte iPhone-test nog open. Niet productie- of iPhone-vrijgegeven.
 **Broncode:** `work/talera-clean-architecture-20261017` (op de afzonderlijke i18n-branch, PR #45). Bestaande iPhone-PWA blijft op de huidige test-Worker; originele RH19-referentie en IndexedDB zijn niet gewijzigd.
 
 ## Definitieve gegevensroute
@@ -24,8 +24,8 @@ De browserroute verstuurt nooit originele foto's, audio of verhaalinhoud. RH19 g
 | RH19 leest dezelfde herinneringen | `local-rh19-adapter.js` registreert metadata, haalt geselecteerde media pas later op | **GOED als één noodzakelijke adapter**, **RISICO bij tijdsgrenzen** | Zelfde tijd, tekst, foto's en gespreksopname; 1900–heden en toekomst toegestaan volgens opslagregels |
 | RH19 originele bediening | `presentation-controller.js`, `memory-story-scroll`, originele swipe- en taplogica blijven | **BRON BEHOUDEN**, praktische acceptatie open | Tik, swipe, fotoformaat, wit uitschuifbaar verhaalpaneel en audio/video controleren |
 | Consistente navigatie | `navigation.js` is één pure component; `?memory=` na opslaan/bewerken/retime | **GOED** | Alle drie de pagina's dezelfde onderbalk; actieve herinnering terug naar tijdlijn |
-| Gemeenschappelijke tijdslogica | RH19 vaste 1976–2026 periode; opslag accepteert andere datums | **GEBLOKKEERD** | Eén dynamisch tijdsbereik, snapshotcheck zodat RH19-gebaren hetzelfde blijven |
-| Eén originele 50-verhalenbron | `src/html/chunk3-6.js` plus `demo-memories.js` | **DUBBEL** | Verwijder duplicaat alleen wanneer RH19-uitvoer byte- of semantisch identiek blijft |
+| Gemeenschappelijke tijdslogica | Eén functie `src/life-range.js` wordt in RH19 en Tijdlijn gebruikt; vroegste herinnering of eerder geboortejaar tot vandaag. RH19 herberekent ook zijn dichtheid bij nieuwe herinneringen | **CODE GEREALISEERD, CI GROEN; echte iPhone-acceptatie OPEN** | Werking met 1948, profiel 1952, meerdere herinneringen, volledig bereik en gebaren op iPhone |
+| Eén originele 50-verhalenbron | `src/reference-memories.js` is de enige bron; beide routes importeren dezelfde records, oude import is alleen een re-export | **CODE GEREALISEERD, CI GROEN** | Vaste snapshot-hash `5805a021` over de 50 goedgekeurde IDs, datums, verhalen en foto-URL's blijft onveranderd |
 | Foto-opslag | Origineel in files, telefoonweergave max 1440px optionele eigen cachesleutel | **GOED op opslagmodel** | Test opslagquota, HEIC, foto draaien, 6 foto's, iPhone eerste- en tweede-laadtijd |
 | Geen extra mediaspeler | RH19 voor foto's; video en audio als media-elementen binnen actieve herinnering | **GOED in ontwerp, latency onbekend** | Meet dubbele render-/videospeleracties en piekgeheugen voor snelle wissels |
 | Vijf talen schaalbaar | `i18n.js` + vijf catalogi; stabiele sleutel-API; runtime fallback | **FUNDAMENT KLAAR**, migratie onvolledig | Elke zichtbare string/verzoek, datumparser en foutmelding getest in NL/EN/DE/FR/ES |
@@ -54,10 +54,14 @@ De browserroute verstuurt nooit originele foto's, audio of verhaalinhoud. RH19 g
 
 **Volgorde van prioriteit:**
 A. Leg werkende functies en testscenario's vast als regressies voordat code beweegt.
-B. Breng RH19-datumgrenzen in overeenstemming met bestaande datumregels, zonder nieuwe omrekenlaag.
-C. Verwijder de dubbele demo-herinneringsbron met outputvergelijking; borg dezelfde 50 records.
-D. Rond de Free-herstelarchitectuur af en onderzoek de iPhone-mogelijkheden voor een werkelijk onafhankelijke, herstelbare kopie. Beloof geen automatische externe map zonder te bewijzen dat iOS/PWA dat kan.
+B. **Afgedekt in code:** RH19 en Tijdlijn hanteren dezelfde dynamische berekening van vroegste herinnering of geboortejaar tot vandaag. Nog te testen op een echte iPhone.
+C. **Afgedekt in code:** één bron voor de 50 originele RH19-voorbeelden, met onveranderlijke snapshotverificatie.
+D. Bouw een expliciete profielinstelling voor het geboortejaar en rond de Free-herstelarchitectuur af en onderzoek de iPhone-mogelijkheden voor een werkelijk onafhankelijke, herstelbare kopie. Beloof geen automatische externe map zonder te bewijzen dat iOS/PWA dat kan.
 E. Maak de vijf taalcatalogi compleet, inclusief de invoerparser en toegankelijkheidslabels.
 F. Meet echte eerste-laad-/wisseltijden en geheugengebruik; optimaliseer alleen bewezen knelpunten.
 
 **Release-gate:** geen merge naar de huidige PWA totdat de bovenstaande end-to-end toetsen op een afzonderlijke acceptatieomgeving geslaagd zijn en de gebruiker de iPhone-werking expliciet goedkeurt. Groene CI ≠ een volledige acceptatietest.
+
+## Afbakening van '100%'
+
+Groene CI toont aan dat de huidige automatische regressietests slagen. Dat is nog geen bewijs van een onafhankelijke, herstelbare iOS-bestandsback-up, volledige premium Cloudflare-autorisatie en AI-bijschriften, en tv-bediening of de prestaties op een fysieke iPhone. Deze hiaten blijven expliciet niet-afgerond. Ook het zichtbare niveau-0-overzicht (nu een vaste zoomschaal) moet nog UX-getoetst worden voor een leven van 1948 tot heden; de wiskundige tijdgrenzen zijn wel dynamisch.

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { DEMO_MEMORIES } from '../experiments/lifeline-main/demo-memories.js';
+import { REFERENCE_MEMORIES } from '../src/reference-memories.js';
 import { NAV_SLOT, NAVIGATION_STYLE, renderNavigation } from '../experiments/lifeline-main/navigation.js';
 
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
@@ -11,22 +12,20 @@ const worker=read('../experiments/lifeline-main/worker.js');
 const config=JSON.parse(read('../experiments/lifeline-main/wrangler.jsonc'));
 
 function originalRh19Memories(){
-  const out=[];
-  for(let i=3;i<=6;i++){
-    const raw=read('../src/html/chunk'+i+'.js');
-    const part=raw.slice(raw.indexOf('[')+1,raw.lastIndexOf(']')).replace(/,\s*$/,'');
-    const lines=JSON.parse('['+part+']');
-    for(const line of lines){
-      const m=line.trim().match(/^\{id:\s*(\d+),\s*at:("(?:\\.|[^"\\])*"),\s*story:("(?:\\.|[^"\\])*"),\s*fullStory:("(?:\\.|[^"\\])*"),\s*image:("(?:\\.|[^"\\])*")\},?$/);
-      if(m)out.push({id:Number(m[1]),at:JSON.parse(m[2]),story:JSON.parse(m[3]),fullStory:JSON.parse(m[4]),image:JSON.parse(m[5])});
-    }
-  }
-  return out.sort((a,b)=>a.id-b.id);
+  return REFERENCE_MEMORIES.map(({id,at,story,fullStory,image})=>({id,at,story,fullStory,image}));
+}
+function rh19SnapshotHash(rows){
+  const json=JSON.stringify(rows.map(({id,at,story,fullStory,image})=>[id,at,story,fullStory,image]));
+  let hash=2166136261;
+  for(let i=0;i<json.length;i++){hash^=json.charCodeAt(i);hash=Math.imul(hash,16777619)}
+  return (hash>>>0).toString(16);
 }
 
 test('TALERA: original approved RH19 memories retained with exact dates photos and texts',()=>{
   const original=originalRh19Memories();
   assert.equal(original.length,50);
+  assert.equal(rh19SnapshotHash(original),'5805a021','approved 50 original stories, dates and photo identity unchanged');
+  assert.strictEqual(REFERENCE_MEMORIES,DEMO_MEMORIES,'only one canonical reference catalogue');
   assert.equal(DEMO_MEMORIES.length,50);
   for(let i=0;i<50;i++){
     const clone=DEMO_MEMORIES[i];

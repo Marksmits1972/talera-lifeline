@@ -77,7 +77,7 @@ test('new language works by extending only the catalog, not changing runtime or 
 });
 test('one bootstrap serves all three existing pages without changing storage schema or RH19 engine',()=>{
  assert.match(worker,/import \{ TALERA_I18N_SCRIPT \} from "\.\/i18n\.js"/);
- assert.match(worker,/icon\+TALERA_I18N_SCRIPT\+"<\/head>"/);
+ assert.match(worker,/LIFE_RANGE_SCRIPT\)\+TALERA_I18N_SCRIPT\+"<\/head>"/);
  assert.match(tell,/data-i18n="tell\.heading"/);
  assert.match(tell,/data-i18n="tell\.save"/);
  assert.ok(tell.includes('data-i18n-placeholder="tell.titlePlaceholder"'));

@@ -1,0 +1,53 @@
+name: TALERA architecture cleanup — pure route and memory checks
+
+on:
+  push:
+    branches:
+      - work/talera-clean-architecture-20261017
+    paths:
+      - 'experiments/lifeline-main/**'
+      - 'src/**'
+      - 'test/lifeline-main.test.mjs'
+      - 'test/lifeline-i18n.test.mjs'
+      - 'test/lifeline-architecture-contract.test.mjs'
+      - 'test/lifeline-dynamic-range.test.mjs'
+      - '.github/workflows/lifeline-clean-architecture.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-clean-architecture-isolated
+  cancel-in-progress: true
+
+jobs:
+  clean-architecture:
+    name: Existing RH19 + local memories + i18n regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Test original RH19 and user-memory workflows
+        run: |
+          node --test test/lifeline-main.test.mjs test/lifeline-i18n.test.mjs test/lifeline-architecture-contract.test.mjs test/lifeline-dynamic-range.test.mjs
+          node --check experiments/lifeline-main/navigation.js
+          node --check experiments/lifeline-main/worker.js
+      - name: Enforce no data reset, original RH19 renderer and one footer component
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const base='experiments/lifeline-main/';
+          const worker=fs.readFileSync(base+'worker.js','utf8');
+          const source=fs.readFileSync(base+'visual-v8-photo-space.html','utf8');
+          if(worker.includes('ORIGINAL_TIMELINE_NAV')||worker.includes('function unifiedFooter'))throw Error('Old scraped navigation is back');
+          if(!worker.includes('renderNavigation("present")')||!worker.includes('renderNavigation("timeline")'))throw Error('Unified footer missing');
+          if(!source.includes('<!--TALERA_SHARED_NAV-->'))throw Error('Explicit timeline footer slot missing');
+          if(!worker.includes('reference-r19h2-carousel-combined-worker.js'))throw Error('Original RH19 renderer missing');
+          if(worker.includes('indexedDB.deleteDatabase(')||worker.includes('localStorage.clear('))throw Error('Unsafe data reset');
+          JS

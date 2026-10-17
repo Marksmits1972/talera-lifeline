@@ -16,6 +16,7 @@ export default {
   "common.title": "Title",
   "common.place": "Place",
   "common.language": "Language",
+  "profile.birthYear": "Year of birth",
   "common.languageSelector": "Choose your language",
   "common.dutch": "Dutch",
   "common.english": "English",

@@ -1,4 +1,6 @@
 export const chunk7 = [
+  "const initialLifeRange=window.TaleraLifeRange(MEMORIES,null);",
+  "LIFE_START=initialLifeRange.startMs; LIFE_END=initialLifeRange.endMs; TOTAL_DAYS=initialLifeRange.totalDays;",
   "const EVENT_OFFSETS = MEMORIES.map(m => (m.ms - LIFE_START) / MS_DAY);",
   "",
   "const LEVELS = [",
@@ -232,7 +234,7 @@ export const chunk7 = [
   "setTimeout(showZoomHint, 650);",
   "",
   "",
-  "const dayCounts = new Uint16Array(TOTAL_DAYS);",
+  "let dayCounts = new Uint16Array(TOTAL_DAYS);",
   "for(const o of EVENT_OFFSETS) {",
   "  const day=Math.floor(o);",
   "  if(day>=0 && day<TOTAL_DAYS) dayCounts[day]++;",

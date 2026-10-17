@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { DEMO_MEMORIES } from '../experiments/lifeline-main/demo-memories.js';
+import { REFERENCE_MEMORIES } from '../src/reference-memories.js';
+import { NAV_SLOT, NAVIGATION_STYLE, renderNavigation } from '../experiments/lifeline-main/navigation.js';
 
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const html=read('../experiments/lifeline-main/index.html');
@@ -10,22 +12,20 @@ const worker=read('../experiments/lifeline-main/worker.js');
 const config=JSON.parse(read('../experiments/lifeline-main/wrangler.jsonc'));
 
 function originalRh19Memories(){
-  const out=[];
-  for(let i=3;i<=6;i++){
-    const raw=read('../src/html/chunk'+i+'.js');
-    const part=raw.slice(raw.indexOf('[')+1,raw.lastIndexOf(']')).replace(/,\s*$/,'');
-    const lines=JSON.parse('['+part+']');
-    for(const line of lines){
-      const m=line.trim().match(/^\{id:\s*(\d+),\s*at:("(?:\\.|[^"\\])*"),\s*story:("(?:\\.|[^"\\])*"),\s*fullStory:("(?:\\.|[^"\\])*"),\s*image:("(?:\\.|[^"\\])*")\},?$/);
-      if(m)out.push({id:Number(m[1]),at:JSON.parse(m[2]),story:JSON.parse(m[3]),fullStory:JSON.parse(m[4]),image:JSON.parse(m[5])});
-    }
-  }
-  return out.sort((a,b)=>a.id-b.id);
+  return REFERENCE_MEMORIES.map(({id,at,story,fullStory,image})=>({id,at,story,fullStory,image}));
+}
+function rh19SnapshotHash(rows){
+  const json=JSON.stringify(rows.map(({id,at,story,fullStory,image})=>[id,at,story,fullStory,image]));
+  let hash=2166136261;
+  for(let i=0;i<json.length;i++){hash^=json.charCodeAt(i);hash=Math.imul(hash,16777619)}
+  return (hash>>>0).toString(16);
 }
 
 test('TALERA: original approved RH19 memories retained with exact dates photos and texts',()=>{
   const original=originalRh19Memories();
   assert.equal(original.length,50);
+  assert.equal(rh19SnapshotHash(original),'5805a021','approved 50 original stories, dates and photo identity unchanged');
+  assert.strictEqual(REFERENCE_MEMORIES,DEMO_MEMORIES,'only one canonical reference catalogue');
   assert.equal(DEMO_MEMORIES.length,50);
   for(let i=0;i<50;i++){
     const clone=DEMO_MEMORIES[i];
@@ -91,11 +91,12 @@ test('Three routes keep native RH19, all reuse one TALERA footer',()=>{
  assert.match(html,/\$\('preview'\)\.href='\/present\?memory='/);
  assert.match(html,/\$\('preview'\)\.addEventListener\('click',rememberFocus\)/);
  assert.match(html,/<nav class="bottom-nav"[^>]*>.*href="\/tell".*href="\/present"/);
- assert.match(worker,/function unifiedFooter\(page\)/);
- assert.match(worker,/const ORIGINAL_TIMELINE_NAV=/);
- assert.match(worker,/unifiedFooter\("present"\)/);
- assert.match(worker,/unifiedFooter\('tell'\)/);
- assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
+ assert.match(worker,/import \{ NAVIGATION_STYLE, NAV_SLOT, renderNavigation \} from "\.\/navigation\.js"/);
+ assert.match(worker,/renderNavigation\("present"\)/);
+ assert.match(worker,/renderNavigation\('tell'\)/);
+ assert.match(worker,/renderNavigation\("timeline"\)/);
+ assert.ok(visualV8.includes(NAV_SLOT));
+ assert.match(NAVIGATION_STYLE,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
 });
 
 const visualV3=read('../experiments/lifeline-main/visual-v3.html');
@@ -331,8 +332,8 @@ test('V11 Free: bulk import can select twenty-five photos and shows separated me
  const markup=exportedHtml(markupLine,'BULK_FREE_MARKUP');
  const script=exportedHtml(scriptLine,'BULK_FREE_SCRIPT');
  assert.match(worker,/import \{ BULK_FREE_STYLE, BULK_FREE_MARKUP, BULK_FREE_SCRIPT \} from "\.\/bulk-free\.js"/);
- assert.match(worker,/\.replace\('<section class="card" id="mediaSection"',BULK_FREE_MARKUP/);
- assert.match(worker,/\.replace\("<\/body>",BULK_FREE_SCRIPT/);
+ assert.match(worker,/\.replace\("<!--TALERA_TELL_BULK-->",BULK_FREE_MARKUP\)/);
+ assert.match(worker,/\.replace\("<!--TALERA_TELL_END-->",BULK_FREE_SCRIPT/);
  for(const id of ['bulkFiles','bulkPanel','bulkGroups','bulkSaveAll','bulkReturn','bulkStudio','bulkStage','bulkRecord','bulkStop'])assert.ok(markup.includes('id="'+id+'"'),id);
  assert.match(markup,/accept="image\/\*,video\/\*"/);
  assert.match(markup,/type="file"[^>]*multiple/);
@@ -420,7 +421,7 @@ test('V12: persistent on-device retime changes date, precision and time without 
  assert.match(store,/day<=localToday\(\)/);
  assert.match(visualV8,/strong\.textContent=String\(yearAt\)/);
  assert.doesNotMatch(visualV8,/strong\.textContent=String\(age\)/);
- assert.match(visualV8,/maxYear=new Date\(\)\.getFullYear\(\)/);
+ assert.match(visualV8,/window\.TaleraLifeRange\(memories,profileBirthYear\)/);
 });
 test('V12: year/month/story drag remains isolated from RH19 presentation',()=>{
  const drag=read('../experiments/lifeline-main/timeline-reposition.js');
@@ -593,16 +594,16 @@ test('Original 50 RH19 records retain their full white-sheet story and exact pho
  assert.match(doc,/memoryStoryScroll\.scrollTop = 0/);
 });
 
-test('iPhone navigation faithfully uses timeline icons, active pill and opaque no-blur footer',()=>{
- assert.match(worker,/const ORIGINAL_TIMELINE_NAV=/);
- assert.match(worker,/function unifiedFooter\(page\)/);
- assert.match(worker,/#taleraPageNav\.bottom-nav,#taleraTellNav\.bottom-nav/);
- assert.match(worker,/background:#fff!important/);
- assert.match(worker,/backdrop-filter:none!important;-webkit-backdrop-filter:none!important/);
- assert.match(worker,/#taleraPageNav \.nav-item\.selected::before/);
- assert.match(worker,/background:#e6f1fd!important/);
- assert.match(worker,/safe-area-inset-bottom/);
- assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
+test('iPhone navigation keeps approved icons and readable footer without HTML scraping',()=>{
+ assert.doesNotMatch(worker,/ORIGINAL_TIMELINE_NAV|unifiedFooter/);
+ assert.match(worker,/NAVIGATION_STYLE\+renderNavigation\("present"\)/);
+ assert.match(NAVIGATION_STYLE,/#taleraPageNav\.bottom-nav,#taleraTellNav\.bottom-nav/);
+ assert.match(NAVIGATION_STYLE,/background:#fff!important/);
+ assert.match(NAVIGATION_STYLE,/backdrop-filter:none!important;-webkit-backdrop-filter:none!important/);
+ assert.match(NAVIGATION_STYLE,/#taleraPageNav \.nav-item\.selected::before/);
+ assert.match(NAVIGATION_STYLE,/background:#e6f1fd!important/);
+ assert.match(NAVIGATION_STYLE,/safe-area-inset-bottom/);
+ assert.match(NAVIGATION_STYLE,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
  assert.doesNotMatch(worker,/PRESENTATION_REPOSITION_SCRIPT|LOCAL_PRESENTATION_HANDOFF/);
 });
 
@@ -621,13 +622,9 @@ test('Phone display variant preserves original photos for later full-resolution 
  assert.doesNotMatch(store,/deleteDatabase\(|localStorage\.clear\(/);
  checkScripts(store,'mobile-renditions');
 });
-test('One live nav template produces the same Vertel / Tijdlijn / Presentatie in each route',()=>{
- const begin=worker.indexOf('const ORIGINAL_TIMELINE_NAV=');
- const end=worker.indexOf('const bridge=String.raw',begin);
- assert.ok(begin>0&&end>begin);
- const navigators=new Function('HOME_HTML',worker.slice(begin,end)+'\nreturn [unifiedFooter("tell"),unifiedFooter("timeline"),unifiedFooter("present")];')(visualV8);
- for(let i=0;i<navigators.length;i++){
-  const h=navigators[i];
+test('One pure navigation component renders same tabs on all three pages',()=>{
+ const navigators=['tell','timeline','present'].map(renderNavigation);
+ for(const h of navigators){
   assert.match(h,/data-i18n="nav.tell"/);
   assert.match(h,/data-i18n="nav.timeline"/);
   assert.match(h,/data-i18n="nav.presentation"/);
@@ -638,4 +635,9 @@ test('One live nav template produces the same Vertel / Tijdlijn / Presentatie in
  }
  assert.match(navigators[0],/id="taleraTellNav"/);
  assert.match(navigators[2],/id="taleraPageNav"/);
+ const body=read('../experiments/lifeline-main/visual-v8-photo-space.html');
+ const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
+ assert.equal((body.match(/<!--TALERA_SHARED_NAV-->/g)||[]).length,1);
+ assert.equal((tell.match(/<!--TALERA_SHARED_NAV-->/g)||[]).length,1);
+ assert.doesNotMatch(worker,/String\(HOME_HTML\)\.match\(\/.*bottom-nav/);
 });

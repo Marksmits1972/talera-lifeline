@@ -237,13 +237,10 @@ img{-webkit-user-drag:none;user-select:none}
   </article>
  </section>
 </div>
-<nav class="bottom-nav" aria-label="Hoofdnavigatie TALERA">
- <a href="/tell" class="nav-item"><span class="nav-icon"><svg viewBox="0 0 24 24" width="23" height="23" aria-hidden="true"><path d="M20 11.5a8.5 8.5 0 0 1-8.5 8.5 10 10 0 0 1-4-.9L3 21l1.6-4.2A8.5 8.5 0 1 1 20 11.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span data-i18n="nav.tell"></span></a>
- <a href="/" class="nav-item selected" aria-current="page"><span class="nav-icon"><svg viewBox="0 0 24 24" width="23" height="23" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 4v8l5 1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span><span data-i18n="nav.timeline"></span></a>
- <a href="/present?visual=weekend-amsterdam" class="nav-item"><span class="nav-icon"><svg viewBox="0 0 24 24" width="23" height="23" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/><path d="m5 18 5-5 3 3 3-4 4 5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span data-i18n="nav.presentation"></span></a>
-</nav>
+<!--TALERA_SHARED_NAV-->
 <div class="dropdown" id="categories" aria-label="Kenmerken uitgeklapt"><div class="option selected"><span class="option-icon"><svg viewBox="0 0 30 28" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M1 20 9 3l5 10 4-7 7 14Z"/></svg></span>Vakanties<span class="check">✓</span></div><div class="option "><span class="option-icon"><svg viewBox="0 0 30 28" width="19" height="19" aria-hidden="true"><circle cx="9" cy="6" r="3" fill="currentColor"/><circle cx="19" cy="7" r="3" fill="currentColor"/><path fill="currentColor" d="M2 22V16q0-6 7-6t7 6v6ZM16 12q8-3 8 7v3h-6v-6q0-2-2-4"/></svg></span>Familie</div><div class="option "><span class="option-icon"><svg viewBox="0 0 30 28" width="19" height="19" aria-hidden="true"><circle cx="7" cy="8" r="3" fill="currentColor"/><circle cx="17" cy="7" r="3" fill="currentColor"/><circle cx="26" cy="9" r="3" fill="currentColor"/><path fill="currentColor" d="M1 23v-5q0-6 7-6t7 6v5Zm12 0v-6q0-6 7-6t7 6v6Z"/></svg></span>Vrienden</div><div class="option "><span class="option-icon"><svg viewBox="0 0 30 28" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M5 9 12 6l3-3 3 1 1 5 4 3-1 4-4 1-1 6h-3l-1-7-5 1-2 6H3l2-8-2-4Z"/></svg></span>Paardrijden</div><div class="option "><span class="option-icon"><svg viewBox="0 0 30 28" width="19" height="19" aria-hidden="true"><rect x="4" y="9" width="20" height="16" rx="2" fill="currentColor"/><path d="M10 9V5h8v4M14 10v14" fill="none" stroke="#fff" stroke-width="1.6"/></svg></span>Reizen</div><div class="option "><span class="option-icon"><svg viewBox="0 0 30 28" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="m1 9 14-7 14 7-14 7Zm6 5v7q8 6 16 0v-7l-8 4Zm19-1v11h2V10Z"/></svg></span>School</div><div class="option "><span class="option-icon"><svg viewBox="0 0 30 28" width="19" height="19" aria-hidden="true"><rect x="2" y="9" width="26" height="17" rx="2" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="2.5" d="M10 9V5h10v4"/><path fill="none" stroke="#fff" stroke-width="1.7" d="M3 17h24"/></svg></span>Werk</div></div>
 </main>
+<!--TALERA_HOME_DATA-->
 <script>
 (()=>{
 'use strict';
@@ -260,7 +257,7 @@ const t=(key,vars)=>window.TaleraI18n?.t(key,vars)||key;
 const monthLabel=(index,style='long')=>new Intl.DateTimeFormat(window.TaleraI18n?.locale()||'nl-NL',{month:style}).format(new Date(2020,index,15));
 const tagKeys={Vakanties:'timeline.vacations',Familie:'timeline.family',Vrienden:'timeline.friends',Paardrijden:'timeline.horseRiding',Reizen:'timeline.travel',School:'timeline.school',Werk:'timeline.work','Mijn verhalen':'timeline.myStories'};
 const tagLabel=tag=>t(tagKeys[tag]||tag);
-let minYear=2022,maxYear=new Date().getFullYear(); // Calendar years, expanded by shared reference and local stories
+let minYear=new Date().getFullYear(),maxYear=minYear; // Recalculated from the same range model as RH19
 const yearImages=$$('.age-photo').map(x=>x.src);
 const storyImages=$$('.story-list .story img').map(x=>x.src);
 const heroImage=previewImage.src;
@@ -277,7 +274,12 @@ const memories=references.map(record=>{
  item.ms=new Date(record.at).getTime();
  return item;
 }).filter(m=>Number.isFinite(m.ms)).sort((a,b)=>a.ms-b.ms);
-if(memories.length)minYear=Math.min(minYear,...memories.map(m=>m.year));
+let profileBirthYear=null;
+function updateLifeBounds(){
+ const range=window.TaleraLifeRange(memories,profileBirthYear);
+ minYear=range.startYear;maxYear=range.endYear;
+}
+updateLifeBounds();
 const tags=['Vakanties','Familie','Vrienden','Paardrijden','Reizen','School','Werk','Mijn verhalen'];
 const iconByTag=Object.fromEntries($$('.option',menu).map(n=>[n.textContent.trim(),$('.option-icon',n)?.innerHTML||'']));
 const state={yearFloat:2026,monthIndex:2026*12+8,selectedId:memories.length?memories[memories.length-1].id:'',shownId:'',
@@ -295,7 +297,7 @@ if(focusedId?.startsWith('ref-')&&memories.some(m=>m.id===focusedId)){
  state.selectedId=m.id;state.yearFloat=m.year;state.monthIndex=m.year*12+m.month;
 }
 const filtered=()=>memories.filter(x=>!state.filter.size||x.tags.some(t=>state.filter.has(t)));
-const dateOf=m=>{const d=new Date(m.ms);if(m.datePrecision==='year')return String(m.year);if(m.datePrecision==='month')return monthLabel(m.month)+' '+m.year;if(m.datePrecision==='season')return (m.seasonLabel||'seizoen')+' '+m.year;if(m.datePrecision==='period'&&m.dateEnd){const e=new Date(m.dateEnd+'T12:00:00');if(Number.isFinite(e.getTime()))return d.getDate()+' '+monthLabel(m.month)+' '+m.year+' – '+e.getDate()+' '+monthLabel(e.getMonth())+' '+e.getFullYear()}return d.getDate()+' '+ML[m.month]+' '+m.year};
+const dateOf=m=>{const d=new Date(m.ms);if(m.datePrecision==='year')return String(m.year);if(m.datePrecision==='month')return monthLabel(m.month)+' '+m.year;if(m.datePrecision==='season')return (m.seasonLabel||'seizoen')+' '+m.year;if(m.datePrecision==='period'&&m.dateEnd){const e=new Date(m.dateEnd+'T12:00:00');if(Number.isFinite(e.getTime()))return d.getDate()+' '+monthLabel(m.month)+' '+m.year+' – '+e.getDate()+' '+monthLabel(e.getMonth())+' '+e.getFullYear()}return d.getDate()+' '+monthLabel(m.month)+' '+m.year};
 const esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const nowYear=()=>Math.max(minYear,Math.min(maxYear,Math.round(state.yearFloat)));
 const activeMonth=()=>Math.max(minYear*12,Math.min(maxYear*12+11,Math.round(state.monthIndex)));
@@ -514,8 +516,20 @@ storyLane.addEventListener('click',ev=>{if(performance.now()<(state.storySuppres
 // No sessionStorage photo/story copies: the URL carries only the memory ID.
 const hamburger=$('.hamburger');
 const quick=document.createElement('div');quick.id='taleraQuickNav';quick.hidden=true;
-quick.innerHTML='<a href="/">⌂ <span data-i18n="nav.timeline"></span></a><a href="/tell">✎ <span data-i18n="nav.tell"></span></a><a href="/present">▣ <span data-i18n="nav.presentation"></span></a><button type="button" id="clearLifeFilter" data-i18n="timeline.clearFilters"></button><label class="talera-language-picker"><span data-i18n="common.language"></span><select id="taleraLanguageChoice" data-i18n-aria-label="common.languageSelector"></select></label>';
+quick.innerHTML='<a href="/">⌂ <span data-i18n="nav.timeline"></span></a><a href="/tell">✎ <span data-i18n="nav.tell"></span></a><a href="/present">▣ <span data-i18n="nav.presentation"></span></a><button type="button" id="clearLifeFilter" data-i18n="timeline.clearFilters"></button><label class="talera-language-picker"><span data-i18n="common.language"></span><select id="taleraLanguageChoice" data-i18n-aria-label="common.languageSelector"></select></label><label class="talera-language-picker"><span data-i18n="profile.birthYear"></span><input id="taleraBirthYear" type="number" min="1900" inputmode="numeric" data-i18n-aria-label="profile.birthYear" style="width:88px;max-width:100%;padding:7px;border:1px solid #d2dde7;border-radius:9px;background:white;color:#0f2747"></label>';
 $('.viewport').appendChild(quick);
+const birthYearInput=$('#taleraBirthYear');
+if(birthYearInput&&window.TaleraMemories){
+ const store=window.TaleraMemories;
+ birthYearInput.max=String(new Date().getFullYear());
+ birthYearInput.value=store.birthday?.()||'';
+ birthYearInput.addEventListener('change',()=>{
+  const year=Number(birthYearInput.value);
+  if(!Number.isInteger(year)||year<1900||year>new Date().getFullYear())return;
+  store.setBirthday(year);
+  window.__taleraLifelineDemo?.setBirthYear(store.birthday());
+ });
+}
 const languageChoice=$('#taleraLanguageChoice');
 if(languageChoice&&window.TaleraI18n){
  for(const code of window.TaleraI18n.languages){
@@ -567,12 +581,16 @@ window.__taleraLifelineDemo={
    seen.add(meta.id);
    const year=Number(meta.date.slice(0,4));if(year<1900||year>new Date().getFullYear())continue;
    const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':meta.items?.some(x=>x.kind==='photo')?'photo':'text';
-   const m=example(meta.id,meta.date,meta.title||'Mijn herinnering',meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',null,['Mijn verhalen'],type);
+   const aiCategories=Array.isArray(meta.characteristics)?[...new Set(meta.characteristics.filter(x=>typeof x==='string').map(x=>x.trim().slice(0,60)).filter(Boolean).slice(0,30))]:[];
+   // Categories are open vocabulary. The current demo labels are not a whitelist.
+   for(const tag of aiCategories)if(!tags.includes(tag))tags.push(tag);
+   const m=example(meta.id,meta.date,meta.title||'Mijn herinnering',meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',null,['Mijn verhalen',...aiCategories],type);
    m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Date.parse(meta.date+'T'+(meta.time||'12:00:00'));inserted.push(m);
-   minYear=Math.min(minYear,year);maxYear=Math.max(maxYear,year);
+
   }
   if(!inserted.length)return 0;
   memories.push(...inserted);memories.sort((a,b)=>a.ms-b.ms);
+  updateLifeBounds();
   const search=new URLSearchParams(location.search);
   const focus=search.get('memory')||search.get('local');
   const chosen=inserted.find(m=>m.localId===focus);
@@ -596,7 +614,14 @@ window.__taleraLifelineDemo={
   }
   if(changed){renderAges();renderStories();if(selected){state.shownId='';setPreview(state.selectedId)}}
  },
- setBirthYear(y){renderAges()}
+ setBirthYear(y){
+  const value=Number(y);
+  profileBirthYear=Number.isInteger(value)&&value>=1000&&value<=new Date().getFullYear()?value:null;
+  updateLifeBounds();
+  state.yearFloat=Math.max(minYear,Math.min(maxYear,state.yearFloat));
+  state.monthIndex=Math.max(minYear*12,Math.min(maxYear*12+11,state.monthIndex));
+  renderNavigation();save();
+ }
 };
 })();
 
@@ -648,4 +673,4 @@ window.__taleraLifelineDemo={
 if ('serviceWorker' in navigator && location.protocol==='https:') {
   window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>{}));
 }
-</script></body></html>
+</script><!--TALERA_HOME_END--></body></html>

@@ -1,3 +1,5 @@
+import { LIFE_RANGE_SCRIPT } from "./life-range.js";
+import { REFERENCE_MEMORIES } from "./reference-memories.js";
 import { chunk1 } from "./html/chunk1.js";
 import { chunk2 } from "./html/chunk2.js";
 import { chunk3 } from "./html/chunk3.js";
@@ -24,6 +26,7 @@ const TALERA_TIMELINE_DEPLOY_REV = "direct-memory-handoff-v11-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
+let taleraBirthYear=null;
 const taleraIntegrationListeners=new Set();
 let taleraRecipientLock=false;
 const taleraWriteMemoryBase=writeMemory;
@@ -32,19 +35,23 @@ writeMemory=function(memory){
   taleraIntegrationListeners.forEach(fn=>{try{fn(memory)}catch(e){}});
 };
 function taleraRebuildDensity(){
+  // Recalculate exactly once whenever the available memories or profile year change.
+  const range=window.TaleraLifeRange(MEMORIES,taleraBirthYear);
+  LIFE_START=range.startMs; LIFE_END=range.endMs; TOTAL_DAYS=range.totalDays;
   EVENT_OFFSETS.splice(0,EVENT_OFFSETS.length,...MEMORIES.map(m=>(m.ms-LIFE_START)/MS_DAY));
-  dayCounts.fill(0);
+  dayCounts=new Uint16Array(TOTAL_DAYS);
   for(const offset of EVENT_OFFSETS){
     const day=Math.floor(offset);
     if(day>=0&&day<TOTAL_DAYS)dayCounts[day]++;
   }
+  keepCenterValid();
 }
 window.__taleraTimelineRuntime={
   version:'runtime-bridge-v2',
-  lifeStart:LIFE_START,
-  lifeEnd:LIFE_END,
+  get lifeStart(){return LIFE_START},
+  get lifeEnd(){return LIFE_END},
   msDay:MS_DAY,
-  totalDays:TOTAL_DAYS,
+  get totalDays(){return TOTAL_DAYS},
   currentMemory(){return MEMORIES.find(m=>m.id===activeMemoryId)||nearestMemory(centerMs)},
   findMemory(identity){
     if(!identity)return null;
@@ -59,6 +66,13 @@ window.__taleraTimelineRuntime={
   activeMemoryId(){return activeMemoryId},
   centerMs(){return centerMs},
   isMoving(){return userIsMoving},
+  setBirthYear(year){
+    const value=Number(year);
+    taleraBirthYear=Number.isInteger(value)&&value>=1000&&value<=new Date().getFullYear()?value:null;
+    if(taleraRecipientLock)return;
+    taleraRebuildDensity();
+    draw();
+  },
   registerMemory(memory){
     if(!memory)return null;
     if(taleraRecipientLock)return null;
@@ -127,7 +141,7 @@ const BASE_HTML = [
   ...chunk7,
   ...chunk8,
   ...chunk9,
-].join("\n").replace(
+].join("\n").replace("__TALERA_REFERENCE_MEMORIES__",JSON.stringify(REFERENCE_MEMORIES.map(({id,at,story,fullStory,image})=>({id,at,story,fullStory,image}))).replace(/</g,"\\u003c")).replace(
   "writeMemory(nearestMemory(centerMs));\nresize();\n})();",
   `${TIMELINE_RUNTIME_BRIDGE}\nwriteMemory(nearestMemory(centerMs));\nresize();\n})();`
 );
@@ -168,7 +182,7 @@ const listenButtonOutlineStyle = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style></head>`)
+  .replace("</head>", `${LIFE_RANGE_SCRIPT}<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style></head>`)
   .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script></body>`);
 
 function escapeMeta(value) {

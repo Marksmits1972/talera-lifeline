@@ -63,10 +63,14 @@ jobs:
           set -euo pipefail
           BASE='https://talera-r19-lifeline-i18n-preview-dev.mark-a39.workers.dev'
           sleep 3
-          for path in "/" "/tell" "/present?memory=50"; do
-            curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE$path" | grep -q 'talera-i18n-bootstrap'
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/" -o /tmp/talera-i18n-home.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/tell" -o /tmp/talera-i18n-tell.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/present?memory=50" -o /tmp/talera-i18n-present.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" -o /tmp/talera-i18n-version.json
+          for file in /tmp/talera-i18n-home.html /tmp/talera-i18n-tell.html /tmp/talera-i18n-present.html; do
+            grep -q 'talera-i18n-bootstrap' "$file"
           done
-          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/" | grep -q 'data-i18n="nav.timeline"'
-          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/tell" | grep -q 'data-i18n="tell.heading"'
-          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" | grep -q 'phone-display-unified-nav'
+          grep -q 'data-i18n="nav.timeline"' /tmp/talera-i18n-home.html
+          grep -q 'data-i18n="tell.heading"' /tmp/talera-i18n-tell.html
+          grep -q 'phone-display-unified-nav' /tmp/talera-i18n-version.json
           echo "Only separate i18n preview was published; installed iPhone PWA remains untouched."

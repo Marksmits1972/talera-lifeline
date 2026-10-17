@@ -105,7 +105,7 @@ export default {
       const size=icon[1]||"180",bin=atob(PWA_ICONS[size]);
       return reply(Uint8Array.from(bin,c=>c.charCodeAt(0)),method,"image/png");
     }
-    if(path==="/"||path==="/index.html")return reply(pwaShell(String(HOME_HTML).replace(NAV_SLOT,renderNavigation("timeline")).replace("<script>",REFERENCE_CATALOG_SCRIPT+MEMORY_STORE_SCRIPT+"<script>").replace("</body>",TIMELINE_REPOSITION_SCRIPT+"</body>")),method,"text/html; charset=utf-8");
+    if(path==="/"||path==="/index.html")return reply(pwaShell(String(HOME_HTML).replace(NAV_SLOT,renderNavigation("timeline")).replace("<!--TALERA_HOME_DATA-->",REFERENCE_CATALOG_SCRIPT+MEMORY_STORE_SCRIPT).replace("<!--TALERA_HOME_END-->",TIMELINE_REPOSITION_SCRIPT)),method,"text/html; charset=utf-8");
     if(path==="/api/demo-memories"){
       return reply(JSON.stringify(DEMO_MEMORIES),method,"application/json; charset=utf-8");
     }
@@ -120,10 +120,10 @@ export default {
     if(path==="/tell"||path==="/tell/"){
       const tell=String(TELL_PAGE_HTML)
         .replace("__MEMORY_STORE__",MEMORY_STORE_SCRIPT)
-        .replace("</head>",'<style id="talera-free-bulk-style">'+BULK_FREE_STYLE+"</style>"+FREE_TELL_POLISH_STYLE+"</head>")
-        .replace('<section class="card" id="mediaSection"',BULK_FREE_MARKUP+'<section class="card" id="mediaSection"')
+        .replace("<!--TALERA_TELL_STYLES-->",'<style id="talera-free-bulk-style">'+BULK_FREE_STYLE+"</style>"+FREE_TELL_POLISH_STYLE)
+        .replace("<!--TALERA_TELL_BULK-->",BULK_FREE_MARKUP)
         .replace(NAV_SLOT,renderNavigation('tell'))
-        .replace("</body>",BULK_FREE_SCRIPT+FREE_DATE_PICKER+NAVIGATION_STYLE+"</body>");
+        .replace("<!--TALERA_TELL_END-->",BULK_FREE_SCRIPT+FREE_DATE_PICKER+NAVIGATION_STYLE);
       return reply(pwaShell(tell),method,"text/html; charset=utf-8");
     }
     if(path==="/storylab-clean"||path==="/storylab-clean/"){

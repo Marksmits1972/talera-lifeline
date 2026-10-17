@@ -91,5 +91,14 @@ export default {
   "status.titleRequired": "Vul eerst een titel in.",
   "status.dateInvalid": "Kies een geldige datum die niet in de toekomst ligt.",
   "status.memoryMissing": "Deze herinnering bestaat niet op dit apparaat.",
-  "status.storageUnavailable": "Dit toestel ondersteunt geen lokale herinneringsopslag."
+  "status.storageUnavailable": "Dit toestel ondersteunt geen lokale herinneringsopslag.",
+  "timeline.all": "Alle herinneringen",
+  "timeline.features": "{count} kenmerken",
+  "timeline.featuresLabel": "Kenmerken: {selection}",
+  "timeline.filterHint": "Filter op een of meerdere kenmerken",
+  "timeline.menuOpen": "Open het navigatiemenu",
+  "timeline.memoriesCount": "{count} herinneringen",
+  "timeline.photoAlt": "Foto bij {title}",
+  "timeline.textAlt": "Geschreven herinnering: {title}",
+  "timeline.openPresentation": "Open {title} in de presentatie"
 };

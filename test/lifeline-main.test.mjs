@@ -265,7 +265,7 @@ test('V9: network-first update watcher refreshes only safe timeline and retains 
 
 test('V10: media-first storytelling sequence and large visual voice studio',()=>{
  const tell=exportedHtml(tellModule,'TELL_PAGE_HTML');
- const head=tell.indexOf('id="mediaSection"'),voice=tell.indexOf('id="voiceSection"'),detail=tell.indexOf('Maak je herinnering compleet');
+ const head=tell.indexOf('id="mediaSection"'),voice=tell.indexOf('id="voiceSection"'),detail=tell.indexOf('data-i18n="tell.completeHeading"');
  assert.ok(head>=0&&voice>head&&detail>voice,'Media → speech → details order');
  for(const id of ['mediaStage','strip','files','start','studio','studioStage','studioPrev','studioNext','stop','story','moment','save']){
   assert.ok(tell.includes('id="'+id+'"'),'missing '+id);
@@ -298,8 +298,10 @@ test('V11 Free: microphone, user-authored text and no automatic AI or recognitio
  assert.match(tell,/getUserMedia\(\{audio:true\}\)/);
  assert.doesNotMatch(tell,/id="aiTitle"/);
  assert.doesNotMatch(tell,/fetch\(['"]\/api\/ai/);
- assert.match(tell,/De geluidsopname wordt apart bewaard/);
- assert.match(tell,/In Free schrijven we je woorden niet automatisch over/);
+ assert.match(tell,/data-i18n="tell.audioNote"/);
+ const dutchCatalog=read('../experiments/lifeline-main/locales/nl.js');
+ assert.match(dutchCatalog,/De geluidsopname wordt apart bewaard/);
+ assert.match(dutchCatalog,/In Free schrijven we je woorden niet automatisch over/);
 });
 test('V10: date precision remains in local storage and timeline, never migrated',()=>{
  const store=exportedHtml(bridgeModule,'MEMORY_STORE_SCRIPT');
@@ -460,7 +462,7 @@ test('V13 Free: photo import visibly previews all six and merges user-chosen gro
 });
 test('V13 Free: simple date choices are wired and valid JavaScript',()=>{
  const picker=exportedHtml(read('../experiments/lifeline-main/free-date-picker.js'),'FREE_DATE_PICKER');
- for(const name of ['Exacte datum','Maand + jaar','Alleen jaartal','Seizoen + jaar'])assert.ok(picker.includes(name),name);
+ for(const key of ['date.exact','date.monthYear','date.yearOnly','date.seasonYear'])assert.ok(picker.includes('data-i18n="'+key+'"'),key);
  assert.match(picker,/type='date'/);
  assert.match(picker,/date\.max=maxYear/);
  assert.match(worker,/FREE_DATE_PICKER/);
@@ -626,13 +628,13 @@ test('One live nav template produces the same Vertel / Tijdlijn / Presentatie in
  const navigators=new Function('HOME_HTML',worker.slice(begin,end)+'\nreturn [unifiedFooter("tell"),unifiedFooter("timeline"),unifiedFooter("present")];')(visualV8);
  for(let i=0;i<navigators.length;i++){
   const h=navigators[i];
-  assert.match(h,/Vertel<\/span>/);
-  assert.match(h,/Tijdlijn<\/span>/);
-  assert.match(h,/Presentatie<\/span>/);
+  assert.match(h,/data-i18n="nav.tell"/);
+  assert.match(h,/data-i18n="nav.timeline"/);
+  assert.match(h,/data-i18n="nav.presentation"/);
   assert.match(h,/class="nav-icon"/);
   assert.equal((h.match(/aria-current="page"/g)||[]).length,1);
   assert.equal((h.match(/<a href=/g)||[]).length,3);
-  assert.ok(h.indexOf('Vertel</span>')<h.indexOf('Tijdlijn</span>')&&h.indexOf('Tijdlijn</span>')<h.indexOf('Presentatie</span>'));
+  assert.ok(h.indexOf('nav.tell')<h.indexOf('nav.timeline')&&h.indexOf('nav.timeline')<h.indexOf('nav.presentation'));
  }
  assert.match(navigators[0],/id="taleraTellNav"/);
  assert.match(navigators[2],/id="taleraPageNav"/);

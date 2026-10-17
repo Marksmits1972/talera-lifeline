@@ -581,7 +581,10 @@ window.__taleraLifelineDemo={
    seen.add(meta.id);
    const year=Number(meta.date.slice(0,4));if(year<1900||year>new Date().getFullYear())continue;
    const type=meta.items?.some(x=>x.kind==='video')?'video':meta.items?.some(x=>x.kind==='audio')?'audio':meta.items?.some(x=>x.kind==='photo')?'photo':'text';
-   const m=example(meta.id,meta.date,meta.title||'Mijn herinnering',meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',null,['Mijn verhalen'],type);
+   const aiCategories=Array.isArray(meta.characteristics)?[...new Set(meta.characteristics.filter(x=>typeof x==='string').map(x=>x.trim().slice(0,60)).filter(Boolean).slice(0,30))]:[];
+   // Categories are open vocabulary. The current demo labels are not a whitelist.
+   for(const tag of aiCategories)if(!tags.includes(tag))tags.push(tag);
+   const m=example(meta.id,meta.date,meta.title||'Mijn herinnering',meta.place||'',meta.text||'Bekijk deze herinnering in de presentatie.',null,['Mijn verhalen',...aiCategories],type);
    m.localId=meta.id;m.datePrecision=meta.datePrecision||'exact';m.dateEnd=meta.dateEnd||null;m.seasonLabel=meta.seasonLabel||null;m.ms=Date.parse(meta.date+'T'+(meta.time||'12:00:00'));inserted.push(m);
 
   }

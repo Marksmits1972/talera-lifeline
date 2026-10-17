@@ -6,9 +6,11 @@ import {TALERA_UI_CATALOGS,TALERA_UI_LANGUAGES,TALERA_I18N_SCRIPT} from '../expe
 
 const load=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const worker=load('../experiments/lifeline-main/worker.js');
-const tell=load('../experiments/lifeline-main/tell-local-page.js');
+const tellModule=load('../experiments/lifeline-main/tell-local-page.js');
+const tell=JSON.parse(tellModule.slice(tellModule.indexOf(' = ')+3).trim().replace(/;$/,''));
 const home=load('../experiments/lifeline-main/visual-v8-photo-space.html');
-const datepicker=load('../experiments/lifeline-main/free-date-picker.js');
+const pickerModule=load('../experiments/lifeline-main/free-date-picker.js');
+const datepicker=JSON.parse(pickerModule.slice(pickerModule.indexOf(' = ')+3).trim().replace(/;$/,''));
 function bootstrap(markup=TALERA_I18N_SCRIPT){
  const match=markup.match(/<script[^>]*>([\s\S]*?)<\/script>/);
  assert.ok(match,'i18n bootstrap script exists');

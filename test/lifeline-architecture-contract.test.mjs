@@ -88,3 +88,12 @@ test('original RH19 catalogue is imported once and preserved by both renderers',
  for(const i of [3,4,5,6])assert.doesNotMatch(read('../src/html/chunk'+i+'.js'),/\{id:\d+, at:/);
 });
 test.todo('Five-language UI strings and photo-loading latency require real iPhone acceptance tests');
+
+test('AI categories are additive open vocabulary and survive ordinary memory edits',()=>{
+ const store=JSON.parse(storeModule.slice(storeModule.indexOf(' = ')+3).trim().replace(/;$/,''));
+ assert.match(store,/characteristics:existing&&Array\.isArray\(existing\.characteristics\)\?existing\.characteristics:\[\]/);
+ assert.match(page,/const aiCategories=Array\.isArray\(meta\.characteristics\)/);
+ assert.match(page,/if\(!tags\.includes\(tag\)\)tags\.push\(tag\)/);
+ assert.match(page,/\['Mijn verhalen',\.\.\.aiCategories\]/);
+ assert.doesNotMatch(page,/meta\.characteristics\.every\(tag=>tags\.includes/);
+});

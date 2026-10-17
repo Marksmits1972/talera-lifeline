@@ -1,3 +1,4 @@
+import { LIFE_RANGE_SCRIPT } from "./life-range.js";
 import { chunk1 } from "./html/chunk1.js";
 import { chunk2 } from "./html/chunk2.js";
 import { chunk3 } from "./html/chunk3.js";
@@ -168,7 +169,7 @@ const listenButtonOutlineStyle = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style></head>`)
+  .replace("</head>", `${LIFE_RANGE_SCRIPT}<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style></head>`)
   .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script></body>`);
 
 function escapeMeta(value) {

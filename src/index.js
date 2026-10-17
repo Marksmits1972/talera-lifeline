@@ -25,6 +25,7 @@ const TALERA_TIMELINE_DEPLOY_REV = "direct-memory-handoff-v11-20260915";
 const SHARE_PREVIEW_TOKEN = /^[a-f0-9]{32}$/;
 
 const TIMELINE_RUNTIME_BRIDGE = String.raw`
+let taleraBirthYear=null;
 const taleraIntegrationListeners=new Set();
 let taleraRecipientLock=false;
 const taleraWriteMemoryBase=writeMemory;
@@ -33,19 +34,23 @@ writeMemory=function(memory){
   taleraIntegrationListeners.forEach(fn=>{try{fn(memory)}catch(e){}});
 };
 function taleraRebuildDensity(){
+  // Recalculate exactly once whenever the available memories or profile year change.
+  const range=window.TaleraLifeRange(MEMORIES,taleraBirthYear);
+  LIFE_START=range.startMs; LIFE_END=range.endMs; TOTAL_DAYS=range.totalDays;
   EVENT_OFFSETS.splice(0,EVENT_OFFSETS.length,...MEMORIES.map(m=>(m.ms-LIFE_START)/MS_DAY));
-  dayCounts.fill(0);
+  dayCounts=new Uint16Array(TOTAL_DAYS);
   for(const offset of EVENT_OFFSETS){
     const day=Math.floor(offset);
     if(day>=0&&day<TOTAL_DAYS)dayCounts[day]++;
   }
+  keepCenterValid();
 }
 window.__taleraTimelineRuntime={
   version:'runtime-bridge-v2',
-  lifeStart:LIFE_START,
-  lifeEnd:LIFE_END,
+  get lifeStart(){return LIFE_START},
+  get lifeEnd(){return LIFE_END},
   msDay:MS_DAY,
-  totalDays:TOTAL_DAYS,
+  get totalDays(){return TOTAL_DAYS},
   currentMemory(){return MEMORIES.find(m=>m.id===activeMemoryId)||nearestMemory(centerMs)},
   findMemory(identity){
     if(!identity)return null;
@@ -60,6 +65,13 @@ window.__taleraTimelineRuntime={
   activeMemoryId(){return activeMemoryId},
   centerMs(){return centerMs},
   isMoving(){return userIsMoving},
+  setBirthYear(year){
+    const value=Number(year);
+    taleraBirthYear=Number.isInteger(value)&&value>=1000&&value<=new Date().getFullYear()?value:null;
+    if(taleraRecipientLock)return;
+    taleraRebuildDensity();
+    draw();
+  },
   registerMemory(memory){
     if(!memory)return null;
     if(taleraRecipientLock)return null;

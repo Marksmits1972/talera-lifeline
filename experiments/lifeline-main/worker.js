@@ -14,6 +14,7 @@ import { PWA_UPDATE_SCRIPT } from "./pwa-update.js";
 import { FREE_TELL_POLISH_STYLE } from "./free-tell-polish.js";
 import { LOCAL_RH19_ADAPTER } from "./local-rh19-adapter.js";
 import { TALERA_I18N_SCRIPT } from "./i18n.js";
+import { LIFE_RANGE_SCRIPT } from "../../src/life-range.js";
 import { NAVIGATION_STYLE, NAV_SLOT, renderNavigation } from "./navigation.js";
 
 const VERSION="talera-lifeline-v13-phone-display-unified-nav-20261016-r4";
@@ -33,7 +34,7 @@ function reply(body,method,contentType,status=200){
 function pwaShell(html){
   const icon='<link rel="apple-touch-icon" href="/talera-brand-v9.png"><link rel="icon" type="image/png" href="/talera-brand-v9.png">';
   let result=String(html).replace(/<link\s+[^>]*rel="apple-touch-icon"[^>]*>/gi,"").replace(/<link\s+[^>]*rel="icon"[^>]*>/gi,"");
-  if(result.includes("</head>"))result=result.replace("</head>",icon+TALERA_I18N_SCRIPT+"</head>");
+  if(result.includes("</head>"))result=result.replace("</head>",icon+(result.includes('id="talera-life-range-model"')?"":LIFE_RANGE_SCRIPT)+TALERA_I18N_SCRIPT+"</head>");
   const updater=PWA_UPDATE_SCRIPT.replace("__TALERA_BUILD_VERSION__",VERSION);
   return result.includes("</body>")?result.replace("</body>",updater+"</body>"):result;
 }

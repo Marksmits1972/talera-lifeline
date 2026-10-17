@@ -91,5 +91,14 @@ export default {
   "status.titleRequired": "Veuillez d'abord saisir un titre.",
   "status.dateInvalid": "Choisissez une date valide qui n'est pas dans le futur.",
   "status.memoryMissing": "Ce souvenir n'est pas sur cet appareil.",
-  "status.storageUnavailable": "Cet appareil ne prend pas en charge le stockage local des souvenirs."
+  "status.storageUnavailable": "Cet appareil ne prend pas en charge le stockage local des souvenirs.",
+  "timeline.all": "Tous les souvenirs",
+  "timeline.features": "{count} catégories",
+  "timeline.featuresLabel": "Catégories : {selection}",
+  "timeline.filterHint": "Filtrer par une ou plusieurs catégories",
+  "timeline.menuOpen": "Ouvrir le menu de navigation",
+  "timeline.memoriesCount": "{count} souvenirs",
+  "timeline.photoAlt": "Photo de {title}",
+  "timeline.textAlt": "Souvenir écrit : {title}",
+  "timeline.openPresentation": "Ouvrir {title} dans la présentation"
 };

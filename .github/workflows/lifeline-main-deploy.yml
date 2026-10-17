@@ -69,60 +69,40 @@ jobs:
           export CLOUDFLARE_ACCOUNT_ID
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           npx wrangler deploy --config experiments/lifeline-main/wrangler.jsonc
-      - name: Verify homepage and API after deploy
+      - name: Verify original PWA URL, all three pages and persistent local memory contract
         shell: bash
-        env:
-          TEST_URL: ${{ vars.TALERA_LIFELINE_TEST_URL }}
         run: |
-          TEST_URL="${TEST_URL:-https://talera-r19-lifeline-main-dev.mark-a39.workers.dev}"
-          echo "Checking freshly deployed worker endpoint availability: $TEST_URL"
+          set -euo pipefail
+          # The URL and manifest identity MUST remain unchanged so installed iPhone
+          # apps continue using their original IndexedDB origin and stored photos.
+          BASE='https://talera-r19-lifeline-main-dev.mark-a39.workers.dev'
           sleep 3
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/" -o /tmp/talera-lifeline-home.html
-          grep -q 'TALERA — Mijn levenslijn' /tmp/talera-lifeline-home.html
-          grep -q 'rel="manifest"' /tmp/talera-lifeline-home.html
-          echo "Checking manifest.webmanifest"
-          curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors "$TEST_URL/manifest.webmanifest" -o /tmp/talera-lifeline-manifest.json
-          grep -q '"display":"standalone"' /tmp/talera-lifeline-manifest.json
-          echo "Checking pwa-192.png"
-          curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors "$TEST_URL/pwa-192.png" -o /tmp/talera-lifeline-icon.png
-          test "$(file --mime-type -b /tmp/talera-lifeline-icon.png)" = "image/png"
-          echo "Checking sw.js"
-          curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors "$TEST_URL/sw.js" -o /tmp/talera-lifeline-sw.js
-          grep -q 'addEventListener' /tmp/talera-lifeline-sw.js
-          grep -q "installGesture(ageLane,'year')" /tmp/talera-lifeline-home.html
-          grep -q "installGesture(monthLane,'month')" /tmp/talera-lifeline-home.html
-          grep -q "installGesture(storyLane,'story')" /tmp/talera-lifeline-home.html
-          grep -q 'href="/tell"' /tmp/talera-lifeline-home.html
-          grep -q 'href="/present?visual=weekend-amsterdam"' /tmp/talera-lifeline-home.html
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/api/demo-memories" -o /tmp/talera-lifeline-memories.json
-          grep -q '"id":50' /tmp/talera-lifeline-memories.json
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/present?visual=weekend-amsterdam" -o /tmp/talera-lifeline-present.html
-          grep -q 'taleraPageNav' /tmp/talera-lifeline-present.html
-          grep -q 'talera-visual-demo-handoff' /tmp/talera-lifeline-present.html
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/present?visual=lifeline" -o /tmp/talera-lifeline-dynamic-presentation.html
-          grep -q 'talera-lifeline-session-handoff' /tmp/talera-lifeline-dynamic-presentation.html
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/tell" -o /tmp/talera-lifeline-tell.html
-          grep -q 'taleraTellNav' /tmp/talera-lifeline-tell.html
-          grep -q 'id="studioStage"' /tmp/talera-lifeline-tell.html
-          grep -q 'id="moment"' /tmp/talera-lifeline-tell.html
-          grep -q 'const maxMedia=6' /tmp/talera-lifeline-tell.html
-          grep -q 'id="mediaStage"' /tmp/talera-lifeline-tell.html
-          grep -q 'id="bulkFiles"' /tmp/talera-lifeline-tell.html
-          grep -q 'id="bulkGroups"' /tmp/talera-lifeline-tell.html
-          grep -q 'talera-bulk-free-v11' /tmp/talera-lifeline-tell.html
-          grep -q 'id="bulkEditorGrid"' /tmp/talera-lifeline-tell.html
-          grep -q 'id="bulkSpinner"' /tmp/talera-lifeline-tell.html
-          grep -q 'id="bulkStudio"' /tmp/talera-lifeline-tell.html
-          grep -q 'const mediaLimit=6,batchLimit=25' /tmp/talera-lifeline-tell.html
-          ! grep -q 'id="aiTitle"' /tmp/talera-lifeline-tell.html
-          echo "Checking V9 approved logo, PWA update script and new version API"
-          grep -q 'talera-brand-v9.png' /tmp/talera-lifeline-home.html
-          grep -q 'talera-version-check-v9' /tmp/talera-lifeline-home.html
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/api/version" -o /tmp/talera-lifeline-version.json
-          grep -q 'talera-lifeline-v13-nine-corrections-20261016' /tmp/talera-lifeline-version.json
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.png" -o /tmp/talera-lifeline-brand.png
-          test "$(file --mime-type -b /tmp/talera-lifeline-brand.png)" = "image/png"
-          curl --fail --silent --show-error --retry 3 --retry-all-errors "$TEST_URL/talera-brand-v9.svg" -o /tmp/talera-lifeline-brand.svg
-          grep -q '<svg' /tmp/talera-lifeline-brand.svg
-          grep -q 'talera-version-check-v9' /tmp/talera-lifeline-tell.html
-          echo "All three independent routes, approved logo, update code and demo API respond."
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/api/version" -o /tmp/talera-main-version.json
+          grep -q 'phone-display-unified-nav-20261016-r4' /tmp/talera-main-version.json
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/manifest.webmanifest" -o /tmp/talera-main-manifest.json
+          grep -q '"start_url":"/"' /tmp/talera-main-manifest.json
+          grep -q '"scope":"/"' /tmp/talera-main-manifest.json
+          grep -q '"id":"/"' /tmp/talera-main-manifest.json
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/" -o /tmp/talera-main-home.html
+          grep -q 'talera-reference-catalog' /tmp/talera-main-home.html
+          grep -q 'talera-local-timeline-integration' /tmp/talera-main-home.html
+          grep -q 'talera-memory-store-v1' /tmp/talera-main-home.html
+          grep -q 'Hoofdnavigatie TALERA' /tmp/talera-main-home.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/present?memory=50" -o /tmp/talera-main-presentation.html
+          grep -q 'talera-unified-navigation' /tmp/talera-main-presentation.html
+          grep -q 'talera-local-memory-adapter' /tmp/talera-main-presentation.html
+          grep -q 'memoryStoryScroll' /tmp/talera-main-presentation.html
+          grep -q 'talera-memory-id-navigation' /tmp/talera-main-presentation.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/present?memory=local-acceptance-smoke" -o /tmp/talera-main-local-presentation.html
+          grep -q 'talera-local-memory-adapter' /tmp/talera-main-local-presentation.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/tell" -o /tmp/talera-main-tell.html
+          grep -q 'talera-memory-store-v1' /tmp/talera-main-tell.html
+          grep -q 'taleraTellNav' /tmp/talera-main-tell.html
+          grep -q 'talera-unified-navigation' /tmp/talera-main-tell.html
+          grep -q 'id="mediaStage"' /tmp/talera-main-tell.html
+          grep -q 'id="moment"' /tmp/talera-main-tell.html
+          curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors "$BASE/sw.js" -o /tmp/talera-main-sw.js
+          grep -q 'addEventListener' /tmp/talera-main-sw.js
+          ! grep -q 'indexedDB.deleteDatabase' /tmp/talera-main-home.html
+          ! grep -q 'indexedDB.deleteDatabase' /tmp/talera-main-presentation.html
+          echo "Same-origin PWA update verified. IndexedDB contents never accessed by this workflow."

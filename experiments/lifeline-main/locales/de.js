@@ -91,5 +91,14 @@ export default {
   "status.titleRequired": "Bitte gib zuerst einen Titel ein.",
   "status.dateInvalid": "Wähle ein gültiges Datum, das nicht in der Zukunft liegt.",
   "status.memoryMissing": "Diese Erinnerung ist nicht auf diesem Gerät.",
-  "status.storageUnavailable": "Dieses Gerät unterstützt keine lokale Erinnerungsspeicherung."
+  "status.storageUnavailable": "Dieses Gerät unterstützt keine lokale Erinnerungsspeicherung.",
+  "timeline.all": "Alle Erinnerungen",
+  "timeline.features": "{count} Kategorien",
+  "timeline.featuresLabel": "Kategorien: {selection}",
+  "timeline.filterHint": "Nach einer oder mehreren Kategorien filtern",
+  "timeline.menuOpen": "Navigationsmenü öffnen",
+  "timeline.memoriesCount": "{count} Erinnerungen",
+  "timeline.photoAlt": "Foto zu {title}",
+  "timeline.textAlt": "Geschriebene Erinnerung: {title}",
+  "timeline.openPresentation": "{title} in der Präsentation öffnen"
 };

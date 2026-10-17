@@ -516,8 +516,20 @@ storyLane.addEventListener('click',ev=>{if(performance.now()<(state.storySuppres
 // No sessionStorage photo/story copies: the URL carries only the memory ID.
 const hamburger=$('.hamburger');
 const quick=document.createElement('div');quick.id='taleraQuickNav';quick.hidden=true;
-quick.innerHTML='<a href="/">⌂ <span data-i18n="nav.timeline"></span></a><a href="/tell">✎ <span data-i18n="nav.tell"></span></a><a href="/present">▣ <span data-i18n="nav.presentation"></span></a><button type="button" id="clearLifeFilter" data-i18n="timeline.clearFilters"></button><label class="talera-language-picker"><span data-i18n="common.language"></span><select id="taleraLanguageChoice" data-i18n-aria-label="common.languageSelector"></select></label>';
+quick.innerHTML='<a href="/">⌂ <span data-i18n="nav.timeline"></span></a><a href="/tell">✎ <span data-i18n="nav.tell"></span></a><a href="/present">▣ <span data-i18n="nav.presentation"></span></a><button type="button" id="clearLifeFilter" data-i18n="timeline.clearFilters"></button><label class="talera-language-picker"><span data-i18n="common.language"></span><select id="taleraLanguageChoice" data-i18n-aria-label="common.languageSelector"></select></label><label class="talera-language-picker"><span data-i18n="profile.birthYear"></span><input id="taleraBirthYear" type="number" min="1900" inputmode="numeric" data-i18n-aria-label="profile.birthYear" style="width:88px;max-width:100%;padding:7px;border:1px solid #d2dde7;border-radius:9px;background:white;color:#0f2747"></label>';
 $('.viewport').appendChild(quick);
+const birthYearInput=$('#taleraBirthYear');
+if(birthYearInput&&window.TaleraMemories){
+ const store=window.TaleraMemories;
+ birthYearInput.max=String(new Date().getFullYear());
+ birthYearInput.value=store.birthday?.()||'';
+ birthYearInput.addEventListener('change',()=>{
+  const year=Number(birthYearInput.value);
+  if(!Number.isInteger(year)||year<1900||year>new Date().getFullYear())return;
+  store.setBirthday(year);
+  window.__taleraLifelineDemo?.setBirthYear(store.birthday());
+ });
+}
 const languageChoice=$('#taleraLanguageChoice');
 if(languageChoice&&window.TaleraI18n){
  for(const code of window.TaleraI18n.languages){

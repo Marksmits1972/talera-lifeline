@@ -13,6 +13,7 @@ import { BRAND_PNG_BASE64, BRAND_ICON_SVG } from "./pwa-brand.js";
 import { PWA_UPDATE_SCRIPT } from "./pwa-update.js";
 import { FREE_TELL_POLISH_STYLE } from "./free-tell-polish.js";
 import { LOCAL_RH19_ADAPTER } from "./local-rh19-adapter.js";
+import { TALERA_I18N_SCRIPT } from "./i18n.js";
 
 const VERSION="talera-lifeline-v13-phone-display-unified-nav-20261016-r4";
 const PWA_MANIFEST=JSON.stringify({name:"TALERA — Mijn levenslijn",short_name:"TALERA",description:"Door je leven reizen en herinneringen beleven",id:"/",start_url:"/",scope:"/",display:"standalone",background_color:"#ffffff",theme_color:"#ffffff",icons:[{src:"/talera-brand-v9.svg",sizes:"any",type:"image/svg+xml",purpose:"any"},{src:"/pwa-192.png",sizes:"192x192",type:"image/png",purpose:"any"},{src:"/pwa-512.png",sizes:"512x512",type:"image/png",purpose:"any"}]});
@@ -31,7 +32,7 @@ function reply(body,method,contentType,status=200){
 function pwaShell(html){
   const icon='<link rel="apple-touch-icon" href="/talera-brand-v9.png"><link rel="icon" type="image/png" href="/talera-brand-v9.png">';
   let result=String(html).replace(/<link\s+[^>]*rel="apple-touch-icon"[^>]*>/gi,"").replace(/<link\s+[^>]*rel="icon"[^>]*>/gi,"");
-  if(result.includes("</head>"))result=result.replace("</head>",icon+"</head>");
+  if(result.includes("</head>"))result=result.replace("</head>",icon+TALERA_I18N_SCRIPT+"</head>");
   const updater=PWA_UPDATE_SCRIPT.replace("__TALERA_BUILD_VERSION__",VERSION);
   return result.includes("</body>")?result.replace("</body>",updater+"</body>"):result;
 }

@@ -77,5 +77,14 @@ test('native RH19 presentation is still the sole carousel and story-sheet engine
 
 test.todo('RH19 must support every valid memory date beyond September 2026 without losing original gestures');
 test.todo('Free must offer a separately restorable backup independent of removable browser storage');
-test.todo('Original RH19 demo catalog must have one canonical source instead of two 50-story copies');
+test('original RH19 catalogue is imported once and preserved by both renderers',()=>{
+ const reference=read('../src/reference-memories.js');
+ const mirror=read('../experiments/lifeline-main/demo-memories.js');
+ const renderer=read('../src/index.js');
+ assert.match(reference,/export const REFERENCE_MEMORIES = \[/);
+ assert.match(renderer,/import \{ REFERENCE_MEMORIES \} from "\.\/reference-memories\.js"/);
+ assert.match(renderer,/replace\("__TALERA_REFERENCE_MEMORIES__"/);
+ assert.match(mirror,/export \{ REFERENCE_MEMORIES as DEMO_MEMORIES \}/);
+ for(const i of [3,4,5,6])assert.doesNotMatch(read('../src/html/chunk'+i+'.js'),/\{id:\d+, at:/);
+});
 test.todo('Five-language UI strings and photo-loading latency require real iPhone acceptance tests');

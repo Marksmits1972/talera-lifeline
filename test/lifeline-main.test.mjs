@@ -97,7 +97,7 @@ test('Three routes keep native RH19, all reuse one TALERA footer',()=>{
  assert.match(worker,/renderNavigation\('tell'\)/);
  assert.match(worker,/renderNavigation\("timeline"\)/);
  assert.ok(visualV8.includes(NAV_SLOT));
- assert.match(worker,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
+ assert.match(NAVIGATION_STYLE,/body nav\[aria-label="TALERA navigatie"\]\{visibility:hidden!important\}/);
 });
 
 const visualV3=read('../experiments/lifeline-main/visual-v3.html');

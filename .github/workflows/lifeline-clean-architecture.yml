@@ -10,6 +10,7 @@ on:
       - 'test/lifeline-main.test.mjs'
       - 'test/lifeline-i18n.test.mjs'
       - 'test/lifeline-architecture-contract.test.mjs'
+      - 'test/lifeline-dynamic-range.test.mjs'
       - '.github/workflows/lifeline-clean-architecture.yml'
   workflow_dispatch:
 
@@ -34,7 +35,7 @@ jobs:
       - run: npm ci
       - name: Test original RH19 and user-memory workflows
         run: |
-          node --test test/lifeline-main.test.mjs test/lifeline-i18n.test.mjs test/lifeline-architecture-contract.test.mjs
+          node --test test/lifeline-main.test.mjs test/lifeline-i18n.test.mjs test/lifeline-architecture-contract.test.mjs test/lifeline-dynamic-range.test.mjs
           node --check experiments/lifeline-main/navigation.js
           node --check experiments/lifeline-main/worker.js
       - name: Enforce no data reset, original RH19 renderer and one footer component

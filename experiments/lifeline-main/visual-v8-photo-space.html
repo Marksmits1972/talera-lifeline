@@ -292,7 +292,7 @@ if(focusedId?.startsWith('ref-')&&memories.some(m=>m.id===focusedId)){
  state.selectedId=m.id;state.yearFloat=m.year;state.monthIndex=m.year*12+m.month;
 }
 const filtered=()=>memories.filter(x=>!state.filter.size||x.tags.some(t=>state.filter.has(t)));
-const dateOf=m=>{const d=new Date(m.ms);if(m.datePrecision==='year')return String(m.year);if(m.datePrecision==='month')return monthLabel(m.month)+' '+m.year;if(m.datePrecision==='season')return (m.seasonLabel||'seizoen')+' '+m.year;if(m.datePrecision==='period'&&m.dateEnd){const e=new Date(m.dateEnd+'T12:00:00');if(Number.isFinite(e.getTime()))return d.getDate()+' '+monthLabel(m.month)+' '+m.year+' – '+e.getDate()+' '+monthLabel(e.getMonth())+' '+e.getFullYear()}return d.getDate()+' '+ML[m.month]+' '+m.year};
+const dateOf=m=>{const d=new Date(m.ms);if(m.datePrecision==='year')return String(m.year);if(m.datePrecision==='month')return monthLabel(m.month)+' '+m.year;if(m.datePrecision==='season')return (m.seasonLabel||'seizoen')+' '+m.year;if(m.datePrecision==='period'&&m.dateEnd){const e=new Date(m.dateEnd+'T12:00:00');if(Number.isFinite(e.getTime()))return d.getDate()+' '+monthLabel(m.month)+' '+m.year+' – '+e.getDate()+' '+monthLabel(e.getMonth())+' '+e.getFullYear()}return d.getDate()+' '+monthLabel(m.month)+' '+m.year};
 const esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const nowYear=()=>Math.max(minYear,Math.min(maxYear,Math.round(state.yearFloat)));
 const activeMonth=()=>Math.max(minYear*12,Math.min(maxYear*12+11,Math.round(state.monthIndex)));

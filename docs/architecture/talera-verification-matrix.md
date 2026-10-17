@@ -20,7 +20,7 @@ De browserroute verstuurt nooit originele foto's, audio of verhaalinhoud. RH19 g
 |---|---|---|---|
 | Eén permanente herinnerings-ID | `TaleraMemories.save()` bewaart `local-...` ID en behoudt die bij bewerking | **GOED op contractniveau** | Maak/bewerk/navigate/keer terug naar dezelfde ID met echte lokale data |
 | Eén gebruikersopslag | IndexedDB `talera-lifeline-dev-local-v1`, stores `stories` en `files` | **GOED op structuur**, **GAT bij back-up** | Originele media intact, herstelbaar na verlies van browseropslag |
-| Tijdlijn leest dezelfde herinneringen | `store.list()` en lokale mediaverwijzingen, alleen zichtbare thumbnails | **GOED op code- en 1000-recordtest** | 1, 50, 1000 echte records inclusief impreciese datums, scrollprestaties op iPhone |
+| Tijdlijn leest dezelfde herinneringen | `store.list()` en lokale mediaverwijzingen, alleen zichtbare thumbnails, inclusief nieuwe open-vocabulary `characteristics` | **GOED op code- en 1000-recordtest** | 1, 50, 1000 echte records inclusief AI-kenmerken en impreciese datums, scrollprestaties op iPhone |
 | RH19 leest dezelfde herinneringen | `local-rh19-adapter.js` registreert metadata, haalt geselecteerde media pas later op | **GOED als één noodzakelijke adapter**, **RISICO bij tijdsgrenzen** | Zelfde tijd, tekst, foto's en gespreksopname; 1900–heden en toekomst toegestaan volgens opslagregels |
 | RH19 originele bediening | `presentation-controller.js`, `memory-story-scroll`, originele swipe- en taplogica blijven | **BRON BEHOUDEN**, praktische acceptatie open | Tik, swipe, fotoformaat, wit uitschuifbaar verhaalpaneel en audio/video controleren |
 | Consistente navigatie | `navigation.js` is één pure component; `?memory=` na opslaan/bewerken/retime | **GOED** | Alle drie de pagina's dezelfde onderbalk; actieve herinnering terug naar tijdlijn |
@@ -30,7 +30,7 @@ De browserroute verstuurt nooit originele foto's, audio of verhaalinhoud. RH19 g
 | Geen extra mediaspeler | RH19 voor foto's; video en audio als media-elementen binnen actieve herinnering | **GOED in ontwerp, latency onbekend** | Meet dubbele render-/videospeleracties en piekgeheugen voor snelle wissels |
 | Vijf talen schaalbaar | `i18n.js` + vijf catalogi; stabiele sleutel-API; runtime fallback | **FUNDAMENT KLAAR**, migratie onvolledig | Elke zichtbare string/verzoek, datumparser en foutmelding getest in NL/EN/DE/FR/ES |
 | Free back-up/herstel | Alleen IndexedDB-lokaal, geen onafhankelijke kopie of betrouwbare import/export | **NOG NIET GEBOUWD** | Export én volledig herstelscenario zonder toegang tot de oude PWA-origin |
-| Premium / AI-kenmerken | Ontwerp is canoniek geheugen plus toekomstige metadata, Cloudflare opslag, synchronisatie | **ONTWERP**, geen volledige implementatie | AI-tags zijn extra metadata, geen overschreven brongegevens; rechten, herstel, beveiliging |
+| Premium / AI-kenmerken | Opslag bewaart bij bewerken bestaande `characteristics`; de tijdlijn kan nieuwe brede AI-tags zonder vaste whitelist in hetzelfde herinneringsrecord filteren. AI-beeldanalyse, Cloudflare-back-end en rechten zijn nog niet gebouwd. | **OPEN-VOCABULARY GEGEVENSCONTRACT DEELS GEBOUWD**, dienstverlening OPEN | Werkelijke fotoanalyse, accordering en Cloudflare-auth/sync testen |
 | Televisiepresentatie | Bestaand ontwerp; gedeelde herinnerings-ID blijft contract | **ONTWERP**, nog niet end-to-end getest | Telefoon stuurt huidige ID/media-offset; originele grote media, sessiebeveiliging |
 | Updateveiligheid | Geïnstalleerde PWA-origin en IndexedDB-sleutels onveranderd | **VEILIG OP CODE**, acceptatie open | Update zonder app-verwijderen of wissen van foto's, browsercache of IndexedDB |
 
@@ -65,3 +65,9 @@ F. Meet echte eerste-laad-/wisseltijden en geheugengebruik; optimaliseer alleen 
 ## Afbakening van '100%'
 
 Groene CI toont aan dat de huidige automatische regressietests slagen. Dat is nog geen bewijs van een onafhankelijke, herstelbare iOS-bestandsback-up, volledige premium Cloudflare-autorisatie en AI-bijschriften, en tv-bediening of de prestaties op een fysieke iPhone. Deze hiaten blijven expliciet niet-afgerond. Ook het zichtbare niveau-0-overzicht (nu een vaste zoomschaal) moet nog UX-getoetst worden voor een leven van 1948 tot heden; de wiskundige tijdgrenzen zijn wel dynamisch.
+
+## Nieuwe controles op dezelfde ontwikkelbranch
+
+- Profielgeboortejaar is instelbaar via het bestaande menu en gebruikt dezelfde `talera-dev-birthyear-v1`-voorkeur voor beide tijdlijnen; vijf taalcatalogi hebben dezelfde nieuwe labelkey.
+- Het bewerken van een lokaal verhaal gooit bestaande AI-kenmerken niet stilzwijgend weg. Het is nadrukkelijk een bewaar-/filtercontract, **geen** claim dat Premium-AI inmiddels foto's analyseert.
+- CI op commit `e5141e4` groen. Oude goedgekeurde RH19-beeld-, swipe- en opslaglogica blijft inhoudelijk onaangeroerd, maar praktijkcontrole op een iPhone blijft verplicht.

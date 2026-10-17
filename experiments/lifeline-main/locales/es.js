@@ -91,5 +91,14 @@ export default {
   "status.titleRequired": "Primero introduce un título.",
   "status.dateInvalid": "Elige una fecha válida que no sea futura.",
   "status.memoryMissing": "Este recuerdo no está en este dispositivo.",
-  "status.storageUnavailable": "Este dispositivo no admite almacenamiento local de recuerdos."
+  "status.storageUnavailable": "Este dispositivo no admite almacenamiento local de recuerdos.",
+  "timeline.all": "Todos los recuerdos",
+  "timeline.features": "{count} categorías",
+  "timeline.featuresLabel": "Categorías: {selection}",
+  "timeline.filterHint": "Filtrar por una o varias categorías",
+  "timeline.menuOpen": "Abrir el menú de navegación",
+  "timeline.memoriesCount": "{count} recuerdos",
+  "timeline.photoAlt": "Foto de {title}",
+  "timeline.textAlt": "Recuerdo escrito: {title}",
+  "timeline.openPresentation": "Abrir {title} en la presentación"
 };

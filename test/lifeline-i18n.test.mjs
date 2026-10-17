@@ -80,11 +80,11 @@ test('one bootstrap serves all three existing pages without changing storage sch
  assert.match(worker,/icon\+TALERA_I18N_SCRIPT\+"<\/head>"/);
  assert.match(tell,/data-i18n="tell\.heading"/);
  assert.match(tell,/data-i18n="tell\.save"/);
- assert.match(tell,/data-i18n-placeholder=\\"tell\.titlePlaceholder\\"/);
+ assert.ok(tell.includes('data-i18n-placeholder="tell.titlePlaceholder"'));
  assert.match(home,/data-i18n="nav\.timeline"/);
  assert.match(home,/data-i18n="nav\.presentation"/);
  assert.match(home,/id="taleraLanguageChoice"/);
- assert.match(datepicker,/data-i18n=\\"date\.yearOnly\\"/);
+ assert.ok(datepicker.includes('data-i18n="date.yearOnly"'));
  assert.match(datepicker,/const months=\['januari'/);
  assert.match(datepicker,/window\.TaleraI18n\?\.locale\(\)/);
  assert.doesNotMatch(worker,/deleteDatabase\(|localStorage\.clear\(|sessionStorage\.clear\(/);

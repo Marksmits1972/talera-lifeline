@@ -1,4 +1,5 @@
 import { LIFE_RANGE_SCRIPT } from "./life-range.js";
+import { REFERENCE_MEMORIES } from "./reference-memories.js";
 import { chunk1 } from "./html/chunk1.js";
 import { chunk2 } from "./html/chunk2.js";
 import { chunk3 } from "./html/chunk3.js";
@@ -140,7 +141,7 @@ const BASE_HTML = [
   ...chunk7,
   ...chunk8,
   ...chunk9,
-].join("\n").replace(
+].join("\n").replace("__TALERA_REFERENCE_MEMORIES__",JSON.stringify(REFERENCE_MEMORIES.map(({id,at,story,fullStory,image})=>({id,at,story,fullStory,image}))).replace(/</g,"\\u003c")).replace(
   "writeMemory(nearestMemory(centerMs));\nresize();\n})();",
   `${TIMELINE_RUNTIME_BRIDGE}\nwriteMemory(nearestMemory(centerMs));\nresize();\n})();`
 );

@@ -91,5 +91,14 @@ export default {
   "status.titleRequired": "Please enter a title first.",
   "status.dateInvalid": "Choose a valid date that is not in the future.",
   "status.memoryMissing": "This memory is not on this device.",
-  "status.storageUnavailable": "This device does not support local memory storage."
+  "status.storageUnavailable": "This device does not support local memory storage.",
+  "timeline.all": "All memories",
+  "timeline.features": "{count} categories",
+  "timeline.featuresLabel": "Categories: {selection}",
+  "timeline.filterHint": "Filter by one or more categories",
+  "timeline.menuOpen": "Open the navigation menu",
+  "timeline.memoriesCount": "{count} memories",
+  "timeline.photoAlt": "Photo for {title}",
+  "timeline.textAlt": "Written memory: {title}",
+  "timeline.openPresentation": "Open {title} in the presentation"
 };

@@ -422,7 +422,7 @@ test('V12: persistent on-device retime changes date, precision and time without 
  assert.match(store,/day<=localToday\(\)/);
  assert.match(visualV8,/strong\.textContent=String\(yearAt\)/);
  assert.doesNotMatch(visualV8,/strong\.textContent=String\(age\)/);
- assert.match(visualV8,/maxYear=new Date\(\)\.getFullYear\(\)/);
+ assert.match(visualV8,/window\.TaleraLifeRange\(memories,profileBirthYear\)/);
 });
 test('V12: year/month/story drag remains isolated from RH19 presentation',()=>{
  const drag=read('../experiments/lifeline-main/timeline-reposition.js');

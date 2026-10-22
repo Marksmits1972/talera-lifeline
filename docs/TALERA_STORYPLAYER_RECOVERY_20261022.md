@@ -28,6 +28,8 @@ De herstelproef behoudt het oorspronkelijke fragment tot na de bestaande V20-tra
 9. De presentatie gebruikt één actieve wrapper voor de Story Player boven op de bestaande TALERA-presentatie; de eerdere dubbele wrapper is uitgeschakeld.
 10. Bij het verlaten van het scherm worden alle aanwezige audio- en video-elementen gepauzeerd.
 
+11. De knoppen voor een nieuw lokaal verhaal verwijzen naar de eigen PWA-route `/tell` op dezelfde origin, niet naar een oude aparte Workers-omgeving. De bestaande externe beheerroutes voor reeds gekoppelde serverherinneringen zijn nog niet gemigreerd.
+
 ## Gecontroleerde browsertests (Cloudflare Browser Rendering)
 - `/`, `/tell`, `/present` en `/story-player-health` renderen zonder fout 1101.
 - Zes afzonderlijke synthetische PNG-bestanden in de vertelpagina geselecteerd: 6 originele blobs opgeslagen, 1 conceptmanifest, geen foutmelding.

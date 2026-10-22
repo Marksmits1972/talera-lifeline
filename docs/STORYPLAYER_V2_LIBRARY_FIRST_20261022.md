@@ -1,0 +1,35 @@
+# TALERA Story Player V2 – library-first rebuild (22 oktober 2026)
+
+## Architectuur (leidend)
+1. De TALERA-bibliotheek is eigenaar van de originele foto-, video- en geluidsbestanden. Een import schrijft een origineel één keer weg, met een stabiele media-ID.
+2. De Story Player bewaart alleen `mediaIds`, `audioId` en `cues: [{atMs, mediaId}]`. Op de tijdlijn zetten schrijft geen grote mediabestanden opnieuw weg.
+3. De afspeelpositie van de stem is de klok voor de fotowisselingen. Pauzes tellen niet mee.
+4. De bestaande PWA-presentatie (`#photoStage`, huidige fotolagen en fotopuntjes) is het enige beeldvlak. Geen tweede scherm of aparte afspeel-app.
+5. Een oranje puntje mag pas activeren nadat de gekoppelde foto werkelijk geladen is. Een ontbrekende foto blijft een expliciete fout, niet een vervangende foto.
+6. Gratis lokale opslag wordt gebouwd met OPFS voor de originelen en IndexedDB voor metadata. Premium/cloud wordt een tweede implementatie van **hetzelfde bibliotheekcontract**; is nog niet aangesloten.
+
+## Nieuw prototype buiten productie
+De nieuwe modulaire implementatie en 12 tests zijn als downloadbaar broncodepakket in de TALERA-ontwikkelchat gegenereerd: `talera_storyplayer_v2_library_first.zip`. Bevat `story-model.js`, `local-library.js`, `capture.js`, `player.js`, `presentation.js`, `pwa-bridge.js`, `index.js`, `README.md` en 4 testbestanden.
+
+Deze feature branch is de veilige werkruimte voor herbouw, geen gepubliceerde of reeds geïntegreerde PWA. V32 t/m V40 en de huidige Cloudflare-app worden hierdoor niet aangepast.
+
+## Afgeronde testresultaten
+- 12 lokale Node-tests geslaagd.
+- Foto-ID's blijven constant en verhuizen niet bij inspreken of afspelen.
+- Onderbroken opname verschuift de fototijden niet.
+- Ontbrekende mediabestanden blokkeren verhaalpublicatie.
+- Eén geluidsopname importeert alleen het nieuwe audiobestand, nooit de foto's opnieuw.
+- Snelle seek en ontbrekende foto tonen geen fictief actieve fotostand.
+- Afspelen wordt gepauzeerd bij het verlaten van de pagina.
+- Bibliotheekrecords bevatten uitsluitend metadata; originele bestandsbytes gaan in OPFS.
+
+## Nog te realiseren voordat iPhone-testlink geschikt is
+- De bestaande V32–V40-PWA is momenteel een samengestelde Cloudflare Worker. Er is nog geen geteste integratie en veilige migratie naar het nieuwe OPFS-bibliotheekformaat.
+- Werkende Free-import met echte grote HEIC/JPEG/MOV-bestanden testen in Safari; anders geen opslagbevestiging.
+- Cloud/Premium-provider en accounts/toegangsrechten bouwen.
+- Legacy lokale opslag `TaleraMemories` en `talera-v4-work` veilig inventariseren en migreren zonder bestanden te verwijderen.
+- De oude Story Player-controller uitschakelen en de nieuwe `pwa-bridge.js` als enige eigenaar van `#photoStage` en audio activeren.
+- Nieuwe test-Worker eerst op alle routes testen vóór delen van een iPhone-link.
+
+## Releasebeleid
+Nieuwe Story Player alléén promoten bij bewezen bestand-opslag, heropenen, stem/foto synchronisatie, één presentatie en geen achterblijvende audio. Oude versies zijn terugvalbasis tot acceptatie.

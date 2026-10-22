@@ -33,3 +33,26 @@ Deze feature branch is de veilige werkruimte voor herbouw, geen gepubliceerde of
 
 ## Releasebeleid
 Nieuwe Story Player alléén promoten bij bewezen bestand-opslag, heropenen, stem/foto synchronisatie, één presentatie en geen achterblijvende audio. Oude versies zijn terugvalbasis tot acceptatie.
+
+
+## Geïntegreerde PWA-preview
+- **GitHub wijziging**: https://github.com/Marksmits1972/talera-lifeline/pull/46 (draft; nog niet samengevoegd)
+- **Cloudflare-preview, niet productie**: https://storyplayer-library-first-20261022-talera-timeline-prototype.mark-a39.workers.dev/
+- Deze preview is daadwerkelijk geopend met Cloudflare Browser Rendering. De oude Vertellen-controller is in `src/index.js` vervangen door `integratedStoryPlayerScript`.
+- Alle media komen één keer in OPFS; een verhaalrecord bevat uitsluitend media-ID's, audio-ID en fototijden. De bestaande `#photoStage`, `.talera-memory-audio` en oranje fotopuntjes worden hergebruikt.
+- De vaste levenslijn-einddatum `6 september 2026` is vervangen door `Date.now()`. Daardoor kan een herinnering van vandaag op de tijdlijn worden geselecteerd.
+- De automatische oude fotocarrousel wordt voor nieuwe V2-herinneringen niet meer geactiveerd.
+
+## Browserintegratietest – bevestigd
+In een verse browseromgeving:
+1. Bestaande Vertellen-knop opent een paneel *in dezelfde PWA*.
+2. Drie nieuwe PNG-testfoto's worden geïmporteerd in de OPFS-bibliotheek.
+3. Eén herinnering wordt opgeslagen, zichtbaar op de tijdlijn onder zijn eigen ID.
+4. Een WAV-testopname wordt **één keer** geïmporteerd. De bibliotheek bevat exact vier media-items en één verhaalrecord.
+5. De opname bevat fotowisselingen op 0, 1.000 en 2.200 ms.
+6. Bij afspelen en seek tonen de bestaande fotolagen en puntjes aantoonbaar index 0, index 1 en index 2; het beeld is geladen.
+7. De bestaande `/`-route opent zonder Cloudflare-fout 1101.
+
+De volledige GitHub-regressie bevat vijf nieuwe integratietests die slagen. Twee **andere, reeds bestaande** tests falen wegens ontbrekende bestanden `xxory-test/src/tv-player.js` en `xxory-test/src/unified-webapp.js`. Dit blokkeert de volledige CI-status totdat apart hersteld; niet maskeren of verwijderen.
+
+**Nog niet bewezen op een echte iPhone**: zes grote HEIC/JPEG/MOV-originelen, echte microfoonopname, Safari OPFS-heropenen, achtergrondstop en migratie van eerder lokaal opgeslagen concepten. Deze resterende punten bepalen of de preview voor algemene uitrol geschikt is.

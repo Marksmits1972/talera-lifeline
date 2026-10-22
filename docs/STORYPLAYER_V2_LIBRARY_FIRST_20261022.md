@@ -14,7 +14,7 @@ De nieuwe modulaire implementatie en 12 tests zijn als downloadbaar broncodepakk
 Deze feature branch is de veilige werkruimte voor herbouw, geen gepubliceerde of reeds geïntegreerde PWA. V32 t/m V40 en de huidige Cloudflare-app worden hierdoor niet aangepast.
 
 ## Afgeronde testresultaten
-- 12 lokale Node-tests geslaagd.
+- 13 lokale Node-tests geslaagd.
 - Foto-ID's blijven constant en verhuizen niet bij inspreken of afspelen.
 - Onderbroken opname verschuift de fototijden niet.
 - Ontbrekende mediabestanden blokkeren verhaalpublicatie.

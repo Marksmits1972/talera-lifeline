@@ -35,7 +35,7 @@ const runtime=window.__taleraTimelineRuntime,stage=document.getElementById('phot
 if(!runtime||!stage)return;
 const docs=document,storage=navigator.storage,urls=new Map(),memories=new Map();
 let dbPromise=null,dirPromise=null,currentStory=null,currentAudioId=null,currentAudioUrl=null,audio=null;
-let active=false,frameId='',generation=0,voiceClock=null,video=null,closing=false;
+let active=false,frameId='',generation=0,voiceClock=null,video=null,closing=false,pendingFrameId='',pendingFramePromise=null;
 let recorder=null,stream=null,recordChunks=[],recStart=0,recPausedAt=0,recPauseTotal=0,recCues=[];
 let recBlob=null,recAudioId=null,recState='idle',selected=[],currentIndex=0,editorBusy=false,recordedDuration=0;
 const uid=()=> 'm-'+crypto.randomUUID();
@@ -99,7 +99,7 @@ async function imageURL(id){if(urls.has(id))return urls.get(id);const blob=await
 const layerImages=()=>[...stage.querySelectorAll('.photo-layer .example-photo,.photo-layer .photo-backdrop,.photo-layer .photo-aligned-blur')];
 function stopVideo(){if(video){try{video.pause()}catch(_){}video.hidden=true;video.removeAttribute('src');video.load()}}
 function updateDot(idx){const m=runtime.currentMemory();if(!m?._taleraLibraryV2)return;m._photoIndex=idx;m.image=m.photos[idx];runtime.writeMemory(m);const dots=docs.querySelectorAll('.talera-photo-dot');dots.forEach((x,i)=>x.classList.toggle('active',i===idx))}
-async function showFrame(mediaId){
+async function performFrame(mediaId){
  const epoch=++generation,meta=await getMeta(mediaId);if(!meta)throw fail('Foto ontbreekt');
  const src=await imageURL(mediaId);if(epoch!==generation)return;
  const m=runtime.currentMemory();if(!m?._taleraLibraryV2||m._taleraStoryId!==currentStory?.id)return;
@@ -124,6 +124,13 @@ async function showFrame(mediaId){
  if(epoch!==generation)return;
  m.photos[idx]=src;m.image=src;frameId=mediaId;updateDot(idx);
 }
+function showFrame(mediaId){
+ if(pendingFrameId===mediaId&&pendingFramePromise)return pendingFramePromise;
+ const promise=performFrame(mediaId);
+ pendingFrameId=mediaId;
+ pendingFramePromise=promise.finally(()=>{if(pendingFrameId===mediaId){pendingFrameId='';pendingFramePromise=null}});
+ return pendingFramePromise;
+}
 function cueAt(ms){let cue=null;for(const x of currentStory?.cues||[]){if(x.atMs>ms)break;cue=x}return cue}
 function sync(){
  if(!currentStory||!active||!audio)return;
@@ -136,7 +143,7 @@ function sync(){
   if(audio.paused&&!video.paused)video.pause();
  }
 }
-function stopVoice(){if(audio){audio.pause();try{audio.currentTime=0}catch(e){}}active=false;frameId='';generation++;stopVideo();if(voiceClock){clearInterval(voiceClock);voiceClock=null}}
+function stopVoice(){if(audio){audio.pause();try{audio.currentTime=0}catch(e){}}active=false;frameId='';generation++;pendingFrameId='';pendingFramePromise=null;stopVideo();const btn=docs.querySelector('.talera-memory-audio');if(btn)btn.classList.remove('is-playing');if(voiceClock){clearInterval(voiceClock);voiceClock=null}}
 async function playStory(story){
  if(!story)return;stopVoice();
  currentStory=story;active=true;
@@ -279,12 +286,19 @@ recordButton.addEventListener('click',async()=>{try{
 stopButton.addEventListener('click',async()=>{try{await stopRecording();stopButton.disabled=true}catch(e){showError(e)}});
 saveButton.addEventListener('click',()=>{void saveCurrent()});
 docs.addEventListener('click',e=>{
+ const sc=e.target.closest('#memoryStoryScroll');
+ if(sc&&runtime.currentMemory()?._taleraLibraryV2&&!(e.target.closest('button,a,input'))){
+  const m=runtime.currentMemory(),story=memories.get(m.id);
+  if(story?.mediaIds?.length>1){e.preventDefault();e.stopImmediatePropagation();void showFrame(story.mediaIds[((m._photoIndex||0)+1)%story.mediaIds.length]).catch(showError)}
+  return;
+ }
  if(e.target.closest('.tell')){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();openEditor();return}
  const button=e.target.closest('.talera-memory-audio');if(button&&runtime.currentMemory()?._taleraLibraryV2){
   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
   const m=runtime.currentMemory(),s=memories.get(m.id);
   if(!s)return;
   if(currentStory?.id===s.id&&audio&&!audio.paused){pauseVoice();button.classList.remove('is-playing')}
+  else if(currentStory?.id===s.id&&audio?.paused&&audio.currentTime>0){audio.play().then(()=>{active=true;voiceClock=setInterval(sync,80);button.classList.add('is-playing')}).catch(showError)}
   else void playStory(s).then(()=>{button.classList.add('is-playing')}).catch(showError);
  }
 },true);

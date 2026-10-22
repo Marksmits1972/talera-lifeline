@@ -240,6 +240,7 @@ export const liveMemoryIntegrationScript = String.raw`
   }
   function scheduleAuto(memory){
     clearAuto();
+    if(memory&&memory._taleraLibraryV2)return;
     if(!memory||memory._photoLoading||!Array.isArray(memory.photos)||memory.photos.length<=1)return;
     autoStartTimer=setTimeout(()=>{
       showPhoto(memory,(memory._photoIndex||0)+1,false);

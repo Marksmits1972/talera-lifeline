@@ -56,3 +56,14 @@ In een verse browseromgeving:
 De volledige GitHub-regressie bevat vijf nieuwe integratietests die slagen. Twee **andere, reeds bestaande** tests falen wegens ontbrekende bestanden `xxory-test/src/tv-player.js` en `xxory-test/src/unified-webapp.js`. Dit blokkeert de volledige CI-status totdat apart hersteld; niet maskeren of verwijderen.
 
 **Nog niet bewezen op een echte iPhone**: zes grote HEIC/JPEG/MOV-originelen, echte microfoonopname, Safari OPFS-heropenen, achtergrondstop en migratie van eerder lokaal opgeslagen concepten. Deze resterende punten bepalen of de preview voor algemene uitrol geschikt is.
+
+## Vaste iPhone-acceptatieversie
+Op 22 oktober 2026 is de aparte preview van de geïntegreerde PWA installatieklaar gemaakt:
+- https://storyplayer-library-first-20261022-talera-timeline-prototype.mark-a39.workers.dev/
+- `/manifest.webmanifest` met `display: standalone`, beginpad `/` en scope `/`.
+- `/talera-icon.svg`, plus iOS `apple-mobile-web-app-capable`-metadata.
+- Browser Rendering: startpagina, manifest en icoon bereikbaar; nieuwe Story Player aanwezig en geen fout 1101.
+- De preview blijft een afzonderlijke acceptatieversie in de branch; productie/main worden niet vervangen.
+- Voeg toe via **Safari → Delen → Zet op beginscherm**. Test lokale opslag uitsluitend in de daaruit gestarte app. De vorige workers.dev-domeinen delen hun lokale bestanden niet automatisch.
+- De CI-status is niet geheel groen: twee oudere, niet op deze Story Player gerichte tests missen bestanden `xxory-test/src/tv-player.js` en `xxory-test/src/unified-webapp.js`. De nieuwe integratietests slagen.
+- Pas na positieve iPhone-tests kan deze versie als definitieve standaard-PWA worden gepromoveerd.

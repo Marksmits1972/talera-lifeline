@@ -42,7 +42,7 @@ test('new memories use only the existing RH19 presentation stage',()=>{
 });
 
 test('one narration clock and actual successful image decode govern cues',()=>{
-  assert.match(integratedStoryPlayerScript,/currentTime\|\|0/);
+  assert.match(integratedStoryPlayerScript,/Number\(audio\.currentTime\)\|\|0/);
   assert.match(integratedStoryPlayerScript,/await img\.decode\(\)/);
   assert.match(integratedStoryPlayerScript,/await writable\.close\(\)/);
   assert.match(integratedStoryPlayerScript,/pendingFramePromise/);

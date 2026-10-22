@@ -176,13 +176,13 @@ async function preview(){
  }catch(e){showError(e)}
 }
 function resetEditor(){
- selected=[];currentIndex=0;recorder=null;recChunks=[];recBlob=null;recAudioId=null;recState='idle';recCues=[];recordedDuration=0;recordChunks=[];
+ selected=[];currentIndex=0;recorder=null;recBlob=null;recAudioId=null;recState='idle';recCues=[];recordedDuration=0;recordChunks=[];
  recordButton.textContent='● Start opname';position.textContent='0 / 0';saveButton.disabled=false;void preview();
  status('Foto’s uit de bibliotheek kiezen, daarna inspreken.');void refreshLibrary();
 }
 function pauseRecording(){
  if(recState==='recording'){recorder.pause();recPausedAt=performance.now();recState='paused';recordButton.textContent='▶ Hervatten';status('Opname gepauzeerd')}
- else if(recState==='paused'){recPauseTotal+=performance.now()-recPausedAt;recorder.resume();recState='recording';recordButton.textContent='Ⅱ Pauzeren';status('Opname hervat')}
+ else if(recState==='paused'){recPauseTotal+=performance.now()-recPausedAt;recorder.resume();recState='recording';if(selected.length&&recCues.at(-1)?.mediaId!==selected[currentIndex]){const last=recCues.at(-1)?.atMs||0;recCues.push({atMs:Math.max(last+1,recordElapsed()),mediaId:selected[currentIndex]})}recordButton.textContent='Ⅱ Pauzeren';status('Opname hervat')}
 }
 async function startRecording(){
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw fail('Opnemen wordt hier niet ondersteund');

@@ -90,13 +90,13 @@ export function patchV47Html(html, pathname) {
       "function playbackAtTime(){const m=voiceMemory,p=activeAudio;if(!m||!p||runtime.currentMemory()?.id!==m.id)return;const frames=m._taleraFrames||[],cues=Array.isArray(m._taleraNarrationCues)?m._taleraNarrationCues:[];if(!frames.length||!cues.length)return;const ms=Math.max(0,(Number(p.currentTime)||0)*1000);let cue=null;for(const c of cues){if(c.t<=ms+10){if(typeof c.mediaId==='string')cue=c}else break}if(!cue)return;const index=frames.findIndex(f=>f.id===cue.mediaId);if(index<0)return;window.__taleraV31SelectPhoto?.(m.id,index);const v=activeVideo;const frame=frames[index];if(!v||frame?.kind!=='video'||v.dataset.storyFrame!==m.id+'|'+index+'|'+frame.key)return;v.muted=true;v.defaultMuted=true;v.playsInline=true;const target=Math.max(0,(ms-cue.t)/1000);if(p.paused||p.ended){if(!v.paused)v.pause();return}if(Number.isFinite(v.duration)&&v.duration>0&&target>=v.duration){if(!v.paused)v.pause();if(v.currentTime<v.duration-.10)try{v.currentTime=Math.max(0,v.duration-.05)}catch(e){}return}if(v.readyState>=1&&Math.abs(v.currentTime-target)>.45)try{v.currentTime=target}catch(e){}if(v.paused&&!v.ended)void v.play().catch(()=>{})}let voiceTicker=0;",
       "single-audio-clock"
     );
-    patch(
-      "const first=voiceMemory._taleraNarrationCues?.[0]?.index??0;window.__taleraV31SelectPhoto?.(voiceMemory.id,first);",
+    patchRegex(
+      /const first=voiceMemory\._taleraNarrationCues\?\.\[0\]\?\.index\?\?0;\s*window\.__taleraV31SelectPhoto\?\.\(voiceMemory\.id,first\);/,
       "const cue=voiceMemory._taleraNarrationCues?.[0];const first=cue?.mediaId?voiceMemory._taleraFrames?.findIndex(f=>f.id===cue.mediaId):-1;if(first>=0)window.__taleraV31SelectPhoto?.(voiceMemory.id,first);",
       "replay-first-id"
     );
-    patch(
-      "memory._taleraEndedVideoFrame=storyFrameId;removeVideo();window.__taleraRefreshPhotoIndicator?.();",
+    patchRegex(
+      /memory\._taleraEndedVideoFrame=storyFrameId;\s*removeVideo\(\);\s*window\.__taleraRefreshPhotoIndicator\?\.\(\);/,
       "player.pause();player.style.opacity='1';window.__taleraRefreshPhotoIndicator?.();",
       "retain-last-video-frame"
     );

@@ -65,3 +65,32 @@ Alle tests in afzonderlijke Cloudflare Browser Rendering-context, zonder persoon
 - Geen promotie naar productie zonder afzonderlijk akkoord.
 
 **Eerstvolgende stap:** echte iPhone-test met zes foto's, afspeelbare video en echte stemopname. V47 blijft een testkandidaat tot alle relevante weergave- en heropenproeven aantoonbaar slagen.
+
+## Correctie V47.1 — 23 oktober 2026, naar aanleiding van iPhone-feedback
+
+**Door gebruiker bevestigd probleem:** op de foto's tikken schakelde ongewenst door; tijdens gesproken afspelen bewogen foto's niet mee. De aanvankelijke V47 acceptatie was te beperkt: uitsluitend opslag en HTML-structuur waren toen getest.
+
+**Aangetroffen technische oorzaken/risico's:**
+
+- De V47-opslagpatch was alleen toegepast in de uiteindelijke `/tell`-pagina. `/present` bevatte nog de oude `safeCues(value,count)` en positionele mediasleutels. Een nieuwe foto/audio-marker die langs die code liep werd weggefilterd: een echte browsertest leverde `narrationCues: []` en `local-ID:0`-items op.
+- De V46 klikonderdrukking op `#photoStage` dekte niet noodzakelijk het hele `#memoryStoryScroll`-fotopaneel of alle pointer-/touch-gebeurtenissen.
+- De afspeelfunctie accepteerde alleen nieuwe media-ID-cues en niet expliciet opgeslagen oudere indexcues. Beide mogen geldig blijven, maar ontbrekende cues mogen niet automatisch verdeeld worden.
+
+**Uitgevoerde correctie op dezelfde test-Worker** `talera-pwa-story-player-v47-id-test`:
+
+1. Identieke media-ID-opslag en cuevalidatie in de uiteindelijke vertel- én presentatieroutes.
+2. Correcte ID-validatie ook bij tekst-/metadata-aanpassingen aan bestaande herinneringen.
+3. Audio `currentTime` selecteert vastgelegde `mediaId`; bestaande echte `{t,index}`-markers zijn als compatibiliteit ondersteund zonder zelf tijdstempels te verzinnen.
+4. Alleen in een lokale herinnering mét opname/markers wordt een tik geblokkeerd, via window-capture op het hele fotopaneel. Werkelijke knoppen en veegbewegingen blijven buiten dit tapfilter.
+
+**Nieuwe browserproeven met kunstmatige foto's en werkelijke lopende WAV:**
+
+- Drie foto's bij handmatige audiosprongen: op 1,35 s werkelijk foto 2 zichtbaar, op 2,7 s werkelijk foto 3; natuurlijke beeldbreedte positief en media-ID's gelijk aan cues.
+- Zes foto's met echte lopende vijf-seconden-WAV (muted voor headless autoplay). Op 1,09 s: geselecteerde/zichtbare foto 2, oranje puntje 2. Op 3,49 s: foto 5, oranje puntje 5. Audio speelde door.
+- Tijdens die run kwam op 3,6 s vanzelf de laatste cue; deze overgang is **niet** als tapfout geteld.
+- Afzonderlijke inputtest zonder tijdsverloop: `click` op `#photoLayerA .example-photo`, `click` op `#memoryStoryScroll` en `pointerup` op foto worden verhinderd; een echte bedieningsknop blijft toegankelijk (alle vier assertions geslaagd).
+- De bestaande Cloudflare service worker gebruikt netwerk-eerst navigatie zonder eigen HTML-cache. Het nieuwe testadres gebruikt `cache-control: no-store` voor de vertel- en presentatiepagina's.
+
+**Nog steeds open:** fysieke iPhone/Safari-acceptatie van microfoon, cues tijdens opname, echte video, pauze/hervat, visuele animaties en heropenen van de PWA. Er is geen productie-release uitgevoerd. De gebruiker moet de bijgewerkte test-PWA echt herladen; bestaande audio-opnames zonder opgeslagen cues kunnen niet betrouwbaar worden gereconstrueerd.
+
+**GitHub-code:** `src/story-player-v47-patch.mjs` (V47.1), commit `c7cb33ba3e86bdadd3650625d2223659c4cbb37f`. **Cloudflare:** bestaande geïsoleerde test-Worker opnieuw geüpload, HTTP 200 (23 oktober 2026 14:19 UTC).

@@ -18,7 +18,7 @@ import { timelinePhotoSelectionScript } from "./timeline-photo-selection.js";
 import { bottomCommandLayerStyle } from "./bottom-command-layer.js";
 import { shareExperienceStyle, shareExperienceScript } from "./share-experience.js";
 import { desktopPresentationStyle, desktopPresentationScript } from "./desktop-presentation.js";
-import { taleraTellStyle, taleraTellScript } from "./talera-tell.js";
+import { integratedStoryPlayerStyle, integratedStoryPlayerScript } from "./story-player-v2-integrated.js";
 import { handleSharePreviewStorage } from "../xxory-test/src/share-preview-storage.js";
 
 const TELL_ORIGIN = "https://xxory-test.mark-a39.workers.dev";
@@ -159,8 +159,8 @@ const listenButtonOutlineStyle = String.raw`
 `;
 
 const HTML = BASE_HTML
-  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style><style id="talera-desktop-presentation">${desktopPresentationStyle}</style><style id="talera-native-tell">${taleraTellStyle}</style></head>`)
-  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script><script id="talera-desktop-presentation-controller">${desktopPresentationScript}</script><script id="talera-native-tell-controller">${taleraTellScript}</script></body>`);
+  .replace("</head>", `<style id="talera-immersive-photo">${enhancementStyle}</style><style id="talera-interaction-fixes">${interactionFixStyle}</style><style id="talera-timeline-visual-state">${timelineVisualStateStyle}</style><style id="talera-timeline-glass-layer">${timelineGlassLayerStyle}</style><style id="talera-live-memory-integration">${liveMemoryIntegrationStyle}</style><style id="talera-memory-presentation-controls">${memoryPresentationControlsStyle}</style><style id="talera-listen-button-outline">${listenButtonOutlineStyle}</style><style id="talera-bottom-command-layer">${bottomCommandLayerStyle}</style><style id="talera-share-experience">${shareExperienceStyle}</style><style id="talera-desktop-presentation">${desktopPresentationStyle}</style><style id="talera-library-first-story-player">${integratedStoryPlayerStyle}</style><link rel="manifest" href="/manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="TALERA"><link rel="icon" href="/talera-icon.svg" type="image/svg+xml"></head>`)
+  .replace("</body>", `<script id="talera-live-memory-integration-controller">${liveMemoryIntegrationScript}</script><script id="talera-memory-presentation-controls-controller">${memoryPresentationControlsScript}</script><script id="talera-presentation-controller">${presentationControllerScript}</script><script id="talera-timeline-visual-state-controller">${timelineVisualStateScript}</script><script id="talera-timeline-photo-selection-controller">${timelinePhotoSelectionScript}</script><script id="talera-share-experience-controller">${shareExperienceScript}</script><script id="talera-desktop-presentation-controller">${desktopPresentationScript}</script><script id="talera-library-first-story-player-controller">${integratedStoryPlayerScript}</script></body>`);
 
 function escapeMeta(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
@@ -309,8 +309,36 @@ async function proxyLinkedMemory(request) {
   });
 }
 
+
+const TALERA_STORYPLAYER_PWA_MANIFEST = {
+  id: "/",
+  name: "TALERA — Herinneringen",
+  short_name: "TALERA",
+  description: "Je herinneringen op je eigen levenslijn.",
+  lang: "nl-NL",
+  start_url: "/",
+  scope: "/",
+  display: "standalone",
+  background_color: "#F7F4EF",
+  theme_color: "#0F2747",
+  icons: [
+    { src: "/talera-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }
+  ]
+};
+const TALERA_STORYPLAYER_PWA_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0F2747"/><path d="M142 166h228" stroke="#E7A98B" stroke-width="18" stroke-linecap="round"/><path d="M256 166v216" stroke="#F7F4EF" stroke-width="25" stroke-linecap="round"/><circle cx="256" cy="166" r="29" fill="#E7A98B"/></svg>';
 export default {
   async fetch(request, env) {
+    const path = new URL(request.url).pathname;
+    if (path === "/manifest.webmanifest") {
+      return new Response(JSON.stringify(TALERA_STORYPLAYER_PWA_MANIFEST), {
+        headers: {"content-type": "application/manifest+json; charset=utf-8", "cache-control": "no-store"}
+      });
+    }
+    if (path === "/talera-icon.svg") {
+      return new Response(TALERA_STORYPLAYER_PWA_ICON, {
+        headers: {"content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=3600"}
+      });
+    }
     const preview = await handleSharePreview(request, env);
     if (preview) return preview;
 

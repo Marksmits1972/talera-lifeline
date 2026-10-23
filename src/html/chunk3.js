@@ -20,7 +20,7 @@ export const chunk3 = [
   "\"use strict\";",
   "",
   "const LIFE_START = new Date(1976,8,6).getTime();",
-  "const LIFE_END = new Date(2026,8,6).getTime();",
+  "const LIFE_END = Date.now();",
   "const MS_DAY = 86400000;",
   "const DAYS_YEAR = 365.2425;",
   "const TOTAL_DAYS = Math.floor((LIFE_END-LIFE_START)/MS_DAY)+1;",

@@ -94,3 +94,15 @@ Alle tests in afzonderlijke Cloudflare Browser Rendering-context, zonder persoon
 **Nog steeds open:** fysieke iPhone/Safari-acceptatie van microfoon, cues tijdens opname, echte video, pauze/hervat, visuele animaties en heropenen van de PWA. Er is geen productie-release uitgevoerd. De gebruiker moet de bijgewerkte test-PWA echt herladen; bestaande audio-opnames zonder opgeslagen cues kunnen niet betrouwbaar worden gereconstrueerd.
 
 **GitHub-code:** `src/story-player-v47-patch.mjs` (V47.1), commit `c7cb33ba3e86bdadd3650625d2223659c4cbb37f`. **Cloudflare:** bestaande geïsoleerde test-Worker opnieuw geüpload, HTTP 200 (23 oktober 2026 14:19 UTC).
+
+## V47.2 — diagnose na herhaalde iPhone-melding — 23 oktober 2026
+
+Gebruiker bevestigt dat geluid afspeelt maar foto's niet automatisch meewisselen. De echte iPhone-acceptatie blijft **niet geslaagd**.
+
+Uitgevoerde Chrome-test: drie foto's via de gewone vertelpagina uploaden, de bestaande opnamebediening activeren, twee keer een foto verder gaan tijdens een gesimuleerde microfoonopname en stoppen. In het concept kwamen daadwerkelijk drie tijdstempels met media-ID's terecht. Daarna is dezelfde herinnering via de echte publicatieknop in de normale TaleraMemories-opslag opgeslagen, met een opzettelijke test-stop vóór de navigatie. Alle drie markers en de audio-ID bleven behouden. Browseronderzoek met echte lopende WAV en zes foto’s liet de juiste foto én indicator wisselen.
+
+Dit test niet de werkelijke mobiele Safari-opname, noch reeds aanwezige opnames waarvoor fotomomenten mogelijk eerder verloren zijn gegaan.
+
+De nieuwe testbuild `v47.2-narration-diagnostics-20261023` toont uitsluitend bij een bestaande lokale opname zonder bruikbare markers een niet-interactieve uitleg. De nieuwe diagnosepagina `/story-player-check` leest alleen via IndexedDB readonly het aantal foto/video-items en opgeslagen/geldige cue-ID's uit deze origin; geen titels, bestanden of audio worden verzonden of gewijzigd. Bij een lege opslag staat expliciet dat in dit browserprofiel nog geen TALERA-herinneringen aanwezig zijn.
+
+Nog vereist: uitsluitsel over de *op dezelfde iPhone opgeslagen* problematische opname. Bij 0 markers is synchronisatie niet reconstrueerbaar uit audio alleen; bij meerdere geldige markers moet Safari-specifieke synchronisatie worden onderzocht. Er is geen productieversie gewijzigd.

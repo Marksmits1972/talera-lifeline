@@ -35,7 +35,7 @@ const runtime=window.__taleraTimelineRuntime,stage=document.getElementById('phot
 if(!runtime||!stage)return;
 const docs=document,storage=navigator.storage,urls=new Map(),memories=new Map();
 let dbPromise=null,dirPromise=null,currentStory=null,currentAudioId=null,currentAudioUrl=null,audio=null;
-let active=false,frameId='',generation=0,voiceClock=null,video=null,closing=false,pendingFrameId='',pendingFramePromise=null;
+let active=false,frameId='',generation=0,voiceClock=null,video=null,closing=false,pendingFrameId='',pendingFramePromise=null,audioPrepareEpoch=0;
 let recorder=null,stream=null,recordChunks=[],recStart=0,recPausedAt=0,recPauseTotal=0,recCues=[];
 let recBlob=null,recAudioId=null,recState='idle',selected=[],currentIndex=0,editorBusy=false,recordedDuration=0;
 const uid=()=> 'm-'+crypto.randomUUID();
@@ -143,22 +143,62 @@ function sync(){
   if(audio.paused&&!video.paused)video.pause();
  }
 }
-function stopVoice(){if(audio){audio.pause();try{audio.currentTime=0}catch(e){}}active=false;frameId='';generation++;pendingFrameId='';pendingFramePromise=null;stopVideo();const btn=docs.querySelector('.talera-memory-audio');if(btn)btn.classList.remove('is-playing');if(voiceClock){clearInterval(voiceClock);voiceClock=null}}
+function ensureAudioElement(){
+ if(!audio){audio=docs.createElement('audio');audio.className='talera-library-narration';audio.hidden=true;audio.preload='auto';stage.appendChild(audio);audio.addEventListener('timeupdate',sync);audio.addEventListener('seeked',sync);audio.addEventListener('pause',sync);audio.addEventListener('ended',stopVoice)}
+ return audio;
+}
+function setAudioBlob(id,blob){
+ const node=ensureAudioElement();
+ if(currentAudioId===id&&currentAudioUrl)return;
+ if(currentAudioUrl){URL.revokeObjectURL(currentAudioUrl);currentAudioUrl=null}
+ currentAudioId=id;
+ if(!id){node.pause();node.removeAttribute('src');node.load();return}
+ currentAudioUrl=URL.createObjectURL(blob);node.src=currentAudioUrl;node.load();
+}
+async function primeAudioForCurrent(story){
+ const token=++audioPrepareEpoch;
+ if(!story?.audioId)return;
+ try{
+  if(currentAudioId===story.audioId&&currentAudioUrl)return;
+  const blob=await getBlob(story.audioId);
+  if(token!==audioPrepareEpoch||runtime.currentMemory()?._taleraStoryId!==story.id)return;
+  if(audio&&!audio.paused)return;
+  setAudioBlob(story.audioId,blob);
+ }catch(error){console.warn('TALERA: stemopname nog niet voorbereid',error)}
+}
+function stopVoice(){
+ audioPrepareEpoch++;
+ if(audio){audio.pause();try{audio.currentTime=0}catch(e){}}
+ active=false;frameId='';generation++;pendingFrameId='';pendingFramePromise=null;stopVideo();
+ const btn=docs.querySelector('.talera-memory-audio');if(btn)btn.classList.remove('is-playing');
+ if(voiceClock){clearInterval(voiceClock);voiceClock=null}
+}
 async function playStory(story){
- if(!story)return;stopVoice();
- currentStory=story;active=true;
- if(!audio){audio=docs.createElement('audio');audio.className='talera-library-narration';audio.hidden=true;stage.appendChild(audio);audio.addEventListener('timeupdate',sync);audio.addEventListener('seeked',sync);audio.addEventListener('pause',sync);audio.addEventListener('ended',stopVoice)}
- if(currentAudioId!==story.audioId){
-  if(currentAudioUrl){URL.revokeObjectURL(currentAudioUrl);currentAudioUrl=null}
-  currentAudioId=story.audioId;audio.removeAttribute('src');
-  if(story.audioId){currentAudioUrl=URL.createObjectURL(await getBlob(story.audioId));audio.src=currentAudioUrl;audio.load()}
+ if(!story)return;
+ stopVoice();currentStory=story;active=true;
+ const node=ensureAudioElement();
+ if(currentAudioId!==story.audioId||(story.audioId&&!currentAudioUrl)){
+  if(story.audioId)setAudioBlob(story.audioId,await getBlob(story.audioId));
+  else setAudioBlob(null,null);
  }
- const first=cueAt(0);if(first)await showFrame(first.mediaId);
- if(story.audioId){try{await audio.play()}catch(e){status('Tik nogmaals op luisteren om je stem af te spelen.',true)}}
+ // Start audio before awaiting image decoding: Mobile Safari retains the user tap.
+ const startPlayback=story.audioId?node.play():null;
+ const first=cueAt(0);
+ if(first)await showFrame(first.mediaId);
+ if(startPlayback)try{await startPlayback}catch(error){
+  node.pause();status('Tik nogmaals op luisteren om je stem af te spelen.',true);
+  const button=docs.querySelector('.talera-memory-audio');
+  if(button)button.title='Tik nogmaals om de stemopname af te spelen';
+ }
  if(voiceClock)clearInterval(voiceClock);
  voiceClock=setInterval(sync,80);
 }
-function pauseVoice(){if(audio)audio.pause();if(voiceClock){clearInterval(voiceClock);voiceClock=null}stopVideo()}
+function pauseVoice(){
+ if(audio)audio.pause();
+ if(voiceClock){clearInterval(voiceClock);voiceClock=null}
+ // Pausing must retain the video URL; it is needed when the same cue resumes.
+ if(video&&!video.paused)video.pause();
+}
 function status(t,error=false){const el=sheet.querySelector('.talera-v2-status');el.textContent=t;el.dataset.error=String(error)}
 function showError(e){status(String(e?.message||e),true)}
 function recordElapsed(){return Math.max(0,Math.floor(performance.now()-recStart-recPauseTotal))}
@@ -298,7 +338,7 @@ docs.addEventListener('click',e=>{
   const m=runtime.currentMemory(),s=memories.get(m.id);
   if(!s)return;
   if(currentStory?.id===s.id&&audio&&!audio.paused){pauseVoice();button.classList.remove('is-playing')}
-  else if(currentStory?.id===s.id&&audio?.paused&&audio.currentTime>0){audio.play().then(()=>{active=true;voiceClock=setInterval(sync,80);button.classList.add('is-playing')}).catch(showError)}
+  else if(currentStory?.id===s.id&&audio?.paused&&audio.src){audio.play().then(()=>{active=true;if(voiceClock)clearInterval(voiceClock);voiceClock=setInterval(sync,80);button.classList.add('is-playing')}).catch(showError)}
   else void playStory(s).then(()=>{button.classList.add('is-playing')}).catch(showError);
  }
 },true);
@@ -306,6 +346,7 @@ runtime.subscribe(m=>{
  if(!m?._taleraLibraryV2){if(currentStory)stopVoice();currentStory=null;return}
  const button=docs.querySelector('.talera-memory-audio');if(button)button.hidden=!m._hasAudio;
  if(currentStory&&currentStory.id!==m._taleraStoryId){stopVoice();currentStory=null}
+ const selectedStory=memories.get(m.id);if(selectedStory?.audioId)void primeAudioForCurrent(selectedStory);
 });
 docs.addEventListener('visibilitychange',()=>{if(docs.hidden){pauseVoice();if(recState==='recording')pauseRecording()}});
 window.addEventListener('pagehide',()=>{stopVoice();if(recState==='recording')pauseRecording();if(stream){stream.getTracks().forEach(x=>x.stop());stream=null}});

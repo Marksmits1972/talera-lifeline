@@ -56,3 +56,19 @@ test('no second window, and iPhone playback stops when PWA is hidden',()=>{
   assert.ok(integratedStoryPlayerScript.includes("if(recState==='recording')pauseRecording()"));
   assert.ok(!integratedStoryPlayerScript.includes('localStorage.setItem('));
 });
+
+test('iPhone playback is initiated before awaiting photo decode',()=>{
+  const start=integratedStoryPlayerScript.indexOf("const startPlayback=story.audioId?node.play():null;");
+  const firstPhoto=integratedStoryPlayerScript.indexOf("if(first)await showFrame(first.mediaId);");
+  assert.ok(start>=0&&firstPhoto>start,'audio starts synchronously before image decoding');
+  assert.ok(integratedStoryPlayerScript.includes('primeAudioForCurrent(selectedStory)'));
+  assert.ok(integratedStoryPlayerScript.includes("audio?.paused&&audio.src"));
+});
+
+test('video pauses without clearing its source and can be resumed',()=>{
+  const a=integratedStoryPlayerScript.indexOf('function pauseVoice(){');
+  const b=integratedStoryPlayerScript.indexOf('function status(',a);
+  const fragment=integratedStoryPlayerScript.slice(a,b);
+  assert.ok(fragment.includes('video.pause()'));
+  assert.ok(!fragment.includes('stopVideo()'));
+});

@@ -106,3 +106,13 @@ Dit test niet de werkelijke mobiele Safari-opname, noch reeds aanwezige opnames 
 De nieuwe testbuild `v47.2-narration-diagnostics-20261023` toont uitsluitend bij een bestaande lokale opname zonder bruikbare markers een niet-interactieve uitleg. De nieuwe diagnosepagina `/story-player-check` leest alleen via IndexedDB readonly het aantal foto/video-items en opgeslagen/geldige cue-ID's uit deze origin; geen titels, bestanden of audio worden verzonden of gewijzigd. Bij een lege opslag staat expliciet dat in dit browserprofiel nog geen TALERA-herinneringen aanwezig zijn.
 
 Nog vereist: uitsluitsel over de *op dezelfde iPhone opgeslagen* problematische opname. Bij 0 markers is synchronisatie niet reconstrueerbaar uit audio alleen; bij meerdere geldige markers moet Safari-specifieke synchronisatie worden onderzocht. Er is geen productieversie gewijzigd.
+
+## V47.3 — 23 oktober 2026 — afspeelbrug rechtstreeks naar zichtbaar RH19-fotovlak
+
+Gebruiker heeft met de lokale read-only check aangetoond dat alle drie testopnames aanwezige en gekoppelde markers hebben: opname 1 drie foto's / zes geldige markers; opname 2 drie / drie; opname 3 zes / zes. Daarmee is het onjuist om het stilstaan van deze foto's zonder nader onderzoek toe te schrijven aan ontbrekende opslagmarkers.
+
+Wijziging: in de geïsoleerde `/present`-pagina leidt `window.__taleraV31SelectPhoto(memoryId,index)` een geldige cue nu rechtstreeks naar `memory._photoIndex`, `memory.image` en de bestaande RH19-fotolagen via `settleVisiblePhoto(memory)`. De oude dubbele `preflight.onload` / `front.onload` / `requestAnimationFrame`-commit wordt uitsluitend voor audio-gestuurde foto-aanwijzingen overgeslagen. De oranje puntjes blijven het daadwerkelijk geladen voorgrondbeeld gebruiken; video blijft bestaande video-afspeelroute behouden. De oude aanraakvergrendeling uit V47.1 is behouden. Geen nieuwe losstaande player of bibliotheek.
+
+Headless-browser regressietest op V47.3 (bestaande TALERA-presentatie, drie echte PNG-blobobjecten + één WAV in bestaande lokale IndexedDB, media-ID-markers 0, 400, 900 ms): op 0 s foto 1/oranje punt 1 zichtbaar; op 0,6 s foto 2/punt 2 met echte decode (`naturalWidth=22`); op 1,2 s foto 3/punt 3. De nieuwe rechtstreekse brug meldt `sourceMatches=true` en test rapporteert `pass=true`. Beide `/tell` en `/present` laden de bijgewerkte testcode zonder fout; bestaande V46- en productie-Workers niet gewijzigd. Broncommit `561692197393e4f32a67ecfc0eae30cc3b0bdd3f`.
+
+**Beperking:** de fysieke Safari/iPhone-afspeelproef is nog niet opnieuw uitgevoerd. De patch is een technisch gemotiveerde oplossing voor een mogelijke iOS timing-/image-commit-race, geen bewezen oorzaak van de specifieke iPhone-fout. Oudere testherinneringen blijven ongewijzigd.

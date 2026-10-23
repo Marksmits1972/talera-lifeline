@@ -4,7 +4,7 @@
  * Fail closed when a required anchor is missing; never silently ship a partial player.
  * Does not touch the general timeline, RH19 presentation styling or other routes.
  */
-export const STORY_PLAYER_V47_BUILD = "v47-media-id-cues-isolated-test-20261023";
+export const STORY_PLAYER_V47_BUILD = "v47.1-audio-cue-tap-lock-20261023";
 
 export function patchV47Html(html, pathname) {
   if (typeof html !== "string") throw Error("V47 expects HTML");
@@ -25,7 +25,7 @@ export function patchV47Html(html, pathname) {
     replaced.push(label);
   }
 
-  if (isTell) {
+  if (isTell || isPresent) {
     patch(
       "function safeCues(value,count){if(!Array.isArray(value))return [];let r=[];for(const c of value.slice(0,500)){const t=Math.round(Number(c?.t)),index=Math.round(Number(c?.index));if(!Number.isFinite(t)||t<0||t>7200000||!Number.isInteger(index)||index<0||index>=count)continue;if(r.length&&t<r[r.length-1].t)continue;if(r.length&&r[r.length-1].index===index)continue;r.push({t,index})}return r;}",
       "function safeCues(value,items){if(!Array.isArray(value))return [];const ids=Array.isArray(items)?new Set(items.map(x=>String(x.id||x.key))):null;const count=Array.isArray(items)?items.length:Number(items)||0;const out=[];for(const c of value.slice(0,500)){const t=Math.round(Number(c?.t));if(!Number.isFinite(t)||t<0||t>7200000)continue;if(out.length&&t<out[out.length-1].t)continue;let m=null;if(typeof c?.mediaId==='string'&&ids?.has(c.mediaId))m={t,mediaId:c.mediaId};else if(Number.isInteger(c?.index)&&c.index>=0&&c.index<count)m={t,index:c.index};if(!m)continue;const last=out[out.length-1];if(last&&((m.mediaId&&last.mediaId===m.mediaId)||(Number.isInteger(m.index)&&last.index===m.index)))continue;out.push(m)}return out;}",
@@ -41,6 +41,14 @@ export function patchV47Html(html, pathname) {
       "safeCues(input.narrationCues,files.filter(i=>i.kind!=='audio'))",
       "validate-media-cues"
     );
+    patch(
+      "safeCues(input.narrationCues,(existing.items||[]).filter(i=>i.kind!=='audio').length)",
+      "safeCues(input.narrationCues,(existing.items||[]).filter(i=>i.kind!=='audio'))",
+      "edit-stable-cues"
+    );
+  }
+
+  if (isTell) {
     patch(
       "voiceDurationMs:g.voiceDurationMs||0,existing:g.existing||''",
       "voiceDurationMs:g.voiceDurationMs||0,assetIdentity:g.assetIdentity||{},existing:g.existing||''",
@@ -87,12 +95,12 @@ export function patchV47Html(html, pathname) {
     );
     patchRegex(
       /function playbackAtTime\(\)\{[\s\S]*?\}\s*let voiceTicker=0;/,
-      "function playbackAtTime(){const m=voiceMemory,p=activeAudio;if(!m||!p||runtime.currentMemory()?.id!==m.id)return;const frames=m._taleraFrames||[],cues=Array.isArray(m._taleraNarrationCues)?m._taleraNarrationCues:[];if(!frames.length||!cues.length)return;const ms=Math.max(0,(Number(p.currentTime)||0)*1000);let cue=null;for(const c of cues){if(c.t<=ms+10){if(typeof c.mediaId==='string')cue=c}else break}if(!cue)return;const index=frames.findIndex(f=>f.id===cue.mediaId);if(index<0)return;window.__taleraV31SelectPhoto?.(m.id,index);const v=activeVideo;const frame=frames[index];if(!v||frame?.kind!=='video'||v.dataset.storyFrame!==m.id+'|'+index+'|'+frame.key)return;v.muted=true;v.defaultMuted=true;v.playsInline=true;const target=Math.max(0,(ms-cue.t)/1000);if(p.paused||p.ended){if(!v.paused)v.pause();return}if(Number.isFinite(v.duration)&&v.duration>0&&target>=v.duration){if(!v.paused)v.pause();if(v.currentTime<v.duration-.10)try{v.currentTime=Math.max(0,v.duration-.05)}catch(e){}return}if(v.readyState>=1&&Math.abs(v.currentTime-target)>.45)try{v.currentTime=target}catch(e){}if(v.paused&&!v.ended)void v.play().catch(()=>{})}let voiceTicker=0;",
+      "function playbackAtTime(){const m=voiceMemory,p=activeAudio;if(!m||!p||runtime.currentMemory()?.id!==m.id)return;const frames=m._taleraFrames||[],cues=Array.isArray(m._taleraNarrationCues)?m._taleraNarrationCues:[];if(!frames.length||!cues.length)return;const ms=Math.max(0,(Number(p.currentTime)||0)*1000);let cue=null;for(const c of cues){if(c.t<=ms+10)cue=c;else break}if(!cue)return;const index=typeof cue.mediaId==='string'?frames.findIndex(f=>(f.id||f.key)===cue.mediaId):(Number.isInteger(cue.index)&&cue.index>=0&&cue.index<frames.length?cue.index:-1);if(index<0){window.__taleraV47CueStatus={state:'missing-media',at:Math.round(ms)};return}window.__taleraV47CueStatus={state:'resolved',at:Math.round(ms),index};window.__taleraV31SelectPhoto?.(m.id,index);const v=activeVideo;const frame=frames[index];if(!v||frame?.kind!=='video'||v.dataset.storyFrame!==m.id+'|'+index+'|'+frame.key)return;v.muted=true;v.defaultMuted=true;v.playsInline=true;const target=Math.max(0,(ms-cue.t)/1000);if(p.paused||p.ended){if(!v.paused)v.pause();return}if(Number.isFinite(v.duration)&&v.duration>0&&target>=v.duration){if(!v.paused)v.pause();if(v.currentTime<v.duration-.10)try{v.currentTime=target}catch(e){}return}if(v.readyState>=1&&Math.abs(v.currentTime-target)>.45)try{v.currentTime=target}catch(e){}if(v.paused&&!v.ended)void v.play().catch(()=>{})}let voiceTicker=0;",
       "single-audio-clock"
     );
     patchRegex(
       /const first=voiceMemory\._taleraNarrationCues\?\.\[0\]\?\.index\?\?0;\s*window\.__taleraV31SelectPhoto\?\.\(voiceMemory\.id,first\);/,
-      "const cue=voiceMemory._taleraNarrationCues?.[0];const first=cue?.mediaId?voiceMemory._taleraFrames?.findIndex(f=>f.id===cue.mediaId):-1;if(first>=0)window.__taleraV31SelectPhoto?.(voiceMemory.id,first);",
+      "const cue=voiceMemory._taleraNarrationCues?.[0];const first=cue?.mediaId?voiceMemory._taleraFrames?.findIndex(f=>f.id===cue.mediaId):(Number.isInteger(cue?.index)?cue.index:-1);if(first>=0)window.__taleraV31SelectPhoto?.(voiceMemory.id,first);",
       "replay-first-id"
     );
     patchRegex(
@@ -100,9 +108,14 @@ export function patchV47Html(html, pathname) {
       "player.pause();player.style.opacity='1';window.__taleraRefreshPhotoIndicator?.();",
       "retain-last-video-frame"
     );
+    patch(
+      "  // When a story has a recorded narration, its saved cues are the ONLY",
+      "  // V47.1: disable all tap-based photo advancement during narrated playback.\n  // Capture above RH19 handlers. Natural swipes and actual controls are unchanged.\n  (()=>{\n    let down=null;\n    const narrated=()=>{\n      const m=runtime.currentMemory();\n      return m?._taleraLocal&&(m._taleraItems?.some(x=>x.kind==='audio')||m._taleraNarrationCues?.length);\n    };\n    const isPanel=e=>Boolean(e.target?.closest?.('#memoryStoryScroll,#photoStage'));\n    const isControl=e=>Boolean(e.target?.closest?.('button,a,nav,input,select,textarea,label,[role=button]'));\n    window.addEventListener('pointerdown',e=>{if(narrated()&&isPanel(e)&&!isControl(e))down={x:e.clientX,y:e.clientY}},true);\n    window.addEventListener('touchstart',e=>{const t=e.touches?.[0];if(t&&narrated()&&isPanel(e)&&!isControl(e))down={x:t.clientX,y:t.clientY}},true);\n    const trap=e=>{\n      if(!narrated()||!isPanel(e)||isControl(e))return;\n      let x=e.clientX,y=e.clientY;\n      if(e.changedTouches?.length){x=e.changedTouches[0].clientX;y=e.changedTouches[0].clientY}\n      if(e.type!=='click'&&down&&Math.hypot(x-down.x,y-down.y)>13)return;\n      e.preventDefault();e.stopImmediatePropagation();e.stopPropagation();\n    };\n    window.addEventListener('pointerup',trap,true);\n    window.addEventListener('touchend',trap,{capture:true,passive:false});\n    window.addEventListener('click',trap,true);\n  })();\n  // When a story has a recorded narration, its saved cues are the ONLY",
+      "full-panel-tap-lock"
+    );
     // Legacy recordings without permanent IDs are protected: no inferred carousel.
     // They can still be listened to; a separately approved compatibility pass is required.
   }
-  patch("</body>", "<script>window.__taleraStoryPlayerV47={version:'v47-media-id-cues-isolated-test-20261023',source:'V46 modern PWA',scope:'story-player-only'};<\/script></body>", "v47-health-marker");
+  patch("</body>", "<script>window.__taleraStoryPlayerV47={version:'v47.1-audio-cue-tap-lock-20261023',source:'V46 modern PWA',scope:'story-player-only'};<\/script></body>", "v47-health-marker");
   return html;
 }

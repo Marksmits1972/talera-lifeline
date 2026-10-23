@@ -67,3 +67,15 @@ Op 22 oktober 2026 is de aparte preview van de geïntegreerde PWA installatiekla
 - Voeg toe via **Safari → Delen → Zet op beginscherm**. Test lokale opslag uitsluitend in de daaruit gestarte app. De vorige workers.dev-domeinen delen hun lokale bestanden niet automatisch.
 - De CI-status is niet geheel groen: twee oudere, niet op deze Story Player gerichte tests missen bestanden `xxory-test/src/tv-player.js` en `xxory-test/src/unified-webapp.js`. De nieuwe integratietests slagen.
 - Pas na positieve iPhone-tests kan deze versie als definitieve standaard-PWA worden gepromoveerd.
+
+
+## Verdere test- en betrouwbaarheidscontrole (23 oktober 2026)
+- Zes PNG-originelen één keer in de OPFS-bibliotheek geïmporteerd; vervolgens dezelfde PWA vanuit een tweede same-origin frame opnieuw geladen. Alle zes media-ID's, bestandsformaten en bijbehorende cues waren terug te lezen.
+- Gesimuleerde stemopname met drie foto's; fototijden [0,350,700] ms, één audiobestand en geen extra fotokopieën.
+- De Safari-afspeelvolgorde is aangepast: de stemopname wordt bij selectie van de herinnering vooraf voorbereid; `audio.play()` start bij een tik vóór wachten op fotodecodering. Als de browser de eerste start blokkeert, kan een tweede tik direct afspelen.
+- Pauzeren van een video verwijdert de videobron niet meer; hervatten kan vanaf dezelfde foto-/videocue.
+- Een nieuwe browsertest van de luisterknop na deze wijziging bevestigt: opname bewaard, knop zichtbaar, afspelen loopt, pauzeert en hervat, fotopositie 2 actief, precies één narratie-element.
+- Ook het PWA-manifest en appicoon zijn na de wijzigingen gecontroleerd: routes geven een geldige respons, de PWA start zonder fout 1101.
+- Nieuwe regressietests beschermen tegen geblokkeerde Safari-gebruikersactivatie en tegen het wissen van een videobron bij pauzeren.
+- **Nog geen echte iPhone-acceptatie.** De tests gebruiken synthetische bestanden en een gesimuleerde microfoon. Voer een echte Safari/iPhone-test uit voordat we releaseclaims of cloud-/backupbeloftes maken.
+- De volledige CI-testset blijft rood op twee oudere tests vanwege ontbrekende historische TV/unified-webapp bestanden. Dit is nog een releaseblokkade voor main/production.

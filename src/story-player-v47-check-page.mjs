@@ -52,6 +52,6 @@ const ok=valid.length>0;
 return '<div class="entry"><strong>Opname '+(i+1)+' <span class="'+(ok?'ok':'bad')+'">'+(ok?'· Fotomomenten aanwezig':'· Geen bruikbare fotomomenten')+'</span></strong><small>'+
 frames.length+' foto’s/video’s · '+cues.length+' opgeslagen markers · '+valid.length+' gekoppelde markers</small></div>'
 }).join('');
-}catch(err){status.textContent='Controle niet mogelijk op dit toestel.';records.textContent=String(err&&err.message||err)}
+}catch(err){if(err&&err.name==='AbortError'){status.textContent='Er zijn in deze browser nog geen opgeslagen TALERA-testherinneringen.';records.textContent='Open de TALERA-testomgeving op hetzelfde toestel waarop je de opname hebt gemaakt.'}else{status.textContent='Controle niet mogelijk op dit toestel.';records.textContent=String(err&&err.message||err)}}
 })();
 </script></body></html>`;

@@ -28,6 +28,9 @@ Herstel de complete normale PWA vóór een nieuwe Story Player wordt ontworpen. 
 5. Met werkelijk door Chromium MediaRecorder gegenereerde WebM als importbestand: screenshot gedecodeerd, `blob:`-URL van preview, afspeelknop zichtbaar. Geen video nodig om poster te zien.
 6. `/`, `/tell`, `/present` en `/normal-pwa-health` zijn bereikbaar in de bestaande PWA-testomgeving en vertellen de verwachte V48-build.
 
+
+7. Extra regressietest van de complete reguliere videospeler met een daadwerkelijk door Chromium MediaRecorder opgenomen kort WebM-filmpje: voor tik was de video gepauzeerd, poster en afspeelknop zichtbaar, `preload=none`; na tik liep de video (`currentTime=0,55s`), waren de poster en knop verwijderd en stond het speler-element op `preload=auto`. Test rapporteert `pass=true`.
+
 ## Behoud en terugdraaien
 
 - V48 werd eerst getest op afzonderlijke Worker `talera-pwa-normal-media-v48-test`.

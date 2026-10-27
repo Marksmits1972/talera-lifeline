@@ -11,6 +11,7 @@
  let owned=[];
  function clearOwned(){for(const url of owned)URL.revokeObjectURL(url);owned=[]}
  function load(data){
+   resetTail();
    voice.pause();
    dispose();
    clearOwned();
@@ -64,5 +65,89 @@
  window.__taleraZeroEmitSaved=blob=>{
    emit('SAVE',{audio:blob,cues:state.cues.map(c=>({...c})),duration:state.duration});
  };
+
+ // I2 additional viewing pass: deliberately leaves recorder, clock and cue logic untouched.
+ const tail={active:false,order:[],position:-1,token:0};
+ const view=$('view'),badge=document.createElement('div'),action=document.createElement('button');
+ badge.id='taleraTailBadge';badge.hidden=true;
+ action.id='taleraTailAction';action.type='button';action.textContent='▶ Video met geluid';action.hidden=true;
+ view.appendChild(badge);view.appendChild(action);
+ function resetTail(){
+   tail.token++;tail.active=false;tail.order=[];tail.position=-1;
+   badge.hidden=true;action.hidden=true;
+   document.body.classList.remove('talera-tail-active');
+   if(state.media?.tagName==='VIDEO'){
+     state.media.pause();state.media.muted=true;state.media.defaultMuted=true;
+     state.media.setAttribute('muted','');
+   }
+ }
+ function finishTail(){
+   resetTail();msg('Herinnering afgelopen');emit('EXTRAS_COMPLETE');
+ }
+ async function nextOriginal(){
+   if(!tail.active)return;
+   tail.position++;
+   if(tail.position>=tail.order.length){finishTail();return}
+   show(tail.order[tail.position]);
+   const video=state.media,token=++tail.token;
+   if(!video||video.tagName!=='VIDEO'){void nextOriginal();return}
+   video.pause();video.muted=false;video.defaultMuted=false;video.removeAttribute('muted');
+   video.playsInline=true;video.setAttribute('playsinline','');
+   try{video.currentTime=0}catch(e){}
+   badge.hidden=false;
+   badge.textContent='Originele video '+(tail.position+1)+' van '+tail.order.length+' · met geluid';
+   action.hidden=true;
+   video.addEventListener('ended',()=>{if(tail.active&&tail.token===token)void nextOriginal()},{once:true});
+   video.addEventListener('error',()=>{
+     if(tail.active&&tail.token===token){
+       action.textContent='Video niet beschikbaar · volgende';
+       action.hidden=false;action.onclick=()=>void nextOriginal();
+     }
+   },{once:true});
+   const start=async()=>{
+     try{await video.play();if(tail.active&&tail.token===token)action.hidden=true}
+     catch(e){
+       if(tail.active&&tail.token===token){
+         action.textContent='▶ Video met geluid';
+         action.hidden=false; // iOS may disallow unmuted autoplay.
+       }
+     }
+   };
+   action.onclick=()=>{if(tail.active&&tail.token===token)void start()};
+   await start();
+ }
+ function startOriginals(){
+   if(!presenter||!state.voiceUrl)return;
+   const order=[];
+   state.items.forEach((item,index)=>{if(item.type==='video')order.push(index)});
+   if(!order.length){emit('EXTRAS_COMPLETE');return}
+   resetTail();tail.active=true;tail.order=order;
+   document.body.classList.add('talera-tail-active');
+   msg('Originele video’s met geluid');void nextOriginal();
+ }
+ voice.addEventListener('ended',startOriginals);
+ // Swipes change timeline story. Taps during the extras pass skip this video.
+ let gesture=null;
+ view.addEventListener('pointerdown',e=>{
+   if(!presenter||e.target.closest('#taleraTailAction'))return;
+   gesture={id:e.pointerId,x:e.clientX,y:e.clientY};
+   if(tail.active)e.stopImmediatePropagation();
+ },true);
+ view.addEventListener('pointerup',e=>{
+   if(!presenter||!gesture||e.pointerId!==gesture.id)return;
+   const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;gesture=null;
+   if(Math.abs(dx)>52&&Math.abs(dx)>Math.abs(dy)*1.25){
+     e.preventDefault();e.stopImmediatePropagation();emit('NEXT_STORY');return;
+   }
+   if(tail.active){
+     e.preventDefault();e.stopImmediatePropagation();
+     if(Math.abs(dx)<20&&Math.abs(dy)<20)void nextOriginal();
+   }
+ },true);
+ view.addEventListener('pointercancel',()=>{gesture=null},true);
+ action.addEventListener('pointerdown',e=>e.stopPropagation(),true);
+ action.addEventListener('pointerup',e=>e.stopPropagation(),true);
+ $('play').addEventListener('click',resetTail,true);
+
  emit('READY');
 })();

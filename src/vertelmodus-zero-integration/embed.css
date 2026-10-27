@@ -50,4 +50,15 @@ body.present .view #taleraTailAction:not([hidden]){
  body.present #taleraTailBadge:not([hidden]){font-size:11px;bottom:13px}
 }
 
+
+/* Minimal layout refinement for recording. No changes to recording behavior. */
+body:not(.present) .panel{padding:13px 14px calc(13px + env(safe-area-inset-bottom,0px))}
+body:not(.present) .head{align-items:center;margin-bottom:10px;color:#546d7b;font-size:12px}
+body:not(.present) .head b{font-size:13px;font-variant-numeric:tabular-nums}
+body:not(.present) .actions{gap:8px}
+body:not(.present) .actions button{border-radius:15px;min-height:48px!important;box-shadow:none}
+body:not(.present) .actions .main{background:#173550}
+body:not(.present) #count{background:rgba(19,42,56,.60);backdrop-filter:blur(7px);
+-webkit-backdrop-filter:blur(7px)}
+
 </style>

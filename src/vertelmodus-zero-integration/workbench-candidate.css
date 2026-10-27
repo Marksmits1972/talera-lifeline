@@ -1,0 +1,70 @@
+
+/* Candidate: clean TALERA workbench; existing overview drag tiles are reused. */
+html,body{background:#f8f7f4!important}
+#app .work.talera-compact-work{max-width:700px;margin:0 auto;padding:2px 0 18px}
+#app .work.talera-compact-work #workName,
+#app .work.talera-compact-work #workDate,
+#app .work.talera-compact-work .frame,
+#app .work.talera-compact-work .subline .eyebrow,
+#app .work.talera-compact-work #v10SourceHint,
+#app .work.talera-compact-work #details>h2,
+#app .work.talera-compact-work #details>p.fine{display:none!important}
+#app .work.talera-compact-work #details{
+ background:transparent!important;box-shadow:none!important;border:0!important;
+ margin:0 0 12px!important;padding:8px 0 0!important
+}
+#app .work.talera-compact-work #details>.field{margin:0 0 10px!important}
+#app .work.talera-compact-work #title{
+ background:#fff!important;border:1px solid #dcdedb!important;border-radius:14px!important;
+ font:500 21px/1.25 Georgia,serif!important;padding:15px 14px!important;color:#193f52!important
+}
+#app .work.talera-compact-work #dateToggle{margin:2px 0 0!important;min-height:42px!important}
+#app .work.talera-compact-work .talera-work-tiles{
+ background:transparent!important;border:0!important;box-shadow:none!important;
+ padding:0!important;margin:10px 0 22px!important
+}
+#app .work.talera-compact-work .talera-work-tiles .tiles{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:10px!important;align-items:stretch!important
+}
+#app .work.talera-compact-work .talera-work-tiles .tile{
+ display:block!important;min-width:0!important;width:100%!important;
+ aspect-ratio:1/1!important;height:auto!important;max-height:none!important;
+ padding:0!important;border-radius:13px!important;overflow:hidden!important;
+ background:#edf2f0!important;border:1px solid #dfe6e2!important;touch-action:none
+}
+#app .work.talera-compact-work .talera-work-tiles .tile img{
+ width:100%!important;height:100%!important;object-fit:cover!important;display:block!important
+}
+#app .work.talera-compact-work .work-tools{
+ display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important;margin:0 0 20px!important
+}
+#app .work.talera-compact-work .work-tools button{min-height:58px!important;border-radius:16px!important;font-size:16px!important}
+#app .work.talera-compact-work .subline{justify-content:flex-end!important;min-height:14px!important;margin:0!important}
+#app .work.talera-compact-work .subline #draft{font-size:11px!important;opacity:.62}
+#app .work.talera-compact-work #writePanel{display:none!important}
+#app>.submit .fine{display:none!important}
+#app>.submit{background:#f8f7f4!important;border-top:1px solid #e3e7e2!important}
+#app>.submit #publish{min-height:52px!important;border-radius:15px!important}
+#taleraWriterOverlay{
+ position:fixed!important;inset:0!important;z-index:9998!important;background:#f8f7f4!important;
+ display:flex!important;flex-direction:column!important;color:#193f52!important
+}
+#taleraWriterOverlay .talera-writer-top{
+ display:flex;align-items:center;justify-content:space-between;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 12px;
+ border-bottom:1px solid #e3e7e2;background:#f8f7f4;gap:12px
+}
+#taleraWriterOverlay .talera-writer-top strong{font:500 22px Georgia,serif}
+#taleraWriterOverlay #taleraWriterDone{
+ border:0;border-radius:13px;background:#224e61;color:#fff;min-height:44px;padding:9px 20px;font-size:15px;font-weight:650
+}
+#taleraWriterOverlay .talera-writer-body{flex:1;min-height:0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+#taleraWriterOverlay #taleraWriterText{
+ display:block;width:100%;height:100%;resize:none;outline:none;
+ background:#fff;color:#213b48;font:18px/1.65 Georgia,serif;
+ border:1px solid #e2e6e1;border-radius:18px;padding:19px 18px
+}
+@media(min-width:650px){
+ #app .work.talera-compact-work .talera-work-tiles .tiles{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+ #taleraWriterOverlay .talera-writer-body{width:min(760px,100%);margin:auto}
+}

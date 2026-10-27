@@ -1,8 +1,7 @@
-/* TALERA clean Vertelmodus V1. One photo stage, manual recording cues. */
+/* TALERA Vertelmodus Sync V2: handmatig naar volgende/vorige beeld; registreer cue na beeldselectie. */
 function stepPhoto(g,n){
  if(!g.media.length)return;
  idx=((idx+n)%g.media.length+g.media.length)%g.media.length;
- taleraVoiceMark(idx);
  const frame=$('frame');
  const old=frame?.querySelector(':scope > img,:scope > video,:scope > .empty');
  if(old){
@@ -13,8 +12,11 @@ function stepPhoto(g,n){
  if(video&&$('recPanel')&&!$('recPanel').hidden){
    video.muted=true;video.defaultMuted=true;video.playsInline=true;
    video.setAttribute('playsinline','');video.controls=false;
-   void video.play().catch(()=>{});
+   if($('recPanel').classList.contains('is-recording'))void video.play().catch(()=>{});
+   else if(!video.paused)video.pause();
  }
  if($('pos'))$('pos').textContent=(idx+1)+' / '+g.media.length;
+ taleraVoiceMark(idx);
 }
+
 

@@ -123,7 +123,20 @@
      }catch(error){console.warn('TALERA zelfstandige herinnering niet geladen',error)}
    };
    entry.listener=e=>{
-     if(e.source===frame.contentWindow&&e.origin===location.origin&&e.data?.taleraZero&&e.data.type==='READY')void send();
+     if(e.source!==frame.contentWindow||e.origin!==location.origin||!e.data?.taleraZero)return;
+     if(e.data.type==='READY'){void send();return}
+     if(e.data.type==='NEXT_STORY'){
+       // Only this memory's active frame can advance the timeline; no cue is changed.
+       if(currentPresentation!==entry||runtime.currentMemory()?.id!==memory.id)return;
+       const memories=runtime.memories().slice().sort((a,b)=>a.ms-b.ms);
+       const index=memories.findIndex(m=>m.id===memory.id);
+       const next=index<0?null:memories[index+1];
+       if(!next)return;
+       disposePresentation();
+       runtime.setCenter(next.ms);
+       runtime.writeMemory(next);
+       runtime.draw();
+     }
    };
    window.addEventListener('message',entry.listener);
    frame.addEventListener('load',()=>void send(),{once:true});

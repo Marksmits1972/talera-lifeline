@@ -1,0 +1,17 @@
+
+<style id="talera-pwa-embedded">
+html,body{height:100%;min-height:100%;overscroll-behavior:none}
+body{background:#f8f5ef}
+main{max-width:none;padding:0;margin:0;min-height:100dvh}
+header,h1,main>p,.file,details{display:none!important}
+.card{margin:0;border:none;border-radius:0;box-shadow:none;background:#f8f5ef}
+.view{aspect-ratio:auto!important;height:calc(100dvh - 138px)!important;max-height:none!important;background:#183347}
+.panel{padding:11px 13px;background:#f8f5ef}
+.head{margin-bottom:8px}
+.actions button{min-height:46px!important}
+#reset{font-size:13px}
+body.present .view{height:calc(100dvh - 89px)!important}
+body.present #record,body.present #pause,body.present #stop,body.present #reset,
+body.present .view button{display:none!important}
+body.present .panel{padding:8px 10px}
+</style>

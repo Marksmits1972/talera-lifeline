@@ -62,7 +62,7 @@ function setupRecording(g){
        pause.hidden=true;stop.hidden=true;message.textContent='Opnemen is mislukt. Je vorige opname is behouden.';
      };
      recorder.onstop=async()=>{
-       const duration=taleraVoicePosition();
+       const duration=Math.max(0,Math.round(Date.now()-startedAt-pauseTotal-($('recPanel')?.classList.contains('is-paused')?Date.now()-pausedAt:0)));
        taleraVoiceSession=null;
        const type=recorder.mimeType||mime||'audio/webm';
        const blob=new Blob(parts,{type});

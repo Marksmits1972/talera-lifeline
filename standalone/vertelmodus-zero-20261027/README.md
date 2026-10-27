@@ -1,5 +1,12 @@
 # TALERA — Vertelmodus volledig los, 27 oktober 2026
 
+## Acceptatie door eigenaar — 27 oktober 2026
+
+De eigenaar heeft de zelfstandige Vertelmodus op iPhone getest en bevestigt dat de microfoonopname werkt, foto's op de eigen tik- en swipemomenten veranderen, de beelden synchroon met de stem terugkomen en gedempte video op het gekozen punt wordt onderbroken. **Technische kern zelfstandig geaccepteerd.** Lay-out en bediening moeten nog worden ontworpen; opslag en integratie in de hoofd-PWA zijn nog niet afgerond. **Behoud de zelfstandige werkende basis, wijzig de synchronisatie niet tijdens de vormgevingsronde.**
+
+Cloudflare-deployment van deze goedgekeurde proef: `2d7fbcfd-652a-4374-ac78-fb476696b1b0` (version `78e8dbfa-34b9-4d37-9645-55829e47d427`). De code die de eigenaar testte staat in `index.html` op deze branch.
+
+
 **Status: GEÏSOLEERDE PROEF, NIET GOEDGEKEURD VOOR TALERA-INTEGRATIE.**
 
 HTTPS-proef: https://talera-vertelmodus-zero-20261027.mark-a39.workers.dev/

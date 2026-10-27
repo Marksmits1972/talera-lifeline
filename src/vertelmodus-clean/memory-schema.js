@@ -1,0 +1,3 @@
+/* TALERA Sync V2: zelfde herinneringsopslag. Vervang safeCues in MEMORY_STORE_SCRIPT.
+   Voeg alleen gevalideerde videoAtMs toe aan de bestaande opnamewissels. */
+function safeCues(value,count){if(!Array.isArray(value))return [];let r=[];for(const c of value.slice(0,500)){const t=Math.round(Number(c?.t)),index=Math.round(Number(c?.index));if(!Number.isFinite(t)||t<0||t>7200000||!Number.isInteger(index)||index<0||index>=count)continue;if(r.length&&t<r[r.length-1].t)continue;if(r.length&&r[r.length-1].index===index&&c?.videoAtMs==null)continue;const cue={t,index};if(c?.videoAtMs!=null){const videoPos=Math.round(Number(c.videoAtMs));if(Number.isFinite(videoPos)&&videoPos>=0&&videoPos<=7200000)cue.videoAtMs=videoPos;}r.push(cue)}return r;}

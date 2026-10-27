@@ -1,0 +1,11 @@
+
+.talera-v4-recent{outline:2px solid #248397!important;outline-offset:5px!important;border-radius:14px!important}
+#taleraV4Published{
+ position:fixed;z-index:9999;left:50%;transform:translateX(-50%);
+ bottom:calc(18px + env(safe-area-inset-bottom,0px));
+ width:max-content;max-width:calc(100vw - 32px);
+ padding:12px 19px;border-radius:18px;background:#184b59;color:#fff;
+ font:600 14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+ box-shadow:0 9px 28px #19394933;
+ pointer-events:none;
+}

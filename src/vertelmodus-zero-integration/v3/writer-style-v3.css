@@ -1,0 +1,36 @@
+
+/* V3: inspiring but compact images remain at top while typing; no additional controls. */
+#taleraWriterOverlay{background:#f9f9f7!important;}
+#taleraWriterOverlay .talera-writer-top{background:#f9f9f7!important;padding-bottom:10px!important}
+#taleraWriterOverlay .talera-writer-top strong{font:500 20px/1.3 Georgia,serif!important}
+#taleraWriterOverlay #taleraWriterDone{min-height:41px!important;background:#183e52!important;border-radius:13px!important}
+#taleraWriterPhotos{
+ display:grid;grid-template-columns:repeat(6,minmax(0,1fr));
+ align-items:start;gap:7px;padding:12px 16px 13px;
+ border-bottom:1px solid #e6ebe7;background:#f9f9f7;
+}
+#taleraWriterPhotos .talera-writer-thumbnail{
+ position:relative;min-width:0;aspect-ratio:1;border-radius:9px;
+ overflow:hidden;background:#e9eeed;border:1px solid #e0e7e4;
+}
+#taleraWriterPhotos img{display:block;width:100%;height:100%;object-fit:cover}
+#taleraWriterPhotos span{
+ position:absolute;bottom:3px;left:3px;display:grid;place-items:center;
+ color:#fff;background:#113a4eb8;font-size:10px;width:20px;height:20px;border-radius:6px
+}
+#taleraWriterOverlay .talera-writer-body{
+ min-height:0;padding:10px 12px calc(12px + env(safe-area-inset-bottom,0px))!important;
+}
+#taleraWriterOverlay #taleraWriterText{
+ background:#fff!important;
+ color:#183b4c!important;
+ font:17px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;
+ padding:16px 15px!important;
+ border:0!important;box-shadow:none!important;
+ border-radius:12px!important;
+}
+#taleraWriterOverlay #taleraWriterText::placeholder{color:#87959e;opacity:1}
+@media(min-width:700px){
+ #taleraWriterPhotos{width:min(740px,100%);margin:auto}
+ #taleraWriterPhotos .talera-writer-thumbnail{max-height:92px}
+}

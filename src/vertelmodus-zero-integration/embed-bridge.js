@@ -4,6 +4,7 @@
  if(window.parent===window)return;
  const origin=location.origin;
  const presenter=new URLSearchParams(location.search).get('mode')==='present';
+ if(presenter)document.body.classList.add('present');
  const emit=(type,fields={})=>window.parent.postMessage({taleraZero:true,type,...fields},origin);
  const originalMode=mode;
  mode=function(next){originalMode(next);emit('MODE',{mode:next})};

@@ -294,7 +294,7 @@ export const shareExperienceScript = String.raw`
   const query=new URLSearchParams(location.search);
   const demoView=query.get('talera_demo')||'';
   const inviteToken=(query.get('talera_invite')||'').replace(/[^a-f0-9]/g,'').slice(0,32);
-  const state={view:'hub',history:[],duration:'30 dagen',circle:'Binnenkring',kind:'story',invite:null,recipientListening:false,previewPhoto:true,invitePreview:null,preparingShare:false,preparedShareUrl:'',preparedWhatsAppUrl:'',previewError:'',previewGeneration:0};
+  const state={view:'hub',history:[],duration:'30 dagen',circle:'Binnenkring',kind:'story',invite:null,recipientListening:false,previewPhoto:true,invitePreview:null,selectedDemoContacts:[],preparingShare:false,preparedShareUrl:'',preparedWhatsAppUrl:'',previewError:'',previewGeneration:0};
   let previousFocus=null;
   let toastTimer=0;
 
@@ -385,6 +385,16 @@ export const shareExperienceScript = String.raw`
       '<div class="talera-share-notice">Dit is een interactieve voorbeeldlijst, geen echte accountlijst. De gekozen personen ontvangen geen bericht of toegang.</div>'+
       '<button class="talera-share-primary" type="button" data-action="preview-contact-selection">Selectie bekijken</button>'+
       '<button class="talera-share-secondary" type="button" data-view="share-choice">Delen via WhatsApp</button>';
+  }
+  function renderContactSelection(){
+    const selected=state.selectedDemoContacts||[];
+    return title('Je selectie','Dit is een controlevoorbeeld. De contacten krijgen geen bericht of toegang.')+
+      memoryCard()+
+      '<p class="talera-share-section-label">Geselecteerde personen</p>'+
+      '<div class="talera-share-status-list">'+selected.map(name=>'<div class="talera-share-person"><strong>'+escapeHtml(name)+'</strong><small>Voorbeeldcontact</small></div>').join('')+'</div>'+
+      '<div class="talera-share-notice">In de echte deelfunctie vraagt TALERA vóór verzending welke herinnering je deelt en controleert het per persoon de rechten. Hier is niets verstuurd.</div>'+
+      '<button class="talera-share-primary" type="button" data-action="return-from-demo-selection">Terug naar de herinnering</button>'+
+      '<button class="talera-share-secondary" type="button" data-action="back">Selectie wijzigen</button>';
   }
   function renderChoice(){
     return title('Wat wil je delen?','De actieve herinnering staat al voor je klaar. Je hoeft niets opnieuw te selecteren.')+memoryCard()+
@@ -499,6 +509,7 @@ export const shareExperienceScript = String.raw`
     const views={
       hub:renderHub,
       'share-contacts':renderContactEntry,
+      'contact-selection':renderContactSelection,
       'share-choice':renderChoice,
       'story-settings':renderStorySettings,
       'timeline-settings':renderTimelineSettings,
@@ -741,9 +752,9 @@ export const shareExperienceScript = String.raw`
     if(action==='preview-contact-selection'){
       const chosen=Array.from(body.querySelectorAll('[data-demo-contact]:checked')).map(el=>['Anja','Peter','Sara'][Number(el.dataset.demoContact)]);
       if(!chosen.length){showToast('Selecteer eerst een contact.');return}
-      showToast('Voorbeeldselectie: '+chosen.join(', ')+'. Er is niets verstuurd.');
-      return;
+      state.selectedDemoContacts=chosen;go('contact-selection');return;
     }
+    if(action==='return-from-demo-selection'){close();return}
     if(action==='create-story-invite'){saveInvite('story');return}
     if(action==='create-timeline-invite'){saveInvite('timeline');return}
     if(action==='preview-recipient'){go(state.kind==='timeline'?'recipient-timeline':'recipient-story');return}

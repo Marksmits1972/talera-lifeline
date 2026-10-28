@@ -19,8 +19,7 @@ function taleraV7EnsureEmpty(){
 }
 function taleraV7DrawWave(){
  if(taleraV7Frame)cancelAnimationFrame(taleraV7Frame);
- const canvas=$('taleraV7Wave');if(!canvas||!state.items.length===false){} // avoid altering media geometry
- if(!canvas||state.items.length||document.body.classList.contains('present')){taleraV7Frame=0;return}
+ const canvas=$('taleraV7Wave'); if(!canvas||state.items.length||document.body.classList.contains('present')){taleraV7Frame=0;return}
  const ctx=canvas.getContext('2d');
  if(!ctx){taleraV7Frame=0;return}
  const w=canvas.width,h=canvas.height,recording=state.mode==='recording';
@@ -52,6 +51,7 @@ function taleraV7AttachMic(stream){
   const Audio=window.AudioContext||window.webkitAudioContext;
   if(!Audio)return;
   taleraV7AudioContext=new Audio();
+  taleraV7AudioContext.resume?.().catch(()=>{});
   taleraV7Source=taleraV7AudioContext.createMediaStreamSource(stream);
   taleraV7Analyser=taleraV7AudioContext.createAnalyser();
   taleraV7Analyser.fftSize=512;

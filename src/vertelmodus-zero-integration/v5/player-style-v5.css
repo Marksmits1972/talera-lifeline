@@ -1,0 +1,27 @@
+
+/* TALERA: one clear action at each stage, media dominates; previews cover paused videos. */
+:root{--navy:#193d50;--ink:#254657;--bg:#f8f9f7}
+html,body{height:100%;background:#f8f9f7!important}
+main{height:100dvh!important;min-height:0!important;max-height:100dvh;display:flex!important;flex-direction:column!important}
+.card{flex:1!important;min-height:0!important;display:flex!important;flex-direction:column!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#f8f9f7!important}
+.view{position:relative!important;flex:1 1 auto!important;height:auto!important;min-height:0!important;max-height:none!important;aspect-ratio:auto!important;background:#edf2ee!important}
+.view img,.view video{background:#edf2ee!important;object-fit:contain!important;z-index:1}
+.view img.talera-video-preview{z-index:2!important;object-fit:contain!important;background:#edf2ee!important}
+.view img.talera-video-preview[hidden]{display:none!important}
+.view button#prev,.view button#next{display:none!important}
+#count{z-index:4!important;left:12px!important;top:14px!important;font:600 12px -apple-system,BlinkMacSystemFont,system-ui,sans-serif!important;border-radius:15px!important;padding:6px 10px!important;background:#426374b0!important;color:#fff!important}
+.panel{position:relative!important;flex:0 0 auto!important;background:#f8f9f7!important;border-top:1px solid #e7ece8!important;padding:11px 14px calc(13px + env(safe-area-inset-bottom,0px))!important}
+.head{display:flex!important;align-items:center!important;gap:12px!important;margin:0 0 9px!important;color:#637b87!important;font-size:12px!important}
+.head #clock{margin-left:auto!important;font-size:13px!important;color:#385365!important}
+body[data-stage="idle"] #clock{visibility:hidden}
+.actions{display:flex!important;gap:10px!important;align-items:center!important;flex-wrap:nowrap!important}
+.actions button{min-height:49px!important;border-radius:14px!important;font-size:15px!important;line-height:1.2!important;margin:0!important;box-shadow:none!important}
+.actions button.main,.actions button.stop{flex:1 1 auto!important;background:#2d626c!important;color:#fff!important}
+.actions button.stop{background:#a24549!important}
+.actions #pause,.actions #reset{flex:0 0 auto!important;background:transparent!important;color:#2f5866!important;border:0!important;padding:9px 8px!important;font-size:13px!important;font-weight:620!important;min-height:42px!important}
+.actions #playpause{flex:1 1 auto!important;background:#2d626c!important;color:#fff!important}
+body[data-stage="idle"] .head #status{font-size:12px!important}
+body.present .view{height:auto!important}
+body.present .panel{padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px))!important}
+body.present .actions #reset,body.present .actions #pause{display:none!important}
+@media(min-width:600px){main{max-width:900px!important}.panel{padding-left:24px!important;padding-right:24px!important}}

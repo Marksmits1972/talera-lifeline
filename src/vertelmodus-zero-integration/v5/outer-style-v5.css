@@ -1,0 +1,7 @@
+
+#taleraZeroOverlay{background:#f8f9f7!important}
+#taleraZeroOverlay .talera-zero-head{padding:calc(8px + env(safe-area-inset-top,0px)) 15px 8px!important;background:#f8f9f7!important;border-bottom:1px solid #edf0ec!important;min-height:52px!important;gap:8px!important}
+#taleraZeroOverlay .talera-zero-head strong{font:600 17px -apple-system,BlinkMacSystemFont,system-ui,sans-serif!important;letter-spacing:0!important}
+#taleraZeroOverlay #taleraZeroSaveState{font-size:11px!important;max-width:37%!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important}
+#taleraZeroOverlay #taleraZeroClose{min-height:43px!important;padding:9px 15px!important;font-size:14px!important;background:#21495b!important;border-radius:13px!important}
+#taleraZeroIframe{background:#edf2ee!important}

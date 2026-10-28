@@ -1,0 +1,12 @@
+
+/* V7: same neutral TALERA background whether a memory has photos or only voice. */
+html,body,main,.card,.view,#taleraV7Empty{background:#f8f9f7!important}
+#taleraV7Empty{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;
+ justify-content:center;gap:18px;padding:24px;text-align:center;color:#1c4456;pointer-events:none}
+#taleraV7Empty[hidden]{display:none!important}
+#taleraV7Empty .talera-v7-empty-title{font:500 clamp(25px,7vw,38px)/1.2 Georgia,serif;margin:0;color:#234f60}
+#taleraV7Empty .talera-v7-empty-hint{font:400 13px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+ color:#6f8894;max-width:240px;margin:0}
+#taleraV7Wave{width:min(100%,420px);height:95px;object-fit:contain;opacity:.9}
+body[data-stage="recording"] #taleraV7Empty .talera-v7-empty-hint{color:#366a75}
+#view:not(:has(img,video)) {background:#f8f9f7!important}

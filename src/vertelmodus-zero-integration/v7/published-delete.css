@@ -1,0 +1,13 @@
+
+.talera-v7-published-card{position:relative!important}
+.talera-v7-published-delete{position:absolute!important;right:8px!important;top:8px!important;z-index:13!important;
+ min-width:36px!important;width:36px!important;height:36px!important;min-height:36px!important;line-height:1!important;
+ background:#f4f8f8!important;color:#3e6371!important;border:1px solid #dbe7e7!important;border-radius:50%!important;
+ box-shadow:0 3px 12px #12344815!important;padding:0!important;font:normal 26px Arial,sans-serif!important}
+#taleraV7PublishedConfirm{position:fixed;inset:0;z-index:30000;background:#102f42aa;display:grid;place-items:center;padding:25px}
+#taleraV7PublishedConfirm .talera-v7-published-sheet{width:min(100%,440px);border-radius:23px;background:#fff;padding:25px 20px;color:#204455;box-shadow:0 15px 48px #122b3930}
+#taleraV7PublishedConfirm h2{font-size:22px;margin:0 0 12px}
+#taleraV7PublishedConfirm p{line-height:1.5;font-size:15px;color:#526a78}
+#taleraV7PublishedConfirm .talera-v7-published-sheet>div{display:flex;gap:11px;margin-top:20px}
+#taleraV7PublishedConfirm button{flex:1;min-height:46px;border:1px solid #d4e1e4;border-radius:13px;background:#f5f9f9;color:#204657;font-weight:600}
+#taleraV7PublishedConfirm #taleraV7PublishedConfirmButton{background:#983d48;color:#fff;border:0}

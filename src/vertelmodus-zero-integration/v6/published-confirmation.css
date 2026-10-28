@@ -1,0 +1,15 @@
+
+/* Only after real mem.get verification; one clear next action. */
+body:has(#taleraV6Published) #taleraV4Published{display:none!important}
+#taleraV6Published{
+ position:fixed;z-index:10020;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));
+ max-width:590px;margin:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;
+ background:#f8faf8;color:#1b4052;border:1px solid #b9d2d4;border-radius:19px;
+ box-shadow:0 8px 28px #14334d40;padding:11px 12px 11px 16px;
+ font:600 14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+}
+#taleraV6Published .talera-v6-success-text{flex:1 1 180px;line-height:1.35}
+#taleraV6Published a{
+ flex:0 0 auto;text-align:center;background:#204e60;color:#fff;text-decoration:none;
+ border-radius:12px;padding:12px 14px;min-height:44px;font-size:13px;font-weight:650
+}

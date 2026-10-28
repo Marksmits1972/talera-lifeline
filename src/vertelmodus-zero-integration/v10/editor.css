@@ -1,0 +1,28 @@
+
+/* V10: obey the actual iOS visualViewport instead of the old 100dvh!important layer. */
+#taleraWriterOverlay{
+ top:var(--talera-v10-viewport-top,0px)!important;
+ height:var(--talera-v10-viewport-height,100dvh)!important;
+ max-height:var(--talera-v10-viewport-height,100dvh)!important;
+ overflow:hidden!important;
+}
+#taleraWriterOverlay .talera-writer-body{
+ min-height:0!important;
+ overflow-y:auto!important;
+ overscroll-behavior:contain;
+ -webkit-overflow-scrolling:touch;
+ padding-bottom:26px!important;
+}
+#taleraWriterOverlay #taleraWriterText{
+ height:auto;
+ min-height:270px!important;
+ overflow:hidden!important;
+ resize:none!important;
+ flex:none!important;
+}
+.talera-tags-v20 .talera-tags-choices{max-height:230px;overflow:auto;gap:8px}
+.talera-tags-v20 .talera-tags-new{display:none!important}
+.talera-tags-v20 .talera-tags-confirm{display:flex;gap:10px;padding-top:12px;margin-top:12px;border-top:1px solid #dfe7e7}
+.talera-tags-v20 .talera-tags-confirm button{flex:1;min-height:45px;border-radius:12px;border:1px solid #d1dfe4;font-size:15px;font-weight:700}
+.talera-tags-v20 .talera-tag-apply{background:#173550;color:white;border-color:#173550}
+.talera-tags-v20 .talera-tag-cancel{background:#fff;color:#173550}

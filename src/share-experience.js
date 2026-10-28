@@ -373,6 +373,14 @@ export const shareExperienceScript = String.raw`
       buttonOption('help','?','Hulp en over TALERA','Uitleg, contact, voorwaarden en privacy')+
       '</div>';
   }
+  function renderContactEntry(){
+    return title('Delen','Kies uit je TALERA-contacten of verstuur via WhatsApp.')+
+      memoryCard()+
+      '<p class="talera-share-section-label">TALERA-contacten</p>'+
+      '<div class="talera-share-empty"><strong>Je contacten verschijnen hier zodra je TALERA-account is gekoppeld.</strong><p>Rechtstreeks delen met contacten wordt nog aangesloten. Er zijn geen echte contacten geladen of uitnodigingen verstuurd.</p></div>'+
+      '<button class="talera-share-primary" type="button" data-view="share-choice">Delen via WhatsApp</button>'+
+      '<div class="talera-share-notice">Je kiest zelf de ontvanger in WhatsApp. De bestaande keuze voor één verhaal of de tijdlijn blijft behouden.</div>';
+  }
   function renderChoice(){
     return title('Wat wil je delen?','De actieve herinnering staat al voor je klaar. Je hoeft niets opnieuw te selecteren.')+memoryCard()+
       '<p class="talera-share-section-label">Kies wat iemand mag zien</p><div class="talera-share-options">'+
@@ -485,6 +493,7 @@ export const shareExperienceScript = String.raw`
   function render(){
     const views={
       hub:renderHub,
+      'share-contacts':renderContactEntry,
       'share-choice':renderChoice,
       'story-settings':renderStorySettings,
       'timeline-settings':renderTimelineSettings,
@@ -712,7 +721,7 @@ export const shareExperienceScript = String.raw`
   }
 
   moreButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('hub')},true);
-  contextShare.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('share-choice')},true);
+  contextShare.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();open('share-contacts')},true);
   shell.addEventListener('click',e=>{
     if(e.target===shell){close();return}
     const target=e.target.closest('button');
@@ -766,11 +775,16 @@ export const shareExperienceScript = String.raw`
     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
   });
+  document.addEventListener('talera:share-from-editor',e=>{
+    if(!e.detail||e.detail.saved!==true){showToast('Sla de herinnering eerst op voordat je deelt.');return}
+    open('share-contacts');
+  });
+  document.addEventListener('talera:open-share',()=>open('share-contacts'));
   document.addEventListener('talera:new-memory-landed',()=>setTimeout(()=>open('after-save'),650));
 
   if(demoView==='recipient-story')loadInvitePreview().finally(()=>setTimeout(activateRecipientPresentation,280));
   else if(demoView==='recipient-timeline')loadInvitePreview().finally(()=>setTimeout(()=>open(demoView),280));
 
-  window.__taleraSharePrototype={open,close,show(view){open(view||'hub')}};
+  window.__taleraSharePrototype={open,close,show(view){open(view||'share-contacts')}};
 })();
 `;

@@ -1,0 +1,567 @@
+{
+  "metadata": {
+    "version": "V11",
+    "mode": "standalone non-destructive photo diagnostic",
+    "count": 50,
+    "source": "Picsum stable seeded photos",
+    "notes": [
+      "All fifty source URLs are new and have no ?blur or ?grayscale processing.",
+      "These are demo stories, not actual user records.",
+      "Existing V10/V9 workers and personal media stores remain unchanged.",
+      "Three aspect ratios cycle 800x1200, 1200x800, 900x900 to reveal rendering variation.",
+      "Same 50 photos are used in both normal and raw photo modes."
+    ]
+  },
+  "photos": [
+    {
+      "id": 1,
+      "story": "Een onverwacht rustig begin van een nieuwe dag.",
+      "fullStory": "Een onverwacht rustig begin van een nieuwe dag.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-001/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 2,
+      "story": "Een moment waarop ik besloot even niets te plannen.",
+      "fullStory": "Een moment waarop ik besloot even niets te plannen.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-002/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 3,
+      "story": "Een kleine omweg die de dag bijzonder maakte.",
+      "fullStory": "Een kleine omweg die de dag bijzonder maakte.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-003/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 4,
+      "story": "De eerste stap naar iets dat later veel betekende.",
+      "fullStory": "De eerste stap naar iets dat later veel betekende.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-004/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 5,
+      "story": "Een middag waarop de tijd langzaam voorbijging.",
+      "fullStory": "Een middag waarop de tijd langzaam voorbijging.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-005/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 6,
+      "story": "Samen lachen om iets wat eigenlijk heel gewoon was.",
+      "fullStory": "Samen lachen om iets wat eigenlijk heel gewoon was.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-006/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 7,
+      "story": "Een uitzicht waarvoor we vanzelf even bleven staan.",
+      "fullStory": "Een uitzicht waarvoor we vanzelf even bleven staan.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-007/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 8,
+      "story": "De weg naar huis voelde die avond anders.",
+      "fullStory": "De weg naar huis voelde die avond anders.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-008/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 9,
+      "story": "Een ontmoeting die me nog lang bijbleef.",
+      "fullStory": "Een ontmoeting die me nog lang bijbleef.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-009/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 10,
+      "story": "De stilte voordat een drukke dag begon.",
+      "fullStory": "De stilte voordat een drukke dag begon.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-010/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 11,
+      "story": "Een herinnering aan een plek die vertrouwd voelde.",
+      "fullStory": "Een herinnering aan een plek die vertrouwd voelde.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-011/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 12,
+      "story": "Het plezier van zonder haast onderweg zijn.",
+      "fullStory": "Het plezier van zonder haast onderweg zijn.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-012/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 13,
+      "story": "Een bijzonder gesprek op een gewone dinsdag.",
+      "fullStory": "Een bijzonder gesprek op een gewone dinsdag.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-013/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 14,
+      "story": "De dag waarop ik iets nieuws durfde te proberen.",
+      "fullStory": "De dag waarop ik iets nieuws durfde te proberen.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-014/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 15,
+      "story": "Een mooi detail dat ik niet wil vergeten.",
+      "fullStory": "Een mooi detail dat ik niet wil vergeten.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-015/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 16,
+      "story": "Soms begint een verhaal met een toevallige blik.",
+      "fullStory": "Soms begint een verhaal met een toevallige blik.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-016/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 17,
+      "story": "Een vrolijk moment dat niet gepland was.",
+      "fullStory": "Een vrolijk moment dat niet gepland was.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-017/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 18,
+      "story": "Een oude gewoonte die ineens bijzonder leek.",
+      "fullStory": "Een oude gewoonte die ineens bijzonder leek.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-018/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 19,
+      "story": "De eerste keer voelde alles een beetje groter.",
+      "fullStory": "De eerste keer voelde alles een beetje groter.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-019/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 20,
+      "story": "Een namiddag die langer mocht duren.",
+      "fullStory": "Een namiddag die langer mocht duren.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-020/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 21,
+      "story": "Een klein succes waar ik nog vaak aan denk.",
+      "fullStory": "Een klein succes waar ik nog vaak aan denk.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-021/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 22,
+      "story": "Een dag met meer verrassingen dan verwacht.",
+      "fullStory": "Een dag met meer verrassingen dan verwacht.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-022/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 23,
+      "story": "Een herinnering die begon met een simpel idee.",
+      "fullStory": "Een herinnering die begon met een simpel idee.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-023/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 24,
+      "story": "De gezelligheid van zomaar bij elkaar zijn.",
+      "fullStory": "De gezelligheid van zomaar bij elkaar zijn.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-024/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 25,
+      "story": "Een nieuwe omgeving met een vertrouwd gevoel.",
+      "fullStory": "Een nieuwe omgeving met een vertrouwd gevoel.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-025/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 26,
+      "story": "Een bijzonder moment tussen twee afspraken door.",
+      "fullStory": "Een bijzonder moment tussen twee afspraken door.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-026/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 27,
+      "story": "Een wandeling zonder duidelijk eindpunt.",
+      "fullStory": "Een wandeling zonder duidelijk eindpunt.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-027/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 28,
+      "story": "De warmte van een dag waarop iedereen er was.",
+      "fullStory": "De warmte van een dag waarop iedereen er was.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-028/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 29,
+      "story": "Een ontdekking die ik graag wilde delen.",
+      "fullStory": "Een ontdekking die ik graag wilde delen.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-029/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 30,
+      "story": "Een moment dat ik later anders ging bekijken.",
+      "fullStory": "Een moment dat ik later anders ging bekijken.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nDe tijd verstrijkt, maar de betekenis van dit moment blijft.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-030/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 31,
+      "story": "Een rustige pauze tijdens een drukke periode.",
+      "fullStory": "Een rustige pauze tijdens een drukke periode.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-031/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 32,
+      "story": "Het soort dag waarvan je de sfeer onthoudt.",
+      "fullStory": "Het soort dag waarvan je de sfeer onthoudt.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-032/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 33,
+      "story": "Een afspraak waar ik met plezier op terugkijk.",
+      "fullStory": "Een afspraak waar ik met plezier op terugkijk.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-033/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 34,
+      "story": "Een kleine verandering maakte een groot verschil.",
+      "fullStory": "Een kleine verandering maakte een groot verschil.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-034/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 35,
+      "story": "Een herinnering die me opnieuw liet glimlachen.",
+      "fullStory": "Een herinnering die me opnieuw liet glimlachen.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nHet zijn precies dit soort herinneringen die een leven kleur geven.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-035/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 36,
+      "story": "De laatste zonnestralen van een fijne middag.",
+      "fullStory": "De laatste zonnestralen van een fijne middag.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-036/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 37,
+      "story": "Een plek waar we uiteindelijk langer bleven.",
+      "fullStory": "Een plek waar we uiteindelijk langer bleven.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-037/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 38,
+      "story": "Een idee dat onderweg een mooi verhaal werd.",
+      "fullStory": "Een idee dat onderweg een mooi verhaal werd.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-038/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 39,
+      "story": "Een gesprek dat nog dagen in mijn hoofd zat.",
+      "fullStory": "Een gesprek dat nog dagen in mijn hoofd zat.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-039/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 40,
+      "story": "Een klein gebaar dat onverwacht veel betekende.",
+      "fullStory": "Een klein gebaar dat onverwacht veel betekende.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nHier wil ik later nog eens rustig bij stilstaan.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-040/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 41,
+      "story": "De spanning vlak voordat iets bijzonders begon.",
+      "fullStory": "De spanning vlak voordat iets bijzonders begon.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-041/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 42,
+      "story": "Een moment waarop alles even op zijn plek viel.",
+      "fullStory": "Een moment waarop alles even op zijn plek viel.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-042/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 43,
+      "story": "Een middag met ruimte voor nieuwe plannen.",
+      "fullStory": "Een middag met ruimte voor nieuwe plannen.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-043/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 44,
+      "story": "Een herinnering aan iets dat eenvoudig begon.",
+      "fullStory": "Een herinnering aan iets dat eenvoudig begon.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-044/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 45,
+      "story": "De sfeer van een dag die me dierbaar is.",
+      "fullStory": "De sfeer van een dag die me dierbaar is.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nHet mooie is dat een klein detail een heel verhaal kan openen.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-045/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 46,
+      "story": "Een terugblik op een periode vol veranderingen.",
+      "fullStory": "Een terugblik op een periode vol veranderingen.\n\nIk weet nog hoe prettig het voelde om even niet op de klok te kijken. Het was geen groot evenement, maar juist daardoor bleef het moment helder in mijn gedachten.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-046/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 47,
+      "story": "Een toevallige foto die veel oproept.",
+      "fullStory": "Een toevallige foto die veel oproept.\n\nWat mij vooral bijbleef, was de combinatie van kleine details. Later merkte ik dat zulke gewone momenten een onverwacht groot deel van mijn verhaal vormen.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-047/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    },
+    {
+      "id": 48,
+      "story": "Een oud verhaal dat opnieuw betekenis kreeg.",
+      "fullStory": "Een oud verhaal dat opnieuw betekenis kreeg.\n\nOp dat ogenblik stond ik niet stil bij hoe bijzonder het later zou worden. Pas wanneer ik terugkijk, herken ik wat deze dag voor mij betekende.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-048/900/900",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "vierkant"
+      }
+    },
+    {
+      "id": 49,
+      "story": "Een plek terugzien met andere ogen.",
+      "fullStory": "Een plek terugzien met andere ogen.\n\nHet is fijn dat ik deze herinnering kan bewaren. Niet omdat alles perfect was, maar omdat de dag een eigen sfeer had die ik graag terugvind.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-049/800/1200",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "staand"
+      }
+    },
+    {
+      "id": 50,
+      "story": "Een rustig einde van een bewogen jaar.",
+      "fullStory": "Een rustig einde van een bewogen jaar.\n\nIk zou de gebeurtenis nu waarschijnlijk anders omschrijven. Toch roept dit beeld meteen het gevoel van toen terug, zonder dat ik er veel woorden voor nodig heb.\n\nDaarom hoort ook deze gewone dag op mijn tijdlijn.",
+      "image": "https://picsum.photos/seed/talera-v11-clean-050/1200/800",
+      "diagnostic": {
+        "source": "Picsum static-seed photography",
+        "untouched": "no blur/grayscale query or image filter in source URL",
+        "profile": "liggend"
+      }
+    }
+  ]
+}

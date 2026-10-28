@@ -70,7 +70,7 @@ export const memoryPresentationControlsScript = String.raw`
 
   const manager=document.createElement('div');
   manager.className='talera-memory-manager';manager.hidden=true;
-  manager.innerHTML='<section class="talera-memory-manager-card" role="dialog" aria-modal="true" aria-label="Herinnering beheren"><div class="talera-memory-manager-head"><strong>Herinnering beheren</strong><button type="button" class="talera-memory-manager-close" aria-label="Sluiten">×</button></div><div class="talera-memory-manager-title"></div><div class="talera-memory-manager-actions"><button type="button" class="talera-memory-manager-action edit"><span>Herinnering bewerken</span><span>›</span></button><button type="button" class="talera-memory-manager-action photos"><span>Foto’s beheren</span><span>›</span></button><button type="button" class="talera-memory-manager-action delete"><span>Herinnering verwijderen</span><span>›</span></button></div><div class="talera-memory-manager-note">Verwijderen gebruikt een korte ongedaan-makenperiode en geen browsermelding.</div></section>';
+  manager.innerHTML='<section class="talera-memory-manager-card" role="dialog" aria-modal="true" aria-label="Herinnering beheren"><div class="talera-memory-manager-head"><strong>Herinnering beheren</strong><button type="button" class="talera-memory-manager-close" aria-label="Sluiten">×</button></div><div class="talera-memory-manager-title"></div><div class="talera-memory-manager-actions"><button type="button" class="talera-memory-manager-action edit"><span>Herinnering bewerken</span><span>›</span></button><button type="button" class="talera-memory-manager-action photos"><span>Foto’s beheren</span><span>›</span></button><button type="button" class="talera-memory-manager-action share"><span>Delen</span><span>›</span></button><button type="button" class="talera-memory-manager-action delete"><span>Herinnering verwijderen</span><span>›</span></button></div><div class="talera-memory-manager-note">Verwijderen gebruikt een korte ongedaan-makenperiode en geen browsermelding.</div></section>';
   document.body.appendChild(manager);
 
   const audioButton=tools.querySelector('.talera-memory-audio');
@@ -105,6 +105,7 @@ export const memoryPresentationControlsScript = String.raw`
   manager.querySelector('.talera-memory-manager-close').addEventListener('click',closeManager);
   manager.addEventListener('click',e=>{if(e.target===manager)closeManager()});
   manager.querySelector('.edit').addEventListener('click',()=>navigateManage(''));
+  manager.querySelector('.share').addEventListener('click',()=>{closeManager();document.dispatchEvent(new CustomEvent('talera:open-share'))});
   manager.querySelector('.photos').addEventListener('click',()=>navigateManage('photos'));
   manager.querySelector('.delete').addEventListener('click',()=>navigateManage('delete-now'));
 

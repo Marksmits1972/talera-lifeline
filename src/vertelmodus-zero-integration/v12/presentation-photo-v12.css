@@ -1,0 +1,126 @@
+/* TALERA V12 — ONE CONTINUOUS SHARP PHOTO PLANE
+   Strictly presentation visuals. Do not change stored photos, swipe/timeline
+   state, voice/video playback, scroll handlers or user-written content.
+
+   Principle: one original-colour photograph fills the viewport. The screen
+   aspect ratio may crop its sides/top; never stretch, blur or mask the photo.
+   The only overlay for readability is a gentle dark gradient behind copy.
+*/
+
+/* 1. Each existing timeline layer remains the swipe/cross-page owner.
+      Existing timers, opacity and transforms of the LAYER are not changed. */
+#photoStage,
+#photoStage > .photo-layer,
+#photoStage .talera-photo-strip-page,
+#photoStage .talera-story-synced-photo {
+  background: transparent !important;
+}
+
+/* 2. Disable duplicate photograph images. The real photo is the only
+      visible photograph and no additional decoder/image effect is required. */
+#photoStage .photo-backdrop,
+#photoStage .photo-aligned-blur,
+#photoStage .talera-story-synced-backdrop {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+/* 3. Full-bleed photo. !important intentionally overrules obsolete inline
+      per-image fitNode() left/top/width/height and per-photo masks, which
+      previously caused discontinuous hard edges for wide/square media. */
+#photoStage .example-photo,
+#photoStage .talera-story-synced-sharp {
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  opacity: 1 !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+/* 4. Real uploaded memories use a separate synced-photo host.
+      Keep it full screen, but let the existing controller decide visibility. */
+#photoStage .talera-story-synced-photo:not([hidden]) {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* 5. Readability ONLY at the story copy at the bottom. Never use backdrop
+      filters on top of or underneath the photograph. The gradient is
+      photographic darkening, not a milky white blur. */
+#photoStage::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 39% !important;
+  z-index: 15 !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  background: linear-gradient(to bottom,
+    rgba(4, 13, 23, 0) 0%,
+    rgba(4, 13, 23, .06) 27%,
+    rgba(4, 13, 23, .20) 51%,
+    rgba(4, 13, 23, .44) 77%,
+    rgba(4, 13, 23, .56) 100%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+/* 6. Avoid the second gradient belonging to the story sheet when collapsed.
+      The full-story/reading mode retains its own existing cream paper surface. */
+#memoryStoryScroll:not(.is-reading) .memory-sheet {
+  background: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#memoryStoryScroll:not(.is-reading) .memory-sheet .story {
+  color: #fff !important;
+  text-shadow: 0 2px 13px rgba(0, 0, 0, .68),
+               0 1px 2px rgba(0, 0, 0, .45) !important;
+}
+#memoryStoryScroll:not(.is-reading) .memory-sheet::before {
+  color: #fff !important;
+}
+
+/* 7. The timeline remains an independent glass control with its own
+      interaction states; no geometry or swipe/tap behaviour changes. */
+
+/* 8. Prevent any neutral background peeking through between successive
+      photo layers, while preserving the existing page swipe transforms. */
+#photoStage .photo-layer img.example-photo {
+  display: block !important;
+}
+
+/* Respect requested reduced motion without interfering with the swipe owner. */
+@media(prefers-reduced-motion: reduce) {
+  #photoStage .example-photo { transition: none !important; }
+}

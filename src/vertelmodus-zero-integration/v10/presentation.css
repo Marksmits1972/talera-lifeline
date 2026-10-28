@@ -1,0 +1,35 @@
+
+/* V10 unified photographic rendering: one sharp photo, subtle atmosphere only.
+   Do not touch #surface gestures, photo indexes, or the timeline engine. */
+#photoStage .photo-backdrop{
+ filter:blur(14px) saturate(1) brightness(1)!important;
+ opacity:.17!important;
+ transform:scale(1.02)!important;
+}
+#photoStage .photo-aligned-blur{opacity:0!important;display:none!important}
+#photoStage .example-photo{
+ filter:none!important;
+ opacity:1!important;
+}
+#photoStage .talera-story-synced-backdrop{
+ filter:blur(14px) saturate(1)!important;
+ opacity:.16!important;
+}
+#photoStage .talera-story-synced-sharp{
+ filter:none!important;
+ opacity:1!important;
+}
+#photoStage .talera-story-synced-photo{background:transparent!important}
+/* The story's bottom readability is a gentle non-blurred gradient, consistent for every image. */
+#photoStage::after{
+ content:"";position:absolute;inset:auto 0 0 0;height:24%;
+ background:linear-gradient(to top,rgba(6,20,28,.28),rgba(6,20,28,.07) 48%,transparent);
+ z-index:4;pointer-events:none;
+}
+/* The top timeline glass stays shallow and consistent, including while dragging. */
+.timeline::before,.timeline.is-timeline-engaged::before,.timeline.is-timeline-afterglow:not(.is-timeline-engaged)::before{
+ backdrop-filter:blur(5px) saturate(1)!important;
+ -webkit-backdrop-filter:blur(5px) saturate(1)!important;
+ background:rgba(255,255,255,.07)!important;
+ opacity:.6!important;
+}

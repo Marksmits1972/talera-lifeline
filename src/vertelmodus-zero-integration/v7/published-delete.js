@@ -7,16 +7,17 @@
  window.__taleraV7DeleteInstalled=true;
  let refresh=0;
  function bind(){
-  for(const a of document.querySelectorAll('a[href*="/present?memory=local-"]')){
+  for(const a of document.querySelectorAll('#myCards a.memory-card[href*="/present?memory=local-"]')){
    const href=new URL(a.href,location.href),id=href.searchParams.get('memory');
    if(!id||!/^local-[a-z0-9-]+$/i.test(id))continue;
-   const card=a.closest('.memory-card,.story-card,article,.card,li')||a.parentElement;
-   if(!card||card.querySelector('.talera-v7-published-delete'))continue;
-   card.classList.add('talera-v7-published-card');
+   const card=a;
+   if(card.closest('.talera-v7-published-card'))continue;
+   const wrap=document.createElement('div');wrap.className='talera-v7-published-card';
+   card.parentNode.insertBefore(wrap,card);wrap.appendChild(card);
    const del=document.createElement('button');
    del.type='button';del.className='talera-v7-published-delete';
    del.setAttribute('aria-label','Herinnering verwijderen');del.title='Herinnering verwijderen';
-   del.textContent='×';card.appendChild(del);
+   del.textContent='×';wrap.appendChild(del);
    del.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();
     if(document.getElementById('taleraV7PublishedConfirm'))return;

@@ -1,0 +1,12 @@
+
+.talera-tag-pref-list{display:grid;gap:7px;padding:3px 0 14px}
+.talera-tag-pref-row{display:flex;gap:12px;align-items:center;min-height:45px;padding:8px 12px;background:#fff;border:1px solid #e1e9e9;border-radius:13px;color:#204a5c;font-size:15px;font-weight:550}
+.talera-tag-pref-row input{width:20px;height:20px;accent-color:#244c60;flex:none}
+.talera-tag-pref-add{display:flex;gap:8px}
+.talera-tag-pref-add input{flex:1;width:50px;min-height:44px;border:1px solid #d4e3e6;border-radius:12px;background:white;padding:10px;color:#1b4155;font-size:16px}
+.talera-tag-pref-add button{padding:10px 12px;background:#20485b;color:#fff;border:0;border-radius:12px;font-size:14px}
+.talera-tag-pref-help{font-size:12px;color:#6e8490;line-height:1.5;margin:13px 0 24px}
+.talera-tags-v20 .talera-tag-badge{cursor:pointer}
+.flow-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.flow-nav #navMore{display:flex;align-items:center;justify-content:center;flex-direction:column;text-decoration:none;color:inherit;gap:3px}
+.flow-nav #navMore svg{width:21px;height:21px;fill:currentColor}

@@ -1,0 +1,21 @@
+
+/* V7 writer must always be on top of the PWA and iPhone keyboard. */
+#taleraWriterOverlay{z-index:12000!important;isolation:isolate!important;background:#f8f9f7!important}
+#taleraWriterOverlay .talera-writer-top{position:relative!important;z-index:2!important;background:#f8f9f7!important}
+#taleraWriterOverlay .talera-writer-body{display:block!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important}
+#taleraWriterPhotos[hidden]{display:none!important}
+#taleraV7DeleteDialog{position:fixed;inset:0;z-index:13000;display:flex;align-items:center;justify-content:center;
+ padding:24px;background:#102f42a3;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#taleraV7DeleteDialog .talera-v7-delete-sheet{width:min(100%,430px);background:#fff;border-radius:23px;
+ padding:25px 20px 20px;box-shadow:0 20px 50px #0c2a3f30;color:#1a4355}
+#taleraV7DeleteDialog h2{font-size:22px;margin:0 0 11px;font-weight:740}
+#taleraV7DeleteDialog p{line-height:1.5;font-size:15px;margin:0 0 18px;color:#536d78}
+#taleraV7DeleteDialog .talera-v7-delete-actions{display:flex;gap:10px}
+#taleraV7DeleteDialog button{flex:1;min-height:46px;border-radius:13px;border:1px solid #d3e1e5;background:#f4f7f8;font-size:15px;color:#204759}
+#taleraV7DeleteDialog #taleraV7Confirm{background:#9e3844;color:#fff;border:0}
+#app .v7-delete-card{position:absolute;right:12px;top:12px;z-index:3;
+ border:0!important;background:#f1f5f5!important;color:#36566b!important;border-radius:50%!important;
+ width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;
+ padding:0!important;font:500 25px/1 sans-serif!important}
+#app #cards>.card{position:relative}
+#app #cards .card-head{padding-right:48px}

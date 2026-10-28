@@ -1,0 +1,38 @@
+
+/* V11 neutral diagnostic. Active ONLY when ?photo_test=raw is present. */
+html.talera-v11-raw-photo #photoStage .photo-backdrop,
+html.talera-v11-raw-photo #photoStage .photo-aligned-blur,
+html.talera-v11-raw-photo #photoStage .talera-story-synced-backdrop {
+ opacity:0!important;
+ display:none!important;
+ filter:none!important;
+}
+html.talera-v11-raw-photo #photoStage .example-photo,
+html.talera-v11-raw-photo #photoStage .talera-story-synced-sharp {
+ opacity:1!important;
+ filter:none!important;
+ -webkit-mask-image:none!important;
+ mask-image:none!important;
+ -webkit-mask:none!important;
+ mask:none!important;
+}
+html.talera-v11-raw-photo #photoStage::after {
+ display:none!important;
+ content:none!important;
+}
+html.talera-v11-raw-photo .timeline::before,
+html.talera-v11-raw-photo .timeline.is-timeline-engaged::before,
+html.talera-v11-raw-photo .timeline.is-timeline-afterglow::before,
+html.talera-v11-raw-photo nav::before,
+html.talera-v11-raw-photo .memory-story-scroll::before {
+ backdrop-filter:none!important;
+ -webkit-backdrop-filter:none!important;
+}
+html.talera-v11-raw-photo .memory-sheet {
+ backdrop-filter:none!important;
+ -webkit-backdrop-filter:none!important;
+}
+/*  Keep text readable without applying any additional blur. */
+html.talera-v11-raw-photo .memory-sheet {
+ text-shadow:0 2px 9px rgba(0,0,0,.70)!important;
+}

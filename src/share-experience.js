@@ -374,12 +374,17 @@ export const shareExperienceScript = String.raw`
       '</div>';
   }
   function renderContactEntry(){
-    return title('Delen','Kies uit je TALERA-contacten of verstuur via WhatsApp.')+
+    // Demonstration-only contacts. Never treat these as real account identities.
+    const samples=[['Anja','Binnenkring'],['Peter','Vertrouwde kring'],['Sara','Ruime kring']];
+    return title('Delen','Kies iemand uit je TALERA-contacten of gebruik WhatsApp.')+
       memoryCard()+
-      '<p class="talera-share-section-label">TALERA-contacten</p>'+
-      '<div class="talera-share-empty"><strong>Je contacten verschijnen hier zodra je TALERA-account is gekoppeld.</strong><p>Rechtstreeks delen met contacten wordt nog aangesloten. Er zijn geen echte contacten geladen of uitnodigingen verstuurd.</p></div>'+
-      '<button class="talera-share-primary" type="button" data-view="share-choice">Delen via WhatsApp</button>'+
-      '<div class="talera-share-notice">Je kiest zelf de ontvanger in WhatsApp. De bestaande keuze voor één verhaal of de tijdlijn blijft behouden.</div>';
+      '<p class="talera-share-section-label">TALERA-contacten · voorbeeld</p>'+
+      '<div class="talera-share-status-list">'+samples.map(([name,level],i)=>
+        '<label class="talera-share-person"><input type="checkbox" data-demo-contact="'+i+'" style="margin-right:12px;width:20px;height:20px;accent-color:#315f87"><span><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(level)+' · voorbeeldcontact</small></span></label>'
+      ).join('')+'</div>'+
+      '<div class="talera-share-notice">Dit is een interactieve voorbeeldlijst, geen echte accountlijst. De gekozen personen ontvangen geen bericht of toegang.</div>'+
+      '<button class="talera-share-primary" type="button" data-action="preview-contact-selection">Selectie bekijken</button>'+
+      '<button class="talera-share-secondary" type="button" data-view="share-choice">Delen via WhatsApp</button>';
   }
   function renderChoice(){
     return title('Wat wil je delen?','De actieve herinnering staat al voor je klaar. Je hoeft niets opnieuw te selecteren.')+memoryCard()+
@@ -733,6 +738,12 @@ export const shareExperienceScript = String.raw`
     const action=target.dataset.action;
     if(action==='close'){close();return}
     if(action==='back'){back();return}
+    if(action==='preview-contact-selection'){
+      const chosen=Array.from(body.querySelectorAll('[data-demo-contact]:checked')).map(el=>['Anja','Peter','Sara'][Number(el.dataset.demoContact)]);
+      if(!chosen.length){showToast('Selecteer eerst een contact.');return}
+      showToast('Voorbeeldselectie: '+chosen.join(', ')+'. Er is niets verstuurd.');
+      return;
+    }
     if(action==='create-story-invite'){saveInvite('story');return}
     if(action==='create-timeline-invite'){saveInvite('timeline');return}
     if(action==='preview-recipient'){go(state.kind==='timeline'?'recipient-timeline':'recipient-story');return}

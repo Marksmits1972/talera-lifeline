@@ -802,6 +802,9 @@ export const shareExperienceScript = String.raw`
     open('share-contacts');
   });
   document.addEventListener('talera:open-share',()=>open('share-contacts'));
+  // Public integration bridge: no client event may be interpreted as permission to share.
+  // This is strictly a navigation action; the server must authorize any future invite.
+  window.__taleraShareOpenContacts=function(){open('share-contacts')};
   document.addEventListener('talera:new-memory-landed',()=>setTimeout(()=>open('after-save'),650));
 
   if(demoView==='recipient-story')loadInvitePreview().finally(()=>setTimeout(activateRecipientPresentation,280));

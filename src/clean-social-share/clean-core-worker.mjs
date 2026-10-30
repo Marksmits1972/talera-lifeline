@@ -31,10 +31,10 @@ async function handler(req,env){
  if(m!=='GET'&&!allowedWrite(req))return error(403,'Ongeldige herkomst');
  if(p==='/api/register'&&m==='POST'){
   if(!await rateLimit(req,env,'register',3))return error(429,'Probeer later opnieuw');
-  const d=await body(req),email=text(d.email,254).toLowerCase(),display=text(d.displayName,100),password=String(d.password||'');
-  if(!emailRule.test(email)||display.length<1||password.length<8||password.length>128)return error(400,'Vul geldige gegevens in (wachtwoord minimaal 8 tekens)');
+  const d=await body(req),email=text(d.email,254).toLowerCase(),display=text(d.displayName,100),password=String(d.password||''),handle=String(d.username||'').trim().toLowerCase().replace(/^@/,'');
+  if(!emailRule.test(email)||display.length<1||password.length<8||password.length>128||!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(handle))return error(400,'Vul geldige gegevens in (wachtwoord minimaal 8 tekens)');
   const salt=secret(),digest=await passwordHash(password,salt),id=random();
-  try{await env.DB.prepare('INSERT INTO accounts(id,email,display_name,password_salt,password_hash,created_at,status) VALUES(?,?,?,?,?,?,?)').bind(id,email,display,salt,digest,Date.now(),'active').run()}catch{return error(409,'Registreren is niet gelukt')}
+  try{await env.DB.prepare('INSERT INTO accounts(id,email,display_name,password_salt,password_hash,created_at,status,public_handle) VALUES(?,?,?,?,?,?,?,?)').bind(id,email,display,salt,digest,Date.now(),'active',handle).run()}catch{return error(409,'Registreren is niet gelukt')}
   return issueSession({id,display_name:display,email},env);
  }
  if(p==='/api/login'&&m==='POST'){
@@ -91,9 +91,10 @@ async function handler(req,env){
  }
  if(p==='/api/discovery'&&m==='POST'){
   const d=await body(req),enabled=d.discoverable===true;
-  const handle='t-'+user.id.slice(0,12);
-  await env.DB.prepare("UPDATE accounts SET discoverable=?,public_handle=COALESCE(public_handle,?) WHERE id=?").bind(enabled?1:0,handle,user.id).run();
-  return json({discoverable:enabled,publicHandle:handle});
+  const handle=String(d.username||'').trim().toLowerCase().replace(/^@/,'');
+  if(handle&&!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(handle))return error(400,'Gebruikersnaam moet 3 tot 30 tekens hebben');
+  try{await env.DB.prepare("UPDATE accounts SET discoverable=?,public_handle=CASE WHEN ?<>'' THEN ? ELSE public_handle END WHERE id=?").bind(enabled?1:0,handle,handle,user.id).run()}catch{return error(409,'Deze gebruikersnaam is al in gebruik')}
+  return json({discoverable:enabled,publicHandle:handle||user.public_handle||null});
  }
  if(p==='/api/people/search'&&m==='GET'){
   if(!await rateLimit(req,env,'people-search',60))return error(429,'Te veel zoekopdrachten');

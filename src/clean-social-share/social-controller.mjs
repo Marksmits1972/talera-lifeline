@@ -21,11 +21,11 @@ export class SocialController{
   this.#pending.set(memoryId,task);return task;
  }
  async mutate(operation){
-  const memoryId=this.#active;if(!memoryId)throw Error('Geen actieve herinnering');if(!this.#adapter.commit)throw Error('Schrijven is niet geconfigureerd');
+  const memoryId=this.#active;if(!memoryId)throw Error('Geen actieve herinnering');if(!this.#adapter.commit&&!this.#adapter.commitLocal)throw Error('Schrijven is niet geconfigureerd');
   const key=memoryId+':'+(operation.type||'');if(this.#mutating.has(key))return {duplicate:true};this.#mutating.add(key);
-  try{const old=this.#cache.get(memoryId),storyId=old?.storyId||await this.#adapter.findStoryId(memoryId);if(!storyId)throw Error('Deze lokale herinnering heeft geen deelbare serverreacties');const fresh=normalise(old?.data);if(operation.type==='toggle-heart'){fresh.hearted=!fresh.hearted;fresh.heartCount=Math.max(0,fresh.heartCount+(fresh.hearted?1:-1))}
+  try{const old=this.#cache.get(memoryId),storyId=old?.storyId||await this.#adapter.findStoryId(memoryId);if(!storyId&&!this.#adapter.commitLocal)throw Error('Reacties op deze lokale herinnering zijn niet beschikbaar');const fresh=normalise(old?.data);if(operation.type==='toggle-heart'){fresh.hearted=!fresh.hearted;fresh.heartCount=Math.max(0,fresh.heartCount+(fresh.hearted?1:-1))}else if(operation.type==='comment'){const text=String(operation.body||'').trim();if(!text)throw Error('Reactie is leeg');fresh.comments.push({id:'local-pending-'+crypto.randomUUID(),from:'Jij',text});fresh.commentCount++}
    this.#cache.set(memoryId,{status:'mutating',storyId,data:fresh,updatedAt:this.#clock(),error:null});if(this.#active===memoryId)this.#emit();
-   const response=await this.#adapter.commit({memoryId,storyId,operation});if(response?.snapshot)this.#cache.set(memoryId,{status:'ready',storyId,data:normalise(response.snapshot),updatedAt:this.#clock(),error:null});else this.#cache.set(memoryId,{status:'ready',storyId,data:fresh,updatedAt:this.#clock(),error:null});if(this.#active===memoryId)this.#emit();return {ok:true}
+   const response=storyId?await this.#adapter.commit({memoryId,storyId,operation}):await this.#adapter.commitLocal({memoryId,operation,snapshot:fresh});if(response?.snapshot)this.#cache.set(memoryId,{status:'ready',storyId,data:normalise(response.snapshot),updatedAt:this.#clock(),error:null});else this.#cache.set(memoryId,{status:'ready',storyId,data:fresh,updatedAt:this.#clock(),error:null});if(this.#active===memoryId)this.#emit();return {ok:true}
   }catch(error){this.#cache.delete(memoryId);if(this.#active===memoryId)this.#emit();await this.load(memoryId);return {ok:false,error:String(error?.message||error)}}finally{this.#mutating.delete(key)}
  }
  dispose(){this.#closed=true;if(this.#settleTimer!==null)this.#timer.clearTimeout(this.#settleTimer);this.#listeners.clear()}

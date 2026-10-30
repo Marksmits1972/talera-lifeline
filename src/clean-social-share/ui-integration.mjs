@@ -57,12 +57,12 @@ async function previewPhotoBlob(memory){
   if(!sw||!sh)throw Error('De foto heeft geen geldige afmetingen.');
   const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
   const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw Error('Foto verwerken lukt niet op dit apparaat.');
-  const cover=Math.max(w/sw,h/sh),bw=sw*cover,bh=sh*cover;
-  ctx.filter='blur(22px) brightness(.75)';
-  ctx.drawImage(photo,(w-bw)/2,(h-bh)/2,bw,bh);
-  ctx.filter='none';
-  const fit=Math.min(w/sw,h/sh),fw=sw*fit,fh=sh*fit;
-  ctx.drawImage(photo,(w-fw)/2,(h-fh)/2,fw,fh);
+  // Eén doorlopende foto, niet de eerdere combinatie van een wazige
+  // achtergrond en een tweede afbeelding in het midden (drie stroken).
+  // Centre-crop vult het Open Graph kader zonder herhaalde randen.
+  const cropWidth=Math.min(sw,sh*w/h),cropHeight=Math.min(sh,sw*h/w);
+  const sx=(sw-cropWidth)/2,sy=(sh-cropHeight)/2;
+  ctx.drawImage(photo,sx,sy,cropWidth,cropHeight,0,0,w,h);
   let jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.83));
   if(!jpeg||jpeg.size>1500000)jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.64));
   if(!jpeg||jpeg.size>1500000)throw Error('Foto is te groot om veilig via WhatsApp te delen.');

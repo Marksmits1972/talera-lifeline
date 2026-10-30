@@ -19,19 +19,16 @@ async function findStoryId(localMemoryId){
  try{
   const d=await coreRequest('/api/pwa/memory-link?localMemoryId='+encodeURIComponent(localMemoryId));
   return d.memoryId||null;
- }catch(e){if(/Meld je aan|niet beschikbaar/.test(String(e.message)))return null;throw e}
+ }catch(e){throw e}
 }
 const socialAdapter={
  findStoryId,
- loadLocal:async id=>stored(id),
+ loadLocal:async()=>{throw Error('Koppel deze herinnering aan je TALERA-account voordat je hartjes of reacties gebruikt.')},
  async fetchSnapshot({storyId}){
   const d=await coreRequest('/api/threads/'+encodeURIComponent(storyId));
   return {hearted:!!d.hearted,heartCount:Number(d.heartCount)||0,commentCount:(d.items||[]).length,comments:(d.items||[]).map(c=>({id:c.id,from:c.display_name,text:c.body,authorId:c.author_id}))};
  },
- async commitLocal({memoryId,snapshot}){
-  localStorage.setItem('talera-clean-local:'+memoryId,JSON.stringify(snapshot));
-  return {snapshot};
- },
+ async commitLocal(){throw Error('Deze herinnering is nog niet gekoppeld aan je TALERA-account.')},
  async commit({storyId,operation}){
   if(operation.type==='toggle-heart')await coreRequest('/api/threads/'+encodeURIComponent(storyId)+'/like',{method:'POST'});
   else if(operation.type==='comment')await coreRequest('/api/threads/'+encodeURIComponent(storyId)+'/comments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({body:operation.body})});
@@ -82,15 +79,15 @@ function mount(){
  social.subscribe(v=>{const h=bar.querySelector('[data-action=heart]');h.querySelector('.count').textContent=String(v.data.heartCount);h.setAttribute('aria-pressed',String(v.data.hearted));bar.querySelector('[data-action=comments] .count').textContent=String(v.data.commentCount);if(mode==='comments')render()});
  share.subscribe(()=>{if(mode==='share')render()});
  function render(){if(!mode)return;const closeButton='<button type="button" class="close" data-action="close" aria-label="Sluiten">×</button>';
-  if(mode==='comments'){const s=social.current();const list=s.data.comments.map(c=>'<div class="comment"><strong>'+escapeText(c.from||'Gebruiker')+'</strong><p>'+escapeText(c.text||'')+'</p></div>').join('');panel.innerHTML=closeButton+'<h2>Berichten</h2><p class="status">'+(s.status==='loading'?'Reacties worden geladen…':escapeText(s.error||''))+'</p>'+(list||'<p>Nog geen berichten.</p>')+'<form id="talera-clean-comment-form"><label for="clean-comment">Reageren</label><textarea id="clean-comment" rows="2" maxlength="4000" required></textarea><button class="primary" type="submit">Versturen</button></form>';return}
+  if(mode==='comments'){const s=social.current();const list=s.data.comments.map(c=>'<div class="comment"><strong>'+escapeText(c.from||'Gebruiker')+'</strong><p>'+escapeText(c.text||'')+'</p></div>').join('');panel.innerHTML=closeButton+'<h2>Berichten</h2><p class="status">'+(s.status==='loading'?'Reacties worden geladen…':escapeText(s.error||(!s.storyId?'Nog niet gekoppeld aan je TALERA-account.':'')))+'</p>'+(list||'<p>Nog geen berichten.</p>')+'<p class="status"><a href="/account">Account en aanmelden</a></p><form id="talera-clean-comment-form"><label for="clean-comment">Reageren</label><textarea id="clean-comment" rows="2" maxlength="4000" required></textarea><button class="primary" type="submit">Versturen</button></form>';return}
   const v=share.current(),labels={1:'1 uur',24:'1 dag',168:'7 dagen',720:'30 dagen'};
   const options=[1,24,168,720].map(h=>'<option value="'+h+'" '+(v.durationHours===h?'selected':'')+'>'+labels[h]+'</option>').join('');
-  panel.innerHTML=closeButton+'<h2>Delen via WhatsApp</h2><p><strong>'+escapeText(memory?.title||memory?.story||'Herinnering')+'</strong></p><p>Alleen deze herinnering wordt gedeeld.</p><label for="talera-clean-expiry">Link geldig voor</label><select id="talera-clean-expiry">'+options+'</select><label style="font-weight:normal"><input id="talera-clean-consent" type="checkbox" '+(consent?'checked':'')+'> Ik geef toestemming deze herinnering tijdelijk te publiceren.</label><p class="status">'+escapeText(v.error||'Beveiligde publicatie staat nog uit in deze integratietest.')+'</p><button type="button" class="primary" data-action="prepare">Uitnodiging voorbereiden</button><button type="button" class="primary" data-action="send" '+(v.state==='ready'?'':'disabled')+'>Verzenden via WhatsApp</button>';
+  panel.innerHTML=closeButton+'<h2>Delen via WhatsApp</h2><p><strong>'+escapeText(memory?.title||memory?.story||'Herinnering')+'</strong></p><p>Alleen deze herinnering wordt gedeeld.</p><label for="talera-clean-expiry">Link geldig voor</label><select id="talera-clean-expiry">'+options+'</select><label style="font-weight:normal"><input id="talera-clean-consent" type="checkbox" '+(consent?'checked':'')+'> Ik geef toestemming deze herinnering tijdelijk te publiceren.</label><p class="status">'+escapeText(v.error||'Kies een geldigheidsduur en geef toestemming om deze herinnering te delen.')+'</p><button type="button" class="primary" data-action="prepare">Uitnodiging voorbereiden</button><button type="button" class="primary" data-action="send" '+(v.state==='ready'?'':'disabled')+'>Verzenden via WhatsApp</button>';
  }
  bar.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(!button)return;const a=button.dataset.action;if(a==='heart')void social.mutate({type:'toggle-heart'});if(a==='comments'){open('comments');social.openComments()}if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}});
  overlay.addEventListener('click',e=>{if(e.target===overlay){close();return}const a=e.target.closest('[data-action]')?.dataset.action;if(a==='close'){close();return}if(a==='prepare'){consent=!!panel.querySelector('#talera-clean-consent')?.checked;void share.prepare({consent}).catch(error=>{const p=panel.querySelector('.status');if(p)p.textContent=String(error.message||error)});return}if(a==='send'){try{location.assign(share.whatsappUrl())}catch(error){panel.querySelector('.status').textContent=error.message}}});
  overlay.addEventListener('change',e=>{if(e.target.id==='talera-clean-expiry'){share.setDuration(Number(e.target.value));consent=false}else if(e.target.id==='talera-clean-consent')consent=e.target.checked});
- overlay.addEventListener('submit',e=>{if(e.target.id!=='talera-clean-comment-form')return;e.preventDefault();const input=e.target.querySelector('textarea');const body=input.value.trim();if(!body)return;input.disabled=true;void social.mutate({type:'comment',body}).then(r=>{if(r.ok)input.value='';input.disabled=false})});
+ overlay.addEventListener('submit',e=>{if(e.target.id!=='talera-clean-comment-form')return;e.preventDefault();const input=e.target.querySelector('textarea');const body=input.value.trim();if(!body)return;input.disabled=true;void social.mutate({type:'comment',body}).then(r=>{if(r.ok)input.value='';else{const status=panel.querySelector('.status');if(status)status.textContent=r.error||'Reactie niet opgeslagen'}input.disabled=false})});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mode)close()});
  window.__taleraCleanSocial={social,share,open,close,unsub};
  document.documentElement.dataset.cleanSocial='mounted';

@@ -32,7 +32,7 @@ async function handler(req,env){
  if(p==='/api/register'&&m==='POST'){
   if(!await rateLimit(req,env,'register',3))return error(429,'Probeer later opnieuw');
   const d=await body(req),email=text(d.email,254).toLowerCase(),display=text(d.displayName,100),password=String(d.password||'');
-  if(!emailRule.test(email)||display.length<1||password.length<12||password.length>128)return error(400,'Vul geldige gegevens in (wachtwoord minimaal 12 tekens)');
+  if(!emailRule.test(email)||display.length<1||password.length<8||password.length>128)return error(400,'Vul geldige gegevens in (wachtwoord minimaal 8 tekens)');
   const salt=secret(),digest=await passwordHash(password,salt),id=random();
   try{await env.DB.prepare('INSERT INTO accounts(id,email,display_name,password_salt,password_hash,created_at,status) VALUES(?,?,?,?,?,?,?)').bind(id,email,display,salt,digest,Date.now(),'active').run()}catch{return error(409,'Registreren is niet gelukt')}
   return issueSession({id,display_name:display},env);
@@ -69,7 +69,7 @@ async function handler(req,env){
  if(p==='/api/password/reset'&&m==='POST'){
   if(!await rateLimit(req,env,'password-reset-confirm',10))return error(429,'Probeer later opnieuw');
   const d=await body(req),token=String(d.code||''),password=String(d.password||'');
-  if(!/^[0-9a-f]{64}$/.test(token)||password.length<12||password.length>128)return error(400,'Ongeldige of verlopen link of wachtwoord');
+  if(!/^[0-9a-f]{64}$/.test(token)||password.length<8||password.length>128)return error(400,'Ongeldige of verlopen link of wachtwoord');
   const tokenHash=await sha(token),now=Date.now();
   const record=await env.DB.prepare('SELECT account_id FROM password_resets WHERE token_hash=? AND used_at IS NULL AND expires_at>?').bind(tokenHash,now).first();
   if(!record)return error(400,'De herstellink is ongeldig, verlopen of al gebruikt.');

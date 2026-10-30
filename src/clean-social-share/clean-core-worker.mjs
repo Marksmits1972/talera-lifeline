@@ -17,7 +17,7 @@ const allowedWrite=req=>req.headers.get('origin')===new URL(req.url).origin;
 const page404=()=>new Response('Deze herinnering is niet meer beschikbaar.',{status:404,headers:{...secHeaders,'content-type':'text/plain; charset=utf-8'}});
 const escape=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function rateLimit(req,env,category,threshold=12){const name=await sha((req.headers.get('CF-Connecting-IP')||'unknown').slice(0,60)+':'+category);const cutoff=Date.now()-600000;await env.DB.prepare("DELETE FROM auth_attempts WHERE bucket_key=? AND started_at<?").bind(name,cutoff).run();const current=await env.DB.prepare('SELECT hits FROM auth_attempts WHERE bucket_key=?').bind(name).first();if((current?.hits||0)>=threshold)return false;await env.DB.prepare('INSERT INTO auth_attempts(bucket_key,started_at,hits) VALUES(?,?,1) ON CONFLICT(bucket_key) DO UPDATE SET hits=hits+1').bind(name,Date.now()).run();return true}
-async function issueSession(account,env){const t=secret();await env.DB.prepare('INSERT INTO sessions(id_hash,account_id,expires_at,created_at) VALUES(?,?,?,?)').bind(await sha(t),account.id,Date.now()+86400000*7,Date.now()).run();const r=json({account:{id:account.id,displayName:account.display_name}});r.headers.set('set-cookie',cookie(t,604800));return r}
+async function issueSession(account,env){const t=secret();await env.DB.prepare('INSERT INTO sessions(id_hash,account_id,expires_at,created_at) VALUES(?,?,?,?)').bind(await sha(t),account.id,Date.now()+86400000*7,Date.now()).run();const r=json({account:{id:account.id,displayName:account.display_name,email:account.email}});r.headers.set('set-cookie',cookie(t,604800));return r}
 async function handler(req,env){
  const u=new URL(req.url),p=u.pathname,m=req.method;
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
@@ -35,12 +35,12 @@ async function handler(req,env){
   if(!emailRule.test(email)||display.length<1||password.length<8||password.length>128)return error(400,'Vul geldige gegevens in (wachtwoord minimaal 8 tekens)');
   const salt=secret(),digest=await passwordHash(password,salt),id=random();
   try{await env.DB.prepare('INSERT INTO accounts(id,email,display_name,password_salt,password_hash,created_at,status) VALUES(?,?,?,?,?,?,?)').bind(id,email,display,salt,digest,Date.now(),'active').run()}catch{return error(409,'Registreren is niet gelukt')}
-  return issueSession({id,display_name:display},env);
+  return issueSession({id,display_name:display,email},env);
  }
  if(p==='/api/login'&&m==='POST'){
   if(!await rateLimit(req,env,'login',12))return error(429,'Probeer later opnieuw');
   const d=await body(req),email=text(d.email,254).toLowerCase(),password=String(d.password||'');
-  const a=await env.DB.prepare("SELECT id,display_name,password_salt,password_hash FROM accounts WHERE email=? AND status='active'").bind(email).first();
+  const a=await env.DB.prepare("SELECT id,email,display_name,password_salt,password_hash FROM accounts WHERE email=? AND status='active'").bind(email).first();
   const comparison=await passwordHash(password.slice(0,128),a?.password_salt||'unknown-salt');
   if(!a||comparison!==a.password_hash)return error(401,'Gegevens niet herkend');
   return issueSession(a,env);
@@ -80,7 +80,7 @@ async function handler(req,env){
   const r=json({ok:true,message:'Je wachtwoord is gewijzigd. Meld je opnieuw aan.'});r.headers.set('set-cookie',cookie('',0));return r;
  }
  const user=await auth(req,env);
- if(p==='/api/me'&&m==='GET')return user?json({account:{id:user.id,displayName:user.display_name}}):error(401,'Aanmelden bij TALERA is nodig');
+ if(p==='/api/me'&&m==='GET')return user?json({account:{id:user.id,displayName:user.display_name,email:user.email}}):error(401,'Aanmelden bij TALERA is nodig');
  if(p==='/api/logout'&&m==='POST'){if(user){const c=(req.headers.get('cookie')||'').match(/talera_sid=([0-9a-f]{64})/);if(c)await env.DB.prepare('DELETE FROM sessions WHERE id_hash=?').bind(await sha(c[1])).run()}const x=json({ok:true});x.headers.set('set-cookie',cookie('',0));return x}
  if(!user)return error(401,'Aanmelden bij TALERA is nodig');
 

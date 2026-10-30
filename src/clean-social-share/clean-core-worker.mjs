@@ -21,12 +21,28 @@ async function issueSession(account,env){const t=secret();await env.DB.prepare('
 async function handler(req,env){
  const u=new URL(req.url),p=u.pathname,m=req.method;
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
+
+ const guestImage=p.match(/^\/gedeeld\/([0-9a-f]{64})\/foto$/);
+ if(guestImage&&m==='GET'){
+  const row=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(guestImage[1]),Date.now()).first();
+  if(!row||!env.SHARE_MEDIA)return page404();
+  const obj=await env.SHARE_MEDIA.get('guest-previews/'+row.id+'.jpg');
+  if(!obj)return page404();
+  return new Response(obj.body,{headers:{...secHeaders,'content-type':'image/jpeg','x-robots-tag':'noindex,nofollow','cross-origin-resource-policy':'cross-origin'}});
+ }
  if(p.startsWith('/gedeeld/')){
   if(m!=='GET')return error(405);
   const token=p.slice('/gedeeld/'.length);if(!/^[0-9a-f]{64}$/.test(token))return page404();
-  const row=await env.DB.prepare("SELECT m.title,m.story_text,m.event_date FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(token),Date.now()).first();
+  const row=await env.DB.prepare("SELECT s.id,m.title,m.story_text,m.event_date FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(token),Date.now()).first();
   if(!row)return page404();
-  return new Response('<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><title>'+escape(row.title)+' · TALERA</title><style>body{margin:0;background:#f4f7f9;color:#223a4c;font:16px/1.6 system-ui}.a{max-width:640px;margin:7vh auto;padding:30px;background:white;border-radius:24px}small{color:#667c8e}p{white-space:pre-wrap}@media(max-width:720px){.a{margin:12px;padding:24px}}</style></head><body><main class="a"><small>TALERA · Persoonlijk met jou gedeeld</small><h1>'+escape(row.title)+'</h1><small>'+escape(row.event_date)+'</small><p>'+escape(row.story_text)+'</p></main></body></html>',{headers:{...secHeaders,'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}});
+  const mediaKey='guest-previews/'+row.id+'.jpg';
+  const hasImage=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head(mediaKey));
+  const imageUrl=new URL('/gedeeld/'+token+'/foto',req.url).href;
+  const pageUrl=new URL('/gedeeld/'+token,req.url).href;
+  const caption=String(row.story_text||'').slice(0,150);
+  const meta='<meta property="og:type" content="article"><meta property="og:site_name" content="TALERA"><meta property="og:title" content="'+escape(row.title)+' · TALERA"><meta property="og:description" content="'+escape(caption)+'"><meta property="og:url" content="'+escape(pageUrl)+'">'+(hasImage?'<meta property="og:image" content="'+escape(imageUrl)+'"><meta property="og:image:secure_url" content="'+escape(imageUrl)+'"><meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="1200"><meta name="twitter:card" content="summary_large_image">':'');
+  const photo=hasImage?'<img class="photo" src="'+escape(imageUrl)+'" alt="Foto bij de gedeelde herinnering">':'';
+  return new Response('<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><title>'+escape(row.title)+' · TALERA</title>'+meta+'<style>body{margin:0;background:#f4f7f9;color:#223a4c;font:16px/1.6 system-ui}.a{max-width:640px;margin:7vh auto;padding:30px;background:white;border-radius:24px}small{color:#667c8e}p{white-space:pre-wrap}.photo{display:block;width:100%;height:auto;max-height:510px;object-fit:cover;border-radius:18px;margin:14px 0}@media(max-width:720px){.a{margin:12px;padding:24px}}</style></head><body><main class="a"><small>TALERA · Persoonlijk met jou gedeeld</small><h1>'+escape(row.title)+'</h1>'+photo+'<small>'+escape(row.event_date)+'</small><p>'+escape(row.story_text)+'</p></main></body></html>',{headers:{...secHeaders,'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}});
  }
  if(m!=='GET'&&!allowedWrite(req))return error(403,'Ongeldige herkomst');
  if(p==='/api/register'&&m==='POST'){
@@ -184,8 +200,24 @@ async function handler(req,env){
  const share=p.match(/^\/api\/memories\/([0-9a-f-]{36})\/shares$/);
  if(share&&m==='POST'){const own=await env.DB.prepare('SELECT id FROM memories WHERE id=? AND account_id=?').bind(share[1],user.id).first();if(!own)return error(404,'Niet gevonden');const d=await body(req),hours=Number(d.hours);if(![1,24,168,720].includes(hours)||d.consent!==true)return error(400,'Geldigheidsduur en toestemming verplicht');const t=secret(),id=random(),exp=Date.now()+hours*3600000;await env.DB.prepare('INSERT INTO shares(id,account_id,memory_id,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)').bind(id,user.id,share[1],await sha(t),exp,Date.now()).run();return json({id,link:new URL('/gedeeld/'+t,req.url).href,expiresAt:new Date(exp).toISOString()},201)}
  if(p==='/api/shares'&&m==='GET'){const rows=await env.DB.prepare('SELECT id,memory_id,expires_at,revoked_at FROM shares WHERE account_id=? ORDER BY created_at DESC LIMIT 200').bind(user.id).all();return json({items:rows.results||[]})}
+
+ const uploadPhoto=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/photo$/);
+ if(uploadPhoto&&m==='POST'){
+  const share=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories mem ON mem.id=s.memory_id AND mem.account_id=s.account_id WHERE s.id=? AND s.account_id=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(uploadPhoto[1],user.id,Date.now()).first();
+  if(!share)return error(404,'Uitnodiging niet gevonden');
+  if(!env.SHARE_MEDIA)return error(503,'Veilige foto-opslag nog niet beschikbaar');
+  const ctype=(req.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+  if(ctype!=='image/jpeg')return error(415,'Stuur alleen een JPEG-foto');
+  if(Number(req.headers.get('content-length')||0)>1500000)return error(413,'Foto te groot');
+  const bytes=await req.arrayBuffer();
+  if(bytes.byteLength<80||bytes.byteLength>1500000)return error(413,'Foto moet kleiner zijn dan 1,5 MB');
+  const magic=new Uint8Array(bytes);
+  if(magic[0]!==255||magic[1]!==216||magic[2]!==255)return error(415,'Geen geldige JPEG');
+  await env.SHARE_MEDIA.put('guest-previews/'+share.id+'.jpg',bytes,{httpMetadata:{contentType:'image/jpeg'}});
+  return json({ok:true,photo:true});
+ }
  const revoke=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/revoke$/);
- if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();return json({revoked:(r.meta?.changes||0)>0})}
+ if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();const revoked=(r.meta?.changes||0)>0;if(revoked&&env.SHARE_MEDIA)await env.SHARE_MEDIA.delete('guest-previews/'+revoke[1]+'.jpg');return json({revoked})}
  const readThread=p.match(/^\/api\/messages\/memory\/([0-9a-f-]{36})\/read$/);
  if(readThread&&m==='POST'){const exists=await accessible(readThread[1]);if(!exists)return error(404,'Herinnering niet gevonden');await env.DB.prepare('UPDATE messages SET read_at=COALESCE(read_at,?) WHERE account_id=? AND memory_id=? AND read_at IS NULL').bind(Date.now(),user.id,readThread[1]).run();return json({ok:true})}
  if(p==='/api/messages/unread-count'&&m==='GET'){const row=await env.DB.prepare('SELECT COUNT(*) AS total FROM messages WHERE account_id=? AND read_at IS NULL').bind(user.id).first();return json({unread:row?.total||0})}

@@ -31,6 +31,9 @@ const css=[
 '#talera-more-menu label{display:block;color:#354d61;font-size:13px;font-weight:650;margin:13px 0}',
 '#talera-more-menu input,#talera-more-menu textarea,#talera-more-menu select{width:100%;display:block;border:1px solid #ccd7df;background:#fff;border-radius:11px;padding:12px;color:#223c51;font:inherit;margin-top:5px}',
 '#talera-more-menu textarea{min-height:60px;resize:vertical}',
+'#talera-more-menu header,#talera-more-menu h1,#talera-more-menu .intro,#talera-more-menu label,#talera-more-menu .section-label,#talera-more-menu .option,#talera-more-menu .account-card{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}',
+'#talera-more-menu input,#talera-more-menu textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}',
+'#talera-more-menu .panel:focus{outline:none}',
 '#talera-more-menu .password-row{position:relative}#talera-more-menu .password-row input{padding-right:55px}#talera-more-menu .eye{position:absolute;right:6px;top:6px;background:#edf2f4;border:0;border-radius:9px;min-width:40px;height:38px;font-size:19px}',
 '#talera-more-menu .primary{width:100%;border:0;border-radius:14px;padding:13px;margin:9px 0 0;background:#315d78;color:#fff;font:700 15px system-ui}',
 '#talera-more-menu .secondary{width:100%;border:1px solid #dbe6ec;border-radius:13px;padding:11px;margin-top:8px;background:#fff;color:#315d78;font:650 14px system-ui}',
@@ -43,7 +46,7 @@ const css=[
 ].join('');
 const style=document.createElement('style');style.id='talera-more-style';style.textContent=css;document.head.appendChild(style);
 const shell=document.createElement('div');shell.id='talera-more-menu';shell.hidden=true;
-shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-label="Meer"><header><button class="headbutton" data-action="back" aria-label="Terug">‹</button><strong>Meer</strong><button class="headbutton" data-action="close" aria-label="Sluiten">×</button></header><div class="body"></div></section>';
+shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-label="Meer" tabindex="-1"><header><button class="headbutton" data-action="back" aria-label="Terug">‹</button><strong>Meer</strong><button class="headbutton" data-action="close" aria-label="Sluiten">×</button></header><div class="body"></div></section>';
 document.body.append(shell);
 const body=shell.querySelector('.body'),head=shell.querySelector('header strong'),back=shell.querySelector('[data-action="back"]');
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null};
@@ -161,7 +164,7 @@ function render(){
 function feedback(message,error=false){state.notice=message;state.error=error;render()}
 function go(view){if(!state.open)return;state.history.push(state.view);state.view=view;state.notice='';render();void load(view)}
 function backOne(){if(!state.history.length){close();return}state.view=state.history.pop();state.notice='';render();void load(state.view)}
-function open(view='hub',intent=null){if(state.open){if(view!=='hub'){state.view=view;state.history=[];state.intent=intent;state.notice='';render()}return}state.open=true;state.view=view;state.intent=intent;state.history=[];state.notice='';shell.hidden=false;document.body.dataset.taleraMoreOpen='true';render();void load(view)}
+function open(view='hub',intent=null){if(state.open){if(view!=='hub'){state.view=view;state.history=[];state.intent=intent;state.notice='';render()}return}state.open=true;state.view=view;state.intent=intent;state.history=[];state.notice='';shell.hidden=false;document.body.dataset.taleraMoreOpen='true';render();shell.querySelector('.panel')?.focus({preventScroll:true});void load(view)}
 function close(){state.open=false;state.intent=null;shell.hidden=true;delete document.body.dataset.taleraMoreOpen;trigger()?.focus?.()}
 async function load(view){
  try{

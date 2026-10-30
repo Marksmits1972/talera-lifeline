@@ -148,7 +148,7 @@ async function handler(req,env){
  if(threadLike&&m==='POST'){
   const memory=await accessible(threadLike[1]);if(!memory)return error(404,'Herinnering niet gevonden');
   const found=await env.DB.prepare('SELECT 1 AS yes FROM likes WHERE memory_id=? AND account_id=?').bind(threadLike[1],user.id).first();
-  if(found){await env.DB.prepare('DELETE FROM likes WHERE memory_id=? AND account_id=?').bind(threadLike[1],user.id).run();await env.DB.prepare("DELETE FROM messages WHERE memory_id=? AND account_id=? AND kind='like' AND comment_id=? AND read_at IS NULL").bind(threadLike[1],memory.account_id,user.id).run()}else{await env.DB.prepare('INSERT INTO likes(memory_id,account_id,created_at) VALUES(?,?,?)').bind(threadLike[1],user.id,Date.now()).run();if(memory.account_id!==user.id)await env.DB.prepare("INSERT INTO messages(id,account_id,memory_id,comment_id,kind,created_at) VALUES(?,?,?,?,?,?)").bind(random(),memory.account_id,threadLike[1],user.id,'like',Date.now()).run()}
+  if(found){await env.DB.prepare('DELETE FROM likes WHERE memory_id=? AND account_id=?').bind(threadLike[1],user.id).run();void 0}else{await env.DB.prepare('INSERT INTO likes(memory_id,account_id,created_at) VALUES(?,?,?)').bind(threadLike[1],user.id,Date.now()).run();if(memory.account_id!==user.id)await env.DB.prepare("INSERT INTO messages(id,account_id,memory_id,comment_id,kind,created_at) VALUES(?,?,?,?,?,?)").bind(random(),memory.account_id,threadLike[1],null,'like',Date.now()).run()}
   return json({hearted:!found});
  }
  if(p==='/api/memories'&&m==='GET'){const result=await env.DB.prepare('SELECT id,title,story_text,event_date,updated_at FROM memories WHERE account_id=? ORDER BY updated_at DESC LIMIT 200').bind(user.id).all();return json({items:result.results||[]})}

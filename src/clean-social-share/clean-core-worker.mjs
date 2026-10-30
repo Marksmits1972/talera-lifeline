@@ -8,7 +8,7 @@ const random=()=>crypto.randomUUID();
 const secret=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
 const emailRule=/^[^\s@]{1,64}@[^\s@]{2,190}$/;
 const uuidRule=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const passwordHash=async (password,salt)=>Array.from(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:te.encode(salt),iterations:220000,hash:'SHA-256'},await crypto.subtle.importKey('raw',te.encode(password),'PBKDF2',false,['deriveBits']),256)),b=>b.toString(16).padStart(2,'0')).join('');
+const passwordHash=async (password,salt)=>Array.from(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:te.encode(salt),iterations:100000,hash:'SHA-256'},await crypto.subtle.importKey('raw',te.encode(password),'PBKDF2',false,['deriveBits']),256)),b=>b.toString(16).padStart(2,'0')).join('');
 const text=(s,n)=>String(s??'').trim().slice(0,n);
 async function body(req){if(Number(req.headers.get('content-length')||0)>16000)throw Error('Te grote aanvraag');const s=await req.text();if(s.length>16000)throw Error('Te grote aanvraag');return JSON.parse(s||'{}')}
 async function auth(req,env){const m=(req.headers.get('cookie')||'').match(/(?:^|;\s*)talera_sid=([0-9a-f]{64})(?:;|$)/);if(!m)return null;const h=await sha(m[1]),row=await env.DB.prepare("SELECT a.id,a.email,a.display_name FROM sessions s JOIN accounts a ON s.account_id=a.id WHERE s.id_hash=? AND s.expires_at>? AND a.status='active'").bind(h,Date.now()).first();return row||null}
@@ -20,7 +20,6 @@ async function rateLimit(req,env,category,threshold=12){const name=await sha((re
 async function issueSession(account,env){const t=secret();await env.DB.prepare('INSERT INTO sessions(id_hash,account_id,expires_at,created_at) VALUES(?,?,?,?)').bind(await sha(t),account.id,Date.now()+86400000*7,Date.now()).run();const r=json({account:{id:account.id,displayName:account.display_name}});r.headers.set('set-cookie',cookie(t,604800));return r}
 async function handler(req,env){
  const u=new URL(req.url),p=u.pathname,m=req.method;
- if(p==='/__diagnose-crypto'&&m==='GET'){try{const h=await passwordHash('staging-diagnostic-password','test-salt');return json({crypto:'ok',length:h.length})}catch(e){return json({crypto:'failed',name:String(e?.name||''),message:String(e?.message||'').slice(0,100)},500)}}
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
  if(p.startsWith('/gedeeld/')){
   if(m!=='GET')return error(405);

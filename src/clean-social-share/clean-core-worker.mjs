@@ -151,6 +151,28 @@ async function handler(req,env){
   if(found){await env.DB.prepare('DELETE FROM likes WHERE memory_id=? AND account_id=?').bind(threadLike[1],user.id).run();void 0}else{await env.DB.prepare('INSERT INTO likes(memory_id,account_id,created_at) VALUES(?,?,?)').bind(threadLike[1],user.id,Date.now()).run();if(memory.account_id!==user.id)await env.DB.prepare("INSERT INTO messages(id,account_id,memory_id,comment_id,kind,created_at) VALUES(?,?,?,?,?,?)").bind(random(),memory.account_id,threadLike[1],null,'like',Date.now()).run()}
   return json({hearted:!found});
  }
+
+ if(p==='/api/pwa/memory-link'&&m==='GET'){
+  const localId=String(u.searchParams.get('localMemoryId')||'');
+  if(!localId||localId.length>128)return error(400,'Ongeldige herinnering');
+  const row=await env.DB.prepare('SELECT memory_id FROM pwa_memory_links WHERE account_id=? AND local_memory_id=?').bind(user.id,localId).first();
+  return json({memoryId:row?.memory_id||null});
+ }
+ if(p==='/api/pwa/memory-link'&&m==='POST'){
+  const d=await body(req),localId=String(d.localMemoryId||''),title=text(d.title,180),storyText=text(d.storyText,12000),eventDate=text(d.eventDate,32);
+  if(d.consent!==true)return error(403,'Publiceren vereist uitdrukkelijke toestemming');
+  if(!localId||localId.length>128||!title||!storyText)return error(400,'Ongeldige herinnering');
+  const existing=await env.DB.prepare('SELECT memory_id FROM pwa_memory_links WHERE account_id=? AND local_memory_id=?').bind(user.id,localId).first();
+  if(existing)return json({memoryId:existing.memory_id,alreadyLinked:true});
+  const id=random(),now=Date.now();
+  try{
+   await env.DB.batch([
+    env.DB.prepare('INSERT INTO memories(id,account_id,title,story_text,event_date,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(id,user.id,title,storyText,eventDate,now,now),
+    env.DB.prepare('INSERT INTO pwa_memory_links(account_id,local_memory_id,memory_id,created_at) VALUES(?,?,?,?)').bind(user.id,localId,id,now)
+   ]);
+  }catch(e){return error(409,'Herinnering kon niet eenduidig worden gekoppeld')}
+  return json({memoryId:id,alreadyLinked:false},201);
+ }
  if(p==='/api/memories'&&m==='GET'){const result=await env.DB.prepare('SELECT id,title,story_text,event_date,updated_at FROM memories WHERE account_id=? ORDER BY updated_at DESC LIMIT 200').bind(user.id).all();return json({items:result.results||[]})}
  if(p==='/api/memories'&&m==='POST'){const d=await body(req),title=text(d.title,180),story=text(d.storyText,12000),date=text(d.eventDate,32);if(!title||!story)return error(400,'Titel en verhaal zijn verplicht');const id=random(),now=Date.now();await env.DB.prepare('INSERT INTO memories(id,account_id,title,story_text,event_date,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(id,user.id,title,story,date,now,now).run();return json({id,title,eventDate:date},201)}
  const memory=p.match(/^\/api\/memories\/([0-9a-f-]{36})$/);

@@ -15,6 +15,13 @@
 - PWA-runtimevelden voor `story`, `fullStory` en `at` worden nu correct omgezet naar `title`, `storyText` en `eventDate` in canonieke geheugenopslag. Publiceren doet geen dubbele memory mapping.
 - Wachtwoord vergeten heeft nu een echt formulier dat de bestaande `/api/password/forgot` gebruikt.
 
+## WhatsApp-preview-correctie — 30 oktober 2026, na iPhone-test
+- De eerste foto-preview werd uit twee tekenlagen opgebouwd: uitgevulde, wazige achtergrond plus een tweede volledige foto in het midden. Op WhatsApp veroorzaakte dat een ongewenst beeld met drie stroken.
+- De gedeelde JPEG op 1200 × 630 bevat nu **precies één tekening van de geselecteerde bronfoto**, met een gecentreerde uitsnede (cover), zonder collage of wazige zijpanelen.
+- De WhatsApp-tekst wordt nu alleen de persoonlijke URL; titel en TALERA staan al in Open Graph. De OG-beschrijving verwijdert een identieke begintitel uit de verhaaltekst.
+- Via mobiele browser geverifieerd: module geladen, exact één `drawImage`, geen `blur(22px)`, één sociale bediening en WhatsApp-tekst zonder dubbele introductie.
+- **Nog op iPhone te bevestigen** met een nieuw gegenereerde uitnodiging: eindkaart in WhatsApp. Bestaande links/kaartcaches worden niet met terugwerkende kracht herschreven. WhatsApp kan de URL onder de kaart blijven tonen; dit is platformgedrag.
+
 ## Nog NIET als afgerond te claimen
 1. **Foto bij WhatsApp-gastlink**: gekoppeld op 30-10-2026. Vanuit de gekozen herinnering wordt na expliciete toestemming een JPEG-voorbeeld (1200×630) gemaakt en beveiligd opgeslagen onder de bestaande share-ID. De persoonlijke gastpagina bevat nu een tokengebonden `og:image` en een zichtbare foto. De foto wordt alleen vrijgegeven voor een geldige, niet-ingetrokken token; bij intrekking wordt de tijdelijke foto verwijderd. Tijdelijke opslag krijgt een 31-daagse lifecycle-regel. **Nog open**: bevestigen met een echt nieuwe WhatsApp-uitnodiging op een iPhone dat de kaart de foto toont; video in gastlinks en afzonderlijke foto-bijlage zijn niet inbegrepen.
 2. **Herstelmail werkelijk versturen**: de clean-core Worker heeft alleen D1-binding en mist momenteel `RESEND_API_KEY` en `RESET_FROM`. Het formulier is gekoppeld, maar e-maillevering is niet actief.

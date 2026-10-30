@@ -84,6 +84,25 @@ async function handler(req,env){
  if(p==='/api/logout'&&m==='POST'){if(user){const c=(req.headers.get('cookie')||'').match(/talera_sid=([0-9a-f]{64})/);if(c)await env.DB.prepare('DELETE FROM sessions WHERE id_hash=?').bind(await sha(c[1])).run()}const x=json({ok:true});x.headers.set('set-cookie',cookie('',0));return x}
  if(!user)return error(401,'Aanmelden bij TALERA is nodig');
 
+
+ if(p==='/api/discovery'&&m==='GET'){
+  const a=await env.DB.prepare("SELECT discoverable,public_handle FROM accounts WHERE id=?").bind(user.id).first();
+  return json({discoverable:!!a?.discoverable,publicHandle:a?.public_handle||null});
+ }
+ if(p==='/api/discovery'&&m==='POST'){
+  const d=await body(req),enabled=d.discoverable===true;
+  const handle='t-'+user.id.slice(0,12);
+  await env.DB.prepare("UPDATE accounts SET discoverable=?,public_handle=COALESCE(public_handle,?) WHERE id=?").bind(enabled?1:0,handle,user.id).run();
+  return json({discoverable:enabled,publicHandle:handle});
+ }
+ if(p==='/api/people/search'&&m==='GET'){
+  if(!await rateLimit(req,env,'people-search',60))return error(429,'Te veel zoekopdrachten');
+  const q=text(u.searchParams.get('q'),70).trim();
+  if(q.length<2)return json({items:[]});
+  const term='%'+q.replace(/[%_\\]/g,'')+'%';
+  const r=await env.DB.prepare("SELECT id,display_name,public_handle FROM accounts WHERE discoverable=1 AND status='active' AND id<>? AND (lower(display_name) LIKE lower(?) OR lower(public_handle) LIKE lower(?)) ORDER BY display_name LIMIT 12").bind(user.id,term,term).all();
+  return json({items:(r.results||[]).map(x=>({id:x.id,name:x.display_name,handle:x.public_handle}))});
+ }
  if(p==='/api/people'&&m==='GET'){
   const q=text(u.searchParams.get('email'),254).toLowerCase();
   if(!emailRule.test(q))return json({items:[]});
@@ -95,15 +114,12 @@ async function handler(req,env){
  }
  const grant=p.match(/^\/api\/memories\/([0-9a-f-]{36})\/grant$/);
  if(grant&&m==='POST'){
-  const d=await body(req),username=text(d.username,100).replace(/\s+/g,' ').trim();
-  if(username.length<2)return error(400,'Vul de gebruikersnaam in');
+  const d=await body(req),recipientId=String(d.recipientId||'');
+  if(!uuidRule.test(recipientId))return error(400,'Kies eerst een TALERA-gebruiker uit de zoekresultaten');
   const own=await env.DB.prepare('SELECT id,title FROM memories WHERE id=? AND account_id=?').bind(grant[1],user.id).first();
   if(!own)return error(404,'Herinnering niet gevonden');
-  const found=await env.DB.prepare("SELECT id,display_name FROM accounts WHERE lower(trim(display_name))=lower(?) AND status='active' AND id<>? LIMIT 3").bind(username,user.id).all();
-  const matches=found.results||[];
-  if(matches.length===0)return error(404,'Geen TALERA-gebruiker met deze naam gevonden.');
-  if(matches.length>1)return error(409,'Deze gebruikersnaam is niet uniek. Deel niet voordat de accounts een unieke gebruikersnaam hebben.');
-  const recipient=matches[0];
+  const recipient=await env.DB.prepare("SELECT id,display_name FROM accounts WHERE id=? AND discoverable=1 AND status='active'").bind(recipientId).first();
+  if(!recipient||recipient.id===user.id)return error(404,'Deze gebruiker is niet beschikbaar om mee te delen');
   const now=Date.now();await env.DB.prepare('INSERT INTO memory_grants(memory_id,recipient_account_id,owner_account_id,created_at,revoked_at) VALUES(?,?,?,?,NULL) ON CONFLICT(memory_id,recipient_account_id) DO UPDATE SET revoked_at=NULL,created_at=excluded.created_at').bind(grant[1],recipient.id,user.id,now).run();
   await env.DB.prepare('INSERT INTO messages(id,account_id,memory_id,kind,created_at) VALUES(?,?,?,?,?)').bind(random(),recipient.id,grant[1],'shared',now).run();
   return json({ok:true,recipientName:recipient.display_name},201);

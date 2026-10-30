@@ -95,14 +95,18 @@ async function handler(req,env){
  }
  const grant=p.match(/^\/api\/memories\/([0-9a-f-]{36})\/grant$/);
  if(grant&&m==='POST'){
-  const d=await body(req),email=text(d.email,254).toLowerCase();if(!emailRule.test(email))return error(400,'Vul het e-mailadres van de ontvanger in');
+  const d=await body(req),username=text(d.username,100).replace(/\\s+/g,' ').trim();
+  if(username.length<2)return error(400,'Vul de gebruikersnaam in');
   const own=await env.DB.prepare('SELECT id,title FROM memories WHERE id=? AND account_id=?').bind(grant[1],user.id).first();
   if(!own)return error(404,'Herinnering niet gevonden');
-  const recipient=await env.DB.prepare("SELECT id FROM accounts WHERE email=? AND status='active'").bind(email).first();
-  if(!recipient||recipient.id===user.id)return error(404,'Geen ander TALERA-account met dit e-mailadres gevonden');
+  const found=await env.DB.prepare("SELECT id,display_name FROM accounts WHERE lower(trim(display_name))=lower(?) AND status='active' AND id<>? LIMIT 3").bind(username,user.id).all();
+  const matches=found.results||[];
+  if(matches.length===0)return error(404,'Geen TALERA-gebruiker met deze naam gevonden.');
+  if(matches.length>1)return error(409,'Deze gebruikersnaam is niet uniek. Deel niet voordat de accounts een unieke gebruikersnaam hebben.');
+  const recipient=matches[0];
   const now=Date.now();await env.DB.prepare('INSERT INTO memory_grants(memory_id,recipient_account_id,owner_account_id,created_at,revoked_at) VALUES(?,?,?,?,NULL) ON CONFLICT(memory_id,recipient_account_id) DO UPDATE SET revoked_at=NULL,created_at=excluded.created_at').bind(grant[1],recipient.id,user.id,now).run();
   await env.DB.prepare('INSERT INTO messages(id,account_id,memory_id,kind,created_at) VALUES(?,?,?,?,?)').bind(random(),recipient.id,grant[1],'shared',now).run();
-  return json({ok:true},201);
+  return json({ok:true,recipientName:recipient.display_name},201);
  }
  const accessible=async id=>env.DB.prepare('SELECT m.id,m.account_id FROM memories m LEFT JOIN memory_grants g ON g.memory_id=m.id AND g.recipient_account_id=? AND g.revoked_at IS NULL WHERE m.id=? AND (m.account_id=? OR g.recipient_account_id IS NOT NULL)').bind(user.id,id,user.id).first();
  const thread=p.match(/^\/api\/threads\/([0-9a-f-]{36})$/);

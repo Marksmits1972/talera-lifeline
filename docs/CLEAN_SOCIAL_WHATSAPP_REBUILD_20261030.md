@@ -26,7 +26,7 @@ De gepubliceerde V50 hangt via V49 aan V45. Er zijn concurrerende oude deelpaden
 
 ## Automatische proeven
 
-Een afzonderlijk lokaal herstelpakket met ES-modules, tests en staging D1-schema heeft 13 van de 13 huidige unit-/simulatietests groen: 20 snelle switches, correcte cache, reacties direct, dedupe, rollback, vier expiraties, eigenaar-auth fail-closed, tokenhergebruik/idempotentie, verval/intrekken en media-autorisatie.
+Een afzonderlijk lokaal herstelpakket met ES-modules, tests en staging D1-schema heeft 14 van de 14 huidige unit-/simulatietests groen: 20 snelle switches, correcte cache, reacties direct, dedupe, rollback, vier expiraties, eigenaar-auth fail-closed, tokenhergebruik/idempotentie, verval/intrekken en media-autorisatie.
 
 ## Nog niet afgerond
 

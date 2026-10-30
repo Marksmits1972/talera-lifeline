@@ -65,4 +65,4 @@ async function handler(req,env){
  if(p==='/api/messages'&&m==='GET'){const rows=await env.DB.prepare('SELECT id,memory_id,comment_id,kind,read_at,created_at FROM messages WHERE account_id=? ORDER BY created_at DESC LIMIT 100').bind(user.id).all();return json({items:rows.results||[]})}
  return error(404,'Niet gevonden');
 }
-export default {async fetch(request,env){try{return await handler(request,env)}catch(e){return error(500,'TALERA staging: '+String(e?.name||'error')+' '+String(e?.message||'').slice(0,130))}}};
+export default {async fetch(request,env){try{return await handler(request,env)}catch(e){return error(500,'TALERA kon de aanvraag niet verwerken')}}};

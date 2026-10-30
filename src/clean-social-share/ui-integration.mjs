@@ -8,17 +8,58 @@ const icons = {
 };
 function escapeText(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function stored(id){try{return JSON.parse(localStorage.getItem('talera-clean-local:'+id)||'null')||{hearted:false,heartCount:0,comments:[],commentCount:0}}catch{return {hearted:false,heartCount:0,comments:[],commentCount:0}}}
-async function findStoryId(memoryId){return new Promise(resolve=>{try{const r=indexedDB.open('talera-v43-local-draft',1);r.onerror=()=>resolve(null);r.onupgradeneeded=()=>resolve(null);r.onsuccess=()=>{const db=r.result;if(!db.objectStoreNames.contains('drafts')){db.close();resolve(null);return}const tx=db.transaction('drafts','readonly');const q=tx.objectStore('drafts').get('shared:'+memoryId);q.onsuccess=()=>{const id=q.result?.storyId;db.close();resolve(/^[0-9a-f-]{36}$/i.test(id||'')?id:null)};q.onerror=()=>{db.close();resolve(null)}}}catch{resolve(null)}})}
+
+async function coreRequest(path,options={}){
+ const r=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers:{'accept':'application/json',...(options.headers||{})}});
+ const d=await r.json().catch(()=>null);
+ if(!r.ok)throw Error(d?.error||(r.status===401?'Meld je aan bij TALERA':'TALERA-accountdienst niet beschikbaar'));
+ return d;
+}
+async function findStoryId(localMemoryId){
+ try{
+  const d=await coreRequest('/api/pwa/memory-link?localMemoryId='+encodeURIComponent(localMemoryId));
+  return d.memoryId||null;
+ }catch(e){if(/Meld je aan|niet beschikbaar/.test(String(e.message)))return null;throw e}
+}
 const socialAdapter={
  findStoryId,
  loadLocal:async id=>stored(id),
- async fetchSnapshot({storyId}){const r=await fetch('/api/account-social/stories/'+encodeURIComponent(storyId)+'/thread',{credentials:'same-origin',cache:'no-store'});if(!r.ok||!(r.headers.get('content-type')||'').includes('application/json'))throw Error('Reacties uit het account zijn nog niet beschikbaar in deze test.');const d=await r.json();return {hearted:!!d.storyLiked,heartCount:Number(d.storyLikes)||0,commentCount:(d.comments||[]).length,comments:(d.comments||[]).map(c=>({id:c.id,from:c.author,text:c.body}))}},
- async commitLocal({memoryId,snapshot}){localStorage.setItem('talera-clean-local:'+memoryId,JSON.stringify(snapshot));return {snapshot}},
- async commit(){throw Error('Reageren op het gedeelde serververhaal wordt nog aangesloten.')}
+ async fetchSnapshot({storyId}){
+  const d=await coreRequest('/api/threads/'+encodeURIComponent(storyId));
+  return {hearted:!!d.hearted,heartCount:Number(d.heartCount)||0,commentCount:(d.items||[]).length,comments:(d.items||[]).map(c=>({id:c.id,from:c.display_name,text:c.body,authorId:c.author_id}))};
+ },
+ async commitLocal({memoryId,snapshot}){
+  localStorage.setItem('talera-clean-local:'+memoryId,JSON.stringify(snapshot));
+  return {snapshot};
+ },
+ async commit({storyId,operation}){
+  if(operation.type==='toggle-heart')await coreRequest('/api/threads/'+encodeURIComponent(storyId)+'/like',{method:'POST'});
+  else if(operation.type==='comment')await coreRequest('/api/threads/'+encodeURIComponent(storyId)+'/comments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({body:operation.body})});
+  else throw Error('Onbekende reactie');
+  const d=await coreRequest('/api/threads/'+encodeURIComponent(storyId));
+  return {snapshot:{hearted:!!d.hearted,heartCount:d.heartCount,comments:(d.items||[]).map(c=>({id:c.id,from:c.display_name,text:c.body})),commentCount:(d.items||[]).length}};
+ }
 };
 const shareAdapter={
- async publish(){throw Error('Veilige TALERA-eigenaarscontrole en tijdelijke media-publicatie worden nog aangesloten. Er is niets gedeeld.')},
- async createInvite(){throw Error('Gastlinkdienst nog niet gekoppeld.')}
+ async publish({memoryId,consent}){
+  if(!consent)throw Error('Toestemming ontbreekt');
+  const item=window.__taleraTimelineRuntime?.currentMemory?.();
+  if(String(item?.id)!==String(memoryId))throw Error('De gekozen herinnering is veranderd');
+  const existing=await findStoryId(memoryId);
+  if(existing)return {storyId:existing};
+  const storyText=String(item?.storyText||item?.description||item?.text||'').trim();
+  const title=String(item?.title||item?.name||'').trim();
+  if(!title||!storyText)throw Error('Deze herinnering heeft nog geen tekst. Veilige publicatie van foto’s en video’s moet eerst worden gekoppeld.');
+  const d=await coreRequest('/api/pwa/memory-link',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({localMemoryId:memoryId,title,storyText,consent:true})});
+  return {storyId:d.memoryId};
+ },
+ async createInvite({storyId,durationHours}){
+  const d=await coreRequest('/api/memories/'+encodeURIComponent(storyId)+'/shares',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({hours:durationHours,consent:true})});
+  return {url:d.link,shareId:d.id,durationHours,expiresAt:d.expiresAt};
+ },
+ async revokeInvite({shareId}){
+  return coreRequest('/api/shares/'+encodeURIComponent(shareId)+'/revoke',{method:'POST'});
+ }
 };
 function mount(){
  if(document.getElementById('talera-clean-social'))return;

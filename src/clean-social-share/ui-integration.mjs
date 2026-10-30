@@ -65,7 +65,7 @@ function mount(){
  for(const id of ['talera-v12-reactions-bar','talera-v12-react-overlay','talera-v12-react-sheet'])document.getElementById(id)?.remove();
  document.querySelectorAll('.talera-share-shell').forEach(e=>e.remove());
  const style=document.createElement('style');style.id='talera-clean-style';style.textContent=css;document.head.append(style);
- const bar=document.createElement('nav');bar.id='talera-clean-social';bar.setAttribute('aria-label','Reacties en delen');
+ const bar=document.createElement('div');bar.id='talera-clean-social';bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Reacties en delen');
  bar.innerHTML='<button data-action="heart" aria-label="Hartje geven" aria-pressed="false">'+icons.heart+'<span class="count">0</span></button><button data-action="comments" aria-label="Berichten openen">'+icons.comment+'<span class="count">0</span></button><button data-action="share" aria-label="Delen">'+icons.share+'<span>Delen</span></button>';
  const overlay=document.createElement('div');overlay.id='talera-clean-overlay';overlay.hidden=true;overlay.innerHTML='<section id="talera-clean-panel" role="dialog" aria-modal="true" tabindex="-1"></section>';
  document.body.append(bar,overlay);

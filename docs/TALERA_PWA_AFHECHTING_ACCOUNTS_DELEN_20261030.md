@@ -16,7 +16,7 @@
 - Wachtwoord vergeten heeft nu een echt formulier dat de bestaande `/api/password/forgot` gebruikt.
 
 ## Nog NIET als afgerond te claimen
-1. **Foto/video bij WhatsApp-gastlink**: de huidige clean-core `/gedeeld/{token}` toont tekst; foto's/video's zijn nog niet veilig gekoppeld aan gastlink-publicatie. De UI meldt dit uitdrukkelijk. Bouw dit als media-uitbreiding van dezelfde kern met eigenaar-/token-/intrekkingscontrole, géén tweede deelservice.
+1. **Foto bij WhatsApp-gastlink**: gekoppeld op 30-10-2026. Vanuit de gekozen herinnering wordt na expliciete toestemming een JPEG-voorbeeld (1200×630) gemaakt en beveiligd opgeslagen onder de bestaande share-ID. De persoonlijke gastpagina bevat nu een tokengebonden `og:image` en een zichtbare foto. De foto wordt alleen vrijgegeven voor een geldige, niet-ingetrokken token; bij intrekking wordt de tijdelijke foto verwijderd. Tijdelijke opslag krijgt een 31-daagse lifecycle-regel. **Nog open**: bevestigen met een echt nieuwe WhatsApp-uitnodiging op een iPhone dat de kaart de foto toont; video in gastlinks en afzonderlijke foto-bijlage zijn niet inbegrepen.
 2. **Herstelmail werkelijk versturen**: de clean-core Worker heeft alleen D1-binding en mist momenteel `RESEND_API_KEY` en `RESET_FROM`. Het formulier is gekoppeld, maar e-maillevering is niet actief.
 3. **Echte gebruikerssessie end-to-end**: login → terug naar dezelfde PWA-herinnering → hartje/reactie → delen → WhatsApp-link → ontvangen → intrekken nog live testen met Mark/Jill in gescheiden browsers, zonder wachtwoorden te delen.
 4. **Mijn mensen / ontvangeruitnodiging**: zoeken en privacy werken via de kern, maar de volledige ontvangerselectie in het originele PWA-deelvenster nog toetsen/afronden.

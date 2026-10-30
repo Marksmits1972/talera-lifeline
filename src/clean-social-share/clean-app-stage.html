@@ -26,5 +26,7 @@ $('searchPeople').onclick=()=>run(async()=>{selectedRecipient=null;$('peopleMatc
 $('grant').onclick=()=>run(async()=>{if(!selectedRecipient)throw Error('Zoek en selecteer eerst de juiste TALERA-gebruiker.');const btn=$('grant');btn.disabled=true;btn.textContent='Delen…';try{const result=await api('/api/memories/'+memory.id+'/grant','POST',{recipientId:selectedRecipient.id});$('recipient').value='';selectedRecipient=null;$('peopleMatches').replaceChildren();$('chosenPerson').textContent='Kies eerst een gebruiker uit de zoekresultaten.';note('Gelukt! Gedeeld met '+result.recipientName+'. De herinnering staat bij deze persoon onder Gedeeld en in de berichtenbox.');btn.textContent='✓ Gedeeld';setTimeout(()=>{btn.textContent='Herinnering delen'},2200)}finally{btn.disabled=false;if(btn.textContent==='Delen…')btn.textContent='Herinnering delen'}});
 $('back').onclick=()=>showTab(lastTab);
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
+async function syncInbox(){if(!user||document.hidden)return;await refreshUnread();if(currentTab==='inbox'&&!$('inbox').hidden)await loadMessages()}
+window.addEventListener('focus',()=>run(syncInbox));document.addEventListener('visibilitychange',()=>{if(!document.hidden)run(syncInbox)});setInterval(()=>{if(user&&!document.hidden)run(syncInbox)},15000);
 run(async()=>{try{const r=await api('/api/me');user=r.account;authState(true)}catch{authState(false)}});
 </script></body></html>

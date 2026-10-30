@@ -45,6 +45,40 @@ async function handler(req,env){
   if(!a||comparison!==a.password_hash)return error(401,'Gegevens niet herkend');
   return issueSession(a,env);
  }
+
+ if(p==='/api/password/forgot'&&m==='POST'){
+  if(!env.RESEND_API_KEY||!env.RESET_FROM)return error(503,'Wachtwoordherstel wordt nog ingericht. Probeer later opnieuw.');
+  if(!await rateLimit(req,env,'password-reset-request',5))return error(429,'Probeer later opnieuw');
+  const d=await body(req),email=text(d.email,254).toLowerCase();
+  const generic=json({message:'Als dit e-mailadres bij TALERA bekend is, ontvang je een herstelmail.'});
+  if(!emailRule.test(email))return generic;
+  const account=await env.DB.prepare("SELECT id,email FROM accounts WHERE email=? AND status='active'").bind(email).first();
+  if(!account)return generic;
+  const t=secret(),h=await sha(t),now=Date.now();
+  await env.DB.prepare('DELETE FROM password_resets WHERE account_id=?').bind(account.id).run();
+  await env.DB.prepare('INSERT INTO password_resets(token_hash,account_id,created_at,expires_at) VALUES(?,?,?,?)').bind(h,account.id,now,now+15*60*1000).run();
+  const origin=new URL(req.url).origin,link=origin+'/wachtwoord-herstellen?code='+t;
+  let sent=false;
+  try{
+   const resp=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'authorization':'Bearer '+env.RESEND_API_KEY,'content-type':'application/json'},body:JSON.stringify({from:env.RESET_FROM,to:[email],subject:'Herstel je TALERA-wachtwoord',text:'Je hebt een wachtwoordherstel aangevraagd voor TALERA.\n\nGebruik deze link binnen 15 minuten:\n'+link+'\n\nHeb jij dit niet aangevraagd? Negeer dit bericht.'})});
+   sent=resp.ok;
+  }catch{}
+  if(!sent){await env.DB.prepare('DELETE FROM password_resets WHERE token_hash=?').bind(h).run();return error(503,'Herstelmail kan momenteel niet worden verzonden. Probeer later opnieuw.')}
+  return generic;
+ }
+ if(p==='/api/password/reset'&&m==='POST'){
+  if(!await rateLimit(req,env,'password-reset-confirm',10))return error(429,'Probeer later opnieuw');
+  const d=await body(req),token=String(d.code||''),password=String(d.password||'');
+  if(!/^[0-9a-f]{64}$/.test(token)||password.length<12||password.length>128)return error(400,'Ongeldige of verlopen link of wachtwoord');
+  const tokenHash=await sha(token),now=Date.now();
+  const record=await env.DB.prepare('SELECT account_id FROM password_resets WHERE token_hash=? AND used_at IS NULL AND expires_at>?').bind(tokenHash,now).first();
+  if(!record)return error(400,'De herstellink is ongeldig, verlopen of al gebruikt.');
+  const salt=secret(),digest=await passwordHash(password,salt);
+  const upd=await env.DB.prepare('UPDATE password_resets SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at>?').bind(now,tokenHash,now).run();
+  if(upd.meta?.changes!==1)return error(400,'De herstellink is al gebruikt.');
+  await env.DB.batch([env.DB.prepare('UPDATE accounts SET password_salt=?,password_hash=? WHERE id=?').bind(salt,digest,record.account_id),env.DB.prepare('DELETE FROM sessions WHERE account_id=?').bind(record.account_id),env.DB.prepare('DELETE FROM password_resets WHERE account_id=? AND token_hash<>?').bind(record.account_id,tokenHash)]);
+  const r=json({ok:true,message:'Je wachtwoord is gewijzigd. Meld je opnieuw aan.'});r.headers.set('set-cookie',cookie('',0));return r;
+ }
  const user=await auth(req,env);
  if(p==='/api/me'&&m==='GET')return user?json({account:{id:user.id,displayName:user.display_name}}):error(401,'Aanmelden bij TALERA is nodig');
  if(p==='/api/logout'&&m==='POST'){if(user){const c=(req.headers.get('cookie')||'').match(/talera_sid=([0-9a-f]{64})/);if(c)await env.DB.prepare('DELETE FROM sessions WHERE id_hash=?').bind(await sha(c[1])).run()}const x=json({ok:true});x.headers.set('set-cookie',cookie('',0));return x}

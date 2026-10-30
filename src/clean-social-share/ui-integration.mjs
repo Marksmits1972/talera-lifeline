@@ -1,6 +1,6 @@
 import {SocialController} from './social-controller.mjs';
 import {ShareController} from './share-controller.mjs';
-const css = '#talera-clean-social{position:fixed;right:18px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:96;display:flex;gap:3px;padding:6px 8px;background:rgba(250,252,255,.20);border:1px solid #ffffffb8;border-radius:22px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 5px 22px #0003}#talera-clean-social[hidden],#talera-clean-overlay[hidden]{display:none!important;pointer-events:none!important}#talera-clean-social button{background:transparent;border:0;color:white;min-width:48px;padding:4px;cursor:pointer;font:600 12px system-ui;display:grid;justify-items:center;gap:1px;text-shadow:0 1px 3px #0007}#talera-clean-social svg{width:23px;height:23px;stroke:currentColor;stroke-width:1.7;fill:none}#talera-clean-social button[aria-pressed=true] svg{fill:white}#talera-clean-overlay{position:fixed;inset:0;z-index:120;display:grid;place-items:end center;background:#0e1f3066}#talera-clean-panel{box-sizing:border-box;width:100%;max-width:700px;max-height:80dvh;overflow:auto;border-radius:28px 28px 0 0;background:#fafaf9;color:#1b3449;padding:22px 20px calc(24px + env(safe-area-inset-bottom));font:15px/1.5 system-ui;box-shadow:0 -9px 33px #0003}#talera-clean-panel h2{font-size:23px;margin:2px 0 14px}#talera-clean-panel button{cursor:pointer;font:inherit;border-radius:12px;padding:11px 14px}#talera-clean-panel .primary{display:block;background:#315f87;color:#fff;border:0;width:100%;font-weight:700;margin:12px 0}#talera-clean-panel .primary:disabled{opacity:.55}#talera-clean-panel .close{float:right;background:transparent;border:0;font-size:21px;padding:2px 10px}#talera-clean-panel label{display:block;font-weight:650;margin:12px 0 5px}#talera-clean-panel select,#talera-clean-panel textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b8c7d0;border-radius:12px;background:#fff;color:inherit;font:inherit}#talera-clean-panel .status{font-size:13px;line-height:1.45;color:#5b6c77;margin:10px 0}#talera-clean-panel .comment{border-bottom:1px solid #e2e7e9;padding:8px 0}';
+const css = '#talera-clean-social{position:fixed;right:18px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:96;display:flex;gap:3px;padding:6px 8px;background:rgba(250,252,255,.20);border:1px solid #ffffffb8;border-radius:22px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 5px 22px #0003}#talera-clean-social{transition:opacity .13s ease-out,visibility 0s linear,transform .13s ease-out;will-change:opacity}#talera-clean-social[data-motion=moving]{opacity:0!important;visibility:hidden!important;pointer-events:none!important;transform:translateY(13px)!important;transition:opacity .1s ease,transform .1s ease,visibility 0s linear .1s!important}#talera-clean-social[hidden],#talera-clean-overlay[hidden]{display:none!important;pointer-events:none!important}#talera-clean-social button{background:transparent;border:0;color:white;min-width:48px;padding:4px;cursor:pointer;font:600 12px system-ui;display:grid;justify-items:center;gap:1px;text-shadow:0 1px 3px #0007}#talera-clean-social svg{width:23px;height:23px;stroke:currentColor;stroke-width:1.7;fill:none}#talera-clean-social button[aria-pressed=true] svg{fill:white}#talera-clean-overlay{position:fixed;inset:0;z-index:120;display:grid;place-items:end center;background:#0e1f3066}#talera-clean-panel{box-sizing:border-box;width:100%;max-width:700px;max-height:80dvh;overflow:auto;border-radius:28px 28px 0 0;background:#fafaf9;color:#1b3449;padding:22px 20px calc(24px + env(safe-area-inset-bottom));font:15px/1.5 system-ui;box-shadow:0 -9px 33px #0003}#talera-clean-panel h2{font-size:23px;margin:2px 0 14px}#talera-clean-panel button{cursor:pointer;font:inherit;border-radius:12px;padding:11px 14px}#talera-clean-panel .primary{display:block;background:#315f87;color:#fff;border:0;width:100%;font-weight:700;margin:12px 0}#talera-clean-panel .primary:disabled{opacity:.55}#talera-clean-panel .close{float:right;background:transparent;border:0;font-size:21px;padding:2px 10px}#talera-clean-panel label{display:block;font-weight:650;margin:12px 0 5px}#talera-clean-panel select,#talera-clean-panel textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b8c7d0;border-radius:12px;background:#fff;color:inherit;font:inherit}#talera-clean-panel .status{font-size:13px;line-height:1.45;color:#5b6c77;margin:10px 0}#talera-clean-panel .comment{border-bottom:1px solid #e2e7e9;padding:8px 0}';
 const icons = {
  heart:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.8c-2-2.1-5.2-2.1-7.3 0L12 6.3l-1.5-1.5c-2.1-2.1-5.3-2.1-7.3 0-2.3 2.2-2.3 5.6 0 7.8L12 21l8.8-8.4c2.2-2.2 2.2-5.6 0-7.8z"/></svg>',
  comment:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.8-.3-4-.9L3 21l1.6-4.8A8.5 8.5 0 1 1 20.5 11.5z"/></svg>',
@@ -72,10 +72,58 @@ function mount(){
  const panel=overlay.firstElementChild;
  const social=new SocialController(socialAdapter),share=new ShareController(shareAdapter);
  let mode=null,memory=runtime.currentMemory(),focus=null,consent=false;
- function close(){mode=null;overlay.hidden=true;bar.hidden=false;share.close();focus?.focus?.()}
- function open(next){mode=next;focus=document.activeElement;overlay.hidden=false;bar.hidden=true;render();panel.focus()}
- function onMemory(m){if(!m?.id)return;memory=m;social.select(String(m.id));if(mode)close()}
- const unsub=runtime.subscribe(onMemory);onMemory(runtime.currentMemory());
+ // Follow the established V32 band motion rules. Do not read social data for
+ // transient memories while swiping: only select the settled photo/memory.
+ let motion=true,forcedMotion=false,stableSince=0,settledMemoryId=null;
+ const QUIET_MS=340;
+ function setMotion(next){
+  if(motion===next)return;
+  motion=next;bar.dataset.motion=next?'moving':'settled';
+ }
+ bar.dataset.motion='moving';
+ function bandMoving(){
+  const band=window.__taleraIntegratedBand?.getState?.();
+  const velocity=Math.abs(Number(band?.v)||0);
+  const movement=!!(band?.drag||band?.snap||band?.timelineTracking||velocity>.02);
+  const p=Number(band?.p);
+  const visualSettled=!!(band&&band.titleMode==='idle'&&!movement&&Number.isFinite(p)&&Math.abs(p-Math.round(p))<.002);
+  return forcedMotion||movement||!!((window.__taleraBandRolling||band?.active)&&!visualSettled)||!!runtime.isMoving?.();
+ }
+ function checkMotion(){
+  if(document.hidden){setMotion(true);stableSince=0;return}
+  const next=runtime.currentMemory?.();
+  if(next?.id!=null&&String(next.id)!==String(memory?.id))onMemory(next);
+  if(bandMoving()){stableSince=0;setMotion(true);return}
+  if(!stableSince)stableSince=performance.now();
+  if(performance.now()-stableSince<QUIET_MS){setMotion(true);return}
+  const current=runtime.currentMemory?.()||memory;
+  if(!current?.id){setMotion(true);return}
+  const id=String(current.id);
+  if(settledMemoryId!==id){
+   memory=current;settledMemoryId=id;social.select(id);
+   bar.dataset.memoryId=id;
+  }
+  setMotion(false);
+ }
+ function close(){mode=null;overlay.hidden=true;bar.hidden=false;share.close();checkMotion();focus?.focus?.()}
+ function open(next){if(motion)return;mode=next;focus=document.activeElement;overlay.hidden=false;bar.hidden=true;render();panel.focus()}
+ function onMemory(m){
+  if(!m?.id)return;
+  const changed=String(m.id)!==String(memory?.id);
+  memory=m;
+  if(changed){stableSince=0;setMotion(true);if(mode)close()}
+  checkMotion();
+ }
+ const unsub=runtime.subscribe(onMemory);
+ document.addEventListener('talera:wheel-motion',event=>{
+  forcedMotion=event.detail?.active===true;
+  stableSince=0;
+  if(forcedMotion)setMotion(true);
+  else checkMotion();
+ });
+ document.addEventListener('visibilitychange',()=>{stableSince=0;checkMotion()});
+ const motionTimer=setInterval(checkMotion,75);
+ onMemory(runtime.currentMemory());
  social.subscribe(v=>{const h=bar.querySelector('[data-action=heart]');h.querySelector('.count').textContent=String(v.data.heartCount);h.setAttribute('aria-pressed',String(v.data.hearted));bar.querySelector('[data-action=comments] .count').textContent=String(v.data.commentCount);if(mode==='comments')render()});
  share.subscribe(()=>{if(mode==='share')render()});
  function render(){if(!mode)return;const closeButton='<button type="button" class="close" data-action="close" aria-label="Sluiten">×</button>';
@@ -84,12 +132,12 @@ function mount(){
   const options=[1,24,168,720].map(h=>'<option value="'+h+'" '+(v.durationHours===h?'selected':'')+'>'+labels[h]+'</option>').join('');
   panel.innerHTML=closeButton+'<h2>Delen via WhatsApp</h2><p><strong>'+escapeText(memory?.title||memory?.story||'Herinnering')+'</strong></p><p>Alleen deze herinnering wordt gedeeld.</p><label for="talera-clean-expiry">Link geldig voor</label><select id="talera-clean-expiry">'+options+'</select><label style="font-weight:normal"><input id="talera-clean-consent" type="checkbox" '+(consent?'checked':'')+'> Ik geef toestemming deze herinnering tijdelijk te publiceren.</label><p class="status">'+escapeText(v.error||'Kies een geldigheidsduur en geef toestemming om deze herinnering te delen.')+'</p><button type="button" class="primary" data-action="prepare">Uitnodiging voorbereiden</button><button type="button" class="primary" data-action="send" '+(v.state==='ready'?'':'disabled')+'>Verzenden via WhatsApp</button>';
  }
- bar.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(!button)return;const a=button.dataset.action;if(a==='heart')void social.mutate({type:'toggle-heart'});if(a==='comments'){open('comments');social.openComments()}if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}});
+ bar.addEventListener('click',e=>{if(motion)return;const button=e.target.closest('[data-action]');if(!button)return;const a=button.dataset.action;if(a==='heart')void social.mutate({type:'toggle-heart'});if(a==='comments'){open('comments');social.openComments()}if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}});
  overlay.addEventListener('click',e=>{if(e.target===overlay){close();return}const a=e.target.closest('[data-action]')?.dataset.action;if(a==='close'){close();return}if(a==='prepare'){consent=!!panel.querySelector('#talera-clean-consent')?.checked;void share.prepare({consent}).catch(error=>{const p=panel.querySelector('.status');if(p)p.textContent=String(error.message||error)});return}if(a==='send'){try{location.assign(share.whatsappUrl())}catch(error){panel.querySelector('.status').textContent=error.message}}});
  overlay.addEventListener('change',e=>{if(e.target.id==='talera-clean-expiry'){share.setDuration(Number(e.target.value));consent=false}else if(e.target.id==='talera-clean-consent')consent=e.target.checked});
  overlay.addEventListener('submit',e=>{if(e.target.id!=='talera-clean-comment-form')return;e.preventDefault();const input=e.target.querySelector('textarea');const body=input.value.trim();if(!body)return;input.disabled=true;void social.mutate({type:'comment',body}).then(r=>{if(r.ok)input.value='';else{const status=panel.querySelector('.status');if(status)status.textContent=r.error||'Reactie niet opgeslagen'}input.disabled=false})});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mode)close()});
- window.__taleraCleanSocial={social,share,open,close,unsub};
+ window.__taleraCleanSocial={social,share,open,close,unsub,motionState:()=>({moving:motion,settledMemoryId,pendingMemoryId:memory?.id,forcedMotion}),stopMotionMonitor:()=>clearInterval(motionTimer)};
  document.documentElement.dataset.cleanSocial='mounted';
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();

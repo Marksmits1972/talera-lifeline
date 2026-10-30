@@ -66,14 +66,14 @@ function passwordField(id,label,autocomplete){return '<label>'+label+'<span clas
 function render(){
  if(!state.open)return;
  back.hidden=!state.history.length;
- head.textContent=state.view==='hub'?'Meer':({account:'Mijn account',login:'Aanmelden',register:'Account aanmaken',privacy:'Privacy',people:'Mijn mensen',shared:'Met mij gedeeld',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',subscription:'Mijn abonnement',help:'Hulp'})[state.view]||'Meer';
+ head.textContent=state.view==='hub'?'Meer':({account:'Mijn account',login:'Aanmelden',register:'Account aanmaken',privacy:'Privacy',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Mijn gedeelde herinneringen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',subscription:'Mijn abonnement',help:'Hulp'})[state.view]||'Meer';
  let html='',a=state.account;
  switch(state.view){
  case 'hub':{
   const enabled=!!window.__taleraAudioControls?.isEnabled?.();
   html=title('Meer','Je account, mensen en algemene TALERA-instellingen op één plek.')+
   '<button class="account-card" data-view="account"><span class="avatar">'+esc((a?.displayName||'T').charAt(0).toUpperCase())+'</span><span class="account-copy"><strong>'+esc(a?.displayName||'Mijn TALERA-account')+'</strong><small>'+esc(a?.email||'Account aanmaken of aanmelden')+'</small></span><span>›</span></button>'+
-  section('Delen en mensen',option('people','○','Mijn mensen','Mensen zoeken en uitnodigen')+option('shared','⌁','Met mij gedeeld','Herinneringen die anderen delen')+option('messages','✉','Berichten','Reacties en gesprekken bij herinneringen'))+
+  section('Delen en mensen',option('mine','▣','Mijn gedeelde herinneringen','Eigen herinneringen en gesprekken')+option('people','○','Mijn mensen','Mensen zoeken en uitnodigen')+option('shared','⌁','Met mij gedeeld','Herinneringen die anderen delen')+option('messages','✉','Berichten','Reacties en gesprekken bij herinneringen'))+
   section('Luisteren',action(enabled?'disable-listening':'enable-listening',enabled?'Ⅱ':'▶',enabled?'Luisteren uitschakelen':'Luisteren inschakelen','Geluid bij gesproken herinneringen'))+
   section('Mijn TALERA',option('subscription','◇','Mijn abonnement','Pakket en betalingen')+option('privacy','♢','Privacy en beveiliging','Vindbaarheid en accountprivacy')+option('notifications','•','Meldingen','Nieuwe reacties en updates')+option('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave'))+
   section('Ondersteuning',option('help','?','Hulp en over TALERA','Uitleg, voorwaarden en contact'));
@@ -112,6 +112,10 @@ function render(){
   (a?'<form data-form="search"><label>Zoek naam of gebruikersnaam<input name="q" value="'+esc(state.query)+'" minlength="2" autocomplete="off" placeholder="Zoek binnen TALERA"></label><button class="primary" type="submit">Zoeken</button></form>'+
   (state.search.length?section('Gevonden',state.search.map(p=>'<div class="thread-item"><strong>'+esc(p.name)+'</strong><p>@'+esc(p.handle||'')+'</p></div>').join('')):''):
   info('Aanmelden nodig','Meld je aan om andere TALERA-gebruikers te zoeken.')+'<button class="primary" data-view="login">Aanmelden</button>');break;
+ case 'mine':
+  html=title('Mijn gedeelde herinneringen','Herinneringen in je TALERA-account.')+(a?
+   (state.memories.length?state.memories.map(m=>'<button class="option" data-thread="'+esc(m.id)+'"><span class="copy"><strong>'+esc(m.title)+'</strong><small>'+esc(m.event_date||'Open het gesprek bij deze herinnering')+'</small></span><span>›</span></button>').join(''):info('Nog geen herinneringen in je account','Je eigen herinneringen verschijnen hier nadat je ze hebt opgeslagen.')):
+   info('Aanmelden nodig','Meld je aan om je herinneringen te zien.'));break;
  case 'shared':
   html=title('Met mij gedeeld','Herinneringen waartoe je persoonlijk toegang hebt.')+(a?
    (state.shared.length?state.shared.map(m=>'<button class="option" data-thread="'+esc(m.id)+'"><span class="copy"><strong>'+esc(m.title)+'</strong><small>Gedeeld door '+esc(m.owner_name)+'</small></span><span>›</span></button>').join(''):info('Geen gedeelde herinneringen','Nieuwe herinneringen verschijnen hier zodra iemand met je deelt.')):
@@ -157,11 +161,12 @@ function open(){if(state.open)return;state.open=true;state.view='hub';state.hist
 function close(){state.open=false;shell.hidden=true;delete document.body.dataset.taleraMoreOpen;trigger()?.focus?.()}
 async function load(view){
  try{
-  if(view==='hub'||view==='account'||view==='settings'||view==='privacy'||view==='people'||view==='shared'||view==='messages'){
+  if(view==='hub'||view==='account'||view==='settings'||view==='privacy'||view==='people'||view==='shared'||view==='mine'||view==='messages'){
    try{const m=await api('/api/me');state.account=m.account}catch(e){if(e.status===401)state.account=null;else throw e}
    if(state.account&&(view==='hub'||view==='account'||view==='privacy'||view==='settings'))state.discovery=await api('/api/discovery');
   }
-  if(!state.account&&(view==='messages'||view==='shared'||view==='people')){if(state.open&&state.view===view)render();return}
+  if(!state.account&&(view==='messages'||view==='shared'||view==='mine'||view==='people')){if(state.open&&state.view===view)render();return}
+  if(view==='mine')state.memories=(await api('/api/memories')).items||[];
   if(view==='messages')state.messages=(await api('/api/messages')).items||[];
   if(view==='shared')state.shared=(await api('/api/shared-with-me')).items||[];
   if(view==='thread'&&state.thread){const id=state.thread;state.threadData=await api('/api/threads/'+encodeURIComponent(id));await api('/api/messages/memory/'+encodeURIComponent(id)+'/read','POST',{});}

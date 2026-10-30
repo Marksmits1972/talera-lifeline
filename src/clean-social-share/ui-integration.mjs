@@ -1,6 +1,6 @@
 import {SocialController} from './social-controller.mjs';
 import {ShareController} from './share-controller.mjs';
-const css = '#talera-clean-social{position:fixed;right:18px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:96;display:flex;gap:3px;padding:6px 8px;background:rgba(250,252,255,.20);border:1px solid #ffffffb8;border-radius:22px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 5px 22px #0003}#talera-clean-social{transition:opacity .13s ease-out,visibility 0s linear,transform .13s ease-out;will-change:opacity}#talera-clean-social[data-motion=moving]{opacity:0!important;visibility:hidden!important;pointer-events:none!important;transform:translateY(13px)!important;transition:opacity .1s ease,transform .1s ease,visibility 0s linear .1s!important}#talera-clean-social[hidden],#talera-clean-overlay[hidden]{display:none!important;pointer-events:none!important}#talera-clean-social button{background:transparent;border:0;color:white;min-width:48px;padding:4px;cursor:pointer;font:600 12px system-ui;display:grid;justify-items:center;gap:1px;text-shadow:0 1px 3px #0007}#talera-clean-social svg{width:23px;height:23px;stroke:currentColor;stroke-width:1.7;fill:none}#talera-clean-social button[aria-pressed=true] svg{fill:white}#talera-clean-overlay{position:fixed;inset:0;z-index:120;display:grid;place-items:end center;background:#0e1f3066}#talera-clean-panel{box-sizing:border-box;width:100%;max-width:700px;max-height:80dvh;overflow:auto;border-radius:28px 28px 0 0;background:#fafaf9;color:#1b3449;padding:22px 20px calc(24px + env(safe-area-inset-bottom));font:15px/1.5 system-ui;box-shadow:0 -9px 33px #0003}#talera-clean-panel h2{font-size:23px;margin:2px 0 14px}#talera-clean-panel button{cursor:pointer;font:inherit;border-radius:12px;padding:11px 14px}#talera-clean-panel .primary{display:block;background:#315f87;color:#fff;border:0;width:100%;font-weight:700;margin:12px 0}#talera-clean-panel .primary:disabled{opacity:.55}#talera-clean-panel .close{float:right;background:transparent;border:0;font-size:21px;padding:2px 10px}#talera-clean-panel label{display:block;font-weight:650;margin:12px 0 5px}#talera-clean-panel select,#talera-clean-panel textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b8c7d0;border-radius:12px;background:#fff;color:inherit;font:inherit}#talera-clean-panel .status{font-size:13px;line-height:1.45;color:#5b6c77;margin:10px 0}#talera-clean-panel .comment{border-bottom:1px solid #e2e7e9;padding:8px 0}';
+const css = '#talera-clean-social{position:fixed;right:18px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:96;display:flex;gap:3px;padding:6px 8px;background:rgba(250,252,255,.20);border:1px solid #ffffffb8;border-radius:22px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 5px 22px #0003}#talera-clean-social{transition:opacity .13s ease-out,visibility 0s linear,transform .13s ease-out;will-change:opacity}#talera-clean-social[data-motion=moving]{opacity:0!important;visibility:hidden!important;pointer-events:none!important;transform:translateY(13px)!important;transition:opacity .1s ease,transform .1s ease,visibility 0s linear .1s!important}#talera-clean-social[hidden],#talera-clean-overlay[hidden]{display:none!important;pointer-events:none!important}#talera-clean-social button{background:transparent;border:0;color:white;min-width:48px;padding:4px;cursor:pointer;font:600 12px system-ui;display:grid;justify-items:center;gap:1px;text-shadow:0 1px 3px #0007}#talera-clean-social svg{width:23px;height:23px;stroke:currentColor;stroke-width:1.7;fill:none}#talera-clean-social button[aria-pressed=true] svg{fill:white}#talera-clean-overlay{position:fixed;inset:0;z-index:120;display:grid;place-items:end center;background:#0e1f3066}#talera-clean-panel{box-sizing:border-box;width:100%;max-width:700px;max-height:80dvh;overflow:auto;border-radius:28px 28px 0 0;background:#fafaf9;color:#1b3449;padding:22px 20px calc(24px + env(safe-area-inset-bottom));font:15px/1.5 system-ui;box-shadow:0 -9px 33px #0003}#talera-clean-panel h2{font-size:23px;margin:2px 0 14px}#talera-clean-panel button{cursor:pointer;font:inherit;border-radius:12px;padding:11px 14px}#talera-clean-panel .primary{display:block;background:#315f87;color:#fff;border:0;width:100%;font-weight:700;margin:12px 0}#talera-clean-panel .primary:disabled{opacity:.55}#talera-clean-panel .close{float:right;background:transparent;border:0;font-size:21px;padding:2px 10px}#talera-clean-panel label{display:block;font-weight:650;margin:12px 0 5px}#talera-clean-panel select,#talera-clean-panel textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b8c7d0;border-radius:12px;background:#fff;color:inherit;font:inherit}#talera-clean-panel .status{font-size:13px;line-height:1.45;color:#5b6c77;margin:10px 0}#talera-clean-panel .photo-thumb{display:block;width:100%;height:155px;object-fit:cover;border-radius:15px;margin:12px 0;background:#eef2f5}#talera-clean-panel .comment{border-bottom:1px solid #e2e7e9;padding:8px 0}';
 const icons = {
  heart:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.8c-2-2.1-5.2-2.1-7.3 0L12 6.3l-1.5-1.5c-2.1-2.1-5.3-2.1-7.3 0-2.3 2.2-2.3 5.6 0 7.8L12 21l8.8-8.4c2.2-2.2 2.2-5.6 0-7.8z"/></svg>',
  comment:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.8-.3-4-.9L3 21l1.6-4.8A8.5 8.5 0 1 1 20.5 11.5z"/></svg>',
@@ -37,6 +37,39 @@ const socialAdapter={
   return {snapshot:{hearted:!!d.hearted,heartCount:d.heartCount,comments:(d.items||[]).map(c=>({id:c.id,from:c.display_name,text:c.body})),commentCount:(d.items||[]).length}};
  }
 };
+
+async function previewPhotoBlob(memory){
+ const source=String(memory?.image||memory?.previewImage||'').trim();
+ if(!source)return null;
+ if(!/^(https?:\/\/|blob:|data:image\/)/i.test(source))throw Error('Deze foto kan niet veilig voor WhatsApp worden voorbereid.');
+ let res;
+ try{res=await fetch(source,{mode:'cors',credentials:'same-origin',cache:'no-store'})}
+ catch{throw Error('De foto kan niet worden geladen. Er is nog niets gedeeld.')}
+ if(!res.ok)throw Error('De foto is niet beschikbaar. Er is nog niets gedeeld.');
+ const original=await res.blob();
+ if(!original.type.startsWith('image/'))throw Error('Deze herinnering bevat geen bruikbare foto.');
+ const src=URL.createObjectURL(original);
+ const photo=new Image();
+ try{
+  photo.decoding='async';
+  await new Promise((resolve,reject)=>{photo.onload=resolve;photo.onerror=()=>reject(Error('De foto kan niet worden gelezen.'));photo.src=src});
+  const w=1200,h=630,sw=photo.naturalWidth,sh=photo.naturalHeight;
+  if(!sw||!sh)throw Error('De foto heeft geen geldige afmetingen.');
+  const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+  const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw Error('Foto verwerken lukt niet op dit apparaat.');
+  const cover=Math.max(w/sw,h/sh),bw=sw*cover,bh=sh*cover;
+  ctx.filter='blur(22px) brightness(.75)';
+  ctx.drawImage(photo,(w-bw)/2,(h-bh)/2,bw,bh);
+  ctx.filter='none';
+  const fit=Math.min(w/sw,h/sh),fw=sw*fit,fh=sh*fit;
+  ctx.drawImage(photo,(w-fw)/2,(h-fh)/2,fw,fh);
+  let jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.83));
+  if(!jpeg||jpeg.size>1500000)jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.64));
+  if(!jpeg||jpeg.size>1500000)throw Error('Foto is te groot om veilig via WhatsApp te delen.');
+  return jpeg;
+ }finally{URL.revokeObjectURL(src)}
+}
+
 const shareAdapter={
  async publish({memoryId,consent}){
   if(!consent)throw Error('Toestemming ontbreekt');
@@ -51,9 +84,22 @@ const shareAdapter={
   const d=await coreRequest('/api/pwa/memory-link',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({localMemoryId:memoryId,title,storyText,eventDate,consent:true})});
   return {storyId:d.memoryId};
  },
- async createInvite({storyId,durationHours}){
+ async createInvite({memoryId,storyId,durationHours}){
+  const current=window.__taleraTimelineRuntime?.currentMemory?.();
+  if(String(current?.id)!==String(memoryId))throw Error('De gekozen herinnering is veranderd. Probeer opnieuw.');
+  // Prepare the approved image before creating an invitation; never send a
+  // text-only link when a selected photo failed to upload.
+  const preview=await previewPhotoBlob(current);
   const d=await coreRequest('/api/memories/'+encodeURIComponent(storyId)+'/shares',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({hours:durationHours,consent:true})});
-  return {url:d.link,shareId:d.id,durationHours,expiresAt:d.expiresAt};
+  if(preview){
+   try{
+    await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo',{method:'POST',headers:{'content-type':'image/jpeg'},body:preview});
+   }catch(e){
+    await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/revoke',{method:'POST'}).catch(()=>{});
+    throw Error('De foto kon niet aan de uitnodiging worden toegevoegd. De link is niet verzonden: '+e.message);
+   }
+  }
+  return {url:d.link,shareId:d.id,durationHours,expiresAt:d.expiresAt,photo:!!preview};
  },
  async revokeInvite({shareId}){
   return coreRequest('/api/shares/'+encodeURIComponent(shareId)+'/revoke',{method:'POST'});
@@ -139,11 +185,11 @@ function mount(){
   if(mode==='comments'){const s=social.current();const list=s.data.comments.map(c=>'<div class="comment"><strong>'+escapeText(c.from||'Gebruiker')+'</strong><p>'+escapeText(c.text||'')+'</p></div>').join('');panel.innerHTML=closeButton+'<h2>Berichten</h2><p class="status">'+(s.status==='loading'?'Reacties worden geladen…':escapeText(s.error||(!s.storyId?'Nog niet gekoppeld aan je TALERA-account.':'')))+'</p>'+(list||'<p>Nog geen berichten.</p>')+'<p class="status">'+(/aanmelden/i.test(s.error||'')?'<button type="button" class="primary" data-action="signin-comments">Aanmelden om te reageren</button>':'')+'</p><form id="talera-clean-comment-form"><label for="clean-comment">Reageren</label><textarea id="clean-comment" rows="2" maxlength="4000" required></textarea><button class="primary" type="submit">Versturen</button></form>';return}
   const v=share.current(),labels={1:'1 uur',24:'1 dag',168:'7 dagen',720:'30 dagen'};
   const options=[1,24,168,720].map(h=>'<option value="'+h+'" '+(v.durationHours===h?'selected':'')+'>'+labels[h]+'</option>').join('');
-  panel.innerHTML=closeButton+'<h2>Delen via WhatsApp</h2><p><strong>'+escapeText(memory?.title||memory?.story||'Herinnering')+'</strong></p><p>Alleen deze herinnering wordt gedeeld.</p><label for="talera-clean-expiry">Link geldig voor</label><select id="talera-clean-expiry">'+options+'</select><label style="font-weight:normal"><input id="talera-clean-consent" type="checkbox" '+(consent?'checked':'')+'> Ik geef toestemming deze herinnering tijdelijk te publiceren.</label><p class="status">'+escapeText(shareAuth===false?'Meld je één keer aan om een persoonlijke deel-link te maken.':shareAuth===null?'TALERA controleert je aanmelding…':shareAuth==='error'?'Aanmeldstatus kon niet worden gecontroleerd. Probeer het opnieuw.':v.error||'Kies een geldigheidsduur en geef toestemming om deze herinnering te delen.')+'</p>'+
+  panel.innerHTML=closeButton+'<h2>Delen via WhatsApp</h2><p><strong>'+escapeText(memory?.title||memory?.story||'Herinnering')+'</strong></p><p>Alleen deze herinnering wordt gedeeld.</p>'+(memory?.image&&/^(https?:\/\/|blob:|data:image\/)/i.test(String(memory.image))?'<img class="photo-thumb" src="'+escapeText(memory.image)+'" alt="Foto die bij de uitnodiging wordt getoond">':'')+'<label for="talera-clean-expiry">Link geldig voor</label><select id="talera-clean-expiry">'+options+'</select><label style="font-weight:normal"><input id="talera-clean-consent" type="checkbox" '+(consent?'checked':'')+'> Ik geef toestemming deze herinnering tijdelijk te publiceren.</label><p class="status">'+escapeText(shareAuth===false?'Meld je één keer aan om een persoonlijke deel-link te maken.':shareAuth===null?'TALERA controleert je aanmelding…':shareAuth==='error'?'Aanmeldstatus kon niet worden gecontroleerd. Probeer het opnieuw.':v.error||'Kies een geldigheidsduur en geef toestemming om deze herinnering te delen.')+'</p>'+
    (shareAuth===false?'<button type="button" class="primary" data-action="signin">Aanmelden om te delen</button>':
     '<button type="button" class="primary" data-action="prepare" '+(shareAuth===true?'':'disabled')+'>Uitnodiging voorbereiden</button>')+
    '<button type="button" class="primary" data-action="send" '+(shareAuth===true&&v.state==='ready'?'':'disabled')+'>Verzenden via WhatsApp</button>'+
-   (memory?.image?'<p class="status">Let op: de foto of video van deze herinnering is nog niet gekoppeld aan de tijdelijke gastlink. De link toont voorlopig alleen de verhaaltekst.</p>':'');
+   (v.state==='ready'?'<p class="status">'+(v.invite?.photo?'De foto is toegevoegd aan de persoonlijke link. WhatsApp kan deze als voorbeeld tonen.':'Dit verhaal heeft geen foto; alleen de tekst wordt gedeeld.')+'</p>':'');
  }
  bar.addEventListener('click',e=>{if(motion)return;const button=e.target.closest('[data-action]');if(!button)return;const a=button.dataset.action;if(a==='heart')void social.mutate({type:'toggle-heart'});if(a==='comments'){open('comments');social.openComments()}if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}});
  overlay.addEventListener('click',e=>{if(e.target===overlay){close();return}const a=e.target.closest('[data-action]')?.dataset.action;if(a==='close'){close();return}if(a==='signin'||a==='signin-comments'){overlay.hidden=true;document.dispatchEvent(new CustomEvent('talera:open-auth',{detail:{intent:a==='signin'?'share':'comments'}}));return}

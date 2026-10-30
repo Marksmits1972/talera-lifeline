@@ -23,15 +23,15 @@ async function handler(req,env){
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
 
  const guestImage=p.match(/^\/gedeeld\/([0-9a-f]{64})\/foto$/);
- if(guestImage&&m==='GET'){
+ if(guestImage&&(m==='GET'||m==='HEAD')){
   const row=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(guestImage[1]),Date.now()).first();
   if(!row||!env.SHARE_MEDIA)return page404();
   const obj=await env.SHARE_MEDIA.get('guest-previews/'+row.id+'.jpg');
   if(!obj)return page404();
-  return new Response(obj.body,{headers:{...secHeaders,'content-type':'image/jpeg','x-robots-tag':'noindex,nofollow','cross-origin-resource-policy':'cross-origin'}});
+  return new Response(m==='HEAD'?null:obj.body,{headers:{...secHeaders,'content-type':'image/jpeg','x-robots-tag':'noindex,nofollow','cross-origin-resource-policy':'cross-origin'}});
  }
  if(p.startsWith('/gedeeld/')){
-  if(m!=='GET')return error(405);
+  if(m!=='GET'&&m!=='HEAD')return error(405);
   const token=p.slice('/gedeeld/'.length);if(!/^[0-9a-f]{64}$/.test(token))return page404();
   const row=await env.DB.prepare("SELECT s.id,m.title,m.story_text,m.event_date FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(token),Date.now()).first();
   if(!row)return page404();
@@ -40,9 +40,9 @@ async function handler(req,env){
   const imageUrl=new URL('/gedeeld/'+token+'/foto',req.url).href;
   const pageUrl=new URL('/gedeeld/'+token,req.url).href;
   const caption=String(row.story_text||'').slice(0,150);
-  const meta='<meta property="og:type" content="article"><meta property="og:site_name" content="TALERA"><meta property="og:title" content="'+escape(row.title)+' · TALERA"><meta property="og:description" content="'+escape(caption)+'"><meta property="og:url" content="'+escape(pageUrl)+'">'+(hasImage?'<meta property="og:image" content="'+escape(imageUrl)+'"><meta property="og:image:secure_url" content="'+escape(imageUrl)+'"><meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="1200"><meta name="twitter:card" content="summary_large_image">':'');
+  const meta='<meta property="og:type" content="article"><meta property="og:site_name" content="TALERA"><meta property="og:title" content="'+escape(row.title)+' · TALERA"><meta property="og:description" content="'+escape(caption)+'"><meta property="og:url" content="'+escape(pageUrl)+'">'+(hasImage?'<meta property="og:image" content="'+escape(imageUrl)+'"><meta property="og:image:secure_url" content="'+escape(imageUrl)+'"><meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">':'');
   const photo=hasImage?'<img class="photo" src="'+escape(imageUrl)+'" alt="Foto bij de gedeelde herinnering">':'';
-  return new Response('<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><title>'+escape(row.title)+' · TALERA</title>'+meta+'<style>body{margin:0;background:#f4f7f9;color:#223a4c;font:16px/1.6 system-ui}.a{max-width:640px;margin:7vh auto;padding:30px;background:white;border-radius:24px}small{color:#667c8e}p{white-space:pre-wrap}.photo{display:block;width:100%;height:auto;max-height:510px;object-fit:cover;border-radius:18px;margin:14px 0}@media(max-width:720px){.a{margin:12px;padding:24px}}</style></head><body><main class="a"><small>TALERA · Persoonlijk met jou gedeeld</small><h1>'+escape(row.title)+'</h1>'+photo+'<small>'+escape(row.event_date)+'</small><p>'+escape(row.story_text)+'</p></main></body></html>',{headers:{...secHeaders,'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}});
+  return new Response(m==='HEAD'?null:'<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><title>'+escape(row.title)+' · TALERA</title>'+meta+'<style>body{margin:0;background:#f4f7f9;color:#223a4c;font:16px/1.6 system-ui}.a{max-width:640px;margin:7vh auto;padding:30px;background:white;border-radius:24px}small{color:#667c8e}p{white-space:pre-wrap}.photo{display:block;width:100%;height:auto;max-height:510px;object-fit:cover;border-radius:18px;margin:14px 0}@media(max-width:720px){.a{margin:12px;padding:24px}}</style></head><body><main class="a"><small>TALERA · Persoonlijk met jou gedeeld</small><h1>'+escape(row.title)+'</h1>'+photo+'<small>'+escape(row.event_date)+'</small><p>'+escape(row.story_text)+'</p></main></body></html>',{headers:{...secHeaders,'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}});
  }
  if(m!=='GET'&&!allowedWrite(req))return error(403,'Ongeldige herkomst');
  if(p==='/api/register'&&m==='POST'){

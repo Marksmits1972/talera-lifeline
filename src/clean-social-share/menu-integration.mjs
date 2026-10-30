@@ -34,7 +34,6 @@ const css=[
 '#talera-more-menu header,#talera-more-menu h1,#talera-more-menu .intro,#talera-more-menu label,#talera-more-menu .section-label,#talera-more-menu .option,#talera-more-menu .account-card{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}',
 '#talera-more-menu input,#talera-more-menu textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}',
 '#talera-more-menu .panel:focus{outline:none}',
-'#talera-more-menu .password-row{position:relative}#talera-more-menu .password-row input{padding-right:55px}#talera-more-menu .eye{position:absolute;right:6px;top:6px;background:#edf2f4;border:0;border-radius:9px;min-width:40px;height:38px;font-size:19px}',
 '#talera-more-menu .primary{width:100%;border:0;border-radius:14px;padding:13px;margin:9px 0 0;background:#315d78;color:#fff;font:700 15px system-ui}',
 '#talera-more-menu .secondary{width:100%;border:1px solid #dbe6ec;border-radius:13px;padding:11px;margin-top:8px;background:#fff;color:#315d78;font:650 14px system-ui}',
 '#talera-more-menu .notice{padding:10px 13px;margin:13px 0;background:#edf3f6;border-radius:10px;font-size:13px;color:#31546c}',
@@ -65,7 +64,7 @@ function options(items){return '<div class="options">'+items+'</div>'}
 function section(label,items){return '<p class="section-label">'+esc(label)+'</p>'+options(items)}
 function info(t,description){return '<div class="info"><strong>'+esc(t)+'</strong><p>'+esc(description)+'</p></div>'}
 function notice(){return state.notice?'<p class="notice'+(state.error?' error':'')+'" role="status">'+esc(state.notice)+'</p>':''}
-function passwordField(id,label,autocomplete){return '<label>'+label+'<span class="password-row"><input id="'+id+'" type="password" name="'+id+'" autocomplete="'+autocomplete+'" required><button type="button" class="eye" data-eye="'+id+'" aria-label="Wachtwoord tonen" aria-pressed="false">◉</button></span></label>'}
+function passwordField(id,label,autocomplete){return '<label>'+label+'<input id="'+id+'" type="password" name="'+id+'" autocomplete="'+autocomplete+'" required></label>'}
 function render(){
  if(!state.open)return;
  back.hidden=!state.history.length;
@@ -182,8 +181,6 @@ async function load(view){
 }
 shell.addEventListener('click',e=>{
  if(e.target===shell){close();return}
- const eye=e.target.closest('[data-eye]');
- if(eye){const input=shell.querySelector('#'+eye.dataset.eye);if(input){const visible=input.type==='password';input.type=visible?'text':'password';eye.setAttribute('aria-pressed',String(visible));eye.setAttribute('aria-label',visible?'Wachtwoord verbergen':'Wachtwoord tonen');eye.textContent=visible?'◎':'◉'}return}
  const button=e.target.closest('button');if(!button)return;
  if(button.dataset.view){go(button.dataset.view);return}
  if(button.dataset.thread){state.thread=button.dataset.thread;state.threadData=null;go('thread');return}

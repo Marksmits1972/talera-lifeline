@@ -66,7 +66,7 @@ function passwordField(id,label,autocomplete){return '<label>'+label+'<span clas
 function render(){
  if(!state.open)return;
  back.hidden=!state.history.length;
- head.textContent=state.view==='hub'?'Meer':({account:'Mijn account',login:'Aanmelden',register:'Account aanmaken',privacy:'Privacy',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Mijn gedeelde herinneringen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',subscription:'Mijn abonnement',help:'Hulp'})[state.view]||'Meer';
+ head.textContent=state.view==='hub'?'Meer':({account:'Mijn account',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Mijn gedeelde herinneringen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',subscription:'Mijn abonnement',help:'Hulp'})[state.view]||'Meer';
  let html='',a=state.account;
  switch(state.view){
  case 'hub':{
@@ -93,7 +93,11 @@ function render(){
    passwordField('login-password','Wachtwoord','current-password')+
    '<button class="primary" type="submit">Aanmelden</button></form>'+
    '<button class="secondary" data-view="register">Account aanmaken</button>'+
-   '<p class="intro">Wachtwoord vergeten? De herstelmailfunctie wordt nog ingericht.</p>';break;
+   '<button class="secondary" data-view="forgot">Wachtwoord vergeten?</button>';break;
+ case 'forgot':
+  html=title('Wachtwoord herstellen','Ontvang een veilige herstel-link als je e-mailadres bij TALERA bekend is.')+
+  '<form data-form="forgot"><label>E-mailadres<input name="email" type="email" autocomplete="email" required></label><button type="submit" class="primary">Herstelmail aanvragen</button></form>'+
+  '<p class="intro">De e-maildienst moet nog worden geactiveerd. Als dat niet is gebeurd, meldt TALERA dit duidelijk.</p>';break;
  case 'register':
   html=title('Account aanmaken','Eén TALERA-account voor je herinneringen en contacten.')+
   '<form data-form="register"><label>Naam<input name="displayName" required maxlength="100" autocomplete="name"></label>'+
@@ -195,6 +199,7 @@ shell.addEventListener('submit',e=>{
  state.busy=true;const data=Object.fromEntries(new FormData(form).entries());
  const task=(async()=>{
   switch(form.dataset.form){
+   case 'forgot':{const result=await api('/api/password/forgot','POST',{email:data.email});return result.message||'Als dit e-mailadres bij TALERA bekend is, ontvang je een herstelmail.'}
    case 'login':{const result=await api('/api/login','POST',{email:data.email,password:data['login-password']});state.account=result.account||null;state.history=[];state.view='account';const intent=state.intent;if(intent)close();else await load('account');document.documentElement.dataset.taleraAuth='signed-in';document.dispatchEvent(new CustomEvent('talera:account-changed',{detail:{intent}}));return 'Je bent aangemeld.'}
    case 'register':{
     if(data['register-password']!==data['register-confirm'])throw Error('De wachtwoorden komen niet overeen.');

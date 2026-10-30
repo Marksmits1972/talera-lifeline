@@ -220,7 +220,8 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.open){e.preventDefault();backOne()}});
 setInterval(()=>{if(state.open&&!document.hidden&&state.view==='thread'&&state.thread)void load('thread')},5000);
-if(new URLSearchParams(location.search).get('talera_menu')==='hub')open();
+const requestedMenu=new URLSearchParams(location.search).get('talera_menu');
+if(['hub','account','login','privacy','messages','settings'].includes(requestedMenu))open(requestedMenu);
 document.addEventListener('talera:open-auth',e=>{const intent=e.detail?.intent||'share';open('login',intent)});
 async function checkSession(){
  try{const m=await api('/api/me');state.account=m.account;document.documentElement.dataset.taleraAuth='signed-in';document.dispatchEvent(new CustomEvent('talera:auth-ready',{detail:{authenticated:true}}))}

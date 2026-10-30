@@ -46,7 +46,7 @@ const shell=document.createElement('div');shell.id='talera-more-menu';shell.hidd
 shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-label="Meer"><header><button class="headbutton" data-action="back" aria-label="Terug">‹</button><strong>Meer</strong><button class="headbutton" data-action="close" aria-label="Sluiten">×</button></header><div class="body"></div></section>';
 document.body.append(shell);
 const body=shell.querySelector('.body'),head=shell.querySelector('header strong'),back=shell.querySelector('[data-action="back"]');
-const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false};
+const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null};
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(path,method='GET',payload){
  const opt={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
@@ -157,8 +157,8 @@ function render(){
 function feedback(message,error=false){state.notice=message;state.error=error;render()}
 function go(view){if(!state.open)return;state.history.push(state.view);state.view=view;state.notice='';render();void load(view)}
 function backOne(){if(!state.history.length){close();return}state.view=state.history.pop();state.notice='';render();void load(state.view)}
-function open(){if(state.open)return;state.open=true;state.view='hub';state.history=[];state.notice='';shell.hidden=false;document.body.dataset.taleraMoreOpen='true';render();void load('hub')}
-function close(){state.open=false;shell.hidden=true;delete document.body.dataset.taleraMoreOpen;trigger()?.focus?.()}
+function open(view='hub',intent=null){if(state.open){if(view!=='hub'){state.view=view;state.history=[];state.intent=intent;state.notice='';render()}return}state.open=true;state.view=view;state.intent=intent;state.history=[];state.notice='';shell.hidden=false;document.body.dataset.taleraMoreOpen='true';render();void load(view)}
+function close(){state.open=false;state.intent=null;shell.hidden=true;delete document.body.dataset.taleraMoreOpen;trigger()?.focus?.()}
 async function load(view){
  try{
   if(view==='hub'||view==='account'||view==='settings'||view==='privacy'||view==='people'||view==='shared'||view==='mine'||view==='messages'){
@@ -183,7 +183,7 @@ shell.addEventListener('click',e=>{
  switch(button.dataset.action){
  case 'close':close();break;
  case 'back':backOne();break;
- case 'logout':void api('/api/logout','POST',{}).then(()=>{state.account=null;state.discovery=null;state.history=[];state.view='hub';feedback('Je bent uitgelogd.');document.dispatchEvent(new CustomEvent('talera:account-changed'));}).catch(e=>feedback(e.message,true));break;
+ case 'logout':void api('/api/logout','POST',{}).then(()=>{document.documentElement.dataset.taleraAuth='signed-out';state.account=null;state.discovery=null;state.history=[];state.view='hub';feedback('Je bent uitgelogd.');document.dispatchEvent(new CustomEvent('talera:account-changed',{detail:{authenticated:false}}));}).catch(e=>feedback(e.message,true));break;
  case 'enable-listening':if(window.__taleraAudioControls?.enable)window.__taleraAudioControls.enable();else document.dispatchEvent(new CustomEvent('talera:enable-listening'));render();break;
  case 'disable-listening':window.__taleraAudioControls?.disable?.();render();break;
  case 'help':feedback('Gebruik Mijn account voor aanmelden en profiel, Mijn mensen voor contacten en Berichten voor reacties.');break;
@@ -195,19 +195,19 @@ shell.addEventListener('submit',e=>{
  state.busy=true;const data=Object.fromEntries(new FormData(form).entries());
  const task=(async()=>{
   switch(form.dataset.form){
-   case 'login':{const result=await api('/api/login','POST',{email:data.email,password:data['login-password']});state.account=result.account||null;state.history=[];state.view='account';await load('account');document.dispatchEvent(new CustomEvent('talera:account-changed'));return 'Je bent aangemeld.'}
+   case 'login':{const result=await api('/api/login','POST',{email:data.email,password:data['login-password']});state.account=result.account||null;state.history=[];state.view='account';const intent=state.intent;if(intent)close();else await load('account');document.documentElement.dataset.taleraAuth='signed-in';document.dispatchEvent(new CustomEvent('talera:account-changed',{detail:{intent}}));return 'Je bent aangemeld.'}
    case 'register':{
     if(data['register-password']!==data['register-confirm'])throw Error('De wachtwoorden komen niet overeen.');
     if(String(data['register-password']||'').length<8)throw Error('Gebruik minimaal 8 tekens.');
     const result=await api('/api/register','POST',{displayName:data.displayName,username:data.username,email:data.email,password:data['register-password']});
-    state.account=result.account||null;state.history=[];state.view='account';await load('account');document.dispatchEvent(new CustomEvent('talera:account-changed'));return 'Je account is aangemaakt.'}
+    state.account=result.account||null;state.history=[];state.view='account';const intent=state.intent;if(intent)close();else await load('account');document.documentElement.dataset.taleraAuth='signed-in';document.dispatchEvent(new CustomEvent('talera:account-changed',{detail:{intent}}));return 'Je account is aangemaakt.'}
    case 'privacy':state.discovery=await api('/api/discovery','POST',{discoverable:form.querySelector('[name="discoverable"]').checked,username:data.username});return 'Je privacykeuzes zijn opgeslagen.';
    case 'search':{state.query=String(data.q||'').trim();state.search=(await api('/api/people/search?q='+encodeURIComponent(state.query))).items||[];return state.search.length?'Gevonden accounts: '+state.search.length:'Geen gebruikers gevonden.'}
    case 'comment':{if(!state.thread)throw Error('Geen gesprek geselecteerd');await api('/api/threads/'+encodeURIComponent(state.thread)+'/comments','POST',{body:data.body});state.threadData=await api('/api/threads/'+encodeURIComponent(state.thread));return 'Reactie verstuurd.'}
   }
   return '';
  })();
- task.then(msg=>feedback(msg)).catch(err=>feedback(err.message,true)).finally(()=>{state.busy=false});
+ task.then(msg=>{if(state.open)feedback(msg)}).catch(err=>feedback(err.message,true)).finally(()=>{state.busy=false});
 });
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('button');if(!btn)return;
@@ -216,6 +216,13 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.open){e.preventDefault();backOne()}});
 setInterval(()=>{if(state.open&&!document.hidden&&state.view==='thread'&&state.thread)void load('thread')},5000);
 if(new URLSearchParams(location.search).get('talera_menu')==='hub')open();
+document.addEventListener('talera:open-auth',e=>{const intent=e.detail?.intent||'share';open('login',intent)});
+async function checkSession(){
+ try{const m=await api('/api/me');state.account=m.account;document.documentElement.dataset.taleraAuth='signed-in';document.dispatchEvent(new CustomEvent('talera:auth-ready',{detail:{authenticated:true}}))}
+ catch(e){if(e.status===401){state.account=null;document.documentElement.dataset.taleraAuth='signed-out';document.dispatchEvent(new CustomEvent('talera:auth-ready',{detail:{authenticated:false}}));if(!state.open&&location.pathname==='/present'&&!new URLSearchParams(location.search).has('preview'))open('login','initial')}
+ else{document.documentElement.dataset.taleraAuth='error'}}
+}
+void checkSession();
 window.__taleraMoreMenu={ready:true,open,close,state:()=>({open:state.open,view:state.view,accountId:state.account?.id||null})};
 document.documentElement.dataset.taleraMoreMenu='mounted';
 })();

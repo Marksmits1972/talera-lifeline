@@ -129,7 +129,7 @@ async function handler(req,env){
  const thread=p.match(/^\/api\/threads\/([0-9a-f-]{36})$/);
  if(thread&&m==='GET'){
   if(!await accessible(thread[1]))return error(404,'Herinnering niet gevonden');
-  const rows=await env.DB.prepare('SELECT c.id,c.body,c.parent_id,c.created_at,a.display_name FROM comments c JOIN accounts a ON a.id=c.account_id WHERE c.memory_id=? ORDER BY c.created_at LIMIT 200').bind(thread[1]).all();
+  const rows=await env.DB.prepare('SELECT c.id,c.body,c.parent_id,c.created_at,c.account_id AS author_id,a.display_name FROM comments c JOIN accounts a ON a.id=c.account_id WHERE c.memory_id=? ORDER BY c.created_at LIMIT 200').bind(thread[1]).all();
   const likes=await env.DB.prepare('SELECT COUNT(*) AS n FROM likes WHERE memory_id=?').bind(thread[1]).first();
   const ownLike=await env.DB.prepare('SELECT 1 AS yes FROM likes WHERE memory_id=? AND account_id=?').bind(thread[1],user.id).first();
   return json({items:rows.results||[],heartCount:likes?.n||0,hearted:!!ownLike});
@@ -164,6 +164,8 @@ async function handler(req,env){
  if(p==='/api/shares'&&m==='GET'){const rows=await env.DB.prepare('SELECT id,memory_id,expires_at,revoked_at FROM shares WHERE account_id=? ORDER BY created_at DESC LIMIT 200').bind(user.id).all();return json({items:rows.results||[]})}
  const revoke=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/revoke$/);
  if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();return json({revoked:(r.meta?.changes||0)>0})}
+ const readThread=p.match(/^\/api\/messages\/memory\/([0-9a-f-]{36})\/read$/);
+ if(readThread&&m==='POST'){const exists=await accessible(readThread[1]);if(!exists)return error(404,'Herinnering niet gevonden');await env.DB.prepare('UPDATE messages SET read_at=COALESCE(read_at,?) WHERE account_id=? AND memory_id=? AND read_at IS NULL').bind(Date.now(),user.id,readThread[1]).run();return json({ok:true})}
  if(p==='/api/messages/unread-count'&&m==='GET'){const row=await env.DB.prepare('SELECT COUNT(*) AS total FROM messages WHERE account_id=? AND read_at IS NULL').bind(user.id).first();return json({unread:row?.total||0})}
  const markRead=p.match(/^\/api\/messages\/([0-9a-f-]{36})\/read$/);
  if(markRead&&m==='POST'){const r=await env.DB.prepare('UPDATE messages SET read_at=COALESCE(read_at,?) WHERE id=? AND account_id=?').bind(Date.now(),markRead[1],user.id).run();return json({ok:(r.meta?.changes||0)>0})}

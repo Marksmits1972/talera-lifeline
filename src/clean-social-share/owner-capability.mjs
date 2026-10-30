@@ -16,6 +16,6 @@ export async function verifyOwnerCapability({request,db,storyId}){
  if(!/^Bearer [A-Za-z0-9_-]{30,256}$/.test(value))return null;
  const candidateHash=await hashOwnerToken(value.slice(7));
  const result=await db.prepare("SELECT token_hash,scope FROM core_story_capabilities WHERE story_id=? AND revoked_at IS NULL AND scope='owner'").bind(storyId).all();
- for(const row of result.results||[]){if(row.scope==='owner'&&constantEqual(candidateHash,row.token_hash))return {storyId,capabilityVerified:true}}
+ for(const row of result.results||[]){if(row.scope==='owner'&&constantEqual(candidateHash,row.token_hash))return {storyId,ownerId:'cap_'+candidateHash.slice(0,48),capabilityVerified:true}}
  return null;
 }

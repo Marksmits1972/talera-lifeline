@@ -36,7 +36,9 @@ export class ShareController {
   whatsappUrl(){
     if(this.#view.state!=='ready'||!this.#view.invite)throw Error('Uitnodiging nog niet gereed');
     const url=this.#view.invite.url;if(!/^https:\/\//.test(url))throw Error('Onveilige uitnodigingslink');
-    return 'https://wa.me/?text='+encodeURIComponent('Een herinnering voor jou · TALERA\n'+url);
+    // De kaart bevat de titel en TALERA al: geen tweede introductietekst.
+    // WhatsApp toont de URL zelf mogelijk alsnog naast de kaart.
+    return 'https://wa.me/?text='+encodeURIComponent(url);
   }
   close(){this.#request++;this.#pending=null;this.#requestId=null;this.#view={state:'idle',memoryId:null,durationHours:168,invite:null,error:null};this.#emit()}
 }

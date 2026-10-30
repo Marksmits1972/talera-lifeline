@@ -95,7 +95,7 @@ async function handler(req,env){
  }
  const grant=p.match(/^\/api\/memories\/([0-9a-f-]{36})\/grant$/);
  if(grant&&m==='POST'){
-  const d=await body(req),username=text(d.username,100).replace(/\\s+/g,' ').trim();
+  const d=await body(req),username=text(d.username,100).replace(/\s+/g,' ').trim();
   if(username.length<2)return error(400,'Vul de gebruikersnaam in');
   const own=await env.DB.prepare('SELECT id,title FROM memories WHERE id=? AND account_id=?').bind(grant[1],user.id).first();
   if(!own)return error(404,'Herinnering niet gevonden');

@@ -20,6 +20,7 @@ async function rateLimit(req,env,category,threshold=12){const name=await sha((re
 async function issueSession(account,env){const t=secret();await env.DB.prepare('INSERT INTO sessions(id_hash,account_id,expires_at,created_at) VALUES(?,?,?,?)').bind(await sha(t),account.id,Date.now()+86400000*7,Date.now()).run();const r=json({account:{id:account.id,displayName:account.display_name}});r.headers.set('set-cookie',cookie(t,604800));return r}
 async function handler(req,env){
  const u=new URL(req.url),p=u.pathname,m=req.method;
+ if(p==='/__diagnose-crypto'&&m==='GET'){try{const h=await passwordHash('staging-diagnostic-password','test-salt');return json({crypto:'ok',length:h.length})}catch(e){return json({crypto:'failed',name:String(e?.name||''),message:String(e?.message||'').slice(0,100)},500)}}
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
  if(p.startsWith('/gedeeld/')){
   if(m!=='GET')return error(405);

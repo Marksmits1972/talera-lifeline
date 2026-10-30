@@ -14,7 +14,7 @@ async function body(req){if(Number(req.headers.get('content-length')||0)>16000)t
 async function auth(req,env){const m=(req.headers.get('cookie')||'').match(/(?:^|;\s*)talera_sid=([0-9a-f]{64})(?:;|$)/);if(!m)return null;const h=await sha(m[1]),row=await env.DB.prepare("SELECT a.id,a.email,a.display_name FROM sessions s JOIN accounts a ON s.account_id=a.id WHERE s.id_hash=? AND s.expires_at>? AND a.status='active'").bind(h,Date.now()).first();return row||null}
 const cookie=(token,maxAge)=>'talera_sid='+token+'; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age='+maxAge;
 const allowedWrite=req=>req.headers.get('origin')===new URL(req.url).origin;
-const page404=new Response('Deze herinnering is niet meer beschikbaar.',{status:404,headers:{...secHeaders,'content-type':'text/plain; charset=utf-8'}});
+const page404=()=>new Response('Deze herinnering is niet meer beschikbaar.',{status:404,headers:{...secHeaders,'content-type':'text/plain; charset=utf-8'}});
 const escape=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function rateLimit(req,env,category,threshold=12){const name=await sha((req.headers.get('CF-Connecting-IP')||'unknown').slice(0,60)+':'+category);const cutoff=Date.now()-600000;await env.DB.prepare("DELETE FROM auth_attempts WHERE bucket_key=? AND started_at<?").bind(name,cutoff).run();const current=await env.DB.prepare('SELECT hits FROM auth_attempts WHERE bucket_key=?').bind(name).first();if((current?.hits||0)>=threshold)return false;await env.DB.prepare('INSERT INTO auth_attempts(bucket_key,started_at,hits) VALUES(?,?,1) ON CONFLICT(bucket_key) DO UPDATE SET hits=hits+1').bind(name,Date.now()).run();return true}
 async function issueSession(account,env){const t=secret();await env.DB.prepare('INSERT INTO sessions(id_hash,account_id,expires_at,created_at) VALUES(?,?,?,?)').bind(await sha(t),account.id,Date.now()+86400000*7,Date.now()).run();const r=json({account:{id:account.id,displayName:account.display_name}});r.headers.set('set-cookie',cookie(t,604800));return r}
@@ -23,9 +23,9 @@ async function handler(req,env){
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
  if(p.startsWith('/gedeeld/')){
   if(m!=='GET')return error(405);
-  const token=p.slice('/gedeeld/'.length);if(!/^[0-9a-f]{64}$/.test(token))return page404;
+  const token=p.slice('/gedeeld/'.length);if(!/^[0-9a-f]{64}$/.test(token))return page404();
   const row=await env.DB.prepare("SELECT m.title,m.story_text,m.event_date FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(token),Date.now()).first();
-  if(!row)return page404;
+  if(!row)return page404();
   return new Response('<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><title>'+escape(row.title)+' · TALERA</title><style>body{margin:0;background:#f4f7f9;color:#223a4c;font:16px/1.6 system-ui}.a{max-width:640px;margin:7vh auto;padding:30px;background:white;border-radius:24px}small{color:#667c8e}p{white-space:pre-wrap}@media(max-width:720px){.a{margin:12px;padding:24px}}</style></head><body><main class="a"><small>TALERA · Persoonlijk met jou gedeeld</small><h1>'+escape(row.title)+'</h1><small>'+escape(row.event_date)+'</small><p>'+escape(row.story_text)+'</p></main></body></html>',{headers:{...secHeaders,'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}});
  }
  if(m!=='GET'&&!allowedWrite(req))return error(403,'Ongeldige herkomst');

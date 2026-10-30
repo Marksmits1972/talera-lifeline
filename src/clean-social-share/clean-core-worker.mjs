@@ -83,6 +83,53 @@ async function handler(req,env){
  if(p==='/api/me'&&m==='GET')return user?json({account:{id:user.id,displayName:user.display_name}}):error(401,'Aanmelden bij TALERA is nodig');
  if(p==='/api/logout'&&m==='POST'){if(user){const c=(req.headers.get('cookie')||'').match(/talera_sid=([0-9a-f]{64})/);if(c)await env.DB.prepare('DELETE FROM sessions WHERE id_hash=?').bind(await sha(c[1])).run()}const x=json({ok:true});x.headers.set('set-cookie',cookie('',0));return x}
  if(!user)return error(401,'Aanmelden bij TALERA is nodig');
+
+ if(p==='/api/people'&&m==='GET'){
+  const q=text(u.searchParams.get('email'),254).toLowerCase();
+  if(!emailRule.test(q))return json({items:[]});
+  const rows=await env.DB.prepare("SELECT id,display_name FROM accounts WHERE email=? AND id<>? AND status='active'").bind(q,user.id).all();
+  return json({items:rows.results||[]});
+ }
+ if(p==='/api/shared-with-me'&&m==='GET'){
+  const rows=await env.DB.prepare("SELECT m.id,m.title,m.story_text,m.event_date,a.display_name AS owner_name FROM memory_grants g JOIN memories m ON g.memory_id=m.id JOIN accounts a ON a.id=m.account_id WHERE g.recipient_account_id=? AND g.revoked_at IS NULL ORDER BY g.created_at DESC LIMIT 200").bind(user.id).all();return json({items:rows.results||[]});
+ }
+ const grant=p.match(/^\/api\/memories\/([0-9a-f-]{36})\/grant$/);
+ if(grant&&m==='POST'){
+  const d=await body(req),email=text(d.email,254).toLowerCase();if(!emailRule.test(email))return error(400,'Vul het e-mailadres van de ontvanger in');
+  const own=await env.DB.prepare('SELECT id,title FROM memories WHERE id=? AND account_id=?').bind(grant[1],user.id).first();
+  if(!own)return error(404,'Herinnering niet gevonden');
+  const recipient=await env.DB.prepare("SELECT id FROM accounts WHERE email=? AND status='active'").bind(email).first();
+  if(!recipient||recipient.id===user.id)return error(404,'Geen ander TALERA-account met dit e-mailadres gevonden');
+  const now=Date.now();await env.DB.prepare('INSERT INTO memory_grants(memory_id,recipient_account_id,owner_account_id,created_at,revoked_at) VALUES(?,?,?,?,NULL) ON CONFLICT(memory_id,recipient_account_id) DO UPDATE SET revoked_at=NULL,created_at=excluded.created_at').bind(grant[1],recipient.id,user.id,now).run();
+  await env.DB.prepare('INSERT INTO messages(id,account_id,memory_id,kind,created_at) VALUES(?,?,?,?,?)').bind(random(),recipient.id,grant[1],'shared',now).run();
+  return json({ok:true},201);
+ }
+ const accessible=async id=>env.DB.prepare('SELECT m.id,m.account_id FROM memories m LEFT JOIN memory_grants g ON g.memory_id=m.id AND g.recipient_account_id=? AND g.revoked_at IS NULL WHERE m.id=? AND (m.account_id=? OR g.recipient_account_id IS NOT NULL)').bind(user.id,id,user.id).first();
+ const thread=p.match(/^\/api\/threads\/([0-9a-f-]{36})$/);
+ if(thread&&m==='GET'){
+  if(!await accessible(thread[1]))return error(404,'Herinnering niet gevonden');
+  const rows=await env.DB.prepare('SELECT c.id,c.body,c.parent_id,c.created_at,a.display_name FROM comments c JOIN accounts a ON a.id=c.account_id WHERE c.memory_id=? ORDER BY c.created_at LIMIT 200').bind(thread[1]).all();
+  const likes=await env.DB.prepare('SELECT COUNT(*) AS n FROM likes WHERE memory_id=?').bind(thread[1]).first();
+  const ownLike=await env.DB.prepare('SELECT 1 AS yes FROM likes WHERE memory_id=? AND account_id=?').bind(thread[1],user.id).first();
+  return json({items:rows.results||[],heartCount:likes?.n||0,hearted:!!ownLike});
+ }
+ const threadPost=p.match(/^\/api\/threads\/([0-9a-f-]{36})\/comments$/);
+ if(threadPost&&m==='POST'){
+  const memory=await accessible(threadPost[1]);if(!memory)return error(404,'Herinnering niet gevonden');
+  const d=await body(req),bodyText=text(d.body,4000);if(!bodyText)return error(400,'Reactie is leeg');
+  const id=random(),now=Date.now();
+  await env.DB.prepare('INSERT INTO comments(id,memory_id,account_id,parent_id,body,created_at) VALUES(?,?,?,?,?,?)').bind(id,threadPost[1],user.id,null,bodyText,now).run();
+  const receivers=await env.DB.prepare('SELECT owner_account_id AS id FROM memory_grants WHERE memory_id=? AND revoked_at IS NULL UNION SELECT recipient_account_id AS id FROM memory_grants WHERE memory_id=? AND revoked_at IS NULL UNION SELECT account_id AS id FROM memories WHERE id=?').bind(threadPost[1],threadPost[1],threadPost[1]).all();
+  for(const receiver of receivers.results||[]){if(receiver.id!==user.id)await env.DB.prepare('INSERT INTO messages(id,account_id,memory_id,comment_id,kind,created_at) VALUES(?,?,?,?,?,?)').bind(random(),receiver.id,threadPost[1],id,'comment',now).run()}
+  return json({id},201);
+ }
+ const threadLike=p.match(/^\/api\/threads\/([0-9a-f-]{36})\/like$/);
+ if(threadLike&&m==='POST'){
+  const memory=await accessible(threadLike[1]);if(!memory)return error(404,'Herinnering niet gevonden');
+  const found=await env.DB.prepare('SELECT 1 AS yes FROM likes WHERE memory_id=? AND account_id=?').bind(threadLike[1],user.id).first();
+  if(found)await env.DB.prepare('DELETE FROM likes WHERE memory_id=? AND account_id=?').bind(threadLike[1],user.id).run();else await env.DB.prepare('INSERT INTO likes(memory_id,account_id,created_at) VALUES(?,?,?)').bind(threadLike[1],user.id,Date.now()).run();
+  return json({hearted:!found});
+ }
  if(p==='/api/memories'&&m==='GET'){const result=await env.DB.prepare('SELECT id,title,story_text,event_date,updated_at FROM memories WHERE account_id=? ORDER BY updated_at DESC LIMIT 200').bind(user.id).all();return json({items:result.results||[]})}
  if(p==='/api/memories'&&m==='POST'){const d=await body(req),title=text(d.title,180),story=text(d.storyText,12000),date=text(d.eventDate,32);if(!title||!story)return error(400,'Titel en verhaal zijn verplicht');const id=random(),now=Date.now();await env.DB.prepare('INSERT INTO memories(id,account_id,title,story_text,event_date,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(id,user.id,title,story,date,now,now).run();return json({id,title,eventDate:date},201)}
  const memory=p.match(/^\/api\/memories\/([0-9a-f-]{36})$/);

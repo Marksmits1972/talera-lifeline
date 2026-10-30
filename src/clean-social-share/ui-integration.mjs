@@ -12,7 +12,7 @@ function stored(id){try{return JSON.parse(localStorage.getItem('talera-clean-loc
 async function coreRequest(path,options={}){
  const r=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers:{'accept':'application/json',...(options.headers||{})}});
  const d=await r.json().catch(()=>null);
- if(!r.ok)throw Error(d?.error||(r.status===401?'Meld je aan bij TALERA':'TALERA-accountdienst niet beschikbaar'));
+ if(!r.ok){const e=Error(d?.error||(r.status===401?'Meld je aan bij TALERA':'TALERA-accountdienst niet beschikbaar'));e.status=r.status;throw e}
  return d;
 }
 async function findStoryId(localMemoryId){
@@ -44,10 +44,11 @@ const shareAdapter={
   if(String(item?.id)!==String(memoryId))throw Error('De gekozen herinnering is veranderd');
   const existing=await findStoryId(memoryId);
   if(existing)return {storyId:existing};
-  const storyText=String(item?.storyText||item?.description||item?.text||'').trim();
-  const title=String(item?.title||item?.name||'').trim();
+  const storyText=String(item?.fullStory||item?.storyText||item?.description||item?.text||item?.story||'').trim();
+  const title=String(item?.title||item?.story||item?.name||'').trim();
+  const eventDate=item?.at&&Number.isFinite(new Date(item.at).getTime())?new Date(item.at).toISOString().slice(0,10):'';
   if(!title||!storyText)throw Error('Deze herinnering heeft nog geen tekst. Veilige publicatie van foto’s en video’s moet eerst worden gekoppeld.');
-  const d=await coreRequest('/api/pwa/memory-link',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({localMemoryId:memoryId,title,storyText,consent:true})});
+  const d=await coreRequest('/api/pwa/memory-link',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({localMemoryId:memoryId,title,storyText,eventDate,consent:true})});
   return {storyId:d.memoryId};
  },
  async createInvite({storyId,durationHours}){
@@ -71,7 +72,7 @@ function mount(){
  document.body.append(bar,overlay);
  const panel=overlay.firstElementChild;
  const social=new SocialController(socialAdapter),share=new ShareController(shareAdapter);
- let mode=null,memory=runtime.currentMemory(),focus=null,consent=false;
+ let mode=null,memory=runtime.currentMemory(),focus=null,consent=false,shareAuth=null,authBusy=false;
  // Follow the established V32 band motion rules. Do not read social data for
  // transient memories while swiping: only select the settled photo/memory.
  let motion=true,forcedMotion=false,stableSince=0,settledMemoryId=null;
@@ -106,7 +107,15 @@ function mount(){
   setMotion(false);
  }
  function close(){mode=null;overlay.hidden=true;bar.hidden=false;share.close();checkMotion();focus?.focus?.()}
- function open(next){if(motion)return;mode=next;focus=document.activeElement;overlay.hidden=false;bar.hidden=true;render();panel.focus()}
+ async function verifyShareAuth(){
+   if(authBusy)return;
+   authBusy=true;shareAuth=null;
+   if(mode==='share')render();
+   try{const me=await coreRequest('/api/me');shareAuth=!!me.account}
+   catch(e){shareAuth=e.status===401?false:'error'}
+   finally{authBusy=false;if(mode==='share'&&!overlay.hidden)render()}
+ }
+ function open(next){if(motion)return;mode=next;focus=document.activeElement;overlay.hidden=false;bar.hidden=true;render();panel.focus();if(next==='share')void verifyShareAuth()}
  function onMemory(m){
   if(!m?.id)return;
   const changed=String(m.id)!==String(memory?.id);
@@ -127,15 +136,32 @@ function mount(){
  social.subscribe(v=>{const h=bar.querySelector('[data-action=heart]');h.querySelector('.count').textContent=String(v.data.heartCount);h.setAttribute('aria-pressed',String(v.data.hearted));bar.querySelector('[data-action=comments] .count').textContent=String(v.data.commentCount);if(mode==='comments')render()});
  share.subscribe(()=>{if(mode==='share')render()});
  function render(){if(!mode)return;const closeButton='<button type="button" class="close" data-action="close" aria-label="Sluiten">×</button>';
-  if(mode==='comments'){const s=social.current();const list=s.data.comments.map(c=>'<div class="comment"><strong>'+escapeText(c.from||'Gebruiker')+'</strong><p>'+escapeText(c.text||'')+'</p></div>').join('');panel.innerHTML=closeButton+'<h2>Berichten</h2><p class="status">'+(s.status==='loading'?'Reacties worden geladen…':escapeText(s.error||(!s.storyId?'Nog niet gekoppeld aan je TALERA-account.':'')))+'</p>'+(list||'<p>Nog geen berichten.</p>')+'<p class="status"><a href="/account">Account en aanmelden</a></p><form id="talera-clean-comment-form"><label for="clean-comment">Reageren</label><textarea id="clean-comment" rows="2" maxlength="4000" required></textarea><button class="primary" type="submit">Versturen</button></form>';return}
+  if(mode==='comments'){const s=social.current();const list=s.data.comments.map(c=>'<div class="comment"><strong>'+escapeText(c.from||'Gebruiker')+'</strong><p>'+escapeText(c.text||'')+'</p></div>').join('');panel.innerHTML=closeButton+'<h2>Berichten</h2><p class="status">'+(s.status==='loading'?'Reacties worden geladen…':escapeText(s.error||(!s.storyId?'Nog niet gekoppeld aan je TALERA-account.':'')))+'</p>'+(list||'<p>Nog geen berichten.</p>')+'<p class="status">'+(/aanmelden/i.test(s.error||'')?'<button type="button" class="primary" data-action="signin-comments">Aanmelden om te reageren</button>':'')+'</p><form id="talera-clean-comment-form"><label for="clean-comment">Reageren</label><textarea id="clean-comment" rows="2" maxlength="4000" required></textarea><button class="primary" type="submit">Versturen</button></form>';return}
   const v=share.current(),labels={1:'1 uur',24:'1 dag',168:'7 dagen',720:'30 dagen'};
   const options=[1,24,168,720].map(h=>'<option value="'+h+'" '+(v.durationHours===h?'selected':'')+'>'+labels[h]+'</option>').join('');
-  panel.innerHTML=closeButton+'<h2>Delen via WhatsApp</h2><p><strong>'+escapeText(memory?.title||memory?.story||'Herinnering')+'</strong></p><p>Alleen deze herinnering wordt gedeeld.</p><label for="talera-clean-expiry">Link geldig voor</label><select id="talera-clean-expiry">'+options+'</select><label style="font-weight:normal"><input id="talera-clean-consent" type="checkbox" '+(consent?'checked':'')+'> Ik geef toestemming deze herinnering tijdelijk te publiceren.</label><p class="status">'+escapeText(v.error||'Kies een geldigheidsduur en geef toestemming om deze herinnering te delen.')+'</p><button type="button" class="primary" data-action="prepare">Uitnodiging voorbereiden</button><button type="button" class="primary" data-action="send" '+(v.state==='ready'?'':'disabled')+'>Verzenden via WhatsApp</button>';
+  panel.innerHTML=closeButton+'<h2>Delen via WhatsApp</h2><p><strong>'+escapeText(memory?.title||memory?.story||'Herinnering')+'</strong></p><p>Alleen deze herinnering wordt gedeeld.</p><label for="talera-clean-expiry">Link geldig voor</label><select id="talera-clean-expiry">'+options+'</select><label style="font-weight:normal"><input id="talera-clean-consent" type="checkbox" '+(consent?'checked':'')+'> Ik geef toestemming deze herinnering tijdelijk te publiceren.</label><p class="status">'+escapeText(shareAuth===false?'Meld je één keer aan om een persoonlijke deel-link te maken.':shareAuth===null?'TALERA controleert je aanmelding…':shareAuth==='error'?'Aanmeldstatus kon niet worden gecontroleerd. Probeer het opnieuw.':v.error||'Kies een geldigheidsduur en geef toestemming om deze herinnering te delen.')+'</p>'+
+   (shareAuth===false?'<button type="button" class="primary" data-action="signin">Aanmelden om te delen</button>':
+    '<button type="button" class="primary" data-action="prepare" '+(shareAuth===true?'':'disabled')+'>Uitnodiging voorbereiden</button>')+
+   '<button type="button" class="primary" data-action="send" '+(shareAuth===true&&v.state==='ready'?'':'disabled')+'>Verzenden via WhatsApp</button>'+
+   (memory?.image?'<p class="status">Let op: de foto of video van deze herinnering is nog niet gekoppeld aan de tijdelijke gastlink. De link toont voorlopig alleen de verhaaltekst.</p>':'');
  }
  bar.addEventListener('click',e=>{if(motion)return;const button=e.target.closest('[data-action]');if(!button)return;const a=button.dataset.action;if(a==='heart')void social.mutate({type:'toggle-heart'});if(a==='comments'){open('comments');social.openComments()}if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}});
- overlay.addEventListener('click',e=>{if(e.target===overlay){close();return}const a=e.target.closest('[data-action]')?.dataset.action;if(a==='close'){close();return}if(a==='prepare'){consent=!!panel.querySelector('#talera-clean-consent')?.checked;void share.prepare({consent}).catch(error=>{const p=panel.querySelector('.status');if(p)p.textContent=String(error.message||error)});return}if(a==='send'){try{location.assign(share.whatsappUrl())}catch(error){panel.querySelector('.status').textContent=error.message}}});
+ overlay.addEventListener('click',e=>{if(e.target===overlay){close();return}const a=e.target.closest('[data-action]')?.dataset.action;if(a==='close'){close();return}if(a==='signin'||a==='signin-comments'){overlay.hidden=true;document.dispatchEvent(new CustomEvent('talera:open-auth',{detail:{intent:a==='signin'?'share':'comments'}}));return}
+ if(a==='prepare'){if(shareAuth!==true){void verifyShareAuth();return}consent=!!panel.querySelector('#talera-clean-consent')?.checked;void share.prepare({consent}).catch(error=>{const p=panel.querySelector('.status');if(p)p.textContent=String(error.message||error)});return}if(a==='send'){try{location.assign(share.whatsappUrl())}catch(error){panel.querySelector('.status').textContent=error.message}}});
  overlay.addEventListener('change',e=>{if(e.target.id==='talera-clean-expiry'){share.setDuration(Number(e.target.value));consent=false}else if(e.target.id==='talera-clean-consent')consent=e.target.checked});
  overlay.addEventListener('submit',e=>{if(e.target.id!=='talera-clean-comment-form')return;e.preventDefault();const input=e.target.querySelector('textarea');const body=input.value.trim();if(!body)return;input.disabled=true;void social.mutate({type:'comment',body}).then(r=>{if(r.ok)input.value='';else{const status=panel.querySelector('.status');if(status)status.textContent=r.error||'Reactie niet opgeslagen'}input.disabled=false})});
+ document.addEventListener('talera:account-changed',e=>{
+  const intent=e.detail?.intent;
+  shareAuth=null;authBusy=false;
+  const id=social.activeMemoryId;
+  if(id){social.invalidate(id);void social.load(id)}
+  if(intent==='share'&&mode==='share'&&memory?.id!=null){
+    overlay.hidden=false;bar.hidden=true;
+    const duration=share.current().durationHours;
+    share.open(String(memory.id));share.setDuration(duration);
+    render();void verifyShareAuth();panel.focus();
+  }else if(intent==='comments'&&mode==='comments'){overlay.hidden=false;bar.hidden=true;render();panel.focus()}
+ });
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mode)close()});
  window.__taleraCleanSocial={social,share,open,close,unsub,motionState:()=>({moving:motion,settledMemoryId,pendingMemoryId:memory?.id,forcedMotion}),stopMotionMonitor:()=>clearInterval(motionTimer)};
  document.documentElement.dataset.cleanSocial='mounted';

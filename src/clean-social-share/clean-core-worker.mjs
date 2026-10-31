@@ -44,27 +44,62 @@ async function toggleThreadHeart(env,memoryId,authorId,ownerId){
  return !found;
 }
 
+
+const guestCookie=(token)=>'talera_guest_id='+token+'; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000';
+function guestIdentity(req){
+ const found=(req.headers.get('cookie')||'').match(/(?:^|;\\s*)talera_guest_id=([0-9a-f]{64})(?:;|$)/);
+ return {token:found?.[1]||secret(),newCookie:!found};
+}
+async function guestThreadSnapshot(env,memoryId,viewer,guestHash){
+ const snapshot=await threadSnapshot(env,memoryId,viewer?.id);
+ const guestComments=await env.DB.prepare('SELECT id,display_name,body,created_at FROM guest_comments WHERE memory_id=? ORDER BY created_at ASC LIMIT 200').bind(memoryId).all();
+ snapshot.items=[...snapshot.items,...(guestComments.results||[]).map(c=>({...c,display_name:c.display_name+' · gast',author_id:null,guest:true}))].sort((a,b)=>Number(a.created_at)-Number(b.created_at)).slice(-200);
+ const extras=await env.DB.prepare('SELECT COUNT(*) AS n FROM guest_likes WHERE memory_id=?').bind(memoryId).first();
+ snapshot.heartCount+=(extras?.n||0);
+ if(!viewer){const own=await env.DB.prepare('SELECT 1 AS ok FROM guest_likes WHERE memory_id=? AND guest_hash=?').bind(memoryId,guestHash).first();snapshot.hearted=!!own}
+ return snapshot;
+}
+
 async function handler(req,env){
  const u=new URL(req.url),p=u.pathname,m=req.method;
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
 
 
- const guestThread=p.match(/^\/api\/guest\/threads\/([0-9a-f]{64})(\/(?:comments|like))?$/);
+ const guestThread=p.match(/^\\/api\\/guest\\/threads\\/([0-9a-f]{64})(\\/(?:comments|like))?$/);
  if(guestThread){
   if(m!=='GET'&&m!=='POST')return error(405);
   if(m==='POST'&&!allowedWrite(req))return error(403,'Ongeldige herkomst');
   const share=await env.DB.prepare("SELECT m.id AS memory_id,m.account_id AS owner_id FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(guestThread[1]),Date.now()).first();
   if(!share)return error(404,'Deze deellink is verlopen of ingetrokken');
-  const viewer=await auth(req,env);
-  if(!guestThread[2]&&m==='GET')return json({...await threadSnapshot(env,share.memory_id,viewer?.id),account:viewer?{id:viewer.id,displayName:viewer.display_name}:null});
+  const viewer=await auth(req,env),visitor=guestIdentity(req),guestHash=await sha(visitor.token);
+  const withVisitor=(res)=>{if(visitor.newCookie)res.headers.set('set-cookie',guestCookie(visitor.token));return res};
+  if(!guestThread[2]&&m==='GET')return withVisitor(json({...await guestThreadSnapshot(env,share.memory_id,viewer,guestHash),account:viewer?{id:viewer.id,displayName:viewer.display_name}:null}));
   if(m!=='POST'||!guestThread[2])return error(405);
-  if(!viewer)return error(401,'Meld je aan bij TALERA om te reageren');
-  if(!await rateLimit(req,env,'guest-social',80))return error(429,'Probeer het later opnieuw');
-  if(guestThread[2]==='/like')return json({hearted:await toggleThreadHeart(env,share.memory_id,viewer.id,share.owner_id)});
-  const data=await body(req),comment=text(data.body,4000);
+  if(!await rateLimit(req,env,'guest-social',30))return error(429,'Te veel reacties. Probeer het later opnieuw.');
+  if(viewer){
+   if(guestThread[2]==='/like')return withVisitor(json({hearted:await toggleThreadHeart(env,share.memory_id,viewer.id,share.owner_id)}));
+   const data=await body(req),comment=text(data.body,4000);
+   if(!comment)return error(400,'Schrijf eerst een reactie');
+   return withVisitor(json({id:await addThreadComment(env,share.memory_id,viewer.id,comment)},201));
+  }
+  if(guestThread[2]==='/like'){
+   const existing=await env.DB.prepare('SELECT 1 AS ok FROM guest_likes WHERE memory_id=? AND guest_hash=?').bind(share.memory_id,guestHash).first();
+   if(existing)await env.DB.prepare('DELETE FROM guest_likes WHERE memory_id=? AND guest_hash=?').bind(share.memory_id,guestHash).run();
+   else {
+    await env.DB.prepare('INSERT INTO guest_likes(memory_id,guest_hash,created_at) VALUES(?,?,?)').bind(share.memory_id,guestHash,Date.now()).run();
+    await env.DB.prepare('INSERT INTO messages(id,account_id,memory_id,kind,created_at) VALUES(?,?,?,?,?)').bind(random(),share.owner_id,share.memory_id,'guest_like',Date.now()).run();
+   }
+   return withVisitor(json({hearted:!existing}));
+  }
+  const data=await body(req),comment=text(data.body,2000),name=text(data.name,40).replace(/[<>\\r\\n\\t]/g,'').trim();
+  if(name.length<2||name.length>40)return error(400,'Vul je voornaam in (2 tot 40 tekens)');
   if(!comment)return error(400,'Schrijf eerst een reactie');
-  const id=await addThreadComment(env,share.memory_id,viewer.id,comment);
-  return json({id},201);
+  const daily=await env.DB.prepare('SELECT COUNT(*) AS n FROM guest_comments WHERE memory_id=? AND guest_hash=? AND created_at>?').bind(share.memory_id,guestHash,Date.now()-86400000).first();
+  if((daily?.n||0)>=10)return error(429,'Je kunt maximaal 10 reacties per dag plaatsen');
+  const id=random(),now=Date.now();
+  await env.DB.prepare('INSERT INTO guest_comments(id,memory_id,guest_hash,display_name,body,created_at) VALUES(?,?,?,?,?,?)').bind(id,share.memory_id,guestHash,name,comment,now).run();
+  await env.DB.prepare('INSERT INTO messages(id,account_id,memory_id,kind,created_at) VALUES(?,?,?,?,?)').bind(random(),share.owner_id,share.memory_id,'guest_comment',now).run();
+  return withVisitor(json({id},201));
  }
  const guestMedia=p.match(/^\/gedeeld\/([0-9a-f]{64})\/(foto|foto-volledig|geluid)$/);
  if(guestMedia&&(m==='GET'||m==='HEAD')){

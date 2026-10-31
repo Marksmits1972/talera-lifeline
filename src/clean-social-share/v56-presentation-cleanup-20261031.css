@@ -1,0 +1,53 @@
+/* TALERA V56: rustige presentatie en gelijkwaardige sociale iconen. */
+#v17-timebox .v17-arrows{display:none!important}
+.life-sheet .main-only>.sheet-sub,
+.life-sheet .main-only>p.sheet-sub,
+.life-sheet .main-only>.hint,
+.life-sheet #v18-phases>.v18-era-note,
+.life-sheet #v18-phases .v18-eras-title>span,
+.life-sheet .talera-topics-note{display:none!important}
+#talera-clean-social{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  box-sizing:border-box!important;
+  align-items:stretch!important;
+  width:min(294px,calc(100vw - 34px))!important;
+  gap:3px!important;
+  padding:6px 8px!important;
+}
+#talera-clean-social>button{
+  display:grid!important;
+  grid-template-rows:29px 16px!important;
+  align-content:center!important;
+  justify-items:center!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  height:64px!important;
+  min-height:64px!important;
+  padding:8px 3px!important;
+  gap:2px!important;
+}
+#talera-clean-social>button>svg{
+  width:27px!important;
+  height:27px!important;
+  grid-row:1!important;
+  align-self:center!important;
+}
+#talera-clean-social>button>.count{
+  grid-row:2!important;
+  line-height:16px!important;
+  min-height:16px!important;
+  align-self:center!important;
+  font-size:13px!important;
+  font-weight:700!important;
+}
+#talera-clean-social>button[data-action="share"]::after{
+  content:"";
+  display:block;
+  grid-row:2;
+  min-height:16px;
+}
+@media(max-width:380px){
+  #talera-clean-social{width:min(270px,calc(100vw - 28px))!important;right:12px!important}
+}

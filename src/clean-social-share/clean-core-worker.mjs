@@ -63,6 +63,19 @@ async function handler(req,env){
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
 
 
+ const guestPresentation=p.match(/^\/api\/guest\/presentation\/([0-9a-f]{64})$/);
+ if(guestPresentation){
+  if(m!=='GET'&&m!=='HEAD')return error(405);
+  const token=guestPresentation[1];
+  const row=await env.DB.prepare("SELECT s.id,m.id AS memory_id,m.title,m.story_text,m.event_date,a.display_name AS owner_name FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id JOIN accounts a ON a.id=m.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(token),Date.now()).first();
+  if(!row)return error(404,'Deze herinnering is niet meer beschikbaar');
+  const photo=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-full/'+row.id+'.jpg'));
+  const preview=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-previews/'+row.id+'.jpg'));
+  const audio=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-audio/'+row.id+'.bin'));
+  const video=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-video/'+row.id+'.bin'));
+  const base='/gedeeld/'+token+'/';
+  return json({memoryId:row.memory_id,title:row.title,storyText:row.story_text,eventDate:row.event_date,ownerName:row.owner_name,photoUrl:photo?base+'foto-volledig':preview?base+'foto':null,audioUrl:audio?base+'geluid':null,videoUrl:video?base+'video':null,hasPhoto:photo||preview,hasAudio:audio,hasVideo:video});
+ }
  const guestThread=p.match(/^\/api\/guest\/threads\/([0-9a-f]{64})(\/(?:comments|like))?$/);
  if(guestThread){
   if(m!=='GET'&&m!=='POST')return error(405);

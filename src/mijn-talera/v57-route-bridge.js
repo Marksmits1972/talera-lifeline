@@ -45,10 +45,15 @@ export default {
     if (view) {
       const target = new URL("/present", url);
       target.searchParams.set("talera_menu", view);
-      const response = Response.redirect(target.toString(), 302);
-      response.headers.set("cache-control", "no-store");
-      response.headers.set("x-talera-integratie", V57_MARKER);
-      return response;
+      // Response.redirect() has immutable headers in the Workers runtime.
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: target.toString(),
+          "cache-control": "no-store",
+          "x-talera-integratie": V57_MARKER,
+        },
+      });
     }
 
     // Keep request method, body, cookies and authorization context untouched.

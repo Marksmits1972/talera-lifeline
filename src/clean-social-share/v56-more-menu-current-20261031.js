@@ -43,7 +43,7 @@ const css=[
 '#talera-more-menu button:focus-visible{outline:2px solid #337cca;outline-offset:2px}',
 '@media(prefers-reduced-motion:reduce){#talera-more-menu{scroll-behavior:auto}}'
 ].join('');
-const style=document.createElement('style');style.id='talera-more-style';style.textContent=css+"#talera-more-menu .talera-pw-wrap{position:relative;display:block}#talera-more-menu .talera-pw-wrap input{padding-right:62px}#talera-more-menu .talera-pw-eye{position:absolute;right:5px;top:6px;width:48px;height:44px;border:0;border-radius:11px;background:transparent;color:#42667d;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}#talera-more-menu .talera-pw-eye svg{width:23px;height:23px;pointer-events:none}#talera-more-menu .talera-pw-eye[aria-pressed=true]{background:#eef4f8;color:#155d90}";style.textContent+="#talera-more-menu .panel[data-view=hub] .intro,#talera-more-menu .panel[data-view=hub] .option small{display:none}\n#talera-more-menu h1{display:none}\n#talera-more-menu .panel[data-view=hub] .body{padding-top:12px}\n#talera-more-menu .option{font-size:14px}\n#talera-more-menu .option .copy{min-width:0}\n#talera-more-menu .thread-item{overflow-wrap:anywhere}\n#talera-more-menu .status-line{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e9edef}\n#talera-more-menu .status-line:last-child{border-bottom:0}\n#talera-more-menu .status-line small{display:block;color:#778899;margin-top:3px}\n#talera-more-menu .inline-button{border:1px solid #c7d8e1;background:#fff;color:#225271;border-radius:10px;padding:9px 11px;font:650 12px system-ui;cursor:pointer;white-space:nowrap}\n#talera-more-menu .inline-button:disabled{opacity:.5;cursor:default}\n#talera-more-menu .meta{font-size:12px;color:#748494}\n#talera-more-menu .panel[data-view=mine] .status-line strong{font-size:13px}\n#talera-more-menu .panel[data-view=messages] .option small{display:block}\n#talera-more-menu .empty-note{padding:18px;color:#6d8290;text-align:center;font-size:13px}\n#talera-more-menu .section-label:first-child{margin-top:4px}\n";document.head.appendChild(style);
+const style=document.createElement('style');style.id='talera-more-style';style.textContent=css+"#talera-more-menu .talera-pw-wrap{position:relative;display:block}#talera-more-menu .talera-pw-wrap input{padding-right:62px}#talera-more-menu .talera-pw-eye{position:absolute;right:5px;top:6px;width:48px;height:44px;border:0;border-radius:11px;background:transparent;color:#42667d;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}#talera-more-menu .talera-pw-eye svg{width:23px;height:23px;pointer-events:none}#talera-more-menu .talera-pw-eye[aria-pressed=true]{background:#eef4f8;color:#155d90}";style.textContent+="#talera-more-menu .panel[data-view=hub] .intro,#talera-more-menu .panel[data-view=hub] .option small{display:none}\n#talera-more-menu h1{display:none}\n#talera-more-menu .panel[data-view=hub] .body{padding-top:12px}\n#talera-more-menu .option{font-size:14px}\n#talera-more-menu .option .copy{min-width:0}\n#talera-more-menu .thread-item{overflow-wrap:anywhere}\n#talera-more-menu .status-line{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e9edef}\n#talera-more-menu .status-line:last-child{border-bottom:0}\n#talera-more-menu .status-line small{display:block;color:#778899;margin-top:3px}\n#talera-more-menu .inline-button{border:1px solid #c7d8e1;background:#fff;color:#225271;border-radius:10px;padding:9px 11px;font:650 12px system-ui;cursor:pointer;white-space:nowrap}\n#talera-more-menu .inline-button:disabled{opacity:.5;cursor:default}\n#talera-more-menu .meta{font-size:12px;color:#748494}\n#talera-more-menu .panel[data-view=mine] .status-line strong{font-size:13px}\n#talera-more-menu .panel[data-view=messages] .option small{display:block}\n#talera-more-menu .empty-note{padding:18px;color:#6d8290;text-align:center;font-size:13px}\n#talera-more-menu .section-label:first-child{margin-top:4px}\n";style.textContent+="\nnav.flow-nav #navNotifications{position:relative}\nnav.flow-nav .talera-unread-badge{position:absolute;top:3px;right:24%;background:#1c5673;color:#fff;border-radius:999px;min-width:17px;height:17px;padding:1px 4px;display:grid;place-items:center;font:700 10px/1 system-ui;box-shadow:0 0 0 2px #fff}\nnav.flow-nav .talera-unread-badge[hidden]{display:none!important}\n";document.head.appendChild(style);
 const shell=document.createElement('div');shell.id='talera-more-menu';shell.hidden=true;
 shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-label="Meer" tabindex="-1"><header><button class="headbutton" data-action="back" aria-label="Terug">‹</button><strong>Meer</strong><button class="headbutton" data-action="close" aria-label="Sluiten">×</button></header><div class="body"></div></section>';
 document.body.append(shell);
@@ -231,12 +231,13 @@ async function load(view){
   }
   if(view==='recipient')state.personMemories=(await api('/api/memories')).items||[];
   if(view==='messages'){
+   void updateUnreadBadge();
    const [msgs,owned,received]=await Promise.all([api('/api/messages'),api('/api/memories'),api('/api/shared-with-me')]);
    state.messages=msgs.items||[];
    state.titles=Object.fromEntries([...(owned.items||[]),...(received.items||[])].map(row=>[String(row.id),row.title||'Herinnering']));
   }
   if(view==='shared')state.shared=(await api('/api/shared-with-me')).items||[];
-  if(view==='thread'&&state.thread){const id=state.thread;state.threadData=await api('/api/threads/'+encodeURIComponent(id));await api('/api/messages/memory/'+encodeURIComponent(id)+'/read','POST',{});}
+  if(view==='thread'&&state.thread){const id=state.thread;state.threadData=await api('/api/threads/'+encodeURIComponent(id));await api('/api/messages/memory/'+encodeURIComponent(id)+'/read','POST',{});void updateUnreadBadge();}
   if(state.open&&state.view===view)render();
  }catch(e){if(state.open&&state.view===view)feedback(e.message,true)}
 }
@@ -319,7 +320,7 @@ const requestedMenu=new URLSearchParams(location.search).get('talera_menu');
 if(['hub','account','login','privacy','messages','settings'].includes(requestedMenu))open(requestedMenu);
 document.addEventListener('talera:open-auth',e=>{const intent=e.detail?.intent||'share';open('login',intent)});
 async function checkSession(){
- try{const m=await api('/api/me');state.account=m.account;document.documentElement.dataset.taleraAuth='signed-in';document.dispatchEvent(new CustomEvent('talera:auth-ready',{detail:{authenticated:true}}))}
+ try{const m=await api('/api/me');state.account=m.account;void updateUnreadBadge();document.documentElement.dataset.taleraAuth='signed-in';document.dispatchEvent(new CustomEvent('talera:auth-ready',{detail:{authenticated:true}}))}
  catch(e){if(e.status===401){state.account=null;document.documentElement.dataset.taleraAuth='signed-out';document.dispatchEvent(new CustomEvent('talera:auth-ready',{detail:{authenticated:false}}));if(!state.open&&location.pathname==='/present'&&!new URLSearchParams(location.search).has('preview'))open('login','initial')}
  else{document.documentElement.dataset.taleraAuth='error'}}
 }
@@ -334,7 +335,21 @@ function updateHomeNav(){
  message.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.8-.3-4-.9L3 21l1.6-4.8A8.5 8.5 0 1 1 20.5 11.5z"/></svg>Berichten';
  if(!document.getElementById('talera-three-main-tabs')){const style=document.createElement('style');style.id='talera-three-main-tabs';style.textContent='nav.flow-nav{grid-template-columns:repeat(3,minmax(0,1fr))!important}nav.flow-nav #navShared{display:none!important}';document.head.append(style)}
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',updateHomeNav,{once:true});else updateHomeNav();
+async function updateUnreadBadge(){
+ if(!state.account||document.hidden)return;
+ const target=document.querySelector('nav.flow-nav #navNotifications');if(!target)return;
+ try{
+  const count=await api('/api/messages/unread-count');
+  const value=Math.max(0,Number(count.unread)||0);
+  let badge=target.querySelector('.talera-unread-badge');
+  if(!badge){badge=document.createElement('span');badge.className='talera-unread-badge';badge.setAttribute('aria-hidden','true');target.append(badge)}
+  badge.hidden=value===0;badge.textContent=value>99?'99+':String(value);
+  target.setAttribute('aria-label',value?'Berichten, '+value+' ongelezen':'Berichten');
+ }catch{}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{updateHomeNav();void updateUnreadBadge()},{once:true});else{updateHomeNav();void updateUnreadBadge()}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void updateUnreadBadge()});
+setInterval(()=>{if(state.account&&!document.hidden)void updateUnreadBadge()},15000);
 document.addEventListener('talera:languagechange',updateHomeNav);
 void checkSession();
 window.__taleraMoreMenu={ready:true,open,close,state:()=>({open:state.open,view:state.view,accountId:state.account?.id||null})};

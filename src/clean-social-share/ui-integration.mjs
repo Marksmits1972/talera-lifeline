@@ -70,6 +70,33 @@ async function previewPhotoBlob(memory){
  }finally{URL.revokeObjectURL(src)}
 }
 
+
+async function presentationPhotoBlob(memory){
+ const source=String(memory?.image||memory?.previewImage||'').trim();
+ if(!source)return null;
+ if(!/^(https?:\/\/|blob:|data:image\/)/i.test(source))throw Error('De foto kan niet veilig worden geladen.');
+ let response;
+ try{response=await fetch(source,{mode:'cors',credentials:'same-origin',cache:'no-store'})}
+ catch{throw Error('De originele foto kan niet worden geladen.')}
+ if(!response.ok)throw Error('De originele foto is niet beschikbaar.');
+ const blob=await response.blob();
+ if(!blob.type.startsWith('image/'))throw Error('Geen bruikbare foto voor de presentatie.');
+ const url=URL.createObjectURL(blob),img=new Image();
+ try{
+  img.decoding='async';
+  await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('Foto kan niet worden verwerkt.'));img.src=url});
+  const w=img.naturalWidth,h=img.naturalHeight;
+  if(!w||!h)throw Error('De afbeelding heeft geen geldige afmetingen.');
+  const scale=Math.min(1,1200/w,1800/h);
+  const canvas=document.createElement('canvas');canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
+  const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw Error('Fotoverwerking is niet beschikbaar.');
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  let jpg=await new Promise(done=>canvas.toBlob(done,'image/jpeg',.84));
+  if(jpg?.size>1500000)jpg=await new Promise(done=>canvas.toBlob(done,'image/jpeg',.67));
+  if(!jpg||jpg.size>1500000)throw Error('Foto is te groot om veilig te delen.');
+  return jpg;
+ }finally{URL.revokeObjectURL(url)}
+}
 const shareAdapter={
  async publish({memoryId,consent}){
   if(!consent)throw Error('Toestemming ontbreekt');
@@ -90,10 +117,12 @@ const shareAdapter={
   // Prepare the approved image before creating an invitation; never send a
   // text-only link when a selected photo failed to upload.
   const preview=await previewPhotoBlob(current);
+  const full=await presentationPhotoBlob(current);
   const d=await coreRequest('/api/memories/'+encodeURIComponent(storyId)+'/shares',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({hours:durationHours,consent:true})});
   if(preview){
    try{
     await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo',{method:'POST',headers:{'content-type':'image/jpeg'},body:preview});
+    if(full)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo-full',{method:'POST',headers:{'content-type':'image/jpeg'},body:full});
    }catch(e){
     await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/revoke',{method:'POST'}).catch(()=>{});
     throw Error('De foto kon niet aan de uitnodiging worden toegevoegd. De link is niet verzonden: '+e.message);

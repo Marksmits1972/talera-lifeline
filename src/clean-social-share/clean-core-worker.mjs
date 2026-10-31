@@ -55,7 +55,12 @@ function guestIdentity(req){
 }
 async function guestThreadSnapshot(env,memoryId,viewer,guestHash){
  const snapshot=await threadSnapshot(env,memoryId,viewer?.id);
- if(!viewer){const own=await env.DB.prepare('SELECT 1 AS ok FROM guest_likes WHERE memory_id=? AND guest_hash=?').bind(memoryId,guestHash).first();snapshot.hearted=!!own}
+ if(!viewer){
+  const own=await env.DB.prepare('SELECT 1 AS ok FROM guest_likes WHERE memory_id=? AND guest_hash=?').bind(memoryId,guestHash).first();
+  snapshot.hearted=!!own;
+ }
+ const ownGuestIds=viewer?new Set() : new Set((await env.DB.prepare('SELECT id FROM guest_comments WHERE memory_id=? AND guest_hash=?').bind(memoryId,guestHash).all()).results?.map(c=>c.id)||[]);
+ snapshot.items=snapshot.items.map(c=>({...c,own:viewer?String(c.author_id||'')===String(viewer.id):!!c.guest&&ownGuestIds.has(c.id)}));
  return snapshot;
 }
 async function handler(req,env){

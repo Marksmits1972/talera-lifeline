@@ -80,5 +80,5 @@ test("account-gated menu deep links include an explicit login action", () => {
   const fixture = original + "\n" + prompts.map(p => "info('Aanmelden nodig','" + p + "')").join("\n");
   const patched = patchMenuScript(fixture);
   assert.equal(patched.ok, true);
-  assert.equal((patched.text.match(/Aanmelden<\\/button>/g)||[]).length, 4);
+  assert.equal(patched.text.split("Aanmelden</button>").length - 1, 4);
 });

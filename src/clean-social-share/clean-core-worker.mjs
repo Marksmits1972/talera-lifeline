@@ -71,10 +71,10 @@ async function handler(req,env){
   const row=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(guestMedia[1]),Date.now()).first();
   if(!row||!env.SHARE_MEDIA)return page404();
   const name=guestMedia[2],isAudio=name==='geluid';
-  const key=(name==='foto'?'guest-previews/':name==='foto-volledig'?'guest-full/':'guest-audio/')+row.id+(isAudio?'.mp3':'.jpg');
+  const key=(name==='foto'?'guest-previews/':name==='foto-volledig'?'guest-full/':'guest-audio/')+row.id+(isAudio?'.bin':'.jpg');
   const obj=await env.SHARE_MEDIA.get(key);
   if(!obj)return page404();
-  const headers={...secHeaders,'content-type':isAudio?'audio/mpeg':'image/jpeg','x-robots-tag':'noindex,nofollow','cross-origin-resource-policy':'cross-origin'};
+  const headers={...secHeaders,'content-type':isAudio?(obj.httpMetadata?.contentType||'audio/mpeg'):'image/jpeg','x-robots-tag':'noindex,nofollow','cross-origin-resource-policy':'cross-origin'};
   return new Response(m==='HEAD'?null:obj.body,{headers});
  }
  if(p.startsWith('/gedeeld/')){
@@ -89,7 +89,7 @@ async function handler(req,env){
   const pageUrl=new URL('/gedeeld/'+token,req.url).href;
   const hasImage=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-previews/'+row.id+'.jpg'));
   const hasFull=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-full/'+row.id+'.jpg'));
-  const hasSound=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-audio/'+row.id+'.mp3'));
+  const hasSound=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-audio/'+row.id+'.bin'));
   const story=String(row.story_text||'').trim(),storyTitle=String(row.title||'').trim();
   const trimmed=story.slice(0,storyTitle.length).toLowerCase()===storyTitle.toLowerCase()?story.slice(storyTitle.length).replace(/^[\s.:·—–-]+/,'').trim():story;
   const caption=(trimmed||'Een persoonlijke herinnering voor jou.').slice(0,145);
@@ -265,8 +265,22 @@ async function handler(req,env){
   await env.SHARE_MEDIA.put(key,bytes,{httpMetadata:{contentType:'image/jpeg'}});
   return json({ok:true,photo:true});
  }
+
+ const uploadAudio=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/audio$/);
+ if(uploadAudio&&m==='POST'){
+  const share=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories mem ON mem.id=s.memory_id AND mem.account_id=s.account_id WHERE s.id=? AND s.account_id=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(uploadAudio[1],user.id,Date.now()).first();
+  if(!share)return error(404,'Uitnodiging niet gevonden');
+  if(!env.SHARE_MEDIA)return error(503,'Audio-opslag niet beschikbaar');
+  const ctype=(req.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+  if(!['audio/mpeg','audio/mp4','audio/aac','audio/x-m4a','audio/wav','audio/ogg','audio/webm'].includes(ctype))return error(415,'Deze geluidsindeling wordt niet ondersteund');
+  if(Number(req.headers.get('content-length')||0)>12000000)return error(413,'Geluidsbestand is te groot');
+  const bytes=await req.arrayBuffer();
+  if(bytes.byteLength<100||bytes.byteLength>12000000)return error(413,'Geluidsbestand moet kleiner zijn dan 12 MB');
+  await env.SHARE_MEDIA.put('guest-audio/'+share.id+'.bin',bytes,{httpMetadata:{contentType:ctype}});
+  return json({ok:true,audio:true});
+ }
  const revoke=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/revoke$/);
- if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();const revoked=(r.meta?.changes||0)>0;if(revoked&&env.SHARE_MEDIA)await Promise.all(['guest-previews/','guest-full/','guest-audio/'].map((prefix,i)=>env.SHARE_MEDIA.delete(prefix+revoke[1]+(i===2?'.mp3':'.jpg'))));return json({revoked})}
+ if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();const revoked=(r.meta?.changes||0)>0;if(revoked&&env.SHARE_MEDIA)await Promise.all(['guest-previews/','guest-full/','guest-audio/'].map((prefix,i)=>env.SHARE_MEDIA.delete(prefix+revoke[1]+(i===2?'.bin':'.jpg'))));return json({revoked})}
  const readThread=p.match(/^\/api\/messages\/memory\/([0-9a-f-]{36})\/read$/);
  if(readThread&&m==='POST'){const exists=await accessible(readThread[1]);if(!exists)return error(404,'Herinnering niet gevonden');await env.DB.prepare('UPDATE messages SET read_at=COALESCE(read_at,?) WHERE account_id=? AND memory_id=? AND read_at IS NULL').bind(Date.now(),user.id,readThread[1]).run();return json({ok:true})}
  if(p==='/api/messages/unread-count'&&m==='GET'){const row=await env.DB.prepare('SELECT COUNT(*) AS total FROM messages WHERE account_id=? AND read_at IS NULL').bind(user.id).first();return json({unread:row?.total||0})}

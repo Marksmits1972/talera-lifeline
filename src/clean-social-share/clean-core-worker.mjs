@@ -47,7 +47,7 @@ async function toggleThreadHeart(env,memoryId,authorId,ownerId){
 
 const guestCookie=(token)=>'talera_guest_id='+token+'; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000';
 function guestIdentity(req){
- const found=(req.headers.get('cookie')||'').match(/(?:^|;\\s*)talera_guest_id=([0-9a-f]{64})(?:;|$)/);
+ const found=(req.headers.get('cookie')||'').match(/(?:^|;\s*)talera_guest_id=([0-9a-f]{64})(?:;|$)/);
  return {token:found?.[1]||secret(),newCookie:!found};
 }
 async function guestThreadSnapshot(env,memoryId,viewer,guestHash){
@@ -65,7 +65,7 @@ async function handler(req,env){
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}
 
 
- const guestThread=p.match(/^\\/api\\/guest\\/threads\\/([0-9a-f]{64})(\\/(?:comments|like))?$/);
+ const guestThread=p.match(/^\/api\/guest\/threads\/([0-9a-f]{64})(\/(?:comments|like))?$/);
  if(guestThread){
   if(m!=='GET'&&m!=='POST')return error(405);
   if(m==='POST'&&!allowedWrite(req))return error(403,'Ongeldige herkomst');
@@ -91,7 +91,7 @@ async function handler(req,env){
    }
    return withVisitor(json({hearted:!existing}));
   }
-  const data=await body(req),comment=text(data.body,2000),name=text(data.name,40).replace(/[<>\\r\\n\\t]/g,'').trim();
+  const data=await body(req),comment=text(data.body,2000),name=text(data.name,40).replace(/[<>\r\n\t]/g,'').trim();
   if(name.length<2||name.length>40)return error(400,'Vul je voornaam in (2 tot 40 tekens)');
   if(!comment)return error(400,'Schrijf eerst een reactie');
   const daily=await env.DB.prepare('SELECT COUNT(*) AS n FROM guest_comments WHERE memory_id=? AND guest_hash=? AND created_at>?').bind(share.memory_id,guestHash,Date.now()-86400000).first();

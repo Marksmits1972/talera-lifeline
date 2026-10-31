@@ -69,7 +69,7 @@ function passwordField(id,label,autocomplete){return '<label>'+label+'<span clas
 function render(){
  if(!state.open)return;
  shell.querySelector('.panel').dataset.view=state.view;back.hidden=!state.history.length;
- head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Door mij gedeeld',recipient:'Herinnering delen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',subscription:'Mijn abonnement',help:'Hulp'})[state.view]||'Meer';
+ head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy en beveiliging',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Door mij gedeeld',recipient:'Herinnering delen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',language:'Taal',accessibility:'Toegankelijkheid',display:'Weergave',subscription:'Mijn abonnement',help:'Hulp en over TALERA'})[state.view]||'Meer';
  let html='',a=state.account;
  switch(state.view){
  case 'hub':{

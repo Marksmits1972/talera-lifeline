@@ -1,13 +1,13 @@
-/* TALERA V56: rustig beginscherm en originele compacte socialbalk. */
+/* TALERA V56: verwijder enkel niet-functionele microteksten op Mijn leven. */
 #v17-timebox .v17-arrows{display:none!important}
-.life-sheet .main-only>.sheet-sub,
-.life-sheet .main-only>p.sheet-sub,
-.life-sheet .main-only>.hint,
-.life-sheet #v18-phases>.v18-era-note,
-.life-sheet #v18-phases .v18-eras-title>span,
-.life-sheet .talera-topics-note{display:none!important}
-/* Laat de goedgekeurde grootte, positionering en hartje/reactietellers intact.
-   Alleen het pictogram van de deelknop iets groter voor een gelijkwaardige balans. */
+#sheet .main-only>.sheet-sub,
+#sheet .main-only>.hint,
+#sheet #v18-phases>.v18-era-note,
+#sheet #v18-phases .v18-eras-title>span,
+#sheet .talera-topics-note,
+#sheet #v17-timebox>.v17-guide,
+#sheet .main-only>.section-head>small:not(#myCount){display:none!important}
+/* Oorspronkelijke compacte socialbalk: alleen het deelicoon iets vergroten. */
 #talera-clean-social>button[data-action="share"]>svg{
   width:27px!important;
   height:27px!important;

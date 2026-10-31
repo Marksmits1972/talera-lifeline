@@ -69,3 +69,16 @@ test("missing V56 service returns 503 instead of attempting unauthenticated alte
   const r=await worker.fetch(new Request("https://staging.example/"),{});
   assert.equal(r.status,503);
 });
+
+test("account-gated menu deep links include an explicit login action", () => {
+  const prompts = [
+    "Meld je aan om mensen op TALERA te vinden.",
+    "Meld je aan om gedeelde herinneringen te beheren.",
+    "Meld je aan om ontvangen herinneringen te openen.",
+    "Meld je aan om je berichten te bekijken.",
+  ];
+  const fixture = original + "\n" + prompts.map(p => "info('Aanmelden nodig','" + p + "')").join("\n");
+  const patched = patchMenuScript(fixture);
+  assert.equal(patched.ok, true);
+  assert.equal((patched.text.match(/Aanmelden<\\/button>/g)||[]).length, 4);
+});

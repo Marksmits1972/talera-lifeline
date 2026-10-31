@@ -49,7 +49,7 @@ shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-lab
 document.body.append(shell);
 shell.querySelector('.panel')?.setAttribute('aria-label','Mijn TALERA');
 const body=shell.querySelector('.body'),head=shell.querySelector('header strong'),back=shell.querySelector('[data-action="back"]');
-const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],person:null,titles:{},personMemories:[]};
+const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(path,method='GET',payload){
  const opt={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
@@ -134,8 +134,7 @@ function render(){
   break;
  case 'mine':{
   const now=Date.now(),byId=state.titles;
-  html=(a?(
-   state.shares.length?section('WhatsApp-deellinks',state.shares.map(link=>{
+  const whatsapp=state.shares.length?section('WhatsApp-deellinks',state.shares.map(link=>{
     const live=!link.revoked_at&&Number(link.expires_at)>now;
     const revoked=Boolean(link.revoked_at);
     const date=new Date(Number(link.expires_at));
@@ -143,8 +142,12 @@ function render(){
     return '<div class="status-line"><span><strong>'+esc(byId[String(link.memory_id)]||'Gedeelde herinnering')+'</strong><small>'+
      (revoked?'Ingetrokken':live?'Geldig tot '+esc(expiry):'Verlopen')+'</small></span>'+
      (live?'<button class="inline-button" data-revoke="'+esc(link.id)+'">Intrekken</button>':'')+'</div>'
-   }).join('')):info('Nog geen WhatsApp-deellinks','Wanneer je vanuit een herinnering via WhatsApp deelt, kun je de geldigheidsduur hier terugzien.')
-  ):info('Aanmelden nodig','Meld je aan om je gedeelde herinneringen te beheren.'));
+  }).join('')):'';
+  const direct=state.grants.length?section('Rechtstreeks met TALERA-gebruikers',state.grants.map(link=>
+   '<div class="status-line"><span><strong>'+esc(link.title||'Herinnering')+'</strong><small>Met '+esc(link.recipient_name||'een gebruiker')+'</small></span>'+
+   '<button class="inline-button" data-revoke-grant="'+esc(link.memory_id)+'" data-recipient-id="'+esc(link.recipient_account_id)+'">Intrekken</button></div>').join('')):'';
+  html=a?(whatsapp+direct||info('Nog niets gedeeld','Deellinks en herinneringen die je met TALERA-gebruikers deelt verschijnen hier.')):
+   info('Aanmelden nodig','Meld je aan om gedeelde herinneringen te beheren.');
   break;
  }
  case 'shared':
@@ -220,8 +223,9 @@ async function load(view){
   }
   if(!state.account&&(view==='messages'||view==='shared'||view==='mine'||view==='people')){if(state.open&&state.view===view)render();return}
   if(view==='mine'){
-   const [shareRes,memRes]=await Promise.all([api('/api/shares'),api('/api/memories')]);
+   const [shareRes,memRes,grantRes]=await Promise.all([api('/api/shares'),api('/api/memories'),api('/api/my-grants')]);
    state.shares=shareRes.items||[];
+   state.grants=grantRes.items||[];
    state.memories=memRes.items||[];
    state.titles=Object.fromEntries(state.memories.map(row=>[String(row.id),row.title||'Herinnering']));
   }
@@ -253,6 +257,15 @@ shell.addEventListener('click',e=>{
    api('/api/memories/'+encodeURIComponent(memory.id)+'/grant','POST',{recipientId:state.person.id})
     .then(()=>feedback('Herinnering gedeeld met '+state.person.name+'.'))
     .catch(e=>feedback(e.message,true)).finally(()=>{state.busy=false});return;
+  }
+  if(button.dataset.revokeGrant){
+   const id=button.dataset.revokeGrant,recipientId=button.dataset.recipientId;
+   const record=state.grants.find(x=>String(x.memory_id)===id&&String(x.recipient_account_id)===recipientId);
+   if(!record||!window.confirm('De toegang voor '+record.recipient_name+' tot '+record.title+' intrekken?'))return;
+   if(state.busy)return;state.busy=true;
+   api('/api/memories/'+encodeURIComponent(id)+'/grants/'+encodeURIComponent(recipientId)+'/revoke','POST',{})
+    .then(()=>load('mine')).catch(e=>feedback(e.message,true)).finally(()=>{state.busy=false});
+   return;
   }
   if(button.dataset.revoke){
    const link=state.shares.find(x=>String(x.id)===button.dataset.revoke);

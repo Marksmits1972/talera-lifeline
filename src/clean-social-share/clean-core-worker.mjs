@@ -249,6 +249,15 @@ async function handler(req,env){
   const rows=await env.DB.prepare("SELECT id,display_name FROM accounts WHERE email=? AND id<>? AND status='active'").bind(q,user.id).all();
   return json({items:rows.results||[]});
  }
+ if(p==='/api/my-grants'&&m==='GET'){
+  const rows=await env.DB.prepare("SELECT g.memory_id,m.title,m.event_date,g.recipient_account_id,a.display_name AS recipient_name,g.created_at FROM memory_grants g JOIN memories m ON m.id=g.memory_id AND m.account_id=g.owner_account_id JOIN accounts a ON a.id=g.recipient_account_id WHERE g.owner_account_id=? AND g.revoked_at IS NULL ORDER BY g.created_at DESC LIMIT 200").bind(user.id).all();
+  return json({items:rows.results||[]});
+ }
+ const revokeGrant=p.match(/^\/api\/memories\/([0-9a-f-]{36})\/grants\/([0-9a-f-]{36})\/revoke$/);
+ if(revokeGrant&&m==='POST'){
+  const result=await env.DB.prepare('UPDATE memory_grants SET revoked_at=? WHERE memory_id=? AND recipient_account_id=? AND owner_account_id=? AND revoked_at IS NULL').bind(Date.now(),revokeGrant[1],revokeGrant[2],user.id).run();
+  return json({revoked:(result.meta?.changes||0)>0});
+ }
  if(p==='/api/shared-with-me'&&m==='GET'){
   const rows=await env.DB.prepare("SELECT m.id,m.title,m.story_text,m.event_date,a.display_name AS owner_name FROM memory_grants g JOIN memories m ON g.memory_id=m.id JOIN accounts a ON a.id=m.account_id WHERE g.recipient_account_id=? AND g.revoked_at IS NULL ORDER BY g.created_at DESC LIMIT 200").bind(user.id).all();return json({items:rows.results||[]});
  }

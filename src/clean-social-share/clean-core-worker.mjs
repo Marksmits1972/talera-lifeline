@@ -248,7 +248,8 @@ async function handler(req,env){
  if(share&&m==='POST'){const own=await env.DB.prepare('SELECT id FROM memories WHERE id=? AND account_id=?').bind(share[1],user.id).first();if(!own)return error(404,'Niet gevonden');const d=await body(req),hours=Number(d.hours);if(![1,24,168,720].includes(hours)||d.consent!==true)return error(400,'Geldigheidsduur en toestemming verplicht');const t=secret(),id=random(),exp=Date.now()+hours*3600000;await env.DB.prepare('INSERT INTO shares(id,account_id,memory_id,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)').bind(id,user.id,share[1],await sha(t),exp,Date.now()).run();return json({id,link:new URL('/gedeeld/'+t,req.url).href,expiresAt:new Date(exp).toISOString()},201)}
  if(p==='/api/shares'&&m==='GET'){const rows=await env.DB.prepare('SELECT id,memory_id,expires_at,revoked_at FROM shares WHERE account_id=? ORDER BY created_at DESC LIMIT 200').bind(user.id).all();return json({items:rows.results||[]})}
 
- const uploadPhoto=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/photo$/);
+
+ const uploadPhoto=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/(photo|photo-full)$/);
  if(uploadPhoto&&m==='POST'){
   const share=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories mem ON mem.id=s.memory_id AND mem.account_id=s.account_id WHERE s.id=? AND s.account_id=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(uploadPhoto[1],user.id,Date.now()).first();
   if(!share)return error(404,'Uitnodiging niet gevonden');
@@ -260,11 +261,12 @@ async function handler(req,env){
   if(bytes.byteLength<80||bytes.byteLength>1500000)return error(413,'Foto moet kleiner zijn dan 1,5 MB');
   const magic=new Uint8Array(bytes);
   if(magic[0]!==255||magic[1]!==216||magic[2]!==255)return error(415,'Geen geldige JPEG');
-  await env.SHARE_MEDIA.put('guest-previews/'+share.id+'.jpg',bytes,{httpMetadata:{contentType:'image/jpeg'}});
+  const key=(uploadPhoto[2]==='photo'?'guest-previews/':'guest-full/')+share.id+'.jpg';
+  await env.SHARE_MEDIA.put(key,bytes,{httpMetadata:{contentType:'image/jpeg'}});
   return json({ok:true,photo:true});
  }
  const revoke=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/revoke$/);
- if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();const revoked=(r.meta?.changes||0)>0;if(revoked&&env.SHARE_MEDIA)await env.SHARE_MEDIA.delete('guest-previews/'+revoke[1]+'.jpg');return json({revoked})}
+ if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();const revoked=(r.meta?.changes||0)>0;if(revoked&&env.SHARE_MEDIA)await Promise.all(['guest-previews/','guest-full/','guest-audio/'].map((prefix,i)=>env.SHARE_MEDIA.delete(prefix+revoke[1]+(i===2?'.mp3':'.jpg'))));return json({revoked})}
  const readThread=p.match(/^\/api\/messages\/memory\/([0-9a-f-]{36})\/read$/);
  if(readThread&&m==='POST'){const exists=await accessible(readThread[1]);if(!exists)return error(404,'Herinnering niet gevonden');await env.DB.prepare('UPDATE messages SET read_at=COALESCE(read_at,?) WHERE account_id=? AND memory_id=? AND read_at IS NULL').bind(Date.now(),user.id,readThread[1]).run();return json({ok:true})}
  if(p==='/api/messages/unread-count'&&m==='GET'){const row=await env.DB.prepare('SELECT COUNT(*) AS total FROM messages WHERE account_id=? AND read_at IS NULL').bind(user.id).first();return json({unread:row?.total||0})}

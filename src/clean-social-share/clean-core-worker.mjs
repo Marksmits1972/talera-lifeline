@@ -23,9 +23,12 @@ const guestPageTemplate="<!doctype html>\n<html lang=\"nl\">\n<head>\n<meta char
 const safeScriptJSON=x=>JSON.stringify(String(x??'')).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
 async function threadSnapshot(env,memoryId,viewerId){
  const comments=await env.DB.prepare('SELECT c.id,c.body,c.parent_id,c.created_at,c.account_id AS author_id,a.display_name FROM comments c JOIN accounts a ON a.id=c.account_id WHERE c.memory_id=? ORDER BY c.created_at LIMIT 200').bind(memoryId).all();
+ const guests=await env.DB.prepare('SELECT id,display_name,body,created_at FROM guest_comments WHERE memory_id=? ORDER BY created_at LIMIT 200').bind(memoryId).all();
+ const items=[...(comments.results||[]),...(guests.results||[]).map(c=>({...c,display_name:c.display_name+' · gast',author_id:null,guest:true}))].sort((x,y)=>Number(x.created_at)-Number(y.created_at)).slice(-200);
  const hearts=await env.DB.prepare('SELECT COUNT(*) AS n FROM likes WHERE memory_id=?').bind(memoryId).first();
+ const guestHearts=await env.DB.prepare('SELECT COUNT(*) AS n FROM guest_likes WHERE memory_id=?').bind(memoryId).first();
  const own=viewerId?await env.DB.prepare('SELECT 1 AS yes FROM likes WHERE memory_id=? AND account_id=?').bind(memoryId,viewerId).first():null;
- return {items:comments.results||[],heartCount:hearts?.n||0,hearted:!!own};
+ return {items,heartCount:(hearts?.n||0)+(guestHearts?.n||0),hearted:!!own};
 }
 async function addThreadComment(env,memoryId,authorId,bodyText){
  const id=random(),now=Date.now();
@@ -52,14 +55,9 @@ function guestIdentity(req){
 }
 async function guestThreadSnapshot(env,memoryId,viewer,guestHash){
  const snapshot=await threadSnapshot(env,memoryId,viewer?.id);
- const guestComments=await env.DB.prepare('SELECT id,display_name,body,created_at FROM guest_comments WHERE memory_id=? ORDER BY created_at ASC LIMIT 200').bind(memoryId).all();
- snapshot.items=[...snapshot.items,...(guestComments.results||[]).map(c=>({...c,display_name:c.display_name+' · gast',author_id:null,guest:true}))].sort((a,b)=>Number(a.created_at)-Number(b.created_at)).slice(-200);
- const extras=await env.DB.prepare('SELECT COUNT(*) AS n FROM guest_likes WHERE memory_id=?').bind(memoryId).first();
- snapshot.heartCount+=(extras?.n||0);
  if(!viewer){const own=await env.DB.prepare('SELECT 1 AS ok FROM guest_likes WHERE memory_id=? AND guest_hash=?').bind(memoryId,guestHash).first();snapshot.hearted=!!own}
  return snapshot;
 }
-
 async function handler(req,env){
  const u=new URL(req.url),p=u.pathname,m=req.method;
  if(p==='/__health'&&m==='GET'){const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('accounts','sessions','memories','comments','likes','shares','messages')").all();return json({service:'talera-clean-core',staging:true,ready:(tables.results||[]).length===7,accountProvider:'TALERA',cloudflareLogin:false})}

@@ -170,7 +170,7 @@ function render(){
   try{
    const r=await api(registering?'/api/register':'/api/login','POST',data);
    signed.account=r.account;await refresh();const intention=signed.intent;
-   if(intention==='heart'){signed.intent=null;await toggleHeart();close()}
+   if(intention==='heart'){signed.intent=null;busy=false;await toggleHeart();close()}
    else{signed.intent=null;open('comments')}
   }catch(err){alertText(err.message,true)}finally{busy=false}
  });

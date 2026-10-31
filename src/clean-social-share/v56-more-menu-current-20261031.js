@@ -43,13 +43,13 @@ const css=[
 '#talera-more-menu button:focus-visible{outline:2px solid #337cca;outline-offset:2px}',
 '@media(prefers-reduced-motion:reduce){#talera-more-menu{scroll-behavior:auto}}'
 ].join('');
-const style=document.createElement('style');style.id='talera-more-style';style.textContent=css+"#talera-more-menu .talera-pw-wrap{position:relative;display:block}#talera-more-menu .talera-pw-wrap input{padding-right:62px}#talera-more-menu .talera-pw-eye{position:absolute;right:5px;top:6px;width:48px;height:44px;border:0;border-radius:11px;background:transparent;color:#42667d;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}#talera-more-menu .talera-pw-eye svg{width:23px;height:23px;pointer-events:none}#talera-more-menu .talera-pw-eye[aria-pressed=true]{background:#eef4f8;color:#155d90}";document.head.appendChild(style);
+const style=document.createElement('style');style.id='talera-more-style';style.textContent=css+"#talera-more-menu .talera-pw-wrap{position:relative;display:block}#talera-more-menu .talera-pw-wrap input{padding-right:62px}#talera-more-menu .talera-pw-eye{position:absolute;right:5px;top:6px;width:48px;height:44px;border:0;border-radius:11px;background:transparent;color:#42667d;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}#talera-more-menu .talera-pw-eye svg{width:23px;height:23px;pointer-events:none}#talera-more-menu .talera-pw-eye[aria-pressed=true]{background:#eef4f8;color:#155d90}";style.textContent+="#talera-more-menu .panel[data-view=hub] .intro,#talera-more-menu .panel[data-view=hub] .option small{display:none}\n#talera-more-menu h1{display:none}\n#talera-more-menu .panel[data-view=hub] .body{padding-top:12px}\n#talera-more-menu .option{font-size:14px}\n#talera-more-menu .option .copy{min-width:0}\n#talera-more-menu .thread-item{overflow-wrap:anywhere}\n#talera-more-menu .status-line{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e9edef}\n#talera-more-menu .status-line:last-child{border-bottom:0}\n#talera-more-menu .status-line small{display:block;color:#778899;margin-top:3px}\n#talera-more-menu .inline-button{border:1px solid #c7d8e1;background:#fff;color:#225271;border-radius:10px;padding:9px 11px;font:650 12px system-ui;cursor:pointer;white-space:nowrap}\n#talera-more-menu .inline-button:disabled{opacity:.5;cursor:default}\n#talera-more-menu .meta{font-size:12px;color:#748494}\n#talera-more-menu .panel[data-view=mine] .status-line strong{font-size:13px}\n#talera-more-menu .panel[data-view=messages] .option small{display:block}\n#talera-more-menu .empty-note{padding:18px;color:#6d8290;text-align:center;font-size:13px}\n#talera-more-menu .section-label:first-child{margin-top:4px}\n";document.head.appendChild(style);
 const shell=document.createElement('div');shell.id='talera-more-menu';shell.hidden=true;
 shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-label="Meer" tabindex="-1"><header><button class="headbutton" data-action="back" aria-label="Terug">‹</button><strong>Meer</strong><button class="headbutton" data-action="close" aria-label="Sluiten">×</button></header><div class="body"></div></section>';
 document.body.append(shell);
 shell.querySelector('.panel')?.setAttribute('aria-label','Mijn TALERA');
 const body=shell.querySelector('.body'),head=shell.querySelector('header strong'),back=shell.querySelector('[data-action="back"]');
-const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null};
+const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],person:null,titles:{},personMemories:[]};
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(path,method='GET',payload){
  const opt={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
@@ -68,8 +68,8 @@ function notice(){return state.notice?'<p class="notice'+(state.error?' error':'
 function passwordField(id,label,autocomplete){return '<label>'+label+'<span class="talera-pw-wrap"><input id="'+id+'" type="password" name="'+id+'" autocomplete="'+autocomplete+'" autocapitalize="off" spellcheck="false" required><button type="button" class="talera-pw-eye" data-password-toggle="'+id+'" aria-label="Toon wachtwoord" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>'}
 function render(){
  if(!state.open)return;
- back.hidden=!state.history.length;
- head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Mijn gedeelde herinneringen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',subscription:'Mijn abonnement',help:'Hulp'})[state.view]||'Meer';
+ shell.querySelector('.panel').dataset.view=state.view;back.hidden=!state.history.length;
+ head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Door mij gedeeld',recipient:'Herinnering delen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',subscription:'Mijn abonnement',help:'Hulp'})[state.view]||'Meer';
  let html='',a=state.account;
  switch(state.view){
  case 'hub':{
@@ -83,12 +83,13 @@ function render(){
   break;
  }
  case 'account':
-  html=title('Mijn account','Je TALERA-account en persoonlijke gegevens.')+(a?
-    info(a.displayName,a.email)+
-    section('Accountgegevens',option('privacy','♢','Privacy en vindbaarheid',state.discovery?.publicHandle?'@'+state.discovery.publicHandle:'Je privacykeuzes beheren'))+
-    '<button class="secondary" data-action="logout">Uitloggen</button>':
-    info('Niet aangemeld','Maak een account aan of meld je aan met je bestaande TALERA-account.')+
-    '<button class="primary" data-view="login">Aanmelden</button><button class="secondary" data-view="register">Account aanmaken</button>');
+  html=(a?
+   info('Aangemeld als '+a.displayName,a.email)+
+   section('Account en privacy',option('privacy','♢','Mijn vindbaarheid',state.discovery?.publicHandle?'@'+state.discovery.publicHandle:'Alleen zichtbaar als jij dat kiest')+
+   option('forgot','◈','Wachtwoord herstellen','Via je e-mailadres'))+
+   '<button class="secondary" data-action="logout">Uitloggen</button>':
+   info('Niet aangemeld','Meld je aan om je TALERA-account te beheren.')+
+   '<button class="primary" data-view="login">Aanmelden</button><button class="secondary" data-view="register">Account aanmaken</button>');
   break;
  case 'login':
   html=title('Aanmelden','Gebruik je bestaande TALERA-account.')+
@@ -110,32 +111,67 @@ function render(){
   passwordField('register-confirm','Wachtwoord herhalen','new-password')+
   '<button class="primary" type="submit">Account aanmaken</button></form><button class="secondary" data-view="login">Ik heb al een account</button>';break;
  case 'privacy':
-  html=title('Privacy en beveiliging','Jij bepaalt of anderen je binnen TALERA kunnen vinden.')+
-  (a?'<form data-form="privacy"><label class="switch"><input name="discoverable" type="checkbox"'+(state.discovery?.discoverable?' checked':'')+'> Mijn account vindbaar maken</label>'+
-    '<label>Gebruikersnaam<input name="username" value="'+esc(state.discovery?.publicHandle||'')+'" placeholder="Jouw unieke naam"></label><button class="primary" type="submit">Privacykeuzes opslaan</button></form>':
-    info('Aanmelden nodig','Meld je aan om privacykeuzes te beheren.')+'<button class="primary" data-view="login">Aanmelden</button>');break;
+  html=(a?
+   info('Vindbaarheid','Andere TALERA-gebruikers kunnen je uitsluitend zoeken als je dit inschakelt.')+
+   '<form data-form="privacy"><label class="switch"><input name="discoverable" type="checkbox"'+(state.discovery?.discoverable?' checked':'')+'> Vindbaar binnen TALERA</label>'+
+   '<label>Mijn gebruikersnaam<input name="username" maxlength="30" value="'+esc(state.discovery?.publicHandle||'')+'" placeholder="Jouw unieke naam"></label><button class="primary" type="submit">Privacykeuzes opslaan</button></form>'+
+   section('Tijdelijke toegang',option('mine','▣','Mijn deellinks','Bekijk en beëindig WhatsApp-deellinks')):
+   info('Aanmelden nodig','Meld je aan om je privacyinstellingen te beheren.')+'<button class="primary" data-view="login">Aanmelden</button>');
+  break;
  case 'people':
-  html=title('Mijn mensen','Zoek mensen die ervoor hebben gekozen vindbaar te zijn.')+
-  (a?'<form data-form="search"><label>Zoek naam of gebruikersnaam<input name="q" value="'+esc(state.query)+'" minlength="2" autocomplete="off" placeholder="Zoek binnen TALERA"></label><button class="primary" type="submit">Zoeken</button></form>'+
-  (state.search.length?section('Gevonden',state.search.map(p=>'<div class="thread-item"><strong>'+esc(p.name)+'</strong><p>@'+esc(p.handle||'')+'</p></div>').join('')):''):
-  info('Aanmelden nodig','Meld je aan om andere TALERA-gebruikers te zoeken.')+'<button class="primary" data-view="login">Aanmelden</button>');break;
- case 'mine':
-  html=title('Mijn gedeelde herinneringen','Herinneringen in je TALERA-account.')+(a?
-   (state.memories.length?state.memories.map(m=>'<button class="option" data-thread="'+esc(m.id)+'"><span class="copy"><strong>'+esc(m.title)+'</strong><small>'+esc(m.event_date||'Open het gesprek bij deze herinnering')+'</small></span><span>›</span></button>').join(''):info('Nog geen herinneringen in je account','Je eigen herinneringen verschijnen hier nadat je ze hebt opgeslagen.')):
-   info('Aanmelden nodig','Meld je aan om je herinneringen te zien.'));break;
+  html=(a?
+   '<form data-form="search"><label>Zoek binnen TALERA<input name="q" minlength="2" value="'+esc(state.query)+'" autocomplete="off" placeholder="Naam of @gebruikersnaam" required></label><button class="primary" type="submit">Zoeken</button></form>'+
+   (state.search.length?section('Gevonden mensen',state.search.map(p=>'<div class="status-line"><span><strong>'+esc(p.name)+'</strong><small>@'+esc(p.handle||'')+'</small></span><button class="inline-button" data-recipient="'+esc(p.id)+'">Deel herinnering</button></div>').join('')):
+     state.query?'<p class="empty-note">Geen vindbare mensen gevonden.</p>':'<p class="meta">Alleen mensen die zelf vindbaarheid hebben aangezet, verschijnen bij het zoeken.</p>'):
+   info('Aanmelden nodig','Meld je aan om mensen op TALERA te vinden.'));
+  break;
+ case 'recipient':
+  html=state.person?
+   info('Delen met '+state.person.name,'Kies één herinnering. De ontvanger krijgt toegang en kan reageren.')+
+   (state.personMemories.length?section('Kies een herinnering',state.personMemories.map(x=>'<button class="option" data-grant="'+esc(x.id)+'"><span class="copy"><strong>'+esc(x.title)+'</strong><small>Toegang geven aan '+esc(state.person.name)+'</small></span><span>›</span></button>').join('')):
+    info('Geen opgeslagen herinneringen','Sla eerst een herinnering op in je TALERA-account.')):
+   info('Geen persoon geselecteerd','Ga terug naar Mijn mensen.');
+  break;
+ case 'mine':{
+  const now=Date.now(),byId=state.titles;
+  html=(a?(
+   state.shares.length?section('WhatsApp-deellinks',state.shares.map(link=>{
+    const live=!link.revoked_at&&Number(link.expires_at)>now;
+    const revoked=Boolean(link.revoked_at);
+    const date=new Date(Number(link.expires_at));
+    const expiry=Number.isFinite(date.getTime())?date.toLocaleDateString('nl-NL'):'Onbekend';
+    return '<div class="status-line"><span><strong>'+esc(byId[String(link.memory_id)]||'Gedeelde herinnering')+'</strong><small>'+
+     (revoked?'Ingetrokken':live?'Geldig tot '+esc(expiry):'Verlopen')+'</small></span>'+
+     (live?'<button class="inline-button" data-revoke="'+esc(link.id)+'">Intrekken</button>':'')+'</div>'
+   }).join('')):info('Nog geen WhatsApp-deellinks','Wanneer je vanuit een herinnering via WhatsApp deelt, kun je de geldigheidsduur hier terugzien.')
+  ):info('Aanmelden nodig','Meld je aan om je gedeelde herinneringen te beheren.'));
+  break;
+ }
  case 'shared':
-  html=title('Met mij gedeeld','Herinneringen waartoe je persoonlijk toegang hebt.')+(a?
-   (state.shared.length?state.shared.map(m=>'<button class="option" data-thread="'+esc(m.id)+'"><span class="copy"><strong>'+esc(m.title)+'</strong><small>Gedeeld door '+esc(m.owner_name)+'</small></span><span>›</span></button>').join(''):info('Geen gedeelde herinneringen','Nieuwe herinneringen verschijnen hier zodra iemand met je deelt.')):
-   info('Aanmelden nodig','Meld je aan om je gedeelde herinneringen te zien.'));break;
+  html=(a?
+   (state.shared.length?section('Ontvangen herinneringen',state.shared.map(x=>
+    '<button class="option" data-thread="'+esc(x.id)+'"><span class="copy"><strong>'+esc(x.title)+'</strong><small>Van '+esc(x.owner_name||'een TALERA-gebruiker')+'</small></span><span>›</span></button>').join('')):
+   info('Nog niets met je gedeeld','Herinneringen die TALERA-gebruikers rechtstreeks met jou delen verschijnen hier.')):
+   info('Aanmelden nodig','Meld je aan om ontvangen herinneringen te openen.'));
+  break;
  case 'messages':{
-  let grouped=new Map();
-  for(const m of state.messages){const id=String(m.memory_id);let x=grouped.get(id);if(!x){x={count:0,unread:0};grouped.set(id,x)}x.count++;if(!m.read_at)x.unread++}
-  html=title('Berichten','Reacties en gesprekken bij jouw herinneringen.')+(a?
-   (grouped.size?[...grouped].map(([id,x])=>'<button class="option" data-thread="'+esc(id)+'"><span class="glyph">✉</span><span class="copy"><strong>Gesprek bij herinnering</strong><small>'+x.count+' meldingen'+(x.unread?' · '+x.unread+' ongelezen':'')+'</small></span><span>›</span></button>').join(''):info('Nog geen berichten','Reacties op gedeelde herinneringen verschijnen hier.')):
-   info('Aanmelden nodig','Meld je aan om je gesprekken te lezen.'));break;
+  const grouped=new Map();
+  for(const msg of state.messages){
+   const id=String(msg.memory_id||'');if(!id)continue;
+   let g=grouped.get(id);
+   if(!g){g={count:0,unread:0,last:Number(msg.created_at)||0};grouped.set(id,g)}
+   g.count++;if(!msg.read_at)g.unread++;
+  }
+  html=(a?(grouped.size?section('Gesprekken',Array.from(grouped).map(([id,x])=>
+   '<button class="option" data-thread="'+esc(id)+'"><span class="glyph">✉</span><span class="copy"><strong>'+esc(state.titles[id]||'Herinnering')+'</strong><small>'+
+   (x.unread?x.unread+' ongelezen · ':'')+x.count+' bericht'+(x.count===1?'':'en')+
+   '</small></span><span class="arrow">›</span></button>').join('')):
+   info('Geen nieuwe gesprekken','Reacties en berichten bij jouw herinneringen verschijnen hier.')):
+   info('Aanmelden nodig','Meld je aan om je berichten te bekijken.'));
+  break;
  }
  case 'thread':
-  html=title('Gesprek','Reacties bij deze herinnering.')+(state.threadData?
+  html=title('Gesprek','Reacties en berichten bij deze herinnering.')+(state.threadData?
    state.threadData.items.map(c=>'<div class="thread-item"><strong>'+esc(c.display_name)+'</strong><p>'+esc(c.body)+'</p></div>').join('')+
    '<form data-form="comment"><label>Reageren<textarea name="body" required maxlength="4000" placeholder="Schrijf een reactie…"></textarea></label><button type="submit" class="primary">Verzenden</button></form>':
    info('Gesprek laden','Even wachten…'));break;
@@ -151,13 +187,22 @@ function render(){
   option('accessibility','Aa','Toegankelijkheid','Tekstgrootte, contrast en bediening')+
   option('display','◐','Weergave','Rust, beweging en visuele voorkeuren'))+
   section('Geluid en afspelen',action(window.__taleraAudioControls?.isEnabled?.()?'disable-listening':'enable-listening',window.__taleraAudioControls?.isEnabled?.()?'Ⅱ':'▶',window.__taleraAudioControls?.isEnabled?.()?'Luisteren uitschakelen':'Luisteren inschakelen','Gesproken herinneringen'));break;
- case 'subscription':html=title('Mijn abonnement','Pakket en betalingen.')+info('Nog geen abonnement gekoppeld','Je persoonlijke account is onafhankelijk van toekomstige betaalinstellingen.');break;
- case 'language':html=title('Taal','Je taalvoorkeuren.')+info('Nederlands','De bestaande TALERA-taalregeling blijft leidend. Je wijzigt de taal via de bestaande taalkeuze in de PWA.');break;
- case 'accessibility':html=title('Toegankelijkheid','Leesbaarheid en bediening.')+info('Bestaande instellingen','We behouden de huidige instellingen van de PWA en voegen geen tweede bediening toe.');break;
- case 'display':html=title('Weergave','Rust en beweging in TALERA.')+info('Presentatiemodus','De goedgekeurde presentatiemodus en bewegingsregeling blijven behouden.');break;
- case 'help':html=title('Hulp en over TALERA','Uitleg, contact en privacy.')+
- section('Ondersteuning',action('help','?','Hulp bij TALERA','Vragen over vertellen, bewaren en delen')+
- action('privacy-info','§','Privacy','Je bepaalt wie toegang heeft tot herinneringen'));break;
+ case 'subscription':
+  html=info('Abonnement nog niet aangesloten','Je TALERA-account werkt al. Het overzicht van pakketten en betalingen wordt later gekoppeld.')+
+   '<p class="meta">Je kunt blijven werken met je huidige account. Er wordt hier niets in rekening gebracht.</p>';break;
+ case 'language':
+  html=info('Taalkeuze','De huidige taalkeuze staat bovenaan Mijn leven en gebruikt dezelfde TALERA-instelling.')+
+   '<button class="secondary" data-action="go-language">Open taalkeuze</button>';break;
+ case 'accessibility':
+  html=info('Leesbaarheid en bediening','TALERA volgt op dit moment de toegankelijkheidsvoorkeuren van je apparaat waar dat mogelijk is.')+
+   '<p class="meta">Er worden hier nog geen aparte instellingen bewaard.</p>';break;
+ case 'display':
+  html=info('Presentatie en beweging','De huidige instellingen voor beeld, swipen en het verdwijnen van de sociale balk blijven behouden.')+
+   '<p class="meta">Er is nog geen afzonderlijk profiel met weergavevoorkeuren actief.</p>';break;
+ case 'help':
+  html=section('Over TALERA',option('privacy','♢','Privacy en toegang','Wie kan jouw herinneringen bekijken?'))+
+   '<div class="info"><strong>Hulp nodig?</strong><p>De TALERA-kennismakingspagina legt uit hoe bewaren en delen werken.</p>'+
+   '<a href="https://talera-website.pages.dev/welkom/" rel="noopener noreferrer" target="_blank">Ontdek TALERA</a></div>';break;
  default:html=title('Meer','TALERA');
  }
  body.innerHTML=html+notice();body.scrollTop=0;
@@ -174,8 +219,18 @@ async function load(view){
    if(state.account&&(view==='hub'||view==='account'||view==='privacy'||view==='settings'))state.discovery=await api('/api/discovery');
   }
   if(!state.account&&(view==='messages'||view==='shared'||view==='mine'||view==='people')){if(state.open&&state.view===view)render();return}
-  if(view==='mine')state.memories=(await api('/api/memories')).items||[];
-  if(view==='messages')state.messages=(await api('/api/messages')).items||[];
+  if(view==='mine'){
+   const [shareRes,memRes]=await Promise.all([api('/api/shares'),api('/api/memories')]);
+   state.shares=shareRes.items||[];
+   state.memories=memRes.items||[];
+   state.titles=Object.fromEntries(state.memories.map(row=>[String(row.id),row.title||'Herinnering']));
+  }
+  if(view==='recipient')state.personMemories=(await api('/api/memories')).items||[];
+  if(view==='messages'){
+   const [msgs,owned,received]=await Promise.all([api('/api/messages'),api('/api/memories'),api('/api/shared-with-me')]);
+   state.messages=msgs.items||[];
+   state.titles=Object.fromEntries([...(owned.items||[]),...(received.items||[])].map(row=>[String(row.id),row.title||'Herinnering']));
+  }
   if(view==='shared')state.shared=(await api('/api/shared-with-me')).items||[];
   if(view==='thread'&&state.thread){const id=state.thread;state.threadData=await api('/api/threads/'+encodeURIComponent(id));await api('/api/messages/memory/'+encodeURIComponent(id)+'/read','POST',{});}
   if(state.open&&state.view===view)render();
@@ -186,7 +241,28 @@ shell.addEventListener('click',e=>{
  const button=e.target.closest('button');if(!button)return;
  if(button.dataset.passwordToggle){const input=shell.querySelector('#'+button.dataset.passwordToggle);if(!input)return;e.preventDefault();const show=input.type==='password';input.type=show?'text':'password';button.setAttribute('aria-label',show?'Verberg wachtwoord':'Toon wachtwoord');button.setAttribute('aria-pressed',String(show));return}
  if(button.dataset.view){go(button.dataset.view);return}
- if(button.dataset.thread){state.thread=button.dataset.thread;state.threadData=null;go('thread');return}
+ if(button.dataset.recipient){
+   state.person=state.search.find(x=>String(x.id)===button.dataset.recipient)||null;
+   if(state.person){state.personMemories=[];go('recipient')}return;
+  }
+  if(button.dataset.grant){
+   const memory=state.personMemories.find(x=>String(x.id)===button.dataset.grant);
+   if(!memory||!state.person)return;
+   if(!window.confirm('Wil je '+memory.title+' delen met '+state.person.name+'?'))return;
+   if(state.busy)return;state.busy=true;
+   api('/api/memories/'+encodeURIComponent(memory.id)+'/grant','POST',{recipientId:state.person.id})
+    .then(()=>feedback('Herinnering gedeeld met '+state.person.name+'.'))
+    .catch(e=>feedback(e.message,true)).finally(()=>{state.busy=false});return;
+  }
+  if(button.dataset.revoke){
+   const link=state.shares.find(x=>String(x.id)===button.dataset.revoke);
+   if(!link||!window.confirm('Deze WhatsApp-deellink intrekken? Iedereen met deze link verliest dan toegang.'))return;
+   if(state.busy)return;state.busy=true;
+   api('/api/shares/'+encodeURIComponent(link.id)+'/revoke','POST',{})
+    .then(()=>load('mine')).catch(e=>feedback(e.message,true)).finally(()=>{state.busy=false});
+   return;
+  }
+  if(button.dataset.thread){state.thread=button.dataset.thread;state.threadData=null;go('thread');return}
  switch(button.dataset.action){
  case 'close':close();break;
  case 'back':backOne();break;
@@ -195,6 +271,7 @@ shell.addEventListener('click',e=>{
  case 'disable-listening':window.__taleraAudioControls?.disable?.();render();break;
  case 'help':feedback('Gebruik Mijn account voor aanmelden en profiel, Mijn mensen voor contacten en Berichten voor reacties.');break;
  case 'privacy-info':go('privacy');break;
+ case 'go-language':close();location.assign('/');break;
  }
 });
 shell.addEventListener('submit',e=>{
@@ -224,7 +301,7 @@ document.addEventListener('click',e=>{
  if(btn.querySelector('.more')||btn.id==='navMore'){e.preventDefault();e.stopImmediatePropagation();e.stopPropagation();open()}
 },true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.open){e.preventDefault();backOne()}});
-setInterval(()=>{if(state.open&&!document.hidden&&state.view==='thread'&&state.thread)void load('thread')},5000);
+setInterval(()=>{if(state.open&&!document.hidden&&state.view==='thread'&&state.thread&&!body.querySelector('form[data-form="comment"] textarea')?.value)void load('thread')},5000);
 const requestedMenu=new URLSearchParams(location.search).get('talera_menu');
 if(['hub','account','login','privacy','messages','settings'].includes(requestedMenu))open(requestedMenu);
 document.addEventListener('talera:open-auth',e=>{const intent=e.detail?.intent||'share';open('login',intent)});

@@ -116,6 +116,24 @@ async function memoryAudioBlob(memory){
  if(blob.size<100||blob.size>12000000)throw Error('De geluidsopname moet kleiner zijn dan 12 MB.');
  return blob;
 }
+async function memoryVideoBlob(memory){
+ const source=memory?.videoUrl||memory?.videoSrc||memory?.clipUrl||memory?.video?.src||memory?.video?.url||memory?.media?.videoUrl||null;
+ if(!source)return null;
+ let blob;
+ if(source instanceof Blob)blob=source;
+ else{
+  if(typeof source!=='string'||!/^(https?:\/\/|blob:|data:video\/)/i.test(source))throw Error('De video is niet beschikbaar om te delen.');
+  let response;
+  try{response=await fetch(source,{mode:'cors',credentials:'same-origin',cache:'no-store'})}
+  catch{throw Error('De video kan niet worden geladen.')}
+  if(!response.ok)throw Error('De video is niet beschikbaar.');
+  blob=await response.blob();
+ }
+ const type=String(blob.type||'').split(';')[0].trim().toLowerCase();
+ if(!['video/mp4','video/quicktime','video/webm'].includes(type))throw Error('Dit videoformaat kan nog niet veilig worden gedeeld.');
+ if(blob.size<100||blob.size>25000000)throw Error('De video moet kleiner zijn dan 25 MB.');
+ return blob;
+}
 const shareAdapter={
  async publish({memoryId,consent}){
   if(!consent)throw Error('Toestemming ontbreekt');
@@ -126,7 +144,7 @@ const shareAdapter={
   const storyText=String(item?.fullStory||item?.storyText||item?.description||item?.text||item?.story||'').trim();
   const title=String(item?.title||item?.story||item?.name||'').trim();
   const eventDate=item?.at&&Number.isFinite(new Date(item.at).getTime())?new Date(item.at).toISOString().slice(0,10):'';
-  if(!title||!storyText)throw Error('Deze herinnering heeft nog geen tekst. Veilige publicatie van foto’s en video’s moet eerst worden gekoppeld.');
+  if(!title||!storyText)throw Error('Deze herinnering heeft nog geen tekst. Voeg een titel en een verhaal toe voordat je deelt.');
   const d=await coreRequest('/api/pwa/memory-link',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({localMemoryId:memoryId,title,storyText,eventDate,consent:true})});
   return {storyId:d.memoryId};
  },
@@ -138,18 +156,20 @@ const shareAdapter={
   const preview=await previewPhotoBlob(current);
   const full=await presentationPhotoBlob(current);
   const sound=await memoryAudioBlob(current);
+  const video=await memoryVideoBlob(current);
   const d=await coreRequest('/api/memories/'+encodeURIComponent(storyId)+'/shares',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({hours:durationHours,consent:true})});
-  if(preview){
+  if(preview||full||sound||video){
    try{
-    await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo',{method:'POST',headers:{'content-type':'image/jpeg'},body:preview});
+    if(preview)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo',{method:'POST',headers:{'content-type':'image/jpeg'},body:preview});
     if(full)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo-full',{method:'POST',headers:{'content-type':'image/jpeg'},body:full});
     if(sound)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/audio',{method:'POST',headers:{'content-type':sound.type.split(';')[0]},body:sound});
+    if(video)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/video',{method:'POST',headers:{'content-type':video.type.split(';')[0]},body:video});
    }catch(e){
     await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/revoke',{method:'POST'}).catch(()=>{});
-    throw Error('De foto kon niet aan de uitnodiging worden toegevoegd. De link is niet verzonden: '+e.message);
+    throw Error('De herinnering kon niet compleet worden gedeeld. De link is niet verzonden: '+e.message);
    }
   }
-  return {url:d.link,shareId:d.id,durationHours,expiresAt:d.expiresAt,photo:!!preview,audio:!!sound};
+  return {url:d.link,shareId:d.id,durationHours,expiresAt:d.expiresAt,photo:!!preview,audio:!!sound,video:!!video};
  },
  async revokeInvite({shareId}){
   return coreRequest('/api/shares/'+encodeURIComponent(shareId)+'/revoke',{method:'POST'});

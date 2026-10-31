@@ -101,16 +101,30 @@ async function handler(req,env){
   await env.DB.prepare('INSERT INTO messages(id,account_id,memory_id,kind,created_at) VALUES(?,?,?,?,?)').bind(random(),share.owner_id,share.memory_id,'guest_comment',now).run();
   return withVisitor(json({id},201));
  }
- const guestMedia=p.match(/^\/gedeeld\/([0-9a-f]{64})\/(foto|foto-volledig|geluid)$/);
+ const guestMedia=p.match(/^\/gedeeld\/([0-9a-f]{64})\/(foto|foto-volledig|geluid|video)$/);
  if(guestMedia&&(m==='GET'||m==='HEAD')){
   const row=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories m ON m.id=s.memory_id AND m.account_id=s.account_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(await sha(guestMedia[1]),Date.now()).first();
   if(!row||!env.SHARE_MEDIA)return page404();
-  const name=guestMedia[2],isAudio=name==='geluid';
-  const key=(name==='foto'?'guest-previews/':name==='foto-volledig'?'guest-full/':'guest-audio/')+row.id+(isAudio?'.bin':'.jpg');
-  const obj=await env.SHARE_MEDIA.get(key);
-  if(!obj)return page404();
-  const headers={...secHeaders,'content-type':isAudio?(obj.httpMetadata?.contentType||'audio/mpeg'):'image/jpeg','x-robots-tag':'noindex,nofollow','cross-origin-resource-policy':'cross-origin'};
-  return new Response(m==='HEAD'?null:obj.body,{headers});
+  const name=guestMedia[2],isAudio=name==='geluid',isVideo=name==='video',stream=isAudio||isVideo;
+  const key=(name==='foto'?'guest-previews/':name==='foto-volledig'?'guest-full/':isAudio?'guest-audio/':'guest-video/')+row.id+(stream?'.bin':'.jpg');
+  const head=await env.SHARE_MEDIA.head(key);
+  if(!head)return page404();
+  const size=head.size,headers={...secHeaders,'content-type':stream?(head.httpMetadata?.contentType||(isAudio?'audio/mpeg':'video/mp4')):'image/jpeg','x-robots-tag':'noindex,nofollow','accept-ranges':'bytes'};
+  if(m==='HEAD'){headers['content-length']=String(size);return new Response(null,{headers})}
+  let opts, status=200;
+  if(stream&&req.headers.has('range')){
+   const match=(req.headers.get('range')||'').match(/^bytes=(\d*)-(\d*)$/);
+   if(!match||(!match[1]&&!match[2]))return new Response(null,{status:416,headers:{...headers,'content-range':'bytes */'+size}});
+   const start=match[1]?Number(match[1]):Math.max(0,size-Number(match[2]));
+   const end=match[1]&&match[2]?Math.min(size-1,Number(match[2])):size-1;
+   if(start>=size||end<start)return new Response(null,{status:416,headers:{...headers,'content-range':'bytes */'+size}});
+   opts={range:{offset:start,length:end-start+1}};status=206;
+   headers['content-range']='bytes '+start+'-'+end+'/'+size;
+   headers['content-length']=String(end-start+1);
+  }else headers['content-length']=String(size);
+  const object=await env.SHARE_MEDIA.get(key,opts);
+  if(!object)return page404();
+  return new Response(object.body,{status,headers});
  }
  if(p.startsWith('/gedeeld/')){
   if(m!=='GET'&&m!=='HEAD')return error(405);
@@ -121,18 +135,21 @@ async function handler(req,env){
   const imageUrl=new URL('/gedeeld/'+token+'/foto',req.url).href;
   const fullUrl=new URL('/gedeeld/'+token+'/foto-volledig',req.url).href;
   const soundUrl=new URL('/gedeeld/'+token+'/geluid',req.url).href;
+  const videoUrl=new URL('/gedeeld/'+token+'/video',req.url).href;
   const pageUrl=new URL('/gedeeld/'+token,req.url).href;
   const hasImage=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-previews/'+row.id+'.jpg'));
   const hasFull=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-full/'+row.id+'.jpg'));
   const hasSound=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-audio/'+row.id+'.bin'));
+  const hasVideo=!!(env.SHARE_MEDIA&&await env.SHARE_MEDIA.head('guest-video/'+row.id+'.bin'));
   const story=String(row.story_text||'').trim(),storyTitle=String(row.title||'').trim();
   const trimmed=story.slice(0,storyTitle.length).toLowerCase()===storyTitle.toLowerCase()?story.slice(storyTitle.length).replace(/^[\s.:·—–-]+/,'').trim():story;
   const caption=(trimmed||'Een persoonlijke herinnering voor jou.').slice(0,145);
   const meta='<meta property="og:type" content="article"><meta property="og:site_name" content="TALERA"><meta property="og:title" content="'+escape(row.title)+' · TALERA"><meta property="og:description" content="'+escape(caption)+'"><meta property="og:url" content="'+escape(pageUrl)+'">'+(hasImage?'<meta property="og:image" content="'+escape(imageUrl)+'"><meta property="og:image:secure_url" content="'+escape(imageUrl)+'"><meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">':'');
   const photo=hasImage?'<img class="photo" src="'+escape(hasFull?fullUrl:imageUrl)+'" alt="Foto bij de gedeelde herinnering">':'';
   const audio=hasSound?'<div class="listen"><span>Geluid</span><audio controls preload="none" src="'+escape(soundUrl)+'">Audio afspelen</audio></div>':'';
-  const html=guestPageTemplate.replaceAll('__TITLE__',escape(row.title)).replaceAll('__STORY_JSON__',safeScriptJSON(trimmed||story)).replaceAll('__TITLE_JSON__',safeScriptJSON(row.title)).replaceAll('__DATE_JSON__',safeScriptJSON(row.event_date)).replaceAll('__DATE__',escape(row.event_date)).replaceAll('__OG_META__',meta).replaceAll('__PHOTO__',photo).replaceAll('__AUDIO__',audio);
-  return new Response(m==='HEAD'?null:html,{headers:{...secHeaders,'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'none'; img-src 'self'; media-src 'self'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"}});
+  const html=guestPageTemplate.replaceAll('__TITLE__',escape(row.title)).replaceAll('__STORY_JSON__',safeScriptJSON(trimmed||story)).replaceAll('__TITLE_JSON__',safeScriptJSON(row.title)).replaceAll('__DATE_JSON__',safeScriptJSON(row.event_date)).replaceAll('__DATE__',escape(row.event_date)).replaceAll('__OG_META__',meta).replaceAll('__PHOTO__',photo).replaceAll('__AUDIO__',audio).replaceAll('__VIDEO_BUTTON__',hasVideo?'<button class="story-open story-video" id="playVideo" type="button">Bekijk video</button>':'').replaceAll('__VIDEO_URL_JSON__',safeScriptJSON(hasVideo?videoUrl:''));
+  const res=new Response(m==='HEAD'?null:html,{headers:{...secHeaders,'content-type':'text/html; charset=utf-8','content-security-policy':"default-src 'none'; img-src 'self'; media-src 'self'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"}});
+  const visitor=guestIdentity(req);if(visitor.newCookie)res.headers.set('set-cookie',guestCookie(visitor.token));return res;
  }
  if(m!=='GET'&&!allowedWrite(req))return error(403,'Ongeldige herkomst');
  if(p==='/api/register'&&m==='POST'){
@@ -314,8 +331,24 @@ async function handler(req,env){
   await env.SHARE_MEDIA.put('guest-audio/'+share.id+'.bin',bytes,{httpMetadata:{contentType:ctype}});
   return json({ok:true,audio:true});
  }
+ const uploadVideo=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/video$/);
+ if(uploadVideo&&m==='POST'){
+  const share=await env.DB.prepare("SELECT s.id FROM shares s JOIN memories mem ON mem.id=s.memory_id AND mem.account_id=s.account_id WHERE s.id=? AND s.account_id=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(uploadVideo[1],user.id,Date.now()).first();
+  if(!share)return error(404,'Uitnodiging niet gevonden');
+  if(!env.SHARE_MEDIA)return error(503,'Video-opslag niet beschikbaar');
+  const ctype=(req.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+  if(!['video/mp4','video/webm','video/quicktime'].includes(ctype))return error(415,'Dit videoformaat kan nog niet veilig worden gedeeld');
+  if(Number(req.headers.get('content-length')||0)>35000000)return error(413,'Video is te groot');
+  const bytes=await req.arrayBuffer();
+  if(bytes.byteLength<512||bytes.byteLength>35000000)return error(413,'Video moet kleiner zijn dan 35 MB');
+  const header=new Uint8Array(bytes.slice(0,12));
+  const containerOk=ctype==='video/webm'?(header[0]===26&&header[1]===69&&header[2]===223&&header[3]===163):String.fromCharCode(...header.slice(4,8))==='ftyp';
+  if(!containerOk)return error(415,'Geen geldig videobestand');
+  await env.SHARE_MEDIA.put('guest-video/'+share.id+'.bin',bytes,{httpMetadata:{contentType:ctype}});
+  return json({ok:true,video:true});
+ }
  const revoke=p.match(/^\/api\/shares\/([0-9a-f-]{36})\/revoke$/);
- if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();const revoked=(r.meta?.changes||0)>0;if(revoked&&env.SHARE_MEDIA)await Promise.all(['guest-previews/','guest-full/','guest-audio/'].map((prefix,i)=>env.SHARE_MEDIA.delete(prefix+revoke[1]+(i===2?'.bin':'.jpg'))));return json({revoked})}
+ if(revoke&&m==='POST'){const r=await env.DB.prepare('UPDATE shares SET revoked_at=? WHERE id=? AND account_id=? AND revoked_at IS NULL').bind(Date.now(),revoke[1],user.id).run();const revoked=(r.meta?.changes||0)>0;if(revoked&&env.SHARE_MEDIA)await Promise.all(['guest-previews/','guest-full/','guest-audio/','guest-video/'].map((prefix,i)=>env.SHARE_MEDIA.delete(prefix+revoke[1]+(i>=2?'.bin':'.jpg'))));return json({revoked})}
  const readThread=p.match(/^\/api\/messages\/memory\/([0-9a-f-]{36})\/read$/);
  if(readThread&&m==='POST'){const exists=await accessible(readThread[1]);if(!exists)return error(404,'Herinnering niet gevonden');await env.DB.prepare('UPDATE messages SET read_at=COALESCE(read_at,?) WHERE account_id=? AND memory_id=? AND read_at IS NULL').bind(Date.now(),user.id,readThread[1]).run();return json({ok:true})}
  if(p==='/api/messages/unread-count'&&m==='GET'){const row=await env.DB.prepare('SELECT COUNT(*) AS total FROM messages WHERE account_id=? AND read_at IS NULL').bind(user.id).first();return json({unread:row?.total||0})}

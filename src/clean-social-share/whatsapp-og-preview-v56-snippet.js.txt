@@ -1,0 +1,16 @@
+const publicPreview=u.pathname.match(/^\/gedeeld\/([0-9a-f]{64})$/);
+if(publicPreview&&(request.method==='GET'||request.method==='HEAD')){
+ if(!env.CLEAN_CORE)return new Response('TALERA tijdelijk niet beschikbaar',{status:503});
+ const token=publicPreview[1];
+ const details=await env.CLEAN_CORE.fetch(new Request(new URL('/api/guest/presentation/'+token,request.url)));
+ if(!details.ok)return new Response('De deellink is verlopen',{status:404});
+ const memory=await details.json();
+ const escape=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const title=escape(memory.title||'Een herinnering voor jou');
+ const desc=escape(String(memory.storyText||'Een herinnering via TALERA').replace(/\s+/g,' ').slice(0,160));
+ const photo=memory.hasPhoto?new URL('/gedeeld/'+token+'/foto',request.url).href:'';
+ const target=new URL('/ontvangen/'+token,request.url).href;
+ const tags='<meta property="og:type" content="article"><meta property="og:site_name" content="TALERA"><meta property="og:title" content="'+title+' · TALERA"><meta property="og:description" content="'+desc+'">'+(photo?'<meta property="og:image" content="'+escape(photo)+'"><meta property="og:image:secure_url" content="'+escape(photo)+'"><meta property="og:image:type" content="image/jpeg"><meta name="twitter:image" content="'+escape(photo)+'">':'')+'<meta name="twitter:card" content="summary_large_image">';
+ const h='<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'+title+'</title>'+tags+'<meta http-equiv="refresh" content="0;url='+escape(target)+'"></head><body><a href="'+escape(target)+'">Open de herinnering in TALERA</a><script>location.replace('+JSON.stringify(target)+')</script></body></html>';
+ return new Response(request.method==='HEAD'?null:h,{status:200,headers:{'content-type':'text/html; charset=utf-8','cache-control':'private, no-store','x-robots-tag':'noindex,nofollow','referrer-policy':'no-referrer'}});
+}

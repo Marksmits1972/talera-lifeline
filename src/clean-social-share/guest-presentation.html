@@ -26,6 +26,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 .story-open{background:#fff;border:0;border-radius:22px;padding:12px 18px;color:#173951;font-weight:750}
 .listen{display:inline-flex;margin:0 0 13px;max-width:100%;align-items:center;gap:10px}
 .listen audio{max-width:min(75vw,320px);height:37px}
+.watch-video{display:inline-flex;align-items:center;border:1px solid #fff8;border-radius:19px;padding:11px 16px;background:#173951cc;color:#fff;font-weight:750;margin:0 0 13px}
+.video-panel[hidden]{display:none!important}
+.video-panel{position:fixed;inset:0;z-index:30;background:#091925f5;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));gap:14px}
+.video-panel video{width:min(100%,920px);max-height:calc(100dvh - 145px);background:#000}
+.video-close{align-self:flex-end;margin-right:max(0px,calc((100vw - 920px)/2));padding:11px 16px;border:0;border-radius:16px;background:#fff;color:#173951;font-weight:750}
 .controls{position:absolute;bottom:calc(19px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 38px);max-width:530px;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:9px;border-radius:23px;border:1px solid #ffffff66;background:#183b50bb;backdrop-filter:blur(17px);-webkit-backdrop-filter:blur(17px)}
 .control{display:flex;justify-content:center;align-items:center;gap:8px;border:0;border-radius:17px;background:#ffffff10;color:white;min-height:53px;font-weight:750;font-size:16px}
 .control svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -65,8 +70,10 @@ __PHOTO__
 <h1>__TITLE__</h1>
 <p class="date">__DATE__</p>
 __AUDIO__
+__VIDEO_BUTTON__
 <button class="story-open" id="readStory" type="button">Lees het verhaal</button>
 </div>
+__VIDEO_PLAYER__
 <div class="controls" aria-label="Reageren op deze herinnering">
 <button class="control" id="heart" type="button" aria-pressed="false" aria-label="Hartje geven">
 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.8c-2-2.1-5.2-2.1-7.3 0L12 6.3l-1.5-1.5c-2.1-2.1-5.3-2.1-7.3 0-2.3 2.2-2.3 5.6 0 7.8L12 21l8.8-8.4c2.2-2.2 2.2-5.6 0-7.8z"/></svg>
@@ -206,6 +213,12 @@ async function toggleHeart(){
   if(err.status===401){signed.account=null;signed.intent='heart';open('login')}
   else{open('comments');alertText(err.message,true)}
  }finally{busy=false}
+}
+const videoPanel=$('videoPanel');
+if(videoPanel){
+ const player=$('guestVideo');
+ $('watchVideo').addEventListener('click',()=>{videoPanel.hidden=false;player.load();});
+ $('closeVideo').addEventListener('click',()=>{player.pause();videoPanel.hidden=true;});
 }
 $('readStory').addEventListener('click',()=>open('story'));
 $('replies').addEventListener('click',()=>{open('comments');void refresh()});

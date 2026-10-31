@@ -92,7 +92,7 @@ const token=location.pathname.split('/')[2];
 const $=id=>document.getElementById(id);
 const panel=$('sheet'),body=$('sheetBody');
 const signed={account:null,intent:null};
-let mode='story',thread={items:[],heartCount:0,hearted:false},busy=false,loading=false;
+let mode='story',thread={items:[],heartCount:0,hearted:false},busy=false,loading=false,commentStamp='';
 const api=async(path,method='GET',data)=>{
  const opts={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
  if(data!==undefined){opts.headers['content-type']='application/json';opts.body=JSON.stringify(data)}
@@ -137,6 +137,7 @@ function render(){
   return;
  }
  if(mode==='comments'){
+  commentStamp=JSON.stringify(thread.items.map(x=>[x.id,x.body]));
   body.append(formatComments());
   if(!signed.account){
    body.append(create('p','Meld je met je TALERA-account aan om een hartje of reactie achter te laten.','notice'));
@@ -187,7 +188,11 @@ async function refresh(){
  try{
   const result=await api(base);
   thread=result;signed.account=result.account||null;syncCounts();
-  if(mode==='comments'&&!panel.hidden)render();
+  if(mode==='comments'&&!panel.hidden){
+   const latest=JSON.stringify(thread.items.map(x=>[x.id,x.body]));
+   const writing=!!body.querySelector('textarea')?.value;
+   if(!writing&&latest!==commentStamp)render();
+  }
  }catch(err){if(err.status===404){$('readStory').textContent='Deze deellink is verlopen';$('readStory').disabled=true;close()}}
  finally{loading=false}
 }

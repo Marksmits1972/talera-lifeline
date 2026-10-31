@@ -20,7 +20,21 @@ export function patchMenuScript(source) {
     // Preserve the original module rather than injecting a partial or broken patch.
     return { ok: false, text: source, reason: "upstream-changed" };
   }
-  const text = source.replace(OLD_MENU_OPEN, NEW_MENU_OPEN).replace(OLD_AUTO_LOGIN, "");
+  let text = source.replace(OLD_MENU_OPEN, NEW_MENU_OPEN).replace(OLD_AUTO_LOGIN, "");
+  // When an account-only screen is opened through a deep link, show an
+  // explicit login action; previously these screens only showed information.
+  const loginPrompts = [
+    "Meld je aan om mensen op TALERA te vinden.",
+    "Meld je aan om gedeelde herinneringen te beheren.",
+    "Meld je aan om ontvangen herinneringen te openen.",
+    "Meld je aan om je berichten te bekijken.",
+  ];
+  for (const message of loginPrompts) {
+    const original = "info('Aanmelden nodig','" + message + "')";
+    if (text.includes(original)) {
+      text = text.replace(original, original + "+'<button class=\\\"primary\\\" data-view=\\\"login\\\">Aanmelden</button>'");
+    }
+  }
   return { ok: true, text, reason: "patched" };
 }
 

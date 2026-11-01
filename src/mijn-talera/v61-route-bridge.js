@@ -124,7 +124,7 @@ export function patchV61MenuScript(source) {
     },
     {
       old:"option('display','◐','Weergave','Rust, beweging en visuele voorkeuren'))+",
-      replacement:"option('display','◐','Weergave','Rust, beweging en visuele voorkeuren')+option('storage','▤','Opslag en back-up','Controle en reservekopieën'))+"
+      replacement:"option('display','◐','Weergave','Rust, beweging en visuele voorkeuren')+option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt'))+"
     },
     {
       old:"storage:'Opslag en herinneringen'",

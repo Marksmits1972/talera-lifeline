@@ -199,7 +199,7 @@ export default {
     headers.delete("content-encoding");
     headers.set("cache-control", "no-store");
     headers.set("content-type", "text/javascript; charset=utf-8");
-    headers.set("x-talera-integratie", updated.ok ? V61_MARKER : "v59-upstream-changed");
+    headers.set("x-talera-integratie", updated.ok ? V61_MARKER : updated.reason);
     return new Response(updated.text, {
       status: upstream.status,
       statusText: upstream.statusText,

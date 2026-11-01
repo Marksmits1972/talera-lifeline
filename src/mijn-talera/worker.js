@@ -6,6 +6,7 @@
  * The existing V56 service handles all other requests, unchanged.
  */
 import menuSource from "./menu-integration.txt";
+import knowledgeSource from "./kennisbank.html";
 
 export const MENU_MODULE = "/__clean/menu-integration.mjs";
 export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
@@ -23,6 +24,18 @@ export default {
       return new Response("TALERA-service niet aangesloten", {status:503});
     }
     const url = new URL(request.url);
+    if ((request.method === "GET" || request.method === "HEAD") &&
+        (url.pathname === "/kennisbank" || url.pathname === "/kennisbank/")) {
+      return new Response(request.method === "HEAD" ? null : knowledgeSource, {
+        status:200,
+        headers:{
+          "content-type":"text/html; charset=utf-8",
+          "cache-control":"no-store",
+          "x-content-type-options":"nosniff",
+          "x-talera-integratie":BUILD_MARKER,
+        },
+      });
+    }
     if (request.method === "GET") {
       const view = legacyDestination(url.pathname);
       if (view) {

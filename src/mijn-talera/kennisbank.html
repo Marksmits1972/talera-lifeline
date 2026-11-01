@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#092b42">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="De TALERA-kennisbank. Hulp bij herinneringen maken, delen, je account en privacy.">
+  <meta name="referrer" content="no-referrer">
+  <title>Kennisbank | TALERA</title>
+  <link rel="icon" href="../assets/brand-mark.png">
+  <style>
+    :root{--navy:#092b42;--ink:#17384b;--muted:#5c7480;--teal:#007b77;--cream:#fbf8f1;--line:#dee7e8;--white:#fff}
+    *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:94px}
+    body{margin:0;background:var(--cream);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:var(--ink)}
+    a{color:inherit}a:focus-visible,summary:focus-visible{outline:3px solid #339eac;outline-offset:4px}
+    .wrap{width:min(100% - 38px,1020px);margin-inline:auto}
+    header{position:sticky;top:0;z-index:5;background:#fbf8f1f5;border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+    .head{min-height:75px;display:flex;align-items:center;justify-content:space-between;gap:15px}
+    .brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:820;letter-spacing:.12em;font-size:17px}
+    .brand img{width:34px;height:34px;object-fit:contain}
+    .back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 15px;border:1px solid #c0d1d3;border-radius:99px;background:var(--white);font-weight:730;font-size:14px;text-decoration:none;color:var(--navy)}
+    .back:hover{background:#e9f3f1}.back:active{transform:translateY(1px)}
+    .hero{background:linear-gradient(135deg,#0a3048,#145169);color:var(--white);padding:70px 0 74px}
+    .eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:#aee4d8}
+    h1,h2,h3{line-height:1.2;letter-spacing:-.035em}h1{font-size:clamp(40px,7vw,68px);margin:14px 0 19px}
+    .hero p{max-width:660px;color:#e1eff0;font-size:clamp(17px,2vw,20px);margin:0}
+    main{padding:36px 0 70px}.intro{font-size:15px;color:var(--muted);margin:0 0 22px}
+    .topics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:0 0 49px}
+    .topic{padding:21px;border:1px solid var(--line);border-radius:17px;background:var(--white);text-decoration:none;font-weight:750;display:flex;justify-content:space-between;gap:9px}
+    .topic:hover{border-color:var(--teal);color:var(--teal)}
+    section{scroll-margin-top:100px;margin:0 0 50px}section h2{font-size:clamp(25px,3.6vw,35px);color:var(--navy);margin:0 0 7px}
+    .section-lead{color:var(--muted);margin:0 0 20px}
+    details{border:1px solid var(--line);background:var(--white);border-radius:15px;margin:9px 0;overflow:hidden}
+    summary{cursor:pointer;padding:18px 21px;list-style:none;font-weight:740;display:flex;gap:16px;justify-content:space-between;align-items:center;min-height:59px}
+    summary::-webkit-details-marker{display:none}summary::after{content:"+";font-size:24px;color:var(--teal);line-height:1}
+    details[open] summary::after{content:"−"}details[open] summary{border-bottom:1px solid var(--line)}
+    .answer{padding:16px 21px 20px;color:#344b5b}.answer p{margin:0 0 12px}.answer p:last-child{margin-bottom:0}
+    .answer a{color:#006e74;text-underline-offset:3px}
+    .foot{padding:30px 0 35px;background:#eaf2f0;border-top:1px solid var(--line)}
+    .foot .wrap{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px}
+    .foot p{margin:0;color:var(--muted);font-size:14px}
+    @media(max-width:680px){.head{min-height:68px}.brand{font-size:15px}.brand img{width:30px;height:30px}.back{font-size:13px;padding:9px 12px}.hero{padding:49px 0 54px}.topics{grid-template-columns:1fr 1fr}.topic{padding:15px;font-size:14px}.wrap{width:min(100% - 32px,1020px)}}
+    @media(max-width:390px){.topics{grid-template-columns:1fr}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap head">
+    <span class="brand" aria-label="TALERA">TALERA</span>
+    <a class="back" data-back-talera href="https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present?talera_menu=help">← Terug naar Mijn TALERA</a>
+  </div>
+</header>
+<div class="hero"><div class="wrap">
+  <span class="eyebrow">Hulp &amp; uitleg</span>
+  <h1>Kennisbank</h1>
+  <p>Hoe maak, bewaar en deel je een herinnering? Hier vind je de belangrijkste antwoorden, zonder ingewikkelde uitleg.</p>
+</div></div>
+<main class="wrap">
+  <p class="intro">Deze eerste versie van de kennisbank groeit mee met TALERA. Onderdelen die nog in ontwikkeling zijn, vermelden we duidelijk.</p>
+  <nav class="topics" aria-label="Onderwerpen">
+    <a class="topic" href="#beginnen">Beginnen <span aria-hidden="true">›</span></a>
+    <a class="topic" href="#herinneringen">Herinneringen <span aria-hidden="true">›</span></a>
+    <a class="topic" href="#delen">Delen <span aria-hidden="true">›</span></a>
+    <a class="topic" href="#account">Mijn TALERA <span aria-hidden="true">›</span></a>
+    <a class="topic" href="#privacy">Privacy en opslag <span aria-hidden="true">›</span></a>
+    <a class="topic" href="#vragen">Veelgestelde vragen <span aria-hidden="true">›</span></a>
+  </nav>
+  <section id="beginnen">
+    <h2>Beginnen met TALERA</h2>
+    <p class="section-lead">Je begint gewoon met één herinnering. De rest komt later.</p>
+    <details><summary>Wat is TALERA?</summary><div class="answer">TALERA geeft persoonlijke herinneringen een plek op je levenslijn. Je kunt foto’s en verhalen toevoegen en ze later opnieuw bekijken of beluisteren.</div></details>
+    <details><summary>Moet ik meteen een account aanmaken?</summary><div class="answer">Nee. Je kunt TALERA Free verkennen zonder direct een account te maken. Voor persoonlijke functies zoals contacten en accountgebonden delen is aanmelden nodig.</div></details>
+    <details><summary>Waar vind ik mijn menu?</summary><div class="answer">Open de presentatie en tik onderaan op <strong>Mijn TALERA</strong> of <strong>Meer</strong>. Daar vind je onder andere je account, contacten, gedeelde herinneringen en instellingen.</div></details>
+  </section>
+  <section id="herinneringen">
+    <h2>Herinneringen maken</h2>
+    <p class="section-lead">Een foto, een paar woorden of je eigen stem: begin op jouw manier.</p>
+    <details><summary>Hoe voeg ik een herinnering toe?</summary><div class="answer">Open de persoonlijke werkruimte van TALERA en kies de mogelijkheid om een verhaal of herinnering toe te voegen. Vul een titel of verhaal in en voeg desgewenst foto’s toe. Je hoeft niet alles in één keer af te maken.</div></details>
+    <details><summary>Kan ik foto’s, gesproken verhalen en video gebruiken?</summary><div class="answer">TALERA ondersteunt verhalen en beelden en ontwikkelt de presentatie van audio en video verder. Welke onderdelen beschikbaar zijn, hangt af van de versie en de inhoud van je herinnering.</div></details>
+    <details><summary>Kan ik een verhaal later nog aanpassen?</summary><div class="answer">In de persoonlijke werkruimte kun je bestaande herinneringen beheren en waar beschikbaar bewerken. Controleer na het opslaan of je wijzigingen goed zijn teruggekomen.</div></details>
+  </section>
+  <section id="delen">
+    <h2>Herinneringen delen</h2>
+    <p class="section-lead">Jij bepaalt met wie je een verhaal deelt.</p>
+    <details><summary>Wat is het verschil tussen ‘Door mij gedeeld’ en ‘Met mij gedeeld’?</summary><div class="answer"><strong>Door mij gedeeld</strong> toont herinneringen die jij hebt gedeeld en de bijbehorende toegang. <strong>Met mij gedeeld</strong> toont herinneringen die anderen met jou delen.</div></details>
+    <details><summary>Hoe werkt een deellink via WhatsApp?</summary><div class="answer">Je verstuurt een verwijzing naar één gedeelde herinnering. De ontvanger kan die herinnering via de link openen. De manier van reageren hangt af van de gedeelde presentatie en de ingestelde toegang.</div></details>
+    <details><summary>Kan ik een gedeelde herinnering weer intrekken?</summary><div class="answer">Bij ondersteunde deellinks kun je in <strong>Door mij gedeeld</strong> de toegang weer intrekken. Daarmee maak je de betreffende link ongeldig.</div></details>
+  </section>
+  <section id="account">
+    <h2>Mijn TALERA-account</h2>
+    <p class="section-lead">Je gegevens en instellingen, overzichtelijk bij elkaar.</p>
+    <details><summary>Waar wijzig ik mijn naam of gebruikersnaam?</summary><div class="answer">Ga naar <strong>Mijn TALERA → Mijn account → Mijn profielgegevens</strong> om je weergavenaam te beheren. Je gebruikersnaam en vindbaarheid staan onder <strong>Privacy en beveiliging</strong>.</div></details>
+    <details><summary>Kan ik mijn e-mailadres aanpassen of wachtwoord herstellen?</summary><div class="answer">Deze onderdelen zijn nog niet volledig aangesloten in de huidige testomgeving. We tonen pas een werkende wijziging of herstelmail wanneer de beveiligde bevestiging beschikbaar is.</div></details>
+    <details><summary>Hoe kom ik terug uit een submenu?</summary><div class="answer">Gebruik de pijl linksboven om terug te gaan naar het vorige menu of naar <strong>Mijn TALERA</strong>. Met het kruisje rechtsboven sluit je het menu volledig.</div></details>
+  </section>
+  <section id="privacy">
+    <h2>Privacy en opslag</h2>
+    <p class="section-lead">Persoonlijke herinneringen vragen om duidelijke keuzes.</p>
+    <details><summary>Zijn mijn herinneringen automatisch in de cloud opgeslagen?</summary><div class="answer">Niet altijd. Herinneringen die alleen in je browser staan, zijn niet automatisch geback-upt. Verwijder daarom niet zomaar je browsergegevens of lokale opslag.</div></details>
+    <details><summary>Waar zie ik hoeveel herinneringen zijn opgeslagen?</summary><div class="answer">Open <strong>Mijn TALERA → Instellingen → Opslag en back-up</strong>. Daar kun je de beschikbare lokale en accountgebonden aantallen controleren. Een volledige reservekopie- en herstelfunctie wordt nog ontwikkeld.</div></details>
+    <details><summary>Waarom zie ik mijn lokale herinneringen niet via een andere testlink?</summary><div class="answer">Iedere afzonderlijke testwebsite kan zijn eigen browseropslag hebben. Een verhaal dat lokaal op één adres staat, verschijnt daardoor niet automatisch op een ander testadres. Dat betekent niet dat je oorspronkelijke verhaal is verwijderd.</div></details>
+  </section>
+  <section id="vragen">
+    <h2>Veelgestelde vragen</h2>
+    <p class="section-lead">Kleine aanwijzingen voor als je even vastloopt.</p>
+    <details><summary>Ik kan niet terug naar mijn menu. Wat nu?</summary><div class="answer">Gebruik bovenaan deze kennisbank <strong>Terug naar Mijn TALERA</strong>. Je komt dan terug in het hulp- en menugedeelte van de TALERA-presentatie. In andere TALERA-menu's gebruik je de pijl linksboven.</div></details>
+    <details><summary>Een foto of herinnering is niet zichtbaar. Is die verdwenen?</summary><div class="answer">Niet per se. Controleer eerst of je hetzelfde toestel, dezelfde browser en dezelfde TALERA-link gebruikt. Verwijder geen opslaggegevens voordat je zeker weet waar je herinnering staat.</div></details>
+    <details><summary>Waar vind ik later uitgebreidere uitleg?</summary><div class="answer">Deze kennisbank is de vaste plek voor nieuwe hulp- en uitlegpagina’s. We breiden de artikelen uit wanneer de bijbehorende TALERA-functies beschikbaar en gecontroleerd zijn.</div></details>
+  </section>
+</main>
+<footer class="foot"><div class="wrap">
+  <div><strong>TALERA Kennisbank</strong><p>Eenvoudige uitleg, op één vaste plek.</p></div>
+  <a class="back" data-back-talera href="https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present?talera_menu=help">← Terug naar Mijn TALERA</a>
+</div></footer>
+<script>
+(()=>{'use strict';
+  // A URL from TALERA is accepted only when it returns to a TALERA PWA menu.
+  // This prevents untrusted sites from using the back link as an open redirect.
+  const input=new URLSearchParams(location.search).get('terug');
+  if(!input)return;
+  try{
+    const url=new URL(input);
+    const validHost=/^talera-pwa-[a-z0-9-]+\.mark-a39\.workers\.dev$/.test(url.hostname);
+    const validMenu=['hub','help'].includes(url.searchParams.get('talera_menu'));
+    if(url.protocol!=='https:'||!validHost||url.pathname!=='/present'||!validMenu||url.username||url.password)return;
+    for(const link of document.querySelectorAll('[data-back-talera]'))link.href=url.href;
+  }catch{}
+})();
+</script>
+</body>
+</html>

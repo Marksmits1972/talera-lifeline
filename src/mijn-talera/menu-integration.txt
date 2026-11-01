@@ -51,6 +51,7 @@ shell.querySelector('.panel')?.setAttribute('aria-label','Mijn TALERA');
 const body=shell.querySelector('.body'),head=shell.querySelector('header strong'),back=shell.querySelector('[data-action="back"]');
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
+const premiumState={rights:null,admin:false,target:null};
 
 let authEpoch=0;
 function clearPrivateState(){
@@ -58,7 +59,7 @@ function clearPrivateState(){
   state.shared=[];state.messages=[];state.memories=[];
   state.thread=null;state.threadData=null;
   state.shares=[];state.grants=[];state.person=null;state.personMemories=[];
-  state.titles={};
+  state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
   storageState.owned=null;storageState.received=null;storageState.error='';
   const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
   if(badge){badge.hidden=true;badge.textContent=''}
@@ -91,7 +92,7 @@ function passwordField(id,label,autocomplete){return '<label>'+label+'<span clas
 function render(){
  if(!state.open)return;
  shell.querySelector('.panel').dataset.view=state.view;back.hidden=state.view==='hub';back.setAttribute('aria-label',state.history.length?'Terug naar vorig menu':'Terug naar Mijn TALERA');
- head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',profile:'Mijn profielgegevens',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy en beveiliging',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Door mij gedeeld',recipient:'Herinnering delen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',language:'Taal',accessibility:'Toegankelijkheid',display:'Weergave',subscription:'Mijn abonnement',storage:'Opslag en back-up',help:'Hulp en over TALERA'})[state.view]||'Meer';
+ head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',profile:'Mijn profielgegevens',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy en beveiliging',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Door mij gedeeld',recipient:'Herinnering delen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',language:'Taal',accessibility:'Toegankelijkheid',display:'Weergave',subscription:'Mijn abonnement','premium-admin':'Premium-testrechten',storage:'Opslag en back-up',help:'Hulp en over TALERA'})[state.view]||'Meer';
  let html='',a=state.account;
  switch(state.view){
  case 'hub':{
@@ -100,7 +101,7 @@ function render(){
   '<button class="account-card" data-view="account"><span class="avatar">'+esc((a?.displayName||'T').charAt(0).toUpperCase())+'</span><span class="account-copy"><strong>'+esc(a?.displayName||'Mijn TALERA-account')+'</strong><small>'+esc(a?.email||'Account aanmaken of aanmelden')+'</small></span><span>›</span></button>'+
   section('Contacten en delen',option('people','○','Mijn mensen','Mensen zoeken en uitnodigen')+option('mine','▣','Door mij gedeeld','Beheer gedeelde herinneringen')+option('shared','⌁','Met mij gedeeld','Herinneringen die anderen delen'))+
   
-  section('Account en voorkeuren',option('privacy','♢','Privacy en beveiliging','Vindbaarheid en accountprivacy')+option('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave')+option('subscription','◇','Mijn abonnement','Nog niet beschikbaar'))+
+  section('Account en voorkeuren',option('privacy','♢','Privacy en beveiliging','Vindbaarheid en accountprivacy')+option('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave')+option('subscription','◇','Mijn abonnement','Free en Premium-testrechten'))+
   section('Ondersteuning',option('help','?','Kennisbank en hulp','Antwoorden over TALERA en je account'));
   break;
  }
@@ -236,9 +237,35 @@ function render(){
       info('Let op','Je Free-herinneringen staan lokaal op dit toestel. Maak hieronder zelf een aparte back-up via Bestanden en herstel die indien nodig. TALERA uploadt deze lokale back-up niet. Controleer zelf of het bestand echt buiten de browser is bewaard.')+
       '<button class="secondary" type="button" data-action="storage-refresh">Opnieuw controleren</button>';
     break;
- case 'subscription':
-  html=info('Abonnement nog niet aangesloten','Je TALERA-account werkt al. Het overzicht van pakketten en betalingen wordt later gekoppeld.')+
-   '<p class="meta">Je kunt blijven werken met je huidige account. Er wordt hier niets in rekening gebracht.</p>';break;
+ case 'subscription':{
+  if(!a){html=info('Mijn abonnement','Meld je aan om je huidige rechten te bekijken.');break}
+  if(!premiumState.rights){html=info('Mijn abonnement','Je accountrechten worden gecontroleerd.');break}
+  const right=premiumState.rights,labels={free:'TALERA Free',individual:'Premium Individual',family_light:'Family Light',family:'Family',family_heavy:'Family Heavy'};
+  html=info('Huidig pakket: '+(labels[right.plan]||'Free'),right.source==='manual_test'?'Tijdelijke testrechten. Geen betaald abonnement.':'Je gebruikt TALERA Free.')+
+    (right.expiresAt?'<p class="meta">Testrecht eindigt op '+esc(new Date(right.expiresAt).toLocaleDateString())+'.</p>':'')+
+    '<p class="meta">Deze fase regelt uitsluitend rechten. Cloudopslag, AI, TV en betalingen worden nog aangesloten. Je Free-herinneringen blijven op dit toestel, zonder automatische upload.</p>';
+  if(premiumState.admin)html+=section('Alleen voor beheer',option('premium-admin','◇','Premium-testrechten beheren','Eén account controleren en tijdelijk rechten geven'));
+  break;
+ }
+ case 'premium-admin':{
+  if(!premiumState.admin){html=info('Niet beschikbaar','Alleen een expliciet gemachtigde TALERA-beheerder mag testrechten toekennen.');break}
+  html=title('Premium-testrechten','Kies eerst een bestaand TALERA-account op e-mailadres. Geen betaaltransactie of cloudupload.')+
+    '<label>E-mailadres account<input id="premium-account-email" type="email" autocomplete="off" maxlength="254" placeholder="naam@voorbeeld.nl"></label>'+
+    '<button class="secondary" type="button" data-action="premium-find">Account opzoeken</button>';
+  if(premiumState.target){
+    const target=premiumState.target,rights=target.rights||{};
+    html+=info('Gevonden: '+target.account.displayName,target.account.email)+
+      '<p class="meta">Huidig recht: '+esc(rights.plan||'free')+(rights.expiresAt?' tot '+esc(new Date(rights.expiresAt).toLocaleDateString()):'')+'</p>'+
+      '<label>Testpakket<select id="premium-test-plan">'+
+      '<option value="individual">Premium Individual</option><option value="family_light">Family Light</option>'+
+      '<option value="family">Family</option><option value="family_heavy">Family Heavy</option></select></label>'+
+      '<label>Tijdelijk recht<select id="premium-test-days"><option value="7">7 dagen</option><option value="30" selected>30 dagen</option><option value="90">90 dagen</option></select></label>'+
+      '<button class="secondary" type="button" data-action="premium-grant">Testrecht toekennen</button>'+
+      '<button class="secondary" type="button" data-action="premium-revoke">Testrecht intrekken</button>'+
+      '<p class="meta">Voor wijzigingen is een nieuwe aanmelding binnen 15 minuten nodig. Iedere toekenning en intrekking wordt geregistreerd.</p>';
+  }
+  break;
+ }
  case 'language':{
   const i18n=window.TaleraI18n;
   const names={nl:'Nederlands',en:'English',de:'Deutsch',fr:'Français',es:'Español'};
@@ -272,11 +299,19 @@ function close(){state.open=false;state.intent=null;shell.hidden=true;delete doc
 async function load(view){
   const startEpoch=authEpoch;
  try{
-  if(view==='hub'||view==='account'||view==='settings'||view==='privacy'||view==='people'||view==='shared'||view==='mine'||view==='messages'||view==='storage'||view==='profile'){
+  if(view==='hub'||view==='account'||view==='settings'||view==='privacy'||view==='people'||view==='shared'||view==='mine'||view==='messages'||view==='storage'||view==='profile'||view==='subscription'||view==='premium-admin'){
    try{const m=await api('/api/me');if(startEpoch!==authEpoch)return;setActiveAccount(m.account)}catch(e){if(startEpoch!==authEpoch)return;if(e.status===401)setActiveAccount(null);else throw e}
    if(state.account&&(view==='hub'||view==='account'||view==='privacy'||view==='settings'||view==='profile'))state.discovery=await api('/api/discovery');
   }
-  if(!state.account&&(view==='messages'||view==='shared'||view==='mine'||view==='people')){if(state.open&&state.view===view)render();return}
+  if(!state.account&&(view==='messages'||view==='shared'||view==='mine'||view==='people'||view==='subscription'||view==='premium-admin')){if(state.open&&state.view===view)render();return}
+  if(view==='subscription'||view==='premium-admin'){
+   premiumState.rights=null;premiumState.admin=false;
+   if(state.open&&state.view===view)render();
+   const entitlement=await api('/api/me/entitlements');
+   premiumState.rights=entitlement.rights;
+   premiumState.admin=entitlement.canManageTests===true;
+   if(view==='premium-admin'&&!premiumState.admin)premiumState.target=null;
+  }
   if(view==='mine'){
    const [shareRes,memRes,grantRes]=await Promise.all([api('/api/shares'),api('/api/memories'),api('/api/my-grants')]);
    state.shares=shareRes.items||[];
@@ -366,6 +401,31 @@ shell.addEventListener('click',e=>{
    return;
   }
   if(button.dataset.thread){state.thread=button.dataset.thread;state.threadData=null;go('thread');return}
+ if(button.dataset.action==='premium-find'){
+   if(!premiumState.admin||state.busy)return;
+   const email=String(body.querySelector('#premium-account-email')?.value||'').trim();
+   if(!email){feedback('Vul een e-mailadres in.',true);return}
+   state.busy=true;
+   api('/api/admin/premium/account?email='+encodeURIComponent(email))
+    .then(data=>{premiumState.target=data;render();feedback('Account gevonden. Kies eventueel een tijdelijk testpakket.')})
+    .catch(err=>{premiumState.target=null;feedback(err.message,true)})
+    .finally(()=>{state.busy=false});
+   return;
+ }
+ if(button.dataset.action==='premium-grant'||button.dataset.action==='premium-revoke'){
+   if(!premiumState.admin||!premiumState.target||state.busy)return;
+   const target=premiumState.target.account,grant=button.dataset.action==='premium-grant';
+   const plan=String(body.querySelector('#premium-test-plan')?.value||'individual');
+   const days=Number(body.querySelector('#premium-test-days')?.value||30);
+   if(!window.confirm((grant?'Tijdelijke Premium-testrechten toekennen aan ':'Testrechten intrekken van ')+target.displayName+'?'))return;
+   state.busy=true;
+   const path=grant?'/api/admin/premium/grant':'/api/admin/premium/revoke';
+   api(path,'POST',{accountId:target.id,plan,days})
+    .then(data=>{premiumState.target={...premiumState.target,rights:data.rights};render();feedback(grant?'Testrecht toegekend.':'Testrecht ingetrokken.')})
+    .catch(e=>feedback(e.message,true))
+    .finally(()=>{state.busy=false});
+   return;
+ }
  switch(button.dataset.action){
  case 'close':close();break;
  case 'back':backOne();break;

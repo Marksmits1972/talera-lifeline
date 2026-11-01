@@ -22,3 +22,14 @@
 3. Echte iPhone Safari acceptatie, inclusief terugpijl aanraken en presentatiebediening.
 
 **Geen productiemerge zonder de eigenaaracceptatie.** V56 t/m V59 blijven intact en rechtstreeks bereikbaar.
+
+## Testuitkomst 1 november — mobiele browser
+
+Staging: https://talera-pwa-v60-terug-hoofdmenu-20261101.mark-a39.workers.dev/present
+
+- V60-patch actief op `/__clean/menu-integration.mjs`: `back.hidden` alleen bij de hub, fallback naar hub bij lege geschiedenis.
+- Browser Rendering (390 × 844): direct geopende `account`, `messages`, `storage`, `people`, `privacy`, `settings`, `help` hadden **alle zeven** een zichtbare terugknop. De klik leidde naar `hub`; daarna sloot × de menulaag in alle zeven tests.
+- Navigatie via twee onderliggende menu's: `hub → settings → language → settings → hub → gesloten`: geslaagd.
+- De lege, niet-aangemelde browser blijft de bestaande login- en opslagafscherming gebruiken. Er is geen echt persoonlijk account aangemaakt en geen wachtwoord gebruikt.
+- Oude V56–V59 blijven ongewijzigd. V60 heeft uitsluitend de servicebinding naar V56.
+- Echte iPhone/Safari-acceptatie is nog open; daarom **geen productiepromotie**.

@@ -1,3 +1,4 @@
+import {addProfileEndpoint,PROFILE_ENDPOINT} from "../src/mijn-talera/account-profile-endpoint.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker, {patchMenuScript, patchV58MenuScript, patchV59MenuScript, patchV60MenuScript, patchV61MenuScript, patchV62MenuScript, legacyDestination, V62_MARKER, MENU_MODULE} from "../src/mijn-talera/v62-route-bridge.js";
@@ -238,7 +239,8 @@ const v62Fixture=v61Fixture+"\n"+[
  "account:'Mijn account',login:'Aanmelden'",
  " case 'login':\n  html=title('Aanmelden'",
  "view==='privacy'||view==='settings'))state.discovery=",
- "option('forgot','◈','Wachtwoord herstellen','Via je e-mailadres')"
+ "option('forgot','◈','Wachtwoord herstellen','Via je e-mailadres')",
+ "   case 'privacy':state.discovery=await api('/api/discovery','POST'"
 ].join("\n");
 
 test("V62 adds a profile entry to account details using existing account fields only",()=>{
@@ -248,11 +250,11 @@ test("V62 adds a profile entry to account details using existing account fields 
  assert.ok(v.text.includes("case 'profile':"));
  assert.ok(v.text.indexOf("case 'profile':") < v.text.indexOf("case 'login':\n  html=title('Aanmelden'"));
  assert.ok(!v.text.includes("switch(form.dataset.form){\n  case 'profile':"));
- assert.ok(v.text.includes("info('Naam',a.displayName"));
+ assert.ok(v.text.includes('form data-form="profile"'));
  assert.ok(v.text.includes("info('E-mailadres',a.email"));
  assert.ok(v.text.includes("state.discovery?.publicHandle"));
- assert.ok(v.text.toLowerCase().includes("naam en e-mailadres"));
- assert.ok(!v.text.includes("api('/api/profile','POST'"));
+ assert.ok(v.text.includes("E-mailadres wijzigen"));
+ assert.ok(v.text.includes("api('/api/profile','POST'"));
 });
 test("V62 profile is protected, uses existing read-only account and discovery APIs",()=>{
  const v=patchV62MenuScript(v62Fixture);
@@ -280,4 +282,28 @@ test("V62 does not modify the menu if upstream profile anchor has changed",()=>{
  const changed=v62Fixture.replace("account:'Mijn account',login:'Aanmelden'","account:'Accountgegevens',login:'Aanmelden'");
  const p=patchV62MenuScript(changed);
  assert.deepEqual(p,{ok:false,text:changed,reason:"v62-upstream-changed"});
+});
+
+test("profile edit uses the existing session account and leaves email alone",()=>{
+ const v=patchV62MenuScript(v62Fixture);
+ assert.equal(v.ok,true);
+ assert.ok(v.text.includes("if(!state.account)throw Error('Aanmelden is nodig')"));
+ assert.ok(v.text.includes("state.account?.id!==id"));
+ assert.ok(v.text.includes("setActiveAccount(result.account||null)"));
+ assert.ok(v.text.includes("E-mailadres wijzigen"));
+ assert.ok(!v.text.includes("api('/api/email-change'"));
+});
+
+test("existing Clean Core receives a single guarded profile route",()=>{
+ const anchor=" if(p==='/api/me'&&m==='GET')return user?json({account:{id:user.id,displayName:user.display_name,email:user.email}}):error(401,'Aanmelden bij TALERA is nodig');";
+ const source="if(m!=='GET'&&!allowedWrite(req))return error(403);\n"+anchor+"\nif(!user)return error(401,'Aanmelden bij TALERA is nodig')";
+ const patched=addProfileEndpoint(source);
+ assert.equal(patched.changed,true);
+ assert.ok(patched.source.includes("if(p==='/api/profile'&&m==='POST')"));
+ assert.ok(patched.source.includes("if(!user)return error(401"));
+ assert.ok(patched.source.includes("UPDATE accounts SET display_name=? WHERE id=? AND status='active'"));
+ assert.ok(!patched.source.includes("UPDATE accounts SET email="));
+ assert.equal(addProfileEndpoint(patched.source).changed,false);
+ assert.ok(PROFILE_ENDPOINT.includes("rateLimit(req,env,'profile-update',12)"));
+ assert.throws(()=>addProfileEndpoint("other upstream"),/gewijzigd|Herkomstcontrole/);
 });

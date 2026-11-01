@@ -6,7 +6,7 @@
 export const PROFILE_ANCHOR =
   " if(p==='/api/me'&&m==='GET')return user?json({account:{id:user.id,displayName:user.display_name,email:user.email}}):error(401,'Aanmelden bij TALERA is nodig');";
 
-export const PROFILE_ENDPOINT = `
+export const PROFILE_ENDPOINT = String.raw`
  if(p==='/api/profile'&&m==='POST'){
    if(!user)return error(401,'Aanmelden bij TALERA is nodig');
    if(!await rateLimit(req,env,'profile-update',12))return error(429,'Probeer later opnieuw');

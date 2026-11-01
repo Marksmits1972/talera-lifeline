@@ -220,7 +220,7 @@ function render(){
   html=title('Instellingen','Je account en de algemene werking van TALERA.')+
   section('Algemeen',option('account','◉','Mijn account','Accountgegevens en aanmelden')+
   option('privacy','♢','Privacy en beveiliging','Vindbaarheid en persoonlijke toegang')+
-  option('language','NL','Taal','Nederlands')+
+  option('language',String(window.TaleraI18n?.language||'nl').toUpperCase(),'Taal',({nl:'Nederlands',en:'English',de:'Deutsch',fr:'Français',es:'Español'}[window.TaleraI18n?.language]||'Nederlands'))+
   option('accessibility','Aa','Toegankelijkheid','Tekstgrootte, contrast en bediening')+
   option('display','◐','Weergave','Rust, beweging en visuele voorkeuren')+option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt'))+
   section('Geluid en afspelen',action(window.__taleraAudioControls?.isEnabled?.()?'disable-listening':'enable-listening',window.__taleraAudioControls?.isEnabled?.()?'Ⅱ':'▶',window.__taleraAudioControls?.isEnabled?.()?'Luisteren uitschakelen':'Luisteren inschakelen','Gesproken herinneringen'));break;
@@ -238,9 +238,15 @@ function render(){
  case 'subscription':
   html=info('Abonnement nog niet aangesloten','Je TALERA-account werkt al. Het overzicht van pakketten en betalingen wordt later gekoppeld.')+
    '<p class="meta">Je kunt blijven werken met je huidige account. Er wordt hier niets in rekening gebracht.</p>';break;
- case 'language':
-  html=info('Taalkeuze','De huidige taalkeuze staat bovenaan Mijn leven en gebruikt dezelfde TALERA-instelling.')+
-   '<button class="secondary" data-action="go-language">Open taalkeuze</button>';break;
+ case 'language':{
+  const i18n=window.TaleraI18n;
+  const names={nl:'Nederlands',en:'English',de:'Deutsch',fr:'Français',es:'Español'};
+  html=info('Taalkeuze','Kies de taal voor de TALERA-app. Je eigen verhalen blijven in de oorspronkelijke taal.')+
+   '<label>Selecteer taal<select id="talera-menu-language" aria-label="Selecteer taal">'+
+   (i18n?.supported||['nl','en','de','fr','es']).map(code=>'<option value="'+esc(code)+'"'+(i18n?.language===code?' selected':'')+'>'+esc(names[code]||code)+'</option>').join('')+
+   '</select></label>';
+  break;
+ }
  case 'accessibility':
   html=info('Leesbaarheid en bediening','TALERA volgt op dit moment de toegankelijkheidsvoorkeuren van je apparaat waar dat mogelijk is.')+
    '<p class="meta">Er worden hier nog geen aparte instellingen bewaard.</p>';break;
@@ -351,8 +357,11 @@ shell.addEventListener('click',e=>{
  case 'disable-listening':window.__taleraAudioControls?.disable?.();render();break;
  case 'help':feedback('Gebruik Mijn account voor aanmelden en profiel, Mijn mensen voor contacten en Berichten voor reacties.');break;
  case 'privacy-info':go('privacy');break;
- case 'go-language':close();location.assign('/');break;
+
  }
+});
+shell.addEventListener('change',e=>{
+ if(e.target?.id==='talera-menu-language')window.TaleraI18n?.setLanguage?.(e.target.value);
 });
 shell.addEventListener('submit',e=>{
  e.preventDefault();const form=e.target;if(state.busy)return;
@@ -418,7 +427,7 @@ async function updateUnreadBadge(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{updateHomeNav();void updateUnreadBadge()},{once:true});else{updateHomeNav();void updateUnreadBadge()}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)void updateUnreadBadge()});
 setInterval(()=>{if(state.account&&!document.hidden)void updateUnreadBadge()},15000);
-document.addEventListener('talera:languagechange',updateHomeNav);
+document.addEventListener('talera:languagechange',()=>{updateHomeNav();if(state.open)render()});
 void checkSession();
 window.__taleraMoreMenu={ready:true,open,close,state:()=>({open:state.open,view:state.view,accountId:state.account?.id||null})};
 document.documentElement.dataset.taleraMoreMenu='mounted';

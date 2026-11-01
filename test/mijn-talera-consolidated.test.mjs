@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 
 const menu=readFileSync(new URL("../src/mijn-talera/menu-integration.txt",import.meta.url),"utf8");
 const worker=readFileSync(new URL("../src/mijn-talera/worker.js",import.meta.url),"utf8");
+const knowledge=readFileSync(new URL("../src/mijn-talera/kennisbank.html",import.meta.url),"utf8");
 
 test("canonical Mijn TALERA menu has valid JavaScript and no runtime patch cascade",()=>{
   assert.doesNotThrow(()=>new Function(menu));
@@ -39,4 +40,16 @@ test("menu is served once, unchanged and without caching; all other requests pro
   assert.ok(worker.includes('if (path === "/gedeeld") return "shared"'));
   assert.ok(worker.includes('if (path === "/meldingen") return "messages"'));
   assert.ok(!worker.includes("api/profile"));
+});
+
+test("Kennisbank opens on the same TALERA origin and has a clear route back",()=>{
+  assert.ok(menu.includes('href="/kennisbank/"'));
+  assert.ok(menu.includes("Kennisbank en hulp"));
+  assert.ok(!menu.includes('talera-website.pages.dev/welkom/'));
+  assert.ok(!menu.includes('target="_blank">Ontdek TALERA'));
+  assert.ok(worker.includes('import knowledgeSource from "./kennisbank.html"'));
+  assert.ok(worker.includes('url.pathname === "/kennisbank/"'));
+  assert.ok(knowledge.includes('Terug naar Mijn TALERA'));
+  assert.ok(knowledge.includes('Veelgestelde vragen'));
+  assert.ok(knowledge.includes('href="https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present?talera_menu=help"'));
 });

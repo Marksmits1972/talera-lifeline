@@ -322,7 +322,7 @@ shell.addEventListener('click',e=>{
   const active=String(document.querySelector('#talera-clean-social')?.dataset.memoryId||new URLSearchParams(location.search).get('memory')||'');
   if(/^[a-zA-Z0-9_-]{1,96}$/.test(active))back.searchParams.set('memory',active);
   const year=new URLSearchParams(location.search).get('year');
-  if(year&&/^\\d{4}$/.test(year))back.searchParams.set('year',year);
+  if(year&&/^\d{4}$/.test(year))back.searchParams.set('year',year);
   back.searchParams.set('talera_menu','help');
   const target=new URL('/kennisbank/',location.origin);
   target.searchParams.set('terug',back.pathname+back.search);

@@ -100,7 +100,7 @@ function render(){
   '<button class="account-card" data-view="account"><span class="avatar">'+esc((a?.displayName||'T').charAt(0).toUpperCase())+'</span><span class="account-copy"><strong>'+esc(a?.displayName||'Mijn TALERA-account')+'</strong><small>'+esc(a?.email||'Account aanmaken of aanmelden')+'</small></span><span>›</span></button>'+
   section('Contacten en delen',option('people','○','Mijn mensen','Mensen zoeken en uitnodigen')+option('mine','▣','Door mij gedeeld','Beheer gedeelde herinneringen')+option('shared','⌁','Met mij gedeeld','Herinneringen die anderen delen'))+
   
-  section('Account en voorkeuren',option('privacy','♢','Privacy en beveiliging','Vindbaarheid en accountprivacy')+option('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave')+option('subscription','◇','Mijn abonnement','Pakket en betalingen'))+
+  section('Account en voorkeuren',option('privacy','♢','Privacy en beveiliging','Vindbaarheid en accountprivacy')+option('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave')+option('subscription','◇','Mijn abonnement','Nog niet beschikbaar'))+
   section('Ondersteuning',option('help','?','Kennisbank en hulp','Antwoorden over TALERA en je account'));
   break;
  }
@@ -221,8 +221,8 @@ function render(){
   section('Algemeen',option('account','◉','Mijn account','Accountgegevens en aanmelden')+
   option('privacy','♢','Privacy en beveiliging','Vindbaarheid en persoonlijke toegang')+
   option('language',String(window.TaleraI18n?.language||'nl').toUpperCase(),'Taal',({nl:'Nederlands',en:'English',de:'Deutsch',fr:'Français',es:'Español'}[window.TaleraI18n?.language]||'Nederlands'))+
-  option('accessibility','Aa','Toegankelijkheid','Tekstgrootte, contrast en bediening')+
-  option('display','◐','Weergave','Rust, beweging en visuele voorkeuren')+option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt'))+
+  option('accessibility','Aa','Toegankelijkheid','Binnenkort: extra lees- en bedieningsopties')+
+  option('display','◐','Weergave','Binnenkort: persoonlijke weergavevoorkeuren')+option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt'))+
   section('Geluid en afspelen',action(window.__taleraAudioControls?.isEnabled?.()?'disable-listening':'enable-listening',window.__taleraAudioControls?.isEnabled?.()?'Ⅱ':'▶',window.__taleraAudioControls?.isEnabled?.()?'Luisteren uitschakelen':'Luisteren inschakelen','Gesproken herinneringen'));break;
 
   case 'storage':
@@ -314,6 +314,21 @@ async function load(view){
 }
 shell.addEventListener('click',e=>{
  if(e.target===shell){close();return}
+ // Retain the currently selected memory when opening the static help page.
+ const knowledge=e.target.closest('a[href="/kennisbank/"]');
+ if(knowledge){
+  e.preventDefault();
+  const back=new URL('/present',location.origin);
+  const active=String(document.querySelector('#talera-clean-social')?.dataset.memoryId||new URLSearchParams(location.search).get('memory')||'');
+  if(/^[a-zA-Z0-9_-]{1,96}$/.test(active))back.searchParams.set('memory',active);
+  const year=new URLSearchParams(location.search).get('year');
+  if(year&&/^\\d{4}$/.test(year))back.searchParams.set('year',year);
+  back.searchParams.set('talera_menu','help');
+  const target=new URL('/kennisbank/',location.origin);
+  target.searchParams.set('terug',back.pathname+back.search);
+  location.assign(target.href);
+  return;
+ }
  const button=e.target.closest('button');if(!button)return;
  if(button.dataset.passwordToggle){const input=shell.querySelector('#'+button.dataset.passwordToggle);if(!input)return;e.preventDefault();const show=input.type==='password';input.type=show?'text':'password';button.setAttribute('aria-label',show?'Verberg wachtwoord':'Toon wachtwoord');button.setAttribute('aria-pressed',String(show));return}
  if(button.dataset.view){go(button.dataset.view);return}

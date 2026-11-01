@@ -158,7 +158,7 @@ export function patchV61MenuScript(source) {
 export function patchV62MenuScript(source) {
   const prior=patchV61MenuScript(source);
   if(!prior.ok)return prior;
-  const profileCase=String.raw\`
+  const profileCase=String.raw`
   case 'profile':
     html=(a?
       title('Mijn profielgegevens','Dit zijn de gegevens van jouw ingelogde TALERA-account.')+
@@ -170,7 +170,7 @@ export function patchV62MenuScript(source) {
       info('Aanmelden nodig','Meld je aan om je eigen profielgegevens te bekijken.')+
       '<button type="button" class="primary" data-view="login">Aanmelden</button>');
     break;
-\`;
+`;
   const changes=[
     {
       old:"section('Account en privacy',option('privacy'",

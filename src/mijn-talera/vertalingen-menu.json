@@ -1,6 +1,6 @@
 {
   "format": "TALERA_V23_TRANSLATIONS_APPEND",
-  "description": "Koppeling van Mijn TALERA aan de bestaande TaleraI18n-catalogus. Geen tweede register of nieuwe database.",
+  "description": "Aanvulling op bestaand TALERA_V23_TRANSLATIONS: 152 more.*-sleutels en 2 present.*-sleutels (vandaag/leeftijd). Geen afzonderlijke vertaalcatalogus.",
   "languages": [
     "nl",
     "en",
@@ -161,7 +161,9 @@
       "more.help.who": "Wie kan jouw herinneringen bekijken?",
       "more.help.knowledge": "Kennisbank",
       "more.help.explain": "Antwoorden over herinneringen, delen, je account en privacy. Vanuit de pagina kom je terug naar dit menu.",
-      "more.help.open": "Open de kennisbank"
+      "more.help.open": "Open de kennisbank",
+      "present.today": "vandaag",
+      "present.ageUnit": "jaar"
     },
     "en": {
       "more.hub.title": "My TALERA",
@@ -315,7 +317,9 @@
       "more.help.who": "Who can view your memories?",
       "more.help.knowledge": "Knowledge base",
       "more.help.explain": "Answers about memories, sharing, your account and privacy. You can return to this menu from the page.",
-      "more.help.open": "Open knowledge base"
+      "more.help.open": "Open knowledge base",
+      "present.today": "today",
+      "present.ageUnit": "years"
     },
     "de": {
       "more.hub.title": "Mein TALERA",
@@ -469,7 +473,9 @@
       "more.help.who": "Wer kann deine Erinnerungen sehen?",
       "more.help.knowledge": "Wissensdatenbank",
       "more.help.explain": "Antworten zu Erinnerungen, Teilen, deinem Konto und Datenschutz. Von der Seite gelangst du zu diesem Menü zurück.",
-      "more.help.open": "Wissensdatenbank öffnen"
+      "more.help.open": "Wissensdatenbank öffnen",
+      "present.today": "heute",
+      "present.ageUnit": "Jahre"
     },
     "fr": {
       "more.hub.title": "Mon TALERA",
@@ -623,7 +629,9 @@
       "more.help.who": "Qui peut voir vos souvenirs ?",
       "more.help.knowledge": "Centre d’aide",
       "more.help.explain": "Des réponses sur les souvenirs, le partage, votre compte et la confidentialité. Vous pouvez revenir à ce menu depuis la page.",
-      "more.help.open": "Ouvrir le centre d’aide"
+      "more.help.open": "Ouvrir le centre d’aide",
+      "present.today": "aujourd’hui",
+      "present.ageUnit": "ans"
     },
     "es": {
       "more.hub.title": "Mi TALERA",
@@ -777,7 +785,9 @@
       "more.help.who": "¿Quién puede ver tus recuerdos?",
       "more.help.knowledge": "Centro de ayuda",
       "more.help.explain": "Respuestas sobre recuerdos, compartir, tu cuenta y privacidad. Desde la página puedes volver a este menú.",
-      "more.help.open": "Abrir el centro de ayuda"
+      "more.help.open": "Abrir el centro de ayuda",
+      "present.today": "hoy",
+      "present.ageUnit": "años"
     }
   }
 }

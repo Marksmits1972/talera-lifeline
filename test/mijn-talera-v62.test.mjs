@@ -236,7 +236,7 @@ test("V61 proxies non-menu data without altering method or body",async()=>{
 
 const v62Fixture=v61Fixture+"\n"+[
  "account:'Mijn account',login:'Aanmelden'",
- "  case 'login':\n   html=title('Aanmelden'",
+ " case 'login':\n  html=title('Aanmelden'",
  "view==='privacy'||view==='settings'))state.discovery=",
  "option('forgot','◈','Wachtwoord herstellen','Via je e-mailadres')"
 ].join("\n");

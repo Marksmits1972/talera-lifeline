@@ -28,3 +28,16 @@
 - `?talera_menu=storage` toont lokale opslag zonder verplicht account; geen automatische upload.
 - Deepshare `/gedeeld` en `/meldingen` blijven in het ingelogde menu.
 - `/api/memories`, `/api/shared-with-me` aanroepen alleen na sessieautorisatie via bestaande backend.
+
+## Bouwcontrole 1 november 2026
+
+- Gepubliceerd als aparte Cloudflare Worker `talera-pwa-v58-opslag-mijn-talera-20261101`:
+  https://talera-pwa-v58-opslag-mijn-talera-20261101.mark-a39.workers.dev/present
+- Alleen servicebinding `V56_BASE` naar bestaande V56; geen eigen databasebindings of mediaopslag.
+- Browser Rendering 390 × 844: gewone /present opent zonder gedwongen login; menu Mijn TALERA bevat opslagingang; /present?talera_menu=storage toont nul lokale verhalen in nieuwe lege testsessie, geen fictieve accountinhoud; /gedeeld en /meldingen openen de bestaande afgeschermde accountweergaven. Knop vanuit menu opent opslagweergave.
+- Geïsoleerde browsertest met tijdelijk gesimuleerde `TaleraMemories.list()` van twee items toont correct 2 lokale herinneringen na ‘Opnieuw controleren’. Dit is **geen bewijs dat twee echte verhalen veilig bewaard of herstelbaar zijn**.
+- Alle **9 tests in de V58-testmodule** zijn geslaagd (7 overgenomen V57-controles plus 2 specifieke V58-controles). De volledige GitHub Actions suite [run 41283129429](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41283129429) eindigt op **109 geslaagd, 2 gefaald**, uitsluitend vanwege reeds geregistreerde ontbrekende oudere bestanden in [issue #61](https://github.com/Marksmits1972/talera-lifeline/issues/61). Geen codeverandering om dit te verdoezelen.
+- Read-only referentiële controle op de bestaande Clean Core testdatabase: **0** herinneringen met ontbrekende eigenaar, **0** share-links met verkeerde of ontbrekende herinnering/eigenaar, **0** gebroken grant-verwijzingen, **0** berichten zonder geldige account-/herinneringsverwijzing, **0** foutieve PWA-koppelrecords en **0** dubbele lokale-ID-toewijzingen. **5** bestaande PWA-memorylinks. Dit is *alleen* een integriteitscontrole op relevante sleutelrelaties en geen bewijs van foto-opslagkwaliteit of rechtenbeheer op meerdere apparaten.
+- PR #62 is afhankelijk van [PR #60](https://github.com/Marksmits1972/talera-lifeline/pull/60) (V57); V56 blijft ongewijzigde terugvalversie.
+
+**Acceptatie blijft OPEN:** daadwerkelijk testen op eigen iPhone, een veilig proefverhaal op dezelfde test-origin en echte tweede ingelogde account. Geen migratie en geen productiegoedkeuring.

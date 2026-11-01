@@ -33,3 +33,8 @@ Staging: https://talera-pwa-v60-terug-hoofdmenu-20261101.mark-a39.workers.dev/pr
 - De lege, niet-aangemelde browser blijft de bestaande login- en opslagafscherming gebruiken. Er is geen echt persoonlijk account aangemaakt en geen wachtwoord gebruikt.
 - Oude V56–V59 blijven ongewijzigd. V60 heeft uitsluitend de servicebinding naar V56.
 - Echte iPhone/Safari-acceptatie is nog open; daarom **geen productiepromotie**.
+
+## Automatische regressie
+- GitHub Actions [run 41284569650](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41284569650): **139 tests geslaagd / 2 gefaald**.
+- Alle nieuwe V60-navigatietests zijn geslaagd. De twee overige foutmeldingen ontstaan door ontbrekende bronbestanden `xxory-test/src/tv-player.js` en `xxory-test/src/unified-webapp.js` in twee reeds bestaande tests: zie [issue #61](https://github.com/Marksmits1972/talera-lifeline/issues/61).
+- De test waarop de gebruiker vastliep is hiermee in de staging-webbrowser opgelost, maar voor definitieve acceptatie is een echte iPhone-test door de gebruiker nodig.

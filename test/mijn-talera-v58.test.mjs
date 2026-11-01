@@ -89,10 +89,10 @@ const anchorFixture = original + [
  "help:'Hulp en over TALERA'",
  "section('Account en voorkeuren',option('privacy'",
  "section('Account en privacy',option('privacy'",
- "  case 'subscription':",
+ " case 'subscription':",
  "||view==='messages'){",
- "   if(view==='shared')state.shared=",
- "  case 'logout':void api(",
+ "  if(view==='shared')state.shared=",
+ " case 'logout':void api(",
 ].join("\n");
 
 test("V58 adds one local/account storage overview without changing existing account endpoints",()=>{

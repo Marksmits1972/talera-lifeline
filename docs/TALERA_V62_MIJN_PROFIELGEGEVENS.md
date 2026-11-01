@@ -52,3 +52,16 @@
 - V62 heeft uitsluitend de V56-servicebinding, geen D1/R2. Controle van de Clean Core-testdatabase gaf dezelfde aantallen als vooraf: 4 accounts, 12 herinneringen, 10 shares, 23 berichten, 4 grants, 5 browserkoppelingen. Alleen aantallen getoetst; geen mutaties uitgevoerd.
 - Cloudflare V56 en V61 deployments blijven ongewijzigd; V62 is een afzonderlijke testversie, niet gepromoveerd.
 - Echte iPhone/Safari-test met een bestaand ingelogd account nog open vóór productieacceptatie.
+
+## Aanvulling bouwronde: naam direct opslaan, zonder nieuwe softwarelaag
+
+- Bestaande **Clean Core Worker** gebruikt; geen extra Worker, database, tabel of afzonderlijke accountservice.
+- Eén beveiligde toevoeging: `POST /api/profile`. De bestaande sessiecontrole `talera_sid` en herkomstcontrole worden hergebruikt. Rate limit 12 per 10 minuten, maximaal 100 tekens en controle op besturingstekens. Alleen `accounts.display_name` voor de aangemelde `user.id` wordt bijgewerkt.
+- **Geen wijziging van e-mailadres** zolang veilige e-mailverificatie niet actief is. Geen fake opslaan-knop voor e-mail.
+- Dit endpoint is als versie `c4496dcc-b120-43d7-846c-25adea9dc31f` van `talera-clean-core-staging-20261030` geüpload en door Cloudflare gecompileerd. Daarna is de versie gedeployed onder deployment `bd8cd77a-e901-4246-803e-f3b63e07bf2d`, met behoud van dezelfde D1- en media-bindings. Terugvaldeployment: `7b37e37c-0be7-4973-bc19-c0c0224d6f6a`.
+- De bestaande **V62**-menuworker is op hetzelfde testadres bijgewerkt; er is geen nieuwe V63-app aangemaakt.
+- Mobiele browsertest met fictieve accountresponsen: naam wijzigen, opslaan en direct terugzien; e-mailadres blijft ongewijzigd. Testresultaat: één profiel-POST; nieuwe naam in profielinvoer en hoofdmenu. Geen echte gebruikers gewijzigd tijdens de browsertest.
+- Anonieme live controle: `GET /api/me`, `POST /api/profile`, `GET /api/shares`, `GET /api/messages` geven alle HTTP 401. De bestaande deelketen is niet opnieuw gebouwd.
+- Nog open: acceptatie met werkelijk ingelogd account op iPhone, en bevestigde persistente naamwijziging na opnieuw aanmelden. E-mailadres wijzigen en account-wachtwoordherstel vereisen werkende geverifieerde e-mailafhandeling.
+
+**Architectuurafspraak:** stop met nieuwe Vxx-wrapperketens; consolideer bij volgende grotere release de bestaande menu-aanpassingen in één module, zonder functies opnieuw te ontwerpen.

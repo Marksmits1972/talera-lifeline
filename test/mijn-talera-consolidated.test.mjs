@@ -5,6 +5,7 @@ import {readFileSync} from "node:fs";
 const menu=readFileSync(new URL("../src/mijn-talera/menu-integration.txt",import.meta.url),"utf8");
 const worker=readFileSync(new URL("../src/mijn-talera/worker.js",import.meta.url),"utf8");
 const knowledge=readFileSync(new URL("../src/mijn-talera/kennisbank.html",import.meta.url),"utf8");
+const languages=JSON.parse(readFileSync(new URL("../src/mijn-talera/vertalingen-menu.json",import.meta.url),"utf8"));
 
 test("canonical Mijn TALERA menu has valid JavaScript and no runtime patch cascade",()=>{
   assert.doesNotThrow(()=>new Function(menu));
@@ -52,4 +53,29 @@ test("Kennisbank opens on the same TALERA origin and has a clear route back",()=
   assert.ok(knowledge.includes('Terug naar Mijn TALERA'));
   assert.ok(knowledge.includes('Veelgestelde vragen'));
   assert.ok(knowledge.includes('href="https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present?talera_menu=help"'));
+});
+
+test("i18n: existing TaleraI18n gets the same 152 extra keys for all five app languages",()=>{
+  const langs=["nl","en","de","fr","es"];
+  assert.deepEqual(languages.languages,langs);
+  const keys=Object.keys(languages.catalog.nl);
+  assert.equal(keys.length,152);
+  for(const lang of langs){
+    const strings=languages.catalog[lang];
+    assert.deepEqual(Object.keys(strings),keys);
+    assert.ok(keys.every(key=>typeof strings[key]==="string"&&strings[key].trim()),lang);
+  }
+  assert.ok(keys.every(key=>key.startsWith("more.")));
+  assert.equal(languages.catalog.de["more.hub.people"],"Meine Kontakte");
+  assert.equal(languages.catalog.fr["more.settings.storage"],"Stockage et sauvegarde");
+  assert.equal(languages.catalog.es["more.help.open"],"Abrir el centro de ayuda");
+});
+test("i18n: language settings select uses the existing global language registry",()=>{
+  assert.ok(menu.includes("window.TaleraI18n?.supported"));
+  assert.ok(menu.includes("window.TaleraI18n?.setLanguage?.(e.target.value)"));
+  assert.ok(menu.includes('id="talera-menu-language"'));
+  assert.ok(menu.includes("talera:languagechange"));
+  assert.ok(!menu.includes("case 'go-language':close();location.assign('/')"));
+  assert.ok(!menu.includes("const TALERA_V23_TRANSLATIONS="));
+  assert.ok(!menu.includes("TaleraI18n={"));
 });

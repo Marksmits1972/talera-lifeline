@@ -26,3 +26,12 @@ Een atomair gepatchte wijziging boven op V60, die op V56 via servicebinding blij
 8. Definitieve iPhone/Safari-acceptatie door gebruiker voordat de nieuwe versie als productievast wordt beschouwd.
 
 **Status**: nieuwe UI-staging, read-only, geen gegevensmigratie.
+
+## Verificatie 1 november 2026
+- Cloudflare V61-testworker gepubliceerd op https://talera-pwa-v61-opslag-onder-instellingen-20261101.mark-a39.workers.dev/present
+- Mobiele browsertest (390×844): hoofdmenu bevat **geen** opslagitem en toont de drie sociale opties. ‘Mijn account’ bevat **geen** tweede opslagitem.
+- Instellingen toont exact één optie ‘Opslag en back-up’, met de verduidelijking ‘Bekijk opslag; back-up volgt’.
+- Route `hub → settings → storage → settings → hub → gesloten` geslaagd na echte menuklikken (browserautomatisering).
+- Rechtstreeks naar `?talera_menu=storage` opent dezelfde teller en vermeldt expliciet dat reservekopie en herstel nog ontbreken.
+- Bestaande anonieme routes `/gedeeld` en `/meldingen` bleven bereikbaar en vereisten aanmelden; er is geen testaccount aangemaakt, geen upload en geen gegevensmigratie gedaan.
+- V56–V60 blijven beschikbaar op hun ongewijzigde URL’s. Echte iPhone-acceptatie en twee-account-deeltest zijn nog open.

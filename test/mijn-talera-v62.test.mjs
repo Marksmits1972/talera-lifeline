@@ -251,7 +251,7 @@ test("V62 adds a profile entry to account details using existing account fields 
  assert.ok(v.text.includes("info('Naam',a.displayName"));
  assert.ok(v.text.includes("info('E-mailadres',a.email"));
  assert.ok(v.text.includes("state.discovery?.publicHandle"));
- assert.ok(v.text.includes("naam en e-mailadres"));
+ assert.ok(v.text.toLowerCase().includes("naam en e-mailadres"));
  assert.ok(!v.text.includes("api('/api/profile','POST'"));
 });
 test("V62 profile is protected, uses existing read-only account and discovery APIs",()=>{

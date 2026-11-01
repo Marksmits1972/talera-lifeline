@@ -57,12 +57,12 @@ test("existing memory and API requests are forwarded without changing their meth
 });
 
 test("only the existing menu module is patched", async () => {
-  const env=fakeEnv();
+  const env=fakeEnv(async()=>new Response(anchorFixture, {headers:{"content-type":"text/javascript"}}));
   const patch=await worker.fetch(new Request("https://staging.example"+MENU_MODULE),env);
   assert.equal(patch.headers.get("x-talera-integratie"),V58_MARKER);
   assert.ok((await patch.text()).includes("'shared'"));
   const other=await worker.fetch(new Request("https://staging.example/some.js"),env);
-  assert.equal(await other.text(),original);
+  assert.equal(await other.text(),anchorFixture);
 });
 
 test("missing V56 service returns 503 instead of attempting unauthenticated alternate access", async () => {

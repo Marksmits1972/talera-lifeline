@@ -47,3 +47,13 @@ De oude V57–V62 patchmodules en hun dubbele tests zijn **uitsluitend uit de ac
 
 ### Kwalificatie
 Browser- en enkele gerichte regressiecontroles geslaagd. De bestaande iPhone-acceptatie en echte ingelogde naamwijziging zijn nog niet end-to-end afgevinkt. De twee oude CI-blokkades van ontbrekende bestanden zijn bekend als issue #61.
+
+## Kennisbank en terugweg — 1 november 2026
+- Canonieke websitepagina: `talera-website/kennisbank/index.html`, gepubliceerd door de bestaande Cloudflare Pages-projectdeploy `1f72af51-bb8f-42a3-af03-bfc96492e1c9`.
+- De website op `talera-website.pages.dev` is voorlopig nog **achter Cloudflare Access**. Geen beveiligingsbeleid gewijzigd.
+- Daarom serveert **dezelfde bestaande V62 Worker** een statische, publiek bereikbare kennisbank op `/kennisbank/`; geen extra Worker, accountservice of database.
+- Onder `Mijn TALERA → Kennisbank en hulp → Open de kennisbank` opent de pagina nu in **dezelfde tab**, zonder externe WhatsApp-kennismakingspagina.
+- Boven- en onderaan de pagina staat `Terug naar Mijn TALERA`, gericht op `/present?talera_menu=help`. Direct openen van de pagina werkt ook.
+- Browsertest (mobiel 390×844): klik op de menulink opent **Kennisbank**, klik op de vaste terugknop opent **Hulp en over TALERA**, inclusief het huidige menu. Beide richtingen geslaagd.
+- De page is een eenvoudig statisch document met ankerlinks en veelgestelde vragen. Later kan dezelfde content rechtstreeks op de website toegankelijk worden gemaakt zodra publicatiebeleid daarvoor geschikt is.
+- V62 Worker versienummer `824f9289-4a20-4430-a534-72a61cab7664`, deployment `1899d89b-2004-4419-a08e-835c8db0dc05`; voorganger `76ce43c3-2ed4-4e0b-b2b0-e3fc43f5f718` blijft als rollback beschikbaar.

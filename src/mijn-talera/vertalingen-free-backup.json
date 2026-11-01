@@ -28,7 +28,9 @@
       "backup.later": "Later",
       "backup.already": "Al gedaan",
       "backup.preparing": "Back-up voorbereiden…",
-      "backup.checking": "Gegevens en mediabestanden controleren…"
+      "backup.checking": "Gegevens en mediabestanden controleren…",
+      "backup.intro": "Je Free-herinneringen blijven op je eigen toestel. Bewaar zelf een reservekopie buiten de browser, bijvoorbeeld via Bestanden. Er wordt niets automatisch geüpload.",
+      "backup.previewCounts": "%new% nieuwe, %existing% al bestaande herinneringen; %files% nieuwe mediabestanden."
     },
     "en": {
       "backup.create": "Create backup",
@@ -50,7 +52,9 @@
       "backup.later": "Later",
       "backup.already": "Already done",
       "backup.preparing": "Preparing backup…",
-      "backup.checking": "Checking memories and media…"
+      "backup.checking": "Checking memories and media…",
+      "backup.intro": "Your Free memories stay on your device. Save a backup outside the browser, for example in Files. Nothing is uploaded automatically.",
+      "backup.previewCounts": "%new% new, %existing% existing memories; %files% new media files."
     },
     "de": {
       "backup.create": "Sicherung erstellen",
@@ -72,7 +76,9 @@
       "backup.later": "Später",
       "backup.already": "Schon erledigt",
       "backup.preparing": "Sicherung vorbereiten…",
-      "backup.checking": "Erinnerungen und Dateien prüfen…"
+      "backup.checking": "Erinnerungen und Dateien prüfen…",
+      "backup.intro": "Deine Free-Erinnerungen bleiben auf deinem Gerät. Sichere sie außerhalb des Browsers in Dateien. Es erfolgt kein automatischer Upload.",
+      "backup.previewCounts": "%new% neue, %existing% vorhandene Erinnerungen; %files% neue Mediendateien."
     },
     "fr": {
       "backup.create": "Créer une sauvegarde",
@@ -94,7 +100,9 @@
       "backup.later": "Plus tard",
       "backup.already": "Déjà fait",
       "backup.preparing": "Préparation de la sauvegarde…",
-      "backup.checking": "Vérification des souvenirs et fichiers…"
+      "backup.checking": "Vérification des souvenirs et fichiers…",
+      "backup.intro": "Vos souvenirs Free restent sur cet appareil. Enregistrez une sauvegarde hors du navigateur, par exemple dans Fichiers. Aucun transfert automatique.",
+      "backup.previewCounts": "%new% nouveaux souvenirs, %existing% déjà présents ; %files% nouveaux médias."
     },
     "es": {
       "backup.create": "Crear copia de seguridad",
@@ -116,7 +124,9 @@
       "backup.later": "Más tarde",
       "backup.already": "Ya lo hice",
       "backup.preparing": "Preparando copia…",
-      "backup.checking": "Comprobando recuerdos y archivos…"
+      "backup.checking": "Comprobando recuerdos y archivos…",
+      "backup.intro": "Tus recuerdos Free permanecen en este dispositivo. Guarda una copia fuera del navegador, por ejemplo en Archivos. No se sube nada automáticamente.",
+      "backup.previewCounts": "%new% recuerdos nuevos, %existing% existentes; %files% archivos multimedia nuevos."
     }
   }
 }

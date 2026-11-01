@@ -120,6 +120,7 @@ const v59Fixture = anchorFixture + "\n" + [
  "try{const m=await api('/api/me');state.account=m.account}catch(e){if(e.status===401)state.account=null;else throw e}",
  "state.account=result.account||null;",
  "state.account=null;state.discovery=null;state.history=[];",
+ "}catch(e){if(state.open&&state.view===view)feedback(e.message,true)}",
  "async function checkSession(){",
  "try{const m=await api('/api/me');state.account=m.account;void updateUnreadBadge();",
  "catch(e){if(e.status===401){state.account=null;document.documentElement.dataset.taleraAuth='signed-out';",
@@ -138,6 +139,7 @@ test("V59 rejects stale account-scoped GET replies, but preserves existing POST 
  assert.ok(x.text.includes("if(startEpoch!==authEpoch)return;setActiveAccount(m.account)"));
  assert.ok(x.text.includes("setActiveAccount(result.account||null)"));
  assert.ok(x.text.includes("setActiveAccount(null);state.history=[]"));
+ assert.ok(x.text.includes("if(e?.code==='STALE_ACCOUNT')return"));
 });
 test("V59 rejects partial upstream patches safely",()=>{
  const f=v59Fixture.replace("async function checkSession(){","async function checkSessionChanged(){");

@@ -23,3 +23,18 @@ De bestaande `Mijn TALERA`-menucontroller bewaart tijdelijk berichten, ontvangen
 V56 en V57/V58 blijven op hun eigen URL beschikbaar; deze nieuwe laag gebruikt uitsluitend een servicebinding `V56_BASE`. Geen database-migraties of cache-wipe van het apparaat. 
 
 **Nog niet opgelost:** centrale eenduidige opslag/migratie, backup-herstel, daadwerkelijke delen van foto's op twee apparaten, Family en abonnement.
+
+## Resultaat bouwronde 1 november 2026
+
+**Afzonderlijke test-URL:** https://talera-pwa-v59-accountisolatie-20261101.mark-a39.workers.dev/present
+
+### Bevestigde checks
+- Mobiele browser (390×844): Mijn TALERA, Opslag en herinneringen, Met mij gedeeld, Berichten en de anonieme Free-presentatie laden zonder Cloudflare-exceptie; er verschijnt geen automatische inlogpop-up.
+- Gecontroleerde *simulatie* in dezelfde browser: testaccount A had ‘SECRET_A_ONLY’; tijdens de tweede A-opvraag werd een GET bewust vertraagd, vervolgens werd de getoonde sessie omgezet naar testaccount B met ‘SECRET_B_ONLY’. Verificatie: `sawA=true`, `account=sim-B`, `sawB=true`, `leakedA=false`, `staleWarning=false`. Test onderschept API-aanroepen in de browser; er zijn **geen echte gebruikers of gegevens** aangemaakt of gewijzigd.
+- Anoniem vanaf schone browser: `GET /api/me`, `/api/memories`, `/api/shared-with-me`, `/api/messages`, `/api/shares`, `/api/my-grants` en `/api/people/search` antwoorden alle met HTTP 401. Deze controle bewijst niet dat alle ingelogde rechten en herroepingen correct zijn.
+- GitHub Actions: [run 41283855771](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41283855771) liet **122 geslaagd / 2 gefaald** zien; de twee resterende fouten zijn de al bekende ontbrekende oude bestanden `tv-player.js` en `unified-webapp.js` (issue #61). De extra V59-regressiechecks zijn geslaagd. Niet markeren als volledig groene release.
+- Na de browserproeven: aantallen in de bestaande Clean Core-testdatabase nog ongewijzigd: 4 accounts, 12 herinneringen, 23 berichten, 10 deellinks, 4 directe grants en 5 lokale koppelingen. Dat bewijst geen volledige data-integriteit, maar bevestigt dat deze controle geen records heeft toegevoegd of verwijderd.
+- V59 is alleen verbonden via `V56_BASE` met de V56-Worker; geen D1/R2 bindingen in V59. V56, V57 en V58 blijven op hun eigen deployments staan.
+
+### Nog niet akkoord / releaseblokkade
+Echte afzonderlijke ingelogde account A/B met correct toegekende rechten, reacties en hartjes op twee iPhones of andere toestellen; status van rechten na intrekken; daadwerkelijke media-aflevering; behoud van bestaande lokale herinneringen; afhandeling van offline/sessie-expiratie. Geen productiemerge en geen accountdata-migratie zonder deze acceptatie.

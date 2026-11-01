@@ -42,3 +42,13 @@
 - Bestaande hoofdmenu-, gedeelde herinneringen-, berichten- en instellingenroutes blijven beschikbaar. V61-opslag blijft uitsluitend onder Instellingen.
 - Clean Core secretbinding-lijst bevat niet de twee noodzakelijke e-mailconfiguraties; de vermelding ‘Herstelmail nog niet aangesloten’ is daarom bewust zichtbaar.
 - Verificatie van echte e-mailverzending, daadwerkelijke naamwijziging en herstel van een echt account is niet uitgevoerd; deze functies blijven expliciet open.
+
+## Afronding testcontrole — V62
+
+- GitHub Actions [run 41286324379](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41286324379): **186 tests geslaagd, 2 gefaald**. Alle V62-profielspecifieke controles geslaagd; de enige twee fouten zijn bestaande ontbrekende oudere bronbestanden, zie [issue #61](https://github.com/Marksmits1972/talera-lifeline/issues/61). Niet melden als een volledig groene regressie.
+- Browser Rendering anoniem: directe profiel-URL levert 'Aanmelden nodig' zonder zichtbare persoonlijke gegevens. Ongevraagde Free-login blijft uit.
+- Browser Rendering met fictieve, onderschepte sessie-API-antwoorden: eigen naam, e-mail en gebruikersnaam worden weergegeven; via privacyinstellingen kan het menu terugkeren naar profiel en daarna account. Geen echte gebruiker aangemeld en niets opgeslagen.
+- Gebruikersnaam aanpassen gebruikt de reeds aanwezige beveiligde privacyroute. **Naam en e-mailadres wijzigen is niet geïmplementeerd** wegens ontbrekende gevalideerde backendendpoint.
+- V62 heeft uitsluitend de V56-servicebinding, geen D1/R2. Controle van de Clean Core-testdatabase gaf dezelfde aantallen als vooraf: 4 accounts, 12 herinneringen, 10 shares, 23 berichten, 4 grants, 5 browserkoppelingen. Alleen aantallen getoetst; geen mutaties uitgevoerd.
+- Cloudflare V56 en V61 deployments blijven ongewijzigd; V62 is een afzonderlijke testversie, niet gepromoveerd.
+- Echte iPhone/Safari-test met een bestaand ingelogd account nog open vóór productieacceptatie.

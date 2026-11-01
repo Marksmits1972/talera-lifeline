@@ -46,7 +46,7 @@ test("backup requires user saving the file outside the browser",()=>{
 });
 
 test("monthly reminder is on opening a menu, not on each memory save",()=>{
- assert.ok(app.includes("const MONTH=30*86400000"));
+ assert.ok(app.includes("MONTH=30*86400000"));
  assert.ok(app.includes("localStorage.setItem(FIRST,String(now))"));
  assert.ok(app.includes("if(now-seen<MONTH)return"));
  assert.ok(app.includes("localStorage.setItem(SEEN,String(now))"));

@@ -35,3 +35,13 @@ Een atomair gepatchte wijziging boven op V60, die op V56 via servicebinding blij
 - Rechtstreeks naar `?talera_menu=storage` opent dezelfde teller en vermeldt expliciet dat reservekopie en herstel nog ontbreken.
 - Bestaande anonieme routes `/gedeeld` en `/meldingen` bleven bereikbaar en vereisten aanmelden; er is geen testaccount aangemaakt, geen upload en geen gegevensmigratie gedaan.
 - V56–V60 blijven beschikbaar op hun ongewijzigde URL’s. Echte iPhone-acceptatie en twee-account-deeltest zijn nog open.
+
+## Regressie en dataveiligheid — 1 november 2026
+- GitHub Actions [run 41285306567](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41285306567): **160 tests geslaagd, 2 gefaald**.
+- Alle specifieke V61-tests (één opslagingang onder Instellingen, geen duplicaat, veilige terugnavigatie, atomaire bronpatch en ongewijzigde API-verzoeken) zijn geslaagd.
+- De twee falende regressietests zijn bestaande controles die verwijzen naar ontbrekende oudere bestanden `xxory-test/src/tv-player.js` en `xxory-test/src/unified-webapp.js`; vastgelegd als [issue #61](https://github.com/Marksmits1972/talera-lifeline/issues/61).
+- Controle van Cloudflare-deployments: V56 (id `21b44d0d-143b-4eb3-bb01-0cb4b9ea2969`) en V60 (id `8289899c-537d-421c-a767-e50ef741e548`) ongewijzigd. Nieuwe V61 heeft uitsluitend `V56_BASE`; geen eigen D1/R2.
+- Bestaande Clean Core-recordaantallen na controle onveranderd: 4 accounts, 12 herinneringen, 23 berichten, 10 shares, 4 directe grants, 5 lokale koppelingen. Geen databasebewerkingen gedaan.
+- Eerste vervolgpoort: daarna met twee vrijwillig aangemaakte testaccounts de complete deelketen, toegangsherroeping en zichtbaarheid van reacties/hartjes op twee toestellen testen. Dit is **nog geen bewezen werkende eindtest**.
+
+**Release-status:** afzonderlijke V61-staging, iPhone-acceptatie van de gebruiker nog nodig.

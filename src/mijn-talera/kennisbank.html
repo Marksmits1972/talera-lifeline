@@ -49,7 +49,7 @@
 <header>
   <div class="wrap head">
     <span class="brand" aria-label="TALERA">TALERA</span>
-    <a class="back" data-back-talera href="https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present?talera_menu=help">← Terug naar Mijn TALERA</a>
+    <a class="back" data-back-talera href="/present?talera_menu=help">← Terug naar Mijn TALERA</a>
   </div>
 </header>
 <div class="hero"><div class="wrap">
@@ -112,20 +112,26 @@
 </main>
 <footer class="foot"><div class="wrap">
   <div><strong>TALERA Kennisbank</strong><p>Eenvoudige uitleg, op één vaste plek.</p></div>
-  <a class="back" data-back-talera href="https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present?talera_menu=help">← Terug naar Mijn TALERA</a>
+  <a class="back" data-back-talera href="/present?talera_menu=help">← Terug naar Mijn TALERA</a>
 </div></footer>
 <script>
 (()=>{'use strict';
-  // A URL from TALERA is accepted only when it returns to a TALERA PWA menu.
-  // This prevents untrusted sites from using the back link as an open redirect.
+  // Only a same-origin, validated presentation route may become a return link.
+  // The selected memory ID is a locator, not a new account or storage record.
   const input=new URLSearchParams(location.search).get('terug');
   if(!input)return;
   try{
-    const url=new URL(input);
-    const validHost=/^talera-pwa-[a-z0-9-]+\.mark-a39\.workers\.dev$/.test(url.hostname);
-    const validMenu=['hub','help'].includes(url.searchParams.get('talera_menu'));
-    if(url.protocol!=='https:'||!validHost||url.pathname!=='/present'||!validMenu||url.username||url.password)return;
-    for(const link of document.querySelectorAll('[data-back-talera]'))link.href=url.href;
+    const back=new URL(input,location.origin);
+    if(back.origin!==location.origin||back.pathname!=='/present'||
+       back.searchParams.get('talera_menu')!=='help'||back.username||back.password)return;
+    const allowed=new Set(['memory','year','talera_menu']);
+    if([...back.searchParams.keys()].some(key=>!allowed.has(key)))return;
+    const memory=back.searchParams.get('memory');
+    if(memory&&!/^[a-zA-Z0-9_-]{1,96}$/.test(memory))return;
+    const year=back.searchParams.get('year');
+    if(year&&!/^\\d{4}$/.test(year))return;
+    for(const link of document.querySelectorAll('[data-back-talera]'))
+      link.href=back.pathname+back.search;
   }catch{}
 })();
 </script>

@@ -246,7 +246,7 @@ test("V62 adds a profile entry to account details using existing account fields 
  assert.equal(v.ok,true);
  assert.ok(v.text.includes("option('profile','◉','Mijn profielgegevens'"));
  assert.ok(v.text.includes("case 'profile':"));
- assert.ok(v.text.indexOf("case 'profile':") < v.text.indexOf("case 'login':\n   html=title('Aanmelden'"));
+ assert.ok(v.text.indexOf("case 'profile':") < v.text.indexOf("case 'login':\n  html=title('Aanmelden'"));
  assert.ok(!v.text.includes("switch(form.dataset.form){\n  case 'profile':"));
  assert.ok(v.text.includes("info('Naam',a.displayName"));
  assert.ok(v.text.includes("info('E-mailadres',a.email"));

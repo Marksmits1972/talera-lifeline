@@ -72,7 +72,7 @@ export function patchV59MenuScript(source){
   {old:"try{const m=await api('/api/me');state.account=m.account;void updateUnreadBadge();",new:"try{const m=await api('/api/me');if(startEpoch!==authEpoch)return;setActiveAccount(m.account);void updateUnreadBadge();"},
   {old:"catch(e){if(e.status===401){state.account=null;document.documentElement.dataset.taleraAuth='signed-out';",new:"catch(e){if(startEpoch!==authEpoch)return;if(e.status===401){setActiveAccount(null);document.documentElement.dataset.taleraAuth='signed-out';"}
  ];
- if(changes.some(({old})=>!previous.text.includes(old)))return {ok:false,text:source,reason:"v60-upstream-changed"};
+ if(changes.some(({old})=>!previous.text.includes(old)))return {ok:false,text:source,reason:"v59-upstream-changed"};
  let changed=previous.text;
  for(const {old,new:replacement,all} of changes)changed=all?changed.replaceAll(old,replacement):changed.replace(old,replacement);
  return {ok:true,text:changed,reason:"patched-v59"};

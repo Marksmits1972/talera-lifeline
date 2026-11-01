@@ -52,20 +52,25 @@ test("Kennisbank opens on the same TALERA origin and has a clear route back",()=
   assert.ok(worker.includes('url.pathname === "/kennisbank/"'));
   assert.ok(knowledge.includes('Terug naar Mijn TALERA'));
   assert.ok(knowledge.includes('Veelgestelde vragen'));
-  assert.ok(knowledge.includes('href="https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present?talera_menu=help"'));
+  assert.ok(knowledge.includes('href="/present?talera_menu=help"'));
+  assert.ok(knowledge.includes("back.origin!==location.origin"));
+  assert.ok(knowledge.includes("back.searchParams.get('memory')"));
 });
 
-test("i18n: existing TaleraI18n gets the same 152 extra keys for all five app languages",()=>{
+test("i18n: existing TaleraI18n retains 152 More and 2 presentation keys in all five languages",()=>{
   const langs=["nl","en","de","fr","es"];
   assert.deepEqual(languages.languages,langs);
   const keys=Object.keys(languages.catalog.nl);
-  assert.equal(keys.length,152);
+  assert.equal(keys.length,154);
   for(const lang of langs){
     const strings=languages.catalog[lang];
     assert.deepEqual(Object.keys(strings),keys);
     assert.ok(keys.every(key=>typeof strings[key]==="string"&&strings[key].trim()),lang);
   }
-  assert.ok(keys.every(key=>key.startsWith("more.")));
+  assert.equal(keys.filter(key=>key.startsWith("more.")).length,152);
+  assert.equal(keys.filter(key=>key.startsWith("present.")).length,2);
+  assert.equal(languages.catalog.en["present.today"],"today");
+  assert.equal(languages.catalog.de["present.ageUnit"],"Jahre");
   assert.equal(languages.catalog.de["more.hub.people"],"Meine Kontakte");
   assert.equal(languages.catalog.fr["more.settings.storage"],"Stockage et sauvegarde");
   assert.equal(languages.catalog.es["more.help.open"],"Abrir el centro de ayuda");
@@ -78,4 +83,27 @@ test("i18n: language settings select uses the existing global language registry"
   assert.ok(!menu.includes("case 'go-language':close();location.assign('/')"));
   assert.ok(!menu.includes("const TALERA_V23_TRANSLATIONS="));
   assert.ok(!menu.includes("TaleraI18n={"));
+});
+
+test("final UI polish: only the unfinished More options are labelled coming soon",()=>{
+  assert.ok(menu.includes("'Nog niet beschikbaar'"));
+  assert.ok(menu.includes("'Binnenkort: extra lees- en bedieningsopties'"));
+  assert.ok(menu.includes("'Binnenkort: persoonlijke weergavevoorkeuren'"));
+  assert.ok(!menu.includes("option('subscription','◇','Mijn abonnement','Pakket en betalingen')"));
+  for(const lang of ["nl","en","de","fr","es"]){
+    assert.ok(languages.catalog[lang]["more.hub.subscriptionHint"]);
+    assert.ok(languages.catalog[lang]["more.settings.accessibilityHint"]);
+    assert.ok(languages.catalog[lang]["more.settings.displayHint"]);
+  }
+});
+
+test("knowledgebase return uses current memory and rejects external destinations",()=>{
+  assert.ok(menu.includes("document.querySelector('#talera-clean-social')?.dataset.memoryId"));
+  assert.ok(menu.includes("back.searchParams.set('memory',active)"));
+  assert.ok(menu.includes("target.searchParams.set('terug',back.pathname+back.search)"));
+  assert.ok(knowledge.includes("back.origin!==location.origin"));
+  assert.ok(knowledge.includes("back.pathname!=='/present'"));
+  assert.ok(knowledge.includes("new Set(['memory','year','talera_menu'])"));
+  assert.ok(!knowledge.includes("location.replace("));
+  assert.ok(!menu.includes('target="_blank">Ontdek TALERA'));
 });

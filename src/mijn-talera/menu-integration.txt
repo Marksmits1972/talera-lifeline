@@ -222,7 +222,7 @@ function render(){
   option('privacy','♢','Privacy en beveiliging','Vindbaarheid en persoonlijke toegang')+
   option('language',String(window.TaleraI18n?.language||'nl').toUpperCase(),'Taal',({nl:'Nederlands',en:'English',de:'Deutsch',fr:'Français',es:'Español'}[window.TaleraI18n?.language]||'Nederlands'))+
   option('accessibility','Aa','Toegankelijkheid','Binnenkort: extra lees- en bedieningsopties')+
-  option('display','◐','Weergave','Binnenkort: persoonlijke weergavevoorkeuren')+option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt'))+
+  option('display','◐','Weergave','Binnenkort: persoonlijke weergavevoorkeuren')+option('storage','▤','Opslag en back-up','Lokale back-up en herstel'))+
   section('Geluid en afspelen',action(window.__taleraAudioControls?.isEnabled?.()?'disable-listening':'enable-listening',window.__taleraAudioControls?.isEnabled?.()?'Ⅱ':'▶',window.__taleraAudioControls?.isEnabled?.()?'Luisteren uitschakelen':'Luisteren inschakelen','Gesproken herinneringen'));break;
 
   case 'storage':
@@ -232,7 +232,7 @@ function render(){
          info('Met mij gedeeld',storageState.received===null?'Nog niet gecontroleerd':storageState.received+' ontvangen herinneringen'):
          info('Account','Niet aangemeld. Je kunt je lokale herinneringen wel bekijken.')+'<button class="secondary" type="button" data-view="login">Aanmelden</button>')+
       (storageState.error?info('Controle niet volledig',storageState.error):'')+
-      info('Let op','Reservekopie en herstel worden nog ontwikkeld. Lokale herinneringen staan in de opslag van deze browser en zijn niet automatisch geback-upt. Iedere TALERA-testlink heeft zijn eigen lokale opslag. Alleen na jouw expliciete toestemming mogen gegevens naar je account worden overgezet. Deze controle wijzigt of uploadt niets.')+
+      info('Let op','Je Free-herinneringen staan lokaal op dit toestel. Maak hieronder zelf een aparte back-up via Bestanden en herstel die indien nodig. TALERA uploadt deze lokale back-up niet. Controleer zelf of het bestand echt buiten de browser is bewaard.')+
       '<button class="secondary" type="button" data-action="storage-refresh">Opnieuw controleren</button>';
     break;
  case 'subscription':
@@ -260,6 +260,8 @@ function render(){
  default:html=title('Meer','TALERA');
  }
  body.innerHTML=html+notice();body.scrollTop=0;
+ if(state.open&&state.view==='storage')window.TaleraFreeBackup?.render(body);
+ if(state.open&&state.view==='hub')void window.TaleraFreeBackup?.remind(shell);
 }
 function feedback(message,error=false){state.notice=message;state.error=error;if(state.open&&state.view==='login'&&error){let p=body.querySelector('[data-auth-error]');if(!p){p=document.createElement('p');p.dataset.authError='true';p.className='notice error';p.setAttribute('role','alert');body.appendChild(p)}p.textContent=message;return}render()}
 function go(view){if(!state.open)return;state.history.push(state.view);state.view=view;state.notice='';render();void load(view)}
@@ -446,4 +448,13 @@ document.addEventListener('talera:languagechange',()=>{updateHomeNav();if(state.
 void checkSession();
 window.__taleraMoreMenu={ready:true,open,close,state:()=>({open:state.open,view:state.view,accountId:state.account?.id||null})};
 document.documentElement.dataset.taleraMoreMenu='mounted';
+
+const backupLoader=document.createElement('script');
+backupLoader.src='/__clean/free-backup.js';
+backupLoader.async=true;
+backupLoader.onload=()=>{
+ if(state.open&&state.view==='storage')window.TaleraFreeBackup?.render(body);
+ if(state.open&&state.view==='hub')void window.TaleraFreeBackup?.remind(shell);
+};
+document.head.appendChild(backupLoader);
 })();

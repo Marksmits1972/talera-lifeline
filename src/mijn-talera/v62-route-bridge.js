@@ -162,11 +162,11 @@ export function patchV62MenuScript(source) {
   case 'profile':
     html=(a?
       title('Mijn profielgegevens','Dit zijn de gegevens van jouw ingelogde TALERA-account.')+
-      info('Naam',a.displayName||'Niet ingevuld')+
+      '<form data-form="profile"><label>Naam<input name="displayName" value="'+esc(a.displayName||'')+'" maxlength="100" required autocomplete="name"></label><button class="primary" type="submit">Naam opslaan</button></form>'+
       info('E-mailadres',a.email||'Niet ingevuld')+
       info('Gebruikersnaam',state.discovery?.publicHandle?'@'+state.discovery.publicHandle:'Nog niet ingesteld')+
       section('Aanpassen',option('privacy','♢','Gebruikersnaam en vindbaarheid','Deze gegevens kun je al wijzigen'))+
-      info('Naam en e-mailadres','Deze gegevens zijn nog niet te wijzigen in TALERA. We voegen pas een bewerkfunctie toe als het veilig opslaan in de accountservice beschikbaar is.') :
+      info('E-mailadres wijzigen','Nog niet mogelijk. Hiervoor moet eerst veilige bevestiging per e-mail beschikbaar zijn.') :
       info('Aanmelden nodig','Meld je aan om je eigen profielgegevens te bekijken.')+
       '<button type="button" class="primary" data-view="login">Aanmelden</button>');
     break;
@@ -199,6 +199,10 @@ export function patchV62MenuScript(source) {
     {
       old:"option('forgot','◈','Wachtwoord herstellen','Via je e-mailadres')",
       replacement:"option('forgot','◈','Wachtwoord herstellen','Herstelmail nog niet aangesloten')"
+    },
+    {
+      old:"   case 'privacy':state.discovery=await api('/api/discovery','POST'",
+      replacement:"   case 'profile':{if(!state.account)throw Error('Aanmelden is nodig');const id=state.account.id;const name=String(data.displayName||'').trim();if(!name||name.length>100)throw Error('Vul een naam van maximaal 100 tekens in');const result=await api('/api/profile','POST',{displayName:name});if(state.account?.id!==id)return '';setActiveAccount(result.account||null);return 'Naam opgeslagen.'}\n   case 'privacy':state.discovery=await api('/api/discovery','POST'"
     }
   ];
   if(changes.some(({old})=>prior.text.split(old).length!==2))

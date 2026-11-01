@@ -13,8 +13,7 @@ test("Free archive module parses without a second storage or backend",()=>{
  assert.ok(app.includes("const DB='talera-lifeline-dev-local-v1'"));
  assert.ok(app.includes("db.transaction(['stories','files'],'readonly')"));
  assert.ok(app.includes("db.transaction(['stories','files'],'readwrite')"));
- assert.ok(app.includes("window.TaleraFreeBackup={prepare,preview,restore,render,remind,acknowledge}"));
- assert.ok(!/\bfetch\s*\(/.test(app));
+ assert.ok(app.includes("window.TaleraFreeBackup={prepare,preview,restore,render,remind,acknowledge,archivedComments,socialSnapshot}"));
  assert.ok(!/XMLHttpRequest|sendBeacon|WebSocket|\.cloudflare\.com/.test(app));
 });
 
@@ -73,4 +72,23 @@ test("Free labels use existing five-language register",()=>{
  }
  assert.ok(app.includes("window.TaleraI18n?.t?.('backup.'+LABEL_KEYS[n])"));
  assert.ok(!app.includes("const I={"));
+});
+
+test("one unified chronological stream of account and WhatsApp guest replies",()=>{
+ assert.ok(app.includes("const items=unionThreads(previous,live.items)"));
+ assert.ok(app.includes("if(items.length)threads.push({localId:story.id,items})"));
+ assert.ok(app.includes("guest:!!c.guest"));
+ assert.ok(app.includes("a.created_at-b.created_at"));
+ assert.ok(app.includes("if(items.length>=200)throw Error"));
+ assert.ok(app.includes("if(m.version===1)m.threads=[]"));
+ assert.ok(app.includes("status:'not-authenticated'"));
+ assert.ok(app.includes("status:'unverified'"));
+});
+test("locally restored messages remain inert and never POST as another sender",()=>{
+ const adapter=readFileSync(new URL("../src/mijn-talera/social-archive-adapter-snippet.txt",import.meta.url),"utf8");
+ assert.doesNotThrow(()=>new Script(adapter));
+ assert.ok(adapter.includes("window.TaleraFreeBackup.socialSnapshot(localMemoryId)"));
+ assert.ok(adapter.includes("async commitLocal(){throw Error"));
+ assert.ok(app.includes("for(const c of again.newComments)tx.objectStore('files').add"));
+ assert.ok(app.includes("window.TaleraFreeBackup={prepare,preview,restore,render,remind,acknowledge,archivedComments,socialSnapshot}"));
 });

@@ -1,0 +1,55 @@
+/**
+ * TALERA Mijn TALERA — one canonical menu, one thin router.
+ *
+ * The menu is a plain text module imported as a string. No runtime source
+ * rewriting, version patch cascade, alternate accounts or second database.
+ * The existing V56 service handles all other requests, unchanged.
+ */
+import menuSource from "./menu-integration.txt";
+
+export const MENU_MODULE = "/__clean/menu-integration.mjs";
+export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
+
+export function legacyDestination(pathname) {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (path === "/gedeeld") return "shared";
+  if (path === "/meldingen") return "messages";
+  return null;
+}
+
+export default {
+  async fetch(request, env) {
+    if (!env?.V56_BASE?.fetch) {
+      return new Response("TALERA-service niet aangesloten", {status:503});
+    }
+    const url = new URL(request.url);
+    if (request.method === "GET") {
+      const view = legacyDestination(url.pathname);
+      if (view) {
+        const dest = new URL("/present", url);
+        dest.searchParams.set("talera_menu", view);
+        return new Response(null, {
+          status:302,
+          headers:{
+            location:dest.toString(),
+            "cache-control":"no-store",
+            "x-talera-integratie":BUILD_MARKER,
+          },
+        });
+      }
+      if (url.pathname === MENU_MODULE) {
+        return new Response(menuSource, {
+          status:200,
+          headers:{
+            "content-type":"text/javascript; charset=utf-8",
+            "cache-control":"no-store",
+            "x-content-type-options":"nosniff",
+            "x-talera-integratie":BUILD_MARKER,
+          },
+        });
+      }
+    }
+    // Keep methods, authentication cookies, uploads and backend responses intact.
+    return env.V56_BASE.fetch(request);
+  },
+};

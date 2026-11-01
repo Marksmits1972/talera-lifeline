@@ -129,7 +129,7 @@
     const memory=back.searchParams.get('memory');
     if(memory&&!/^[a-zA-Z0-9_-]{1,96}$/.test(memory))return;
     const year=back.searchParams.get('year');
-    if(year&&!/^\\d{4}$/.test(year))return;
+    if(year&&!/^\d{4}$/.test(year))return;
     for(const link of document.querySelectorAll('[data-back-talera]'))
       link.href=back.pathname+back.search;
   }catch{}

@@ -1,0 +1,217 @@
+// TALERA: one existing 'Meer' entry, account APIs from the tested clean core.
+// Deliberately no second account controller, demo data or new share controller.
+(()=>{'use strict';
+const trigger=()=>document.querySelector('.more')?.closest('button')||document.getElementById('navMore');
+if(window.__taleraMoreMenu?.ready)return;
+const css=[
+'#talera-more-menu[hidden]{display:none!important}',
+'#talera-more-menu{position:fixed;inset:0;z-index:220;display:flex;align-items:flex-end;justify-content:center;background:rgba(6,18,30,.3);font:15px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#26384f}',
+'#talera-more-menu *{box-sizing:border-box}',
+'#talera-more-menu .panel{width:min(100%,560px);height:min(85dvh,800px);background:#faf9f6;border-radius:30px 30px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -14px 45px #0b2e4433}',
+'#talera-more-menu header{display:flex;align-items:center;gap:10px;padding:13px 20px;background:#fff;border-bottom:1px solid #e9edef;flex-shrink:0}',
+'#talera-more-menu header strong{flex:1;text-align:center;font-size:16px;color:#24495c}',
+'#talera-more-menu .headbutton{border:0;background:#eef3f5;border-radius:22px;min-width:40px;height:40px;color:#234a61;font-size:23px;cursor:pointer}',
+'#talera-more-menu .body{padding:19px 18px 35px;overflow-y:auto;overscroll-behavior:contain;flex:1}',
+'#talera-more-menu h1{font-size:25px;letter-spacing:-.6px;margin:0 0 5px;color:#24475d}',
+'#talera-more-menu .intro{font-size:13px;color:#738297;margin:0 0 20px}',
+'#talera-more-menu .section-label{font-size:12px;font-weight:750;letter-spacing:.04em;color:#718397;margin:20px 3px 7px}',
+'#talera-more-menu .options{background:#fff;border-radius:18px;overflow:hidden;border:1px solid #e7ecee}',
+'#talera-more-menu button.option{width:100%;min-height:66px;display:flex;gap:13px;align-items:center;text-align:left;border:0;border-bottom:1px solid #f0f1f3;background:#fff;padding:12px 14px;color:#26384f;cursor:pointer}',
+'#talera-more-menu button.option:last-child{border-bottom:0}',
+'#talera-more-menu button.option .glyph{width:33px;flex:0 0 33px;display:grid;place-items:center;font-size:22px;color:#46758e}',
+'#talera-more-menu button.option span.copy{flex:1}',
+'#talera-more-menu button.option strong{display:block;font-size:14px;font-weight:720;color:#2a475b}',
+'#talera-more-menu button.option small{display:block;font-size:11px;line-height:1.4;color:#788697;margin-top:3px}',
+'#talera-more-menu button.option .arrow{color:#90a0ab;font-size:21px}',
+'#talera-more-menu .account-card{width:100%;display:flex;gap:13px;align-items:center;text-align:left;background:linear-gradient(130deg,#fff,#f0f4f6);border:1px solid #e0e9ec;border-radius:20px;padding:14px;cursor:pointer;color:#23465c}',
+'#talera-more-menu .avatar{width:52px;height:52px;flex-shrink:0;background:#315b74;color:#fff;border-radius:16px;display:grid;place-items:center;font-weight:750;font-size:20px}',
+'#talera-more-menu .account-copy{flex:1}#talera-more-menu .account-copy strong{display:block;font-size:15px}#talera-more-menu .account-copy small{display:block;color:#708398;font-size:12px}',
+'#talera-more-menu .info{background:#fff;border:1px solid #e7ebee;border-radius:18px;padding:16px;margin-bottom:16px;overflow-wrap:anywhere}',
+'#talera-more-menu .info p{margin:6px 0}#talera-more-menu .info small{color:#718397}',
+'#talera-more-menu label{display:block;color:#354d61;font-size:13px;font-weight:650;margin:13px 0}',
+'#talera-more-menu input,#talera-more-menu textarea,#talera-more-menu select{width:100%;display:block;border:1px solid #ccd7df;background:#fff;border-radius:11px;padding:12px;color:#223c51;font:inherit;margin-top:5px}',
+'#talera-more-menu textarea{min-height:60px;resize:vertical}',
+'#talera-more-menu header,#talera-more-menu h1,#talera-more-menu .intro,#talera-more-menu label,#talera-more-menu .section-label,#talera-more-menu .option,#talera-more-menu .account-card{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}',
+'#talera-more-menu input,#talera-more-menu textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}',
+'#talera-more-menu .panel:focus{outline:none}',
+'#talera-more-menu .primary{width:100%;border:0;border-radius:14px;padding:13px;margin:9px 0 0;background:#315d78;color:#fff;font:700 15px system-ui}',
+'#talera-more-menu .secondary{width:100%;border:1px solid #dbe6ec;border-radius:13px;padding:11px;margin-top:8px;background:#fff;color:#315d78;font:650 14px system-ui}',
+'#talera-more-menu .notice{padding:10px 13px;margin:13px 0;background:#edf3f6;border-radius:10px;font-size:13px;color:#31546c}',
+'#talera-more-menu .notice.error{background:#fff0ee;color:#a12e20}',
+'#talera-more-menu .switch{display:flex;gap:10px;align-items:center}#talera-more-menu .switch input{width:auto;margin:0}',
+'#talera-more-menu .thread-item{padding:11px 13px;background:#fff;border:1px solid #e5ebee;border-radius:12px;margin:9px 0}',
+'#talera-more-menu button:focus-visible{outline:2px solid #337cca;outline-offset:2px}',
+'@media(prefers-reduced-motion:reduce){#talera-more-menu{scroll-behavior:auto}}'
+].join('');
+const style=document.createElement('style');style.id='talera-more-style';style.textContent=css+"#talera-more-menu .talera-pw-wrap{position:relative;display:block}#talera-more-menu .talera-pw-wrap input{padding-right:62px}#talera-more-menu .talera-pw-eye{position:absolute;right:5px;top:6px;width:48px;height:44px;border:0;border-radius:11px;background:transparent;color:#42667d;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}#talera-more-menu .talera-pw-eye svg{width:23px;height:23px;pointer-events:none}#talera-more-menu .talera-pw-eye[aria-pressed=true]{background:#eef4f8;color:#155d90}";style.textContent+="#talera-more-menu .panel[data-view=hub] .intro,#talera-more-menu .panel[data-view=hub] .option small{display:none}\n#talera-more-menu h1{display:none}\n#talera-more-menu .panel[data-view=hub] .body{padding-top:12px}\n#talera-more-menu .option{font-size:14px}\n#talera-more-menu .option .copy{min-width:0}\n#talera-more-menu .thread-item{overflow-wrap:anywhere}\n#talera-more-menu .status-line{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e9edef}\n#talera-more-menu .status-line:last-child{border-bottom:0}\n#talera-more-menu .status-line small{display:block;color:#778899;margin-top:3px}\n#talera-more-menu .inline-button{border:1px solid #c7d8e1;background:#fff;color:#225271;border-radius:10px;padding:9px 11px;font:650 12px system-ui;cursor:pointer;white-space:nowrap}\n#talera-more-menu .inline-button:disabled{opacity:.5;cursor:default}\n#talera-more-menu .meta{font-size:12px;color:#748494}\n#talera-more-menu .panel[data-view=mine] .status-line strong{font-size:13px}\n#talera-more-menu .panel[data-view=messages] .option small{display:block}\n#talera-more-menu .empty-note{padding:18px;color:#6d8290;text-align:center;font-size:13px}\n#talera-more-menu .section-label:first-child{margin-top:4px}\n";style.textContent+="\nnav.flow-nav #navNotifications{position:relative}\nnav.flow-nav .talera-unread-badge{position:absolute;top:3px;right:24%;background:#1c5673;color:#fff;border-radius:999px;min-width:17px;height:17px;padding:1px 4px;display:grid;place-items:center;font:700 10px/1 system-ui;box-shadow:0 0 0 2px #fff}\nnav.flow-nav .talera-unread-badge[hidden]{display:none!important}\n";document.head.appendChild(style);
+const shell=document.createElement('div');shell.id='talera-more-menu';shell.hidden=true;
+shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-label="Meer" tabindex="-1"><header><button class="headbutton" data-action="back" aria-label="Terug">‹</button><strong>Meer</strong><button class="headbutton" data-action="close" aria-label="Sluiten">×</button></header><div class="body"></div></section>';
+document.body.append(shell);
+shell.querySelector('.panel')?.setAttribute('aria-label','Mijn TALERA');
+const body=shell.querySelector('.body'),head=shell.querySelector('header strong'),back=shell.querySelector('[data-action="back"]');
+const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
+const storageState={local:null,owned:null,received:null,error:''};
+
+let authEpoch=0;
+function clearPrivateState(){
+  state.discovery=null;state.search=[];state.query='';
+  state.shared=[];state.messages=[];state.memories=[];
+  state.thread=null;state.threadData=null;
+  state.shares=[];state.grants=[];state.person=null;state.personMemories=[];
+  state.titles={};
+  storageState.owned=null;storageState.received=null;storageState.error='';
+  const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
+  if(badge){badge.hidden=true;badge.textContent=''}
+  const tab=document.querySelector('nav.flow-nav #navNotifications');
+  if(tab)tab.setAttribute('aria-label','Berichten');
+}
+function setActiveAccount(account){
+  const before=String(state.account?.id||''),after=String(account?.id||'');
+  if(before!==after){authEpoch++;clearPrivateState()}
+  state.account=account||null;
+}
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path,method='GET',payload){
+  const requestEpoch=authEpoch;
+ const opt={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
+ if(payload!==undefined){opt.headers['content-type']='application/json';opt.body=JSON.stringify(payload)}
+ const res=await fetch(path,opt),data=await res.json().catch(()=>({}));
+  if(method==='GET'&&path!=='/api/me'&&requestEpoch!==authEpoch){const e=new Error('Account gewijzigd. Open dit onderdeel opnieuw.');e.code='STALE_ACCOUNT';throw e}
+ if(!res.ok){const e=new Error(data.error||'De aanvraag is niet gelukt');e.status=res.status;throw e}
+ return data;
+}
+function title(t,description){return '<h1>'+esc(t)+'</h1><p class="intro">'+esc(description)+'</p>'}
+function option(view,icon,label,sub){return '<button type="button" class="option" data-view="'+view+'"><span class="glyph">'+icon+'</span><span class="copy"><strong>'+esc(label)+'</strong><small>'+esc(sub)+'</small></span><span class="arrow">›</span></button>'}
+function action(key,icon,label,sub){return '<button type="button" class="option" data-action="'+key+'"><span class="glyph">'+icon+'</span><span class="copy"><strong>'+esc(label)+'</strong><small>'+esc(sub)+'</small></span><span class="arrow">›</span></button>'}
+function options(items){return '<div class="options">'+items+'</div>'}
+function section(label,items){return '<p class="section-label">'+esc(label)+'</p>'+options(items)}
+function info(t,description){return '<div class="info"><strong>'+esc(t)+'</strong><p>'+esc(description)+'</p></div>'}
+function notice(){return state.notice?'<p class="notice'+(state.error?' error':'')+'" role="status">'+esc(state.notice)+'</p>':''}
+function passwordField(id,label,autocomplete){return '<label>'+label+'<span class="talera-pw-wrap"><input id="'+id+'" type="password" name="'+id+'" autocomplete="'+autocomplete+'" autocapitalize="off" spellcheck="false" required><button type="button" class="talera-pw-eye" data-password-toggle="'+id+'" aria-label="Toon wachtwoord" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>'}
+function render(){
+ if(!state.open)return;
+ shell.querySelector('.panel').dataset.view=state.view;back.hidden=state.view==='hub';back.setAttribute('aria-label',state.history.length?'Terug naar vorig menu':'Terug naar Mijn TALERA');
+ head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',profile:'Mijn profielgegevens',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy en beveiliging',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Door mij gedeeld',recipient:'Herinnering delen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',language:'Taal',accessibility:'Toegankelijkheid',display:'Weergave',subscription:'Mijn abonnement',storage:'Opslag en back-up',help:'Hulp en over TALERA'})[state.view]||'Meer';
+ let html='',a=state.account;
+ switch(state.view){
+ case 'hub':{
+  const enabled=!!window.__taleraAudioControls?.isEnabled?.();
+  html=''+
+  '<button class="account-card" data-view="account"><span class="avatar">'+esc((a?.displayName||'T').charAt(0).toUpperCase())+'</span><span class="account-copy"><strong>'+esc(a?.displayName||'Mijn TALERA-account')+'</strong><small>'+esc(a?.email||'Account aanmaken of aanmelden')+'</small></span><span>›</span></button>'+
+  section('Contacten en delen',option('people','○','Mijn mensen','Mensen zoeken en uitnodigen')+option('mine','▣','Door mij gedeeld','Beheer gedeelde herinneringen')+option('shared','⌁','Met mij gedeeld','Herinneringen die anderen delen'))+
+  
+  section('Account en voorkeuren',option('privacy','♢','Privacy en beveiliging','Vindbaarheid en accountprivacy')+option('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave')+option('subscription','◇','Mijn abonnement','Pakket en betalingen'))+
+  section('Ondersteuning',option('help','?','Hulp en over TALERA','Uitleg, voorwaarden en contact'));
+  break;
+ }
+ case 'account':
+  html=(a?
+   info('Aangemeld als '+a.displayName,a.email)+
+   section('Mijn profiel',option('profile','◉','Mijn profielgegevens','Naam, e-mailadres en gebruikersnaam'))+section('Account en privacy',option('privacy','♢','Mijn vindbaarheid',state.discovery?.publicHandle?'@'+state.discovery.publicHandle:'Alleen zichtbaar als jij dat kiest')+
+   option('forgot','◈','Wachtwoord herstellen','Herstelmail nog niet aangesloten'))+
+   '<button class="secondary" data-action="logout">Uitloggen</button>':
+   info('Niet aangemeld','Meld je aan om je TALERA-account te beheren.')+
+   '<button class="primary" data-view="login">Aanmelden</button><button class="secondary" data-view="register">Account aanmaken</button>');
+  break;
+
+  case 'profile':
+    html=(a?
+      title('Mijn profielgegevens','Dit zijn de gegevens van jouw ingelogde TALERA-account.')+
+      '<form data-form="profile"><label>Naam<input name="displayName" value="'+esc(a.displayName||'')+'" maxlength="100" required autocomplete="name"></label><button class="primary" type="submit">Naam opslaan</button></form>'+
+      info('E-mailadres',a.email||'Niet ingevuld')+
+      info('Gebruikersnaam',state.discovery?.publicHandle?'@'+state.discovery.publicHandle:'Nog niet ingesteld')+
+      section('Aanpassen',option('privacy','♢','Gebruikersnaam en vindbaarheid','Deze gegevens kun je al wijzigen'))+
+      info('E-mailadres wijzigen','Nog niet mogelijk. Hiervoor moet eerst veilige bevestiging per e-mail beschikbaar zijn.') :
+      info('Aanmelden nodig','Meld je aan om je eigen profielgegevens te bekijken.')+
+      '<button type="button" class="primary" data-view="login">Aanmelden</button>');
+    break;
+ case 'login':
+  html=title('Aanmelden','Gebruik je bestaande TALERA-account.')+
+   '<form data-form="login"><label>E-mailadres<input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>'+
+   passwordField('login-password','Wachtwoord','current-password')+
+   '<button class="primary" type="submit">Aanmelden</button></form>'+
+   '<button class="secondary" data-view="register">Account aanmaken</button>'+
+   '<button class="secondary" data-view="forgot">Wachtwoord vergeten?</button>';break;
+ case 'forgot':
+  html=title('Wachtwoord herstellen','Ontvang een veilige herstel-link als je e-mailadres bij TALERA bekend is.')+
+  '<form data-form="forgot"><label>E-mailadres<input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" required></label><button type="submit" class="primary">Herstelmail aanvragen</button></form>'+
+  '<p class="intro">De e-maildienst moet nog worden geactiveerd. Als dat niet is gebeurd, meldt TALERA dit duidelijk.</p>';break;
+ case 'register':
+  html=title('Account aanmaken','Eén TALERA-account voor je herinneringen en contacten.')+
+  '<form data-form="register"><label>Naam<input name="displayName" required maxlength="100" autocomplete="name"></label>'+
+  '<label>Unieke gebruikersnaam<input name="username" required minlength="3" maxlength="30" autocomplete="username" placeholder="bijvoorbeeld mark smits"></label>'+
+  '<label>E-mailadres<input name="email" type="email" required autocomplete="email"></label>'+
+  passwordField('register-password','Wachtwoord (minimaal 8 tekens)','new-password')+
+  passwordField('register-confirm','Wachtwoord herhalen','new-password')+
+  '<button class="primary" type="submit">Account aanmaken</button></form><button class="secondary" data-view="login">Ik heb al een account</button>';break;
+ case 'privacy':
+  html=(a?
+   info('Vindbaarheid','Andere TALERA-gebruikers kunnen je uitsluitend zoeken als je dit inschakelt.')+
+   '<form data-form="privacy"><label class="switch"><input name="discoverable" type="checkbox"'+(state.discovery?.discoverable?' checked':'')+'> Vindbaar binnen TALERA</label>'+
+   '<label>Mijn gebruikersnaam<input name="username" maxlength="30" value="'+esc(state.discovery?.publicHandle||'')+'" placeholder="Jouw unieke naam"></label><button class="primary" type="submit">Privacykeuzes opslaan</button></form>'+
+   section('Tijdelijke toegang',option('mine','▣','Mijn deellinks','Bekijk en beëindig WhatsApp-deellinks')):
+   info('Aanmelden nodig','Meld je aan om je privacyinstellingen te beheren.')+'<button class="primary" data-view="login">Aanmelden</button>');
+  break;
+ case 'people':
+  html=(a?
+   '<form data-form="search"><label>Zoek binnen TALERA<input name="q" minlength="2" value="'+esc(state.query)+'" autocomplete="off" placeholder="Naam of @gebruikersnaam" required></label><button class="primary" type="submit">Zoeken</button></form>'+
+   (state.search.length?section('Gevonden mensen',state.search.map(p=>'<div class="status-line"><span><strong>'+esc(p.name)+'</strong><small>@'+esc(p.handle||'')+'</small></span><button class="inline-button" data-recipient="'+esc(p.id)+'">Deel herinnering</button></div>').join('')):
+     state.query?'<p class="empty-note">Geen vindbare mensen gevonden.</p>':'<p class="meta">Alleen mensen die zelf vindbaarheid hebben aangezet, verschijnen bij het zoeken.</p>'):
+   info('Aanmelden nodig','Meld je aan om mensen op TALERA te vinden.')+'<button class=\"primary\" data-view=\"login\">Aanmelden</button>');
+  break;
+ case 'recipient':
+  html=state.person?
+   info('Delen met '+state.person.name,'Kies één herinnering. De ontvanger krijgt toegang en kan reageren.')+
+   (state.personMemories.length?section('Kies een herinnering',state.personMemories.map(x=>'<button class="option" data-grant="'+esc(x.id)+'"><span class="copy"><strong>'+esc(x.title)+'</strong><small>Toegang geven aan '+esc(state.person.name)+'</small></span><span>›</span></button>').join('')):
+    info('Geen opgeslagen herinneringen','Sla eerst een herinnering op in je TALERA-account.')):
+   info('Geen persoon geselecteerd','Ga terug naar Mijn mensen.');
+  break;
+ case 'mine':{
+  const now=Date.now(),byId=state.titles;
+  const whatsapp=state.shares.length?section('WhatsApp-deellinks',state.shares.map(link=>{
+    const live=!link.revoked_at&&Number(link.expires_at)>now;
+    const revoked=Boolean(link.revoked_at);
+    const date=new Date(Number(link.expires_at));
+    const expiry=Number.isFinite(date.getTime())?date.toLocaleDateString('nl-NL'):'Onbekend';
+    return '<div class="status-line"><span><strong>'+esc(byId[String(link.memory_id)]||'Gedeelde herinnering')+'</strong><small>'+
+     (revoked?'Ingetrokken':live?'Geldig tot '+esc(expiry):'Verlopen')+'</small></span>'+
+     (live?'<button class="inline-button" data-revoke="'+esc(link.id)+'">Intrekken</button>':'')+'</div>'
+  }).join('')):'';
+  const direct=state.grants.length?section('Rechtstreeks met TALERA-gebruikers',state.grants.map(link=>
+   '<div class="status-line"><span><strong>'+esc(link.title||'Herinnering')+'</strong><small>Met '+esc(link.recipient_name||'een gebruiker')+'</small></span>'+
+   '<button class="inline-button" data-revoke-grant="'+esc(link.memory_id)+'" data-recipient-id="'+esc(link.recipient_account_id)+'">Intrekken</button></div>').join('')):'';
+  html=a?(whatsapp+direct||info('Nog niets gedeeld','Deellinks en herinneringen die je met TALERA-gebruikers deelt verschijnen hier.')):
+   info('Aanmelden nodig','Meld je aan om gedeelde herinneringen te beheren.')+'<button class=\"primary\" data-view=\"login\">Aanmelden</button>';
+  break;
+ }
+ case 'shared':
+  html=(a?
+   (state.shared.length?section('Ontvangen herinneringen',state.shared.map(x=>
+    '<button class="option" data-thread="'+esc(x.id)+'"><span class="copy"><strong>'+esc(x.title)+'</strong><small>Van '+esc(x.owner_name||'een TALERA-gebruiker')+'</small></span><span>›</span></button>').join('')):
+   info('Nog niets met je gedeeld','Herinneringen die TALERA-gebruikers rechtstreeks met jou delen verschijnen hier.')):
+   info('Aanmelden nodig','Meld je aan om ontvangen herinneringen te openen.')+'<button class=\"primary\" data-view=\"login\">Aanmelden</button>');
+  break;
+ case 'messages':{
+  const grouped=new Map();
+  for(const msg of state.messages){
+   const id=String(msg.memory_id||'');if(!id)continue;
+   let g=grouped.get(id);
+   if(!g){g={count:0,unread:0,last:Number(msg.created_at)||0};grouped.set(id,g)}
+   g.count++;if(!msg.read_at)g.unread++;
+  }
+  html=(a?(grouped.size?section('Gesprekken',Array.from(grouped).map(([id,x])=>
+   '<button class="option" data-thread="'+esc(id)+'"><span class="glyph">✉</span><span class="copy"><strong>'+esc(state.titles[id]||'Herinnering')+'</strong><small>'+
+   (x.unread?x.unread+' ongelezen · ':'')+x.count+' bericht'+(x.count===1?'':'en')+
+   '</small></span><span class="arrow">›</span></button>').join('')):
+   info('Geen nieuwe gesprekken','Reacties en berichten bij jouw herinneringen verschijnen hier.')):
+   info('Aanmelden nodig','Meld je aan om je berichten te bekijken.')+'<button class=\"primary\" data-view=\"login\">Aanmelden</button>');
+  break;
+ }
+ case 'thread':
+  html=title('Gesprek','Reacties en berichten bij deze herinnering.')+(state.threadData?
+   state.threadData.items.map(c=>'<div class="thread-item"><strong>'+esc(c.display_name)+'</strong><p>'+esc(c.body)+'</p></div>').join('')+
+   '<form data-form="comment"><label>Reageren<textarea name="body" required maxlength="4000" placeholder="Schrijf een reactie…"></textarea></label><button type="submit" class="primary">Verzenden</button></form>':
+   info('Gesprek laden','Even wachten…'));break;
+ case 'notifications':
+  html=title('Meldingen','Alleen de berichten en gebeurtenissen die je aandacht nodig hebben.')+
+  section(' --- TRUNCATED --- 41,721 chars

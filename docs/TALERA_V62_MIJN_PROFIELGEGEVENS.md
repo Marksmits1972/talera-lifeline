@@ -31,3 +31,14 @@
 4. Herstelmail wordt niet als actief aangeboden zolang e-mailconfiguratie ontbreekt.
 5. Delen, berichten, foto's, presentatiemodus, Free, V61-opslag en V59-accountisolatie blijven intact.
 6. Echte iPhone-test en echte ingelogde profieltest nog vereist vóór productie.
+
+## Technische testbevindingen
+
+- Staging-URL: https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev/present
+- Anoniem openen van `?talera_menu=profile` toont alleen 'Aanmelden nodig', geen profielwaarden.
+- De profielcase is in de **render-menu-switch** ingevoegd; tijdens het testen is een aanvankelijke fout met een verkeerde switch-anker hersteld. Na herstel is de route opnieuw getest.
+- Gesimuleerde ingelogde account in de browser (geen productieaccounts): naam, e-mailadres en publieke gebruikersnaam verschijnen uit `/api/me` en `/api/discovery`. Een voorbeeldweergave met fictieve gegevens toont tevens dat naam/e-mailadres nog niet gewijzigd kunnen worden.
+- Klikroute getest: Mijn account → Mijn profielgegevens → Privacy en beveiliging → Mijn profielgegevens → Mijn account.
+- Bestaande hoofdmenu-, gedeelde herinneringen-, berichten- en instellingenroutes blijven beschikbaar. V61-opslag blijft uitsluitend onder Instellingen.
+- Clean Core secretbinding-lijst bevat niet de twee noodzakelijke e-mailconfiguraties; de vermelding ‘Herstelmail nog niet aangesloten’ is daarom bewust zichtbaar.
+- Verificatie van echte e-mailverzending, daadwerkelijke naamwijziging en herstel van een echt account is niet uitgevoerd; deze functies blijven expliciet open.

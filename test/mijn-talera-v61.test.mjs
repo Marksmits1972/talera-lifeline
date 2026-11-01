@@ -57,7 +57,7 @@ test("existing memory and API requests are forwarded without changing their meth
 });
 
 test("only the existing menu module is patched", async () => {
-  const env=fakeEnv(async()=>new Response(v60Fixture, {headers:{"content-type":"text/javascript"}}));
+  const env=fakeEnv(async()=>new Response(v61Fixture, {headers:{"content-type":"text/javascript"}}));
   const patch=await worker.fetch(new Request("https://staging.example"+MENU_MODULE),env);
   assert.equal(patch.headers.get("x-talera-integratie"),V61_MARKER);
   assert.ok((await patch.text()).includes("'shared'"));
@@ -180,12 +180,14 @@ test("V60 patches only the menu module; other requests are forwarded unchanged",
  assert.equal(menu.headers.get("x-talera-integratie"),V61_MARKER);
  assert.ok((await menu.text()).includes("Terug naar Mijn TALERA"));
  const other=await worker.fetch(new Request("https://staging.example/data"),env);
- assert.equal(await other.text(),v60Fixture);
+ assert.equal(await other.text(),v61Fixture);
 });
 
 
-const v61Fixture=v60Fixture+"\n"+
- "option('display','◐','Weergave','Rust, beweging en visuele voorkeuren'))+";
+const v61Fixture=v60Fixture+"\n"+[
+ "option('display','◐','Weergave','Rust, beweging en visuele voorkeuren'))+",
+ "section('Contacten en delen',option('people','○','Mijn mensen','Mensen zoeken en uitnodigen')+option('mine','▣','Door mij gedeeld','Beheer gedeelde herinneringen')+option('shared','⌁','Met mij gedeeld','Herinneringen die anderen delen'))"
+].join("\n");
 
 test("V61 moves storage only to Instellingen and retains all three social entries",()=>{
  const p=patchV61MenuScript(v61Fixture);

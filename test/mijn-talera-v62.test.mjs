@@ -236,7 +236,7 @@ test("V61 proxies non-menu data without altering method or body",async()=>{
 
 const v62Fixture=v61Fixture+"\n"+[
  "account:'Mijn account',login:'Aanmelden'",
- "  case 'login':",
+ "  case 'login':\n   html=title('Aanmelden'",
  "view==='privacy'||view==='settings'))state.discovery=",
  "option('forgot','◈','Wachtwoord herstellen','Via je e-mailadres')"
 ].join("\n");
@@ -246,6 +246,8 @@ test("V62 adds a profile entry to account details using existing account fields 
  assert.equal(v.ok,true);
  assert.ok(v.text.includes("option('profile','◉','Mijn profielgegevens'"));
  assert.ok(v.text.includes("case 'profile':"));
+ assert.ok(v.text.indexOf("case 'profile':") < v.text.indexOf("case 'login':\n   html=title('Aanmelden'"));
+ assert.ok(!v.text.includes("switch(form.dataset.form){\n  case 'profile':"));
  assert.ok(v.text.includes("info('Naam',a.displayName"));
  assert.ok(v.text.includes("info('E-mailadres',a.email"));
  assert.ok(v.text.includes("state.discovery?.publicHandle"));

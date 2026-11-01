@@ -101,7 +101,7 @@ function render(){
   section('Contacten en delen',option('people','○','Mijn mensen','Mensen zoeken en uitnodigen')+option('mine','▣','Door mij gedeeld','Beheer gedeelde herinneringen')+option('shared','⌁','Met mij gedeeld','Herinneringen die anderen delen'))+
   
   section('Account en voorkeuren',option('privacy','♢','Privacy en beveiliging','Vindbaarheid en accountprivacy')+option('settings','⚙','Instellingen','Taal, toegankelijkheid en weergave')+option('subscription','◇','Mijn abonnement','Pakket en betalingen'))+
-  section('Ondersteuning',option('help','?','Hulp en over TALERA','Uitleg, voorwaarden en contact'));
+  section('Ondersteuning',option('help','?','Kennisbank en hulp','Antwoorden over TALERA en je account'));
   break;
  }
  case 'account':
@@ -249,8 +249,8 @@ function render(){
    '<p class="meta">Er is nog geen afzonderlijk profiel met weergavevoorkeuren actief.</p>';break;
  case 'help':
   html=section('Over TALERA',option('privacy','♢','Privacy en toegang','Wie kan jouw herinneringen bekijken?'))+
-   '<div class="info"><strong>Kennisbank</strong><p>Uitleg over herinneringen, delen, je account en privacy. Je kunt altijd terug naar dit menu.</p>'+
-   '<a href="https://talera-website.pages.dev/kennisbank/?terug='+encodeURIComponent(location.origin+'/present?talera_menu=help')+'" rel="noopener">Open de kennisbank</a></div>';break;
+   '<div class="info"><strong>Kennisbank</strong><p>Antwoorden over herinneringen, delen, je account en privacy. Vanuit de pagina kom je terug naar dit menu.</p>'+
+   '<a href="/kennisbank/">Open de kennisbank</a></div>';break;
  default:html=title('Meer','TALERA');
  }
  body.innerHTML=html+notice();body.scrollTop=0;

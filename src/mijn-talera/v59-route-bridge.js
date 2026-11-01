@@ -67,6 +67,7 @@ export function patchV59MenuScript(source){
   {old:"try{const m=await api('/api/me');state.account=m.account}catch(e){if(e.status===401)state.account=null;else throw e}",new:"try{const m=await api('/api/me');if(startEpoch!==authEpoch)return;setActiveAccount(m.account)}catch(e){if(startEpoch!==authEpoch)return;if(e.status===401)setActiveAccount(null);else throw e}"},
   {old:"state.account=result.account||null;",new:"setActiveAccount(result.account||null);",all:true},
   {old:"state.account=null;state.discovery=null;state.history=[];",new:"setActiveAccount(null);state.history=[];"},
+  {old:"}catch(e){if(state.open&&state.view===view)feedback(e.message,true)}",new:"}catch(e){if(e?.code==='STALE_ACCOUNT')return;if(state.open&&state.view===view)feedback(e.message,true)}"},
   {old:"async function checkSession(){",new:"async function checkSession(){\n  const startEpoch=authEpoch;"},
   {old:"try{const m=await api('/api/me');state.account=m.account;void updateUnreadBadge();",new:"try{const m=await api('/api/me');if(startEpoch!==authEpoch)return;setActiveAccount(m.account);void updateUnreadBadge();"},
   {old:"catch(e){if(e.status===401){state.account=null;document.documentElement.dataset.taleraAuth='signed-out';",new:"catch(e){if(startEpoch!==authEpoch)return;if(e.status===401){setActiveAccount(null);document.documentElement.dataset.taleraAuth='signed-out';"}

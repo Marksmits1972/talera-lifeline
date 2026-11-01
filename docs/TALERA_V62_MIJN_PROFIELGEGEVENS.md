@@ -27,3 +27,23 @@
 
 ## Architectuurregel voor vervolg
 Geen nieuwe Vxx-proxyketen voor kleine wijzigingen. Werk bestaande modules rechtstreeks bij en consolideer de eerdere menu-aanpassingen vóór verdere grote uitbreidingen.
+
+## Consolidatie Mijn TALERA — 1 november 2026
+
+De zes opeenvolgende V57–V62 runtime-codepatches zijn vervangen door:
+- `src/mijn-talera/menu-integration.txt`: **de volledige, gevalideerde 41.721 tekens tellende menubron** (GitHub-koppeling kan bij lezen grote bestanden afkappen; de werkelijke Git-blob is compleet).
+- `src/mijn-talera/worker.js`: **één kleine router**. Alleen het menubestand wordt rechtstreeks geserveerd; de bestaande backend, cookies, uploads, deellinks en overige routes gaan ongewijzigd naar de bestaande V56-service.
+- `test/mijn-talera-consolidated.test.mjs`: één gerichte regressiecontrole van de canonieke menubron.
+
+De oude V57–V62 patchmodules en hun dubbele tests zijn **uitsluitend uit de actieve Git-bouwtak verwijderd**. Git-geschiedenis en Cloudflare versies zijn behouden; terugvalcommit voorafgaand aan de opruiming: `f56a9cec282c405acae66d03db800f0d1c2c5717`.
+
+### Resultaat op bestaande V62-test-URL
+- Gecompileerde twee-module Worker `724b2075-2949-425b-95fa-08001325233a` draait op Cloudflare deployment `76ce43c3-2ed4-4e0b-b2b0-e3fc43f5f718`.
+- Voorgaande V62 Worker versie `af81a715-1809-4261-a3db-674782db638f` blijft als terugval beschikbaar.
+- Browser getoetst: volledige menubron 41.721 tekens, geen afgekapte inhoud; Free, Mijn TALERA, Mijn profiel, Instellingen, gedeelde herinneringen, Berichten openen.
+- Klikroute `Mijn TALERA → Instellingen → Opslag en back-up → Instellingen → Mijn TALERA → sluiten`: **geslaagd**.
+- Er is **geen nieuwe Worker, database of persoonlijke gegevensmigratie** toegevoegd. Geen nieuwe V63-versie.
+- De volgende wijziging behoort rechtstreeks in deze canonieke menubron of bestaande accountbackend; nooit opnieuw een keten van tekstpatches opbouwen.
+
+### Kwalificatie
+Browser- en enkele gerichte regressiecontroles geslaagd. De bestaande iPhone-acceptatie en echte ingelogde naamwijziging zijn nog niet end-to-end afgevinkt. De twee oude CI-blokkades van ontbrekende bestanden zijn bekend als issue #61.

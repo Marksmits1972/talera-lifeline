@@ -181,8 +181,8 @@ export function patchV62MenuScript(source) {
       replacement:"account:'Mijn account',profile:'Mijn profielgegevens',login:'Aanmelden'"
     },
     {
-      old:"  case 'login':",
-      replacement:profileCase+"  case 'login':"
+      old:"  case 'login':\n   html=title('Aanmelden'",
+      replacement:profileCase+"  case 'login':\n   html=title('Aanmelden'"
     },
     {
       old:"||view==='storage'){",

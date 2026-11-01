@@ -190,7 +190,7 @@ const v61Fixture=v60Fixture+"\n"+
 test("V61 moves storage only to Instellingen and retains all three social entries",()=>{
  const p=patchV61MenuScript(v61Fixture);
  assert.equal(p.ok,true);
- assert.ok(p.text.includes("option('storage','▤','Opslag en back-up','Controle en reservekopieën')"));
+ assert.ok(p.text.includes("option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt')"));
  assert.equal(p.text.split("option('storage','▤'").length-1,1);
  assert.ok(!p.text.includes("option('storage','▤','Opslag en herinneringen'"));
  assert.ok(p.text.includes("option('people','○','Mijn mensen'"));

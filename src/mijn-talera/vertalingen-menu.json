@@ -163,7 +163,8 @@
       "more.help.explain": "Antwoorden over herinneringen, delen, je account en privacy. Vanuit de pagina kom je terug naar dit menu.",
       "more.help.open": "Open de kennisbank",
       "present.today": "vandaag",
-      "present.ageUnit": "jaar"
+      "present.ageUnit": "jaar",
+      "more.messages.actorNotice": "{actor} reageerde op de herinnering van {owner}"
     },
     "en": {
       "more.hub.title": "My TALERA",
@@ -319,7 +320,8 @@
       "more.help.explain": "Answers about memories, sharing, your account and privacy. You can return to this menu from the page.",
       "more.help.open": "Open knowledge base",
       "present.today": "today",
-      "present.ageUnit": "years"
+      "present.ageUnit": "years",
+      "more.messages.actorNotice": "{actor} replied to {owner}'s memory"
     },
     "de": {
       "more.hub.title": "Mein TALERA",
@@ -475,7 +477,8 @@
       "more.help.explain": "Antworten zu Erinnerungen, Teilen, deinem Konto und Datenschutz. Von der Seite gelangst du zu diesem Menü zurück.",
       "more.help.open": "Wissensdatenbank öffnen",
       "present.today": "heute",
-      "present.ageUnit": "Jahre"
+      "present.ageUnit": "Jahre",
+      "more.messages.actorNotice": "{actor} hat auf die Erinnerung von {owner} geantwortet"
     },
     "fr": {
       "more.hub.title": "Mon TALERA",
@@ -631,7 +634,8 @@
       "more.help.explain": "Des réponses sur les souvenirs, le partage, votre compte et la confidentialité. Vous pouvez revenir à ce menu depuis la page.",
       "more.help.open": "Ouvrir le centre d’aide",
       "present.today": "aujourd’hui",
-      "present.ageUnit": "ans"
+      "present.ageUnit": "ans",
+      "more.messages.actorNotice": "{actor} a réagi au souvenir de {owner}"
     },
     "es": {
       "more.hub.title": "Mi TALERA",
@@ -787,7 +791,8 @@
       "more.help.explain": "Respuestas sobre recuerdos, compartir, tu cuenta y privacidad. Desde la página puedes volver a este menú.",
       "more.help.open": "Abrir el centro de ayuda",
       "present.today": "hoy",
-      "present.ageUnit": "años"
+      "present.ageUnit": "años",
+      "more.messages.actorNotice": "{actor} ha respondido al recuerdo de {owner}"
     }
   }
 }

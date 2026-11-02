@@ -25,14 +25,17 @@ test('upload is only triggered by direct user action and deliberate consent',()=
  assert.match(cloud,/const res=await fetch\(url,options\)/);
  assert.doesNotMatch(cloud,/addEventListener\('load',.+fetch/);
 });
-test('no copy of Free and no writes to local IndexedDB',()=>{
+test('uploads read the Free library without changes; restore uses safe atomic add',()=>{
  assert.match(cloud,/const DB='talera-lifeline-dev-local-v1'/);
  assert.match(cloud,/db\.transaction\('stories','readonly'\)/);
- assert.doesNotMatch(cloud,/indexedDB\.deleteDatabase|objectStore\('stories'\)\.(put|add|delete)|'readwrite'/);
  assert.match(cloud,/record\.id!==id/);
  assert.match(cloud,/record\.items\.length>7/);
  assert.match(cloud,/saveOriginalMedia\(id,item\)/);
  assert.match(cloud,/TaleraMemories\?\.blob\?\./);
+ assert.match(cloud,/db\.transaction\(\['stories','files'\],'readwrite'\)/);
+ assert.match(cloud,/stories\.add\(memory\)/);
+ assert.match(cloud,/files\.add\(\{key:file\.key,blob:file\.blob\}\)/);
+ assert.doesNotMatch(cloud,/indexedDB\.deleteDatabase|stories\.put\(|files\.put\(/);
 });
 test('Free backup still exposes local archive and restore, untouched by Premium',()=>{
  assert.match(worker,/import backupSource from "\.\/free-backup\.txt"/);
@@ -44,4 +47,13 @@ test('account switching invalidates pending Premium UI operations',()=>{
  assert.match(menu,/window\.TaleraPremiumCloud\?\.reset\?\.\(\)/);
  assert.match(cloud,/generation===epoch/);
  assert.match(cloud,/if\(!valid\(\)\)return/);
+});
+
+test('failed media upload best-effort removes only newly uploaded objects before manifest',()=>{
+ assert.match(cloud,/alreadyUploaded:result\.alreadyUploaded===true/);
+ assert.match(cloud,/const media=\[\],newlyStaged=\[\]/);
+ assert.match(cloud,/if\(!uploaded\.alreadyUploaded\)newlyStaged\.push\(uploaded\)/);
+ assert.match(cloud,/await clearNewlyStagedMedia\(id,newlyStaged\)/);
+ assert.match(cloud,/method:'DELETE',credentials:'same-origin'/);
+ assert.match(cloud,/if\(valid\(\)&&newlyStaged\.length\)/);
 });

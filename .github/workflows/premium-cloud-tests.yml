@@ -1,0 +1,21 @@
+name: Premium cloud module tests
+on:
+  push:
+    branches:
+      - feature/v62-mijn-profiel-accountoverzicht-20261101
+    paths:
+      - 'src/core/premium-*.mjs'
+      - 'test/premium-*.test.mjs'
+      - '.github/workflows/premium-cloud-tests.yml'
+  workflow_dispatch:
+jobs:
+  premium-cloud:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs

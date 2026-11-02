@@ -171,8 +171,18 @@ export async function restorePremiumCloudAtomic({
  for(const entry of entries.filter(x=>x.store==='files'&&x.localId)){
   if(!storyIds.has(entry.localId))throw makeError('comment_story_missing');
  }
- // Check again after all network transfers. Only one IndexedDB transaction
- // writes every record using add(); no puts, no replacement or partial commit.
+ // Permissions may have been revoked while content was downloading.
+ // Recheck the live signed-in account, Premium entitlement and consent
+ // immediately before writing anything to Free IndexedDB.
+ const [rightsAgain,consentAgain]=await Promise.all([
+  getJson(fetcher,'/api/me/entitlements'),getJson(fetcher,'/api/premium/cloud/consent')
+ ]);
+ if(rightsAgain?.accountId!==expectedAccountId||
+    rightsAgain?.rights?.permissions?.cloud_storage!==true||
+    rightsAgain?.rights?.available?.cloud_storage!==true||
+    consentAgain?.consent?.enabled!==true||!active())throw makeError('cloud_permission_changed');
+ // Only one IndexedDB transaction writes the entire verified archive.
+ // Use add(), never put(), replacement or partial commits.
  await assertEmptyDatabase(indexedDB);
  if(!active())throw makeError('account_changed');
  const db=await new Promise((resolve,reject)=>{

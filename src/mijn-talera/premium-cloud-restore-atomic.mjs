@@ -5,6 +5,7 @@
  */
 import {previewPremiumCloudRestore} from './premium-cloud-restore-preview.mjs';
 import {fetchPremiumManifestIds} from './premium-sync-audit.mjs';
+import {createPremiumRestoreStage,RESTORE_STAGING_LIMIT} from './premium-restore-stage.mjs';
 
 export const CLOUD_RESTORE_ATOMIC_LIMIT=64*1024*1024;
 const DB='talera-lifeline-dev-local-v1',PREFIX='talera-thread-archive-v1:';
@@ -106,7 +107,7 @@ async function assertEmptyDatabase(indexedDB){
  }finally{db.close()}
 }
 export async function restorePremiumCloudAtomic({
- indexedDB,crypto,fetcher,expectedAccountId,accountMatches=()=>false,online=()=>true,approval=false
+ indexedDB,crypto,fetcher,storage=null,onProgress=()=>{},expectedAccountId,accountMatches=()=>false,online=()=>true,approval=false
 }={}){
  if(!approval)return {phase:'approval_required',restored:false};
  if(!indexedDB||!crypto?.subtle||typeof fetcher!=='function'||!UUID.test(expectedAccountId||''))
@@ -124,21 +125,32 @@ export async function restorePremiumCloudAtomic({
  if(!active())return {phase:'not_enabled',restored:false};
  if(media.size!==preview.media||records.size!==preview.stories+preview.comments)
   throw makeError('cloud_archive_changed');
- let total=0;
+ let total=0,recordBytes=0,requiresStaging=false;
  for(const item of media.values()){
   if(typeof item.source_key!=='string'||!item.source_key||item.source_key.length>240||item.source_key.startsWith(PREFIX)||
    !TYPES.has(item.content_type)||!Number.isSafeInteger(item.byte_size)||item.byte_size<1||
-   item.digest_kind!=='full-sha256'||!HEX.test(item.sha256||''))
+   !['full-sha256','part-sha256-v1'].includes(item.digest_kind)||!HEX.test(item.sha256||'')||
+   (item.digest_kind==='full-sha256'&&item.byte_size>25*1024*1024)||
+   (item.digest_kind==='part-sha256-v1'&&item.byte_size<=25*1024*1024))
    throw makeError('cloud_restore_not_supported');
   total+=item.byte_size;
+  if(item.digest_kind==='part-sha256-v1')requiresStaging=true;
  }
  for(const item of records.values()){
   if(!['story','comment_archive'].includes(item.kind)||!HEX.test(item.sha256||'')||
    !Number.isSafeInteger(item.byte_size)||item.byte_size<1||item.byte_size>1048576)
    throw makeError('invalid_cloud_record');
-  total+=item.byte_size;
+  total+=item.byte_size;recordBytes+=item.byte_size;
  }
- if(total>CLOUD_RESTORE_ATOMIC_LIMIT) return {phase:'archive_too_large_for_atomic_restore',restored:false,bytes:total};
+ if(total>RESTORE_STAGING_LIMIT||recordBytes>CLOUD_RESTORE_ATOMIC_LIMIT)
+  return {phase:'archive_too_large_for_safe_restore',restored:false,bytes:total};
+ requiresStaging=requiresStaging||total>CLOUD_RESTORE_ATOMIC_LIMIT;
+ if(requiresStaging&&!storage?.getDirectory)
+  return {phase:'private_staging_unavailable',restored:false};
+ let stage=null;
+ if(requiresStaging)stage=await createPremiumRestoreStage({
+   storage,crypto,fetcher,accountId:expectedAccountId,active,onProgress
+ });
  const entries=[],storyIds=new Set(),fileKeys=new Set();
  for(const item of records.values()){
   if(!active())throw makeError('account_changed');
@@ -162,7 +174,7 @@ export async function restorePremiumCloudAtomic({
  for(const item of media.values()){
   if(fileKeys.has(item.source_key))throw makeError('duplicate_cloud_file');
   fileKeys.add(item.source_key);
-  entries.push(await readMedia(fetcher,crypto,item,active));
+  entries.push(stage?await stage.stage(item):await readMedia(fetcher,crypto,item,active));
  }
  if(!active())throw makeError('account_changed');
  for(const entry of entries.filter(x=>x.store==='stories')){
@@ -197,6 +209,9 @@ export async function restorePremiumCloudAtomic({
   catch(error){try{tx.abort()}catch{};throw error}
   await done;
  }finally{db.close()}
+ // Only remove staged bytes after IndexedDB confirms a successful commit.
+ if(stage)try{await stage.cleanup([...media.values()])}catch{}
  return {phase:'restored',restored:true,stories:storyIds.size,
-  comments:entries.filter(x=>x.localId).length,media:media.size};
+  comments:entries.filter(x=>x.localId).length,media:media.size,
+  ...(stage?{mode:'disk_staged'}:{})};
 }

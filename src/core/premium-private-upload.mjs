@@ -24,7 +24,8 @@ export async function storePremiumObject({bucket,db,accountId,mediaId,contentTyp
   if (digest!==sha256.toLowerCase()) return {ok:false,reason:'digest_mismatch'};
   const exists=await db.prepare('SELECT media_id,sha256 FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
   if (exists) return {ok:exists.sha256===digest,reason:exists.sha256===digest?'already_stored':'id_conflict',objectKey:validation.objectKey};
-  await bucket.put(validation.objectKey,buffer,{httpMetadata:{contentType},customMetadata:{sha256:digest}});
+  const stored=await bucket.put(validation.objectKey,buffer,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType},customMetadata:{sha256:digest}});
+  if (!stored) return {ok:false,reason:'concurrent_upload_retry'};
   try {
     await db.prepare('INSERT INTO talera_premium_media(account_id,media_id,object_key,content_type,byte_size,sha256,created_at) VALUES(?,?,?,?,?,?,?)')
       .bind(accountId,mediaId,validation.objectKey,contentType,buffer.byteLength,digest,now).run();

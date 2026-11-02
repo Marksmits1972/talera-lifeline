@@ -27,5 +27,12 @@ assert.equal(integrations.length,1,'Mijn leven must load exactly one canonical m
 const menu=await fetch(origin+'/__clean/menu-integration.mjs',{signal:AbortSignal.timeout(15000)});
 assert.equal(menu.status,200,'The canonical More menu source must be served');
 assert.match(menu.headers.get('content-type')||'',/javascript/i);
-assert.match(await menu.text(),/premium-cloud-consent/);
+const menuSource=await menu.text();
+assert.match(menuSource,/premium-cloud-consent/);
+assert.match(menuSource,/data-action="premium-device-link"/,
+ 'Existing consent must offer one-time local account binding');
+assert.match(menuSource,/rights\.accountId!==accountId/,
+ 'Local binding must first verify server-proven account identity');
+assert.match(menuSource,/consent\.consent\?\.enabled!==true/,
+ 'Local binding must first verify the existing cloud consent');
 console.log('V62 Mijn leven opens the canonical More menu in-place: OK');

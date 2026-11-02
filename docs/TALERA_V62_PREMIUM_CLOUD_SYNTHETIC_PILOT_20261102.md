@@ -110,3 +110,27 @@ Eerst een R2-bucket met aantoonbare `eu`-jurisdiction (niet slechts WEUR-hint), 
 - Er zijn geen echte klantfoto's, echte accountgegevens, permanente grants of D1-schemawijzigingen gemoeid. **Geen actieve V62 Worker/PWA-deployment gewijzigd.**
 
 **Open vóór publieke cloudopslag:** aantoonbare EU-jurisdiction-R2-bucket, duurzaam beheer van onafgemaakte uploads en opslagquotas, echte sessie-/accountacceptatie, complete herstelroute naar een tweede apparaat met conflictbewaking, wettelijke bewaartermijnen en toestemming. De Draft-code is niet als productief gereed aangemerkt.
+
+
+## Vervolgbouwblok — herstelfunctie voor tweede apparaat, 2 november 2026
+**Status: concept-implementatie in de bestaande Draft PR #67. Niet geactiveerd, geen echte accounts/media betrokken.**
+
+### Zelfde account, zelfde herinnerings-ID, geen tweede database
+- Toegevoegd aan `src/core/premium-private-memory.js`: `GET /api/me/premium/cloud/memories` met accountprefix `private/v1/<ingelogd-account>/`, R2-paginering via `cursor` en `delimiter:'/'`. Maximaal 20 account-eigen manifestgroepen per pagina. Alleen correct gehashede, aan de accountidentiteit gekoppelde, **volledig gecontroleerde** geheugenkopieën worden als `{id,title,savedAt,mediaCount,totalMediaBytes}` getoond. Onvolledige uploads zonder manifest worden niet in de lijst opgenomen. De route gebruikt dezelfde bestaande sessie-, tijdelijke Premium-rechten-, allowlist- en featurevlagcontroles als alle privécloudroutes. Geen nieuwe D1-tabellen of indexdatabase.
+- Uitgebreid `src/mijn-talera/premium-cloud-selection.txt`: **Cloudherinneringen laden** vraagt pas na een klik de lijst op; **Gekozen herinnering herstellen** vraagt opnieuw toestemming. Werkt ook als op dat toestel nog geen herinneringen zijn opgeslagen.
+- Het manifest wordt opnieuw geverifieerd, elk origineel foto-/video-/geluidsbestand via de privéroute opgehaald en in de browser byte-voor-byte gehasht. Alleen als alle originele media qua ID, soort, MIME, omvang en SHA256 kloppen, schrijft de PWA het complete originele `story`-record met bestanden in **één IndexedDB-transactie** naar de **bestaande Free** stores `stories` en `files` van `talera-lifeline-dev-local-v1`.
+- Gebruik van **`add()`, nooit `put()`**: wanneer die lokale herinnering of een media-key al bestaat, faalt de hele transactie. Er worden geen lokale bestaande bestanden vervangen. Accountwissel maakt eventuele lopende UI-herstelacties ongeldig.
+- Voor de eerste prototype/herstelproef is het totaal aan media begrensd op 160 MiB om overmatige browser-/iPhone-geheugenbelasting te vermijden. Grotere cloudherinneringen worden niet gedeeltelijk hersteld; dit is **nog geen definitieve Premium-limiet**. Media-compressie-/streamingstrategie voor grotere verzamelingen volgt pas bij technisch aangetoonde noodzaak.
+- Download via `src/core/premium-private-media.js` heeft extra veilige headers (`Content-Disposition: attachment`, `Content-Security-Policy: sandbox`, `nosniff`), weigert web-actieve MIME-types zoals SVG/XML en houdt de media uitsluitend toegankelijk voor de juiste ingelogde account.
+
+### Resultaten
+- Browserproef met nieuw, fictief cloudgeheugen + originele afbeeldingsbytes en nagebootste API: **9/9 controles geslaagd**. Lijst verschijnt alleen na klik, downloadvolgorde manifest en foto klopt, originele story-ID en foto worden lokaal opgeslagen, lokale conflict-herstelactie geweigerd en beschadigde foto veroorzaakt geen lokale opslag.
+- Rechtstreekse browserproef op servermodule met fictieve twee manifests + MockR2: **6/6 controles geslaagd**. Beide geheugenrecords gecommit, uitsluitend complete cloudherinneringen opgelijst, metadata correct, andere account geweigerd, POST naar lijst geweigerd, uitgeschakelde feature weigert toegang.
+- Zelfstandige browserproef op de werkelijke lokale IndexedDB-transactiefunctie: **3/3 controles geslaagd**. Botsende mediabestandssleutel veroorzaakt een transactie-abort, laat geen nieuwe story achter en behoudt alle originele lokale bestandsbytes.
+- `test/premium-cloud-restore-v62.test.mjs` toegevoegd voor toekomstige Node-regressies; gecommit **maar nog niet in Node CI uitgevoerd**. De bovenstaande browserproeven zijn geïsoleerde ontwikkeltests, geen live twee-toestelaccceptatie.
+- Laatste read-only controle actieve staging: Core Worker `6a74f222-27a3-49c4-9082-0ca9f7b9742a`, PWA `73a651ba-5c87-4268-8b97-078d71969400`; rollback Core `1ae8bd64-81ba-4b45-88c3-361938679c85`; D1 onveranderd op 12 herinneringen, 0 grants, 1 admin, 0 persoonlijke `private/v1/`-bestanden. De al uitgerolde synthetische pilot blijft **UIT**.
+
+### Releasevoorwaarden (nog open)
+Een expliciete **EU-jurisdiction** private R2-bucket en bijpassende Worker-binding; het opruimen van onafgemaakte mediauploads en quota/bewaarregels; een geldige echte Premium-testgrant en twee normale TALERA-sessies; volledige praktijkacceptatie met echte iPhone en oorspronkelijke media. Pas dan kan `available.cloud_storage` bewust van `false` naar `true` worden veranderd.
+
+**Geen Free-herbouw, geen tweede herinneringsbibliotheek, geen commerciële uitrol.**

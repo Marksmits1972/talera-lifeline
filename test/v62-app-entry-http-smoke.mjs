@@ -24,7 +24,7 @@ const homeHtml=await home.text();
 assert.match(homeHtml,/id=["']navMore["']/,'Mijn leven must have its More navigation');
 const integrations=homeHtml.match(/src=["']\/__clean\/menu-integration\.mjs["']/g)||[];
 assert.equal(integrations.length,1,'Mijn leven must load exactly one canonical menu in-place');
-const menu=await fetch(origin+'/__clean/menu-integration.mjs',{signal:AbortSignal.timeout(15000)});
+const menu=await fetch(origin+'/__clean/menu-integration.mjs?smoke=iphone-audit-layout-20261102',{cache:'no-store',signal:AbortSignal.timeout(15000)});
 assert.equal(menu.status,200,'The canonical More menu source must be served');
 assert.match(menu.headers.get('content-type')||'',/javascript/i);
 const menuSource=await menu.text();

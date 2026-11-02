@@ -55,11 +55,24 @@ export async function inspectPremiumLocalFileCoverage({indexedDB,dbName=DATABASE
   if(!db.objectStoreNames.contains('files'))return {uploadable:0,oversized:0,unsupported:0,archivedComments:0};
   const tx=db.transaction('files','readonly');
   const records=await requestResult(tx.objectStore('files').getAll());
-  const result={uploadable:0,oversized:0,unsupported:0,archivedComments:0};
+  const result={uploadable:0,oversized:0,unsupported:0,archivedComments:0,unsupportedDetails:[]};
   for(const file of records){
    if(String(file?.key||'').startsWith('talera-thread-archive-v1:')){result.archivedComments++;continue}
-   if(!(file?.blob instanceof Blob)||!validMedia.has(file.blob.type.toLowerCase())||file.blob.size<1){result.unsupported++;continue}
-   if(file.blob.size>2*1024*1024*1024){result.oversized++;continue}
+   const blob=file?.blob;
+   let reason='';
+   if(!(blob instanceof Blob))reason='Geen mediabestand';
+   else if(!validMedia.has(blob.type.toLowerCase()))reason='Bestandstype '+(blob.type||'onbekend');
+   else if(blob.size<1)reason='Leeg bestand';
+   if(reason){
+    result.unsupported++;
+    if(result.unsupportedDetails.length<5)result.unsupportedDetails.push({
+     key:String(file?.key??'(zonder sleutel)').slice(0,90),
+     reason,
+     bytes:blob instanceof Blob?blob.size:null
+    });
+    continue;
+   }
+   if(blob.size>2*1024*1024*1024){result.oversized++;continue}
    result.uploadable++;
   }
   return result;

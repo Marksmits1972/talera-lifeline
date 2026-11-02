@@ -26,7 +26,22 @@ async function saveOriginalMedia(memoryId,item){
  const result=await response.json().catch(()=>({}));
  if(!response.ok||result.verified!==true||result.sha256!==sha256||
     result.key!==item.key)throw Error(result.error||'Mediabestand niet veilig opgeslagen');
- return {key:item.key,kind:item.kind,mime:item.mime,size:item.size,sha256};
+ return {key:item.key,kind:item.kind,mime:item.mime,size:item.size,sha256,
+  alreadyUploaded:result.alreadyUploaded===true};
+}
+async function clearNewlyStagedMedia(memoryId,items){
+ // Best effort only BEFORE final manifest PUT: do not erase uploads from previous sessions.
+ // Server independently rejects DELETE if a committed manifest exists.
+ let removed=0;
+ for(const item of items){
+  const url=MEDIA_ENDPOINT+'?id='+encodeURIComponent(memoryId)+'&key='+encodeURIComponent(item.key);
+  try{
+   const res=await fetch(url,{method:'DELETE',credentials:'same-origin',
+    cache:'no-store',headers:{accept:'application/json'}});
+   if(res.ok)removed++;
+  }catch{}
+ }
+ return removed;
 }
 
 /* Same local stories/files stores as TALERA Free. Never overwrite either store.
@@ -239,11 +254,22 @@ async function render(host,account,rights){
     if(!window.confirm('Deze herinnering inclusief '+record.items.length+
        ' originele mediabestanden vrijwillig in je Premium-cloud opslaan? De lokale versie blijft behouden.'))
       return;
-    const media=[];
-    for(const item of record.items){
+    const media=[],newlyStaged=[];
+    try{
+     for(const item of record.items){
       if(!valid())return;
       message(status,'Origineel bestand '+(media.length+1)+' van '+record.items.length+' controleren en opslaan…');
-      media.push(await saveOriginalMedia(id,item));
+      const uploaded=await saveOriginalMedia(id,item);
+      media.push({key:uploaded.key,kind:uploaded.kind,mime:uploaded.mime,
+       size:uploaded.size,sha256:uploaded.sha256});
+      if(!uploaded.alreadyUploaded)newlyStaged.push(uploaded);
+     }
+    }catch(error){
+     // No final manifest request was sent by this attempt.
+     // Never delete a previously existing object, including an idempotent retry.
+     if(valid()&&newlyStaged.length)
+      await clearNewlyStagedMedia(id,newlyStaged);
+     throw error;
     }
     if(!valid())return;
     url=ENDPOINT;

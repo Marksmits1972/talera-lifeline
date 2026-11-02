@@ -114,7 +114,9 @@ function premiumAuditStatus(){
  const a=premiumSyncUi.audit;
  if(!a)return '';
  let result='';
- if(a.phase==='manifest_matched')result='Controle geslaagd: '+a.mediaMatched+' mediabestanden en '+a.recordsMatched+' verhalen/reacties komen overeen met de cloudregistratie. Teruglezen moet nog afzonderlijk worden gecontroleerd.';
+ if(a.phase==='local_archive_empty')
+  result='Geen lokale herinneringen gevonden in dit browservenster. Vergelijken is hier niet mogelijk. Op dit account staan in de EU-cloud '+a.cloudMediaTotal+' mediabestanden en '+a.cloudRecordsTotal+' verhalen/reacties. Open de TALERA-installatie waarin je de herinnering hebt opgeslagen voor een echte volledigheids- en terugleescontrole.';
+ else if(a.phase==='manifest_matched')result='Controle geslaagd: '+a.mediaMatched+' mediabestanden en '+a.recordsMatched+' verhalen/reacties komen overeen met de cloudregistratie. Teruglezen moet nog afzonderlijk worden gecontroleerd.';
  else if(a.phase==='pending'||a.phase==='needs_attention')
   result='Op de server geregistreerd: '+(a.mediaMatched||0)+' mediabestanden en '+(a.recordsMatched||0)+' verhalen/reacties. Nog ontbrekend: '+(a.mediaMissing||0)+' mediabestanden en '+(a.recordsMissing||0)+' verhalen/reacties. Andere lokale bestanden die niet kunnen worden geüpload: '+(a.unsupported||0)+'.';
  else result='Volledigheidscontrole: '+a.phase+'.';
@@ -319,7 +321,9 @@ function render(){
         html+='<button class="secondary" data-action="premium-sync-resume">Synchronisatie hervatten</button>'+
           '<button class="secondary" data-action="premium-sync-audit"'+(premiumSyncUi.auditWorking?' disabled':'')+'>'+(premiumSyncUi.auditWorking?'Controleren…':'Controleer volledigheid')+'</button>'+
           premiumAuditStatus()+
-          '<button class="secondary" data-action="premium-sync-restore"'+(premiumSyncUi.restoreWorking?' disabled':'')+'>'+(premiumSyncUi.restoreWorking?'Teruglezen…':'Controleer teruglezen')+'</button>'+premiumReadbackStatus();
+          (premiumSyncUi.audit?.phase==='local_archive_empty'?
+            '<p class="meta">Teruglezen vergelijken met lokale originelen kan hier niet: deze browser heeft geen opgeslagen Free-herinneringen.</p>':
+            '<button class="secondary" data-action="premium-sync-restore"'+(premiumSyncUi.restoreWorking?' disabled':'')+'>'+(premiumSyncUi.restoreWorking?'Teruglezen…':'Controleer teruglezen')+'</button>'+premiumReadbackStatus());
       }else if(deviceOwner===null){
         html+='<p class="meta">De cloudtoestemming is al gegeven. Koppel nu één keer de lokale herinneringen op dit apparaat aan '+esc(a.email||'dit account')+'.</p>'+
           '<button class="secondary" type="button" data-action="premium-device-link">Koppel lokaal archief en start upload</button>'+

@@ -300,7 +300,12 @@ function render(){
   if(!a){html=info('Mijn abonnement','Meld je aan om je huidige rechten te bekijken.');break}
   if(!premiumState.rights){html=info('Mijn abonnement','Je accountrechten worden gecontroleerd.');break}
   const right=premiumState.rights,labels={free:'TALERA Free',individual:'Premium Individual',family_light:'Family Light',family:'Family',family_heavy:'Family Heavy'};
-  html=info('Huidig pakket: '+(labels[right.plan]||'Free'),right.source==='manual_test'?'Tijdelijke testrechten. Geen betaald abonnement.':'Je gebruikt TALERA Free.')+
+  const cloudTestOnFree=right.plan==='free'&&right.available?.cloud_storage===true;
+  const packageLabel=cloudTestOnFree?'TALERA Free + Premium-testtoegang':(labels[right.plan]||'TALERA Free');
+  const packageExplanation=right.source==='manual_test'||cloudTestOnFree?
+    'Tijdelijke Premium-testrechten. Geen betaald abonnement. Je lokale Free-herinneringen blijven behouden.':
+    'Je gebruikt TALERA Free.';
+  html=info('Huidig pakket: '+packageLabel,packageExplanation)+
     (right.expiresAt?'<p class="meta">Testrecht eindigt op '+esc(new Date(right.expiresAt).toLocaleDateString())+'.</p>':'')+
     '<p class="meta">De Premium-cloudopslag wordt in een beveiligde testfase aangesloten. Uploaden gebeurt uitsluitend na jouw eenmalige toestemming. TALERA Free blijft lokaal behouden; de betaling wordt voorlopig gesimuleerd.</p>';
   if(right.source==='manual_test'&&right.permissions?.cloud_storage===true)html+='<button class="secondary" type="button" data-action="premium-cloud-test">EU-cloudopslag testen</button><p class="meta">Alleen een fictieve herinnering. Je eigen herinneringen blijven ongemoeid.</p>';

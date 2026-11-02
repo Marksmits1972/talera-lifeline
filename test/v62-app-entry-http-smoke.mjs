@@ -16,3 +16,16 @@ const html=await page.text();
 assert.match(html,/<html[\s>]/i);
 assert.ok(!html.includes('{"error":"Niet gevonden"}'));
 console.log('V62 /app -> /present redirect and TALERA page: OK');
+
+const home=await fetch(origin+'/mijn-leven',{redirect:'manual',signal:AbortSignal.timeout(15000)});
+assert.equal(home.status,200,'Mijn leven must serve the home page');
+assert.match(home.headers.get('content-type')||'',/text\/html/i);
+const homeHtml=await home.text();
+assert.match(homeHtml,/id=["']navMore["']/,'Mijn leven must have its More navigation');
+const integrations=homeHtml.match(/src=["']\/__clean\/menu-integration\.mjs["']/g)||[];
+assert.equal(integrations.length,1,'Mijn leven must load exactly one canonical menu in-place');
+const menu=await fetch(origin+'/__clean/menu-integration.mjs',{signal:AbortSignal.timeout(15000)});
+assert.equal(menu.status,200,'The canonical More menu source must be served');
+assert.match(menu.headers.get('content-type')||'',/javascript/i);
+assert.match(await menu.text(),/premium-cloud-consent/);
+console.log('V62 Mijn leven opens the canonical More menu in-place: OK');

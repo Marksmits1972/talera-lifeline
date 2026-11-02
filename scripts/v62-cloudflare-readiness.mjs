@@ -71,6 +71,19 @@ if(!token){
   report.liveContentBytes=binary.length;
   report.liveContentSha256=createHash('sha256').update(binary).digest('hex');
   report.liveContentIsMultipart=/multipart\//i.test(mime);
+  report.liveMimeKind=mime.split(';')[0];
+  // Inspect part names, not content. Never save Worker source in artifacts.
+  if(/multipart\/form-data/i.test(mime)){
+   try{
+    const form=await new Response(binary,{headers:{'content-type':mime}}).formData();
+    report.liveMultipartPartNames=[...form.keys()].sort();
+    report.liveMainModuleFromMetadata=null;
+    if(typeof form.get('metadata')==='string'){
+     const md=JSON.parse(form.get('metadata'));
+     report.liveMainModuleFromMetadata=typeof md.main_module==='string'?md.main_module:null;
+    }
+   }catch{report.liveMultipartPartNames=[];}
+  }
   report.ready=report.serviceBindingValid===true&&
    Boolean(report.currentDeploymentId)&&Boolean(report.previousDeploymentId)&&
    report.liveContentAvailable===true;

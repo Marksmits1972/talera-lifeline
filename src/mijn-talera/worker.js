@@ -36,6 +36,18 @@ export default {
       return new Response("TALERA-service niet aangesloten", {status:503});
     }
     const url = new URL(request.url);
+    // V62's public PWA entry is /present. The previous /app bookmark was
+    // proxied to Clean Core (404). Repair GET/HEAD only; preserve other routes.
+    if ((request.method === "GET" || request.method === "HEAD") &&
+        (url.pathname === "/app" || url.pathname === "/app/")) {
+      const destination = new URL("/present", url);
+      destination.search = url.search;
+      return new Response(null, {status:302,headers:{
+        location:destination.toString(),
+        "cache-control":"no-store",
+        "x-talera-integratie":BUILD_MARKER,
+      }});
+    }
     if ((request.method === "GET" || request.method === "HEAD") &&
         (url.pathname === "/kennisbank" || url.pathname === "/kennisbank/")) {
       return new Response(request.method === "HEAD" ? null : knowledgeSource, {

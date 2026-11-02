@@ -56,7 +56,9 @@ export async function premiumMultipartRoute({request,env,accountId,writeAllowed=
  if(!writeAllowed&&method!=='GET')return bad('invalid_origin',403);
  const db=env.DB,bucket=env.PREMIUM_PRIVATE,objectKey=keyFor(accountId,mediaId);
  if(action==='start'&&method==='POST'){
-  const info=await request.json().catch(()=>null);
+  const incoming=await readBounded(request,4096);
+  let info;
+  try{info=JSON.parse(new TextDecoder().decode(incoming))}catch{return bad('invalid_upload')}
   const size=info?.byteSize,type=info?.contentType,hash=info?.fingerprint;
   if(!Number.isSafeInteger(size)||size<=SMALL_LIMIT||size>LARGE_MEDIA_MAX||
     !TYPES.has(type)||!SHA.test(hash||''))return bad('invalid_upload');
@@ -64,6 +66,9 @@ export async function premiumMultipartRoute({request,env,accountId,writeAllowed=
   const existing=await db.prepare('SELECT sha256,byte_size,digest_kind FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
   if(existing)return existing.sha256===hash&&existing.byte_size===size&&existing.digest_kind==='part-sha256-v1'?
     json({ok:true,reason:'already_stored'}):bad('id_conflict',409);
+  // Never create a multipart upload that could overwrite an existing private object.
+  const present=await bucket.head(objectKey);
+  if(present)return bad('object_exists_unregistered',409);
   let session=await getSession(db,accountId,mediaId);
   if(session&&Date.now()-session.created_at>6*86400000){
    try{await bucket.resumeMultipartUpload(objectKey,session.upload_id).abort()}catch{}

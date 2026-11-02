@@ -28,6 +28,143 @@ async function saveOriginalMedia(memoryId,item){
     result.key!==item.key)throw Error(result.error||'Mediabestand niet veilig opgeslagen');
  return {key:item.key,kind:item.kind,mime:item.mime,size:item.size,sha256};
 }
+
+/* Same local stories/files stores as TALERA Free. Never overwrite either store.
+ * Binary files are verified BEFORE opening one atomic local transaction.
+ */
+const RESTORE_LIMIT=160*1048576; // first mobile-safe QA tranche, not a product quota
+async function restoreIntoExistingLibrary(memory,originals){
+ const db=await new Promise((resolve,reject)=>{
+  const r=indexedDB.open(DB,1);
+  r.onupgradeneeded=()=>{
+   if(!r.result.objectStoreNames.contains('stories'))r.result.createObjectStore('stories',{keyPath:'id'});
+   if(!r.result.objectStoreNames.contains('files'))r.result.createObjectStore('files',{keyPath:'key'});
+  };
+  r.onsuccess=()=>resolve(r.result);
+  r.onerror=()=>reject(r.error||Error('Lokale opslag niet bereikbaar'));
+ });
+ try{
+  return await new Promise((resolve,reject)=>{
+   const tx=db.transaction(['stories','files'],'readwrite');
+   tx.oncomplete=()=>resolve(true);
+   tx.onerror=()=>reject(Error('Herstellen afgebroken: mogelijk bestaat deze herinnering al'));
+   tx.onabort=()=>reject(Error('Geen wijzigingen doorgevoerd. Herinnering of mediabestand bestaat al.'));
+   const stories=tx.objectStore('stories'),files=tx.objectStore('files');
+   stories.add(memory); // add, NEVER put; duplicate aborts whole transaction
+   for(const file of originals)files.add({key:file.key,blob:file.blob});
+  });
+ }finally{db.close()}
+}
+function restoreManifestValid(payload,id){
+ const memory=payload?.memory,media=payload?.media;
+ if(payload?.verified!==true||payload.memoryId!==id||memory?.id!==id||
+    !Array.isArray(memory.items)||!Array.isArray(media)||
+    media.length!==memory.items.length||media.length>7)return false;
+ const seen=new Set(),counts={photo:0,video:0,audio:0};
+ for(let i=0;i<media.length;i++){
+  const m=media[i],local=memory.items[i];
+  if(!m||!local||seen.has(m.key)||m.key!==local.key||
+     m.kind!==local.kind||m.mime!==local.mime||m.size!==local.size||
+     !Object.hasOwn(LIMITS,m.kind)||!Number.isSafeInteger(m.size)||
+     m.size<1||m.size>LIMITS[m.kind]||
+     !m.mime.startsWith(({photo:'image/',video:'video/',audio:'audio/'})[m.kind])||
+     !/^[a-f0-9]{64}$/.test(m.sha256))return false;
+  seen.add(m.key);counts[m.kind]++;
+ }
+ return counts.photo+counts.video<=6&&counts.audio<=1;
+}
+async function cloudJSON(path){
+ const res=await fetch(path,{credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}});
+ const value=await res.json().catch(()=>({}));
+ if(!res.ok)throw Error(value.error||'Cloudkopie niet beschikbaar');
+ return value;
+}
+async function renderCloudRestore(parent,valid){
+ const section=document.createElement('section');section.id='talera-premium-restore';
+ section.style.cssText='padding:14px 0;border-top:1px solid #ccd8dd;margin-top:16px';
+ const heading=document.createElement('strong');heading.textContent='Cloudherinnering terughalen';
+ const desc=document.createElement('p');
+ desc.textContent='Ook op een ander toestel: bekijk je cloudkopieën en herstel er één na bevestiging. Bestaande herinneringen worden nooit overschreven.';
+ const list=button('Mijn cloudherinneringen laden');
+ const select=document.createElement('select');select.setAttribute('aria-label','Te herstellen cloudherinnering');
+ const restore=button('Gekozen herinnering herstellen');restore.disabled=true;
+ const more=button('Meer cloudherinneringen');more.hidden=true;
+ const status=document.createElement('p');status.setAttribute('role','status');
+ section.append(heading,desc,list,select,restore,more,status);parent.append(section);
+ const known=new Map();
+ let cursor=null,busy=false;
+ const controls=locked=>{list.disabled=locked;restore.disabled=locked||known.size===0;more.disabled=locked};
+ async function load(next=false){
+  if(busy||!valid())return;
+  busy=true;controls(true);
+  try{
+   if(!next){known.clear();select.replaceChildren();cursor=null}
+   const data=await cloudJSON('/api/me/premium/cloud/memories'+
+     (next&&cursor?'?cursor='+encodeURIComponent(cursor):''));
+   if(!valid())return;
+   if(!Array.isArray(data.items))throw Error('Ongeldig cloudoverzicht');
+   for(const item of data.items){
+    if(typeof item.id!=='string'||item.id.length>192||known.has(item.id))continue;
+    known.set(item.id,item);
+    const option=document.createElement('option');option.value=item.id;
+    option.textContent=String(item.title||'Herinnering').slice(0,100)+
+      ' ('+Number(item.mediaCount||0)+' media)';
+    select.append(option);
+   }
+   cursor=typeof data.nextCursor==='string'&&data.nextCursor?data.nextCursor:null;
+   more.hidden=!cursor;
+   message(status,known.size?known.size+' cloudherinnering(en) beschikbaar. Kies er één.':
+     'Er staan nog geen cloudherinneringen in je account.');
+  }catch(e){if(valid())message(status,e.message||'Cloudlijst niet bereikbaar')}
+  finally{busy=false;if(valid())controls(false)}
+ }
+ async function restoreSelected(){
+  if(busy||!valid()||!known.has(select.value))return;
+  const id=select.value,selected=known.get(id);
+  if(!window.confirm('Deze cloudherinnering inclusief originele bestanden herstellen op dit toestel? Bestaande lokale herinneringen blijven onaangetast.'))
+    return;
+  busy=true;controls(true);
+  try{
+   const existing=await window.TaleraMemories?.get?.(id);
+   if(!valid())return;
+   if(existing)throw Error('Deze herinnering staat al op dit toestel. Er wordt niets overschreven.');
+   const payload=await cloudJSON('/api/me/premium/cloud/memory?id='+encodeURIComponent(id));
+   if(!valid())return;
+   if(!restoreManifestValid(payload,id))throw Error('Deze cloudherinnering kan niet veilig worden hersteld');
+   const media=payload.media;
+   const total=media.reduce((n,m)=>n+m.size,0);
+   if(total>RESTORE_LIMIT)throw Error('Voor deze eerste herstelproef maximaal 160 MB per herinnering. De cloudkopie is niet gewijzigd.');
+   const originals=[];
+   for(const item of media){
+    if(!valid())return;
+    message(status,'Origineel bestand '+(originals.length+1)+' van '+media.length+' controleren…');
+    const url='/api/me/premium/cloud/media?id='+encodeURIComponent(id)+'&key='+encodeURIComponent(item.key);
+    const response=await fetch(url,{credentials:'same-origin',cache:'no-store',headers:{accept:'application/octet-stream'}});
+    if(!response.ok)throw Error('Cloudbestand is niet beschikbaar: '+String(item.key));
+    if(response.headers.get('content-type')!==item.mime||
+       response.headers.get('x-talera-sha256')!==item.sha256)
+      throw Error('Verkeerde bestandsgegevens bij cloudherstel');
+    const blob=await response.blob();
+    if(!valid())return;
+    if(blob.size!==item.size||await checksum(blob)!==item.sha256)
+      throw Error('Cloudbestand is niet volledig of is beschadigd');
+    originals.push({key:item.key,blob});
+   }
+   if(!valid())return;
+   // Store exactly the original record and original blobs in one atomic transaction.
+   // Any existing story OR file key causes a complete transaction rollback.
+   await restoreIntoExistingLibrary(payload.memory,originals);
+   if(!valid())return;
+   message(status,'Herinnering inclusief originele bestanden hersteld. Open de tijdlijn opnieuw om haar te bekijken.');
+   document.dispatchEvent(new CustomEvent('talera:memory-restored',{detail:{memoryId:id}}));
+  }catch(e){if(valid())message(status,e.message||'Herstel niet voltooid; bestaande gegevens behouden')}
+  finally{busy=false;if(valid())controls(false)}
+ }
+ list.addEventListener('click',()=>{void load()});
+ more.addEventListener('click',()=>{void load(true)});
+ restore.addEventListener('click',()=>{void restoreSelected()});
+}
+
 let epoch=0;
 const button=(label)=>{const el=document.createElement('button');el.type='button';el.className='secondary';el.textContent=label;return el};
 const message=(host,text)=>{host.textContent=text};
@@ -72,6 +209,7 @@ async function render(host,account,rights){
  host.append(root);
  let choices=[];
  const valid=()=>generation===epoch&&document.contains(root)&&accountId===account.id;
+ void renderCloudRestore(root,valid);
  try{
   choices=await currentStories();
   if(!valid())return;

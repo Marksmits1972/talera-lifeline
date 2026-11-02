@@ -27,7 +27,7 @@ function fixture(){
   async put(key,bytes){if(objects.has(key))return null;objects.set(key,bytes.slice(0));return {etag:'fixture'}},
   async get(key){const bytes=objects.get(key);return bytes?{body:bytes}:null}
  };
- return {env:{DB:db,PREMIUM_PRIVATE:bucket},objects,manifests};
+ return {env:{DB:db,PREMIUM_PRIVATE:bucket},objects,manifests,consents};
 }
 test('fictional upload and download stays scoped to its account',async()=>{
  const {env}=fixture();
@@ -44,4 +44,16 @@ test('fictional upload and download stays scoped to its account',async()=>{
  assert.equal(other.status,404);
  const free=await premiumCloudRoute({request:new Request('https://example.test'+path),env,sessionAccount:alice,entitlement:{permissions:{cloud_storage:false},available:{cloud_storage:false}},pilotEnabled:true});
  assert.equal(free.status,403);
+});
+
+test('consent is required before cloud media reads',async()=>{
+ const {env,consents}=fixture();consents.delete(alice.id);
+ const path='/api/premium/cloud/media';
+ const r=await premiumCloudRoute({request:new Request('https://example.test'+path),env,sessionAccount:alice,entitlement,pilotEnabled:true});
+ assert.equal(r.status,403);assert.equal((await r.json()).reason,'consent_required');
+});
+test('disabled pilot blocks cloud requests without touching stored objects',async()=>{
+ const {env,objects}=fixture();
+ const r=await premiumCloudRoute({request:new Request('https://example.test/api/premium/cloud/media'),env,sessionAccount:alice,entitlement,pilotEnabled:false});
+ assert.equal(r.status,403);assert.equal(objects.size,0);
 });

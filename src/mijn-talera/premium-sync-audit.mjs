@@ -76,6 +76,7 @@ export async function auditPremiumSync({indexedDB,crypto,fetcher,expectedAccount
   phase:blocked?'needs_attention':missing?'pending':'manifest_matched',
   mediaMatched,recordsMatched,mediaMissing,recordsMissing,
   oversized:coverage.oversized,oversizedRecords,unsupported:coverage.unsupported,
+  unsupportedDetails:coverage.unsupportedDetails||[],
   localMediaTotal:coverage.uploadable+coverage.oversized+coverage.unsupported,
   localRecordsTotal:localRecords.length,
   // This is only a manifest-level comparison, never a claim of full restore.

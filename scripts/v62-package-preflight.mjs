@@ -49,7 +49,7 @@ const config={
  main:'./worker.js',
  compatibility_date:'2026-10-30',
  workers_dev:false,
- rules:[{type:'Text',globs:['**/*.txt','**/*.html']}]
+ rules:[{type:'Text',globs:['**/*.txt','**/*.html'],fallthrough:false}]
 };
 // This config has deliberately NO live service bindings, no account ID,
 // no secrets and a non-production worker name. NEVER publish it.

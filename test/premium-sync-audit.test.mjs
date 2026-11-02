@@ -67,7 +67,7 @@ function fakeArchive(stories,files){
   return request;
  }};
 }
-test('completeness audit exposes oversized/unsupported files instead of reporting ready',async()=>{
+test('completeness audit marks supported 26 MiB video as pending and unsupported types as attention',async()=>{
  const largeBlob=new Blob([new Uint8Array(26*1024*1024)],{type:'video/mp4'});
  const archive=fakeArchive([{id:'my-story',items:[],title:'A memory'}],[
   {key:'photo',blob:new Blob(['photo'],{type:'image/jpeg'})},
@@ -83,9 +83,9 @@ test('completeness audit exposes oversized/unsupported files instead of reportin
  });
  const result=await auditPremiumSync({indexedDB:archive,crypto,fetcher,expectedAccountId:user,ownerMatches:()=>true});
  assert.equal(result.phase,'needs_attention');
- assert.equal(result.mediaMissing,1);
+ assert.equal(result.mediaMissing,2);
  assert.equal(result.recordsMissing,1);
- assert.equal(result.oversized,1);
+ assert.equal(result.oversized,0);
  assert.equal(result.unsupported,1);
  assert.equal(result.verifiedObjects,false);
 });

@@ -187,3 +187,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Via gekoppelde Cloudflare REST API geeft GET bucket met `cf-r2-jurisdiction: eu` nog 404/10006. Dit betekent dat de huidige connectorroute niet aantoonbaar bij deze EU-bucket kan, niet dat het dashboard ongelijk heeft.
 - Bestaande Clean Core Worker-binding opnieuw bevestigd: `PREMIUM_PRIVATE` wijst naar de juiste naam met `jurisdiction=eu`; pilot `false`, accountallowlist leeg. Er zijn geen nieuwe uploadroutes uitgerold en geen gebruikersbestanden aangeraakt.
 - Verifieer daadwerkelijke buckettoegang bij voorkeur via geïsoleerde, afgeschermde Worker-bindingtest of Cloudflare-dashboard, zonder de privacycontroles te omzeilen. Er is **nog geen werkende end-to-end Worker-R2-upload** aangetoond. Geen productietoegang openen zonder geverifieerde tests.
+
+## Fase W — actieve Core Worker gecontroleerd (2 november 2026)
+- Bestaande actieve Worker via Cloudflare GET content/v2 bekeken zonder deployment of wijzigingen. Scriptinhoud circa 67 KB inclusief multipartverpakking.
+- Actieve script bevat `premiumRoutes` en `/api/me/entitlements`, maar **geen** `/api/premium/cloud/` route en geen `PREMIUM_PRIVATE` objectaanroep. De R2-binding is dus ingesteld, maar de upload-/downloadmodule is nog niet in het actieve script gemonteerd.
+- Existing Worker subdomain enabled; previews disabled; actieve deployment bestaat. De pilot blijft uit en de whitelist leeg.
+- Volgende concrete integratiestap: minimalistische patch van de bestaande Core-router op basis van geverifieerde brontekst en terugvalversie; behoud sessie-, origin-, rechten- en rate-limitfuncties. Eerst code+regressietests, dan pas staging-deployment, daarna fictieve upload/download via de Worker-binding. Niet blind 67 KB productie-/stagingcode vervangen of via gewone API EU-jurisdictie omzeilen.

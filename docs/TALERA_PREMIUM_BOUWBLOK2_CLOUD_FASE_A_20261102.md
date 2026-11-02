@@ -169,3 +169,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - De lege testbucket is aansluitend verwijderd (Cloudflare API bevestigde succes), om geen opslag met verkeerde jurisdictie te laten staan.
 - **Openstaande blokkade:** de definitieve `PREMIUM_PRIVATE` bucket moet als aantoonbare EU-jurisdictie worden aangemaakt en bij de bestaande Core Worker passen. De daadwerkelijke sessie-/consent-/entitlement-/R2-route en automatische PWA-sync zijn daarmee nog NIET end-to-end bevestigd.
 - Cloudpilot blijft uit, met lege allowlist; geen betaling of gebruikersdata aangeraakt. Bestaande Free- en social-mediaopslag niet hergebruiken voor de persoonlijke Premium-cloud.
+
+## Fase T — EU-jurisdictie nader onderzocht (2 november 2026)
+- Cloudflare API-specificatie bevestigt dat `cf-r2-jurisdiction: eu` bij het aanmaken hoort en dat `jurisdiction` in het resultaat `eu` moet aangeven. `locationHint: weur` alleen is daarvoor onvoldoende.
+- Na de eerdere R2 CRUD-test is opnieuw exact de beoogde bucketnaam met EU-header aangevraagd. Cloudflare rapporteerde wederom `location: WEUR` maar `jurisdiction: default`. De aanmaak is daarom **niet geaccepteerd als EU-conform**; de lege bucket is weer verwijderd, met bevestigde DELETE-respons.
+- Mogelijke oorzaak is dat de huidige Cloudflare-connector de opgegeven jurisdictieheader bij POST niet correct doorstuurt. Dit is nog niet bewezen; er zijn geen persoonlijke gegevens geüpload.
+- Voor daadwerkelijke Premium-media eerst bij bucket-creatie in Cloudflare Dashboard of via gecontroleerde REST-client expliciet EU-jurisdictie kiezen en retourwaarde `jurisdiction: eu` verifiëren. Pas daarna gesloten pilot-route testen. De actieve TALERA PWA, Free en betaling zijn ongemoeid gebleven.

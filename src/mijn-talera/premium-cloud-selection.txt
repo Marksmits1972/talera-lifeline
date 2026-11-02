@@ -5,7 +5,29 @@
 (function(){
 'use strict';
 if(window.TaleraPremiumCloud)return;
-const DB='talera-lifeline-dev-local-v1',ENDPOINT='/api/me/premium/cloud/memory';
+const DB='talera-lifeline-dev-local-v1',ENDPOINT='/api/me/premium/cloud/memory',MEDIA_ENDPOINT='/api/me/premium/cloud/media';
+const LIMITS={photo:20*1048576,video:95*1048576,audio:60*1048576};
+async function checksum(blob){
+ const hash=await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());
+ return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function saveOriginalMedia(memoryId,item){
+ const blob=await window.TaleraMemories?.blob?.(item.key);
+ if(!(blob instanceof Blob)||!Object.hasOwn(LIMITS,item.kind)||
+    !Number.isSafeInteger(item.size)||item.size<1||
+    item.size>LIMITS[item.kind]||blob.size!==item.size||
+    blob.type!==item.mime)
+  throw Error('Origineel mediabestand ontbreekt of is gewijzigd: '+String(item.name||item.key));
+ const sha256=await checksum(blob);
+ const url=MEDIA_ENDPOINT+'?id='+encodeURIComponent(memoryId)+'&key='+encodeURIComponent(item.key);
+ const response=await fetch(url,{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{
+  'content-type':item.mime,'x-talera-size':String(blob.size),
+  'x-talera-kind':item.kind,'x-talera-sha256':sha256},body:blob});
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.verified!==true||result.sha256!==sha256||
+    result.key!==item.key)throw Error(result.error||'Mediabestand niet veilig opgeslagen');
+ return {key:item.key,kind:item.kind,mime:item.mime,size:item.size,sha256};
+}
 let epoch=0;
 const button=(label)=>{const el=document.createElement('button');el.type='button';el.className='secondary';el.textContent=label;return el};
 const message=(host,text)=>{host.textContent=text};
@@ -27,7 +49,7 @@ function readStory(id){
 async function currentStories(){
  const rows=await window.TaleraMemories?.list?.();
  if(!Array.isArray(rows))throw Error('Lokale herinneringen zijn niet beschikbaar');
- return rows.filter(s=>s&&typeof s.id==='string'&&s.id.length<=192&&Array.isArray(s.items)&&s.items.length===0);
+ return rows.filter(s=>s&&typeof s.id==='string'&&s.id.length<=192&&Array.isArray(s.items)&&s.items.length<=7);
 }
 const ready=rights=>rights?.permissions?.cloud_storage===true&&rights?.available?.cloud_storage===true;
 function reset(){epoch++}
@@ -39,8 +61,8 @@ async function render(host,account,rights){
  root.style.cssText='padding:14px 0;border-top:1px solid #ccd8dd;margin-top:16px';
  const heading=document.createElement('strong');heading.textContent='Premium-cloudopslag — zelf kiezen';
  const desc=document.createElement('p');
- desc.textContent='Alleen voor tekstherinneringen. TALERA verstuurt niets automatisch en verwijdert niets van dit toestel.';
- const select=document.createElement('select');select.setAttribute('aria-label','Kies een lokale tekstherinnering');
+ desc.textContent='Kies één herinnering inclusief originele foto’s, video of geluid. Niets wordt automatisch verstuurd en het origineel blijft op dit toestel.';
+ const select=document.createElement('select');select.setAttribute('aria-label','Kies een lokale herinnering');
  const save=button('Deze herinnering veilig opslaan');
  const preview=button('Mijn cloudkopie bekijken');preview.style.marginLeft='8px';
  const status=document.createElement('p');status.setAttribute('role','status');
@@ -60,7 +82,7 @@ async function render(host,account,rights){
    select.append(o);
   }
   save.disabled=preview.disabled=choices.length===0;
-  if(!choices.length)message(status,'Er zijn geen tekstherinneringen zonder mediabestanden op dit toestel.');
+  if(!choices.length)message(status,'Er zijn geen geschikte herinneringen op dit toestel.');
  }catch(e){if(valid()){save.disabled=preview.disabled=true;message(status,e.message)}return}
  let busy=false;
  async function run(mode){
@@ -73,13 +95,21 @@ async function render(host,account,rights){
    if(mode==='save'){
     const record=await readStory(id);
     if(!valid())return;
-    if(!record||record.id!==id||!Array.isArray(record.items)||record.items.length!==0)
+    if(!record||record.id!==id||!Array.isArray(record.items)||record.items.length>7)
       throw Error('Herinnering is veranderd. Vernieuw het overzicht.');
-    if(!window.confirm('Deze ene tekstherinnering vrijwillig opslaan in je Premium-cloud? De lokale versie blijft behouden.'))
+    if(!window.confirm('Deze herinnering inclusief '+record.items.length+
+       ' originele mediabestanden vrijwillig in je Premium-cloud opslaan? De lokale versie blijft behouden.'))
       return;
+    const media=[];
+    for(const item of record.items){
+      if(!valid())return;
+      message(status,'Origineel bestand '+(media.length+1)+' van '+record.items.length+' controleren en opslaan…');
+      media.push(await saveOriginalMedia(id,item));
+    }
+    if(!valid())return;
     url=ENDPOINT;
     options={...options,method:'PUT',headers:{...options.headers,'content-type':'application/json'},
-      body:JSON.stringify({consent:true,memory:record})};
+      body:JSON.stringify({consent:true,memory:record,media})};
    }else url+='?id='+encodeURIComponent(id);
    if(!valid())return;
    const res=await fetch(url,options);
@@ -87,13 +117,13 @@ async function render(host,account,rights){
    if(!valid())return;
    if(!res.ok)throw Error(result.error||'Cloudopslag niet beschikbaar');
    if(result.memoryId!==id||result.verified!==true)throw Error('Cloudkopie kon niet worden bevestigd');
-   if(mode==='save')message(status,'Cloudkopie gecontroleerd. Je lokale herinnering staat nog op dit toestel.');
+   if(mode==='save')message(status,'Volledige cloudkopie bevestigd. Je lokale herinnering staat nog op dit toestel.');
    else{
     const cloud=result.memory;
     if(!cloud||cloud.id!==id)throw Error('Cloudkopie hoort niet bij deze herinnering');
     message(status,'Cloudkopie gecontroleerd. Alleen een voorbeeld; lokaal is niets gewijzigd.');
-    output.textContent=JSON.stringify({titel:cloud.title||'',herinnering:cloud.story||cloud.story_text||'',
-      opgeslagenOp:result.savedAt||''},null,2);
+    output.textContent=JSON.stringify({titel:cloud.title||'',herinnering:cloud.text||cloud.story||cloud.story_text||'',
+      origineleMediabestanden:result.media?.length||0,opgeslagenOp:result.savedAt||''},null,2);
    }
   }catch(e){if(valid())message(status,e.message||'Er is iets misgegaan')}
   finally{busy=false;if(valid())save.disabled=preview.disabled=false}

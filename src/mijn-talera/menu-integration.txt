@@ -696,7 +696,40 @@ shell.addEventListener('click',e=>{
    .finally(()=>{premiumSyncUi.atomicRestoreWorking=false;state.busy=false});
   return;
  }
- if(button.dataset.action==='premium-cloud-restore-preview'){
+ if(button.dataset.action==='premium-cloud-integrity'){
+   if(premiumSyncUi.cloudIntegrityWorking||state.busy||!state.account?.id||
+      premiumSyncUi.consent?.enabled!==true||premiumSyncUi.cloudPreview?.phase!=='manifest_available')return;
+   const expectedAccountId=state.account.id;
+   if(premiumSyncUi.cloudPreview.atomicBytes>64*1024*1024&&
+      !window.confirm('Deze alleen-lezen cloudcontrole downloadt een groot archief en kan veel dataverkeer gebruiken. Doorgaan?'))return;
+   premiumSyncUi.cloudIntegrityWorking=true;premiumSyncUi.cloudIntegrity=null;
+   premiumSyncUi.cloudIntegrityProgress=null;premiumSyncUi.cloudIntegrityError='';
+   if(state.open&&state.view==='subscription')render();
+   void import('/__clean/premium-cloud-integrity.mjs')
+    .then(mod=>mod.verifyPremiumCloudBytesReadOnly({
+      crypto:window.crypto,fetcher:(url,options)=>fetch(url,options),
+      expectedAccountId,accountMatches:()=>state.account?.id===expectedAccountId,
+      online:()=>navigator.onLine!==false,
+      onProgress:p=>{
+       if(state.account?.id!==expectedAccountId)return;
+       premiumSyncUi.cloudIntegrityProgress=p;
+       if(state.open&&state.view==='subscription')render();
+      }
+    })).then(result=>{
+      if(state.account?.id!==expectedAccountId)return;
+      premiumSyncUi.cloudIntegrity=result;
+      if(state.open&&state.view==='subscription')render();
+    }).catch(error=>{
+      if(state.account?.id!==expectedAccountId)return;
+      premiumSyncUi.cloudIntegrityError=error?.message||'controlefout';
+      if(state.open&&state.view==='subscription')render();
+    }).finally(()=>{
+      premiumSyncUi.cloudIntegrityWorking=false;
+      if(state.open&&state.view==='subscription')render();
+    });
+   return;
+  }
+  if(button.dataset.action==='premium-cloud-restore-preview'){
   if(premiumSyncUi.cloudPreviewWorking||!state.account?.id||premiumSyncUi.consent?.enabled!==true)return;
   const expectedAccountId=state.account.id;
   premiumSyncUi.cloudPreviewWorking=true;premiumSyncUi.cloudPreview=null;premiumSyncUi.cloudIntegrity=null;premiumSyncUi.cloudIntegrityProgress=null;premiumSyncUi.cloudIntegrityError='';

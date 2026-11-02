@@ -5,6 +5,7 @@
 import {cloudAccess,canAcceptCloudConsent,cloudConsentDetails} from './premium-cloud-auth.mjs';
 import {storePremiumObject} from './premium-private-upload.mjs';
 import {privateRecordRoute} from './premium-private-records.mjs';
+import {premiumMultipartRoute} from './premium-multipart-media.mjs';
 const reply=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store'}});
 const denied=(reason)=>reply({ok:false,reason},reason==='login_required'?401:403);
 export async function premiumCloudRoute({request,env,sessionAccount,entitlement,pilotEnabled=false,writeAllowed=false}) {
@@ -27,11 +28,12 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   }
   const access=cloudAccess({sessionAccount,entitlement,consentRow,pilotEnabled});
   if (!access.allowed) return denied(access.reason);
+  if (path.startsWith('/api/premium/cloud/multipart/')) return premiumMultipartRoute({request,env,accountId,writeAllowed});
   if (path.startsWith('/api/premium/cloud/records')) return privateRecordRoute({request,env,accountId,writeAllowed});
   if (path==='/api/premium/cloud/media' && method==='GET') {
     const after=url.searchParams.get('after')||'';
     if(after&&!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(after))return reply({ok:false,reason:'invalid_cursor'},400);
-    const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,created_at FROM talera_premium_media WHERE account_id=? AND media_id>? ORDER BY media_id ASC LIMIT 501').bind(accountId,after).all();
+    const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,sha256,digest_kind,created_at FROM talera_premium_media WHERE account_id=? AND media_id>? ORDER BY media_id ASC LIMIT 501').bind(accountId,after).all();
     const batch=rows.results||[],items=batch.slice(0,500);
     return reply({ok:true,items,next:batch.length>500?items[items.length-1].media_id:null});
   }

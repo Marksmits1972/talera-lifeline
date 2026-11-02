@@ -15,8 +15,15 @@ export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>t
  };
  if(!online())return {phase:'offline',uploaded:0,pending:0};
  if(!(await allowed().catch(()=>false)))return {phase:'not_enabled',uploaded:0,pending:0};
- const remote=await json(fetcher,'/api/premium/cloud/media');
- const stored=new Set((remote.items||[]).map(x=>x.media_id));
+ const stored=new Set();
+ let after=null,pages=0;
+ do{
+  const remote=await json(fetcher,'/api/premium/cloud/media'+(after?'?after='+encodeURIComponent(after):''));
+  if(remote?.ok!==true||!Array.isArray(remote.items)||remote.items.length>500)throw Error('invalid_media_manifest');
+  for(const row of remote.items)stored.add(row.media_id);
+  after=remote.next||null;
+  if(after&&(!/^[0-9a-f-]{36}$/i.test(after)||++pages>1000))throw Error('invalid_media_cursor');
+ }while(after);
  const local=await listLocalPremiumMedia({indexedDB});
  const items=[];
  for(const media of local){

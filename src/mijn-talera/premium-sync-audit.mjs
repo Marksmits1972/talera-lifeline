@@ -72,8 +72,14 @@ export async function auditPremiumSync({indexedDB,crypto,fetcher,expectedAccount
  }
  const blocked=coverage.oversized+coverage.unsupported+oversizedRecords;
  const missing=mediaMissing+recordsMissing;
+ // A separate browser/installed PWA may see an empty IndexedDB even when
+ // the authenticated cloud account already has memories. Comparing nothing
+ // with cloud manifests must NEVER report "Controle geslaagd".
+ const localArchiveEmpty=(coverage.uploadable+coverage.oversized+coverage.unsupported===0)&&
+   localRecords.length===0&&coverage.archivedComments===0;
  return {
-  phase:blocked?'needs_attention':missing?'pending':'manifest_matched',
+  phase:localArchiveEmpty?'local_archive_empty':blocked?'needs_attention':missing?'pending':'manifest_matched',
+  cloudMediaTotal:remoteMedia.size,cloudRecordsTotal:remoteRecords.size,
   mediaMatched,recordsMatched,mediaMissing,recordsMissing,
   oversized:coverage.oversized,oversizedRecords,unsupported:coverage.unsupported,
   unsupportedDetails:coverage.unsupportedDetails||[],

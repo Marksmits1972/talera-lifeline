@@ -4,6 +4,7 @@
  */
 import {cloudAccess,canAcceptCloudConsent,cloudConsentDetails} from './premium-cloud-auth.mjs';
 import {storePremiumObject} from './premium-private-upload.mjs';
+import {privateRecordRoute} from './premium-private-records.mjs';
 const reply=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store'}});
 const denied=(reason)=>reply({ok:false,reason},reason==='login_required'?401:403);
 export async function premiumCloudRoute({request,env,sessionAccount,entitlement,pilotEnabled=false,writeAllowed=false}) {
@@ -26,6 +27,7 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   }
   const access=cloudAccess({sessionAccount,entitlement,consentRow,pilotEnabled});
   if (!access.allowed) return denied(access.reason);
+  if (path.startsWith('/api/premium/cloud/records')) return privateRecordRoute({request,env,accountId,writeAllowed});
   if (path==='/api/premium/cloud/media' && method==='GET') {
     const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,created_at FROM talera_premium_media WHERE account_id=? ORDER BY created_at DESC LIMIT 200').bind(accountId).all();
     return reply({ok:true,items:rows.results||[]});

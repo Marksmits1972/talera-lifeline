@@ -120,3 +120,10 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Bestaande manifesttest aangepast om een echte fictieve Blob te gebruiken; regressietest toegevoegd voor gewijzigde bestanden met dezelfde grootte.
 - Bestaande IndexedDB-structuur en Free-back-up blijven ongemoeid. Voor veel/grote video's kan volledig hashen van de Blob kostbaar zijn: dit is nog niet de definitieve hervatbare grote-video-upload.
 - Nog niet actief gekoppeld aan de PWA. Tests zijn toegevoegd maar nog niet bevestigd als uitgevoerd. Geen echte uploads of wijzigingen aan persoonlijke herinneringen.
+
+## Fase L — lokale media + Premium-sync coördineren (2 november 2026)
+- `src/mijn-talera/premium-sync-coordinator.mjs`: testbare verbindingslaag tussen bestaande IndexedDB-reader, cloudmanifest, synchronisatiewachtrij en servergecontroleerde Premium-rechten/toestemming. Controleert serverrechten vóór het uitlezen van lokale media en hercontroleert vóór iedere upload.
+- Bestaande servermedia-ID's worden vergeleken om dubbele uploads te beperken. Uploadstatus wordt alleen voor deze tijdelijke run in het geheugen bijgehouden, zonder Free-store of persoonlijke herinneringen te wijzigen.
+- Twee tests toegevoegd in `test/premium-sync-coordinator.test.mjs`; opgenomen in GitHub workflow. Uitvoering nog niet bevestigd.
+- **Nog niet geïntegreerd in actieve PWA**. Server moet consent-/media-API aanbieden via dezelfde origin of expliciete veilige bestaande router. De bestaande V62 PWA proxyt naar V56; niet aannemen dat nieuwe `/api/premium/cloud/*` routes automatisch de Core Worker bereiken.
+- Nog nodig: end-to-end accountcontrole, grote video-chunks, metadata/stories-synchronisatie, veilig scheduling/retry. Geen betaalprovider, Free-wijziging of live upload.

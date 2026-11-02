@@ -17,6 +17,7 @@ import syncAuditSource from "./premium-sync-audit.txt";
 import largeMediaSource from "./premium-large-media.txt";
 import restoreVerifierSource from "./premium-restore-verifier.txt";
 import restorePreviewSource from "./premium-cloud-restore-preview.txt";
+import cloudIntegritySource from "./premium-cloud-integrity.txt";
 import atomicRestoreSource from "./premium-cloud-restore-atomic.txt";
 import stagedRestoreSource from "./premium-restore-stage.txt";
 
@@ -115,6 +116,7 @@ export default {
         "/__clean/premium-large-media.mjs":largeMediaSource,
         "/__clean/premium-restore-verifier.mjs":restoreVerifierSource,
         "/__clean/premium-cloud-restore-preview.mjs":restorePreviewSource,
+        "/__clean/premium-cloud-integrity.mjs":cloudIntegritySource,
         "/__clean/premium-cloud-restore-atomic.mjs":atomicRestoreSource,
         "/__clean/premium-restore-stage.mjs":stagedRestoreSource,
       };

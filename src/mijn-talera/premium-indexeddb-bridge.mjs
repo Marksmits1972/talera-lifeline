@@ -58,7 +58,7 @@ export async function inspectPremiumLocalFileCoverage({indexedDB,dbName=DATABASE
   for(const file of records){
    if(String(file?.key||'').startsWith('talera-thread-archive-v1:')){result.archivedComments++;continue}
    if(!(file?.blob instanceof Blob)||!validMedia.has(file.blob.type.toLowerCase())||file.blob.size<1){result.unsupported++;continue}
-   if(file.blob.size>25*1024*1024){result.oversized++;continue}
+   if(file.blob.size>2*1024*1024*1024){result.oversized++;continue}
    result.uploadable++;
   }
   return result;

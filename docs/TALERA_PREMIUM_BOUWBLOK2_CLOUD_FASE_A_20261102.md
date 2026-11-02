@@ -114,3 +114,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - De adapter selecteert lokale media-Blobs, bereidt stabiele media-ID's voor en heeft een fetch-interface voor de beveiligde Core-uploadroute. Twee unit-tests toegevoegd en in CI-testopdracht opgenomen.
 - Nog NIET ingebouwd in actieve PWA of automatisch gestart; echte consent/entitlement API en markSynced-methode moeten veilig worden aangesloten. De huidige media-ID is gebaseerd op sleutel/grootte/mime; voor gewijzigde media moet eerst versiestrategie of content-hash worden verwerkt om botsingen te voorkomen. Stories-tekst en relaties vallen nog niet binnen deze media-bridge.
 - Geen uploads uitgevoerd; tests nog niet als uitgevoerd bevestigd.
+
+## Fase K — gewijzigde lokale media betrouwbaar herkennen (2 november 2026)
+- `createPremiumManifest` in `src/mijn-talera/premium-indexeddb-bridge.mjs` gebruikt nu de SHA-256-inhoud van de Blob, samen met de lokale sleutel en het mediatype, voor een stabiele versiegebonden media-ID. Hierdoor krijgen foto's met dezelfde sleutel en grootte maar gewijzigde inhoud een andere cloud-ID.
+- Bestaande manifesttest aangepast om een echte fictieve Blob te gebruiken; regressietest toegevoegd voor gewijzigde bestanden met dezelfde grootte.
+- Bestaande IndexedDB-structuur en Free-back-up blijven ongemoeid. Voor veel/grote video's kan volledig hashen van de Blob kostbaar zijn: dit is nog niet de definitieve hervatbare grote-video-upload.
+- Nog niet actief gekoppeld aan de PWA. Tests zijn toegevoegd maar nog niet bevestigd als uitgevoerd. Geen echte uploads of wijzigingen aan persoonlijke herinneringen.

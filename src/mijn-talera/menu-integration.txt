@@ -66,7 +66,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
-const premiumSyncUi={consent:null,localArchiveCount:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,restoreError:'',cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
+const premiumSyncUi={consent:null,localArchiveCount:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,restoreError:'',cloudPreview:null,cloudPreviewWorking:false,cloudIntegrity:null,cloudIntegrityWorking:false,cloudIntegrityProgress:null,cloudIntegrityError:'',atomicRestoreWorking:false,restoreProgressBytes:0};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
 
 let authEpoch=0;
@@ -78,7 +78,7 @@ function clearPrivateState(){
   state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
   premiumSyncUi.consent=null;premiumSyncUi.localArchiveCount=null;premiumSyncUi.phase='';premiumSyncUi.uploaded=0;premiumSyncUi.pending=0;
   premiumSyncUi.recordsPhase='';premiumSyncUi.recordsUploaded=0;premiumSyncUi.recordsPending=0;
-  premiumSyncUi.audit=null;premiumSyncUi.restore=null;premiumSyncUi.restoreError='';premiumSyncUi.cloudPreview=null;premiumSyncUi.restoreProgressBytes=0;
+  premiumSyncUi.audit=null;premiumSyncUi.restore=null;premiumSyncUi.restoreError='';premiumSyncUi.cloudPreview=null;premiumSyncUi.cloudIntegrity=null;premiumSyncUi.cloudIntegrityProgress=null;premiumSyncUi.cloudIntegrityError='';premiumSyncUi.restoreProgressBytes=0;
   storageState.owned=null;storageState.received=null;storageState.error='';
   const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
   if(badge){badge.hidden=true;badge.textContent=''}
@@ -355,11 +355,20 @@ function render(){
        'Cloudarchief: '+esc(p.phase)+'.')+'</p>';
     }
     if(premiumSyncUi.cloudPreview?.phase==='manifest_available'){
-      if(premiumSyncUi.cloudPreview.atomicRestoreEligible===true||
-         (premiumSyncUi.cloudPreview.largeRestoreEligible===true&&!!navigator.storage?.getDirectory))
-       html+='<button class="secondary" data-action="premium-cloud-restore-atomic">Herstel naar leeg apparaat</button><p class="meta">TALERA controleert eerst alle bestanden en herstelt daarna alles in één keer. Grote archieven gebruiken tijdelijke privéopslag op het apparaat. Bestaande lokale herinneringen blijven onaangeroerd.</p>';
-      else
-       html+='<p class="meta">Het archief kan op dit apparaat nog niet veilig worden teruggezet. Het wordt niet gedeeltelijk hersteld; de cloudbestanden blijven bewaard.</p>';
+      html+='<button class="secondary" data-action="premium-cloud-integrity"'+(premiumSyncUi.cloudIntegrityWorking?' disabled':'')+'>'+(premiumSyncUi.cloudIntegrityWorking?'Cloudbestanden controleren…':'Controleer cloudbestanden (alleen lezen)')+'</button>';
+      if(premiumSyncUi.cloudIntegrityProgress&&premiumSyncUi.cloudIntegrityWorking)
+       html+='<p class="meta" role="status">'+premiumSyncUi.cloudIntegrityProgress.verifiedMedia+' mediabestanden en '+premiumSyncUi.cloudIntegrityProgress.verifiedRecords+' verhalen/reacties gecontroleerd.</p>';
+      if(premiumSyncUi.cloudIntegrity?.cloudBytesVerified===true)
+       html+='<p class="notice" role="status" data-cloud-bytes-verified>Cloudbestanden inhoudelijk gecontroleerd: '+premiumSyncUi.cloudIntegrity.verifiedMedia+' media en '+premiumSyncUi.cloudIntegrity.verifiedRecords+' verhalen/reacties. Dit vergelijkt de bestanden met de serverregistratie, niet met een ontbrekend lokaal origineel. Er is niets hersteld.</p>';
+      else if(premiumSyncUi.cloudIntegrity?.phase==='needs_attention'||premiumSyncUi.cloudIntegrityError)
+       html+='<p class="notice error" role="status" data-cloud-bytes-error>Cloudcontrole niet geslaagd ('+esc(premiumSyncUi.cloudIntegrityError||premiumSyncUi.cloudIntegrity?.reason||'controlefout')+'). Er is niets gewijzigd.</p>';
+      else html+='<p class="meta">De cloudregistratie is gevonden. De inhoud is nog niet afzonderlijk teruggelezen. Herstel blijft uitgeschakeld tot die controle geslaagd is.</p>';
+      if(premiumSyncUi.cloudIntegrity?.cloudBytesVerified===true&&
+         (premiumSyncUi.cloudPreview.atomicRestoreEligible===true||
+          (premiumSyncUi.cloudPreview.largeRestoreEligible===true&&!!navigator.storage?.getDirectory)))
+       html+='<button class="secondary" data-action="premium-cloud-restore-atomic">Herstel naar leeg apparaat</button><p class="meta">Alleen op een bewust gekozen, echt leeg apparaat en na jouw bevestiging. De herstelroute controleert alle bytes opnieuw; bestaande Free-herinneringen worden nooit overschreven.</p>';
+      else if(premiumSyncUi.cloudIntegrity?.cloudBytesVerified===true)
+       html+='<p class="meta">Dit apparaat ondersteunt nog geen veilig herstel van dit archief. De cloudgegevens blijven bewaard.</p>';
       if(premiumSyncUi.atomicRestoreWorking)
        html+='<p class="meta">Tijdelijk gecontroleerd: '+Math.round(premiumSyncUi.restoreProgressBytes/1048576)+' MiB. TALERA herstelt pas nadat alle bestanden kloppen.</p>';
     }
@@ -641,6 +650,7 @@ shell.addEventListener('click',e=>{
  }
  if(button.dataset.action==='premium-cloud-restore-atomic'){
   if(premiumSyncUi.atomicRestoreWorking||state.busy||premiumSyncUi.consent?.enabled!==true||
+     premiumSyncUi.cloudIntegrity?.cloudBytesVerified!==true||
      premiumSyncUi.cloudPreview?.phase!=='manifest_available'||
      !(premiumSyncUi.cloudPreview?.atomicRestoreEligible===true||premiumSyncUi.cloudPreview?.largeRestoreEligible===true)||!state.account?.id)return;
   const expectedAccountId=state.account.id;
@@ -689,7 +699,7 @@ shell.addEventListener('click',e=>{
  if(button.dataset.action==='premium-cloud-restore-preview'){
   if(premiumSyncUi.cloudPreviewWorking||!state.account?.id||premiumSyncUi.consent?.enabled!==true)return;
   const expectedAccountId=state.account.id;
-  premiumSyncUi.cloudPreviewWorking=true;premiumSyncUi.cloudPreview=null;
+  premiumSyncUi.cloudPreviewWorking=true;premiumSyncUi.cloudPreview=null;premiumSyncUi.cloudIntegrity=null;premiumSyncUi.cloudIntegrityProgress=null;premiumSyncUi.cloudIntegrityError='';
   void import('/__clean/premium-cloud-restore-preview.mjs')
    .then(mod=>mod.previewPremiumCloudRestore({fetcher:(url,options)=>fetch(url,options),
      expectedAccountId,online:()=>navigator.onLine!==false}))

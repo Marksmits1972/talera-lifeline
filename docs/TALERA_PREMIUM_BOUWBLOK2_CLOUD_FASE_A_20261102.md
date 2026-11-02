@@ -127,3 +127,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Twee tests toegevoegd in `test/premium-sync-coordinator.test.mjs`; opgenomen in GitHub workflow. Uitvoering nog niet bevestigd.
 - **Nog niet geïntegreerd in actieve PWA**. Server moet consent-/media-API aanbieden via dezelfde origin of expliciete veilige bestaande router. De bestaande V62 PWA proxyt naar V56; niet aannemen dat nieuwe `/api/premium/cloud/*` routes automatisch de Core Worker bereiken.
 - Nog nodig: end-to-end accountcontrole, grote video-chunks, metadata/stories-synchronisatie, veilig scheduling/retry. Geen betaalprovider, Free-wijziging of live upload.
+
+## Fase M — strikt afgeschermde Core-pilot (2 november 2026)
+- Huidige PWA V62 verwijst niet rechtstreeks naar Clean Core: de `src/mijn-talera/worker.js` router geeft overige routes door aan V56_BASE. Daardoor mogen de nieuwe cloudroutes niet blind via PWA worden vrijgegeven.
+- `src/core/premium-cloud-pilot.mjs` toegevoegd: gebruik bestaande Core-pilotbindings, beperkte account-allowlist en serverafgeleide `manual_test`-entitlement. Alleen zo mag de cloudbeschikbaarheid voor een pilotaccount worden aangezet; Free en andere Premium-gebruikers houden `available.cloud_storage=false`.
+- Zes gerichte tests toegevoegd en opgenomen in GitHub Actions. Uitvoering nog onbevestigd. Module is nog NIET gemonteerd in bestaande Core Worker en pilot is niet geactiveerd.
+- Vervolg: geverifieerde Core-sessie en entitlement binnen bestaande Worker aan routeadapter koppelen, originbeveiliging verifiëren; PWA same-origin doorgifte alleen voor geselecteerde pilotroutes expliciet bouwen en met testaccounts beoordelen. Geen productie-/Free-aanpassingen en geen betalingsprovider.

@@ -7,11 +7,11 @@ const css=[
 '#talera-more-menu[hidden]{display:none!important}',
 '#talera-more-menu{position:fixed;inset:0;z-index:220;display:flex;align-items:flex-end;justify-content:center;background:rgba(6,18,30,.3);font:15px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#26384f}',
 '#talera-more-menu *{box-sizing:border-box}',
-'#talera-more-menu .panel{width:min(100%,560px);height:min(85dvh,800px);background:#faf9f6;border-radius:30px 30px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -14px 45px #0b2e4433}',
+'#talera-more-menu .panel{width:100%;max-width:560px;min-width:0;max-height:100%;height:min(85dvh,800px);background:#faf9f6;border-radius:30px 30px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -14px 45px #0b2e4433}',
 '#talera-more-menu header{display:flex;align-items:center;gap:10px;padding:13px 20px;background:#fff;border-bottom:1px solid #e9edef;flex-shrink:0}',
 '#talera-more-menu header strong{flex:1;text-align:center;font-size:16px;color:#24495c}',
 '#talera-more-menu .headbutton{border:0;background:#eef3f5;border-radius:22px;min-width:40px;height:40px;color:#234a61;font-size:23px;cursor:pointer}',
-'#talera-more-menu .body{padding:19px 18px 35px;overflow-y:auto;overscroll-behavior:contain;flex:1}',
+'#talera-more-menu .body{padding:19px 18px 35px;min-width:0;overflow-x:hidden;overflow-y:auto;overflow-wrap:anywhere;overscroll-behavior:contain;flex:1}',
 '#talera-more-menu h1{font-size:25px;letter-spacing:-.6px;margin:0 0 5px;color:#24475d}',
 '#talera-more-menu .intro{font-size:13px;color:#738297;margin:0 0 20px}',
 '#talera-more-menu .section-label{font-size:12px;font-weight:750;letter-spacing:.04em;color:#718397;margin:20px 3px 7px}',
@@ -35,7 +35,7 @@ const css=[
 '#talera-more-menu input,#talera-more-menu textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}',
 '#talera-more-menu .panel:focus{outline:none}',
 '#talera-more-menu .primary{width:100%;border:0;border-radius:14px;padding:13px;margin:9px 0 0;background:#315d78;color:#fff;font:700 15px system-ui}',
-'#talera-more-menu .secondary{width:100%;border:1px solid #dbe6ec;border-radius:13px;padding:11px;margin-top:8px;background:#fff;color:#315d78;font:650 14px system-ui}',
+'#talera-more-menu .secondary{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;border:1px solid #dbe6ec;border-radius:13px;padding:11px;margin-top:8px;background:#fff;color:#315d78;font:650 14px system-ui}',
 '#talera-more-menu .notice{padding:10px 13px;margin:13px 0;background:#edf3f6;border-radius:10px;font-size:13px;color:#31546c}',
 '#talera-more-menu .notice.error{background:#fff0ee;color:#a12e20}',
 '#talera-more-menu .switch{display:flex;gap:10px;align-items:center}#talera-more-menu .switch input{width:auto;margin:0}',
@@ -45,6 +45,20 @@ const css=[
 ].join('');
 const style=document.createElement('style');style.id='talera-more-style';style.textContent=css+"#talera-more-menu .talera-pw-wrap{position:relative;display:block}#talera-more-menu .talera-pw-wrap input{padding-right:62px}#talera-more-menu .talera-pw-eye{position:absolute;right:5px;top:6px;width:48px;height:44px;border:0;border-radius:11px;background:transparent;color:#42667d;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}#talera-more-menu .talera-pw-eye svg{width:23px;height:23px;pointer-events:none}#talera-more-menu .talera-pw-eye[aria-pressed=true]{background:#eef4f8;color:#155d90}";style.textContent+="#talera-more-menu .panel[data-view=hub] .intro,#talera-more-menu .panel[data-view=hub] .option small{display:none}\n#talera-more-menu h1{display:none}\n#talera-more-menu .panel[data-view=hub] .body{padding-top:12px}\n#talera-more-menu .option{font-size:14px}\n#talera-more-menu .option .copy{min-width:0}\n#talera-more-menu .thread-item{overflow-wrap:anywhere}\n#talera-more-menu .status-line{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e9edef}\n#talera-more-menu .status-line:last-child{border-bottom:0}\n#talera-more-menu .status-line small{display:block;color:#778899;margin-top:3px}\n#talera-more-menu .inline-button{border:1px solid #c7d8e1;background:#fff;color:#225271;border-radius:10px;padding:9px 11px;font:650 12px system-ui;cursor:pointer;white-space:nowrap}\n#talera-more-menu .inline-button:disabled{opacity:.5;cursor:default}\n#talera-more-menu .meta{font-size:12px;color:#748494}\n#talera-more-menu .panel[data-view=mine] .status-line strong{font-size:13px}\n#talera-more-menu .panel[data-view=messages] .option small{display:block}\n#talera-more-menu .empty-note{padding:18px;color:#6d8290;text-align:center;font-size:13px}\n#talera-more-menu .section-label:first-child{margin-top:4px}\n";style.textContent+="\nnav.flow-nav #navNotifications{position:relative}\nnav.flow-nav .talera-unread-badge{position:absolute;top:3px;right:24%;background:#1c5673;color:#fff;border-radius:999px;min-width:17px;height:17px;padding:1px 4px;display:grid;place-items:center;font:700 10px/1 system-ui;box-shadow:0 0 0 2px #fff}\nnav.flow-nav .talera-unread-badge[hidden]{display:none!important}\n";document.head.appendChild(style);
 const shell=document.createElement('div');shell.id='talera-more-menu';shell.hidden=true;
+// iOS can keep the layout viewport wider than what is actually visible after zoom.
+// Fit the modal to the current visual viewport without changing the user's zoom.
+function fitMenuViewport(){
+ if(!state.open)return;
+ const viewport=window.visualViewport;
+ if(!viewport)return;
+ shell.style.inset='auto';
+ shell.style.left=viewport.offsetLeft+'px';
+ shell.style.top=viewport.offsetTop+'px';
+ shell.style.width=viewport.width+'px';
+ shell.style.height=viewport.height+'px';
+}
+window.visualViewport?.addEventListener('resize',fitMenuViewport);
+window.visualViewport?.addEventListener('scroll',fitMenuViewport);
 shell.innerHTML='<section class="panel" role="dialog" aria-modal="true" aria-label="Meer" tabindex="-1"><header><button class="headbutton" data-action="back" aria-label="Terug">‹</button><strong>Meer</strong><button class="headbutton" data-action="close" aria-label="Sluiten">×</button></header><div class="body"></div></section>';
 document.body.append(shell);
 shell.querySelector('.panel')?.setAttribute('aria-label','Mijn TALERA');
@@ -52,7 +66,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
-const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,restore:null,restoreWorking:false,cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
+const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
 
 let authEpoch=0;
@@ -94,9 +108,23 @@ function section(label,items){return '<p class="section-label">'+esc(label)+'</p
 function info(t,description){return '<div class="info"><strong>'+esc(t)+'</strong><p>'+esc(description)+'</p></div>'}
 function notice(){return state.notice?'<p class="notice'+(state.error?' error':'')+'" role="status">'+esc(state.notice)+'</p>':''}
 function passwordField(id,label,autocomplete){return '<label>'+label+'<span class="talera-pw-wrap"><input id="'+id+'" type="password" name="'+id+'" autocomplete="'+autocomplete+'" autocapitalize="off" spellcheck="false" required><button type="button" class="talera-pw-eye" data-password-toggle="'+id+'" aria-label="Toon wachtwoord" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>'}
+function premiumAuditStatus(){
+ if(premiumSyncUi.auditWorking)return '<p class="notice" role="status" data-premium-audit-status>Volledigheidscontrole bezig. TALERA vergelijkt het lokale archief met de EU-cloud.</p>';
+ if(premiumSyncUi.auditError)return '<p class="notice error" role="status" data-premium-audit-status>'+esc(premiumSyncUi.auditError)+'</p>';
+ const a=premiumSyncUi.audit;
+ if(!a)return '';
+ let result='';
+ if(a.phase==='manifest_matched')result='Controle geslaagd: '+a.mediaMatched+' mediabestanden en '+a.recordsMatched+' verhalen/reacties komen overeen met de cloudregistratie. Teruglezen moet nog afzonderlijk worden gecontroleerd.';
+ else if(a.phase==='pending'||a.phase==='needs_attention')
+  result='Nog niet volledig: '+a.mediaMissing+' mediabestanden en '+a.recordsMissing+' verhalen/reacties ontbreken; '+a.oversized+' mediabestanden te groot, '+a.oversizedRecords+' verhalen/reacties te groot en '+a.unsupported+' bestanden niet ondersteund.';
+ else result='Volledigheidscontrole: '+a.phase+'.';
+ return '<p class="notice" role="status" data-premium-audit-status>'+esc(result)+'</p>';
+}
 function render(){
  if(!state.open)return;
- shell.querySelector('.panel').dataset.view=state.view;back.hidden=state.view==='hub';back.setAttribute('aria-label',state.history.length?'Terug naar vorig menu':'Terug naar Mijn TALERA');
+ const panel=shell.querySelector('.panel');
+ const preserveScroll=panel.dataset.view===state.view?body.scrollTop:0;
+ panel.dataset.view=state.view;back.hidden=state.view==='hub';back.setAttribute('aria-label',state.history.length?'Terug naar vorig menu':'Terug naar Mijn TALERA');
  head.textContent=state.view==='hub'?'Mijn TALERA':({account:'Mijn account',profile:'Mijn profielgegevens',login:'Aanmelden',forgot:'Wachtwoord herstellen',register:'Account aanmaken',privacy:'Privacy en beveiliging',people:'Mijn mensen',shared:'Met mij gedeeld',mine:'Door mij gedeeld',recipient:'Herinnering delen',messages:'Berichten',thread:'Gesprek',notifications:'Meldingen',settings:'Instellingen',language:'Taal',accessibility:'Toegankelijkheid',display:'Weergave',subscription:'Mijn abonnement','premium-admin':'Premium-testrechten',storage:'Opslag en back-up',help:'Hulp en over TALERA'})[state.view]||'Meer';
  let html='',a=state.account;
  switch(state.view){
@@ -258,7 +286,8 @@ function render(){
       html+='<p class="meta">EU-cloudopslag toegestaan. Mediabestanden, verhalen en bewaarde reacties worden automatisch verwerkt zodra het lokale archief aan dit account is gekoppeld. Videobestanden tot 2 GiB worden in delen verwerkt.</p>';
       if(deviceOwner===a.id){
         html+='<button class="secondary" data-action="premium-sync-resume">Synchronisatie hervatten</button>'+
-          '<button class="secondary" data-action="premium-sync-audit">Controleer volledigheid</button>'+
+          '<button class="secondary" data-action="premium-sync-audit"'+(premiumSyncUi.auditWorking?' disabled':'')+'>'+(premiumSyncUi.auditWorking?'Controleren…':'Controleer volledigheid')+'</button>'+
+          premiumAuditStatus()+
           '<button class="secondary" data-action="premium-sync-restore">Controleer teruglezen</button>';
       }else if(deviceOwner===null){
         html+='<p class="meta">De cloudtoestemming is al gegeven. Koppel nu één keer de lokale herinneringen op dit apparaat aan '+esc(a.email||'dit account')+'.</p>'+
@@ -275,14 +304,6 @@ function render(){
     }
     if(premiumSyncUi.phase)html+='<p class="meta">Mediabestanden: '+esc(premiumSyncUi.phase)+' · '+premiumSyncUi.uploaded+' geüpload · '+premiumSyncUi.pending+' wachtend.</p>';
     if(premiumSyncUi.recordsPhase)html+='<p class="meta">Verhalen en bewaarde reacties: '+esc(premiumSyncUi.recordsPhase)+' · '+premiumSyncUi.recordsUploaded+' geüpload · '+premiumSyncUi.recordsPending+' wachtend.</p>';
-    if(premiumSyncUi.audit){
-      const a=premiumSyncUi.audit;
-      if(a.phase==='manifest_matched')
-       html+='<p class="meta">Controle: alle ondersteunde lokale bestanden en herinneringen komen overeen met de serverregistratie. Een volledige terugzetproef is nog nodig.</p>';
-      else if(a.phase==='pending'||a.phase==='needs_attention')
-       html+='<p class="meta">Nog niet compleet: '+a.mediaMissing+' mediabestanden en '+a.recordsMissing+' verhalen/reacties ontbreken; '+a.oversized+' te grote mediabestanden, '+a.oversizedRecords+' te grote verhalen/reacties en '+a.unsupported+' niet-ondersteunde bestanden.</p>';
-      else html+='<p class="meta">Volledigheidscontrole: '+esc(a.phase)+'.</p>';
-    }
     if(premiumSyncUi.restore){
       const check=premiumSyncUi.restore;
       html+='<p class="meta">'+(check.verifiedObjects?
@@ -351,7 +372,7 @@ function render(){
    '<a href="/kennisbank/">Open de kennisbank</a></div>';break;
  default:html=title('Meer','TALERA');
  }
- body.innerHTML=html+notice();body.scrollTop=0;
+ body.innerHTML=html+notice();body.scrollTop=preserveScroll;
  if(state.open&&state.view==='storage')window.TaleraFreeBackup?.render(body);
  if(state.open&&state.view==='hub')void window.TaleraFreeBackup?.remind(shell);
 }
@@ -388,8 +409,8 @@ async function resumePremiumCloudMediaSync(){
 function feedback(message,error=false){state.notice=message;state.error=error;if(state.open&&state.view==='login'&&error){let p=body.querySelector('[data-auth-error]');if(!p){p=document.createElement('p');p.dataset.authError='true';p.className='notice error';p.setAttribute('role','alert');body.appendChild(p)}p.textContent=message;return}render()}
 function go(view){if(!state.open)return;state.history.push(state.view);state.view=view;state.notice='';render();void load(view)}
 function backOne(){if(state.history.length){state.view=state.history.pop()}else if(state.view!=='hub'){state.view='hub'}else{close();return}state.notice='';render();void load(state.view)}
-function open(view='hub',intent=null){if(state.open){if(view!=='hub'){state.view=view;state.history=[];state.intent=intent;state.notice='';render()}return}state.open=true;state.view=view;state.intent=intent;state.history=[];state.notice='';shell.hidden=false;document.body.dataset.taleraMoreOpen='true';render();shell.querySelector('.panel')?.focus({preventScroll:true});void load(view)}
-function close(){state.open=false;state.intent=null;shell.hidden=true;delete document.body.dataset.taleraMoreOpen;trigger()?.focus?.()}
+function open(view='hub',intent=null){if(state.open){if(view!=='hub'){state.view=view;state.history=[];state.intent=intent;state.notice='';fitMenuViewport();render()}return}state.open=true;state.view=view;state.intent=intent;state.history=[];state.notice='';shell.hidden=false;document.body.dataset.taleraMoreOpen='true';fitMenuViewport();render();shell.querySelector('.panel')?.focus({preventScroll:true});void load(view)}
+function close(){state.open=false;state.intent=null;shell.hidden=true;shell.removeAttribute('style');delete document.body.dataset.taleraMoreOpen;trigger()?.focus?.()}
 async function load(view){
   const startEpoch=authEpoch;
  try{
@@ -652,8 +673,7 @@ shell.addEventListener('click',e=>{
    if(premiumSyncUi.auditWorking||state.busy||!state.account?.id||premiumSyncUi.consent?.enabled!==true)return;
    const expectedAccountId=state.account.id;
    const ownerMatches=()=>state.account?.id===expectedAccountId&&localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)===expectedAccountId;
-   premiumSyncUi.auditWorking=true;premiumSyncUi.audit=null;
-   feedback('Volledigheidscontrole gestart. TALERA vergelijkt lokale herinneringen met de EU-cloudregistratie.');
+   premiumSyncUi.auditWorking=true;premiumSyncUi.audit=null;premiumSyncUi.auditError='';render();
    void import('/__clean/premium-sync-audit.mjs')
     .then(mod=>mod.auditPremiumSync({
       indexedDB:window.indexedDB,crypto:window.crypto,
@@ -663,11 +683,17 @@ shell.addEventListener('click',e=>{
       if(state.account?.id!==expectedAccountId||!ownerMatches())return;
       premiumSyncUi.audit=result;
       if(state.open&&state.view==='subscription')render();
-    }).catch(()=>{
+    }).catch(error=>{
       if(state.account?.id!==expectedAccountId)return;
-      premiumSyncUi.error='Controle onderbroken: nog geen bevestiging dat alle herinneringen zijn overgezet.';
+      premiumSyncUi.auditError='Controle onderbroken ('+(error?.message||'onbekende fout')+'). Nog geen bevestiging dat alles is overgezet.';
       if(state.open&&state.view==='subscription')render();
-    }).finally(()=>{premiumSyncUi.auditWorking=false});
+    }).finally(()=>{
+      premiumSyncUi.auditWorking=false;
+      if(state.open&&state.view==='subscription'){
+        render();
+        body.querySelector('[data-premium-audit-status]')?.scrollIntoView({block:'nearest',behavior:'instant'});
+      }
+    });
    return;
  }
  if(button.dataset.action==='premium-sync-resume'){

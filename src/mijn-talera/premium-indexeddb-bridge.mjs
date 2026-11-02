@@ -30,6 +30,7 @@ export async function createPremiumManifest(media,{crypto}={}) {
 }
 export async function uploadLocalPremiumMedia({media,manifest,fetcher=fetch,crypto}={}) {
  if(!crypto?.subtle)throw Error('crypto_unavailable');
+ if(typeof media?.key!=='string'||!media.key||media.key.length>240||media.key.startsWith('talera-thread-archive-v1:'))throw Error('invalid_local_key');
  const bytes=await media.blob.arrayBuffer();
  const sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
  const response=await fetcher('/api/premium/cloud/media/'+manifest.mediaId,{method:'PUT',credentials:'same-origin',headers:{'content-type':media.mime,'x-content-sha256':sha,'x-talera-local-key':encodeURIComponent(media.key)},body:bytes});

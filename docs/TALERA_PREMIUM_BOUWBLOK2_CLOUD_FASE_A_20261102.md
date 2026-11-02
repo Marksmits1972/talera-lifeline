@@ -55,3 +55,12 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 **Heldere UI:** toon 'Premium-testtoegang' voor beheertests, nooit 'Betaald' of een factuur. In productie blijft er geen algemene knop over waarmee gebruikers zichzelf Premium kunnen geven. Zelf-toekennen blijft serverzijdig onmogelijk. Het intrekken van een recht mag nooit stil persoonlijke cloudgegevens verwijderen.
 
 **Laatste integratiestap rond 99%:** echte provider koppelen aan hetzelfde rechtensysteem met serverzijdig geverifieerde, idempotente betaalbevestiging; aparte test van hernieuwen, mislukte betaling, terugbetaling en opzegging. Tot dan is commercialBillingActive:false correct.
+
+
+## Uitvoering — fase B, 2 november 2026
+- Bestaande Clean Core Worker-bindings gecontroleerd: DB = bestaande staging D1, PREMIUM_PRIVATE = talera-premium-private-eu-staging, PREMIUM_MEDIA = talera-core-media, SHARE_MEDIA = afzonderlijke sociale bucket.
+- Geen nieuwe Worker of R2-bucket gemaakt. Premium-pilotflags bestaan al in de Core Worker.
+- D1-migratie migrations/20261102_premium_private_media.sql in bestaande staging D1 toegepast: talera_premium_media en index aanwezig; direct daarna nul records bevestigd.
+- Nieuwe uploadmodule src/core/premium-private-upload.mjs is uitsluitend broncode; nog NIET verbonden met publieke routes, geen persoonlijke uploads uitgevoerd.
+- Privacy-/beveiligingsgrens: testaccount krijgt niet vanzelf uploads; rechten + eenmalige toestemming + serveridentiteit + checks moeten vóór live openstelling zijn afgedwongen.
+- Nog uit te voeren voor functioneel gereed: serverroute met authentieke sessie; duurzame consentregistratie; R2-opslagtransacties en foutafhandeling; uploadwachtrij/retries; IndexedDB-migratie en automatische sync; e2e tests met fictieve media. Het nieuwe testsbestand is nog niet gedraaid. QR-status volgt pas na gecontroleerde cloudverwerking.

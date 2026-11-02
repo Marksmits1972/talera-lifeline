@@ -15,6 +15,7 @@ import recordsBridgeSource from "./premium-records-bridge.txt";
 import recordsCoordinatorSource from "./premium-records-coordinator.txt";
 import syncAuditSource from "./premium-sync-audit.txt";
 import largeMediaSource from "./premium-large-media.txt";
+import restoreVerifierSource from "./premium-restore-verifier.txt";
 
 export const MENU_MODULE = "/__clean/menu-integration.mjs";
 export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
@@ -53,6 +54,7 @@ export default {
         "/__clean/premium-records-coordinator.mjs":recordsCoordinatorSource,
         "/__clean/premium-sync-audit.mjs":syncAuditSource,
         "/__clean/premium-large-media.mjs":largeMediaSource,
+        "/__clean/premium-restore-verifier.mjs":restoreVerifierSource,
       };
       const moduleText = syncModules[url.pathname];
       if (moduleText !== undefined) {

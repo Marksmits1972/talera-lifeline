@@ -15,20 +15,21 @@ export function validatePremiumUpload({accountId, mediaId, contentType, byteLeng
   if (!hexHash.test(String(sha256||''))) return {ok:false,reason:'invalid_digest'};
   return {ok:true,objectKey:'premium/'+accountId+'/'+mediaId};
 }
-export async function storePremiumObject({bucket,db,accountId,mediaId,contentType,bytes,sha256,entitlement,consent,now=Date.now()}) {
+export async function storePremiumObject({bucket,db,accountId,mediaId,contentType,bytes,sha256,sourceKey=null,entitlement,consent,now=Date.now()}) {
   const buffer = bytes instanceof ArrayBuffer ? bytes : null;
   const validation=validatePremiumUpload({accountId,mediaId,contentType,byteLength:buffer?.byteLength,sha256,entitlement,consent});
   if (!validation.ok) return validation;
+  if(sourceKey!==null&&(typeof sourceKey!=='string'||!sourceKey||sourceKey.length>240||sourceKey.startsWith('talera-thread-archive-v1:')))return {ok:false,reason:'invalid_source_key'};
   if (!bucket?.put || !db?.prepare || !globalThis.crypto?.subtle) return {ok:false,reason:'storage_unavailable'};
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer))).map(x=>x.toString(16).padStart(2,'0')).join('');
   if (digest!==sha256.toLowerCase()) return {ok:false,reason:'digest_mismatch'};
-  const exists=await db.prepare('SELECT media_id,sha256 FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
-  if (exists) return {ok:exists.sha256===digest,reason:exists.sha256===digest?'already_stored':'id_conflict',objectKey:validation.objectKey};
-  const stored=await bucket.put(validation.objectKey,buffer,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType},customMetadata:{sha256:digest}});
+  const exists=await db.prepare('SELECT media_id,sha256,source_key FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
+  if (exists){const match=exists.sha256===digest&&(!sourceKey||!exists.source_key||exists.source_key===sourceKey);return {ok:match,reason:match?'already_stored':'id_conflict',objectKey:validation.objectKey}}
+  const stored=await bucket.put(validation.objectKey,buffer,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType},customMetadata:{sha256:digest,...(sourceKey?{sourceKey}:{})}});
   if (!stored) return {ok:false,reason:'concurrent_upload_retry'};
   try {
-    await db.prepare('INSERT INTO talera_premium_media(account_id,media_id,object_key,content_type,byte_size,sha256,created_at) VALUES(?,?,?,?,?,?,?)')
-      .bind(accountId,mediaId,validation.objectKey,contentType,buffer.byteLength,digest,now).run();
+    await db.prepare('INSERT INTO talera_premium_media(account_id,media_id,object_key,content_type,byte_size,sha256,created_at,source_key) VALUES(?,?,?,?,?,?,?,?)')
+      .bind(accountId,mediaId,validation.objectKey,contentType,buffer.byteLength,digest,now,sourceKey).run();
   } catch(err) {
     // Preserve the cloud object for safe reconciliation after concurrent uploads.
     throw err;

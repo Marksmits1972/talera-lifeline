@@ -291,11 +291,13 @@ function render(){
   case 'storage':
     html=title('Opslag en back-up','Controle voor deze browser en jouw TALERA-account.')+
       info('Op dit toestel',storageState.local===null?'Nog niet gecontroleerd of niet beschikbaar':storageState.local+' lokale herinnering'+(storageState.local===1?'':'en')+' in deze browser')+
-      (a?info('In mijn TALERA-account',storageState.owned===null?'Nog niet gecontroleerd':storageState.owned+' account-herinneringen')+
+      (a?info('In mijn TALERA-account',storageState.owned===null?'Nog niet gecontroleerd':storageState.owned+' gewone account-herinneringen. Premium-cloudherinneringen worden apart getoond onder Mijn abonnement.')+
          info('Met mij gedeeld',storageState.received===null?'Nog niet gecontroleerd':storageState.received+' ontvangen herinneringen'):
          info('Account','Niet aangemeld. Je kunt je lokale herinneringen wel bekijken.')+'<button class="secondary" type="button" data-view="login">Aanmelden</button>')+
       (storageState.error?info('Controle niet volledig',storageState.error):'')+
-      info('Let op','Je Free-herinneringen staan lokaal op dit toestel. Maak hieronder zelf een aparte back-up via Bestanden en herstel die indien nodig. TALERA uploadt deze lokale back-up niet. Controleer zelf of het bestand echt buiten de browser is bewaard.')+
+      info('Let op',storageState.local===0?
+        'In deze browser zijn geen lokale Free-herinneringen gevonden. Dit zegt niets over je bestaande Premium EU-cloudarchief of over andere TALERA-installaties. Koppel of herstel niet opnieuw zonder het juiste archief te controleren.':
+        'Free-herinneringen worden lokaal per installatie bewaard. Maak bij aanwezige herinneringen een aparte back-up via Bestanden. TALERA uploadt dit back-upbestand niet. Controleer of het bestand buiten de browser is bewaard.')+
       '<button class="secondary" type="button" data-action="storage-refresh">Opnieuw controleren</button>';
     break;
  case 'subscription':{

@@ -52,7 +52,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
-const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false};
+const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,restore:null,restoreWorking:false};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
 
 let authEpoch=0;
@@ -64,7 +64,7 @@ function clearPrivateState(){
   state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
   premiumSyncUi.consent=null;premiumSyncUi.phase='';premiumSyncUi.uploaded=0;premiumSyncUi.pending=0;
   premiumSyncUi.recordsPhase='';premiumSyncUi.recordsUploaded=0;premiumSyncUi.recordsPending=0;
-  premiumSyncUi.audit=null;
+  premiumSyncUi.audit=null;premiumSyncUi.restore=null;
   storageState.owned=null;storageState.received=null;storageState.error='';
   const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
   if(badge){badge.hidden=true;badge.textContent=''}
@@ -252,7 +252,7 @@ function render(){
   if(right.source==='manual_test'&&right.permissions?.cloud_storage===true)html+='<button class="secondary" type="button" data-action="premium-cloud-test">EU-cloudopslag testen</button><p class="meta">Alleen een fictieve herinnering. Je eigen herinneringen blijven ongemoeid.</p>';
   if(right.available?.cloud_storage===true){
     html+=premiumSyncUi.consent?.enabled?
-      '<p class="meta">EU-cloudopslag toegestaan. Mediabestanden, verhalen en bewaarde reacties worden automatisch verwerkt zolang TALERA open is. Grote bestanden zijn nog niet ondersteund.</p><button class="secondary" data-action="premium-sync-resume">Synchronisatie hervatten</button><button class="secondary" data-action="premium-sync-audit">Controleer volledigheid</button>':
+      '<p class="meta">EU-cloudopslag toegestaan. Mediabestanden, verhalen en bewaarde reacties worden automatisch verwerkt zolang TALERA open is. Grote bestanden zijn nog niet ondersteund.</p><button class="secondary" data-action="premium-sync-resume">Synchronisatie hervatten</button><button class="secondary" data-action="premium-sync-audit">Controleer volledigheid</button><button class="secondary" data-action="premium-sync-restore">Controleer teruglezen</button>':
       '<button class="secondary" data-action="premium-cloud-consent">Eenmalig toestemming geven voor EU-cloudopslag</button><p class="meta">Je geeft één keer toestemming om de lokale herinneringen van dit apparaat aan dit account te koppelen. Gebruik deze test niet als hier herinneringen van een ander account staan. Free-data blijven behouden.</p>';
     if(premiumSyncUi.phase)html+='<p class="meta">Mediabestanden: '+esc(premiumSyncUi.phase)+' · '+premiumSyncUi.uploaded+' geüpload · '+premiumSyncUi.pending+' wachtend.</p>';
     if(premiumSyncUi.recordsPhase)html+='<p class="meta">Verhalen en bewaarde reacties: '+esc(premiumSyncUi.recordsPhase)+' · '+premiumSyncUi.recordsUploaded+' geüpload · '+premiumSyncUi.recordsPending+' wachtend.</p>';
@@ -263,6 +263,12 @@ function render(){
       else if(a.phase==='pending'||a.phase==='needs_attention')
        html+='<p class="meta">Nog niet compleet: '+a.mediaMissing+' mediabestanden en '+a.recordsMissing+' verhalen/reacties ontbreken; '+a.oversized+' te grote mediabestanden, '+a.oversizedRecords+' te grote verhalen/reacties en '+a.unsupported+' niet-ondersteunde bestanden.</p>';
       else html+='<p class="meta">Volledigheidscontrole: '+esc(a.phase)+'.</p>';
+    }
+    if(premiumSyncUi.restore){
+      const check=premiumSyncUi.restore;
+      html+='<p class="meta">'+(check.verifiedObjects?
+       'Terugleescontrole geslaagd: '+check.verifiedMedia+' mediabestanden en '+check.verifiedRecords+' verhalen/reacties inhoudelijk gecontroleerd.':
+       'Terugleescontrole nog niet compleet: '+esc(check.reason||check.phase)+'.')+'</p>';
     }
     if(premiumSyncUi.error)html+='<p class="meta">'+esc(premiumSyncUi.error)+'</p>';
   }
@@ -481,6 +487,29 @@ shell.addEventListener('click',e=>{
     }).catch(e=>{if(newlyClaimed){try{localStorage.removeItem(PREMIUM_DEVICE_OWNER_KEY)}catch{}}feedback(e.message,true)})
     .finally(()=>{state.busy=false});
    return;
+ }
+ if(button.dataset.action==='premium-sync-restore'){
+  if(premiumSyncUi.restoreWorking||state.busy||!state.account?.id||premiumSyncUi.consent?.enabled!==true)return;
+  if(!window.confirm('Controleer je dat TALERA alle opgeslagen herinneringen uit de EU-cloud kan teruglezen? Dit leest bestanden, schrijft niets over Free heen en kan bij grote video\'s veel dataverkeer gebruiken.'))return;
+  const expectedAccountId=state.account.id;
+  const ownerMatches=()=>state.account?.id===expectedAccountId&&localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)===expectedAccountId;
+  premiumSyncUi.restoreWorking=true;premiumSyncUi.restore=null;
+  feedback('Terugleescontrole gestart. TALERA vergelijkt de bestanden met de lokale originelen.');
+  void import('/__clean/premium-restore-verifier.mjs')
+   .then(mod=>mod.verifyPremiumRemoteBytes({
+     indexedDB:window.indexedDB,crypto:window.crypto,
+     fetcher:(url,options)=>fetch(url,options),expectedAccountId,ownerMatches,
+     online:()=>navigator.onLine!==false
+   })).then(result=>{
+     if(state.account?.id!==expectedAccountId||!ownerMatches())return;
+     premiumSyncUi.restore=result;
+     if(state.open&&state.view==='subscription')render();
+   }).catch(()=>{
+     if(state.account?.id!==expectedAccountId)return;
+     premiumSyncUi.error='Terugleescontrole onderbroken; er is nog geen volledige bevestiging.';
+     if(state.open&&state.view==='subscription')render();
+   }).finally(()=>{premiumSyncUi.restoreWorking=false});
+  return;
  }
  if(button.dataset.action==='premium-sync-audit'){
    if(premiumSyncUi.auditWorking||state.busy||!state.account?.id||premiumSyncUi.consent?.enabled!==true)return;

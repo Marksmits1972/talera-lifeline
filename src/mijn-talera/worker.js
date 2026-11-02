@@ -11,6 +11,8 @@ import backupSource from "./free-backup.txt";
 import syncCoordinatorSource from "./premium-sync-coordinator.txt";
 import syncQueueSource from "./premium-sync-queue.txt";
 import syncBridgeSource from "./premium-indexeddb-bridge.txt";
+import recordsBridgeSource from "./premium-records-bridge.txt";
+import recordsCoordinatorSource from "./premium-records-coordinator.txt";
 
 export const MENU_MODULE = "/__clean/menu-integration.mjs";
 export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
@@ -45,6 +47,8 @@ export default {
         "/__clean/premium-sync-coordinator.mjs":syncCoordinatorSource,
         "/__clean/premium-sync-queue.mjs":syncQueueSource,
         "/__clean/premium-indexeddb-bridge.mjs":syncBridgeSource,
+        "/__clean/premium-records-bridge.mjs":recordsBridgeSource,
+        "/__clean/premium-records-coordinator.mjs":recordsCoordinatorSource,
       };
       const moduleText = syncModules[url.pathname];
       if (moduleText !== undefined) {

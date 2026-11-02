@@ -29,8 +29,11 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   if (!access.allowed) return denied(access.reason);
   if (path.startsWith('/api/premium/cloud/records')) return privateRecordRoute({request,env,accountId,writeAllowed});
   if (path==='/api/premium/cloud/media' && method==='GET') {
-    const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,created_at FROM talera_premium_media WHERE account_id=? ORDER BY created_at DESC LIMIT 200').bind(accountId).all();
-    return reply({ok:true,items:rows.results||[]});
+    const after=url.searchParams.get('after')||'';
+    if(after&&!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(after))return reply({ok:false,reason:'invalid_cursor'},400);
+    const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,created_at FROM talera_premium_media WHERE account_id=? AND media_id>? ORDER BY media_id ASC LIMIT 501').bind(accountId,after).all();
+    const batch=rows.results||[],items=batch.slice(0,500);
+    return reply({ok:true,items,next:batch.length>500?items[items.length-1].media_id:null});
   }
   const match=path.match(/^\/api\/premium\/cloud\/media\/([0-9a-f-]{36})$/i);
   if (match && method==='GET') {

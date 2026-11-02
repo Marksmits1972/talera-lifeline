@@ -35,7 +35,7 @@ export async function previewPremiumCloudRestore({fetcher,expectedAccountId,onli
   if(keys.has(key))conflictingKeys++;else keys.add(key);
   atomicBytes+=item.byte_size;
   const verifiedDigest=/^[a-f0-9]{64}$/.test(item.sha256||'');
-  if(item.digest_kind!=='full-sha256'||!verifiedDigest)atomicIneligible++;
+  if(item.digest_kind!=='full-sha256'||!verifiedDigest||item.byte_size>25*1024*1024)atomicIneligible++;
   if(!verifiedDigest||!['full-sha256','part-sha256-v1'].includes(item.digest_kind)||
     item.byte_size>2*1024*1024*1024||
     (item.digest_kind==='full-sha256'&&item.byte_size>25*1024*1024)||
@@ -55,8 +55,8 @@ export async function previewPremiumCloudRestore({fetcher,expectedAccountId,onli
   media:media.size,stories,comments,
   missingFileKeys,conflictingKeys,invalidMedia,invalidRecords,
   canRestore:false, // Preview does not write; a separate explicit action is required.
-  atomicRestoreEligible:incomplete===0&&atomicIneligible===0&&atomicBytes<=64*1024*1024,
-  largeRestoreEligible:incomplete===0&&stageIneligible===0&&atomicIneligible>=0&&atomicBytes<=4*1024*1024*1024&&recordBytes<=64*1024*1024&&atomicBytes>0,
+  atomicRestoreEligible:incomplete===0&&atomicIneligible===0&&stageIneligible===0&&atomicBytes>0&&atomicBytes<=64*1024*1024,
+  largeRestoreEligible:incomplete===0&&stageIneligible===0&&atomicBytes<=4*1024*1024*1024&&recordBytes<=64*1024*1024&&atomicBytes>0,
   atomicBytes,atomicIneligible,stageIneligible,recordBytes,
   originalKeysVerified:incomplete===0
  };

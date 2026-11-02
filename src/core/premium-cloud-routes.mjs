@@ -42,13 +42,13 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
     if (!writeAllowed) return denied('invalid_origin');
     const type=(request.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
     const rawLength=request.headers.get('content-length');
-    const declaredLength=rawLength===null?NaN:Number(rawLength);
-    if (!Number.isSafeInteger(declaredLength)||declaredLength<1||declaredLength>25*1024*1024) return reply({ok:false,reason:'invalid_size'},413);
+    const declaredLength=rawLength===null?null:Number(rawLength);
+    if (declaredLength!==null&&(!Number.isSafeInteger(declaredLength)||declaredLength<1||declaredLength>25*1024*1024)) return reply({ok:false,reason:'invalid_size'},413);
     // Read with a hard cap even when Transfer-Encoding omits Content-Length.
     if (!request.body) return reply({ok:false,reason:'invalid_size'},400);
     const reader=request.body.getReader();const chunks=[];let total=0;
     try {while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>25*1024*1024){await reader.cancel();return reply({ok:false,reason:'invalid_size'},413)}chunks.push(value)}} finally {reader.releaseLock()}
-    if(total!==declaredLength) return reply({ok:false,reason:'length_mismatch'},400);
+    if(total===0|| (declaredLength!==null&&total!==declaredLength)) return reply({ok:false,reason:'length_mismatch'},400);
     const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
     const result=await storePremiumObject({bucket:env.PREMIUM_PRIVATE,db:env.DB,accountId,mediaId:match[1],contentType:type,bytes:bytes.buffer,sha256:request.headers.get('x-content-sha256'),entitlement,consent:true});
     return reply(result,result.ok?200:400);

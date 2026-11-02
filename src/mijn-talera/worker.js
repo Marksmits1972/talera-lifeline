@@ -8,6 +8,9 @@
 import menuSource from "./menu-integration.txt";
 import knowledgeSource from "./kennisbank.html";
 import backupSource from "./free-backup.txt";
+import syncCoordinatorSource from "./premium-sync-coordinator.txt";
+import syncQueueSource from "./premium-sync-queue.txt";
+import syncBridgeSource from "./premium-indexeddb-bridge.txt";
 
 export const MENU_MODULE = "/__clean/menu-integration.mjs";
 export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
@@ -36,6 +39,21 @@ export default {
           "x-talera-integratie":BUILD_MARKER,
         },
       });
+    }
+    if (request.method === "GET") {
+      const syncModules = {
+        "/__clean/premium-sync-coordinator.mjs":syncCoordinatorSource,
+        "/__clean/premium-sync-queue.mjs":syncQueueSource,
+        "/__clean/premium-indexeddb-bridge.mjs":syncBridgeSource,
+      };
+      const moduleText = syncModules[url.pathname];
+      if (moduleText !== undefined) {
+        return new Response(moduleText,{status:200,headers:{
+          "content-type":"text/javascript; charset=utf-8",
+          "cache-control":"no-store",
+          "x-content-type-options":"nosniff",
+        }});
+      }
     }
     if (request.method === "GET" && url.pathname === "/__clean/free-backup.js") {
       return new Response(backupSource, {

@@ -691,7 +691,7 @@ shell.addEventListener('click',e=>{
       premiumSyncUi.auditWorking=false;
       if(state.open&&state.view==='subscription'){
         render();
-        body.querySelector('[data-premium-audit-status]')?.scrollIntoView({block:'nearest',behavior:'instant'});
+        body.querySelector('[data-premium-audit-status]')?.scrollIntoView({block:'nearest',behavior:'auto'});
       }
     });
    return;

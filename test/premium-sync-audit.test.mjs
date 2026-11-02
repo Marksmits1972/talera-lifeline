@@ -154,3 +154,14 @@ test('subscription UI only offers relink after a positive read-only local story 
  assert.match(subscription,/Number\.isInteger\(premiumSyncUi\.localArchiveCount\)&&premiumSyncUi\.localArchiveCount>0[\s\S]*?data-action="premium-device-link"/);
  assert.match(subscription,/data-premium-local-archive="unverified"/);
 });
+
+test('storage screen does not confuse zero local or account memories with Premium cloud content',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const menu=await readFile(new URL('../src/mijn-talera/menu-integration.txt',import.meta.url),'utf8');
+ const storage=menu.slice(menu.indexOf("case 'storage':"),menu.indexOf("case 'subscription':{"));
+ assert.match(storage,/storageState\.local===0/);
+ assert.match(storage,/geen lokale Free-herinneringen gevonden/);
+ assert.match(storage,/Premium-cloudherinneringen worden apart getoond onder Mijn abonnement/);
+ assert.match(storage,/Dit zegt niets over je bestaande Premium EU-cloudarchief/);
+ assert.doesNotMatch(storage,/Je Free-herinneringen staan lokaal op dit toestel/);
+});

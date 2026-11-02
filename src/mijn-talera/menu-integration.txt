@@ -66,7 +66,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
-const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,restoreError:'',cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
+const premiumSyncUi={consent:null,localArchiveCount:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,restoreError:'',cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
 
 let authEpoch=0;
@@ -76,7 +76,7 @@ function clearPrivateState(){
   state.thread=null;state.threadData=null;
   state.shares=[];state.grants=[];state.person=null;state.personMemories=[];
   state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
-  premiumSyncUi.consent=null;premiumSyncUi.phase='';premiumSyncUi.uploaded=0;premiumSyncUi.pending=0;
+  premiumSyncUi.consent=null;premiumSyncUi.localArchiveCount=null;premiumSyncUi.phase='';premiumSyncUi.uploaded=0;premiumSyncUi.pending=0;
   premiumSyncUi.recordsPhase='';premiumSyncUi.recordsUploaded=0;premiumSyncUi.recordsPending=0;
   premiumSyncUi.audit=null;premiumSyncUi.restore=null;premiumSyncUi.restoreError='';premiumSyncUi.cloudPreview=null;premiumSyncUi.restoreProgressBytes=0;
   storageState.owned=null;storageState.received=null;storageState.error='';
@@ -325,9 +325,14 @@ function render(){
             '<p class="meta">Teruglezen vergelijken met lokale originelen kan hier niet: deze browser heeft geen opgeslagen Free-herinneringen.</p>':
             '<button class="secondary" data-action="premium-sync-restore"'+(premiumSyncUi.restoreWorking?' disabled':'')+'>'+(premiumSyncUi.restoreWorking?'Teruglezen…':'Controleer teruglezen')+'</button>'+premiumReadbackStatus());
       }else if(deviceOwner===null){
-        html+='<p class="meta">De cloudtoestemming is al gegeven. Koppel nu één keer de lokale herinneringen op dit apparaat aan '+esc(a.email||'dit account')+'.</p>'+
-          '<button class="secondary" type="button" data-action="premium-device-link">Koppel lokaal archief en start upload</button>'+
-          '<p class="meta">Je bevestigt eerst dat deze lokale herinneringen bij dit account horen. TALERA verwijdert niets uit Free.</p>';
+        if(premiumSyncUi.localArchiveCount===0)
+          html+='<p class="notice" role="status" data-premium-local-archive="empty">In deze browser zijn geen eigen Free-herinneringen gevonden. Een eerdere koppeling of upload kan in een andere TALERA-installatie zijn uitgevoerd. Koppel hier niets opnieuw. Bekijk desgewenst hieronder alleen je bestaande cloudarchief.</p>';
+        else if(Number.isInteger(premiumSyncUi.localArchiveCount)&&premiumSyncUi.localArchiveCount>0)
+          html+='<p class="meta" data-premium-local-archive="found">Op dit toestel zijn '+premiumSyncUi.localArchiveCount+' eigen Free-herinnering(en) gevonden. Alleen als deze bij '+esc(a.email||'dit account')+' horen kun je het archief koppelen.</p>'+
+            '<button class="secondary" type="button" data-action="premium-device-link">Koppel lokaal archief en start upload</button>'+
+            '<p class="meta">TALERA verwijdert niets uit Free.</p>';
+        else
+          html+='<p class="meta" data-premium-local-archive="unverified">Lokale herinneringen zijn hier nog niet gecontroleerd of niet leesbaar. Voor de veiligheid verschijnt er geen nieuwe koppelknop. Het cloudarchief blijft alleen-lezen beschikbaar.</p>';
       }else if(deviceOwner==='unavailable'){
         html+='<p class="meta">Lokale opslag is niet beschikbaar. De upload blijft geblokkeerd.</p>';
       }else{
@@ -459,11 +464,22 @@ async function load(view){
     const consent=await api('/api/premium/cloud/consent');
     premiumSyncUi.consent=consent.consent||null;
     if(premiumSyncUi.consent?.enabled){
+     premiumSyncUi.localArchiveCount=null;
      try{
        const owner=localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY);
        premiumSyncUi.error=owner===state.account.id?'':owner?
          'Automatische upload geblokkeerd: dit lokale archief hoort bij een ander account.':
-         'Automatische upload wacht op eenmalige koppeling van dit lokale archief.';
+         'Lokale koppeling is niet aangetroffen in deze browser.';
+       if(!owner){
+         // Read only: account consent does not prove this browser owns Free stories.
+         try{
+           const rows=await window.TaleraMemories?.list?.();
+           if(startEpoch!==authEpoch)return;
+           premiumSyncUi.localArchiveCount=Array.isArray(rows)?rows.length:'unavailable';
+         }catch{premiumSyncUi.localArchiveCount='unavailable'}
+         if(premiumSyncUi.localArchiveCount===0)
+           premiumSyncUi.error='Deze browser bevat geen lokale Free-herinneringen. Er is niets opnieuw gekoppeld of geüpload.';
+       }
      }catch{premiumSyncUi.error='Lokale opslag niet beschikbaar.'}
     }
    }

@@ -29,6 +29,8 @@ jobs:
         run: node scripts/v62-package-preflight.mjs
       - name: Compile only — Wrangler --dry-run (NO DEPLOY)
         run: npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Verify CURRENT public V62 routes and preserved Free features (read-only)
+        run: node test/v62-app-entry-http-smoke.mjs
       - name: Preserve checksum inventory for release review
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

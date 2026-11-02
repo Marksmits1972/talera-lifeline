@@ -3,6 +3,7 @@
  * Actions secret, if present. All requested Cloudflare endpoints are GET.
  */
 import {writeFileSync,mkdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 const ACCOUNT='6a396704721632d6d1889be48213c3a0';
 const WORKER='talera-pwa-v62-mijn-profiel-20261101';
 const BASE='https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT+'/workers/scripts/'+WORKER;
@@ -11,7 +12,7 @@ const report={target:WORKER,checkedAt:new Date().toISOString(),
  check:'READ_ONLY',deploymentAllowed:false,ready:false,
  status:'not_checked',serviceBindingValid:false,
  currentDeploymentId:null,previousDeploymentId:null,
- currentVersionId:null};
+ currentVersionId:null,liveContentAvailable:false,liveContentSha256:null,liveContentBytes:null};
 function save(){
  mkdirSync('.talera-v62-package',{recursive:true});
  writeFileSync(artifact,JSON.stringify(report,null,2)+'\n');
@@ -56,8 +57,23 @@ if(!token){
   report.previousDeploymentId=listed[1]?.id||null;
   report.currentVersionId=listed[0]?.versions[0]?.version_id||null;
   report.deploymentCount=all.length;
+  // Download the current script into ephemeral runner memory ONLY. Never
+  // write its source or multipart body to logs or workflow artifacts.
+  const contentResponse=await fetch(BASE+'/content/v2',{
+    method:'GET',headers:{Authorization:'Bearer '+token},
+    signal:AbortSignal.timeout(16000)});
+  if(!contentResponse.ok)throw Error('cloudflare_content_http_'+contentResponse.status);
+  const mime=contentResponse.headers.get('content-type')||'';
+  const binary=new Uint8Array(await contentResponse.arrayBuffer());
+  if(binary.length<25000||binary.length>4*1024*1024)
+   throw Error('unexpected_live_content_size');
+  report.liveContentAvailable=true;
+  report.liveContentBytes=binary.length;
+  report.liveContentSha256=createHash('sha256').update(binary).digest('hex');
+  report.liveContentIsMultipart=/multipart\//i.test(mime);
   report.ready=report.serviceBindingValid===true&&
-   Boolean(report.currentDeploymentId)&&Boolean(report.previousDeploymentId);
+   Boolean(report.currentDeploymentId)&&Boolean(report.previousDeploymentId)&&
+   report.liveContentAvailable===true;
   report.status=report.ready?'metadata_and_rollback_verified':'read_metadata_incomplete';
   if(!report.ready)console.log('::warning::V62 live release is BLOCKED: metadata or rollback requirement is missing.');
  }catch(error){

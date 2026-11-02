@@ -43,11 +43,14 @@ async function privateMemoryRetrieve(env,user,memoryId){
  if(object.size>privateMemoryMaxBytes||!/^([a-f0-9]{64})$/.test(object.customMetadata?.sha256||''))
   return privateMemoryReply({error:'Cloudbestand niet betrouwbaar'},409);
  const bytes=new Uint8Array(await object.arrayBuffer());
- const hash=await privateMemoryHash(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+ let bodyText;
+ try{bodyText=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}
+ catch{return privateMemoryReply({error:'Cloudbestand niet leesbaar'},409)}
+ const hash=await privateMemoryHash(bodyText);
  if(hash!==object.customMetadata.sha256)
   return privateMemoryReply({error:'Cloudbestand niet betrouwbaar'},409);
  let saved;
- try{saved=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}
+ try{saved=JSON.parse(bodyText)}
  catch{return privateMemoryReply({error:'Cloudbestand niet leesbaar'},409)}
  if(saved?.type!==privateMemoryType||saved?.accountId!==user.id||
     saved?.memoryId!==memoryId||saved?.memory?.id!==memoryId||

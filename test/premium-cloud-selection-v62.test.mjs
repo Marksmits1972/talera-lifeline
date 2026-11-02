@@ -21,7 +21,7 @@ test('premium cloud code is only exposed from the existing PWA router',()=>{
 test('upload is only triggered by direct user action and deliberate consent',()=>{
  assert.match(cloud,/save\.addEventListener\('click'/);
  assert.match(cloud,/window\.confirm\(/);
- assert.match(cloud,/consent:true,memory:record/);
+ assert.match(cloud,/consent:true,memory:record,media/);
  assert.match(cloud,/const res=await fetch\(url,options\)/);
  assert.doesNotMatch(cloud,/addEventListener\('load',.+fetch/);
 });
@@ -30,7 +30,9 @@ test('no copy of Free and no writes to local IndexedDB',()=>{
  assert.match(cloud,/db\.transaction\('stories','readonly'\)/);
  assert.doesNotMatch(cloud,/indexedDB\.deleteDatabase|objectStore\('stories'\)\.(put|add|delete)|'readwrite'/);
  assert.match(cloud,/record\.id!==id/);
- assert.match(cloud,/record\.items\.length!==0/);
+ assert.match(cloud,/record\.items\.length>7/);
+ assert.match(cloud,/saveOriginalMedia\(id,item\)/);
+ assert.match(cloud,/TaleraMemories\?\.blob\?\./);
 });
 test('Free backup still exposes local archive and restore, untouched by Premium',()=>{
  assert.match(worker,/import backupSource from "\.\/free-backup\.txt"/);

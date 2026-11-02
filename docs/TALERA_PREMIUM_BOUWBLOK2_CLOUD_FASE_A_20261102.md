@@ -80,3 +80,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Zes gerichte route-contracttests toegevoegd in test/premium-cloud-routes.test.mjs. Nog niet uitgevoerd en routeadapter nog NIET in actieve Core Worker geïntegreerd.
 - Pilot moet standaard gesloten blijven; bestaande Core moet zijn CSRF-/Origincontrole, authenticatie, rate limiting en entitlementbeleid vóór aanroep toepassen. Uploadbewaking voor mediagroottes/streaming en samenloop/idempotentie nog integraal toetsen.
 - Nog NIET gereed: client IndexedDB-wachtrij, automatische hervatting, beveiligde live-integratie, downloadacceptatie en QR-beschikbaarheidskoppeling. Geen persoonlijke media geüpload.
+
+## Fase E — uploadgrenzen aangescherpt (2 november 2026)
+- De pilotroute weigert opgegeven bestanden groter dan 25 MiB en leest de uploadstream met een harde bovengrens, ook zonder Content-Length-header (relevant voor browsers). Lege bestanden en opgegeven lengte die niet overeenkomt met de ontvangen bytes worden geweigerd.
+- Twee extra route-tests toegevoegd voor te grote bestanden en ontbrekende Content-Length met ongeldige hash. Nog niet als uitgevoerd aangemerkt.
+- De 25 MiB limiet is strikt voor deze technische pilot en **geen** productlimiet voor TALERA video's. Voor volledige Premium moeten grote uploads via begrensde, hervatbare chunks of gelijkwaardige streaming worden verwerkt, inclusief retry en integriteitscontrole.
+- De code is niet live gekoppeld aan de bestaande Core Worker. Nog geen daadwerkelijke cloudupload of cross-device sync bewezen. Eerst code- en regressietests, daarna geïsoleerde stagingintegratie met testaccount en fictieve media.

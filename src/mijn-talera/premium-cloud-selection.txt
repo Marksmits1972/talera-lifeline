@@ -1,0 +1,105 @@
+/* TALERA Premium: opt-in cloud choice inside the existing Mijn TALERA storage view.
+ * Disabled unless server-confirmed availability and a live Premium permission.
+ * The Free IndexedDB store, Free backup and existing sharing are read-only here.
+ */
+(function(){
+'use strict';
+if(window.TaleraPremiumCloud)return;
+const DB='talera-lifeline-dev-local-v1',ENDPOINT='/api/me/premium/cloud/memory';
+let epoch=0;
+const button=(label)=>{const el=document.createElement('button');el.type='button';el.className='secondary';el.textContent=label;return el};
+const message=(host,text)=>{host.textContent=text};
+function readStory(id){
+ return new Promise((resolve,reject)=>{
+  const request=indexedDB.open(DB,1);
+  request.onupgradeneeded=()=>{request.transaction?.abort();reject(Error('Er is nog geen lokale bibliotheek'))};
+  request.onerror=()=>reject(request.error||Error('Lokale opslag niet bereikbaar'));
+  request.onsuccess=()=>{
+   const db=request.result;
+   if(!db.objectStoreNames.contains('stories')){db.close();reject(Error('Geen herinneringen gevonden'));return}
+   const tx=db.transaction('stories','readonly');
+   const r=tx.objectStore('stories').get(id);
+   r.onsuccess=()=>{db.close();resolve(r.result||null)};
+   r.onerror=()=>{db.close();reject(r.error||Error('Herinnering niet leesbaar'))};
+  };
+ });
+}
+async function currentStories(){
+ const rows=await window.TaleraMemories?.list?.();
+ if(!Array.isArray(rows))throw Error('Lokale herinneringen zijn niet beschikbaar');
+ return rows.filter(s=>s&&typeof s.id==='string'&&s.id.length<=192&&Array.isArray(s.items)&&s.items.length===0);
+}
+const ready=rights=>rights?.permissions?.cloud_storage===true&&rights?.available?.cloud_storage===true;
+function reset(){epoch++}
+async function render(host,account,rights){
+ host.querySelector('#talera-premium-cloud')?.remove();
+ if(!account?.id||!ready(rights))return;
+ const generation=++epoch,accountId=account.id;
+ const root=document.createElement('section');root.id='talera-premium-cloud';
+ root.style.cssText='padding:14px 0;border-top:1px solid #ccd8dd;margin-top:16px';
+ const heading=document.createElement('strong');heading.textContent='Premium-cloudopslag — zelf kiezen';
+ const desc=document.createElement('p');
+ desc.textContent='Alleen voor tekstherinneringen. TALERA verstuurt niets automatisch en verwijdert niets van dit toestel.';
+ const select=document.createElement('select');select.setAttribute('aria-label','Kies een lokale tekstherinnering');
+ const save=button('Deze herinnering veilig opslaan');
+ const preview=button('Mijn cloudkopie bekijken');preview.style.marginLeft='8px';
+ const status=document.createElement('p');status.setAttribute('role','status');
+ const output=document.createElement('pre');
+ output.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font:inherit';
+ root.append(heading,desc,select,save,preview,status,output);
+ host.append(root);
+ let choices=[];
+ const valid=()=>generation===epoch&&document.contains(root)&&accountId===account.id;
+ try{
+  choices=await currentStories();
+  if(!valid())return;
+  select.replaceChildren();
+  for(const story of choices){
+   const o=document.createElement('option');o.value=story.id;
+   o.textContent=String(story.title||story.name||'Herinnering zonder titel').slice(0,120);
+   select.append(o);
+  }
+  save.disabled=preview.disabled=choices.length===0;
+  if(!choices.length)message(status,'Er zijn geen tekstherinneringen zonder mediabestanden op dit toestel.');
+ }catch(e){if(valid()){save.disabled=preview.disabled=true;message(status,e.message)}return}
+ let busy=false;
+ async function run(mode){
+  if(busy||!valid())return;
+  const id=select.value;
+  if(!choices.some(x=>x.id===id))return;
+  busy=true;save.disabled=preview.disabled=true;output.textContent='';
+  try{
+   let url=ENDPOINT,options={credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
+   if(mode==='save'){
+    const record=await readStory(id);
+    if(!valid())return;
+    if(!record||record.id!==id||!Array.isArray(record.items)||record.items.length!==0)
+      throw Error('Herinnering is veranderd. Vernieuw het overzicht.');
+    if(!window.confirm('Deze ene tekstherinnering vrijwillig opslaan in je Premium-cloud? De lokale versie blijft behouden.'))
+      return;
+    url=ENDPOINT;
+    options={...options,method:'PUT',headers:{...options.headers,'content-type':'application/json'},
+      body:JSON.stringify({consent:true,memory:record})};
+   }else url+='?id='+encodeURIComponent(id);
+   if(!valid())return;
+   const res=await fetch(url,options);
+   const result=await res.json().catch(()=>({}));
+   if(!valid())return;
+   if(!res.ok)throw Error(result.error||'Cloudopslag niet beschikbaar');
+   if(result.memoryId!==id||result.verified!==true)throw Error('Cloudkopie kon niet worden bevestigd');
+   if(mode==='save')message(status,'Cloudkopie gecontroleerd. Je lokale herinnering staat nog op dit toestel.');
+   else{
+    const cloud=result.memory;
+    if(!cloud||cloud.id!==id)throw Error('Cloudkopie hoort niet bij deze herinnering');
+    message(status,'Cloudkopie gecontroleerd. Alleen een voorbeeld; lokaal is niets gewijzigd.');
+    output.textContent=JSON.stringify({titel:cloud.title||'',herinnering:cloud.story||cloud.story_text||'',
+      opgeslagenOp:result.savedAt||''},null,2);
+   }
+  }catch(e){if(valid())message(status,e.message||'Er is iets misgegaan')}
+  finally{busy=false;if(valid())save.disabled=preview.disabled=false}
+ }
+ save.addEventListener('click',()=>{void run('save')});
+ preview.addEventListener('click',()=>{void run('preview')});
+}
+window.TaleraPremiumCloud={render,reset};
+})();

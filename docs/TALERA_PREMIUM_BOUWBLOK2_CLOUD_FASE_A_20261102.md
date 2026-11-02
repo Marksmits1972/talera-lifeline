@@ -161,3 +161,11 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - `src/mijn-talera/premium-sync-queue.mjs` gecorrigeerd: zowel synchrone exceptions als afgewezen promises in `allowed()` worden nu veilig afgevangen. Een weigering of netwerkfout mag geen media als gesynchroniseerd markeren.
 - Eén extra regressietest toegevoegd in `test/premium-sync-queue.test.mjs`, nog niet als geslaagd bevestigd.
 - Cloudflare-pilot blijft uit en de gewone TALERA PWA is niet gewijzigd. Volgende actie: verifieer workflowuitvoering met geldige Actions-toegang of draai de repository-tests lokaal met volledige checkout; daarna pas geïsoleerde R2-upload.
+
+## Fase S — echte Cloudflare R2-opslagtest (2 november 2026)
+- Cloudflare Worker-bindings gecontroleerd: de bestaande Core Worker verwijst naar `PREMIUM_PRIVATE = talera-premium-private-eu-staging` met `jurisdiction=eu`, maar de bestemming bleek niet te bestaan (R2 API 404 / code 10006).
+- Die specifieke bucket tijdelijk aangemaakt voor een technische test. Cloudflare rapporteerde `location=WEUR`, maar **`jurisdiction=default`**, niet de vereiste EU-jurisdictie. Dit is niet als conforme Premium-persoonsopslag beschouwd.
+- In de tijdelijke R2-bucket is een volledig fictief tekstobject met de R2 Object API geüpload, exact teruggelezen en verwijderd. PUT, GET en DELETE werkten. Geen privéfoto's, accounts, sessies, D1-manifestwijzigingen of PWA-uploadroute gebruikt.
+- De lege testbucket is aansluitend verwijderd (Cloudflare API bevestigde succes), om geen opslag met verkeerde jurisdictie te laten staan.
+- **Openstaande blokkade:** de definitieve `PREMIUM_PRIVATE` bucket moet als aantoonbare EU-jurisdictie worden aangemaakt en bij de bestaande Core Worker passen. De daadwerkelijke sessie-/consent-/entitlement-/R2-route en automatische PWA-sync zijn daarmee nog NIET end-to-end bevestigd.
+- Cloudpilot blijft uit, met lege allowlist; geen betaling of gebruikersdata aangeraakt. Bestaande Free- en social-mediaopslag niet hergebruiken voor de persoonlijke Premium-cloud.

@@ -88,3 +88,31 @@ test('multipart video checks chunk fingerprint and ID without opening local DB',
  assert.equal(result.verifiedRecords,1);
  assert.equal(result.archiveComplete,false);
 });
+
+test('PWA does not offer restore before a separate read-only integrity proof',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const menu=await readFile(new URL('../src/mijn-talera/menu-integration.txt',import.meta.url),'utf8');
+ const show=menu.slice(menu.indexOf("case 'subscription':{"),menu.indexOf("case 'premium-admin':{"));
+ assert.match(show,/data-action="premium-cloud-integrity"/);
+ assert.match(show,/data-cloud-bytes-verified/);
+ const previewStart=show.indexOf("if(premiumSyncUi.cloudPreview?.phase==='manifest_available')");
+ const proof=show.indexOf("premiumSyncUi.cloudIntegrity?.cloudBytesVerified===true",previewStart);
+ const restoreButton=show.indexOf("data-action=\"premium-cloud-restore-atomic\"",proof);
+ assert.ok(previewStart>=0&&proof>previewStart&&restoreButton>proof,'restore button requires read-only integrity proof');
+ const handler=menu.slice(menu.indexOf("if(button.dataset.action==='premium-cloud-integrity')"),
+  menu.indexOf("if(button.dataset.action==='premium-cloud-restore-preview')"));
+ assert.match(handler,/verifyPremiumCloudBytesReadOnly/);
+ assert.doesNotMatch(handler,/indexedDB|localStorage\.setItem|method:'PUT'|method:'POST'/);
+ const restoreHandler=menu.slice(menu.indexOf("if(button.dataset.action==='premium-cloud-restore-atomic')"),
+  menu.indexOf("if(button.dataset.action==='premium-cloud-integrity')"));
+ assert.match(restoreHandler,/premiumSyncUi\.cloudIntegrity\?\.cloudBytesVerified!==true/);
+});
+test('existing V62 Worker serves one read-only integrity module without creating another database or router',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const router=await readFile(new URL('../src/mijn-talera/worker.js',import.meta.url),'utf8');
+ const served=await readFile(new URL('../src/mijn-talera/premium-cloud-integrity.txt',import.meta.url),'utf8');
+ const original=await readFile(new URL('../src/mijn-talera/premium-cloud-integrity.mjs',import.meta.url),'utf8');
+ assert.equal(served,original);
+ assert.match(router,/"\/__clean\/premium-cloud-integrity\.mjs":cloudIntegritySource/);
+ assert.doesNotMatch(original,/indexedDB\.open|localStorage\.setItem|method:'POST'|method:'PUT'/);
+});

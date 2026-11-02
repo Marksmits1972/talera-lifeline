@@ -72,6 +72,14 @@ async function privateMediaRoutes(req,env,user,m,u){
   size:Number(req.headers.get('x-talera-size')),mime:req.headers.get('content-type'),
   sha256:req.headers.get('x-talera-sha256')};
  if(!privateMediaEntryValid(entry))return privateMemoryReply({error:'Bestandstype, omvang of controlewaarde ongeldig'},422);
+ // Identical retry is safe, but replacing the original binary never is.
+ const prior=await env.PREMIUM_PRIVATE.head(objectKey);
+ if(prior){
+  if(prior.size===entry.size&&prior.customMetadata?.sha256===entry.sha256&&
+     prior.customMetadata?.mime===entry.mime&&prior.customMetadata?.kind===entry.kind)
+   return privateMemoryReply({ok:true,key:itemKey,bytes:entry.size,sha256:entry.sha256,verified:true,alreadyUploaded:true},200);
+  return privateMemoryReply({error:'Bestand bestaat al met andere inhoud'},409);
+ }
  const knownLength=req.headers.get('content-length');
  if(knownLength!==null&&Number(knownLength)!==entry.size)
   return privateMemoryReply({error:'Bestandsgrootte komt niet overeen'},400);

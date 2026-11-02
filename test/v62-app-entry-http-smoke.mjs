@@ -22,6 +22,16 @@ assert.equal(home.status,200,'Mijn leven must serve the home page');
 assert.match(home.headers.get('content-type')||'',/text\/html/i);
 const homeHtml=await home.text();
 assert.match(homeHtml,/id=["']navMore["']/,'Mijn leven must have its More navigation');
+assert.match(homeHtml,/<style id="talera-v62-iphone-fit">/,
+ 'Mijn leven must include a single scoped iPhone layout fix');
+assert.match(homeHtml,/touch-action:pan-y pinch-zoom/,
+ 'Pinch zoom must remain available on iPhone instead of being blocked');
+assert.match(homeHtml,/--talera-v62-visual-width/,
+ 'Home sheet, hero and three-tab navigation must use the visual viewport');
+assert.match(homeHtml,/<script id="talera-v62-iphone-fit-script">/,
+ 'iOS should resize the home layout when the visual viewport changes');
+assert.doesNotMatch(html,/id="talera-v62-iphone-fit"/,
+ 'The main home layout fix must not modify the presentation page');
 const getMenuTag=html=>{
  const tags=[...html.matchAll(/src=["'](\/__clean\/menu-integration\.mjs\?v=[a-z0-9]+)["']/g)].map(m=>m[1]);
  assert.equal(tags.length,1,'TALERA page must load one versioned menu; saw '+JSON.stringify((html.match(/.{0,90}menu-integration[.]mjs.{0,90}/g)||[]).slice(0,3)));

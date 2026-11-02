@@ -261,7 +261,7 @@ function render(){
       if(a.phase==='manifest_matched')
        html+='<p class="meta">Controle: alle ondersteunde lokale bestanden en herinneringen komen overeen met de serverregistratie. Een volledige terugzetproef is nog nodig.</p>';
       else if(a.phase==='pending'||a.phase==='needs_attention')
-       html+='<p class="meta">Nog niet compleet: '+a.mediaMissing+' mediabestanden en '+a.recordsMissing+' verhalen/reacties ontbreken; '+a.oversized+' te grote en '+a.unsupported+' niet-ondersteunde bestanden.</p>';
+       html+='<p class="meta">Nog niet compleet: '+a.mediaMissing+' mediabestanden en '+a.recordsMissing+' verhalen/reacties ontbreken; '+a.oversized+' te grote mediabestanden, '+a.oversizedRecords+' te grote verhalen/reacties en '+a.unsupported+' niet-ondersteunde bestanden.</p>';
       else html+='<p class="meta">Volledigheidscontrole: '+esc(a.phase)+'.</p>';
     }
     if(premiumSyncUi.error)html+='<p class="meta">'+esc(premiumSyncUi.error)+'</p>';

@@ -494,9 +494,11 @@ shell.addEventListener('click',e=>{
       fetcher:(url,options)=>fetch(url,options),
       expectedAccountId,ownerMatches,online:()=>navigator.onLine!==false
     })).then(result=>{
+      if(state.account?.id!==expectedAccountId||!ownerMatches())return;
       premiumSyncUi.audit=result;
       if(state.open&&state.view==='subscription')render();
     }).catch(()=>{
+      if(state.account?.id!==expectedAccountId)return;
       premiumSyncUi.error='Controle onderbroken: nog geen bevestiging dat alle herinneringen zijn overgezet.';
       if(state.open&&state.view==='subscription')render();
     }).finally(()=>{premiumSyncUi.auditWorking=false});

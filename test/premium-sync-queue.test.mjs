@@ -23,3 +23,5 @@ test('rights check failure mid-batch retains remaining local media',async()=>{
  assert.deepEqual(f.synced,['a']);
  assert.equal(result.pending,1);
 });
+
+test('synchronous entitlement check failure is safely denied',async()=>{const f=fixture({allowed:()=>{throw Error('offline')}});const r=await syncPremiumPending(f.args);assert.equal(r.phase,'not_enabled');assert.deepEqual(f.synced,[])});

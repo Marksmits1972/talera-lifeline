@@ -181,3 +181,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Stagingstatus gecontroleerd: `PREMIUM_PRIVATE` binding verwijst naar `talera-premium-private-eu-staging` met `jurisdiction=eu`, maar de daadwerkelijke bucket ontbreekt. `PREMIUM_CLOUD_PILOT_ENABLED=false`, `PREMIUM_CLOUD_PILOT_ACCOUNT_IDS` leeg.
 - Geen nieuwe bucket gemaakt omdat de eerdere API-creaties ondanks expliciete EU-header consequent `jurisdiction=default` teruggaven. Dat niet als EU-conform accepteren. Gebruik Cloudflare Dashboard R2 > Create bucket > Location > Specify jurisdiction > EU, naam exact `talera-premium-private-eu-staging`. Verifieer na aanmaak teruggelezen metadata `jurisdiction=eu`, en test dan eerst met fictief object; geen persoonlijke uploads vóór bevestiging.
 - De bestaande Worker en PWA zijn bewust niet aangepast en de pilot blijft uit.
+
+## Fase V — EU-bucket zichtbaar in dashboard, API nog niet bruikbaar (2 november 2026)
+- Gebruiker heeft Cloudflare-dashboard screenshots aangeleverd met bucket `talera-premium-private-eu-staging`, expliciet `Jurisdiction: European Union (EU)`, public access disabled, size 0 B. De bucket **niet opnieuw aanmaken of verwijderen**.
+- Via gekoppelde Cloudflare REST API geeft GET bucket met `cf-r2-jurisdiction: eu` nog 404/10006. Dit betekent dat de huidige connectorroute niet aantoonbaar bij deze EU-bucket kan, niet dat het dashboard ongelijk heeft.
+- Bestaande Clean Core Worker-binding opnieuw bevestigd: `PREMIUM_PRIVATE` wijst naar de juiste naam met `jurisdiction=eu`; pilot `false`, accountallowlist leeg. Er zijn geen nieuwe uploadroutes uitgerold en geen gebruikersbestanden aangeraakt.
+- Verifieer daadwerkelijke buckettoegang bij voorkeur via geïsoleerde, afgeschermde Worker-bindingtest of Cloudflare-dashboard, zonder de privacycontroles te omzeilen. Er is **nog geen werkende end-to-end Worker-R2-upload** aangetoond. Geen productietoegang openen zonder geverifieerde tests.

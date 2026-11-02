@@ -61,6 +61,7 @@ function clearPrivateState(){
   state.shares=[];state.grants=[];state.person=null;state.personMemories=[];
   state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
   storageState.owned=null;storageState.received=null;storageState.error='';
+  window.TaleraPremiumCloud?.reset?.();
   const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
   if(badge){badge.hidden=true;badge.textContent=''}
   const tab=document.querySelector('nav.flow-nav #navNotifications');
@@ -288,8 +289,27 @@ function render(){
  default:html=title('Meer','TALERA');
  }
  body.innerHTML=html+notice();body.scrollTop=0;
- if(state.open&&state.view==='storage')window.TaleraFreeBackup?.render(body);
+ if(state.open&&state.view==='storage'){
+  window.TaleraFreeBackup?.render(body);
+  maybePremiumCloudRender();
+ }
  if(state.open&&state.view==='hub')void window.TaleraFreeBackup?.remind(shell);
+}
+function maybePremiumCloudRender(){
+ if(!state.open||state.view!=='storage'||!state.account||
+    premiumState.rights?.permissions?.cloud_storage!==true||
+    premiumState.rights?.available?.cloud_storage!==true)return;
+ if(window.TaleraPremiumCloud){
+   void window.TaleraPremiumCloud.render(body,state.account,premiumState.rights);
+   return;
+ }
+ if(document.getElementById('talera-premium-cloud-loader'))return;
+ const script=document.createElement('script');
+ script.id='talera-premium-cloud-loader';script.src='/__clean/premium-cloud.js';
+ script.async=true;
+ script.onload=()=>{if(state.open&&state.view==='storage'&&state.account)
+  void window.TaleraPremiumCloud?.render(body,state.account,premiumState.rights)};
+ document.head.appendChild(script);
 }
 function feedback(message,error=false){state.notice=message;state.error=error;if(state.open&&state.view==='login'&&error){let p=body.querySelector('[data-auth-error]');if(!p){p=document.createElement('p');p.dataset.authError='true';p.className='notice error';p.setAttribute('role','alert');body.appendChild(p)}p.textContent=message;return}render()}
 function go(view){if(!state.open)return;state.history.push(state.view);state.view=view;state.notice='';render();void load(view)}
@@ -329,6 +349,7 @@ async function load(view){
 
    if(view==='storage'){
      storageState.local=null;storageState.owned=null;storageState.received=null;storageState.error='';
+     premiumState.rights=null;
      if(state.open&&state.view===view)render();
      const failed=[];
      try{
@@ -344,6 +365,13 @@ async function load(view){
        else failed.push('Ontvangen herinneringen niet beschikbaar.');
      }
      storageState.error=failed.join(' ');
+     if(state.account){
+       try{
+         const entitlement=await api('/api/me/entitlements');
+         if(startEpoch!==authEpoch)return;
+         premiumState.rights=entitlement.rights;
+       }catch{premiumState.rights=null}
+     }
    }
   if(view==='shared')state.shared=(await api('/api/shared-with-me')).items||[];
   if(view==='thread'&&state.thread){const id=state.thread;state.threadData=await api('/api/threads/'+encodeURIComponent(id));await api('/api/messages/memory/'+encodeURIComponent(id)+'/read','POST',{});void updateUnreadBadge();}

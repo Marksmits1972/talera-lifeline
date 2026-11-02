@@ -142,3 +142,15 @@ test('Premium local relink refuses an empty browser archive before writing owner
  assert.ok(ownerWrite>confirm,'never set local owner key or launch uploads for an empty archive');
  assert.match(handler,/Geen eigen Free-herinneringen in deze browser/);
 });
+
+test('subscription UI only offers relink after a positive read-only local story count',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const menu=await readFile(new URL('../src/mijn-talera/menu-integration.txt',import.meta.url),'utf8');
+ assert.match(menu,/const premiumSyncUi=\{consent:null,localArchiveCount:null,/);
+ assert.match(menu,/const rows=await window\.TaleraMemories\?\.list\?\.\(\)/);
+ assert.match(menu,/premiumSyncUi\.localArchiveCount=Array\.isArray\(rows\)\?rows\.length:'unavailable'/);
+ const subscription=menu.slice(menu.indexOf("case 'subscription':{"),menu.indexOf("case 'premium-admin':{"));
+ assert.match(subscription,/premiumSyncUi\.localArchiveCount===0[\s\S]*?data-premium-local-archive="empty"/);
+ assert.match(subscription,/Number\.isInteger\(premiumSyncUi\.localArchiveCount\)&&premiumSyncUi\.localArchiveCount>0[\s\S]*?data-action="premium-device-link"/);
+ assert.match(subscription,/data-premium-local-archive="unverified"/);
+});

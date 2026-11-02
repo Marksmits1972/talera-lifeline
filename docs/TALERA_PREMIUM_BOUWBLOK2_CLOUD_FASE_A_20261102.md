@@ -98,3 +98,8 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Deze workflow bevat **geen** deployment, betaalprovider of echte opslagopdracht; test alleen de modules met fictieve invoer.
 - Bij de eerste controle waren nog geen commit-gekoppelde workflowresultaten beschikbaar. Teststatus dus **onbevestigd**, niet als geslaagd rapporteren.
 - De daadwerkelijke Cloudflare R2 end-to-end upload/downloadtest en bestaande Core Worker integratie blijven afzonderlijke vervolgstappen.
+
+## Fase H — fictieve end-to-end test (2 november 2026)
+- `test/premium-cloud-e2e-fixture.test.mjs` toegevoegd: simuleert upload, teruglezen, accountisolatie en Free-afwijzing met in-memory D1/R2 mocks; er worden geen persoonlijke data of echte R2-objecten gebruikt.
+- `.github/workflows/premium-cloud-tests.yml` uitgebreid zodat deze test samen met de eerdere moduletests wordt uitgevoerd zodra Actions de workflow draait.
+- Workflowstatus is nog NIET bevestigd als succesvol. De mock bewijst nog geen echte Cloudflare R2 end-to-end werking. Geen productie-uitrol.

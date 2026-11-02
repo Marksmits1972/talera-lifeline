@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - name: Check TALERA menu script syntax
         run: node --check --input-type=commonjs < src/mijn-talera/menu-integration.txt
-      - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs test/premium-cloud-e2e-fixture.test.mjs test/premium-sync-queue.test.mjs test/premium-indexeddb-bridge.test.mjs test/premium-sync-coordinator.test.mjs test/premium-cloud-pilot.test.mjs test/premium-cloud-core-adapter.test.mjs test/premium-eu-pilot-patch.test.mjs test/premium-cloud-integration-patch.test.mjs test/premium-private-records.test.mjs test/premium-records-coordinator.test.mjs test/premium-sync-audit.test.mjs
+      - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs test/premium-cloud-e2e-fixture.test.mjs test/premium-sync-queue.test.mjs test/premium-indexeddb-bridge.test.mjs test/premium-sync-coordinator.test.mjs test/premium-cloud-pilot.test.mjs test/premium-cloud-core-adapter.test.mjs test/premium-eu-pilot-patch.test.mjs test/premium-cloud-integration-patch.test.mjs test/premium-private-records.test.mjs test/premium-records-coordinator.test.mjs test/premium-sync-audit.test.mjs test/premium-multipart-media.test.mjs
       - name: Verify closed pilot rejects anonymous requests
         env:
           TALERA_CORE_STAGING_URL: https://talera-clean-core-staging-20261030.mark-a39.workers.dev

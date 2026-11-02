@@ -35,4 +35,12 @@ assert.match(menuSource,/rights\.accountId!==accountId/,
  'Local binding must first verify server-proven account identity');
 assert.match(menuSource,/consent\.consent\?\.enabled!==true/,
  'Local binding must first verify the existing cloud consent');
-console.log('V62 Mijn leven opens the canonical More menu in-place: OK');
+assert.match(menuSource,/window\.visualViewport/,
+ 'iPhone menu must use the actual visible viewport when the page is zoomed');
+assert.match(menuSource,/body\.scrollTop=preserveScroll/,
+ 'audit re-render must retain the current menu scroll position');
+assert.match(menuSource,/data-premium-audit-status/,
+ 'the result of Controleer volledigheid must appear alongside its button');
+assert.match(menuSource,/Controleren…/,
+ 'the completeness button must show visible progress');
+console.log('V62 Mijn leven menu scales to mobile and displays audit progress/results: OK');

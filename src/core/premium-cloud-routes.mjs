@@ -39,11 +39,23 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   }
   const match=path.match(/^\/api\/premium\/cloud\/media\/([0-9a-f-]{36})$/i);
   if (match && method==='GET') {
-    const row=await env.DB.prepare('SELECT object_key,content_type FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,match[1]).first();
+    const row=await env.DB.prepare('SELECT object_key,content_type,byte_size FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,match[1]).first();
     if (!row) return reply({ok:false,reason:'not_found'},404);
-    const object=await env.PREMIUM_PRIVATE.get(row.object_key);
-    if (!object) return reply({ok:false,reason:'not_found'},404);
-    return new Response(object.body,{headers:{'content-type':row.content_type,'cache-control':'private, no-store','x-content-type-options':'nosniff'}});
+    const requested=request.headers.get('range');
+    let range=null;
+    if(requested!==null){
+      const matchRange=/^bytes=(\d+)-(\d+)$/.exec(requested);
+      if(!matchRange)return reply({ok:false,reason:'invalid_range'},416);
+      const start=Number(matchRange[1]),end=Number(matchRange[2]);
+      if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||end<start||
+        end>=row.byte_size||end-start+1>8*1024*1024)return reply({ok:false,reason:'invalid_range'},416);
+      range={offset:start,length:end-start+1};
+    }
+    const object=await env.PREMIUM_PRIVATE.get(row.object_key,range?{range}:undefined);
+    if (!object?.body) return reply({ok:false,reason:'not_found'},404);
+    const headers={'content-type':row.content_type,'cache-control':'private, no-store','x-content-type-options':'nosniff'};
+    if(range){headers['content-range']='bytes '+range.offset+'-'+(range.offset+range.length-1)+'/'+row.byte_size;headers['accept-ranges']='bytes'}
+    return new Response(object.body,{status:range?206:200,headers});
   }
   if (match && method==='PUT') {
     if (!writeAllowed) return denied('invalid_origin');

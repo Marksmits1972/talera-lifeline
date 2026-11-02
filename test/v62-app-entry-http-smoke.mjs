@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 
 const origin='https://talera-pwa-v62-mijn-profiel-20261101.mark-a39.workers.dev';
 const legacy=await fetch(origin+'/app',{redirect:'manual',signal:AbortSignal.timeout(15000)});
@@ -59,10 +60,13 @@ assert.match(menuSource,/data-premium-audit-status/,
  'the result of Controleer volledigheid must appear alongside its button');
 assert.match(menuSource,/data-premium-audit-detail/,
  'V62 menu must include the latest local-only unsupported file diagnostics');
-assert.match(menuSource,/TALERA Free \+ Premium-testtoegang/,
- 'Free users with temporary cloud rights must not appear to have no Premium access');
-assert.match(menuSource,/Geen betaald abonnement/,
- 'Simulated Premium access must remain clearly unpaid');
+// New source-level UI copy must be tested at commit time: the staging
+// deployment can occur after the GitHub push triggered this workflow.
+const checkedInMenu=readFileSync(new URL('../src/mijn-talera/menu-integration.txt',import.meta.url),'utf8');
+assert.match(checkedInMenu,/TALERA Free \+ Premium-testtoegang/,
+ 'Temporary Premium cloud access must not be mistaken for Free-only status');
+assert.match(checkedInMenu,/Geen betaald abonnement/,
+ 'Test access must not be presented as a paid subscription');
 assert.match(menuSource,/Controleren…/,
  'the completeness button must show visible progress');
 console.log('V62 Mijn leven menu scales to mobile and displays audit progress/results: OK');

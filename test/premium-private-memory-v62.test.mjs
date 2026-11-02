@@ -109,6 +109,6 @@ test('origin, disabled flag and absent consent fail closed',async()=>{
 });
 test('no implicit local IndexedDB writes or Share Media replication',()=>{
  assert.doesNotMatch(source,/indexedDB|SHARE_MEDIA|INSERT INTO|CREATE TABLE/);
- assert.match(source,/etagDoesNotMatch:'\\*'/);
+ assert.ok(source.includes("etagDoesNotMatch:'*'"));
  assert.match(source,/PREMIUM_PRIVATE_MEMORY_ENABLED!=='true'/);
 });

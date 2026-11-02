@@ -150,3 +150,8 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Twee aanvullende regressietests toegevoegd aan `test/premium-sync-queue.test.mjs`.
 - Drie gerichte tests uitgevoerd met Node 22 in een lokale kopie van de gecorrigeerde wachtrijlogica: fout bij eerste rechtencontrole, fout midden in ronde en normale upload; 3/3 geslaagd. Dit is **geen** volledige repository-CI of echte R2-test.
 - De actieve TALERA Worker en PWA zijn niet gewijzigd, pilot blijft afgeschermd, geen persoonlijke herinneringen aangeraakt.
+
+## Fase Q — integratietests verder aangescherpt (2 november 2026)
+- In `test/premium-cloud-e2e-fixture.test.mjs` twee extra afgeschermde tests toegevoegd: cloudmedia worden zonder eenmalige toestemming geweigerd; de uitgeschakelde pilot weigert ook voor een Premium-account de cloudroute. De in-memory fixture maakt de toestemmingsstatus toetsbaar.
+- De reeds aanwezige upload/download-accountisolatietest blijft bestaan. Dit zijn tests met mocks en géén bewijs van een echte Cloudflare R2-upload.
+- GitHub-workflowresultaten zijn via de beschikbare PR-commitopvraging niet bevestigd; geen claim over geslaagde suite. De echte end-to-end uploadroute is nog niet in de bestaande Worker uitgerold. Geen persoonlijke media geraakt en geen betaling gekoppeld.

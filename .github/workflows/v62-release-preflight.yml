@@ -7,6 +7,7 @@ on:
       - 'src/mijn-talera/**'
       - 'scripts/v62-package-preflight.mjs'
       - 'scripts/v62-live-drift-check.mjs'
+      - 'scripts/v62-cloudflare-readiness.mjs'
       - '.github/workflows/v62-release-preflight.yml'
   workflow_dispatch:
 permissions:
@@ -34,7 +35,11 @@ jobs:
         run: node test/v62-app-entry-http-smoke.mjs
       - name: Compare live V62 public modules to review package (GET-only, block on drift)
         run: node scripts/v62-live-drift-check.mjs
-      - name: Preserve checksum inventory and drift evidence for release review
+      - name: Read existing V62 Cloudflare metadata only if a GitHub secret already exists
+        env:
+          TALERA_V62_CF_READ_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/v62-cloudflare-readiness.mjs
+      - name: Preserve checksum, drift and read-only readiness evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
@@ -42,5 +47,6 @@ jobs:
           path: |
             .talera-v62-package/release-inventory.json
             .talera-v62-package/live-drift-report.json
+            .talera-v62-package/cloudflare-readiness.json
           if-no-files-found: warn
           retention-days: 30

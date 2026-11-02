@@ -66,10 +66,15 @@ export async function premiumMultipartRoute({request,env,accountId,writeAllowed=
   const existing=await db.prepare('SELECT sha256,byte_size,digest_kind FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
   if(existing)return existing.sha256===hash&&existing.byte_size===size&&existing.digest_kind==='part-sha256-v1'?
     json({ok:true,reason:'already_stored'}):bad('id_conflict',409);
-  // Never create a multipart upload that could overwrite an existing private object.
-  const present=await bucket.head(objectKey);
-  if(present)return bad('object_exists_unregistered',409);
+  // If R2 completed but D1 finalization was interrupted, resume its existing
+  // authorized session without overwriting the private object.
   let session=await getSession(db,accountId,mediaId);
+  const present=await bucket.head(objectKey);
+  if(present){
+   if(session&&present.size===size&&present.customMetadata?.sha256===hash)
+    return json({ok:true,reason:'resumed',partSize:PART_BYTES,partCount:count});
+   return bad('object_exists_unregistered',409);
+  }
   if(session&&Date.now()-session.created_at>6*86400000){
    try{await bucket.resumeMultipartUpload(objectKey,session.upload_id).abort()}catch{}
    await cleanup(db,accountId,mediaId);session=null;

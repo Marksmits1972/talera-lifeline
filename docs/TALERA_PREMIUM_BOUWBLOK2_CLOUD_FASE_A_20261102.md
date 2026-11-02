@@ -218,3 +218,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Herlezing na deployment: exact acht `env.PREMIUM_PRIVATE` verwijzingen in pilotfunctie, nul `env.PREMIUM_MEDIA`. De aanwezige bindings `DB`, `PREMIUM_MEDIA`, `PREMIUM_PRIVATE`, `SHARE_MEDIA` behouden; `PREMIUM_PRIVATE` verwijst naar `talera-premium-private-eu-staging` met `jurisdiction=eu`.
 - Veiligheid na deployment opnieuw bevestigd: `PREMIUM_CLOUD_PILOT_ENABLED=false` en `PREMIUM_CLOUD_PILOT_ACCOUNT_IDS=''` (leeg). De pilot is dus nog afgesloten; geen echte upload/download via testaccount uitgevoerd, geen persoonlijke gegevens gewijzigd.
 - Bestaande Cloudflare-Workerhistorie is bewaard; vóór het activeren van de pilot opnieuw verifiëren dat beheerder een specifiek fictief testaccount aanwijst en testresultaten worden teruggelezen. Payment en Free-ongewijzigd.
+
+## Fase AB — gesloten pilot en testrechtendatabase geverifieerd (2 november 2026)
+- Cloudflare Core Worker bindings opnieuw uitgelezen: `PREMIUM_CLOUD_PILOT_ENABLED=false`, allowlist leeg, `PREMIUM_PRIVATE` jurisdictie `eu`.
+- Bestaande staging D1 read-only query `SELECT count(*) AS total FROM talera_premium_test_grants` succesvol uitgevoerd: **0 rijen**. Er is dus geen bestaand Premium-testrecht voor een end-to-end gebruikersupload. Geen accounts of rechten aangemaakt.
+- `test/premium-eu-pilot-http-smoke.mjs` toegevoegd: gecontroleerde anonieme GET op de bestaande pilot-URL, assert 401; alleen uit te voeren met expliciet opgegeven HTTPS-staginghost. De test is nog niet tegen een live endpoint uitgevoerd.
+- Voor upload/download via daadwerkelijke Worker-sessie: gebruiker kiest bestaand niet-persoonlijk testaccount (of autoriseert veilige aanmaak), admin verleent tijdelijk `manual_test`-recht, alleen dat account wordt geallowlist, dan expliciete staging pilot aan/uit, synthetische POST/GET/DELETE en cleanup met uitgeschakelde pilot als eindstatus.

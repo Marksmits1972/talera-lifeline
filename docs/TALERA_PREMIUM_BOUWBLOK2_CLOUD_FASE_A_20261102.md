@@ -155,3 +155,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - In `test/premium-cloud-e2e-fixture.test.mjs` twee extra afgeschermde tests toegevoegd: cloudmedia worden zonder eenmalige toestemming geweigerd; de uitgeschakelde pilot weigert ook voor een Premium-account de cloudroute. De in-memory fixture maakt de toestemmingsstatus toetsbaar.
 - De reeds aanwezige upload/download-accountisolatietest blijft bestaan. Dit zijn tests met mocks en géén bewijs van een echte Cloudflare R2-upload.
 - GitHub-workflowresultaten zijn via de beschikbare PR-commitopvraging niet bevestigd; geen claim over geslaagde suite. De echte end-to-end uploadroute is nog niet in de bestaande Worker uitgerold. Geen persoonlijke media geraakt en geen betaling gekoppeld.
+
+## Fase R — teststatus en foutbestendige rechtencheck (2 november 2026)
+- De bestaande GitHub-actie leverde bij controle op de laatste commit nog geen workflowresultaat terug. De volledige suite is dus **niet aantoonbaar gedraaid**. De private repository kon via de lokale shell evenmin rechtstreeks worden opgehaald; geen claim over een volledige lokale repo-test.
+- `src/mijn-talera/premium-sync-queue.mjs` gecorrigeerd: zowel synchrone exceptions als afgewezen promises in `allowed()` worden nu veilig afgevangen. Een weigering of netwerkfout mag geen media als gesynchroniseerd markeren.
+- Eén extra regressietest toegevoegd in `test/premium-sync-queue.test.mjs`, nog niet als geslaagd bevestigd.
+- Cloudflare-pilot blijft uit en de gewone TALERA PWA is niet gewijzigd. Volgende actie: verifieer workflowuitvoering met geldige Actions-toegang of draai de repository-tests lokaal met volledige checkout; daarna pas geïsoleerde R2-upload.

@@ -124,3 +124,21 @@ test('empty browser archive does not report a successful cloud backup',async()=>
  assert.equal(result.cloudRecordsTotal,1);
  assert.equal(result.verifiedObjects,false);
 });
+
+test('Premium local relink refuses an empty browser archive before writing owner key',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const menu=await readFile(new URL('../src/mijn-talera/menu-integration.txt',import.meta.url),'utf8');
+ const start=menu.indexOf("if(button.dataset.action==='premium-device-link')");
+ const end=menu.indexOf("if(button.dataset.action==='premium-cloud-consent')",start);
+ assert.ok(start>=0&&end>start,'existing Premium device link handler must be present');
+ const handler=menu.slice(start,end);
+ const localRead=handler.indexOf('window.TaleraMemories?.list');
+ const emptyBlock=handler.indexOf('if(localStories.length===0)throw Error');
+ const accountRecheck=handler.indexOf("if(state.account?.id!==accountId)throw Error");
+ const confirm=handler.indexOf("if(!window.confirm('Bevestig éénmalig: '+localStories.length");
+ const ownerWrite=handler.indexOf('localStorage.setItem(PREMIUM_DEVICE_OWNER_KEY,accountId)');
+ assert.ok(localRead>=0&&emptyBlock>localRead,'must verify actual local Free stories');
+ assert.ok(accountRecheck>emptyBlock&&confirm>accountRecheck,'account and user confirmation must follow local read');
+ assert.ok(ownerWrite>confirm,'never set local owner key or launch uploads for an empty archive');
+ assert.match(handler,/Geen eigen Free-herinneringen in deze browser/);
+});

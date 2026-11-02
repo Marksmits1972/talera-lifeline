@@ -519,10 +519,16 @@ shell.addEventListener('click',e=>{
   if(!window.confirm('Wil je jouw Premium-cloudarchief terugzetten op DIT apparaat? Dit werkt uitsluitend met een volledig leeg lokaal TALERA-archief. Bij grote bestanden wordt eerst tijdelijke opslag gebruikt. Alles wordt gecontroleerd voordat de herinneringen samen worden toegevoegd; niets wordt overschreven.'))return;
   premiumSyncUi.atomicRestoreWorking=true;premiumSyncUi.restoreProgressBytes=0;state.busy=true;
   feedback('Herstelcontrole gestart. TALERA controleert de bestanden voordat iets lokaal wordt toegevoegd.');
+  let lastProgressStep=-1;
   void import('/__clean/premium-cloud-restore-atomic.mjs')
    .then(mod=>mod.restorePremiumCloudAtomic({indexedDB:window.indexedDB,crypto:window.crypto,
      storage:navigator.storage,
-     onProgress:({bytes})=>{if(state.account?.id===expectedAccountId)premiumSyncUi.restoreProgressBytes=bytes},
+     onProgress:({bytes})=>{
+       if(state.account?.id!==expectedAccountId)return;
+       premiumSyncUi.restoreProgressBytes=bytes;
+       const step=Math.floor(bytes/(32*1048576));
+       if(step!==lastProgressStep){lastProgressStep=step;if(state.open&&state.view==='subscription')render()}
+     },
      fetcher:(url,options)=>fetch(url,options),expectedAccountId,approval:true,
      online:()=>navigator.onLine!==false,
      accountMatches:()=>state.account?.id===expectedAccountId}))

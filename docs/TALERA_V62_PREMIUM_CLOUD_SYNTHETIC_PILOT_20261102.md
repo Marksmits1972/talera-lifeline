@@ -145,3 +145,13 @@ Een expliciete **EU-jurisdiction** private R2-bucket en bijpassende Worker-bindi
 - **Nog open voor echte publieke opslag:** bij een onbevestigde netwerkupload kan een overgebleven object niet altijd als nieuw worden geïdentificeerd; afhandeling van races met gelijktijdige sessies, opslagquota en oude onafgeronde media vereisen verdere acceptatie. Voeg niet zonder onderscheid een R2-lifecycle-regel toe op een prefix met tevens definitieve originelen.
 
 **Geen nieuwe Cloudflare-Worker-versie of PWA-deployment; alle bestaande accountrechten en gegevens onveranderd.**
+
+
+## 2 november 2026 — eerste echte automatische GitHub Actions-regressie
+
+- Nieuwe beperkte workflow `.github/workflows/premium-cloud-pilot.yml` toegevoegd voor **push op de bestaande Premium-branch**, uitsluitend `node --test test/premium-*.test.mjs` met Node 22, zonder nieuwe runtime-worker of applicatiedatabase.
+- Eerste run [41424038072](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41424038072): **30/31 groen, 1 testfout**. De fout was een te sterk ge-escapet regulier expressiepatroon in de test voor de letterlijke R2-`etagDoesNotMatch:'*'`-beveiliging. De servercode zelf week hier niet van af.
+- Testpatroon gecorrigeerd in `test/premium-private-memory-v62.test.mjs`; nieuwe run [41424143726](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41424143726): **31/31 geslaagd** (job `premium-cloud` conclusie `success`). Hiermee zijn voor het eerst de nieuwe Cloudpilot-, mediabestand-, gebruikerskeuze- en herstelcontracten op de echte GitHub CI-runner uitgevoerd. De eerdere losse browserproeven blijven apart bewijs, maar zijn niet langer de enige testbron.
+- De GitHub-workflow bevat geen productie- of Cloudflare-deploymentstap. De Core-stagingworker bleef bij versie `6a74f222-27a3-49c4-9082-0ca9f7b9742a`, de PWA bij `73a651ba-5c87-4268-8b97-078d71969400`.
+- Nieuwe controle Cloudflare R2: beoogde bucket `talera-premium-private-eu-staging` is **niet aanwezig** (404). Er is bewust géén standaardbucket gecreëerd. De EU-jurisdiction moet bij aanmaak expliciet worden ingesteld, waarna de status onafhankelijk te controleren is.
+- **Nog geen live dataacceptatie:** echte EU-bucket, Workerbinding, normale login/testrechten en daadwerkelijke op-/herstelproef op twee apparaten blijven nodig. De groene CI bewijst de codecontracten, niet de geschiktheid voor publieke cloudopslag.

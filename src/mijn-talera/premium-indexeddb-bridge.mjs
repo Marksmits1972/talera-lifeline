@@ -37,3 +37,30 @@ export async function uploadLocalPremiumMedia({media,manifest,fetcher=fetch,cryp
  const result=await response.json().catch(()=>null);
  return result?.ok===true?result:{ok:false,reason:'upload_not_confirmed'};
 }
+
+/* A read-only coverage count. Never silently call a filtered media list
+ * "complete" when Free contains unsupported or oversized objects.
+ * Archived comments are handled by the separate private-records bridge.
+ */
+export async function inspectPremiumLocalFileCoverage({indexedDB,dbName=DATABASE}={}){
+ if(!indexedDB)throw Error('indexeddb_unavailable');
+ const db=await new Promise((resolve,reject)=>{
+  const r=indexedDB.open(dbName,1);
+  r.onupgradeneeded=()=>{r.transaction.abort();reject(Error('local_archive_missing'))};
+  r.onerror=()=>reject(r.error||Error('indexeddb_open_failed'));
+  r.onsuccess=()=>resolve(r.result);
+ });
+ try{
+  if(!db.objectStoreNames.contains('files'))return {uploadable:0,oversized:0,unsupported:0,archivedComments:0};
+  const tx=db.transaction('files','readonly');
+  const records=await requestResult(tx.objectStore('files').getAll());
+  const result={uploadable:0,oversized:0,unsupported:0,archivedComments:0};
+  for(const file of records){
+   if(String(file?.key||'').startsWith('talera-thread-archive-v1:')){result.archivedComments++;continue}
+   if(!(file?.blob instanceof Blob)||!validMedia.has(file.blob.type.toLowerCase())||file.blob.size<1){result.unsupported++;continue}
+   if(file.blob.size>25*1024*1024){result.oversized++;continue}
+   result.uploadable++;
+  }
+  return result;
+ }finally{db.close()}
+}

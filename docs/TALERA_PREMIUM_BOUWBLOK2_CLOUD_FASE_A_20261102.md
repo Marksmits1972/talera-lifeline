@@ -139,3 +139,8 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - `src/core/premium-cloud-core-adapter.mjs` toegevoegd als fail-closed integratieadapter: verwacht de reeds geverifieerde Core-sessie en bestaande helpers voor rechten, request-origincontrole en rate limiting; geen nieuwe inlogstructuur. Alleen allowlisted testaccounts met handmatig Premium-recht komen door de poort.
 - Zes regressietests in `test/premium-cloud-core-adapter.test.mjs` toegevoegd aan de bestaande testworkflow. Tests nog niet bevestigd als uitgevoerd.
 - De adapter is **nog niet** in de actieve Clean Core Worker ingebouwd, de PWA-router is niet gewijzigd en er zijn geen uploads uitgevoerd. De pilot blijft dicht totdat de daadwerkelijke veilige sessie-/route-integratie en geïsoleerde R2-test zijn bewezen.
+
+## Fase O — uploadbevestiging vóór lokale syncstatus (2 november 2026)
+- `src/mijn-talera/premium-indexeddb-bridge.mjs` accepteert een upload nu alleen als de HTTP-respons succesvol **en** de serverbody expliciet `ok:true` meldt. Een HTTP-fout met misleidende respons of ontbrekende serverbevestiging mag nooit leiden tot lokaal `synced`.
+- Twee regressietests voor mislukte en onbevestigde responses toegevoegd aan `test/premium-indexeddb-bridge.test.mjs`; bestaande succesvolle mock aangepast met correcte HTTP-status.
+- Werkelijke Core-integratie is nog niet uitgerold: Cloudflare-pilot staat uit; broncode alleen op featurebranch. Tests zijn nog niet aantoonbaar gedraaid. Geen live gebruikersdata geraakt.

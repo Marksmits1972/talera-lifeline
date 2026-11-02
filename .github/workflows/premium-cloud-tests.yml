@@ -19,4 +19,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs test/premium-cloud-e2e-fixture.test.mjs test/premium-sync-queue.test.mjs test/premium-indexeddb-bridge.test.mjs test/premium-sync-coordinator.test.mjs test/premium-cloud-pilot.test.mjs
+      - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs test/premium-cloud-e2e-fixture.test.mjs test/premium-sync-queue.test.mjs test/premium-indexeddb-bridge.test.mjs test/premium-sync-coordinator.test.mjs test/premium-cloud-pilot.test.mjs test/premium-cloud-core-adapter.test.mjs

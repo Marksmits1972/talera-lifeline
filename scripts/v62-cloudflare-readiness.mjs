@@ -2,7 +2,7 @@
  * Never deploy, patch or read personal data. Use only an EXISTING GitHub
  * Actions secret, if present. All requested Cloudflare endpoints are GET.
  */
-import {writeFileSync,mkdirSync} from 'node:fs';
+import {writeFileSync,mkdirSync,readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const ACCOUNT='6a396704721632d6d1889be48213c3a0';
 const WORKER='talera-pwa-v62-mijn-profiel-20261101';
@@ -77,6 +77,16 @@ if(!token){
    try{
     const form=await new Response(binary,{headers:{'content-type':mime}}).formData();
     report.liveMultipartPartNames=[...form.keys()].sort();
+    const liveMain=form.get('worker.mjs');
+    if(liveMain&&typeof liveMain.arrayBuffer==='function'){
+     const candidate=readFileSync('.talera-v62-package/worker.js','utf8');
+     const oldSource=candidate
+      .replace('import cloudIntegritySource from "./premium-cloud-integrity.txt";\\n','')
+      .replace('        "/__clean/premium-cloud-integrity.mjs":cloudIntegritySource,\\n','');
+     const oldHash=createHash('sha256').update(oldSource).digest('hex');
+     const realHash=createHash('sha256').update(new Uint8Array(await liveMain.arrayBuffer())).digest('hex');
+     report.liveWorkerMatchesPreChangeSource=oldHash===realHash;
+    }else report.liveWorkerMatchesPreChangeSource=false;
     report.liveMainModuleFromMetadata=null;
     if(typeof form.get('metadata')==='string'){
      const md=JSON.parse(form.get('metadata'));
@@ -86,7 +96,7 @@ if(!token){
   }
   report.ready=report.serviceBindingValid===true&&
    Boolean(report.currentDeploymentId)&&Boolean(report.previousDeploymentId)&&
-   report.liveContentAvailable===true;
+   report.liveContentAvailable===true&&report.liveWorkerMatchesPreChangeSource===true;
   report.status=report.ready?'metadata_and_rollback_verified':'read_metadata_incomplete';
   if(!report.ready)console.log('::warning::V62 live release is BLOCKED: metadata or rollback requirement is missing.');
  }catch(error){

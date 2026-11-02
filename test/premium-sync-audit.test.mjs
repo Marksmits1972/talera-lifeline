@@ -47,3 +47,45 @@ test('offline does not issue requests or open IndexedDB',async()=>{
  });
  assert.equal(result.phase,'offline');assert.equal(touched,0);assert.equal(calls,0);
 });
+
+function fakeArchive(stories,files){
+ const reqResult=(value)=>{
+  const request={result:undefined};
+  queueMicrotask(()=>{request.result=value;request.onsuccess?.()});
+  return request;
+ };
+ return {open(){
+  const request={};
+  queueMicrotask(()=>{
+   request.result={
+    objectStoreNames:{contains:x=>['stories','files'].includes(x)},
+    transaction(){return {objectStore(name){return {getAll:()=>reqResult(name==='stories'?stories:files)}}}},
+    close(){}
+   };
+   request.onsuccess?.();
+  });
+  return request;
+ }};
+}
+test('completeness audit exposes oversized/unsupported files instead of reporting ready',async()=>{
+ const largeBlob=new Blob([new Uint8Array(26*1024*1024)],{type:'video/mp4'});
+ const archive=fakeArchive([{id:'my-story',items:[],title:'A memory'}],[
+  {key:'photo',blob:new Blob(['photo'],{type:'image/jpeg'})},
+  {key:'large-video',blob:largeBlob},
+  {key:'unknown-file',blob:new Blob(['unknown'],{type:'application/unknown'})}
+ ]);
+ const fetcher=async path=>({
+  ok:true,json:async()=>{
+   if(path==='/api/me/entitlements')return {accountId:user,rights:{permissions:{cloud_storage:true},available:{cloud_storage:true}}};
+   if(path==='/api/premium/cloud/consent')return {consent:{enabled:true}};
+   return {ok:true,items:[],next:null};
+  }
+ });
+ const result=await auditPremiumSync({indexedDB:archive,crypto,fetcher,expectedAccountId:user,ownerMatches:()=>true});
+ assert.equal(result.phase,'needs_attention');
+ assert.equal(result.mediaMissing,1);
+ assert.equal(result.recordsMissing,1);
+ assert.equal(result.oversized,1);
+ assert.equal(result.unsupported,1);
+ assert.equal(result.verifiedObjects,false);
+});

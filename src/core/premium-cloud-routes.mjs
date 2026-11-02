@@ -33,7 +33,7 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   if (path==='/api/premium/cloud/media' && method==='GET') {
     const after=url.searchParams.get('after')||'';
     if(after&&!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(after))return reply({ok:false,reason:'invalid_cursor'},400);
-    const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,sha256,digest_kind,created_at FROM talera_premium_media WHERE account_id=? AND media_id>? ORDER BY media_id ASC LIMIT 501').bind(accountId,after).all();
+    const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,sha256,digest_kind,source_key,created_at FROM talera_premium_media WHERE account_id=? AND media_id>? ORDER BY media_id ASC LIMIT 501').bind(accountId,after).all();
     const batch=rows.results||[],items=batch.slice(0,500);
     return reply({ok:true,items,next:batch.length>500?items[items.length-1].media_id:null});
   }
@@ -60,6 +60,13 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   if (match && method==='PUT') {
     if (!writeAllowed) return denied('invalid_origin');
     const type=(request.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+    let sourceKey=null;
+    const encodedKey=request.headers.get('x-talera-local-key');
+    if(encodedKey!==null){
+      try{sourceKey=decodeURIComponent(encodedKey)}catch{return reply({ok:false,reason:'invalid_source_key'},400)}
+      if(!sourceKey||sourceKey.length>240||sourceKey.startsWith('talera-thread-archive-v1:'))
+        return reply({ok:false,reason:'invalid_source_key'},400);
+    }
     const rawLength=request.headers.get('content-length');
     const declaredLength=rawLength===null?null:Number(rawLength);
     if (declaredLength!==null&&(!Number.isSafeInteger(declaredLength)||declaredLength<1||declaredLength>25*1024*1024)) return reply({ok:false,reason:'invalid_size'},413);
@@ -69,7 +76,7 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
     try {while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>25*1024*1024){await reader.cancel();return reply({ok:false,reason:'invalid_size'},413)}chunks.push(value)}} finally {reader.releaseLock()}
     if(total===0|| (declaredLength!==null&&total!==declaredLength)) return reply({ok:false,reason:'length_mismatch'},400);
     const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
-    const result=await storePremiumObject({bucket:env.PREMIUM_PRIVATE,db:env.DB,accountId,mediaId:match[1],contentType:type,bytes:bytes.buffer,sha256:request.headers.get('x-content-sha256'),entitlement,consent:true});
+    const result=await storePremiumObject({bucket:env.PREMIUM_PRIVATE,db:env.DB,accountId,mediaId:match[1],contentType:type,bytes:bytes.buffer,sha256:request.headers.get('x-content-sha256'),sourceKey,entitlement,consent:true});
     return reply(result,result.ok?200:400);
   }
   return reply({ok:false,reason:'not_found'},404);

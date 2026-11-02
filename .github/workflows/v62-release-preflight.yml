@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/mijn-talera/**'
       - 'scripts/v62-package-preflight.mjs'
+      - 'scripts/v62-live-drift-check.mjs'
       - '.github/workflows/v62-release-preflight.yml'
   workflow_dispatch:
 permissions:
@@ -31,11 +32,15 @@ jobs:
         run: npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
       - name: Verify CURRENT public V62 routes and preserved Free features (read-only)
         run: node test/v62-app-entry-http-smoke.mjs
-      - name: Preserve checksum inventory for release review
+      - name: Compare live V62 public modules to review package (GET-only, block on drift)
+        run: node scripts/v62-live-drift-check.mjs
+      - name: Preserve checksum inventory and drift evidence for release review
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: talera-v62-offline-module-inventory-${{ github.sha }}
-          path: .talera-v62-package/release-inventory.json
+          path: |
+            .talera-v62-package/release-inventory.json
+            .talera-v62-package/live-drift-report.json
           if-no-files-found: warn
           retention-days: 30

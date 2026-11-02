@@ -568,10 +568,18 @@ shell.addEventListener('click',e=>{
      feedback('Dit lokale archief is aan een ander account gekoppeld. Upload geblokkeerd.',true);return;
    }
    if(currentOwner===accountId){premiumSyncUi.error='';void resumePremiumCloudMediaSync();render();return}
-   if(!window.confirm('Bevestig éénmalig: alle lokaal opgeslagen herinneringen op DIT apparaat horen bij '+email+' en mogen naar de privé-EU-cloud worden overgezet. TALERA Free en de lokale herinneringen blijven behouden.'))return;
    state.busy=true;
    void (async()=>{
      try{
+       // Account consent is NOT proof that this browser contains Free stories.
+       // Reject an empty/missing local archive before recording device ownership.
+       const listLocal=window.TaleraMemories?.list;
+       if(typeof listLocal!=='function')throw Error('Lokale herinneringen zijn hier niet leesbaar. Koppeling niet gestart. Open je oorspronkelijke TALERA-installatie.');
+       const localStories=await listLocal.call(window.TaleraMemories);
+       if(!Array.isArray(localStories))throw Error('Lokale herinneringen konden niet worden gecontroleerd. Koppeling niet gestart.');
+       if(localStories.length===0)throw Error('Geen eigen Free-herinneringen in deze browser. Koppel hier niet opnieuw. Bekijk eerst het bestaande cloudarchief of open je oorspronkelijke TALERA-installatie.');
+       if(state.account?.id!==accountId)throw Error('Account gewijzigd. Koppeling niet gestart.');
+       if(!window.confirm('Bevestig éénmalig: '+localStories.length+' lokaal opgeslagen herinnering(en) op DIT apparaat horen bij '+email+' en mogen naar de privé-EU-cloud worden overgezet. TALERA Free en de lokale herinneringen blijven behouden.'))return;
        // Consent on the server is not sufficient proof of local ownership.
        const [rights,consent]=await Promise.all([
          api('/api/me/entitlements'),api('/api/premium/cloud/consent')

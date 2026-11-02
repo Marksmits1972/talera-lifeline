@@ -20,10 +20,16 @@ async function bytesBounded(response,limit){
 export async function verifyPremiumRemoteBytes({indexedDB,crypto,fetcher,expectedAccountId,ownerMatches,online=()=>true}={}){
  const allowed=()=>typeof ownerMatches==='function'&&ownerMatches()===true&&online();
  const result=await auditPremiumSync({indexedDB,crypto,fetcher,expectedAccountId,ownerMatches,online});
- if(result.phase!=='manifest_matched')return {...result,verifiedObjects:false};
- if(!allowed())return {phase:'not_enabled',verifiedObjects:false};
- const [media,records]=await Promise.all([listLocalPremiumMedia({indexedDB}),listLocalPremiumRecords({indexedDB})]);
- if(media.length===0&&records.length===0)return {phase:'empty',verifiedObjects:false,verifiedMedia:0,verifiedRecords:0};
+ // Unsupported local auxiliary files do not prevent validating the supported
+ // cloud objects. Missing or oversized memories still block readback approval.
+ const supportedManifestComplete=result.phase==='manifest_matched'||
+   (result.phase==='needs_attention'&&result.mediaMissing===0&&result.recordsMissing===0&&
+    result.oversized===0&&result.oversizedRecords===0&&result.unsupported>0);
+ if(!supportedManifestComplete)return {...result,verifiedObjects:false,supportedObjectsVerified:false};
+ if(!allowed())return {phase:'not_enabled',verifiedObjects:false,supportedObjectsVerified:false};
+ const [allMedia,records]=await Promise.all([listLocalPremiumMedia({indexedDB}),listLocalPremiumRecords({indexedDB})]);
+ const media=allMedia.filter(file=>file.size>0);
+ if(media.length===0&&records.length===0)return {phase:'empty',verifiedObjects:false,supportedObjectsVerified:false,verifiedMedia:0,verifiedRecords:0};
  let verifiedMedia=0,verifiedRecords=0;
  const get=async(url,headers)=>{
   if(!allowed())throw Error('verification_interrupted');
@@ -61,8 +67,14 @@ export async function verifyPremiumRemoteBytes({indexedDB,crypto,fetcher,expecte
    verifiedRecords++;
   }
  }catch(error){
-  return {phase:'needs_attention',verifiedObjects:false,verifiedMedia,verifiedRecords,
+  return {phase:'needs_attention',verifiedObjects:false,supportedObjectsVerified:false,verifiedMedia,verifiedRecords,
    reason:error?.message||'restore_verification_failed'};
+ }
+ if(result.unsupported>0){
+  return {phase:'supported_readback_verified',verifiedObjects:false,
+   supportedObjectsVerified:true,verifiedMedia,verifiedRecords,
+   unsupported:result.unsupported,
+   unsupportedDetails:result.unsupportedDetails||[]};
  }
  return {phase:'readback_verified',verifiedObjects:true,verifiedMedia,verifiedRecords};
 }

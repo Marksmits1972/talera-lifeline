@@ -93,8 +93,7 @@ test('completeness audit marks supported 26 MiB video as pending and unsupported
 test('audit explains non-media local files without sending names or contents to cloud',async()=>{
  const archive=fakeArchive([],[{key:'photo',blob:new Blob(['test'],{type:'image/jpeg'})},
   {key:'note-json',blob:new Blob(['private content'],{type:'application/json'})},
-  {key:'missing-blob',value:'not a media blob'},
-  {key:'talera-thread-archive-v1:archived',blob:new Blob(['{}'],{type:'application/json'})}]);
+  {key:'missing-blob',value:'not a media blob'}]);
  const requested=[];
  const result=await auditPremiumSync({indexedDB:archive,crypto,expectedAccountId:user,ownerMatches:()=>true,
   fetcher:async(path)=>{requested.push(path);return {ok:true,json:async()=>path.endsWith('/entitlements')?

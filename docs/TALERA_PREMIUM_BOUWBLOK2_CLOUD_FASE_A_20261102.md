@@ -175,3 +175,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Na de eerdere R2 CRUD-test is opnieuw exact de beoogde bucketnaam met EU-header aangevraagd. Cloudflare rapporteerde wederom `location: WEUR` maar `jurisdiction: default`. De aanmaak is daarom **niet geaccepteerd als EU-conform**; de lege bucket is weer verwijderd, met bevestigde DELETE-respons.
 - Mogelijke oorzaak is dat de huidige Cloudflare-connector de opgegeven jurisdictieheader bij POST niet correct doorstuurt. Dit is nog niet bewezen; er zijn geen persoonlijke gegevens geüpload.
 - Voor daadwerkelijke Premium-media eerst bij bucket-creatie in Cloudflare Dashboard of via gecontroleerde REST-client expliciet EU-jurisdictie kiezen en retourwaarde `jurisdiction: eu` verifiëren. Pas daarna gesloten pilot-route testen. De actieve TALERA PWA, Free en betaling zijn ongemoeid gebleven.
+
+## Fase U — bucketvoorwaarde gecontroleerd (2 november 2026)
+- Cloudflare-documentatie (https://developers.cloudflare.com/r2/reference/data-location/) bevestigt dat `Location: WEUR` niet gelijkstaat aan de verplichte `Jurisdiction: EU`; jurisdictie is een aparte bucketcreatiekeuze.
+- Stagingstatus gecontroleerd: `PREMIUM_PRIVATE` binding verwijst naar `talera-premium-private-eu-staging` met `jurisdiction=eu`, maar de daadwerkelijke bucket ontbreekt. `PREMIUM_CLOUD_PILOT_ENABLED=false`, `PREMIUM_CLOUD_PILOT_ACCOUNT_IDS` leeg.
+- Geen nieuwe bucket gemaakt omdat de eerdere API-creaties ondanks expliciete EU-header consequent `jurisdiction=default` teruggaven. Dat niet als EU-conform accepteren. Gebruik Cloudflare Dashboard R2 > Create bucket > Location > Specify jurisdiction > EU, naam exact `talera-premium-private-eu-staging`. Verifieer na aanmaak teruggelezen metadata `jurisdiction=eu`, en test dan eerst met fictief object; geen persoonlijke uploads vóór bevestiging.
+- De bestaande Worker en PWA zijn bewust niet aangepast en de pilot blijft uit.

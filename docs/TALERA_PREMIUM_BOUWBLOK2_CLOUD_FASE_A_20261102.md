@@ -92,3 +92,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Twee regressietests toegevoegd aan test/premium-private-upload.test.mjs: afwijzing bij parallelle upload en geen verwijdering bij manifestfout.
 - GitHub Actions leverde voor de nieuwste commit geen workflowresultaten. De tests zijn dus nog niet aangetoond als geslaagd. Geen deployment naar actieve Worker; bestaande Free- en Premium-testbeheerfuncties niet geraakt.
 - Vóór live zetten: conditionele R2-write verifiëren tegen echte Worker/R2, conflict- en orphan-reconciliatie testen, volledige testset draaien en pas daarna afgeschermde end-to-end test uitvoeren.
+
+## Fase G — geautomatiseerde tests (2 november 2026)
+- `.github/workflows/premium-cloud-tests.yml` toegevoegd op de bestaande bouwbranch. Node 22 voert de vier gerichte Premium-cloudtestbestanden uit bij relevante codewijzigingen en via handmatige workflowstart.
+- Deze workflow bevat **geen** deployment, betaalprovider of echte opslagopdracht; test alleen de modules met fictieve invoer.
+- Bij de eerste controle waren nog geen commit-gekoppelde workflowresultaten beschikbaar. Teststatus dus **onbevestigd**, niet als geslaagd rapporteren.
+- De daadwerkelijke Cloudflare R2 end-to-end upload/downloadtest en bestaande Core Worker integratie blijven afzonderlijke vervolgstappen.

@@ -13,7 +13,7 @@ export function validatePrivateRecord({accountId,id,kind,payload,bytes,sha256}={
  if(!(bytes instanceof ArrayBuffer)||bytes.byteLength<1||bytes.byteLength>PREMIUM_RECORD_LIMIT)return 'invalid_size';
  if(!SHA.test(sha256||''))return 'invalid_digest';
  if(payload?.schema!=='talera-premium-record/1'||payload.kind!==kind||
-   typeof payload.sourceKey!=='string'||payload.sourceKey.length<1||payload.sourceKey.length>256||
+   typeof payload.sourceKey!=='string'||payload.sourceKey.length<1||payload.sourceKey.length>1024||
    !payload.record||typeof payload.record!=='object'||Array.isArray(payload.record))return 'invalid_record';
  if(kind==='story'&&
    (typeof payload.record.id!=='string'||!payload.record.id||

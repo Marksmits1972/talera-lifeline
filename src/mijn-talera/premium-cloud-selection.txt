@@ -1,0 +1,300 @@
+/* TALERA Premium: opt-in cloud choice inside the existing Mijn TALERA storage view.
+ * Disabled unless server-confirmed availability and a live Premium permission.
+ * The Free IndexedDB store, Free backup and existing sharing are read-only here.
+ */
+(function(){
+'use strict';
+if(window.TaleraPremiumCloud)return;
+const DB='talera-lifeline-dev-local-v1',ENDPOINT='/api/me/premium/cloud/memory',MEDIA_ENDPOINT='/api/me/premium/cloud/media';
+const LIMITS={photo:20*1048576,video:95*1048576,audio:60*1048576};
+async function checksum(blob){
+ const hash=await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());
+ return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function saveOriginalMedia(memoryId,item){
+ const blob=await window.TaleraMemories?.blob?.(item.key);
+ if(!(blob instanceof Blob)||!Object.hasOwn(LIMITS,item.kind)||
+    !Number.isSafeInteger(item.size)||item.size<1||
+    item.size>LIMITS[item.kind]||blob.size!==item.size||
+    blob.type!==item.mime)
+  throw Error('Origineel mediabestand ontbreekt of is gewijzigd: '+String(item.name||item.key));
+ const sha256=await checksum(blob);
+ const url=MEDIA_ENDPOINT+'?id='+encodeURIComponent(memoryId)+'&key='+encodeURIComponent(item.key);
+ const response=await fetch(url,{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{
+  'content-type':item.mime,'x-talera-size':String(blob.size),
+  'x-talera-kind':item.kind,'x-talera-sha256':sha256},body:blob});
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.verified!==true||result.sha256!==sha256||
+    result.key!==item.key)throw Error(result.error||'Mediabestand niet veilig opgeslagen');
+ return {key:item.key,kind:item.kind,mime:item.mime,size:item.size,sha256,
+  alreadyUploaded:result.alreadyUploaded===true};
+}
+async function clearNewlyStagedMedia(memoryId,items){
+ // Best effort only BEFORE final manifest PUT: do not erase uploads from previous sessions.
+ // Server independently rejects DELETE if a committed manifest exists.
+ let removed=0;
+ for(const item of items){
+  const url=MEDIA_ENDPOINT+'?id='+encodeURIComponent(memoryId)+'&key='+encodeURIComponent(item.key);
+  try{
+   const res=await fetch(url,{method:'DELETE',credentials:'same-origin',
+    cache:'no-store',headers:{accept:'application/json'}});
+   if(res.ok)removed++;
+  }catch{}
+ }
+ return removed;
+}
+
+/* Same local stories/files stores as TALERA Free. Never overwrite either store.
+ * Binary files are verified BEFORE opening one atomic local transaction.
+ */
+const RESTORE_LIMIT=160*1048576; // first mobile-safe QA tranche, not a product quota
+async function restoreIntoExistingLibrary(memory,originals){
+ const db=await new Promise((resolve,reject)=>{
+  const r=indexedDB.open(DB,1);
+  r.onupgradeneeded=()=>{
+   if(!r.result.objectStoreNames.contains('stories'))r.result.createObjectStore('stories',{keyPath:'id'});
+   if(!r.result.objectStoreNames.contains('files'))r.result.createObjectStore('files',{keyPath:'key'});
+  };
+  r.onsuccess=()=>resolve(r.result);
+  r.onerror=()=>reject(r.error||Error('Lokale opslag niet bereikbaar'));
+ });
+ try{
+  return await new Promise((resolve,reject)=>{
+   const tx=db.transaction(['stories','files'],'readwrite');
+   tx.oncomplete=()=>resolve(true);
+   tx.onerror=()=>reject(Error('Herstellen afgebroken: mogelijk bestaat deze herinnering al'));
+   tx.onabort=()=>reject(Error('Geen wijzigingen doorgevoerd. Herinnering of mediabestand bestaat al.'));
+   const stories=tx.objectStore('stories'),files=tx.objectStore('files');
+   stories.add(memory); // add, NEVER put; duplicate aborts whole transaction
+   for(const file of originals)files.add({key:file.key,blob:file.blob});
+  });
+ }finally{db.close()}
+}
+function restoreManifestValid(payload,id){
+ const memory=payload?.memory,media=payload?.media;
+ if(payload?.verified!==true||payload.memoryId!==id||memory?.id!==id||
+    !Array.isArray(memory.items)||!Array.isArray(media)||
+    media.length!==memory.items.length||media.length>7)return false;
+ const seen=new Set(),counts={photo:0,video:0,audio:0};
+ for(let i=0;i<media.length;i++){
+  const m=media[i],local=memory.items[i];
+  if(!m||!local||seen.has(m.key)||m.key!==local.key||
+     m.kind!==local.kind||m.mime!==local.mime||m.size!==local.size||
+     !Object.hasOwn(LIMITS,m.kind)||!Number.isSafeInteger(m.size)||
+     m.size<1||m.size>LIMITS[m.kind]||
+     !m.mime.startsWith(({photo:'image/',video:'video/',audio:'audio/'})[m.kind])||
+     /(?:svg|xml|html|javascript|\+xml)/i.test(m.mime)||
+     !/^[a-f0-9]{64}$/.test(m.sha256))return false;
+  seen.add(m.key);counts[m.kind]++;
+ }
+ return counts.photo+counts.video<=6&&counts.audio<=1;
+}
+async function cloudJSON(path){
+ const res=await fetch(path,{credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}});
+ const value=await res.json().catch(()=>({}));
+ if(!res.ok)throw Error(value.error||'Cloudkopie niet beschikbaar');
+ return value;
+}
+async function renderCloudRestore(parent,valid){
+ const section=document.createElement('section');section.id='talera-premium-restore';
+ section.style.cssText='padding:14px 0;border-top:1px solid #ccd8dd;margin-top:16px';
+ const heading=document.createElement('strong');heading.textContent='Cloudherinnering terughalen';
+ const desc=document.createElement('p');
+ desc.textContent='Ook op een ander toestel: bekijk je cloudkopieën en herstel er één na bevestiging. Bestaande herinneringen worden nooit overschreven.';
+ const list=button('Mijn cloudherinneringen laden');
+ const select=document.createElement('select');select.setAttribute('aria-label','Te herstellen cloudherinnering');
+ const restore=button('Gekozen herinnering herstellen');restore.disabled=true;
+ const more=button('Meer cloudherinneringen');more.hidden=true;
+ const status=document.createElement('p');status.setAttribute('role','status');
+ section.append(heading,desc,list,select,restore,more,status);parent.append(section);
+ const known=new Map();
+ let cursor=null,busy=false;
+ const controls=locked=>{list.disabled=locked;restore.disabled=locked||known.size===0;more.disabled=locked};
+ async function load(next=false){
+  if(busy||!valid())return;
+  busy=true;controls(true);
+  try{
+   if(!next){known.clear();select.replaceChildren();cursor=null}
+   const data=await cloudJSON('/api/me/premium/cloud/memories'+
+     (next&&cursor?'?cursor='+encodeURIComponent(cursor):''));
+   if(!valid())return;
+   if(!Array.isArray(data.items))throw Error('Ongeldig cloudoverzicht');
+   for(const item of data.items){
+    if(typeof item.id!=='string'||item.id.length>192||known.has(item.id))continue;
+    known.set(item.id,item);
+    const option=document.createElement('option');option.value=item.id;
+    option.textContent=String(item.title||'Herinnering').slice(0,100)+
+      ' ('+Number(item.mediaCount||0)+' media)';
+    select.append(option);
+   }
+   cursor=typeof data.nextCursor==='string'&&data.nextCursor?data.nextCursor:null;
+   more.hidden=!cursor;
+   message(status,known.size?known.size+' cloudherinnering(en) beschikbaar. Kies er één.':
+     'Er staan nog geen cloudherinneringen in je account.');
+  }catch(e){if(valid())message(status,e.message||'Cloudlijst niet bereikbaar')}
+  finally{busy=false;if(valid())controls(false)}
+ }
+ async function restoreSelected(){
+  if(busy||!valid()||!known.has(select.value))return;
+  const id=select.value,selected=known.get(id);
+  if(!window.confirm('Deze cloudherinnering inclusief originele bestanden herstellen op dit toestel? Bestaande lokale herinneringen blijven onaangetast.'))
+    return;
+  busy=true;controls(true);
+  try{
+   const existing=await window.TaleraMemories?.get?.(id);
+   if(!valid())return;
+   if(existing)throw Error('Deze herinnering staat al op dit toestel. Er wordt niets overschreven.');
+   const payload=await cloudJSON('/api/me/premium/cloud/memory?id='+encodeURIComponent(id));
+   if(!valid())return;
+   if(!restoreManifestValid(payload,id))throw Error('Deze cloudherinnering kan niet veilig worden hersteld');
+   const media=payload.media;
+   const total=media.reduce((n,m)=>n+m.size,0);
+   if(total>RESTORE_LIMIT)throw Error('Voor deze eerste herstelproef maximaal 160 MB per herinnering. De cloudkopie is niet gewijzigd.');
+   const originals=[];
+   for(const item of media){
+    if(!valid())return;
+    message(status,'Origineel bestand '+(originals.length+1)+' van '+media.length+' controleren…');
+    const url='/api/me/premium/cloud/media?id='+encodeURIComponent(id)+'&key='+encodeURIComponent(item.key);
+    const response=await fetch(url,{credentials:'same-origin',cache:'no-store',headers:{accept:'application/octet-stream'}});
+    if(!response.ok)throw Error('Cloudbestand is niet beschikbaar: '+String(item.key));
+    if(response.headers.get('content-type')!==item.mime||
+       response.headers.get('x-talera-sha256')!==item.sha256)
+      throw Error('Verkeerde bestandsgegevens bij cloudherstel');
+    const blob=await response.blob();
+    if(!valid())return;
+    if(blob.size!==item.size||await checksum(blob)!==item.sha256)
+      throw Error('Cloudbestand is niet volledig of is beschadigd');
+    originals.push({key:item.key,blob});
+   }
+   if(!valid())return;
+   // Store exactly the original record and original blobs in one atomic transaction.
+   // Any existing story OR file key causes a complete transaction rollback.
+   await restoreIntoExistingLibrary(payload.memory,originals);
+   if(!valid())return;
+   message(status,'Herinnering inclusief originele bestanden hersteld. Open de tijdlijn opnieuw om haar te bekijken.');
+   document.dispatchEvent(new CustomEvent('talera:memory-restored',{detail:{memoryId:id}}));
+  }catch(e){if(valid())message(status,e.message||'Herstel niet voltooid; bestaande gegevens behouden')}
+  finally{busy=false;if(valid())controls(false)}
+ }
+ list.addEventListener('click',()=>{void load()});
+ more.addEventListener('click',()=>{void load(true)});
+ restore.addEventListener('click',()=>{void restoreSelected()});
+}
+
+let epoch=0;
+const button=(label)=>{const el=document.createElement('button');el.type='button';el.className='secondary';el.textContent=label;return el};
+const message=(host,text)=>{host.textContent=text};
+function readStory(id){
+ return new Promise((resolve,reject)=>{
+  const request=indexedDB.open(DB,1);
+  request.onupgradeneeded=()=>{request.transaction?.abort();reject(Error('Er is nog geen lokale bibliotheek'))};
+  request.onerror=()=>reject(request.error||Error('Lokale opslag niet bereikbaar'));
+  request.onsuccess=()=>{
+   const db=request.result;
+   if(!db.objectStoreNames.contains('stories')){db.close();reject(Error('Geen herinneringen gevonden'));return}
+   const tx=db.transaction('stories','readonly');
+   const r=tx.objectStore('stories').get(id);
+   r.onsuccess=()=>{db.close();resolve(r.result||null)};
+   r.onerror=()=>{db.close();reject(r.error||Error('Herinnering niet leesbaar'))};
+  };
+ });
+}
+async function currentStories(){
+ const rows=await window.TaleraMemories?.list?.();
+ if(!Array.isArray(rows))throw Error('Lokale herinneringen zijn niet beschikbaar');
+ return rows.filter(s=>s&&typeof s.id==='string'&&s.id.length<=192&&Array.isArray(s.items)&&s.items.length<=7);
+}
+const ready=rights=>rights?.permissions?.cloud_storage===true&&rights?.available?.cloud_storage===true;
+function reset(){epoch++}
+async function render(host,account,rights){
+ host.querySelector('#talera-premium-cloud')?.remove();
+ if(!account?.id||!ready(rights))return;
+ const generation=++epoch,accountId=account.id;
+ const root=document.createElement('section');root.id='talera-premium-cloud';
+ root.style.cssText='padding:14px 0;border-top:1px solid #ccd8dd;margin-top:16px';
+ const heading=document.createElement('strong');heading.textContent='Premium-cloudopslag — zelf kiezen';
+ const desc=document.createElement('p');
+ desc.textContent='Kies één herinnering inclusief originele foto’s, video of geluid. Niets wordt automatisch verstuurd en het origineel blijft op dit toestel.';
+ const select=document.createElement('select');select.setAttribute('aria-label','Kies een lokale herinnering');
+ const save=button('Deze herinnering veilig opslaan');
+ const preview=button('Mijn cloudkopie bekijken');preview.style.marginLeft='8px';
+ const status=document.createElement('p');status.setAttribute('role','status');
+ const output=document.createElement('pre');
+ output.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font:inherit';
+ root.append(heading,desc,select,save,preview,status,output);
+ host.append(root);
+ let choices=[];
+ const valid=()=>generation===epoch&&document.contains(root)&&accountId===account.id;
+ void renderCloudRestore(root,valid);
+ try{
+  choices=await currentStories();
+  if(!valid())return;
+  select.replaceChildren();
+  for(const story of choices){
+   const o=document.createElement('option');o.value=story.id;
+   o.textContent=String(story.title||story.name||'Herinnering zonder titel').slice(0,120);
+   select.append(o);
+  }
+  save.disabled=preview.disabled=choices.length===0;
+  if(!choices.length)message(status,'Er zijn geen geschikte herinneringen op dit toestel.');
+ }catch(e){if(valid()){save.disabled=preview.disabled=true;message(status,e.message)}return}
+ let busy=false;
+ async function run(mode){
+  if(busy||!valid())return;
+  const id=select.value;
+  if(!choices.some(x=>x.id===id))return;
+  busy=true;save.disabled=preview.disabled=true;output.textContent='';
+  try{
+   let url=ENDPOINT,options={credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
+   if(mode==='save'){
+    const record=await readStory(id);
+    if(!valid())return;
+    if(!record||record.id!==id||!Array.isArray(record.items)||record.items.length>7)
+      throw Error('Herinnering is veranderd. Vernieuw het overzicht.');
+    if(!window.confirm('Deze herinnering inclusief '+record.items.length+
+       ' originele mediabestanden vrijwillig in je Premium-cloud opslaan? De lokale versie blijft behouden.'))
+      return;
+    const media=[],newlyStaged=[];
+    try{
+     for(const item of record.items){
+      if(!valid())return;
+      message(status,'Origineel bestand '+(media.length+1)+' van '+record.items.length+' controleren en opslaan…');
+      const uploaded=await saveOriginalMedia(id,item);
+      media.push({key:uploaded.key,kind:uploaded.kind,mime:uploaded.mime,
+       size:uploaded.size,sha256:uploaded.sha256});
+      if(!uploaded.alreadyUploaded)newlyStaged.push(uploaded);
+     }
+    }catch(error){
+     // No final manifest request was sent by this attempt.
+     // Never delete a previously existing object, including an idempotent retry.
+     if(valid()&&newlyStaged.length)
+      await clearNewlyStagedMedia(id,newlyStaged);
+     throw error;
+    }
+    if(!valid())return;
+    url=ENDPOINT;
+    options={...options,method:'PUT',headers:{...options.headers,'content-type':'application/json'},
+      body:JSON.stringify({consent:true,memory:record,media})};
+   }else url+='?id='+encodeURIComponent(id);
+   if(!valid())return;
+   const res=await fetch(url,options);
+   const result=await res.json().catch(()=>({}));
+   if(!valid())return;
+   if(!res.ok)throw Error(result.error||'Cloudopslag niet beschikbaar');
+   if(result.memoryId!==id||result.verified!==true)throw Error('Cloudkopie kon niet worden bevestigd');
+   if(mode==='save')message(status,'Volledige cloudkopie bevestigd. Je lokale herinnering staat nog op dit toestel.');
+   else{
+    const cloud=result.memory;
+    if(!cloud||cloud.id!==id)throw Error('Cloudkopie hoort niet bij deze herinnering');
+    message(status,'Cloudkopie gecontroleerd. Alleen een voorbeeld; lokaal is niets gewijzigd.');
+    output.textContent=JSON.stringify({titel:cloud.title||'',herinnering:cloud.text||cloud.story||cloud.story_text||'',
+      origineleMediabestanden:result.media?.length||0,opgeslagenOp:result.savedAt||''},null,2);
+   }
+  }catch(e){if(valid())message(status,e.message||'Er is iets misgegaan')}
+  finally{busy=false;if(valid())save.disabled=preview.disabled=false}
+ }
+ save.addEventListener('click',()=>{void run('save')});
+ preview.addEventListener('click',()=>{void run('preview')});
+}
+window.TaleraPremiumCloud={render,reset};
+})();

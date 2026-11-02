@@ -8,6 +8,7 @@
 import menuSource from "./menu-integration.txt";
 import knowledgeSource from "./kennisbank.html";
 import backupSource from "./free-backup.txt";
+import premiumCloudSource from "./premium-cloud-selection.txt";
 
 export const MENU_MODULE = "/__clean/menu-integration.mjs";
 export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
@@ -35,6 +36,13 @@ export default {
           "x-content-type-options":"nosniff",
           "x-talera-integratie":BUILD_MARKER,
         },
+      });
+    }
+    if (request.method === "GET" && url.pathname === "/__clean/premium-cloud.js") {
+      return new Response(premiumCloudSource, {
+        status:200,
+        headers:{"content-type":"text/javascript; charset=utf-8",
+                 "cache-control":"no-store","x-content-type-options":"nosniff"}
       });
     }
     if (request.method === "GET" && url.pathname === "/__clean/free-backup.js") {

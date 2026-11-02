@@ -43,3 +43,15 @@ TALERA Premium belooft standaard cloudopslag en synchronisatie. Na éénmalige g
 - Wanneer relevant: status 'Herinneringen worden overgezet', voortgang waar betrouwbaar meetbaar, en 'Klaar om samen te kijken'. Geen verzonnen minuten of vaste wachttijd. In de tussentijd blijven lokaal beschikbare herinneringen zichtbaar op het eigen apparaat.
 - Implementatie: betaalbevestiging idempotent verwerken; entitlement toekennen op bevestigde betaalstatus, cloud-upload apart asynchroon/voortzetbaar en foutbestendig; QR kijkroute alleen beschikbaar voor daadwerkelijk cloudbeschikbare geselecteerde inhoud. Intrekking/downgrade en autorisatie blijven serverzijdig afgedwongen.
 - Niet nu bouwen: providerintegratie, definitieve UX of geautomatiseerde upload zijn nog toekomstige stappen. Dit is de verplichtende bouwspecificatie.
+
+
+## Vast ontwerpbesluit — betalingsprovider pas bij circa 99% gereed (2 november 2026)
+De echte betalingskoppeling wordt bewust uitgesteld totdat circa 99% van de productfunctionaliteit klaar is. Nu geen betalingsprovider, betaalpagina, webhook of echte incasso implementeren.
+
+**Testvervanging zonder extra account- of betaalarchitectuur:** gebruik de bestaande beveiligde Premium-testrechten (talera_premium_test_grants), uitsluitend toe te kennen/intrekken door een bevoegde beheerder. Hetzelfde centrale entitlementbeleid moet zowel testrechten als toekomstige betaalde Premium-rechten laten gelden, zonder de Cloud-/AI-/QR-functies voor gebruikers met Free-rechten open te zetten.
+
+Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → automatische upload/sync → QR-kijken zodra relevante cloudmedia gereed is → intrekken/verlopen → nieuwe Premium-handelingen geblokkeerd. Simuleer eventueel een 'betaling bevestigd'-gebeurtenis in geïsoleerde tests die daarna de rechtenverlening aanroept; **geen nepbetaling** registreren als echte commerciële betaling.
+
+**Heldere UI:** toon 'Premium-testtoegang' voor beheertests, nooit 'Betaald' of een factuur. In productie blijft er geen algemene knop over waarmee gebruikers zichzelf Premium kunnen geven. Zelf-toekennen blijft serverzijdig onmogelijk. Het intrekken van een recht mag nooit stil persoonlijke cloudgegevens verwijderen.
+
+**Laatste integratiestap rond 99%:** echte provider koppelen aan hetzelfde rechtensysteem met serverzijdig geverifieerde, idempotente betaalbevestiging; aparte test van hernieuwen, mislukte betaling, terugbetaling en opzegging. Tot dan is commercialBillingActive:false correct.

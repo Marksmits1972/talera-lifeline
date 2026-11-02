@@ -14,6 +14,7 @@ function privateMediaEntryValid(item){
     item.size>privateMediaLimits[item.kind]||
     typeof item.mime!=='string'||item.mime.length>120||
     !item.mime.startsWith(({photo:'image/',video:'video/',audio:'audio/'})[item.kind])||
+    /(?:svg|xml|html|javascript|\+xml)/i.test(item.mime)||
     !privateMediaHex(item.sha256))return false;
  return true;
 }
@@ -56,6 +57,8 @@ async function privateMediaRoutes(req,env,user,m,u){
   return new Response(object.body,{status:200,headers:{
    'content-type':file.mime,'content-length':String(file.size),
    'cache-control':'private, no-store','x-content-type-options':'nosniff',
+   'content-disposition':'attachment; filename="talera-origineel"',
+   'content-security-policy':'sandbox','cross-origin-resource-policy':'same-origin',
    'x-talera-sha256':file.sha256,'vary':'Cookie'}});
  }
  if(!['PUT','DELETE'].includes(m))return privateMemoryReply({error:'Methode niet toegestaan'},405);

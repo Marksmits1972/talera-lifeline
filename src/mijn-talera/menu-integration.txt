@@ -116,9 +116,19 @@ function premiumAuditStatus(){
  let result='';
  if(a.phase==='manifest_matched')result='Controle geslaagd: '+a.mediaMatched+' mediabestanden en '+a.recordsMatched+' verhalen/reacties komen overeen met de cloudregistratie. Teruglezen moet nog afzonderlijk worden gecontroleerd.';
  else if(a.phase==='pending'||a.phase==='needs_attention')
-  result='Nog niet volledig: '+a.mediaMissing+' mediabestanden en '+a.recordsMissing+' verhalen/reacties ontbreken; '+a.oversized+' mediabestanden te groot, '+a.oversizedRecords+' verhalen/reacties te groot en '+a.unsupported+' bestanden niet ondersteund.';
+  result='Op de server geregistreerd: '+(a.mediaMatched||0)+' mediabestanden en '+(a.recordsMatched||0)+' verhalen/reacties. Nog ontbrekend: '+(a.mediaMissing||0)+' mediabestanden en '+(a.recordsMissing||0)+' verhalen/reacties. Andere lokale bestanden die niet kunnen worden geüpload: '+(a.unsupported||0)+'.';
  else result='Volledigheidscontrole: '+a.phase+'.';
- return '<p class="notice" role="status" data-premium-audit-status>'+esc(result)+'</p>';
+ let details='';
+ if(Array.isArray(a.unsupportedDetails)&&a.unsupportedDetails.length){
+  details='<p class="meta">Waarom deze lokale bestanden niet zijn meegenomen (alleen op dit apparaat gelezen):</p>'+
+   a.unsupportedDetails.map(d=>
+    '<p class="meta" data-premium-audit-detail><strong>'+esc(d.key)+'</strong>: '+esc(d.reason)+
+    (Number.isSafeInteger(d.bytes)?' ('+d.bytes+' bytes)':'')+'</p>'
+   ).join('');
+  if(a.unsupported>a.unsupportedDetails.length)
+   details+='<p class="meta">En '+(a.unsupported-a.unsupportedDetails.length)+' andere bestanden.</p>';
+ }
+ return '<div class="notice" role="status" data-premium-audit-status>'+esc(result)+details+'</div>';
 }
 function render(){
  if(!state.open)return;

@@ -86,3 +86,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Twee extra route-tests toegevoegd voor te grote bestanden en ontbrekende Content-Length met ongeldige hash. Nog niet als uitgevoerd aangemerkt.
 - De 25 MiB limiet is strikt voor deze technische pilot en **geen** productlimiet voor TALERA video's. Voor volledige Premium moeten grote uploads via begrensde, hervatbare chunks of gelijkwaardige streaming worden verwerkt, inclusief retry en integriteitscontrole.
 - De code is niet live gekoppeld aan de bestaande Core Worker. Nog geen daadwerkelijke cloudupload of cross-device sync bewezen. Eerst code- en regressietests, daarna geïsoleerde stagingintegratie met testaccount en fictieve media.
+
+## Fase F — gelijktijdige uploads (2 november 2026)
+- Bronmodule src/core/premium-private-upload.mjs aangepast: bestaande objecten worden bij parallelle upload niet meer blind overschreven; bij fout tijdens D1-manifestschrijving wordt het R2-object niet meteen verwijderd, om verlies van een andere geslaagde aanvraag te voorkomen.
+- Twee regressietests toegevoegd aan test/premium-private-upload.test.mjs: afwijzing bij parallelle upload en geen verwijdering bij manifestfout.
+- GitHub Actions leverde voor de nieuwste commit geen workflowresultaten. De tests zijn dus nog niet aangetoond als geslaagd. Geen deployment naar actieve Worker; bestaande Free- en Premium-testbeheerfuncties niet geraakt.
+- Vóór live zetten: conditionele R2-write verifiëren tegen echte Worker/R2, conflict- en orphan-reconciliatie testen, volledige testset draaien en pas daarna afgeschermde end-to-end test uitvoeren.

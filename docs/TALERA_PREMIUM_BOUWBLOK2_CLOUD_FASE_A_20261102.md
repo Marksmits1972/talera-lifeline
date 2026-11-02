@@ -103,3 +103,8 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - `test/premium-cloud-e2e-fixture.test.mjs` toegevoegd: simuleert upload, teruglezen, accountisolatie en Free-afwijzing met in-memory D1/R2 mocks; er worden geen persoonlijke data of echte R2-objecten gebruikt.
 - `.github/workflows/premium-cloud-tests.yml` uitgebreid zodat deze test samen met de eerdere moduletests wordt uitgevoerd zodra Actions de workflow draait.
 - Workflowstatus is nog NIET bevestigd als succesvol. De mock bewijst nog geen echte Cloudflare R2 end-to-end werking. Geen productie-uitrol.
+
+## Fase I — automatische lokale uploadwachtrij (2 november 2026)
+- `src/mijn-talera/premium-sync-queue.mjs` toegevoegd: kleine begrensde wachtrij voor nieuwe/bestaande lokale media. Per upload controle op geldige Premium-toegang en internetverbinding, lokale status pas als gesynchroniseerd markeren bij expliciete serverbevestiging. Fouten laten lokale herinneringen staan en kunnen bij volgende aanroep opnieuw worden geprobeerd. Geen per-bestand-toestemming.
+- Zeven gerichte tests in `test/premium-sync-queue.test.mjs`; toegevoegd aan de bestaande GitHub Actions-workflow.
+- Dit is nog een losse herbruikbare module, niet geïntegreerd in bestaande IndexedDB of actief in de PWA. De aanroep-/retryplanning en volledige verwerking van grote video's blijven nog te verbinden. Geen live Core- of Free-wijzigingen. Workflow-uitvoering nog onbevestigd.

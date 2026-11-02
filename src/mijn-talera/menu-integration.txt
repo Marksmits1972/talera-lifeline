@@ -244,6 +244,7 @@ function render(){
   html=info('Huidig pakket: '+(labels[right.plan]||'Free'),right.source==='manual_test'?'Tijdelijke testrechten. Geen betaald abonnement.':'Je gebruikt TALERA Free.')+
     (right.expiresAt?'<p class="meta">Testrecht eindigt op '+esc(new Date(right.expiresAt).toLocaleDateString())+'.</p>':'')+
     '<p class="meta">Deze fase regelt uitsluitend rechten. Cloudopslag, AI, TV en betalingen worden nog aangesloten. Je Free-herinneringen blijven op dit toestel, zonder automatische upload.</p>';
+  if(right.source==='manual_test'&&right.permissions?.cloud_storage===true)html+='<button class="secondary" type="button" data-action="premium-cloud-test">EU-cloudopslag testen</button><p class="meta">Alleen een fictieve herinnering. Je eigen herinneringen blijven ongemoeid.</p>';
   if(premiumState.admin)html+=section('Alleen voor beheer',option('premium-admin','◇','Premium-testrechten beheren','Eén account controleren en tijdelijk rechten geven'));
   break;
  }
@@ -401,6 +402,24 @@ shell.addEventListener('click',e=>{
    return;
   }
   if(button.dataset.thread){state.thread=button.dataset.thread;state.threadData=null;go('thread');return}
+ if(button.dataset.action==='premium-cloud-test'){
+  if(state.busy||state.view!=='subscription'||!state.account||premiumState.rights?.source!=='manual_test')return;
+  if(!window.confirm('De EU-cloudopslag testen met een fictieve herinnering?'))return;
+  state.busy=true;
+  void (async()=>{
+   const path='/api/me/premium/cloud/pilot';let uploaded=false;
+   try{
+    const put=await api(path,'POST',{});if(put?.ok!==true||put?.synthetic!==true)throw Error('Testupload niet bevestigd');uploaded=true;
+    const get=await api(path);if(get?.ok!==true||get?.verified!==true||get?.synthetic!==true)throw Error('Teruglezen niet bevestigd');
+    const del=await api(path,'DELETE',{});if(del?.ok!==true||del?.deleted!==true)throw Error('Opruimen niet bevestigd');uploaded=false;
+    feedback('EU-cloudtest geslaagd: fictieve herinnering opgeslagen, teruggelezen en verwijderd.');
+   }catch(err){
+    if(uploaded){try{await api(path,'DELETE',{})}catch(_){}}
+    const message=String(err?.message||'Onbekende fout');
+    feedback(message.includes('Cloudproef is niet actief')?'Je bent aangemeld. De beveiligde EU-cloudproef staat nog uit.':'EU-cloudtest niet afgerond: '+message,!message.includes('Cloudproef is niet actief'));
+   }finally{state.busy=false}
+  })();return;
+ }
  if(button.dataset.action==='premium-find'){
    if(!premiumState.admin||state.busy)return;
    const email=String(body.querySelector('#premium-account-email')?.value||'').trim();

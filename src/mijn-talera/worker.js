@@ -32,6 +32,40 @@ export const MENU_REVISION=menuFingerprint.toString(36);
 const currentMenuTag='<script type="module" src="'+MENU_MODULE+'?v='+MENU_REVISION+'"></script>';
 const originalMenuTag='<script type="module" src="'+MENU_MODULE+'"></script>';
 
+// Keep the V56 home presentation, timeline and three-tab navigation.
+// Fix only their visible boundaries on iOS if its visual viewport is smaller
+// than the layout viewport. Do not scale the user's content or alter storage.
+const HOME_FIT_STYLE = `<style id="talera-v62-iphone-fit">
+@media(max-width: 800px){
+ html,body{max-width:100vw!important;overflow-x:hidden!important}
+ body{touch-action:pan-y pinch-zoom!important}
+ .hero,.mast,.life-sheet{left:var(--talera-v62-visual-left,0px)!important;right:auto!important;width:var(--talera-v62-visual-width,100vw)!important;max-width:100vw!important;min-width:0!important}
+ .sheet-body{width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:hidden!important;overflow-wrap:anywhere}
+ .sheet-body .main-only,.sheet-body .view-only,.cards,#v17-timebox,.v17-rail-wrap{min-width:0!important;max-width:100%!important}
+ .cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .v17-yearrow,.v17-yearunit,.section-head{min-width:0!important}
+ .flow-nav{left:calc(var(--talera-v62-visual-left,0px) + 17px)!important;right:auto!important;width:calc(var(--talera-v62-visual-width,100vw) - 34px)!important;max-width:510px!important;min-width:0!important}
+ .flow-nav a{min-width:0!important}
+ input,textarea,select{font-size:max(16px,1em)}
+}
+</style>`;
+const HOME_FIT_SCRIPT = `<script id="talera-v62-iphone-fit-script">
+(function(){'use strict';
+ const viewport=window.visualViewport;
+ if(!viewport)return;
+ const update=()=>{
+  const root=document.documentElement;
+  root.style.setProperty('--talera-v62-visual-left',viewport.offsetLeft+'px');
+  root.style.setProperty('--talera-v62-visual-width',Math.max(1,viewport.width)+'px');
+ };
+ viewport.addEventListener('resize',update,{passive:true});
+ viewport.addEventListener('scroll',update,{passive:true});
+ window.addEventListener('pageshow',update);
+ update();
+})();
+</script>`;
+
+
 
 export function legacyDestination(pathname) {
   const path = pathname.replace(/\/+$/, "") || "/";
@@ -140,11 +174,17 @@ export default {
       const isHome=url.pathname!=="/present";
       if ((isHome && !html.includes('id="navMore"')) ||
           !html.includes("</body>")) return response;
-      const updated=html.includes(originalMenuTag)
+      let updated=html.includes(originalMenuTag)
         ?html.replace(originalMenuTag,currentMenuTag)
         :html.includes(currentMenuTag)
          ?html
          :html.replace("</body>",currentMenuTag+"</body>");
+      if(isHome && html.includes('class="life-sheet"') && html.includes('class="flow-nav"')){
+        if(!updated.includes('id="talera-v62-iphone-fit"') && updated.includes("</head>"))
+          updated=updated.replace("</head>",HOME_FIT_STYLE+"</head>");
+        if(!updated.includes('id="talera-v62-iphone-fit-script"'))
+          updated=updated.replace("</body>",HOME_FIT_SCRIPT+"</body>");
+      }
       if (updated===html)return response;
       const headers=new Headers(response.headers);
       headers.delete("content-length");

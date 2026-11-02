@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {restorePremiumCloudAtomic,CLOUD_RESTORE_ATOMIC_LIMIT} from '../src/mijn-talera/premium-cloud-restore-atomic.mjs';
 import {createPremiumRecordSnapshot} from '../src/mijn-talera/premium-records-bridge.mjs';
 import {createPremiumManifest} from '../src/mijn-talera/premium-indexeddb-bridge.mjs';
+import {createLargeMediaManifest} from '../src/mijn-talera/premium-large-media.mjs';
 
 const account='a8f08aa9-a0a2-4ce3-a179-44fb758d1102';
 const sha=async(bytes)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -118,7 +119,7 @@ test('more than 64 MiB cannot enter atomic restore',async()=>{
  const db=localDatabase(),fx=await fixture({oversize:true});
  const res=await restorePremiumCloudAtomic({indexedDB:db.indexedDB,crypto,fetcher:fx.fetcher,
   expectedAccountId:account,accountMatches:()=>true,approval:true});
- assert.equal(res.phase,'archive_too_large_for_atomic_restore');assert.equal(db.stats().writes,0);
+ assert.equal(res.phase,'private_staging_unavailable');assert.equal(db.stats().writes,0);
 });
 test('wrong signed-in account is denied before IndexedDB is opened',async()=>{
  const db=localDatabase(),fx=await fixture({mismatch:true});
@@ -131,4 +132,69 @@ test('account switch aborts before any writes even after preflight',async()=>{
  await assert.rejects(restorePremiumCloudAtomic({indexedDB:db.indexedDB,crypto,fetcher:fx.fetcher,
   expectedAccountId:account,accountMatches:()=>++visits<3,approval:true}),/account_changed/);
  assert.equal(db.stats().writes,0);
+});
+
+function fakePrivateFileStorage(){
+ let writes=0,cleaned=0;
+ function folder(){
+  const subfolders=new Map(),files=new Map();
+  return {
+   async getDirectoryHandle(name,{create}={}){if(!subfolders.has(name)&&create)subfolders.set(name,folder());if(!subfolders.has(name))throw Error('not_found');return subfolders.get(name)},
+   async getFileHandle(name,{create}={}){if(!files.has(name)&&create)files.set(name,{blob:new Blob([])});
+    if(!files.has(name))throw Error('not_found');
+    const data=files.get(name);
+    return {
+     async getFile(){return data.blob},
+     async createWritable(){
+      const parts=[];
+      return {
+       async write(value){writes++;parts.push(new Uint8Array(value))},
+       async close(){data.blob=new Blob(parts)},
+       async abort(){}
+      };
+     }
+    };
+   },
+   async removeEntry(name){if(files.delete(name)||subfolders.delete(name)){cleaned++;return}throw Error('not_found')}
+  };
+ }
+ const root=folder();
+ return {storage:{getDirectory:async()=>root},stats:()=>({writes,cleaned})};
+}
+test('26 MiB multipart video is staged privately, verified and atomically restored to Free',async()=>{
+ const size=26*1024*1024+47;
+ const contents=new Uint8Array(size);
+ for(let i=0;i<contents.length;i+=32768)contents[i]=(i/32768)%255;
+ const video={key:'movie-mp4',size,mime:'video/mp4',blob:new Blob([contents],{type:'video/mp4'})};
+ const manifest=await createLargeMediaManifest(video,{crypto});
+ const story={id:'movie-story',title:'A long movie',items:[{key:'movie-mp4'}]};
+ const snapshot=await createPremiumRecordSnapshot({kind:'story',sourceKey:'story:movie-story',record:story},{crypto});
+ const media={media_id:manifest.mediaId,source_key:video.key,byte_size:size,
+  content_type:video.mime,sha256:manifest.fingerprint,digest_kind:'part-sha256-v1'};
+ const record={record_id:snapshot.id,kind:'story',sha256:snapshot.sha256,byte_size:snapshot.bytes.byteLength};
+ let downloaded=0;
+ const fetcher=async(path,options={})=>{
+  if(path==='/api/me/entitlements')return Response.json({accountId:account,rights:{permissions:{cloud_storage:true},available:{cloud_storage:true}}});
+  if(path==='/api/premium/cloud/consent')return Response.json({consent:{enabled:true}});
+  if(path==='/api/premium/cloud/media')return Response.json({ok:true,items:[media],next:null});
+  if(path==='/api/premium/cloud/records')return Response.json({ok:true,items:[record],next:null});
+  if(path==='/api/premium/cloud/records/story/'+snapshot.id)return new Response(snapshot.bytes);
+  if(path==='/api/premium/cloud/media/'+manifest.mediaId){
+   const range=/bytes=(\d+)-(\d+)/.exec(options.headers?.range||'');
+   assert.ok(range);const from=Number(range[1]),to=Number(range[2]);downloaded++;
+   return new Response(video.blob.slice(from,to+1),{status:206,
+    headers:{'content-range':'bytes '+from+'-'+to+'/'+size}});
+  }
+  throw Error('unexpected cloud request '+path);
+ };
+ const db=localDatabase(),fs=fakePrivateFileStorage();
+ const result=await restorePremiumCloudAtomic({indexedDB:db.indexedDB,crypto,fetcher,
+  expectedAccountId:account,accountMatches:()=>true,storage:fs.storage,approval:true});
+ assert.equal(result.phase,'restored');assert.equal(result.mode,'disk_staged');
+ assert.equal(result.stories,1);assert.equal(result.media,1);
+ assert.equal(db.data.files.get('movie-mp4').blob.size,size);
+ assert.equal(db.data.stories.get('movie-story').id,'movie-story');
+ assert.equal(db.stats().writes,2);
+ assert.equal(downloaded,Math.ceil(size/(8*1024*1024)));
+ assert.ok(fs.stats().cleaned>=1);
 });

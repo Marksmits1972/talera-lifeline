@@ -24,7 +24,7 @@ export async function previewPremiumCloudRestore({fetcher,expectedAccountId,onli
  const [media,records]=await Promise.all([
   fetchPremiumManifestIds(fetcher,'media'),fetchPremiumManifestIds(fetcher,'records')
  ]);
- const keys=new Set();let missingFileKeys=0,conflictingKeys=0,invalidMedia=0;
+ const keys=new Set();let missingFileKeys=0,conflictingKeys=0,invalidMedia=0;let atomicBytes=0,atomicIneligible=0;
  for(const item of media.values()){
   const key=item.source_key;
   if(typeof key!=='string'||key.length<1){missingFileKeys++;continue}
@@ -33,19 +33,25 @@ export async function previewPremiumCloudRestore({fetcher,expectedAccountId,onli
    invalidMedia++;continue;
   }
   if(keys.has(key))conflictingKeys++;else keys.add(key);
+  atomicBytes+=item.byte_size;
+  if(item.digest_kind!=='full-sha256'||!/^[a-f0-9]{64}$/.test(item.sha256||''))atomicIneligible++;
  }
  let stories=0,comments=0,invalidRecords=0;
  for(const record of records.values()){
   if(record.kind==='story')stories++;
   else if(record.kind==='comment_archive')comments++;
   else invalidRecords++;
+  if(!Number.isSafeInteger(record.byte_size)||record.byte_size<1||record.byte_size>1048576||!/^[a-f0-9]{64}$/.test(record.sha256||''))atomicIneligible++;
+  else atomicBytes+=record.byte_size;
  }
  const incomplete=missingFileKeys+conflictingKeys+invalidMedia+invalidRecords;
  return {
   phase:incomplete?'needs_attention':media.size+records.size?'manifest_available':'empty',
   media:media.size,stories,comments,
   missingFileKeys,conflictingKeys,invalidMedia,invalidRecords,
-  canRestore:false, // This is a manifest preview, never a completed restore.
+  canRestore:false, // Preview does not write; a separate explicit action is required.
+  atomicRestoreEligible:incomplete===0&&atomicIneligible===0&&atomicBytes<=64*1024*1024,
+  atomicBytes,atomicIneligible,
   originalKeysVerified:incomplete===0
  };
 }

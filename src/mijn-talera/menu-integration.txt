@@ -66,7 +66,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
-const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
+const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,restoreError:'',cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
 
 let authEpoch=0;
@@ -78,7 +78,7 @@ function clearPrivateState(){
   state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
   premiumSyncUi.consent=null;premiumSyncUi.phase='';premiumSyncUi.uploaded=0;premiumSyncUi.pending=0;
   premiumSyncUi.recordsPhase='';premiumSyncUi.recordsUploaded=0;premiumSyncUi.recordsPending=0;
-  premiumSyncUi.audit=null;premiumSyncUi.restore=null;premiumSyncUi.cloudPreview=null;premiumSyncUi.restoreProgressBytes=0;
+  premiumSyncUi.audit=null;premiumSyncUi.restore=null;premiumSyncUi.restoreError='';premiumSyncUi.cloudPreview=null;premiumSyncUi.restoreProgressBytes=0;
   storageState.owned=null;storageState.received=null;storageState.error='';
   const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
   if(badge){badge.hidden=true;badge.textContent=''}
@@ -129,6 +129,22 @@ function premiumAuditStatus(){
    details+='<p class="meta">En '+(a.unsupported-a.unsupportedDetails.length)+' andere bestanden.</p>';
  }
  return '<div class="notice" role="status" data-premium-audit-status>'+esc(result)+details+'</div>';
+}
+function premiumReadbackStatus(){
+ if(premiumSyncUi.restoreWorking)
+  return '<div class="notice" role="status" data-premium-readback-status>Teruglezen bezig. TALERA vergelijkt de opgeslagen cloudbestanden met de lokale originelen. Er wordt niets veranderd.</div>';
+ if(premiumSyncUi.restoreError)
+  return '<div class="notice error" role="status" data-premium-readback-status>'+esc(premiumSyncUi.restoreError)+'</div>';
+ const check=premiumSyncUi.restore;
+ if(!check)return '';
+ let message;
+ if(check.verifiedObjects===true)
+  message='Teruglezen geslaagd: '+check.verifiedMedia+' mediabestanden en '+check.verifiedRecords+' verhalen/reacties inhoudelijk gecontroleerd. Alle ondersteunde lokale bestanden komen overeen.';
+ else if(check.supportedObjectsVerified===true)
+  message='Teruglezen geslaagd voor '+check.verifiedMedia+' mediabestanden en '+check.verifiedRecords+' verhalen/reacties. Daarnaast blijven '+check.unsupported+' lokale bestanden openstaan; de volledige back-up is nog niet bevestigd.';
+ else
+  message='Teruglezen nog niet volledig: '+esc(check.reason||check.phase)+'. Er is niets gewijzigd aan je herinneringen.';
+ return '<div class="notice" role="status" data-premium-readback-status>'+message+'</div>';
 }
 function render(){
  if(!state.open)return;
@@ -298,7 +314,7 @@ function render(){
         html+='<button class="secondary" data-action="premium-sync-resume">Synchronisatie hervatten</button>'+
           '<button class="secondary" data-action="premium-sync-audit"'+(premiumSyncUi.auditWorking?' disabled':'')+'>'+(premiumSyncUi.auditWorking?'Controleren…':'Controleer volledigheid')+'</button>'+
           premiumAuditStatus()+
-          '<button class="secondary" data-action="premium-sync-restore">Controleer teruglezen</button>';
+          '<button class="secondary" data-action="premium-sync-restore"'+(premiumSyncUi.restoreWorking?' disabled':'')+'>'+(premiumSyncUi.restoreWorking?'Teruglezen…':'Controleer teruglezen')+'</button>'+premiumReadbackStatus();
       }else if(deviceOwner===null){
         html+='<p class="meta">De cloudtoestemming is al gegeven. Koppel nu één keer de lokale herinneringen op dit apparaat aan '+esc(a.email||'dit account')+'.</p>'+
           '<button class="secondary" type="button" data-action="premium-device-link">Koppel lokaal archief en start upload</button>'+
@@ -314,12 +330,6 @@ function render(){
     }
     if(premiumSyncUi.phase)html+='<p class="meta">Mediabestanden: '+esc(premiumSyncUi.phase)+' · '+premiumSyncUi.uploaded+' geüpload · '+premiumSyncUi.pending+' wachtend.</p>';
     if(premiumSyncUi.recordsPhase)html+='<p class="meta">Verhalen en bewaarde reacties: '+esc(premiumSyncUi.recordsPhase)+' · '+premiumSyncUi.recordsUploaded+' geüpload · '+premiumSyncUi.recordsPending+' wachtend.</p>';
-    if(premiumSyncUi.restore){
-      const check=premiumSyncUi.restore;
-      html+='<p class="meta">'+(check.verifiedObjects?
-       'Terugleescontrole geslaagd: '+check.verifiedMedia+' mediabestanden en '+check.verifiedRecords+' verhalen/reacties inhoudelijk gecontroleerd.':
-       'Terugleescontrole nog niet compleet: '+esc(check.reason||check.phase)+'.')+'</p>';
-    }
     if(premiumSyncUi.cloudPreview){
       const p=premiumSyncUi.cloudPreview;
       html+='<p class="meta">'+(p.phase==='manifest_available'?
@@ -661,8 +671,8 @@ shell.addEventListener('click',e=>{
   if(!window.confirm('Controleer je dat TALERA alle opgeslagen herinneringen uit de EU-cloud kan teruglezen? Dit leest bestanden, schrijft niets over Free heen en kan bij grote video\'s veel dataverkeer gebruiken.'))return;
   const expectedAccountId=state.account.id;
   const ownerMatches=()=>state.account?.id===expectedAccountId&&localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)===expectedAccountId;
-  premiumSyncUi.restoreWorking=true;premiumSyncUi.restore=null;
-  feedback('Terugleescontrole gestart. TALERA vergelijkt de bestanden met de lokale originelen.');
+  premiumSyncUi.restoreWorking=true;premiumSyncUi.restore=null;premiumSyncUi.restoreError='';
+  if(state.open&&state.view==='subscription')render();
   void import('/__clean/premium-restore-verifier.mjs')
    .then(mod=>mod.verifyPremiumRemoteBytes({
      indexedDB:window.indexedDB,crypto:window.crypto,
@@ -672,11 +682,17 @@ shell.addEventListener('click',e=>{
      if(state.account?.id!==expectedAccountId||!ownerMatches())return;
      premiumSyncUi.restore=result;
      if(state.open&&state.view==='subscription')render();
-   }).catch(()=>{
+   }).catch(error=>{
      if(state.account?.id!==expectedAccountId)return;
-     premiumSyncUi.error='Terugleescontrole onderbroken; er is nog geen volledige bevestiging.';
+     premiumSyncUi.restoreError='Terugleescontrole onderbroken ('+(error?.message||'controlefout')+'). De gegevens zijn niet gewijzigd.';
      if(state.open&&state.view==='subscription')render();
-   }).finally(()=>{premiumSyncUi.restoreWorking=false});
+   }).finally(()=>{
+     premiumSyncUi.restoreWorking=false;
+     if(state.open&&state.view==='subscription'){
+       render();
+       body.querySelector('[data-premium-readback-status]')?.scrollIntoView({block:'nearest',behavior:'auto'});
+     }
+   });
   return;
  }
  if(button.dataset.action==='premium-sync-audit'){

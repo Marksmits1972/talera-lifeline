@@ -10,7 +10,7 @@ export function patchPremiumCloudCore(source){
  const imports="import {handleCorePremiumCloud} from './premium-cloud-core-adapter.mjs';\nimport {premiumCloudPilotRights} from './premium-cloud-pilot.mjs';\n";
  let out=imports+source;
  out=out.replace(authMarker,authMarker+"\n const privateCloud=await handleCorePremiumCloud({request:req,env,user,getRights:premiumGrantView,allowedWrite,rateLimit});\n if(privateCloud)return privateCloud;");
- out=out.replace(rightsMarker,"return json({rights:premiumCloudPilotRights({env,accountId:user.id,rights}),canManageTests:admin,commercialBillingActive:false});");
+ out=out.replace(rightsMarker,"return json({accountId:user.id,rights:premiumCloudPilotRights({env,accountId:user.id,rights}),canManageTests:admin,commercialBillingActive:false});");
  if(out.split('handleCorePremiumCloud(').length!==2||out.split('premiumCloudPilotRights({').length!==2)
   throw Error('core_patch_validation_failed');
  return out;

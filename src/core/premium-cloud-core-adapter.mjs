@@ -19,7 +19,11 @@ export async function handleCorePremiumCloud({request,env,user,getRights,allowed
  if(!['GET','POST','PUT'].includes(request.method))return denied(405,'method_not_allowed');
  if(request.method!=='GET'){
   if(!allowedWrite(request))return denied(403,'invalid_origin');
-  if(!await rateLimit(request,env,'premium-cloud-write',30))return denied(429,'rate_limited');
+  // Large video parts are separately bounded to this verified account.
+  // Ordinary TALERA and Premium consent writes keep their original 30/10min cap.
+  const isPart=/^\/api\/premium\/cloud\/multipart\/[0-9a-f-]{36}\/part\/\d{1,4}$/i.test(path);
+  const category=isPart?'premium-cloud-part:'+user.id:'premium-cloud-write';
+  if(!await rateLimit(request,env,category,isPart?600:30))return denied(429,'rate_limited');
  }
  return premiumCloudRoute({request,env,sessionAccount:user,entitlement:rights,pilotEnabled,writeAllowed:request.method==='GET'||allowedWrite(request)});
 }

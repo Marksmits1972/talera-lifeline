@@ -4,13 +4,13 @@
  * another database or requests per-memory confirmation.
  */
 export async function syncPremiumPending({listPending,readMedia,markSynced,upload,allowed,online=()=>true,maxItems=20}={}) {
- if(typeof allowed!=='function'||!(await allowed().catch(()=>false))) return {phase:'not_enabled',uploaded:0,pending:0};
+ if(typeof allowed!=='function'||!(await Promise.resolve().then(allowed).catch(()=>false))) return {phase:'not_enabled',uploaded:0,pending:0};
  if(!online()) return {phase:'offline',uploaded:0,pending:0};
  const items=await listPending();
  let uploaded=0,failed=0,attempted=0;
  for(const item of items.slice(0,maxItems)){
   if(!online()) return {phase:'offline',uploaded,failed,pending:items.length-attempted};
-  if(!(await allowed().catch(()=>false))) return {phase:'not_enabled',uploaded,failed,pending:items.length-attempted};
+  if(!(await Promise.resolve().then(allowed).catch(()=>false))) return {phase:'not_enabled',uploaded,failed,pending:items.length-attempted};
   attempted++;
   try{
    const data=await readMedia(item);

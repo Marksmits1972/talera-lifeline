@@ -52,7 +52,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
-const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,restore:null,restoreWorking:false,cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false};
+const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,restore:null,restoreWorking:false,cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false,restoreProgressBytes:0};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
 
 let authEpoch=0;
@@ -64,7 +64,7 @@ function clearPrivateState(){
   state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
   premiumSyncUi.consent=null;premiumSyncUi.phase='';premiumSyncUi.uploaded=0;premiumSyncUi.pending=0;
   premiumSyncUi.recordsPhase='';premiumSyncUi.recordsUploaded=0;premiumSyncUi.recordsPending=0;
-  premiumSyncUi.audit=null;premiumSyncUi.restore=null;premiumSyncUi.cloudPreview=null;
+  premiumSyncUi.audit=null;premiumSyncUi.restore=null;premiumSyncUi.cloudPreview=null;premiumSyncUi.restoreProgressBytes=0;
   storageState.owned=null;storageState.received=null;storageState.error='';
   const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
   if(badge){badge.hidden=true;badge.textContent=''}
@@ -279,10 +279,13 @@ function render(){
        'Cloudarchief: '+esc(p.phase)+'.')+'</p>';
     }
     if(premiumSyncUi.cloudPreview?.phase==='manifest_available'){
-      if(premiumSyncUi.cloudPreview.atomicRestoreEligible===true)
-       html+='<button class="secondary" data-action="premium-cloud-restore-atomic">Herstel naar leeg apparaat</button><p class="meta">TALERA controleert alle gegevens eerst en herstelt daarna alles tegelijk. Bestaande lokale herinneringen worden niet overschreven.</p>';
+      if(premiumSyncUi.cloudPreview.atomicRestoreEligible===true||
+         (premiumSyncUi.cloudPreview.largeRestoreEligible===true&&!!navigator.storage?.getDirectory))
+       html+='<button class="secondary" data-action="premium-cloud-restore-atomic">Herstel naar leeg apparaat</button><p class="meta">TALERA controleert eerst alle bestanden en herstelt daarna alles in één keer. Grote archieven gebruiken tijdelijke privéopslag op het apparaat. Bestaande lokale herinneringen blijven onaangeroerd.</p>';
       else
-       html+='<p class="meta">Het archief is nog niet geschikt voor herstel in één keer (maximaal 64 MiB, alleen volledig controleerbare bestanden). De cloudbestanden blijven veilig bewaard.</p>';
+       html+='<p class="meta">Het archief kan op dit apparaat nog niet veilig worden teruggezet. Het wordt niet gedeeltelijk hersteld; de cloudbestanden blijven bewaard.</p>';
+      if(premiumSyncUi.atomicRestoreWorking)
+       html+='<p class="meta">Tijdelijk gecontroleerd: '+Math.round(premiumSyncUi.restoreProgressBytes/1048576)+' MiB. TALERA herstelt pas nadat alle bestanden kloppen.</p>';
     }
     if(premiumSyncUi.error)html+='<p class="meta">'+esc(premiumSyncUi.error)+'</p>';
   }
@@ -505,24 +508,29 @@ shell.addEventListener('click',e=>{
  if(button.dataset.action==='premium-cloud-restore-atomic'){
   if(premiumSyncUi.atomicRestoreWorking||state.busy||premiumSyncUi.consent?.enabled!==true||
      premiumSyncUi.cloudPreview?.phase!=='manifest_available'||
-     premiumSyncUi.cloudPreview?.atomicRestoreEligible!==true||!state.account?.id)return;
+     !(premiumSyncUi.cloudPreview?.atomicRestoreEligible===true||premiumSyncUi.cloudPreview?.largeRestoreEligible===true)||!state.account?.id)return;
   const expectedAccountId=state.account.id;
   try{const owner=localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY);
       if(owner&&owner!==expectedAccountId){feedback('Dit apparaat is al aan een ander TALERA-account gekoppeld.',true);return}}
   catch{feedback('Lokale opslag is niet beschikbaar.',true);return}
-  if(!window.confirm('Wil je jouw Premium-cloudarchief terugzetten op DIT apparaat? Dit kan uitsluitend als het lokale TALERA-archief volledig leeg is. TALERA controleert eerst alle bestanden. Bestaande herinneringen worden nooit overschreven.'))return;
-  premiumSyncUi.atomicRestoreWorking=true;state.busy=true;
+  if(premiumSyncUi.cloudPreview.atomicRestoreEligible!==true&&!navigator.storage?.getDirectory){
+     feedback('Voor dit grote archief ondersteunt dit apparaat nog geen veilige tijdelijke privéopslag. Er is niets gewijzigd.',true);return;
+  }
+  if(!window.confirm('Wil je jouw Premium-cloudarchief terugzetten op DIT apparaat? Dit werkt uitsluitend met een volledig leeg lokaal TALERA-archief. Bij grote bestanden wordt eerst tijdelijke opslag gebruikt. Alles wordt gecontroleerd voordat de herinneringen samen worden toegevoegd; niets wordt overschreven.'))return;
+  premiumSyncUi.atomicRestoreWorking=true;premiumSyncUi.restoreProgressBytes=0;state.busy=true;
   feedback('Herstelcontrole gestart. TALERA controleert de bestanden voordat iets lokaal wordt toegevoegd.');
   void import('/__clean/premium-cloud-restore-atomic.mjs')
    .then(mod=>mod.restorePremiumCloudAtomic({indexedDB:window.indexedDB,crypto:window.crypto,
+     storage:navigator.storage,
+     onProgress:({bytes})=>{if(state.account?.id===expectedAccountId)premiumSyncUi.restoreProgressBytes=bytes},
      fetcher:(url,options)=>fetch(url,options),expectedAccountId,approval:true,
      online:()=>navigator.onLine!==false,
      accountMatches:()=>state.account?.id===expectedAccountId}))
    .then(result=>{
      if(state.account?.id!==expectedAccountId)return;
      if(!result.restored){
-       const text=result.phase==='archive_too_large_for_atomic_restore'?
-        'Het cloudarchief is groter dan de huidige veilige herstelgrens van 64 MiB. Er is niets gewijzigd.':
+       const text=result.phase==='archive_too_large_for_safe_restore'?
+        'Het cloudarchief overschrijdt de veilige herstelgrens voor dit apparaat. Er is niets gewijzigd.':
         'Herstel niet uitgevoerd ('+result.phase+'). Je lokale herinneringen blijven onaangeroerd.';
        feedback(text,true);return;
      }

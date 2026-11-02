@@ -116,6 +116,28 @@ export default {
         });
       }
     }
+    // Open the same canonical 'Meer' menu directly from Mijn leven.
+    // The V56 home markup has #navMore, but previously its link navigated
+    // away to /present before the V62 menu module was loaded.
+    if (request.method === "GET" &&
+        ["/mijn-leven","/mijn-leven/","/","/index.html"].includes(url.pathname)) {
+      const response = await env.V56_BASE.fetch(request);
+      if (!response.ok ||
+          !(response.headers.get("content-type") || "").includes("text/html")) {
+        return response;
+      }
+      const html = await response.clone().text();
+      if (!html.includes('id="navMore"') ||
+          html.includes('src="/__clean/menu-integration.mjs"') ||
+          !html.includes("</body>")) return response;
+      const updated = html.replace("</body>",
+        '<script type="module" src="/__clean/menu-integration.mjs"></script></body>');
+      const headers = new Headers(response.headers);
+      headers.delete("content-length");
+      headers.set("cache-control","no-store");
+      headers.set("x-talera-integratie",BUILD_MARKER);
+      return new Response(updated,{status:response.status,statusText:response.statusText,headers});
+    }
     // Keep methods, authentication cookies, uploads and backend responses intact.
     return env.V56_BASE.fetch(request);
   },

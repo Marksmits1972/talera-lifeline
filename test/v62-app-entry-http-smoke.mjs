@@ -24,7 +24,7 @@ const homeHtml=await home.text();
 assert.match(homeHtml,/id=["']navMore["']/,'Mijn leven must have its More navigation');
 const getMenuTag=html=>{
  const tags=[...html.matchAll(/src=["'](\/__clean\/menu-integration\.mjs\?v=[a-z0-9]+)["']/g)].map(m=>m[1]);
- assert.equal(tags.length,1,'TALERA page must load exactly one versioned canonical menu; saw '+JSON.stringify(html.match(/.{0,90}menu-integration\\.mjs.{0,90}/g)?.slice(0,3)||[])));
+ assert.equal(tags.length,1,'TALERA page must load one versioned menu; saw '+JSON.stringify((html.match(/.{0,90}menu-integration[.]mjs.{0,90}/g)||[]).slice(0,3)));
  return tags[0];
 };
 const homeTag=getMenuTag(homeHtml);

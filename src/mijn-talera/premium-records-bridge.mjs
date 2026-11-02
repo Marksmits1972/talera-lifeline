@@ -22,7 +22,7 @@ export async function listLocalPremiumRecords({indexedDB,dbName=DB_NAME}={}){
   if(stories.length>200000||files.length>200000)throw Error('archive_too_large');
   const records=[];
   for(const story of stories){
-   if(typeof story?.id!=='string'||!story.id||story.id.length>192||!Array.isArray(story.items))throw Error('invalid_free_story');
+   if(typeof story?.id!=='string'||!story.id||story.id.length>192||!Array.isArray(story.items||[]))throw Error('invalid_free_story');
    records.push({kind:'story',sourceKey:'story:'+story.id,record:story});
   }
   for(const file of files){

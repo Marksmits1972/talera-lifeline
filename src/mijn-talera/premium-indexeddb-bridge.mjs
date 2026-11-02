@@ -17,11 +17,16 @@ export async function listLocalPremiumMedia({indexedDB,dbName=DATABASE}={}) {
 }
 export async function createPremiumManifest(media,{crypto}={}) {
  if(!crypto?.subtle)throw Error('crypto_unavailable');
- const input=new TextEncoder().encode(media.key+':'+media.size+':'+media.mime);
+ if(!(media?.blob instanceof Blob))throw Error('media_blob_required');
+ // Content fingerprint prevents same-size edits from sharing an upload identity.
+ const contentHash=new Uint8Array(await crypto.subtle.digest('SHA-256',await media.blob.arrayBuffer()));
+ const prefix=new TextEncoder().encode(media.key+':'+media.blob.type+':');
+ const input=new Uint8Array(prefix.length+contentHash.length);
+ input.set(prefix);input.set(contentHash,prefix.length);
  const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',input));
  const uuid=[...hash.slice(0,16)];uuid[6]=(uuid[6]&15)|64;uuid[8]=(uuid[8]&63)|128;
  const hex=uuid.map(v=>v.toString(16).padStart(2,'0')).join('');
- return {mediaId:[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-'),key:media.key,mime:media.mime,size:media.size};
+ return {mediaId:[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-'),key:media.key,mime:media.mime,size:media.blob.size};
 }
 export async function uploadLocalPremiumMedia({media,manifest,fetcher=fetch,crypto}={}) {
  if(!crypto?.subtle)throw Error('crypto_unavailable');

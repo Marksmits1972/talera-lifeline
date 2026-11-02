@@ -108,3 +108,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - `src/mijn-talera/premium-sync-queue.mjs` toegevoegd: kleine begrensde wachtrij voor nieuwe/bestaande lokale media. Per upload controle op geldige Premium-toegang en internetverbinding, lokale status pas als gesynchroniseerd markeren bij expliciete serverbevestiging. Fouten laten lokale herinneringen staan en kunnen bij volgende aanroep opnieuw worden geprobeerd. Geen per-bestand-toestemming.
 - Zeven gerichte tests in `test/premium-sync-queue.test.mjs`; toegevoegd aan de bestaande GitHub Actions-workflow.
 - Dit is nog een losse herbruikbare module, niet geïntegreerd in bestaande IndexedDB of actief in de PWA. De aanroep-/retryplanning en volledige verwerking van grote video's blijven nog te verbinden. Geen live Core- of Free-wijzigingen. Workflow-uitvoering nog onbevestigd.
+
+## Fase J — bestaande IndexedDB lezen (2 november 2026)
+- `src/mijn-talera/premium-indexeddb-bridge.mjs` toegevoegd als read-only adapter naar bestaande database `talera-lifeline-dev-local-v1` en store `files`. Geen tweede IndexedDB, geen schema-upgrade en geen wijziging in Free-back-up.
+- De adapter selecteert lokale media-Blobs, bereidt stabiele media-ID's voor en heeft een fetch-interface voor de beveiligde Core-uploadroute. Twee unit-tests toegevoegd en in CI-testopdracht opgenomen.
+- Nog NIET ingebouwd in actieve PWA of automatisch gestart; echte consent/entitlement API en markSynced-methode moeten veilig worden aangesloten. De huidige media-ID is gebaseerd op sleutel/grootte/mime; voor gewijzigde media moet eerst versiestrategie of content-hash worden verwerkt om botsingen te voorkomen. Stories-tekst en relaties vallen nog niet binnen deze media-bridge.
+- Geen uploads uitgevoerd; tests nog niet als uitgevoerd bevestigd.

@@ -155,3 +155,14 @@ Een expliciete **EU-jurisdiction** private R2-bucket en bijpassende Worker-bindi
 - De GitHub-workflow bevat geen productie- of Cloudflare-deploymentstap. De Core-stagingworker bleef bij versie `6a74f222-27a3-49c4-9082-0ca9f7b9742a`, de PWA bij `73a651ba-5c87-4268-8b97-078d71969400`.
 - Nieuwe controle Cloudflare R2: beoogde bucket `talera-premium-private-eu-staging` is **niet aanwezig** (404). Er is bewust géén standaardbucket gecreëerd. De EU-jurisdiction moet bij aanmaak expliciet worden ingesteld, waarna de status onafhankelijk te controleren is.
 - **Nog geen live dataacceptatie:** echte EU-bucket, Workerbinding, normale login/testrechten en daadwerkelijke op-/herstelproef op twee apparaten blijven nodig. De groene CI bewijst de codecontracten, niet de geschiktheid voor publieke cloudopslag.
+
+
+## 2 november 2026 — EU-bucket daadwerkelijk aangemaakt en gekoppeld
+
+De eerdere notities waarin staat dat `talera-premium-private-eu-staging` ontbreekt zijn een **historische status**. De eigenaar heeft de bucket inmiddels via het Cloudflare-dashboard in het juiste bestaande account aangemaakt, met `Specify jurisdiction: European Union (EU)`, `Standard`, `Public Access Disabled` en bij creatie `0 B`. De bucket is zichtbaar onder `/r2/eu/buckets/talera-premium-private-eu-staging`.
+
+De koppeling is **daadwerkelijk doorgevoerd** via de Cloudflare Worker-settings API. De bestaande `talera-clean-core-staging-20261030` heeft nu `PREMIUM_PRIVATE` `r2_bucket`, `bucket_name:"talera-premium-private-eu-staging"`, `jurisdiction:"eu"`. Onafhankelijke tweede uitlezing bevestigt dat precies. Alle andere vijf bindings zijn behouden, inclusief `PREMIUM_CLOUD_PILOT_ENABLED:"false"` en lege account-allowlist.
+
+De Cloudflare-settings PATCH heeft automatisch een nieuwe **actieve versie 44** gemaakt: `f9f87f6e-813e-4d8b-a866-c97ac5963e24`. Terugvalpunt versie 43 is `6a74f222-27a3-49c4-9082-0ca9f7b9742a`. Browsercontrole ná wijzigen: `GET /__health` **200** met `ready:true`; vier geauthenticeerde paden geven anoniem nog **401**. D1 ongewijzigd **12 herinneringen, 0 Premium-grants**.
+
+**Hierdoor is de infrastructuurblokkade voor EU-opslag opgelost.** De daadwerkelijke privémedia- en geheugenroutes zijn nog niet vanuit de Draft-code uitgerold. Geen productiegebruikers of echte TALERA-herinneringen zijn overgezet. Volgende fase: route-integratie met standaard UIT-vlag, gerichte synthetische end-to-end-controle en pas daarna vrijgave. Details en actuele inrichting: `docs/TALERA_PREMIUM_EU_R2_AANSLUITEN_20261102.md`.

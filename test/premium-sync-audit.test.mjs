@@ -109,3 +109,18 @@ test('audit explains non-media local files without sending names or contents to 
  assert.equal(result.phase,'needs_attention');
  assert.ok(requested.every(path=>!path.includes('note-json')&&!path.includes('missing-blob')));
 });
+
+test('empty browser archive does not report a successful cloud backup',async()=>{
+ const result=await auditPremiumSync({
+  indexedDB:fakeArchive([],[]),crypto,expectedAccountId:user,ownerMatches:()=>true,
+  fetcher:async path=>({ok:true,json:async()=>{
+   if(path==='/api/me/entitlements')return {accountId:user,rights:{permissions:{cloud_storage:true},available:{cloud_storage:true}}};
+   if(path==='/api/premium/cloud/consent')return {consent:{enabled:true}};
+   return {ok:true,items:path.endsWith('/media')?[{media_id:u(12),byte_size:400,content_type:'image/jpeg'}]:[{record_id:u(13),kind:'story'}],next:null};
+  }})
+ });
+ assert.equal(result.phase,'local_archive_empty');
+ assert.equal(result.cloudMediaTotal,1);
+ assert.equal(result.cloudRecordsTotal,1);
+ assert.equal(result.verifiedObjects,false);
+});

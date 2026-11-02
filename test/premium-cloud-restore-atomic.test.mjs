@@ -128,7 +128,7 @@ test('wrong signed-in account is denied before IndexedDB is opened',async()=>{
 });
 test('account switch aborts before any writes even after preflight',async()=>{
  const db=localDatabase(),fx=await fixture();let visits=0;
- const result=await restorePremiumCloudAtomic({indexedDB:db.indexedDB,crypto,fetcher:fx.fetcher,
-  expectedAccountId:account,accountMatches:()=>++visits<3,approval:true});
- assert.equal(result.phase,'not_enabled');assert.equal(db.stats().writes,0);
+ await assert.rejects(restorePremiumCloudAtomic({indexedDB:db.indexedDB,crypto,fetcher:fx.fetcher,
+  expectedAccountId:account,accountMatches:()=>++visits<3,approval:true}),/account_changed/);
+ assert.equal(db.stats().writes,0);
 });

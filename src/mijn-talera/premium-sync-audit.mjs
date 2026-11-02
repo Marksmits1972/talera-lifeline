@@ -47,7 +47,7 @@ export async function auditPremiumSync({indexedDB,crypto,fetcher,expectedAccount
  const localMedia=await listLocalPremiumMedia({indexedDB});
  const localRecords=await listLocalPremiumRecords({indexedDB});
  if(!guarded())return {phase:'not_enabled'};
- let mediaMissing=0,recordsMissing=0,mediaMatched=0,recordsMatched=0;
+ let mediaMissing=0,recordsMissing=0,mediaMatched=0,recordsMatched=0,oversizedRecords=0;
  for(const media of localMedia){
   if(!guarded())return {phase:'not_enabled'};
   // Oversized media are not yet supported in staging; count separately.
@@ -57,17 +57,19 @@ export async function auditPremiumSync({indexedDB,crypto,fetcher,expectedAccount
  }
  for(const source of localRecords){
   if(!guarded())return {phase:'not_enabled'};
-  const snapshot=await createPremiumRecordSnapshot(source,{crypto});
+  let snapshot;
+  try{snapshot=await createPremiumRecordSnapshot(source,{crypto})}
+  catch(error){if(error?.message==='record_too_large'){oversizedRecords++;continue}throw error}
   const remote=remoteRecords.get(snapshot.id);
   if(remote?.kind===snapshot.kind&&remote.sha256===snapshot.sha256)recordsMatched++;
   else recordsMissing++;
  }
- const blocked=coverage.oversized+coverage.unsupported;
+ const blocked=coverage.oversized+coverage.unsupported+oversizedRecords;
  const missing=mediaMissing+recordsMissing;
  return {
   phase:blocked?'needs_attention':missing?'pending':'manifest_matched',
   mediaMatched,recordsMatched,mediaMissing,recordsMissing,
-  oversized:coverage.oversized,unsupported:coverage.unsupported,
+  oversized:coverage.oversized,oversizedRecords,unsupported:coverage.unsupported,
   localMediaTotal:coverage.uploadable+coverage.oversized+coverage.unsupported,
   localRecordsTotal:localRecords.length,
   // This is only a manifest-level comparison, never a claim of full restore.

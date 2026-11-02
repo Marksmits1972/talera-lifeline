@@ -45,7 +45,7 @@ const metadata=files.map(x=>({module:x.target,source:x.source,bytes:Buffer.byteL
 const modulesDir=output;
 for(const item of files)writeFileSync(join(modulesDir,item.target),item.text,'utf8');
 const config={
- name:'talera-v62-OFFLINE-COMPILE-ONLY',
+ name:'talera-v62-offline-compile-only',
  main:'./worker.js',
  compatibility_date:'2026-10-30',
  workers_dev:false,

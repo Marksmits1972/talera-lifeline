@@ -52,6 +52,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
+const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,working:false,error:''};
 
 let authEpoch=0;
 function clearPrivateState(){
@@ -60,6 +61,7 @@ function clearPrivateState(){
   state.thread=null;state.threadData=null;
   state.shares=[];state.grants=[];state.person=null;state.personMemories=[];
   state.titles={};premiumState.rights=null;premiumState.admin=false;premiumState.target=null;
+  premiumSyncUi.consent=null;premiumSyncUi.phase='';premiumSyncUi.uploaded=0;premiumSyncUi.pending=0;
   storageState.owned=null;storageState.received=null;storageState.error='';
   const badge=document.querySelector('nav.flow-nav #navNotifications .talera-unread-badge');
   if(badge){badge.hidden=true;badge.textContent=''}
@@ -245,6 +247,13 @@ function render(){
     (right.expiresAt?'<p class="meta">Testrecht eindigt op '+esc(new Date(right.expiresAt).toLocaleDateString())+'.</p>':'')+
     '<p class="meta">Deze fase regelt uitsluitend rechten. Cloudopslag, AI, TV en betalingen worden nog aangesloten. Je Free-herinneringen blijven op dit toestel, zonder automatische upload.</p>';
   if(right.source==='manual_test'&&right.permissions?.cloud_storage===true)html+='<button class="secondary" type="button" data-action="premium-cloud-test">EU-cloudopslag testen</button><p class="meta">Alleen een fictieve herinnering. Je eigen herinneringen blijven ongemoeid.</p>';
+  if(right.available?.cloud_storage===true){
+    html+=premiumSyncUi.consent?.enabled?
+      '<p class="meta">EU-cloudopslag toegestaan. Mediabestanden synchroniseren automatisch zolang TALERA open is; verhalen volgen in de volgende bouwstap.</p><button class="secondary" data-action="premium-sync-resume">Synchronisatie controleren</button>':
+      '<button class="secondary" data-action="premium-cloud-consent">Eenmalig toestemming geven voor EU-cloudopslag</button><p class="meta">Je geeft één keer toestemming voor de automatische overdracht. Lokale Free-herinneringen worden niet verwijderd.</p>';
+    if(premiumSyncUi.phase)html+='<p class="meta">Mediabestanden: '+esc(premiumSyncUi.phase)+' · '+premiumSyncUi.uploaded+' geüpload · '+premiumSyncUi.pending+' wachtend.</p>';
+    if(premiumSyncUi.error)html+='<p class="meta">'+esc(premiumSyncUi.error)+'</p>';
+  }
   if(premiumState.admin)html+=section('Alleen voor beheer',option('premium-admin','◇','Premium-testrechten beheren','Eén account controleren en tijdelijk rechten geven'));
   break;
  }
@@ -292,6 +301,27 @@ function render(){
  if(state.open&&state.view==='storage')window.TaleraFreeBackup?.render(body);
  if(state.open&&state.view==='hub')void window.TaleraFreeBackup?.remind(shell);
 }
+async function resumePremiumCloudMediaSync(){
+ if(premiumSyncUi.working||navigator.onLine===false)return;
+ premiumSyncUi.working=true;premiumSyncUi.error='';
+ try{
+  const mod=await import('/__clean/premium-sync-coordinator.mjs');
+  let result;
+  // Process small batches: never rewrite or delete Free IndexedDB data.
+  for(let i=0;i<20;i++){
+   result=await mod.runPremiumMediaSync({
+    indexedDB:window.indexedDB,crypto:window.crypto,fetcher:(url,options)=>fetch(url,options),
+    online:()=>navigator.onLine!==false,maxItems:10
+   });
+   premiumSyncUi.phase=result.phase;premiumSyncUi.uploaded+=result.uploaded||0;
+   premiumSyncUi.pending=result.pending||0;
+   if(result.phase!=='uploading'||result.pending===0)break;
+  }
+  if(state.open&&state.view==='subscription')render();
+ }catch(e){premiumSyncUi.error='Synchronisatie onderbroken; bij opnieuw openen wordt veilig hervat.';
+  if(state.open&&state.view==='subscription')render()}
+ finally{premiumSyncUi.working=false}
+}
 function feedback(message,error=false){state.notice=message;state.error=error;if(state.open&&state.view==='login'&&error){let p=body.querySelector('[data-auth-error]');if(!p){p=document.createElement('p');p.dataset.authError='true';p.className='notice error';p.setAttribute('role','alert');body.appendChild(p)}p.textContent=message;return}render()}
 function go(view){if(!state.open)return;state.history.push(state.view);state.view=view;state.notice='';render();void load(view)}
 function backOne(){if(state.history.length){state.view=state.history.pop()}else if(state.view!=='hub'){state.view='hub'}else{close();return}state.notice='';render();void load(state.view)}
@@ -312,6 +342,10 @@ async function load(view){
    premiumState.rights=entitlement.rights;
    premiumState.admin=entitlement.canManageTests===true;
    if(view==='premium-admin'&&!premiumState.admin)premiumState.target=null;
+   if(view==='subscription'&&premiumState.rights?.available?.cloud_storage===true){
+    const consent=await api('/api/premium/cloud/consent');
+    premiumSyncUi.consent=consent.consent||null;
+   }
   }
   if(view==='mine'){
    const [shareRes,memRes,grantRes]=await Promise.all([api('/api/shares'),api('/api/memories'),api('/api/my-grants')]);
@@ -402,6 +436,22 @@ shell.addEventListener('click',e=>{
    return;
   }
   if(button.dataset.thread){state.thread=button.dataset.thread;state.threadData=null;go('thread');return}
+ if(button.dataset.action==='premium-cloud-consent'){
+   if(state.busy||state.view!=='subscription'||premiumState.rights?.available?.cloud_storage!==true)return;
+   if(!window.confirm('Geef je één keer toestemming om je bestaande en toekomstige TALERA-herinneringen veilig in de EU-cloud op te slaan? Je lokale herinneringen blijven staan.'))return;
+   state.busy=true;
+   void api('/api/premium/cloud/consent','POST',{agree:true})
+    .then(async result=>{
+      if(result?.consent?.enabled!==true)throw Error('Toestemming niet bevestigd');
+      premiumSyncUi.consent=result.consent;render();feedback('Toestemming opgeslagen. De mediabestanden worden automatisch verwerkt.');
+      await resumePremiumCloudMediaSync();
+    }).catch(e=>feedback(e.message,true)).finally(()=>{state.busy=false});
+   return;
+ }
+ if(button.dataset.action==='premium-sync-resume'){
+   if(!state.busy)void resumePremiumCloudMediaSync();
+   return;
+ }
  if(button.dataset.action==='premium-cloud-test'){
   if(state.busy||state.view!=='subscription'||!state.account||premiumState.rights?.source!=='manual_test')return;
   if(!window.confirm('De EU-cloudopslag testen met een fictieve herinnering?'))return;
@@ -525,7 +575,9 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)void updateUnreadBadge()});
 setInterval(()=>{if(state.account&&!document.hidden)void updateUnreadBadge()},15000);
 document.addEventListener('talera:languagechange',()=>{updateHomeNav();if(state.open)render()});
-void checkSession();
+void checkSession().then(()=>{if(state.account)void resumePremiumCloudMediaSync()});
+window.addEventListener('online',()=>{if(state.account)void resumePremiumCloudMediaSync()});
+document.addEventListener('talera:account-changed',()=>{if(state.account)void resumePremiumCloudMediaSync()});
 window.__taleraMoreMenu={ready:true,open,close,state:()=>({open:state.open,view:state.view,accountId:state.account?.id||null})};
 document.documentElement.dataset.taleraMoreMenu='mounted';
 

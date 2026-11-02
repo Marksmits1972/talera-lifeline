@@ -3,6 +3,40 @@
  * NOT routed or deployed until a private EU-jurisdiction bucket is bound.
  */
 const privateMemoryRoute='/api/me/premium/cloud/memory';
+
+const privateMemoryListRoute='/api/me/premium/cloud/memories';
+async function privateMemoryList(env,user,u){
+ const cursor=u.searchParams.get('cursor');
+ if(cursor!==null&&(cursor.length===0||cursor.length>2048))
+  return privateMemoryReply({error:'Ongeldige vervolgpagina'},400);
+ const prefix='private/v1/'+user.id+'/';
+ const page=await env.PREMIUM_PRIVATE.list({prefix,delimiter:'/',limit:20,
+   ...(cursor?{cursor}:{})});
+ if(!Array.isArray(page.delimitedPrefixes))
+  return privateMemoryReply({error:'Cloudlijst niet beschikbaar'},503);
+ const items=[];
+ for(const folder of page.delimitedPrefixes){
+  if(!folder.startsWith(prefix)||!/^[a-f0-9]{64}\/$/.test(folder.slice(prefix.length)))continue;
+  const obj=await env.PREMIUM_PRIVATE.get(folder+'memory.json');
+  if(!obj||obj.size>privateMemoryMaxBytes||
+     !/^[a-f0-9]{64}$/.test(obj.customMetadata?.sha256||''))continue;
+  try{
+   const raw=await obj.text();
+   if(await privateMemoryHash(raw)!==obj.customMetadata.sha256)continue;
+   const saved=JSON.parse(raw);
+   if(saved.type!==privateMemoryType||saved.accountId!==user.id||
+      !privateMemoryValidId(saved.memoryId)||saved.memory?.id!==saved.memoryId||
+      folder!==prefix+await privateMemoryHash(saved.memoryId)+'/'||
+      !privateMemoryManifestMatches(saved.memory,saved.media)||
+      !await privateMediaConfirmed(env,user,saved.memoryId,saved.media))continue;
+   items.push({id:saved.memoryId,title:String(saved.memory.title||'Herinnering').slice(0,140),
+     savedAt:saved.savedAt,mediaCount:saved.media.length,
+     totalMediaBytes:saved.media.reduce((n,x)=>n+x.size,0)});
+  }catch{}
+ }
+ return privateMemoryReply({items,nextCursor:page.truncated?page.cursor||null:null});
+}
+
 const privateMemoryMaxBytes=128*1024;
 const privateMemoryType='talera-premium-private-memory-v1';
 const privateMemoryReply=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
@@ -77,7 +111,7 @@ function privateMemoryManifestMatches(memory,files){
  return true;
 }
 async function privateMemoryCloudRoutes(req,env,user,p,m,u){
- if(p!==privateMemoryRoute&&p!==privateMediaRoute)return null;
+ if(p!==privateMemoryRoute&&p!==privateMediaRoute&&p!==privateMemoryListRoute)return null;
  if(!user||typeof user.id!=='string'||!uuidRule.test(user.id))
   return privateMemoryReply({error:'Aanmelden bij TALERA is nodig'},401);
  // Explicitly test-only: never enabled by a package grant alone.
@@ -95,6 +129,14 @@ async function privateMemoryCloudRoutes(req,env,user,p,m,u){
    typeof env.PREMIUM_PRIVATE.head!=='function')
   return privateMemoryReply({error:'Privéopslag niet aangesloten'},503);
  if(p===privateMediaRoute)return privateMediaRoutes(req,env,user,m,u);
+ if(p===privateMemoryListRoute){
+  if(m!=='GET')return privateMemoryReply({error:'Methode niet toegestaan'},405);
+  if(typeof env.PREMIUM_PRIVATE.list!=='function')
+   return privateMemoryReply({error:'Cloudlijst niet aangesloten'},503);
+  if(!await rateLimit(req,env,'premium-cloud-list',30))
+   return privateMemoryReply({error:'Te veel verzoeken'},429);
+  return privateMemoryList(env,user,u);
+ }
  if(m==='GET'){
   const memoryId=u.searchParams.get('id');
   if(!privateMemoryValidId(memoryId))return privateMemoryReply({error:'Ongeldige herinnering'},400);

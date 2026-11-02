@@ -52,7 +52,7 @@ const body=shell.querySelector('.body'),head=shell.querySelector('header strong'
 const state={view:'hub',history:[],account:null,discovery:null,search:[],query:'',shared:[],messages:[],memories:[],thread:null,threadData:null,notice:'',error:false,busy:false,open:false,intent:null,shares:[],grants:[],person:null,titles:{},personMemories:[]};
 const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
-const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,restore:null,restoreWorking:false,cloudPreview:null,cloudPreviewWorking:false};
+const premiumSyncUi={consent:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,restore:null,restoreWorking:false,cloudPreview:null,cloudPreviewWorking:false,atomicRestoreWorking:false};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
 
 let authEpoch=0;
@@ -278,6 +278,12 @@ function render(){
        p.phase==='needs_attention'?'Cloudarchief nog niet veilig herstelbaar: '+p.missingFileKeys+' bestanden zonder lokale koppeling en '+p.conflictingKeys+' dubbele bestandskoppelingen.':
        'Cloudarchief: '+esc(p.phase)+'.')+'</p>';
     }
+    if(premiumSyncUi.cloudPreview?.phase==='manifest_available'){
+      if(premiumSyncUi.cloudPreview.atomicRestoreEligible===true)
+       html+='<button class="secondary" data-action="premium-cloud-restore-atomic">Herstel naar leeg apparaat</button><p class="meta">TALERA controleert alle gegevens eerst en herstelt daarna alles tegelijk. Bestaande lokale herinneringen worden niet overschreven.</p>';
+      else
+       html+='<p class="meta">Het archief is nog niet geschikt voor herstel in één keer (maximaal 64 MiB, alleen volledig controleerbare bestanden). De cloudbestanden blijven veilig bewaard.</p>';
+    }
     if(premiumSyncUi.error)html+='<p class="meta">'+esc(premiumSyncUi.error)+'</p>';
   }
   if(premiumState.admin)html+=section('Alleen voor beheer',option('premium-admin','◇','Premium-testrechten beheren','Eén account controleren en tijdelijk rechten geven'));
@@ -495,6 +501,42 @@ shell.addEventListener('click',e=>{
     }).catch(e=>{if(newlyClaimed){try{localStorage.removeItem(PREMIUM_DEVICE_OWNER_KEY)}catch{}}feedback(e.message,true)})
     .finally(()=>{state.busy=false});
    return;
+ }
+ if(button.dataset.action==='premium-cloud-restore-atomic'){
+  if(premiumSyncUi.atomicRestoreWorking||state.busy||premiumSyncUi.consent?.enabled!==true||
+     premiumSyncUi.cloudPreview?.phase!=='manifest_available'||
+     premiumSyncUi.cloudPreview?.atomicRestoreEligible!==true||!state.account?.id)return;
+  const expectedAccountId=state.account.id;
+  try{const owner=localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY);
+      if(owner&&owner!==expectedAccountId){feedback('Dit apparaat is al aan een ander TALERA-account gekoppeld.',true);return}}
+  catch{feedback('Lokale opslag is niet beschikbaar.',true);return}
+  if(!window.confirm('Wil je jouw Premium-cloudarchief terugzetten op DIT apparaat? Dit kan uitsluitend als het lokale TALERA-archief volledig leeg is. TALERA controleert eerst alle bestanden. Bestaande herinneringen worden nooit overschreven.'))return;
+  premiumSyncUi.atomicRestoreWorking=true;state.busy=true;
+  feedback('Herstelcontrole gestart. TALERA controleert de bestanden voordat iets lokaal wordt toegevoegd.');
+  void import('/__clean/premium-cloud-restore-atomic.mjs')
+   .then(mod=>mod.restorePremiumCloudAtomic({indexedDB:window.indexedDB,crypto:window.crypto,
+     fetcher:(url,options)=>fetch(url,options),expectedAccountId,approval:true,
+     online:()=>navigator.onLine!==false,
+     accountMatches:()=>state.account?.id===expectedAccountId}))
+   .then(result=>{
+     if(state.account?.id!==expectedAccountId)return;
+     if(!result.restored){
+       const text=result.phase==='archive_too_large_for_atomic_restore'?
+        'Het cloudarchief is groter dan de huidige veilige herstelgrens van 64 MiB. Er is niets gewijzigd.':
+        'Herstel niet uitgevoerd ('+result.phase+'). Je lokale herinneringen blijven onaangeroerd.';
+       feedback(text,true);return;
+     }
+     localStorage.setItem(PREMIUM_DEVICE_OWNER_KEY,expectedAccountId);
+     premiumSyncUi.cloudPreview=null;
+     feedback('Cloudherstel geslaagd: '+result.stories+' verhalen, '+result.comments+' reacties en '+result.media+' bestanden. Open de tijdlijn opnieuw om ze te bekijken.');
+   })
+   .catch(error=>{if(state.account?.id!==expectedAccountId)return;
+     const message=error?.message==='local_archive_not_empty'?
+      'Herstel gestopt: op dit apparaat staan al lokale herinneringen. Er is niets overschreven.':
+      'Herstel niet voltooid ('+(error?.message||'controlefout')+'). Er zijn geen bestaande herinneringen overschreven.';
+     feedback(message,true)})
+   .finally(()=>{premiumSyncUi.atomicRestoreWorking=false;state.busy=false});
+  return;
  }
  if(button.dataset.action==='premium-cloud-restore-preview'){
   if(premiumSyncUi.cloudPreviewWorking||!state.account?.id||premiumSyncUi.consent?.enabled!==true)return;

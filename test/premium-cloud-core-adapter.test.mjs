@@ -11,3 +11,12 @@ test('disabled pilot denies even valid account',async()=>assert.equal((await han
 test('other account excluded by allowlist',async()=>assert.equal((await handleCorePremiumCloud({...base,env:{...env,PREMIUM_CLOUD_PILOT_ENABLED:'true'},user:{id:'f5cbaefc-d7d8-4a3a-a334-b93d0a08d170'},request:req('/api/premium/cloud/media')})).status,403));
 test('missing Core guards fail closed',async()=>assert.equal((await handleCorePremiumCloud({...base,allowedWrite:null,request:req('/api/premium/cloud/media')})).status,503));
 test('pilot requests enforce rate limit before data access',async()=>{const r=await handleCorePremiumCloud({...base,env:{...env,PREMIUM_CLOUD_PILOT_ENABLED:'true'},rateLimit:async()=>false,request:req('/api/premium/cloud/consent','POST')});assert.equal(r.status,429)});
+
+test('large-video parts use a separate per-account rate bucket',async()=>{
+ let seen;
+ const request=req('/api/premium/cloud/multipart/c6cd53e5-49b1-4483-b8f1-0aa29fa3ce72/part/1','PUT');
+ const result=await handleCorePremiumCloud({...base,env:{...env,PREMIUM_CLOUD_PILOT_ENABLED:'true'},
+  rateLimit:async(_req,_env,category,threshold)=>{seen={category,threshold};return false},request});
+ assert.equal(result.status,429);
+ assert.deepEqual(seen,{category:'premium-cloud-part:'+id,threshold:600});
+});

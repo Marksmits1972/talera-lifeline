@@ -8,6 +8,7 @@ on:
       - 'scripts/v62-package-preflight.mjs'
       - 'scripts/v62-live-drift-check.mjs'
       - 'scripts/v62-cloudflare-readiness.mjs'
+      - 'scripts/v62-cloud-integrity-release.mjs'
       - '.github/workflows/v62-release-preflight.yml'
   workflow_dispatch:
 permissions:
@@ -27,6 +28,8 @@ jobs:
           node-version: '22'
       - name: Install locked development tools
         run: npm ci
+      - name: Validate guarded live release script without execution
+        run: node --check scripts/v62-cloud-integrity-release.mjs
       - name: Construct reviewed V62 package without modifying tracked sources
         run: node scripts/v62-package-preflight.mjs
       - name: Compile only — Wrangler --dry-run (NO DEPLOY)

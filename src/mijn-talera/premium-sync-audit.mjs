@@ -5,6 +5,7 @@
  */
 import {listLocalPremiumMedia,createPremiumManifest,inspectPremiumLocalFileCoverage} from './premium-indexeddb-bridge.mjs';
 import {listLocalPremiumRecords,createPremiumRecordSnapshot} from './premium-records-bridge.mjs';
+import {createLargeMediaManifest,LARGE_THRESHOLD,LARGE_MEDIA_LIMIT} from './premium-large-media.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 async function json(fetcher,path){
@@ -50,10 +51,15 @@ export async function auditPremiumSync({indexedDB,crypto,fetcher,expectedAccount
  let mediaMissing=0,recordsMissing=0,mediaMatched=0,recordsMatched=0,oversizedRecords=0;
  for(const media of localMedia){
   if(!guarded())return {phase:'not_enabled'};
-  // Oversized media are not yet supported in staging; count separately.
-  if(media.size>25*1024*1024||media.size<1)continue;
-  const manifest=await createPremiumManifest(media,{crypto});
-  if(remoteMedia.has(manifest.mediaId))mediaMatched++;else mediaMissing++;
+  // Unsupported or exceptionally large media must not produce a false ready state.
+  if(media.size>LARGE_MEDIA_LIMIT||media.size<1)continue;
+  const manifest=media.size>LARGE_THRESHOLD?
+   await createLargeMediaManifest(media,{crypto}):await createPremiumManifest(media,{crypto});
+  const remote=remoteMedia.get(manifest.mediaId);
+  if(remote?.byte_size===media.size&&remote?.content_type===media.mime&&
+    (!manifest.large||(remote.sha256===manifest.fingerprint&&remote.digest_kind==='part-sha256-v1')))
+   mediaMatched++;
+  else mediaMissing++;
  }
  for(const source of localRecords){
   if(!guarded())return {phase:'not_enabled'};

@@ -22,6 +22,16 @@ import stagedRestoreSource from "./premium-restore-stage.txt";
 
 export const MENU_MODULE = "/__clean/menu-integration.mjs";
 export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
+// The mobile PWA may keep ES modules in a tab or WebKit's cache across deploys.
+// Derive an asset revision from the actual menu source, not from a manually
+// incremented release number. The same URL is used on all TALERA entry pages.
+let menuFingerprint=2166136261;
+for(let i=0;i<menuSource.length;i++)
+  menuFingerprint=Math.imul(menuFingerprint^menuSource.charCodeAt(i),16777619)>>>0;
+export const MENU_REVISION=menuFingerprint.toString(36);
+const currentMenuTag='<script type="module" src="'+MENU_MODULE+'?v='+MENU_REVISION+'"></script>';
+const originalMenuTag='<script type="module" src="'+MENU_MODULE+'"></script>';
+
 
 export function legacyDestination(pathname) {
   const path = pathname.replace(/\/+$/, "") || "/";
@@ -116,23 +126,27 @@ export default {
         });
       }
     }
-    // Open the same canonical 'Meer' menu directly from Mijn leven.
-    // The V56 home markup has #navMore, but previously its link navigated
-    // away to /present before the V62 menu module was loaded.
+    // Both /present and Mijn leven use the same canonical V62 menu.
+    // Give the module a source-derived URL so iOS cannot silently reuse
+    // a prior version after the Worker has been updated.
     if (request.method === "GET" &&
-        ["/mijn-leven","/mijn-leven/","/","/index.html"].includes(url.pathname)) {
+        ["/present","/mijn-leven","/mijn-leven/","/","/index.html"].includes(url.pathname)) {
       const response = await env.V56_BASE.fetch(request);
       if (!response.ok ||
           !(response.headers.get("content-type") || "").includes("text/html")) {
         return response;
       }
       const html = await response.clone().text();
-      if (!html.includes('id="navMore"') ||
-          html.includes('src="/__clean/menu-integration.mjs"') ||
+      const isHome=url.pathname!=="/present";
+      if ((isHome && !html.includes('id="navMore"')) ||
           !html.includes("</body>")) return response;
-      const updated = html.replace("</body>",
-        '<script type="module" src="/__clean/menu-integration.mjs"></script></body>');
-      const headers = new Headers(response.headers);
+      const updated=html.includes(originalMenuTag)
+        ?html.replace(originalMenuTag,currentMenuTag)
+        :html.includes(currentMenuTag)
+         ?html
+         :html.replace("</body>",currentMenuTag+"</body>");
+      if (updated===html)return response;
+      const headers=new Headers(response.headers);
       headers.delete("content-length");
       headers.set("cache-control","no-store");
       headers.set("x-talera-integratie",BUILD_MARKER);

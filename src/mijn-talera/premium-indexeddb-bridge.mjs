@@ -33,5 +33,7 @@ export async function uploadLocalPremiumMedia({media,manifest,fetcher=fetch,cryp
  const bytes=await media.blob.arrayBuffer();
  const sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
  const response=await fetcher('/api/premium/cloud/media/'+manifest.mediaId,{method:'PUT',credentials:'same-origin',headers:{'content-type':media.mime,'x-content-sha256':sha},body:bytes});
- return response.json();
+ if(!response?.ok)return {ok:false,reason:'upload_http_failure',status:response?.status||0};
+ const result=await response.json().catch(()=>null);
+ return result?.ok===true?result:{ok:false,reason:'upload_not_confirmed'};
 }

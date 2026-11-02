@@ -179,7 +179,7 @@ export default {
         :html.includes(currentMenuTag)
          ?html
          :html.replace("</body>",currentMenuTag+"</body>");
-      if(isHome && html.includes('class="life-sheet"') && html.includes('class="flow-nav"')){
+      if(isHome){
         if(!updated.includes('id="talera-v62-iphone-fit"') && updated.includes("</head>"))
           updated=updated.replace("</head>",HOME_FIT_STYLE+"</head>");
         if(!updated.includes('id="talera-v62-iphone-fit-script"'))

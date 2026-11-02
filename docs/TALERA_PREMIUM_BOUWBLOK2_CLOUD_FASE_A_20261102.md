@@ -74,3 +74,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Deze pure module staat in GitHub, maar is nog niet in de live Core-route opgenomen. Geen daadwerkelijke uploads, geen automatische toestemmingen en geen wijziging aan TALERA Free.
 - Voordat de pilot gebruikt wordt: de bestaande Core Worker moet veilige GET/POST-consentroutes aanbieden met serverafgeleide gebruiker; origin/CSRF-controle en rate limiting; uploadpad met hercontrole bij ieder bestand; en volledig werkende terugleesroute. Daarna pas voor uitsluitend testaccounts beschikbaar maken.
 - Voor UX blijft de afspraak ongewijzigd: slechts één keer toestemming; daarna automatisch en hervatbaar synchroniseren, nooit per herinnering bevestigen.
+
+## Uitvoering fase D — routeadapter (2 november 2026)
+- Bron: src/core/premium-cloud-routes.mjs. Consent GET/POST, accountgebonden mediamanifest GET, privé-object GET en pilot-upload PUT. Identiteit uit geverifieerde server-sessie; geen account-ID uit URL/body als autoriteit.
+- Zes gerichte route-contracttests toegevoegd in test/premium-cloud-routes.test.mjs. Nog niet uitgevoerd en routeadapter nog NIET in actieve Core Worker geïntegreerd.
+- Pilot moet standaard gesloten blijven; bestaande Core moet zijn CSRF-/Origincontrole, authenticatie, rate limiting en entitlementbeleid vóór aanroep toepassen. Uploadbewaking voor mediagroottes/streaming en samenloop/idempotentie nog integraal toetsen.
+- Nog NIET gereed: client IndexedDB-wachtrij, automatische hervatting, beveiligde live-integratie, downloadacceptatie en QR-beschikbaarheidskoppeling. Geen persoonlijke media geüpload.

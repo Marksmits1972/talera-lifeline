@@ -251,9 +251,28 @@ function render(){
     '<p class="meta">De Premium-cloudopslag wordt in een beveiligde testfase aangesloten. Uploaden gebeurt uitsluitend na jouw eenmalige toestemming. TALERA Free blijft lokaal behouden; de betaling wordt voorlopig gesimuleerd.</p>';
   if(right.source==='manual_test'&&right.permissions?.cloud_storage===true)html+='<button class="secondary" type="button" data-action="premium-cloud-test">EU-cloudopslag testen</button><p class="meta">Alleen een fictieve herinnering. Je eigen herinneringen blijven ongemoeid.</p>';
   if(right.available?.cloud_storage===true){
-    html+=premiumSyncUi.consent?.enabled?
-      '<p class="meta">EU-cloudopslag toegestaan. Mediabestanden, verhalen en bewaarde reacties worden automatisch verwerkt zolang TALERA open is. Videobestanden tot 2 GiB worden in delen verwerkt; grotere of onbekende bestanden blijven zichtbaar als openstaand.</p><button class="secondary" data-action="premium-sync-resume">Synchronisatie hervatten</button><button class="secondary" data-action="premium-sync-audit">Controleer volledigheid</button><button class="secondary" data-action="premium-sync-restore">Controleer teruglezen</button><button class="secondary" data-action="premium-cloud-restore-preview">Bekijk cloudarchief op dit account</button>':
-      '<button class="secondary" data-action="premium-cloud-consent">Eenmalig toestemming geven voor EU-cloudopslag</button><p class="meta">Je geeft één keer toestemming om de lokale herinneringen van dit apparaat aan dit account te koppelen. Gebruik deze test niet als hier herinneringen van een ander account staan. Free-data blijven behouden.</p>';
+    if(premiumSyncUi.consent?.enabled){
+      let deviceOwner;
+      try{deviceOwner=localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)||null}
+      catch{deviceOwner='unavailable'}
+      html+='<p class="meta">EU-cloudopslag toegestaan. Mediabestanden, verhalen en bewaarde reacties worden automatisch verwerkt zodra het lokale archief aan dit account is gekoppeld. Videobestanden tot 2 GiB worden in delen verwerkt.</p>';
+      if(deviceOwner===a.id){
+        html+='<button class="secondary" data-action="premium-sync-resume">Synchronisatie hervatten</button>'+
+          '<button class="secondary" data-action="premium-sync-audit">Controleer volledigheid</button>'+
+          '<button class="secondary" data-action="premium-sync-restore">Controleer teruglezen</button>';
+      }else if(deviceOwner===null){
+        html+='<p class="meta">De cloudtoestemming is al gegeven. Koppel nu één keer de lokale herinneringen op dit apparaat aan '+esc(a.email||'dit account')+'.</p>'+
+          '<button class="secondary" type="button" data-action="premium-device-link">Koppel lokaal archief en start upload</button>'+
+          '<p class="meta">Je bevestigt eerst dat deze lokale herinneringen bij dit account horen. TALERA verwijdert niets uit Free.</p>';
+      }else if(deviceOwner==='unavailable'){
+        html+='<p class="meta">Lokale opslag is niet beschikbaar. De upload blijft geblokkeerd.</p>';
+      }else{
+        html+='<p class="meta">Dit lokale archief is gekoppeld aan een ander account. De upload blijft voor de veiligheid geblokkeerd.</p>';
+      }
+      html+='<button class="secondary" data-action="premium-cloud-restore-preview">Bekijk cloudarchief op dit account</button>';
+    }else{
+      html+='<button class="secondary" data-action="premium-cloud-consent">Eenmalig toestemming geven voor EU-cloudopslag</button><p class="meta">Je geeft één keer toestemming om de lokale herinneringen van dit apparaat aan dit account te koppelen. Gebruik deze test niet als hier herinneringen van een ander account staan. Free-data blijven behouden.</p>';
+    }
     if(premiumSyncUi.phase)html+='<p class="meta">Mediabestanden: '+esc(premiumSyncUi.phase)+' · '+premiumSyncUi.uploaded+' geüpload · '+premiumSyncUi.pending+' wachtend.</p>';
     if(premiumSyncUi.recordsPhase)html+='<p class="meta">Verhalen en bewaarde reacties: '+esc(premiumSyncUi.recordsPhase)+' · '+premiumSyncUi.recordsUploaded+' geüpload · '+premiumSyncUi.recordsPending+' wachtend.</p>';
     if(premiumSyncUi.audit){
@@ -390,9 +409,12 @@ async function load(view){
     const consent=await api('/api/premium/cloud/consent');
     premiumSyncUi.consent=consent.consent||null;
     if(premiumSyncUi.consent?.enabled){
-     try{if(localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)!==state.account.id)
-       premiumSyncUi.error='Automatische upload geblokkeerd: lokaal archief niet aan dit account gekoppeld.'}
-     catch{premiumSyncUi.error='Lokale opslag niet beschikbaar.'}
+     try{
+       const owner=localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY);
+       premiumSyncUi.error=owner===state.account.id?'':owner?
+         'Automatische upload geblokkeerd: dit lokale archief hoort bij een ander account.':
+         'Automatische upload wacht op eenmalige koppeling van dit lokale archief.';
+     }catch{premiumSyncUi.error='Lokale opslag niet beschikbaar.'}
     }
    }
   }
@@ -485,6 +507,42 @@ shell.addEventListener('click',e=>{
    return;
   }
   if(button.dataset.thread){state.thread=button.dataset.thread;state.threadData=null;go('thread');return}
+ if(button.dataset.action==='premium-device-link'){
+   if(state.busy||state.view!=='subscription'||premiumSyncUi.consent?.enabled!==true||
+      premiumState.rights?.available?.cloud_storage!==true||!state.account?.id)return;
+   const accountId=state.account.id,email=state.account.email||'dit TALERA-account';
+   let currentOwner;
+   try{currentOwner=localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)}
+   catch{feedback('Lokale opslag is niet beschikbaar.',true);return}
+   if(currentOwner&&currentOwner!==accountId){
+     feedback('Dit lokale archief is aan een ander account gekoppeld. Upload geblokkeerd.',true);return;
+   }
+   if(currentOwner===accountId){premiumSyncUi.error='';void resumePremiumCloudMediaSync();render();return}
+   if(!window.confirm('Bevestig éénmalig: alle lokaal opgeslagen herinneringen op DIT apparaat horen bij '+email+' en mogen naar de privé-EU-cloud worden overgezet. TALERA Free en de lokale herinneringen blijven behouden.'))return;
+   state.busy=true;
+   void (async()=>{
+     try{
+       // Consent on the server is not sufficient proof of local ownership.
+       const [rights,consent]=await Promise.all([
+         api('/api/me/entitlements'),api('/api/premium/cloud/consent')
+       ]);
+       if(state.account?.id!==accountId||rights.accountId!==accountId||
+          rights.rights?.permissions?.cloud_storage!==true||
+          rights.rights?.available?.cloud_storage!==true||
+          consent.consent?.enabled!==true)
+         throw Error('Account of cloudtoestemming is veranderd. Er is niets gekoppeld.');
+       const owner=localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY);
+       if(owner&&owner!==accountId)throw Error('Dit apparaatarchief hoort bij een ander account.');
+       if(!owner)localStorage.setItem(PREMIUM_DEVICE_OWNER_KEY,accountId);
+       premiumSyncUi.consent=consent.consent;premiumSyncUi.error='';
+       feedback('Lokaal archief gekoppeld. De synchronisatie wordt gestart.');
+       await resumePremiumCloudMediaSync();
+     }catch(error){
+       if(state.account?.id===accountId)feedback(error?.message||'Koppelen is niet gelukt.',true);
+     }finally{state.busy=false}
+   })();
+   return;
+ }
  if(button.dataset.action==='premium-cloud-consent'){
    if(state.busy||state.view!=='subscription'||premiumState.rights?.available?.cloud_storage!==true)return;
    const id=state.account?.id;

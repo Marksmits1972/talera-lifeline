@@ -20,14 +20,14 @@ function fixture(){
   },
   async run(){
    if(sql.startsWith('INSERT INTO talera_premium_uploads')){
-    const [account_id,media_id,upload_id,content_type,byte_size,part_size,part_count,fingerprint,created_at]=arg;
-    sessions.set(index(account_id,media_id),{account_id,media_id,upload_id,content_type,byte_size,part_size,part_count,fingerprint,created_at});
+    const [account_id,media_id,upload_id,content_type,byte_size,part_size,part_count,fingerprint,created_at,source_key]=arg;
+    sessions.set(index(account_id,media_id),{account_id,media_id,upload_id,content_type,byte_size,part_size,part_count,fingerprint,created_at,source_key});
    } else if(sql.startsWith('INSERT INTO talera_premium_upload_parts')){
     const [account_id,media_id,part_number,sha256,byte_size,etag]=arg;
     chunks.set(index(account_id,media_id)+'/'+part_number,{account_id,media_id,part_number,sha256,byte_size,etag});
    }else if(sql.startsWith('INSERT INTO talera_premium_media')){
-    const [account_id,media_id,object_key,content_type,byte_size,sha256,created_at]=arg;
-    media.set(index(account_id,media_id),{account_id,media_id,object_key,content_type,byte_size,sha256,digest_kind:'part-sha256-v1',created_at});
+    const [account_id,media_id,object_key,content_type,byte_size,sha256,created_at,source_key]=arg;
+    media.set(index(account_id,media_id),{account_id,media_id,object_key,content_type,byte_size,sha256,digest_kind:'part-sha256-v1',created_at,source_key});
    }else if(sql.startsWith('DELETE FROM talera_premium_upload_parts')){
     for(const key of chunks.keys())if(key.startsWith(index(arg[0],arg[1])+'/'))chunks.delete(key);
    }else if(sql.startsWith('DELETE FROM talera_premium_uploads')){
@@ -78,6 +78,7 @@ test('large video is streamed in 8 MiB chunks, verified, registered once and res
  assert.deepEqual(outcome,{ok:true,reason:'stored'});
  const row=media.get(alice+'/'+manifest.mediaId);
  assert.equal(row.digest_kind,'part-sha256-v1');assert.equal(row.sha256,manifest.fingerprint);
+ assert.equal(row.source_key,source.key);
  assert.equal(objects.get(row.object_key).size,source.blob.size);
  const again=await uploadLargePremiumMedia({media:source,manifest,crypto,fetcher});
  assert.equal(again.reason,'already_stored');assert.equal(objects.size,1);

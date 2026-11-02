@@ -81,8 +81,8 @@ if(!token){
     if(liveMain&&typeof liveMain.arrayBuffer==='function'){
      const candidate=readFileSync('.talera-v62-package/worker.js','utf8');
      const oldSource=candidate
-      .replace('import cloudIntegritySource from "./premium-cloud-integrity.txt";\\n','')
-      .replace('        "/__clean/premium-cloud-integrity.mjs":cloudIntegritySource,\\n','');
+      .replace('import cloudIntegritySource from "./premium-cloud-integrity.txt";\n','')
+      .replace('        "/__clean/premium-cloud-integrity.mjs":cloudIntegritySource,\n','');
      const oldHash=createHash('sha256').update(oldSource).digest('hex');
      const realHash=createHash('sha256').update(new Uint8Array(await liveMain.arrayBuffer())).digest('hex');
      report.liveWorkerMatchesPreChangeSource=oldHash===realHash;

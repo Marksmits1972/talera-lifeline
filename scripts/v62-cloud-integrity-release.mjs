@@ -151,9 +151,16 @@ try{
 }catch(error){
  report.reason=error?.message||'unexpected_error';
  console.error('::error::V62 targeted release halted: '+report.reason);
- if(report.published){
-  try{await rollback();console.error('::warning::Rollback to previously reviewed Worker version requested.')}
-  catch(e){console.error('::error::Automatic rollback failed: '+(e?.message||'unknown'))}
+ if(report.attempted){
+  // PUT may have succeeded even if the response timed out. Never assume
+  // a failed request left the active deployment unchanged.
+  try{
+   const now=head(deployments(await json('/deployments')));
+   if(now.version!==req.expectedVersionId){
+    await rollback();
+    console.error('::warning::Rollback to the previously reviewed Worker version requested.');
+   }
+  }catch(e){console.error('::error::Rollback state could not be confirmed: '+(e?.message||'unknown'))}
  }
  save();
  process.exitCode=1;

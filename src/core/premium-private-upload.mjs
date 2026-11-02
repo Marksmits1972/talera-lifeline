@@ -29,7 +29,7 @@ export async function storePremiumObject({bucket,db,accountId,mediaId,contentTyp
     await db.prepare('INSERT INTO talera_premium_media(account_id,media_id,object_key,content_type,byte_size,sha256,created_at) VALUES(?,?,?,?,?,?,?)')
       .bind(accountId,mediaId,validation.objectKey,contentType,buffer.byteLength,digest,now).run();
   } catch(err) {
-    await bucket.delete(validation.objectKey); // best effort cleanup; never delete local original
+    // Preserve the cloud object for safe reconciliation after concurrent uploads.
     throw err;
   }
   return {ok:true,reason:'stored',objectKey:validation.objectKey};

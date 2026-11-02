@@ -70,3 +70,15 @@ assert.match(checkedInMenu,/Geen betaald abonnement/,
 assert.match(menuSource,/Controleren…/,
  'the completeness button must show visible progress');
 console.log('V62 Mijn leven menu scales to mobile and displays audit progress/results: OK');
+
+
+const updatedSource=readFileSync(new URL('../src/mijn-talera/menu-integration.txt',import.meta.url),'utf8');
+assert.equal(menuSource,updatedSource,'the live V62 menu must match the new deployed source byte-for-byte');
+assert.match(menuSource,/data-action="premium-cloud-integrity"/,'live menu must offer read-only cloud verification');
+assert.match(menuSource,/data-premium-local-archive="empty"/,'live menu must hide relink in an empty browser');
+assert.match(menuSource,/premiumSyncUi\.cloudIntegrity\?\.cloudBytesVerified===true/,'restore must be gated behind byte verification');
+assert.doesNotMatch(menuSource,/De cloudtoestemming is al gegeven\. Koppel nu één keer de lokale herinneringen/,'stale pre-release menu must not be served');
+const integrity=await fetch(origin+'/__clean/premium-cloud-integrity.mjs',{cache:'no-store',signal:AbortSignal.timeout(15000)});
+assert.equal(integrity.status,200,'new read-only cloud verification module must be served');
+assert.match(await integrity.text(),/verifyPremiumCloudBytesReadOnly/);
+console.log('V62 live cloud-integrity module and canonical updated menu: OK');

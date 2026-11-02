@@ -1,0 +1,39 @@
+name: TALERA V62 offline release-package preflight (NO DEPLOY)
+on:
+  push:
+    branches:
+      - feature/v62-mijn-profiel-accountoverzicht-20261101
+    paths:
+      - 'src/mijn-talera/**'
+      - 'scripts/v62-package-preflight.mjs'
+      - '.github/workflows/v62-release-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talera-v62-offline-release-preflight
+  cancel-in-progress: true
+jobs:
+  dry-run-only:
+    if: ${{ github.repository == 'Marksmits1972/talera-lifeline' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked development tools
+        run: npm ci
+      - name: Construct reviewed V62 package without modifying tracked sources
+        run: node scripts/v62-package-preflight.mjs
+      - name: Compile only — Wrangler --dry-run (NO DEPLOY)
+        run: npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Preserve checksum inventory for release review
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-v62-offline-module-inventory-${{ github.sha }}
+          path: .talera-v62-package/release-inventory.json
+          if-no-files-found: warn
+          retention-days: 30

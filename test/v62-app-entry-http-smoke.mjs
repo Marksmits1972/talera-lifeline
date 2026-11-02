@@ -22,9 +22,15 @@ assert.equal(home.status,200,'Mijn leven must serve the home page');
 assert.match(home.headers.get('content-type')||'',/text\/html/i);
 const homeHtml=await home.text();
 assert.match(homeHtml,/id=["']navMore["']/,'Mijn leven must have its More navigation');
-const integrations=homeHtml.match(/src=["']\/__clean\/menu-integration\.mjs["']/g)||[];
-assert.equal(integrations.length,1,'Mijn leven must load exactly one canonical menu in-place');
-const menu=await fetch(origin+'/__clean/menu-integration.mjs?smoke=iphone-audit-layout-20261102',{cache:'no-store',signal:AbortSignal.timeout(15000)});
+const getMenuTag=html=>{
+ const tags=[...html.matchAll(/src=["'](\/__clean\/menu-integration\.mjs\?v=[a-z0-9]+)["']/g)].map(m=>m[1]);
+ assert.equal(tags.length,1,'TALERA page must load exactly one versioned canonical menu');
+ return tags[0];
+};
+const homeTag=getMenuTag(homeHtml);
+const presentTag=getMenuTag(html);
+assert.equal(homeTag,presentTag,'Mijn leven and /present must load the same menu revision');
+const menu=await fetch(origin+homeTag,{cache:'no-store',signal:AbortSignal.timeout(15000)});
 assert.equal(menu.status,200,'The canonical More menu source must be served');
 assert.match(menu.headers.get('content-type')||'',/javascript/i);
 const menuSource=await menu.text();
@@ -41,6 +47,8 @@ assert.match(menuSource,/body\.scrollTop=preserveScroll/,
  'audit re-render must retain the current menu scroll position');
 assert.match(menuSource,/data-premium-audit-status/,
  'the result of Controleer volledigheid must appear alongside its button');
+assert.match(menuSource,/data-premium-audit-detail/,
+ 'V62 menu must include the latest local-only unsupported file diagnostics');
 assert.match(menuSource,/Controleren…/,
  'the completeness button must show visible progress');
 console.log('V62 Mijn leven menu scales to mobile and displays audit progress/results: OK');

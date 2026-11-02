@@ -1,15 +1,15 @@
 # TALERA Premium — EU-R2 opslag klaarzetten
 
-**Status 2 november 2026:** gecontroleerd ontwerp, **EU-bucket nog NIET aangemaakt** en nog geen gebruikersdata. De bestaande Core/PWA-staging blijft actief, de persoonlijke cloudgate blijft uit.
+**Status 2 november 2026, na aanmaken via Cloudflare-dashboard:** **EU-bucket aangemaakt en op de bestaande Clean Core-staging Worker aangesloten.** De persoonlijke cloudroutes blijven nog niet geactiveerd; er is geen klantdata overgezet.
 
-## Keuze
-Maak in hetzelfde bestaande Cloudflare-account één **private R2-bucket** aan met echte `eu`-jurisdiction, bedoeld voor Premium-privéherinneringen; **geen extra Worker, database, account of publieke R2-domeinnaam**.
+## Gerealiseerde opslagkeuze
+In hetzelfde bestaande Cloudflare-account is één **private R2-bucket** aangemaakt met echte `eu`-jurisdiction, bedoeld voor Premium-privéherinneringen; **geen extra Worker, database, account of publieke R2-domeinnaam**.
 
-Voorgestelde exacte bucketnaam: `talera-premium-private-eu-staging`.
+Gerealiseerde exacte bucketnaam: `talera-premium-private-eu-staging`.
 
-Cloudflare is gecontroleerd: `cf-r2-jurisdiction: eu` is bij API-aanmaak verplicht om het gebied te garanderen; de via ChatGPT beschikbare Cloudflare-aanroep ondersteunt geen eigen requestheaders. Daarom is **geen** standaardbucket met `WEUR`-hint als schijnoplossing aangemaakt. Alle op 2 november aangetroffen TALERA-buckets hadden `jurisdiction: default`.
+Cloudflare is gecontroleerd: `cf-r2-jurisdiction: eu` is bij API-aanmaak verplicht om het gebied te garanderen; de via ChatGPT beschikbare Cloudflare-aanroep ondersteunt geen eigen requestheaders. In plaats van een gewone `WEUR`-bucket heeft de eigenaar de bucket handmatig via het dashboard met **Specify jurisdiction → European Union (EU)** aangemaakt. Alle op 2 november aangetroffen TALERA-buckets hadden `jurisdiction: default`.
 
-## Eénmalige EU-aanmaak (wanneer authentificatie voor Cloudflare CLI beschikbaar is)
+## Herhaalbare EU-aanmaakmethode (voor andere omgevingen, hier al uitgevoerd)
 
 ```sh
 npx wrangler r2 bucket create talera-premium-private-eu-staging --jurisdiction eu
@@ -18,7 +18,7 @@ npx wrangler r2 bucket info talera-premium-private-eu-staging --jurisdiction eu
 
 Of Cloudflare dashboard → R2 object storage → Create bucket → **Specify jurisdiction → EU**. Controleer via de details dat `jurisdiction=eu` staat vóór gebruik. Gebruik niet enkel `--location weur`: een location hint is geen residentiegarantie.
 
-Na aanmaak uitsluitend in de **bestaande** Clean Core-staging een afzonderlijke, private binding toevoegen:
+De afzonderlijke, private binding is in de **bestaande** Clean Core-staging daadwerkelijk aangesloten:
 
 ```json
 {
@@ -29,6 +29,23 @@ Na aanmaak uitsluitend in de **bestaande** Clean Core-staging een afzonderlijke,
 ```
 
 Behoud bij upload/versiewijziging alle bestaande bindingen (`DB`, `SHARE_MEDIA`, `PREMIUM_MEDIA`) en de laatst goed werkende versie. **Bij oplevering blijft** `PREMIUM_PRIVATE_MEMORY_ENABLED=false`, lege testaccount-allowlist, `available.cloud_storage=false`. Niets publiceren voordat een geauthenticeerde synthetische QA-acceptatie compleet is.
+
+
+### Aansluiting en verificatie — 2 november 2026
+
+Cloudflare-dashboard bevestigt de nieuwe bucket onder `/r2/eu/buckets/talera-premium-private-eu-staging`, **Standard**, **Public Access Disabled** en **0 B** bij creatie.
+
+De gekoppelde Cloudflare API heeft via `PATCH /accounts/{account_id}/workers/scripts/talera-clean-core-staging-20261030/settings` met behoud van alle vijf bestaande bindings de zesde binding **`PREMIUM_PRIVATE`** toegevoegd, inclusief `jurisdiction:"eu"`. Cloudflare antwoordde succesvol en een onafhankelijke tweede GET op de Worker-settings bevestigde die binding exact. Instellingen zijn:
+
+- `DB` dezelfde D1-database; `SHARE_MEDIA` en `PREMIUM_MEDIA` behouden;
+- `PREMIUM_CLOUD_PILOT_ENABLED="false"` en lege `PREMIUM_CLOUD_PILOT_ACCOUNT_IDS` ongewijzigd;
+- `PREMIUM_PRIVATE` → `talera-premium-private-eu-staging`, jurisdictie `eu`.
+
+Cloudflare heeft bij de instellingenwijziging **automatisch een nieuwe actieve versie** uitgerold: `f9f87f6e-813e-4d8b-a866-c97ac5963e24` (versie 44). De voorafgaande werkende versie `6a74f222-27a3-49c4-9082-0ca9f7b9742a` (versie 43) blijft als direct terugvalpunt beschikbaar.
+
+**Functionele controle na de automatische uitrol:** `GET /__health` = **200, ready:true**. `/api/me`, `/api/me/entitlements`, `/api/me/premium/cloud/pilot` en `/api/me/premium/cloud/memories` weigeren een anonieme sessie nog steeds met **401**. D1 bevat onveranderd 12 herinneringen en 0 tijdelijke Premium-grants. De nieuwe private geheugenroutes zijn vooralsnog uitsluitend GitHub Draft-code, **niet in deze actieve Worker geladen**. Geen echte upload/herstelclaim.
+
+**Nog open:** de GitHub Draft-code gecontroleerd aansluiten, eigen fail-closed activering, synthetische testaccount en twee authentieke sessies, volledige media-integriteitsacceptatie en bewaarbeleid/quotas vóór gebruikersvrijgave. Geen extra Cloudflare-account of nieuwe Worker aanmaken.
 
 ## Afgeschermde ontwikkelproeven
 - De concept-API voor `PUT` media en daarna het complete `memory.json`-manifest is accountgescheiden en controleert SHA256. De cloudkopie wordt pas volledig gemeld als alle originele bestanden kloppen.

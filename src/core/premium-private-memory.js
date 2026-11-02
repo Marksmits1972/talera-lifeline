@@ -54,13 +54,30 @@ async function privateMemoryRetrieve(env,user,memoryId){
  catch{return privateMemoryReply({error:'Cloudbestand niet leesbaar'},409)}
  if(saved?.type!==privateMemoryType||saved?.accountId!==user.id||
     saved?.memoryId!==memoryId||saved?.memory?.id!==memoryId||
-    !Array.isArray(saved.memory.items)||saved.memory.items.length!==0)
+    !Array.isArray(saved.memory.items)||!Array.isArray(saved.media)||
+    saved.memory.items.length!==saved.media.length)
   return privateMemoryReply({error:'Cloudbestand komt niet overeen'},409);
+ if(!privateMemoryManifestMatches(saved.memory,saved.media)||
+    !await privateMediaConfirmed(env,user,memoryId,saved.media))
+  return privateMemoryReply({error:'Een of meer mediabestanden ontbreken of zijn niet betrouwbaar'},409);
  return privateMemoryReply({ok:true,memoryId,savedAt:saved.savedAt,memory:saved.memory,
-   verified:true,sha256:hash,mediaIncluded:false});
+   media:saved.media,verified:true,sha256:hash,mediaIncluded:saved.media.length>0});
+}
+function privateMemoryManifestMatches(memory,files){
+ if(!Array.isArray(memory.items)||!Array.isArray(files)||
+    memory.items.length!==files.length||files.length>7)return false;
+ const seen=new Set();
+ for(let i=0;i<files.length;i++){
+  const x=files[i],local=memory.items[i];
+  if(!privateMediaEntryValid(x)||!local||seen.has(x.key)||
+     local.key!==x.key||local.kind!==x.kind||local.size!==x.size||
+     local.mime!==x.mime)return false;
+  seen.add(x.key);
+ }
+ return true;
 }
 async function privateMemoryCloudRoutes(req,env,user,p,m,u){
- if(p!==privateMemoryRoute)return null;
+ if(p!==privateMemoryRoute&&p!==privateMediaRoute)return null;
  if(!user||typeof user.id!=='string'||!uuidRule.test(user.id))
   return privateMemoryReply({error:'Aanmelden bij TALERA is nodig'},401);
  // Explicitly test-only: never enabled by a package grant alone.
@@ -74,8 +91,10 @@ async function privateMemoryCloudRoutes(req,env,user,p,m,u){
  if(rights.source!=='manual_test'||rights.permissions?.cloud_storage!==true)
   return privateMemoryReply({error:'Geen geldig testrecht'},403);
  if(!env.PREMIUM_PRIVATE||typeof env.PREMIUM_PRIVATE.get!=='function'||
-   typeof env.PREMIUM_PRIVATE.put!=='function')
+   typeof env.PREMIUM_PRIVATE.put!=='function'||
+   typeof env.PREMIUM_PRIVATE.head!=='function')
   return privateMemoryReply({error:'Privéopslag niet aangesloten'},503);
+ if(p===privateMediaRoute)return privateMediaRoutes(req,env,user,m,u);
  if(m==='GET'){
   const memoryId=u.searchParams.get('id');
   if(!privateMemoryValidId(memoryId))return privateMemoryReply({error:'Ongeldige herinnering'},400);
@@ -90,13 +109,16 @@ async function privateMemoryCloudRoutes(req,env,user,p,m,u){
  const request=await privateMemoryBody(req),memory=request?.memory;
  if(request?.consent!==true||!memory||typeof memory!=='object'||
     Array.isArray(memory)||!privateMemoryValidId(memory.id)||
-    !Array.isArray(memory.items))
+    !Array.isArray(memory.items)||!Array.isArray(request.media))
   return privateMemoryReply({error:'Kies zelf één geldige herinnering'},400);
- // A text-only test must refuse media instead of silently creating partial backups.
- if(memory.items.length>0)return privateMemoryReply({
-  error:'Herinneringen met media worden pas ondersteund na veilige media-overdracht'},422);
+ const files=request.media;
+ if(!privateMemoryManifestMatches(memory,files))
+  return privateMemoryReply({error:'Mediabestanden komen niet overeen met de herinnering'},422);
+ // Before the final manifest, every original must exist and match its SHA256.
+ if(!await privateMediaConfirmed(env,user,memory.id,files))
+  return privateMemoryReply({error:'Niet alle mediabestanden zijn volledig gecontroleerd'},422);
  const saved={type:privateMemoryType,version:1,accountId:user.id,
-  memoryId:memory.id,memory,savedAt:new Date().toISOString()};
+  memoryId:memory.id,memory,media:files,savedAt:new Date().toISOString()};
  const text=JSON.stringify(saved),data=new TextEncoder().encode(text);
  if(data.length>privateMemoryMaxBytes)
   return privateMemoryReply({error:'Herinnering te groot voor deze proef'},413);

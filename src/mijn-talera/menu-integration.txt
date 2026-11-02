@@ -604,6 +604,15 @@ void checkSession().then(()=>{if(state.account)void resumePremiumCloudMediaSync(
 window.addEventListener('online',()=>{if(state.account)void resumePremiumCloudMediaSync()});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.account)void resumePremiumCloudMediaSync()});
 document.addEventListener('talera:account-changed',()=>{if(state.account)void resumePremiumCloudMediaSync()});
+// Reuse the events the existing memory editor already emits after saving.
+let premiumSyncEventTimer=null;
+for(const eventName of ['talera:v9-memory-saved','talera:new-memory-landed','talera:storylab-memory-landed']){
+ document.addEventListener(eventName,()=>{
+  if(!state.account)return;
+  if(premiumSyncEventTimer)clearTimeout(premiumSyncEventTimer);
+  premiumSyncEventTimer=setTimeout(()=>{premiumSyncEventTimer=null;void resumePremiumCloudMediaSync()},1500);
+ });
+}
 window.__taleraMoreMenu={ready:true,open,close,state:()=>({open:state.open,view:state.view,accountId:state.account?.id||null})};
 document.documentElement.dataset.taleraMoreMenu='mounted';
 

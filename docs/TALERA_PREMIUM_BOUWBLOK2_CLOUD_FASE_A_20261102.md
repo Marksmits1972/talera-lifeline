@@ -64,3 +64,13 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Nieuwe uploadmodule src/core/premium-private-upload.mjs is uitsluitend broncode; nog NIET verbonden met publieke routes, geen persoonlijke uploads uitgevoerd.
 - Privacy-/beveiligingsgrens: testaccount krijgt niet vanzelf uploads; rechten + eenmalige toestemming + serveridentiteit + checks moeten vóór live openstelling zijn afgedwongen.
 - Nog uit te voeren voor functioneel gereed: serverroute met authentieke sessie; duurzame consentregistratie; R2-opslagtransacties en foutafhandeling; uploadwachtrij/retries; IndexedDB-migratie en automatische sync; e2e tests met fictieve media. Het nieuwe testsbestand is nog niet gedraaid. QR-status volgt pas na gecontroleerde cloudverwerking.
+
+
+## Uitvoering fase C — consent en autorisatie (2 november 2026)
+- Nieuwe pure autorisatiemodule: src/core/premium-cloud-auth.mjs. Controleert geverifieerde sessie, actieve Premium-cloudrechten, featurebeschikbaarheid, pilotflag en opgeslagen eenmalige toestemming. Een account-ID mag nooit uit een ongecontroleerde aanvraag worden overgenomen.
+- Acht testgevallen toegevoegd: test/premium-cloud-auth.test.mjs. Nog niet als door CI uitgevoerd geclaimd.
+- Nieuwe D1-tabel talera_premium_cloud_consent toegevoegd aan de **bestaande** stagingdatabase met een accountgebonden consentstatus. Direct gecontroleerd: 0 toestemmingen.
+- Migratie vastgelegd: migrations/20261102_premium_cloud_consent.sql.
+- Deze pure module staat in GitHub, maar is nog niet in de live Core-route opgenomen. Geen daadwerkelijke uploads, geen automatische toestemmingen en geen wijziging aan TALERA Free.
+- Voordat de pilot gebruikt wordt: de bestaande Core Worker moet veilige GET/POST-consentroutes aanbieden met serverafgeleide gebruiker; origin/CSRF-controle en rate limiting; uploadpad met hercontrole bij ieder bestand; en volledig werkende terugleesroute. Daarna pas voor uitsluitend testaccounts beschikbaar maken.
+- Voor UX blijft de afspraak ongewijzigd: slechts één keer toestemming; daarna automatisch en hervatbaar synchroniseren, nooit per herinnering bevestigen.

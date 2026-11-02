@@ -59,6 +59,10 @@ assert.match(menuSource,/data-premium-audit-status/,
  'the result of Controleer volledigheid must appear alongside its button');
 assert.match(menuSource,/data-premium-audit-detail/,
  'V62 menu must include the latest local-only unsupported file diagnostics');
+assert.match(menuSource,/TALERA Free \+ Premium-testtoegang/,
+ 'Free users with temporary cloud rights must not appear to have no Premium access');
+assert.match(menuSource,/Geen betaald abonnement/,
+ 'Simulated Premium access must remain clearly unpaid');
 assert.match(menuSource,/Controleren…/,
  'the completeness button must show visible progress');
 console.log('V62 Mijn leven menu scales to mobile and displays audit progress/results: OK');

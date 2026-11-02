@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {premiumCloudRoute} from '../src/core/premium-cloud-routes.mjs';
+const entitlement={permissions:{cloud_storage:true},available:{cloud_storage:true}},account={id:'a8f08aa9-a0a2-4ce3-a179-44fb758d1102'};
+const env={DB:{prepare(){return {bind(){return {first:async()=>null}}}}}};
+const request=(path,method='GET')=>new Request('https://example.test'+path,{method});
+test('unknown route leaves Core routing intact',async()=>assert.equal(await premiumCloudRoute({request:request('/api/me'),env}),null));
+test('unauthed Cloud route denied before query',async()=>assert.equal((await premiumCloudRoute({request:request('/api/premium/cloud/media'),env})).status,401));
+test('consent can be read as unset without granting permission',async()=>{const r=await premiumCloudRoute({request:request('/api/premium/cloud/consent'),env,sessionAccount:account});assert.deepEqual((await r.json()).consent,{enabled:false,grantedAt:null})});
+test('grant requires origin check',async()=>assert.equal((await premiumCloudRoute({request:request('/api/premium/cloud/consent','POST'),env,sessionAccount:account,entitlement,pilotEnabled:true})).status,403));
+test('Free cannot accept consent',async()=>{const r=await premiumCloudRoute({request:new Request('https://example.test/api/premium/cloud/consent',{method:'POST',body:JSON.stringify({agree:true})}),env,sessionAccount:account,entitlement:{permissions:{cloud_storage:false}},pilotEnabled:true,writeAllowed:true});assert.equal(r.status,403)});
+test('media list denied while pilot disabled',async()=>assert.equal((await premiumCloudRoute({request:request('/api/premium/cloud/media'),env,sessionAccount:account,entitlement})).status,403));

@@ -5,6 +5,7 @@ on:
       - feature/v62-mijn-profiel-accountoverzicht-20261101
     paths:
       - 'src/core/premium-*.mjs'
+      - 'src/mijn-talera/premium-*.mjs'
       - 'test/premium-*.test.mjs'
       - '.github/workflows/premium-cloud-tests.yml'
   workflow_dispatch:
@@ -18,4 +19,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs test/premium-cloud-e2e-fixture.test.mjs
+      - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs test/premium-cloud-e2e-fixture.test.mjs test/premium-sync-queue.test.mjs

@@ -40,10 +40,10 @@ async function cleanup(db,accountId,mediaId){
 async function saveManifest(env,accountId,mediaId,s,object){
  if(object?.size!==s.byte_size)return bad('object_size_mismatch',409);
  if(object?.customMetadata?.sha256!==s.fingerprint)return bad('object_fingerprint_mismatch',409);
- await env.DB.prepare("INSERT INTO talera_premium_media(account_id,media_id,object_key,content_type,byte_size,sha256,created_at,digest_kind) VALUES(?,?,?,?,?,?,?,'part-sha256-v1') ON CONFLICT(account_id,media_id) DO NOTHING")
-  .bind(accountId,mediaId,keyFor(accountId,mediaId),s.content_type,s.byte_size,s.fingerprint,Date.now()).run();
- const stored=await env.DB.prepare('SELECT sha256,byte_size,digest_kind FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
- if(stored?.sha256!==s.fingerprint||stored?.byte_size!==s.byte_size||stored?.digest_kind!=='part-sha256-v1')return bad('manifest_conflict',409);
+ await env.DB.prepare("INSERT INTO talera_premium_media(account_id,media_id,object_key,content_type,byte_size,sha256,created_at,digest_kind,source_key) VALUES(?,?,?,?,?,?,?,'part-sha256-v1',?) ON CONFLICT(account_id,media_id) DO NOTHING")
+  .bind(accountId,mediaId,keyFor(accountId,mediaId),s.content_type,s.byte_size,s.fingerprint,Date.now(),s.source_key||null).run();
+ const stored=await env.DB.prepare('SELECT sha256,byte_size,digest_kind,source_key FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
+ if(stored?.sha256!==s.fingerprint||stored?.byte_size!==s.byte_size||stored?.digest_kind!=='part-sha256-v1'||(s.source_key&&stored?.source_key!==s.source_key))return bad('manifest_conflict',409);
  await cleanup(env.DB,accountId,mediaId);
  return json({ok:true,reason:'stored',digestKind:'part-sha256-v1',byteSize:s.byte_size});
 }
@@ -59,19 +59,19 @@ export async function premiumMultipartRoute({request,env,accountId,writeAllowed=
   const incoming=await readBounded(request,4096);
   let info;
   try{info=JSON.parse(new TextDecoder().decode(incoming))}catch{return bad('invalid_upload')}
-  const size=info?.byteSize,type=info?.contentType,hash=info?.fingerprint;
+  const size=info?.byteSize,type=info?.contentType,hash=info?.fingerprint,sourceKey=info?.sourceKey??null;
   if(!Number.isSafeInteger(size)||size<=SMALL_LIMIT||size>LARGE_MEDIA_MAX||
-    !TYPES.has(type)||!SHA.test(hash||''))return bad('invalid_upload');
+    !TYPES.has(type)||!SHA.test(hash||'')||(sourceKey!==null&&(typeof sourceKey!=='string'||!sourceKey||sourceKey.length>240||sourceKey.startsWith('talera-thread-archive-v1:'))))return bad('invalid_upload');
   const count=Math.ceil(size/PART_BYTES);
-  const existing=await db.prepare('SELECT sha256,byte_size,digest_kind FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
-  if(existing)return existing.sha256===hash&&existing.byte_size===size&&existing.digest_kind==='part-sha256-v1'?
+  const existing=await db.prepare('SELECT sha256,byte_size,digest_kind,source_key FROM talera_premium_media WHERE account_id=? AND media_id=?').bind(accountId,mediaId).first();
+  if(existing)return existing.sha256===hash&&existing.byte_size===size&&existing.digest_kind==='part-sha256-v1'&&(!sourceKey||existing.source_key===sourceKey)?
     json({ok:true,reason:'already_stored'}):bad('id_conflict',409);
   // If R2 completed but D1 finalization was interrupted, resume its existing
   // authorized session without overwriting the private object.
   let session=await getSession(db,accountId,mediaId);
   const present=await bucket.head(objectKey);
   if(present){
-   if(session&&present.size===size&&present.customMetadata?.sha256===hash)
+   if(session&&present.size===size&&present.customMetadata?.sha256===hash&&(!sourceKey||session.source_key===sourceKey))
     return json({ok:true,reason:'resumed',partSize:PART_BYTES,partCount:count});
    return bad('object_exists_unregistered',409);
   }
@@ -79,12 +79,12 @@ export async function premiumMultipartRoute({request,env,accountId,writeAllowed=
    try{await bucket.resumeMultipartUpload(objectKey,session.upload_id).abort()}catch{}
    await cleanup(db,accountId,mediaId);session=null;
   }
-  if(session)return same(session.fingerprint,hash)&&same(session.content_type,type)&&session.byte_size===size?
+  if(session)return same(session.fingerprint,hash)&&same(session.content_type,type)&&session.byte_size===size&&(!sourceKey||session.source_key===sourceKey)?
    json({ok:true,reason:'resumed',partSize:PART_BYTES,partCount:count}):bad('id_conflict',409);
-  const uploaded=await bucket.createMultipartUpload(objectKey,{httpMetadata:{contentType:type},customMetadata:{sha256:hash,digestKind:'part-sha256-v1'}});
+  const uploaded=await bucket.createMultipartUpload(objectKey,{httpMetadata:{contentType:type},customMetadata:{sha256:hash,digestKind:'part-sha256-v1',...(sourceKey?{sourceKey}:{})}});
   try{
-   await db.prepare('INSERT INTO talera_premium_uploads(account_id,media_id,upload_id,content_type,byte_size,part_size,part_count,fingerprint,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-    .bind(accountId,mediaId,uploaded.uploadId,type,size,PART_BYTES,count,hash,Date.now()).run();
+   await db.prepare('INSERT INTO talera_premium_uploads(account_id,media_id,upload_id,content_type,byte_size,part_size,part_count,fingerprint,created_at,source_key) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind(accountId,mediaId,uploaded.uploadId,type,size,PART_BYTES,count,hash,Date.now(),sourceKey).run();
   }catch(error){try{await uploaded.abort()}catch{};throw error}
   return json({ok:true,reason:'started',partSize:PART_BYTES,partCount:count});
  }

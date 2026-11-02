@@ -237,3 +237,10 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Via Cloudflare `PUT /workers/scripts/talera-pwa-v62-mijn-profiel-20261101/content` alleen de `menu-integration.txt` module in de bestaande multipart-Worker geactualiseerd. Cloudflare meldde succesvolle deployment `91ab7490df454cd6be1b92e4758c3b68` (2 november 2026 15:50 UTC). Bestaande onderdelen `free-backup.txt`, `kennisbank.html` en `worker.mjs` behouden; binding `V56_BASE` onveranderd.
 - Nacontrole actieve Cloudflare-bron: één knop, één clickhandler, één pilot-API-pad. PWA-menu exact identiek aan GitHub-bron (lengte 50.130 tekens, FNV1a `9d7f97f6`), GitHub commit `cae8ca3e4f19792355dcb493e455a06d80e13881`. Testworkflow uitgebreid met JS-syntaxcontrole van menu-script (commit `2ab738c8c6eb5878dcd8671bbca609f6b8f64966`).
 - Core pilot blijft **uit** (`PREMIUM_CLOUD_PILOT_ENABLED=false`, whitelist leeg); eerste veilige schermtest moet daarom de gesloten-pilotmelding opleveren in de ingelogde PWA. Er is nog geen echte opslag-/downloadcontrole gedaan, en geen gebruikersdata gebruikt.
+
+## Fase AE — EU-cloudpilot voor één testaccount geopend (2 november 2026)
+- Gebruikersscreenshot V62 bevestigt Premium Individual, knop EU-cloudopslag testen en terugmelding dat de beveiligde cloudproef nog uit stond. De ingelogde PWA-origin werkt.
+- Na Cloudflare preflight uitsluitend de twee bestaande pilotinstellingen geactiveerd voor account sales@swimm.nl: PREMIUM_CLOUD_PILOT_ENABLED=true; PREMIUM_CLOUD_PILOT_ACCOUNT_IDS bevat exact de UUID b70d49a4-0c94-4964-9024-0c44521b5ccf.
+- Directe herlezing: alle zes oorspronkelijke Worker-bindings qua inhoud behouden, allowlist exact één account, private bucket nog steeds EU-jurisdictie. Geen nieuwe Worker, DB of bucket gemaakt.
+- Gebruiker moet nu via de knop in de aangemelde PWA fictieve POST/GET/DELETE testen; er is nog geen succesvolle objectuitwisseling bevestigd.
+- **Verplichte cleanup na test of bij afbreken:** PREMIUM_CLOUD_PILOT_ENABLED weer false en PREMIUM_CLOUD_PILOT_ACCOUNT_IDS leeg maken, andere bindings onaangeroerd laten. Niet onbeperkt open laten staan.

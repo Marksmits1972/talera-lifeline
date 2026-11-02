@@ -133,5 +133,5 @@ async function privateMemoryCloudRoutes(req,env,user,p,m,u){
  if(verified.status!==200)return privateMemoryReply({error:'Opslag niet bevestigd; lokale versie behouden'},503);
  const result=await verified.json();
  return privateMemoryReply({ok:true,memoryId:memory.id,sha256:result.sha256,
-  savedAt:result.savedAt,verified:true,mediaIncluded:false},201);
+  savedAt:result.savedAt,verified:true,mediaIncluded:files.length>0},201);
 }

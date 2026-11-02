@@ -89,3 +89,24 @@ test('completeness audit marks supported 26 MiB video as pending and unsupported
  assert.equal(result.unsupported,1);
  assert.equal(result.verifiedObjects,false);
 });
+
+test('audit explains non-media local files without sending names or contents to cloud',async()=>{
+ const archive=fakeArchive([],[{key:'photo',blob:new Blob(['test'],{type:'image/jpeg'})},
+  {key:'note-json',blob:new Blob(['private content'],{type:'application/json'})},
+  {key:'missing-blob',value:'not a media blob'},
+  {key:'talera-thread-archive-v1:archived',blob:new Blob(['{}'],{type:'application/json'})}]);
+ const requested=[];
+ const result=await auditPremiumSync({indexedDB:archive,crypto,expectedAccountId:user,ownerMatches:()=>true,
+  fetcher:async(path)=>{requested.push(path);return {ok:true,json:async()=>path.endsWith('/entitlements')?
+   {accountId:user,rights:{permissions:{cloud_storage:true},available:{cloud_storage:true}}}:
+   path.endsWith('/consent')?{consent:{enabled:true}}:{ok:true,items:[],next:null}}}
+ });
+ assert.equal(result.unsupported,2);
+ assert.equal(result.mediaMissing,1);
+ assert.deepEqual(result.unsupportedDetails,[
+  {key:'note-json',reason:'Bestandstype application/json',bytes:15},
+  {key:'missing-blob',reason:'Geen mediabestand',bytes:null}
+ ]);
+ assert.equal(result.phase,'needs_attention');
+ assert.ok(requested.every(path=>!path.includes('note-json')&&!path.includes('missing-blob')));
+});

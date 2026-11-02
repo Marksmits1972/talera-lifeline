@@ -9,3 +9,17 @@ test('idempotent server response is accepted',async()=>{const f=fixture({upload:
 test('exception retries later without deleting local media',async()=>{const f=fixture({upload:async()=>{throw Error('offline')}});const r=await syncPremiumPending(f.args);assert.equal(r.failed,2);assert.deepEqual(f.synced,[])});
 test('bounded batch keeps more items pending',async()=>{const f=fixture();const r=await syncPremiumPending({...f.args,maxItems:1});assert.equal(r.pending,1);assert.equal(r.phase,'uploading')});
 test('entitlement revoked mid-sync stops subsequent uploads',async()=>{let n=0;const f=fixture({allowed:async()=>++n<=2});const r=await syncPremiumPending(f.args);assert.equal(r.phase,'not_enabled');assert.deepEqual(f.synced,['a'])});
+
+test('temporary rights check failure does not crash or mark local media synced',async()=>{
+ const f=fixture({allowed:async()=>{throw Error('network_unavailable')}});
+ const result=await syncPremiumPending(f.args);
+ assert.equal(result.phase,'not_enabled');
+ assert.deepEqual(f.synced,[]);
+});
+test('rights check failure mid-batch retains remaining local media',async()=>{
+ let checks=0;const f=fixture({allowed:async()=>{checks++;if(checks===3)throw Error('network_unavailable');return true}});
+ const result=await syncPremiumPending(f.args);
+ assert.equal(result.phase,'not_enabled');
+ assert.deepEqual(f.synced,['a']);
+ assert.equal(result.pending,1);
+});

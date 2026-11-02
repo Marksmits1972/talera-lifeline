@@ -46,7 +46,7 @@ export async function previewPremiumCloudRestore({fetcher,expectedAccountId,onli
   if(record.kind==='story')stories++;
   else if(record.kind==='comment_archive')comments++;
   else invalidRecords++;
-  if(!Number.isSafeInteger(record.byte_size)||record.byte_size<1||record.byte_size>1048576||!/^[a-f0-9]{64}$/.test(record.sha256||''))atomicIneligible++;
+  if(!Number.isSafeInteger(record.byte_size)||record.byte_size<1||record.byte_size>1048576||!/^[a-f0-9]{64}$/.test(record.sha256||'')){atomicIneligible++;stageIneligible++}
   else {atomicBytes+=record.byte_size;recordBytes+=record.byte_size}
  }
  const incomplete=missingFileKeys+conflictingKeys+invalidMedia+invalidRecords;

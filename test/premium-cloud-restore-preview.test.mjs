@@ -49,3 +49,28 @@ test('offline preview makes no requests',async()=>{
  const result=await previewPremiumCloudRestore({fetcher:async()=>{calls++},expectedAccountId:id,online:()=>false});
  assert.equal(result.phase,'offline');assert.equal(calls,0);
 });
+
+test('oversized legacy full-SHA media never advertises an atomic restore button',async()=>{
+ const {fetcher}=fixture({media:[{media_id:mk(41),source_key:'video-old',byte_size:26*1024*1024,
+  content_type:'video/mp4',sha256:'a'.repeat(64),digest_kind:'full-sha256'}]});
+ const result=await previewPremiumCloudRestore({fetcher,expectedAccountId:id});
+ assert.equal(result.phase,'manifest_available');
+ assert.equal(result.atomicRestoreEligible,false);
+ assert.equal(result.largeRestoreEligible,false);
+ assert.equal(result.stageIneligible,1);
+});
+test('valid multipart video has staged eligibility but never atomic-only eligibility',async()=>{
+ const {fetcher}=fixture({media:[{media_id:mk(42),source_key:'video-26mb',byte_size:26*1024*1024,
+  content_type:'video/mp4',sha256:'b'.repeat(64),digest_kind:'part-sha256-v1'}]});
+ const result=await previewPremiumCloudRestore({fetcher,expectedAccountId:id});
+ assert.equal(result.phase,'manifest_available');
+ assert.equal(result.atomicRestoreEligible,false);
+ assert.equal(result.largeRestoreEligible,true);
+});
+test('invalid historical comments block both restore routes',async()=>{
+ const {fetcher}=fixture({records:[{record_id:mk(51),kind:'comment_archive',
+  byte_size:1048577,sha256:'f'.repeat(64)}]});
+ const result=await previewPremiumCloudRestore({fetcher,expectedAccountId:id});
+ assert.equal(result.atomicRestoreEligible,false);
+ assert.equal(result.largeRestoreEligible,false);
+});

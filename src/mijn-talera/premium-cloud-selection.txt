@@ -68,6 +68,7 @@ function restoreManifestValid(payload,id){
      !Object.hasOwn(LIMITS,m.kind)||!Number.isSafeInteger(m.size)||
      m.size<1||m.size>LIMITS[m.kind]||
      !m.mime.startsWith(({photo:'image/',video:'video/',audio:'audio/'})[m.kind])||
+     /(?:svg|xml|html|javascript|\+xml)/i.test(m.mime)||
      !/^[a-f0-9]{64}$/.test(m.sha256))return false;
   seen.add(m.key);counts[m.kind]++;
  }

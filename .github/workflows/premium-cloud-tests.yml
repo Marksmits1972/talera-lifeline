@@ -7,6 +7,7 @@ on:
       - 'src/core/premium-*.mjs'
       - 'src/mijn-talera/premium-*.mjs'
       - 'test/premium-*.test.mjs'
+      - 'test/premium-eu-pilot-http-smoke.mjs'
       - '.github/workflows/premium-cloud-tests.yml'
   workflow_dispatch:
 jobs:
@@ -20,3 +21,7 @@ jobs:
         with:
           node-version: '22'
       - run: node --test test/premium-cloud-auth.test.mjs test/premium-cloud-readiness.test.mjs test/premium-cloud-routes.test.mjs test/premium-private-upload.test.mjs test/premium-cloud-e2e-fixture.test.mjs test/premium-sync-queue.test.mjs test/premium-indexeddb-bridge.test.mjs test/premium-sync-coordinator.test.mjs test/premium-cloud-pilot.test.mjs test/premium-cloud-core-adapter.test.mjs test/premium-eu-pilot-patch.test.mjs
+      - name: Verify closed pilot rejects anonymous requests
+        env:
+          TALERA_CORE_STAGING_URL: https://talera-clean-core-staging-20261030.mark-a39.workers.dev
+        run: node test/premium-eu-pilot-http-smoke.mjs

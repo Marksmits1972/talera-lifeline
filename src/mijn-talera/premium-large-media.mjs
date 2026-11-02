@@ -43,7 +43,7 @@ export async function uploadLargePremiumMedia({media,manifest,fetcher=fetch,cryp
  const base='/api/premium/cloud/multipart/'+manifest.mediaId;
  const started=await fetchJson(fetcher,base+'/start',{method:'POST',
   headers:{'content-type':'application/json'},body:JSON.stringify({
-   byteSize:manifest.size,contentType:manifest.mime,fingerprint:manifest.fingerprint})});
+   byteSize:manifest.size,contentType:manifest.mime,fingerprint:manifest.fingerprint,sourceKey:manifest.key})});
  if(started.reason==='already_stored')return {ok:true,reason:'already_stored'};
  if(started.partSize!==LARGE_PART_BYTES||started.partCount!==manifest.parts.length)throw Error('invalid_upload_session');
  const status=await fetchJson(fetcher,base+'/status',{method:'GET'});

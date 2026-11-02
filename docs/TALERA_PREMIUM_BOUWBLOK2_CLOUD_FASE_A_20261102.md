@@ -200,3 +200,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - Minimale vervolgaanpassing: **uitsluitend binnen deze bestaande testroute** de drie R2-acties en de bindingcontrole omzetten van `PREMIUM_MEDIA` naar `PREMIUM_PRIVATE`, met dezelfde sessie-/pilot-/allowlist-/rechtenchecks en dezelfde synthetische fixture. Niet alle andere Worker-routes wijzigen en geen tweede pilotroute bouwen.
 - Leg vóór deployment de huidige Worker-versie vast voor rollback, test syntaxis en regressie, en houd `PREMIUM_CLOUD_PILOT_ENABLED=false` totdat alleen een aangewezen technisch testaccount is toegelaten. Dit is nog **niet uitgerold**.
 - De EU-bucket is door de gebruiker in het dashboard bevestigd met `Jurisdiction: European Union (EU)`; de Cloudflare-connector geeft bij directe R2 REST-aanvraag nog 404. Test daarom via de Worker R2-binding, niet via de onbetrouwbare directe connectorroute.
+
+## Fase Y — bestaande synthetische pilot voorbereiden voor EU R2 (2 november 2026)
+- Via Cloudflare is de actieve Clean Core-bron opnieuw gelezen. De bestaande `premiumCloudPilotRoutes` bevat precies acht `env.PREMIUM_MEDIA` verwijzingen; buiten die route zijn geen aanroepen naar deze binding aangetroffen.
+- `src/core/premium-eu-pilot-patch.mjs` toegevoegd: een fail-closed, strikt afgebakende bronpatch voor precies deze acht verwijzingen binnen de bestaande synthetische route. `test/premium-eu-pilot-patch.test.mjs` bevat twee controles; de testworkflow is uitgebreid.
+- De patch is nog niet op de actieve Worker toegepast; er is nog geen nieuwe deployment, geen fictieve upload via de EU-binding en geen gebruik van persoonlijke herinneringen. Pilotflag en allowlist blijven ongewijzigd.
+- Vóór deployment: actuele Worker-source bewaren als terugvalversie, diff van uitsluitend de testroute controleren, tests uitvoeren en de echte R2-binding test via een aangewezen testaccount. Niet de normale klantcloud openstellen.

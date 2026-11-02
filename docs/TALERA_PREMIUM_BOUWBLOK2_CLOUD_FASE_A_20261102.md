@@ -144,3 +144,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - `src/mijn-talera/premium-indexeddb-bridge.mjs` accepteert een upload nu alleen als de HTTP-respons succesvol **en** de serverbody expliciet `ok:true` meldt. Een HTTP-fout met misleidende respons of ontbrekende serverbevestiging mag nooit leiden tot lokaal `synced`.
 - Twee regressietests voor mislukte en onbevestigde responses toegevoegd aan `test/premium-indexeddb-bridge.test.mjs`; bestaande succesvolle mock aangepast met correcte HTTP-status.
 - Werkelijke Core-integratie is nog niet uitgerold: Cloudflare-pilot staat uit; broncode alleen op featurebranch. Tests zijn nog niet aantoonbaar gedraaid. Geen live gebruikersdata geraakt.
+
+## Fase P — herstelbare rechtencontrole, lokale test (2 november 2026)
+- In `src/mijn-talera/premium-sync-queue.mjs` geven fouten tijdens de eerste en tussentijdse Premium-rechtencontrole voortaan gecontroleerd `not_enabled` terug in plaats van de synchronisatieronde abrupt te laten mislukken.
+- Twee aanvullende regressietests toegevoegd aan `test/premium-sync-queue.test.mjs`.
+- Drie gerichte tests uitgevoerd met Node 22 in een lokale kopie van de gecorrigeerde wachtrijlogica: fout bij eerste rechtencontrole, fout midden in ronde en normale upload; 3/3 geslaagd. Dit is **geen** volledige repository-CI of echte R2-test.
+- De actieve TALERA Worker en PWA zijn niet gewijzigd, pilot blijft afgeschermd, geen persoonlijke herinneringen aangeraakt.

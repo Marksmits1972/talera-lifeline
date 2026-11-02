@@ -133,3 +133,9 @@ Testscenario's: Free → Premium-testrecht → eenmalige cloudtoestemming → au
 - `src/core/premium-cloud-pilot.mjs` toegevoegd: gebruik bestaande Core-pilotbindings, beperkte account-allowlist en serverafgeleide `manual_test`-entitlement. Alleen zo mag de cloudbeschikbaarheid voor een pilotaccount worden aangezet; Free en andere Premium-gebruikers houden `available.cloud_storage=false`.
 - Zes gerichte tests toegevoegd en opgenomen in GitHub Actions. Uitvoering nog onbevestigd. Module is nog NIET gemonteerd in bestaande Core Worker en pilot is niet geactiveerd.
 - Vervolg: geverifieerde Core-sessie en entitlement binnen bestaande Worker aan routeadapter koppelen, originbeveiliging verifiëren; PWA same-origin doorgifte alleen voor geselecteerde pilotroutes expliciet bouwen en met testaccounts beoordelen. Geen productie-/Free-aanpassingen en geen betalingsprovider.
+
+## Fase N — bestaande Core-accountbeveiliging hergebruiken (2 november 2026)
+- Cloudflare bevestigd: `PREMIUM_CLOUD_PILOT_ENABLED=false` en de account-allowlist is leeg; cloudpilot is dus daadwerkelijk uitgeschakeld.
+- `src/core/premium-cloud-core-adapter.mjs` toegevoegd als fail-closed integratieadapter: verwacht de reeds geverifieerde Core-sessie en bestaande helpers voor rechten, request-origincontrole en rate limiting; geen nieuwe inlogstructuur. Alleen allowlisted testaccounts met handmatig Premium-recht komen door de poort.
+- Zes regressietests in `test/premium-cloud-core-adapter.test.mjs` toegevoegd aan de bestaande testworkflow. Tests nog niet bevestigd als uitgevoerd.
+- De adapter is **nog niet** in de actieve Clean Core Worker ingebouwd, de PWA-router is niet gewijzigd en er zijn geen uploads uitgevoerd. De pilot blijft dicht totdat de daadwerkelijke veilige sessie-/route-integratie en geïsoleerde R2-test zijn bewezen.

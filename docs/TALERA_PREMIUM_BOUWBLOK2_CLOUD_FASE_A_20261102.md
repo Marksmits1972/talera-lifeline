@@ -34,3 +34,12 @@ Deze fase legt de bouwgrens vast zonder nieuwe Worker of ongevraagde D1/R2-migra
 
 ## Vast ontwerpbesluit gebruiker — 2 november 2026
 TALERA Premium belooft standaard cloudopslag en synchronisatie. Na éénmalige gebruikersinstemming verloopt dat automatisch voor alle Premium-herinneringen. Geen individuele selectie of handmatige upload als normale werking. TALERA Free blijft lokaal. Dit besluit vervangt alle eerdere formuleringen over handmatig kiezen van cloudherinneringen.
+
+## Vast ontwerpbesluit — betaling, directe rechten en QR/TV-kijken (2 november 2026)
+- Zodra een betaling **serverzijdig als geslaagd is bevestigd** (betrouwbare betalingsprovider/webhook; niet louter browserredirect), worden de rechten van het betaalde Premium-pakket direct actief op het account. De daadwerkelijke functies worden alleen zichtbaar/bruikbaar voor zover technisch beschikbaar. Betalingskoppeling bestaat nog niet; niet als gebouwd presenteren.
+- Bij eerste Premium-activatie vraagt TALERA één keer toestemming voor migratie en automatische cloudopslag. Daarna start de upload automatisch, zonder per-herinnering-vragen.
+- **Rechten actief ≠ cloudinhoud al klaar.** QR-code-/familie-/TV-kijken is afhankelijk van de aanwezigheid en verwerking van de betreffende herinneringen/media in de cloud. Geen 'gereed'-melding of werkende QR-presentatie beloven voordat de relevante upload en eventuele verwerking voltooid zijn.
+- In de QR-code-kijkroute komt een korte, vriendelijke uitleg vóór het tonen/genereren van een kijkcode (met duidelijke status indien upload nog bezig is): **'Net Premium geworden? Je herinneringen worden eerst veilig naar de cloud overgezet. Dat kan even duren, vooral bij veel foto's en video's. Zodra het overzetten klaar is, kun je ze samen via de QR-code bekijken.'**
+- Wanneer relevant: status 'Herinneringen worden overgezet', voortgang waar betrouwbaar meetbaar, en 'Klaar om samen te kijken'. Geen verzonnen minuten of vaste wachttijd. In de tussentijd blijven lokaal beschikbare herinneringen zichtbaar op het eigen apparaat.
+- Implementatie: betaalbevestiging idempotent verwerken; entitlement toekennen op bevestigde betaalstatus, cloud-upload apart asynchroon/voortzetbaar en foutbestendig; QR kijkroute alleen beschikbaar voor daadwerkelijk cloudbeschikbare geselecteerde inhoud. Intrekking/downgrade en autorisatie blijven serverzijdig afgedwongen.
+- Niet nu bouwen: providerintegratie, definitieve UX of geautomatiseerde upload zijn nog toekomstige stappen. Dit is de verplichtende bouwspecificatie.

@@ -17,7 +17,7 @@ export function validatePrivateRecord({accountId,id,kind,payload,bytes,sha256}={
    !payload.record||typeof payload.record!=='object'||Array.isArray(payload.record))return 'invalid_record';
  if(kind==='story'&&
    (typeof payload.record.id!=='string'||!payload.record.id||
-   payload.record.id.length>192||!Array.isArray(payload.record.items)))return 'invalid_story';
+   payload.record.id.length>192||!Array.isArray(payload.record.items||[])))return 'invalid_story';
  if(kind==='comment_archive'&&
    (typeof payload.record.localId!=='string'||!payload.record.localId||
    payload.record.localId.length>192||typeof payload.record.comment?.id!=='string'||

@@ -17,6 +17,7 @@ import syncAuditSource from "./premium-sync-audit.txt";
 import largeMediaSource from "./premium-large-media.txt";
 import restoreVerifierSource from "./premium-restore-verifier.txt";
 import restorePreviewSource from "./premium-cloud-restore-preview.txt";
+import atomicRestoreSource from "./premium-cloud-restore-atomic.txt";
 
 export const MENU_MODULE = "/__clean/menu-integration.mjs";
 export const BUILD_MARKER = "mijn-talera-geconsolideerd-20261101";
@@ -57,6 +58,7 @@ export default {
         "/__clean/premium-large-media.mjs":largeMediaSource,
         "/__clean/premium-restore-verifier.mjs":restoreVerifierSource,
         "/__clean/premium-cloud-restore-preview.mjs":restorePreviewSource,
+        "/__clean/premium-cloud-restore-atomic.mjs":atomicRestoreSource,
       };
       const moduleText = syncModules[url.pathname];
       if (moduleText !== undefined) {

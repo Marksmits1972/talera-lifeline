@@ -17,7 +17,7 @@ function localDb(stories,files){
   });return r;
  }};
 }
-async function fixture({corrupt=false}={}){
+async function fixture({corrupt=false,extraUnsupported=false}={}){
  const story={id:'local-story',title:'A happy story',items:[]};
  const data=new Uint8Array([1,2,3,4,5]);
  const media={key:'photo-story',blob:new Blob([data],{type:'image/jpeg'}),mime:'image/jpeg',size:data.length};
@@ -36,7 +36,9 @@ async function fixture({corrupt=false}={}){
   if(path==='/api/premium/cloud/records/story/'+snap.id)return new Response(snap.bytes,{status:200});
   throw Error('unexpected URL: '+path);
  };
- return {indexedDB:localDb([story],[{key:media.key,blob:media.blob}]),fetcher};
+ const files=[{key:media.key,blob:media.blob}];
+ if(extraUnsupported)files.push({key:'unsupported-local-attachment',blob:new Blob(['private sample'],{type:'application/pdf'})});
+ return {indexedDB:localDb([story],files),fetcher};
 }
 test('readback verification confirms exact media bytes and archived story content without local writes',async()=>{
  const {indexedDB,fetcher}=await fixture();
@@ -56,4 +58,25 @@ test('account mismatch blocks cloud verification and all local reads',async()=>{
   expectedAccountId:account,ownerMatches:()=>false});
  assert.equal(result.verifiedObjects,false);
  assert.equal(localReads,0);assert.equal(calls,0);
+});
+
+test('supported memories are read back even with an unsupported local file; no false full-completion claim',async()=>{
+ const {indexedDB,fetcher}=await fixture({extraUnsupported:true});
+ const result=await verifyPremiumRemoteBytes({indexedDB,crypto,fetcher,
+  expectedAccountId:account,ownerMatches:()=>true});
+ assert.equal(result.phase,'supported_readback_verified');
+ assert.equal(result.supportedObjectsVerified,true);
+ assert.equal(result.verifiedObjects,false);
+ assert.equal(result.verifiedMedia,1);
+ assert.equal(result.verifiedRecords,1);
+ assert.equal(result.unsupported,1);
+ assert.equal(result.unsupportedDetails[0].reason,'Bestandstype application/pdf');
+});
+test('mismatched supported cloud media still fails when there are unsupported local files',async()=>{
+ const {indexedDB,fetcher}=await fixture({corrupt:true,extraUnsupported:true});
+ const result=await verifyPremiumRemoteBytes({indexedDB,crypto,fetcher,
+  expectedAccountId:account,ownerMatches:()=>true});
+ assert.equal(result.verifiedObjects,false);
+ assert.equal(result.supportedObjectsVerified,false);
+ assert.equal(result.reason,'remote_media_mismatch');
 });

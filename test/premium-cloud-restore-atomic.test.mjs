@@ -115,11 +115,11 @@ test('missing media referenced by a story is rejected before any writes',async()
   expectedAccountId:account,accountMatches:()=>true,approval:true}),/story_media_missing/);
  assert.equal(db.stats().writes,0);
 });
-test('more than 64 MiB cannot enter atomic restore',async()=>{
+test('a falsely declared 64 MiB full-hash photo is rejected without touching Free data',async()=>{
  const db=localDatabase(),fx=await fixture({oversize:true});
- const res=await restorePremiumCloudAtomic({indexedDB:db.indexedDB,crypto,fetcher:fx.fetcher,
-  expectedAccountId:account,accountMatches:()=>true,approval:true});
- assert.equal(res.phase,'private_staging_unavailable');assert.equal(db.stats().writes,0);
+ await assert.rejects(restorePremiumCloudAtomic({indexedDB:db.indexedDB,crypto,fetcher:fx.fetcher,
+  expectedAccountId:account,accountMatches:()=>true,approval:true}),/cloud_restore_not_supported/);
+ assert.equal(db.stats().writes,0);
 });
 test('wrong signed-in account is denied before IndexedDB is opened',async()=>{
  const db=localDatabase(),fx=await fixture({mismatch:true});

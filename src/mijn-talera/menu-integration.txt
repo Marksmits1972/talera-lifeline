@@ -307,6 +307,7 @@ async function resumePremiumCloudMediaSync(){
  // Free's local database is device-scoped; never upload across accounts by default.
  try{if(localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)!==state.account.id)return}
  catch{return}
+ const expectedAccountId=state.account.id;
  premiumSyncUi.working=true;premiumSyncUi.error='';
  try{
   const mod=await import('/__clean/premium-sync-coordinator.mjs');
@@ -315,7 +316,8 @@ async function resumePremiumCloudMediaSync(){
   for(let i=0;i<20;i++){
    result=await mod.runPremiumMediaSync({
     indexedDB:window.indexedDB,crypto:window.crypto,fetcher:(url,options)=>fetch(url,options),
-    online:()=>navigator.onLine!==false,maxItems:10
+    online:()=>navigator.onLine!==false,maxItems:10,expectedAccountId,
+    ownerMatches:()=>state.account?.id===expectedAccountId&&localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)===expectedAccountId
    });
    premiumSyncUi.phase=result.phase;premiumSyncUi.uploaded+=result.uploaded||0;
    premiumSyncUi.pending=result.pending||0;

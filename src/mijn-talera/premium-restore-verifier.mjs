@@ -23,6 +23,7 @@ export async function verifyPremiumRemoteBytes({indexedDB,crypto,fetcher,expecte
  if(result.phase!=='manifest_matched')return {...result,verifiedObjects:false};
  if(!allowed())return {phase:'not_enabled',verifiedObjects:false};
  const [media,records]=await Promise.all([listLocalPremiumMedia({indexedDB}),listLocalPremiumRecords({indexedDB})]);
+ if(media.length===0&&records.length===0)return {phase:'empty',verifiedObjects:false,verifiedMedia:0,verifiedRecords:0};
  let verifiedMedia=0,verifiedRecords=0;
  const get=async(url,headers)=>{
   if(!allowed())throw Error('verification_interrupted');

@@ -368,6 +368,23 @@ function patchPresent(html){
   return {html:html.slice(0,begin)+block+html.slice(end),changed:true,reason:'inline-presentation'};
 }
 
+function removeEditorShareBeforePublish(html){
+  // The editor is a draft, never a share entry point. Only the social button
+  // on the published presentation can initiate sharing.
+  const start="  if(isEditor){\n    document.body.classList.add('talera-editor-share-mode');\n    function installEditorShare(){";
+  const idx=html.indexOf(start);
+  const terminator='  // Public integration bridge: no client event may be interpreted as permission to share.';
+  const fin=html.indexOf(terminator,idx);
+  if(idx<0||fin<0)return {html,changed:false};
+  let out=html.slice(0,idx)+"  if(isEditor)document.body.classList.add('talera-editor-share-mode');\n"+html.slice(fin);
+  const eventStart=out.indexOf("  document.addEventListener('talera:share-from-editor',e=>{");
+  const eventEnd=out.indexOf("  if(isEditor)",eventStart);
+  if(eventStart>=0&&eventEnd>eventStart)out=out.slice(0,eventStart)+out.slice(eventEnd);
+  const css='<style id="talera-v61-postpublish-sharing">body.talera-editor-share-mode #app .work.talera-compact-work .work-tools{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}body.talera-editor-share-mode [data-talera-editor-share]{display:none!important}</style>';
+  out=out.replace('</head>',css+'</head>');
+  return {html:out,changed:true};
+}
+
 function patchTell(html){
   const a=html.indexOf('function openZeroPlayer(g){');
   if(a<0)return{html,changed:false,reason:'no-tell'};
@@ -377,7 +394,9 @@ function patchTell(html){
   const updated=html.slice(0,a)+taleraV61RecordMark.toString()+'\n'+openZeroPlayer.toString()+html.slice(b);
   const patched=updated.replace(needle,"if($('pos'))$('pos').textContent=(idx+1)+' / '+g.media.length;taleraV61RecordMark(idx)}");
   if(!patched.includes('taleraV61RecControls'))return{html,changed:false,reason:'patch-incomplete'};
-  return{html:patched.replace('</head>',RECORD_CSS+'</head>'),changed:true,reason:'inline-recording'};
+  const withoutPrematureShare=removeEditorShareBeforePublish(patched);
+  if(!withoutPrematureShare.changed)return{html,changed:false,reason:'share-source-changed'};
+  return{html:withoutPrematureShare.html.replace('</head>',RECORD_CSS+'</head>'),changed:true,reason:'inline-recording-no-editor-share'};
 }
 
 export default {
@@ -396,6 +415,11 @@ export default {
     headers.delete('content-length');headers.delete('content-encoding');headers.delete('etag');
     headers.set('cache-control','no-store');
     headers.set('x-talera-v61-vertelmodus',result.reason);
-    return new Response(result.html,{status:upstream.status,statusText:upstream.statusText,headers});
+    // Create listening preference on both the home timeline and presentation.
+    // Otherwise the existing Meer > Settings toggle only works on /present.
+    const appRoutes=['/','/mijn-leven','/present','/tell'];
+    const output=(appRoutes.includes(url.pathname)&&result.html.includes('</head>'))
+      ?installGlobalAudioPref(result.html):result.html;
+    return new Response(output,{status:upstream.status,statusText:upstream.statusText,headers});
   }
 };

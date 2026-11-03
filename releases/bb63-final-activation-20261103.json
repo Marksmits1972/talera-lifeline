@@ -1,0 +1,19 @@
+{
+  "action": "precheck-only",
+  "releaseAuthorized": false,
+  "core": "talera-clean-core-staging-20261030",
+  "app": "talera-pwa-v62-mijn-profiel-20261101",
+  "newCore": "4f972875-8309-4814-9ed7-95c69b6124de",
+  "newApp": "37fbe2f6-5250-491d-875a-b37abf39f30a",
+  "oldCore": "ef484758-391d-4875-999f-34f1a4b78a93",
+  "oldApp": "31b38681-ca28-4b12-bde6-22a446ce1337",
+  "reviewedBaseCommit": null,
+  "evidence": {
+    "coreValidatedFromRun": 41606374597,
+    "appValidatedFromRun": 41607443541,
+    "rollbackVerifiedFromRun": 41610673394
+  },
+  "noUploads": true,
+  "noDatabaseWrites": true,
+  "versionOnlyRelease": true
+}

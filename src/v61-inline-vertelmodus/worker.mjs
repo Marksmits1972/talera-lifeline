@@ -77,7 +77,7 @@ async function taleraInlineLoadVideo(s,frame,cue,ms){
     video.setAttribute('playsinline','');video.playsInline=true;
     video.muted=true;video.defaultMuted=true;video.controls=false;
     video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';
-    stage.appendChild(video);s.video=video;
+    (stage.parentElement||stage).appendChild(video);s.video=video;
     try{
       const url=await store.mediaUrl(frame.key);
       if(s!==taleraInline||s.video!==video||s.videoKey!==frame.key){

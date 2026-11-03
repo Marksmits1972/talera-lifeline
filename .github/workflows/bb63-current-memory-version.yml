@@ -69,7 +69,7 @@ jobs:
           assert.equal(createHash('sha256').update(content).digest('hex'),part.sha256);
           assert.equal(content.toString(),upstream.toString(),'current browser module source must exactly match reviewed original');
           const worker=readFileSync(base+'worker.js','utf8');
-          assert.match(worker,/"\\/\\__clean\\/premium-current-client\\.mjs":currentClientSource/);
+          assert.ok(worker.includes('"/__clean/premium-current-client.mjs":currentClientSource'),'Worker must serve the real current client module');
           console.log('BB63 browser module route and 17-part immutable package: PASS');
           EOF
           npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out

@@ -1,8 +1,6 @@
 // TALERA: one existing 'Meer' entry, account APIs from the tested clean core.
 // Deliberately no second account controller, demo data or new share controller.
 (()=>{'use strict';
-// Explicit diagnostic URL only; prevents all automatic Premium-sync attempts.
-const taleraDiagnoseMode=new URLSearchParams(location.search).get('talera_diagnose')==='1';
 const trigger=()=>document.querySelector('.more')?.closest('button')||document.getElementById('navMore');
 if(window.__taleraMoreMenu?.ready)return;
 const css=[
@@ -70,75 +68,6 @@ const storageState={local:null,owned:null,received:null,error:''};
 const premiumState={rights:null,admin:false,target:null};
 const premiumSyncUi={consent:null,localArchiveCount:null,phase:'',uploaded:0,pending:0,recordsPhase:'',recordsUploaded:0,recordsPending:0,working:false,error:'',audit:null,auditWorking:false,auditError:'',restore:null,restoreWorking:false,restoreError:'',cloudPreview:null,cloudPreviewWorking:false,cloudIntegrity:null,cloudIntegrityWorking:false,cloudIntegrityProgress:null,cloudIntegrityError:'',atomicRestoreWorking:false,restoreProgressBytes:0};
 const PREMIUM_DEVICE_OWNER_KEY='talera-premium-device-owner-v1';
-
-const diagnoseState={phase:'not_started',summary:null};
-async function inspectOriginReadOnly(){
- // This report contains only public app-context metadata and DB COUNTS.
- // It does not enumerate records, read files, change localStorage or make network requests.
- const report={
-   origin:location.origin,pathname:location.pathname,
-   displayMode:window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true?'standalone':'browser',
-   menuScript:document.querySelector('script[src*="/__clean/menu-integration.mjs"]')?.getAttribute('src')||'not_detected',
-   manifestLink:document.querySelector('link[rel="manifest"]')?.getAttribute('href')||'not_detected',
-   serviceWorkerScope:'not_detected',cacheCount:'unavailable',
-   freeDatabase:'unavailable',localStories:'unavailable',localFiles:'unavailable'
- };
- try{const reg=await navigator.serviceWorker?.getRegistration?.();
-   if(reg?.scope)report.serviceWorkerScope=reg.scope;
- }catch{report.serviceWorkerScope='unavailable'}
- try{const names=await window.caches?.keys?.();
-   if(Array.isArray(names))report.cacheCount=names.length;
- }catch{}
- const idb=window.indexedDB;
- // NEVER call indexedDB.open when the existence of this DB is not already known.
- if(typeof idb?.databases!=='function')return report;
- let databases;
- try{databases=await idb.databases()}catch{return report}
- if(!Array.isArray(databases))return report;
- const name='talera-lifeline-dev-local-v1';
- if(!databases.some(row=>row?.name===name)){
-   report.freeDatabase='not_present';report.localStories=0;report.localFiles=0;
-   return report;
- }
- report.freeDatabase='present';
- try{
-   const db=await new Promise((resolve,reject)=>{
-     const request=idb.open(name);
-     request.onupgradeneeded=()=>{request.transaction?.abort();reject(Error('database_changed'))};
-     request.onerror=()=>reject(request.error||Error('database_unavailable'));
-     request.onsuccess=()=>resolve(request.result);
-   });
-   try{
-     if(!db.objectStoreNames.contains('stories')||!db.objectStoreNames.contains('files')){
-       report.freeDatabase='unsupported_schema';return report;
-     }
-     const counts=await new Promise((resolve,reject)=>{
-       const tx=db.transaction(['stories','files'],'readonly');
-       const st=tx.objectStore('stories').count();
-       const fi=tx.objectStore('files').count();
-       tx.oncomplete=()=>resolve([st.result,fi.result]);
-       tx.onerror=()=>reject(tx.error||Error('count_failed'));
-       tx.onabort=()=>reject(tx.error||Error('count_aborted'));
-     });
-     report.localStories=counts[0];report.localFiles=counts[1];
-   }finally{db.close()}
- }catch{report.freeDatabase='present_but_unreadable'}
- return report;
-}
-function diagnoseSummaryHtml(){
- const r=diagnoseState.summary;
- if(!r)return '<p class="meta" role="status">'+(diagnoseState.phase==='working'?'Alleen lokale tellers worden gelezen…':'Nog niet gecontroleerd.')+'</p>';
- const rows=[
- ['App-adres',r.origin],['Pad',r.pathname],['Weergavemodus',r.displayMode],
- ['Geladen menumodule',r.menuScript],['Manifestlink',r.manifestLink],
- ['Service-worker-scope',r.serviceWorkerScope],['Aantal caches',r.cacheCount],
- ['Lokale Free-database',r.freeDatabase],['Eigen verhalen (aantal)',r.localStories],
- ['Lokale bestanden (aantal)',r.localFiles]
- ];
- return rows.map(([label,value])=>'<div class="status-line"><span><strong>'+esc(label)+'</strong><small>'+esc(String(value))+'</small></span></div>').join('')+
-   '<p class="meta">Alleen metagegevens en aantallen. Geen verhalen, foto’s, sleutels, accountgegevens of cloudbestanden zijn gelezen, verstuurd of gewijzigd.</p>';
-}
-
 
 let authEpoch=0;
 function clearPrivateState(){
@@ -359,12 +288,6 @@ function render(){
   option('display','◐','Weergave','Binnenkort: persoonlijke weergavevoorkeuren')+option('storage','▤','Opslag en back-up','Lokale back-up en herstel'))+
   section('Geluid en afspelen',action(window.__taleraAudioControls?.isEnabled?.()?'disable-listening':'enable-listening',window.__taleraAudioControls?.isEnabled?.()?'Ⅱ':'▶',window.__taleraAudioControls?.isEnabled?.()?'Luisteren uitschakelen':'Luisteren inschakelen','Gesproken herinneringen'));break;
 
-  case 'diagnose':
-    html=title('Technische controle','BB63 · Alleen lokaal en alleen lezen.')+
-      info('Controle van deze installatie','Deze pagina meet uitsluitend het huidige webadres, de geladen versie en aantallen eigen Free-records. Er worden geen herinneringen, bestanden of cloudgegevens verzonden.')+
-      '<button class="secondary" type="button" data-action="diagnose-refresh">Controle herhalen (alleen lezen)</button>'+
-      diagnoseSummaryHtml();
-    break;
   case 'storage':
     html=title('Opslag en back-up','Controle voor deze browser en jouw TALERA-account.')+
       info('Op dit toestel',storageState.local===null?'Nog niet gecontroleerd of niet beschikbaar':storageState.local+' lokale herinnering'+(storageState.local===1?'':'en')+' in deze browser')+
@@ -499,7 +422,6 @@ function render(){
  if(state.open&&state.view==='hub')void window.TaleraFreeBackup?.remind(shell);
 }
 async function resumePremiumCloudMediaSync(){
- if(taleraDiagnoseMode)return;
  if(premiumSyncUi.working||navigator.onLine===false||!state.account?.id)return;
  try{if(localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)!==state.account.id)return}catch{return}
  const expectedAccountId=state.account.id;
@@ -536,14 +458,6 @@ function open(view='hub',intent=null){if(state.open){if(view!=='hub'){state.view
 function close(){state.open=false;state.intent=null;shell.hidden=true;shell.removeAttribute('style');delete document.body.dataset.taleraMoreOpen;trigger()?.focus?.()}
 async function load(view){
   const startEpoch=authEpoch;
-  if(view==='diagnose'){
-    diagnoseState.phase='working';diagnoseState.summary=null;
-    if(state.open&&state.view===view)render();
-    try{diagnoseState.summary=await inspectOriginReadOnly();diagnoseState.phase='ready'}
-    catch{diagnoseState.phase='unavailable'}
-    if(state.open&&state.view===view)render();
-    return;
-  }
  try{
   if(view==='hub'||view==='account'||view==='settings'||view==='privacy'||view==='people'||view==='shared'||view==='mine'||view==='messages'||view==='storage'||view==='profile'||view==='subscription'||view==='premium-admin'){
    try{const m=await api('/api/me');if(startEpoch!==authEpoch)return;setActiveAccount(m.account)}catch(e){if(startEpoch!==authEpoch)return;if(e.status===401)setActiveAccount(null);else throw e}
@@ -637,7 +551,6 @@ shell.addEventListener('click',e=>{
   return;
  }
  const button=e.target.closest('button');if(!button)return;
- if(button.dataset.action==='diagnose-refresh'&&taleraDiagnoseMode){void load('diagnose');return}
  if(button.dataset.passwordToggle){const input=shell.querySelector('#'+button.dataset.passwordToggle);if(!input)return;e.preventDefault();const show=input.type==='password';input.type=show?'text':'password';button.setAttribute('aria-label',show?'Verberg wachtwoord':'Toon wachtwoord');button.setAttribute('aria-pressed',String(show));return}
  if(button.dataset.view){go(button.dataset.view);return}
  if(button.dataset.recipient){
@@ -979,8 +892,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.open){e.preventDefault();backOne()}});
 setInterval(()=>{if(state.open&&!document.hidden&&state.view==='thread'&&state.thread&&!body.querySelector('form[data-form="comment"] textarea')?.value)void load('thread')},5000);
 const requestedMenu=new URLSearchParams(location.search).get('talera_menu');
-if(requestedMenu==='diagnose'&&taleraDiagnoseMode)open('diagnose');
-else if(['hub','account','login','privacy','messages','settings','people','mine','shared','subscription','help','language','accessibility','display','storage','profile'].includes(requestedMenu))open(requestedMenu);
+if(['hub','account','login','privacy','messages','settings','people','mine','shared','subscription','help','language','accessibility','display','storage','profile'].includes(requestedMenu))open(requestedMenu);
 document.addEventListener('talera:open-auth',e=>{const intent=e.detail?.intent||'share';open('login',intent)});
 async function checkSession(){
   const startEpoch=authEpoch;

@@ -1,0 +1,36 @@
+name: BB63 Core topology metadata only (NO DEPLOY)
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'scripts/bb63-core-readonly-topology.mjs'
+      - '.github/workflows/bb63-core-topology.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read-bound-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax validation (no API writes)
+        run: |
+          node --check scripts/bb63-core-readonly-topology.mjs
+          ! grep -E "method:[[:space:]]*['\"](POST|PUT|DELETE|PATCH)" scripts/bb63-core-readonly-topology.mjs
+      - name: Read active V62 binding, bound Core deployment, D1/R2 binding names and source SHA only
+        env:
+          TALERA_V62_CF_READ_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-core-readonly-topology.mjs
+      - name: Preserve sanitized read-only evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-core-topology-${{ github.sha }}
+          path: .talera-bb63-evidence/core-readonly-topology.json
+          if-no-files-found: warn
+          retention-days: 45

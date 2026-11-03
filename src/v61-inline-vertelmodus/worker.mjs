@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-r13-datum-eenvoud-r12-locked-20261103';
+const BUILD='v61-r14-rustige-herinnering-r12-locked-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -1045,6 +1045,29 @@ function patchDateUx(html){
   return{html:page,changed:true,reason:'r13-simple-date-ui'};
 }
 
+
+const V14_EDITOR_CSS="<style id=\"talera-v61-r14-quiet-editor\">\n/* Only editor chrome. Never alter media grid, gestures, remove buttons or player. */\n#app .work.talera-compact-work #details{\n  padding-top:0!important;margin:0 0 8px!important;\n}\n#app .work.talera-compact-work #details .talera-v14-heading{\n  box-sizing:border-box!important;display:flex!important;flex-direction:column!important;\n  border:1px solid #dfe5e6!important;border-radius:16px!important;\n  background:#fff!important;box-shadow:none!important;\n  padding:13px 16px 11px!important;gap:0!important;\n}\n#app .work.talera-compact-work #details .talera-v14-heading>.field{\n  display:block!important;position:relative!important;\n  margin:0!important;padding:0!important;border:0!important;\n}\n#app .work.talera-compact-work #details .talera-v14-heading>.field::after{\n  content:none!important;display:none!important;\n}\n#app .work.talera-compact-work .talera-v14-heading #title{\n  box-sizing:border-box!important;display:block!important;\n  width:100%!important;height:auto!important;min-height:36px!important;\n  background:transparent!important;border:0!important;box-shadow:none!important;\n  margin:0!important;padding:1px 0 3px!important;border-radius:0!important;\n  color:#1d4053!important;\n  font:650 21px/1.32 -apple-system,BlinkMacSystemFont,system-ui,sans-serif!important;\n  letter-spacing:-.025em!important;\n}\n#app .work.talera-compact-work .talera-v14-heading #title:focus-visible{\n  outline:2px solid #aacbd9!important;outline-offset:3px!important;border-radius:4px!important;\n}\n#app .work.talera-compact-work .talera-v14-heading #dateToggle{\n  display:inline-flex!important;align-self:flex-start!important;\n  width:auto!important;max-width:100%!important;min-height:36px!important;\n  background:transparent!important;border:0!important;box-shadow:none!important;\n  padding:4px 0!important;margin:0!important;\n  text-align:left!important;color:#667f8e!important;\n  font:550 14px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif!important;\n  text-decoration:underline!important;text-decoration-color:#c7d8df!important;\n  text-underline-offset:4px!important;\n}\n#app .work.talera-compact-work .talera-v14-heading #dateToggle::after{\n  content:none!important;display:none!important;\n}\n#app .work.talera-compact-work #details>.talera-tags-v20{\n  border:0!important;border-top:0!important;\n  padding:0!important;margin:8px 0 0!important;\n  background:transparent!important;\n}\n#app .work.talera-compact-work #details .talera-tags-toggle{\n  font:600 13px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif!important;\n  color:#607f91!important;min-height:37px!important;\n  margin:0!important;padding:7px 0!important;\n}\n#app .work.talera-compact-work #details .talera-tags-selected{margin-top:3px!important}\n#app .work.talera-compact-work .work-tools button{\n  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif!important;\n  font-size:16px!important;font-weight:700!important;letter-spacing:-.01em!important;\n}\n#app>.submit #publish{\n  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif!important;\n  font-size:15px!important;font-weight:750!important;letter-spacing:-.01em!important;\n}\n</style>";
+const V14_EDITOR_HELPER="function taleraV14SimplifyHeader(g){\n  const details=$('details'),title=$('title'),date=$('dateToggle');\n  if(!details||!title||!date||details.querySelector('.talera-v14-heading'))return;\n  const titleLabel=title.closest('label.field');\n  if(!titleLabel||titleLabel.parentElement!==details)return;\n  const header=document.createElement('div');\n  header.className='talera-v14-heading';\n  header.setAttribute('role','group');\n  header.setAttribute('aria-label','Titel en datum');\n  details.insertBefore(header,titleLabel);\n  header.appendChild(titleLabel);\n  header.appendChild(date);\n  const sourceHint=$('v10SourceHint');\n  if(sourceHint)header.appendChild(sourceHint);\n}";
+function patchEditorChrome(html){
+ const anchor='function workView(){',a=html.indexOf(anchor);
+ const b=a>=0?html.indexOf('</script>',a):-1;
+ if(a<0||b<0)return{html,changed:false,reason:'r14-original-editor-not-found'};
+ let block=html.slice(a,b);
+ const caller='setupV20Tags(g,details);setupV10(g,details,frame,footer);taleraCompactWorkbench(g);if(errorMsg)showError(errorMsg)';
+ const proposed="const proposedTitle=()=>validDay(g.date)?'Herinnering · '+dateLabel(g):'Mijn herinnering';";
+ if(!block.includes(caller)||!block.includes(proposed))
+   return{html,changed:false,reason:'r14-editor-contract-drift'};
+ block=V14_EDITOR_HELPER+'\n'+block;
+ block=block.replace(caller,'setupV20Tags(g,details);setupV10(g,details,frame,footer);taleraCompactWorkbench(g);taleraV14SimplifyHeader(g);if(errorMsg)showError(errorMsg)');
+ // The date is visible just below the title. Do not duplicate it in the
+ // autogenerated display name. Custom titles and published fallbacks stay intact.
+ block=block.replace(proposed,"const proposedTitle=()=> 'Herinnering';");
+ let page=html.slice(0,a)+block+html.slice(b);
+ if(!page.includes('</head>'))return{html,changed:false,reason:'r14-head-missing'};
+ page=page.replace('</head>',V14_EDITOR_CSS+'</head>');
+ return{html:page,changed:true,reason:'r14-quiet-editor'};
+}
+
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
@@ -1057,7 +1080,8 @@ export default {
     const html=await upstream.text();
     const result=html.includes('<script id="talera-zero-memory-adapter">')?patchPresent(html):
       html.includes('function openZeroPlayer(g){')?patchTell(html):{html,changed:false,reason:'not-applicable'};
-    const finalResult=url.pathname==='/tell'&&result.changed?patchDateUx(result.html):result;
+    let finalResult=url.pathname==='/tell'&&result.changed?patchDateUx(result.html):result;
+    if(url.pathname==='/tell'&&finalResult.changed)finalResult=patchEditorChrome(finalResult.html);
     const headers=new Headers(upstream.headers);
     headers.delete('content-length');headers.delete('content-encoding');headers.delete('etag');
     headers.set('cache-control','no-store');

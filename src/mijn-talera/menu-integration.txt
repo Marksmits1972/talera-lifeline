@@ -504,8 +504,22 @@ async function resumePremiumCloudMediaSync(){
  try{if(localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)!==state.account.id)return}catch{return}
  const expectedAccountId=state.account.id;
  const ownerMatches=()=>state.account?.id===expectedAccountId&&localStorage.getItem(PREMIUM_DEVICE_OWNER_KEY)===expectedAccountId;
+ // Record only the most recently acknowledged cloud snapshot for THIS device.
+ // Without this baseline, an out-of-date device may not overwrite a newer
+ // cloud version merely because it can read its current ID.
+ const versionId=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+ const headKey=(kind,key)=>'talera-premium-last-confirmed-v1:'+expectedAccountId+':'+kind+':'+encodeURIComponent(key);
+ const getLastConfirmed=(kind,key)=>{
+   try{const id=localStorage.getItem(headKey(kind,key));return versionId.test(id||'')?id:null}
+   catch{return null}
+ };
+ const rememberLastConfirmed=(kind,key,id)=>{
+   if(!versionId.test(id||'')||!ownerMatches())throw Error('account_changed');
+   localStorage.setItem(headKey(kind,key),id);
+ };
  const common={indexedDB:window.indexedDB,crypto:window.crypto,fetcher:(url,options)=>fetch(url,options),
-   online:()=>navigator.onLine!==false,maxItems:10,expectedAccountId,ownerMatches};
+   online:()=>navigator.onLine!==false,maxItems:10,expectedAccountId,ownerMatches,
+   getLastConfirmed,rememberLastConfirmed};
  premiumSyncUi.working=true;premiumSyncUi.error='';
  let continueSoon=false;
  try{

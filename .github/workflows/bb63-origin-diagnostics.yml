@@ -6,6 +6,8 @@ on:
     paths:
       - 'src/mijn-talera/menu-integration.txt'
       - 'test/bb63-origin-diagnostics.test.mjs'
+      - 'scripts/bb63-menu-only-release.mjs'
+      - '.github/workflows/bb63-menu-only-release.yml'
       - '.github/workflows/bb63-origin-diagnostics.yml'
   workflow_dispatch:
 permissions:
@@ -26,6 +28,7 @@ jobs:
         run: |
           node --check --input-type=commonjs < src/mijn-talera/menu-integration.txt
           node --check test/bb63-origin-diagnostics.test.mjs
+          node --check scripts/bb63-menu-only-release.mjs
       - name: Verify read-only IndexedDB and no automatic Premium upload
         run: node --test test/bb63-origin-diagnostics.test.mjs
       - name: Verify existing Premium local ownership and cloud integrity guards

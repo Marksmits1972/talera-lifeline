@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-vertelcyclus-r9-editor-controls-20261103';
+const BUILD='v61-vertelcyclus-r10-safari-media-gestures-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -459,11 +459,18 @@ function openZeroPlayer(g){
   s.observer.observe(frame,{childList:true});
   const onTouchStart=e=>{if(e.touches.length===1)s.touch={x:e.touches[0].clientX,y:e.touches[0].clientY}};
   const onTouchEnd=e=>{
-    if(!s.touch)return;
+    if(!s.touch||!e.changedTouches?.length)return;
     const dx=e.changedTouches[0].clientX-s.touch.x,dy=e.changedTouches[0].clientY-s.touch.y;
-    s.touch=null;if(Math.abs(dx)>30||Math.abs(dy)>30)s.skipClickUntil=Date.now()+600;
-    // Horizontal swipes are already handled by the original TALERA frame;
-    // do not also step in the recording layer (that would record two cues).
+    s.touch=null;
+    if(Math.abs(dx)>30||Math.abs(dy)>30)s.skipClickUntil=Date.now()+600;
+    // During narration, handle the swipe once in the capture phase. Native
+    // iOS video surfaces may never generate a synthetic click or bubble the
+    // touchend to the editor's ordinary swipe listener. Keep one media cue.
+    if(s.recorder?.state==='recording'&&g.media.length>1
+       &&Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3){
+      e.stopImmediatePropagation();
+      stepPhoto(g,dx<0?1:-1);
+    }
   };
   const onClick=e=>{if(Date.now()<s.skipClickUntil||e.target.closest('button'))return;if(g.media.length>1)stepPhoto(g,1)};
   frame.addEventListener('touchstart',onTouchStart,{passive:true,capture:true});
@@ -569,6 +576,7 @@ const RECORD_CSS = '\n<style id="talera-v61-inline-record-css">'+
 'body.talera-v61-inline-recording #frame{background:#fbfaf7!important}'+
 'body.talera-v61-inline-recording #app .work.talera-compact-work #frame{display:flex!important;align-items:center!important;justify-content:center!important;position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;z-index:2000!important;background:#fbfaf7!important;overflow:hidden!important}'+
 'body.talera-v61-inline-recording #frame>img,body.talera-v61-inline-recording #frame>video{width:100%!important;height:100%!important;object-fit:contain!important;max-height:none!important;max-width:none!important}'+
+'body.talera-v61-inline-recording #frame>video{pointer-events:none!important;touch-action:none!important}'+
 'body.talera-v61-inline-recording #frame .empty{color:#4f6b76!important;background:transparent!important}'+
 '#taleraV61RecControls{position:fixed;z-index:2200;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.98);color:#183b50;border-radius:21px;border:1px solid rgba(218,225,227,.95);padding:12px 15px;box-shadow:0 8px 27px rgba(18,48,64,.12);font:500 14px/1.4 system-ui}'+
 '#taleraV61RecControls .talera-v61-rec-top,#taleraV61RecControls .talera-v61-rec-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}'+
@@ -841,16 +849,19 @@ function taleraV9EditorMediaControls(g){
   const panel=document.querySelector('.talera-work-tiles');
   const grid=panel?.querySelector('.tiles');
   if(!grid)return;
-  for(const tile of [...grid.querySelectorAll(':scope > .tile')]){
-    const holder=document.createElement('div');
-    holder.className='talera-v9-media-holder';
-    tile.replaceWith(holder);holder.appendChild(tile);
+  // Keep every original TALERA tile as a DIRECT grid child. Wrapping a
+  // percentage-height tile in a new aspect-ratio div made Safari shrink
+  // thumbnails to tiny images while the delete buttons stayed full size.
+  for(const [i,tile] of [...grid.querySelectorAll(':scope > .tile')].entries()){
+    const row=String(Math.floor(i/3)+1),column=String(i%3+1);
+    tile.style.gridRow=row;tile.style.gridColumn=column;
     const remove=document.createElement('button');
     remove.type='button';remove.className='talera-v9-remove-media';
+    remove.style.gridRow=row;remove.style.gridColumn=column;
     remove.textContent='×';remove.setAttribute('aria-label','Beeld verwijderen');
     remove.title='Beeld verwijderen';
     remove.onclick=e=>{e.preventDefault();e.stopPropagation();void taleraV9RemoveMedia(g,tile.dataset.id)};
-    holder.append(remove);
+    grid.append(remove);
   }
   if(g.media.length>=6)return;
   const input=document.createElement('input');
@@ -959,9 +970,9 @@ function patchTell(html){
     +taleraV9EditorMediaControls.toString()+'\n'
     +workAnchor);
   const cssR9='<style id="talera-v61-r9-controls-css">'
-    +'#app .work.talera-compact-work .talera-work-tiles .talera-v9-media-holder{position:relative;aspect-ratio:1;min-width:0}'
-    +'#app .work.talera-compact-work .talera-work-tiles .talera-v9-media-holder>.tile{height:100%!important}'
-    +'#app .work.talera-compact-work .talera-v9-remove-media{position:absolute;top:5px;right:5px;z-index:5;width:29px;height:29px;border:0;border-radius:50%;background:rgba(255,255,255,.96);color:#173b52;box-shadow:0 1px 5px #1234;font:700 23px/1 system-ui;padding:0;touch-action:manipulation}'
+    +'#app .work.talera-compact-work .talera-work-tiles .tile{min-width:0!important;width:100%!important;aspect-ratio:1/1!important;height:auto!important}'
+    +'#app .work.talera-compact-work .talera-work-tiles .tile>img{width:100%!important;height:100%!important;object-fit:cover!important}'
+    +'#app .work.talera-compact-work .talera-v9-remove-media{position:relative;align-self:start;justify-self:end;margin:5px;z-index:5;width:28px;height:28px;min-width:28px;max-width:28px;border:0;border-radius:50%;background:rgba(255,255,255,.97);color:#173b52;box-shadow:0 1px 5px #1234;font:650 20px/1 system-ui;padding:0;touch-action:manipulation}'
     +'#app .work.talera-compact-work .talera-v9-add-media{display:grid;place-items:center;aspect-ratio:1;width:100%;border:2px dashed #bdd1d9;border-radius:13px;background:#f1f6f8;color:#20516b;font:450 42px/1 system-ui;touch-action:manipulation}'
     +'#taleraV61RecControls{z-index:9990!important;pointer-events:auto!important}'
     +'#taleraV61RecControls #taleraV61RecStart{touch-action:manipulation;pointer-events:auto!important;-webkit-tap-highlight-color:transparent;user-select:none}'

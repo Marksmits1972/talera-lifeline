@@ -9,6 +9,7 @@ import menuSource from "./menu-integration.txt";
 import knowledgeSource from "./kennisbank.html";
 import backupSource from "./free-backup.txt";
 import syncCoordinatorSource from "./premium-sync-coordinator.txt";
+import currentClientSource from "./premium-current-client.txt";
 import syncQueueSource from "./premium-sync-queue.txt";
 import syncBridgeSource from "./premium-indexeddb-bridge.txt";
 import recordsBridgeSource from "./premium-records-bridge.txt";
@@ -108,6 +109,7 @@ export default {
     if (request.method === "GET") {
       const syncModules = {
         "/__clean/premium-sync-coordinator.mjs":syncCoordinatorSource,
+        "/__clean/premium-current-client.mjs":currentClientSource,
         "/__clean/premium-sync-queue.mjs":syncQueueSource,
         "/__clean/premium-indexeddb-bridge.mjs":syncBridgeSource,
         "/__clean/premium-records-bridge.mjs":recordsBridgeSource,

@@ -533,6 +533,8 @@ async function resumePremiumCloudMediaSync(){
   if(!ownerMatches())return;
   const b=await records.runPremiumRecordSync(common);
   premiumSyncUi.recordsPhase=b.phase;premiumSyncUi.recordsUploaded+=b.uploaded||0;premiumSyncUi.recordsPending=b.pending||0;
+  if(a.reason==='remote_newer_version'||b.reason==='remote_newer_version')
+   premiumSyncUi.error='Er staat een nieuwere versie in de cloud. TALERA heeft niets overschreven. Controleer eerst welke versie je wilt bewaren.';
   continueSoon=(a.phase==='uploading'||b.phase==='uploading')&&ownerMatches();
   if(state.open&&state.view==='subscription')render();
  }catch(e){

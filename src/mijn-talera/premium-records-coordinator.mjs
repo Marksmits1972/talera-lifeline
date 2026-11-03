@@ -9,7 +9,7 @@ const json=async(fetcher,path)=>{
  if(!r?.ok)throw Error('premium_record_api_unavailable');
  return r.json();
 };
-export async function runPremiumRecordSync({indexedDB,crypto,fetcher,online=()=>true,maxItems=10,expectedAccountId=null,ownerMatches=()=>true}={}){
+export async function runPremiumRecordSync({indexedDB,crypto,fetcher,online=()=>true,maxItems=10,expectedAccountId=null,ownerMatches=()=>true,getLastConfirmed=()=>null,rememberLastConfirmed=()=>{}}={}){
  if(!crypto?.subtle||typeof fetcher!=='function')return {phase:'not_enabled',uploaded:0,pending:0};
  const allowed=async()=>{
   if(expectedAccountId&&ownerMatches()!==true)return false;
@@ -36,8 +36,15 @@ export async function runPremiumRecordSync({indexedDB,crypto,fetcher,online=()=>
   if(expectedAccountId&&ownerMatches()!==true)return {phase:'not_enabled',uploaded:0,pending:0};
   const snapshot=await createPremiumRecordSnapshot(source,{crypto});
   const pointer=(snapshot.kind==='story'?storyCurrent:commentCurrent).get(snapshot.sourceKey);
-  if(!stored.has(snapshot.id)||pointer?.current_id!==snapshot.id)
-   pending.push({...snapshot,alreadyStored:stored.has(snapshot.id),expectedCurrentId:pointer?.current_id||null});
+  const currentId=pointer?.current_id||null;
+  const confirmed=await getLastConfirmed(snapshot.kind,snapshot.sourceKey);
+  if(currentId===snapshot.id){
+   if(confirmed!==currentId)await rememberLastConfirmed(snapshot.kind,snapshot.sourceKey,currentId);
+   continue;
+  }
+  if(currentId!==null&&confirmed!==currentId)
+   return {phase:'attention',uploaded:0,failed:1,pending:0,reason:'remote_newer_version'};
+  pending.push({...snapshot,alreadyStored:stored.has(snapshot.id),expectedCurrentId:currentId});
  }
  return syncPremiumPending({
   listPending:async()=>pending,
@@ -50,7 +57,10 @@ export async function runPremiumRecordSync({indexedDB,crypto,fetcher,online=()=>
    return commitPremiumCurrentVersion({fetcher,kind:item.kind,sourceKey:item.sourceKey,
     snapshotId:item.id,expectedCurrentId:item.expectedCurrentId});
   },
-  markSynced:async item=>{stored.add(item.id)},
+  markSynced:async item=>{
+   stored.add(item.id);
+   await rememberLastConfirmed(item.kind,item.sourceKey,item.id);
+  },
   allowed,online,maxItems
  });
 }

@@ -1,8 +1,8 @@
 {
-  "action": "precheck-only",
+  "action": "publish-tested-bb63-resume",
   "core": "talera-clean-core-staging-20261030",
   "v62": "talera-pwa-v62-mijn-profiel-20261101",
-  "reviewedBaseCommit": null,
+  "reviewedBaseCommit": "cb678d0ff8cbbdd778c46c643d4eceda160b8e39",
   "originalCoreVersion": "ef484758-391d-4875-999f-34f1a4b78a93",
   "testedCoreVersion": "4f972875-8309-4814-9ed7-95c69b6124de",
   "previousCoreRollbackDeployment": "fc2bdbc1-8f64-40ee-8297-ef6617d117f7",
@@ -11,5 +11,7 @@
   "expectedClientMimeFromLive": "read-only check",
   "legacyTestDataMayBeHidden": true,
   "noDataDeletion": true,
-  "releaseAuthorized": false
+  "releaseAuthorized": true,
+  "precheckRunId": 41607198950,
+  "reviewedScope": "activate existing validated Core version, then V62 module with text/plain MIME and rollback"
 }

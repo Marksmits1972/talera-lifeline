@@ -542,8 +542,13 @@ function patchTell(html){
   const newFrame="kind(f)==='video'?'<video src=\"'+escapeHtml(originalUrl(g.media[idx]))+'\" '+(previewBlobs.has(g.media[idx])?'poster=\"'+escapeHtml(u)+'\" ':'')+'controls playsinline preload=\"metadata\"></video>'";
   if(!page.includes(oldFrame))return{html,changed:false,reason:'video-work-frame-changed'};
   page=page.replace(oldFrame,newFrame);
-  // One active decoder at a time on iPhones; image loading remains untouched.
-  page=page.replace("while(activeThumbs<3&&waitingThumbs.length)","while(activeThumbs<1&&waitingThumbs.length)");
+  // At most one hardware video decoder, while allowing three lightweight
+  // photo thumbnail jobs in parallel. Original storage is asynchronous.
+  const originalQueueHead="let activeThumbs=0;const waitingThumbs=[];function pumpThumbs(){while(activeThumbs<3&&waitingThumbs.length){const [id,file]=waitingThumbs.shift();activeThumbs++;";
+  const originalQueueTail="finally{activeThumbs--;pumpThumbs()}";
+  if(!page.includes(originalQueueHead)||!page.includes(originalQueueTail))return{html,changed:false,reason:'video-queue-upstream-changed'};
+  page=page.replace(originalQueueHead,"let activeThumbs=0,activeVideoThumbs=0;const waitingThumbs=[];function pumpThumbs(){while(activeThumbs<3&&waitingThumbs.length){const next=waitingThumbs.findIndex(([id,file])=>kind(file)!=='video'||activeVideoThumbs<1);if(next<0)break;const [id,file]=waitingThumbs.splice(next,1)[0];const taskIsVideo=kind(file)==='video';activeThumbs++;if(taskIsVideo)activeVideoThumbs++;");
+  page=page.replace(originalQueueTail,"finally{activeThumbs--;if(taskIsVideo)activeVideoThumbs--;pumpThumbs()}");
   const css='<style id="talera-v61-native-video-cover-css">.tile{position:relative}.tile>.video{position:relative;z-index:3}.tile>video.talera-v61-native-cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:1}</style>';
   page=page.replace('</head>',css+'</head>');
   // The old Player's postMessage bridge must not run without an iframe.

@@ -16,6 +16,7 @@ on:
       - 'migrations/20261103_premium_current_version.sql'
       - 'test/premium-current-version.test.mjs'
       - 'test/premium-current-route.test.mjs'
+      - 'test/premium-current-client.test.mjs'
       - '.github/workflows/bb63-current-memory-version.yml'
 permissions:
   contents: read
@@ -35,10 +36,11 @@ jobs:
           node --check src/core/premium-cloud-routes.mjs
           node --check src/core/premium-private-records.mjs
           node --check src/mijn-talera/premium-current-client.mjs
+          node --check test/premium-current-client.test.mjs
           node --check src/mijn-talera/premium-sync-coordinator.mjs
           node --check src/mijn-talera/premium-records-coordinator.mjs
           node --check test/premium-current-version.test.mjs
-          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs
+          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs test/premium-current-client.test.mjs
       - name: Run full Premium automated regressions (no account or cloud access)
         run: node --test test/premium-*.test.mjs
       - name: Compile the existing V62 client and menu offline only

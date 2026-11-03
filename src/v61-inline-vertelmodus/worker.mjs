@@ -660,6 +660,44 @@ async function taleraV61KeepVideoPosters(group,row){
   }finally{db.close()}
 }
 
+
+async function taleraV61PersistMediaIds(g,persisted){
+  // Canonical media references are assigned by TaleraMemories.save().
+  // Amend ONLY story metadata in the SAME IndexedDB stories store; never
+  // re-upload/copy an original video or create a second library.
+  if(!g.voice)return persisted;
+  const source=Array.isArray(g.voiceCues)?g.voiceCues:[];
+  const items=(persisted.items||[]).filter(item=>item.kind==='photo'||item.kind==='video');
+  if(items.length!==g.media.length)throw Error('De mediavolgorde kon niet veilig worden vastgelegd.');
+  const mapped=[];
+  for(const cue of source){
+    const fromId=typeof cue?.mediaId==='string'&&cue.mediaId.length;
+    const index=fromId?g.media.indexOf(cue.mediaId):Number(cue?.index);
+    if(!Number.isInteger(index)||index<0||index>=items.length||!items[index]?.key)
+      throw Error('Een foto of video uit de opname is verwijderd. Herstel deze of spreek opnieuw in.');
+    const time=Math.max(0,Math.round(Number(cue.t)||0));
+    const row={t:time,index,mediaId:items[index].key};
+    if(Number.isFinite(Number(cue.videoAtMs))&&Number(cue.videoAtMs)>=0)
+      row.videoAtMs=Math.round(Number(cue.videoAtMs));
+    mapped.push(row);
+  }
+  mapped.sort((a,b)=>a.t-b.t);
+  if(items.length&&mapped.length&&mapped[0].t!==0)
+    throw Error('De beginfoto ontbreekt in het opgenomen tijdschema.');
+  const updated={...persisted,narrationCues:mapped,narrationSchema:'media-id-v1'};
+  const db=await dbOpen();
+  try{
+    const tx=db.transaction('stories','readwrite'),complete=done(tx);
+    tx.objectStore('stories').put(updated);
+    await complete;
+  }finally{db.close()}
+  const verify=await mem.get(persisted.id);
+  if(!verify||verify.narrationSchema!=='media-id-v1'
+    ||JSON.stringify(verify.narrationCues)!==JSON.stringify(mapped))
+    throw Error('Het tijdschema met media-ID’s kon niet worden teruggelezen.');
+  return verify;
+}
+
 function patchTell(html){
   const a=html.indexOf('function openZeroPlayer(g){');
   if(a<0)return{html,changed:false,reason:'no-tell'};
@@ -707,10 +745,10 @@ function patchTell(html){
   page=page.replace("s.child.contentWindow){s.child.contentWindow.postMessage","s.child?.contentWindow){s.child.contentWindow.postMessage");
   const pub='async function publish(g){';
   if(!page.includes(pub))return{html,changed:false,reason:'publish-upstream-changed'};
-  page=page.replace(pub,taleraV61KeepVideoPosters.toString()+'\n'+pub);
+  page=page.replace(pub,taleraV61KeepVideoPosters.toString()+'\n'+taleraV61PersistMediaIds.toString()+'\n'+pub);
   const cleanup="const remove=[...g.media,...(g.voice?[g.voice]:[])];";
   if(!page.includes(cleanup))return{html,changed:false,reason:'publish-cleanup-upstream-changed'};
-  page=page.replace(cleanup,"try{await taleraV61KeepVideoPosters(g,persisted)}catch(e){console.warn('TALERA videovoorbeeld later herstellen',e)}"+cleanup);
+  page=page.replace(cleanup,"await taleraV61PersistMediaIds(g,persisted);try{await taleraV61KeepVideoPosters(g,persisted)}catch(e){console.warn('TALERA videovoorbeeld later herstellen',e)}"+cleanup);
   // This script is owned by the original editor; keep its stores and media IDs.
   return{html:page.replace('</head>',RECORD_CSS+'</head>'),changed:true,reason:'inline-recording-video-posters-one-store'};
 }

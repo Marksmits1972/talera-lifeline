@@ -454,7 +454,6 @@ async function taleraV61MakeVideoPreview(file){
     video.load();
   });
 }
-async 
 function taleraV61AttachNativeCovers(){
   // Visible native Safari video fallback. Original video stays under one media ID.
   document.querySelectorAll('.tile[data-id]').forEach(tile=>{
@@ -488,7 +487,7 @@ function taleraV61AttachNativeCovers(){
   });
 }
 
-function taleraV61KeepVideoPosters(group,row){
+async function taleraV61KeepVideoPosters(group,row){
   // Only a tiny JPEG sidecar. Video remains in the original TaleraMemories
   // item and is always loaded by its media ID in the player.
   const items=Array.isArray(row?.items)?row.items:[];

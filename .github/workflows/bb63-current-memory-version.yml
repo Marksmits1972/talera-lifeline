@@ -1,0 +1,29 @@
+name: BB63 Current Memory Version — tests only, NEVER DEPLOY
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'src/core/premium-current-version.mjs'
+      - 'migrations/20261103_premium_current_version.sql'
+      - 'test/premium-current-version.test.mjs'
+      - '.github/workflows/bb63-current-memory-version.yml'
+permissions:
+  contents: read
+jobs:
+  current-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Static syntax and targeted current-memory tests (no cloud access)
+        run: |
+          node --check src/core/premium-current-version.mjs
+          node --check test/premium-current-version.test.mjs
+          node --test test/premium-current-version.test.mjs
+      - name: Existing Premium restore safeguards must still pass
+        run: |
+          node --test test/premium-cloud-restore-preview.test.mjs test/premium-cloud-restore-atomic.test.mjs

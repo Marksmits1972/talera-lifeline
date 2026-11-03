@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-inline-vertelmodus-r1-20261103';
+const BUILD='v61-inline-vertelmodus-r2-clean-20261103';
 
 function taleraInlineDispose(){
   const s=taleraInline;
@@ -77,6 +77,36 @@ async function taleraInlineLoadVideo(s,frame,cue,ms){
   else if(video.paused)void video.play().catch(()=>{});
 }
 
+function taleraInlineInstallAudioControls(){
+  // One setting for the whole presentation, used by Meer > Luisteren.
+  const KEY='talera-v61-listening-enabled';
+  const read=()=>{try{return localStorage.getItem(KEY)==='on'}catch(e){return false}};
+  const write=enabled=>{try{localStorage.setItem(KEY,enabled?'on':'off')}catch(e){}};
+  const playCurrent=()=>{
+    const s=taleraInline;if(!s?.audio||!read())return;
+    if(s.audio.ended){try{s.audio.currentTime=0}catch(e){}}
+    if(s.audio.paused)void s.audio.play().catch(()=>{});
+  };
+  const stopCurrent=()=>{
+    const s=taleraInline;
+    if(s?.audio&&!s.audio.paused)s.audio.pause();
+    if(s?.video&&!s.video.paused)s.video.pause();
+  };
+  if(!window.__taleraAudioControls?.isEnabled){
+    window.__taleraAudioControls={
+      isEnabled:()=>read(),
+      enable(){write(true);playCurrent()},
+      disable(){write(false);stopCurrent()}
+    };
+  }
+  window.__taleraInlineTryAutoPlay=()=>{if(window.__taleraAudioControls?.isEnabled?.())playCurrent()};
+  document.addEventListener('talera:enable-listening',()=>window.__taleraAudioControls?.enable?.());
+  window.addEventListener('storage',e=>{
+    if(e.key!==KEY)return;
+    if(read())playCurrent();else stopCurrent();
+  });
+}
+
 async function present(memory){
   if(!stage||!memory)return;
   if(activeId===memory.id)return;
@@ -88,46 +118,27 @@ async function present(memory){
   let blob;
   try{blob=await store.blob(voice.key)}catch(e){}
   if(activeId!==memory.id||serial!==own||runtime.currentMemory()?.id!==memory.id)return;
-  if(!(blob instanceof Blob)||!blob.size){
-    console.warn('TALERA: originele stemopname ontbreekt');
-    return;
-  }
+  if(!(blob instanceof Blob)||!blob.size){console.warn('TALERA: originele stemopname ontbreekt');return}
   const audio=document.createElement('audio');
   audio.preload='metadata';audio.playsInline=true;audio.style.display='none';
   stage.appendChild(audio);
   const voiceUrl=URL.createObjectURL(blob);audio.src=voiceUrl;
-  const panel=document.createElement('div');
-  panel.className='talera-v61-inline-listen';
-  panel.style.cssText='position:absolute;right:16px;bottom:76px;z-index:120;display:flex;align-items:center;gap:8px;padding:6px 9px 6px 6px;border:1px solid #d5e2e8;border-radius:26px;background:rgba(248,250,249,.95);box-shadow:0 3px 16px #142f4240;color:#173d52;pointer-events:auto';
-  const button=document.createElement('button');
-  button.type='button';button.textContent='▶';button.setAttribute('aria-label','Luister');
-  button.style.cssText='width:42px;height:42px;border:0;border-radius:50%;background:#173d52;color:white;font:700 17px system-ui;cursor:pointer;touch-action:manipulation';
-  const label=document.createElement('span');label.textContent='Luister';label.style.cssText='font:650 13px system-ui';
-  const clock=document.createElement('span');clock.textContent='00:00';clock.style.cssText='font:500 12px system-ui;min-width:36px;font-variant-numeric:tabular-nums';
-  panel.append(button,label,clock);(stage.parentElement||stage).appendChild(panel);
   const frames=memory._zeroFrames||[];
   const cues=(memory._taleraNarrationCues||[]).filter(c=>Number.isFinite(Number(c.t))&&Number.isInteger(c.index)&&c.index>=0&&c.index<frames.length).map(c=>({t:Math.max(0,Number(c.t)),index:c.index,videoAtMs:Math.max(0,Number(c.videoAtMs)||0)})).sort((a,b)=>a.t-b.t);
-  const s={memory,frames,cues,audio,voiceUrl,panel,button,label,clock,timer:null,video:null,videoKey:'',videoUrl:null};
+  const s={memory,frames,cues,audio,voiceUrl,timer:null,video:null,videoKey:'',videoUrl:null};
   taleraInline=s;
   const tick=()=>taleraInlineSync(s);
   const stopTimer=()=>{if(s.timer){clearInterval(s.timer);s.timer=null}};
-  button.addEventListener('click',async()=>{
-    if(s!==taleraInline)return;
-    if(audio.paused){try{await audio.play()}catch(e){label.textContent='Tik opnieuw om te luisteren'}}
-    else audio.pause();
-  });
-  audio.addEventListener('play',()=>{
-    button.textContent='Ⅱ';button.setAttribute('aria-label','Pauzeer');
-    label.textContent='Luisteren';stopTimer();tick();s.timer=setInterval(tick,90);
-  });
-  audio.addEventListener('pause',()=>{
-    button.textContent='▶';button.setAttribute('aria-label','Luister');
-    label.textContent='Luister';stopTimer();tick();
-  });
-  audio.addEventListener('ended',()=>{stopTimer();button.textContent='↺';label.textContent='Opnieuw luisteren';tick()});
-  audio.addEventListener('seeking',tick);audio.addEventListener('seeked',tick);
+  audio.addEventListener('play',()=>{stopTimer();tick();s.timer=setInterval(tick,90)});
+  audio.addEventListener('pause',()=>{stopTimer();tick()});
+  audio.addEventListener('ended',()=>{stopTimer();tick()});
+  audio.addEventListener('seeking',tick);
+  audio.addEventListener('seeked',tick);
   audio.addEventListener('timeupdate',tick);
   tick();
+  // Audio is controlled through More, not a per-memory play button.
+  // Safari may block autoplay before the user permits audio.
+  window.__taleraInlineTryAutoPlay?.();
 }
 
 async function showSimpleVideo(memory,frameData){
@@ -298,7 +309,7 @@ function patchPresent(html){
   const q=block.indexOf(' async function showSimpleVideo(memory,frameData){',p);
   const v=block.indexOf('function activate(memory){',q);
   if(p<0||q<0||v<0||!block.includes("frame.src='/vertelmodus-embed?mode=present'"))return{html,changed:false,reason:'upstream-changed'};
-  const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),present.toString()].join('\n');
+  const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),taleraInlineInstallAudioControls.toString(),'taleraInlineInstallAudioControls();',present.toString()].join('\n');
   block=block.slice(0,p)+injected+'\n '+showSimpleVideo.toString()+'\n '+block.slice(v);
   block=block.replace('function disposePresentation(){','function disposePresentation(){\n taleraInlineDispose();');
   block=block.replace('if(localVideo)locate(localVideo);','if(localVideo&&localVideo.parentElement!==stage)locate(localVideo);');

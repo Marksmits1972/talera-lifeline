@@ -7,7 +7,7 @@ import {syncPremiumPending} from './premium-sync-queue.mjs';
 import {fetchPremiumCurrentVersions,commitPremiumCurrentVersion} from './premium-current-client.mjs';
 import {createLargeMediaManifest,uploadLargePremiumMedia,LARGE_THRESHOLD,LARGE_MEDIA_LIMIT} from './premium-large-media.mjs';
 const json=async(fetcher,path)=>{const r=await fetcher(path,{credentials:'same-origin',cache:'no-store'});if(!r.ok)throw Error('premium_api_unavailable');return r.json()};
-export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>true,maxItems=10,expectedAccountId=null,ownerMatches=()=>true}={}) {
+export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>true,maxItems=10,expectedAccountId=null,ownerMatches=()=>true,getLastConfirmed=()=>null,rememberLastConfirmed=()=>{}}={}) {
  if(!fetcher||!crypto?.subtle)return {phase:'not_enabled',uploaded:0,pending:0};
  const allowed=async()=>{
   if(expectedAccountId&&ownerMatches()!==true)return false;
@@ -38,7 +38,14 @@ export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>t
     (manifest.large&&(remote.sha256!==manifest.fingerprint||remote.digest_kind!=='part-sha256-v1'))))
    throw Error('remote_media_conflict');
   const currentId=current.get(media.key)?.current_id||null;
-  if(!remote||currentId!==manifest.mediaId)items.push({media,manifest,stored:Boolean(remote),expectedCurrentId:currentId});
+  const confirmed=await getLastConfirmed('media',media.key);
+  if(currentId===manifest.mediaId){
+   if(confirmed!==currentId)await rememberLastConfirmed('media',media.key,currentId);
+   continue;
+  }
+  if(currentId!==null&&confirmed!==currentId)
+   return {phase:'attention',uploaded:0,failed:1,pending:0,reason:'remote_newer_version'};
+  items.push({media,manifest,stored:Boolean(remote),expectedCurrentId:currentId});
  }
  return syncPremiumPending({
   listPending:async()=>items,
@@ -53,7 +60,10 @@ export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>t
    return commitPremiumCurrentVersion({fetcher,kind:'media',sourceKey:media.key,
     snapshotId:item.manifest.mediaId,expectedCurrentId:item.expectedCurrentId});
   },
-  markSynced:async item=>{stored.set(item.manifest.mediaId,{byte_size:item.manifest.size,content_type:item.manifest.mime})},
+  markSynced:async item=>{
+   stored.set(item.manifest.mediaId,{byte_size:item.manifest.size,content_type:item.manifest.mime});
+   await rememberLastConfirmed('media',item.media.key,item.manifest.mediaId);
+  },
   allowed,
   online,
   maxItems

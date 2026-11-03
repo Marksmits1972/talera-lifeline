@@ -1,0 +1,50 @@
+name: BB63 complete Core plus V62 deploy precheck ONLY
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'scripts/bb63-integrated-release.mjs'
+      - '.github/workflows/bb63-integrated-precheck.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify release script and existing 28 current pointer tests
+        run: |
+          node --check scripts/bb63-integrated-release.mjs
+          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs test/premium-current-client.test.mjs test/premium-current-sync-flow.test.mjs
+      - name: Verify other Premium components and D1 schema in memory
+        run: |
+          node --test test/premium-*.test.mjs
+          python3 scripts/bb63-sqlite-contract.py
+      - name: Compile reviewed 17-module V62 package without deployment
+        run: |
+          npm ci
+          node scripts/v62-package-preflight.mjs
+          npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Confirm pinned LIVE Core and V62 before any possible release — no writes
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          BB63_REVIEW_COMMIT: ${{ github.sha }}
+        run: node scripts/bb63-integrated-release.mjs --check
+      - name: Compile actual live Core source plus only reviewed changes without deployment
+        run: npx wrangler deploy --dry-run --config .talera-bb63-evidence/core-package/wrangler.dry-run.json --outdir .talera-bb63-evidence/core-compiled
+      - name: Preserve sanitized only release preflight
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-integrated-precheck-${{ github.sha }}
+          path: .talera-bb63-evidence/bb63-current-sync-release.json
+          if-no-files-found: warn
+          retention-days: 30

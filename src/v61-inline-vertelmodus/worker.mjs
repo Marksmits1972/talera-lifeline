@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-inline-vertelmodus-r5-ios-native-fallback-20261103';
+const BUILD='v61-inline-vertelmodus-r6-complete-media-cycle-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -35,16 +35,17 @@ function taleraInlineDispose(){
   taleraInline=null;
   if(!s)return;
   if(s.timer)clearInterval(s.timer);
+  clearTimeout(s.ordinaryTimer);
   if(s.audio){
     s.audio.onplay=s.audio.onpause=s.audio.onended=null;
     s.audio.onseeking=s.audio.onseeked=s.audio.ontimeupdate=null;
     s.audio.pause();s.audio.removeAttribute('src');
     // Keep the same audio element attached for the next memory on iOS.
   }
-  if(s.video){s.video.pause();s.video.removeAttribute('src');s.video.remove()}
+  taleraInlineCleanVideo(s);
   if(s.panel)s.panel.remove();
   if(s.voiceUrl)URL.revokeObjectURL(s.voiceUrl);
-  if(s.videoUrl)URL.revokeObjectURL(s.videoUrl);
+  if(s.hint)s.hint.remove();
 }
 
 function taleraInlineSync(s){
@@ -105,6 +106,100 @@ async function taleraInlineLoadVideo(s,frame,cue,ms){
   else if(video.paused)void video.play().catch(()=>{});
 }
 
+
+function taleraInlineCleanVideo(s){
+  s.videoSerial=(s.videoSerial||0)+1;
+  if(s.video){
+    s.video.onended=s.video.onerror=s.video.onloadedmetadata=null;
+    s.video.pause();s.video.removeAttribute('src');s.video.remove();s.video=null;
+  }
+  if(s.videoUrl){URL.revokeObjectURL(s.videoUrl);s.videoUrl=null}
+  s.videoKey='';
+}
+function taleraInlineSetFrame(s,index){
+  if(s!==taleraInline||runtime.currentMemory()?.id!==s.memory.id||index<0||index>=s.frames.length)return;
+  s.ordinaryIndex=index;
+  if(s.memory._photoIndex!==index)window.__taleraV31SelectPhoto?.(s.memory.id,index);
+}
+function taleraInlinePlayMedia(s,frame,muted,finished){
+  if(s!==taleraInline||!frame)return;
+  taleraInlineCleanVideo(s);
+  const serial=s.videoSerial;
+  const video=document.createElement('video');
+  video.className='talera-v61-inline-video';
+  video.playsInline=true;video.setAttribute('playsinline','');video.setAttribute('webkit-playsinline','');
+  video.preload='auto';video.controls=false;video.muted=muted;video.defaultMuted=muted;video.volume=1;
+  video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';
+  (stage.parentElement||stage).appendChild(video);
+  s.video=video;s.videoKey=frame.key;
+  const tryPlay=()=>{
+    if(s!==taleraInline||s.video!==video)return;
+    Promise.resolve(video.play()).then(()=>{
+      if(s.hint){s.hint.remove();s.hint=null}
+    }).catch(e=>{
+      if(e?.name==='NotAllowedError'){
+        s.blockedByBrowser=true;
+        if(!s.hint){
+          const hint=document.createElement('div');
+          hint.textContent='Tik op de foto om het geluid te starten';
+          hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';
+          (stage.parentElement||stage).appendChild(hint);s.hint=hint;
+        }
+      }else console.warn('TALERA videoweergave niet gestart',e);
+    });
+  };
+  video.onended=()=>{if(s===taleraInline&&s.video===video)finished?.()};
+  video.onerror=()=>{if(s===taleraInline&&s.video===video){console.warn('TALERA originele video niet afspeelbaar');finished?.()}};
+  void (async()=>{
+    try{
+      const url=await store.mediaUrl(frame.key);
+      if(s!==taleraInline||s.video!==video||s.videoSerial!==serial){
+        if(url)URL.revokeObjectURL(url);return;
+      }
+      if(!url)throw Error('Videobestand ontbreekt');
+      s.videoUrl=url;video.src=url;
+      video.onloadedmetadata=tryPlay;
+      tryPlay();
+    }catch(e){console.warn('TALERA videobestand ontbreekt',e);if(s===taleraInline&&s.video===video)finished?.()}
+  })();
+}
+function taleraInlineReplayNext(s){
+  if(s!==taleraInline||s.phase!=='originals')return;
+  const frame=s.replayFrames[++s.replayIndex];
+  if(!frame){taleraInlineCleanVideo(s);s.phase='done';return}
+  const index=s.frames.indexOf(frame);
+  if(index>=0)taleraInlineSetFrame(s,index);
+  taleraInlinePlayMedia(s,frame,!window.__taleraAudioControls?.isEnabled?.(),()=>taleraInlineReplayNext(s));
+}
+function taleraInlineVoiceEnded(s){
+  if(s!==taleraInline||s.phase!=='narration')return;
+  if(s.timer){clearInterval(s.timer);s.timer=null}
+  taleraInlineCleanVideo(s);
+  s.replayFrames=s.frames.filter(f=>f.kind==='video');
+  if(!s.replayFrames.length){s.phase='done';return}
+  s.phase='originals';s.replayIndex=-1;
+  taleraInlineReplayNext(s);
+}
+function taleraInlineOrdinaryStep(s,index){
+  if(s!==taleraInline||s.phase!=='ordinary')return;
+  clearTimeout(s.ordinaryTimer);s.ordinaryTimer=null;
+  taleraInlineCleanVideo(s);
+  if(!s.frames.length)return;
+  index=(index+s.frames.length)%s.frames.length;
+  taleraInlineSetFrame(s,index);
+  const frame=s.frames[index];
+  if(frame.kind==='video'){
+    taleraInlinePlayMedia(s,frame,!window.__taleraAudioControls?.isEnabled?.(),()=>taleraInlineOrdinaryStep(s,index+1));
+  }else s.ordinaryTimer=setTimeout(()=>taleraInlineOrdinaryStep(s,index+1),2500);
+}
+function taleraInlineStartOrdinary(s){
+  if(s!==taleraInline)return;
+  if(s.audio&&!s.audio.paused)s.audio.pause();
+  if(s.timer){clearInterval(s.timer);s.timer=null}
+  s.phase='ordinary';
+  taleraInlineOrdinaryStep(s,0);
+}
+
 function taleraInlineInstallAudioControls(){
   // The same setting is created on My Life and on Presentation.
   // Safari may need a real tap before playing unmuted audio.
@@ -148,40 +243,53 @@ function taleraInlineInstallAudioControls(){
 
 async function present(memory){
   if(!stage||!memory)return;
-  if(activeId===memory.id)return;
+  if(activeId===memory.id){
+    const s=taleraInline;
+    if(s?.phase==='ordinary'&&Number.isInteger(memory._photoIndex)&&s.ordinaryIndex!==memory._photoIndex){
+      taleraInlineOrdinaryStep(s,memory._photoIndex);
+    }
+    return;
+  }
   disposePresentation();
   activeId=memory.id;
   const own=++serial;
   const voice=memory._zeroItems.find(x=>x.kind==='audio');
-  if(!voice)return;
-  let blob;
-  try{blob=await store.blob(voice.key)}catch(e){}
+  let blob=null;
+  if(voice){try{blob=await store.blob(voice.key)}catch(e){}}
   if(activeId!==memory.id||serial!==own||runtime.currentMemory()?.id!==memory.id)return;
-  if(!(blob instanceof Blob)||!blob.size){console.warn('TALERA: originele stemopname ontbreekt');return}
-  // Reuse one media element across memories: on iOS this preserves the
-  // user's first audio interaction better than creating a new player per story.
-  const audio=window.__taleraInlineSharedAudio||document.createElement('audio');
-  if(!window.__taleraInlineSharedAudio)window.__taleraInlineSharedAudio=audio;
-  audio.preload='auto';audio.playsInline=true;audio.style.display='none';
-  if(audio.parentElement!==stage)stage.appendChild(audio);
-  const voiceUrl=URL.createObjectURL(blob);
-  audio.src=voiceUrl;
-  audio.muted=false;audio.volume=1;
   const frames=memory._zeroFrames||[];
-  const cues=(memory._taleraNarrationCues||[]).filter(c=>Number.isFinite(Number(c.t))&&Number.isInteger(c.index)&&c.index>=0&&c.index<frames.length).map(c=>({t:Math.max(0,Number(c.t)),index:c.index,videoAtMs:Math.max(0,Number(c.videoAtMs)||0)})).sort((a,b)=>a.t-b.t);
-  const s={memory,frames,cues,audio,voiceUrl,timer:null,video:null,videoKey:'',videoUrl:null,_playPending:false};
+  const cues=(memory._taleraNarrationCues||[])
+    .filter(c=>Number.isFinite(Number(c.t))&&Number.isInteger(c.index)&&c.index>=0&&c.index<frames.length)
+    .map(c=>({t:Math.max(0,Number(c.t)),index:c.index,videoAtMs:Math.max(0,Number(c.videoAtMs)||0)}))
+    .sort((a,b)=>a.t-b.t);
+  const s={memory,frames,cues,audio:null,voiceUrl:null,timer:null,video:null,videoKey:'',videoUrl:null,
+    videoSerial:0,ordinaryTimer:null,ordinaryIndex:0,phase:'ready',replayFrames:[],replayIndex:-1,
+    blockedByBrowser:false,hint:null,_playPending:false};
   taleraInline=s;
-  const tick=()=>taleraInlineSync(s);
-  const stopTimer=()=>{if(s.timer){clearInterval(s.timer);s.timer=null}};
-  audio.onplay=()=>{stopTimer();tick();s.timer=setInterval(tick,90)};
-  audio.onpause=()=>{stopTimer();tick()};
-  audio.onended=()=>{stopTimer();tick()};
-  audio.onseeking=tick;
-  audio.onseeked=tick;
-  audio.ontimeupdate=tick;
-  tick();
-  window.__taleraInlineTryAutoPlay?.();
+  if(blob instanceof Blob&&blob.size){
+    const audio=window.__taleraInlineSharedAudio||document.createElement('audio');
+    window.__taleraInlineSharedAudio=audio;
+    audio.preload='auto';audio.playsInline=true;audio.style.display='none';
+    if(audio.parentElement!==stage)stage.appendChild(audio);
+    s.voiceUrl=URL.createObjectURL(blob);
+    audio.src=s.voiceUrl;audio.muted=false;audio.volume=1;s.audio=audio;
+    const tick=()=>{if(s===taleraInline&&s.phase==='narration')taleraInlineSync(s)};
+    const stopTimer=()=>{if(s.timer){clearInterval(s.timer);s.timer=null}};
+    audio.onplay=()=>{if(s.phase==='narration'){stopTimer();tick();s.timer=setInterval(tick,90)}};
+    audio.onpause=()=>{stopTimer();if(s.phase==='narration'&&s.video)s.video.pause()};
+    audio.onended=()=>{stopTimer();tick();taleraInlineVoiceEnded(s)};
+    audio.ontimeupdate=tick;audio.onseeking=tick;audio.onseeked=tick;
+  }
+  if(s.audio&&window.__taleraAudioControls?.isEnabled?.()){
+    s.phase='narration';
+    if(s.frames.length)taleraInlineSetFrame(s,s.cues[0]?.index||0);
+    taleraInlineSync(s);
+    window.__taleraInlineTryAutoPlay?.();
+  }else{
+    taleraInlineStartOrdinary(s);
+  }
 }
+
 
 async function showSimpleVideo(memory,frameData){
   if(!stage||!frameData)return;
@@ -360,7 +468,7 @@ function patchPresent(html){
   const q=block.indexOf(' async function showSimpleVideo(memory,frameData){',p);
   const v=block.indexOf('function activate(memory){',q);
   if(p<0||q<0||v<0||!block.includes("frame.src='/vertelmodus-embed?mode=present'"))return{html,changed:false,reason:'upstream-changed'};
-  const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),taleraInlineInstallAudioControls.toString(),'taleraInlineInstallAudioControls();',present.toString()].join('\n');
+  const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),taleraInlineCleanVideo.toString(),taleraInlineSetFrame.toString(),taleraInlinePlayMedia.toString(),taleraInlineReplayNext.toString(),taleraInlineVoiceEnded.toString(),taleraInlineOrdinaryStep.toString(),taleraInlineStartOrdinary.toString(),taleraInlineInstallAudioControls.toString(),present.toString(),'taleraInlineInstallAudioControls();'].join('\n');
   block=block.slice(0,p)+injected+'\n '+showSimpleVideo.toString()+'\n '+block.slice(v);
   block=block.replace('function disposePresentation(){','function disposePresentation(){\n taleraInlineDispose();');
   // A video is still one original media item. A tiny still image is a

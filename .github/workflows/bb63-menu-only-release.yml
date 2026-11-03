@@ -56,10 +56,12 @@ jobs:
       - name: Read-only verify pinned live deployment, V56_BASE and all 16 immutable part hashes
         env:
           TALERA_V62_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          BB63_REVIEWED_BASE_COMMIT: ${{ github.event.before }}
         run: node scripts/bb63-menu-only-release.mjs --check
       - name: Update only V62 menu and verify byte-identical remaining parts, else rollback
         env:
           TALERA_V62_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          BB63_REVIEWED_BASE_COMMIT: ${{ github.event.before }}
         run: node scripts/bb63-menu-only-release.mjs --publish
       - name: Save sanitized release result
         if: ${{ always() }}

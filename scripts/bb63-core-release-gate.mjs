@@ -19,7 +19,7 @@ const PIN={
 const ORIGINAL={
  'worker.js':'e765572a78f0b6861f6aad1df6264503c24f8c285b563ce7ba854d974647fd8e',
  'premium-cloud-core-adapter.mjs':'ac7f1a64b900b40392323e0e902b8e928fe32c4d85eae6a0053a8c976d610f58',
- 'premium-cloud-pilot.mjs':'11511607b95515983f779883f10171580e7e5e6835a50c3cda031620db3ed1d7e5',
+ 'premium-cloud-pilot.mjs':'11511607b95515983f779883f10171580e7e6835a50c3cda031620db3ed1d7e5',
  'premium-cloud-routes.mjs':'574920146a0c7943b46be60b04c42531852f10522be71d4effa469622b77dd01',
  'premium-multipart-media.mjs':'22f9b2d86a4a7d9b09182806ba740ea3dd0be9b0e1a1df1a43f6bbb779abee28',
  'premium-private-records.mjs':'01980fcce9d9a3ac6b1c4f96eda55d0449f9b8c673801eca772a474a0b596e02',

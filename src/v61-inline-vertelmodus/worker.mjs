@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-vertelcyclus-r8-audible-voice-smooth-video-20261103';
+const BUILD='v61-vertelcyclus-r9-editor-controls-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -486,11 +486,32 @@ function openZeroPlayer(g){
     if($('draft'))$('draft').textContent=g.voice?'Opname als concept bewaard':'Concept bewaard op dit toestel';
   };
   close.onclick=finish;
+  const stopRecording=()=>{
+    const r=s.recorder;
+    if(!r||s.saving||!['recording','paused'].includes(r.state))return;
+    s.saving=true;
+    start.disabled=true;start.textContent='Opname bewaren…';
+    try{
+      r.stop();
+      feedback('Je opname wordt bewaard…');
+    }catch(e){
+      s.saving=false;start.disabled=false;
+      start.textContent='■ Stoppen';
+      feedback('Stoppen lukte niet. Tik nogmaals: '+e.message);
+    }
+  };
+  // Safari sometimes suppresses a synthetic click after the full-screen
+  // picture's touch gestures. A direct touchend also reaches Stoppen.
+  start.addEventListener('touchend',e=>{
+    if(s.recorder&&['recording','paused'].includes(s.recorder.state)&&!s.saving){
+      e.preventDefault();e.stopPropagation();stopRecording();
+    }
+  },{passive:false});
   start.onclick=async()=>{
-    if(s.recorder?.state==='recording'){stop.click();return}
-    if(s.recorder||s.saving)return;
+    if(s.recorder&&['recording','paused'].includes(s.recorder.state)){stopRecording();return}
+    if(s.recorder||s.saving){feedback('Je opname wordt bewaard…');return}
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status.textContent='Deze browser ondersteunt opnemen niet.';return}
-    start.disabled=true;preview.pause();feedback('');
+    start.disabled=true;start.textContent='Microfoon openen…';preview.pause();feedback('Microfoon voorbereiden…');
     try{
       s.stream=await navigator.mediaDevices.getUserMedia({audio:true});
       const mime=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(x=>MediaRecorder.isTypeSupported(x));
@@ -502,7 +523,7 @@ function openZeroPlayer(g){
       const v=frame.querySelector(':scope > video');
       if(v&&s.cues.length)s.cues[0].videoAtMs=Math.max(0,Math.round((v.currentTime||0)*1000));
       r.ondataavailable=e=>{if(e.data?.size)s.parts.push(e.data)};
-      r.onerror=()=>{feedback('Opnemen mislukt. De vorige opname is behouden.');cleanMedia();s.recorder=null;start.textContent='● Opnemen';start.disabled=false;pause.hidden=true;stop.hidden=true;clock.hidden=true};
+      r.onerror=()=>{feedback('Opnemen mislukt. De vorige opname is behouden.');cleanMedia();s.recorder=null;s.saving=false;start.textContent='● Opnemen';start.disabled=false;pause.hidden=true;stop.hidden=true;clock.hidden=true};
       r.onstop=async()=>{
         s.saving=true;start.disabled=true;start.textContent='Opslaan…';feedback('');
         const duration=Math.max(0,Math.round(elapsed())),type=r.mimeType||mime||'audio/webm';
@@ -523,10 +544,10 @@ function openZeroPlayer(g){
           status.textContent='Bewaren niet gelukt: '+e.message+'. De vorige opname is behouden.';
         }finally{s.saving=false;start.textContent='● Opnemen';start.disabled=false}
       };
-      r.start(1000);start.textContent='■ Stop';start.hidden=false;start.disabled=false;pause.hidden=true;stop.hidden=true;clock.hidden=false;
+      r.start(1000);start.textContent='■ Stoppen';start.hidden=false;start.disabled=false;pause.hidden=true;stop.hidden=true;clock.hidden=false;
       feedback('');
       videoAdjust();s.clockTimer=setInterval(updateClock,350);
-    }catch(e){cleanMedia();s.recorder=null;start.disabled=false;status.textContent='Microfoon niet beschikbaar: '+e.message}
+    }catch(e){cleanMedia();s.recorder=null;s.saving=false;start.textContent='● Opnemen';start.disabled=false;feedback('Microfoon niet beschikbaar: '+e.message)}
   };
   pause.onclick=()=>{
     const r=s.recorder;if(!r)return;
@@ -539,7 +560,7 @@ function openZeroPlayer(g){
       status.textContent='Opname hervat.';videoAdjust();
     }
   };
-  stop.onclick=()=>{if(s.recorder&&s.recorder.state!=='inactive'){s.saving=true;stop.disabled=true;start.disabled=true;s.recorder.stop();feedback('')}};
+  stop.onclick=stopRecording;
   videoAdjust();
 }
 
@@ -761,6 +782,92 @@ async function taleraV61PersistMediaIds(g,persisted){
   return verify;
 }
 
+
+let taleraV9MediaMutating=false;
+async function taleraV9RemoveMedia(g,id){
+  if(taleraV9MediaMutating||!g.media.includes(id))return;
+  if(taleraZeroSession||recorder&&recorder.state!=='inactive'){
+    showError('Stop eerst je opname voordat je een beeld verwijdert.');return;
+  }
+  const tied=Boolean(g.voice&&Array.isArray(g.voiceCues)&&g.voiceCues.some(
+    c=>c?.mediaId===id||(!c?.mediaId&&g.media[Number(c.index)]===id)
+  ));
+  if(tied){
+    if(document.getElementById('taleraV9MediaConfirm'))return;
+    const sheet=document.createElement('div');
+    sheet.id='taleraV9MediaConfirm';sheet.setAttribute('role','dialog');
+    sheet.setAttribute('aria-modal','true');
+    sheet.setAttribute('aria-label','Beeld verwijderen');
+    sheet.innerHTML='<div class="talera-v7-delete-sheet"><h2>Beeld verwijderen?</h2>'
+      +'<p>Dit beeld hoort bij je ingesproken verhaal. Na verwijderen moet je opnieuw inspreken.</p>'
+      +'<div class="talera-v7-delete-actions"><button type="button" data-answer="no">Annuleren</button>'
+      +'<button type="button" data-answer="yes">Verwijderen</button></div></div>';
+    document.body.append(sheet);
+    const yes=await new Promise(resolve=>{
+      sheet.querySelector('[data-answer="no"]').onclick=()=>resolve(false);
+      sheet.querySelector('[data-answer="yes"]').onclick=()=>resolve(true);
+      sheet.addEventListener('click',e=>{if(e.target===sheet)resolve(false)});
+    });
+    sheet.remove();
+    if(!yes)return;
+  }
+  taleraV9MediaMutating=true;
+  const previous={media:[...g.media],voice:g.voice,cues:g.voiceCues,duration:g.voiceDurationMs,wave:g.voiceWave};
+  try{
+    await queue;await savingOriginals;
+    g.media=g.media.filter(k=>k!==id);
+    if(tied){g.voice='';g.voiceCues=[];g.voiceDurationMs=0;g.voiceWave=[]}
+    await saveDraft();
+    const candidates=[id,...(tied&&previous.voice?[previous.voice]:[])];
+    const unused=candidates.filter(k=>!groups.some(x=>x.media.includes(k)||x.voice===k));
+    if(unused.length){
+      try{await deleteFiles(unused.flatMap(k=>[k,'preview:'+k]))}
+      catch(e){console.warn('TALERA oud voorbeeld later opruimen',e)}
+      for(const k of unused){
+        revoke(k);assets.delete(k);
+        const cached=previewUrls.get(k);if(cached)URL.revokeObjectURL(cached);
+        previewUrls.delete(k);previewBlobs.delete(k);
+      }
+    }
+    errorMsg='';
+    open('work',g.id);
+  }catch(e){
+    g.media=previous.media;g.voice=previous.voice;g.voiceCues=previous.cues;
+    g.voiceDurationMs=previous.duration;g.voiceWave=previous.wave;
+    showError('Dit beeld kon niet worden verwijderd: '+e.message);
+  }finally{taleraV9MediaMutating=false}
+}
+function taleraV9EditorMediaControls(g){
+  const panel=document.querySelector('.talera-work-tiles');
+  const grid=panel?.querySelector('.tiles');
+  if(!grid)return;
+  for(const tile of [...grid.querySelectorAll(':scope > .tile')]){
+    const holder=document.createElement('div');
+    holder.className='talera-v9-media-holder';
+    tile.replaceWith(holder);holder.appendChild(tile);
+    const remove=document.createElement('button');
+    remove.type='button';remove.className='talera-v9-remove-media';
+    remove.textContent='×';remove.setAttribute('aria-label','Beeld verwijderen');
+    remove.title='Beeld verwijderen';
+    remove.onclick=e=>{e.preventDefault();e.stopPropagation();void taleraV9RemoveMedia(g,tile.dataset.id)};
+    holder.append(remove);
+  }
+  if(g.media.length>=6)return;
+  const input=document.createElement('input');
+  input.type='file';input.accept='image/*,video/*';input.multiple=true;input.hidden=true;
+  input.id='taleraV9AddMediaInput';
+  input.onchange=()=>{
+    const files=[...(input.files||[])];input.value='';
+    if(files.length)void importPhotos(files,g.id);
+  };
+  const add=document.createElement('button');
+  add.type='button';add.className='talera-v9-add-media';
+  add.textContent='+';add.setAttribute('aria-label','Foto of video toevoegen');
+  add.title='Beeld toevoegen';
+  add.onclick=()=>{if(!taleraZeroSession&&!taleraV9MediaMutating)input.click()};
+  grid.append(add);panel.append(input);
+}
+
 function patchTell(html){
   const a=html.indexOf('function openZeroPlayer(g){');
   if(a<0)return{html,changed:false,reason:'no-tell'};
@@ -812,6 +919,56 @@ function patchTell(html){
   const cleanup="const remove=[...g.media,...(g.voice?[g.voice]:[])];";
   if(!page.includes(cleanup))return{html,changed:false,reason:'publish-cleanup-upstream-changed'};
   page=page.replace(cleanup,"await taleraV61PersistMediaIds(g,persisted);try{await taleraV61KeepVideoPosters(g,persisted)}catch(e){console.warn('TALERA videovoorbeeld later herstellen',e)}"+cleanup);
+
+  // Keep the original import, media IDs and design sizes. Only make the
+  // currently opened concept editable and remove the verbose overview copy.
+  const importStart="async function importPhotos(chosen){\n if(!chosen.length)return;\n if(chosen.length>25)";
+  const importTarget="async function importPhotos(chosen,targetGroupId=''){\n if(!chosen.length)return;\n const target=targetGroupId?groups.find(g=>g.id===targetGroupId):null;\n if(targetGroupId&&!target){showError('Deze herinnering is niet meer beschikbaar.');return}\n if(target&&chosen.length>6-target.media.length){\n   showError('Er passen nog '+(6-target.media.length)+' beelden bij deze herinnering. Maximaal zes.');return;\n }\n if(target&&(taleraZeroSession||taleraV9MediaMutating)){\n   showError('Stop eerst de opname voordat je foto's toevoegt.');return;\n }\n if(chosen.length>25)";
+  const importGroups="  const made=makeGroups(rows);for(const g of made){g.date=today();g.precision='exact';g.dateSource='creation';g.dateConfirmed=true}groups.push(...made);importsPending++;";
+  const appendToExisting="  // In an open memory, append to THAT memory instead of creating a new group.\n  // Keep the same draft media IDs and the one existing IndexedDB store.\n  if(target){\n    if(target.media.length+entries.length>6)\n      throw Error('Deze herinnering kan maximaal zes beelden bevatten.');\n    const prior=[...target.media];\n    target.media.push(...entries.map(([id])=>id));\n    importsPending++;\n    savingOriginals=savingOriginals.then(()=>writeFiles(entries));\n    const saved=saveDraft();\n    open('work',target.id);\n    afterImportMedia(entries);notifyImportStatus();\n    saved.then(()=>{importsPending=Math.max(0,importsPending-1);notifyImportStatus()})\n      .catch(e=>{\n        importsPending=Math.max(0,importsPending-1);\n        target.media=prior;\n        showError('De toegevoegde beelden zijn nog niet veilig bewaard: '+e.message);\n        notifyImportStatus();\n      });\n    return;\n  }\n  const made=makeGroups(rows);for(const g of made){g.date=today();g.precision='exact';g.dateSource='creation';g.dateConfirmed=true}groups.push(...made);importsPending++;";
+  if(!page.includes(importStart)||!page.includes(importGroups))
+    return{html,changed:false,reason:'r9-import-upstream-changed'};
+  page=page.replace(importStart,importTarget);
+  page=page.replace(importGroups,appendToExisting);
+  const overviewAt=page.indexOf('function overview(){');
+  const overviewEnd=page.indexOf('\nlet dragGhost=',overviewAt);
+  if(overviewAt<0||overviewEnd<0)return{html,changed:false,reason:'r9-overview-upstream-changed'};
+  let overview=page.slice(overviewAt,overviewEnd);
+  const para=overview.indexOf('<p class="p">');
+  const paraEnd=overview.indexOf('</p>',para);
+  if(para<0||paraEnd<0||!overview.slice(para,paraEnd).includes('Kloppen de foto'))
+    return{html,changed:false,reason:'r9-overview-copy-changed'};
+  overview=overview.slice(0,para)+overview.slice(paraEnd+4);
+  overview=overview.replace("'+count+' beelden</span>","</span>");
+  overview=overview.replace('Je werk is nog niet op de tijdlijn geplaatst.','');
+  overview=overview.replace('Open herinnering →','Open →');
+  overview=overview.replace("g.media.length+' beelden · '+(g.existing?'Bewerken':'Concept')","''");
+  page=page.slice(0,overviewAt)+overview+page.slice(overviewEnd);
+  const importStatus="node.hidden=false;node.textContent=importsPending?'Originele bestanden bewaren…':'Je werk is nog niet op de tijdlijn geplaatst.'";
+  if(!page.includes(importStatus))return{html,changed:false,reason:'r9-status-upstream-changed'};
+  page=page.replace(importStatus,"node.hidden=!importsPending;node.textContent=importsPending?'Beelden bewaren…':''");
+  const workTilesHook="tiles.querySelectorAll('.tile').forEach(enableDrag);";
+  if(!page.includes(workTilesHook))return{html,changed:false,reason:'r9-tiles-upstream-changed'};
+  page=page.replace(workTilesHook,workTilesHook+'taleraV9EditorMediaControls(g);');
+  // Helpers execute INSIDE the original editor closure, sharing its state.
+  const workAnchor='function taleraCompactWorkbench(g){';
+  if(!page.includes(workAnchor))return{html,changed:false,reason:'r9-editor-upstream-changed'};
+  page=page.replace(workAnchor,
+    'let taleraV9MediaMutating=false;\n'
+    +taleraV9RemoveMedia.toString()+'\n'
+    +taleraV9EditorMediaControls.toString()+'\n'
+    +workAnchor);
+  const cssR9='<style id="talera-v61-r9-controls-css">'
+    +'#app .work.talera-compact-work .talera-work-tiles .talera-v9-media-holder{position:relative;aspect-ratio:1;min-width:0}'
+    +'#app .work.talera-compact-work .talera-work-tiles .talera-v9-media-holder>.tile{height:100%!important}'
+    +'#app .work.talera-compact-work .talera-v9-remove-media{position:absolute;top:5px;right:5px;z-index:5;width:29px;height:29px;border:0;border-radius:50%;background:rgba(255,255,255,.96);color:#173b52;box-shadow:0 1px 5px #1234;font:700 23px/1 system-ui;padding:0;touch-action:manipulation}'
+    +'#app .work.talera-compact-work .talera-v9-add-media{display:grid;place-items:center;aspect-ratio:1;width:100%;border:2px dashed #bdd1d9;border-radius:13px;background:#f1f6f8;color:#20516b;font:450 42px/1 system-ui;touch-action:manipulation}'
+    +'#taleraV61RecControls{z-index:9990!important;pointer-events:auto!important}'
+    +'#taleraV61RecControls #taleraV61RecStart{touch-action:manipulation;pointer-events:auto!important;-webkit-tap-highlight-color:transparent;user-select:none}'
+    +'#app .group-header .tag,#app #cards .card-head>span{display:none!important}'
+    +'</style>';
+  page=page.replace('</head>',cssR9+'</head>');
+
   // This script is owned by the original editor; keep its stores and media IDs.
   return{html:page.replace('</head>',RECORD_CSS+'</head>'),changed:true,reason:'inline-recording-video-posters-one-store'};
 }

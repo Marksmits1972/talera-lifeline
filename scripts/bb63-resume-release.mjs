@@ -106,7 +106,8 @@ const pkg=name=>readFileSync('.talera-v62-package/'+(name==='worker.mjs'?'worker
 async function preflight(){
  need(token.length>15,'missing_cloudflare_token');
  need(['--check','--publish'].includes(mode),'invalid_mode');
- need((mode==='--publish'?marker.action==='publish-tested-bb63-resume':marker.action==='precheck-only')&&
+ need((mode==='--publish'?marker.action==='publish-tested-bb63-resume':
+  ['precheck-only','publish-tested-bb63-resume'].includes(marker.action))&&
   marker.core===CORE&&marker.v62===V62,'resume_scope_not_approved');
  if(mode==='--publish')need(marker.reviewedBaseCommit===process.env.BB63_REVIEW_COMMIT,'unreviewed_commit');
  need(manifest.moduleCount===17&&manifest.deploymentAuthorized===false,'wrong_v62_package');

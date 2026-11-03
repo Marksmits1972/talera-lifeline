@@ -15,12 +15,14 @@ const imported=[...worker.matchAll(/^import\s+\w+\s+from\s+["']\.\/([^"']+)["'];
 if(imported.length<15||new Set(imported).size!==imported.length)
  throw Error('V62 canonical Worker import inventory is incomplete or duplicated');
 const required=['menu-integration.txt','kennisbank.html','free-backup.txt',
- 'premium-sync-coordinator.txt','premium-sync-queue.txt','premium-indexeddb-bridge.txt',
+ 'premium-sync-coordinator.txt','premium-current-client.txt','premium-sync-queue.txt','premium-indexeddb-bridge.txt',
  'premium-records-bridge.txt','premium-records-coordinator.txt','premium-sync-audit.txt',
  'premium-large-media.txt','premium-restore-verifier.txt','premium-cloud-restore-preview.txt',
  'premium-cloud-restore-atomic.txt','premium-restore-stage.txt','premium-cloud-integrity.txt'];
 if(required.some(x=>!imported.includes(x))||imported.some(x=>!required.includes(x)))
  throw Error('V62 package imports differ from known canonical module set');
+if(!worker.includes('"/__clean/premium-current-client.mjs":currentClientSource'))
+ throw Error('Current-version sync module route missing');
 if(!worker.includes('"/__clean/premium-cloud-integrity.mjs":cloudIntegritySource'))
  throw Error('Cloud-only integrity route missing');
 if(!worker.includes('V56_BASE'))throw Error('Existing V56 service boundary missing');

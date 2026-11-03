@@ -120,9 +120,11 @@ function packageV62(name){return readFileSync(packageDir+'/'+(name==='worker.mjs
 async function preflight(){
  need(token.length>15,'cloudflare_secret_missing');
  need(['--check','--publish'].includes(mode),'invalid_mode');
- need(release.action==='publish-bb63-current-sync-v1'&&release.coreTarget===CORE&&release.v62Target===V62,
-  'unauthorized_target');
- need(release.reviewedBaseCommit===process.env.BB63_REVIEW_COMMIT,'review_commit_mismatch');
+ need((mode==='--publish'?release.action==='publish-bb63-current-sync-v1':
+  ['precheck-only','publish-bb63-current-sync-v1'].includes(release.action))&&
+  release.coreTarget===CORE&&release.v62Target===V62,'unauthorized_target');
+ if(mode==='--publish')
+  need(release.reviewedBaseCommit===process.env.BB63_REVIEW_COMMIT,'review_commit_mismatch');
  need(release.canonicalBase===SOURCE_REF,'release_source_anchor_wrong');
  need(manifest.moduleCount===17&&manifest.targetForReviewOnly===V62&&manifest.deploymentAuthorized===false,
   'offline_v62_package_wrong');

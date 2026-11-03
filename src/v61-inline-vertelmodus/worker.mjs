@@ -5,14 +5,42 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-inline-vertelmodus-r2-clean-20261103';
+const BUILD='v61-inline-vertelmodus-r3-audio-share-20261103';
+
+
+// One persistent listening preference shared by My Life and Presentation.
+// This is intentionally initialized before the TALERA More menu renders.
+const GLOBAL_AUDIO_PREF_SCRIPT = String.raw`<script id="talera-v61-listening-pref">
+(()=>{
+  if(window.__taleraAudioControls?.isEnabled)return;
+  const KEY='talera-v61-listening-enabled';
+  const read=()=>{try{return localStorage.getItem(KEY)==='on'}catch(e){return false}};
+  const write=on=>{try{localStorage.setItem(KEY,on?'on':'off')}catch(e){}};
+  const controls={
+    isEnabled:read,
+    enable(){write(true);window.__taleraInlineTryAutoPlay?.(true)},
+    disable(){write(false);window.__taleraInlineStopAudio?.()}
+  };
+  window.__taleraAudioControls=controls;
+  document.addEventListener('talera:enable-listening',()=>controls.enable());
+})();
+</script>`;
+function installGlobalAudioPref(html){
+  if(html.includes('id="talera-v61-listening-pref"'))return html;
+  return html.replace('</head>',GLOBAL_AUDIO_PREF_SCRIPT+'</head>');
+}
 
 function taleraInlineDispose(){
   const s=taleraInline;
   taleraInline=null;
   if(!s)return;
   if(s.timer)clearInterval(s.timer);
-  if(s.audio){s.audio.pause();s.audio.removeAttribute('src');s.audio.remove()}
+  if(s.audio){
+    s.audio.onplay=s.audio.onpause=s.audio.onended=null;
+    s.audio.onseeking=s.audio.onseeked=s.audio.ontimeupdate=null;
+    s.audio.pause();s.audio.removeAttribute('src');
+    // Keep the same audio element attached for the next memory on iOS.
+  }
   if(s.video){s.video.pause();s.video.removeAttribute('src');s.video.remove()}
   if(s.panel)s.panel.remove();
   if(s.voiceUrl)URL.revokeObjectURL(s.voiceUrl);
@@ -78,32 +106,43 @@ async function taleraInlineLoadVideo(s,frame,cue,ms){
 }
 
 function taleraInlineInstallAudioControls(){
-  // One setting for the whole presentation, used by Meer > Luisteren.
-  const KEY='talera-v61-listening-enabled';
-  const read=()=>{try{return localStorage.getItem(KEY)==='on'}catch(e){return false}};
-  const write=enabled=>{try{localStorage.setItem(KEY,enabled?'on':'off')}catch(e){}};
-  const playCurrent=()=>{
-    const s=taleraInline;if(!s?.audio||!read())return;
-    if(s.audio.ended){try{s.audio.currentTime=0}catch(e){}}
-    if(s.audio.paused)void s.audio.play().catch(()=>{});
+  // The same setting is created on My Life and on Presentation.
+  // Safari may need a real tap before playing unmuted audio.
+  const canListen=()=>Boolean(window.__taleraAudioControls?.isEnabled?.());
+  const playCurrent=(restart=false)=>{
+    const s=taleraInline;
+    if(!s?.audio||!canListen()||!s.audio.paused||s._playPending)return;
+    if(s.audio.ended){
+      if(!restart)return;
+      try{s.audio.currentTime=0}catch(e){}
+    }
+    s._playPending=true;
+    try{
+      const promise=s.audio.play();
+      Promise.resolve(promise).catch(err=>{
+        if(s===taleraInline)s.blockedByBrowser=err?.name==='NotAllowedError';
+      }).finally(()=>{s._playPending=false});
+    }catch(e){s._playPending=false}
   };
   const stopCurrent=()=>{
     const s=taleraInline;
     if(s?.audio&&!s.audio.paused)s.audio.pause();
     if(s?.video&&!s.video.paused)s.video.pause();
   };
-  if(!window.__taleraAudioControls?.isEnabled){
-    window.__taleraAudioControls={
-      isEnabled:()=>read(),
-      enable(){write(true);playCurrent()},
-      disable(){write(false);stopCurrent()}
-    };
-  }
-  window.__taleraInlineTryAutoPlay=()=>{if(window.__taleraAudioControls?.isEnabled?.())playCurrent()};
-  document.addEventListener('talera:enable-listening',()=>window.__taleraAudioControls?.enable?.());
+  window.__taleraInlineTryAutoPlay=playCurrent;
+  window.__taleraInlineStopAudio=stopCurrent;
+  // Do not introduce another player button: a tap on the photograph itself
+  // can unlock native Safari audio after autoplay was denied.
+  const retryOnPhotoGesture=e=>{
+    if(!taleraInline?.audio||!canListen()||!taleraInline.audio.paused)return;
+    if(e.target?.closest?.('button,a,input,select,textarea,[role="button"],.talera-share-shell'))return;
+    playCurrent();
+  };
+  document.addEventListener('pointerup',retryOnPhotoGesture,{passive:true});
+  document.addEventListener('touchend',retryOnPhotoGesture,{passive:true});
   window.addEventListener('storage',e=>{
-    if(e.key!==KEY)return;
-    if(read())playCurrent();else stopCurrent();
+    if(e.key!=='talera-v61-listening-enabled')return;
+    if(canListen())playCurrent();else stopCurrent();
   });
 }
 
@@ -119,25 +158,28 @@ async function present(memory){
   try{blob=await store.blob(voice.key)}catch(e){}
   if(activeId!==memory.id||serial!==own||runtime.currentMemory()?.id!==memory.id)return;
   if(!(blob instanceof Blob)||!blob.size){console.warn('TALERA: originele stemopname ontbreekt');return}
-  const audio=document.createElement('audio');
-  audio.preload='metadata';audio.playsInline=true;audio.style.display='none';
-  stage.appendChild(audio);
-  const voiceUrl=URL.createObjectURL(blob);audio.src=voiceUrl;
+  // Reuse one media element across memories: on iOS this preserves the
+  // user's first audio interaction better than creating a new player per story.
+  const audio=window.__taleraInlineSharedAudio||document.createElement('audio');
+  if(!window.__taleraInlineSharedAudio)window.__taleraInlineSharedAudio=audio;
+  audio.preload='auto';audio.playsInline=true;audio.style.display='none';
+  if(audio.parentElement!==stage)stage.appendChild(audio);
+  const voiceUrl=URL.createObjectURL(blob);
+  audio.src=voiceUrl;
+  audio.muted=false;audio.volume=1;
   const frames=memory._zeroFrames||[];
   const cues=(memory._taleraNarrationCues||[]).filter(c=>Number.isFinite(Number(c.t))&&Number.isInteger(c.index)&&c.index>=0&&c.index<frames.length).map(c=>({t:Math.max(0,Number(c.t)),index:c.index,videoAtMs:Math.max(0,Number(c.videoAtMs)||0)})).sort((a,b)=>a.t-b.t);
-  const s={memory,frames,cues,audio,voiceUrl,timer:null,video:null,videoKey:'',videoUrl:null};
+  const s={memory,frames,cues,audio,voiceUrl,timer:null,video:null,videoKey:'',videoUrl:null,_playPending:false};
   taleraInline=s;
   const tick=()=>taleraInlineSync(s);
   const stopTimer=()=>{if(s.timer){clearInterval(s.timer);s.timer=null}};
-  audio.addEventListener('play',()=>{stopTimer();tick();s.timer=setInterval(tick,90)});
-  audio.addEventListener('pause',()=>{stopTimer();tick()});
-  audio.addEventListener('ended',()=>{stopTimer();tick()});
-  audio.addEventListener('seeking',tick);
-  audio.addEventListener('seeked',tick);
-  audio.addEventListener('timeupdate',tick);
+  audio.onplay=()=>{stopTimer();tick();s.timer=setInterval(tick,90)};
+  audio.onpause=()=>{stopTimer();tick()};
+  audio.onended=()=>{stopTimer();tick()};
+  audio.onseeking=tick;
+  audio.onseeked=tick;
+  audio.ontimeupdate=tick;
   tick();
-  // Audio is controlled through More, not a per-memory play button.
-  // Safari may block autoplay before the user permits audio.
   window.__taleraInlineTryAutoPlay?.();
 }
 

@@ -4,6 +4,7 @@
  */
 import {listLocalPremiumMedia,createPremiumManifest,uploadLocalPremiumMedia} from './premium-indexeddb-bridge.mjs';
 import {syncPremiumPending} from './premium-sync-queue.mjs';
+import {fetchPremiumCurrentVersions,commitPremiumCurrentVersion} from './premium-current-client.mjs';
 import {createLargeMediaManifest,uploadLargePremiumMedia,LARGE_THRESHOLD,LARGE_MEDIA_LIMIT} from './premium-large-media.mjs';
 const json=async(fetcher,path)=>{const r=await fetcher(path,{credentials:'same-origin',cache:'no-store'});if(!r.ok)throw Error('premium_api_unavailable');return r.json()};
 export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>true,maxItems=10,expectedAccountId=null,ownerMatches=()=>true}={}) {
@@ -25,6 +26,7 @@ export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>t
   after=remote.next||null;
   if(after&&(!/^[0-9a-f-]{36}$/i.test(after)||++pages>1000))throw Error('invalid_media_cursor');
  }while(after);
+ const current=await fetchPremiumCurrentVersions(fetcher,'media');
  const local=await listLocalPremiumMedia({indexedDB});
  const items=[];
  for(const media of local){
@@ -35,16 +37,21 @@ export async function runPremiumMediaSync({indexedDB,crypto,fetcher,online=()=>t
   if(remote&&(remote.byte_size!==media.size||remote.content_type!==media.mime||
     (manifest.large&&(remote.sha256!==manifest.fingerprint||remote.digest_kind!=='part-sha256-v1'))))
    throw Error('remote_media_conflict');
-  if(!remote)items.push({media,manifest});
+  const currentId=current.get(media.key)?.current_id||null;
+  if(!remote||currentId!==manifest.mediaId)items.push({media,manifest,stored:Boolean(remote),expectedCurrentId:currentId});
  }
  return syncPremiumPending({
   listPending:async()=>items,
   readMedia:async item=>item.media,
   upload:async(item,media)=>{
    if(expectedAccountId&&ownerMatches()!==true)return {ok:false,reason:'account_changed'};
-   return item.manifest.large?
-    uploadLargePremiumMedia({media,manifest:item.manifest,fetcher,crypto,ownerMatches}):
-    uploadLocalPremiumMedia({media,manifest:item.manifest,fetcher,crypto});
+   const result=item.stored?{ok:true}:(item.manifest.large?
+    await uploadLargePremiumMedia({media,manifest:item.manifest,fetcher,crypto,ownerMatches}):
+    await uploadLocalPremiumMedia({media,manifest:item.manifest,fetcher,crypto}));
+   if(result?.ok!==true)return result;
+   if(expectedAccountId&&ownerMatches()!==true)return {ok:false,reason:'account_changed'};
+   return commitPremiumCurrentVersion({fetcher,kind:'media',sourceKey:media.key,
+    snapshotId:item.manifest.mediaId,expectedCurrentId:item.expectedCurrentId});
   },
   markSynced:async item=>{stored.set(item.manifest.mediaId,{byte_size:item.manifest.size,content_type:item.manifest.mime})},
   allowed,

@@ -84,7 +84,8 @@ test('no IndexedDB never triggers a write attempt',async()=>{
  assert.equal(fixture.calls.opens,0);
 });
 test('diagnostic code contains no persistence, cloud calls or media enumeration',()=>{
- assert.doesNotMatch(source,/\bfetch\s*\(|\bapi\s*\(|\blocalStorage\b|\.put\s*\(|\.add\s*\(|\.delete\s*\(|\.clear\s*\(|\.getAll\s*\(|\.get\s*\(|\bXMLHttpRequest\b/);
+ const executable=source.replace(/\/\/[^\n]*/g,''); // comments are not executable behavior
+ assert.doesNotMatch(executable,/\bfetch\s*\(|\bapi\s*\(|\blocalStorage\b|\.put\s*\(|\.add\s*\(|\.delete\s*\(|\.clear\s*\(|\.getAll\s*\(|\.get\s*\(|\bXMLHttpRequest\b/);
  assert.match(source,/\.transaction\(\['stories','files'\],'readonly'\)/);
  assert.match(menu,/if\(taleraDiagnoseMode\)return;\s*if\(premiumSyncUi\.working/);
  assert.match(menu,/if\(requestedMenu==='diagnose'&&taleraDiagnoseMode\)open\('diagnose'\)/);

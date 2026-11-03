@@ -1,0 +1,45 @@
+async function findStoryId(localMemoryId){
+ try{
+  const d=await coreRequest('/api/pwa/memory-link?localMemoryId='+encodeURIComponent(localMemoryId));
+  return d.memoryId||null;
+ }catch(e){
+  // Only show restored historical comments when the signed-out owner has
+  // already restored a verified local backup. No server identity is forged.
+  if(e.status===401){
+   const history=await window.TaleraFreeBackup?.archivedComments?.(localMemoryId);
+   if(history?.length)return null;
+  }
+  throw e;
+ }
+}
+const socialAdapter={
+ findStoryId,
+ async loadLocal(localMemoryId){
+  const archive=await window.TaleraFreeBackup?.archivedComments?.(localMemoryId);
+  if(!archive?.length)throw Error('Koppel deze herinnering aan je TALERA-account voordat je hartjes of reacties gebruikt.');
+  return window.TaleraFreeBackup.socialSnapshot(localMemoryId);
+ },
+ async fetchSnapshot({memoryId,storyId}){
+  const d=await coreRequest('/api/threads/'+encodeURIComponent(storyId));
+  const live={hearted:!!d.hearted,heartCount:Number(d.heartCount)||0,
+   commentCount:(d.items||[]).length,
+   comments:(d.items||[]).map(c=>({id:c.id,from:c.display_name,text:c.body,
+     authorId:c.author_id,createdAt:Number(c.created_at)||0,parentId:c.parent_id||null}))};
+  return window.TaleraFreeBackup?.socialSnapshot
+   ? window.TaleraFreeBackup.socialSnapshot(memoryId,live):live;
+ },
+ async commitLocal(){throw Error('Op een hersteld archief kun je pas weer reageren nadat de herinnering met je TALERA-account is gekoppeld.')},
+ async commit({memoryId,storyId,operation}){
+  if(operation.type==='toggle-heart')await coreRequest('/api/threads/'+encodeURIComponent(storyId)+'/like',{method:'POST'});
+  else if(operation.type==='comment')await coreRequest('/api/threads/'+encodeURIComponent(storyId)+'/comments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({body:operation.body})});
+  else throw Error('Onbekende reactie');
+  const d=await coreRequest('/api/threads/'+encodeURIComponent(storyId));
+  const live={hearted:!!d.hearted,heartCount:Number(d.heartCount)||0,
+   comments:(d.items||[]).map(c=>({id:c.id,from:c.display_name,text:c.body,
+    createdAt:Number(c.created_at)||0,parentId:c.parent_id||null})),
+   commentCount:(d.items||[]).length};
+  return {snapshot:window.TaleraFreeBackup?.socialSnapshot
+    ?await window.TaleraFreeBackup.socialSnapshot(memoryId,live):live};
+ }
+};
+

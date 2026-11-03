@@ -1,0 +1,55 @@
+name: TALERA V62 offline release-package preflight (NO DEPLOY)
+on:
+  push:
+    branches:
+      - feature/v62-mijn-profiel-accountoverzicht-20261101
+    paths:
+      - 'src/mijn-talera/**'
+      - 'scripts/v62-package-preflight.mjs'
+      - 'scripts/v62-live-drift-check.mjs'
+      - 'scripts/v62-cloudflare-readiness.mjs'
+      - 'scripts/v62-cloud-integrity-release.mjs'
+      - '.github/workflows/v62-release-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talera-v62-offline-release-preflight
+  cancel-in-progress: true
+jobs:
+  dry-run-only:
+    if: ${{ github.repository == 'Marksmits1972/talera-lifeline' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked development tools
+        run: npm ci
+      - name: Validate guarded live release script without execution
+        run: node --check scripts/v62-cloud-integrity-release.mjs
+      - name: Construct reviewed V62 package without modifying tracked sources
+        run: node scripts/v62-package-preflight.mjs
+      - name: Compile only — Wrangler --dry-run (NO DEPLOY)
+        run: npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Verify CURRENT public V62 routes and preserved Free features (read-only)
+        run: node test/v62-app-entry-http-smoke.mjs
+      - name: Compare live V62 public modules to review package (GET-only, block on drift)
+        run: node scripts/v62-live-drift-check.mjs
+      - name: Read existing V62 Cloudflare metadata only if a GitHub secret already exists
+        env:
+          TALERA_V62_CF_READ_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/v62-cloudflare-readiness.mjs
+      - name: Preserve checksum, drift and read-only readiness evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-v62-offline-module-inventory-${{ github.sha }}
+          path: |
+            .talera-v62-package/release-inventory.json
+            .talera-v62-package/live-drift-report.json
+            .talera-v62-package/cloudflare-readiness.json
+          if-no-files-found: warn
+          retention-days: 30

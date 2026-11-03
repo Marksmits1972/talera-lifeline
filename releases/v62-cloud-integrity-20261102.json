@@ -1,0 +1,10 @@
+{
+  "action": "publish-cloud-integrity-only",
+  "target": "talera-pwa-v62-mijn-profiel-20261101",
+  "reviewedBaseCommit": "51c95de128e219be19d73a8d18891fc920432e1c",
+  "expectedDeploymentId": "b896199b-dbdc-4e8d-a1aa-6b7fb0dcc44a",
+  "expectedVersionId": "9ed50d3a-1f3e-4a63-a80b-840990e3bd2f",
+  "scope": "one existing Worker; canonical menu, main module and one new read-only verification module; preserve every other part and settings",
+  "noDatabaseWrites": true,
+  "requireRollbackOnFailure": true
+}

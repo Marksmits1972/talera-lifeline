@@ -1,0 +1,99 @@
+/* TALERA WhatsApp: native one-memory presentation, not a second presentation. */
+(()=>{'use strict';
+const d=window.__taleraGuestData,root=document.documentElement;
+if(!d||!d.token||!d.memory){root.classList.remove('talera-guest-boot');return}
+const token=d.token,record=d.memory,base='/api/guest/threads/'+encodeURIComponent(token);
+const style=document.createElement('style');
+style.textContent='body.talera-guest-live nav[aria-label="TALERA navigatie"],body.talera-guest-live .talera-context-share,body.talera-guest-live .talera-memory-edit,body.talera-guest-live #talera-clean-social,body.talera-guest-live .talera-share-shell{display:none!important}body.talera-guest-live .timeline{pointer-events:none!important;touch-action:none!important}body.talera-guest-live #talera-guest-toolbar{position:fixed;z-index:110;right:16px;bottom:calc(24px + env(safe-area-inset-bottom));display:flex;gap:6px;padding:7px 9px;background:rgba(22,48,69,.42);border:1px solid #ffffffa8;border-radius:25px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 5px 20px #0002}body.talera-guest-live #talera-guest-toolbar button{border:0;background:transparent;color:white;min-width:50px;min-height:50px;display:flex;gap:4px;align-items:center;justify-content:center;flex-direction:column;font:700 12px system-ui;cursor:pointer}body.talera-guest-live #talera-guest-toolbar svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}body.talera-guest-live #talera-guest-toolbar [aria-pressed=true] svg{fill:white}#talera-guest-dialog[hidden]{display:none!important}#talera-guest-dialog{position:fixed;inset:0;z-index:130;background:#06152299;display:flex;align-items:flex-end;justify-content:center}#talera-guest-box{box-sizing:border-box;width:min(100%,680px);max-height:84dvh;display:flex;flex-direction:column;border-radius:28px 28px 0 0;background:#fcfdfd;color:#19354c;padding:17px 20px calc(25px + env(safe-area-inset-bottom));font:16px/1.5 system-ui;box-shadow:0 -12px 38px #0003}#talera-guest-box header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e0e8ed;padding-bottom:10px}#talera-guest-box h2{margin:0;font-size:19px}#talera-guest-close{background:#e9f1f4;border:0;border-radius:50%;height:40px;width:40px;color:#19415a;font-size:24px}#talera-guest-body{overflow-y:auto;overscroll-behavior:contain;padding:14px 3px 18px}#talera-guest-box .entry{padding:12px 0;border-bottom:1px solid #dae5e9}#talera-guest-box .entry strong{display:block;color:#173c58}#talera-guest-box .entry p{white-space:pre-wrap;margin:5px 0}#talera-guest-box label{display:block;margin:13px 0 6px;font-weight:750}#talera-guest-box input,#talera-guest-box textarea{box-sizing:border-box;width:100%;background:white;color:#16354d;border:1px solid #bfd0d8;border-radius:11px;font:inherit;padding:12px}#talera-guest-box textarea{min-height:95px}#talera-guest-box .send{width:100%;padding:13px;border:0;border-radius:12px;background:#315f7e;color:white;font-weight:760;font-size:16px;margin-top:14px}#talera-guest-box video{display:block;max-height:64dvh;width:100%;background:#13283a;border-radius:12px}#talera-guest-box audio{width:100%;margin:15px 0}#talera-guest-box .msg{font-size:14px;color:#507087}@media(max-width:430px){body.talera-guest-live #talera-guest-toolbar{right:12px;gap:2px}body.talera-guest-live #talera-guest-toolbar button{min-width:45px}body.talera-guest-live #talera-guest-toolbar svg{width:25px;height:25px}}';
+style.textContent += '#talera-guest-comment-list{display:flex;flex-direction:column;gap:10px;padding:3px 0 14px}#talera-guest-comment-list .chat-row{display:flex;max-width:96%}#talera-guest-comment-list .chat-row.is-own{align-self:flex-end}#talera-guest-comment-list .chat-row.is-other{align-self:flex-start}#talera-guest-comment-list .chat-bubble{min-width:140px;max-width:100%;border-radius:16px;padding:12px 14px;background:#ebf1f5;border:1px solid #d9e5ed;color:#17354c}#talera-guest-comment-list .chat-row.is-own .chat-bubble{background:#dcefe4;border-color:#b9dec8}#talera-guest-comment-list .chat-bubble strong{font-size:14px;font-weight:750;display:block}#talera-guest-comment-list .chat-bubble p{font-size:15px;margin:4px 0!important;white-space:pre-wrap;overflow-wrap:anywhere}#talera-guest-comment-list .chat-bubble time{font-size:11px;color:#617f91;display:block;margin-top:4px}';
+style.textContent+="#talera-guest-brand{position:fixed;z-index:118;top:calc(14px + env(safe-area-inset-top));left:16px;display:inline-flex;align-items:center;gap:8px;min-height:35px;padding:8px 13px;background:rgba(11,37,55,.38);border:1px solid rgba(255,255,255,.50);border-radius:999px;box-shadow:0 2px 14px #00132315;backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px);text-decoration:none;color:#fff;font:800 12px/1 'DM Sans',system-ui,sans-serif;letter-spacing:.12em;text-shadow:0 1px 5px #0005;transition:background .15s}#talera-guest-brand:hover,#talera-guest-brand:focus-visible{background:rgba(10,47,66,.8)}#talera-guest-brand .talera-guest-brand-dot{height:7px;width:7px;border:1.5px solid #ccebe8;border-radius:50%;background:#83cbc6}#talera-guest-brand .talera-guest-brand-hint{font-size:9px;font-weight:600;letter-spacing:0;color:#e5eff2;opacity:.8;margin-left:4px}@media(max-width:430px){#talera-guest-brand{top:calc(12px + env(safe-area-inset-top));left:12px;min-height:33px;padding:7px 10px}}";
+style.textContent+='#talera-guest-dialog [hidden]{display:none!important}#talera-guest-reply-start{width:100%;min-height:46px;padding:11px 15px;border:1px solid #c9dce4;border-radius:13px;background:#f4f9fa;color:#214b62;font:750 15px system-ui;cursor:pointer}#talera-guest-known-name{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 4px;color:#355469;font-size:14px;font-weight:650}#talera-guest-known-name .name-change{border:0;background:transparent;color:#245d7a;font:650 13px system-ui;text-decoration:underline;cursor:pointer;padding:8px}';
+document.head.append(style);
+const api=async(path,method='GET',value)=>{const opts={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};if(value!==undefined){opts.headers['content-type']='application/json';opts.body=JSON.stringify(value)}const r=await fetch(path,opts),data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'Aanvraag niet gelukt');return data};
+let thread={items:[],heartCount:0,hearted:false},account=null,busy=false,mode=null;
+const nav=document.createElement('div');nav.id='talera-guest-toolbar';nav.setAttribute('role','toolbar');nav.setAttribute('aria-label','Reacties bij deze herinnering');
+const heartSVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.8c-2-2.1-5.2-2.1-7.3 0L12 6.3l-1.5-1.5c-2.1-2.1-5.3-2.1-7.3 0-2.3 2.2-2.3 5.6 0 7.8L12 21l8.8-8.4c2.2-2.2 2.2-5.6 0-7.8z"/></svg>';
+const bubbleSVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-2.8-.3-4-.9L3 21l1.6-4.8A8.5 8.5 0 1 1 20.5 11.5z"/></svg>';
+nav.innerHTML='<button type="button" id="talera-guest-heart" aria-label="Hartje geven" aria-pressed="false">'+heartSVG+'<span>0</span></button><button type="button" id="talera-guest-comments" aria-label="Reacties bekijken">'+bubbleSVG+'<span>0</span></button>'+(record.hasAudio?'<button type="button" id="talera-guest-audio">◖))<span>Luister</span></button>':'')+(record.hasVideo?'<button type="button" id="talera-guest-video">▷<span>Video</span></button>':'');
+const dialog=document.createElement('section');dialog.id='talera-guest-dialog';dialog.hidden=true;dialog.setAttribute('aria-label','Deze herinnering');dialog.innerHTML='<div id="talera-guest-box" role="dialog" aria-modal="true"><header><h2 id="talera-guest-title">Reacties</h2><button type="button" id="talera-guest-close" aria-label="Sluiten">×</button></header><div id="talera-guest-body"></div></div>';
+const brandLink=document.createElement('a');brandLink.id='talera-guest-brand';brandLink.href='https://talera-website.pages.dev/welkom/?via=gedeeld&v=2#terug='+encodeURIComponent(location.origin+'/ontvangen/'+token);brandLink.setAttribute('aria-label','Ontdek TALERA');brandLink.title='Ontdek TALERA';brandLink.innerHTML='<span class="talera-guest-brand-dot" aria-hidden="true"></span><span>TALERA</span><span class="talera-guest-brand-hint">ontdek</span>';
+document.body.append(brandLink,nav,dialog);
+const $=id=>document.getElementById(id),body=$('talera-guest-body');
+function counts(){$('talera-guest-heart').setAttribute('aria-pressed',String(!!thread.hearted));$('talera-guest-heart').querySelector('span').textContent=String(thread.heartCount||0);$('talera-guest-comments').querySelector('span').textContent=String(thread.items?.length||0)}
+async function refresh(){try{const t=await api(base);thread=t;account=t.account||null;counts()}catch(ex){console.warn('Reacties niet beschikbaar',ex)}}
+function close(){dialog.hidden=true;mode=null;body.querySelectorAll('audio,video').forEach(x=>x.pause());body.replaceChildren()}
+function comments(){
+ const list=$('talera-guest-comment-list');if(!list)return;list.replaceChildren();
+ for(const c of thread.items||[]){
+  const row=document.createElement('div');row.className='chat-row '+(c.own?'is-own':'is-other');
+  const bubble=document.createElement('div');bubble.className='chat-bubble';
+  const name=document.createElement('strong');name.textContent=(c.own?'Jij · ':'')+(c.display_name||'TALERA');
+  const msg=document.createElement('p');msg.textContent=c.body||'';
+  const time=document.createElement('time');const when=new Date(Number(c.created_at)||Date.now());time.dateTime=when.toISOString();time.textContent=when.toLocaleString('nl-NL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  bubble.append(name,msg,time);row.append(bubble);list.append(row);
+ }
+ if(!thread.items?.length){const p=document.createElement('p');p.className='msg';p.textContent='Nog geen reacties.';list.append(p)}
+}
+function open(next){
+ mode=next;dialog.hidden=false;body.replaceChildren();$('talera-guest-title').textContent=next==='comments'?'Reacties':next==='audio'?'Luister naar de herinnering':'Bekijk de video';
+ if(next==='audio'||next==='video'){const player=document.createElement(next==='audio'?'audio':'video');player.controls=true;player.preload='metadata';if(next==='video')player.playsInline=true;player.src=next==='audio'?record.audioUrl:record.videoUrl;body.append(player);return}
+ // Reading is the default. A visitor explicitly opens the editor only to reply.
+ const list=document.createElement('div');list.id='talera-guest-comment-list';body.append(list);comments();
+ const reply=document.createElement('button');reply.type='button';reply.id='talera-guest-reply-start';reply.textContent='Reageren';body.append(reply);
+ const form=document.createElement('form');form.id='talera-guest-form';form.hidden=true;
+ let showRememberedName=()=>{};
+ if(!account){
+  const savedKey='talera-gast-voornaam';
+  const label=document.createElement('label');label.textContent='Jouw voornaam';label.htmlFor='talera-guest-name';
+  const input=document.createElement('input');input.id='talera-guest-name';input.name='name';input.required=true;input.minLength=2;input.maxLength=40;input.autocomplete='given-name';
+  const known=document.createElement('div');known.id='talera-guest-known-name';known.hidden=true;
+  const caption=document.createElement('span');
+  const change=document.createElement('button');change.type='button';change.textContent='Naam wijzigen';change.className='name-change';
+  known.append(caption,change);form.append(known,label,input);
+  showRememberedName=name=>{
+   const value=String(name||'').trim();
+   if(value.length<2||value.length>40)return;
+   input.value=value;caption.textContent='Reageren als '+value;
+   label.hidden=true;input.hidden=true;known.hidden=false;
+  };
+  change.addEventListener('click',()=>{known.hidden=true;label.hidden=false;input.hidden=false;input.focus()});
+  try{showRememberedName(localStorage.getItem(savedKey))}catch{}
+ }
+ const label=document.createElement('label');label.htmlFor='talera-guest-text';label.textContent='Jouw reactie';
+ const area=document.createElement('textarea');area.id='talera-guest-text';area.name='body';area.maxLength=2000;area.required=true;
+ const send=document.createElement('button');send.type='submit';send.className='send';send.textContent='Reactie plaatsen';
+ const status=document.createElement('p');status.className='msg';status.setAttribute('role','status');
+ form.append(label,area,send,status);body.append(form);
+ reply.addEventListener('click',()=>{reply.hidden=true;form.hidden=false;area.focus()});
+ form.addEventListener('submit',async ev=>{
+  ev.preventDefault();if(busy)return;
+  const payload={body:area.value};
+  const name=form.querySelector('[name=name]');if(name)payload.name=name.value.trim();
+  busy=true;send.disabled=true;status.textContent='';
+  try{
+   await api(base+'/comments','POST',payload);
+   if(name){try{localStorage.setItem('talera-gast-voornaam',payload.name)}catch{}showRememberedName(payload.name)}
+   area.value='';await refresh();comments();
+   form.hidden=true;reply.hidden=false;
+  }catch(ex){status.textContent=ex.message}
+  finally{busy=false;send.disabled=false}
+ });
+}
+nav.addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b)return;if(b.id==='talera-guest-comments'){await refresh();open('comments')}else if(b.id==='talera-guest-audio'){open('audio')}else if(b.id==='talera-guest-video'){open('video')}else if(b.id==='talera-guest-heart'&&!busy){busy=true;try{await api(base+'/like','POST',{});await refresh()}catch(ex){await refresh();open('comments');const p=document.createElement('p');p.className='msg';p.textContent=ex.message;body.prepend(p)}finally{busy=false}}});
+$('talera-guest-close').addEventListener('click',close);dialog.addEventListener('click',ev=>{if(ev.target===dialog)close()});document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!dialog.hidden)close()});
+function error(message){root.classList.remove('talera-guest-boot');document.body.replaceChildren();const p=document.createElement('p');p.textContent=message;p.style.cssText='padding:12vh 24px;font:20px/1.5 system-ui;color:#18354f';document.body.append(p)}
+function boot(){
+ const runtime=window.__taleraTimelineRuntime;if(!runtime||typeof runtime.restrictToMemory!=='function'){error('De presentatie kon niet worden gestart.');return}
+ const day=Date.parse(String(record.eventDate||'')),ms=Number.isFinite(day)?Math.min(runtime.lifeEnd,Math.max(runtime.lifeStart,day)):runtime.centerMs();
+ const photo=record.photoUrl||'',headline=record.title||'Herinnering';
+ const memory={id:'whatsapp:'+record.memoryId,storyId:record.memoryId,at:new Date(ms).toISOString(),ms,title:headline,story:headline,fullStory:String(record.storyText||headline),image:photo,photos:photo?[photo]:[],_photoIndex:0,_taleraSharedRecipient:true,_hasAudio:false,_taleraGuestOnly:true};
+ document.body.classList.add('talera-guest-live','talera-recipient-presentation');
+ runtime.restrictToMemory(memory);
+ document.querySelectorAll('.talera-share-shell').forEach(x=>x.remove());
+ root.classList.remove('talera-guest-boot');void refresh();
+ document.dispatchEvent(new CustomEvent('talera:recipient-presentation',{detail:{scope:'story'}}));
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh()});
+setInterval(()=>{if(!document.hidden&&!dialog.hidden&&mode==='comments'&&!body.querySelector('textarea:focus'))void refresh().then(comments)},7000);
+})();

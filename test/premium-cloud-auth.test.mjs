@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {cloudAccess,canAcceptCloudConsent,cloudConsentDetails} from '../src/core/premium-cloud-auth.mjs';
+const sessionAccount={id:'f5cbaefc-d7d8-4a3a-a334-b93d0a08d170'};
+const entitlement={permissions:{cloud_storage:true},available:{cloud_storage:true}};
+const base={sessionAccount,entitlement,consentRow:{enabled:1,granted_at:42},pilotEnabled:true};
+test('staging pilot with explicit consent',()=>assert.deepEqual(cloudAccess(base),{allowed:true,accountId:sessionAccount.id}));
+test('anonymous is denied',()=>assert.equal(cloudAccess({...base,sessionAccount:null}).reason,'login_required'));
+test('pilot defaults closed',()=>assert.equal(cloudAccess({...base,pilotEnabled:false}).reason,'pilot_disabled'));
+test('Free denied',()=>assert.equal(cloudAccess({...base,entitlement:{permissions:{cloud_storage:false},available:{cloud_storage:true}}}).reason,'premium_required'));
+test('feature marked unavailable denies',()=>assert.equal(cloudAccess({...base,entitlement:{permissions:{cloud_storage:true},available:{cloud_storage:false}}}).reason,'feature_unavailable'));
+test('no consent denied',()=>assert.equal(cloudAccess({...base,consentRow:null}).reason,'consent_required'));
+test('consent acceptance needs Premium and pilot',()=>{assert.equal(canAcceptCloudConsent(base),true);assert.equal(canAcceptCloudConsent({...base,pilotEnabled:false}),false)});
+test('consent status has no private payload',()=>assert.deepEqual(cloudConsentDetails({enabled:1,granted_at:42}),{enabled:true,grantedAt:42}));

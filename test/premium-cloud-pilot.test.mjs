@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {premiumCloudPilotAllowed,premiumCloudPilotRights} from '../src/core/premium-cloud-pilot.mjs';
+const id='a8f08aa9-a0a2-4ce3-a179-44fb758d1102',rights={source:'manual_test',permissions:{cloud_storage:true},available:{cloud_storage:false}};
+const env={PREMIUM_CLOUD_PILOT_ENABLED:'true',PREMIUM_CLOUD_PILOT_ACCOUNT_IDS:id};
+test('pilot defaults off',()=>assert.equal(premiumCloudPilotAllowed({env:{},accountId:id,rights}),false));
+test('only explicit test account allowed',()=>assert.equal(premiumCloudPilotAllowed({env,accountId:'f5cbaefc-d7d8-4a3a-a334-b93d0a08d170',rights}),false));
+test('active manual Premium test right is mandatory',()=>assert.equal(premiumCloudPilotAllowed({env,accountId:id,rights:{source:'free',permissions:{cloud_storage:false}}}),false));
+test('paid account not automatically admitted in pilot',()=>assert.equal(premiumCloudPilotAllowed({env,accountId:id,rights:{...rights,source:'payment'}}),false));
+test('scoped capability and not global change',()=>{assert.equal(premiumCloudPilotRights({env,accountId:id,rights}).available.cloud_storage,true);assert.equal(rights.available.cloud_storage,false)});
+test('disabled pilot denies even authorized account',()=>assert.equal(premiumCloudPilotAllowed({env:{...env,PREMIUM_CLOUD_PILOT_ENABLED:'false'},accountId:id,rights}),false));

@@ -1,0 +1,74 @@
+name: BB63 resume already tested Core version + corrected V62 text-module release
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'releases/bb63-resume-20261103.json'
+permissions:
+  contents: read
+concurrency:
+  group: talera-v62-production-content-release
+  cancel-in-progress: false
+jobs:
+  publish-resume:
+    if: ${{ github.repository == 'Marksmits1972/talera-lifeline' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Approve EXACTLY one marker-only commit, pinned unchanged source
+        run: |
+          node --input-type=module <<'EOF'
+          import {readFileSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const m=JSON.parse(readFileSync('releases/bb63-resume-20261103.json','utf8'));
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();
+          const parent=git('rev-parse','HEAD^');
+          const delta=git('diff-tree','--no-commit-id','--name-only','-r','HEAD');
+          if(delta!=='releases/bb63-resume-20261103.json'||
+             m.action!=='publish-tested-bb63-resume'||
+             m.releaseAuthorized!==true||
+             m.reviewedBaseCommit!==parent||
+             m.precheckRunId!==41607198950||
+             m.core!=='talera-clean-core-staging-20261030'||
+             m.v62!=='talera-pwa-v62-mijn-profiel-20261101'||
+             m.testedCoreVersion!=='4f972875-8309-4814-9ed7-95c69b6124de')
+            throw Error('Unreviewed or wrong-worker BB63 recovery: stop before any live changes');
+          console.log('BB63 exact source and recovery scope confirmed');
+          EOF
+      - name: Install pinned dependencies and re-run focused + full Premium tests
+        run: |
+          npm ci
+          node --check scripts/bb63-resume-release.mjs
+          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs test/premium-current-client.test.mjs test/premium-current-sync-flow.test.mjs
+          node --test test/premium-*.test.mjs
+          python3 scripts/bb63-sqlite-contract.py
+      - name: Compile exactly 17 V62 modules — NO DEPLOY
+        run: |
+          node scripts/v62-package-preflight.mjs
+          npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Reconfirm live rollback, verified new Core version, actual V62 text MIME and D1 schema — read only
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-resume-release.mjs --check
+      - name: Activate tested existing Core version and corrected 17-module V62; rollback both if needed
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          BB63_REVIEW_COMMIT: ${{ github.event.before }}
+        run: node scripts/bb63-resume-release.mjs --publish
+      - name: Save only sanitized release evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-resumed-live-release-${{ github.sha }}
+          path: |
+            .talera-bb63-evidence/bb63-resume-release.json
+            .talera-v62-package/release-inventory.json
+          if-no-files-found: warn
+          retention-days: 60

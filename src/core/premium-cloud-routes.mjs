@@ -6,6 +6,7 @@ import {cloudAccess,canAcceptCloudConsent,cloudConsentDetails} from './premium-c
 import {storePremiumObject} from './premium-private-upload.mjs';
 import {privateRecordRoute} from './premium-private-records.mjs';
 import {premiumMultipartRoute} from './premium-multipart-media.mjs';
+import {premiumCurrentRoute} from './premium-current-route.mjs';
 const reply=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store'}});
 const denied=(reason)=>reply({ok:false,reason},reason==='login_required'?401:403);
 export async function premiumCloudRoute({request,env,sessionAccount,entitlement,pilotEnabled=false,writeAllowed=false}) {
@@ -28,6 +29,7 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   }
   const access=cloudAccess({sessionAccount,entitlement,consentRow,pilotEnabled});
   if (!access.allowed) return denied(access.reason);
+  if (path==='/api/premium/cloud/current') return premiumCurrentRoute({request,env,accountId,writeAllowed});
   if (path.startsWith('/api/premium/cloud/multipart/')) return premiumMultipartRoute({request,env,accountId,writeAllowed});
   if (path.startsWith('/api/premium/cloud/records')) return privateRecordRoute({request,env,accountId,writeAllowed});
   if (path==='/api/premium/cloud/media' && method==='GET') {

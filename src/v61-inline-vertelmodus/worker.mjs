@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-inline-vertelmodus-r4-video-posters-20261103';
+const BUILD='v61-inline-vertelmodus-r5-ios-native-fallback-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -454,7 +454,41 @@ async function taleraV61MakeVideoPreview(file){
     video.load();
   });
 }
-async function taleraV61KeepVideoPosters(group,row){
+async 
+function taleraV61AttachNativeCovers(){
+  // Visible native Safari video fallback. Original video stays under one media ID.
+  document.querySelectorAll('.tile[data-id]').forEach(tile=>{
+    const id=tile.dataset.id,file=assets.get(id);
+    if(!file||kind(file)!=='video'||previewBlobs.has(id)||tile.querySelector('video.talera-v61-native-cover'))return;
+    const v=document.createElement('video');
+    v.className='talera-v61-native-cover';
+    v.muted=true;v.defaultMuted=true;v.playsInline=true;v.preload='auto';v.controls=false;
+    v.setAttribute('muted','');v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.setAttribute('aria-hidden','true');
+    v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;opacity:0;z-index:1';
+    let pending=false;
+    const capture=async()=>{
+      if(pending||!v.isConnected||!assets.has(id)||previewBlobs.has(id)||v.readyState<2||!v.videoWidth||!v.videoHeight)return;
+      pending=true;v.style.opacity='1';v.pause();
+      try{
+        const image=await drawnPreview(v,v.videoWidth,v.videoHeight);
+        if(image?.size&&assets.has(id)&&!previewBlobs.has(id)){
+          previewBlobs.set(id,image);refreshPreview(id);
+          try{await writeFiles([['preview:'+id,image]])}catch(e){console.warn('TALERA videominiatuurcache',e)}
+        }
+      }catch(e){console.warn('TALERA video-frame niet beschikbaar',e)}
+      finally{pending=false}
+    };
+    v.addEventListener('loadedmetadata',()=>{
+      if(Number.isFinite(v.duration)&&v.duration>.2){try{v.currentTime=Math.min(.15,v.duration/3)}catch(e){}}
+      void v.play().then(()=>setTimeout(()=>{if(v.isConnected){v.pause();void capture()}},250)).catch(()=>{});
+    },{once:true});
+    for(const e of ['loadeddata','seeked','canplay','timeupdate'])v.addEventListener(e,()=>void capture());
+    v.addEventListener('error',()=>{v.remove();console.warn('TALERA: Safari kon de video niet voorvertonen')},{once:true});
+    tile.appendChild(v);v.src=originalUrl(id);v.load();
+  });
+}
+
+function taleraV61KeepVideoPosters(group,row){
   // Only a tiny JPEG sidecar. Video remains in the original TaleraMemories
   // item and is always loaded by its media ID in the player.
   const items=Array.isArray(row?.items)?row.items:[];
@@ -493,6 +527,25 @@ function patchTell(html){
   const call="const preview=kind(file)==='video'?await makeVideoPreview(file):await makePhotoPreview(file);if(!preview||!preview.size||!assets.has(id))return;previewBlobs.set(id,preview);refreshPreview(id)";
   if(!page.includes(call))return{html,changed:false,reason:'thumbnail-queue-upstream-changed'};
   page=page.replace(call,"const videoItem=kind(file)==='video';const preview=videoItem?await taleraV61MakeVideoPreview(file):await makePhotoPreview(file);if(!preview||!preview.size||!assets.has(id))return;previewBlobs.set(id,preview);refreshPreview(id);if(videoItem){try{await writeFiles([['preview:'+id,preview]])}catch(e){console.warn('TALERA videovoorbeeld niet bewaard',e)}}");
+
+  const tileStart=page.indexOf('function tileHtml(id,gid){');
+  const tileEnd=page.indexOf('\n/* V7 draft deletion.',tileStart);
+  if(tileStart<0||tileEnd<0)return{html,changed:false,reason:'video-tile-upstream-changed'};
+  const originalTile=page.slice(tileStart,tileEnd);
+  const newTile=originalTile.replace("const f=assets.get(id),k=kind(f);return","const f=assets.get(id),k=kind(f);if(k==='video'&&!previewBlobs.has(id))requestAnimationFrame(taleraV61AttachNativeCovers);return");
+  if(newTile===originalTile)return{html,changed:false,reason:'video-tile-hook-changed'};
+  page=page.slice(0,tileStart)+taleraV61AttachNativeCovers.toString()+'\n'+newTile+page.slice(tileEnd);
+  const thumbRefresh="if(img)img.src=src";
+  if(!page.includes(thumbRefresh))return{html,changed:false,reason:'video-refresh-hook-changed'};
+  page=page.replace(thumbRefresh,"if(img)img.src=src;const native=tile.querySelector('video.talera-v61-native-cover');if(native){native.pause();native.removeAttribute('src');native.remove()}");
+  const oldFrame="kind(f)==='video'?'<video src=\"'+escapeHtml(originalUrl(g.media[idx]))+'\" poster=\"'+escapeHtml(u)+'\" controls playsinline preload=\"none\"></video>'";
+  const newFrame="kind(f)==='video'?'<video src=\"'+escapeHtml(originalUrl(g.media[idx]))+'\" '+(previewBlobs.has(g.media[idx])?'poster=\"'+escapeHtml(u)+'\" ':'')+'controls playsinline preload=\"metadata\"></video>'";
+  if(!page.includes(oldFrame))return{html,changed:false,reason:'video-work-frame-changed'};
+  page=page.replace(oldFrame,newFrame);
+  // One active decoder at a time on iPhones; image loading remains untouched.
+  page=page.replace("while(activeThumbs<3&&waitingThumbs.length)","while(activeThumbs<1&&waitingThumbs.length)");
+  const css='<style id="talera-v61-native-video-cover-css">.tile{position:relative}.tile>.video{position:relative;z-index:3}.tile>video.talera-v61-native-cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:1}</style>';
+  page=page.replace('</head>',css+'</head>');
   // The old Player's postMessage bridge must not run without an iframe.
   page=page.replace("s.child.contentWindow){s.child.contentWindow.postMessage","s.child?.contentWindow){s.child.contentWindow.postMessage");
   const pub='async function publish(g){';

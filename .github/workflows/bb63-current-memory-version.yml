@@ -7,6 +7,12 @@ on:
       - 'src/core/premium-current-version.mjs'
       - 'src/core/premium-current-route.mjs'
       - 'src/core/premium-cloud-routes.mjs'
+      - 'src/core/premium-private-records.mjs'
+      - 'src/mijn-talera/premium-current-client.mjs'
+      - 'src/mijn-talera/premium-sync-coordinator.mjs'
+      - 'src/mijn-talera/premium-records-coordinator.mjs'
+      - 'src/mijn-talera/premium-records-bridge.mjs'
+      - 'src/mijn-talera/premium-sync-queue.mjs'
       - 'migrations/20261103_premium_current_version.sql'
       - 'test/premium-current-version.test.mjs'
       - 'test/premium-current-route.test.mjs'
@@ -27,8 +33,16 @@ jobs:
           node --check src/core/premium-current-version.mjs
           node --check src/core/premium-current-route.mjs
           node --check src/core/premium-cloud-routes.mjs
+          node --check src/core/premium-private-records.mjs
+          node --check src/mijn-talera/premium-current-client.mjs
+          node --check src/mijn-talera/premium-sync-coordinator.mjs
+          node --check src/mijn-talera/premium-records-coordinator.mjs
           node --check test/premium-current-version.test.mjs
           node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs
-      - name: Existing Premium restore safeguards must still pass
+      - name: Run full Premium automated regressions (no account or cloud access)
+        run: node --test test/premium-*.test.mjs
+      - name: Compile the existing V62 client and menu offline only
         run: |
-          node --test test/premium-cloud-restore-preview.test.mjs test/premium-cloud-restore-atomic.test.mjs
+          npm ci
+          node scripts/v62-package-preflight.mjs
+          npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out

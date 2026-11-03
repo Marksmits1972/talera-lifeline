@@ -49,7 +49,7 @@ function taleraInlineDispose(){
 }
 
 function taleraInlineSync(s){
-  if(!s||s!==taleraInline||runtime.currentMemory()?.id!==s.memory.id)return;
+  if(!s||s!==taleraInline||s.phase!=='narration'||runtime.currentMemory()?.id!==s.memory.id||!s.audio)return;
   const audioMs=Math.max(0,Math.round((Number(s.audio.currentTime)||0)*1000));
   let cue=null;
   for(const c of s.cues){if(c.t<=audioMs+15)cue=c;else break}
@@ -59,9 +59,7 @@ function taleraInlineSync(s){
     if(selected?.kind==='video'){
       void taleraInlineLoadVideo(s,selected,cue,audioMs);
     }else if(s.video){
-      s.video.pause();s.video.remove();s.video=null;
-      if(s.videoUrl){URL.revokeObjectURL(s.videoUrl);s.videoUrl=null}
-      s.videoKey='';
+      taleraInlineCleanVideo(s);
     }
   }
   const secs=Math.floor(audioMs/1000);
@@ -69,7 +67,7 @@ function taleraInlineSync(s){
 }
 
 async function taleraInlineLoadVideo(s,frame,cue,ms){
-  if(!s||s!==taleraInline)return;
+  if(!s||s!==taleraInline||s.phase!=='narration')return;
   if(s.videoKey!==frame.key){
     if(s.video){s.video.pause();s.video.remove();s.video=null}
     if(s.videoUrl){URL.revokeObjectURL(s.videoUrl);s.videoUrl=null}
@@ -201,45 +199,83 @@ function taleraInlineStartOrdinary(s){
 }
 
 function taleraInlineInstallAudioControls(){
-  // The same setting is created on My Life and on Presentation.
-  // Safari may need a real tap before playing unmuted audio.
   const canListen=()=>Boolean(window.__taleraAudioControls?.isEnabled?.());
   const playCurrent=(restart=false)=>{
     const s=taleraInline;
-    if(!s?.audio||!canListen()||!s.audio.paused||s._playPending)return;
-    if(s.audio.ended){
-      if(!restart)return;
-      try{s.audio.currentTime=0}catch(e){}
+    if(!s||!canListen())return;
+    if(s.audio){
+      // Re-enable listening: restart the recorded story and its photo cues.
+      if(s.phase!=='narration'||restart){
+        clearTimeout(s.ordinaryTimer);s.ordinaryTimer=null;
+        taleraInlineCleanVideo(s);
+        s.phase='narration';s.blockedByBrowser=false;
+        try{s.audio.currentTime=0}catch(e){}
+        if(s.frames.length)taleraInlineSetFrame(s,s.cues[0]?.index||0);
+        taleraInlineSync(s);
+      }
+      if(s.audio.paused&&!s._playPending){
+        s._playPending=true;
+        try{
+          Promise.resolve(s.audio.play()).then(()=>{
+            if(s===taleraInline){s.blockedByBrowser=false;if(s.hint){s.hint.remove();s.hint=null}}
+          }).catch(err=>{
+            if(s===taleraInline){
+              s.blockedByBrowser=err?.name==='NotAllowedError';
+              if(s.blockedByBrowser){
+                // Conditional guidance, not an extra per-memory player button.
+                if(!s.hint){
+                  const hint=document.createElement('div');
+                  hint.textContent='Tik op de foto om het geluid te starten';
+                  hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';
+                  (stage.parentElement||stage).appendChild(hint);s.hint=hint;
+                }
+              }
+            }
+          }).finally(()=>{s._playPending=false});
+        }catch(e){s._playPending=false}
+      }
+    }else if(s.video){
+      s.video.muted=false;
+      if(s.video.paused)void s.video.play().catch(()=>{});
     }
-    s._playPending=true;
-    try{
-      const promise=s.audio.play();
-      Promise.resolve(promise).catch(err=>{
-        if(s===taleraInline)s.blockedByBrowser=err?.name==='NotAllowedError';
-      }).finally(()=>{s._playPending=false});
-    }catch(e){s._playPending=false}
   };
   const stopCurrent=()=>{
-    const s=taleraInline;
-    if(s?.audio&&!s.audio.paused)s.audio.pause();
-    if(s?.video&&!s.video.paused)s.video.pause();
+    const s=taleraInline;if(!s)return;
+    s.blockedByBrowser=false;
+    if(s.hint){s.hint.remove();s.hint=null}
+    if(s.audio)taleraInlineStartOrdinary(s);
+    else if(s.video)s.video.muted=true;
   };
   window.__taleraInlineTryAutoPlay=playCurrent;
   window.__taleraInlineStopAudio=stopCurrent;
-  // Do not introduce another player button: a tap on the photograph itself
-  // can unlock native Safari audio after autoplay was denied.
+  // Safari blocks unmuted playback before a real gesture. The photograph
+  // itself unlocks audio; no additional permanent listen button.
   const retryOnPhotoGesture=e=>{
-    if(!taleraInline?.audio||!canListen()||!taleraInline.audio.paused)return;
+    const s=taleraInline;if(!s||!canListen())return;
     if(e.target?.closest?.('button,a,input,select,textarea,[role="button"],.talera-share-shell'))return;
-    playCurrent();
+    if(s.phase==='narration'&&s.audio?.paused)playCurrent(false);
+    else if((s.phase==='originals'||s.phase==='ordinary')&&s.video?.paused){
+      s.video.muted=false;
+      void s.video.play().then(()=>{s.blockedByBrowser=false;if(s.hint){s.hint.remove();s.hint=null}}).catch(()=>{});
+    }
   };
   document.addEventListener('pointerup',retryOnPhotoGesture,{passive:true});
   document.addEventListener('touchend',retryOnPhotoGesture,{passive:true});
   window.addEventListener('storage',e=>{
     if(e.key!=='talera-v61-listening-enabled')return;
-    if(canListen())playCurrent();else stopCurrent();
+    if(canListen())playCurrent(true);else stopCurrent();
+  });
+  document.addEventListener('visibilitychange',()=>{
+    const s=taleraInline;if(!s)return;
+    if(document.hidden){
+      if(s.audio&&!s.audio.paused)s.audio.pause();
+      if(s.video&&!s.video.paused)s.video.pause();
+      clearTimeout(s.ordinaryTimer);
+    }else if(s.phase==='ordinary'){taleraInlineOrdinaryStep(s,s.ordinaryIndex)}
+    else if(canListen())playCurrent(false);
   });
 }
+
 
 async function present(memory){
   if(!stage||!memory)return;
@@ -469,8 +505,11 @@ function patchPresent(html){
   const v=block.indexOf('function activate(memory){',q);
   if(p<0||q<0||v<0||!block.includes("frame.src='/vertelmodus-embed?mode=present'"))return{html,changed:false,reason:'upstream-changed'};
   const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),taleraInlineCleanVideo.toString(),taleraInlineSetFrame.toString(),taleraInlinePlayMedia.toString(),taleraInlineReplayNext.toString(),taleraInlineVoiceEnded.toString(),taleraInlineOrdinaryStep.toString(),taleraInlineStartOrdinary.toString(),taleraInlineInstallAudioControls.toString(),present.toString(),'taleraInlineInstallAudioControls();'].join('\n');
-  block=block.slice(0,p)+injected+'\n '+showSimpleVideo.toString()+'\n '+block.slice(v);
+  block=block.slice(0,p)+injected+'\n '+block.slice(v);
   block=block.replace('function disposePresentation(){','function disposePresentation(){\n taleraInlineDispose();');
+  const oldActivate="   const hasVoice=memory._zeroItems.some(x=>x.kind==='audio');\n   if(hasVoice){\n     void present(memory);\n     return;\n   }\n   if(currentPresentation)disposePresentation();\n   const selected=memory._zeroFrames?.[memory._photoIndex||0];\n   if(selected?.kind==='video'){void showSimpleVideo(memory,selected);return}\n   if(localVideo){localVideo.pause();localVideo.remove();localVideo=null}";
+  if(!block.includes(oldActivate))return{html,changed:false,reason:'activation-upstream-changed'};
+  block=block.replace(oldActivate,"   void present(memory);");
   // A video is still one original media item. A tiny still image is a
   // rendition associated with that item's ID, in the SAME TaleraMemories
   // IndexedDB files store (the :phone-v1 key is already used for renditions).

@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-vertelcyclus-r7-media-id-two-engines-20261103';
+const BUILD='v61-vertelcyclus-r8-audible-voice-smooth-video-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -14,8 +14,17 @@ const GLOBAL_AUDIO_PREF_SCRIPT = String.raw`<script id="talera-v61-listening-pre
 (()=>{
   if(window.__taleraAudioControls?.isEnabled)return;
   const KEY='talera-v61-listening-enabled';
-  const read=()=>{try{return localStorage.getItem(KEY)==='on'}catch(e){return false}};
-  const write=on=>{try{localStorage.setItem(KEY,on?'on':'off')}catch(e){}};
+  // R7 silently defaulted audio OFF. On this staging environment we reset
+  // that faulty initial state ON once. After R8, an intentional OFF stays OFF.
+  const REV='talera-v61-listening-intent-r8';
+  const read=()=>{try{
+    const explicit=localStorage.getItem(REV);
+    return explicit==='off'?false:true;
+  }catch(e){return true}};
+  const write=on=>{try{
+    localStorage.setItem(REV,on?'on':'off');
+    localStorage.setItem(KEY,on?'on':'off');
+  }catch(e){}};
   const controls={
     isEnabled:read,
     enable(){write(true);window.__taleraInlineTryAutoPlay?.(true)},
@@ -68,42 +77,77 @@ function taleraInlineSync(s){
 
 async function taleraInlineLoadVideo(s,frame,cue,ms){
   if(!s||s!==taleraInline||s.phase!=='narration')return;
+  const targetAt=voiceMs=>{
+    const offset=Math.max(0,(Number(cue.videoAtMs)||0));
+    return Math.max(0,(offset+Math.max(0,voiceMs-cue.t))/1000);
+  };
+  const tryMutedPlay=video=>{
+    if(s!==taleraInline||s.video!==video||s.phase!=='narration')return;
+    if(s.audio?.paused||s.audio?.ended){if(!video.paused)video.pause();return}
+    if(video.ended||!video.paused||s.videoPlayPending||video.seeking)return;
+    s.videoPlayPending=true;
+    try{
+      Promise.resolve(video.play()).catch(e=>{
+        if(e?.name!=='AbortError')console.warn('TALERA gedempte video nog niet klaar',e);
+      }).finally(()=>{s.videoPlayPending=false});
+    }catch(e){s.videoPlayPending=false}
+  };
   if(s.videoKey!==frame.key){
-    if(s.video){s.video.pause();s.video.remove();s.video=null}
-    if(s.videoUrl){URL.revokeObjectURL(s.videoUrl);s.videoUrl=null}
-    s.videoKey=frame.key;
+    taleraInlineCleanVideo(s);
+    const serial=s.videoSerial;
     const video=document.createElement('video');
     video.className='talera-v61-inline-video';
-    video.setAttribute('playsinline','');video.playsInline=true;
+    video.setAttribute('playsinline','');video.setAttribute('webkit-playsinline','');
+    video.playsInline=true;video.preload='auto';
     video.muted=true;video.defaultMuted=true;video.controls=false;
     video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';
-    (stage.parentElement||stage).appendChild(video);s.video=video;
+    (stage.parentElement||stage).appendChild(video);s.video=video;s.videoKey=frame.key;
+    // Seek once, on metadata, to the current audio position. Seeking every
+    // 90ms during decode used to cause repeated iPhone freezes/stuttering.
+    video.onloadedmetadata=()=>{
+      if(s!==taleraInline||s.video!==video||s.videoSerial!==serial)return;
+      const audioMs=Math.max(0,(Number(s.audio?.currentTime)||0)*1000);
+      const wanted=targetAt(audioMs);
+      const limit=Number.isFinite(video.duration)&&video.duration>0
+        ?Math.max(0,video.duration-.05):wanted;
+      if(wanted>.15){
+        try{video.currentTime=Math.min(wanted,limit)}catch(e){}
+      }
+      tryMutedPlay(video);
+    };
+    video.onseeked=()=>tryMutedPlay(video);
+    video.oncanplay=()=>tryMutedPlay(video);
     try{
       const url=await store.mediaUrl(frame.key);
-      if(s!==taleraInline||s.video!==video||s.videoKey!==frame.key){
+      if(s!==taleraInline||s.video!==video||s.videoSerial!==serial){
         if(url)URL.revokeObjectURL(url);
         video.remove();return;
       }
-      if(!url)throw Error('Videobestand ontbreekt');
+      if(!url)throw Error('Originele video ontbreekt');
       s.videoUrl=url;video.src=url;
-    }catch(error){
-      if(s.video===video){video.remove();s.video=null;s.videoKey=''}
-      console.warn('TALERA inline-video niet geladen',error);
-      return;
+      video.load();
+    }catch(e){
+      if(s===taleraInline&&s.video===video)taleraInlineCleanVideo(s);
+      console.warn('TALERA originele video kon niet geladen worden',e);
+    }
+    return;
+  }
+  const video=s.video;
+  if(!video||s!==taleraInline)return;
+  if(s.audio?.paused||s.audio?.ended){if(!video.paused)video.pause();return}
+  // Correct only substantial, sustained drift. Do not fight iOS buffering.
+  if(video.readyState>=2&&!video.seeking&&!video.ended){
+    const target=targetAt(ms),duration=video.duration;
+    const bounded=Number.isFinite(duration)&&duration>0
+      ?Math.min(target,Math.max(0,duration-.05)):target;
+    if(Math.abs((video.currentTime||0)-bounded)>2.25
+       &&ms-(s.videoLastCorrectionAt||0)>2200){
+      s.videoLastCorrectionAt=ms;
+      try{video.currentTime=bounded}catch(e){}
     }
   }
-  const video=s.video;if(!video||s!==taleraInline)return;
-  const target=Math.max(0,((Number(cue.videoAtMs)||0)+(ms-cue.t))/1000);
-  if(video.readyState>=1){
-    const limit=Number.isFinite(video.duration)&&video.duration>0?Math.max(0,video.duration-.05):target;
-    if(Math.abs(video.currentTime-Math.min(limit,target))>.35){
-      try{video.currentTime=Math.min(limit,target)}catch(e){}
-    }
-  }
-  if(s.audio.paused||s.audio.ended){if(!video.paused)video.pause()}
-  else if(video.paused&&!video.ended)void video.play().catch(()=>{});
+  tryMutedPlay(video);
 }
-
 
 function taleraInlineCleanVideo(s){
   s.videoSerial=(s.videoSerial||0)+1;
@@ -112,7 +156,8 @@ function taleraInlineCleanVideo(s){
     s.video.pause();s.video.removeAttribute('src');s.video.remove();s.video=null;
   }
   if(s.videoUrl){URL.revokeObjectURL(s.videoUrl);s.videoUrl=null}
-  s.videoKey='';
+  s.videoKey='';s.videoPlayPending=false;
+  s.videoLastCorrectionAt=-Infinity;
 }
 function taleraInlineSetFrame(s,index){
   if(s!==taleraInline||runtime.currentMemory()?.id!==s.memory.id||index<0||index>=s.frames.length)return;

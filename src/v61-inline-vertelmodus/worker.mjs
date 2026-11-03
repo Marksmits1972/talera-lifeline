@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-inline-vertelmodus-r3-audio-share-20261103';
+const BUILD='v61-inline-vertelmodus-r4-video-posters-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -385,6 +385,86 @@ function removeEditorShareBeforePublish(html){
   return {html:out,changed:true};
 }
 
+
+/**
+ * Capture one lightweight still from the original video with no duplicate
+ * video file, no external upload and no new data store.
+ * On iOS Safari a muted playing <video> often decodes reliably when a
+ * detached, preload-only <video> does not.
+ */
+async function taleraV61MakeVideoPreview(file){
+  if(!file||!file.size)return null;
+  const objectUrl=URL.createObjectURL(file);
+  const video=document.createElement('video');
+  video.muted=true;
+  video.defaultMuted=true;
+  video.autoplay=true;
+  video.playsInline=true;
+  video.preload='auto';
+  video.setAttribute('muted','');
+  video.setAttribute('autoplay','');
+  video.setAttribute('playsinline','');
+  video.style.cssText='position:fixed;left:-10px;top:-10px;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1';
+  return new Promise(resolve=>{
+    let settled=false,drawing=false;
+    const timer=setTimeout(()=>finish(null),12000);
+    function finish(image){
+      if(settled)return;
+      settled=true;clearTimeout(timer);
+      video.onloadedmetadata=video.onloadeddata=video.onseeked=video.oncanplay=video.ontimeupdate=video.onerror=null;
+      video.pause();video.removeAttribute('src');video.remove();
+      try{video.load()}catch(e){}
+      URL.revokeObjectURL(objectUrl);
+      resolve(image instanceof Blob&&image.size?image:null);
+    }
+    async function paint(){
+      if(settled||drawing||video.readyState<2||!video.videoWidth||!video.videoHeight)return;
+      drawing=true;
+      try{
+        const image=await drawnPreview(video,video.videoWidth,video.videoHeight);
+        if(image?.size)finish(image);
+        else drawing=false;
+      }catch(e){drawing=false}
+    }
+    video.onloadedmetadata=()=>{
+      if(Number.isFinite(video.duration)&&video.duration>.15){
+        try{video.currentTime=Math.min(.15,video.duration/3)}catch(e){}
+      }
+      void video.play().catch(()=>{});
+      if(typeof video.requestVideoFrameCallback==='function'){
+        try{video.requestVideoFrameCallback(()=>void paint())}catch(e){}
+      }
+    };
+    video.onloadeddata=()=>void paint();
+    video.onseeked=()=>void paint();
+    video.oncanplay=()=>void paint();
+    video.ontimeupdate=()=>void paint();
+    video.onerror=()=>finish(null);
+    document.body.appendChild(video);
+    video.src=objectUrl;
+    video.load();
+  });
+}
+async function taleraV61KeepVideoPosters(group,row){
+  // Only a tiny JPEG sidecar. Video remains in the original TaleraMemories
+  // item and is always loaded by its media ID in the player.
+  const items=Array.isArray(row?.items)?row.items:[];
+  const images=[];
+  for(let i=0;i<(group?.media||[]).length;i++){
+    const id=group.media[i],item=items[i],file=assets.get(id),poster=previewBlobs.get(id);
+    if(item?.kind==='video'&&item.key&&kind(file)==='video'&&poster instanceof Blob&&poster.size&&poster.type.startsWith('image/')){
+      images.push({key:item.key+':phone-v1',blob:poster});
+    }
+  }
+  if(!images.length)return;
+  const db=await dbOpen();
+  try{
+    const tx=db.transaction('files','readwrite'),finished=done(tx),store=tx.objectStore('files');
+    for(const image of images)store.put(image);
+    await finished;
+  }finally{db.close()}
+}
+
 function patchTell(html){
   const a=html.indexOf('function openZeroPlayer(g){');
   if(a<0)return{html,changed:false,reason:'no-tell'};
@@ -396,7 +476,24 @@ function patchTell(html){
   if(!patched.includes('taleraV61RecControls'))return{html,changed:false,reason:'patch-incomplete'};
   const withoutPrematureShare=removeEditorShareBeforePublish(patched);
   if(!withoutPrematureShare.changed)return{html,changed:false,reason:'share-source-changed'};
-  return{html:withoutPrematureShare.html.replace('</head>',RECORD_CSS+'</head>'),changed:true,reason:'inline-recording-no-editor-share'};
+  let page=withoutPrematureShare.html;
+  const oldThumbFn='async function makeVideoPreview(file){';
+  const start=page.indexOf(oldThumbFn),end=page.indexOf('let activeThumbs=0;',start);
+  if(start<0||end<0)return{html,changed:false,reason:'thumbnail-upstream-changed'};
+  page=page.slice(0,start)+taleraV61MakeVideoPreview.toString()+'\\n'+page.slice(end);
+  const call="const preview=kind(file)==='video'?await makeVideoPreview(file):await makePhotoPreview(file);if(!preview||!preview.size||!assets.has(id))return;previewBlobs.set(id,preview);refreshPreview(id)";
+  if(!page.includes(call))return{html,changed:false,reason:'thumbnail-queue-upstream-changed'};
+  page=page.replace(call,"const videoItem=kind(file)==='video';const preview=videoItem?await taleraV61MakeVideoPreview(file):await makePhotoPreview(file);if(!preview||!preview.size||!assets.has(id))return;previewBlobs.set(id,preview);refreshPreview(id);if(videoItem){try{await writeFiles([['preview:'+id,preview]])}catch(e){console.warn('TALERA videovoorbeeld niet bewaard',e)}}");
+  // The old Player's postMessage bridge must not run without an iframe.
+  page=page.replace("s.child.contentWindow){s.child.contentWindow.postMessage","s.child?.contentWindow){s.child.contentWindow.postMessage");
+  const pub='async function publish(g){';
+  if(!page.includes(pub))return{html,changed:false,reason:'publish-upstream-changed'};
+  page=page.replace(pub,taleraV61KeepVideoPosters.toString()+'\\n'+pub);
+  const cleanup="const remove=[...g.media,...(g.voice?[g.voice]:[])];";
+  if(!page.includes(cleanup))return{html,changed:false,reason:'publish-cleanup-upstream-changed'};
+  page=page.replace(cleanup,"try{await taleraV61KeepVideoPosters(g,persisted)}catch(e){console.warn('TALERA videovoorbeeld later herstellen',e)}"+cleanup);
+  // This script is owned by the original editor; keep its stores and media IDs.
+  return{html:page.replace('</head>',RECORD_CSS+'</head>'),changed:true,reason:'inline-recording-video-posters-one-store'};
 }
 
 export default {

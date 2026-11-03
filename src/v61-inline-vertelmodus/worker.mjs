@@ -363,6 +363,15 @@ function patchPresent(html){
   const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),taleraInlineInstallAudioControls.toString(),'taleraInlineInstallAudioControls();',present.toString()].join('\n');
   block=block.slice(0,p)+injected+'\n '+showSimpleVideo.toString()+'\n '+block.slice(v);
   block=block.replace('function disposePresentation(){','function disposePresentation(){\n taleraInlineDispose();');
+  // A video is still one original media item. A tiny still image is a
+  // rendition associated with that item's ID, in the SAME TaleraMemories
+  // IndexedDB files store (the :phone-v1 key is already used for renditions).
+  const photoRead="if(item.kind==='photo'){\n           try{url=await (store.displayUrl?store.displayUrl(item.key):store.mediaUrl(item.key))}catch(e){}\n         }";
+  if(!block.includes(photoRead))return{html,changed:false,reason:'video-poster-hydrate-upstream-changed'};
+  block=block.replace(photoRead,photoRead+"\n         if(item.kind==='video'){\n           try{const poster=await store.blob(item.key+':phone-v1');if(poster instanceof Blob&&poster.size&&String(poster.type).startsWith('image/'))url=URL.createObjectURL(poster)}catch(e){}\n         }");
+  const oldCover="photos.push(item.kind==='video'?videoPoster:(url||placeholder));";
+  if(!block.includes(oldCover))return{html,changed:false,reason:'video-poster-cover-upstream-changed'};
+  block=block.replace(oldCover,"photos.push(item.kind==='video'?(url||videoPoster):(url||placeholder));");
   block=block.replace('if(localVideo)locate(localVideo);','if(localVideo&&localVideo.parentElement!==stage)locate(localVideo);');
   if(block.includes("frame.src='/vertelmodus-embed?mode=present'")||!block.includes('taleraInlineSync'))return{html,changed:false,reason:'patch-incomplete'};
   return {html:html.slice(0,begin)+block+html.slice(end),changed:true,reason:'inline-presentation'};
@@ -480,7 +489,7 @@ function patchTell(html){
   const oldThumbFn='async function makeVideoPreview(file){';
   const start=page.indexOf(oldThumbFn),end=page.indexOf('let activeThumbs=0;',start);
   if(start<0||end<0)return{html,changed:false,reason:'thumbnail-upstream-changed'};
-  page=page.slice(0,start)+taleraV61MakeVideoPreview.toString()+'\\n'+page.slice(end);
+  page=page.slice(0,start)+taleraV61MakeVideoPreview.toString()+'\n'+page.slice(end);
   const call="const preview=kind(file)==='video'?await makeVideoPreview(file):await makePhotoPreview(file);if(!preview||!preview.size||!assets.has(id))return;previewBlobs.set(id,preview);refreshPreview(id)";
   if(!page.includes(call))return{html,changed:false,reason:'thumbnail-queue-upstream-changed'};
   page=page.replace(call,"const videoItem=kind(file)==='video';const preview=videoItem?await taleraV61MakeVideoPreview(file):await makePhotoPreview(file);if(!preview||!preview.size||!assets.has(id))return;previewBlobs.set(id,preview);refreshPreview(id);if(videoItem){try{await writeFiles([['preview:'+id,preview]])}catch(e){console.warn('TALERA videovoorbeeld niet bewaard',e)}}");
@@ -488,7 +497,7 @@ function patchTell(html){
   page=page.replace("s.child.contentWindow){s.child.contentWindow.postMessage","s.child?.contentWindow){s.child.contentWindow.postMessage");
   const pub='async function publish(g){';
   if(!page.includes(pub))return{html,changed:false,reason:'publish-upstream-changed'};
-  page=page.replace(pub,taleraV61KeepVideoPosters.toString()+'\\n'+pub);
+  page=page.replace(pub,taleraV61KeepVideoPosters.toString()+'\n'+pub);
   const cleanup="const remove=[...g.media,...(g.voice?[g.voice]:[])];";
   if(!page.includes(cleanup))return{html,changed:false,reason:'publish-cleanup-upstream-changed'};
   page=page.replace(cleanup,"try{await taleraV61KeepVideoPosters(g,persisted)}catch(e){console.warn('TALERA videovoorbeeld later herstellen',e)}"+cleanup);

@@ -47,7 +47,7 @@ export async function createPremiumRecordSnapshot(source,{crypto}={}){
  const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',data));
  const uuid=[...digest.slice(0,16)];uuid[6]=(uuid[6]&15)|64;uuid[8]=(uuid[8]&63)|128;
  const hex=idHex(uuid),id=[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
- return {id,kind:source.kind,bytes:data,sha256:idHex(digest)};
+ return {id,kind:source.kind,sourceKey:source.sourceKey,bytes:data,sha256:idHex(digest)};
 }
 export async function uploadPremiumRecord({snapshot,fetcher=fetch}={}){
  const url='/api/premium/cloud/records/'+snapshot.kind+'/'+snapshot.id;

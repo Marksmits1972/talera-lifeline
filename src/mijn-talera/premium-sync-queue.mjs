@@ -16,7 +16,7 @@ export async function syncPremiumPending({listPending,readMedia,markSynced,uploa
    const data=await readMedia(item);
    if(!data) {failed++;continue}
    const result=await upload(item,data);
-   if(result?.ok && ['stored','already_stored'].includes(result.reason)){
+   if(result?.ok && ['stored','already_stored','current_created','current_updated','already_current'].includes(result.reason)){
     await markSynced(item);uploaded++;
    }else failed++;
   }catch{failed++}

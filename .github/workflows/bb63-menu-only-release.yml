@@ -1,0 +1,73 @@
+name: BB63 one-time menu-only V62 diagnosis release
+on:
+  push:
+    branches:
+      - feature/bb63-101-readonly-origin-diagnostics-20261103
+    paths:
+      - 'releases/bb63-origin-diagnosis-20261103.json'
+permissions:
+  contents: read
+concurrency:
+  group: talera-v62-production-content-release
+  cancel-in-progress: false
+jobs:
+  menu-only-release:
+    if: ${{ github.repository == 'Marksmits1972/talera-lifeline' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: talera-v62-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm single reviewed marker commit, immutable release scope and only menu runtime change
+        run: |
+          node --input-type=module <<'EOF'
+          import {readFileSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const marker=JSON.parse(readFileSync('releases/bb63-origin-diagnosis-20261103.json','utf8'));
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();
+          const parent=git('rev-parse','HEAD^');
+          const diff=git('diff-tree','--no-commit-id','--name-only','-r','HEAD');
+          const old='41071641ca1edc02a9aa396cb9cb9a78fdfba0ed';
+          const runtime=git('diff','--name-only',old,'HEAD','--','src/mijn-talera');
+          if(marker.action!=='publish-menu-diagnostics-only'||
+             marker.target!=='talera-pwa-v62-mijn-profiel-20261101'||
+             marker.canonicalSourceCommit!==old||
+             marker.reviewedBaseCommit!==parent||
+             diff!=='releases/bb63-origin-diagnosis-20261103.json'||
+             runtime!=='src/mijn-talera/menu-integration.txt')
+            throw Error('Not an immutable menu-only review release commit');
+          EOF
+      - name: Install locked development tools
+        run: npm ci
+      - name: Syntax check and 24 read-only/Premium guard tests
+        run: |
+          node --check scripts/bb63-menu-only-release.mjs
+          node --check --input-type=commonjs < src/mijn-talera/menu-integration.txt
+          node --test test/bb63-origin-diagnostics.test.mjs test/premium-sync-audit.test.mjs test/premium-cloud-integrity.test.mjs
+      - name: Build exactly 16 unchanged Worker modules except review menu (no deployment)
+        run: node scripts/v62-package-preflight.mjs
+      - name: Compile reviewed bundle without deploying
+        run: npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Read-only verify pinned live deployment, V56_BASE and all 16 immutable part hashes
+        env:
+          TALERA_V62_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-menu-only-release.mjs --check
+      - name: Update only V62 menu and verify byte-identical remaining parts, else rollback
+        env:
+          TALERA_V62_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-menu-only-release.mjs --publish
+      - name: Save sanitized release result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-bb63-menu-only-release-${{ github.sha }}
+          path: |
+            .talera-v62-package/bb63-menu-release-result.json
+            .talera-v62-package/release-inventory.json
+          if-no-files-found: warn
+          retention-days: 60

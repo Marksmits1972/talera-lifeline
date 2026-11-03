@@ -5,8 +5,11 @@ on:
       - feature/bb63-current-memory-version-20261103
     paths:
       - 'src/core/premium-current-version.mjs'
+      - 'src/core/premium-current-route.mjs'
+      - 'src/core/premium-cloud-routes.mjs'
       - 'migrations/20261103_premium_current_version.sql'
       - 'test/premium-current-version.test.mjs'
+      - 'test/premium-current-route.test.mjs'
       - '.github/workflows/bb63-current-memory-version.yml'
 permissions:
   contents: read
@@ -22,8 +25,10 @@ jobs:
       - name: Static syntax and targeted current-memory tests (no cloud access)
         run: |
           node --check src/core/premium-current-version.mjs
+          node --check src/core/premium-current-route.mjs
+          node --check src/core/premium-cloud-routes.mjs
           node --check test/premium-current-version.test.mjs
-          node --test test/premium-current-version.test.mjs
+          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs
       - name: Existing Premium restore safeguards must still pass
         run: |
           node --test test/premium-cloud-restore-preview.test.mjs test/premium-cloud-restore-atomic.test.mjs

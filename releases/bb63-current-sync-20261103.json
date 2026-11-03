@@ -1,13 +1,15 @@
 {
-  "action": "precheck-only",
+  "action": "publish-bb63-current-sync-v1",
   "coreTarget": "talera-clean-core-staging-20261030",
   "v62Target": "talera-pwa-v62-mijn-profiel-20261101",
   "canonicalBase": "f93a1109ded45a57b050320364a97c423ea15b91",
-  "reviewedBaseCommit": null,
+  "reviewedBaseCommit": "dfe3f2b699c98760dfdf0324fdc5807134881c85",
   "migration": "20261103_premium_current_version.sql",
   "noUserDataReads": true,
   "noAutomaticDataReset": true,
-  "releaseFlag": "not_authorized",
+  "releaseFlag": "reviewed_and_authorized",
   "verifiedExistingCoreVersion": "ef484758-391d-4875-999f-34f1a4b78a93",
-  "verifiedExistingV62Version": "31b38681-ca28-4b12-bde6-22a446ce1337"
+  "verifiedExistingV62Version": "31b38681-ca28-4b12-bde6-22a446ce1337",
+  "reviewedTestRun": 41606075550,
+  "releaseScope": "existing Clean Core + existing V62 only; additive current table; no legacy migration"
 }

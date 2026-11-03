@@ -1,0 +1,15 @@
+{
+  "action": "publish-menu-diagnostics-only",
+  "target": "talera-pwa-v62-mijn-profiel-20261101",
+  "canonicalSourceCommit": "41071641ca1edc02a9aa396cb9cb9a78fdfba0ed",
+  "reviewedBaseCommit": "f77d4d9d006ff1915e0022c86ab536de7bf19a27",
+  "expectedDeploymentId": "f26d3f99-e417-447d-b94f-e6a1d5efc7f7",
+  "expectedVersionId": "baf562ac-bcc4-4e6c-8766-e3991bb9a064",
+  "scope": "ONLY menu-integration.txt; preserve the existing worker.mjs, 14 other source assets and exact V56_BASE binding",
+  "diagnosticsOnly": true,
+  "noPersonalDataReads": true,
+  "noDatabaseWrites": true,
+  "noBackgroundUploadInDiagnosticMode": true,
+  "rollbackOnFailedPostflight": true,
+  "reviewedTestRun": 41592178378
+}

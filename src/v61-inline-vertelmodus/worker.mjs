@@ -104,7 +104,7 @@ async function present(memory){
   button.style.cssText='width:42px;height:42px;border:0;border-radius:50%;background:#173d52;color:white;font:700 17px system-ui;cursor:pointer;touch-action:manipulation';
   const label=document.createElement('span');label.textContent='Luister';label.style.cssText='font:650 13px system-ui';
   const clock=document.createElement('span');clock.textContent='00:00';clock.style.cssText='font:500 12px system-ui;min-width:36px;font-variant-numeric:tabular-nums';
-  panel.append(button,label,clock);stage.appendChild(panel);
+  panel.append(button,label,clock);(stage.parentElement||stage).appendChild(panel);
   const frames=memory._zeroFrames||[];
   const cues=(memory._taleraNarrationCues||[]).filter(c=>Number.isFinite(Number(c.t))&&Number.isInteger(c.index)&&c.index>=0&&c.index<frames.length).map(c=>({t:Math.max(0,Number(c.t)),index:c.index,videoAtMs:Math.max(0,Number(c.videoAtMs)||0)})).sort((a,b)=>a.t-b.t);
   const s={memory,frames,cues,audio,voiceUrl,panel,button,label,clock,timer:null,video:null,videoKey:'',videoUrl:null};
@@ -140,7 +140,7 @@ async function showSimpleVideo(memory,frameData){
   element.dataset.key=id;element.setAttribute('playsinline','');
   element.playsInline=true;element.controls=true;element.preload='metadata';
   element.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:12;object-fit:cover;background:#183347';
-  stage.appendChild(element);localVideo=element;
+  (stage.parentElement||stage).appendChild(element);localVideo=element;
   try{
     const url=await store.mediaUrl(frameData.key);
     if(localVideo!==element||runtime.currentMemory()?.id!==memory.id){if(url)URL.revokeObjectURL(url);element.remove();return}
@@ -268,7 +268,7 @@ function openZeroPlayer(g){
       status.textContent='Opname hervat.';videoAdjust();
     }
   };
-  stop.onclick=()=>{if(s.recorder&&s.recorder.state!=='inactive'){stop.disabled=true;s.recorder.stop();status.textContent='Opname afronden…'}};
+  stop.onclick=()=>{if(s.recorder&&s.recorder.state!=='inactive'){s.saving=true;stop.disabled=true;s.recorder.stop();status.textContent='Opname afronden…'}};
   videoAdjust();
 }
 

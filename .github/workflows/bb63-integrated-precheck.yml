@@ -5,6 +5,7 @@ on:
       - feature/bb63-current-memory-version-20261103
     paths:
       - 'scripts/bb63-integrated-release.mjs'
+      - 'releases/bb63-current-sync-20261103.json'
       - '.github/workflows/bb63-integrated-precheck.yml'
   workflow_dispatch:
 permissions:

@@ -83,12 +83,14 @@ async function verifyLive(){
     readFileSync('.talera-v62-package/'+name);
   assert(sha(bytes)===sha(old),'live_part_changed_'+name);
  }
- return {form,running};
+ return {form,running,binding:binds[0]};
 }
 async function postflight(previous){
  const [settings,history,response]=await Promise.all([json('/settings'),json('/deployments'),request('/content/v2')]);
  const binds=settings?.bindings||[];
- assert(binds.length===1&&binds[0]?.name==='V56_BASE'&&binds[0]?.type==='service','binding_changed_after_release');
+ assert(binds.length===1&&binds[0]?.name==='V56_BASE'&&binds[0]?.type==='service'&&
+  binds[0].service===previous.binding.service&&
+  binds[0].environment===previous.binding.environment,'binding_changed_after_release');
  const now=active(deployments(history));
  assert(now.version!==previous.running.version&&now.deployment!==previous.running.deployment,'new_deployment_not_active');
  const form=await response.formData();

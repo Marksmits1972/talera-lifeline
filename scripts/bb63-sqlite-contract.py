@@ -10,12 +10,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 DB = sqlite3.connect(":memory:")
 DB.execute("PRAGMA foreign_keys=ON")
 DB.execute("CREATE TABLE accounts (id TEXT PRIMARY KEY)")
-DB.execute("CREATE TABLE talera_premium_uploads (account_id TEXT, media_id TEXT)")
 for acc in ("account_a", "account_b"):
     DB.execute("INSERT INTO accounts(id) VALUES(?)", (acc,))
 for file in (
     "20261102_premium_private_media.sql",
     "20261102_premium_private_records.sql",
+    "20261102_premium_multipart_media.sql",
     "20261102_premium_media_source_key.sql",
     "20261103_premium_current_version.sql",
 ):

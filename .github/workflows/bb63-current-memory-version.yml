@@ -19,6 +19,9 @@ on:
       - 'test/premium-current-client.test.mjs'
       - 'test/premium-current-sync-flow.test.mjs'
       - 'src/mijn-talera/menu-integration.txt'
+      - 'src/mijn-talera/worker.js'
+      - 'scripts/v62-package-preflight.mjs'
+      - 'scripts/bb63-sqlite-contract.py'
       - '.github/workflows/bb63-current-memory-version.yml'
 permissions:
   contents: read
@@ -44,10 +47,29 @@ jobs:
           node --check src/mijn-talera/premium-records-coordinator.mjs
           node --check test/premium-current-version.test.mjs
           node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs test/premium-current-client.test.mjs test/premium-current-sync-flow.test.mjs
+      - name: Apply actual BB63 D1 migrations in memory and prove current-only SQL
+        run: python3 scripts/bb63-sqlite-contract.py
       - name: Run full Premium automated regressions (no account or cloud access)
         run: node --test test/premium-*.test.mjs
       - name: Compile the existing V62 client and menu offline only
         run: |
           npm ci
           node scripts/v62-package-preflight.mjs
+          node --input-type=module <<'EOF'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          const base='.talera-v62-package/';
+          const manifest=JSON.parse(readFileSync(base+'release-inventory.json','utf8'));
+          const part=manifest.modules.find(m=>m.module==='premium-current-client.txt');
+          assert.equal(manifest.moduleCount,17,'BB63 must bundle precisely 17 V62 modules');
+          assert.ok(part,'current-version browser module must be embedded in Worker');
+          const content=readFileSync(base+part.module);
+          const upstream=readFileSync('src/mijn-talera/premium-current-client.mjs');
+          assert.equal(createHash('sha256').update(content).digest('hex'),part.sha256);
+          assert.equal(content.toString(),upstream.toString(),'current browser module source must exactly match reviewed original');
+          const worker=readFileSync(base+'worker.js','utf8');
+          assert.match(worker,/"\\/\\__clean\\/premium-current-client\\.mjs":currentClientSource/);
+          console.log('BB63 browser module route and 17-part immutable package: PASS');
+          EOF
           npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out

@@ -1,0 +1,82 @@
+name: BB63 gated existing Clean Core + V62 current-version release
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'releases/bb63-current-sync-20261103.json'
+permissions:
+  contents: read
+concurrency:
+  group: talera-v62-production-content-release
+  cancel-in-progress: false
+jobs:
+  publish-existing-core-and-v62:
+    if: ${{ github.repository == 'Marksmits1972/talera-lifeline' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require the exact single release-marker-only commit and an approved parent
+        run: |
+          node --input-type=module <<'EOF'
+          import {readFileSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const marker=JSON.parse(readFileSync('releases/bb63-current-sync-20261103.json','utf8'));
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();
+          const parent=git('rev-parse','HEAD^');
+          const changed=git('diff-tree','--no-commit-id','--name-only','-r','HEAD');
+          if(changed!=='releases/bb63-current-sync-20261103.json'||
+             marker.action!=='publish-bb63-current-sync-v1'||
+             marker.releaseFlag!=='reviewed_and_authorized'||
+             marker.reviewedBaseCommit!==parent||
+             marker.reviewedTestRun!==41606075550||
+             marker.canonicalBase!=='f93a1109ded45a57b050320364a97c423ea15b91'||
+             marker.coreTarget!=='talera-clean-core-staging-20261030'||
+             marker.v62Target!=='talera-pwa-v62-mijn-profiel-20261101')
+            throw Error('BB63 release scope not reviewed: stop without cloud mutations');
+          console.log('BB63 immutable source and approved marker verified');
+          EOF
+      - name: Install locked build dependencies
+        run: npm ci
+      - name: Current-version security tests, full Premium regression and isolated D1 migration
+        run: |
+          node --check scripts/bb63-integrated-release.mjs
+          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs test/premium-current-client.test.mjs test/premium-current-sync-flow.test.mjs
+          node --test test/premium-*.test.mjs
+          python3 scripts/bb63-sqlite-contract.py
+      - name: Build current 17-module V62 without deploying
+        run: |
+          node scripts/v62-package-preflight.mjs
+          npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Read-only confirm exact live Core, all eight module hashes, D1 schema and recovery bookmark
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-core-release-gate.mjs
+      - name: Assemble and validate current Core and V62 release sources without cloud writes
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-integrated-release.mjs --check
+      - name: Dry-run actual 10-module Core package before release
+        run: npx wrangler deploy --dry-run --config .talera-bb63-evidence/core-package/wrangler.dry-run.json --outdir .talera-bb63-evidence/core-compiled
+      - name: Apply additive D1 schema, update only existing Core then V62, verify and rollback on failure
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          BB63_REVIEW_COMMIT: ${{ github.event.before }}
+        run: node scripts/bb63-integrated-release.mjs --publish
+      - name: Preserve sanitized final release and source-integrity evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-integrated-current-sync-release-${{ github.sha }}
+          path: |
+            .talera-bb63-evidence/bb63-current-sync-release.json
+            .talera-bb63-evidence/core-release-gate.json
+            .talera-v62-package/release-inventory.json
+          if-no-files-found: warn
+          retention-days: 60

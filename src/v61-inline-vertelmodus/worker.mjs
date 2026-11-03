@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-vertelcyclus-r11-photo-layer-link-20261103';
+const BUILD='v61-vertelcyclus-r12-one-photo-owner-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -42,6 +42,8 @@ function installGlobalAudioPref(html){
 function taleraInlineDispose(){
   const s=taleraInline;
   taleraInline=null;
+  // Ordinary TALERA recovers its untouched native photo/strip layers.
+  document.body.classList.remove('talera-v61-narration-visual');
   if(!s)return;
   if(s.timer)clearInterval(s.timer);
   clearTimeout(s.ordinaryTimer);
@@ -54,6 +56,7 @@ function taleraInlineDispose(){
   taleraInlineCleanVideo(s);
   if(s.panel)s.panel.remove();
   if(s.voiceUrl)URL.revokeObjectURL(s.voiceUrl);
+  if(s.warmImages)s.warmImages.length=0;
   if(s.hint)s.hint.remove();
 }
 
@@ -343,6 +346,11 @@ async function present(memory){
     return;
   }
   disposePresentation();
+  // One visible RH19 image only for narrated memories: the original photo
+  // layer A is the image owner, while the existing native video appears only
+  // for video cues. The ordinary mode retains all normal navigation layers.
+  const hasRecordedVoice=!!memory._zeroItems?.some(x=>x.kind==='audio');
+  document.body.classList.toggle('talera-v61-narration-visual',hasRecordedVoice);
   activeId=memory.id;
   const own=++serial;
   const voice=memory._zeroItems.find(x=>x.kind==='audio');
@@ -362,6 +370,7 @@ async function present(memory){
     return{t:Math.round(time),index,mediaId:frames[index].key,videoAtMs};
   }).filter(Boolean).sort((a,b)=>a.t-b.t);
   const hasVoice=blob instanceof Blob&&blob.size>0;
+  if(!hasVoice)document.body.classList.remove('talera-v61-narration-visual');
   // Older voice records without cues play with their first image held still.
   // The engine still remains narrated: never replace it with an auto slideshow.
   if(hasVoice&&frames.length&&!cues.length)cues.push({t:0,index:0,mediaId:frames[0].key,videoAtMs:0});
@@ -370,6 +379,15 @@ async function present(memory){
     videoSerial:0,ordinaryTimer:null,ordinaryIndex:0,engine:hasVoice?'narrated':'ordinary',
     phase:'ready',replayFrames:[],replayIndex:-1,blockedByBrowser:false,hint:null,_playPending:false};
   taleraInline=s;
+  if(hasVoice){
+    s.warmImages=frames.map(frame=>{
+      const src=frame.url;
+      if(!src)return null;
+      const image=new Image();image.decoding='async';image.src=src;
+      if(typeof image.decode==='function')void image.decode().catch(()=>{});
+      return image;
+    }).filter(Boolean);
+  }
   if(hasVoice){
     const audio=window.__taleraInlineSharedAudio||document.createElement('audio');
     window.__taleraInlineSharedAudio=audio;
@@ -625,7 +643,25 @@ function patchPresent(html){
   block=block.replace(oldCover,"photos.push(item.kind==='video'?(url||videoPoster):(url||placeholder));");
   block=block.replace('if(localVideo)locate(localVideo);','if(localVideo&&localVideo.parentElement!==stage)locate(localVideo);');
   if(block.includes("frame.src='/vertelmodus-embed?mode=present'")||!block.includes('taleraInlineSync'))return{html,changed:false,reason:'patch-incomplete'};
-  return {html:html.slice(0,begin)+block+html.slice(end),changed:true,reason:'inline-presentation'};
+  let page=html.slice(0,begin)+block+html.slice(end);
+  const hostNeedle="return function(memory){\n      if(!ensure())return;";
+  const nativeReplacement="return function(memory){\n      if(memory?._taleraLocal&&memory._zeroItems?.some(x=>x.kind==='audio')){hide();return}\n      if(!ensure())return;";
+  if(!page.includes(hostNeedle)||page.split(hostNeedle).length!==2)
+    return{html,changed:false,reason:'rh19-sync-host-contract-changed'};
+  page=page.replace(hostNeedle,nativeReplacement);
+  // Narrated RH19 uses photoLayerA as its ONE visible image. Other native
+  // layers stay intact but are visually inactive until ordinary mode.
+  const ownerCSS='<style id="talera-v61-r12-one-photo-owner">'
+    +'body.talera-v61-narration-visual #photoStage>#photoLayerB,'
+    +'body.talera-v61-narration-visual #photoStage .talera-photo-strip,'
+    +'body.talera-v61-narration-visual #photoStage .talera-story-synced-photo'
+    +'{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}'
+    +'body.talera-v61-narration-visual #photoStage>#photoLayerA'
+    +'{display:block!important;visibility:visible!important;opacity:1!important;transform:none!important}'
+    +'</style>';
+  if(!page.includes('</head>'))return{html,changed:false,reason:'missing-head'};
+  page=page.replace('</head>',ownerCSS+'</head>');
+  return{html:page,changed:true,reason:'one-native-photo-owner'};
 }
 
 function removeEditorShareBeforePublish(html){

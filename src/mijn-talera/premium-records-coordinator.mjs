@@ -3,6 +3,7 @@
  */
 import {listLocalPremiumRecords,createPremiumRecordSnapshot,uploadPremiumRecord} from './premium-records-bridge.mjs';
 import {syncPremiumPending} from './premium-sync-queue.mjs';
+import {fetchPremiumCurrentVersions,commitPremiumCurrentVersion} from './premium-current-client.mjs';
 const json=async(fetcher,path)=>{
  const r=await fetcher(path,{method:'GET',credentials:'same-origin',cache:'no-store'});
  if(!r?.ok)throw Error('premium_record_api_unavailable');
@@ -26,19 +27,28 @@ export async function runPremiumRecordSync({indexedDB,crypto,fetcher,online=()=>
   after=list.next||null;
   if(++pages>1000)throw Error('manifest_too_large');
  }while(after);
+ const [storyCurrent,commentCurrent]=await Promise.all([
+  fetchPremiumCurrentVersions(fetcher,'story'),fetchPremiumCurrentVersions(fetcher,'comment_archive')
+ ]);
  const local=await listLocalPremiumRecords({indexedDB});
  const pending=[];
  for(const source of local){
   if(expectedAccountId&&ownerMatches()!==true)return {phase:'not_enabled',uploaded:0,pending:0};
   const snapshot=await createPremiumRecordSnapshot(source,{crypto});
-  if(!stored.has(snapshot.id))pending.push(snapshot);
+  const pointer=(snapshot.kind==='story'?storyCurrent:commentCurrent).get(snapshot.sourceKey);
+  if(!stored.has(snapshot.id)||pointer?.current_id!==snapshot.id)
+   pending.push({...snapshot,alreadyStored:stored.has(snapshot.id),expectedCurrentId:pointer?.current_id||null});
  }
  return syncPremiumPending({
   listPending:async()=>pending,
   readMedia:async item=>item,
   upload:async item=>{
    if(expectedAccountId&&ownerMatches()!==true)return {ok:false,reason:'account_changed'};
-   return uploadPremiumRecord({snapshot:item,fetcher});
+   const result=item.alreadyStored?{ok:true}:await uploadPremiumRecord({snapshot:item,fetcher});
+   if(result?.ok!==true)return result;
+   if(expectedAccountId&&ownerMatches()!==true)return {ok:false,reason:'account_changed'};
+   return commitPremiumCurrentVersion({fetcher,kind:item.kind,sourceKey:item.sourceKey,
+    snapshotId:item.id,expectedCurrentId:item.expectedCurrentId});
   },
   markSynced:async item=>{stored.add(item.id)},
   allowed,online,maxItems

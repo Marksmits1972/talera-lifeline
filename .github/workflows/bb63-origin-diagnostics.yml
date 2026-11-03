@@ -1,0 +1,44 @@
+name: BB63 read-only iPhone origin diagnosis (NO DEPLOY)
+on:
+  push:
+    branches:
+      - feature/bb63-101-readonly-origin-diagnostics-20261103
+    paths:
+      - 'src/mijn-talera/menu-integration.txt'
+      - 'test/bb63-origin-diagnostics.test.mjs'
+      - '.github/workflows/bb63-origin-diagnostics.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only:
+    if: ${{ github.repository == 'Marksmits1972/talera-lifeline' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install build dependencies
+        run: npm ci
+      - name: Parse canonical menu and diagnostic tests
+        run: |
+          node --check --input-type=commonjs < src/mijn-talera/menu-integration.txt
+          node --check test/bb63-origin-diagnostics.test.mjs
+      - name: Verify read-only IndexedDB and no automatic Premium upload
+        run: node --test test/bb63-origin-diagnostics.test.mjs
+      - name: Verify existing Premium local ownership and cloud integrity guards
+        run: node --test test/premium-sync-audit.test.mjs test/premium-cloud-integrity.test.mjs
+      - name: Rebuild exactly the current V62 16-module release package without publishing
+        run: node scripts/v62-package-preflight.mjs
+      - name: Compile for Worker using Wrangler --dry-run (NO DEPLOY)
+        run: npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Save checksum inventory for review
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-origin-diagnosis-offline-${{ github.sha }}
+          path: .talera-v62-package/release-inventory.json
+          if-no-files-found: warn
+          retention-days: 21

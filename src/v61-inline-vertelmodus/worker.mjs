@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-vertelcyclus-r12-one-photo-owner-20261103';
+const BUILD='v61-r13-datum-eenvoud-r12-locked-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -1026,6 +1026,25 @@ function patchTell(html){
   return{html:page.replace('</head>',RECORD_CSS+'</head>'),changed:true,reason:'inline-recording-video-posters-one-store'};
 }
 
+
+const V13_DATE_HANDLERS="\nlet v13Mode='exact';\nfunction v13Today(){\n const d=new Date();return String(d.getFullYear())+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');\n}\nfunction v13SetMode(mode){\n v13Mode=['exact','month','year','season'].includes(mode)?mode:'exact';\n const isExact=v13Mode==='exact';\n $('v13ExactLine').hidden=!isExact;\n $('v13Partial').hidden=isExact;\n $('v13Expand').hidden=!isExact;\n $('v13BackToDate').hidden=isExact;\n $('v13YearLine').hidden=isExact;\n $('v13MonthLine').hidden=v13Mode!=='month';\n $('v13SeasonLine').hidden=v13Mode!=='season';\n for(const button of dialog.querySelectorAll('[data-v13-mode]')){\n   button.setAttribute('aria-pressed',String(button.dataset.v13Mode===v13Mode));\n }\n $('v13Error').hidden=true;\n}\nfunction create(){\n if(dialog)return;\n dialog=document.createElement('div');\n dialog.id='v30DateModal';dialog.hidden=true;\n dialog.innerHTML='<section id=\"v30DateBox\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"v30DateHeading\">'\n  +'<h2 id=\"v30DateHeading\">Wanneer was dit?</h2>'\n  +'<div id=\"v30DateFields\">'\n  +'<label id=\"v13ExactLine\">Datum<input id=\"v13ExactDate\" type=\"date\" lang=\"nl-NL\" min=\"1900-01-01\"></label>'\n  +'<button id=\"v13Expand\" type=\"button\">Ik weet de exacte dag niet</button>'\n  +'<div id=\"v13Partial\" hidden>'\n  +'<div id=\"v13ModeButtons\" role=\"group\" aria-label=\"Wat weet je nog?\">'\n  +'<button type=\"button\" data-v13-mode=\"month\">Maand</button>'\n  +'<button type=\"button\" data-v13-mode=\"year\">Jaar</button>'\n  +'<button type=\"button\" data-v13-mode=\"season\">Seizoen</button>'\n  +'</div>'\n  +'<div id=\"v13PartialFields\">'\n  +'<label id=\"v13YearLine\">Jaar<input id=\"v13Year\" type=\"number\" inputmode=\"numeric\" min=\"1900\" max=\"2100\" placeholder=\"Bijv. 1984\"></label>'\n  +'<label id=\"v13MonthLine\" hidden>Maand<select id=\"v13Month\"></select></label>'\n  +'<label id=\"v13SeasonLine\" hidden>Seizoen<select id=\"v13Season\"><option value=\"lente\">Lente</option><option value=\"zomer\">Zomer</option><option value=\"herfst\">Herfst</option><option value=\"winter\">Winter</option></select></label>'\n  +'</div></div>'\n  +'<button id=\"v13BackToDate\" type=\"button\" hidden>Ik weet de exacte datum</button>'\n  +'<p id=\"v13Error\" role=\"alert\" hidden></p></div>'\n  +'<div id=\"v30DateActions\"><button id=\"v30DateCancel\" type=\"button\">Annuleren</button><button id=\"v30DateSave\" type=\"button\">Bewaren</button></div>'\n  +'</section>';\n document.body.append(dialog);\n $('v13ExactDate').max=v13Today();\n $('v13Year').max=String(new Date().getFullYear());\n monthNames.forEach((label,index)=>{\n   const option=document.createElement('option');\n   option.value=String(index+1).padStart(2,'0');option.textContent=label;\n   $('v13Month').append(option);\n });\n $('v13Expand').onclick=()=>v13SetMode('year');\n $('v13BackToDate').onclick=()=>v13SetMode('exact');\n for(const button of dialog.querySelectorAll('[data-v13-mode]')){\n   button.onclick=()=>v13SetMode(button.dataset.v13Mode);\n }\n $('v30DateCancel').onclick=()=>dialog.hidden=true;\n dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.hidden=true});\n dialog.addEventListener('keydown',e=>{\n   if(e.key==='Escape'){e.preventDefault();dialog.hidden=true}\n });\n $('v30DateSave').onclick=()=>{\n   const year=String($('v13Year').value||'').trim();\n   const month=$('v13Month').value;\n   const season=$('v13Season').value;\n   const seasonMonth={lente:'03',zomer:'06',herfst:'09',winter:'12'};\n   const date=v13Mode==='exact'?$('v13ExactDate').value:\n     year+'-'+(v13Mode==='month'?month:v13Mode==='season'?seasonMonth[season]:'01')+'-01';\n   const d=new Date(date+'T12:00:00');\n   const valid=/^\\d{4}-\\d{2}-\\d{2}$/.test(date)&&Number.isFinite(+d)\n    &&d.getFullYear()===+date.slice(0,4)&&d.getMonth()+1===+date.slice(5,7)\n    &&d.getDate()===+date.slice(8,10)\n    &&date>= '1900-01-01' && date<=v13Today();\n   if(!valid){\n     $('v13Error').textContent='Kies een geldige datum.';\n     $('v13Error').hidden=false;return;\n   }\n   const precision=$('precision');\n   if(!precision){$('v13Error').textContent='Datumveld niet beschikbaar.';$('v13Error').hidden=false;return}\n   // Use the EXISTING editor save and date model. No new storage format.\n   $('dateToggle')?.onclick?.();\n   precision.value=v13Mode;\n   precision.dispatchEvent(new Event('change',{bubbles:true}));\n   const input=v13Mode==='exact'?$('date'):v13Mode==='month'?$('month'):$('year');\n   if(!input){$('v13Error').textContent='Probeer opnieuw.';$('v13Error').hidden=false;return}\n   input.value=v13Mode==='exact'?date:v13Mode==='month'?date.slice(0,7):date.slice(0,4);\n   input.dispatchEvent(new Event('input',{bubbles:true}));\n   input.dispatchEvent(new Event('change',{bubbles:true}));\n   if(v13Mode==='season'&&$('season')){\n     $('season').value=season;\n     $('season').dispatchEvent(new Event('change',{bubbles:true}));\n   }\n   $('v10DateDone')?.click();\n   dialog.hidden=true;\n };\n v13SetMode('exact');\n}\nfunction show(){\n create();\n const precision=$('precision')?.value||'exact';\n const saved=$('date')?.value||$('month')?.value||$('year')?.value||'';\n const year=/^\\d{4}/.test(saved)?saved.slice(0,4):String(new Date().getFullYear());\n const month=/^\\d{4}-\\d{2}/.test(saved)?saved.slice(5,7):'01';\n const day=/^\\d{4}-\\d{2}-\\d{2}$/.test(saved)?saved.slice(8,10):'01';\n $('v13Year').value=year;\n $('v13Month').value=month;\n $('v13Season').value=$('season')?.value||'lente';\n $('v13ExactDate').value=precision==='exact'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(saved)\n   ?saved : precision==='month' ?year+'-'+month+'-01' : precision==='year'?year+'-01-01':'';\n v13SetMode(precision);\n dialog.hidden=false;\n}\ndocument.addEventListener('click',e=>{\n if(e.target.closest('#dateToggle,#v10ChangeDate')){\n   e.preventDefault();e.stopImmediatePropagation();show();\n }else if(e.target.closest('#publish')&&/nog te kiezen|not chosen|aún|choisir|noch/i.test($('dateToggle')?.textContent||'')){\n   e.preventDefault();e.stopImmediatePropagation();show();\n }\n},true);\n";
+const V13_DATE_CSS="<style id=\"talera-v61-r13-simple-date\">\n#v30DateBox{width:min(100%,410px);padding:24px;border-radius:23px}\n#v30DateBox h2{font-size:25px;line-height:1.15;margin:0 0 23px}\n#v30DateFields{display:block}\n#v30DateFields [hidden]{display:none!important}\n#v30DateFields label{font-size:14px;font-weight:700;display:grid;gap:9px}\n#v30DateFields #v13ExactDate,#v30DateFields #v13Year,#v30DateFields #v13Month,#v30DateFields #v13Season{\n  width:100%;min-width:0;height:56px;box-sizing:border-box;\n  border:1px solid #c5d6df;border-radius:13px;background:white;color:#173e56;\n  font:650 18px system-ui;padding:10px 13px;appearance:auto;\n}\n#v13Expand,#v13BackToDate{\n  display:block;background:transparent;border:0;color:#3c6983;\n  font:650 14px system-ui;text-align:left;padding:15px 0 3px;min-height:43px;\n}\n#v13ModeButtons{display:flex;gap:8px;margin:0 0 17px}\n#v13ModeButtons button{\n  flex:1;min-width:0;background:#f1f5f7;color:#32566a;border:1px solid #d4e0e6;\n  border-radius:11px;min-height:44px;padding:8px 5px;font:650 14px system-ui;\n}\n#v13ModeButtons button[aria-pressed=\"true\"]{background:#193f58;border-color:#193f58;color:#fff}\n#v13PartialFields{display:grid;grid-template-columns:1fr 1fr;gap:12px}\n#v13PartialFields label{min-width:0}\n#v13PartialFields #v13YearLine:only-child{grid-column:1/-1}\n#v13Error{color:#b34032!important;font:600 14px system-ui!important;margin:12px 0 0!important}\n#v30DateActions{margin-top:20px;grid-template-columns:1fr 1.5fr}\n#v30DateActions button{min-height:51px}\n#v30DateSave{font-weight:750}\n</style>";
+function patchDateUx(html){
+  const begin='<script id="talera-v30-tell-js">';
+  const a=html.indexOf(begin);
+  const b=a>=0?html.indexOf('</script>',a):-1;
+  if(a<0||b<0)return{html,changed:false,reason:'date-ui-original-not-found'};
+  const old=html.slice(a+begin.length,b);
+  const start=old.indexOf('function create(){');
+  const end=old.indexOf('let video=null;',start);
+  if(start<0||end<0||!old.includes("v30DateSave")||!old.includes("v30Mode"))
+    return{html,changed:false,reason:'date-ui-contract-drift'};
+  const patched=old.slice(0,start)+V13_DATE_HANDLERS+'\n'+old.slice(end);
+  let page=html.slice(0,a+begin.length)+patched+html.slice(b);
+  page=page.replace('</head>',V13_DATE_CSS+'</head>');
+  return{html:page,changed:true,reason:'r13-simple-date-ui'};
+}
+
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
@@ -1038,15 +1057,16 @@ export default {
     const html=await upstream.text();
     const result=html.includes('<script id="talera-zero-memory-adapter">')?patchPresent(html):
       html.includes('function openZeroPlayer(g){')?patchTell(html):{html,changed:false,reason:'not-applicable'};
+    const finalResult=url.pathname==='/tell'&&result.changed?patchDateUx(result.html):result;
     const headers=new Headers(upstream.headers);
     headers.delete('content-length');headers.delete('content-encoding');headers.delete('etag');
     headers.set('cache-control','no-store');
-    headers.set('x-talera-v61-vertelmodus',result.reason);
+    headers.set('x-talera-v61-vertelmodus',finalResult.reason);
     // Create listening preference on both the home timeline and presentation.
     // Otherwise the existing Meer > Settings toggle only works on /present.
     const appRoutes=['/','/mijn-leven','/present','/tell'];
-    const output=(appRoutes.includes(url.pathname)&&result.html.includes('</head>'))
-      ?installGlobalAudioPref(result.html):result.html;
+    const output=(appRoutes.includes(url.pathname)&&finalResult.html.includes('</head>'))
+      ?installGlobalAudioPref(finalResult.html):finalResult.html;
     return new Response(output,{status:upstream.status,statusText:upstream.statusText,headers});
   }
 };

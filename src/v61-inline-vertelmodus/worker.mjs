@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-inline-vertelmodus-r6-complete-media-cycle-20261103';
+const BUILD='v61-vertelcyclus-r7-media-id-two-engines-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -101,7 +101,7 @@ async function taleraInlineLoadVideo(s,frame,cue,ms){
     }
   }
   if(s.audio.paused||s.audio.ended){if(!video.paused)video.pause()}
-  else if(video.paused)void video.play().catch(()=>{});
+  else if(video.paused&&!video.ended)void video.play().catch(()=>{});
 }
 
 
@@ -353,8 +353,10 @@ function taleraV61RecordMark(index,force){
   const now=performance.now();
   const ms=Math.max(0,Math.round(now-s.started-s.paused));
   const last=s.cues[s.cues.length-1];
-  if(last?.index===index&&!force)return;
-  const cue={t:ms,index};
+  if(last?.mediaId===s.g.media[index]&&!force)return;
+  const mediaId=s.g.media[index];
+  if(typeof mediaId!=='string'||!mediaId)return;
+  const cue={t:ms,index,mediaId};
   const video=document.querySelector('#frame > video');
   if(video&&Number.isFinite(video.currentTime))cue.videoAtMs=Math.max(0,Math.round(video.currentTime*1000));
   s.cues.push(cue);
@@ -397,8 +399,10 @@ function openZeroPlayer(g){
     if(!s.touch)return;
     const dx=e.changedTouches[0].clientX-s.touch.x,dy=e.changedTouches[0].clientY-s.touch.y;
     s.touch=null;if(Math.abs(dx)>30||Math.abs(dy)>30)s.skipClickUntil=Date.now()+600;
+    // Horizontal swipes are already handled by the original TALERA frame;
+    // do not also step in the recording layer (that would record two cues).
   };
-  const onClick=e=>{if(Date.now()<s.skipClickUntil||e.target.closest('button,video'))return;if(g.media.length>1)stepPhoto(g,1)};
+  const onClick=e=>{if(Date.now()<s.skipClickUntil||e.target.closest('button'))return;if(g.media.length>1)stepPhoto(g,1)};
   frame.addEventListener('touchstart',onTouchStart,{passive:true,capture:true});
   frame.addEventListener('touchend',onTouchEnd,{passive:true,capture:true});
   frame.addEventListener('click',onClick);
@@ -429,7 +433,9 @@ function openZeroPlayer(g){
       const mime=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(x=>MediaRecorder.isTypeSupported(x));
       const r=new MediaRecorder(s.stream,mime?{mimeType:mime}:undefined);
       s.recorder=r;s.parts=[];s.started=performance.now();s.paused=0;s.pauseStart=0;
-      s.cues=g.media.length?[{t:0,index:idx}]:[];
+      // Every new voice starts at photo/video #1, even if editing previously stopped elsewhere.
+      if(g.media.length&&idx!==0)stepPhoto(g,-idx);
+      s.cues=g.media.length?[{t:0,index:0,mediaId:g.media[0]}]:[];
       const v=frame.querySelector(':scope > video');
       if(v&&s.cues.length)s.cues[0].videoAtMs=Math.max(0,Math.round((v.currentTime||0)*1000));
       r.ondataavailable=e=>{if(e.data?.size)s.parts.push(e.data)};

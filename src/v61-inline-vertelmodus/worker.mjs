@@ -187,8 +187,13 @@ function taleraInlineOrdinaryStep(s,index){
   taleraInlineSetFrame(s,index);
   const frame=s.frames[index];
   if(frame.kind==='video'){
-    taleraInlinePlayMedia(s,frame,!window.__taleraAudioControls?.isEnabled?.(),()=>taleraInlineOrdinaryStep(s,index+1));
-  }else s.ordinaryTimer=setTimeout(()=>taleraInlineOrdinaryStep(s,index+1),2500);
+    taleraInlinePlayMedia(s,frame,!window.__taleraAudioControls?.isEnabled?.(),()=>{
+      // End of video does not advance the ordinary presentation; only tapping does.
+    });
+  }else{
+    // Ordinary TALERA: the user TAPS to pick the next medium. No photo timer.
+    // A video remains on its last frame when it finishes.
+  }
 }
 function taleraInlineStartOrdinary(s){
   if(s!==taleraInline)return;
@@ -199,90 +204,96 @@ function taleraInlineStartOrdinary(s){
 }
 
 function taleraInlineInstallAudioControls(){
-  const canListen=()=>Boolean(window.__taleraAudioControls?.isEnabled?.());
-  const playCurrent=(restart=false)=>{
-    const s=taleraInline;
-    if(!s||!canListen())return;
-    if(s.audio){
-      // Re-enable listening: restart the recorded story and its photo cues.
-      if(s.phase!=='narration'||restart){
-        clearTimeout(s.ordinaryTimer);s.ordinaryTimer=null;
-        taleraInlineCleanVideo(s);
-        s.phase='narration';s.blockedByBrowser=false;
-        try{s.audio.currentTime=0}catch(e){}
-        if(s.frames.length)taleraInlineSetFrame(s,s.cues[0]?.index||0);
-        taleraInlineSync(s);
-      }
-      if(s.audio.paused&&!s._playPending){
-        s._playPending=true;
-        try{
-          Promise.resolve(s.audio.play()).then(()=>{
-            if(s===taleraInline){s.blockedByBrowser=false;if(s.hint){s.hint.remove();s.hint=null}}
-          }).catch(err=>{
-            if(s===taleraInline){
-              s.blockedByBrowser=err?.name==='NotAllowedError';
-              if(s.blockedByBrowser){
-                // Conditional guidance, not an extra per-memory player button.
-                if(!s.hint){
-                  const hint=document.createElement('div');
-                  hint.textContent='Tik op de foto om het geluid te starten';
-                  hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';
-                  (stage.parentElement||stage).appendChild(hint);s.hint=hint;
-                }
-              }
-            }
-          }).finally(()=>{s._playPending=false});
-        }catch(e){s._playPending=false}
+  const enabled=()=>Boolean(window.__taleraAudioControls?.isEnabled?.());
+  const informGesture=s=>{
+    if(s.hint||s!==taleraInline)return;
+    const hint=document.createElement('div');
+    hint.className='talera-v61-audio-permission-hint';
+    hint.textContent='Tik op de foto om het geluid te starten';
+    hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';
+    (stage.parentElement||stage).appendChild(hint);s.hint=hint;
+  };
+  const clearHint=s=>{if(s?.hint){s.hint.remove();s.hint=null}};
+  const tryVoice=s=>{
+    if(!s?.audio||s!==taleraInline||s.phase!=='narration')return;
+    s.audio.muted=!enabled();
+    if(!s.audio.paused)return;
+    if(s._playPending)return;
+    s._playPending=true;
+    try{
+      Promise.resolve(s.audio.play()).then(()=>{
+        if(s===taleraInline){s.blockedByBrowser=false;clearHint(s)}
+      }).catch(err=>{
+        if(s===taleraInline&&err?.name==='NotAllowedError'){
+          s.blockedByBrowser=true;
+          if(enabled())informGesture(s);
+        }
+      }).finally(()=>{s._playPending=false});
+    }catch(e){s._playPending=false}
+  };
+  const playCurrent=()=>{
+    const s=taleraInline;if(!s)return;
+    // Listening changes only the VOLUME, never which motor controls photos.
+    if(s.engine==='narrated'){
+      if(s.phase==='narration')tryVoice(s);
+      else if(s.phase==='originals'&&s.video){
+        s.video.muted=!enabled();
+        if(s.video.paused)void s.video.play().catch(err=>{
+          if(err?.name==='NotAllowedError'&&enabled())informGesture(s);
+        });
       }
     }else if(s.video){
-      s.video.muted=false;
-      if(s.video.paused)void s.video.play().catch(()=>{});
+      s.video.muted=!enabled();
+      if(s.video.paused&&!s.video.ended)void s.video.play().catch(()=>{});
     }
+    if(!enabled()){s.blockedByBrowser=false;clearHint(s)}
   };
-  const stopCurrent=()=>{
-    const s=taleraInline;if(!s)return;
-    s.blockedByBrowser=false;
-    if(s.hint){s.hint.remove();s.hint=null}
-    if(s.audio)taleraInlineStartOrdinary(s);
-    else if(s.video)s.video.muted=true;
-  };
+  const silence=()=>playCurrent();
   window.__taleraInlineTryAutoPlay=playCurrent;
-  window.__taleraInlineStopAudio=stopCurrent;
-  // Safari blocks unmuted playback before a real gesture. The photograph
-  // itself unlocks audio; no additional permanent listen button.
-  const retryOnPhotoGesture=e=>{
-    const s=taleraInline;if(!s||!canListen())return;
-    if(e.target?.closest?.('button,a,input,select,textarea,[role="button"],.talera-share-shell'))return;
-    if(s.phase==='narration'&&s.audio?.paused)playCurrent(false);
-    else if((s.phase==='originals'||s.phase==='ordinary')&&s.video?.paused){
+  window.__taleraInlineStopAudio=silence;
+  const retry=e=>{
+    const s=taleraInline;
+    if(!s||!enabled()||e.target?.closest?.('button,a,input,select,textarea,[role="button"],.talera-share-shell'))return;
+    if(s.engine==='narrated'&&s.phase==='narration'&&s.audio?.paused){
+      tryVoice(s);
+    }else if(s.video?.paused&&!s.video.ended){
       s.video.muted=false;
-      void s.video.play().then(()=>{s.blockedByBrowser=false;if(s.hint){s.hint.remove();s.hint=null}}).catch(()=>{});
+      void s.video.play().then(()=>clearHint(s)).catch(()=>{});
     }
   };
-  document.addEventListener('pointerup',retryOnPhotoGesture,{passive:true});
-  document.addEventListener('touchend',retryOnPhotoGesture,{passive:true});
+  document.addEventListener('pointerup',retry,{passive:true});
+  // iOS supports touchend on devices that do not dispatch pointerup.
+  document.addEventListener('touchend',retry,{passive:true});
+  document.addEventListener('click',e=>{
+    const s=taleraInline;
+    if(s?.engine!=='narrated'||s.phase!=='narration')return;
+    if(!e.target?.closest?.('#photoStage,#memoryStoryScroll'))return;
+    if(e.target?.closest?.('button,a,input,select,textarea,[role="button"]'))return;
+    // Prevent the ordinary RH19 tap-to-next-photo handler from taking over.
+    e.preventDefault();e.stopImmediatePropagation();
+  },true);
   window.addEventListener('storage',e=>{
-    if(e.key!=='talera-v61-listening-enabled')return;
-    if(canListen())playCurrent(true);else stopCurrent();
+    if(e.key==='talera-v61-listening-enabled')playCurrent();
   });
   document.addEventListener('visibilitychange',()=>{
     const s=taleraInline;if(!s)return;
     if(document.hidden){
-      if(s.audio&&!s.audio.paused)s.audio.pause();
-      if(s.video&&!s.video.paused)s.video.pause();
-      clearTimeout(s.ordinaryTimer);
-    }else if(s.phase==='ordinary'){taleraInlineOrdinaryStep(s,s.ordinaryIndex)}
-    else if(canListen())playCurrent(false);
+      s.audio?.pause();s.video?.pause();
+    }else if(s.engine==='narrated'&&s.phase==='narration')tryVoice(s);
+    else if(s.video?.paused&&!s.video.ended)void s.video.play().catch(()=>{});
   });
 }
-
 
 async function present(memory){
   if(!stage||!memory)return;
   if(activeId===memory.id){
     const s=taleraInline;
-    if(s?.phase==='ordinary'&&Number.isInteger(memory._photoIndex)&&s.ordinaryIndex!==memory._photoIndex){
-      taleraInlineOrdinaryStep(s,memory._photoIndex);
+    if(s?.engine==='ordinary'&&Number.isInteger(memory._photoIndex)&&
+       s.ordinaryIndex!==memory._photoIndex)taleraInlineOrdinaryStep(s,memory._photoIndex);
+    else if(s?.engine==='narrated'&&s.phase==='narration'&&
+       s.cues.length&&memory._photoIndex!==s.cues[0].index){
+      // Existing RH19 gesture handlers are not a second storytelling engine.
+      taleraInlineSync(s);
     }
     return;
   }
@@ -294,38 +305,45 @@ async function present(memory){
   if(voice){try{blob=await store.blob(voice.key)}catch(e){}}
   if(activeId!==memory.id||serial!==own||runtime.currentMemory()?.id!==memory.id)return;
   const frames=memory._zeroFrames||[];
-  const cues=(memory._taleraNarrationCues||[])
-    .filter(c=>Number.isFinite(Number(c.t))&&Number.isInteger(c.index)&&c.index>=0&&c.index<frames.length)
-    .map(c=>({t:Math.max(0,Number(c.t)),index:c.index,videoAtMs:Math.max(0,Number(c.videoAtMs)||0)}))
-    .sort((a,b)=>a.t-b.t);
+  const raw=Array.isArray(memory._taleraNarrationCues)?memory._taleraNarrationCues:[];
+  const idIndex=new Map(frames.map((f,i)=>[f.key,i]));
+  const cues=raw.map(c=>{
+    const time=Number(c?.t);
+    if(!Number.isFinite(time)||time<0)return null;
+    const byId=typeof c.mediaId==='string'&&c.mediaId.length>0;
+    const index=byId?idIndex.get(c.mediaId):Number(c?.index);
+    if(!Number.isInteger(index)||index<0||index>=frames.length)return null;
+    const videoAtMs=Math.max(0,Number(c.videoAtMs)||0);
+    return{t:Math.round(time),index,mediaId:frames[index].key,videoAtMs};
+  }).filter(Boolean).sort((a,b)=>a.t-b.t);
+  const hasVoice=blob instanceof Blob&&blob.size>0;
+  // Older voice records without cues play with their first image held still.
+  // The engine still remains narrated: never replace it with an auto slideshow.
+  if(hasVoice&&frames.length&&!cues.length)cues.push({t:0,index:0,mediaId:frames[0].key,videoAtMs:0});
+  if(hasVoice&&cues.length&&cues[0].t>0)cues.unshift({t:0,index:cues[0].index,mediaId:cues[0].mediaId,videoAtMs:0});
   const s={memory,frames,cues,audio:null,voiceUrl:null,timer:null,video:null,videoKey:'',videoUrl:null,
-    videoSerial:0,ordinaryTimer:null,ordinaryIndex:0,phase:'ready',replayFrames:[],replayIndex:-1,
-    blockedByBrowser:false,hint:null,_playPending:false};
+    videoSerial:0,ordinaryTimer:null,ordinaryIndex:0,engine:hasVoice?'narrated':'ordinary',
+    phase:'ready',replayFrames:[],replayIndex:-1,blockedByBrowser:false,hint:null,_playPending:false};
   taleraInline=s;
-  if(blob instanceof Blob&&blob.size){
+  if(hasVoice){
     const audio=window.__taleraInlineSharedAudio||document.createElement('audio');
     window.__taleraInlineSharedAudio=audio;
     audio.preload='auto';audio.playsInline=true;audio.style.display='none';
     if(audio.parentElement!==stage)stage.appendChild(audio);
     s.voiceUrl=URL.createObjectURL(blob);
-    audio.src=s.voiceUrl;audio.muted=false;audio.volume=1;s.audio=audio;
+    audio.src=s.voiceUrl;audio.muted=!window.__taleraAudioControls?.isEnabled?.();audio.volume=1;s.audio=audio;
     const tick=()=>{if(s===taleraInline&&s.phase==='narration')taleraInlineSync(s)};
     const stopTimer=()=>{if(s.timer){clearInterval(s.timer);s.timer=null}};
     audio.onplay=()=>{if(s.phase==='narration'){stopTimer();tick();s.timer=setInterval(tick,90)}};
     audio.onpause=()=>{stopTimer();if(s.phase==='narration'&&s.video)s.video.pause()};
     audio.onended=()=>{stopTimer();tick();taleraInlineVoiceEnded(s)};
     audio.ontimeupdate=tick;audio.onseeking=tick;audio.onseeked=tick;
-  }
-  if(s.audio&&window.__taleraAudioControls?.isEnabled?.()){
     s.phase='narration';
     if(s.frames.length)taleraInlineSetFrame(s,s.cues[0]?.index||0);
     taleraInlineSync(s);
     window.__taleraInlineTryAutoPlay?.();
-  }else{
-    taleraInlineStartOrdinary(s);
-  }
+  }else taleraInlineStartOrdinary(s);
 }
-
 
 async function showSimpleVideo(memory,frameData){
   if(!stage||!frameData)return;

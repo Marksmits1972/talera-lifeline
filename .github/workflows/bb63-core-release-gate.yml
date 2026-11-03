@@ -1,0 +1,41 @@
+name: BB63 Core source and database release gate — READ ONLY
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'scripts/bb63-core-release-gate.mjs'
+      - '.github/workflows/bb63-core-release-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talera-bb63-core-release-readonly-gate
+  cancel-in-progress: true
+jobs:
+  release-gate-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate script syntax and ensure no D1 mutations/Worker uploads
+        run: |
+          node --check scripts/bb63-core-release-gate.mjs
+          ! grep -E "CREATE[[:space:]]+TABLE|/content['\"]?[,;].*PUT" scripts/bb63-core-release-gate.mjs
+      - name: Compare three live Worker deployments, all 8 Core bytes, D1 schema and Time Travel bookmark
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-core-release-gate.mjs
+      - name: Keep only sanitized audit evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-core-release-gate-${{ github.sha }}
+          path: .talera-bb63-evidence/core-release-gate.json
+          if-no-files-found: warn
+          retention-days: 30

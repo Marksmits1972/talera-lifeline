@@ -1,0 +1,42 @@
+name: BB63 resume after safe Core rollback - read-only MIME gate
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'scripts/bb63-resume-release.mjs'
+      - 'releases/bb63-resume-20261103.json'
+      - '.github/workflows/bb63-resume-precheck.yml'
+permissions:
+  contents: read
+jobs:
+  verify-resume-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check recovery script and original migration tests
+        run: |
+          node --check scripts/bb63-resume-release.mjs
+          python3 scripts/bb63-sqlite-contract.py
+          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs test/premium-current-client.test.mjs test/premium-current-sync-flow.test.mjs
+      - name: Build exact 17-part current V62 offline
+        run: |
+          npm ci
+          node scripts/v62-package-preflight.mjs
+          npx wrangler deploy --dry-run --config .talera-v62-package/wrangler.dry-run.json --outdir .talera-v62-package/out
+      - name: Inspect existing original Core rollback, new-version metadata and V62 text MIME — no writes
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-resume-release.mjs --check
+      - name: Preserve sanitized verified resume evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-resume-precheck-${{ github.sha }}
+          path: .talera-bb63-evidence/bb63-resume-release.json
+          if-no-files-found: warn
+          retention-days: 30

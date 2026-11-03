@@ -1,0 +1,15 @@
+{
+  "action": "precheck-only",
+  "core": "talera-clean-core-staging-20261030",
+  "v62": "talera-pwa-v62-mijn-profiel-20261101",
+  "reviewedBaseCommit": null,
+  "originalCoreVersion": "ef484758-391d-4875-999f-34f1a4b78a93",
+  "testedCoreVersion": "4f972875-8309-4814-9ed7-95c69b6124de",
+  "previousCoreRollbackDeployment": "fc2bdbc1-8f64-40ee-8297-ef6617d117f7",
+  "previousV62Version": "31b38681-ca28-4b12-bde6-22a446ce1337",
+  "newClientModule": "premium-current-client.txt",
+  "expectedClientMimeFromLive": "read-only check",
+  "legacyTestDataMayBeHidden": true,
+  "noDataDeletion": true,
+  "releaseAuthorized": false
+}

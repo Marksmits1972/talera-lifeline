@@ -35,7 +35,9 @@ export async function premiumCloudRoute({request,env,sessionAccount,entitlement,
   if (path==='/api/premium/cloud/media' && method==='GET') {
     const after=url.searchParams.get('after')||'';
     if(after&&!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(after))return reply({ok:false,reason:'invalid_cursor'},400);
-    const rows=await env.DB.prepare('SELECT media_id,content_type,byte_size,sha256,digest_kind,source_key,created_at FROM talera_premium_media WHERE account_id=? AND media_id>? ORDER BY media_id ASC LIMIT 501').bind(accountId,after).all();
+    // Return ONLY the one current revision of each Free media key. Old immutable
+    // R2 snapshots remain stored for conflict recovery, never duplicated in restore.
+    const rows=await env.DB.prepare("SELECT m.media_id,m.content_type,m.byte_size,m.sha256,m.digest_kind,m.source_key,m.created_at FROM talera_premium_media m JOIN talera_premium_current c ON c.account_id=m.account_id AND c.kind='media' AND c.current_id=m.media_id WHERE m.account_id=? AND m.media_id>? ORDER BY m.media_id ASC LIMIT 501").bind(accountId,after).all();
     const batch=rows.results||[],items=batch.slice(0,500);
     return reply({ok:true,items,next:batch.length>500?items[items.length-1].media_id:null});
   }

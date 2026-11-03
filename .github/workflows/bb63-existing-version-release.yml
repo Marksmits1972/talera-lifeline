@@ -1,0 +1,67 @@
+name: BB63 one-time activation of previously validated Core and V62 versions
+on:
+  push:
+    branches:
+      - feature/bb63-current-memory-version-20261103
+    paths:
+      - 'releases/bb63-final-activation-20261103.json'
+permissions:
+  contents: read
+concurrency:
+  group: talera-v62-production-content-release
+  cancel-in-progress: false
+jobs:
+  activate-reviewed-versions:
+    if: ${{ github.repository == 'Marksmits1972/talera-lifeline' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require one marker-only approved commit, pinned old and new Worker IDs
+        run: |
+          node --input-type=module <<'EOF'
+          import {readFileSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const m=JSON.parse(readFileSync('releases/bb63-final-activation-20261103.json','utf8'));
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();
+          const parent=git('rev-parse','HEAD^');
+          const delta=git('diff-tree','--no-commit-id','--name-only','-r','HEAD');
+          if(delta!=='releases/bb63-final-activation-20261103.json'||
+             m.action!=='activate-reviewed-existing-versions'||
+             m.releaseAuthorized!==true||
+             m.reviewedBaseCommit!==parent||
+             m.evidence?.coreValidatedFromRun!==41606374597||
+             m.evidence?.appValidatedFromRun!==41607443541||
+             m.newCore!=='4f972875-8309-4814-9ed7-95c69b6124de'||
+             m.newApp!=='37fbe2f6-5250-491d-875a-b37abf39f30a'||
+             m.core!=='talera-clean-core-staging-20261030'||
+             m.app!=='talera-pwa-v62-mijn-profiel-20261101')
+            throw Error('BB63 immutable version activation not authorized');
+          console.log('Review source and exactly two existing Worker versions confirmed');
+          EOF
+      - name: Confirm syntax and 28 current-version tests
+        run: |
+          node --check scripts/bb63-activate-existing-versions.mjs
+          node --test test/premium-current-version.test.mjs test/premium-current-route.test.mjs test/premium-current-client.test.mjs test/premium-current-sync-flow.test.mjs
+      - name: Verify existing Core+V62 version IDs, bindings and rollback readiness without writing
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/bb63-activate-existing-versions.mjs --check
+      - name: Activate two existing validated versions, poll entry and current module, rollback on failure
+        env:
+          TALERA_BB63_CF_TOKEN: ${{ secrets.TALERA_V62_CLOUDFLARE_READ_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          BB63_REVIEW_COMMIT: ${{ github.event.before }}
+        run: node scripts/bb63-activate-existing-versions.mjs --publish
+      - name: Save sanitized confirmation and rollback evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb63-activate-existing-versions-${{ github.sha }}
+          path: .talera-bb63-evidence/bb63-activation-result.json
+          retention-days: 45
+          if-no-files-found: warn

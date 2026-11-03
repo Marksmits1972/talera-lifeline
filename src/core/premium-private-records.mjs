@@ -29,7 +29,9 @@ export async function privateRecordRoute({request,env,accountId,writeAllowed=fal
  if(path==='/api/premium/cloud/records'&&method==='GET'){
   const after=url.searchParams.get('after')||'';
   if(after&&!UUID.test(after))return reply({ok:false,reason:'invalid_cursor'},400);
-  const rows=await env.DB.prepare('SELECT record_id,kind,sha256,byte_size,created_at FROM talera_premium_records WHERE account_id=? AND record_id>? ORDER BY record_id ASC LIMIT 501').bind(accountId,after).all();
+  // Only return the current story/comment snapshot. Content-hash history remains
+  // immutable in private R2 but cannot appear as duplicate restored stories.
+  const rows=await env.DB.prepare('SELECT r.record_id,r.kind,r.sha256,r.byte_size,r.created_at FROM talera_premium_records r JOIN talera_premium_current c ON c.account_id=r.account_id AND c.kind=r.kind AND c.current_id=r.record_id WHERE r.account_id=? AND r.record_id>? ORDER BY r.record_id ASC LIMIT 501').bind(accountId,after).all();
   const batch=rows.results||[],items=batch.slice(0,500);
   return reply({ok:true,items,next:batch.length>500?items[items.length-1].record_id:null});
  }

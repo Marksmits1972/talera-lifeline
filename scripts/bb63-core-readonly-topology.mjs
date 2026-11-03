@@ -1,92 +1,102 @@
-/* BB63 Core topology evidence: READ-ONLY metadata only.
- * Called by a CI job with an existing GitHub Cloudflare secret.
- * Reads only Worker settings/deployments/code hashes. NEVER API account data,
- * D1 records, R2 objects, user sessions, or source text in logs/artifacts.
+/* BB63: Trace the ACTUAL V62 -> V56 -> CLEAN_CORE service path.
+ * GET-only Cloudflare Worker metadata and source hashes. Never touches
+ * D1 records, R2 data, sessions, end user content or production settings.
  */
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const ACCOUNT='6a396704721632d6d1889be48213c3a0';
 const V62='talera-pwa-v62-mijn-profiel-20261101';
-const BASE='https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT+'/workers/scripts/';
-const path='.talera-bb63-evidence/core-readonly-topology.json';
+const API='https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT+'/workers/scripts/';
+const FILE='.talera-bb63-evidence/core-readonly-topology.json';
 const token=process.env.TALERA_V62_CF_READ_TOKEN||'';
-const sha=buffer=>createHash('sha256').update(buffer).digest('hex');
-const report={checkedAt:new Date().toISOString(),check:'READ_ONLY',deploymentAuthorized:false,
- target:V62,liveVersion:null,liveDeployment:null,v56BindingValid:false,
- serviceTarget:null,coreMetadataChecked:false,coreScriptReadable:false,
- coreVersion:null,coreDeployment:null,coreModules:[],bindingTypes:[],
- dbBindingPresent:false,privateR2BindingPresent:false,reason:'not_started'};
-const write=()=>{mkdirSync('.talera-bb63-evidence',{recursive:true});
- writeFileSync(path,JSON.stringify(report,null,2)+'\n');};
-const assert=(value,error)=>{if(!value)throw Error(error)};
-async function get(worker,route){
- const response=await fetch(BASE+encodeURIComponent(worker)+route,{
-  method:'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json'},
+const validWorker=/^[a-z0-9][a-z0-9-]{1,95}$/;
+const report={checkedAt:new Date().toISOString(),check:'READ_ONLY',
+ deploymentAuthorized:false,entry:V62,chain:[],targetCore:null,
+ coreMetadataChecked:false,coreScriptReadable:false,coreModules:[],
+ reason:'not_started'};
+const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+const save=()=>{mkdirSync('.talera-bb63-evidence',{recursive:true});
+ writeFileSync(FILE,JSON.stringify(report,null,2)+'\n')};
+const assert=(value,reason)=>{if(!value)throw Error(reason)};
+async function request(worker,route){
+ const response=await fetch(API+encodeURIComponent(worker)+route,{
+  method:'GET',headers:{Authorization:'Bearer '+token},
   signal:AbortSignal.timeout(20000)
  });
- if(!response.ok)throw Error('cloudflare_'+worker+'_http_'+response.status);
+ assert(response.ok,'cloudflare_'+worker+'_http_'+response.status);
  return response;
 }
-async function json(worker,route){
- const r=await get(worker,route),body=await r.json();
- assert(body.success===true&&body.result,'cloudflare_'+worker+'_invalid_result');
- return body.result;
+async function getJson(worker,route){
+ const data=await (await request(worker,route)).json();
+ assert(data?.success===true&&data.result,'cloudflare_'+worker+'_invalid_metadata');
+ return data.result;
 }
-function active(data){
- const items=Array.isArray(data)?data:data?.deployments;
- assert(Array.isArray(items),'cloudflare_deployments_missing');
- const ordered=items.filter(x=>x.id&&Array.isArray(x.versions))
+function active(deployments){
+ const rows=Array.isArray(deployments)?deployments:deployments?.deployments;
+ assert(Array.isArray(rows),'cloudflare_deployments_unknown');
+ const sorted=rows.filter(row=>row?.id&&Array.isArray(row.versions))
   .sort((a,b)=>Date.parse(b.created_on||0)-Date.parse(a.created_on||0));
- const first=ordered[0];
- assert(first?.versions?.length===1&&first.versions[0]?.percentage===100&&
-  first.versions[0]?.version_id,'active_worker_not_single_version');
- return {deployment:first.id,version:first.versions[0].version_id};
+ const entry=sorted[0];
+ assert(entry?.versions?.length===1&&entry.versions[0]?.percentage===100&&
+  entry.versions[0]?.version_id,'cloudflare_noncanonical_deployment');
+ return {deployment:entry.id,version:entry.versions[0].version_id};
 }
 try{
- assert(token.length>15,'existing_cloudflare_secret_missing');
- const [v62settings,v62history]=await Promise.all([json(V62,'/settings'),json(V62,'/deployments')]);
- const binding=(v62settings.bindings||[]).filter(b=>b?.name==='V56_BASE'&&b.type==='service');
- assert(binding.length===1&&/^[a-z0-9][a-z0-9-]{1,95}$/.test(binding[0].service||''),'v56_binding_unknown');
- report.v56BindingValid=true;report.serviceTarget=binding[0].service;
- const v62=active(v62history);
- report.liveVersion=v62.version;report.liveDeployment=v62.deployment;
- // The first worker bound to the app is authoritative, not a guessed talera-core script.
- const service=report.serviceTarget;
- const [settings,history,body]=await Promise.all([json(service,'/settings'),json(service,'/deployments'),get(service,'/content/v2')]);
- report.coreMetadataChecked=true;
- const live=active(history);
- report.coreVersion=live.version;report.coreDeployment=live.deployment;
- const names=(settings.bindings||[]).map(({name,type})=>({name,type}));
- report.bindingTypes=names;
- report.dbBindingPresent=names.some(b=>b.name==='DB'&&b.type==='d1');
- report.privateR2BindingPresent=names.some(b=>b.name==='PREMIUM_PRIVATE'&&b.type==='r2_bucket');
- assert(report.dbBindingPresent&&report.privateR2BindingPresent,'missing_premium_core_bindings');
- const kind=body.headers.get('content-type')||'';
- const form=kind.includes('multipart/form-data')?await body.formData():null;
- if(form){
-  for(const [name,part] of form.entries()){
-   if(typeof part.arrayBuffer!=='function')continue;
-   const bytes=Buffer.from(await part.arrayBuffer());
-   const source=bytes.toString('utf8');
-   report.coreModules.push({name,bytes:bytes.length,sha256:sha(bytes),
-    hasPremiumCloudHandler:source.includes('handleCorePremiumCloud'),
-    hasPremiumCloudRoute:source.includes('premiumCloudRoute'),
-    hasCurrentPointer:source.includes('talera_premium_current')});
+ assert(token.length>15,'cloudflare_read_token_missing');
+ let worker=V62;const seen=new Set();
+ for(let depth=0;depth<5;depth++){
+  assert(validWorker.test(worker)&&!seen.has(worker),'worker_service_cycle_or_invalid_name');
+  seen.add(worker);
+  const [settings,deployment]=await Promise.all([
+   getJson(worker,'/settings'),getJson(worker,'/deployments')
+  ]);
+  const current=active(deployment);
+  const bindings=(settings?.bindings||[]).map(binding=>({
+   name:binding.name,type:binding.type,
+   ...(binding.type==='service'&&typeof binding.service==='string'
+    ?{service:binding.service}: {})
+  }));
+  const hop={worker,depth,version:current.version,deployment:current.deployment,
+   bindings,db:bindings.some(b=>b.type==='d1'&&b.name==='DB'),
+   premiumPrivate:bindings.some(b=>b.type==='r2_bucket'&&b.name==='PREMIUM_PRIVATE')};
+  report.chain.push(hop);
+  if(depth===0){
+   const link=bindings.filter(b=>b.name==='V56_BASE'&&b.type==='service');
+   assert(link.length===1&&validWorker.test(link[0].service||''),'missing_v62_v56_binding');
+   worker=link[0].service;
+   continue;
   }
- }else{
-  const bytes=Buffer.from(await body.arrayBuffer());
-  const source=bytes.toString('utf8');
-  report.coreModules.push({name:'single_script',bytes:bytes.length,sha256:sha(bytes),
-    hasPremiumCloudHandler:source.includes('handleCorePremiumCloud'),
-    hasPremiumCloudRoute:source.includes('premiumCloudRoute'),
-    hasCurrentPointer:source.includes('talera_premium_current')});
+  if(hop.db&&hop.premiumPrivate){
+   report.targetCore=worker;report.coreMetadataChecked=true;
+   const response=await request(worker,'/content/v2');
+   const mime=response.headers.get('content-type')||'';
+   const form=mime.includes('multipart/form-data')?await response.formData():null;
+   const parts=form?[...form.entries()]:[['single_script',new Blob([await response.arrayBuffer()])]];
+   for(const [name,part] of parts){
+    const bytes=Buffer.from(await part.arrayBuffer());
+    const code=bytes.toString('utf8');
+    report.coreModules.push({name,bytes:bytes.length,sha256:sha(bytes),
+     hasCloudHandler:code.includes('handleCorePremiumCloud'),
+     hasPremiumRoute:code.includes('premiumCloudRoute'),
+     hasCurrentPointer:code.includes('talera_premium_current')});
+   }
+   report.coreScriptReadable=true;report.reason='active_core_chain_confirmed';
+   break;
+  }
+  // This is NOT necessarily the final Core; V56 delegates to CLEAN_CORE.
+  const service=bindings.find(b=>b.name==='CLEAN_CORE'&&b.type==='service')
+    ||bindings.find(b=>b.name==='CORE'&&b.type==='service');
+  if(!service?.service){report.reason='no_verified_core_service_beyond_'+worker;break}
+  assert(validWorker.test(service.service),'invalid_next_core_service');
+  worker=service.service;
  }
- report.coreScriptReadable=true;
- report.reason='core_source_and_bindings_read_only_confirmed';
- console.log('BB63 Core topology confirmed; V62='+V62+'; boundCore='+service+'; modules='+report.coreModules.length+
-  '; currentVersionPresent='+report.coreModules.some(x=>x.hasCurrentPointer));
+ assert(report.coreScriptReadable,'core_chain_not_fully_verified');
+ console.log('BB63 live Worker route read-only CONFIRMED: '+
+  report.chain.map(x=>x.worker).join(' -> ')+
+  '; target Core modules='+report.coreModules.length+
+  '; current-pointer code already active='+report.coreModules.some(x=>x.hasCurrentPointer));
 }catch(error){
- report.reason=String(error.message||'unknown_readonly_error');
- console.log('::warning::BB63 Core read-only topology not confirmed: '+report.reason);
+ if(report.reason==='not_started')report.reason=String(error.message||'unknown_read_error');
+ console.log('::warning::BB63 Core read-only topology incomplete: '+report.reason);
  process.exitCode=1;
-}finally{write()}
+}finally{save()}

@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-vertelcyclus-r10-safari-media-gestures-20261103';
+const BUILD='v61-vertelcyclus-r11-photo-layer-link-20261103';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -614,6 +614,12 @@ function patchPresent(html){
   const photoRead="if(item.kind==='photo'){\n           try{url=await (store.displayUrl?store.displayUrl(item.key):store.mediaUrl(item.key))}catch(e){}\n         }";
   if(!block.includes(photoRead))return{html,changed:false,reason:'video-poster-hydrate-upstream-changed'};
   block=block.replace(photoRead,photoRead+"\n         if(item.kind==='video'){\n           try{const poster=await store.blob(item.key+':phone-v1');if(poster instanceof Blob&&poster.size&&String(poster.type).startsWith('image/'))url=URL.createObjectURL(poster)}catch(e){}\n         }");
+  // The already-existing RH19 photograph layer reads _taleraFrames,
+  // while the V61 adapter hydrates _zeroFrames. Both must reference the
+  // SAME array of canonical media IDs; no duplicate files or viewer.
+  const frameAssignment='memory._zeroFrames=frames;';
+  if(!block.includes(frameAssignment))return{html,changed:false,reason:'rh19-frame-contract-changed'};
+  block=block.replace(frameAssignment,'memory._zeroFrames=frames;memory._taleraFrames=frames;');
   const oldCover="photos.push(item.kind==='video'?videoPoster:(url||placeholder));";
   if(!block.includes(oldCover))return{html,changed:false,reason:'video-poster-cover-upstream-changed'};
   block=block.replace(oldCover,"photos.push(item.kind==='video'?(url||videoPoster):(url||placeholder));");

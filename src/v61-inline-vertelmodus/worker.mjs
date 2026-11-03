@@ -181,15 +181,21 @@ function openZeroPlayer(g){
   const panel=document.createElement('section');
   panel.id='taleraV61RecControls';
   panel.setAttribute('aria-label','TALERA Vertelmodus');
-  panel.innerHTML='<div class="talera-v61-rec-top"><strong>Vertellen bij mijn herinnering</strong><button type="button" id="taleraV61RecClose">Klaar</button></div><p id="taleraV61RecStatus" role="status">Je kunt nu inspreken terwijl je door de foto’s bladert.</p><div class="talera-v61-rec-actions"><button type="button" id="taleraV61RecPrev" aria-label="Vorige foto">‹</button><button type="button" id="taleraV61RecStart">● Opnemen</button><button type="button" id="taleraV61RecPause" hidden>Pauze</button><button type="button" id="taleraV61RecStop" hidden>Stop</button><button type="button" id="taleraV61RecNext" aria-label="Volgende foto">›</button></div><div class="talera-v61-rec-bottom"><span id="taleraV61RecClock">00:00</span><audio id="taleraV61RecPreview" controls hidden></audio></div>';
+  panel.innerHTML='<div class="talera-v61-rec-top"><strong>Vertellen</strong><button type="button" id="taleraV61RecClose">Klaar</button></div><p id="taleraV61RecStatus" role="status" hidden></p><div class="talera-v61-rec-actions"><button type="button" id="taleraV61RecStart">● Opnemen</button><button type="button" id="taleraV61RecPause" hidden>Pauze</button><button type="button" id="taleraV61RecStop" hidden>Stop</button></div><div class="talera-v61-rec-bottom"><span id="taleraV61RecClock" hidden>00:00</span><button type="button" id="taleraV61RecPlay" hidden>▶ Terugluisteren</button><audio id="taleraV61RecPreview" hidden></audio></div>';
   document.body.appendChild(panel);
   document.body.classList.add('talera-v61-inline-recording');
   const el=id=>panel.querySelector('#'+id);
   const status=el('taleraV61RecStatus'),start=el('taleraV61RecStart'),pause=el('taleraV61RecPause'),stop=el('taleraV61RecStop'),close=el('taleraV61RecClose');
-  const clock=el('taleraV61RecClock'),preview=el('taleraV61RecPreview');
+  const clock=el('taleraV61RecClock'),preview=el('taleraV61RecPreview'),playback=el('taleraV61RecPlay');
+  const feedback=text=>{status.textContent=text;status.hidden=!text};
+  const updatePlayback=()=>{playback.textContent=preview.paused?'▶ Terugluisteren':'Ⅱ Pauze'};
+  playback.onclick=()=>{if(preview.paused){void preview.play().catch(()=>feedback('Afspelen is niet beschikbaar.'))}else preview.pause()};
+  preview.addEventListener('play',updatePlayback);
+  preview.addEventListener('pause',updatePlayback);
+  preview.addEventListener('ended',updatePlayback);
   const s={g,panel,frame,stream:null,recorder:null,parts:[],cues:[],started:0,paused:0,pauseStart:0,saving:false,clockTimer:null,observer:null,skipClickUntil:0};
   taleraZeroSession=s;
-  if(g.voice&&assets.get(g.voice)){preview.src=originalUrl(g.voice);preview.hidden=false}
+  if(g.voice&&assets.get(g.voice)){preview.src=originalUrl(g.voice);playback.hidden=false}
   const elapsed=()=>Math.max(0,performance.now()-s.started-s.paused-(s.pauseStart?performance.now()-s.pauseStart:0));
   const updateClock=()=>{const n=Math.floor(elapsed()/1000);clock.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')};
   const videoAdjust=()=>{
@@ -227,12 +233,11 @@ function openZeroPlayer(g){
     if($('draft'))$('draft').textContent=g.voice?'Opname als concept bewaard':'Concept bewaard op dit toestel';
   };
   close.onclick=finish;
-  el('taleraV61RecPrev').onclick=()=>{if(g.media.length>1)stepPhoto(g,-1)};
-  el('taleraV61RecNext').onclick=()=>{if(g.media.length>1)stepPhoto(g,1)};
   start.onclick=async()=>{
+    if(s.recorder?.state==='recording'){stop.click();return}
     if(s.recorder||s.saving)return;
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status.textContent='Deze browser ondersteunt opnemen niet.';return}
-    start.disabled=true;preview.pause();
+    start.disabled=true;preview.pause();feedback('');
     try{
       s.stream=await navigator.mediaDevices.getUserMedia({audio:true});
       const mime=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(x=>MediaRecorder.isTypeSupported(x));
@@ -242,13 +247,13 @@ function openZeroPlayer(g){
       const v=frame.querySelector(':scope > video');
       if(v&&s.cues.length)s.cues[0].videoAtMs=Math.max(0,Math.round((v.currentTime||0)*1000));
       r.ondataavailable=e=>{if(e.data?.size)s.parts.push(e.data)};
-      r.onerror=()=>{status.textContent='Opnemen mislukt. De vorige opname is behouden.';cleanMedia();s.recorder=null;start.disabled=false;start.hidden=false;pause.hidden=true;stop.hidden=true};
+      r.onerror=()=>{feedback('Opnemen mislukt. De vorige opname is behouden.');cleanMedia();s.recorder=null;start.textContent='● Opnemen';start.disabled=false;pause.hidden=true;stop.hidden=true;clock.hidden=true};
       r.onstop=async()=>{
-        s.saving=true;status.textContent='Stem veilig bewaren…';
+        s.saving=true;start.disabled=true;start.textContent='Opslaan…';feedback('');
         const duration=Math.max(0,Math.round(elapsed())),type=r.mimeType||mime||'audio/webm';
         const blob=new Blob(s.parts,{type});
-        cleanMedia();s.recorder=null;pause.hidden=true;stop.hidden=true;start.hidden=false;start.disabled=false;
-        if(!blob.size){status.textContent='Geen opname ontvangen. De vorige opname blijft bestaan.';s.saving=false;return}
+        cleanMedia();s.recorder=null;pause.hidden=true;stop.hidden=true;clock.hidden=true;
+        if(!blob.size){feedback('Geen opname ontvangen. De vorige opname blijft bestaan.');s.saving=false;start.textContent='● Opnemen';start.disabled=false;return}
         const id=uid(),file=new File([blob],'mijn-stem.'+(type.includes('mp4')?'m4a':'webm'),{type});
         const old={voice:g.voice,cues:g.voiceCues,duration:g.voiceDurationMs,wave:g.voiceWave};
         try{
@@ -256,15 +261,15 @@ function openZeroPlayer(g){
           assets.set(id,file);
           g.voice=id;g.voiceCues=s.cues.map(c=>({...c}));g.voiceDurationMs=duration;g.voiceWave=[];
           await saveDraft();
-          preview.src=originalUrl(id);preview.hidden=false;status.textContent='Opname bewaard bij deze herinnering.';
+          preview.src=originalUrl(id);playback.hidden=false;feedback('');
           if(old.voice&&old.voice!==id){try{await deleteFiles([old.voice]);revoke(old.voice);assets.delete(old.voice)}catch(e){}}
         }catch(e){
           g.voice=old.voice;g.voiceCues=old.cues;g.voiceDurationMs=old.duration;g.voiceWave=old.wave;
           status.textContent='Bewaren niet gelukt: '+e.message+'. De vorige opname is behouden.';
-        }finally{s.saving=false}
+        }finally{s.saving=false;start.textContent='● Opnemen';start.disabled=false}
       };
-      r.start(1000);start.hidden=true;pause.hidden=false;stop.hidden=false;
-      status.textContent='Opname loopt. Tik of veeg om van foto te wisselen.';
+      r.start(1000);start.textContent='■ Stop';start.hidden=false;start.disabled=false;pause.hidden=true;stop.hidden=true;clock.hidden=false;
+      feedback('');
       videoAdjust();s.clockTimer=setInterval(updateClock,350);
     }catch(e){cleanMedia();s.recorder=null;start.disabled=false;status.textContent='Microfoon niet beschikbaar: '+e.message}
   };
@@ -279,23 +284,27 @@ function openZeroPlayer(g){
       status.textContent='Opname hervat.';videoAdjust();
     }
   };
-  stop.onclick=()=>{if(s.recorder&&s.recorder.state!=='inactive'){s.saving=true;stop.disabled=true;s.recorder.stop();status.textContent='Opname afronden…'}};
+  stop.onclick=()=>{if(s.recorder&&s.recorder.state!=='inactive'){s.saving=true;stop.disabled=true;start.disabled=true;s.recorder.stop();feedback('')}};
   videoAdjust();
 }
 
 const RECORD_CSS = '\n<style id="talera-v61-inline-record-css">'+
 'body.talera-v61-inline-recording{overflow:hidden!important}'+
-'body.talera-v61-inline-recording #app .work.talera-compact-work #frame{display:flex!important;align-items:center!important;justify-content:center!important;position:fixed!important;inset:0!important;top:0!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;border:0!important;border-radius:0!important;z-index:2000!important;background:#173550!important;overflow:hidden!important}'+
+'body.talera-v61-inline-recording #frame{background:#fbfaf7!important}'+
+'body.talera-v61-inline-recording #app .work.talera-compact-work #frame{display:flex!important;align-items:center!important;justify-content:center!important;position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;z-index:2000!important;background:#fbfaf7!important;overflow:hidden!important}'+
 'body.talera-v61-inline-recording #frame>img,body.talera-v61-inline-recording #frame>video{width:100%!important;height:100%!important;object-fit:contain!important;max-height:none!important;max-width:none!important}'+
-'#taleraV61RecControls{position:fixed;z-index:2200;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:#f8f7f3;color:#173550;border-radius:20px;border:1px solid #d5e1e3;padding:12px;box-shadow:0 6px 30px #142c4760;font:500 14px/1.4 system-ui}'+
-'#taleraV61RecControls .talera-v61-rec-top,#taleraV61RecControls .talera-v61-rec-actions{display:flex;align-items:center;justify-content:space-between;gap:7px}'+
-'#taleraV61RecControls .talera-v61-rec-top strong{font:700 14px system-ui}'+
-'#taleraV61RecControls .talera-v61-rec-top button{background:transparent;border:1px solid #bfcfd6;border-radius:20px;padding:8px 14px}'+
-'#taleraV61RecControls p{margin:8px 0;color:#355668;font-size:12px}'+
-'#taleraV61RecControls .talera-v61-rec-actions button{min-height:44px;min-width:44px;padding:8px 10px;border:1px solid #bed1da;border-radius:13px;background:#e5edf0;color:#14384d;font:700 14px system-ui}'+
-'#taleraV61RecControls #taleraV61RecStart,#taleraV61RecControls #taleraV61RecStop{flex:1;background:#173d52;color:white}'+
-'#taleraV61RecControls .talera-v61-rec-bottom{display:flex;align-items:center;gap:10px;margin-top:8px}'+
-'#taleraV61RecControls audio{width:100%;max-width:100%;height:34px}'+
+'body.talera-v61-inline-recording #frame .empty{color:#4f6b76!important;background:transparent!important}'+
+'#taleraV61RecControls{position:fixed;z-index:2200;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.98);color:#183b50;border-radius:21px;border:1px solid rgba(218,225,227,.95);padding:12px 15px;box-shadow:0 8px 27px rgba(18,48,64,.12);font:500 14px/1.4 system-ui}'+
+'#taleraV61RecControls .talera-v61-rec-top,#taleraV61RecControls .talera-v61-rec-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}'+
+'#taleraV61RecControls .talera-v61-rec-top strong{font:750 15px system-ui;letter-spacing:.01em}'+
+'#taleraV61RecControls .talera-v61-rec-top button{background:#f7f8f6;border:1px solid #e2e7e8;color:#163b50;border-radius:20px;padding:8px 17px;font:650 14px system-ui;min-height:40px}'+
+'#taleraV61RecControls p{margin:8px 0;color:#a34a30;font-size:12px}'+
+'#taleraV61RecControls .talera-v61-rec-actions{margin-top:11px}'+
+'#taleraV61RecControls .talera-v61-rec-actions button{width:100%;min-height:52px;border:0;border-radius:15px;background:#16455b;color:#fff;font:700 16px system-ui;letter-spacing:.01em}'+
+'#taleraV61RecControls .talera-v61-rec-bottom{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:0}'+
+'#taleraV61RecControls .talera-v61-rec-bottom:has(button:not([hidden])){margin-top:9px}'+
+'#taleraV61RecControls #taleraV61RecClock:not([hidden]){display:block;font:650 13px system-ui;font-variant-numeric:tabular-nums;color:#56717a}'+
+'#taleraV61RecControls #taleraV61RecPlay{border:0;background:transparent;color:#16455b;padding:9px 14px;font:650 14px system-ui;min-height:38px}'+
 '#taleraV61RecControls [hidden]{display:none!important}</style>\n';
 
 function patchPresent(html){

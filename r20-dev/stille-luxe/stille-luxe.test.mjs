@@ -7,7 +7,7 @@ const origin='https://staging.example.test';
 const testHtml= [
  '<!doctype html><html><head>',
  '<meta name="theme-color" content="#e7a98b">',
- '<style>.nav-item{color:#337cca}.story.active{background:#eaf4ff}</style>',
+ '<style>.nav-item{color:#337cca}.story.active{background:#eaf4ff}#photoStage{background:#fbfaf7}.talera-v61-narration-visual #photoLayerA{background:#337cca}</style>',
  '<script id="talera-player">const COLOR="#337cca";const inner="<style>.frame{color:#337cca}</style>";</script>',
  '<style id="talera-v8-player-clock">.clock{color:#337cca}</style>',
  '</head><body class="app"><div class="logo">TALERA</div></body></html>'
@@ -32,6 +32,8 @@ test('actual HTML styles normalized, while player JavaScript and its embedded CS
  assert.match(html,/const COLOR="#337cca"/);
  assert.match(html,/const inner="<style>\.frame\{color:#337cca\}<\/style>"/);
  assert.match(html,/\.clock\{color:#337cca\}/);
+ assert.match(html,/#photoStage\{background:#fbfaf7\}/);
+ assert.match(html,/\.talera-v61-narration-visual #photoLayerA\{background:#337cca\}/);
  assert.match(html,/content="#FFFFFF"/);
  assert.match(html,/id="talera-stille-luxe"/);
  assert.equal((html.match(/id="talera-stille-luxe"/g)||[]).length,1);

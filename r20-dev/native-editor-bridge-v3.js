@@ -5,7 +5,7 @@ function taleraDevNativeEditorPatch(html){
   const keyWork="setupV10(g,details,frame,footer);taleraCompactWorkbench(g);if(errorMsg)showError(errorMsg)";
   const keyRemove="dlg.remove();if(current===gid)current=groups[0]?.id||'';";
   const keySaved="const remove=[...g.media,...(g.voice?[g.voice]:[])];groups=groups.filter(x=>x!==g);";
-  if([keyBoot,keyWork,keyRemove,keySaved].some(k=>html.split(k).length!==2)){
+  if([keyBoot,keyWork,keyRemove,keySaved,"async function boot(){"].some(k=>html.split(k).length!==2)){
     return {changed:false,html,reason:'native-tell-editor-contract-changed',
      anchors:[keyBoot,keyWork,keyRemove,keySaved].map(k=>html.split(k).length-1)};
   }
@@ -36,7 +36,6 @@ if(demoId){
      dateConfirmed:true,dateSource:'history',title:String(ref.title||'Voorbeeldherinnering').slice(0,140),
      text:String(ref.text||'').slice(0,20000),season:'',demoSourceId:demoId};
    groups.push(g);
-   await saveDraft();
   }
   open('work',g.id);
   return;
@@ -54,7 +53,8 @@ if(g.demoSourceId){
  details.appendChild(button);
 }
 `;
-  let out=html.replace(keyBoot,helper+"await readDraft();"+init+"const edit=new URLSearchParams(location.search).get('edit');");
+  let out=html.replace("async function boot(){",helper+"async function boot(){");
+  out=out.replace(keyBoot,"await readDraft();"+init+"const edit=new URLSearchParams(location.search).get('edit');");
   out=out.replace(keyWork,keyWork+";"+nativeButton);
   out=out.replace(keyRemove,"if(g.demoSourceId)taleraDevHideExampleAfterAction(g.demoSourceId);"+keyRemove);
   out=out.replace(keySaved,"if(g.demoSourceId)taleraDevHideExampleAfterAction(g.demoSourceId);"+keySaved);

@@ -48,6 +48,9 @@ for(const check of checks){
     assert.match(text,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/,'photo canvas reaches bottom');
     assert.match(text,/@media \(display-mode:standalone\)/,'no change to regular browsers');
     assert.match(text,/@supports \(-webkit-touch-callout:none\)/,'Safari only');
+    assert.match(text,/\.app main,\.app \.memory-space\{overflow:visible!important;\}/,'photo-parent clips removed');
+    assert.match(text,/\.app \.photo-stage\{bottom:calc\(-1 \* env\(safe-area-inset-top,0px\)\)!important;/,'real photo extends through bottom gap');
+    assert.match(text,/height:calc\(100% \+ env\(safe-area-inset-top,0px\)\)!important;/,'photo stage height increased');
     // Compare the entire protected R20/V9 body to its original live route.
     const baseline=await fetch(
       'https://talera-v61-r20-definitief-verwijderen-v9-20261104.mark-a39.workers.dev/present',

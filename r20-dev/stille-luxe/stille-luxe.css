@@ -18,7 +18,7 @@ html,body{background-color:#FFFFFF;color:#304653;font-family:-apple-system,Blink
 :is(.subtle,.muted,.hint,.caption,.meta,.story-loc,.detail-subtle,.month-mark,.age-info small){color:#718D9A;}
 :is(.topbar,header:not(.presentation-header):not(.mast)){background-color:#FFFFFF;}
 /* Approved 04-11 photo-led home variant: dark top safe area, transparent mast on photo. */
-html[data-talera-hero="true"],html[data-talera-hero="true"] body{background-color:#304653;}
+html[data-talera-hero="true"],html[data-talera-hero="true"] body{background-color:#FFFFFF;}
 html[data-talera-hero="true"] .hero{background:#304653;}
 html[data-talera-hero="true"] .mast{background:transparent;color:#FFFFFF;}
 html[data-talera-hero="true"] .mast .logo{color:#FFFFFF;text-shadow:0 1px 5px #304653;}

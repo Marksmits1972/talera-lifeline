@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `c2c2a0c1-af39-467d-ab96-89ab07ff3de7`  
-**Deployment:** `21eb2f12-f25c-4cc8-be27-35b40ac09d48`  
+**Actuele Worker-versie:** `2e5252a4-10ac-4ace-880b-95891aecfe53`  
+**Deployment:** `a643a0f7-5404-4034-82aa-12a1b53dffc0`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -112,4 +112,7 @@ Elk workers.dev-hostname heeft een eigen browserorigin en dus andere lokale Inde
 
 **Reparatie uitsluitend in afzonderlijke stijlstaging**: voor GET `/present` en `/present/` worden in de HTML-`<head>` de drie metadata ingesteld op `apple-mobile-web-app-capable=yes`, `apple-mobile-web-app-status-bar-style=black-translucent`, `theme-color=#304653`. De oorspronkelijke `viewport-fit=cover` blijft. **Alle HTML na `</head>` blijft exact gelijk aan V9**; geen nieuwe CSS, geen JS, geen voorstelling van een andere mediaplayer. Andere PWA-schermen en het witte manifest blijven ongewijzigd.
 
-**Toetsing:** automatische Node-regressietest met originele speler-body en scripts, dubbele tags en tweede rendering; live alleen-lezen vergelijking van de volledige body van `/present` tussen V9 en deze staging is opgenomen in `smoke-live.mjs`. **iPhone-standalone statusgedrag kan niet via Linux-screenshot bewezen worden** en moet op toestel worden nagekeken. Het OS kan de statusbalkconfiguratie bij starten/installeren vastleggen. De gebruiker mag daarom de bestaande geïnstalleerde PWA NIET verwijderen voor deze test: lokale Free-herinneringen kunnen anders verloren gaan.
+**Toetsing:** automatische Node-regressietest met originele speler-body en scripts, dubbele tags en tweede rendering; live alleen-lezen vergelijking van de volledige body van `/present` tussen V9 en deze staging is opgenomen in `smoke-live.mjs`. 
+**Controle na publicatie:** GitHub Actions [run 41897293077](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41897293077) toont **13/13 Node-tests**, **8/8 echte HTTP-controles**, inclusief een byte-voor-byte vergelijking van alles na de `</head>` in `/present` tegen beschermde V9. De iPhone-statuszone kan alleen op een werkelijk iOS-standalone toestel beoordeeld worden. V9 is ongewijzigd.
+
+**iPhone-standalone statusgedrag kan niet via Linux-screenshot bewezen worden** en moet op toestel worden nagekeken. Het OS kan de statusbalkconfiguratie bij starten/installeren vastleggen. De gebruiker mag daarom de bestaande geïnstalleerde PWA NIET verwijderen voor deze test: lokale Free-herinneringen kunnen anders verloren gaan.

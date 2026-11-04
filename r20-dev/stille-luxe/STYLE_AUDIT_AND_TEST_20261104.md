@@ -102,3 +102,14 @@ Elk workers.dev-hostname heeft een eigen browserorigin en dus andere lokale Inde
 3. Daarna volledige regressie inclusief V7/V8/V9 en bruikbaarheid back-up, delen en instellingen, voor zover aanwezig.
 4. De `/present`-route is bewust van generieke CSS-herkleuring uitgezonderd om de goedgekeurde R20-presentatie en V7/V8 fixes niet te beschadigen; presentatiechroming is dus nog NIET als geharmoniseerd geaccepteerd.
 5. Na een geslaagde controle kan besloten worden of diepere bronopschoning veilig kan worden uitgevoerd. V9/R20 blijven intussen onaangeroerd.
+
+
+## Gerichte presentatiecorrectie — witte iPhone-statusstrook (04-11-2026)
+
+**Visueel oordeel:** op de iPhone-screenshot is de foto horizontaal en onderaan al randloos. Het witte vlak zit bovenaan ter hoogte van de iOS-statusbalk, niet als afgeronde fotokaart. Geen wijziging aan object-fit, fotokader, tijdlijn of bediening nodig.
+
+**Gecontroleerde historische bron:** in de V56-presentatiewrapper stond `TALERA_PRESENTATIE_V15_HEAD` met `apple-mobile-web-app-status-bar-style=default`; de oudere PWA-manifestkleuren waren wit. Apple documenteert dat `default` de webinhoud ONDER de statusbalk begint en `black-translucent` de webinhoud onder de statusbalk laat doorlopen. Zie Apple "Supported Meta Tags" en "Configuring Web Applications".
+
+**Reparatie uitsluitend in afzonderlijke stijlstaging**: voor GET `/present` en `/present/` worden in de HTML-`<head>` de drie metadata ingesteld op `apple-mobile-web-app-capable=yes`, `apple-mobile-web-app-status-bar-style=black-translucent`, `theme-color=#304653`. De oorspronkelijke `viewport-fit=cover` blijft. **Alle HTML na `</head>` blijft exact gelijk aan V9**; geen nieuwe CSS, geen JS, geen voorstelling van een andere mediaplayer. Andere PWA-schermen en het witte manifest blijven ongewijzigd.
+
+**Toetsing:** automatische Node-regressietest met originele speler-body en scripts, dubbele tags en tweede rendering; live alleen-lezen vergelijking van de volledige body van `/present` tussen V9 en deze staging is opgenomen in `smoke-live.mjs`. **iPhone-standalone statusgedrag kan niet via Linux-screenshot bewezen worden** en moet op toestel worden nagekeken. Het OS kan de statusbalkconfiguratie bij starten/installeren vastleggen. De gebruiker mag daarom de bestaande geïnstalleerde PWA NIET verwijderen voor deze test: lokale Free-herinneringen kunnen anders verloren gaan.

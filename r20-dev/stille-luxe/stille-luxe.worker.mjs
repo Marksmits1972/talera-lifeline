@@ -24,13 +24,22 @@ OLD.push(
 );
 const REGEX = new RegExp(OLD.map(([x])=>x.replace('#','\\#')).join('|'),'gi');
 function rewriteStyleBlock(html){
-  // Never rewrite colors inside inline JavaScript, including script-created CSS,
-  // story player logic and presentation timings. Only inspect actual HTML CSS.
-  return html.split(/(<script\b[^>]*>[\s\S]*?<\/script\s*>)/gi).map(part => {
+  // Protect all JavaScript including embedded style templates, the narration
+  // engine, and the presentation renderer. Process actual CSS blocks only.
+  const protectedSelector=/(?:photoStage|photoLayer|story-synced-photo|talera-v61-narration|talera-v61-inline-record|taleraV61Rec|player-clock|presentatie|presentation|\.baseStage|#frame\b|\.recording|\.swipe)/i;
+  const color=c=>OLD.find(([v])=>v===c.toLowerCase())?.[1]||c;
+  return html.split(/(<script\b[^>]*>[\s\S]*?<\/script\s*>)/gi).map(part=>{
     if(/^<script\b/i.test(part))return part;
     return part.replace(/<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi,(whole,attrs,body)=>{
       if(/(?:talera-v8|narration|photo-strip|player-clock|presentation)/i.test(attrs))return whole;
-      return '<style'+attrs+'>'+body.replace(REGEX,c=>OLD.find(([v])=>v===c.toLowerCase())?.[1]||c)+'</style>';
+      // Only rewrite declaration values of safe ordinary-UI selectors.
+      // Never rewrite the protected photo/player/recording CSS even if
+      // it shares a stylesheet with a navigation rule.
+      const safe=body.replace(/([^{}]+)\{([^{}]*)\}/g,(rule,sel,declarations)=>{
+        if(protectedSelector.test(sel))return rule;
+        return sel+'{'+declarations.replace(REGEX,color)+'}';
+      });
+      return '<style'+attrs+'>'+safe+'</style>';
     });
   }).join('');
 }

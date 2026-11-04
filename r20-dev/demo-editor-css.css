@@ -1,0 +1,26 @@
+body.talera-dev-demo-page{overflow:hidden!important}
+body.talera-dev-demo-page>:not(#talera-dev-demo-editor):not(script){display:none!important}
+#talera-dev-demo-editor{position:fixed;inset:0;z-index:10090;overflow:auto;-webkit-overflow-scrolling:touch;background:#f7f5f0;color:#304653;font-family:system-ui,-apple-system,sans-serif}
+#talera-dev-demo-editor *{box-sizing:border-box}
+.talera-demo-header{display:flex;align-items:center;gap:20px;padding:calc(12px + env(safe-area-inset-top,0px)) 18px 12px;background:white;position:sticky;top:0;z-index:2}
+.talera-demo-header strong{font-size:14px;letter-spacing:.18em}
+.talera-demo-back{width:44px;height:44px;background:#eef2f3;color:#304653;font-size:32px;line-height:1;border:0;border-radius:50%}
+.talera-demo-main{width:min(100%,620px);margin:0 auto;padding:22px 20px 110px}
+.talera-demo-kicker{text-transform:uppercase;letter-spacing:.15em;font-size:11px;color:#718d9a;font-weight:750}
+.talera-demo-main h1{font:500 29px/1.15 Georgia,serif;margin:10px 0}
+.talera-demo-note{font:450 13px/1.5 system-ui;color:#647984}
+.talera-demo-form{display:grid;gap:18px}
+.talera-demo-label{display:grid;gap:7px;font-size:14px;font-weight:650}
+.talera-demo-input,.talera-demo-text{display:block;width:100%;min-height:47px;padding:12px;border:1px solid #bfced5;border-radius:12px;background:white;color:#304653;font:500 16px system-ui}
+.talera-demo-text{min-height:145px;resize:vertical}
+.talera-demo-preview{display:grid;gap:6px;font-size:13px;color:#718d9a}
+.talera-demo-preview img{width:130px;height:130px;object-fit:cover;border-radius:12px}
+.talera-demo-actions{display:flex;gap:12px;flex-wrap:wrap}
+.talera-demo-actions button{flex:1 1 190px;min-height:49px;border-radius:13px;border:1px solid #b5c6cd;padding:9px 14px;font:700 14px/1.3 system-ui}
+.talera-demo-save{background:#304653!important;color:white!important}
+.talera-demo-remove{background:#fff!important;color:#943d3d!important}
+.talera-demo-status{font-size:13px;color:#943d3d}
+.talera-demo-confirm{position:fixed;inset:0;z-index:4;display:grid;place-items:center;background:rgba(10,30,43,.6);padding:18px}
+.talera-demo-confirm-card{width:min(100%,450px);padding:22px;background:white;border-radius:20px}
+.talera-demo-confirm-card h2{font-size:20px;margin-top:0}
+.talera-demo-confirm-card p{font-size:14px;line-height:1.5}

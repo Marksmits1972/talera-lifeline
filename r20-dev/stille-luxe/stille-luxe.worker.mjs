@@ -111,8 +111,8 @@ async function icon(request,env,path){
   if(!bytes)return new Response('Originele logo-asset heeft onverwacht formaat',{status:503});
   if(path.endsWith('.svg')){
     const chunks=[];
-    for(let off=0;off<bytes.length;off+=8192)
-      chunks.push(btoa(String.fromCharCode(...bytes.subarray(off,off+8192))));
+    for(let off=0;off<bytes.length;off+=8190)
+      chunks.push(btoa(String.fromCharCode(...bytes.subarray(off,off+8190))));
     // Encode as one PNG in SVG; no geometry redrawn.
     const svg='<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#FFFFFF"/><image x="0" y="0" width="512" height="512" href="data:image/png;base64,'+chunks.join('')+'"/></svg>';
     return new Response(svg,{headers:{'content-type':'image/svg+xml','cache-control':'public, max-age=3600','x-talera-brand':'original-v3-panel-recolor'}});
@@ -128,7 +128,7 @@ export default {
     if(request.method!=='GET'||!upstream.ok)return upstream;
     if(path==='/manifest.webmanifest'){
       try{
-        const m=await upstream.json();
+        const m=JSON.parse(await upstream.clone().text());
         m.background_color=PALETTE.white;m.theme_color=PALETTE.white;
         m.icons=[
           {src:'/talera-stille-luxe-icon-192.png',sizes:'192x192',type:'image/png',purpose:'any'},

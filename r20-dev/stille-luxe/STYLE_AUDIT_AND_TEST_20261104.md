@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `2e5252a4-10ac-4ace-880b-95891aecfe53`  
-**Deployment:** `a643a0f7-5404-4034-82aa-12a1b53dffc0`  
+**Actuele Worker-versie:** `e4de5fb6-7838-418f-b7e2-61d2b3ba7fbd`  
+**Deployment:** `c68d8767-d8b6-4848-b45d-30581590725c`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -116,3 +116,11 @@ Elk workers.dev-hostname heeft een eigen browserorigin en dus andere lokale Inde
 **Controle na publicatie:** GitHub Actions [run 41897293077](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41897293077) toont **13/13 Node-tests**, **8/8 echte HTTP-controles**, inclusief een byte-voor-byte vergelijking van alles na de `</head>` in `/present` tegen beschermde V9. De iPhone-statuszone kan alleen op een werkelijk iOS-standalone toestel beoordeeld worden. V9 is ongewijzigd.
 
 **iPhone-standalone statusgedrag kan niet via Linux-screenshot bewezen worden** en moet op toestel worden nagekeken. Het OS kan de statusbalkconfiguratie bij starten/installeren vastleggen. De gebruiker mag daarom de bestaande geïnstalleerde PWA NIET verwijderen voor deze test: lokale Free-herinneringen kunnen anders verloren gaan.
+
+
+## Extra herstel — witte strook onderaan iOS-presentatie (4 november 2026)
+De producteigenaar bevestigde via een eigen iPhone-screenshot dat de eerdere `black-translucent`-statusbalk het fotobeeld bovenaan verlengde, maar dat daarna **onderaan circa één bovenste safe-area-hoogte** als wit vlak zichtbaar werd. De R20/V56-presentatiebasis bevat `.app{height:100dvh!important}`; de volledige `main`, `.memory-space` en `.photo-stage` zijn afhankelijk van de apphoogte. In iOS-standalone kan de translucente statusbalk de oorspronkelijke viewportberekening overhouden.
+
+De afzonderlijke stijlstaging injecteert daarom alleen op `/present` en `/present/` in de HTML-`<head>` een compacte style-tag `talera-present-ios-edge-to-edge`. Binnen `@supports (-webkit-touch-callout:none)` én `@media(display-mode:standalone)` wordt de bestaande apphoogte gelijk aan `calc(100dvh + env(safe-area-inset-top,0px))`; de bodyachtergrond krijgt inktblauw `#304653` als fallback. Dit rekt de bestaande fotocontainer mee op **zonder zijn eigen foto-/swipe-/tijdcode-CSS te wijzigen**. Er zijn geen scripts, foto-data, opslagvelden, handelingen of bestaande Workers veranderd.
+
+Regressietests controleren dat deze regel exact één keer binnen een presentatie-`<head>` verschijnt, andere routes onaangeroerd blijven en de hele HTML-body van de live V9-presentatie byte-voor-byte identiek blijft. **Nog open:** daadwerkelijke visuele iPhone-standalone controle op volledig beeld tot achter de onderste schermrand, ook bij het terugkeren vanuit een foto; automatische desktop/headless tests kunnen dat specifieke iOS-viewportgedrag niet reproduceren. De gebruiker hoeft de PWA niet te verwijderen.

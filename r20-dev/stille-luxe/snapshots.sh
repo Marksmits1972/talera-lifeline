@@ -13,7 +13,9 @@ for key in home mijn-leven tell present; do
   if [[ "$key" == home ]]; then page="/"; else page="/$key"; fi
   profile="$(mktemp -d)"
   echo "Capture anonymous $key (393 x 852)"
-  timeout 25 "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --disable-dev-shm-usage --no-first-run --disable-extensions --user-data-dir="$profile" --virtual-time-budget=2500 --window-size=393,852 --screenshot="$out/iphone-${key}.png" "$base$page" >/dev/null 2>&1 || true
+  budget=2500
+  if [[ "$key" == tell ]]; then budget=12000; fi
+  timeout 25 "$browser" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --disable-dev-shm-usage --no-first-run --disable-extensions --user-data-dir="$profile" --virtual-time-budget="$budget" --window-size=393,852 --screenshot="$out/iphone-${key}.png" "$base$page" >/dev/null 2>&1 || true
   rm -rf "$profile"
 done
 profile="$(mktemp -d)"

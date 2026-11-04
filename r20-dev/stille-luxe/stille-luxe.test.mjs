@@ -67,6 +67,10 @@ test('presentation restores translucent iPhone status while preserving exact R20
  assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
  assert.match(changed,/min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
  assert.match(changed,/@media \(display-mode:standalone\)/);
+ assert.match(changed,/\.app main,\.app \.memory-space\{overflow:visible!important;\}/);
+ assert.match(changed,/\.app \.photo-stage\{bottom:calc\(-1 \* env\(safe-area-inset-top,0px\)\)!important;/);
+ assert.match(changed,/height:calc\(100% \+ env\(safe-area-inset-top,0px\)\)!important;/);
+ assert.doesNotMatch(changed,/\.app \.photo-stage\{background:/);
  assert.match(changed,/@supports \(-webkit-touch-callout:none\)/);
  assert.match(changed,/html,body\{margin:0!important;background:#304653!important;overflow:hidden!important;/);
  assert.equal(changed.slice(changed.indexOf('</head>')+7),oldBody);

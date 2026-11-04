@@ -159,6 +159,22 @@ function restorePresentationStatusArea(html){
     setMeta('apple-mobile-web-app-capable','yes');
     setMeta('apple-mobile-web-app-status-bar-style','black-translucent');
     setMeta('theme-color','#304653');
+    // R20 presentation uses .app{height:100dvh!important}. With the new
+    // translucent iPhone status bar, standalone Safari expands the canvas
+    // upward by the top safe inset while 100dvh can retain its former height.
+    // Compensate ONLY for iOS standalone, so the photo reaches the bottom.
+    // Its main/media layers already use inset:0 relative to .app, and none
+    // of the story/timing/swipe logic is changed.
+    const marker='talera-present-ios-edge-to-edge';
+    if(!head.includes('id="'+marker+'"')){
+      const css='@supports (-webkit-touch-callout:none){'+
+        '@media (display-mode:standalone){'+
+        'html,body{margin:0!important;background:#304653!important;overflow:hidden!important;}'+
+        '.app{height:calc(100dvh + env(safe-area-inset-top,0px))!important;'+
+        'min-height:calc(100dvh + env(safe-area-inset-top,0px))!important;}'+
+        '}}';
+      head=head.replace(/<\/head\s*>/i,'<style id="'+marker+'">'+css+'</style>\n</head>');
+    }
     return head;
   });
 }

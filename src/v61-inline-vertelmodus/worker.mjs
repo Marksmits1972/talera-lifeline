@@ -259,8 +259,9 @@ function taleraInlineInstallOrdinaryPhotoTap(){
   // for local memories. A single capture handler handles this photo-only case.
   document.addEventListener('click',event=>{
     const s=taleraInline;
-    if(!s||s.engine!=='ordinary'||s.phase!=='ordinary'||s.frames.length<=1
-       ||!s.frames.every(frame=>frame.kind==='photo'))return;
+    // A tap belongs to ALL ordinary memories (photos or videos).
+    // Only the 2.5-second timeout below is exclusive to photo-only stories.
+    if(!s||s.engine!=='ordinary'||s.phase!=='ordinary'||s.frames.length<=1)return;
     if(!event.target?.closest?.('#photoStage'))return;
     if(event.target.closest('button,a,input,select,textarea,video,audio,nav,.timeline,[role="button"],.talera-share-shell'))return;
     event.preventDefault();

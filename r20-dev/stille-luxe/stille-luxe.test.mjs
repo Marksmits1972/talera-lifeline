@@ -124,7 +124,8 @@ test('approved photo-led homepage has ink-blue status bar and no white mast over
  const output=await res.text();
  assert.match(output,/<html data-talera-hero="true" lang="nl">/);
  assert.match(output,/<meta name="theme-color" content="#304653">/);
- assert.match(output,/\.hero\{background:#304653;\}/);\n assert.match(output,/\.mast\{background:transparent;color:#FFFFFF;\}/);
+ assert.match(output,/\.hero\{background:#304653;\}/);
+ assert.match(output,/\.mast\{background:transparent;color:#FFFFFF;\}/);
  assert.match(output,/\.mast \.logo\{color:#FFFFFF/);
  assert.match(output,/background-color:#304653/);
  assert.doesNotMatch(output,/header:not\(\.presentation-header\)\)\{background-color:#FFFFFF;\}/);

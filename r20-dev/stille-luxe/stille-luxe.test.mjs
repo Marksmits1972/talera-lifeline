@@ -64,15 +64,19 @@ test('presentation restores translucent iPhone status while preserving exact R20
  assert.match(changed,/<meta name="theme-color" content="#304653">/);
  assert.match(changed,/viewport-fit=cover/);
  assert.match(changed,/<style id="talera-present-ios-edge-to-edge">/);
- assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
+ assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;overflow:visible!important;\}/);
  assert.match(changed,/min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
  assert.match(changed,/@media \(display-mode:standalone\)/);
  assert.match(changed,/\.app main,\.app \.memory-space\{overflow:visible!important;\}/);
- assert.match(changed,/\.app \.photo-stage\{bottom:calc\(-1 \* env\(safe-area-inset-top,0px\)\)!important;/);
- assert.match(changed,/height:calc\(100% \+ env\(safe-area-inset-top,0px\)\)!important;/);
+ assert.match(changed,/\.app \.photo-stage\{top:0!important;bottom:auto!important;/);
+ assert.match(changed,/height:calc\(100% \+ max\(96px, env\(safe-area-inset-top,0px\)\)\)!important;/);
  assert.doesNotMatch(changed,/\.app \.photo-stage\{background:/);
  assert.match(changed,/@supports \(-webkit-touch-callout:none\)/);
- assert.match(changed,/html,body\{margin:0!important;background:#304653!important;overflow:hidden!important;/);
+ assert.match(changed,/html,body\{margin:0!important;overflow:hidden!important;\}/);
+ const iosStyle=changed.match(/<style id="talera-present-ios-edge-to-edge">([\s\S]*?)<\/style>/)?.[1];
+ assert.ok(iosStyle);
+ assert.doesNotMatch(iosStyle,/background(?:-color)?:/i,'do not paint anthracite instead of extending the photo');
+ assert.doesNotMatch(iosStyle,/\.app\{[^}]*overflow:hidden/);
  assert.equal(changed.slice(changed.indexOf('</head>')+7),oldBody);
  assert.equal((changed.match(/name="apple-mobile-web-app-status-bar-style"/g)||[]).length,1);
  assert.equal((changed.match(/name="theme-color"/g)||[]).length,1);
@@ -87,7 +91,7 @@ test('presentation without historical status meta receives safe-area metadata bu
  const changed=await res.text();
  assert.match(changed,/apple-mobile-web-app-status-bar-style" content="black-translucent"/);
  assert.match(changed,/theme-color" content="#304653"/);
- assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
+ assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;overflow:visible!important;\}/);
  assert.equal(changed.slice(changed.indexOf('</head>')+7),original.slice(original.indexOf('</head>')+7));
 });
 test('private APIs and unrelated paths are forwarded without styling',async()=>{

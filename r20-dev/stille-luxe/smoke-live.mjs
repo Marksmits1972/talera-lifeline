@@ -40,6 +40,20 @@ for(const check of checks){
     }
    }else{
     assert.equal(version,null,'presentation must not receive general styling');
+    assert.equal(response.headers.get('x-talera-present-status'),'photo-under-system-bar');
+    assert.match(text,/apple-mobile-web-app-status-bar-style["']\s+content=["']black-translucent/,'transparent iOS status bar');
+    assert.match(text,/viewport-fit=cover/,'retain edge-to-edge viewport');
+    assert.match(text,/name=["']theme-color["']\s+content=["']#304653/,'presentation fallback ink');
+    // Compare the entire protected R20/V9 body to its original live route.
+    const baseline=await fetch(
+      'https://talera-v61-r20-definitief-verwijderen-v9-20261104.mark-a39.workers.dev/present',
+      {headers:{'cache-control':'no-cache','user-agent':'TALERA-Style-ReadOnly-CI/1'},
+       signal:AbortSignal.timeout(20000)}
+    );
+    assert.equal(baseline.status,200,'V9 source is online');
+    const baselineHtml=await baseline.text();
+    const body=html=>{const match=/<\/head\s*>/i.exec(html);assert.ok(match,'head closes');return html.slice(match.index+match[0].length);};
+    assert.equal(body(text),body(baselineHtml),'photo, narrated player, swipe and timeline markup unchanged');
    }
   }else if(check.kind==='manifest'){
    const manifest=await response.json();

@@ -139,9 +139,14 @@ async function icon(request,env,path){
   }
   return new Response(bytes,{headers:{'content-type':'image/png','cache-control':'public, max-age=3600','x-talera-brand':'original-v3-panel-recolor'}});
 }
-/* The original /present HTML uses apple-mobile-web-app-status-bar-style=default.
- * Safari standalone then reserves a white strip above the photograph.
- * Only <head> metadata may change. The original playback code is immutable.
+/*
+ * iOS standalone fallback (WebKit bug 313800 / 301994).
+ * In affected iOS 26 installations, black-translucent moves the photo
+ * under the top status area but leaves a ~status-bar-height region outside
+ * the paintable viewport at the bottom. CSS overscan CANNOT paint there.
+ * Restore the original PWA status-bar mode and do not hack player heights.
+ * Keep the brand color as status chrome, the actual photo fills the
+ * available viewer down to the physical bottom.
  */
 function restorePresentationStatusArea(html){
   return html.replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/i,head=>{
@@ -157,37 +162,15 @@ function restorePresentationStatusArea(html){
       if(!found)head=head.replace(/<\/head\s*>/i,'<meta name="'+name+'" content="'+value+'">\n</head>');
     }
     setMeta('apple-mobile-web-app-capable','yes');
-    setMeta('apple-mobile-web-app-status-bar-style','black-translucent');
+    setMeta('apple-mobile-web-app-status-bar-style','default');
     setMeta('theme-color','#304653');
-    // R20 presentation uses .app{height:100dvh!important}. With the new
-    // translucent iPhone status bar, standalone Safari expands the canvas
-    // upward by the top safe inset while 100dvh can retain its former height.
-    // Compensate ONLY for iOS standalone, so the photo reaches the bottom.
-    // Its main/media layers already use inset:0 relative to .app, and none
-    // of the story/timing/swipe logic is changed.
-    const marker='talera-present-ios-edge-to-edge';
-    if(!head.includes('id="'+marker+'"')){
-      const css='@supports (-webkit-touch-callout:none){'+
-        '@media (display-mode:standalone){'+
-        // The legacy photo had full-bleed output before status-bar metadata
-        // changed. The iOS view now shifts 100dvh upwards, but R20 still
-        // clips the .app at the previous bottom edge. The prior color
-        // fallback could only mask that exposed space.
-        // Unclip the parent chain and overscan the actual photograph;
-        // do not move the timeline, captions, player, or gestures.
-        'html,body{margin:0!important;overflow:hidden!important;}'+
-        '.app{height:calc(100dvh + env(safe-area-inset-top,0px))!important;'+
-        'min-height:calc(100dvh + env(safe-area-inset-top,0px))!important;'+
-        'overflow:visible!important;}'+
-        '.app main,.app .memory-space{overflow:visible!important;}'+
-        '.app .photo-stage{top:0!important;bottom:auto!important;'+
-        'height:calc(100% + max(96px, env(safe-area-inset-top,0px)))!important;}'+
-        '}}';
-      head=head.replace(/<\/head\s*>/i,'<style id="'+marker+'">'+css+'</style>\n</head>');
-    }
+    // Strip only the abandoned staging workaround if any upstream already
+    // contains it. Never rewrite the player's body, media or timestamps.
+    head=head.replace(/<style\s+id=["']talera-present-ios-edge-to-edge["'][^>]*>[\s\S]*?<\/style>\s*/gi,'');
     return head;
   });
 }
+
 export default {
   async fetch(request,env){
     if(!env?.V9_BASE?.fetch)return new Response('V9-herstelbasis ontbreekt',{status:503});
@@ -206,8 +189,8 @@ export default {
         return new Response(JSON.stringify(m),{headers:{'content-type':'application/manifest+json','cache-control':'no-store'}});
       }catch(e){return upstream;}
     }
-    // Only the iOS status-area metadata of the photo presentation changes.
-    // Do not touch the photo stage, recordings, timelines, or swipe scripts.
+    // Restore native standalone viewport geometry on /present. Only <head>
+    // metadata changes; photo stage, recordings, timelines and scripts remain identical.
     if((path==='/present'||path==='/present/') &&
         (upstream.headers.get('content-type')||'').toLowerCase().includes('text/html')){
       const html=await upstream.text();

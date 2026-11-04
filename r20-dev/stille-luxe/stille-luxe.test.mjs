@@ -45,12 +45,38 @@ test('repeated styling does not duplicate the central CSS block',async()=>{
  const s=await again.text();
  assert.equal((s.match(/id="talera-stille-luxe"/g)||[]).length,1);
 });
-test('R20 presentation route remains byte-for-byte unmodified',async()=>{
- const {env}=mock(testHtml);
+test('presentation restores translucent iPhone status while preserving exact R20 body and scripts',async()=>{
+ const oldHead='<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'+
+ '<meta name="apple-mobile-web-app-capable" content="yes">'+
+ '<meta name="apple-mobile-web-app-status-bar-style" content="default">'+
+ '<meta name="theme-color" content="#ffffff">';
+ const oldBody='<body><div id="photoStage"><img src="image.jpg"></div>'+
+ '<script>const narrator="DO NOT TOUCH"; const swipe={duration:500};</script></body></html>';
+ const original='<!doctype html><html><head>'+oldHead+'</head>'+oldBody;
+ const {env}=mock(original);
  const out=await app.fetch(new Request(origin+'/present'),env);
- assert.equal(await out.text(),testHtml);
- assert.equal(out.headers.get('etag'),'original-hash');
+ const changed=await out.text();
+ assert.equal(out.status,200);
+ assert.equal(out.headers.get('etag'),null);
  assert.equal(out.headers.get('x-talera-style'),null);
+ assert.equal(out.headers.get('x-talera-present-status'),'photo-under-system-bar');
+ assert.match(changed,/<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">/);
+ assert.match(changed,/<meta name="theme-color" content="#304653">/);
+ assert.match(changed,/viewport-fit=cover/);
+ assert.equal(changed.slice(changed.indexOf('</head>')+7),oldBody);
+ assert.equal((changed.match(/name="apple-mobile-web-app-status-bar-style"/g)||[]).length,1);
+ assert.equal((changed.match(/name="theme-color"/g)||[]).length,1);
+ assert.equal(changed.includes('id="talera-stille-luxe"'),false);
+ const twice=await app.fetch(new Request(origin+'/present'),mock(changed).env);
+ assert.equal(await twice.text(),changed,'head transform must be idempotent');
+});
+test('presentation without historical status meta receives safe-area metadata but keeps media untouched',async()=>{
+ const original='<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><div class="timeline">important</div><script>originalPlayer()</script></body></html>';
+ const res=await app.fetch(new Request(origin+'/present/'),mock(original).env);
+ const changed=await res.text();
+ assert.match(changed,/apple-mobile-web-app-status-bar-style" content="black-translucent"/);
+ assert.match(changed,/theme-color" content="#304653"/);
+ assert.equal(changed.slice(changed.indexOf('</head>')+7),original.slice(original.indexOf('</head>')+7));
 });
 test('private APIs and unrelated paths are forwarded without styling',async()=>{
  const {env,seen}=mock('{"secret":"untouched"}',{contentType:'application/json'});

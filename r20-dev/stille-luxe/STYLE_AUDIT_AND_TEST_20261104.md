@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `415b1087-fa98-4c23-bfc3-e693f665ec18`  
-**Deployment:** `fec2974c-eef1-4546-8cd6-155d282a6087`  
+**Actuele Worker-versie:** `61723384-5f9e-4a34-9824-b27453c881ac`  
+**Deployment:** `e1756385-133b-4cbb-a944-11f638888a55`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -138,3 +138,22 @@ De iPhone-screenshot na het vorige herstel bewijst dat er nog altijd een effen a
 - **GitHub Actions:** 13/13 unit/regressietests, 8/8 live HTTP-controles, bronconfiguratie en anonieme screenshots zijn geslaagd in [run 41922520650](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41922520650) (na staging-deployment). De Cloudflare Worker-versie is `415b1087-fa98-4c23-bfc3-e693f665ec18` en de beschermde V9-versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`.
 
 **Nog NIET bevestigd:** of iOS standalone op het toestel daadwerkelijk tot de fysieke onderrand foto laat zien. Een GitHub Actions/Linux-browser kan de iOS-standalone safe-area-compositor niet volledig reproduceren. Bevestiging vereist één schermafbeelding uit dezelfde testversie op de eigen iPhone; daarom geen claim 'visueel definitief opgelost' totdat dat duidelijk is. Geen herinstallatie of wissen van browseropslag.
+
+
+## Correctie WebKit iOS 26 — statusbalk en onderrand (4 november 2026)
+
+De gebruiker leverde twee iPhone-screenshots van dezelfde staging met een identieke strook van ongeveer 60 CSS-pixels onder zowel de presentatie als het gewone begin-/tijdlijnscherm. Het gaat niet om een afwijkend CSS-fotoformaat: de **hele webviewport is circa één statusbalkhoogte korter dan het scherm**. De eerdere presentatie-specifieke CSS-hacks met `overflow:visible`, vergroting van `.photo-stage`, +96px overscan en antracietkleurige achtergrond veranderden die niet-beschilderbare ruimte alleen van kleur, zonder de foto daadwerkelijk naar de onderrand te kunnen laten lopen.
+
+Er bestaat een **gedocumenteerde WebKit-fout**, waarvan de geometrie vrijwel exact overeenkomt met deze screenshots:
+- https://bugs.webkit.org/show_bug.cgi?id=313800 — standalone PWA met `black-translucent`, viewport korter dan fysieke schermhoogte met top-inset-delta, buiten CSS bereik.
+- https://bugs.webkit.org/show_bug.cgi?id=301994 — iOS 26(.x) reproduceert een ~62px niet-beschilderbare strook; probleem op 21 oktober 2026 nog open.
+- https://bugs.webkit.org/show_bug.cgi?id=317153 — Apple meldt dat `black-translucent` voor Home Screen webapps verouderd is.
+
+**Veilige correctie in nieuwe stijlstaging, niet in V9:**
+1. De iOS `black-translucent`-meta-instelling wordt op `/present` vervangen door de oorspronkelijke stabiele waarde `default`; kleur van de statusbalk via `theme-color:#304653` gevraagd. De oorspronkelijke `viewport-fit=cover` blijft.
+2. De hele extra `talera-present-ios-edge-to-edge`-CSS die `100dvh`, `overflow` en fotolagen manipuleerde is verwijderd; de oorspronkelijke V9 presentatiemodus, mediastructuur en body worden byte-voor-byte behouden.
+3. Op gewone home/tijdlijn routes wordt eveneens expliciet `status-bar-style=default` gezet. De grote fotoheader blijft transparant over de foto; de algemene `html/body`-achtergrond wordt weer wit in plaats van antraciet. Dit voorkomt een tweede gekleurde onderrand bij lege pagina's.
+4. **Afweging:** deze veilige browsermodus kan op bepaalde iOS-versies weer een statusbalk *boven* de foto laten zien; de transparante foto achter de klok en een volle onderrand zijn met de betreffende WebKit-fout mogelijk niet tegelijk te krijgen. Geen verdere CSS-overflowexperimenten totdat een toestelmeting het gedrag duidelijk bevestigt.
+5. **Niet aanpassen, herinstalleren of verwijderen** van de geïnstalleerde PWA: browserorigin en lokale herinneringen blijven beschermd. Een harde app-herstart is wel nuttig omdat de PWA-statusbalk bij starten kan worden vastgelegd.
+
+Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste schermrand, geen bewijs van een volledige foto onder de iOS-systeembalk aan beide kanten. De echte iPhone-beoordeling blijft een acceptatiepunt.

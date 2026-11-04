@@ -33,6 +33,11 @@ for(const check of checks){
     assert.equal(version,'stille-luxe-v9-20261104');
     assert.match(text,/#304653/);
     assert.match(text,/#FFFFFF/);
+    if(check.path==='/'||check.path==='/mijn-leven'){
+      assert.match(text,/<html[^>]*data-talera-hero="true"/,'photo-led hero marker');
+      assert.match(text,/<meta name="theme-color" content="#304653"/,'dark iPhone status-bar color');
+      assert.match(text,/\.mast\{background:transparent;color:#FFFFFF;/,'photographic mast not white');
+    }
    }else{
     assert.equal(version,null,'presentation must not receive general styling');
    }

@@ -1,0 +1,107 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {deflateSync,inflateSync} from 'node:zlib';
+import app from './stille-luxe.worker.mjs';
+
+const origin='https://staging.example.test';
+const testHtml= [
+ '<!doctype html><html><head>',
+ '<meta name="theme-color" content="#e7a98b">',
+ '<style>.nav-item{color:#337cca}.story.active{background:#eaf4ff}</style>',
+ '<script id="talera-player">const COLOR="#337cca";const inner="<style>.frame{color:#337cca}</style>";</script>',
+ '<style id="talera-v8-player-clock">.clock{color:#337cca}</style>',
+ '</head><body class="app"><div class="logo">TALERA</div></body></html>'
+].join('');
+function mock(body,{status=200,contentType='text/html'}={}){
+ const seen=[];
+ const env={V9_BASE:{fetch:async request=>{
+  seen.push({method:request.method,path:new URL(request.url).pathname});
+  return new Response(body,{status,headers:{'content-type':contentType,'etag':'original-hash'}});
+ }}};
+ return {env,seen};
+}
+test('actual HTML styles normalized, while player JavaScript and its embedded CSS remain intact',async()=>{
+ const {env}=mock(testHtml);
+ const response=await app.fetch(new Request(origin+'/mijn-leven'),env);
+ const html=await response.text();
+ assert.equal(response.status,200);
+ assert.equal(response.headers.get('x-talera-style'),'stille-luxe-v9-20261104');
+ assert.equal(response.headers.get('etag'),null);
+ assert.match(html,/\.nav-item\{color:#304653\}/);
+ assert.match(html,/\.story\.active\{background:#F7F5F0\}/);
+ assert.match(html,/const COLOR="#337cca"/);
+ assert.match(html,/const inner="<style>\.frame\{color:#337cca\}<\/style>"/);
+ assert.match(html,/\.clock\{color:#337cca\}/);
+ assert.match(html,/content="#FFFFFF"/);
+ assert.match(html,/id="talera-stille-luxe"/);
+ assert.equal((html.match(/id="talera-stille-luxe"/g)||[]).length,1);
+});
+test('repeated styling does not duplicate the central CSS block',async()=>{
+ const first=await app.fetch(new Request(origin+'/tell'),mock(testHtml).env);
+ const again=await app.fetch(new Request(origin+'/tell'),mock(await first.text()).env);
+ const s=await again.text();
+ assert.equal((s.match(/id="talera-stille-luxe"/g)||[]).length,1);
+});
+test('R20 presentation route remains byte-for-byte unmodified',async()=>{
+ const {env}=mock(testHtml);
+ const out=await app.fetch(new Request(origin+'/present'),env);
+ assert.equal(await out.text(),testHtml);
+ assert.equal(out.headers.get('etag'),'original-hash');
+ assert.equal(out.headers.get('x-talera-style'),null);
+});
+test('private APIs and unrelated paths are forwarded without styling',async()=>{
+ const {env,seen}=mock('{"secret":"untouched"}',{contentType:'application/json'});
+ const out=await app.fetch(new Request(origin+'/api/v9/memory'),env);
+ assert.equal(await out.text(),'{"secret":"untouched"}');
+ assert.deepEqual(seen,[{method:'GET',path:'/api/v9/memory'}]);
+});
+test('data-changing requests are forwarded and never rewritten',async()=>{
+ const {env,seen}=mock(testHtml);
+ const out=await app.fetch(new Request(origin+'/tell',{method:'POST',body:'test'}),env);
+ assert.equal(await out.text(),testHtml);
+ assert.deepEqual(seen,[{method:'POST',path:'/tell'}]);
+});
+test('manifest keeps other metadata but serves exact branded icon sizes and white theme',async()=>{
+ const input={name:'TALERA',start_url:'/',display:'standalone',theme_color:'#123456',background_color:'#eeeeee',icons:[{src:'/old.png'}]};
+ const {env}=mock(JSON.stringify(input),{contentType:'application/manifest+json'});
+ const res=await app.fetch(new Request(origin+'/manifest.webmanifest'),env);
+ const out=await res.json();
+ assert.equal(out.name,input.name);
+ assert.equal(out.display,input.display);
+ assert.equal(out.theme_color,'#FFFFFF');
+ assert.equal(out.background_color,'#FFFFFF');
+ assert.deepEqual(out.icons.map(i=>i.src),['/talera-stille-luxe-icon-192.png','/talera-stille-luxe-icon-512.png']);
+});
+test('unparseable manifest remains unchanged rather than breaking installation',async()=>{
+ const {env}=mock('not json',{contentType:'application/manifest+json'});
+ const out=await app.fetch(new Request(origin+'/manifest.webmanifest'),env);
+ assert.equal(await out.text(),'not json');
+});
+test('service binding absence fails closed rather than touching another app',async()=>{
+ const out=await app.fetch(new Request(origin+'/mijn-leven'),{});
+ assert.equal(out.status,503);
+ assert.match(await out.text(),/V9-herstelbasis ontbreekt/);
+});
+function crc32(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let j=0;j<8;j++)c=(c>>>1)^((c&1)?0xedb88320:0);}return(c^0xffffffff)>>>0;}
+function be32(n){const x=Buffer.alloc(4);x.writeUInt32BE(n>>>0);return x;}
+function chunk(t,bytes){const text=Buffer.from(t);return Buffer.concat([be32(bytes.length),text,bytes,be32(crc32(Buffer.concat([text,bytes])))]);}
+function makePng(){const w=12,h=1,bytes=Buffer.alloc(1+w*3,255);bytes[0]=0;const set=(x,r,g,b)=>{bytes[1+x*3]=r;bytes[2+x*3]=g;bytes[3+x*3]=b;};set(0,0,30,180);set(7,40,100,200);set(11,60,150,220);const hdr=Buffer.alloc(13);hdr.writeUInt32BE(w,0);hdr.writeUInt32BE(h,4);hdr[8]=8;hdr[9]=2;return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',hdr),chunk('IDAT',deflateSync(bytes)),chunk('IEND',Buffer.alloc(0))]);}
+function readPng(png){const ids=[];for(let i=8;i+12<=png.length;){const n=png.readUInt32BE(i),type=png.toString('ascii',i+4,i+8);if(type==='IDAT')ids.push(png.subarray(i+8,i+8+n));i+=n+12;if(type==='IEND')break;}return inflateSync(Buffer.concat(ids));}
+test('original PNG image geometry and white route are preserved while all three panel colors are applied',async()=>{
+ const original=makePng();
+ const seen=[];
+ const env={V9_BASE:{fetch:async req=>{seen.push(new URL(req.url).pathname);return new Response(original,{headers:{'content-type':'image/png'}});}}};
+ const response=await app.fetch(new Request(origin+'/pwa-192.png'),env);
+ const png=Buffer.from(await response.arrayBuffer());
+ assert.equal(response.status,200);
+ assert.equal(response.headers.get('content-type'),'image/png');
+ assert.deepEqual(seen,['/talera-brand-v3-192.png']);
+ assert.equal(png.readUInt32BE(16),12);
+ assert.equal(png.readUInt32BE(20),1);
+ const raw=readPng(png);
+ const pixel=x=>Array.from(raw.subarray(1+x*3,4+x*3));
+ assert.deepEqual(pixel(0),[48,70,83]);
+ assert.deepEqual(pixel(4),[255,255,255]);
+ assert.deepEqual(pixel(7),[113,141,154]);
+ assert.deepEqual(pixel(11),[181,198,205]);
+});

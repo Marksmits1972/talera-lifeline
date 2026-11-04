@@ -45,53 +45,36 @@ test('repeated styling does not duplicate the central CSS block',async()=>{
  const s=await again.text();
  assert.equal((s.match(/id="talera-stille-luxe"/g)||[]).length,1);
 });
-test('presentation restores translucent iPhone status while preserving exact R20 body and scripts',async()=>{
- const oldHead='<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'+
+test('presentation restores stable iPhone viewport instead of unpaintable bottom strip',async()=>{
+ const original='<!doctype html><html><head>'+
+ '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'+
  '<meta name="apple-mobile-web-app-capable" content="yes">'+
- '<meta name="apple-mobile-web-app-status-bar-style" content="default">'+
- '<meta name="theme-color" content="#ffffff">';
- const oldBody='<body><div id="photoStage"><img src="image.jpg"></div>'+
- '<script>const narrator="DO NOT TOUCH"; const swipe={duration:500};</script></body></html>';
- const original='<!doctype html><html><head>'+oldHead+'</head>'+oldBody;
- const {env}=mock(original);
- const out=await app.fetch(new Request(origin+'/present'),env);
- const changed=await out.text();
- assert.equal(out.status,200);
- assert.equal(out.headers.get('etag'),null);
- assert.equal(out.headers.get('x-talera-style'),null);
- assert.equal(out.headers.get('x-talera-present-status'),'photo-under-system-bar');
- assert.match(changed,/<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">/);
- assert.match(changed,/<meta name="theme-color" content="#304653">/);
+ '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'+
+ '<meta name="theme-color" content="#ffffff">'+
+ '</head><body><div id="photoStage"><img src="image.jpg"></div>'+
+ '<script>const narrator="DO NOT TOUCH";const swipe={duration:500};</script></body></html>';
+ const response=await app.fetch(new Request(origin+'/present'),mock(original).env);
+ const changed=await response.text();
+ assert.equal(response.status,200);
+ assert.equal(response.headers.get('x-talera-style'),null);
+ assert.match(changed,/name="apple-mobile-web-app-status-bar-style" content="default"/);
+ assert.match(changed,/name="theme-color" content="#304653"/);
  assert.match(changed,/viewport-fit=cover/);
- assert.match(changed,/<style id="talera-present-ios-edge-to-edge">/);
- assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;overflow:visible!important;\}/);
- assert.match(changed,/min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
- assert.match(changed,/@media \(display-mode:standalone\)/);
- assert.match(changed,/\.app main,\.app \.memory-space\{overflow:visible!important;\}/);
- assert.match(changed,/\.app \.photo-stage\{top:0!important;bottom:auto!important;/);
- assert.match(changed,/height:calc\(100% \+ max\(96px, env\(safe-area-inset-top,0px\)\)\)!important;/);
- assert.doesNotMatch(changed,/\.app \.photo-stage\{background:/);
- assert.match(changed,/@supports \(-webkit-touch-callout:none\)/);
- assert.match(changed,/html,body\{margin:0!important;overflow:hidden!important;\}/);
- const iosStyle=changed.match(/<style id="talera-present-ios-edge-to-edge">([\s\S]*?)<\/style>/)?.[1];
- assert.ok(iosStyle);
- assert.doesNotMatch(iosStyle,/background(?:-color)?:/i,'do not paint anthracite instead of extending the photo');
- assert.doesNotMatch(iosStyle,/\.app\{[^}]*overflow:hidden/);
- assert.equal(changed.slice(changed.indexOf('</head>')+7),oldBody);
+ assert.doesNotMatch(changed,/<style id="talera-present-ios-edge-to-edge">/);
+ assert.doesNotMatch(changed,/black-translucent/);
+ assert.doesNotMatch(changed,/100dvh \+ env\(safe-area-inset-top/);
+ assert.equal(changed.slice(changed.indexOf('</head>')+7),original.slice(original.indexOf('</head>')+7));
  assert.equal((changed.match(/name="apple-mobile-web-app-status-bar-style"/g)||[]).length,1);
- assert.equal((changed.match(/name="theme-color"/g)||[]).length,1);
- assert.equal(changed.includes('id="talera-stille-luxe"'),false);
- assert.equal((changed.match(/id="talera-present-ios-edge-to-edge"/g)||[]).length,1);
- const twice=await app.fetch(new Request(origin+'/present'),mock(changed).env);
- assert.equal(await twice.text(),changed,'head transform must be idempotent');
+ const again=await app.fetch(new Request(origin+'/present'),mock(changed).env);
+ assert.equal(await again.text(),changed);
 });
-test('presentation without historical status meta receives safe-area metadata but keeps media untouched',async()=>{
- const original='<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><div class="timeline">important</div><script>originalPlayer()</script></body></html>';
+test('presentation without status metadata receives native mode and original media stays intact',async()=>{
+ const original='<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><div class="timeline">keep</div><script>originalPlayer()</script></body></html>';
  const res=await app.fetch(new Request(origin+'/present/'),mock(original).env);
  const changed=await res.text();
- assert.match(changed,/apple-mobile-web-app-status-bar-style" content="black-translucent"/);
- assert.match(changed,/theme-color" content="#304653"/);
- assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;overflow:visible!important;\}/);
+ assert.match(changed,/name="apple-mobile-web-app-status-bar-style" content="default"/);
+ assert.match(changed,/name="theme-color" content="#304653"/);
+ assert.doesNotMatch(changed,/talera-present-ios-edge-to-edge/);
  assert.equal(changed.slice(changed.indexOf('</head>')+7),original.slice(original.indexOf('</head>')+7));
 });
 test('private APIs and unrelated paths are forwarded without styling',async()=>{
@@ -169,7 +152,9 @@ test('approved photo-led homepage has ink-blue status bar and no white mast over
  assert.match(output,/\.hero\{background:#304653;\}/);
  assert.match(output,/\.mast\{background:transparent;color:#FFFFFF;\}/);
  assert.match(output,/\.mast \.logo\{color:#FFFFFF/);
- assert.match(output,/background-color:#304653/);
+ assert.match(output,/html\[data-talera-hero="true"\],html\[data-talera-hero="true"\] body\{background-color:#FFFFFF;\}/);
+ assert.match(output,/name="apple-mobile-web-app-status-bar-style" content="default"/);
+ assert.doesNotMatch(output,/html\[data-talera-hero="true"\] body\{background-color:#304653;\}/);
  assert.doesNotMatch(output,/header:not\(\.presentation-header\)\)\{background-color:#FFFFFF;\}/);
  assert.match(output,/\.hero-caption/);
  const twice=await app.fetch(new Request(origin+'/mijn-leven'),mock(output).env);

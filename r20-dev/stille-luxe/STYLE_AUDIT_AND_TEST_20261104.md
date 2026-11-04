@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `e4de5fb6-7838-418f-b7e2-61d2b3ba7fbd`  
-**Deployment:** `c68d8767-d8b6-4848-b45d-30581590725c`  
+**Actuele Worker-versie:** `415b1087-fa98-4c23-bfc3-e693f665ec18`  
+**Deployment:** `fec2974c-eef1-4546-8cd6-155d282a6087`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -124,3 +124,17 @@ De producteigenaar bevestigde via een eigen iPhone-screenshot dat de eerdere `bl
 De afzonderlijke stijlstaging injecteert daarom alleen op `/present` en `/present/` in de HTML-`<head>` een compacte style-tag `talera-present-ios-edge-to-edge`. Binnen `@supports (-webkit-touch-callout:none)` én `@media(display-mode:standalone)` wordt de bestaande apphoogte gelijk aan `calc(100dvh + env(safe-area-inset-top,0px))`; de bodyachtergrond krijgt inktblauw `#304653` als fallback. Dit rekt de bestaande fotocontainer mee op **zonder zijn eigen foto-/swipe-/tijdcode-CSS te wijzigen**. Er zijn geen scripts, foto-data, opslagvelden, handelingen of bestaande Workers veranderd.
 
 Regressietests controleren dat deze regel exact één keer binnen een presentatie-`<head>` verschijnt, andere routes onaangeroerd blijven en de hele HTML-body van de live V9-presentatie byte-voor-byte identiek blijft. **Nog open:** daadwerkelijke visuele iPhone-standalone controle op volledig beeld tot achter de onderste schermrand, ook bij het terugkeren vanuit een foto; automatische desktop/headless tests kunnen dat specifieke iOS-viewportgedrag niet reproduceren. De gebruiker hoeft de PWA niet te verwijderen.
+
+
+## Correctie op eerdere misdiagnose — foto i.p.v. kleurvlak (04-11-2026)
+
+De iPhone-screenshot na het vorige herstel bewijst dat er nog altijd een effen antracietkleurige strook onder de foto te zien was. De eerdere CSS probeerde het scherm te vergroten maar voegde **zelf** `html,body{background:#304653!important}` toe. Dit was niet conform de goedgekeurde presentatiemodus: beeld is de enige zichtbare achtergrond. Het werkelijke probleem in de beschermde V56/R20-presentatiecode is bovendien `.app{overflow:hidden!important}` terwijl de foto's binnen `.photo-stage` op 100% van die container zijn gepositioneerd. Het vorige vergroten van de fotolaag werd daarom door de appcontainer afgekapt, zodat onderaan juist het eigen kleurvlak zichtbaar werd.
+
+**Uitgevoerde correctie in uitsluitend de losse stijlstaging:**
+- In de iOS-standalone `/present`-`<head>`-stijl zijn de extra antracietkleurige `html/body`-achtergronden verwijderd.
+- De afsluiting `overflow:hidden!important` op de presentatie-`.app` is lokaal vervangen door `overflow:visible!important`; `main` en `.memory-space` zijn eveneens niet-afkappend. Gewone appschermen, andere browsers en de originele Workers blijven onaangetast.
+- De bestaande `.photo-stage` wordt vanaf `top:0` beeldvullend gerenderd met **96 CSS-pixels overscan** onderaan als veilige compensatie voor niet-nul/lege iOS safe-area-insets. Hierin zitten de reeds bestaande actieve foto-, backdrop- en fotostrip-elementen; geen wijziging van de tijdlijn, captions, bediening, fotoduplicatiecorrecties of vertelengine.
+- Het volledige HTML-fragment na `</head>` is op live V9 en staging gelijk. CSS-regressietests controleren expliciet dat de extra presentatie-<style> geen `background` bevat en dat app en stage niet meer afknippen.
+- **GitHub Actions:** 13/13 unit/regressietests, 8/8 live HTTP-controles, bronconfiguratie en anonieme screenshots zijn geslaagd in [run 41922520650](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41922520650) (na staging-deployment). De Cloudflare Worker-versie is `415b1087-fa98-4c23-bfc3-e693f665ec18` en de beschermde V9-versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`.
+
+**Nog NIET bevestigd:** of iOS standalone op het toestel daadwerkelijk tot de fysieke onderrand foto laat zien. Een GitHub Actions/Linux-browser kan de iOS-standalone safe-area-compositor niet volledig reproduceren. Bevestiging vereist één schermafbeelding uit dezelfde testversie op de eigen iPhone; daarom geen claim 'visueel definitief opgelost' totdat dat duidelijk is. Geen herinstallatie of wissen van browseropslag.

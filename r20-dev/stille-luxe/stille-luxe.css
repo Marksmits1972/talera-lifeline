@@ -19,6 +19,7 @@ html,body{background-color:#FFFFFF;color:#304653;font-family:-apple-system,Blink
 :is(.topbar,header:not(.presentation-header):not(.mast)){background-color:#FFFFFF;}
 /* Approved 04-11 photo-led home variant: dark top safe area, transparent mast on photo. */
 html[data-talera-hero="true"],html[data-talera-hero="true"] body{background-color:#304653;}
+html[data-talera-hero="true"] .hero{background:#304653;}
 html[data-talera-hero="true"] .mast{background:transparent;color:#FFFFFF;}
 html[data-talera-hero="true"] .mast .logo{color:#FFFFFF;text-shadow:0 1px 5px #304653;}
 html[data-talera-hero="true"] .mast .logo::before{background-color:#FFFFFF;border-radius:5px;}

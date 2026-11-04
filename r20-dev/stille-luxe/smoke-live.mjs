@@ -45,12 +45,15 @@ for(const check of checks){
     assert.match(text,/viewport-fit=cover/,'retain edge-to-edge viewport');
     assert.match(text,/name=["']theme-color["']\s+content=["']#304653/,'presentation fallback ink');
     assert.match(text,/<style id="talera-present-ios-edge-to-edge">/,'only an iOS-specific presentation style is present');
-    assert.match(text,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/,'photo canvas reaches bottom');
+    assert.match(text,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;overflow:visible!important;/,'unclipped R20 photo canvas');
     assert.match(text,/@media \(display-mode:standalone\)/,'no change to regular browsers');
     assert.match(text,/@supports \(-webkit-touch-callout:none\)/,'Safari only');
+    const iosPatch=text.match(/<style id="talera-present-ios-edge-to-edge">([\s\S]*?)<\/style>/)?.[1];
+    assert.ok(iosPatch,'iOS-specific patch present');
+    assert.doesNotMatch(iosPatch,/background(?:-color)?:/,'never substitute an anthracite strip for a photo');
     assert.match(text,/\.app main,\.app \.memory-space\{overflow:visible!important;\}/,'photo-parent clips removed');
-    assert.match(text,/\.app \.photo-stage\{bottom:calc\(-1 \* env\(safe-area-inset-top,0px\)\)!important;/,'real photo extends through bottom gap');
-    assert.match(text,/height:calc\(100% \+ env\(safe-area-inset-top,0px\)\)!important;/,'photo stage height increased');
+    assert.match(text,/\.app \.photo-stage\{top:0!important;bottom:auto!important;/,'photo layer overscans rather than filling with a brand color');
+    assert.match(text,/height:calc\(100% \+ max\(96px, env\(safe-area-inset-top,0px\)\)\)!important;/,'real photo overscans the lower iPhone screen');
     // Compare the entire protected R20/V9 body to its original live route.
     const baseline=await fetch(
       'https://talera-v61-r20-definitief-verwijderen-v9-20261104.mark-a39.workers.dev/present',

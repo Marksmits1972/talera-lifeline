@@ -1,0 +1,24 @@
+name: TALERA Stille luxe - isolated checks
+on:
+  push:
+    branches:
+      - style/talera-stille-luxe-v9-20261104
+    paths:
+      - 'r20-dev/stille-luxe/**'
+      - '.github/workflows/talera-stille-luxe-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout isolated style branch
+        uses: actions/checkout@v4
+      - name: Check runtime version
+        run: node --version
+      - name: Check CSS single source of truth
+        run: node r20-dev/stille-luxe/sync-style.mjs --check
+      - name: Run isolated regression tests
+        run: node --test r20-dev/stille-luxe/stille-luxe.test.mjs

@@ -169,15 +169,19 @@ function restorePresentationStatusArea(html){
     if(!head.includes('id="'+marker+'"')){
       const css='@supports (-webkit-touch-callout:none){'+
         '@media (display-mode:standalone){'+
-        'html,body{margin:0!important;background:#304653!important;overflow:hidden!important;}'+
+        // The legacy photo had full-bleed output before status-bar metadata
+        // changed. The iOS view now shifts 100dvh upwards, but R20 still
+        // clips the .app at the previous bottom edge. The prior color
+        // fallback could only mask that exposed space.
+        // Unclip the parent chain and overscan the actual photograph;
+        // do not move the timeline, captions, player, or gestures.
+        'html,body{margin:0!important;overflow:hidden!important;}'+
         '.app{height:calc(100dvh + env(safe-area-inset-top,0px))!important;'+
-        'min-height:calc(100dvh + env(safe-area-inset-top,0px))!important;}'+
-        /* Preserve the existing story and timeline positions. Only the image
-           stage is extended through the lower iOS inset. Its live photo
-           children already fill their stage via absolute inset:0. */
+        'min-height:calc(100dvh + env(safe-area-inset-top,0px))!important;'+
+        'overflow:visible!important;}'+
         '.app main,.app .memory-space{overflow:visible!important;}'+
-        '.app .photo-stage{bottom:calc(-1 * env(safe-area-inset-top,0px))!important;'+
-        'height:calc(100% + env(safe-area-inset-top,0px))!important;}'+
+        '.app .photo-stage{top:0!important;bottom:auto!important;'+
+        'height:calc(100% + max(96px, env(safe-area-inset-top,0px)))!important;}'+
         '}}';
       head=head.replace(/<\/head\s*>/i,'<style id="'+marker+'">'+css+'</style>\n</head>');
     }

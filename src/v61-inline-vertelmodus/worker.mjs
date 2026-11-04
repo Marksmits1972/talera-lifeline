@@ -690,8 +690,8 @@ function patchPresent(html){
     +'body:not(.talera-recipient-presentation) #talera-v30-edit'
     +'{background:rgba(250,252,255,.16)!important;'
     +'border:1px solid rgba(255,255,255,.82)!important;'
-    +'color:#fff!important;box-shadow:0 2px 8px rgba(0,0,0,.13)!important;'
-    +'backdrop-filter:blur(9px)!important;-webkit-backdrop-filter:blur(9px)!important}'
+    +'color:#fff!important;box-shadow:0 3px 12px rgba(13,30,42,.11)!important;'
+    +'backdrop-filter:blur(18px) saturate(1.18)!important;-webkit-backdrop-filter:blur(18px) saturate(1.18)!important}'
     +'</style>';
   if(!page.includes('</head>'))return{html,changed:false,reason:'missing-head'};
   page=page.replace('</head>',ownerCSS+presentationSkin+'</head>');

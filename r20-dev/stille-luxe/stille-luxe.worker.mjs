@@ -139,6 +139,29 @@ async function icon(request,env,path){
   }
   return new Response(bytes,{headers:{'content-type':'image/png','cache-control':'public, max-age=3600','x-talera-brand':'original-v3-panel-recolor'}});
 }
+/* The original /present HTML uses apple-mobile-web-app-status-bar-style=default.
+ * Safari standalone then reserves a white strip above the photograph.
+ * Only <head> metadata may change. The original playback code is immutable.
+ */
+function restorePresentationStatusArea(html){
+  return html.replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/i,head=>{
+    function setMeta(name,value){
+      const tag=new RegExp('<meta\\b(?=[^>]*\\bname\\s*=\\s*["\\x27]'+name+'["\\x27])[^>]*>','gi');
+      let found=false;
+      head=head.replace(tag,raw=>{
+        found=true;
+        if(/\bcontent\s*=\s*["'][^"']*["']/i.test(raw))
+          return raw.replace(/(\bcontent\s*=\s*["'])[^"']*(["'])/i,(_,a,b)=>a+value+b);
+        return raw.replace(/\s*\/?>$/, ' content="'+value+'">');
+      });
+      if(!found)head=head.replace(/<\/head\s*>/i,'<meta name="'+name+'" content="'+value+'">\n</head>');
+    }
+    setMeta('apple-mobile-web-app-capable','yes');
+    setMeta('apple-mobile-web-app-status-bar-style','black-translucent');
+    setMeta('theme-color','#304653');
+    return head;
+  });
+}
 export default {
   async fetch(request,env){
     if(!env?.V9_BASE?.fetch)return new Response('V9-herstelbasis ontbreekt',{status:503});
@@ -156,6 +179,18 @@ export default {
         ];
         return new Response(JSON.stringify(m),{headers:{'content-type':'application/manifest+json','cache-control':'no-store'}});
       }catch(e){return upstream;}
+    }
+    // Only the iOS status-area metadata of the photo presentation changes.
+    // Do not touch the photo stage, recordings, timelines, or swipe scripts.
+    if((path==='/present'||path==='/present/') &&
+        (upstream.headers.get('content-type')||'').toLowerCase().includes('text/html')){
+      const html=await upstream.text();
+      const changed=restorePresentationStatusArea(html);
+      const headers=new Headers(upstream.headers);
+      for(const h of ['content-length','content-encoding','etag'])headers.delete(h);
+      headers.set('cache-control','no-store');
+      headers.set('x-talera-present-status','photo-under-system-bar');
+      return new Response(changed,{status:upstream.status,statusText:upstream.statusText,headers});
     }
     if(!HTML_PATHS.has(path)||(upstream.headers.get('content-type')||'').toLowerCase().indexOf('text/html')<0)return upstream;
     const html=await upstream.text();

@@ -24,7 +24,8 @@ button,input,textarea,select{font-family:inherit;}
 :is(input,textarea,select):focus-visible{outline:2px solid #718D9A;outline-offset:2px;}
 :is(.card,.memory-card,.story,.preview,.detail-list){box-shadow:none;}
 :is(.card,.memory-card,.detail-list,.preview){border-color:#B5C6CD;}
-:is(.logo){font-weight:650;letter-spacing:.13em;}
+:is(.logo){font-weight:650;letter-spacing:.13em;display:inline-flex;align-items:center;gap:7px;}
+.logo::before{content:'';display:inline-block;flex:0 0 24px;width:24px;height:24px;background:url('/talera-stille-luxe-icon-180.png') center/contain no-repeat;}
 body{font-size:16px;line-height:1.45;}
 h1,.page-title{font-size:clamp(23px,5vw,29px);font-weight:680;line-height:1.2;letter-spacing:-.025em;}
 h2,.memory-title{font-size:clamp(19px,4.6vw,23px);font-weight:650;line-height:1.25;letter-spacing:-.015em;}

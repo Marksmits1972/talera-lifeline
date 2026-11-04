@@ -63,10 +63,17 @@ test('presentation restores translucent iPhone status while preserving exact R20
  assert.match(changed,/<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">/);
  assert.match(changed,/<meta name="theme-color" content="#304653">/);
  assert.match(changed,/viewport-fit=cover/);
+ assert.match(changed,/<style id="talera-present-ios-edge-to-edge">/);
+ assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
+ assert.match(changed,/min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
+ assert.match(changed,/@media \(display-mode:standalone\)/);
+ assert.match(changed,/@supports \(-webkit-touch-callout:none\)/);
+ assert.match(changed,/html,body\{margin:0!important;background:#304653!important;overflow:hidden!important;/);
  assert.equal(changed.slice(changed.indexOf('</head>')+7),oldBody);
  assert.equal((changed.match(/name="apple-mobile-web-app-status-bar-style"/g)||[]).length,1);
  assert.equal((changed.match(/name="theme-color"/g)||[]).length,1);
  assert.equal(changed.includes('id="talera-stille-luxe"'),false);
+ assert.equal((changed.match(/id="talera-present-ios-edge-to-edge"/g)||[]).length,1);
  const twice=await app.fetch(new Request(origin+'/present'),mock(changed).env);
  assert.equal(await twice.text(),changed,'head transform must be idempotent');
 });
@@ -76,6 +83,7 @@ test('presentation without historical status meta receives safe-area metadata bu
  const changed=await res.text();
  assert.match(changed,/apple-mobile-web-app-status-bar-style" content="black-translucent"/);
  assert.match(changed,/theme-color" content="#304653"/);
+ assert.match(changed,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/);
  assert.equal(changed.slice(changed.indexOf('</head>')+7),original.slice(original.indexOf('</head>')+7));
 });
 test('private APIs and unrelated paths are forwarded without styling',async()=>{

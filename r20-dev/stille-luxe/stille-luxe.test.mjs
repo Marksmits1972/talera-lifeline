@@ -116,3 +116,28 @@ test('photo-memory headline remains white for legibility without changing the ph
  assert.doesNotMatch(css,/\.hero\s*img\s*\{/);
  assert.doesNotMatch(css,/#photoStage\s*\{/);
 });
+
+test('approved photo-led homepage has ink-blue status bar and no white mast override',async()=>{
+ const hero='<!doctype html><html lang="nl"><head><meta name="theme-color" content="#fff"></head><body><section class="hero"></section><header class="mast"><div class="logo">TALERA</div></header><div class="hero-caption main-only"><h1>Herinnering</h1></div><div class="life-sheet"></div></body></html>';
+ const {env}=mock(hero);
+ const res=await app.fetch(new Request(origin+'/mijn-leven'),env);
+ const output=await res.text();
+ assert.match(output,/<html data-talera-hero="true" lang="nl">/);
+ assert.match(output,/<meta name="theme-color" content="#304653">/);
+ assert.match(output,/\.mast\{background:transparent;color:#FFFFFF;\}/);
+ assert.match(output,/\.mast \.logo\{color:#FFFFFF/);
+ assert.match(output,/background-color:#304653/);
+ assert.doesNotMatch(output,/header:not\(\.presentation-header\)\)\{background-color:#FFFFFF;\}/);
+ assert.match(output,/\.hero-caption/);
+ const twice=await app.fetch(new Request(origin+'/mijn-leven'),mock(output).env);
+ const second=await twice.text();
+ assert.equal((second.match(/data-talera-hero="true"/g)||[]).length,3); // markup attribute and two CSS selectors
+});
+test('native editor visuals change only color tokens, not recording or toolbar geometry',()=>{
+ const css=readFileSync(new URL('./stille-luxe.css',import.meta.url),'utf8');
+ assert.match(css,/\.talera-r16-toolbar #publish\{background-color:#304653!important/);
+ assert.match(css,/#v30DateBox #v30DateCancel\{background:#FFFFFF/);
+ assert.match(css,/#v30DateBox #v30DateSave\{background:#304653/);
+ assert.doesNotMatch(css,/#taleraV61RecControls\s*\{/);
+ assert.doesNotMatch(css,/#photoLayerA\s*\{/);
+});

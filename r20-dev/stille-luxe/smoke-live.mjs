@@ -36,24 +36,16 @@ for(const check of checks){
     if(check.path==='/'||check.path==='/mijn-leven'){
       assert.match(text,/<html[^>]*data-talera-hero="true"/,'photo-led hero marker');
       assert.match(text,/<meta name="theme-color" content="#304653"/,'dark iPhone status-bar color');
+      assert.match(text,/name=["']apple-mobile-web-app-status-bar-style["']\s+content=["']default/,'non-translucent PWA root');
       assert.match(text,/\.mast\{background:transparent;color:#FFFFFF;/,'photographic mast not white');
     }
    }else{
-    assert.equal(version,null,'presentation must not receive general styling');
-    assert.equal(response.headers.get('x-talera-present-status'),'photo-under-system-bar');
-    assert.match(text,/apple-mobile-web-app-status-bar-style["']\s+content=["']black-translucent/,'transparent iOS status bar');
-    assert.match(text,/viewport-fit=cover/,'retain edge-to-edge viewport');
-    assert.match(text,/name=["']theme-color["']\s+content=["']#304653/,'presentation fallback ink');
-    assert.match(text,/<style id="talera-present-ios-edge-to-edge">/,'only an iOS-specific presentation style is present');
-    assert.match(text,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;min-height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;overflow:visible!important;/,'unclipped R20 photo canvas');
-    assert.match(text,/@media \(display-mode:standalone\)/,'no change to regular browsers');
-    assert.match(text,/@supports \(-webkit-touch-callout:none\)/,'Safari only');
-    const iosPatch=text.match(/<style id="talera-present-ios-edge-to-edge">([\s\S]*?)<\/style>/)?.[1];
-    assert.ok(iosPatch,'iOS-specific patch present');
-    assert.doesNotMatch(iosPatch,/background(?:-color)?:/,'never substitute an anthracite strip for a photo');
-    assert.match(text,/\.app main,\.app \.memory-space\{overflow:visible!important;\}/,'photo-parent clips removed');
-    assert.match(text,/\.app \.photo-stage\{top:0!important;bottom:auto!important;/,'photo layer overscans rather than filling with a brand color');
-    assert.match(text,/height:calc\(100% \+ max\(96px, env\(safe-area-inset-top,0px\)\)\)!important;/,'real photo overscans the lower iPhone screen');
+    assert.equal(version,null,'presentation must not receive ordinary-page styling');
+    assert.match(text,/name=["']apple-mobile-web-app-status-bar-style["']\s+content=["']default/,'stable native iOS PWA status geometry');
+    assert.match(text,/viewport-fit=cover/,'keep original viewport');
+    assert.match(text,/name=["']theme-color["']\s+content=["']#304653/,'ink-color system chrome');
+    assert.doesNotMatch(text,/<style id="talera-present-ios-edge-to-edge">/,'no failed 100dvh overscan patches');
+    assert.doesNotMatch(text,/<meta[^>]*black-translucent/,'do not trigger WebKit bottom strip');
     // Compare the entire protected R20/V9 body to its original live route.
     const baseline=await fetch(
       'https://talera-v61-r20-definitief-verwijderen-v9-20261104.mark-a39.workers.dev/present',

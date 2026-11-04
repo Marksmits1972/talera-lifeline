@@ -24,12 +24,15 @@ OLD.push(
 );
 const REGEX = new RegExp(OLD.map(([x])=>x.replace('#','\\#')).join('|'),'gi');
 function rewriteStyleBlock(html){
-  // Harmonize existing style declarations IN PLACE rather than a giant second
-  // !important override tree. Leave scripts/player content byte-for-byte alone.
-  return html.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (whole, attrs, body) => {
-    if(/(?:talera-v8|narration|photo-strip|player-clock|presentation)/i.test(attrs)) return whole;
-    return '<style'+attrs+'>'+body.replace(REGEX, c=>OLD.find(([v])=>v===c.toLowerCase())?.[1]||c)+'</style>';
-  });
+  // Never rewrite colors inside inline JavaScript, including script-created CSS,
+  // story player logic and presentation timings. Only inspect actual HTML CSS.
+  return html.split(/(<script\b[^>]*>[\s\S]*?<\/script\s*>)/gi).map(part => {
+    if(/^<script\b/i.test(part))return part;
+    return part.replace(/<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi,(whole,attrs,body)=>{
+      if(/(?:talera-v8|narration|photo-strip|player-clock|presentation)/i.test(attrs))return whole;
+      return '<style'+attrs+'>'+body.replace(REGEX,c=>OLD.find(([v])=>v===c.toLowerCase())?.[1]||c)+'</style>';
+    });
+  }).join('');
 }
 function updateHtml(html){
   let output=rewriteStyleBlock(html);

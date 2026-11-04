@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `10ebdc1a-efb9-4dbe-9a50-c3adc5d0cc48`  
-**Deployment:** `a8838645-77ca-4848-9603-129db2055c4b`  
+**Actuele Worker-versie:** `4444493f-cb5a-4b32-bdd0-a3098c67bbb3`  
+**Deployment:** `0bd52d91-181f-4825-8edd-2f5020659e82`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -33,7 +33,7 @@ De originele schermreferenties en kleurenkaart zijn afzonderlijk in Drive terugg
 **BELANGRIJKE grens van deze eerste veilige stijlrelease:** de historische V56/R20-CSS is in de **beschermde** bronsystemen niet fysiek verwijderd. De staging herschrijft in-place een set bekende kleurcodes in teruggegeven HTML en voegt één compacte centrale CSS-stijlbron toe. Door runtime door JavaScript geïnjecteerde stijlen, onherkende kleurcodes en niet bezochte routes zijn niet bewezen volledig geharmoniseerd. Noem dit dus nog geen afgeronde diepgaande bronrefactor of volledige CSS-opschoning. Een refactor van de oorspronkelijke diepe keten is risicovol en valt buiten de expliciet beschermde functionele code; eerst echte schermacceptatie is nodig.
 
 ## Gewijzigde bestanden, uitsluitend op nieuwe stijlbranch
-- `r20-dev/stille-luxe/stille-luxe.css` — centrale tokens, typografie, buttons en daadwerkelijk gevonden UI-selectors.
+- `r20-dev/stille-luxe/stille-luxe.css` — centrale tokens, typografie, buttons, daadwerkelijke UI-selectors en bestaande originele drieluik-logo als CSS-headericoon.
 - `r20-dev/stille-luxe/stille-luxe.worker.mjs` — één nieuwe Cloudflare staging, laat originele V9 onaangeroerd, normaliseert bekende CSS-tinten, voegt stijl in normale HTML toe, beheert manifest/icons.
 - `r20-dev/stille-luxe/STYLE_AUDIT_AND_TEST_20261104.md` — dit audit-/controleverslag.
 

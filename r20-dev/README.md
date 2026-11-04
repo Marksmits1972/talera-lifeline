@@ -3,18 +3,18 @@
 - **Ontwikkelbranch:** `dev/r20-start-potlood-bewerken-20261104`
 - **Geteste app-origin:** `talera-pwa-v61-kleine-kruisjes-staging-20261104.mark-a39.workers.dev`
 - **Cloudflare staging-Worker:** `talera-pwa-v61-kleine-kruisjes-staging-20261104`
-- **Staging-versie:** `36a2f8d3-dea1-4553-b31b-85f8719a87ed`
+- **Staging-versie:** `dc7c5565-065c-4942-92fe-a71f6e465597`
 - **Goedkeurde beschermde R20 Worker (niet bewerken):** `talera-pwa-v61-r20-goedgekeurd-herstelpunt-20261104`
 - **Beschermde R20-versie:** `1f65e254-3bc7-418a-8015-236fe5e5d441`
 - **Vóór deze ronde op start-origin:** `1bfe2d99-8171-4472-bf3f-da84e8db4dc4`
 
 ## Wijzigingen
 
-De bestaande R20-code van 93.560 tekens is intact gehouden en met een geïsoleerd UI-blok uitgebreid tot 102.062 tekens. In de presentatie, tijdlijn en Mijn leven staat één potloodje voor aantoonbaar eigen opgeslagen herinneringen. De bestaande bewerkpagina wordt geopend, zonder aan de vertel-, foto-, video-, audio- of presentatiemotor te raken.
+De bestaande R20-code van 93.560 tekens is intact gehouden en met een geïsoleerd UI-blok uitgebreid tot 104.227 tekens. In de presentatie, tijdlijn en Mijn leven staat nu altijd één vast potloodje, los van de huidige herinnering. Bij aanklikken wordt de op dat moment actieve herinnerings-ID opnieuw opgevraagd. Bij eigen opgeslagen herinneringen opent de editor. Bij ingebouwde voorbeeldherinneringen geeft een beheer-informatiedialoog de ID, datum en herkomst weer; deze zijn geen persoonlijke records en kunnen niet via de bestaande editor verwijderd worden. De bestaande bewerkpagina wordt geopend, zonder aan de vertel-, foto-, video-, audio- of presentatiemotor te raken.
 
 Bij lokaal gepubliceerde herinneringen verschijnt binnen de bestaande editor een afzonderlijke knop **Herinnering volledig verwijderen**, die na een expliciete bevestiging `TaleraMemories.remove(id)` aanroept. Bij gedeelde/cloud-herinneringen blijft de bestaande beheer- en verwijderroute gehandhaafd.
 
-Demo-/voorbeeldherinneringen hebben geen persoonlijk opslagrecord en krijgen daarom geen vernietigende verwijderknop. Als die opnieuw bij het laden verschijnen, komen ze uit vaste voorbeeldcode en niet uit een nieuwe opname.
+Demo-/voorbeeldherinneringen hebben geen persoonlijk opslagrecord en krijgen daarom geen vernietigende verwijderknop. Het vaste potloodje blijft wel zichtbaar bij deze testrecords en toont hun ID, zodat de gebruiker ziet welke bron de tijdlijn op dat moment heeft. Als die opnieuw bij het laden verschijnen, komen ze uit vaste voorbeeldcode en niet uit een nieuwe opname.
 
 ## Bronbestanden
 

@@ -22,3 +22,5 @@ jobs:
         run: node r20-dev/stille-luxe/sync-style.mjs --check
       - name: Run isolated regression tests
         run: node --test r20-dev/stille-luxe/stille-luxe.test.mjs
+      - name: Verify deployed staging over public HTTP (read only)
+        run: node r20-dev/stille-luxe/smoke-live.mjs

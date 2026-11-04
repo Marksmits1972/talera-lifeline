@@ -16,7 +16,12 @@ html,body{background-color:#FFFFFF;color:#304653;font-family:-apple-system,Blink
 /* Photo-overlay copy must remain readable; unlike regular page text, it is white. */
 .hero-caption,.hero-caption h1,.hero-caption small{color:#FFFFFF;}
 :is(.subtle,.muted,.hint,.caption,.meta,.story-loc,.detail-subtle,.month-mark,.age-info small){color:#718D9A;}
-:is(.topbar,header:not(.presentation-header)){background-color:#FFFFFF;}
+:is(.topbar,header:not(.presentation-header):not(.mast)){background-color:#FFFFFF;}
+/* Approved 04-11 photo-led home variant: dark top safe area, transparent mast on photo. */
+html[data-talera-hero="true"],html[data-talera-hero="true"] body{background-color:#304653;}
+html[data-talera-hero="true"] .mast{background:transparent;color:#FFFFFF;}
+html[data-talera-hero="true"] .mast .logo{color:#FFFFFF;text-shadow:0 1px 5px #304653;}
+html[data-talera-hero="true"] .mast .logo::before{background-color:#FFFFFF;border-radius:5px;}
 button,input,textarea,select{font-family:inherit;}
 :is(button,[role='button']){letter-spacing:0;font-weight:600;}
 :is(.primary,.btn-primary,.primary-button,button.primary,button[data-primary],#v30DateSave){background-color:#304653;color:#FFFFFF;border:1px solid #304653;border-radius:12px;}
@@ -54,4 +59,15 @@ h2,.memory-title{font-size:clamp(19px,4.6vw,23px);font-weight:650;line-height:1.
 .sheetHead h2{color:#304653;font-size:24px;line-height:1.25;}
 .sheetHead p{color:#718D9A;}
 .closeSheet{background:#F7F5F0;color:#304653;}
+/* Following style round: native editor, date dialogue and controls, colors only. */
+#app .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{color:#304653!important;}
+#app .work.talera-compact-work.talera-r16-editor #details .talera-tags-toggle{color:#718D9A!important;}
+#app .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar #publish{background-color:#304653!important;color:#FFFFFF!important;box-shadow:none!important;}
+#app .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar :is(#speak,#write){color:#304653!important;}
+#v30DateBox{background:#FFFFFF;color:#304653;border-radius:16px;}
+#v30DateBox h2{color:#304653;}
+#v30DateBox :is(#v13ExactDate,#v13Year,#v13Month,#v13Season){background-color:#F7F5F0;color:#304653;border-color:#B5C6CD;}
+#v30DateBox :is(#v13Expand,#v13BackToDate){color:#718D9A;}
+#v30DateBox #v30DateSave{background:#304653;color:#FFFFFF;border-color:#304653;}
+#v30DateBox #v30DateCancel{background:#FFFFFF;color:#304653;border-color:#B5C6CD;}
 /* Protected photo, narration, player, slide and swipe layers remain untouched. */

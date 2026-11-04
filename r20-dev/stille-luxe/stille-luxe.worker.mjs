@@ -172,6 +172,12 @@ function restorePresentationStatusArea(html){
         'html,body{margin:0!important;background:#304653!important;overflow:hidden!important;}'+
         '.app{height:calc(100dvh + env(safe-area-inset-top,0px))!important;'+
         'min-height:calc(100dvh + env(safe-area-inset-top,0px))!important;}'+
+        /* Preserve the existing story and timeline positions. Only the image
+           stage is extended through the lower iOS inset. Its live photo
+           children already fill their stage via absolute inset:0. */
+        '.app main,.app .memory-space{overflow:visible!important;}'+
+        '.app .photo-stage{bottom:calc(-1 * env(safe-area-inset-top,0px))!important;'+
+        'height:calc(100% + env(safe-area-inset-top,0px))!important;}'+
         '}}';
       head=head.replace(/<\/head\s*>/i,'<style id="'+marker+'">'+css+'</style>\n</head>');
     }

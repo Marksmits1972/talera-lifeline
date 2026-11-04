@@ -24,3 +24,12 @@ jobs:
         run: node --test r20-dev/stille-luxe/stille-luxe.test.mjs
       - name: Verify deployed staging over public HTTP (read only)
         run: node r20-dev/stille-luxe/smoke-live.mjs
+      - name: Capture anonymous mobile and desktop rendering
+        run: bash r20-dev/stille-luxe/snapshots.sh
+      - name: Save visual references for audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-stille-luxe-anonymous-screens
+          path: ${{ runner.temp }}/talera-stille-luxe-screens/*.png
+          if-no-files-found: warn
+          retention-days: 3

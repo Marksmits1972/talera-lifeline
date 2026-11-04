@@ -5,7 +5,7 @@
  * No database migration, account change, API key, or live V61 deployment.
  */
 const BASE_NAME='talera-pwa-v61-opslag-onder-instellingen-20261101';
-const BUILD='v61-r17-kleine-fotokruisjes-r12-locked-20261104';
+const BUILD='v61-r18-presentatie-fotos-tap-en-2500ms-r12-locked-20261104';
 
 
 // One persistent listening preference shared by My Life and Presentation.
@@ -187,6 +187,7 @@ function taleraInlinePlayMedia(s,frame,muted,finished){
         s.blockedByBrowser=true;
         if(!s.hint){
           const hint=document.createElement('div');
+          hint.className='talera-v61-audio-permission-hint';
           hint.textContent='Tik op de foto om het geluid te starten';
           hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';
           (stage.parentElement||stage).appendChild(hint);s.hint=hint;
@@ -238,10 +239,34 @@ function taleraInlineOrdinaryStep(s,index){
     taleraInlinePlayMedia(s,frame,!window.__taleraAudioControls?.isEnabled?.(),()=>{
       // End of video does not advance the ordinary presentation; only tapping does.
     });
-  }else{
-    // Ordinary TALERA: the user TAPS to pick the next medium. No photo timer.
-    // A video remains on its last frame when it finishes.
+  }else if(s.frames.length>1&&s.frames.every(f=>f.kind==='photo')){
+    // Only an ordinary, photo-only presentation uses the 2.5s slideshow.
+    // Any manual tap resets this timeout. Narrated memories keep their
+    // ORIGINAL voice-clock cue engine, and mixed/video stories never change.
+    s.ordinaryTimer=setTimeout(()=>{
+      if(s!==taleraInline||s.phase!=='ordinary'
+         ||runtime.currentMemory()?.id!==s.memory.id)return;
+      if(document.hidden||runtime.isMoving()){
+        taleraInlineOrdinaryStep(s,s.ordinaryIndex);
+        return;
+      }
+      taleraInlineOrdinaryStep(s,s.ordinaryIndex+1);
+    },2500);
   }
+}
+function taleraInlineInstallOrdinaryPhotoTap(){
+  // The RH19 storySurface click handler does not cover the main image stage
+  // for local memories. A single capture handler handles this photo-only case.
+  document.addEventListener('click',event=>{
+    const s=taleraInline;
+    if(!s||s.engine!=='ordinary'||s.phase!=='ordinary'||s.frames.length<=1
+       ||!s.frames.every(frame=>frame.kind==='photo'))return;
+    if(!event.target?.closest?.('#photoStage'))return;
+    if(event.target.closest('button,a,input,select,textarea,video,audio,nav,.timeline,[role="button"],.talera-share-shell'))return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    taleraInlineOrdinaryStep(s,s.ordinaryIndex+1);
+  },true);
 }
 function taleraInlineStartOrdinary(s){
   if(s!==taleraInline)return;
@@ -620,7 +645,7 @@ function patchPresent(html){
   const q=block.indexOf(' async function showSimpleVideo(memory,frameData){',p);
   const v=block.indexOf('function activate(memory){',q);
   if(p<0||q<0||v<0||!block.includes("frame.src='/vertelmodus-embed?mode=present'"))return{html,changed:false,reason:'upstream-changed'};
-  const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),taleraInlineCleanVideo.toString(),taleraInlineSetFrame.toString(),taleraInlinePlayMedia.toString(),taleraInlineReplayNext.toString(),taleraInlineVoiceEnded.toString(),taleraInlineOrdinaryStep.toString(),taleraInlineStartOrdinary.toString(),taleraInlineInstallAudioControls.toString(),present.toString(),'taleraInlineInstallAudioControls();'].join('\n');
+  const injected=['let taleraInline=null;',taleraInlineDispose.toString(),taleraInlineSync.toString(),taleraInlineLoadVideo.toString(),taleraInlineCleanVideo.toString(),taleraInlineSetFrame.toString(),taleraInlinePlayMedia.toString(),taleraInlineReplayNext.toString(),taleraInlineVoiceEnded.toString(),taleraInlineOrdinaryStep.toString(),taleraInlineInstallOrdinaryPhotoTap.toString(),taleraInlineStartOrdinary.toString(),taleraInlineInstallAudioControls.toString(),present.toString(),'taleraInlineInstallAudioControls();taleraInlineInstallOrdinaryPhotoTap();'].join('\n');
   block=block.slice(0,p)+injected+'\n '+block.slice(v);
   block=block.replace('function disposePresentation(){','function disposePresentation(){\n taleraInlineDispose();');
   const oldActivate="   const hasVoice=memory._zeroItems.some(x=>x.kind==='audio');\n   if(hasVoice){\n     void present(memory);\n     return;\n   }\n   if(currentPresentation)disposePresentation();\n   const selected=memory._zeroFrames?.[memory._photoIndex||0];\n   if(selected?.kind==='video'){void showSimpleVideo(memory,selected);return}\n   if(localVideo){localVideo.pause();localVideo.remove();localVideo=null}";
@@ -659,9 +684,18 @@ function patchPresent(html){
     +'body.talera-v61-narration-visual #photoStage>#photoLayerA'
     +'{display:block!important;visibility:visible!important;opacity:1!important;transform:none!important}'
     +'</style>';
+  // R18 presentation-only visual polish. This changes no media handlers.
+  const presentationSkin='<style id="talera-v61-r18-presentation-chrome">'
+    +'body .talera-v61-audio-permission-hint{display:none!important}'
+    +'body:not(.talera-recipient-presentation) #talera-v30-edit'
+    +'{background:rgba(250,252,255,.16)!important;'
+    +'border:1px solid rgba(255,255,255,.82)!important;'
+    +'color:#fff!important;box-shadow:0 2px 8px rgba(0,0,0,.13)!important;'
+    +'backdrop-filter:blur(9px)!important;-webkit-backdrop-filter:blur(9px)!important}'
+    +'</style>';
   if(!page.includes('</head>'))return{html,changed:false,reason:'missing-head'};
-  page=page.replace('</head>',ownerCSS+'</head>');
-  return{html:page,changed:true,reason:'one-native-photo-owner'};
+  page=page.replace('</head>',ownerCSS+presentationSkin+'</head>');
+  return{html:page,changed:true,reason:'r18-photo-only-presentation'};
 }
 
 function removeEditorShareBeforePublish(html){

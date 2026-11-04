@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `f7c8cff4-59a7-4e8c-8171-ca05608bc377`  
-**Deployment:** `a12b10ce-3aeb-493a-991d-3c7dd76ce8dd`  
+**Actuele Worker-versie:** `c2c2a0c1-af39-467d-ab96-89ab07ff3de7`  
+**Deployment:** `21eb2f12-f25c-4cc8-be27-35b40ac09d48`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -61,6 +61,17 @@ De bestaande oorspronkelijke `/talera-brand-v3-180.png`, `192.png` en `512.png` 
 - De automatische browser toont bij een leeg profiel standaard Engelstalige labels. Dat is geen taalkeuze van de iPhone-gebruiker en deze stijlronde past geen taal- of accountinstellingen aan.
 - Headless screenshots zijn **geen bewijs voor iOS Safari touch, echte audio/video, swipe of gegevensherstel**. Die blijven afzonderlijke acceptatietests.
 - Kleine vierkantjes op enkele screenshot-iconen kunnen ontstaan door niet beschikbare platform-glyphs in headless Linux; de werkelijke iPhone-iconen vereisen nog beoordeling voordat ze als defect of hersteld worden beschreven.
+
+## Vervolgronde: donkere hero + schermgroep editor/datum
+- **Eigendomskeuze in echte iPhone-vergelijking:** de producteigenaar verkiest de beeldvullende foto met donkere bovenzone boven de variant met witte mast/header.
+- Daarom wordt in de losse staging uitsluitend het foto-gebaseerde beginscherm/Mijn leven met `data-talera-hero="true"` gemarkeerd: iOS theme-color en lege hero-achtergrond `#304653`, transparante mast, witte TALERA-tekst en fototitel. Andere gewone pagina's blijven wit `#FFFFFF`, inclusief formulieren.
+- De oorspronkelijke drie-panelen-logo-asset blijft intact en verschijnt als klein herkenbaar beeldmerk naast de naam. Taalkeuze blijft op haar oorspronkelijke plaats.
+- Het herkende lege home-beeld gebruikt een **egale** merkblauwe achtergrond, niet het oude decoratieve verloop.
+- **Volgende schermgroep in dezelfde ronde:** bestaande native editor en datumvenster. Aangepast zijn alleen gerichte tekst-, knop-, label-, invoer- en dialoogkleuren; niet de editor-layout, vertelmodus, video, tijdcodes of media-acties.
+- De officiële overdracht beschrijft **acht technische fasen (0–7)**, niet vier. Voor praktische schermcontrole volgen we vier logische schermgroepen: (1) Start/Mijn leven, (2) Herinnering maken en datum, (3) Delen/berichten/meldingen, (4) Meer/instellingen/ondersteuning. Deze indeling vervangt de oorspronkelijke technische fasen niet.
+- Een anonieme headless /tell-screenshot toont soms uitsluitend `TALERA openen – Concepten controleren`. Dat is **geen** bevestigde productfout, maar de editor is hiermee evenmin end-to-end op iPhone getest.
+- De bijgewerkte code staat op `style/talera-stille-luxe-v9-20261104`, is opnieuw gepubliceerd op hetzelfde stagingadres en behoudt V9-versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`.
+- Deze wijziging is geen finale acceptatie voor alle vier schermgroepen; groepen 3 en 4 plus volledige iPhone-regressie blijven open.
 
 ## Reële testresultaten
 | Controle | Feitelijke status |

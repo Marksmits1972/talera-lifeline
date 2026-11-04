@@ -57,7 +57,7 @@ async function recolorPng(response){
   if(!size)return null;
   const raw=new Uint8Array(size);let offset=0;
   for(const p of idat){raw.set(p,offset);offset+=p.length;}
-  const unzipped=new Uint8Array(await new Response(raw).body.pipeThrough(new DecompressionStream('deflate')).arrayBuffer());
+  const unzipped=new Uint8Array(await new Response(new Response(raw).body.pipeThrough(new DecompressionStream('deflate'))).arrayBuffer());
   const bpp=type===2?3:4,stride=width*bpp;
   if(unzipped.length!==(stride+1)*height)return null;
   const pixels=new Uint8Array(stride*height);
@@ -88,7 +88,7 @@ async function recolorPng(response){
   }
   const output=new Uint8Array((stride+1)*height);
   for(let y=0;y<height;y++)output.set(pixels.subarray(y*stride,(y+1)*stride),y*(stride+1)+1);
-  const deflate=new Uint8Array(await new Response(output).body.pipeThrough(new CompressionStream('deflate')).arrayBuffer());
+  const deflate=new Uint8Array(await new Response(new Response(output).body.pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
   const out=[137,80,78,71,13,10,26,10];
   out.push(...pngChunk('IHDR',bytes.subarray(16,29)));
   // Large IDAT chunks would overflow spread; split by 12 KiB.

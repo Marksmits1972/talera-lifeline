@@ -5,7 +5,7 @@ function taleraDevNativeEditorPatch(html){
   const keyWork="setupV10(g,details,frame,footer);taleraCompactWorkbench(g);if(errorMsg)showError(errorMsg)";
   const keyRemove="dlg.remove();if(current===gid)current=groups[0]?.id||'';";
   const keySaved="const remove=[...g.media,...(g.voice?[g.voice]:[])];groups=groups.filter(x=>x!==g);";
-  if([keyBoot,keyWork,keyRemove,keySaved,"async function boot(){"].some(k=>html.split(k).length!==2)){
+  if([keyBoot,keyWork,keyRemove,keySaved,"async function boot(){busy('TALERA openen','Concepten controleren');"].some(k=>html.split(k).length!==2)){
     return {changed:false,html,reason:'native-tell-editor-contract-changed',
      anchors:[keyBoot,keyWork,keyRemove,keySaved].map(k=>html.split(k).length-1)};
   }
@@ -53,7 +53,7 @@ if(g.demoSourceId){
  details.appendChild(button);
 }
 `;
-  let out=html.replace("async function boot(){",helper+"async function boot(){");
+  let out=html.replace("async function boot(){busy('TALERA openen','Concepten controleren');",helper+"async function boot(){busy('TALERA openen','Concepten controleren');");
   out=out.replace(keyBoot,"await readDraft();"+init+"const edit=new URLSearchParams(location.search).get('edit');");
   out=out.replace(keyWork,keyWork+";"+nativeButton);
   out=out.replace(keyRemove,"if(g.demoSourceId)taleraDevHideExampleAfterAction(g.demoSourceId);"+keyRemove);

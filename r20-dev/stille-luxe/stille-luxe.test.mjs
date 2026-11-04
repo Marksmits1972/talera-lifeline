@@ -131,7 +131,8 @@ test('approved photo-led homepage has ink-blue status bar and no white mast over
  assert.match(output,/\.hero-caption/);
  const twice=await app.fetch(new Request(origin+'/mijn-leven'),mock(output).env);
  const second=await twice.text();
- assert.equal((second.match(/data-talera-hero="true"/g)||[]).length,3); // markup attribute and two CSS selectors
+ assert.equal((second.match(/<html data-talera-hero="true"/g)||[]).length,1);
+ assert.equal((second.match(/id="talera-stille-luxe"/g)||[]).length,1);
 });
 test('native editor visuals change only color tokens, not recording or toolbar geometry',()=>{
  const css=readFileSync(new URL('./stille-luxe.css',import.meta.url),'utf8');

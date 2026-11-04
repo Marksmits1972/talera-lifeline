@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `45d125cb-76a5-4b50-a1b5-234171936a5d`  
-**Deployment:** `91d683f5-ce1b-4689-9210-e284c70aab9d`  
+**Actuele Worker-versie:** `f7c8cff4-59a7-4e8c-8171-ca05608bc377`  
+**Deployment:** `a12b10ce-3aeb-493a-991d-3c7dd76ce8dd`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -52,6 +52,15 @@ De bestaande oorspronkelijke `/talera-brand-v3-180.png`, `192.png` en `512.png` 
 - De GitHub Actions-workflow `.github/workflows/talera-stille-luxe-check.yml` test alleen deze branch en voert geen deployment of gegevensmutatie uit.
 - Publieke read-only HTTP-smoketests van 8 routes/icoonformaten: **8/8 PASS** op https://github.com/Marksmits1972/talera-lifeline/actions/runs/41890127603 (basisstaging voor veilige CSS-doorwerking). Na de nieuwste patch draait dezelfde controle opnieuw.
 - De Cloudflare-API bevestigt de actuele stagingbinding `V9_BASE` naar exact de beschermde V9 en de originele V9-deploymentversie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` nog intact.
+
+## Visuele browsercontrole (anoniem, geen eigen data)
+- GitHub Actions [run 41891355982](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41891355982) rapporteerde succes voor Node-regressie, CSS-bronconsistentie, **8/8 echte HTTP-routes** én het vastleggen van vijf schermafbeeldingen met een lege tijdelijke browser.
+- De screenshots omvatten 393×852 pixels voor start, Mijn leven, /tell en /present en 1280×800 voor Mijn leven.
+- Een vorige afbeelding liet ten onrechte **donkerblauwe tekst op de voorbeeldfoto** zien doordat de algemene h1-kleur de fototitel overschreef. Dit is visueel en in tests opgelost: fotokoppen weer **wit #FFFFFF**; gewone paginatitels blijven **inkt #304653**.
+- De eerste korte /tell-screenshot toonde slechts de laadindicator. Met langere afzonderlijke browsercontrole verscheen het bestaande scherm **Add photos / Tell without photos**; dit was een te vroege screenshot, geen bewijs van een functionele blokkade.
+- De automatische browser toont bij een leeg profiel standaard Engelstalige labels. Dat is geen taalkeuze van de iPhone-gebruiker en deze stijlronde past geen taal- of accountinstellingen aan.
+- Headless screenshots zijn **geen bewijs voor iOS Safari touch, echte audio/video, swipe of gegevensherstel**. Die blijven afzonderlijke acceptatietests.
+- Kleine vierkantjes op enkele screenshot-iconen kunnen ontstaan door niet beschikbare platform-glyphs in headless Linux; de werkelijke iPhone-iconen vereisen nog beoordeling voordat ze als defect of hersteld worden beschreven.
 
 ## Reële testresultaten
 | Controle | Feitelijke status |

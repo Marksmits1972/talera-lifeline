@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `4444493f-cb5a-4b32-bdd0-a3098c67bbb3`  
-**Deployment:** `0bd52d91-181f-4825-8edd-2f5020659e82`  
+**Actuele Worker-versie:** `45d125cb-76a5-4b50-a1b5-234171936a5d`  
+**Deployment:** `91d683f5-ce1b-4689-9210-e284c70aab9d`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -36,11 +36,22 @@ De originele schermreferenties en kleurenkaart zijn afzonderlijk in Drive terugg
 - `r20-dev/stille-luxe/stille-luxe.css` — centrale tokens, typografie, buttons, daadwerkelijke UI-selectors en bestaande originele drieluik-logo als CSS-headericoon.
 - `r20-dev/stille-luxe/stille-luxe.worker.mjs` — één nieuwe Cloudflare staging, laat originele V9 onaangeroerd, normaliseert bekende CSS-tinten, voegt stijl in normale HTML toe, beheert manifest/icons.
 - `r20-dev/stille-luxe/STYLE_AUDIT_AND_TEST_20261104.md` — dit audit-/controleverslag.
+- `r20-dev/stille-luxe/sync-style.mjs`, `stille-luxe.test.mjs`, `smoke-live.mjs` en de exclusieve GitHub Actions-workflow — onderhoudbare, alleen-lezen veiligheidstests.
 
 Geen nieuwe externe fonts, frameworks, credentials, betaalde API's of datastructuren.
 
 ## Logo-proef
 De bestaande oorspronkelijke `/talera-brand-v3-180.png`, `192.png` en `512.png` zijn technisch gecontroleerd via Cloudflare runtime PNG-decode → chromatische blauwherkleuring → PNG-encode. Voor alle formaten werd een geldig PNG-header/resultaat met dezelfde pixelafmetingen teruggegeven. Witte routepixels worden niet geometrisch gewijzigd; perceptuele verificatie op echte schermen blijft open. De nieuwe staging onderschept app-icons en stuurt het manifest naar de nieuw herkleurde iconen.
+
+## Vervolgcontroles op 4 november — echte staging en veilige CSS
+- De producteigenaar heeft de nieuwe styling globaal op iPhone bekeken en meldde geen zichtbare vreemde afwijkingen. Dit is een eerste visuele beoordeling, geen volledige expliciete eindacceptatie van alle schermen.
+- De staging is opnieuw gepubliceerd op **hetzelfde** testadres; geen nieuwe Worker of gebruikersorigin.
+- Het CSS-vervangingsproces houdt volledige inline `<script>`-blokken intact, en slaat gevoelige player-, foto-, vertel-, swipe- en opname-CSS-selectors over, óók wanneer gewone navigatie-CSS in hetzelfde stylesheet staat.
+- `r20-dev/stille-luxe/sync-style.mjs --check` bevestigt dat `stille-luxe.css` de enige te bewerken stijlbron is en de Worker slechts een gegenereerde ingesloten kopie gebruikt.
+- `r20-dev/stille-luxe/stille-luxe.test.mjs` bevat onafhankelijke regressiecontroles met fictieve HTML en PNG-fixtures; geen privéfoto's of accountgegevens.
+- De GitHub Actions-workflow `.github/workflows/talera-stille-luxe-check.yml` test alleen deze branch en voert geen deployment of gegevensmutatie uit.
+- Publieke read-only HTTP-smoketests van 8 routes/icoonformaten: **8/8 PASS** op https://github.com/Marksmits1972/talera-lifeline/actions/runs/41890127603 (basisstaging voor veilige CSS-doorwerking). Na de nieuwste patch draait dezelfde controle opnieuw.
+- De Cloudflare-API bevestigt de actuele stagingbinding `V9_BASE` naar exact de beschermde V9 en de originele V9-deploymentversie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` nog intact.
 
 ## Reële testresultaten
 | Controle | Feitelijke status |
@@ -51,7 +62,8 @@ De bestaande oorspronkelijke `/talera-brand-v3-180.png`, `192.png` en `512.png` 
 | GitHub-workerbron identiek aan Cloudflare script-readback | BEVESTIGD |
 | Oorspronkelijke V9 deployment-versie intact | BEVESTIGD |
 | Originele iconenverwerking 180, 192, 512 | GESLAAGD in geïsoleerde runtimeproef |
-| Schermrendering/screenshot op live link | NIET geverifieerd: geautomatiseerde toegang tot workers.dev werd vanuit de testomgeving geweigerd |
+| Live HTTP-routes (home, Mijn leven, editor, presentatie, manifest, iconen) | 8/8 PASS in GitHub Actions; URL vanuit webzoektool niet bereikbaar |
+| Visuele schermrendering / echte screenshotvergelijking | NIET volledig automatisch geverifieerd; eerste iPhone-beoordeling gebruiker: geen opvallende afwijkingen |
 | iPhone safe areas, mobile overflow, werkelijke CSS-cascade en logo-uitstraling | OPEN: handmatige toestelcontrole |
 | Herinnering aanmaken/bewerken/verwijderen, foto, swipe, audio, vertelstart, video, delen, back-up | NIET end-to-end in de nieuwe staging getest; absoluut niet claimen als geslaagd |
 | Free→Premium-werkstroom | NIET aangeraakt |

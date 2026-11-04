@@ -13,6 +13,8 @@
 html,body{background-color:#FFFFFF;color:#304653;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,system-ui,sans-serif;}
 :is(.app,.viewport,.screen,.timeline-page,.detail,.detail-list,.preview,.preview-description,.ages,.work,.sheet,.menu-panel,.settings-panel){background-color:#FFFFFF;}
 :is(.logo,h1,h2,h3,.page-title,.memory-title,.story-name,.preview-title,.sheet h2){color:#304653;}
+/* Photo-overlay copy must remain readable; unlike regular page text, it is white. */
+.hero-caption,.hero-caption h1,.hero-caption small{color:#FFFFFF;}
 :is(.subtle,.muted,.hint,.caption,.meta,.story-loc,.detail-subtle,.month-mark,.age-info small){color:#718D9A;}
 :is(.topbar,header:not(.presentation-header)){background-color:#FFFFFF;}
 button,input,textarea,select{font-family:inherit;}

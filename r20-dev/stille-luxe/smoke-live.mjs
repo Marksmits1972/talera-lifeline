@@ -44,6 +44,10 @@ for(const check of checks){
     assert.match(text,/apple-mobile-web-app-status-bar-style["']\s+content=["']black-translucent/,'transparent iOS status bar');
     assert.match(text,/viewport-fit=cover/,'retain edge-to-edge viewport');
     assert.match(text,/name=["']theme-color["']\s+content=["']#304653/,'presentation fallback ink');
+    assert.match(text,/<style id="talera-present-ios-edge-to-edge">/,'only an iOS-specific presentation style is present');
+    assert.match(text,/\.app\{height:calc\(100dvh \+ env\(safe-area-inset-top,0px\)\)!important;/,'photo canvas reaches bottom');
+    assert.match(text,/@media \(display-mode:standalone\)/,'no change to regular browsers');
+    assert.match(text,/@supports \(-webkit-touch-callout:none\)/,'Safari only');
     // Compare the entire protected R20/V9 body to its original live route.
     const baseline=await fetch(
       'https://talera-v61-r20-definitief-verwijderen-v9-20261104.mark-a39.workers.dev/present',

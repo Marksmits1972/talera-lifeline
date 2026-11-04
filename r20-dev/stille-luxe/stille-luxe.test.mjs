@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {deflateSync,inflateSync} from 'node:zlib';
+import {readFileSync} from 'node:fs';
 import app from './stille-luxe.worker.mjs';
 
 const origin='https://staging.example.test';
@@ -106,4 +107,12 @@ test('original PNG image geometry and white route are preserved while all three 
  assert.deepEqual(pixel(4),[255,255,255]);
  assert.deepEqual(pixel(7),[113,141,154]);
  assert.deepEqual(pixel(11),[181,198,205]);
+});
+
+
+test('photo-memory headline remains white for legibility without changing the photo layer',()=>{
+ const css=readFileSync(new URL('./stille-luxe.css',import.meta.url),'utf8');
+ assert.match(css,/\.hero-caption,\.hero-caption h1,\.hero-caption small\{color:#FFFFFF;\}/);
+ assert.doesNotMatch(css,/\.hero\s*img\s*\{/);
+ assert.doesNotMatch(css,/#photoStage\s*\{/);
 });

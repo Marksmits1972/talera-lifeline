@@ -9,7 +9,7 @@ const dir=process.env.TALERA_CDP_DIR;
 assert.ok(dir,'Chrome CDP profile required');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let tab;
-for(let i=0;i<100;i++){
+for(let i=0;i<300;i++){
  try{
   const port=Number((await readFile(join(dir,'DevToolsActivePort'),'utf8')).split('\n')[0]);
   const res=await fetch('http://127.0.0.1:'+port+'/json');

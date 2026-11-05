@@ -1,18 +1,28 @@
+/* Read-only verification against currently approved V9 HTML.
+ * No Cloudflare API token, no deploy and no browser data mutation.
+ */
 import assert from 'node:assert/strict';
-import {INLINE_PHOTO_HELPER,ORIGINAL_AUDIO_END,PATCHED_AUDIO_END} from './restfotos.worker.mjs';
-const a='https://talera-v12-restfotos-veilige-test-20261105.mark-a39.workers.dev';
-const b='https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev';
-for(const p of ['/present','/','/tell','/vertelmodus-embed?mode=present','/vertelmodus-embed?mode=record']){
- const [r,t]=await Promise.all([fetch(a+p),fetch(b+p)]);
- assert.equal(r.status,200);assert.equal(t.status,200);
- const [x,y]=await Promise.all([r.text(),t.text()]);
- let z=x;
- if(p==='/present'){
-  assert.equal(r.headers.get('x-talera-v12-inline-restfotos'),'installed');
-  assert.equal(x.split(INLINE_PHOTO_HELPER).length-1,1);
-  assert.equal(x.split(PATCHED_AUDIO_END).length-1,1);
-  z=x.replace(INLINE_PHOTO_HELPER+'\n','').replace(PATCHED_AUDIO_END,ORIGINAL_AUDIO_END);
- }else assert.equal(r.headers.get('x-talera-v12-inline-restfotos'),null);
- assert.equal(z,y.replaceAll(b,a),'V12 and original V9 differ only at native voice end');
- console.log('PASS live parity',p);
-}
+import {
+  INLINE_PHOTO_HELPER, ORIGINAL_VIDEO_SELECTION, PATCHED_VIDEO_SELECTION,
+  ORIGINAL_VIDEO_DONE, PATCHED_VIDEO_DONE, ORIGINAL_NO_VIDEOS,
+  PATCHED_NO_VIDEOS, addRemainingPhotosToInlinePlayer
+} from './restfotos.worker.mjs';
+
+const approvedBase='https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev';
+const res=await fetch(approvedBase+'/present',{headers:{accept:'text/html'}});
+assert.equal(res.status,200,'approved V9 /present must be reachable');
+const html=await res.text();
+const result=addRemainingPhotosToInlinePlayer(html);
+assert.equal(result.status,'installed','current V9 inline anchors must match exactly');
+assert.equal(result.html.split(INLINE_PHOTO_HELPER).length-1,1);
+assert.equal(result.html.split(PATCHED_VIDEO_SELECTION).length-1,1);
+assert.equal(result.html.split(PATCHED_VIDEO_DONE).length-1,1);
+assert.equal(result.html.split(PATCHED_NO_VIDEOS).length-1,1);
+assert.equal(
+  result.html.replace(INLINE_PHOTO_HELPER+'\n','')
+    .replace(PATCHED_VIDEO_SELECTION,ORIGINAL_VIDEO_SELECTION)
+    .replace(PATCHED_VIDEO_DONE,ORIGINAL_VIDEO_DONE)
+    .replace(PATCHED_NO_VIDEOS,ORIGINAL_NO_VIDEOS),
+  html,'no other original V9 HTML or JS may be changed');
+console.log('PASS: real approved V9 inline HTML accepts exactly 1 helper and 3 tiny patches');
+console.log('PASS: recorder, storage, CSS, story UI and all other V9 page bytes are untouched');

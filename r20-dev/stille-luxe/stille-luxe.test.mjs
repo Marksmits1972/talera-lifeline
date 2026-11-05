@@ -178,23 +178,24 @@ test('native editor visuals change only color tokens, not recording or toolbar g
  assert.doesNotMatch(css,/#photoLayerA\s*\{/);
 });
 
-test('pre-programmed CSS switches footer instantly at first sheet movement with exact V9 paper token',async()=>{
+test('reading-sheet fades faster and footer stays black until paper is almost solid',async()=>{
  const original='<!doctype html><html><head><meta name="theme-color" content="#ffffff"></head><body></body></html>';
  const response=await app.fetch(new Request(origin+'/present'),mock(original).env);
  const html=await response.text();
  const script=html.match(/<script id="talera-present-bottom-tint-script">([\s\S]*?)<\/script>/)?.[1];
  const style=html.match(/<style id="talera-present-bottom-tint">([\s\S]*?)<\/style>/)?.[1];
- assert.ok(script,'presentation-only synchronizer exists');
- assert.ok(style,'static presentation CSS loads before sheet is opened');
+ assert.ok(script&&style,'only presentation-injected style and color sync');
  assert.match(style,/html,body\{background-color:#000000!important/,'photo footer black from initial paint');
- assert.match(style,/html\[data-talera-present-reading="true"\]/,'paper color already declared in static CSS');
- assert.match(style,/rgb\(var\(--talera-present-paper-rgb\)\)/,'paper selector references one shared color token');
- assert.match(script,/scroll\.scrollTop > 0/,'first scroll movement switches state');
- assert.match(script,/scroll\.addEventListener\('scroll', sync/,'synchronous scroll handler');
- assert.doesNotMatch(script,/getImageData|drawImage|activePhoto/,'no picture sampling for fixed black');
- assert.doesNotMatch(script,/requestAnimationFrame\(/,'no scheduling delay before color request');
- assert.match(script,/taleraTintTest/,'test-only diagnostic remains');
- const cssWrites={},attrs={},events={};let themeValue='',paper='247,244,239';let queued=0;
+ assert.match(style,/html\[data-talera-present-reading="true"\]/,'solid paper state preloaded');
+ assert.match(style,/#memoryCaption\{/,'only existing raised story sheet is restyled');
+ assert.match(style,/--talera-v28-paper-alpha:var\(--talera-present-sheet-alpha,0\)!important/,'overrides slow V28 paper fade');
+ assert.match(style,/--talera-v28-title-color:var\(--talera-present-sheet-title,#FFFFFF\)!important/,'text contrast transitions with paper');
+ assert.doesNotMatch(style,/html:has\(/,'old early-white reading class selectors removed');
+ assert.match(script,/SHEET_FADE_PX = 100/,'shorter 100px paper fade versus original 155px');
+ assert.match(script,/FOOTER_PAPER_AT_PX = 90/,'footer remains black until paper is almost opaque');
+ assert.doesNotMatch(script,/requestAnimationFrame\(/,'synchronous without added timers');
+ assert.doesNotMatch(script,/getImageData|drawImage|activePhoto/,'photo and swipe layers untouched');
+ const vars={},attrs={},events={};let themeValue='',paper='247,244,239',queued=0;
  const scroll={scrollTop:0,classList:{contains:()=>false},
   addEventListener:(name,fn)=>events['scroll:'+name]=fn};
  const space={classList:{contains:()=>false}};
@@ -202,9 +203,9 @@ test('pre-programmed CSS switches footer instantly at first sheet movement with 
  const theme={setAttribute:(key,value)=>{if(key==='content')themeValue=value;}};
  const doc={
   readyState:'complete',
-  documentElement:{style:{setProperty:(key,value)=>cssWrites[key]=value},
+  documentElement:{style:{setProperty:(key,value)=>vars[key]=value},
    setAttribute:(key,value)=>attrs[key]=value},
-  body:{style:{setProperty:()=>{throw Error('ordinary body not to be painted by JS');}}},
+  body:{style:{setProperty:()=>{throw Error('body must be governed by CSS rules');}}},
   querySelector:q=>q==='.memory-space'?space:q==='meta[name="theme-color"]'?theme:null,
   getElementById:q=>q==='memoryStoryScroll'?scroll:q==='memoryCaption'?card:null,
   addEventListener:(name,fn)=>events['document:'+name]=fn
@@ -212,26 +213,38 @@ test('pre-programmed CSS switches footer instantly at first sheet movement with 
  runInNewContext(script,{
   window:{addEventListener:(name,fn)=>events['window:'+name]=fn},
   document:doc,
-  getComputedStyle:element=>element===space?
-   {getPropertyValue:key=>key==='--story-neutral'?paper:''}:
-   {backgroundColor:'rgb(247, 244, 239)'},
+  getComputedStyle:element=>element===space?{
+    getPropertyValue:key=>key==='--story-neutral'?paper:''
+  }:{backgroundColor:'rgb(247, 244, 239)'},
   MutationObserver:class{observe(){}},
   requestAnimationFrame:()=>{queued++;return 1;}
  });
- assert.equal(cssWrites['--talera-present-paper-rgb'],'247,244,239',
-  'actual paper token prepared once before opening');
- assert.equal(attrs['data-talera-present-reading'],'false');
- assert.equal(themeValue,'#000000','native color black at beginning');
- scroll.scrollTop=1;
+ assert.equal(vars['--talera-present-paper-rgb'],'247,244,239','paper read once up-front from same V9 token');
+ assert.equal(themeValue,'#000000','initial footer black');
+ for(const y of [1,18,56,89]){
+   scroll.scrollTop=y;
+   events['scroll:scroll']();
+   assert.equal(attrs['data-talera-present-reading'],'false','black footer before 90px, scroll='+y);
+   assert.equal(themeValue,'#000000','no early white native request at scroll='+y);
+ }
+ assert.ok(Number(vars['--talera-present-sheet-alpha'])>.9,'paper has already almost solidified before footer switches');
+ scroll.scrollTop=90;
  events['scroll:scroll']();
- assert.equal(queued,0,'no RAF scheduled');
- assert.equal(attrs['data-talera-present-reading'],'true','CSS paper rule active at first pixel');
- assert.equal(themeValue,'#F7F4EF','same paper RGB sent to iOS synchronously');
+ assert.equal(attrs['data-talera-present-reading'],'true','paper footer enabled only at 90px');
+ assert.equal(themeValue,'#F7F4EF','footer matches actual sheet token');
+ assert.ok(Number(vars['--talera-present-sheet-alpha'])>.97,'paper is already 97% solid at switch');
+ scroll.scrollTop=100;
+ events['scroll:scroll']();
+ assert.equal(vars['--talera-present-sheet-alpha'],'1.0000','full paper by 100px');
+ assert.equal(vars['--talera-present-sheet-shadow'],'0.000','dark text fully legible');
  scroll.scrollTop=0;
  events['scroll:scroll']();
- assert.equal(attrs['data-talera-present-reading'],'false','black CSS rule restored immediately');
- assert.equal(themeValue,'#000000','native system black requested immediately');
+ assert.equal(attrs['data-talera-present-reading'],'false','black CSS restored on sheet collapse');
+ assert.equal(themeValue,'#000000');
+ assert.equal(vars['--talera-present-sheet-alpha'],'0.0000','photo title returns');
+ assert.equal(queued,0,'never wait for a new JS animation frame');
 });
+
 test('all ordinary HTML entry routes request the same iOS status mode as presentation',async()=>{
  for(const path of ['/','/mijn-leven','/tell','/meer']){
   const html='<!doctype html><html><head><meta name="apple-mobile-web-app-status-bar-style" content="default"></head><body><main>original</main></body></html>';

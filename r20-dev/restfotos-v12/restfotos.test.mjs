@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {runInNewContext,Script} from 'node:vm';
 import worker,{
  ORIGINAL_VOICE_END,PATCHED_VOICE_END,PHOTO_TAIL_HELPER,
- ORIGINAL_RESTORE,PATCHED_RESTORE,ORIGINAL_STAGE_DECL,PATCHED_STAGE_DECL,ORIGINAL_ACTIVATE,PATCHED_ACTIVATE,patchEmbed,patchPresentation
+ ORIGINAL_RESTORE,PATCHED_RESTORE,ORIGINAL_PRESENTER_GUARD,PATCHED_PRESENTER_GUARD,patchEmbed,patchPresentation
 } from './restfotos.worker.mjs';
 
 const image=id=>({id,type:'image'});
@@ -14,7 +14,7 @@ const originalEmbed='<!doctype html><html><body><script>const taleraZero=true;'+
   'const oldRecordingStillWorks=true;'+ORIGINAL_VOICE_END+
   'voice.addEventListener("timeupdate",follow);</script></body></html>';
 const originalPresent='<!doctype html><html><body><script>'+
-  ORIGINAL_STAGE_DECL+';'+ORIGINAL_ACTIVATE+'return;}'+
+  'async function present(memory){'+ORIGINAL_PRESENTER_GUARD+'}'+
   'runtime.subscribe(activate);runtime.registerMemories(memories);'+
   'const visible=runtime.currentMemory();'+ORIGINAL_RESTORE+
   '</script></body></html>';
@@ -34,8 +34,7 @@ test('freshly reloaded local memory explicitly activates after hydration',()=>{
  const r=patchPresentation(originalPresent);
  assert.equal(r.status,'installed');
  assert.equal(r.html.replace(PATCHED_RESTORE,ORIGINAL_RESTORE)
-  .replace(PATCHED_ACTIVATE,ORIGINAL_ACTIVATE)
-  .replace(PATCHED_STAGE_DECL,ORIGINAL_STAGE_DECL),originalPresent);
+  .replace(PATCHED_PRESENTER_GUARD,ORIGINAL_PRESENTER_GUARD),originalPresent);
  assert.equal(patchPresentation(r.html).status,'already-installed');
  assert.equal(r.html.split(PATCHED_RESTORE).length-1,1);
 });
@@ -165,10 +164,19 @@ test('missing bound V9 fails safely, never falls back to an unknown source',asyn
  assert.equal((await worker.fetch(new Request('https://stage.test/present'),{})).status,503);
 });
 
-test('lazy stage is resolved by ORIGINAL activator only when it is invoked',()=>{
- const token={tag:'existing-photoStage'};
- const context={document:{getElementById:(id)=>id==='photoStage'?token:null}};
- const actual=runInNewContext("let stage=null;"+PATCHED_ACTIVATE+
- "return;return stage;} activate({_taleraLocal:true});",context);
- assert.equal(actual?.tag,'existing-photoStage');
+test('same memory is skipped only while ORIGINAL iframe is still connected',()=>{
+ const simulate=(same,connected)=>{
+  const log={dispose:0};
+  const code="let activeId='story-a',currentPresentation={frame:{isConnected:"+connected+
+   "}};function disposePresentation(){log.dispose++}function present(memory){"+
+   PATCHED_PRESENTER_GUARD+"return true;}present({id:'"+(same?'story-a':'story-b')+"'})";
+  const returned=runInNewContext(code,{log});
+  return{returned,disposed:log.dispose};
+ };
+ assert.deepEqual(simulate(true,true),{returned:undefined,disposed:0},
+   'connected original player keeps existing behavior');
+ assert.deepEqual(simulate(true,false),{returned:true,disposed:1},
+   'missing original player must reopen with same memory ID');
+ assert.deepEqual(simulate(false,true),{returned:true,disposed:1},
+   'a different story must open normally');
 });

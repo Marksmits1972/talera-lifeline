@@ -48,16 +48,25 @@ const saved=await evaluate(`(async()=>{
  const canvas=document.createElement('canvas');canvas.width=60;canvas.height=60;
  const ctx=canvas.getContext('2d');ctx.fillStyle='#244b71';ctx.fillRect(0,0,60,60);
  const stream=canvas.captureStream(12);
- const mime=['video/webm;codecs=vp8','video/webm'].find(type=>MediaRecorder.isTypeSupported(type));
+ // Give the video an actual audible track, not just an unmuted-but-silent picture.
+ const audioContext=new AudioContext(),destination=audioContext.createMediaStreamDestination();
+ const oscillator=audioContext.createOscillator(),gain=audioContext.createGain();
+ oscillator.frequency.value=440;gain.gain.value=.13;
+ oscillator.connect(gain);gain.connect(destination);oscillator.start();
+ await audioContext.resume();
+ const mixedStream=new MediaStream([...stream.getVideoTracks(),...destination.stream.getAudioTracks()]);
+ const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp8','video/webm'].find(type=>MediaRecorder.isTypeSupported(type));
  if(!mime)throw Error('Browser has no WebM recorder');
  const recording=await new Promise((resolve,reject)=>{
-   const r=new MediaRecorder(stream,{mimeType:mime}),pieces=[];
+   const r=new MediaRecorder(mixedStream,{mimeType:mime}),pieces=[];
    r.ondataavailable=e=>{if(e.data?.size)pieces.push(e.data)};
    r.onstop=()=>resolve(new Blob(pieces,{type:mime}));
    r.onerror=reject;r.start();setTimeout(()=>r.stop(),1300);
  });
- stream.getTracks().forEach(t=>t.stop());
- const files=[new File([recording],'unseen-video.webm',{type:mime})];
+ oscillator.stop();
+ mixedStream.getTracks().forEach(t=>t.stop());
+ await audioContext.close();
+ const files=[new File([recording],'narrated-video-with-sound.webm',{type:mime})];
  for(let i=1;i<=5;i++)files.push(new File([png],'photo-'+i+'.png',{type:'image/png'}));
  const samples=24000;const buf=new ArrayBuffer(44+samples*2),v=new DataView(buf);
  const str=(at,text)=>{for(let i=0;i<text.length;i++)v.setUint8(at+i,text.charCodeAt(i))};
@@ -70,19 +79,22 @@ const saved=await evaluate(`(async()=>{
  const row=await TaleraMemories.save({
    title:'Clean flow automatic browser test',date:'2026-11-04',time:'12:00:00',
    datePrecision:'exact',text:'Only synthetic local browser data',
-   narrationCues:[{t:0,index:1},{t:1500,index:2}],narrationDurationMs:3000
+   narrationCues:[{t:0,index:0},{t:1200,index:1},{t:1900,index:2}],narrationDurationMs:3000
  },files);
  const fetched=await TaleraMemories.get(row.id);
  return {id:row.id,files:fetched?.items?.length,cues:fetched?.narrationCues?.length};
 })()`,true);
 assert.ok(saved?.id?.startsWith('local-'),JSON.stringify(saved));
-assert.equal(saved.files,7);assert.equal(saved.cues,2);
-console.log('PASS native indexedDB: five photos, unseen video, real WAV and cues preserved');
+assert.equal(saved.files,7);assert.equal(saved.cues,3);
+console.log('PASS native IndexedDB: five photos, narrated video WITH audio track, real WAV and three cues');
 await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
 assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)'),'native V9 audio must load');
 await evaluate(`(()=>{
  window.__oneFlowTest={voiceEndedAt:0,photos:[],videos:[],errors:[]};
  const t=window.__oneFlowTest,rt=window.__taleraTimelineRuntime;
+ const controls=window.__taleraAudioControls;
+ if(!controls||typeof controls.isEnabled!=='function')throw Error('Original V9 listening controls missing');
+ controls.isEnabled=()=>true;
  const record=()=>{
   const index=rt.currentMemory()?._photoIndex;
   if(Number.isInteger(index)&&t.photos.at(-1)?.index!==index)
@@ -90,9 +102,15 @@ await evaluate(`(()=>{
   for(const video of document.querySelectorAll('video.talera-v61-inline-video')){
     if(!t.videos.some(v=>v.elementId===video.dataset.testID)){
       video.dataset.testID=String(t.videos.length+1);
-      t.videos.push({elementId:video.dataset.testID,muted:video.muted,at:performance.now()});
+      const item={elementId:video.dataset.testID,muted:video.muted,at:performance.now(),
+        progress:0,duration:0};
+      t.videos.push(item);
+      video.addEventListener('timeupdate',()=>{
+        item.progress=Math.max(item.progress,video.currentTime||0);
+        item.duration=Number.isFinite(video.duration)?video.duration:0;
+      });
     }
-    if(!video.muted)t.errors.push('video with audio');
+    if(!video.muted&&t.voiceEndedAt===0)t.errors.push('video not silent during narration');
   }
  };
  new MutationObserver(record).observe(document.body,{subtree:true,childList:true});
@@ -103,8 +121,8 @@ await evaluate(`(()=>{
  if(a.paused)a.play().catch(e=>{t.errors.push('voice play '+String(e))});
 })()`);
 assert.ok(await until('window.__oneFlowTest.voiceEndedAt>0'),'real narration must finish');
-assert.ok(await until("window.__oneFlowTest.videos.some(v=>v.muted&&v.at>=window.__oneFlowTest.voiceEndedAt-100)"),
- 'unseen original video should play muted after the narration');
+assert.ok(await until('window.__oneFlowTest.videos.some(v=>v.muted&&v.at<window.__oneFlowTest.voiceEndedAt)'),
+ 'narrated video must have played silently during the voice');
 for(const index of [3,4,5]){
  assert.ok(await until('window.__oneFlowTest.photos.some(p=>p.index==='+index+'&&p.at>=window.__oneFlowTest.voiceEndedAt-100)',330),
   'unseen photo '+index+' must appear in the original viewport');
@@ -118,8 +136,16 @@ const remaining=result.photos.filter(p=>p.index>=3&&p.at>=result.voiceEndedAt-10
 assert.deepEqual(remaining.map(p=>p.index),[3,4,5]);
 assert.ok(remaining[1].at-remaining[0].at>=3200);
 assert.ok(remaining[2].at-remaining[1].at>=3200);
-assert.ok(result.videos.some(v=>v.muted&&v.at>=result.voiceEndedAt-100));
+assert.ok(await until('window.__oneFlowTest.videos.some(v=>!v.muted&&v.progress>.6)',200),
+ 'the original video must replay from 0 with sound after the remaining photos');
+const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,progress:v.progress,duration:v.duration}))`);
+const narrated=videoPlayback.find(v=>v.muted&&v.at<result.voiceEndedAt);
+const replay=videoPlayback.find(v=>!v.muted&&v.at>remaining.at(-1).at);
+assert.ok(narrated,'narrated video exists and was muted');
+assert.ok(replay,'original native video replay starts AFTER the last remaining photo');
+assert.ok(replay.progress>.6,'unmuted replay advanced from t=0');
+assert.ok(replay.duration>=1,'replay has the original full clip duration');
 assert.deepEqual(result.errors,[]);
 assert.equal(result.iframes,0);
-console.log('PASS actual browser: audio -> silent unseen video -> photos 3,4,5 (4s) in same native TALERA viewport');
+console.log('PASS actual browser: silent narrated video -> 3 untouched photos at 4s -> full original video AGAIN with sound, same viewport');
 ws.close();

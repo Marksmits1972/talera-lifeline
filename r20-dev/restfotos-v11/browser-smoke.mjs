@@ -53,6 +53,10 @@ async function testMode(mode,{withVideo=false}={}){
  const initial=await evaluate('({count:window.__taleraV11Test.initialized.itemCount,mode:window.__taleraV11Test.mode, presenter:window.__taleraV11Test.presenter})');
  assert.equal(initial.count,withVideo?7:6,mode+': player sees all media');
  assert.equal(initial.presenter,mode==='present');
+ assert.ok(await until("window.__taleraV11Test?.child?.getElementById('talera-v11-readonly-audit')?.textContent.includes('Restfoto’s: 2')"),mode+': actual INIT data recognized as exactly two remaining photos');
+ const beforeAudit=await evaluate("window.__taleraV11Test.child.getElementById('talera-v11-readonly-audit').textContent");
+ assert.match(beforeAudit,/Spraak: 4 tijdcodes, 4 foto’s/);
+ assert.match(beforeAudit,/Stem afgelopen: nee/);
 
  // Initiate the REAL audio playback, rather than dispatching a synthetic ended event.
  const clicked=await evaluate("(()=>{const x=window.__taleraV11Test;const b=x.child.getElementById('play'); if(!b)return false;b.click();return true})()");
@@ -71,6 +75,10 @@ async function testMode(mode,{withVideo=false}={}){
  assert.ok(images.find(e=>e.img==='4').t>=result.endedAt-20,'fifth photo does not show before voice finishes');
  assert.ok(images.find(e=>e.img==='5').t-images.find(e=>e.img==='4').t>=3500,'photo hold is ~4 seconds');
  assert.ok(result.events.some(e=>e.stage==='playing'),'voice playback existed');
+ const auditText=await evaluate("window.__taleraV11Test.child.getElementById('talera-v11-readonly-audit').textContent");
+ assert.match(auditText,/Stem afgelopen: JA/);
+ assert.match(auditText,/Na stem gezien: 5, 6/,'actual photo elements reported by independent read-only observer');
+ console.log('PASS read-only audit saw real input and real post-voice images',JSON.stringify({mode,summary:auditText}));
  if(withVideo){
   assert.ok(await until('window.__taleraV11Test?.child?.querySelector("#view > video")?.muted===false',{attempts:110,interval:50}),
    mode+': ORIGINAL video with original sound begins only after photos');

@@ -48,7 +48,7 @@ jobs:
           BROWSER=$(command -v google-chrome-stable || command -v google-chrome || command -v chromium)
           CDP_DIR="$RUNNER_TEMP/talera-clean-flow-$GITHUB_RUN_ATTEMPT-$$"
           mkdir -p "$CDP_DIR"
-          "$BROWSER" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --autoplay-policy=no-user-gesture-required --remote-allow-origins='*' --remote-debugging-port=0 --user-data-dir="$CDP_DIR" about:blank >/tmp/talera-clean-flow-browser.log 2>&1 &
+          "$BROWSER" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --autoplay-policy=user-gesture-required --remote-allow-origins='*' --remote-debugging-port=0 --user-data-dir="$CDP_DIR" about:blank >/tmp/talera-clean-flow-browser.log 2>&1 &
           CHROME_PID=$!
           trap 'kill "$CHROME_PID" 2>/dev/null || true' EXIT
           TALERA_CDP_DIR="$CDP_DIR" node r20-dev/one-flow/browser-smoke.mjs || { tail -n 60 /tmp/talera-clean-flow-browser.log; exit 1; }

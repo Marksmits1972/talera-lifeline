@@ -23,7 +23,7 @@ for(const [path,patched] of [
  assert.equal(b.status,200,path+' protected style status');
  const [newHtml,oldHtml]=await Promise.all([a.text(),b.text()]);
  assert.ok(newHtml.length>200,path+' returns real page');
- if(patched){
+ if(patched===true){
   assert.equal(a.headers.get('x-talera-v11-photos'),'installed');
   assert.ok(newHtml.includes(PHOTO_HELPER),'only one photo helper added');
   assert.ok(newHtml.includes(VOICE_END_WITH_PHOTOS));

@@ -75,6 +75,36 @@ document.addEventListener('click',e=>{
   if(e.target?.closest?.('.talera-audio-consent,.talera-memory-audio'))taleraUnifiedPrimeCurrent();
 },true);
 document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);
+/* Restores the permission prompt as a REAL button. The gesture resumes
+   this memory's EXISTING native audio/video element, never advances photos
+   and never creates a second player. The picture itself stays untappable. */
+function taleraUnifiedCreateListeningButton(s){
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='talera-v61-audio-permission-hint';
+  button.setAttribute('aria-label','Ingesproken herinnering afspelen');
+  button.textContent='▶ Beluister';
+  button.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:65;padding:9px 15px;border:0;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:auto;cursor:pointer;touch-action:manipulation';
+  button.addEventListener('click',e=>{
+    e.preventDefault();e.stopPropagation();
+    if(s!==taleraInline||s.engine!=='narrated')return;
+    // Do everything synchronously in the actual iPhone user gesture.
+    taleraUnifiedPrimeCurrent();
+    const target=s.phase==='narration'?s.audio:s.phase==='originals'?s.video:null;
+    if(target){
+      target.addEventListener('playing',()=>{
+        if(s===taleraInline&&s.hint===button){
+          button.remove();s.hint=null;s.blockedByBrowser=false;
+        }
+      },{once:true});
+    }
+    if(window.__taleraAudioControls?.isEnabled?.())
+      window.__taleraInlineTryAutoPlay?.();
+    else
+      window.__taleraAudioControls?.enable?.();
+  });
+  return button;
+}
 function taleraUnifiedTakePrimed(s,frame){
   if(s.phase!=='originals')return null;
   const entry=s.taleraUnifiedPrepared?.get(frame.key);
@@ -206,13 +236,20 @@ export function applyUnifiedTail(html){
   const changedVideo=nativeVideo
     .replace(oldCreate,"const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');")
     .replace(oldUrl,"const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;");
-  result=result.slice(0,nativeVideoStart)+changedVideo+result.slice(nativeVideoEnd);
+  const beforeVideoHint="          const hint=document.createElement('div');\n          hint.textContent='Tik op de foto om het geluid te starten';\n          hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';";
+  const afterVideoHint="          const hint=taleraUnifiedCreateListeningButton(s);";
+  if(changedVideo.split(beforeVideoHint).length!==2)return {html,status:'anchor-unmatched'};
+  const safeVideo=changedVideo.replace(beforeVideoHint,afterVideoHint);
+  result=result.slice(0,nativeVideoStart)+safeVideo+result.slice(nativeVideoEnd);
   // Original V9 also resumes video on every pointerup/touchend; do not
   // equate the end of a swipe with a deliberate tap on the photo.
   const audioStart=result.indexOf('function taleraInlineInstallAudioControls(){');
   const audioEnd=result.indexOf('async function present(memory){',audioStart);
   if(audioStart<0||audioEnd<0)return {html,status:'anchor-unmatched'};
   const audioSource=result.slice(audioStart,audioEnd);
+  const beforeVoiceHint="    const hint=document.createElement('div');\n    hint.className='talera-v61-audio-permission-hint';\n    hint.textContent='Tik op de foto om het geluid te starten';\n    hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';";
+  const afterVoiceHint="    const hint=taleraUnifiedCreateListeningButton(s);";
+  if(audioSource.split(beforeVoiceHint).length!==2)return {html,status:'anchor-unmatched'};
   const oldRetry="  const retry=e=>{\n    const s=taleraInline;";
   const newRetry="  const retry=e=>{\n    const s=taleraInline;\n    if(s?.engine==='narrated')return;";
   const oldClickGuard="    if(s?.engine!=='narrated'||s.phase!=='narration')return;";
@@ -220,7 +257,8 @@ export function applyUnifiedTail(html){
   if(audioSource.split(oldRetry).length!==2||audioSource.split(oldClickGuard).length!==2)
     return {html,status:'anchor-unmatched'};
   result=result.slice(0,audioStart)+audioSource
-    .replace(oldRetry,newRetry).replace(oldClickGuard,newClickGuard)+result.slice(audioEnd);
+    .replace(oldRetry,newRetry).replace(oldClickGuard,newClickGuard)
+    .replace(beforeVoiceHint,afterVoiceHint)+result.slice(audioEnd);
   const presentAnchor="  taleraInline=s;\n  if(hasVoice){";
   const disposalAnchor="function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;";
   if(result.split(presentAnchor).length!==2||result.split(disposalAnchor).length!==2)
@@ -233,6 +271,8 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
+    .replace("    const hint=taleraUnifiedCreateListeningButton(s);","    const hint=document.createElement('div');\n    hint.className='talera-v61-audio-permission-hint';\n    hint.textContent='Tik op de foto om het geluid te starten';\n    hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';")
+    .replace("          const hint=taleraUnifiedCreateListeningButton(s);","          const hint=document.createElement('div');\n          hint.textContent='Tik op de foto om het geluid te starten';\n          hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';")
     .replace("  const retry=e=>{\n    const s=taleraInline;\n    if(s?.engine==='narrated')return;",
       "  const retry=e=>{\n    const s=taleraInline;")
     .replace("    if(s?.engine!=='narrated'&&!(runtime.currentMemory()?._zeroItems?.some(x=>x.kind==='audio')))return;",

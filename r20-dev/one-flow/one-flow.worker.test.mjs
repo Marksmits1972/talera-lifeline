@@ -216,30 +216,11 @@ test('first genuine listening gesture unlocks each *original* video element for 
   await env.taleraUnifiedWarmVideos(s);
   assert.equal(s.taleraUnifiedPrepared.size,1);
   assert.equal(playCalls,0,'do not autoplay an audible video before a user gesture');
-  const photo={closest:selector=>selector.includes('#photoStage')?{}:null};
-  const other={closest:()=>null};
-  const pointer=(type,x,y,target=photo)=>({type,pointerId:1,pointerType:'touch',isPrimary:true,
-    clientX:x,clientY:y,target});
-  // A swipe across a narrated memory must never start hidden videos.
-  listeners.get('pointerdown')(pointer('pointerdown',100,150));
-  listeners.get('pointermove')(pointer('pointermove',210,150));
-  const swipe=pointer('pointerup',210,150);
-  listeners.get('pointerup')(swipe);
-  assert.equal(env.taleraUnifiedWasStationaryTap(swipe),false);
-  assert.equal(playCalls,0,'swipe cannot call video.play even while media is prepared');
-  // Native iOS touch events must have the same result.
-  const touch=(id,x,y)=>({identifier:id,clientX:x,clientY:y});
-  listeners.get('touchstart')({changedTouches:[touch(7,100,150)],touches:[touch(7,100,150)],target:photo});
-  listeners.get('touchmove')({changedTouches:[touch(7,150,150)],touches:[touch(7,150,150)],target:photo});
-  const swipeTouch={changedTouches:[touch(7,150,150)],touches:[],target:photo};
-  listeners.get('touchend')(swipeTouch);
-  assert.equal(env.taleraUnifiedWasStationaryTap(swipeTouch),false);
-  assert.equal(playCalls,0,'touch swipe cannot prime video');
-  // Even a stationary tap on unrelated navigation controls cannot prime.
-  listeners.get('pointerdown')(pointer('pointerdown',70,90,other));
-  listeners.get('pointerup')(pointer('pointerup',70,90,other));
-  assert.equal(playCalls,0);
-  // An explicit Beluister action is still a valid Safari gesture.
+  assert.equal(listeners.has('pointerup'),false,'swiping may never be a video-prime handler');
+  assert.equal(listeners.has('touchend'),false,'touch swipe may never prime videos');
+  assert.equal(listeners.has('click'),false,'photo taps must not prime narrator videos');
+  assert.equal(playCalls,0,'prepared clips remain paused on a narrated memory');
+  // The existing, explicit Beluister action alone is allowed to authorize sound.
   listeners.get('talera:enable-listening')();
   await Promise.resolve();await Promise.resolve();await Promise.resolve();
   assert.equal(playCalls,1);
@@ -270,25 +251,45 @@ test('navigation away frees non-used video preparation objects and URLs',async()
   assert.equal(removed.length,2);
 });
 
-test('photo TAP, not swipe: only a stationary photo gesture can prime narrator video',async()=>{
-  const listeners=new Map(),events=[];
-  const document={addEventListener:(type,fn)=>listeners.set(type,fn),
-    createElement:()=>({style:{},setAttribute(){},load(){},paused:true,currentTime:0,
-      play(){events.push('video-play');return Promise.resolve()},
-      pause(){events.push('video-pause')},removeAttribute(){},remove(){}})};
-  const s={frames:[{kind:'video',key:'clip'}],engine:'narrated',phase:'narration'};
-  const photo={closest:x=>x.includes('#photoStage')?{}:null};
+
+test('narrated photo is closed: no pointer, touch or click handler primes original videos',async()=>{
+  const listeners=new Map(),plays=[];
+  const document={addEventListener:(name,cb)=>listeners.set(name,cb),
+    createElement:()=>({style:{},setAttribute(){},load(){},currentTime:0,
+      play(){plays.push('video-play');return Promise.resolve()},
+      pause(){plays.push('pause')},removeAttribute(){},remove(){}})};
+  const memory={id:'saved-memory',_zeroItems:[{kind:'audio'}]};
+  const s={memory,frames:[{kind:'video',key:'clip'}],engine:'narrated',phase:'unifiedTail'};
   const env={document,stage:{appendChild(){}},store:{mediaUrl:async()=> 'blob:clip'},
     URL:{revokeObjectURL(){}},console:{warn(){}},taleraInline:s};
   vm.runInNewContext(INLINE_TAIL,env);
   await env.taleraUnifiedWarmVideos(s);
-  const e=(type,x,y)=>({type,pointerId:11,isPrimary:true,clientX:x,clientY:y,target:photo});
-  listeners.get('pointerup')(e('pointerup',120,130));
-  assert.equal(events.length,0,'no pointerdown means no validated tap');
-  listeners.get('pointerdown')(e('pointerdown',120,130));
-  const tap=e('pointerup',123,133);
-  listeners.get('pointerup')(tap);
-  assert.equal(env.taleraUnifiedWasStationaryTap(tap),true);
-  await Promise.resolve();await Promise.resolve();await Promise.resolve();
-  assert.deepEqual(events,['video-play','video-pause']);
+  for(const event of ['pointerup','touchend','click','pointerdown','touchstart']){
+    assert.equal(listeners.has(event),false,event+' must not create playback or internal navigation');
+  }
+  assert.deepEqual(plays,[]);
+  assert.equal(s.taleraUnifiedPrepared.size,1);
+});
+
+test('native V9 tap suppression spans the ENTIRE narrated memory, including photos and originals',()=>{
+  const patched=applyUnifiedTail(nativePage);
+  assert.equal(patched.status,'installed');
+  assert.ok(patched.html.includes(
+    "if(s?.engine!=='narrated'&&!(runtime.currentMemory()?._zeroItems?.some(x=>x.kind==='audio')))return;"
+  ),'narrated tap guard must not depend on narration phase');
+  assert.ok(!patched.html.includes("if(s?.engine!=='narrated'||s.phase!=='narration')return;"),
+    'old narration-only guard must not remain');
+  assert.ok(patched.html.includes("if(s?.engine==='narrated')return;"),
+    'generic pointer/touch audio retry must not run for any narrated phase');
+  assert.ok(patched.html.includes("document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);"),
+    'Beluister keeps native iOS unlocking gesture');
+  assert.equal(restoreApprovedV9(patched.html),nativePage);
+});
+
+test('existing ordinary photo memories still use V9 tap-to-advance unchanged',()=>{
+  const patched=applyUnifiedTail(nativePage);
+  assert.equal(patched.status,'installed');
+  assert.ok(patched.html.includes("if(s?.engine!=='narrated'&&!(runtime.currentMemory()?._zeroItems?.some(x=>x.kind==='audio')))return;"));
+  assert.equal(restoreApprovedV9(patched.html),nativePage,
+    'ordinary photo handlers and whole native V9 are untouched');
 });

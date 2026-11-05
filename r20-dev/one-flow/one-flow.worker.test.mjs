@@ -19,6 +19,10 @@ const nativePage='<html><script>'+
   'function taleraInlineCleanVideo(s){}'+
   'function taleraInlineReplayNext(s){}'+
   INSERT_BEFORE+'}'+
+  "function taleraInlineInstallAudioControls(){\n"+
+  "  const retry=e=>{\n    const s=taleraInline;};\n"+
+  "  document.addEventListener('click',e=>{\n"+
+  "    if(s?.engine!=='narrated'||s.phase!=='narration')return;},true);\n}"+
   "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
   AUDIO_END_BEFORE+'</script></html>';
 
@@ -212,7 +216,31 @@ test('first genuine listening gesture unlocks each *original* video element for 
   await env.taleraUnifiedWarmVideos(s);
   assert.equal(s.taleraUnifiedPrepared.size,1);
   assert.equal(playCalls,0,'do not autoplay an audible video before a user gesture');
-  listeners.get('click')();
+  const photo={closest:selector=>selector.includes('#photoStage')?{}:null};
+  const other={closest:()=>null};
+  const pointer=(type,x,y,target=photo)=>({type,pointerId:1,pointerType:'touch',isPrimary:true,
+    clientX:x,clientY:y,target});
+  // A swipe across a narrated memory must never start hidden videos.
+  listeners.get('pointerdown')(pointer('pointerdown',100,150));
+  listeners.get('pointermove')(pointer('pointermove',210,150));
+  const swipe=pointer('pointerup',210,150);
+  listeners.get('pointerup')(swipe);
+  assert.equal(env.taleraUnifiedWasStationaryTap(swipe),false);
+  assert.equal(playCalls,0,'swipe cannot call video.play even while media is prepared');
+  // Native iOS touch events must have the same result.
+  const touch=(id,x,y)=>({identifier:id,clientX:x,clientY:y});
+  listeners.get('touchstart')({changedTouches:[touch(7,100,150)],touches:[touch(7,100,150)],target:photo});
+  listeners.get('touchmove')({changedTouches:[touch(7,150,150)],touches:[touch(7,150,150)],target:photo});
+  const swipeTouch={changedTouches:[touch(7,150,150)],touches:[],target:photo};
+  listeners.get('touchend')(swipeTouch);
+  assert.equal(env.taleraUnifiedWasStationaryTap(swipeTouch),false);
+  assert.equal(playCalls,0,'touch swipe cannot prime video');
+  // Even a stationary tap on unrelated navigation controls cannot prime.
+  listeners.get('pointerdown')(pointer('pointerdown',70,90,other));
+  listeners.get('pointerup')(pointer('pointerup',70,90,other));
+  assert.equal(playCalls,0);
+  // An explicit Beluister action is still a valid Safari gesture.
+  listeners.get('talera:enable-listening')();
   await Promise.resolve();await Promise.resolve();await Promise.resolve();
   assert.equal(playCalls,1);
   assert.equal(s.taleraUnifiedPrepared.get('original-v1').primed,true);
@@ -240,4 +268,27 @@ test('navigation away frees non-used video preparation objects and URLs',async()
   env.taleraUnifiedDropPrepared(s);
   assert.deepEqual(revoked,['blob:v1','blob:v2']);
   assert.equal(removed.length,2);
+});
+
+test('photo TAP, not swipe: only a stationary photo gesture can prime narrator video',async()=>{
+  const listeners=new Map(),events=[];
+  const document={addEventListener:(type,fn)=>listeners.set(type,fn),
+    createElement:()=>({style:{},setAttribute(){},load(){},paused:true,currentTime:0,
+      play(){events.push('video-play');return Promise.resolve()},
+      pause(){events.push('video-pause')},removeAttribute(){},remove(){}})};
+  const s={frames:[{kind:'video',key:'clip'}],engine:'narrated',phase:'narration'};
+  const photo={closest:x=>x.includes('#photoStage')?{}:null};
+  const env={document,stage:{appendChild(){}},store:{mediaUrl:async()=> 'blob:clip'},
+    URL:{revokeObjectURL(){}},console:{warn(){}},taleraInline:s};
+  vm.runInNewContext(INLINE_TAIL,env);
+  await env.taleraUnifiedWarmVideos(s);
+  const e=(type,x,y)=>({type,pointerId:11,isPrimary:true,clientX:x,clientY:y,target:photo});
+  listeners.get('pointerup')(e('pointerup',120,130));
+  assert.equal(events.length,0,'no pointerdown means no validated tap');
+  listeners.get('pointerdown')(e('pointerdown',120,130));
+  const tap=e('pointerup',123,133);
+  listeners.get('pointerup')(tap);
+  assert.equal(env.taleraUnifiedWasStationaryTap(tap),true);
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.deepEqual(events,['video-play','video-pause']);
 });

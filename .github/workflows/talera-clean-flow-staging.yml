@@ -1,0 +1,52 @@
+name: TALERA clean one-memory test deployment through GitHub
+on:
+  push:
+    branches: [feature/clean-one-memory-flow-20261105]
+    paths:
+      - r20-dev/one-flow/one-flow.worker.mjs
+      - r20-dev/one-flow/one-flow.worker.test.mjs
+      - r20-dev/one-flow/check-v9.mjs
+      - r20-dev/one-flow/wrangler.jsonc
+      - .github/workflows/talera-clean-flow-staging.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Wrangler
+        run: npm ci
+      - name: Single-memory timing regressions
+        run: node --test test/one-memory-flow.test.mjs
+      - name: Native V9 tail adapter regressions
+        run: node --test r20-dev/one-flow/one-flow.worker.test.mjs
+      - name: Validate actual approved V9 source, no changes to recorder
+        run: node r20-dev/one-flow/check-v9.mjs
+      - name: Require existing GitHub deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'No GitHub secret: deployment skipped'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'No GitHub account ID: deployment skipped'; exit 1; }
+      - name: Deploy NEW staging worker only, never V9
+        run: npx wrangler deploy --config r20-dev/one-flow/wrangler.jsonc
+      - name: Verify staging is reachable and native patch installed
+        run: |
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict';
+          const url='https://talera-one-memory-clean-test-20261105.mark-a39.workers.dev';
+          for(const path of ['/present','/','/tell','/vertelmodus-embed?mode=record']){
+            const r=await fetch(url+path);
+            assert.equal(r.status,200,'staging '+path+' must respond');
+            if(path==='/present')assert.equal(r.headers.get('x-talera-clean-one-memory'),'installed');
+            console.log('PASS staged TALERA',path,r.status);
+          }
+          NODE

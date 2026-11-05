@@ -21,3 +21,6 @@ De native IndexedDB-integratietest maakt een lokale herinnering aan met zes medi
 
 Branch: `feature/talera-v12-restfotos-veilige-activatie-20261105`.
 Testworker: `talera-v12-restfotos-veilige-test-20261105`.
+
+## Huidige testversie (5 november 2026)
+V12 is apart gedeployed op `talera-v12-restfotos-veilige-test-20261105`, Cloudflare-versie `d23171ea-9596-4e2b-a3ac-cb97b1072427`. De beschermde V9 blijft `bc36d913-49f8-4f4d-b00d-3d5894a11146`. Deze live publicatie bevat de minimaal aangepaste presenter-guard, de activatie van bestaande herinneringen en de toevoeging van ongebruikte foto's na audio. De browser-end-to-endcontrole van deze exacte live versie is verplicht voordat dit een goedgekeurde versie kan worden; geen productiepromotie.

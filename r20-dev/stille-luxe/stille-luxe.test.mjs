@@ -63,7 +63,7 @@ test('historical working photo status returns, only head changes and bottom tint
  assert.match(changed,/viewport-fit=cover/);
  assert.match(changed,/<style id="talera-present-bottom-tint">/);
  assert.match(changed,/<script id="talera-present-bottom-tint-script">/);
- assert.match(changed,/FOOTER_PAPER_AT_PX = 90/,'defer white footer until near-opaque story sheet');
+ assert.match(changed,/FOOTER_PAPER_AT_PX = 75/,'defer paper-colored footer until sheet is mostly opaque');
  assert.match(changed,/--story-neutral/);
  assert.doesNotMatch(changed,/getImageData/,'no photo color analysis in black bar test');
  assert.match(changed,/theme\.setAttribute\('content', color\)/);

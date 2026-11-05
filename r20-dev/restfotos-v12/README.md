@@ -1,26 +1,37 @@
-# TALERA V12 — beschermde V9 + ontbrekende foto's
+# TALERA V12 — bestaande geïntegreerde speler: video + restmedia in volgorde
 
-5 november 2026 — uitsluitend aparte test-Worker; **nog niet goedgekeurd op iPhone**.
+**Status 5 november 2026:** geïsoleerde GitHub-kandidaat; regressietests groen. Niet gepubliceerd als deze nieuwe kandidaat en **niet** op iPhone goedgekeurd. Beschermde V9, stijl, Free/Premium en gebruikersdata zijn niet gewijzigd.
 
-## Grens van de wijziging
-- Basis: `talera-v9-stille-luxe-stijlstaging-20261104` als Cloudflare service-binding.
-- Bestaande vertelspeler, stemopname, wisseltijdcodes, `show()`, videofunctie `taleraStartOriginalRound()`, lokale opslag en stijl veranderen **niet**.
-- In `/vertelmodus-embed`: één aanvullende functie berekent de nog niet tijdens de opname gebruikte **foto-posities** en toont ze na het native einde van de spraakopname, ieder 4 seconden, in originele mediavolgorde; daarna roept zij de bestaande videofunctie aan. De oorspronkelijke voice-ended eventregel krijgt alleen de nieuwe functieaanroep.
-- In `/present`: (a) de bestaande speler slaat de activatie alleen over als dezelfde herinnering **én een nog gekoppeld iframe** actief zijn; een verdwenen iframe kan met de bestaande functie opnieuw worden opgebouwd; (b) na heropenen wordt de bestaande, reeds gehydrateerde herinnering expliciet geactiveerd. Exact twee atomische tekstvervangingen in de oorspronkelijke presentatie-adapter.
-- Geen diagnose-overlay en geen nieuwe afspeellaag, opslagwaarde, media-ID, videocontroller of API.
+## Vastgelegde functionele volgorde
 
-## Onderzoek achter de podiumverwijzing
-De native IndexedDB-integratietest maakt een lokale herinnering aan met zes media, een korte stemopname en drie fototijdcodes. Die gegevens werden correct gevonden, maar het originele vertelvenster ontbrak. Een controletest riep de originele activator direct aan: lokaal geheugen en audio waren aanwezig, het fotovenster was al beschikbaar, maar er werd geen iframe aangemaakt. De vermoedelijke blokkade was de originele korte controle `if(activeId===id)return`, ook wanneer het iframe niet langer was gekoppeld. V12 vervangt deze controle door `if(activeId===id&&currentPresentation?.frame?.isConnected)return`. Geen nieuwe videofunctie of speler.
+- De bestaande V9 stemopname en de tijdstempels blijven de enige vertellende klok. Tijdens de stem worden bijbehorende video's gedempt.
+- Op het echte einde van de stem wordt de **oorspronkelijke V9-videospeler** gebruikt om video's die tijdens de vertelling al in beeld waren volledig met eigen geluid te herhalen.
+- De nog niet tijdens de vertelling gebruikte media volgen daarna **in de oorspronkelijke opgeslagen volgorde**, inclusief afwisseling foto–video–foto. Foto = 4 seconden; video = eigen volledige duur, met geluid.
+- Al vertelde media worden niet opnieuw als restant toegevoegd. Alle koppelingen blijven op de bestaande `mediaId` en `s.frames` gebaseerd, zonder aparte speler, nieuw datamodel of extra klok.
+- De bestaande V9 voice-ended eventhandler is ongewijzigd.
 
-## Validatie en terugrollen
-- `restfotos.test.mjs`: unit regressies inclusief gemengde beelden, herhaalde tijdcodes, annulering bij gewijzigde herinnering, originele recorder en originele video.
-- `smoke-live.mjs`: bewijs dat de opgeleverde V12-HTML volledig gelijk is aan de beschermde V9 behalve de uitdrukkelijk vermelde drie bronvervangingen plus één functie.
-- `browser-smoke.mjs`: echte browser, lokale IndexedDB, heropenen, originele iframe, echte audio-`ended`, daarna drie restfoto's en de originele ongemute video.
-- Pas geschikt voor iPhone nadat de laatste volledige browsertest groen is. De testbrowser bevat tijdelijke observatiecode **uitsluitend in de testscript-runner**, niet in de Cloudflare Worker.
-- Rollback = uitsluitend aparte V12-testlink niet meer gebruiken; V9, V10 en V11 blijven intact. De V12-testhost heeft zijn eigen browseropslag, dus bestaande iPhone-PWA's niet verwijderen.
+## Wijziging, exact afgebakend
 
-Branch: `feature/talera-v12-restfotos-veilige-activatie-20261105`.
-Testworker: `talera-v12-restfotos-veilige-test-20261105`.
+Alleen de HTML van `GET /present` wordt op runtime getoetst aan unieke ankerfragmenten. Bij een mismatch wordt niets gepatcht (`anchor-unmatched`); er wordt niet blind een nieuwe speler geïnjecteerd.
 
-## Huidige testversie (5 november 2026)
-V12 is apart gedeployed op `talera-v12-restfotos-veilige-test-20261105`, Cloudflare-versie `d23171ea-9596-4e2b-a3ac-cb97b1072427`. De beschermde V9 blijft `bc36d913-49f8-4f4d-b00d-3d5894a11146`. Deze live publicatie bevat de minimaal aangepaste presenter-guard, de activatie van bestaande herinneringen en de toevoeging van ongebruikte foto's na audio. De browser-end-to-endcontrole van deze exacte live versie is verplicht voordat dit een goedgekeurde versie kan worden; geen productiepromotie.
+1. Eén helper `taleraInlineRemainingPhotos(s)` voor de vervolgqueue in de bestaande geïntegreerde presentatiemodus. Deze gebruikt de bestaande `taleraInlineSetFrame`, `taleraInlinePlayMedia`, `taleraInlineCleanVideo` en `ordinaryTimer`.
+2. De oude videoronde selecteert alleen tijdens de opname **besproken video's**, zodat latere video's op hun oorspronkelijke positie in de resterende media verschijnen.
+3. Beide oorspronkelijke voltooiingspaden (laatste vertelde video en geen vertelde video's) gaan naar dezelfde vervolgqueue.
+
+Niet gewijzigd: de recorder, de audio-`ended` callback, fototijdstempels, media-IDs, lokale opslag, geüploade bestanden, CSS, V9, Cloudflare-productie en de aparte Free/Premium-ontwikkeling.
+
+## GitHub-controle
+
+- Branch: `fix/talera-v12-restfotos-na-videos-20261105`
+- Laatste groene workflow: https://github.com/Marksmits1972/talera-lifeline/actions/runs/42072245671
+- Unit/regressietests dekken gesproken video met geluid, ongebruikte foto's, foto's en video's door elkaar in hun originele volgorde, geen dubbelen, verlaten van herinnering en ongewijzigde V9-bron buiten de drie gerichte hooks.
+- De workflow is **alleen een test**, bevat geen Cloudflare-publicatie en claimt geen werkende iPhone-weergave.
+
+## Nog verplicht vóór acceptatie
+
+1. Publiceer de GitHub-kandidaat eerst op een **eigen geïsoleerde test-Worker** met de bestaande beschermde V9 als service-binding; nooit overschrijven naar V9, het huidige testadres of productie.
+2. Controleer de live gerenderde `/present` byte-voor-byte tegen V9 op exact de helper en drie bedoelde wijzigingen; controleer dat de header `x-talera-v12-inline-restfotos` `installed` is.
+3. Voer echte browser-end-to-end-tests met opgeslagen testmedia en een echte audio-`ended` uit, inclusief photo–video–photo, geen extra venster en native videogeluid.
+4. Test op iPhone Safari met eigen nieuw aangemaakte testherinnering op het nieuwe testadres, zonder de bestaande PWA te verwijderen. Lokale browseropslag deelt niet automatisch tussen afzonderlijke Worker-hosts.
+
+**Rollback:** uitsluitend het nieuwe, nog te maken testadres niet gebruiken; de bestaande V9- en andere test-Workers blijven ongemoeid.

@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `85021228-546e-45c2-b067-bc2bccbfbc6c`  
-**Deployment:** `a5f5436d-8500-48ff-a24d-0937f105cc79`  
+**Actuele Worker-versie:** `b617adc2-6296-4ebc-b261-9c62d15de402`  
+**Deployment:** `568a86a6-d070-47e7-8960-25d66bc1b20f`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -192,3 +192,14 @@ Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste s
 - Geen aanpassing aan het R20-presentatiebody, foto's, swipes, tijdcodes, opnames, lokale data of Premium-werkstroom. V9/R20-herstelpunten staan ongewijzigd.
 
 **Nog te valideren op een echt geïnstalleerde iPhone**: dat foto achter klok blijft doorlopen, gewone pagina's onderaan wit blijven, bij verschillende foto's de onderstrook daadwerkelijk volgt, en dat het lezen direct naar wit schakelt. **WebKit-bug 301994** meldt voor iOS 26.5.2 dat het onderste kleurgedeelte wordt gecached tot relaunch, ook als `theme-color` en body wijzigen: https://bugs.webkit.org/show_bug.cgi?id=301994. Dit experiment is bedoeld om te meten of en hoe het op deze specifieke iPhone reageert, niet om OS-controle te beloven. PWA nooit verwijderen voor deze test: herinneringen zijn lokaal in browserorigin opgeslagen.
+
+
+## Correctie statusbalk bij app-opstarten — 5 november 2026
+
+**Aanleiding**: in iPhone-screenshot 09:14 was de hele presentatie-foto zichtbaar TOT aan onder, maar de bovenste statusbalk toonde nog steeds een donkerblauw vlak. Dit was niet omdat een extra foto-overlay ontbrak: **onze eigen geïsoleerde stijl-Worker had een inconsistentie geïntroduceerd**. `/present` vroeg `black-translucent` voor foto achter de klok, maar de Home Screen launcher `/` en de overige hoofdroutes overschreven de webappstatus juist met `default`. iOS kan die opstartinstelling vasthouden terwijl je naar `/present` navigeert. De eerdere automatische onderrandkleur was dus geïmplementeerd zonder de bovenkant stabiel te houden. Dat was een implementatiefout.
+
+**Gerichte fix**: in `updateHtml()` van dezelfde geïsoleerde Worker vraagt nu **iedere reguliere HTML-ingangsroute** hetzelfde `apple-mobile-web-app-status-bar-style=black-translucent` als `/present`. CSS voor reguliere schermen blijft wit, met de bestaande foto-header en transparante mast. Presentatie-vulcanvas, swipe/foto/audio/tekstbron en de tint-metingen zijn ongewijzigd. Tests kijken expliciet naar `/`, `/mijn-leven`, `/tell` en `/meer` en controleren dat er precies één consistente statusbar-metadatawaarde wordt gezet.
+
+**Cloudflare apart stijltestdeployment**: `568a86a6-d070-47e7-8960-25d66bc1b20f`, Worker-versie `b617adc2-6296-4ebc-b261-9c62d15de402`. De oorspronkelijke V9 blijft `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`; alleen de `V9_BASE` servicebinding is aanwezig. Geen back-up- of data-aanpassingen.
+
+**Niet beloven dat dit bestaande iPhone-installaties corrigeert**: er zijn bekende iOS/WebKit-beperkingen waarbij statusbalkmodus op installatie/startmoment wordt vastgezet. Code- en HTTP-tests bewijzen correcte HTML-output, **niet** de feitelijke iOS fullscreen-chrome. Herstarten zonder verwijderen is de veiligste test. De geïnstalleerde PWA **niet verwijderen**, want lokale herinneringen kunnen daarmee verloren gaan. Referentie: https://bugs.webkit.org/show_bug.cgi?id=316008 (relevantie install-time), https://bugs.webkit.org/show_bug.cgi?id=313800 (onpaintable bottom). Als iOS de oude instelling blijft gebruiken, eerst een niet-destructieve verificatievariant bedenken voor de echte telefoon in plaats van nieuwe fotoposities te hacken.

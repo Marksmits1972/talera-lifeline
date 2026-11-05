@@ -41,8 +41,12 @@ assert.ok(saved?.id?.startsWith('local-'),'native IndexedDB save must succeed: '
 assert.equal(saved.total,7);assert.equal(saved.cues,3);
 console.log('PASS local saved six media + voice + three cues');
 await command('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await until("Boolean(document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('play'))",{tries:220,ms:75}),
- 'real saved memory MUST activate original narration iframe');
+const iframeOpened=await until("Boolean(document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('play'))",{tries:220,ms:75});
+if(!iframeOpened){
+ const diagnostic=await evalJs("(async()=>({href:location.href,title:document.title,ready:document.readyState,activeMemory:window.__taleraTimelineRuntime?.currentMemory()?.id,activeStory:window.__taleraTimelineRuntime?.currentMemory()?.storyId,activeLocal:window.__taleraTimelineRuntime?.currentMemory()?._taleraLocal,frames:[...document.querySelectorAll('iframe')].map(f=>({cls:f.className,src:f.getAttribute('src'),ready:f.contentDocument?.readyState,play:Boolean(f.contentDocument?.getElementById('play'))})),saved:(await window.TaleraMemories.list()).map(x=>({id:x.id,date:x.date,total:x.items?.length})),error:document.getElementById('taleraV8LoadError')?.textContent}))()",true);
+ console.log('V12 MISSING IFRAME INVESTIGATION',JSON.stringify(diagnostic));
+}
+assert.ok(iframeOpened,'real saved memory MUST activate original narration iframe');
 assert.ok(await until("document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('count')?.textContent.includes(' / 6')",{tries:200,ms:80}),
  'real V9 player must receive six stored media files');
 assert.equal(await evalJs("document.querySelector('iframe.talera-zero-present-frame').contentDocument.body.classList.contains('present')"),true);

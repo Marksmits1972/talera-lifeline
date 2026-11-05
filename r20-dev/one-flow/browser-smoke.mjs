@@ -87,6 +87,8 @@ const saved=await evaluate(`(async()=>{
 assert.ok(saved?.id?.startsWith('local-'),JSON.stringify(saved));
 assert.equal(saved.files,7);assert.equal(saved.cues,3);
 console.log('PASS native IndexedDB: five photos, narrated video WITH audio track, real WAV and three cues');
+for(const playbackRound of [1,2,3]){
+console.log('BEGIN playback round',playbackRound);
 await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
 assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)'),'native V9 audio must load');
 // Verify iOS warm video is present BEFORE the user's first Beluister action.
@@ -155,5 +157,6 @@ assert.ok(replay.progress>.6,'unmuted replay advanced from t=0');
 assert.ok(replay.duration>=1,'replay has the original full clip duration');
 assert.deepEqual(result.errors,[]);
 assert.equal(result.iframes,0);
-console.log('PASS actual browser: silent narrated video -> 3 untouched photos at 4s -> full original video AGAIN with sound, same viewport');
+console.log('PASS browser playback round '+playbackRound+': silent narration -> remaining photos -> audible video from zero, no second Beluister');
+}
 ws.close();

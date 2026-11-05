@@ -159,7 +159,7 @@ test('approved photo-led homepage has ink-blue status bar and no white mast over
  assert.match(output,/\.mast\{background:transparent;color:#FFFFFF;\}/);
  assert.match(output,/\.mast \.logo\{color:#FFFFFF/);
  assert.match(output,/html\[data-talera-hero="true"\],html\[data-talera-hero="true"\] body\{background-color:#FFFFFF;\}/);
- assert.match(output,/name="apple-mobile-web-app-status-bar-style" content="default"/);
+ assert.match(output,/name="apple-mobile-web-app-status-bar-style" content="black-translucent"/);
  assert.doesNotMatch(output,/html\[data-talera-hero="true"\] body\{background-color:#304653;\}/);
  assert.doesNotMatch(output,/header:not\(\.presentation-header\)\)\{background-color:#FFFFFF;\}/);
  assert.match(output,/\.hero-caption/);
@@ -238,4 +238,16 @@ test('adaptive presentation edge samples current image and switches to white on 
  scroll.scrollTop=0;
  listeners['scroll:scroll']();
  assert.equal(styles['--talera-present-edge-color'],'#60829e','closing sheet restores active photo tint');
+});
+
+test('all ordinary HTML entry routes request the same iOS status mode as presentation',async()=>{
+ for(const path of ['/','/mijn-leven','/tell','/meer']){
+  const html='<!doctype html><html><head><meta name="apple-mobile-web-app-status-bar-style" content="default"></head><body><main>original</main></body></html>';
+  const res=await app.fetch(new Request(origin+path),mock(html).env);
+  const out=await res.text();
+  assert.match(out,/name="apple-mobile-web-app-status-bar-style" content="black-translucent"/);
+  assert.doesNotMatch(out,/name="apple-mobile-web-app-status-bar-style" content="default"/);
+  assert.equal((out.match(/name="apple-mobile-web-app-status-bar-style"/g)||[]).length,1);
+  assert.match(out,/html,body\\{background-color:#FFFFFF/,'ordinary canvas stays white');
+ }
 });

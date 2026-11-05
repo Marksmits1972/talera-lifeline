@@ -213,7 +213,7 @@ test('adaptive presentation edge samples current image and switches to white on 
  const layer={querySelector:()=>photo};
  const stage={
    querySelectorAll:selector=>selector.includes('talera-photo-strip-page')?[]:[layer],
-   querySelector:()=>photo,
+   querySelector:selector=>selector.includes('talera-photo-strip.is-visible')?null:photo,
    addEventListener:(event,fn)=>{listeners['stage:'+event]=fn;}
  };
  const scroll={scrollTop:0,classList:{contains:()=>false},
@@ -227,6 +227,9 @@ test('adaptive presentation edge samples current image and switches to white on 
    requestAnimationFrame:fn=>{fn();return 1;}
  });
  assert.equal(styles['--talera-present-edge-color'],'#60829e','image bottom color sampled from actual pixel values');
+ assert.match(script,/taleraTintTest/,'optional latency debug mode is present');
+ assert.match(script,/talera-photo-strip\.is-visible/,'active swipe strip recognized');
+ assert.match(script,/Math\.round\(Math\.max\(0, tick\(\)-eventAt\)\)/,'requested latency is measured');
  assert.equal(metaValue,'#60829e');
  assert.equal(bodyStyles['--talera-present-edge-color'],'#60829e');
  scroll.scrollTop=70;

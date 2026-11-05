@@ -5,6 +5,7 @@ on:
     paths:
       - r20-dev/one-flow/one-flow.worker.mjs
       - r20-dev/one-flow/one-flow.worker.test.mjs
+      - r20-dev/one-flow/browser-smoke.mjs
       - r20-dev/one-flow/check-v9.mjs
       - r20-dev/one-flow/wrangler.jsonc
       - .github/workflows/talera-clean-flow-staging.yml

@@ -31,7 +31,12 @@ async function until(expr,{tries=170,ms=75}={}){
  return false;
 }
 await command('Runtime.enable');await command('Page.enable');
-await command('Page.addScriptToEvaluateOnNewDocument',{source:"(()=>{\n window.__v12trace=[];\n function log(type,element){\n  try{window.__v12trace.push({\n   type,t:Math.round(performance.now()),cls:element?.className,src:element?.getAttribute?.('src'),\n   stack:new Error().stack?.slice(0,2000)\n  })}catch(e){}\n }\n const originalAppend=Node.prototype.appendChild;\n Node.prototype.appendChild=function(node){\n  if(node?.tagName==='IFRAME')log('iframe-append',node);\n  return originalAppend.apply(this,arguments);\n };\n const originalRemove=Element.prototype.remove;\n Element.prototype.remove=function(){\n  if(this.tagName==='IFRAME')log('iframe-remove',this);\n  return originalRemove.apply(this,arguments);\n };\n window.addEventListener('error',e=>log('error-'+String(e.message).slice(0,200),null));\n window.addEventListener('unhandledrejection',e=>log('rejection-'+String(e.reason).slice(0,200),null));\n})()"});
+await command('Page.addScriptToEvaluateOnNewDocument',{source:"(()=>{\n window.__v12trace=[];\n function log(type,element){\n  try{window.__v12trace.push({\n   type,t:Math.round(performance.now()),cls:element?.className,src:element?.getAttribute?.('src'),\n   stack:new Error().stack?.slice(0,2000)\n  })}catch(e){}\n }\n const originalAppend=Node.prototype.appendChild;\n Node.prototype.appendChild=function(node){\n  if(node?.tagName==='IFRAME')log('iframe-append',node);\n  return originalAppend.apply(this,arguments);\n };\n const originalAppendVariadic=Element.prototype.append;
+ Element.prototype.append=function(...nodes){
+  for(const node of nodes)if(node?.tagName==='IFRAME')log('iframe-append',node);
+  return originalAppendVariadic.apply(this,nodes);
+ };
+ const originalRemove=Element.prototype.remove;\n Element.prototype.remove=function(){\n  if(this.tagName==='IFRAME')log('iframe-remove',this);\n  return originalRemove.apply(this,arguments);\n };\n window.addEventListener('error',e=>log('error-'+String(e.message).slice(0,200),null));\n window.addEventListener('unhandledrejection',e=>log('rejection-'+String(e.reason).slice(0,200),null));\n})()"});
 await command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await command('Page.navigate',{url:base+'/present'});
 assert.ok(await until("document.readyState==='complete'&&Boolean(window.TaleraMemories)&&Boolean(window.__taleraTimelineRuntime)"),

@@ -20,25 +20,31 @@ export function missingStillIndices(items, cues) {
 
 export const ORIGINAL_VOICE_END = 'voice.addEventListener("ended",function(){if(state.media&&state.media.pause)state.media.pause();if(!taleraStartOriginalRound()){mode("ready");msg("Terugkijken afgelopen")} $("clock").textContent=clock(state.duration)});';
 export const PHOTO_HOLD_MS = 4000;
-const MARKER = 'taleraV10StartRemainingPhotos';
+const MARKER = 'taleraV10PrepareBeforeOriginalVideoRound';
 
+export const ORIGINAL_VIDEO_ROUND_INSERTION_POINT = '/* Capture presentation gestures inside its iframe: swipe changes story; tap advances medium. */';
 export const PHOTO_TAIL_PATCH = [
-  '/* TALERA V10: after narration, only unused photos, then ORIGINAL video sound. */',
+  '/* TALERA V10: photographs before unchanged original-sound videos. */',
   missingStillIndices.toString(),
-  "\nlet taleraV10MissingPhotos = [];\nlet taleraV10MissingTotal = 0;\nlet taleraV10MissingTimer = null;\nlet taleraV10MissingActive = false;\nfunction taleraV10ClearRemainingPhotos() {\n  if (taleraV10MissingTimer !== null) clearTimeout(taleraV10MissingTimer);\n  taleraV10MissingTimer = null;\n  taleraV10MissingPhotos = [];\n  taleraV10MissingTotal = 0;\n  taleraV10MissingActive = false;\n}\nfunction taleraV10NextRemainingPhoto() {\n  if (!taleraV10MissingActive) return;\n  if (taleraV10MissingTimer !== null) clearTimeout(taleraV10MissingTimer);\n  taleraV10MissingTimer = null;\n  const index = taleraV10MissingPhotos.shift();\n  if (index === undefined) {\n    taleraV10ClearRemainingPhotos();\n    // Keep the approved original-video-sound round after the photo tail.\n    if (!taleraStartOriginalRound()) {\n      mode('ready');\n      msg('Terugkijken afgelopen');\n    }\n    return;\n  }\n  show(index);\n  mode('ready');\n  $('play').hidden = true;\n  msg('Overige foto ' + (taleraV10MissingTotal - taleraV10MissingPhotos.length) +\n      ' van ' + taleraV10MissingTotal);\n  taleraV10MissingTimer = setTimeout(taleraV10NextRemainingPhoto, 4000);\n}\nfunction taleraV10StartRemainingPhotos() {\n  if (!document.body.classList.contains('present') ||\n      !state.voiceUrl || !state.items.length) return false;\n  const upcoming = missingStillIndices(state.items, state.cues);\n  if (!upcoming.length) return false;\n  taleraV10ClearRemainingPhotos();\n  taleraV10MissingPhotos = upcoming;\n  taleraV10MissingTotal = upcoming.length;\n  taleraV10MissingActive = true;\n  taleraV10NextRemainingPhoto();\n  return true;\n}\nwindow.addEventListener('message', function(event) {\n  if (event.origin !== location.origin || !event.data?.taleraZero) return;\n  if (event.data.type === 'INIT' || event.data.type === 'PAUSE_PLAYER')\n    taleraV10ClearRemainingPhotos();\n}, true);\nwindow.addEventListener('pagehide', taleraV10ClearRemainingPhotos, {once:true});\nvoice.addEventListener(\"ended\", function() {\n  if (state.media && state.media.pause) state.media.pause();\n  if (!taleraV10StartRemainingPhotos()) {\n    if (!taleraStartOriginalRound()) {\n      mode(\"ready\");\n      msg(\"Terugkijken afgelopen\");\n    }\n  }\n  $(\"clock\").textContent = clock(state.duration);\n});"
+  "\n/* V10: intercept the EXISTING working transition into the original-sound\n   video round, without rewriting the audio ended handler or the video player. */\nconst taleraV10SavedStartOriginalVideoRound = taleraStartOriginalRound;\nlet taleraV10PendingStillIndices = [];\nlet taleraV10StillTotal = 0;\nlet taleraV10StillTimer = null;\nlet taleraV10StillRunning = false;\nfunction taleraV10CancelStillRound() {\n  if (taleraV10StillTimer !== null) clearTimeout(taleraV10StillTimer);\n  taleraV10StillTimer = null;\n  taleraV10PendingStillIndices = [];\n  taleraV10StillTotal = 0;\n  taleraV10StillRunning = false;\n}\nfunction taleraV10AdvanceStillRound() {\n  if (!taleraV10StillRunning) return;\n  if (taleraV10StillTimer !== null) clearTimeout(taleraV10StillTimer);\n  taleraV10StillTimer = null;\n  const nextIndex = taleraV10PendingStillIndices.shift();\n  if (nextIndex === undefined) {\n    taleraV10CancelStillRound();\n    // This is the ORIGINAL approved second round. Its code is not patched.\n    const videosStarted = taleraV10SavedStartOriginalVideoRound();\n    if (!videosStarted) {\n      mode('ready');\n      $('play').hidden = false;\n      msg('Herinnering afgelopen');\n    }\n    return;\n  }\n  show(nextIndex);\n  mode('ready');\n  $('play').hidden = true;\n  msg('Overige foto ' +\n    (taleraV10StillTotal - taleraV10PendingStillIndices.length) +\n    ' van ' + taleraV10StillTotal);\n  taleraV10StillTimer = setTimeout(taleraV10AdvanceStillRound, 4000);\n}\nfunction taleraV10PrepareBeforeOriginalVideoRound() {\n  if (!document.body.classList.contains('present') ||\n      !state.voiceUrl || !state.items.length) {\n    return taleraV10SavedStartOriginalVideoRound();\n  }\n  // The parent preserves the IDs in media order; the voice cues store their\n  // indices into that exact ordered list. Images not referenced by a cue are\n  // shown once in original order. Video objects never enter this tail.\n  const unspoken = missingStillIndices(state.items, state.cues);\n  if (!unspoken.length) return taleraV10SavedStartOriginalVideoRound();\n  taleraV10CancelStillRound();\n  taleraV10PendingStillIndices = unspoken;\n  taleraV10StillTotal = unspoken.length;\n  taleraV10StillRunning = true;\n  taleraV10AdvanceStillRound();\n  return true; // tell the ORIGINAL ended handler the following round started\n}\ntaleraStartOriginalRound = taleraV10PrepareBeforeOriginalVideoRound;\nwindow.addEventListener('message', function(event) {\n  if (event.origin !== location.origin || !event.data?.taleraZero) return;\n  if (event.data.type === 'INIT' || event.data.type === 'PAUSE_PLAYER')\n    taleraV10CancelStillRound();\n}, true);\nwindow.addEventListener('pagehide', taleraV10CancelStillRound, {once:true});\n"
 ].join('\n');
 
 export function applyMissingPhotoTail(html) {
   if (typeof html !== 'string') return {html, status:'not-html'};
   if (html.includes(MARKER)) return {html, status:'already-installed'};
-  const first = html.indexOf(ORIGINAL_VOICE_END);
-  if (first < 0 || html.indexOf(ORIGINAL_VOICE_END, first + 1) !== -1 ||
-      !html.includes('taleraStartOriginalRound') ||
+  // Require the exact existing video-start function and unmodified voice
+  // ended handler before inserting a hook immediately after the function.
+  // Nothing in the original videoplayer or audio-ended code is replaced.
+  const first = html.indexOf(ORIGINAL_VIDEO_ROUND_INSERTION_POINT);
+  const originalVoiceEnd = html.indexOf(ORIGINAL_VOICE_END);
+  if (first < 0 || html.indexOf(ORIGINAL_VIDEO_ROUND_INSERTION_POINT, first + 1) !== -1 ||
+      originalVoiceEnd < 0 ||
+      !html.includes('function taleraStartOriginalRound(){') ||
       !html.includes('taleraZero')) {
     return {html, status:'anchor-unmatched'};
   }
   return {
-    html:html.slice(0, first) + PHOTO_TAIL_PATCH + html.slice(first + ORIGINAL_VOICE_END.length),
+    html:html.slice(0, first) + PHOTO_TAIL_PATCH + '\n' + html.slice(first),
     status:'installed'
   };
 }

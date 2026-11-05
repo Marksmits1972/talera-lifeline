@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import worker,{applyUnifiedTail,INLINE_TAIL,remainingMedia,
-  AUDIO_END_BEFORE,AUDIO_END_AFTER,INSTALL_MARKER,INSERT_BEFORE} from './one-flow.worker.mjs';
+  AUDIO_END_BEFORE,AUDIO_END_AFTER,INSTALL_MARKER,INSERT_BEFORE,restoreApprovedV9} from './one-flow.worker.mjs';
 
 const frames=()=>[
   {kind:'photo',key:'p1'},{kind:'video',key:'v1'}, {kind:'photo',key:'p2'},
@@ -10,10 +10,17 @@ const frames=()=>[
 ];
 const cues=()=>[{mediaId:'p1',index:0,t:0},{mediaId:'v1',index:1,t:5000},
   {mediaId:'p2',index:2,t:12000}];
-const nativePage='<html><script>function taleraInlineSetFrame(s,index){}'+
-  'function taleraInlinePlayMedia(s,frame,muted,finished){}'+
+const nativePage='<html><script>'+
+  "function taleraInlineDispose(){\\n  const s=taleraInline;\\n  taleraInline=null;}"+
+  'function taleraInlineSetFrame(s,index){}'+
+  "function taleraInlinePlayMedia(s,frame,muted,finished){"+
+  "const video=document.createElement('video');"+
+  "async function load(){const url=await store.mediaUrl(frame.key);}}"+
   'function taleraInlineCleanVideo(s){}'+
-  INSERT_BEFORE+'}'+AUDIO_END_BEFORE+'</script></html>';
+  'function taleraInlineReplayNext(s){}'+
+  INSERT_BEFORE+'}'+
+  "async function present(memory){\\n  taleraInline=s;\\n  if(hasVoice){}}"+
+  AUDIO_END_BEFORE+'</script></html>';
 
 function fixture({ordered=frames(),recorded=cues(),lastVideo=null,soundEnabled=true}={}){
   const s={memory:{id:'m1'},frames:ordered,cues:recorded,timer:null,ordinaryTimer:null,phase:'narration',
@@ -63,7 +70,7 @@ test('patch only one callback and preserve original native V9 video helpers',()=
   assert.equal(r.status,'installed');
   assert.equal(r.html.split(INSTALL_MARKER).length-1,1);
   assert.equal(r.html.split(AUDIO_END_AFTER).length-1,1);
-  assert.equal(r.html.replace(INLINE_TAIL+'\n','').replace(AUDIO_END_AFTER,AUDIO_END_BEFORE),nativePage);
+  assert.equal(restoreApprovedV9(r.html),nativePage);
   assert.equal(applyUnifiedTail(r.html).status,'already-installed');
   assert.equal(applyUnifiedTail(nativePage.replace(AUDIO_END_BEFORE,'')).status,'anchor-unmatched');
 });
@@ -180,4 +187,57 @@ test('missing protected V9 or changed native anchors fail safely',async()=>{
   assert.equal((await worker.fetch(new Request('https://test.local/present'),{})).status,503);
   const env={STYLE_BASE:{fetch:async()=>new Response('<html>changed</html>',{headers:{'content-type':'text/html'}})}};
   assert.equal((await worker.fetch(new Request('https://test.local/present'),env)).status,503);
+});
+
+test('first genuine listening gesture unlocks each *original* video element for its later replay',async()=>{
+  const listeners=new Map(),events=[],nodes=[],revoked=[];
+  let playCalls=0;
+  const document={
+    addEventListener:(type,fn)=>{listeners.set(type,fn)},
+    createElement:tag=>{
+      assert.equal(tag,'video');
+      const video={muted:false,defaultMuted:false,paused:true,currentTime:0,
+        setAttribute(){},load(){events.push('load')},
+        play(){playCalls++;events.push('gesture-play');this.paused=false;return Promise.resolve()},
+        pause(){this.paused=true;events.push('pause')},
+        removeAttribute(){},remove(){events.push('remove')}};
+      nodes.push(video);return video;
+    }
+  };
+  const s={frames:[{kind:'video',key:'original-v1'}],engine:'narrated',phase:'narration'};
+  const stage={parentElement:null,appendChild:n=>events.push('append')};
+  const env={document,stage,store:{mediaUrl:async key=>{assert.equal(key,'original-v1');return 'blob:original'}},
+    URL:{revokeObjectURL:u=>revoked.push(u)},console:{warn:()=>{}},taleraInline:s};
+  vm.runInNewContext(INLINE_TAIL,env);
+  await env.taleraUnifiedWarmVideos(s);
+  assert.equal(s.taleraUnifiedPrepared.size,1);
+  assert.equal(playCalls,0,'do not autoplay an audible video before a user gesture');
+  listeners.get('click')();
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.equal(playCalls,1);
+  assert.equal(s.taleraUnifiedPrepared.get('original-v1').primed,true);
+  assert.equal(nodes[0].paused,true);
+  assert.equal(nodes[0].currentTime,0);
+  s.phase='originals';
+  assert.equal(env.taleraUnifiedTakePrimed(s,s.frames[0]),nodes[0]);
+  assert.equal(s.taleraUnifiedReplayUrl,'blob:original');
+  assert.equal(s.taleraUnifiedPrepared.size,0);
+  env.taleraUnifiedDropPrepared(s);
+  assert.deepEqual(revoked,[],'native V9 owns blob URL of adopted replay video');
+});
+
+test('navigation away frees non-used video preparation objects and URLs',async()=>{
+  const revoked=[],removed=[];
+  const s={frames:[{kind:'video',key:'v1'},{kind:'video',key:'v2'}],
+    engine:'narrated',phase:'narration'};
+  const env={taleraInline:s,URL:{revokeObjectURL:u=>revoked.push(u)},
+    console:{warn:()=>{}},stage:{appendChild:()=>{}},store:{mediaUrl:async k=>'blob:'+k},
+    document:{addEventListener(){},createElement:()=>({
+      setAttribute(){},load(){},pause(){},removeAttribute(){},remove(){removed.push(true)}
+    })}};
+  vm.runInNewContext(INLINE_TAIL,env);
+  await env.taleraUnifiedWarmVideos(s);
+  env.taleraUnifiedDropPrepared(s);
+  assert.deepEqual(revoked,['blob:v1','blob:v2']);
+  assert.equal(removed.length,2);
 });

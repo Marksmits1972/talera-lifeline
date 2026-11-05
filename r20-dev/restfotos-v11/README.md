@@ -38,3 +38,21 @@ De bestaande presentatietest draait via een aparte Cloudflare service-binding na
 - Beschermde V9: `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`, **ongemoeid**
 
 **Let op:** browsertests zijn geen garantie voor iOS Safari en echte persoonlijke herinneringsbestanden. Definitieve acceptatie pas na iPhone-test met bijvoorbeeld zes foto's waarvan vier tijdens het inspreken in beeld kwamen. De nieuwe aparte testhost heeft eigen lokale opslag: verwijder de bestaande TALERA-PWA niet. Bij problemen laat de oude V10-test-Worker en beschermde V9 volledig staan.
+
+## Tijdelijke zichtbare diagnose voor iPhone-proef (5 november 2026)
+
+Een eerdere read-only diagnose stond uitsluitend **binnen de verborgen/inliggende iframe** en was niet zichtbaar op het hoofdscherm. Dit is hersteld **zonder de bestaande opname- of afspeelcode te wijzigen**.
+
+- Alleen op `/present` en `/tell` voegt de aparte V11-test-Worker één script aan het einde van de pagina toe: `FRONT_DIAG_SCRIPT`, tag `talera-v11-front-diagnose-script`.
+- De knop **🔎 Diagnose** staat vast linksonder op het bovenliggende scherm, buiten de foto-iframe. Er is een uitklapvenster met **Ververs**, **Kopieer** en **Sluiten**.
+- De al bestaande read-only observatie in `/vertelmodus-embed` is verborgen in de iframe en stuurt alleen zijn **samenvatting** via `postMessage` naar het bovenliggende venster. De samenvatting bevat aantallen en **1-gebaseerde beeldposities**, geen media-ID's, beeldbestanden of gesproken audio. Het ontvangersvenster controleert de exacte iframe en de gelijke origin.
+- Het venster toont: totaal aantal media, foto's, video's, aantal tijdcodes, verschillende gebruikte foto's, ontbrekende foto's, of de stem werkelijk is afgelopen, huidige beeldpositie, en welke restfoto's daadwerkelijk na de stem zijn waargenomen.
+- Bij ontbreken van een actieve speler staat **Wachten op vertelspeler…**. Dat is op zichzelf diagnostisch: het hoofdscherm heeft dan nog geen gegevens ontvangen.
+- Alles gebeurt lokaal in dezelfde browser. **Geen uploads, geen logging naar server, geen cloud-database, geen wijzigingen aan opnames/tijdcodes/video's.**
+- Terugzetten na iPhone-proef: verwijder `FRONT_DIAG_SCRIPT` / `addFrontDiagnostic()` / de twee front-routes `/present` en `/tell` uit deze V11-test-Worker en de aparte `READ_ONLY_AUDIT_SCRIPT` uit de embed. De originele pagina's zijn verder byte-identiek.
+- De bestaande V10-rollback, de stijl-Worker en de V9-basis zijn niet aangepast.
+
+Technische verificatie: **13/13** unit-tests, **5/5** live HTML-/routevergelijkingen en Chrome-integratietest met een **zichtbare en aanklikbare knop** op zowel `/present` als `/tell`. Met zes synthetische foto's en vier cues werd de melding **Restfoto's: 2 (5, 6)** zichtbaar in het voorgrondpaneel. Ook de echte afspeelvolgorde van stem, foto 5, foto 6 en de originele videoronde met geluid blijft in de test intact.
+
+GitHub Actions: https://github.com/Marksmits1972/talera-lifeline/actions/runs/42038713338
+Testadres: https://talera-vertel-restfotos-v11-test-20261105.mark-a39.workers.dev/

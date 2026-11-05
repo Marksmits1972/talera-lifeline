@@ -258,6 +258,6 @@ test('narrated photo predecode is bounded to three; avoids eager full-memory dec
   const warmed=env.taleraUnifiedWarmPreviewImages(s);
   assert.equal(warmed.length,3);
   assert.equal(allocated.length,3);
-  assert.deepEqual(warmed.map(x=>x.src),['blob:f0','blob:f5','blob:f7']);
-  assert.deepEqual(warmed.map(x=>x.decoding),['async','async','async']);
+  assert.deepEqual(Array.from(warmed,x=>x.src),['blob:f0','blob:f5','blob:f7']);
+  assert.deepEqual(Array.from(warmed,x=>x.decoding),['async','async','async']);
 });

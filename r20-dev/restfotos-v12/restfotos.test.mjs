@@ -169,7 +169,7 @@ test('same memory is skipped only while ORIGINAL iframe is still connected',()=>
   const log={dispose:0};
   const code="let activeId='story-a',currentPresentation={frame:{isConnected:"+connected+
    "}};function disposePresentation(){log.dispose++}function present(memory){const id=memory.id;"+
-   PATCHED_PRESENTER_GUARD+"return true;}present({id:'"+(same?'story-a':'story-b')+"'})";
+   PATCHED_PRESENTER_GUARD+"disposePresentation();return true;}present({id:'"+(same?'story-a':'story-b')+"'})";
   const returned=runInNewContext(code,{log});
   return{returned,disposed:log.dispose};
  };

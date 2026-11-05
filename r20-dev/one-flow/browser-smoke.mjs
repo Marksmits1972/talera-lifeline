@@ -89,12 +89,17 @@ assert.equal(saved.files,7);assert.equal(saved.cues,3);
 console.log('PASS native IndexedDB: five photos, narrated video WITH audio track, real WAV and three cues');
 await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
 assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)'),'native V9 audio must load');
+// Verify iOS warm video is present BEFORE the user's first Beluister action.
+assert.ok(await until('Boolean(document.querySelector(\'video[style*="-9999px"]\'))'),
+ 'original video must be prepared before first listener gesture');
 await evaluate(`(()=>{
  window.__oneFlowTest={voiceEndedAt:0,photos:[],videos:[],errors:[]};
  const t=window.__oneFlowTest,rt=window.__taleraTimelineRuntime;
  const controls=window.__taleraAudioControls;
  if(!controls||typeof controls.isEnabled!=='function')throw Error('Original V9 listening controls missing');
- controls.isEnabled=()=>true;
+ const prepared=document.querySelector('video[style*="-9999px"]');
+ if(!prepared)throw Error('Preloaded original video is missing before user gesture');
+ prepared.dataset.primedVideo='yes';
  const record=()=>{
   const index=rt.currentMemory()?._photoIndex;
   if(Number.isInteger(index)&&t.photos.at(-1)?.index!==index)
@@ -103,7 +108,7 @@ await evaluate(`(()=>{
     if(!t.videos.some(v=>v.elementId===video.dataset.testID)){
       video.dataset.testID=String(t.videos.length+1);
       const item={elementId:video.dataset.testID,muted:video.muted,at:performance.now(),
-        progress:0,duration:0};
+        warmed:video.dataset.primedVideo==='yes',progress:0,duration:0};
       t.videos.push(item);
       video.addEventListener('timeupdate',()=>{
         item.progress=Math.max(item.progress,video.currentTime||0);
@@ -118,6 +123,8 @@ await evaluate(`(()=>{
  const a=window.__taleraInlineSharedAudio;
  a.addEventListener('ended',()=>{t.voiceEndedAt=performance.now();record()},{once:true});
  record();
+ // One initial Beluister gesture starts the whole memory, including later video.
+ document.dispatchEvent(new Event('talera:enable-listening'));
  if(a.paused)a.play().catch(e=>{t.errors.push('voice play '+String(e))});
 })()`);
 assert.ok(await until('window.__oneFlowTest.voiceEndedAt>0'),'real narration must finish');
@@ -138,11 +145,12 @@ assert.ok(remaining[1].at-remaining[0].at>=3200);
 assert.ok(remaining[2].at-remaining[1].at>=3200);
 assert.ok(await until('window.__oneFlowTest.videos.some(v=>!v.muted&&v.progress>.6)',200),
  'the original video must replay from 0 with sound after the remaining photos');
-const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,progress:v.progress,duration:v.duration}))`);
+const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,warmed:v.warmed,progress:v.progress,duration:v.duration}))`);
 const narrated=videoPlayback.find(v=>v.muted&&v.at<result.voiceEndedAt);
 const replay=videoPlayback.find(v=>!v.muted&&v.at>remaining.at(-1).at);
 assert.ok(narrated,'narrated video exists and was muted');
 assert.ok(replay,'original native video replay starts AFTER the last remaining photo');
+assert.equal(replay.warmed,true,'native replay MUST reuse video authorized by the FIRST listener gesture');
 assert.ok(replay.progress>.6,'unmuted replay advanced from t=0');
 assert.ok(replay.duration>=1,'replay has the original full clip duration');
 assert.deepEqual(result.errors,[]);

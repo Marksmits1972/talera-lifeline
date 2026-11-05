@@ -1,0 +1,40 @@
+name: TALERA V12 — restfoto's zonder vertelmoduswijziging
+
+on:
+  push:
+    branches:
+      - feature/talera-v12-restfotos-veilige-activatie-20261105
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-v12:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax of new read-only V9 wrapper
+        run: node --check r20-dev/restfotos-v12/restfotos.worker.mjs
+      - name: Photo and narrator regressions, ID/cue preservation
+        run: node --test r20-dev/restfotos-v12/restfotos.test.mjs
+      - name: Live original HTML comparison with protected V9
+        run: node r20-dev/restfotos-v12/smoke-live.mjs
+      - name: Real browser end-to-end with saved local memory and real WAV audio
+        run: |
+          BROWSER=$(command -v google-chrome-stable || command -v google-chrome || command -v chromium)
+          "$BROWSER" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --autoplay-policy=no-user-gesture-required --remote-allow-origins='*' --remote-debugging-port=9224 --user-data-dir="$RUNNER_TEMP/talera-v12-cdp" about:blank >/tmp/talera-v12-browser.log 2>&1 &
+          CHROME_PID=$!
+          trap 'kill "$CHROME_PID" 2>/dev/null || true' EXIT
+          node r20-dev/restfotos-v12/browser-smoke.mjs
+      - name: Ensure no old wrappers, diagnostics, storage writes or video intercept
+        run: |
+          node --input-type=module - <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const s=readFileSync('r20-dev/restfotos-v12/restfotos.worker.mjs','utf8');
+          assert.doesNotMatch(s,/taleraStartOriginalRound\s*=|TaleraMemories\.save|indexedDB|localStorage|V11_DIAG|FRONT_DIAG_SCRIPT/);
+          assert.match(s,/if\(!document\.body\.classList\.contains\('present'\)\)/);
+          console.log('V12: recording, storage and original video player protected');
+          NODE

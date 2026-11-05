@@ -13,6 +13,21 @@ const res=await fetch(approvedBase+'/present',{headers:{accept:'text/html'}});
 assert.equal(res.status,200,'approved V9 /present must be reachable');
 const html=await res.text();
 const result=addRemainingPhotosToInlinePlayer(html);
+if(result.status!=='installed'){
+  const checks={
+    replayFunction:'function taleraInlineReplayNext(s){',
+    narratedVideoSelection:ORIGINAL_VIDEO_SELECTION,
+    videoCompleted:ORIGINAL_VIDEO_DONE,
+    noSpokenVideos:ORIGINAL_NO_VIDEOS,
+    nativePhoto:'function taleraInlineSetFrame(s,index){',
+    nativeVideo:'function taleraInlinePlayMedia(s,frame,muted,done){',
+    voiceEnd:'function taleraInlineVoiceEnded(s){'
+  };
+  const counts=Object.fromEntries(Object.entries(checks).map(([name,token])=>[
+    name,html.split(token).length-1
+  ]));
+  console.log('Read-only real V9 anchor counts:',JSON.stringify(counts));
+}
 assert.equal(result.status,'installed','current V9 inline anchors must match exactly');
 assert.equal(result.html.split(INLINE_PHOTO_HELPER).length-1,1);
 assert.equal(result.html.split(PATCHED_VIDEO_SELECTION).length-1,1);

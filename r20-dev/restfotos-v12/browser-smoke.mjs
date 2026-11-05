@@ -48,7 +48,7 @@ if(!iframeOpened){
  console.log('V12 MISSING IFRAME INVESTIGATION',JSON.stringify(diagnostic));
  console.log('V12 CONSOLE WARNING/ERROR',JSON.stringify(browserWarnings.slice(-25)));
  const viaExistingBridge=await evalJs("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraLocalFrameChanged(m);return !!document.querySelector('iframe.talera-zero-present-frame')})()");
- const bridgeOpened=await until("Boolean(document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('play'))",{tries:55,ms:75});
+ const bridgeOpened=await until("Boolean(document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('play'))",{tries:80,ms:75});
  console.log('V12 EXISTING FRAME-CHANGED BRIDGE CALLED DIRECTLY IN DISPOSABLE TEST BROWSER',
   JSON.stringify({immediate:viaExistingBridge,eventually:bridgeOpened,trace:await evalJs('window.__v12trace')}));
 

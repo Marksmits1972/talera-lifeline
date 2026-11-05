@@ -39,7 +39,6 @@ jobs:
       - name: Deploy NEW staging worker only, never V9
         run: |
           export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
-          export CLOUDFLARE_API_TOKEN="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '\\r\\n')"
           npx wrangler deploy --config r20-dev/one-flow/wrangler.jsonc
       - name: Verify staging is reachable and native patch installed
         run: |

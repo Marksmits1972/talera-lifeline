@@ -196,7 +196,7 @@ test('first genuine listening gesture unlocks each *original* video element for 
     addEventListener:(type,fn)=>{listeners.set(type,fn)},
     createElement:tag=>{
       assert.equal(tag,'video');
-      const video={muted:false,defaultMuted:false,paused:true,currentTime:0,
+      const video={muted:false,defaultMuted:false,paused:true,currentTime:0,style:{},
         setAttribute(){},load(){events.push('load')},
         play(){playCalls++;events.push('gesture-play');this.paused=false;return Promise.resolve()},
         pause(){this.paused=true;events.push('pause')},
@@ -233,7 +233,7 @@ test('navigation away frees non-used video preparation objects and URLs',async()
   const env={taleraInline:s,URL:{revokeObjectURL:u=>revoked.push(u)},
     console:{warn:()=>{}},stage:{appendChild:()=>{}},store:{mediaUrl:async k=>'blob:'+k},
     document:{addEventListener(){},createElement:()=>({
-      setAttribute(){},load(){},pause(){},removeAttribute(){},remove(){removed.push(true)}
+      style:{},setAttribute(){},load(){},pause(){},removeAttribute(){},remove(){removed.push(true)}
     })}};
   vm.runInNewContext(INLINE_TAIL,env);
   await env.taleraUnifiedWarmVideos(s);

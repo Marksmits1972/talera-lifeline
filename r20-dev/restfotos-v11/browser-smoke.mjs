@@ -114,8 +114,11 @@ for(const route of ['/present','/tell']){
  assert.ok(Number(buttonState.zIndex)>100000,route+': button has top visual layer');
  assert.equal(await evaluate("(()=>{document.getElementById('talera-v11-debug-toggle').click();return !document.getElementById('talera-v11-debug-panel').hidden})()"),
   true,route+': opening Diagnose shows the panel');
- assert.ok(await evaluate("document.getElementById('talera-v11-debug-panel').textContent.includes('Wachten op vertelspeler')"),
-  route+': diagnostic panel shows waiting state before a player is active');
+ assert.ok(await until("document.getElementById('talera-v11-debug-panel')?.textContent.includes('Vertelspeler-venster:')",{attempts:70,interval:60}),
+  route+': diagnostic reports whether a real narrator iframe exists, even when there is none');
+ const localSummary=await evaluate("document.getElementById('talera-v11-debug-text').textContent");
+ assert.match(localSummary,/Opgeslagen herinneringen:|Lokale geheugenbibliotheek:/,
+  route+': parent diagnostic reads local storage status without relying on the narrator iframe');
  console.log('PASS front-side Diagnose button',route,JSON.stringify(buttonState));
  if(route==='/present'){
   const result=await command('Runtime.evaluate',{expression:"new Promise(resolve=>{\n const f=document.createElement('iframe');\n f.className='talera-zero-present-frame';\n f.style.cssText='width:3px;height:3px;position:fixed;left:0;bottom:0';\n f.src='/vertelmodus-embed?mode=present&diagnostic_browser_test=1';\n f.addEventListener('load',()=>{\n  const svg='<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"></svg>';\n  const items=Array.from({length:6},()=>({type:'image',name:'fake',blob:new Blob([svg],{type:'image/svg+xml'})}));\n  f.contentWindow.postMessage({\n   taleraZero:true,type:'INIT',items,\n   cues:[{t:0,index:0},{t:100,index:1},{t:200,index:2},{t:300,index:3}],\n   duration:500,voice:null\n  },location.origin);\n  resolve(true);\n },{once:true});\n document.body.appendChild(f);\n})",returnByValue:true,awaitPromise:true,userGesture:true});

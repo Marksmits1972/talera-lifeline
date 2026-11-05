@@ -218,7 +218,9 @@ test('first genuine listening gesture unlocks each *original* video element for 
   assert.equal(playCalls,0,'do not autoplay an audible video before a user gesture');
   assert.equal(listeners.has('pointerup'),false,'swiping may never be a video-prime handler');
   assert.equal(listeners.has('touchend'),false,'touch swipe may never prime videos');
-  assert.equal(listeners.has('click'),false,'photo taps must not prime narrator videos');
+  const photoTap={target:{closest:()=>null}};
+  listeners.get('click')(photoTap);
+  assert.equal(playCalls,0,'photo taps must not prime narrator videos');
   assert.equal(playCalls,0,'prepared clips remain paused on a narrated memory');
   // The existing, explicit Beluister action alone is allowed to authorize sound.
   listeners.get('talera:enable-listening')();
@@ -264,10 +266,11 @@ test('narrated photo is closed: no pointer, touch or click handler primes origin
     URL:{revokeObjectURL(){}},console:{warn(){}},taleraInline:s};
   vm.runInNewContext(INLINE_TAIL,env);
   await env.taleraUnifiedWarmVideos(s);
-  for(const event of ['pointerup','touchend','click','pointerdown','touchstart']){
+  for(const event of ['pointerup','touchend','pointerdown','touchstart']){
     assert.equal(listeners.has(event),false,event+' must not create playback or internal navigation');
   }
-  assert.deepEqual(plays,[]);
+  listeners.get('click')({target:{closest:()=>null}});
+  assert.deepEqual(plays,[],'story photo tapping cannot call video.play');
   assert.equal(s.taleraUnifiedPrepared.size,1);
 });
 
@@ -283,6 +286,9 @@ test('native V9 tap suppression spans the ENTIRE narrated memory, including phot
     'generic pointer/touch audio retry must not run for any narrated phase');
   assert.ok(patched.html.includes("document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);"),
     'Beluister keeps native iOS unlocking gesture');
+  assert.ok(patched.html.includes("'.talera-audio-consent,.talera-memory-audio'")||
+    patched.html.includes(".talera-audio-consent,.talera-memory-audio"),
+    'only a real existing audio control can unlock narrated video sound');
   assert.equal(restoreApprovedV9(patched.html),nativePage);
 });
 
@@ -292,4 +298,24 @@ test('existing ordinary photo memories still use V9 tap-to-advance unchanged',()
   assert.ok(patched.html.includes("if(s?.engine!=='narrated'&&!(runtime.currentMemory()?._zeroItems?.some(x=>x.kind==='audio')))return;"));
   assert.equal(restoreApprovedV9(patched.html),nativePage,
     'ordinary photo handlers and whole native V9 are untouched');
+});
+
+test('existing Luister consent button is a valid Safari gesture but the photo itself is NOT',async()=>{
+  const listeners=new Map(),played=[];
+  const document={addEventListener:(name,cb)=>listeners.set(name,cb),
+    createElement:()=>({style:{},setAttribute(){},load(){},currentTime:0,
+      play(){played.push('play');return Promise.resolve()},
+      pause(){played.push('pause')},removeAttribute(){},remove(){}})};
+  const s={frames:[{kind:'video',key:'original'}],engine:'narrated',phase:'narration'};
+  const env={document,stage:{appendChild(){}},store:{mediaUrl:async()=> 'blob:original'},
+    URL:{revokeObjectURL(){}},console:{warn(){}},taleraInline:s};
+  vm.runInNewContext(INLINE_TAIL,env);
+  await env.taleraUnifiedWarmVideos(s);
+  const photo={closest:()=>null};
+  const consent={closest:selector=>selector.includes('.talera-audio-consent')?{}:null};
+  listeners.get('click')({target:photo});
+  assert.deepEqual(played,[]);
+  listeners.get('click')({target:consent});
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.deepEqual(played,['play','pause'],'existing consent button primes once and immediately pauses');
 });

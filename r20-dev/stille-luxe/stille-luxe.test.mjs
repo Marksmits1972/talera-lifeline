@@ -178,26 +178,33 @@ test('native editor visuals change only color tokens, not recording or toolbar g
  assert.doesNotMatch(css,/#photoLayerA\s*\{/);
 });
 
-test('presentation bottom is black and reading sheet uses exact existing --story-neutral color',async()=>{
+test('pre-programmed CSS switches footer instantly at first sheet movement with exact V9 paper token',async()=>{
  const original='<!doctype html><html><head><meta name="theme-color" content="#ffffff"></head><body></body></html>';
  const response=await app.fetch(new Request(origin+'/present'),mock(original).env);
  const html=await response.text();
  const script=html.match(/<script id="talera-present-bottom-tint-script">([\s\S]*?)<\/script>/)?.[1];
  const style=html.match(/<style id="talera-present-bottom-tint">([\s\S]*?)<\/style>/)?.[1];
- assert.ok(script,'presentation mode synchronizer exists');
- assert.ok(style,'presentation-specific black background rules exist');
- assert.match(style,/--talera-present-edge-color:#000000/);
- assert.doesNotMatch(script,/getImageData|drawImage|activePhoto/,'black is fixed; no image sampling');
- assert.match(script,/taleraTintTest/,'opt-in diagnostics remain possible');
- const cssWrites={},bodyWrites={}; let themeValue='',paper='247,244,239'; const events={};
- const scroll={scrollTop:0,classList:{contains:()=>false},addEventListener:(name,fn)=>events['scroll:'+name]=fn};
+ assert.ok(script,'presentation-only synchronizer exists');
+ assert.ok(style,'static presentation CSS loads before sheet is opened');
+ assert.match(style,/html,body\{background-color:#000000!important/,'photo footer black from initial paint');
+ assert.match(style,/html\[data-talera-present-reading="true"\]/,'paper color already declared in static CSS');
+ assert.match(style,/rgb\(var\(--talera-present-paper-rgb\)\)/,'paper selector references one shared color token');
+ assert.match(script,/scroll\.scrollTop > 0/,'first scroll movement switches state');
+ assert.match(script,/scroll\.addEventListener\('scroll', sync/,'synchronous scroll handler');
+ assert.doesNotMatch(script,/getImageData|drawImage|activePhoto/,'no picture sampling for fixed black');
+ assert.doesNotMatch(script,/requestAnimationFrame\(/,'no scheduling delay before color request');
+ assert.match(script,/taleraTintTest/,'test-only diagnostic remains');
+ const cssWrites={},attrs={},events={};let themeValue='',paper='247,244,239';let queued=0;
+ const scroll={scrollTop:0,classList:{contains:()=>false},
+  addEventListener:(name,fn)=>events['scroll:'+name]=fn};
  const space={classList:{contains:()=>false}};
  const card={};
  const theme={setAttribute:(key,value)=>{if(key==='content')themeValue=value;}};
  const doc={
   readyState:'complete',
-  documentElement:{style:{setProperty:(key,value)=>cssWrites[key]=value}},
-  body:{style:{setProperty:(key,value)=>bodyWrites[key]=value}},
+  documentElement:{style:{setProperty:(key,value)=>cssWrites[key]=value},
+   setAttribute:(key,value)=>attrs[key]=value},
+  body:{style:{setProperty:()=>{throw Error('ordinary body not to be painted by JS');}}},
   querySelector:q=>q==='.memory-space'?space:q==='meta[name="theme-color"]'?theme:null,
   getElementById:q=>q==='memoryStoryScroll'?scroll:q==='memoryCaption'?card:null,
   addEventListener:(name,fn)=>events['document:'+name]=fn
@@ -205,28 +212,26 @@ test('presentation bottom is black and reading sheet uses exact existing --story
  runInNewContext(script,{
   window:{addEventListener:(name,fn)=>events['window:'+name]=fn},
   document:doc,
-  getComputedStyle:element=>element===space?{
-    getPropertyValue:key=>key==='--story-neutral'?paper:''
-  }:{backgroundColor:'rgb(247, 244, 239)'},
+  getComputedStyle:element=>element===space?
+   {getPropertyValue:key=>key==='--story-neutral'?paper:''}:
+   {backgroundColor:'rgb(247, 244, 239)'},
   MutationObserver:class{observe(){}},
-  requestAnimationFrame:fn=>{fn();return 1;}
+  requestAnimationFrame:()=>{queued++;return 1;}
  });
- assert.equal(cssWrites['--talera-present-edge-color'],'#000000','photo view is black');
- assert.equal(bodyWrites['--talera-present-edge-color'],'#000000');
- assert.equal(themeValue,'#000000','native requested system color is black');
- scroll.scrollTop=70;
+ assert.equal(cssWrites['--talera-present-paper-rgb'],'247,244,239',
+  'actual paper token prepared once before opening');
+ assert.equal(attrs['data-talera-present-reading'],'false');
+ assert.equal(themeValue,'#000000','native color black at beginning');
+ scroll.scrollTop=1;
  events['scroll:scroll']();
- assert.equal(cssWrites['--talera-present-edge-color'],'#F7F4EF','opened pane matches existing warm paper');
- assert.equal(themeValue,'#F7F4EF');
- paper='245,243,237';
- events['scroll:scroll']();
- assert.equal(cssWrites['--talera-present-edge-color'],'#F5F3ED','color follows source token, not hardcoded approximation');
+ assert.equal(queued,0,'no RAF scheduled');
+ assert.equal(attrs['data-talera-present-reading'],'true','CSS paper rule active at first pixel');
+ assert.equal(themeValue,'#F7F4EF','same paper RGB sent to iOS synchronously');
  scroll.scrollTop=0;
  events['scroll:scroll']();
- assert.equal(cssWrites['--talera-present-edge-color'],'#000000','return to photo restores black');
- assert.equal(themeValue,'#000000');
+ assert.equal(attrs['data-talera-present-reading'],'false','black CSS rule restored immediately');
+ assert.equal(themeValue,'#000000','native system black requested immediately');
 });
-
 test('all ordinary HTML entry routes request the same iOS status mode as presentation',async()=>{
  for(const path of ['/','/mijn-leven','/tell','/meer']){
   const html='<!doctype html><html><head><meta name="apple-mobile-web-app-status-bar-style" content="default"></head><body><main>original</main></body></html>';

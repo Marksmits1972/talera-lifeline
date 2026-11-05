@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `61723384-5f9e-4a34-9824-b27453c881ac`  
-**Deployment:** `e1756385-133b-4cbb-a944-11f638888a55`  
+**Actuele Worker-versie:** `120fa2cb-4ce9-4e58-99fe-aa2a97a2c2e7`  
+**Deployment:** `4c4520c2-50ac-4de0-8cd7-a702313bf7f3`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -157,3 +157,21 @@ Er bestaat een **gedocumenteerde WebKit-fout**, waarvan de geometrie vrijwel exa
 5. **Niet aanpassen, herinstalleren of verwijderen** van de geïnstalleerde PWA: browserorigin en lokale herinneringen blijven beschermd. Een harde app-herstart is wel nuttig omdat de PWA-statusbalk bij starten kan worden vastgelegd.
 
 Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste schermrand, geen bewijs van een volledige foto onder de iOS-systeembalk aan beide kanten. De echte iPhone-beoordeling blijft een acceptatiepunt.
+
+
+## Fotovullende bovenkant uit historische versie en adaptieve onderrand (05-11-2026)
+
+**Door gebruiker gekozen uitgangspunt**: historische stijlstaging Cloudflare-versie `2e5252a4-10ac-4ace-880b-95891aecfe53`, uit 4 november 2026 om 20:27 Nederlandse tijd, broncommit `78b0a6e55b0b`. In deze versie stond de foto correct achter de iOS-statusbalk, maar onderaan was een aparte strook zichtbaar. We hebben de bewezen `black-translucent`-head-instelling uit dit commit **specifiek teruggebracht** in de bestaande, nieuwe stijlbranch. We hebben niet de complete historische Worker teruggezet, dus de inmiddels gerealiseerde overige stijlverbeteringen en beschermde V9-functionaliteit blijven behouden.
+
+**Nieuwe aanvullende aanpassing, uitsluitend op `/present`**:
+- De iOS-statusbalk wordt `black-translucent`, zodat het fotobeeld weer achter klok, signaal en batterij kan doorlopen.
+- Een korte inline `<head>`-stijl gebruikt `--talera-present-edge-color` als kleur van het HTML/body-vlak buiten de foto. Een inline script neemt bij fotoverandering een klein gemiddelde van de **onderste zichtbare strook van de actieve foto** via een tijdelijk canvas (40×8 pixels) en past deze kleur toe op de achtergrondvariabele en `meta[name=theme-color]`. **Er wordt geen foto geüpload, geprojecteerd naar externe diensten of opgeslagen**.
+- De actieve bronfoto komt uit de bestaande presentatie-`.photo-stage` met `.photo-layer`-foto's. De code observeert alleen foto-`src`/class/style en hun bestaande scrollpositie, verandert geen bestaande media-, swipe- of tijdcodecode.
+- Bij een uitgeschoven tekst/leesweergave (`#memoryStoryScroll.scrollTop > 38` of de bestaande `talera-v14-reading` / `talera-v26-reading`-status) kiest de onderrand **wit `#FFFFFF`**. Bij sluiten schakelt hij terug naar de tint van de huidige foto.
+- Op het reguliere beginscherm blijft de HTML/body-achtergrond **wit**, zonder de presentatie-specifieke synchronisatie.
+
+**Beperkingen, eerlijk rapporteren**: JavaScript mag soms een extern geladen foto niet via canvas uitlezen (CORS). Dan gebruikt de presentatie een rustige vaste fallback `#304653`; dat is niet gegarandeerd de perfecte kleur van iedere foto. iOS kan het dynamisch aanpassen van zijn eigen onderste systeemstrook anders behandelen dan de HTML/body-achtergrond: alleen een echte iPhone-test kan aantonen of de systeemstrook bij elke foto en bij het openen van het leesvlak meeverkleurt. We claimen pas 'volledig opgelost' na die visuele test.
+
+**Beschermde onderdelen**: Cloudflare V9-versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` ongewijzigd. De gehele `/present`-body van de werkende V9 wordt in de test byte-voor-byte vergeleken met de nieuwe staging. Geen wijziging aan vertelcyclus, foto/sound, swipes, datamodel, Free/Premium of andere Workers.
+
+**Nieuw staged deployment**: `4c4520c2-50ac-4de0-8cd7-a702313bf7f3`, versie `120fa2cb-4ce9-4e58-99fe-aa2a97a2c2e7`, onder dezelfde bestaande testlink. Regressietest omvat een Node VM-fictieve fotosimulatie die van onderkleur `#60829e` naar **wit** en terug schakelt. Live HTTP-controles worden na publicatie opnieuw uitgevoerd via GitHub Actions [run 41988586149](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41988586149).

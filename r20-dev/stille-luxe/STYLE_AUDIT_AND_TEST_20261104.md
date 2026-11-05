@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `120fa2cb-4ce9-4e58-99fe-aa2a97a2c2e7`  
-**Deployment:** `4c4520c2-50ac-4de0-8cd7-a702313bf7f3`  
+**Actuele Worker-versie:** `85021228-546e-45c2-b067-bc2bccbfbc6c`  
+**Deployment:** `a5f5436d-8500-48ff-a24d-0937f105cc79`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -175,3 +175,20 @@ Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste s
 **Beschermde onderdelen**: Cloudflare V9-versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` ongewijzigd. De gehele `/present`-body van de werkende V9 wordt in de test byte-voor-byte vergeleken met de nieuwe staging. Geen wijziging aan vertelcyclus, foto/sound, swipes, datamodel, Free/Premium of andere Workers.
 
 **Nieuw staged deployment**: `4c4520c2-50ac-4de0-8cd7-a702313bf7f3`, versie `120fa2cb-4ce9-4e58-99fe-aa2a97a2c2e7`, onder dezelfde bestaande testlink. Regressietest omvat een Node VM-fictieve fotosimulatie die van onderkleur `#60829e` naar **wit** en terug schakelt. Live HTTP-controles worden na publicatie opnieuw uitgevoerd via GitHub Actions [run 41988586149](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41988586149).
+
+
+## Vervolgronde 5 november 2026 — kleurreacties op iPhone testen
+
+**Afgesproken doel**: op het gewone beginscherm, de bewerk-/importschermen en bij gewone invoer is de onderste ruimte wit. In de presentatie loopt de foto achter de statusbalk bovenaan door; onderaan vraagt TALERA de passende tint van de actieve foto aan iOS, en bij het omhooggeschoven witte tekstpaneel wit. Als de native onderste strook op de telefoon niet tijdig/reproduceerbaar kleurt, gebruiken we in de presentatie het merkinkt `#304653` als vaste fallback. De correcte witte normale schermen blijven dan behouden.
+
+**Gekozen technische basis**: bestaande stijlorigin en de eerder bevestigde historische werkende fotoheader `black-translucent` van Cloudflare `2e5252a4-10ac-4ace-880b-95891aecfe53`. V9-versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` is ongewijzigd.
+
+**Aangepast op 5 november 2026**:
+- Een optionele diagnose bij de presentatieroute met `?taleraTintTest=1`. Standaard onzichtbaar; alleen via die URL toont TALERA klein: **gevraagde kleur**, reden (foto, wit paneel of fallback) en de tijd in milliseconden tot het verzoek vanuit de browsercode is verzonden. Dit is **niet** de werkelijk gemeten kleurreactietijd van iOS: alleen een echte visuele iPhone-observatie kan die vaststellen.
+- Tijdens een fotoswipe wordt de **zichtbare strip** `.talera-photo-strip.is-visible` gevolgd; daaruit wordt de pagina gekozen die onder het midden van de fotocontainer valt. In de ruststand blijft de huidige basisfoto leidend. Hiermee sluiten we aan bij de originele V7-swipecorrectie in plaats van pagina's te koppelen of te dupliceren.
+- De witte paneelstatus schakelt nu vanaf `scrollTop>18` en via de bestaande `talera-v14-reading`/`talera-v26-reading` classes, overeenkomstig de werkelijke leesstatus.
+- De kleuren worden lokaal met canvas uit de zichtbare foto benaderd. Bij gebrek aan canvas-toegang wegens cross-origin (CORS) wordt `#304653` gevraagd. Er worden geen foto's gekopieerd, verstuurd, opgeslagen of via nieuwe API's verwerkt.
+- Controle na deze aanpassingen: GitHub Actions [run 41991158526](https://github.com/Marksmits1972/talera-lifeline/actions/runs/41991158526), opnieuw gedraaid **na** Cloudflare-publicatie: 14/14 Node-regressietests en 8/8 live HTTP-smoketests, met anonieme desktop/mobile screenshots. Cloudflare-bron teruggelezen en exact met GitHub vergeleken, resultaat is gelijk. Nieuwe stagingversie `85021228-546e-45c2-b067-bc2bccbfbc6c` met deployment `a5f5436d-8500-48ff-a24d-0937f105cc79`, dezelfde bestaande URL.
+- Geen aanpassing aan het R20-presentatiebody, foto's, swipes, tijdcodes, opnames, lokale data of Premium-werkstroom. V9/R20-herstelpunten staan ongewijzigd.
+
+**Nog te valideren op een echt geïnstalleerde iPhone**: dat foto achter klok blijft doorlopen, gewone pagina's onderaan wit blijven, bij verschillende foto's de onderstrook daadwerkelijk volgt, en dat het lezen direct naar wit schakelt. **WebKit-bug 301994** meldt voor iOS 26.5.2 dat het onderste kleurgedeelte wordt gecached tot relaunch, ook als `theme-color` en body wijzigen: https://bugs.webkit.org/show_bug.cgi?id=301994. Dit experiment is bedoeld om te meten of en hoe het op deze specifieke iPhone reageert, niet om OS-controle te beloven. PWA nooit verwijderen voor deze test: herinneringen zijn lokaal in browserorigin opgeslagen.

@@ -100,4 +100,34 @@ async function testMode(mode,{withVideo=false}={}){
 }
 await testMode('present',{withVideo:true});
 await testMode('record',{withVideo:false});
+
+// The prior iframe-only diagnostic was not visible on the user's presentation.
+for(const route of ['/present','/tell']){
+ await command('Page.navigate',{url:base+route});
+ assert.ok(await until('document.readyState==="complete"&&location.pathname==='+JSON.stringify(route)),
+  route+': TALERA page loads');
+ assert.ok(await until('Boolean(document.getElementById("talera-v11-debug-toggle"))',{attempts:70,interval:100}),
+  route+': front-side Diagnose button exists outside the photograph iframe');
+ const buttonState=await evaluate("(()=>{\n const b=document.getElementById('talera-v11-debug-toggle');\n const r=b.getBoundingClientRect(),s=getComputedStyle(b);\n return {visible:r.width>75&&r.height>35&&r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,\n   zIndex:getComputedStyle(b.parentElement).zIndex,display:s.display,position:getComputedStyle(b.parentElement).position};\n})()");
+ assert.equal(buttonState.visible,true,route+': button is inside viewport');
+ assert.equal(buttonState.position,'fixed',route+': button floats above main photograph');
+ assert.ok(Number(buttonState.zIndex)>100000,route+': button has top visual layer');
+ assert.equal(await evaluate("(()=>{document.getElementById('talera-v11-debug-toggle').click();return !document.getElementById('talera-v11-debug-panel').hidden})()"),
+  true,route+': opening Diagnose shows the panel');
+ assert.ok(await evaluate("document.getElementById('talera-v11-debug-panel').textContent.includes('Wachten op vertelspeler')"),
+  route+': diagnostic panel shows waiting state before a player is active');
+ console.log('PASS front-side Diagnose button',route,JSON.stringify(buttonState));
+ if(route==='/present'){
+  const result=await command('Runtime.evaluate',{expression:"new Promise(resolve=>{\n const f=document.createElement('iframe');\n f.className='talera-zero-present-frame';\n f.style.cssText='width:3px;height:3px;position:fixed;left:0;bottom:0';\n f.src='/vertelmodus-embed?mode=present&diagnostic_browser_test=1';\n f.addEventListener('load',()=>{\n  const svg='<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"></svg>';\n  const items=Array.from({length:6},()=>({type:'image',name:'fake',blob:new Blob([svg],{type:'image/svg+xml'})}));\n  f.contentWindow.postMessage({\n   taleraZero:true,type:'INIT',items,\n   cues:[{t:0,index:0},{t:100,index:1},{t:200,index:2},{t:300,index:3}],\n   duration:500,voice:null\n  },location.origin);\n  resolve(true);\n },{once:true});\n document.body.appendChild(f);\n})",returnByValue:true,awaitPromise:true,userGesture:true});
+  if(result.exceptionDetails)throw Error('iframe diagnostic test: '+result.exceptionDetails.text);
+  assert.equal(result.result.value,true);
+  assert.ok(await until("document.getElementById('talera-v11-debug-text')?.textContent.includes('Restfoto’s: 2')",{attempts:70,interval:100}),
+   'real narrator iframe counts reach the TOP-LEVEL diagnostic panel');
+  const report=await evaluate("document.getElementById('talera-v11-debug-text').textContent");
+  assert.match(report,/Media 6/);
+  assert.match(report,/Spraak: 4 tijdcodes, 4 foto’s/);
+  assert.match(report,/Restfoto’s: 2 \(5, 6\)/);
+  console.log('PASS iframe report visible in parent Diagnosis panel',report.replace(/\n/g,' | '));
+ }
+}
 ws.close();

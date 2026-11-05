@@ -19,6 +19,8 @@ jobs:
         run: node r20-dev/one-flow/check-v9.mjs
       - name: Inspect native V9 video startup and listening callbacks
         run: node r20-dev/one-flow/inspect-playback-v9.mjs
+      - name: Read-only inspect swipe performance and narration event handlers
+        run: node r20-dev/one-flow/inspect-swipe-v9.mjs
       - name: Check deployment readiness through GitHub (never print tokens)
         env:
           DEPLOY_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

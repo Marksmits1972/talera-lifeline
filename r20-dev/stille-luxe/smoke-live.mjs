@@ -36,7 +36,7 @@ for(const check of checks){
     if(check.path==='/'||check.path==='/mijn-leven'){
       assert.match(text,/<html[^>]*data-talera-hero="true"/,'photo-led hero marker');
       assert.match(text,/<meta name="theme-color" content="#304653"/,'dark iPhone status-bar color');
-      assert.match(text,/name=["']apple-mobile-web-app-status-bar-style["']\s+content=["']default/,'non-translucent PWA root');
+      assert.match(text,/name=["']apple-mobile-web-app-status-bar-style["']\s+content=["']black-translucent/,'launcher must match /present for full-bleed photo above');
       assert.match(text,/\.mast\{background:transparent;color:#FFFFFF;/,'photographic mast not white');
     }
    }else{

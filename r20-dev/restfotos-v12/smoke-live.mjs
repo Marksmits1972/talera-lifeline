@@ -40,7 +40,9 @@ for(const [path,kind] of [
     runtimeSubscribe:origHtml.includes('runtime.subscribe(activate);'),
     registerMemories:origHtml.includes('runtime.registerMemories(memories);'),
     at,
-    around:at<0?'NOT FOUND':origHtml.slice(Math.max(0,at-80),at+140)
+    around:at<0?'NOT FOUND':origHtml.slice(Math.max(0,at-80),at+140),
+    presentedAt:origHtml.indexOf('async function present(memory)'),
+    presentedBody:origHtml.slice(origHtml.indexOf('async function present(memory)'),origHtml.indexOf('async function present(memory)')+570)
    }));
   }
   assert.equal(newRes.headers.get('x-talera-v12-restfotos'),'installed');

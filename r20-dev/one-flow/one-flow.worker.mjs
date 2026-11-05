@@ -18,24 +18,6 @@ export const INLINE_TAIL = `/* One native TALERA viewport, recorded media IDs, n
    Preload each original clip once, activate that same element inside the
    FIRST genuine tap, then reuse it in V9's EXISTING native video viewport.
    No extra visible player, no gesture replay and no storage writes. */
-function taleraUnifiedWarmPreviewImages(s){
-  // Limit immediate image decoding: the native photo plane already owns
-  // every original image URL. Decoding an entire memory during timeline
-  // motion makes narrated memories feel heavier than ordinary ones.
-  const preferred=[...s.cues.map(c=>c.index),...s.frames.map((f,i)=>i)];
-  const result=[],seen=new Set();
-  for(const index of preferred){
-    if(result.length>=3)break;
-    const frame=s.frames[index];
-    if(frame?.kind!=='photo'||!frame.url||seen.has(frame.key))continue;
-    seen.add(frame.key);
-    const img=new Image();
-    img.decoding='async';img.src=frame.url;
-    if(typeof img.decode==='function')void img.decode().catch(()=>{});
-    result.push(img);
-  }
-  return result;
-}
 async function taleraUnifiedWarmVideos(s){
   const pool=new Map();
   s.taleraUnifiedPrepared=pool;
@@ -219,10 +201,6 @@ export function applyUnifiedTail(html){
     .replace(oldCreate,"const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');")
     .replace(oldUrl,"const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;");
   result=result.slice(0,nativeVideoStart)+changedVideo+result.slice(nativeVideoEnd);
-  const originalWarmImages="    s.warmImages=frames.map(frame=>{\n      const src=frame.url;\n      if(!src)return null;\n      const image=new Image();image.decoding='async';image.src=src;\n      if(typeof image.decode==='function')void image.decode().catch(()=>{});\n      return image;\n    }).filter(Boolean);";
-  const optimizedWarmImages="    s.warmImages=taleraUnifiedWarmPreviewImages(s);";
-  if(result.split(originalWarmImages).length!==2)return {html,status:'anchor-unmatched'};
-  result=result.replace(originalWarmImages,optimizedWarmImages);
   const presentAnchor="  taleraInline=s;\n  if(hasVoice){";
   const disposalAnchor="function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;";
   if(result.split(presentAnchor).length!==2||result.split(disposalAnchor).length!==2)
@@ -235,7 +213,6 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
-    .replace("    s.warmImages=taleraUnifiedWarmPreviewImages(s);","    s.warmImages=frames.map(frame=>{\n      const src=frame.url;\n      if(!src)return null;\n      const image=new Image();image.decoding='async';image.src=src;\n      if(typeof image.decode==='function')void image.decode().catch(()=>{});\n      return image;\n    }).filter(Boolean);")
     .replace(INLINE_TAIL+'\n','')
     .replace(AUDIO_END_AFTER,AUDIO_END_BEFORE)
     .replace("const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');",

@@ -132,8 +132,11 @@ await evaluate(`(()=>{
  const a=window.__taleraInlineSharedAudio;
  a.addEventListener('ended',()=>{t.voiceEndedAt=performance.now();record()},{once:true});
  record();
- // One initial Beluister gesture starts the whole memory, including later video.
- document.dispatchEvent(new Event('talera:enable-listening'));
+ // Reuse the existing listening UI control as the only video authorization.
+ // It is OUTSIDE the closed story photo. No synthetic photo tap is needed.
+ const consent=document.querySelector('button.talera-audio-consent');
+ if(consent&&!consent.hidden)consent.click();
+ else document.dispatchEvent(new Event('talera:enable-listening'));
  if(a.paused)a.play().catch(e=>{t.errors.push('voice play '+String(e))});
 })()`);
 if(playbackRound===1)console.log('AUDIO_UI_CONTROLS',JSON.stringify(await evaluate('window.__taleraAudioUiControls')));

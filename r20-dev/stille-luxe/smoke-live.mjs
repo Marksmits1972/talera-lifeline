@@ -52,7 +52,9 @@ for(const check of checks){
     assert.match(text,/scroll\.addEventListener\('scroll', sync/,'immediate readout update without scheduled frame');
     assert.match(text,/--talera-present-paper-rgb/,'reading footer follows source-paper RGB');
     assert.match(text,/talera-v26-reading/,'open reading state recognized');
-    assert.doesNotMatch(text,/getImageData/,'no photo color sampling in fixed black variant');
+    const tintScript=text.match(/<script id="talera-present-bottom-tint-script">([\\s\\S]*?)<\\/script>/)?.[1]||'';
+    assert.ok(tintScript,'isolated black/paper-color code present');
+    assert.doesNotMatch(tintScript,/getImageData/,'fixed black switch contains no photo sampling; protected V9 may use canvas elsewhere');
     assert.doesNotMatch(text,/<style id="talera-present-ios-edge-to-edge">/,'no old overscan hacks');
     // Compare the entire protected R20/V9 body to its original live route.
     const baseline=await fetch(

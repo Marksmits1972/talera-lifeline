@@ -51,12 +51,14 @@ function updateHtml(html){
     output=output.replace(/<html\b/i,'<html data-talera-hero="true"');
   const theme=hasHero?'#304653':'#FFFFFF';
   output=output.replace(/(<meta\s+name=["']theme-color["']\s+content=["'])[^"']+(["'])/i,'$1'+theme+'$2');
-  // Do not leave a stale translucent status mode after visiting /present.
-  // On affected iOS standalone PWAs that mode reserves an unpaintable
-  // strip below the screen; the normal viewport must fill the page.
-  output=output.replace(/(<meta\s+name=["']apple-mobile-web-app-status-bar-style["']\s+content=["'])[^"']+(["'])/i,'$1default$2');
+  // The Home Screen launcher must request the SAME translucent mode as
+  // /present. Previously the launcher explicitly forced 'default'; on iOS
+  // this can persist for subsequent navigation, leaving a dark status-bar
+  // block ABOVE the supposedly full-bleed photograph. Do not change layout,
+  // photographs, gestures or media; keep ordinary-page body background white.
+  output=output.replace(/(<meta\s+name=["']apple-mobile-web-app-status-bar-style["']\s+content=["'])[^"']+(["'])/i,'$1black-translucent$2');
   if(!/name=["']apple-mobile-web-app-status-bar-style["']/i.test(output))
-    output=output.replace('</head>','<meta name="apple-mobile-web-app-status-bar-style" content="default">\n</head>');
+    output=output.replace('</head>','<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n</head>');
 
   const head='<!-- TALERA STILLE LUXE, central compact style -->\n<style id="talera-stille-luxe">' + BRAND_CSS + '</style>\n';
   if(!output.includes('id="talera-stille-luxe"')&&output.includes('</head>'))

@@ -1,26 +1,45 @@
-# TALERA V12 — beschermde V9 + ontbrekende foto's
+# TALERA V12 — restfoto's na gesproken herinnering
 
-5 november 2026 — uitsluitend aparte test-Worker; **nog niet goedgekeurd op iPhone**.
+## Definitieve technische basis
+Beschermde goedgekeurde V9: `talera-v9-stille-luxe-stijlstaging-20261104`.
+Afzonderlijke test-Worker: `talera-v12-restfotos-veilige-test-20261105`.
+GitHub branch: `feature/talera-v12-restfotos-veilige-activatie-20261105`.
 
-## Grens van de wijziging
-- Basis: `talera-v9-stille-luxe-stijlstaging-20261104` als Cloudflare service-binding.
-- Bestaande vertelspeler, stemopname, wisseltijdcodes, `show()`, videofunctie `taleraStartOriginalRound()`, lokale opslag en stijl veranderen **niet**.
-- In `/vertelmodus-embed`: één aanvullende functie berekent de nog niet tijdens de opname gebruikte **foto-posities** en toont ze na het native einde van de spraakopname, ieder 4 seconden, in originele mediavolgorde; daarna roept zij de bestaande videofunctie aan. De oorspronkelijke voice-ended eventregel krijgt alleen de nieuwe functieaanroep.
-- In `/present`: (a) de bestaande speler slaat de activatie alleen over als dezelfde herinnering **én een nog gekoppeld iframe** actief zijn; een verdwenen iframe kan met de bestaande functie opnieuw worden opgebouwd; (b) na heropenen wordt de bestaande, reeds gehydrateerde herinnering expliciet geactiveerd. Exact twee atomische tekstvervangingen in de oorspronkelijke presentatie-adapter.
-- Geen diagnose-overlay en geen nieuwe afspeellaag, opslagwaarde, media-ID, videocontroller of API.
+**Belangrijk:** de echte goedgekeurde V9 gebruikt een *ingebouwde* speler
+(`taleraInlineVoiceEnded`), geen nieuw iframe-venster. De eerdere V10/V11 en
+eerste V12-experimenten gingen ten onrechte uit van een ouder iframe-spelerpad.
+Deze V12 vervangt die experimenten; geen extra speler of diagnose-overlays.
 
-## Onderzoek achter de podiumverwijzing
-De native IndexedDB-integratietest maakt een lokale herinnering aan met zes media, een korte stemopname en drie fototijdcodes. Die gegevens werden correct gevonden, maar het originele vertelvenster ontbrak. Een controletest riep de originele activator direct aan: lokaal geheugen en audio waren aanwezig, het fotovenster was al beschikbaar, maar er werd geen iframe aangemaakt. De vermoedelijke blokkade was de originele korte controle `if(activeId===id)return`, ook wanneer het iframe niet langer was gekoppeld. V12 vervangt deze controle door `if(activeId===id&&currentPresentation?.frame?.isConnected)return`. Geen nieuwe videofunctie of speler.
+## Eén aanvulling, geen verbouwing
+Alleen `GET /present` krijgt een kleine helper `taleraInlineRemainingPhotos(s)`
+en één gewijzigde aanroep van `audio.onended`. De oorspronkelijke
+`taleraInlineVoiceEnded(s)` blijft letterlijk ongewijzigd en zorgt na de
+extra foto's voor de *bestaande* videoronde met geluid.
 
-## Validatie en terugrollen
-- `restfotos.test.mjs`: unit regressies inclusief gemengde beelden, herhaalde tijdcodes, annulering bij gewijzigde herinnering, originele recorder en originele video.
-- `smoke-live.mjs`: bewijs dat de opgeleverde V12-HTML volledig gelijk is aan de beschermde V9 behalve de uitdrukkelijk vermelde drie bronvervangingen plus één functie.
-- `browser-smoke.mjs`: echte browser, lokale IndexedDB, heropenen, originele iframe, echte audio-`ended`, daarna drie restfoto's en de originele ongemute video.
-- Pas geschikt voor iPhone nadat de laatste volledige browsertest groen is. De testbrowser bevat tijdelijke observatiecode **uitsluitend in de testscript-runner**, niet in de Cloudflare Worker.
-- Rollback = uitsluitend aparte V12-testlink niet meer gebruiken; V9, V10 en V11 blijven intact. De V12-testhost heeft zijn eigen browseropslag, dus bestaande iPhone-PWA's niet verwijderen.
+De helper leest de bestaande `s.frames` (media keys) en al genormaliseerde
+`s.cues` (waarbij `mediaId` gekoppeld is aan het bijbehorende beeld).
+Een foto waarvan de media-key niet in de gesproken cue-IDs voorkomt, wordt
+via de bestaande `taleraInlineSetFrame` getoond, vier seconden per foto.
+Video's worden nooit als restfoto behandeld. Na de laatste foto wordt de
+oorspronkelijke `taleraInlineVoiceEnded(s)` aangeroepen.
 
-Branch: `feature/talera-v12-restfotos-veilige-activatie-20261105`.
-Testworker: `talera-v12-restfotos-veilige-test-20261105`.
+De helper hergebruikt `ordinaryTimer`, die door de oorspronkelijke
+`taleraInlineDispose` bij verlaten van een herinnering al wordt opgeruimd.
+Geen nieuwe speler, extra index, opslagbewerking, opname-tijdcode of
+aangepaste video-afhandeling.
 
-## Huidige testversie (5 november 2026)
-V12 is apart gedeployed op `talera-v12-restfotos-veilige-test-20261105`, Cloudflare-versie `d23171ea-9596-4e2b-a3ac-cb97b1072427`. De beschermde V9 blijft `bc36d913-49f8-4f4d-b00d-3d5894a11146`. Deze live publicatie bevat de minimaal aangepaste presenter-guard, de activatie van bestaande herinneringen en de toevoeging van ongebruikte foto's na audio. De browser-end-to-endcontrole van deze exacte live versie is verplicht voordat dit een goedgekeurde versie kan worden; geen productiepromotie.
+## Tests en bescherming
+- `restfotos.test.mjs`: ID-vergelijking, 2 en 3 ontbrekende foto's, dubbele
+  tijdcodes, video overgeslagen, originele overgang, navigatie-annulering.
+- `smoke-live.mjs`: 5 routes, oorspronkelijke V9-HTML byte-identiek
+  behalve precies de helper en één `audio.onended`-aanroep.
+- `browser-smoke.mjs`: echte lokale IndexedDB-herinnering met 5 foto's,
+  1 video, echte WAV-stemopname en drie tijdcodes. Uitkomst: foto's op
+  index 3, 4, 5 na de stem, circa 4 seconden elk, daarna originele video
+  met `muted=false`; originele recorder onaangetast.
+- V9, V10, V11 en de onderliggende TALERA-workers zijn niet aangepast.
+- Browser/gebruikersopslag verschilt per Worker-host en geïnstalleerde PWA.
+  Gebruik de V12-testlink in dezelfde Safari-context; verwijder geen oude app.
+
+CI: `https://github.com/Marksmits1972/talera-lifeline/actions`.
+Rollback: uitsluitend deze losse V12 Worker niet meer gebruiken.

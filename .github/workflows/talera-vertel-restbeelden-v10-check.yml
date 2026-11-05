@@ -1,0 +1,34 @@
+name: TALERA V10 — ontbrekende foto's na spraak (geïsoleerd)
+
+on:
+  push:
+    branches:
+      - feature/talera-vertel-restbeelden-20261105
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-voice-photo-tail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated V10 branch
+        uses: actions/checkout@v4
+      - name: Check Node runtime
+        run: node --version
+      - name: Verify new standalone Worker syntax
+        run: node --check r20-dev/vertel-restbeelden/vertel-restbeelden.worker.mjs
+      - name: Run audio-photo-tail regression suite
+        run: node --test r20-dev/vertel-restbeelden/vertel-restbeelden.test.mjs
+      - name: Enforce separate adapter, no mutations to stored audio or base PWA
+        run: |
+          node --input-type=module - <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const text=readFileSync('r20-dev/vertel-restbeelden/vertel-restbeelden.worker.mjs','utf8');
+          assert.match(text,/STYLE_BASE/);
+          assert.match(text,/vertelmodus-embed/);
+          assert.doesNotMatch(text,/indexedDB|localStorage|R2|D1|MEDIA\.put|fetch\('\/api\/.*method:\s*'POST'/);
+          console.log('Geen nieuwe opslag, datamutaties of betaalde API-aanroepen');
+          NODE

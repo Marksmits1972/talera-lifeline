@@ -210,6 +210,21 @@ export function applyUnifiedTail(html){
   return {html:result.replace(AUDIO_END_BEFORE,AUDIO_END_AFTER),status:'installed'};
 }
 
+export function restoreApprovedV9(patched){
+  if(typeof patched!=='string')return patched;
+  return patched
+    .replace(INLINE_TAIL+'\n','')
+    .replace(AUDIO_END_AFTER,AUDIO_END_BEFORE)
+    .replace("const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');",
+      "const video=document.createElement('video');")
+    .replace("const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;",
+      "const url=await store.mediaUrl(frame.key);")
+    .replace("  taleraInline=s;\n  if(hasVoice)await taleraUnifiedWarmVideos(s);\n  if(s!==taleraInline)return;\n  if(hasVoice){",
+      "  taleraInline=s;\n  if(hasVoice){")
+    .replace("function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;\n  taleraUnifiedDropPrepared(s);",
+      "function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;");
+}
+
 export default {
   async fetch(request,env){
     if(!env?.STYLE_BASE?.fetch)return new Response('Goedgekeurde TALERA V9 service-binding ontbreekt',{status:503});

@@ -14,6 +14,82 @@ export function remainingMedia(frames,cues){
 // This function is executed inside the existing TALERA /present script closure.
 // Existing TALERA functions, photo plane, video element and timer stay authoritative.
 export const INLINE_TAIL = `/* One native TALERA viewport, recorded media IDs, no second player. */
+/* iOS Safari: a NEW audible video after a timeout needs another tap.
+   Preload each original clip once, activate that same element inside the
+   FIRST genuine tap, then reuse it in V9's EXISTING native video viewport.
+   No extra visible player, no gesture replay and no storage writes. */
+async function taleraUnifiedWarmVideos(s){
+  const pool=new Map();
+  s.taleraUnifiedPrepared=pool;
+  for(const frame of s.frames){
+    if(frame.kind!=='video'||pool.has(frame.key))continue;
+    let url=null;
+    try{
+      url=await store.mediaUrl(frame.key);
+      if(s!==taleraInline){if(url)URL.revokeObjectURL(url);return}
+      if(!url)continue;
+      const video=document.createElement('video');
+      video.playsInline=true;
+      video.setAttribute('playsinline','');
+      video.setAttribute('webkit-playsinline','');
+      video.preload='auto';video.controls=false;
+      video.muted=false;video.defaultMuted=false;video.volume=0;
+      video.style.cssText='position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
+      (stage.parentElement||stage).appendChild(video);
+      video.src=url;video.load();
+      pool.set(frame.key,{video,url,primed:false,pending:false});
+    }catch(e){
+      if(url)URL.revokeObjectURL(url);
+      console.warn('TALERA videovoorbereiding overgeslagen',e);
+    }
+  }
+}
+function taleraUnifiedPrimeCurrent(){
+  const s=taleraInline;
+  if(!s||s.engine!=='narrated'||!s.taleraUnifiedPrepared||s.phase==='done')return;
+  for(const entry of s.taleraUnifiedPrepared.values()){
+    if(entry.primed||entry.pending)continue;
+    entry.pending=true;
+    const video=entry.video;
+    // Play is invoked SYNCHRONOUSLY inside the original user gesture.
+    // It has zero volume and is paused immediately after permission is granted.
+    video.volume=0;video.muted=false;
+    let result;
+    try{result=video.play()}
+    catch(e){entry.pending=false;continue}
+    Promise.resolve(result).then(()=>{
+      if(s!==taleraInline)return;
+      video.pause();
+      try{video.currentTime=0}catch(e){}
+      entry.primed=true;
+    }).catch(()=>{}).finally(()=>{entry.pending=false});
+  }
+}
+document.addEventListener('touchend',taleraUnifiedPrimeCurrent,{capture:true,passive:true});
+document.addEventListener('pointerup',taleraUnifiedPrimeCurrent,{capture:true,passive:true});
+document.addEventListener('click',taleraUnifiedPrimeCurrent,true);
+document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);
+function taleraUnifiedTakePrimed(s,frame){
+  if(s.phase!=='originals')return null;
+  const entry=s.taleraUnifiedPrepared?.get(frame.key);
+  if(!entry?.primed)return null;
+  s.taleraUnifiedPrepared.delete(frame.key);
+  s.taleraUnifiedReplayUrl=entry.url;
+  entry.video.pause();
+  try{entry.video.currentTime=0}catch(e){}
+  return entry.video;
+}
+function taleraUnifiedDropPrepared(s){
+  if(!s)return;
+  if(s.taleraUnifiedPrepared){
+    for(const entry of s.taleraUnifiedPrepared.values()){
+      entry.video.pause();entry.video.removeAttribute('src');entry.video.remove();
+      if(entry.url)URL.revokeObjectURL(entry.url);
+    }
+    s.taleraUnifiedPrepared.clear();
+  }
+  s.taleraUnifiedPrepared=null;
+}
 function taleraUnifiedNarrationEnded(s){
   if(s!==taleraInline||s.phase!=='narration'||runtime.currentMemory()?.id!==s.memory.id)return;
   if(s.timer){clearInterval(s.timer);s.timer=null}
@@ -111,8 +187,27 @@ export function applyUnifiedTail(html){
   }
   if(html.indexOf(INSERT_BEFORE)>=html.indexOf(AUDIO_END_BEFORE))return {html,status:'anchor-unmatched'};
   const at=html.indexOf(INSERT_BEFORE);
-  const withHelper=html.slice(0,at)+INLINE_TAIL+'\n'+html.slice(at);
-  return {html:withHelper.replace(AUDIO_END_BEFORE,AUDIO_END_AFTER),status:'installed'};
+  let result=html.slice(0,at)+INLINE_TAIL+'\n'+html.slice(at);
+  // Target only the existing inline presenter, not its voice recorder.
+  const nativeVideoStart=result.indexOf('function taleraInlinePlayMedia(s,frame,muted,finished){');
+  const nativeVideoEnd=result.indexOf('function taleraInlineReplayNext(s){',nativeVideoStart);
+  if(nativeVideoStart<0||nativeVideoEnd<0)return {html,status:'anchor-unmatched'};
+  const nativeVideo=result.slice(nativeVideoStart,nativeVideoEnd);
+  const oldCreate="const video=document.createElement('video');";
+  const oldUrl="const url=await store.mediaUrl(frame.key);";
+  if(nativeVideo.split(oldCreate).length!==2||nativeVideo.split(oldUrl).length!==2)
+    return {html,status:'anchor-unmatched'};
+  const changedVideo=nativeVideo
+    .replace(oldCreate,"const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');")
+    .replace(oldUrl,"const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;");
+  result=result.slice(0,nativeVideoStart)+changedVideo+result.slice(nativeVideoEnd);
+  const presentAnchor="  taleraInline=s;\n  if(hasVoice){";
+  const disposalAnchor="function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;";
+  if(result.split(presentAnchor).length!==2||result.split(disposalAnchor).length!==2)
+    return {html,status:'anchor-unmatched'};
+  result=result.replace(presentAnchor,"  taleraInline=s;\n  if(hasVoice)await taleraUnifiedWarmVideos(s);\n  if(s!==taleraInline)return;\n  if(hasVoice){");
+  result=result.replace(disposalAnchor,disposalAnchor+"\n  taleraUnifiedDropPrepared(s);");
+  return {html:result.replace(AUDIO_END_BEFORE,AUDIO_END_AFTER),status:'installed'};
 }
 
 export default {

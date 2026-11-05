@@ -191,8 +191,8 @@ test('reading-sheet fades faster and footer stays black until paper is almost so
  assert.match(style,/--talera-v28-paper-alpha:var\(--talera-present-sheet-alpha,0\)!important/,'overrides slow V28 paper fade');
  assert.match(style,/--talera-v28-title-color:var\(--talera-present-sheet-title,#FFFFFF\)!important/,'text contrast transitions with paper');
  assert.doesNotMatch(style,/html:has\(/,'old early-white reading class selectors removed');
- assert.match(script,/SHEET_FADE_PX = 90/,'paper fade now 90px versus original V28 155px');
- assert.match(script,/FOOTER_PAPER_AT_PX = 75/,'footer joins paper when coverage reaches 93 percent');
+ assert.match(script,/SHEET_FADE_PX = 78/,'paper fade tuned to 78px vs original V28 155px');
+ assert.match(script,/FOOTER_PAPER_AT_PX = 60/,'send iOS paper request at 86 percent opacity to allow browser response time');
  assert.doesNotMatch(script,/requestAnimationFrame\(/,'synchronous without added timers');
  assert.doesNotMatch(script,/getImageData|drawImage|activePhoto/,'photo and swipe layers untouched');
  const vars={},attrs={},events={};let themeValue='',paper='247,244,239',queued=0;
@@ -221,24 +221,24 @@ test('reading-sheet fades faster and footer stays black until paper is almost so
  });
  assert.equal(vars['--talera-present-paper-rgb'],'247,244,239','paper read once up-front from same V9 token');
  assert.equal(themeValue,'#000000','initial footer black');
- for(const y of [1,18,45,56,74]){
+ for(const y of [1,18,40,45,59]){
    scroll.scrollTop=y;
    events['scroll:scroll']();
-   assert.equal(attrs['data-talera-present-reading'],'false','black footer before 75px, scroll='+y);
+   assert.equal(attrs['data-talera-present-reading'],'false','black footer before 60px, scroll='+y);
    assert.equal(themeValue,'#000000','no early white native request at scroll='+y);
  }
  assert.ok(Number(vars['--talera-present-sheet-alpha'])>.9,'paper has already almost solidified before footer switches');
  scroll.scrollTop=45;
  events['scroll:scroll']();
- assert.equal(vars['--talera-present-sheet-title'],'rgb(233,235,238)','heading remains almost white over translucent photo');
- scroll.scrollTop=75;
+ assert.equal(vars['--talera-present-sheet-title'],'rgb(255,255,255)','heading stays fully light at 45px');
+ scroll.scrollTop=60;
  events['scroll:scroll']();
- assert.equal(attrs['data-talera-present-reading'],'true','paper footer enabled at 75px');
+ assert.equal(attrs['data-talera-present-reading'],'true','paper tint requested at 60px');
  assert.equal(themeValue,'#F7F4EF','footer matches actual sheet token');
- assert.ok(Number(vars['--talera-present-sheet-alpha'])>.92,'paper is 93% solid when footer joins');
- scroll.scrollTop=90;
+ assert.ok(Number(vars['--talera-present-sheet-alpha'])>.86,'paper is at least 86 percent opaque when tint is requested');
+ scroll.scrollTop=78;
  events['scroll:scroll']();
- assert.equal(vars['--talera-present-sheet-alpha'],'1.0000','full paper by 90px');
+ assert.equal(vars['--talera-present-sheet-alpha'],'1.0000','full paper by 78px');
  assert.equal(vars['--talera-present-sheet-shadow'],'0.000','dark text fully legible');
  scroll.scrollTop=0;
  events['scroll:scroll']();

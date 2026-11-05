@@ -1,0 +1,17 @@
+name: TALERA clean-flow protected V9 read-only probe
+on:
+  push:
+    branches: [feature/clean-one-memory-flow-20261105]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: New pure logic regression tests
+        run: node --test test/one-memory-flow.test.mjs
+      - name: Inspect actual V9 hooks (no user data, no deploy)
+        run: node r20-dev/one-flow/probe-v9.mjs

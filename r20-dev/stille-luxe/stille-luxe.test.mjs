@@ -248,6 +248,6 @@ test('all ordinary HTML entry routes request the same iOS status mode as present
   assert.match(out,/name="apple-mobile-web-app-status-bar-style" content="black-translucent"/);
   assert.doesNotMatch(out,/name="apple-mobile-web-app-status-bar-style" content="default"/);
   assert.equal((out.match(/name="apple-mobile-web-app-status-bar-style"/g)||[]).length,1);
-  assert.match(out,/html,body\\{background-color:#FFFFFF/,'ordinary canvas stays white');
+  assert.match(out,/html,body\{background-color:#FFFFFF/,'ordinary canvas stays white');
  }
 });

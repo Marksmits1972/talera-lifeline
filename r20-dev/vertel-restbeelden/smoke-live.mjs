@@ -23,11 +23,12 @@ for(const check of checks){
  assert.ok(text.length>250,'real page body '+check.path);
  assert.equal(resp.headers.get('x-talera-v10-tail-photos'),check.expect,check.path+' must only be changed at embed');
  if(check.expect==='installed'){
-   assert.match(text,/function taleraV10StartRemainingPhotos/);
+   assert.match(text,/function taleraV10PrepareBeforeOriginalVideoRound/);
    assert.match(text,/function missingStillIndices/);
    assert.match(text,/taleraStartOriginalRound\(\)/,'existing original-sound videos remain');
    assert.match(text,/voice\.addEventListener\("timeupdate",follow\)/,'voice clock untouched');
-   assert.doesNotMatch(text,/voice\.addEventListener\("ended",function\(\)\{if\(state\.media/,'original end handler replaced, not doubled');
+   assert.match(text,/voice\.addEventListener\("ended",function\(\)\{if\(state\.media/,'original voice-ended handler is preserved verbatim');
+   assert.match(text,/const taleraV10SavedStartOriginalVideoRound = taleraStartOriginalRound/,'phototail wraps rather than replaces original video function');
    const scripts=[...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]);
    assert.ok(scripts.length,'embed contains executable scripts');
    for(const [index,inline] of scripts.entries()){
@@ -36,7 +37,7 @@ for(const check of checks){
        'complete delivered embed script '+index+' must parse, not only contain V10 markers');
    }
  }else{
-   assert.doesNotMatch(text,/function taleraV10StartRemainingPhotos/,'other page contains no V10 narration patch');
+   assert.doesNotMatch(text,/function taleraV10PrepareBeforeOriginalVideoRound/,'other page contains no V10 narration patch');
  }
  passes++;
  console.log('PASS',check.path,'status',resp.status,'header',check.expect||'untouched');

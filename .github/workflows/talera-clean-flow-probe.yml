@@ -17,7 +17,7 @@ jobs:
         run: node --test r20-dev/one-flow/one-flow.worker.test.mjs
       - name: Compile patch on actual approved V9 code and prove other pages byte-identical
         run: node r20-dev/one-flow/check-v9.mjs
-      - name: Check deployment readiness through GitHub (never print tokens)
+      - name: Inspect native V9 video startup and listening callbacks\n        run: node r20-dev/one-flow/inspect-playback-v9.mjs\n      - name: Check deployment readiness through GitHub (never print tokens)
         env:
           DEPLOY_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DEPLOY_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

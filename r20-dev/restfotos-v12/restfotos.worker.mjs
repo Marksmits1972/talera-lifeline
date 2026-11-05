@@ -1,9 +1,14 @@
-/* TALERA V12 — only two existing V9 completion branches change.
- * Original audio cues, silent narration video, original video replay WITH sound,
- * UI and storage stay intact. A single native photo tail follows the last video.
- * The normal voice-ended callback remains byte-identical to approved V9.
+/* TALERA V12 — isolated native V9 continuation, not a second player.
+ * Original audio-onended handler, narrated cue clock, muted narrative videos,
+ * media storage and existing video renderer are untouched.
+ * After audio: replay narrated videos fully with their own sound using V9.
+ * Then display every not-yet-narrated media item in its original saved order:
+ * stills for 4 seconds, videos completely with their native sound.
+ * Only the existing inline replay selection and two completion branches are patched.
  */
-export const INLINE_PHOTO_HELPER="/* Continue the approved V9 inline presentation AFTER the original video-sound round.\n   Stored cue IDs are normalized by V9; keep its original photos, media and voice. */\nfunction taleraInlineRemainingPhotos(s){\n  if(s!==taleraInline||(s.phase!=='narration'&&s.phase!=='originals'))return;\n  const used=new Set(s.cues.map(c=>c.mediaId));\n  const remaining=[];\n  s.frames.forEach((frame,i)=>{\n    if(frame.kind==='photo'&&!used.has(frame.key))remaining.push(i);\n  });\n  if(!remaining.length){s.phase='done';return;}\n  s.phase='remainingPhotos';\n  let cursor=0;\n  function next(){\n    if(s!==taleraInline||s.phase!=='remainingPhotos'||\n       runtime.currentMemory()?.id!==s.memory.id)return;\n    if(cursor===remaining.length){\n      s.ordinaryTimer=null;\n      s.phase='done';\n      return;\n    }\n    taleraInlineSetFrame(s,remaining[cursor++]);\n    s.ordinaryTimer=setTimeout(next,4000);\n  }\n  next();\n}\n";
+export const INLINE_PHOTO_HELPER="/* Continue in the one native V9 presentation. Reuse its native video player, photo surface and cleanup. */\nfunction taleraInlineRemainingPhotos(s){\n  if(s!==taleraInline||(s.phase!=='narration'&&s.phase!=='originals'))return;\n  const seen=new Set(s.cues.map(c=>c.mediaId));\n  const remaining=[];\n  s.frames.forEach((frame,i)=>{\n    if((frame.kind==='photo'||frame.kind==='video')&&!seen.has(frame.key))remaining.push({frame,index:i});\n  });\n  if(!remaining.length){s.phase='done';return;}\n  s.phase='remainingPhotos';\n  let cursor=0;\n  function next(){\n    if(s!==taleraInline||s.phase!=='remainingPhotos'||\n       runtime.currentMemory()?.id!==s.memory.id)return;\n    if(cursor===remaining.length){\n      s.ordinaryTimer=null;\n      taleraInlineCleanVideo(s);\n      s.phase='done';\n      return;\n    }\n    const item=remaining[cursor++];\n    taleraInlineSetFrame(s,item.index);\n    if(item.frame.kind==='video')taleraInlinePlayMedia(s,item.frame,false,next);\n    else s.ordinaryTimer=setTimeout(next,4000);\n  }\n  next();\n}\n";
+export const ORIGINAL_VIDEO_SELECTION="s.replayFrames=s.frames.filter(f=>f.kind==='video');";
+export const PATCHED_VIDEO_SELECTION="s.replayFrames=s.frames.filter(f=>f.kind==='video'&&s.cues.some(c=>c.mediaId===f.key));";
 export const ORIGINAL_VIDEO_DONE="if(!frame){taleraInlineCleanVideo(s);s.phase='done';return}";
 export const PATCHED_VIDEO_DONE="if(!frame){taleraInlineCleanVideo(s);taleraInlineRemainingPhotos(s);return}";
 export const ORIGINAL_NO_VIDEOS="if(!s.replayFrames.length){s.phase='done';return}";
@@ -14,8 +19,9 @@ export const INSTALLED_MARKER="function taleraInlineRemainingPhotos(s){";
 export function addRemainingPhotosToInlinePlayer(html){
   if(typeof html!=='string')return{html,status:'not-html'};
   if(html.includes(INSTALLED_MARKER))return{html,status:'already-installed'};
-  for(const token of [INSERT_ANCHOR,ORIGINAL_VIDEO_DONE,ORIGINAL_NO_VIDEOS,
-    "function taleraInlineSetFrame(s,index){",
+  for(const token of [INSERT_ANCHOR,ORIGINAL_VIDEO_SELECTION,ORIGINAL_VIDEO_DONE,
+    ORIGINAL_NO_VIDEOS,"function taleraInlineSetFrame(s,index){",
+    "function taleraInlinePlayMedia(s,frame,muted,done){",
     "function taleraInlineVoiceEnded(s){"]){
     const at=html.indexOf(token);
     if(at<0||html.indexOf(token,at+token.length)>=0)
@@ -23,6 +29,7 @@ export function addRemainingPhotosToInlinePlayer(html){
   }
   const insertAt=html.indexOf(INSERT_ANCHOR);
   let patched=html.slice(0,insertAt)+INLINE_PHOTO_HELPER+"\n"+html.slice(insertAt);
+  patched=patched.replace(ORIGINAL_VIDEO_SELECTION,PATCHED_VIDEO_SELECTION);
   patched=patched.replace(ORIGINAL_VIDEO_DONE,PATCHED_VIDEO_DONE);
   patched=patched.replace(ORIGINAL_NO_VIDEOS,PATCHED_NO_VIDEOS);
   return{html:patched,status:'installed'};

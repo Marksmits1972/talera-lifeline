@@ -212,7 +212,7 @@ test('adaptive presentation edge samples current image and switches to white on 
  };
  const layer={querySelector:()=>photo};
  const stage={
-   querySelectorAll:()=>[layer],
+   querySelectorAll:selector=>selector.includes('talera-photo-strip-page')?[]:[layer],
    querySelector:()=>photo,
    addEventListener:(event,fn)=>{listeners['stage:'+event]=fn;}
  };

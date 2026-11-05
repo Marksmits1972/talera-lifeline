@@ -146,15 +146,10 @@ async function icon(request,env,path){
   }
   return new Response(bytes,{headers:{'content-type':'image/png','cache-control':'public, max-age=3600','x-talera-brand':'original-v3-panel-recolor'}});
 }
-/*
- * iOS standalone fallback (WebKit bug 313800 / 301994).
- * In affected iOS 26 installations, black-translucent moves the photo
- * under the top status area but leaves a ~status-bar-height region outside
- * the paintable viewport at the bottom. CSS overscan CANNOT paint there.
- * Restore the original PWA status-bar mode and do not hack player heights.
- * Keep the brand color as status chrome, the actual photo fills the
- * available viewer down to the physical bottom.
- */
+/* Restored confirmed photo-behind-status-bar presentation head (4 Nov 20:27).
+ * No R20 presentation body or playback code changes. */
+const PRESENTATION_BOTTOM_TINT_JS = "(() => {\n  'use strict';\n  if (window.__taleraPresentEdgeTint) return;\n  window.__taleraPresentEdgeTint = true;\n\n  const FALLBACK = '#304653';\n  const WHITE = '#FFFFFF';\n  let applied = '';\n  let pending = false;\n  const cache = new Map();\n  const stageId = 'photoStage';\n  const scrollId = 'memoryStoryScroll';\n  const doc = document.documentElement;\n\n  function updateTint(color) {\n    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) color = FALLBACK;\n    if (color === applied) return;\n    applied = color;\n    doc.style.setProperty('--talera-present-edge-color', color);\n    const body = document.body;\n    if (body) body.style.setProperty('--talera-present-edge-color', color);\n    const meta = document.querySelector('meta[name=\"theme-color\"]');\n    if (meta) meta.setAttribute('content', color);\n  }\n  function isReading() {\n    const scroll = document.getElementById(scrollId);\n    const space = document.querySelector('.memory-space');\n    return !!(\n      (scroll && scroll.scrollTop > 38) ||\n      (scroll && scroll.classList.contains('is-reading')) ||\n      (space && (space.classList.contains('talera-v14-reading') ||\n                 space.classList.contains('talera-v26-reading')))\n    );\n  }\n  function activePhoto() {\n    const stage = document.getElementById(stageId);\n    if (!stage) return null;\n    const pages = Array.from(stage.querySelectorAll('.talera-photo-strip-page'));\n    const activePage = pages.find(p => p.classList.contains('is-visible') ||\n                                      p.classList.contains('is-current'));\n    if (activePage) {\n      const photo = activePage.querySelector('img');\n      if (photo) return photo;\n    }\n    const layers = Array.from(stage.querySelectorAll('.photo-layer:not(.talera-photo-strip-page)'));\n    let best = null;\n    let opacity = -1;\n    for (const layer of layers) {\n      const img = layer.querySelector('img.example-photo') ||\n                  layer.querySelector('img:not(.photo-backdrop)');\n      if (!img) continue;\n      const value = parseFloat(getComputedStyle(layer).opacity) || 0;\n      if (value > opacity) { opacity = value; best = img; }\n    }\n    return best || stage.querySelector('#memoryPhotoA,#memoryPhotoB');\n  }\n  function sampleBottom(img) {\n    if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;\n    const key = img.currentSrc || img.src;\n    if (cache.has(key)) return cache.get(key);\n    let color = null;\n    try {\n      const canvas = document.createElement('canvas');\n      canvas.width = 40;\n      canvas.height = 8;\n      const ctx = canvas.getContext('2d', {willReadFrequently: true});\n      if (!ctx) return null;\n      const nw = img.naturalWidth, nh = img.naturalHeight;\n      const rect = img.getBoundingClientRect();\n      const rw = Math.max(1, rect.width), rh = Math.max(1, rect.height);\n      const scale = Math.max(rw / nw, rh / nh);\n      const cw = Math.min(nw, rw / scale), ch = Math.min(nh, rh / scale);\n      const sx = (nw - cw) / 2, sy = (nh - ch) / 2 + ch * .86;\n      ctx.drawImage(img, sx, sy, cw, ch * .12, 0, 0, 40, 8);\n      const data = ctx.getImageData(0, 0, 40, 8).data;\n      let r = 0, g = 0, b = 0, total = 0;\n      for (let i = 0; i < data.length; i += 4) {\n        if (data[i + 3] < 128) continue;\n        r += data[i]; g += data[i + 1]; b += data[i + 2]; total++;\n      }\n      if (total) {\n        const hex = x => Math.min(255, Math.max(0, Math.round(x / total))).toString(16).padStart(2, '0');\n        color = '#' + hex(r) + hex(g) + hex(b);\n      }\n    } catch (_) {\n      // A cross-origin image may taint a canvas. We never change its src,\n      // CORS mode, natural presentation, or request path just to sample it.\n    }\n    if (cache.size >= 20) cache.clear();\n    cache.set(key, color);\n    return color;\n  }\n  function sync() {\n    pending = false;\n    if (isReading()) {\n      updateTint(WHITE);\n      return;\n    }\n    const photo = activePhoto();\n    updateTint(sampleBottom(photo) || FALLBACK);\n  }\n  function schedule() {\n    if (pending) return;\n    pending = true;\n    requestAnimationFrame(sync);\n  }\n  function install() {\n    const stage = document.getElementById(stageId);\n    const scroll = document.getElementById(scrollId);\n    const space = document.querySelector('.memory-space');\n    if (stage) {\n      stage.addEventListener('load', schedule, true);\n      new MutationObserver(schedule).observe(stage, {\n        attributes: true, subtree: true, childList: true,\n        attributeFilter: ['src', 'class', 'style']\n      });\n    }\n    if (scroll) scroll.addEventListener('scroll', schedule, {passive: true});\n    if (space) new MutationObserver(schedule).observe(space, {\n      attributes: true, attributeFilter: ['class']\n    });\n    window.addEventListener('pageshow', schedule, {passive: true});\n    document.addEventListener('visibilitychange', schedule);\n    schedule();\n  }\n  if (document.readyState === 'loading') {\n    document.addEventListener('DOMContentLoaded', install, {once: true});\n  } else install();\n})();";
+const PRESENTATION_BOTTOM_TINT_CSS = "html,body{background-color:var(--talera-present-edge-color,#304653)!important;transition:background-color .2s linear;}html{--talera-present-edge-color:#304653;}";
 function restorePresentationStatusArea(html){
   return html.replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/i,head=>{
     function setMeta(name,value){
@@ -169,15 +164,16 @@ function restorePresentationStatusArea(html){
       if(!found)head=head.replace(/<\/head\s*>/i,'<meta name="'+name+'" content="'+value+'">\n</head>');
     }
     setMeta('apple-mobile-web-app-capable','yes');
-    setMeta('apple-mobile-web-app-status-bar-style','default');
+    setMeta('apple-mobile-web-app-status-bar-style','black-translucent');
     setMeta('theme-color','#304653');
-    // Strip only the abandoned staging workaround if any upstream already
-    // contains it. Never rewrite the player's body, media or timestamps.
-    head=head.replace(/<style\s+id=["']talera-present-ios-edge-to-edge["'][^>]*>[\s\S]*?<\/style>\s*/gi,'');
+    if(!head.includes('id="talera-present-bottom-tint"')) {
+      const extra='<style id="talera-present-bottom-tint">'+PRESENTATION_BOTTOM_TINT_CSS+'</style>\n'+
+        '<script id="talera-present-bottom-tint-script">'+PRESENTATION_BOTTOM_TINT_JS+'</script>\n';
+      head=head.replace(/<\/head\s*>/i,extra+'</head>');
+    }
     return head;
   });
 }
-
 export default {
   async fetch(request,env){
     if(!env?.V9_BASE?.fetch)return new Response('V9-herstelbasis ontbreekt',{status:503});

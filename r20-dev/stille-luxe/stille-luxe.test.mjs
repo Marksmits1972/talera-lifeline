@@ -63,7 +63,7 @@ test('historical working photo status returns, only head changes and bottom tint
  assert.match(changed,/viewport-fit=cover/);
  assert.match(changed,/<style id="talera-present-bottom-tint">/);
  assert.match(changed,/<script id="talera-present-bottom-tint-script">/);
- assert.match(changed,/FOOTER_PAPER_AT_PX = 75/,'defer paper-colored footer until sheet is mostly opaque');
+ assert.match(changed,/FOOTER_PAPER_AT_PX = 60/,'request native paper tint at 60px while local sheet is mostly opaque');
  assert.match(changed,/--story-neutral/);
  assert.doesNotMatch(changed,/getImageData/,'no photo color analysis in black bar test');
  assert.match(changed,/theme\.setAttribute\('content', color\)/);
@@ -227,7 +227,7 @@ test('reading-sheet fades faster and footer stays black until paper is almost so
    assert.equal(attrs['data-talera-present-reading'],'false','black footer before 60px, scroll='+y);
    assert.equal(themeValue,'#000000','no early white native request at scroll='+y);
  }
- assert.ok(Number(vars['--talera-present-sheet-alpha'])>.9,'paper has already almost solidified before footer switches');
+ assert.ok(Number(vars['--talera-present-sheet-alpha'])>.84,'paper has already brightened substantially before footer switches');
  scroll.scrollTop=45;
  events['scroll:scroll']();
  assert.equal(vars['--talera-present-sheet-title'],'rgb(255,255,255)','heading stays fully light at 45px');

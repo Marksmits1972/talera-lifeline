@@ -36,3 +36,13 @@ for(const needle of ['async function hydrate(', 'function hydrate(', 'function t
  const p=html.indexOf(needle);
  console.log('FOCUSED',needle,p, p<0?'':JSON.stringify(html.slice(p,Math.min(html.length,p+6100))));
 }
+
+// Only read, never change the approved V9 script: map audio intent, taps, and swipe dispatch.
+for(const needle of ["talera:enable-listening","__taleraInlineTryAutoPlay","function showPhoto(","function toMemory(","function taleraInlineSetFrame(","function taleraInlineSync(","function taleraInlineLoadVideo("]){
+  let p=html.indexOf(needle),n=0;
+  while(p>=0&&n<12){
+    console.log('GESTURE_LINK',needle,'MATCH',n,'AT',p,
+       JSON.stringify(html.slice(Math.max(0,p-1100),Math.min(html.length,p+1800))));
+    p=html.indexOf(needle,p+needle.length);n++;
+  }
+}

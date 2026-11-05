@@ -168,8 +168,7 @@ test('photo-only story: final still then normal end, no fake audio or duplicate 
  s.end();
  for(let k=0;k<4;k++)s.nextPhotoTimer();
  assert.equal(s.shown.length,4);
- s.nextPhotoTimer();
- assert.equal(s.videoStarts,1);
+ assert.equal(s.videoStarts,1,'after four stills no extra timer is created');
  assert.equal(s.notices.at(-1),'Terugkijken afgelopen');
 });
 test('reinitializing or pausing the iframe cancels timers and forbids an orphan advance',()=>{

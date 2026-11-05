@@ -1,4 +1,4 @@
-/* Browser: native IndexedDB save -> V9 iframe opens -> true WAV audio ended
+/* Browser: native IndexedDB save -> V9 inline player opens -> true WAV audio ended
    -> three remaining stills -> same original, unmuted video round. */
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -59,18 +59,18 @@ assert.equal(await evalJs("Boolean(document.querySelector('iframe.talera-zero-pr
 const initial=await evalJs("(()=>{\n const audio=window.__taleraInlineSharedAudio,rt=window.__taleraTimelineRuntime;\n window.__v12={photos:[],videos:[],ended:false,at:0};\n const o=window.__v12;\n const record=()=>{\n  const i=rt.currentMemory()?._photoIndex;\n  const last=o.photos.at(-1);\n  if(Number.isInteger(i)&&(!last||last.index!==i))o.photos.push({index:i,t:performance.now()});\n  const v=document.querySelector('video.talera-v61-inline-video');\n  if(v&&(!o.videos.length||o.videos.at(-1).muted!==v.muted))\n   o.videos.push({muted:v.muted,t:performance.now()});\n };\n setInterval(record,60);\n audio.addEventListener('ended',()=>{o.ended=true;o.at=performance.now();record()},{once:true});\n record();\n if(audio.paused)audio.play().catch(e=>{o.error=String(e)});\n return {src:!!audio.src,started:!audio.paused};\n})()");
 assert.ok(initial?.src);
 assert.ok(await until("window.__v12?.ended",{tries:140,ms:80}),'natural voice-ended fires');
-for(const i of [3,4,5])
- assert.ok(await until("window.__v12.photos.some(x=>x.index==="+i+"&&x.t>=window.__v12.at-150)",{tries:135,ms:80}),
-  'rest photo '+i+' shows');
 assert.ok(await until("window.__v12.videos.some(x=>x.muted===false&&x.t>window.__v12.at)",{tries:140,ms:80}),
- 'original video with sound shows after photos');
+  'original video WITH sound must start immediately after narration');
+for(const i of [3,4,5])
+  assert.ok(await until("window.__v12.photos.some(x=>x.index==="+i+"&&x.t>=window.__v12.at-150)",{tries:135,ms:80}),
+    'unused photo '+i+' appears after the video round');
 const result=await evalJs("({at:window.__v12.at,photos:window.__v12.photos,videos:window.__v12.videos,error:window.__v12.error})");
 const photos=result.photos.filter(x=>[3,4,5].includes(x.index)&&x.t>=result.at-150);
 assert.deepEqual(photos.map(x=>x.index),[3,4,5]);
 assert.ok(photos[1].t-photos[0].t>=3200);
 assert.ok(photos[2].t-photos[1].t>=3200);
-assert.ok(result.videos.some(v=>v.muted===false&&v.t>photos[2].t));
-console.log('PASS native V9 inline voice -> three rest photos -> original unmuted video',JSON.stringify({
+assert.ok(result.videos.some(v=>v.muted===false&&v.t>result.at&&v.t<photos[0].t),\n 'the unmuted video must precede the first unused photo');
+console.log('PASS native V9 inline voice -> original unmuted video -> three rest photos',JSON.stringify({
  photos:photos.map(x=>x.index),holds:[Math.round(photos[1].t-photos[0].t),Math.round(photos[2].t-photos[1].t)]
 }));
 await command('Page.navigate',{url:base+'/vertelmodus-embed?mode=record'});

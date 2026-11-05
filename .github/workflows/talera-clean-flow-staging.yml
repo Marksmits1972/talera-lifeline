@@ -40,15 +40,5 @@ jobs:
         run: |
           export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
           npx wrangler deploy --config r20-dev/one-flow/wrangler.jsonc
-      - name: Verify staging is reachable and native patch installed
-        run: |
-          node --input-type=module - <<'NODE'
-          import assert from 'node:assert/strict';
-          const url='https://talera-one-memory-clean-test-20261105.mark-a39.workers.dev';
-          for(const path of ['/present','/','/tell','/vertelmodus-embed?mode=record']){
-            const r=await fetch(url+path);
-            assert.equal(r.status,200,'staging '+path+' must respond');
-            if(path==='/present')assert.equal(r.headers.get('x-talera-clean-one-memory'),'installed');
-            console.log('PASS staged TALERA',path,r.status);
-          }
-          NODE
+      - name: Verify live staging routes after propagation
+        run: node r20-dev/one-flow/verify-stage.mjs

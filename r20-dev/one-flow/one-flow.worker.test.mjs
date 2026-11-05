@@ -11,7 +11,7 @@ const frames=()=>[
 const cues=()=>[{mediaId:'p1',index:0,t:0},{mediaId:'v1',index:1,t:5000},
   {mediaId:'p2',index:2,t:12000}];
 const nativePage='<html><script>'+
-  "function taleraInlineDispose(){\\n  const s=taleraInline;\\n  taleraInline=null;}"+
+  "function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;}"+
   'function taleraInlineSetFrame(s,index){}'+
   "function taleraInlinePlayMedia(s,frame,muted,finished){"+
   "const video=document.createElement('video');"+
@@ -19,7 +19,7 @@ const nativePage='<html><script>'+
   'function taleraInlineCleanVideo(s){}'+
   'function taleraInlineReplayNext(s){}'+
   INSERT_BEFORE+'}'+
-  "async function present(memory){\\n  taleraInline=s;\\n  if(hasVoice){}}"+
+  "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
   AUDIO_END_BEFORE+'</script></html>';
 
 function fixture({ordered=frames(),recorded=cues(),lastVideo=null,soundEnabled=true}={}){

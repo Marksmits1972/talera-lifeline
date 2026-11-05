@@ -19,7 +19,7 @@ const nativePage='<html><script>'+
   'function taleraInlineCleanVideo(s){}'+
   'function taleraInlineReplayNext(s){}'+
   INSERT_BEFORE+'}'+
-  "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
+  "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){"+"    s.warmImages=frames.map(frame=>{\n      const src=frame.url;\n      if(!src)return null;\n      const image=new Image();image.decoding='async';image.src=src;\n      if(typeof image.decode==='function')void image.decode().catch(()=>{});\n      return image;\n    }).filter(Boolean);"+"}}"+
   AUDIO_END_BEFORE+'</script></html>';
 
 function fixture({ordered=frames(),recorded=cues(),lastVideo=null,soundEnabled=true}={}){
@@ -240,4 +240,24 @@ test('navigation away frees non-used video preparation objects and URLs',async()
   env.taleraUnifiedDropPrepared(s);
   assert.deepEqual(revoked,['blob:v1','blob:v2']);
   assert.equal(removed.length,2);
+});
+
+test('narrated photo predecode is bounded to three; avoids eager full-memory decoding during swipe',()=>{
+  const allocated=[];
+  class FakeImage{
+    decoding='';
+    constructor(){allocated.push(this)}
+    decode(){return Promise.resolve()}
+  }
+  const env={Image:FakeImage,document:{addEventListener(){}},console:{warn(){}}};
+  vm.runInNewContext(INLINE_TAIL,env);
+  const frames=Array.from({length:30},(_,i)=>({
+    kind:i===8||i===12?'video':'photo',key:'f'+i,url:'blob:f'+i
+  }));
+  const s={frames,cues:[{index:0},{index:8},{index:12},{index:5},{index:7},{index:20}]};
+  const warmed=env.taleraUnifiedWarmPreviewImages(s);
+  assert.equal(warmed.length,3);
+  assert.equal(allocated.length,3);
+  assert.deepEqual(warmed.map(x=>x.src),['blob:f0','blob:f5','blob:f7']);
+  assert.deepEqual(warmed.map(x=>x.decoding),['async','async','async']);
 });

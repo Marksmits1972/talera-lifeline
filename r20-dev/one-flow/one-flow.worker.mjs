@@ -65,9 +65,51 @@ function taleraUnifiedPrimeCurrent(){
     }).catch(()=>{}).finally(()=>{entry.pending=false});
   }
 }
-document.addEventListener('touchend',taleraUnifiedPrimeCurrent,{capture:true,passive:true});
-document.addEventListener('pointerup',taleraUnifiedPrimeCurrent,{capture:true,passive:true});
-document.addEventListener('click',taleraUnifiedPrimeCurrent,true);
+/* Swipe endings are NOT user intent to play video. A tracked photo TAP or
+   explicit listening action can prime the originals, never a dragging gesture. */
+const taleraUnifiedVerifiedTaps=new WeakSet();
+let taleraUnifiedPointer=null,taleraUnifiedTouch=null;
+const taleraUnifiedMoved=(g,x,y)=>Math.hypot(x-g.x,y-g.y)>12;
+const taleraUnifiedTapTarget=e=>Boolean(e.target?.closest?.('#photoStage,#memoryStoryScroll'));
+function taleraUnifiedWasStationaryTap(e){
+  return taleraUnifiedVerifiedTaps.has(e)&&taleraUnifiedTapTarget(e);
+}
+document.addEventListener('pointerdown',e=>{
+  if(e.isPrimary===false)return;
+  taleraUnifiedPointer={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
+},{capture:true,passive:true});
+document.addEventListener('pointermove',e=>{
+  const g=taleraUnifiedPointer;
+  if(g&&g.id===e.pointerId&&taleraUnifiedMoved(g,e.clientX,e.clientY))g.moved=true;
+},{capture:true,passive:true});
+document.addEventListener('pointerup',e=>{
+  const g=taleraUnifiedPointer;taleraUnifiedPointer=null;
+  if(!g||g.id!==e.pointerId||g.moved||taleraUnifiedMoved(g,e.clientX,e.clientY))return;
+  taleraUnifiedVerifiedTaps.add(e);
+  if(taleraUnifiedTapTarget(e))taleraUnifiedPrimeCurrent();
+},{capture:true,passive:true});
+document.addEventListener('pointercancel',()=>{taleraUnifiedPointer=null},{capture:true,passive:true});
+document.addEventListener('touchstart',e=>{
+  const t=e.changedTouches?.[0];
+  if(!t||e.touches?.length!==1){taleraUnifiedTouch=null;return}
+  taleraUnifiedTouch={id:t.identifier,x:t.clientX,y:t.clientY,moved:false};
+},{capture:true,passive:true});
+document.addEventListener('touchmove',e=>{
+  const g=taleraUnifiedTouch;
+  if(!g)return;
+  if(e.touches?.length!==1){g.moved=true;return}
+  const t=Array.from(e.touches||[]).find(t=>t.identifier===g.id);
+  if(t&&taleraUnifiedMoved(g,t.clientX,t.clientY))g.moved=true;
+},{capture:true,passive:true});
+document.addEventListener('touchend',e=>{
+  const g=taleraUnifiedTouch;taleraUnifiedTouch=null;
+  if(!g||g.moved)return;
+  const t=Array.from(e.changedTouches||[]).find(t=>t.identifier===g.id);
+  if(!t||taleraUnifiedMoved(g,t.clientX,t.clientY))return;
+  taleraUnifiedVerifiedTaps.add(e);
+  if(taleraUnifiedTapTarget(e))taleraUnifiedPrimeCurrent();
+},{capture:true,passive:true});
+document.addEventListener('touchcancel',()=>{taleraUnifiedTouch=null},{capture:true,passive:true});
 document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);
 function taleraUnifiedTakePrimed(s,frame){
   if(s.phase!=='originals')return null;
@@ -201,6 +243,20 @@ export function applyUnifiedTail(html){
     .replace(oldCreate,"const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');")
     .replace(oldUrl,"const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;");
   result=result.slice(0,nativeVideoStart)+changedVideo+result.slice(nativeVideoEnd);
+  // Original V9 also resumes video on every pointerup/touchend; do not
+  // equate the end of a swipe with a deliberate tap on the photo.
+  const audioStart=result.indexOf('function taleraInlineInstallAudioControls(){');
+  const audioEnd=result.indexOf('async function present(memory){',audioStart);
+  if(audioStart<0||audioEnd<0)return {html,status:'anchor-unmatched'};
+  const audioSource=result.slice(audioStart,audioEnd);
+  const oldRetry="  const retry=e=>{\\n    const s=taleraInline;";
+  const newRetry="  const retry=e=>{\\n    if(!taleraUnifiedWasStationaryTap(e))return;\\n    const s=taleraInline;";
+  const oldClickGuard="    if(s?.engine!=='narrated'||s.phase!=='narration')return;";
+  const newClickGuard="    if(s?.engine!=='narrated')return;";
+  if(audioSource.split(oldRetry).length!==2||audioSource.split(oldClickGuard).length!==2)
+    return {html,status:'anchor-unmatched'};
+  result=result.slice(0,audioStart)+audioSource
+    .replace(oldRetry,newRetry).replace(oldClickGuard,newClickGuard)+result.slice(audioEnd);
   const presentAnchor="  taleraInline=s;\n  if(hasVoice){";
   const disposalAnchor="function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;";
   if(result.split(presentAnchor).length!==2||result.split(disposalAnchor).length!==2)
@@ -213,6 +269,10 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
+    .replace("  const retry=e=>{\\n    if(!taleraUnifiedWasStationaryTap(e))return;\\n    const s=taleraInline;",
+      "  const retry=e=>{\\n    const s=taleraInline;")
+    .replace("    if(s?.engine!=='narrated')return;",
+      "    if(s?.engine!=='narrated'||s.phase!=='narration')return;")
     .replace(INLINE_TAIL+'\n','')
     .replace(AUDIO_END_AFTER,AUDIO_END_BEFORE)
     .replace("const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');",

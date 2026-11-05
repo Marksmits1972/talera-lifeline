@@ -41,11 +41,13 @@ for(const check of checks){
     }
    }else{
     assert.equal(version,null,'presentation must not receive ordinary-page styling');
-    assert.match(text,/name=["']apple-mobile-web-app-status-bar-style["']\s+content=["']default/,'stable native iOS PWA status geometry');
+    assert.match(text,/name=["']apple-mobile-web-app-status-bar-style["']\s+content=["']black-translucent/,'verified photo beneath clock and battery');
     assert.match(text,/viewport-fit=cover/,'keep original viewport');
-    assert.match(text,/name=["']theme-color["']\s+content=["']#304653/,'ink-color system chrome');
-    assert.doesNotMatch(text,/<style id="talera-present-ios-edge-to-edge">/,'no failed 100dvh overscan patches');
-    assert.doesNotMatch(text,/<meta[^>]*black-translucent/,'do not trigger WebKit bottom strip');
+    assert.match(text,/name=["']theme-color["']\s+content=["']#304653/,'initial photo status tone');
+    assert.match(text,/<style id="talera-present-bottom-tint">/,'adaptive lower safe-area color rules');
+    assert.match(text,/<script id="talera-present-bottom-tint-script">/,'photo/reading color synchronizer');
+    assert.match(text,/talera-v26-reading/,'reading state turns band white');
+    assert.doesNotMatch(text,/<style id="talera-present-ios-edge-to-edge">/,'no old overscan hacks');
     // Compare the entire protected R20/V9 body to its original live route.
     const baseline=await fetch(
       'https://talera-v61-r20-definitief-verwijderen-v9-20261104.mark-a39.workers.dev/present',

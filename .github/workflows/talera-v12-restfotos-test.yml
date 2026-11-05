@@ -1,47 +1,37 @@
-name: TALERA V12 — restfoto's zonder vertelmoduswijziging
+name: TALERA V12 — videos daarna restfoto's (geisoleerde kandidaat)
 
 on:
   push:
     branches:
-      - feature/talera-v12-restfotos-veilige-activatie-20261105
+      - fix/talera-v12-restfotos-na-videos-20261105
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  verify-v12:
+  verify-isolated-v12:
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
-      - name: Syntax of new read-only V9 wrapper
+      - name: Syntax of isolated presentation-only wrapper
         run: node --check r20-dev/restfotos-v12/restfotos.worker.mjs
-      - name: Photo and narrator regressions, ID/cue preservation
+      - name: Regression tests — native video sound before remaining photos
         run: node --test r20-dev/restfotos-v12/restfotos.test.mjs
-      - name: Live original HTML comparison with protected V9
-        run: node r20-dev/restfotos-v12/smoke-live.mjs
-      - name: Real browser end-to-end with saved local memory and real WAV audio
+      - name: No extra player, recording change, storage write or Cloudflare publication
         run: |
-          BROWSER=$(command -v google-chrome-stable || command -v google-chrome || command -v chromium)
-          CDP_DIR="$RUNNER_TEMP/talera-v12-cdp-$GITHUB_RUN_ATTEMPT-$$"
-          mkdir -p "$CDP_DIR"
-          "$BROWSER" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --autoplay-policy=no-user-gesture-required --remote-allow-origins='*' --remote-debugging-port=0 --user-data-dir="$CDP_DIR" about:blank >/tmp/talera-v12-browser.log 2>&1 &
-          CHROME_PID=$!
-          trap 'kill "$CHROME_PID" 2>/dev/null || true' EXIT
-          node --check r20-dev/restfotos-v12/browser-smoke.mjs
-          TALERA_CDP_DIR="$CDP_DIR" node r20-dev/restfotos-v12/browser-smoke.mjs || { tail -n 45 /tmp/talera-v12-browser.log; exit 1; }
-      - name: Ensure no old wrappers, diagnostics, storage writes or video intercept
-        run: |
-          node --input-type=module - <<'NODE'
-          import {readFileSync} from 'node:fs';
+          node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
           const s=readFileSync('r20-dev/restfotos-v12/restfotos.worker.mjs','utf8');
-          assert.doesNotMatch(s,/taleraStartOriginalRound\s*=|TaleraMemories\.save|indexedDB|localStorage|V11_DIAG|FRONT_DIAG_SCRIPT/);
           assert.match(s,/function taleraInlineRemainingPhotos/);
-          assert.match(s,/frame\.kind==='photo'/);
-          assert.match(s,/s\.cues\.map\(c=>c\.mediaId\)/);
-          assert.match(s,/taleraInlineVoiceEnded\(s\)/);
-          assert.doesNotMatch(s,/PATCHED_PRESENTER_GUARD|taleraZeroIframe|taleraStartOriginalRound\s*=/);
-          console.log('V12: recording, storage and original video player protected');
+          assert.match(s,/ORIGINAL_VIDEO_DONE/);
+          assert.match(s,/ORIGINAL_NO_VIDEOS/);
+          assert.doesNotMatch(s,/taleraStartOriginalRound\s*=|TaleraMemories\.save|indexedDB|localStorage|FRONT_DIAG_SCRIPT|taleraZeroIframe/);
+          console.log('PASS: isolated native player candidate, no release');
           NODE
+      - name: Scope and release status
+        run: |
+          echo "Only unit/regression validation. This workflow does NOT deploy."
+          echo "Browser E2E and real iPhone acceptance are still required."

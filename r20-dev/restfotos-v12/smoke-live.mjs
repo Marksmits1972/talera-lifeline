@@ -32,6 +32,17 @@ for(const [path,kind] of [
   reconstructed=newHtml.replace(PHOTO_TAIL_HELPER+'\n'+PATCHED_VOICE_END,ORIGINAL_VOICE_END);
   assert.doesNotMatch(newHtml,/taleraV10PlayRemainingPhotosThenVideos|taleraV11ShowRemainingPhotos|talera-v11-readonly-audit|talera-v11-front-diagnostic/);
  }else if(kind==='present'){
+  if(newRes.headers.get('x-talera-v12-restfotos')!=='installed'){
+   const at=origHtml.indexOf('if(activeId===id)return;');
+   console.error('V12 PRESENT ANCHOR CHECK',JSON.stringify({
+    originalGuardCount:origHtml.split(ORIGINAL_PRESENTER_GUARD).length-1,
+    originalRestoreCount:origHtml.split(ORIGINAL_RESTORE).length-1,
+    runtimeSubscribe:origHtml.includes('runtime.subscribe(activate);'),
+    registerMemories:origHtml.includes('runtime.registerMemories(memories);'),
+    at,
+    around:at<0?'NOT FOUND':origHtml.slice(Math.max(0,at-80),at+140)
+   }));
+  }
   assert.equal(newRes.headers.get('x-talera-v12-restfotos'),'installed');
   assert.equal(newHtml.split(PATCHED_RESTORE).length-1,1);
   assert.equal(newHtml.split(PATCHED_PRESENTER_GUARD).length-1,1);

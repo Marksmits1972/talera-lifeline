@@ -57,6 +57,15 @@ async function testMode(mode,{withVideo=false}={}){
  const beforeAudit=await evaluate("window.__taleraV11Test.child.getElementById('talera-v11-readonly-audit').textContent");
  assert.match(beforeAudit,/Spraak: 4 tijdcodes, 4 foto’s/);
  assert.match(beforeAudit,/Stem afgelopen: nee/);
+ if(mode==='record'){
+   // Simulate the native recording UI updating its already-existing cue details.
+   // This changes only the visible diagnostic <pre>, NEVER the actual player state.
+   await evaluate("(()=>{window.__taleraV11Test.child.getElementById('cues').textContent=JSON.stringify({cues:[{t:0,index:0},{t:100,index:1}]});return true})()");
+   assert.ok(await until("window.__taleraV11Test.child.getElementById('talera-v11-readonly-audit').textContent.includes('Restfoto’s: 4')",{attempts:35,interval:30}),
+    'diagnostic tracks live recording cues without affecting playback');
+   await evaluate("(()=>{window.__taleraV11Test.child.getElementById('cues').textContent=JSON.stringify({cues:[{t:0,index:0},{t:100,index:1},{t:200,index:2},{t:300,index:3}]});return true})()");
+   assert.ok(await until("window.__taleraV11Test.child.getElementById('talera-v11-readonly-audit').textContent.includes('Restfoto’s: 2')",{attempts:35,interval:30}));
+ }
 
  // Initiate the REAL audio playback, rather than dispatching a synthetic ended event.
  const clicked=await evaluate("(()=>{const x=window.__taleraV11Test;const b=x.child.getElementById('play'); if(!b)return false;b.click();return true})()");

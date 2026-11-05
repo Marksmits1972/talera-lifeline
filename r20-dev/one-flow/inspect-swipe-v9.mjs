@@ -54,3 +54,9 @@ for(const needle of ["function taleraInlineInstallAudioControls()","const retry=
     p+=needle.length;n++;
  }
 }
+
+const v13Start=html.indexOf("/* TALERA V13: V3 continuous wheel is sole owner of photo gestures and position. */");
+const v13End=html.indexOf("</script>",v13Start);
+console.log("V13_FULL",v13Start,v13End,JSON.stringify(html.slice(v13Start,v13End)));
+const v3=html.indexOf("__taleraPhotoBook=");
+console.log("V3_BOOK",v3,JSON.stringify(html.slice(Math.max(0,v3-3500),v3+10000)));

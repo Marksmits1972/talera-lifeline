@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import worker,{
-  VOICE_END_ORIGINAL,VOICE_END_WITH_PHOTOS,PHOTO_HELPER,addRemainingPhotos
+  VOICE_END_ORIGINAL,VOICE_END_WITH_PHOTOS,PHOTO_HELPER,addRemainingPhotos,
+  READ_ONLY_AUDIT_SCRIPT,READ_ONLY_AUDIT_ID,addReadOnlyAudit
 } from './restfotos.worker.mjs';
 
 const photo=id=>({id,type:'image'});
@@ -127,4 +128,18 @@ test('only GET /vertelmodus-embed is affected, all other routes and POST untouch
 test('no service binding fails without modifying protected original',async()=>{
  const response=await worker.fetch(new Request('https://stage.test/vertelmodus-embed'),{});
  assert.equal(response.status,503);
+});
+
+
+test('read-only diagnostic is appended only after the native player, never inside voice logic',()=>{
+ const player=addRemainingPhotos(original).html;
+ const audited=addReadOnlyAudit(player);
+ assert.equal(audited.slice(0,player.length-7),player.slice(0,-7),
+  'the existing original HTML remains unchanged up to closing body');
+ assert.ok(audited.includes('id="'+READ_ONLY_AUDIT_ID+'"'));
+ assert.ok(audited.includes(READ_ONLY_AUDIT_SCRIPT));
+ assert.equal(addReadOnlyAudit(audited),audited,'idempotent and no duplicate listener');
+ assert.match(audited,/window\.addEventListener\('message'/);
+ assert.match(audited,/new MutationObserver\(render\)\.observe/);
+ assert.doesNotMatch(READ_ONLY_AUDIT_SCRIPT,/indexedDB|localStorage|fetch\s*\(|taleraStartOriginalRound\s*=|voice\.play\s*\(|audio\.play\s*\(|state\.items\s*=/);
 });

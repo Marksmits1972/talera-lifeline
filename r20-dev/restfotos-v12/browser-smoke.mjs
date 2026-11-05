@@ -10,7 +10,7 @@ assert.ok(cdpDir,'test browser profile directory must be set');
 let tabs=[];
 for(let i=0;i<100;i++){
  try{
-  const port=Number((await readFile(join(cdpDir,'DevToolsActivePort'),'utf8')).split('\\n')[0]);
+  const port=Number((await readFile(join(cdpDir,'DevToolsActivePort'),'utf8')).split('\n')[0]);
   if(Number.isInteger(port)&&port>0){
    const r=await fetch('http://127.0.0.1:'+port+'/json');
    if(r.ok){tabs=await r.json();if(tabs.some(x=>x.type==='page'))break}

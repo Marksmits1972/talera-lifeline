@@ -216,4 +216,41 @@ assert.notEqual(away.id,'pwa:'+saved.id);
 assert.equal(away.voicePaused,true,'leaving story must pause speech');
 assert.equal(away.activeVideoCount,0,'leaving story must dispose current native inline video');
 console.log('PASS real touch swipe while narrating: next WHOLE memory, previous voice stopped, no orphan video');
+// Navigate BACK using the same native V13 memory-wheel (no separate player).
+const rback=await evaluate("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
+"return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
+const by=Math.round(rback.y+rback.h*.50);
+const right0=Math.round(rback.x+rback.w*.22),right1=Math.round(rback.x+rback.w*.78);
+await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:right0,y:by,id:12}]});
+for(let i=1;i<=8;i++){
+ const x=Math.round(right0+(right1-right0)*i/8);
+ await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:by,id:12}]});
+ await sleep(25);
+}
+await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify('pwa:'+saved.id),100),
+  'reverse swipe must restore the original narrated MEMORY, not an internal clip');
+assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)',100),
+  'return to narrated memory must reinitialize one native voice element');
+const restored=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
+"const index=m._photoIndex;document.getElementById('memoryStoryScroll').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));"+
+"return {id:m.id,indexBefore:index,indexAfter:m._photoIndex,voiceNodes:document.querySelectorAll('audio').length};})()");
+assert.equal(restored.id,'pwa:'+saved.id);
+assert.equal(restored.indexAfter,restored.indexBefore,'narrated memory stays closed to clicks after return');
+console.log('PASS reverse swipe: same whole narrated memory restored, internal photo taps still ignored');
+
+// Ordinary memories keep their original tap-to-next-photo interaction.
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(nextMemory.id.slice(4))});
+assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(nextMemory.id)+
+  '&&!window.__taleraTimelineRuntime.currentMemory()._photoLoading',160),
+  'ordinary adjacent memory must load');
+const ordinaryTap=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
+"const before=m._photoIndex,count=m.photos.length;"+
+"document.getElementById('memoryStoryScroll').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));"+
+"return {before,after:m._photoIndex,count,kind:m._zeroItems.some(x=>x.kind==='audio')?'narrated':'ordinary'};})()");
+assert.equal(ordinaryTap.kind,'ordinary');
+assert.equal(ordinaryTap.count,2);
+assert.equal(ordinaryTap.after,(ordinaryTap.before+1)%ordinaryTap.count,
+  'normal photo memory TAP must still advance its photo');
+console.log('PASS ordinary photo memory: tap advances to next photo exactly as approved V9');
 ws.close();

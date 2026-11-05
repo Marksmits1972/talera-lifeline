@@ -29,7 +29,7 @@ for(const [path,patched] of [
   assert.equal(newHtml.split(VOICE_END_WITH_PHOTOS).length-1,1,'one native voice handler only');
   assert.doesNotMatch(newHtml,/taleraV10SavedStartOriginalVideoRound|taleraV10PendingStillIndices/);
   const reverted=newHtml.replace(PHOTO_HELPER+'\n'+VOICE_END_WITH_PHOTOS,VOICE_END_ORIGINAL);
-  assert.equal(reverted,oldHtml,'original delivered player is byte-for-byte preserved outside one helper and one call');
+  assert.equal(reverted,oldHtml.replaceAll(originalBase,base),'original delivered player is byte-identical aside from normal per-host absolute metadata URLs');
   const scripts=[...newHtml.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(x=>x[1]);
   assert.ok(scripts.length,'embed scripts exist');
   for(let i=0;i<scripts.length;i++)if(scripts[i].trim())
@@ -37,7 +37,7 @@ for(const [path,patched] of [
     'actual served JavaScript must parse');
  }else{
   assert.equal(a.headers.get('x-talera-v11-photos'),null);
-  assert.equal(newHtml,oldHtml,'root and other pages are unmodified');
+  assert.equal(newHtml,oldHtml.replaceAll(originalBase,base),'root and other pages match original after hostname normalization');
  }
  console.log('PASS V11 real HTTP',path,patched?'single safe native voice-call extension':'byte-exact original');
 }

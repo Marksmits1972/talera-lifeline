@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `b617adc2-6296-4ebc-b261-9c62d15de402`  
-**Deployment:** `568a86a6-d070-47e7-8960-25d66bc1b20f`  
+**Actuele Worker-versie:** `ab1434cc-bb48-4fdd-823f-524af90e12fb`  
+**Deployment:** `bdf279ea-4e68-402a-950f-0f4b968454df`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -219,3 +219,21 @@ Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste s
 **Validatie:** er is een regressietest die een `scrollTop=1` simuleert, direct het nieuwe HTML-attribuut en dezelfde kleur in `theme-color` toetst, en bewijst dat er nul requestAnimationFrame-calls zijn. De live smoke controleert de voorgeserveerde CSS en oorspronkelijke body. Deze test kan niet garanderen dat de door iOS gereserveerde onderste systeemstrook ook direct een nieuwe kleur krijgt; dat hangt af van iOS-caching en wordt op het toestel gecontroleerd. De webpagina zelf hoeft in ieder geval niet meer op een volgend animatieframe of fotoberekening te wachten.
 
 **Test-Worker-versie:** `d630a9e4-e118-4f77-9217-ef17ec527af1`, deployment `459ea075-8cd1-44ab-a3b3-695d68b2eed0`; beschermde V9 blijft `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`. GitHub Actions validatierun: https://github.com/Marksmits1972/talera-lifeline/actions/runs/42000020592.
+
+
+## 5 november 2026 — Vervolgproef: zwarte onderrand vasthouden tot tekstpaneel bijna ondoorzichtig is
+
+**Observatie vanaf iPhone (6 opeenvolgende screenshots, 10:14):** de presentatiefoto stond goed achter de klok; zwarte onderrand is visueel aantrekkelijk. Bij het begin van een leesbeweging werd onderaan echter meteen de lichtgekleurde balk zichtbaar terwijl het verhaalpaneel nog grotendeels transparant over de foto lag. Pas na verder doorscrollen werd het paneel een egaal papierkleurig vlak.
+
+**Oorzaak bevestigd in de originele V56/V28 presentatiecode:** V28 berekent zijn papierlaag met een `smoothstep(scrollTop / 155px)`; onze stijlstaging schakelde de onderrand al bij `scrollTop > 0` om. Bovendien hadden we `html:has(.talera-v26-reading/.talera-v14-reading/.is-reading)` selectors die de onderrand nog vóór de echte paneelverkleuring naar papier forceerden.
+
+**Alleen de bestaande stijlinjectie van het tekstpaneel en onderrand gewijzigd (geen R20/V9-bodywijziging):**
+- De V28-papierdekking loopt nu van 0% naar 100% gedurende **100 CSS-pixels** schuiven (in plaats van 155). De originele V28-achtergrond en fotocompositie worden niet herschreven; we overschrijven slechts de drie CSS-variabelen `--talera-v28-paper-alpha`, `--talera-v28-title-color` en `--talera-v28-shadow` uitsluitend op `#memoryCaption`. Tekstcontrast volgt de kortere dekking.
+- De zwarte onderrand `#000000` blijft tot **scrollTop = 90 CSS-pixels** intact. Bij dit omslagpunt is de versnelde papierlaag ongeveer 97,2% ondoorzichtig; dan wisselt de onderrand in één keer naar **de bestaande papierkleur uit `--story-neutral`** (normaliter `#F7F4EF`).
+- Vroege `:has()` selectors voor de native leesclassen zijn weggehaald; ze zouden deze gewenste latere omschakeling anders tenietdoen. Bij terugswipen naar foto wordt onder de 90px weer zwart gevraagd.
+- Dit is een **bewegingsafstand**, geen `setTimeout` of extra tijdvertraging. De reeds aanwezige synchrone scroll handler blijft de kleurcode aan iOS doorgeven.
+- Alle wijzigingen staan in `PRESENTATION_BOTTOM_TINT_JS` en `PRESENTATION_BOTTOM_TINT_CSS` in de geïsoleerde styling Worker. **De beschermde `/present` HTML-body, foto's, filmstrip, swipes, narratie, tijdlijn, audio, Free/Premium en andere schermen zijn niet veranderd.**
+- Gedekte regressie: bij scrolltop 1/18/56/89 is de kleurcode nog zwart; bij 90 is de papieralpha >97% en verandert het codeverzoek naar de werkelijke papierkleur; bij 100 is de papieralpha volledig; bij terug naar 0 komt zwart terug. GitHub [CI run 42001723783](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42001723783), opnieuw uitgevoerd na aparte testdeployment.
+- Cloudflare geïsoleerde stijltestversie `ab1434cc-bb48-4fdd-823f-524af90e12fb`, deployment `bdf279ea-4e68-402a-950f-0f4b968454df`, bestaande staging URL ongewijzigd. De beschermde V9 blijft versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`.
+
+**Nog echte iPhone-acceptatietest nodig**: de eigen PWA-onderrand kan door iOS worden gecached. Een goede code- en live-test bewijst niet dat het OS exact op de gevraagde pixel omschakelt. Als de overgang nog net verkeerd valt, pas alleen beide drempelwaarden (100px/90px) aan, niet de rest van de presentatiemodus.

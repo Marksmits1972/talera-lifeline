@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import {Script} from 'node:vm';
 import {
- VOICE_END_ORIGINAL,VOICE_END_WITH_PHOTOS,PHOTO_HELPER
+ VOICE_END_ORIGINAL,VOICE_END_WITH_PHOTOS,PHOTO_HELPER,
+ READ_ONLY_AUDIT_SCRIPT,READ_ONLY_AUDIT_ID
 } from './restfotos.worker.mjs';
 
 const base='https://talera-vertel-restfotos-v11-test-20261105.mark-a39.workers.dev';
@@ -28,7 +29,10 @@ for(const [path,patched] of [
   assert.equal(newHtml.split(PHOTO_HELPER).length-1,1,'one helper only');
   assert.equal(newHtml.split(VOICE_END_WITH_PHOTOS).length-1,1,'one native voice handler only');
   assert.doesNotMatch(newHtml,/taleraV10SavedStartOriginalVideoRound|taleraV10PendingStillIndices/);
-  const reverted=newHtml.replace(PHOTO_HELPER+'\n'+VOICE_END_WITH_PHOTOS,VOICE_END_ORIGINAL);
+  const auditTag='<script id="'+READ_ONLY_AUDIT_ID+'">'+READ_ONLY_AUDIT_SCRIPT+'</script>';
+  assert.ok(newHtml.includes(auditTag),'read-only audit script is appended once');
+  assert.equal(newHtml.split(auditTag).length-1,1);
+  const reverted=newHtml.replace(auditTag,'').replace(PHOTO_HELPER+'\n'+VOICE_END_WITH_PHOTOS,VOICE_END_ORIGINAL);
   assert.equal(reverted,oldHtml.replaceAll(originalBase,base),'original delivered player is byte-identical aside from normal per-host absolute metadata URLs');
   const scripts=[...newHtml.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(x=>x[1]);
   assert.ok(scripts.length,'embed scripts exist');

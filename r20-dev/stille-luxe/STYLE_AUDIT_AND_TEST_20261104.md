@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `8cffa110-f5d8-484e-9e20-308cd423bc50`  
-**Deployment:** `e3f1009d-726e-40d7-8711-9817d71e39c7`  
+**Actuele Worker-versie:** `61c69ff7-895b-4c8a-9ef6-18747626936c`  
+**Deployment:** `e353ae16-ecfa-4b80-bec4-90f8b19e45fb`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -251,3 +251,20 @@ Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste s
 - Extra regressietests controleren zwarte onderrand tot 74px, witte/papierkleur vanaf 75px, donkere titel pas op lichter papier en volle dekking bij 90px; de originele presentatieroute-body wordt byte-voor-byte tegen V9 gecontroleerd.
 - De nieuwe staging heeft Cloudflare versie `8cffa110-f5d8-484e-9e20-308cd423bc50`, deployment `e3f1009d-726e-40d7-8711-9817d71e39c7`, dezelfde staginglink. Beschermde V9 versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` bleef gelijk. Nieuwe GitHub-controle: https://github.com/Marksmits1972/talera-lifeline/actions/runs/42004049810 (opnieuw uitgevoerd na staging).
 - **Acceptatie op iPhone blijft doorslaggevend**: iOS kan de kleurwisseling van zijn eigen onderrand vertragen of anders timen dan de webcode. Beoordeel vooral de tussenfase met gedeeltelijk zichtbaar tekstpaneel; gebruik waar mogelijk dezelfde herinnering en dezelfde beweging als op de vijf screenshots.
+
+
+## 05-11-2026 — Zevental screenshots: iOS neemt papierkleur wel over, maar te laat
+
+**Visuele bevinding uit 7 aangeleverde iPhone-screenshots (10:53–10:54)**:
+- Bij de eerste zes screenshots staat onderaan een **zwarte** horizontale native PWA-strook terwijl het lees-/tekstpaneel al steeds lichter wordt. Op het zevende screenshot is de strook eindelijk dezelfde warme papierkleur geworden.
+- Daarmee is bevestigd dat de WebKit-kleurwisseling op deze iPhone **kan** volgen, maar vaak later dan de CSS-overgang van TALERA. Het is geen permanent ontbrekende functie en geen reden om de fullscreen-foto of oorspronkelijke presentatie te wijzigen.
+- De blauwe selectiemarkeringen en de knop "Kopieer / Zoek op" op sommige screenshots zijn een gewone iOS tekstselectie tijdens aanrakingen; deze screenshots waren **geen** autorisatie om tekstselectie, swipebediening of editgedrag aan te passen.
+
+**Minimale nieuwe afstelling, alleen de inline `PRESENTATION_BOTTOM_TINT_JS` in de afzonderlijke stijl-Worker**:
+- Papierdekking van `#memoryCaption`: kortere `smoothstep` van 90 naar **78 CSS-pixels** (originele beschermde V28 blijft 155 pixels).
+- Verzoek van de native onderrand `#000000` naar de uit het bestaande scherm gelezen papierkleur (`--story-neutral`): bij `scrollTop >= 60px` in plaats van 75px. Op dat punt is de zichtbare papierlaag al **86,48%** ondoorzichtig, en iOS krijgt eerder tijd om de request te verwerken.
+- Titeldonkering op een lichter paneel: kleurprogressie van `(alpha-.46)/.44` naar `(alpha-.62)/.32`; de titel blijft daardoor langer wit over de foto en wordt pas snel donker als de leesachtergrond duidelijk lichter is.
+- De bestaande CSS-selectors, layout, fotoheaders, zwarte eindkleur zonder paneel en papier-eindkleur bij geopend paneel zijn **niet** veranderd. Alleen de bestaande drie numerieke afstemmingen + commentaar zijn gewijzigd, zonder aparte nieuwe timers.
+- De buitenste iOS-balk blijft platformgestuurd; de daadwerkelijke OS-reactietijd kunnen onze unit- of live HTTP-tests niet meten. Screenshotreeks met langzaam omhoog schuiven is het criterium.
+
+**Technische controle en herstelpunt**: separate Worker `talera-v9-stille-luxe-stijlstaging-20261104`, versie `61c69ff7-895b-4c8a-9ef6-18747626936c`, deployment `e353ae16-ecfa-4b80-bec4-90f8b19e45fb`, GitHub stylebranch `style/talera-stille-luxe-v9-20261104` en CI [run 42006772375](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42006772375). Originele V9 blijft `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`. Staging is bytegewijs tegen exact de nieuwe GitHub-workerbron gecontroleerd voordat Cloudflare deze versie aannam.

@@ -12,9 +12,9 @@ const tab=tabs.find(x=>x.type==='page');
 assert.ok(tab?.webSocketDebuggerUrl,'Chrome remote debugging unavailable');
 const ws=new WebSocket(tab.webSocketDebuggerUrl);
 await new Promise((res,rej)=>{ws.addEventListener('open',res,{once:true});ws.addEventListener('error',rej,{once:true})});
-let id=0;const pending=new Map();
+let id=0;const pending=new Map(),browserWarnings=[];
 ws.addEventListener('message',ev=>{
- const e=JSON.parse(String(ev.data));if(!e.id||!pending.has(e.id))return;
+ const e=JSON.parse(String(ev.data));if(e.method==='Runtime.consoleAPICalled'&&['warning','error'].includes(e.params?.type))browserWarnings.push(e.params.args?.map(a=>a.value??a.description).slice(0,4));if(!e.id||!pending.has(e.id))return;
  const p=pending.get(e.id);pending.delete(e.id);
  e.error?p.reject(Error(JSON.stringify(e.error))):p.resolve(e.result);
 });
@@ -46,6 +46,7 @@ const iframeOpened=await until("Boolean(document.querySelector('iframe.talera-ze
 if(!iframeOpened){
  const diagnostic=await evalJs("(async()=>({href:location.href,title:document.title,ready:document.readyState,activeMemory:window.__taleraTimelineRuntime?.currentMemory()?.id,activeStory:window.__taleraTimelineRuntime?.currentMemory()?.storyId,activeLocal:window.__taleraTimelineRuntime?.currentMemory()?._taleraLocal,activeLoading:window.__taleraTimelineRuntime?.currentMemory()?._photoLoading,activePhotos:window.__taleraTimelineRuntime?.currentMemory()?.photos?.length,activeKinds:window.__taleraTimelineRuntime?.currentMemory()?._zeroItems?.map(x=>x.kind),photoStage:!!document.getElementById('photoStage'),photoStageSize:document.getElementById('photoStage')?.getBoundingClientRect()?.toJSON?.(),adapterScript:!!document.getElementById('talera-zero-memory-adapter'),trace:window.__v12trace,frames:[...document.querySelectorAll('iframe')].map(f=>({cls:f.className,src:f.getAttribute('src'),ready:f.contentDocument?.readyState,play:Boolean(f.contentDocument?.getElementById('play'))})),saved:(await window.TaleraMemories.list()).map(x=>({id:x.id,date:x.date,total:x.items?.length})),error:document.getElementById('taleraV8LoadError')?.textContent}))()",true);
  console.log('V12 MISSING IFRAME INVESTIGATION',JSON.stringify(diagnostic));
+ console.log('V12 CONSOLE WARNING/ERROR',JSON.stringify(browserWarnings.slice(-25)));
 }
 assert.ok(iframeOpened,'real saved memory MUST activate original narration iframe');
 assert.ok(await until("document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('count')?.textContent.includes(' / 6')",{tries:200,ms:80}),

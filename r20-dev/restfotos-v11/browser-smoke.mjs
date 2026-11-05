@@ -131,6 +131,21 @@ for(const route of ['/present','/tell']){
   assert.match(report,/Spraak: 4 tijdcodes, 4 foto’s/);
   assert.match(report,/Restfoto’s: 2 \(5, 6\)/);
   console.log('PASS iframe report visible in parent Diagnosis panel',report.replace(/\n/g,' | '));
+  // Deliberately mock only the store's read method in the disposable Chrome
+  // session. This proves that a real locally saved voice is diagnosed even
+  // when the narrator iframe itself is not supplying any useful report.
+  const synthetic=await evaluate("(()=>{\n const runtime=window.__taleraLifelineDemo,store=window.TaleraMemories;\n if(!runtime||!store||typeof runtime.currentMemory!=='function'||typeof store.list!=='function')\n  return {error:'No current memory or local store API'};\n const current=runtime.currentMemory, list=store.list;\n const id='local-v11-synthetic-readonly';\n store.list=async()=>[{\n  id,items:[\n   {kind:'photo'},{kind:'photo'},{kind:'photo'},\n   {kind:'photo'},{kind:'photo'},{kind:'photo'},{kind:'audio'}\n  ],\n  narrationCues:[{t:0,index:0},{t:1300,index:1},\n   {t:3000,index:2},{t:4500,index:3}]\n }];\n runtime.currentMemory=()=>({id:'pwa:'+id,storyId:id});\n window.__taleraV11RestoreDemo=()=>{store.list=list;runtime.currentMemory=current};\n const buttons=[...document.querySelectorAll('#talera-v11-debug-panel button')];\n buttons.find(b=>b.textContent==='Ververs')?.click();\n return {success:true};\n})()");
+  assert.equal(synthetic.success,true,'runtime and local memory source exposed in the real page');
+  assert.ok(await until("document.getElementById('talera-v11-debug-text').textContent.includes('Stem opgeslagen: JA')",{attempts:80,interval:50}),
+    'parent must recognize an existing audio item independently of narrator messages');
+  const storeReport=await evaluate("document.getElementById('talera-v11-debug-text').textContent");
+  assert.match(storeReport,/Opgeslagen herinneringen: 1 \| Met stemopname: 1/);
+  assert.match(storeReport,/Tijdcodes: 4 \| Gebruikte foto’s: 4 \(1, 2, 3, 4\)/);
+  assert.match(storeReport,/Ontbrekende foto’s: 2 \(5, 6\)/);
+  assert.match(storeReport,/Vertelspeler-venster: AANWEZIG/);
+  await evaluate('window.__taleraV11RestoreDemo();delete window.__taleraV11RestoreDemo;true');
+  console.log('PASS parent diagnoses locally stored narration with 2 unmatched photos',storeReport.replace(/\n/g,' | '));
+
  }
 }
 ws.close();

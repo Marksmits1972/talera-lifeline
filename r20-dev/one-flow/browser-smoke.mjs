@@ -199,6 +199,9 @@ console.log('PASS whole memory seal: image tap ignored, all preloaded originals 
 // A real stationary finger TAP may trigger the unchanged V13 wheel's
 // pointerdown/up; it still must not invoke any narrated media frame or play().
 await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+// Freeze narration: an automatic cue at 1.2s is not evidence of a tap.
+const frozen=await evaluate("(()=>{window.__taleraInlineSharedAudio?.pause();"+
+"const m=window.__taleraTimelineRuntime.currentMemory();return {id:m.id,index:m._photoIndex};})()");
 const tapX=Math.round(initial.storyRect.x+initial.storyRect.w*.5),
       tapY=Math.round(initial.storyRect.y+initial.storyRect.h*.5);
 await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tapX,y:tapY,id:9}]});
@@ -207,7 +210,7 @@ await sleep(1100);
 const afterRealTap=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
 "return {id:m.id,index:m._photoIndex,prepared:Array.from(document.querySelectorAll('video[style*=\"-9999px\"]')).map(v=>v.paused)};})()");
 assert.equal(afterRealTap.id,'pwa:'+saved.id,'stationary tap must not navigate to a different memory');
-assert.equal(afterRealTap.index,initial.indexBefore,'stationary finger tap cannot step narrated photos');
+assert.equal(afterRealTap.index,frozen.index,'stationary finger tap cannot step narrated photos');
 assert.ok(afterRealTap.prepared.every(Boolean),'stationary finger tap cannot start any prepared video');
 console.log('PASS real touch tap on narrated memory: no media stepping, no hidden video activation');
 

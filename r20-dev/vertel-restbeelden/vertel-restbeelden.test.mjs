@@ -140,6 +140,23 @@ function simulate(items,cues,{present=true,voiceUrl='blob:narration',videos=true
    get videoStarts(){return videoStarts;}
  };
 }
+test('exact six-ID case: four media IDs referenced by voice, final two photos automatically follow',()=>{
+ const ids=['foto-id-01','foto-id-02','foto-id-03','foto-id-04','foto-id-05','foto-id-06'];
+ const six=ids.map(image);
+ const cues=[{t:0,index:0},{t:1000,index:1},{t:3100,index:2},{t:5100,index:3}];
+ assert.deepEqual(missingStillIndices(six,cues),[4,5],
+   'only fifth and sixth IDs are unused by voice');
+ const snapshot=JSON.stringify({six,cues});
+ const s=simulate(six,cues,{videos:false});
+ s.end();
+ assert.deepEqual(s.shown,[4],'fifth image appears immediately at voice end');
+ assert.equal(s.nextPhotoTimer(),PHOTO_HOLD_MS);
+ assert.deepEqual(s.shown,[4,5],'sixth image appears automatically after 4s');
+ assert.equal(s.nextPhotoTimer(),PHOTO_HOLD_MS);
+ assert.equal(s.timers.size,0,'end of two stills leaves no pending timer');
+ assert.equal(s.notices.at(-1),'Herinnering afgelopen');
+ assert.equal(JSON.stringify({six,cues}),snapshot,'original six IDs and four voice cues are preserved');
+});
 test('full replay: narration, three missing images in 4-second turns, then original video audio',()=>{
  const items=[image('a'),image('b'),image('c'),image('d'),image('e'),image('f'),video('g')];
  const cues=[{t:0,index:0},{t:3000,index:1},{t:6700,index:2}];

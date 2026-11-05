@@ -38,6 +38,10 @@ jobs:
           import assert from 'node:assert/strict';
           const s=readFileSync('r20-dev/restfotos-v12/restfotos.worker.mjs','utf8');
           assert.doesNotMatch(s,/taleraStartOriginalRound\s*=|TaleraMemories\.save|indexedDB|localStorage|V11_DIAG|FRONT_DIAG_SCRIPT/);
-          assert.match(s,/if\(!document\.body\.classList\.contains\('present'\)\)/);
+          assert.match(s,/function taleraInlineRemainingPhotos/);
+          assert.match(s,/frame\.kind==='photo'/);
+          assert.match(s,/s\.cues\.map\(c=>c\.mediaId\)/);
+          assert.match(s,/taleraInlineVoiceEnded\(s\)/);
+          assert.doesNotMatch(s,/PATCHED_PRESENTER_GUARD|taleraZeroIframe|taleraStartOriginalRound\s*=/);
           console.log('V12: recording, storage and original video player protected');
           NODE

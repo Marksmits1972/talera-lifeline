@@ -11,7 +11,7 @@ import worker, {
 const native = [
   'function taleraInlineSetFrame(s,index){window.shown.push(index)}',
   'function taleraInlineCleanVideo(s){window.cleaned++}',
-  'function taleraInlinePlayMedia(s,frame,muted,done){window.videos.push({key:frame.key,muted,done})}',
+  'function taleraInlinePlayMedia(s,frame,muted,finished){window.videos.push({key:frame.key,muted,done:finished})}',
   'function taleraInlineReplayNext(s){',
   "  if(s!==taleraInline||s.phase!=='originals')return;",
   '  const frame=s.replayFrames[++s.replayIndex];',

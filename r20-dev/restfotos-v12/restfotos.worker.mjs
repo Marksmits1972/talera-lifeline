@@ -21,7 +21,7 @@ export function addRemainingPhotosToInlinePlayer(html){
   if(html.includes(INSTALLED_MARKER))return{html,status:'already-installed'};
   for(const token of [INSERT_ANCHOR,ORIGINAL_VIDEO_SELECTION,ORIGINAL_VIDEO_DONE,
     ORIGINAL_NO_VIDEOS,"function taleraInlineSetFrame(s,index){",
-    "function taleraInlinePlayMedia(s,frame,muted,done){",
+    "function taleraInlinePlayMedia(s,frame,muted,finished){",
     "function taleraInlineVoiceEnded(s){"]){
     const at=html.indexOf(token);
     if(at<0||html.indexOf(token,at+token.length)>=0)

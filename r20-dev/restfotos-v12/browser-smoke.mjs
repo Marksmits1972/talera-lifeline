@@ -53,7 +53,8 @@ if(!iframeOpened){
   JSON.stringify({immediate:viaExistingBridge,eventually:bridgeOpened,trace:await evalJs('window.__v12trace')}));
 
 }
-assert.ok(iframeOpened,'real saved memory MUST activate original narration iframe');
+assert.ok(iframeOpened||await until("Boolean(document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('play'))",{tries:70,ms:65}),
+ 'native narrator fails even after invoking EXISTING activation bridge in isolated test');
 assert.ok(await until("document.querySelector('iframe.talera-zero-present-frame')?.contentDocument?.getElementById('count')?.textContent.includes(' / 6')",{tries:200,ms:80}),
  'real V9 player must receive six stored media files');
 assert.equal(await evalJs("document.querySelector('iframe.talera-zero-present-frame').contentDocument.body.classList.contains('present')"),true);

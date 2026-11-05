@@ -99,12 +99,13 @@ await evaluate(`(()=>{
  const t=window.__oneFlowTest,rt=window.__taleraTimelineRuntime;
  const controls=window.__taleraAudioControls;
  if(!controls||typeof controls.isEnabled!=='function')throw Error('Original V9 listening controls missing');
- if(playbackRound===1)console.log('AUDIO_UI_CONTROLS',JSON.stringify(
+ window.__taleraAudioUiControls=
   Array.from(document.querySelectorAll('button,[role="button"]'))
     .filter(el=>/luister|geluid|audio|afspelen|play/i.test((el.textContent||'')+' '+(el.className||'')+' '+(el.getAttribute('aria-label')||'')))
     .map(el=>({tag:el.tagName,cls:String(el.className).slice(0,80),id:el.id,
       label:(el.textContent||'').trim().slice(0,60),hidden:el.hidden,
-      aria:el.getAttribute('aria-label')})).slice(0,15)));
+      aria:el.getAttribute('aria-label')})).slice(0,15);
+
  const prepared=document.querySelector('video[style*="-9999px"]');
  if(!prepared)throw Error('Preloaded original video is missing before user gesture');
  prepared.dataset.primedVideo='yes';
@@ -135,6 +136,7 @@ await evaluate(`(()=>{
  document.dispatchEvent(new Event('talera:enable-listening'));
  if(a.paused)a.play().catch(e=>{t.errors.push('voice play '+String(e))});
 })()`);
+if(playbackRound===1)console.log('AUDIO_UI_CONTROLS',JSON.stringify(await evaluate('window.__taleraAudioUiControls')));
 assert.ok(await until('window.__oneFlowTest.voiceEndedAt>0'),'real narration must finish');
 assert.ok(await until('window.__oneFlowTest.videos.some(v=>v.muted&&v.at<window.__oneFlowTest.voiceEndedAt)'),
  'narrated video must have played silently during the voice');

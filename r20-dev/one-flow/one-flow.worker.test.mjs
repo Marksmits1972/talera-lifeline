@@ -10,19 +10,21 @@ const frames=()=>[
 ];
 const cues=()=>[{mediaId:'p1',index:0,t:0},{mediaId:'v1',index:1,t:5000},
   {mediaId:'p2',index:2,t:12000}];
+const nativeVideoHint="          const hint=document.createElement('div');\n          hint.textContent='Tik op de foto om het geluid te starten';\n          hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';";
+const nativeVoiceHint="    const hint=document.createElement('div');\n    hint.className='talera-v61-audio-permission-hint';\n    hint.textContent='Tik op de foto om het geluid te starten';\n    hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';";
 const nativePage='<html><script>'+
   "function taleraInlineDispose(){\n  const s=taleraInline;\n  taleraInline=null;}"+
   'function taleraInlineSetFrame(s,index){}'+
   "function taleraInlinePlayMedia(s,frame,muted,finished){"+
   "const video=document.createElement('video');"+
-  "async function load(){const url=await store.mediaUrl(frame.key);}}"+
+  "async function load(){const url=await store.mediaUrl(frame.key);}\n"+nativeVideoHint+"\n}"+
   'function taleraInlineCleanVideo(s){}'+
   'function taleraInlineReplayNext(s){}'+
   INSERT_BEFORE+'}'+
   "function taleraInlineInstallAudioControls(){\n"+
   "  const retry=e=>{\n    const s=taleraInline;};\n"+
   "  document.addEventListener('click',e=>{\n"+
-  "    if(s?.engine!=='narrated'||s.phase!=='narration')return;},true);\n}"+
+  "    if(s?.engine!=='narrated'||s.phase!=='narration')return;},true);\n"+nativeVoiceHint+"\n}"+
   "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
   AUDIO_END_BEFORE+'</script></html>';
 
@@ -318,4 +320,54 @@ test('existing Luister consent button is a valid Safari gesture but the photo it
   listeners.get('click')({target:consent});
   await Promise.resolve();await Promise.resolve();await Promise.resolve();
   assert.deepEqual(played,['play','pause'],'existing consent button primes once and immediately pauses');
+});
+
+test('a Safari autoplay permission hint is a REAL accessible replay button, not a dead image overlay',async()=>{
+  const handler=new Map(),plays=[],audioPlays=[];
+  const document={
+    addEventListener(name,fn){handler.set(name,fn)},
+    createElement(tag){
+      assert.equal(tag,'button');
+      return {
+        tagName:'BUTTON',type:'',className:'',style:{},textContent:'',removed:false,
+        setAttribute(name,value){this[name]=value},
+        addEventListener(name,fn){this['on'+name]=fn},
+        remove(){this.removed=true}
+      };
+    }
+  };
+  const s={engine:'narrated',phase:'narration',frames:[],
+    audio:{paused:true,addEventListener(name,fn){this.onplaying=fn}},
+    video:null,hint:null};
+  const env={document,taleraInline:s,
+    window:{__taleraAudioControls:{
+      isEnabled:()=>true
+    },__taleraInlineTryAutoPlay:()=>{
+      audioPlays.push('resume existing voice element');
+      s.audio.paused=false;
+      s.audio.onplaying?.();
+    }}};
+  vm.runInNewContext(INLINE_TAIL,env);
+  const button=env.taleraUnifiedCreateListeningButton(s);
+  s.hint=button;
+  assert.equal(button.tagName,'BUTTON');
+  assert.equal(button.type,'button');
+  assert.equal(button['aria-label'],'Ingesproken herinnering afspelen');
+  assert.match(button.textContent,/Beluister/);
+  assert.match(button.style.cssText,/pointer-events:auto/);
+  assert.equal(typeof button.onclick,'function');
+  const event={preventDefault(){plays.push('prevent')},stopPropagation(){plays.push('stop')}};
+  button.onclick(event);
+  assert.deepEqual(audioPlays,['resume existing voice element']);
+  assert.equal(button.removed,true);
+  assert.equal(s.hint,null);
+  assert.deepEqual(plays,['prevent','stop']);
+});
+
+test('the native voice and audible-video permission prompts both use one clickable button; V9 reverses exactly',()=>{
+  const patched=applyUnifiedTail(nativePage);
+  assert.equal(patched.status,'installed');
+  assert.equal(patched.html.split('const hint=taleraUnifiedCreateListeningButton(s);').length-1,2);
+  assert.ok(!patched.html.includes("hint.textContent='Tik op de foto om het geluid te starten';"));
+  assert.equal(restoreApprovedV9(patched.html),nativePage);
 });

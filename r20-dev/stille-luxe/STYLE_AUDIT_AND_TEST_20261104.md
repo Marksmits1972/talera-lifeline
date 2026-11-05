@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `61c69ff7-895b-4c8a-9ef6-18747626936c`  
-**Deployment:** `e353ae16-ecfa-4b80-bec4-90f8b19e45fb`  
+**Actuele Worker-versie:** `bc36d913-49f8-4f4d-b00d-3d5894a11146`  
+**Deployment:** `a613561d-e799-47ff-a032-5ee9e9a5bda6`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -268,3 +268,19 @@ Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste s
 - De buitenste iOS-balk blijft platformgestuurd; de daadwerkelijke OS-reactietijd kunnen onze unit- of live HTTP-tests niet meten. Screenshotreeks met langzaam omhoog schuiven is het criterium.
 
 **Technische controle en herstelpunt**: separate Worker `talera-v9-stille-luxe-stijlstaging-20261104`, versie `61c69ff7-895b-4c8a-9ef6-18747626936c`, deployment `e353ae16-ecfa-4b80-bec4-90f8b19e45fb`, GitHub stylebranch `style/talera-stille-luxe-v9-20261104` en CI [run 42006772375](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42006772375). Originele V9 blijft `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`. Staging is bytegewijs tegen exact de nieuwe GitHub-workerbron gecontroleerd voordat Cloudflare deze versie aannam.
+
+
+## 05-11-2026 — Definitieve proef gelijkmatige uitfasering van het leesvlak
+
+**Gebruikersobservatie (5 screenshots, 11:01–11:02)**: de dekking van het omhooggetrokken leesvlak lijkt eerst weinig toe te nemen en daarna in weinig scrollpixels ineens grotendeels wit te worden; halverwege oogt de titel onscherp/grijzig door combinatie van een gemengde tekstkleur met nog aanwezige tekstschaduw.
+
+**Alleen geïsoleerde stijl-injectie aangepast**:
+- Behoud `SHEET_FADE_PX=78` en `FOOTER_PAPER_AT_PX=60`, want fotovullende statusbalk, zwarte onderrand en de kleurwisseling werken verder zoals bedoeld.
+- Het V28-leesvlak gebruikt een CSS-variabele `--talera-v28-paper-alpha` die vanaf `scrollTop=0` tot `scrollTop=78px` **lineair** van 0 naar 1 loopt: `alpha=min(1,scrollTop/78)`. Voorheen gebruikte dit vlak `p*p*(3-2*p)` en nam de dekking aan het begin en einde traag toe, met snelle omslag in het midden.
+- Titelleesbaarheid: `--talera-v28-shadow` wordt al vanaf 33% scrollprogressie afgebouwd en is uiterlijk bij 58% volledig verdwenen; pas vanaf 55% wordt de titel van helder wit richting originele inkt `rgb(15,39,71)` bij 78% scrollprogressie gebracht. Daardoor is er nauwelijks overlap tussen halfdonkere titel en vervagende 6px-tekstschaduw.
+- De exacte papier-eindkleur blijft afkomstig van het originele V9-token `--story-neutral` (`#F7F4EF` bij standaardweergave); het OS-verzoek voor die kleur blijft op 60px. De eigen iOS-strook kan daardoor iets later zichtbaar meeschakelen dan het webpaneel.
+- Enkel de functie `syncSheetAppearance()` in `PRESENTATION_BOTTOM_TINT_JS` is gewijzigd, geen extra CSS-selector, geen timers, geen wijzigingen aan de foto, titelinhoud, swipes, audio, timeline, presentatiebody of overige schermen.
+- Nieuw model/regressietest volgt de paper-alpha op **0, 19,5, 39, 58,5 en 78 pixels** met verwachte waarden **0%, 25%, 50%, 75%, 100%**, en controleert dat de vervagende tekstschaduw weg is voordat de titel donkerder wordt.
+- GitHub Actions CI: https://github.com/Marksmits1972/talera-lifeline/actions/runs/42007963138. Staging-Worker-versie `bc36d913-49f8-4f4d-b00d-3d5894a11146`, deployment `a613561d-e799-47ff-a032-5ee9e9a5bda6`. Oorspronkelijke V9 Worker-versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` bleef beschermd en onveranderd.
+
+**Acceptatie op echte iPhone**: controleer een normale vloeiende beweging van foto naar papier zonder plotselinge witte omslag en zonder grijs/wazig titelinterval. Na bevestiging dit onderdeel als gekozen versie bevriezen en geen verdere detailtuning.

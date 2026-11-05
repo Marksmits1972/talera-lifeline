@@ -7,9 +7,10 @@ export const INSTALL_MARKER = 'function taleraUnifiedNarrationEnded(s){';
 
 export function remainingMedia(frames,cues){
   const shown=new Set((cues||[]).map(c=>c.mediaId));
-  return (frames||[]).map((f,index)=>({frame:f,index})).filter(x=>!shown.has(x.frame.key));
+  return (frames||[]).map((f,index)=>({frame:f,index})).filter(x=>x.frame.kind==='photo'&&!shown.has(x.frame.key));
 }
 
+// After unshown photos, delegate ALL original videos to the proven V9 replay (with sound).
 // This function is executed inside the existing TALERA /present script closure.
 // Existing TALERA functions, photo plane, video element and timer stay authoritative.
 export const INLINE_TAIL = `/* One native TALERA viewport, recorded media IDs, no second player. */
@@ -18,7 +19,7 @@ function taleraUnifiedNarrationEnded(s){
   if(s.timer){clearInterval(s.timer);s.timer=null}
   const spoken=new Set(s.cues.map(c=>c.mediaId));
   const remaining=s.frames.map((frame,index)=>({frame,index}))
-    .filter(x=>!spoken.has(x.frame.key));
+    .filter(x=>x.frame.kind==='photo'&&!spoken.has(x.frame.key));
   const last=s.cues.length?s.cues[s.cues.length-1]:null;
   const lastFrame=last&&s.frames[last.index];
   const lastVideo=lastFrame?.kind==='video'&&s.videoKey===lastFrame.key?s.video:null;
@@ -43,8 +44,11 @@ function taleraUnifiedNarrationEnded(s){
     if(!active())return;
     stopPhotoTimer();
     if(tail.cursor>=remaining.length){
-      taleraInlineCleanVideo(s);
-      s.phase='done';
+      // Resume the original, proven V9 video round. Every original video
+      // starts at 0 and uses V9's existing sound/listening controls.
+      // No new DOM player, duplicate silent video round or media copy.
+      s.phase='narration';
+      taleraInlineVoiceEnded(s);
       return;
     }
     const {frame,index}=remaining[tail.cursor++];
@@ -54,13 +58,6 @@ function taleraUnifiedNarrationEnded(s){
       tail.photoUntil=performance.now()+4000;
       tail.remainingMs=4000;
       s.ordinaryTimer=setTimeout(next,4000);
-      return;
-    }
-    if(frame.kind==='video'){
-      // Existing native inline video surface, always silent during and after voice.
-      taleraInlineSetFrame(s,index);
-      taleraInlinePlayMedia(s,frame,true,()=>{if(active())next()});
-      if(s.video){s.video.muted=true;s.video.defaultMuted=true}
       return;
     }
     issue(new Error('Onbekend mediaformaat'));

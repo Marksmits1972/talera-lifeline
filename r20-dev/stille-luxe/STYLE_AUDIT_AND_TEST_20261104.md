@@ -6,8 +6,8 @@
 **Testlink:** https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39.workers.dev/
 
 **Nieuwe Worker:** `talera-v9-stille-luxe-stijlstaging-20261104`  
-**Actuele Worker-versie:** `ab1434cc-bb48-4fdd-823f-524af90e12fb`  
-**Deployment:** `bdf279ea-4e68-402a-950f-0f4b968454df`  
+**Actuele Worker-versie:** `8cffa110-f5d8-484e-9e20-308cd423bc50`  
+**Deployment:** `e3f1009d-726e-40d7-8711-9817d71e39c7`  
 **GitHub-branch:** `style/talera-stille-luxe-v9-20261104`
 
 ## Technische uitgangspositie (live geverifieerd via Cloudflare API)
@@ -237,3 +237,17 @@ Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste s
 - Cloudflare geïsoleerde stijltestversie `ab1434cc-bb48-4fdd-823f-524af90e12fb`, deployment `bdf279ea-4e68-402a-950f-0f4b968454df`, bestaande staging URL ongewijzigd. De beschermde V9 blijft versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`.
 
 **Nog echte iPhone-acceptatietest nodig**: de eigen PWA-onderrand kan door iOS worden gecached. Een goede code- en live-test bewijst niet dat het OS exact op de gevraagde pixel omschakelt. Als de overgang nog net verkeerd valt, pas alleen beide drempelwaarden (100px/90px) aan, niet de rest van de presentatiemodus.
+
+
+## 5 november 2026 — Nauwkeuriger afstemmen op vijf opeenvolgende iPhone-beelden
+
+**Gebruikersbeoordeling**: de vorige versie met zwarte rand en versnelde papierkleur is een sterke visuele verbetering. Vijf opeenvolgende iPhone-screenshots van 10:31–10:32 tonen nog twee verbeterpunten: de tekstopmaak wordt midden in de beweging al grijs op een foto die nog zichtbaar doorschijnt; in een bijna papierkleurige stand blijft onderaan nog een zwarte strook die pas op een volgende positie omslaat.
+
+**Zeer gerichte bijstelling, alleen de reeds bestaande `PRESENTATION_BOTTOM_TINT_JS` in de geïsoleerde stijlstaging (geen CSS- of V9-bodywijziging):**
+- V28-variabelen die alleen `#memoryCaption` aansturen gaan van 100 CSS-pixels naar **90 CSS-pixels** om sneller visueel papierkleurig te zijn. Oorspronkelijke V28 in de beschermde V9 blijft 155px.
+- De omschakeling zwart → oorspronkelijke papierkleur van het onderste iPhone-gebied wordt van `scrollTop=90` naar **`scrollTop=75`** verschoven, op circa **92,6% papierdekking**.
+- De titel krijgt zijn donkerblauwe inktkleur later, door de bestaande titelcontrastfactor `(alpha-.26)/.52` te vervangen met `(alpha-.46)/.44`. Zo blijft de kop langer licht boven de herkenbare foto, met donkerblauw pas als het paneel al duidelijk licht is.
+- Geen wijziging in foto-overlay, player, tijdlijn, swipe, audioregeling, tekst, andere schermen, home-statusbalk, opgeklapte eindstand of de zwart/papier-eindkleuren. De benodigde papierkleur blijft afkomstig van het V9 `--story-neutral` token.
+- Extra regressietests controleren zwarte onderrand tot 74px, witte/papierkleur vanaf 75px, donkere titel pas op lichter papier en volle dekking bij 90px; de originele presentatieroute-body wordt byte-voor-byte tegen V9 gecontroleerd.
+- De nieuwe staging heeft Cloudflare versie `8cffa110-f5d8-484e-9e20-308cd423bc50`, deployment `e3f1009d-726e-40d7-8711-9817d71e39c7`, dezelfde staginglink. Beschermde V9 versie `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06` bleef gelijk. Nieuwe GitHub-controle: https://github.com/Marksmits1972/talera-lifeline/actions/runs/42004049810 (opnieuw uitgevoerd na staging).
+- **Acceptatie op iPhone blijft doorslaggevend**: iOS kan de kleurwisseling van zijn eigen onderrand vertragen of anders timen dan de webcode. Beoordeel vooral de tussenfase met gedeeltelijk zichtbaar tekstpaneel; gebruik waar mogelijk dezelfde herinnering en dezelfde beweging als op de vijf screenshots.

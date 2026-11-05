@@ -134,8 +134,11 @@ test('no service binding fails without modifying protected original',async()=>{
 test('read-only diagnostic is appended only after the native player, never inside voice logic',()=>{
  const player=addRemainingPhotos(original).html;
  const audited=addReadOnlyAudit(player);
- assert.equal(audited.slice(0,player.length-7),player.slice(0,-7),
-  'the existing original HTML remains unchanged up to closing body');
+ const bodyEnd=player.indexOf('</body>');
+ assert.equal(audited.slice(0,bodyEnd),player.slice(0,bodyEnd),
+  'all existing native HTML and player code stay untouched');
+ assert.equal(audited.slice(audited.indexOf('</body>')),player.slice(bodyEnd),
+  'the original closing tags remain untouched');
  assert.ok(audited.includes('id="'+READ_ONLY_AUDIT_ID+'"'));
  assert.ok(audited.includes(READ_ONLY_AUDIT_SCRIPT));
  assert.equal(addReadOnlyAudit(audited),audited,'idempotent and no duplicate listener');

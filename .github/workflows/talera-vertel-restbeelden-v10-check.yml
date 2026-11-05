@@ -23,6 +23,13 @@ jobs:
         run: node --test r20-dev/vertel-restbeelden/vertel-restbeelden.test.mjs
       - name: Read-only live staging smoke (no media and no writes)
         run: node r20-dev/vertel-restbeelden/smoke-live.mjs
+      - name: Real browser replay — six synthetic photos, four spoken cues
+        run: |
+          BROWSER=$(command -v google-chrome-stable || command -v google-chrome || command -v chromium)
+          "$BROWSER" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --remote-allow-origins='*' --remote-debugging-port=9223 --user-data-dir="$RUNNER_TEMP/talera-v10-playback-chrome" about:blank >/tmp/talera-v10-chrome.log 2>&1 &
+          CHROME_PID=$!
+          trap 'kill "$CHROME_PID" 2>/dev/null || true' EXIT
+          node r20-dev/vertel-restbeelden/browser-smoke.mjs
       - name: Enforce separate adapter, no mutations to stored audio or base PWA
         run: |
           node --input-type=module - <<'NODE'

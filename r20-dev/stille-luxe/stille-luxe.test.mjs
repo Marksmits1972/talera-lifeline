@@ -59,13 +59,14 @@ test('historical working photo status returns, only head changes and bottom tint
  assert.equal(response.status,200);
  assert.equal(response.headers.get('x-talera-style'),null);
  assert.match(changed,/name="apple-mobile-web-app-status-bar-style" content="black-translucent"/);
- assert.match(changed,/name="theme-color" content="#304653"/);
+ assert.match(changed,/name="theme-color" content="#000000"/);
  assert.match(changed,/viewport-fit=cover/);
  assert.match(changed,/<style id="talera-present-bottom-tint">/);
  assert.match(changed,/<script id="talera-present-bottom-tint-script">/);
  assert.match(changed,/talera-v26-reading/);
- assert.match(changed,/getImageData/);
- assert.match(changed,/meta\.setAttribute\('content', color\)/);
+ assert.match(changed,/--story-neutral/);
+ assert.doesNotMatch(changed,/getImageData/,'no photo color analysis in black bar test');
+ assert.match(changed,/theme\.setAttribute\('content', color\)/);
  assert.match(changed,/isReading\(\)/);
  assert.doesNotMatch(changed,/talera-present-ios-edge-to-edge/);
  assert.doesNotMatch(changed,/100dvh \+ env\(safe-area-inset-top/);
@@ -79,7 +80,7 @@ test('photo presentation with no metadata receives safe working historic top plu
  const res=await app.fetch(new Request(origin+'/present/'),mock(original).env);
  const changed=await res.text();
  assert.match(changed,/name="apple-mobile-web-app-status-bar-style" content="black-translucent"/);
- assert.match(changed,/name="theme-color" content="#304653"/);
+ assert.match(changed,/name="theme-color" content="#000000"/);
  assert.match(changed,/talera-present-bottom-tint-script/);
  assert.equal(changed.slice(changed.indexOf('</head>')+7),original.slice(original.indexOf('</head>')+7));
 });
@@ -177,67 +178,53 @@ test('native editor visuals change only color tokens, not recording or toolbar g
  assert.doesNotMatch(css,/#photoLayerA\s*\{/);
 });
 
-test('adaptive presentation edge samples current image and switches to white on raised reading panel',async()=>{
- const original='<!doctype html><html><head><meta name="theme-color" content="#304653"></head><body></body></html>';
+test('presentation bottom is black and reading sheet uses exact existing --story-neutral color',async()=>{
+ const original='<!doctype html><html><head><meta name="theme-color" content="#ffffff"></head><body></body></html>';
  const response=await app.fetch(new Request(origin+'/present'),mock(original).env);
  const html=await response.text();
  const script=html.match(/<script id="talera-present-bottom-tint-script">([\s\S]*?)<\/script>/)?.[1];
- assert.ok(script,'color synchronizer exists');
- const styles={};
- const bodyStyles={};
- let metaValue='';
- const listeners={};
- const doc={
-   readyState:'complete',
-   documentElement:{style:{setProperty:(k,v)=>{styles[k]=v;}}},
-   body:{style:{setProperty:(k,v)=>{bodyStyles[k]=v;}}},
-   querySelector:q=>q==='.memory-space'?space:q==='meta[name="theme-color"]'?meta:null,
-   getElementById:q=>q==='photoStage'?stage:q==='memoryStoryScroll'?scroll:null,
-   createElement:q=>{assert.equal(q,'canvas');return {
-     width:0,height:0,getContext:()=>({
-       drawImage:()=>{},
-       getImageData:()=>{const data=new Uint8ClampedArray(40*8*4);
-         for(let i=0;i<data.length;i+=4){data[i]=96;data[i+1]=130;data[i+2]=158;data[i+3]=255;}
-         return {data};
-       }
-     })
-   };},
-   addEventListener:(event,fn)=>{listeners['document:'+event]=fn;}
- };
- const meta={setAttribute:(k,v)=>{if(k==='content')metaValue=v;}};
- const photo={
-   complete:true,naturalWidth:128,naturalHeight:256,
-   currentSrc:'blob:photo-a',src:'blob:photo-a',
-   getBoundingClientRect:()=>({width:128,height:256})
- };
- const layer={querySelector:()=>photo};
- const stage={
-   querySelectorAll:selector=>selector.includes('talera-photo-strip-page')?[]:[layer],
-   querySelector:selector=>selector.includes('talera-photo-strip.is-visible')?null:photo,
-   addEventListener:(event,fn)=>{listeners['stage:'+event]=fn;}
- };
- const scroll={scrollTop:0,classList:{contains:()=>false},
-   addEventListener:(event,fn)=>{listeners['scroll:'+event]=fn;}};
+ const style=html.match(/<style id="talera-present-bottom-tint">([\s\S]*?)<\/style>/)?.[1];
+ assert.ok(script,'presentation mode synchronizer exists');
+ assert.ok(style,'presentation-specific black background rules exist');
+ assert.match(style,/--talera-present-edge-color:#000000/);
+ assert.doesNotMatch(script,/getImageData|drawImage|activePhoto/,'black is fixed; no image sampling');
+ assert.match(script,/taleraTintTest/,'opt-in diagnostics remain possible');
+ const cssWrites={},bodyWrites={}; let themeValue='',paper='247,244,239'; const events={};
+ const scroll={scrollTop:0,classList:{contains:()=>false},addEventListener:(name,fn)=>events['scroll:'+name]=fn};
  const space={classList:{contains:()=>false}};
- const windowMock={addEventListener:(event,fn)=>{listeners['window:'+event]=fn;}};
- const MutationObserverMock=class{observe(){}};
+ const card={};
+ const theme={setAttribute:(key,value)=>{if(key==='content')themeValue=value;}};
+ const doc={
+  readyState:'complete',
+  documentElement:{style:{setProperty:(key,value)=>cssWrites[key]=value}},
+  body:{style:{setProperty:(key,value)=>bodyWrites[key]=value}},
+  querySelector:q=>q==='.memory-space'?space:q==='meta[name="theme-color"]'?theme:null,
+  getElementById:q=>q==='memoryStoryScroll'?scroll:q==='memoryCaption'?card:null,
+  addEventListener:(name,fn)=>events['document:'+name]=fn
+ };
  runInNewContext(script,{
-   window:windowMock,document:doc,MutationObserver:MutationObserverMock,
-   getComputedStyle:()=>({opacity:'1'}),
-   requestAnimationFrame:fn=>{fn();return 1;}
+  window:{addEventListener:(name,fn)=>events['window:'+name]=fn},
+  document:doc,
+  getComputedStyle:element=>element===space?{
+    getPropertyValue:key=>key==='--story-neutral'?paper:''
+  }:{backgroundColor:'rgb(247, 244, 239)'},
+  MutationObserver:class{observe(){}},
+  requestAnimationFrame:fn=>{fn();return 1;}
  });
- assert.equal(styles['--talera-present-edge-color'],'#60829e','image bottom color sampled from actual pixel values');
- assert.match(script,/taleraTintTest/,'optional latency debug mode is present');
- assert.match(script,/talera-photo-strip\.is-visible/,'active swipe strip recognized');
- assert.match(script,/Math\.round\(Math\.max\(0, tick\(\)-eventAt\)\)/,'requested latency is measured');
- assert.equal(metaValue,'#60829e');
- assert.equal(bodyStyles['--talera-present-edge-color'],'#60829e');
+ assert.equal(cssWrites['--talera-present-edge-color'],'#000000','photo view is black');
+ assert.equal(bodyWrites['--talera-present-edge-color'],'#000000');
+ assert.equal(themeValue,'#000000','native requested system color is black');
  scroll.scrollTop=70;
- listeners['scroll:scroll']();
- assert.equal(styles['--talera-present-edge-color'],'#FFFFFF','opening white reading sheet turns strip white');
+ events['scroll:scroll']();
+ assert.equal(cssWrites['--talera-present-edge-color'],'#F7F4EF','opened pane matches existing warm paper');
+ assert.equal(themeValue,'#F7F4EF');
+ paper='245,243,237';
+ events['scroll:scroll']();
+ assert.equal(cssWrites['--talera-present-edge-color'],'#F5F3ED','color follows source token, not hardcoded approximation');
  scroll.scrollTop=0;
- listeners['scroll:scroll']();
- assert.equal(styles['--talera-present-edge-color'],'#60829e','closing sheet restores active photo tint');
+ events['scroll:scroll']();
+ assert.equal(cssWrites['--talera-present-edge-color'],'#000000','return to photo restores black');
+ assert.equal(themeValue,'#000000');
 });
 
 test('all ordinary HTML entry routes request the same iOS status mode as presentation',async()=>{

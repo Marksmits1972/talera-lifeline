@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import worker,{
-  missingStillIndices,ORIGINAL_VOICE_END,PHOTO_HOLD_MS,PHOTO_TAIL_PATCH,
+  missingStillIndices,ORIGINAL_VOICE_END,ORIGINAL_VIDEO_ROUND_INSERTION_POINT,PHOTO_HOLD_MS,PHOTO_TAIL_PATCH,
   applyMissingPhotoTail
 } from './vertel-restbeelden.worker.mjs';
 
@@ -24,7 +24,7 @@ function mock(html,{contentType='text/html; charset=utf-8',status=200}={}){
 }
 const marker='<script>const taleraZero=true;function taleraStartOriginalRound(){return true;}';
 const fixture='<!doctype html><html><head><title>Player</title></head><body>'+
- marker+'var recorder="untouched";'+ORIGINAL_VOICE_END+
+ marker+'var recorder="untouched";'+ORIGINAL_VIDEO_ROUND_INSERTION_POINT+ORIGINAL_VOICE_END+
  'voice.addEventListener("timeupdate",follow);</script><p>Originele speler</p></body></html>';
 
 test('six images, first three narrated: remaining 4, 5 and 6 are scheduled',()=>{
@@ -50,13 +50,15 @@ test('all discussed, video-only or no media: nothing appended',()=>{
 test('invalid cue indices do not mark a photo discussed',()=>{
  assert.deepEqual(missingStillIndices([image('a'),image('b')],[{index:-1},{index:7},{index:1.2},{index:'foo'},{index:'1'}]),[0]);
 });
-test('patch targets exactly one original ended handler, preserves the other player byte-for-byte',()=>{
+test('patch hooks video launch once while original voice-ended handler and entire player remain byte-for-byte',()=>{
  const result=applyMissingPhotoTail(fixture);
  assert.equal(result.status,'installed');
- assert.equal(result.html.slice(0,fixture.indexOf(ORIGINAL_VOICE_END)),fixture.slice(0,fixture.indexOf(ORIGINAL_VOICE_END)));
+ assert.equal(result.html.slice(0,fixture.indexOf(ORIGINAL_VIDEO_ROUND_INSERTION_POINT)),fixture.slice(0,fixture.indexOf(ORIGINAL_VIDEO_ROUND_INSERTION_POINT)));
+ assert.equal(result.html.split(ORIGINAL_VOICE_END).length-1,1,'native voice-ended handler stays intact verbatim');
  assert.equal(result.html.slice(result.html.indexOf('voice.addEventListener("timeupdate",follow)')),
   fixture.slice(fixture.indexOf('voice.addEventListener("timeupdate",follow)')));
- assert.match(result.html,/function taleraV10StartRemainingPhotos/);
+ assert.match(result.html,/function taleraV10PrepareBeforeOriginalVideoRound/);
+ assert.match(result.html,/const taleraV10SavedStartOriginalVideoRound = taleraStartOriginalRound/);
  assert.match(result.html,/taleraStartOriginalRound\(\)/);
  assert.match(result.html,/msg\("Terugkijken afgelopen"\)/);
  assert.doesNotMatch(result.html,/const recorder="changed"/);
@@ -66,7 +68,7 @@ test('patch targets exactly one original ended handler, preserves the other play
 });
 test('missing or ambiguous source anchor fails closed; never blindly overwrites player code',()=>{
  assert.deepEqual(applyMissingPhotoTail('no original cues'),{html:'no original cues',status:'anchor-unmatched'});
- const duplicate=fixture.replace('</script>',ORIGINAL_VOICE_END+'</script>');
+ const duplicate=fixture.replace('</script>',ORIGINAL_VIDEO_ROUND_INSERTION_POINT+'</script>');
  assert.equal(applyMissingPhotoTail(duplicate).status,'anchor-unmatched');
 });
 test('GET embed only is patched, preserving upstream status and caching controls',async()=>{
@@ -77,7 +79,7 @@ test('GET embed only is patched, preserving upstream status and caching controls
  assert.equal(response.headers.get('x-talera-v10-tail-photos'),'installed');
  assert.equal(response.headers.get('etag'),null);
  assert.equal(response.headers.get('x-upstream'),'stil-luxe');
- assert.match(s,/taleraV10MissingPhotos/);
+ assert.match(s,/taleraV10PendingStillIndices/);
  assert.equal(requests[0].path,'/vertelmodus-embed');
 });
 test('presenter, home, editor, APIs, POST and non-HTML are strictly passed through',async()=>{
@@ -130,7 +132,8 @@ function simulate(items,cues,{present=true,voiceUrl='blob:narration',videos=true
    return ms;
  }
  return {state,shown,notices,stages,clockLabel,timers,playButton,
-   end:()=>eventHandlers.get('ended')(),
+   end:()=>{if(!context.taleraStartOriginalRound()){context.mode('ready');context.msg('Terugkijken afgelopen');}
+      context.$('clock').textContent=context.clock(state.duration);},
    nextPhotoTimer,
    message:data=>eventHandlers.get('window:message')({origin,data}),
    hide:()=>eventHandlers.get('window:pagehide')(),
@@ -169,7 +172,7 @@ test('photo-only story: final still then normal end, no fake audio or duplicate 
  for(let k=0;k<4;k++)s.nextPhotoTimer();
  assert.equal(s.shown.length,4);
  assert.equal(s.videoStarts,1,'after four stills no extra timer is created');
- assert.equal(s.notices.at(-1),'Terugkijken afgelopen');
+ assert.equal(s.notices.at(-1),'Herinnering afgelopen');
 });
 test('reinitializing or pausing the iframe cancels timers and forbids an orphan advance',()=>{
  for(const type of ['INIT','PAUSE_PLAYER']){

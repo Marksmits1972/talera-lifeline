@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {deflateSync,inflateSync} from 'node:zlib';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import app from './stille-luxe.worker.mjs';
 
 const origin='https://staging.example.test';
@@ -174,4 +175,64 @@ test('native editor visuals change only color tokens, not recording or toolbar g
  assert.match(css,/#v30DateBox #v30DateSave\{background:#304653/);
  assert.doesNotMatch(css,/#taleraV61RecControls\s*\{/);
  assert.doesNotMatch(css,/#photoLayerA\s*\{/);
+});
+
+test('adaptive presentation edge samples current image and switches to white on raised reading panel',async()=>{
+ const original='<!doctype html><html><head><meta name="theme-color" content="#304653"></head><body></body></html>';
+ const response=await app.fetch(new Request(origin+'/present'),mock(original).env);
+ const html=await response.text();
+ const script=html.match(/<script id="talera-present-bottom-tint-script">([\s\S]*?)<\/script>/)?.[1];
+ assert.ok(script,'color synchronizer exists');
+ const styles={};
+ const bodyStyles={};
+ let metaValue='';
+ const listeners={};
+ const doc={
+   readyState:'complete',
+   documentElement:{style:{setProperty:(k,v)=>{styles[k]=v;}}},
+   body:{style:{setProperty:(k,v)=>{bodyStyles[k]=v;}}},
+   querySelector:q=>q==='.memory-space'?space:q==='meta[name="theme-color"]'?meta:null,
+   getElementById:q=>q==='photoStage'?stage:q==='memoryStoryScroll'?scroll:null,
+   createElement:q=>{assert.equal(q,'canvas');return {
+     width:0,height:0,getContext:()=>({
+       drawImage:()=>{},
+       getImageData:()=>{const data=new Uint8ClampedArray(40*8*4);
+         for(let i=0;i<data.length;i+=4){data[i]=96;data[i+1]=130;data[i+2]=158;data[i+3]=255;}
+         return {data};
+       }
+     })
+   };},
+   addEventListener:(event,fn)=>{listeners['document:'+event]=fn;}
+ };
+ const meta={setAttribute:(k,v)=>{if(k==='content')metaValue=v;}};
+ const photo={
+   complete:true,naturalWidth:128,naturalHeight:256,
+   currentSrc:'blob:photo-a',src:'blob:photo-a',
+   getBoundingClientRect:()=>({width:128,height:256})
+ };
+ const layer={querySelector:()=>photo};
+ const stage={
+   querySelectorAll:()=>[layer],
+   querySelector:()=>photo,
+   addEventListener:(event,fn)=>{listeners['stage:'+event]=fn;}
+ };
+ const scroll={scrollTop:0,classList:{contains:()=>false},
+   addEventListener:(event,fn)=>{listeners['scroll:'+event]=fn;}};
+ const space={classList:{contains:()=>false}};
+ const windowMock={addEventListener:(event,fn)=>{listeners['window:'+event]=fn;}};
+ const MutationObserverMock=class{observe(){}};
+ runInNewContext(script,{
+   window:windowMock,document:doc,MutationObserver:MutationObserverMock,
+   getComputedStyle:()=>({opacity:'1'}),
+   requestAnimationFrame:fn=>{fn();return 1;}
+ });
+ assert.equal(styles['--talera-present-edge-color'],'#60829e','image bottom color sampled from actual pixel values');
+ assert.equal(metaValue,'#60829e');
+ assert.equal(bodyStyles['--talera-present-edge-color'],'#60829e');
+ scroll.scrollTop=70;
+ listeners['scroll:scroll']();
+ assert.equal(styles['--talera-present-edge-color'],'#FFFFFF','opening white reading sheet turns strip white');
+ scroll.scrollTop=0;
+ listeners['scroll:scroll']();
+ assert.equal(styles['--talera-present-edge-color'],'#60829e','closing sheet restores active photo tint');
 });

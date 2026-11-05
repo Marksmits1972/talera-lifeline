@@ -27,6 +27,7 @@ if(result.status!=='installed'){
     name,html.split(token).length-1
   ]));
   console.log('Read-only real V9 anchor counts:',JSON.stringify(counts));
+  console.log('Native V9 media-function signatures:',JSON.stringify(html.match(/function taleraInlinePlayMedia\([^)]*\)\s*\{/g)||[]));
 }
 assert.equal(result.status,'installed','current V9 inline anchors must match exactly');
 assert.equal(result.html.split(INLINE_PHOTO_HELPER).length-1,1);

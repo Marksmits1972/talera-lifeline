@@ -31,3 +31,8 @@ for(const needle of needles){
    for(const p of matches.slice(0,10))console.log('EXCERPT',needle,p,JSON.stringify(html.slice(Math.max(0,p-360),Math.min(html.length,p+560))));
  }
 }
+
+for(const needle of ['async function hydrate(', 'function hydrate(', 'function toMemory(', 'function disposePresentation(', 'window.__taleraV31SelectPhoto=', 'const hydrate=', 'const toMemory=', "s.warmImages=frames.map(frame=>{"]){
+ const p=html.indexOf(needle);
+ console.log('FOCUSED',needle,p, p<0?'':JSON.stringify(html.slice(p,Math.min(html.length,p+6100))));
+}

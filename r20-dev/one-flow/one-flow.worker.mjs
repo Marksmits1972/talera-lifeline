@@ -249,8 +249,8 @@ export function applyUnifiedTail(html){
   const audioEnd=result.indexOf('async function present(memory){',audioStart);
   if(audioStart<0||audioEnd<0)return {html,status:'anchor-unmatched'};
   const audioSource=result.slice(audioStart,audioEnd);
-  const oldRetry="  const retry=e=>{\\n    const s=taleraInline;";
-  const newRetry="  const retry=e=>{\\n    if(!taleraUnifiedWasStationaryTap(e))return;\\n    const s=taleraInline;";
+  const oldRetry="  const retry=e=>{\n    const s=taleraInline;";
+  const newRetry="  const retry=e=>{\n    if(!taleraUnifiedWasStationaryTap(e))return;\n    const s=taleraInline;";
   const oldClickGuard="    if(s?.engine!=='narrated'||s.phase!=='narration')return;";
   const newClickGuard="    if(s?.engine!=='narrated')return;";
   if(audioSource.split(oldRetry).length!==2||audioSource.split(oldClickGuard).length!==2)
@@ -269,8 +269,8 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
-    .replace("  const retry=e=>{\\n    if(!taleraUnifiedWasStationaryTap(e))return;\\n    const s=taleraInline;",
-      "  const retry=e=>{\\n    const s=taleraInline;")
+    .replace("  const retry=e=>{\n    if(!taleraUnifiedWasStationaryTap(e))return;\n    const s=taleraInline;",
+      "  const retry=e=>{\n    const s=taleraInline;")
     .replace("    if(s?.engine!=='narrated')return;",
       "    if(s?.engine!=='narrated'||s.phase!=='narration')return;")
     .replace(INLINE_TAIL+'\n','')

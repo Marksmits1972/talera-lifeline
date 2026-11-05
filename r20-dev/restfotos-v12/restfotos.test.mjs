@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import worker, {
-  INLINE_PHOTO_HELPER, ORIGINAL_VIDEO_DONE, PATCHED_VIDEO_DONE,
+  INLINE_PHOTO_HELPER, ORIGINAL_VIDEO_SELECTION, PATCHED_VIDEO_SELECTION,
+  ORIGINAL_VIDEO_DONE, PATCHED_VIDEO_DONE,
   ORIGINAL_NO_VIDEOS, PATCHED_NO_VIDEOS, addRemainingPhotosToInlinePlayer
 } from './restfotos.worker.mjs';
 
@@ -54,13 +55,15 @@ function harness(frames,cues){
   };
 }
 
-test('exact V9 code outside one added helper and TWO video-end branches',()=>{
+test('exact V9 code outside one helper and THREE original transition hooks',()=>{
   const result=addRemainingPhotosToInlinePlayer(native);
   assert.equal(result.status,'installed');
   assert.equal(result.html.split(INLINE_PHOTO_HELPER).length-1,1);
+  assert.equal(result.html.split(PATCHED_VIDEO_SELECTION).length-1,1);
   assert.equal(result.html.split(PATCHED_VIDEO_DONE).length-1,1);
   assert.equal(result.html.split(PATCHED_NO_VIDEOS).length-1,1);
   assert.equal(result.html.replace(INLINE_PHOTO_HELPER+'\n','')
+    .replace(PATCHED_VIDEO_SELECTION,ORIGINAL_VIDEO_SELECTION)
     .replace(PATCHED_VIDEO_DONE,ORIGINAL_VIDEO_DONE)
     .replace(PATCHED_NO_VIDEOS,ORIGINAL_NO_VIDEOS),native);
   assert.equal(addRemainingPhotosToInlinePlayer(result.html).status,'already-installed');
@@ -120,6 +123,38 @@ test('switching memories prevents delayed photos changing the new memory',()=>{
   h.ctx.taleraInline={memory:{id:'different'}};
   h.tick();
   assert.deepEqual(h.log.shown,[1]);
+});
+
+test('narrated video is replayed fully, then alternating remaining photos and videos keep their saved order',()=>{
+  const h=harness([video('v1'),photo('p1'),photo('p2'),video('v2'),photo('p3')],
+    [cue('v1'),cue('p1')]);
+  h.voiceEnd();
+  assert.deepEqual(h.log.videos.map(v=>v.key),['v1']);
+  assert.equal(h.log.videos[0].muted,false);
+  h.finishVideo(0);
+  assert.deepEqual(h.log.shown,[0,2]);
+  assert.equal(h.tick(),4000);
+  assert.deepEqual(h.log.shown,[0,2,3]);
+  assert.deepEqual(h.log.videos.map(v=>v.key),['v1','v2']);
+  assert.deepEqual(h.log.videos.map(v=>v.muted),[false,false]);
+  h.finishVideo(1);
+  assert.deepEqual(h.log.shown,[0,2,3,4]);
+  assert.equal(h.tick(),4000);
+  assert.equal(h.s.phase,'done');
+});
+
+test('when no video was narrated, a later video stays between its original photos',()=>{
+  const h=harness([photo('p1'),photo('p2'),video('v3'),photo('p4')],
+    [cue('p1')]);
+  h.voiceEnd();
+  assert.deepEqual(h.log.shown,[1]);
+  assert.equal(h.tick(),4000);
+  assert.deepEqual(h.log.shown,[1,2]);
+  assert.deepEqual(h.log.videos.map(v=>({key:v.key,muted:v.muted})),[{key:'v3',muted:false}]);
+  h.finishVideo(0);
+  assert.deepEqual(h.log.shown,[1,2,3]);
+  assert.equal(h.tick(),4000);
+  assert.equal(h.s.phase,'done');
 });
 
 test('different or duplicated V9 playback anchors fail closed',()=>{

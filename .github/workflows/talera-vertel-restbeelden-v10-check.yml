@@ -21,6 +21,8 @@ jobs:
         run: node --check r20-dev/vertel-restbeelden/vertel-restbeelden.worker.mjs
       - name: Run audio-photo-tail regression suite
         run: node --test r20-dev/vertel-restbeelden/vertel-restbeelden.test.mjs
+      - name: Read-only live staging smoke (no media and no writes)
+        run: node r20-dev/vertel-restbeelden/smoke-live.mjs
       - name: Enforce separate adapter, no mutations to stored audio or base PWA
         run: |
           node --input-type=module - <<'NODE'

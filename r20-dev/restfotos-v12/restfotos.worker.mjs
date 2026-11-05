@@ -1,75 +1,54 @@
-/* TALERA V12 - safe, minimal extension around approved V9.
- * Three small source substitutions on two protected V9 HTML routes:
- *  1) /present: explicitly activate the already-hydrated current memory
- *     after restoring its saved local record on a fresh open.
- *     and restart its original player only when the previous iframe is gone.
- *  2) /vertelmodus-embed: at real voice-ended, display the remaining still
- *     images from the EXISTING cue/index mapping; then call the original
- *     video function exactly as before.
- * NO extra diagnostic, proxy player, storage change, or video interception.
+/* TALERA V12 — minimale restfoto-uitbreiding op de GOEDGEKEURDE V9 INLINE
+ * presentatiemodus. GEEN iframe-speler of nieuwe mediacyclus.
+ * Er verandert uitsluitend GET /present op exact twee plaatsen:
+ * 1. één helper voor ongebruikte foto-ID's in de originele fotolaag;
+ * 2. aan het eind van stemopname de bestaande helper aanroepen.
+ * De originele taleraInlineVoiceEnded(), videoronde, recorder, opslaan,
+ * tijdcodes, navigatie en alle andere routes blijven byte-identiek.
  */
-export const ORIGINAL_VOICE_END="voice.addEventListener(\"ended\",function(){if(state.media&&state.media.pause)state.media.pause();if(!taleraStartOriginalRound()){mode(\"ready\");msg(\"Terugkijken afgelopen\")} $(\"clock\").textContent=clock(state.duration)});";
-export const PATCHED_VOICE_END="voice.addEventListener(\"ended\",function(){if(state.media&&state.media.pause)state.media.pause();if(!taleraV12RemainingPhotos()){mode(\"ready\");msg(\"Terugkijken afgelopen\")} $(\"clock\").textContent=clock(state.duration)});";
-export const PHOTO_TAIL_HELPER="/* TALERA V12: only in PRESENTATION, after real voice ended.\n   Existing recording, cue creation and original video round are untouched. */\nfunction taleraV12RemainingPhotos(){\n  if(!document.body.classList.contains('present'))\n    return taleraStartOriginalRound();\n  const spoken=new Set(state.cues.map(c=>Number(c.index)));\n  const rest=[];\n  state.items.forEach((item,i)=>{\n    if(item.type==='image'&&!spoken.has(i))rest.push(i);\n  });\n  if(!rest.length)return taleraStartOriginalRound();\n  const originalItems=state.items,originalVoice=state.voiceUrl;\n  let nextIndex=0;\n  mode('ready');\n  function next(){\n    if(state.items!==originalItems||state.voiceUrl!==originalVoice||\n       state.mode==='playing'||state.mode==='recording')return;\n    if(nextIndex===rest.length){\n      if(!taleraStartOriginalRound()){\n        mode('ready');\n        $('play').hidden=false;\n        msg('Terugkijken afgelopen');\n      }\n      return;\n    }\n    show(rest[nextIndex++]);\n    $('play').hidden=true;\n    setTimeout(next,4000);\n  }\n  next();\n  return true;\n}\n";
-export const ORIGINAL_PRESENTER_GUARD="if(activeId===id)return;";
-export const PATCHED_PRESENTER_GUARD="if(activeId===id&&currentPresentation?.frame?.isConnected)return;";
-export const ORIGINAL_RESTORE="if(visible?._taleraLocal)await hydrate(visible);";
-export const PATCHED_RESTORE="if(visible?._taleraLocal){await hydrate(visible);activate(visible);}";
-const MARKER='function taleraV12RemainingPhotos(){';
+export const INLINE_PHOTO_HELPER="/* After the recorded voice, show only photos whose existing media IDs\n   never appeared in the recorded cues. The native photo surface and the\n   original unmuted video replay remain the only presentation engines. */\nfunction taleraInlineRemainingPhotos(s){\n  if(s!==taleraInline||s.phase!=='narration')return;\n  const spoken=new Set(s.cues.map(c=>c.mediaId));\n  const remaining=[];\n  s.frames.forEach((frame,i)=>{\n    if(frame.kind==='photo'&&!spoken.has(frame.key))remaining.push(i);\n  });\n  if(!remaining.length){taleraInlineVoiceEnded(s);return;}\n  taleraInlineCleanVideo(s);\n  s.phase='remainingPhotos';\n  let nextIndex=0;\n  function next(){\n    if(s!==taleraInline||s.phase!=='remainingPhotos'||\n       runtime.currentMemory()?.id!==s.memory.id)return;\n    if(nextIndex===remaining.length){\n      s.ordinaryTimer=null;\n      s.phase='narration';\n      taleraInlineVoiceEnded(s);\n      return;\n    }\n    taleraInlineSetFrame(s,remaining[nextIndex++]);\n    s.ordinaryTimer=setTimeout(next,4000);\n  }\n  next();\n}\n";
+export const ORIGINAL_AUDIO_END="audio.onended=()=>{stopTimer();tick();taleraInlineVoiceEnded(s)};";
+export const PATCHED_AUDIO_END="audio.onended=()=>{stopTimer();tick();taleraInlineRemainingPhotos(s)};";
+export const INSERT_ANCHOR="function taleraInlineVoiceEnded(s){";
+export const INSTALLED_MARKER="function taleraInlineRemainingPhotos(s){";
 
-export function patchEmbed(html){
+export function addRemainingPhotosToInlinePlayer(html){
  if(typeof html!=='string')return{html,status:'not-html'};
- if(html.includes(MARKER))return{html,status:'already-installed'};
- const i=html.indexOf(ORIGINAL_VOICE_END);
- if(i<0||html.indexOf(ORIGINAL_VOICE_END,i+1)!==-1||
-    !html.includes('function taleraStartOriginalRound(){')||
-    !html.includes('function show(n)'))return{html,status:'anchor-unmatched'};
- return{html:html.slice(0,i)+PHOTO_TAIL_HELPER+'\n'+PATCHED_VOICE_END+
-    html.slice(i+ORIGINAL_VOICE_END.length),status:'installed'};
-}
-
-export function patchPresentation(html){
- if(typeof html!=='string')return{html,status:'not-html'};
- if(html.includes(PATCHED_RESTORE)&&html.includes(PATCHED_PRESENTER_GUARD))
-   return{html,status:'already-installed'};
- if(!html.includes("runtime.subscribe(activate);")||
-    !html.includes("runtime.registerMemories(memories);"))
-   return{html,status:'anchor-unmatched'};
- const swaps=[
-  [ORIGINAL_PRESENTER_GUARD,PATCHED_PRESENTER_GUARD],
-  [ORIGINAL_RESTORE,PATCHED_RESTORE]
+ if(html.includes(INSTALLED_MARKER))return{html,status:'already-installed'};
+ const required=[
+  INSERT_ANCHOR,ORIGINAL_AUDIO_END,
+  'function taleraInlineSetFrame(s,index){',
+  'function taleraInlineReplayNext(s){',
+  'function taleraInlineCleanVideo(s){'
  ];
- // Fail closed: require both exact original anchors and no duplicate.
- for(const [oldText] of swaps){
-  const i=html.indexOf(oldText);
-  if(i<0||html.indexOf(oldText,i+1)!==-1)return{html,status:'anchor-unmatched'};
+ for(const token of required){
+  const at=html.indexOf(token);
+  if(at<0||html.indexOf(token,at+1)>=0)
+    return{html,status:'anchor-unmatched'};
  }
- let updated=html;
- for(const [oldText,newText] of swaps)updated=updated.replace(oldText,newText);
- return{html:updated,status:'installed'};
+ const before=html.indexOf(INSERT_ANCHOR);
+ const after=html.indexOf(ORIGINAL_AUDIO_END);
+ if(after<=before)return{html,status:'anchor-unmatched'};
+ const patched=html.slice(0,before)+INLINE_PHOTO_HELPER+'\n'+html.slice(before);
+ return{html:patched.replace(ORIGINAL_AUDIO_END,PATCHED_AUDIO_END),status:'installed'};
 }
 
 export default {
  async fetch(request,env){
   if(!env?.STYLE_BASE?.fetch)
-    return new Response('Beschermde TALERA V9 basis ontbreekt',{status:503});
+   return new Response('Beschermde TALERA V9 basis ontbreekt',{status:503});
   const upstream=await env.STYLE_BASE.fetch(request);
-  const path=new URL(request.url).pathname;
-  if(request.method!=='GET'||!upstream.ok||
-     (upstream.headers.get('content-type')||'').toLowerCase().indexOf('text/html')<0||
-     !['/vertelmodus-embed','/present'].includes(path))
-    return upstream;
-  const source=await upstream.text();
-  const result=path==='/vertelmodus-embed'?patchEmbed(source):patchPresentation(source);
-  // Fail closed on upstream changes; NEVER force an incomplete rewrite.
+  if(request.method!=='GET'||new URL(request.url).pathname!=='/present'||
+     !upstream.ok||!(upstream.headers.get('content-type')||'').includes('text/html'))
+   return upstream;
+  const {html,status}=addRemainingPhotosToInlinePlayer(await upstream.text());
   const headers=new Headers(upstream.headers);
-  if(result.status==='installed'){
-    headers.delete('etag');headers.delete('content-length');
-    headers.delete('content-encoding');
-    headers.set('cache-control','no-store');
+  if(status==='installed'){
+   headers.delete('etag');headers.delete('content-length');
+   headers.delete('content-encoding');
+   headers.set('cache-control','no-store');
   }
-  headers.set('x-talera-v12-restfotos',result.status);
-  return new Response(result.html,{status:upstream.status,
-    statusText:upstream.statusText,headers});
+  headers.set('x-talera-v12-inline-restfotos',status);
+  return new Response(html,{status:upstream.status,statusText:upstream.statusText,headers});
  }
 };

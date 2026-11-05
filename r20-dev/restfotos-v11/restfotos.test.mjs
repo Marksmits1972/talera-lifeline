@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import worker,{
   VOICE_END_ORIGINAL,VOICE_END_WITH_PHOTOS,PHOTO_HELPER,addRemainingPhotos,
-  READ_ONLY_AUDIT_SCRIPT,READ_ONLY_AUDIT_ID,addReadOnlyAudit
+  READ_ONLY_AUDIT_SCRIPT,READ_ONLY_AUDIT_ID,addReadOnlyAudit,
+  FRONT_DIAG_SCRIPT,FRONT_DIAG_ID,addFrontDiagnostic
 } from './restfotos.worker.mjs';
 
 const photo=id=>({id,type:'image'});
@@ -109,7 +110,7 @@ test('injection is fail-closed if source changed or voice handler duplicated',()
  assert.equal(addRemainingPhotos('unrelated html').status,'anchor-unmatched');
  assert.equal(addRemainingPhotos(original.replace('</script>',VOICE_END_ORIGINAL+'</script>')).status,'anchor-unmatched');
 });
-test('only GET /vertelmodus-embed is affected, all other routes and POST untouched',async()=>{
+test('only GET embed and temporary front diagnose on /present and /tell are changed',async()=>{
  const env={STYLE_BASE:{fetch:async()=>new Response(original,{headers:{
   'content-type':'text/html; charset=utf-8',etag:'original-html'
  }})}};
@@ -117,7 +118,15 @@ test('only GET /vertelmodus-embed is affected, all other routes and POST untouch
  assert.equal(embed.headers.get('x-talera-v11-photos'),'installed');
  assert.equal(embed.headers.get('etag'),null);
  assert.match(await embed.text(),/taleraV11ShowRemainingPhotos/);
- for(const path of ['/','/present','/tell','/api/memory']){
+ for(const path of ['/present','/tell']){
+  const response=await worker.fetch(new Request('https://stage.test'+path),env);
+  assert.equal(response.headers.get('x-talera-v11-front-diagnostic'),'installed');
+  assert.equal(response.headers.get('etag'),null);
+  const html=await response.text();
+  assert.ok(html.includes('id="'+FRONT_DIAG_ID+'"'));
+  assert.equal(html.replace('<script id="'+FRONT_DIAG_ID+'">'+FRONT_DIAG_SCRIPT+'</script>',''),original);
+ }
+ for(const path of ['/','/api/memory']){
   const response=await worker.fetch(new Request('https://stage.test'+path),env);
   assert.equal(await response.text(),original);
   assert.equal(response.headers.get('etag'),'original-html');
@@ -125,6 +134,7 @@ test('only GET /vertelmodus-embed is affected, all other routes and POST untouch
  const post=await worker.fetch(new Request('https://stage.test/vertelmodus-embed',{method:'POST'}),env);
  assert.equal(await post.text(),original);
 });
+
 test('no service binding fails without modifying protected original',async()=>{
  const response=await worker.fetch(new Request('https://stage.test/vertelmodus-embed'),{});
  assert.equal(response.status,503);
@@ -145,4 +155,20 @@ test('read-only diagnostic is appended only after the native player, never insid
  assert.match(audited,/window\.addEventListener\('message'/);
  assert.match(audited,/new MutationObserver\(render\)\.observe/);
  assert.doesNotMatch(READ_ONLY_AUDIT_SCRIPT,/indexedDB|localStorage|fetch\s*\(|taleraStartOriginalRound\s*=|voice\.play\s*\(|audio\.play\s*\(|state\.items\s*=/);
+});
+
+
+test('temporary front diagnose is removable without touching the original parent page',()=>{
+ const page='<!doctype html><html><body><main>Original original</main></body></html>';
+ const result=addFrontDiagnostic(page);
+ assert.equal(result.status,'installed');
+ const injected='<script id="'+FRONT_DIAG_ID+'">'+FRONT_DIAG_SCRIPT+'</script>';
+ assert.equal(result.html.replace(injected,''),page,'all original DOM is preserved byte-for-byte');
+ assert.equal(result.html.split(injected).length-1,1,'one removable diagnostic tag only');
+ assert.equal(addFrontDiagnostic(result.html).status,'already-installed');
+ assert.equal(addFrontDiagnostic('source changed').status,'anchor-unmatched');
+ assert.match(FRONT_DIAG_SCRIPT,/talera-v11-debug-toggle/);
+ assert.match(FRONT_DIAG_SCRIPT,/talera-v11-debug-panel/);
+ assert.match(FRONT_DIAG_SCRIPT,/Kopieer/);
+ assert.doesNotMatch(FRONT_DIAG_SCRIPT,/indexedDB|localStorage|fetch\s*\(|voice\.play\s*\(|taleraStartOriginalRound\s*=/);
 });

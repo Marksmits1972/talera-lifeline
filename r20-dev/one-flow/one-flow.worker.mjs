@@ -69,6 +69,11 @@ function taleraUnifiedPrimeCurrent(){
    unlock any clip. Only the app's explicit Beluister/listening action (which
    runs in the original user gesture) can authorize original video sound.
    In particular, SWIPES must not call video.play() on prepared clips. */
+/* The existing visible "Luister" / automatic-listening BUTTONS are valid
+   audio gestures. This does not add a player or make the story photo tappable. */
+document.addEventListener('click',e=>{
+  if(e.target?.closest?.('.talera-audio-consent,.talera-memory-audio'))taleraUnifiedPrimeCurrent();
+},true);
 document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);
 function taleraUnifiedTakePrimed(s,frame){
   if(s.phase!=='originals')return null;

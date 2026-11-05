@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {Script} from 'node:vm';
 import {
  VOICE_END_ORIGINAL,VOICE_END_WITH_PHOTOS,PHOTO_HELPER,
- READ_ONLY_AUDIT_SCRIPT,READ_ONLY_AUDIT_ID
+ READ_ONLY_AUDIT_SCRIPT,READ_ONLY_AUDIT_ID,
+ FRONT_DIAG_SCRIPT,FRONT_DIAG_ID
 } from './restfotos.worker.mjs';
 
 const base='https://talera-vertel-restfotos-v11-test-20261105.mark-a39.workers.dev';
@@ -12,7 +13,7 @@ const originalBase='https://talera-v9-stille-luxe-stijlstaging-20261104.mark-a39
 for(const [path,patched] of [
  ['/vertelmodus-embed?mode=present',true],
  ['/vertelmodus-embed?mode=record',true],
- ['/',false],['/present',false],['/tell',false]
+ ['/',false],['/present','front'],['/tell','front']
 ]){
  const [a,b]=await Promise.all([
   fetch(base+path,{headers:{'cache-control':'no-cache'}}),
@@ -39,9 +40,19 @@ for(const [path,patched] of [
   for(let i=0;i<scripts.length;i++)if(scripts[i].trim())
    assert.doesNotThrow(()=>new Script(scripts[i],{filename:'v11-live-embed-'+i}),
     'actual served JavaScript must parse');
+ }else if(patched==='front'){
+  assert.equal(a.headers.get('x-talera-v11-front-diagnostic'),'installed');
+  const tag='<script id="'+FRONT_DIAG_ID+'">'+FRONT_DIAG_SCRIPT+'</script>';
+  assert.equal(newHtml.split(tag).length-1,1,'only one front diagnostic script is appended');
+  assert.equal(newHtml.replace(tag,''),oldHtml.replaceAll(originalBase,base),
+    'the complete original present/tell page must remain byte-identical apart from the temporary debug button');
+  assert.doesNotThrow(()=>new Script(FRONT_DIAG_SCRIPT),'temporary parent debug script must parse');
+  assert.match(FRONT_DIAG_SCRIPT,/talera-v11-debug-toggle/);
+  assert.match(FRONT_DIAG_SCRIPT,/Kopieer/);
+  assert.doesNotMatch(FRONT_DIAG_SCRIPT,/indexedDB|localStorage|fetch\s*\(|voice\.play\s*\(|taleraStartOriginalRound\s*=/);
  }else{
   assert.equal(a.headers.get('x-talera-v11-photos'),null);
-  assert.equal(newHtml,oldHtml.replaceAll(originalBase,base),'root and other pages match original after hostname normalization');
+  assert.equal(newHtml,oldHtml.replaceAll(originalBase,base),'home and other pages unchanged');
  }
  console.log('PASS V11 real HTTP',path,patched?'single safe native voice-call extension':'byte-exact original');
 }

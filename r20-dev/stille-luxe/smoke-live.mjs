@@ -49,9 +49,9 @@ for(const check of checks){
     assert.match(text,/--talera-present-edge-color:#000000/,'black at start');
     assert.match(text,/--story-neutral/,'open reading panel reuses existing paper token');
     assert.match(text,/data-talera-present-reading/,'both black/paper states loaded up-front');
-    assert.match(text,/SHEET_FADE_PX = 90/,'reading sheet fades in 90px');
-    assert.match(text,/FOOTER_PAPER_AT_PX = 75/,'black footer waits until paper is about 93 percent opaque');
-    assert.match(text,/alpha - \.46/,'keep title white until sheet visibly brightens');
+    assert.match(text,/SHEET_FADE_PX = 78/,'reading sheet fade tuned to 78px');
+    assert.match(text,/FOOTER_PAPER_AT_PX = 60/,'earlier footer request at 60px gives iOS time to react');
+    assert.match(text,/alpha - \.62/,'title stays white until paper is much lighter');
     assert.match(text,/--talera-v28-paper-alpha:var\(--talera-present-sheet-alpha,0\)!important/,'reading-sheet-only opacity override');
     assert.doesNotMatch(text.slice(text.indexOf('<style id="talera-present-bottom-tint">'),text.indexOf('</style>',text.indexOf('<style id="talera-present-bottom-tint">'))),/html:has\(/,'no premature class-triggered white footer');
     assert.match(text,/scroll\.addEventListener\('scroll', sync/,'immediate readout update without scheduled frame');

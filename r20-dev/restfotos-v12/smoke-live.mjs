@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {Script} from 'node:vm';
 import {
  ORIGINAL_VOICE_END,PATCHED_VOICE_END,PHOTO_TAIL_HELPER,
- ORIGINAL_RESTORE,PATCHED_RESTORE
+ ORIGINAL_RESTORE,PATCHED_RESTORE,
+ ORIGINAL_STAGE_DECL,PATCHED_STAGE_DECL,ORIGINAL_ACTIVATE,PATCHED_ACTIVATE
 } from './restfotos.worker.mjs';
 
 const base='https://talera-v12-restfotos-veilige-test-20261105.mark-a39.workers.dev';
@@ -33,7 +34,11 @@ for(const [path,kind] of [
  }else if(kind==='present'){
   assert.equal(newRes.headers.get('x-talera-v12-restfotos'),'installed');
   assert.equal(newHtml.split(PATCHED_RESTORE).length-1,1);
-  reconstructed=newHtml.replace(PATCHED_RESTORE,ORIGINAL_RESTORE);
+  assert.equal(newHtml.split(PATCHED_ACTIVATE).length-1,1);
+  assert.equal(newHtml.split(PATCHED_STAGE_DECL).length-1,1);
+  reconstructed=newHtml.replace(PATCHED_RESTORE,ORIGINAL_RESTORE)
+   .replace(PATCHED_ACTIVATE,ORIGINAL_ACTIVATE)
+   .replace(PATCHED_STAGE_DECL,ORIGINAL_STAGE_DECL);
   assert.doesNotMatch(newHtml,/talera-v11-front-diagnostic/);
  }else{
   assert.equal(newRes.headers.get('x-talera-v12-restfotos'),null);

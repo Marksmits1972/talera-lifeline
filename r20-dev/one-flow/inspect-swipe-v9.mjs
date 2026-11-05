@@ -46,3 +46,11 @@ for(const needle of ["talera:enable-listening","__taleraInlineTryAutoPlay","func
     p=html.indexOf(needle,p+needle.length);n++;
   }
 }
+
+for(const needle of ["function taleraInlineInstallAudioControls()","const retry=e=>","Beluister","beluister","controls.enable()","__taleraAudioControls.enable","__taleraAudioControls?.enable","__taleraInlineTryAutoPlay","talera:enable-listening","storySurface.addEventListener('click'"]){
+ let p=0,n=0;
+ while((p=html.indexOf(needle,p))>=0&&n<15){
+    console.log('INTERACTION_DETAIL',needle,n,p,JSON.stringify(html.slice(Math.max(0,p-(needle==='const retry=e=>'?1200:450)),Math.min(html.length,p+(needle==='function taleraInlineInstallAudioControls()'?5500:1000)))));
+    p+=needle.length;n++;
+ }
+}

@@ -28,7 +28,7 @@ for(const check of checks){
    assert.match(text,/taleraStartOriginalRound\(\)/,'existing original-sound videos remain');
    assert.match(text,/voice\.addEventListener\("timeupdate",follow\)/,'voice clock untouched');
    assert.doesNotMatch(text,/voice\.addEventListener\("ended",function\(\)\{if\(state\.media/,'original end handler replaced, not doubled');
-   const scripts=[...text.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(m=>m[1]);
+   const scripts=[...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]);
    assert.ok(scripts.length,'embed contains executable scripts');
    for(const [index,inline] of scripts.entries()){
      if(!inline.trim())continue;

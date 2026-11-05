@@ -22,7 +22,7 @@ for(const path of paths){
   let p=body.indexOf(anchor);
   if(p<0)continue;
   const count=body.split(anchor).length-1;
-  const from=Math.max(0,p-180),to=Math.min(body.length,p+((/InlineInstallAudioControls|InlineLoadVideo|present\\(/.test(anchor))?4500:2000));
+  const from=Math.max(0,p-180),to=Math.min(body.length,p+((anchor.includes('InlineInstallAudioControls')||anchor.includes('InlineLoadVideo')||anchor.includes('present('))?4500:2000));
   console.log('ANCHOR',JSON.stringify(anchor),'COUNT',count,'EXCERPT',JSON.stringify(body.slice(from,to)));
  }
 }

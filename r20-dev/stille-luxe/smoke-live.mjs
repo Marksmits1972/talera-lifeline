@@ -48,6 +48,9 @@ for(const check of checks){
     assert.match(text,/<script id="talera-present-bottom-tint-script">/,'black/reading-paper color synchronizer');
     assert.match(text,/--talera-present-edge-color:#000000/,'black at start');
     assert.match(text,/--story-neutral/,'open reading panel reuses existing paper token');
+    assert.match(text,/data-talera-present-reading/,'both black/paper states loaded up-front');
+    assert.match(text,/scroll\.addEventListener\('scroll', sync/,'immediate readout update without scheduled frame');
+    assert.match(text,/--talera-present-paper-rgb/,'reading footer follows source-paper RGB');
     assert.match(text,/talera-v26-reading/,'open reading state recognized');
     assert.doesNotMatch(text,/getImageData/,'no photo color sampling in fixed black variant');
     assert.doesNotMatch(text,/<style id="talera-present-ios-edge-to-edge">/,'no old overscan hacks');

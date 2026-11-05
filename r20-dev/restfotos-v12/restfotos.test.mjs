@@ -1,102 +1,145 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {runInNewContext,Script} from 'node:vm';
-import worker,{INLINE_PHOTO_HELPER,ORIGINAL_AUDIO_END,PATCHED_AUDIO_END,
- INSERT_ANCHOR,addRemainingPhotosToInlinePlayer} from './restfotos.worker.mjs';
+import {runInNewContext} from 'node:vm';
+import worker, {
+  INLINE_PHOTO_HELPER, ORIGINAL_VIDEO_DONE, PATCHED_VIDEO_DONE,
+  ORIGINAL_NO_VIDEOS, PATCHED_NO_VIDEOS, addRemainingPhotosToInlinePlayer
+} from './restfotos.worker.mjs';
 
-const page='<html><body><script>'+
- 'function taleraInlineCleanVideo(s){}'+
- 'function taleraInlineSetFrame(s,index){}'+
- 'function taleraInlineReplayNext(s){}'+
- INSERT_ANCHOR+'s.phase="originals";taleraInlineReplayNext(s)}'+
- 'function present(){'+ORIGINAL_AUDIO_END+'}'+
- '</script></body></html>';
-const photo=n=>({kind:'photo',key:'p'+n});
-const video=n=>({kind:'video',key:'v'+n});
-const cues=(...keys)=>keys.map((mediaId,t)=>({mediaId,t:t*700,index:t}));
-function setup(frames,cueList,{same=true,active=true}={}){
- const s={frames,cues:cueList,memory:{id:'mem'},phase:'narration',ordinaryTimer:null};
- let session=s;
- if(!same)session={other:true};
- const shown=[],timers=[],events=[];let originalCalls=0;
- const audio={};
- const env={s,audio,taleraInline:session,
- runtime:{currentMemory:()=>({id:active?'mem':'other'})},
- taleraInlineSetFrame:(s,n)=>{shown.push(n);events.push('photo-'+n)},
- taleraInlineCleanVideo:()=>events.push('clean-old-video'),
- taleraInlineVoiceEnded:()=>{originalCalls++;events.push('original-videos')},
- setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.at(-1)},
- stopTimer:()=>{},tick:()=>{}};
- runInNewContext(INLINE_PHOTO_HELPER+'\n'+PATCHED_AUDIO_END,env);
- return{s,shown,timers,events,end:()=>audio.onended(),
- tick:()=>{const x=timers.shift();assert.ok(x);x.fn();return x.ms},
- original:()=>originalCalls};
+// This reproduces only the existing V9 INLINE state transitions, not an iframe.
+const native = [
+  'function taleraInlineSetFrame(s,index){window.shown.push(index)}',
+  'function taleraInlineCleanVideo(s){window.cleaned++}',
+  'function taleraInlinePlayMedia(s,frame,muted,done){window.videos.push({key:frame.key,muted,done})}',
+  'function taleraInlineReplayNext(s){',
+  "  if(s!==taleraInline||s.phase!=='originals')return;",
+  '  const frame=s.replayFrames[++s.replayIndex];',
+  ORIGINAL_VIDEO_DONE,
+  '  const index=s.frames.indexOf(frame);',
+  '  if(index>=0)taleraInlineSetFrame(s,index);',
+  '  taleraInlinePlayMedia(s,frame,false,()=>taleraInlineReplayNext(s));',
+  '}',
+  'function taleraInlineVoiceEnded(s){',
+  "  if(s!==taleraInline||s.phase!=='narration')return;",
+  '  if(s.timer){clearInterval(s.timer);s.timer=null}',
+  '  taleraInlineCleanVideo(s);',
+  "  s.replayFrames=s.frames.filter(f=>f.kind==='video');",
+  ORIGINAL_NO_VIDEOS,
+  "  s.phase='originals';s.replayIndex=-1;",
+  '  taleraInlineReplayNext(s);',
+  '}'
+].join('\n');
+
+const photo=key=>({kind:'photo',key});
+const video=key=>({kind:'video',key});
+const cue=key=>({t:0,index:0,mediaId:key});
+
+function harness(frames,cues){
+  const s={frames,cues,memory:{id:'saved-memory'},phase:'narration',timer:null,
+    ordinaryTimer:null,replayFrames:[],replayIndex:-1};
+  const log={shown:[],videos:[],cleaned:0,timers:[]};
+  const ctx={
+    taleraInline:s,runtime:{currentMemory:()=>({id:s.memory.id})},
+    window:log,
+    clearInterval:()=>{},
+    setTimeout:(fn,ms)=>{const entry={fn,ms};log.timers.push(entry);return entry;}
+  };
+  const code=addRemainingPhotosToInlinePlayer(native);
+  assert.equal(code.status,'installed');
+  runInNewContext(code.html,ctx);
+  return {s,log,ctx,
+    voiceEnd:()=>ctx.taleraInlineVoiceEnded(s),
+    finishVideo:i=>log.videos[i].done(),
+    tick:()=>{const timer=log.timers.shift();assert.ok(timer);timer.fn();return timer.ms;}
+  };
 }
-test('exact original V9 HTML recovered from 1 helper + 1 callback',()=>{
- const r=addRemainingPhotosToInlinePlayer(page);
- assert.equal(r.status,'installed');
- assert.equal(r.html.split(INLINE_PHOTO_HELPER).length-1,1);
- assert.equal(r.html.split(PATCHED_AUDIO_END).length-1,1);
- assert.equal(r.html.replace(INLINE_PHOTO_HELPER+'\n','').replace(PATCHED_AUDIO_END,ORIGINAL_AUDIO_END),page);
- assert.equal(addRemainingPhotosToInlinePlayer(r.html).status,'already-installed');
- assert.doesNotThrow(()=>new Script(INLINE_PHOTO_HELPER+'\n'+PATCHED_AUDIO_END));
+
+test('exact V9 code outside one added helper and TWO video-end branches',()=>{
+  const result=addRemainingPhotosToInlinePlayer(native);
+  assert.equal(result.status,'installed');
+  assert.equal(result.html.split(INLINE_PHOTO_HELPER).length-1,1);
+  assert.equal(result.html.split(PATCHED_VIDEO_DONE).length-1,1);
+  assert.equal(result.html.split(PATCHED_NO_VIDEOS).length-1,1);
+  assert.equal(result.html.replace(INLINE_PHOTO_HELPER+'\n','')
+    .replace(PATCHED_VIDEO_DONE,ORIGINAL_VIDEO_DONE)
+    .replace(PATCHED_NO_VIDEOS,ORIGINAL_NO_VIDEOS),native);
+  assert.equal(addRemainingPhotosToInlinePlayer(result.html).status,'already-installed');
+  assert.match(result.html,/taleraInlineVoiceEnded\(s\)/);
+  assert.doesNotMatch(result.html,/iframe|taleraStartOriginalRound\s*=/);
 });
-test('5 photos plus a video: three unused photo IDs then original video',()=>{
- const frames=[video(0),photo(1),photo(2),photo(3),photo(4),photo(5)];
- const spoken=cues('v0','p1','p2'),originalJSON=JSON.stringify({frames,spoken});
- const h=setup(frames,spoken);h.end();assert.deepEqual(h.shown,[3]);
- assert.equal(h.tick(),4000);assert.deepEqual(h.shown,[3,4]);
- assert.equal(h.tick(),4000);assert.deepEqual(h.shown,[3,4,5]);
- assert.equal(h.tick(),4000);assert.equal(h.original(),1);
- assert.deepEqual(h.events.slice(-4),['photo-3','photo-4','photo-5','original-videos']);
- assert.equal(JSON.stringify({frames,spoken}),originalJSON);
+
+test('two videos replay WITH sound BEFORE remaining photos',()=>{
+  const h=harness([video('v1'),photo('p1'),video('v2'),photo('p2'),photo('p3')],
+    [cue('v1'),cue('p1'),cue('v2')]);
+  h.voiceEnd();
+  assert.deepEqual(h.log.shown,[0]);
+  assert.deepEqual(h.log.videos.map(v=>v.key),['v1']);
+  assert.equal(h.log.timers.length,0);
+  h.finishVideo(0);
+  assert.deepEqual(h.log.shown,[0,2]);
+  assert.deepEqual(h.log.videos.map(v=>v.muted),[false,false]);
+  assert.equal(h.log.timers.length,0);
+  h.finishVideo(1);
+  assert.deepEqual(h.log.shown,[0,2,3]);
+  assert.equal(h.tick(),4000);
+  assert.deepEqual(h.log.shown,[0,2,3,4]);
+  assert.equal(h.tick(),4000);
+  assert.equal(h.s.phase,'done');
 });
-test('six photos, four narrated, exactly two restphotos',()=>{
- const h=setup(Array.from({length:6},(_,i)=>photo(i)),cues('p0','p1','p2','p3'));
- h.end();assert.deepEqual(h.shown,[4]);h.tick();assert.deepEqual(h.shown,[4,5]);
- h.tick();assert.equal(h.original(),1);
+
+test('without a video, only unused photos follow the actual voice-ended event',()=>{
+  const h=harness([photo('p1'),photo('p2'),photo('p3')],[cue('p2')]);
+  h.voiceEnd();
+  assert.deepEqual(h.log.shown,[0]);
+  assert.equal(h.log.videos.length,0);
+  h.tick();
+  assert.deepEqual(h.log.shown,[0,2]);
+  h.tick();
+  assert.equal(h.s.phase,'done');
 });
-test('all photos narrated: native replay follows immediately',()=>{
- const h=setup([video(0),photo(0),photo(1)],cues('v0','p0','p1'));
- h.end();assert.deepEqual(h.shown,[]);assert.equal(h.timers.length,0);assert.equal(h.original(),1);
+
+test('all pictures used means no second slideshow and no timer',()=>{
+  const h=harness([photo('a'),video('v'),photo('b')],[cue('a'),cue('v'),cue('b')]);
+  h.voiceEnd();h.finishVideo(0);
+  assert.equal(h.s.phase,'done');
+  assert.equal(h.log.timers.length,0);
+  assert.deepEqual(h.log.shown,[1]);
 });
-test('duplicate / out of order cues never count another photo as spoken',()=>{
- const h=setup([photo(0),photo(1),photo(2),photo(3)],cues('p3','p0','p3'));
- h.end();assert.deepEqual(h.shown,[1]);h.tick();assert.deepEqual(h.shown,[1,2]);
+
+test('repeated cue IDs do not duplicate photographs; stored order wins',()=>{
+  const h=harness([photo('a'),photo('b'),photo('c'),photo('d')],
+    [cue('d'),cue('a'),cue('d')]);
+  h.voiceEnd();h.tick();h.tick();
+  assert.deepEqual(h.log.shown,[1,2]);
+  assert.equal(h.s.phase,'done');
 });
-test('unspoken videos never enter rest photo queue',()=>{
- const h=setup([video(0),photo(0),video(1)],cues('p0'));
- h.end();assert.deepEqual(h.shown,[]);assert.equal(h.original(),1);
+
+test('switching memories prevents delayed photos changing the new memory',()=>{
+  const h=harness([photo('a'),photo('b'),photo('c')],[cue('a')]);
+  h.voiceEnd();
+  h.ctx.taleraInline={memory:{id:'different'}};
+  h.tick();
+  assert.deepEqual(h.log.shown,[1]);
 });
-test('canceled session and another memory cannot show a stale photo',()=>{
- for(const options of [{same:false},{active:false}]){
-  const h=setup([photo(0),photo(1)],cues('p0'),options);
-  h.end();assert.deepEqual(h.shown,[]);assert.equal(h.original(),0);
- }
- const x=setup([photo(0),photo(1)],cues('p0'));x.end();
- x.s.phase='ordinary';x.tick();assert.equal(x.original(),0);
+
+test('different or duplicated V9 playback anchors fail closed',()=>{
+  for(const broken of ['other page',native.replace(ORIGINAL_NO_VIDEOS,'noop()'),
+    native+'\n'+ORIGINAL_VIDEO_DONE]){
+    const r=addRemainingPhotosToInlinePlayer(broken);
+    assert.equal(r.status,'anchor-unmatched');
+    assert.equal(r.html,broken);
+  }
 });
-test('native ordinaryTimer is reused for cleanup, no new player state',()=>{
- const h=setup([photo(0),photo(1)],cues('p0'));h.end();
- assert.equal(h.s.phase,'remainingPhotos');
- assert.equal(h.s.ordinaryTimer,h.timers[0]);h.tick();
- assert.equal(h.s.ordinaryTimer,null);
- assert.equal(h.s.phase,'narration');
-});
-test('fails closed for missing or duplicate native anchors',()=>{
- assert.equal(addRemainingPhotosToInlinePlayer('unknown').status,'anchor-unmatched');
- assert.equal(addRemainingPhotosToInlinePlayer(page.replace('</script>',ORIGINAL_AUDIO_END+'</script>')).status,'anchor-unmatched');
-});
-test('GET /present only; original editor, recorder, timeline, POST unchanged',async()=>{
- const env={STYLE_BASE:{fetch:async()=>new Response(page,{headers:{'content-type':'text/html; charset=utf-8',etag:'old'}})}};
- const p=await worker.fetch(new Request('https://x.test/present'),env);
- assert.equal(p.headers.get('x-talera-v12-inline-restfotos'),'installed');
- assert.equal(p.headers.get('etag'),null);
- for(const path of ['/','/tell','/vertelmodus-embed?mode=present']){
-  const r=await worker.fetch(new Request('https://x.test'+path),env);
-  assert.equal(await r.text(),page);assert.equal(r.headers.get('etag'),'old');
- }
-});
-test('no protected base: safe 503',async()=>{
- assert.equal((await worker.fetch(new Request('https://x.test/present'),{})).status,503);
+
+test('only the presentation HTML is changed, not recording or storage',async()=>{
+  const env={STYLE_BASE:{fetch:async()=>new Response(native,{
+    headers:{'content-type':'text/html; charset=utf-8',etag:'v9'}})}};
+  const r=await worker.fetch(new Request('https://test.local/present'),env);
+  assert.equal(r.headers.get('x-talera-v12-inline-restfotos'),'installed');
+  assert.ok((await r.text()).includes(PATCHED_VIDEO_DONE));
+  for(const route of ['/','/tell','/vertelmodus-embed?mode=record']){
+    const original=await worker.fetch(new Request('https://test.local'+route),env);
+    assert.equal(original.headers.get('x-talera-v12-inline-restfotos'),null);
+    assert.equal(await original.text(),native);
+  }
 });

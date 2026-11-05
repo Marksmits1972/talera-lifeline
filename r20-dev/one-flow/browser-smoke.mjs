@@ -282,4 +282,36 @@ assert.equal(ordinaryTap.count,2);
 assert.equal(ordinaryTap.after,(ordinaryTap.before+1)%ordinaryTap.count,
   'normal photo memory TAP must still advance its photo');
 console.log('PASS ordinary photo memory: tap advances to next photo exactly as approved V9');
+
+// Safari permission regression: autoplay blocked -> the white hint must be a
+// real button that plays the ORIGINAL native voice. The photo stays sealed.
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))'),
+  'narrated memory and original video must load');
+await sleep(200);
+await evaluate("(()=>{const a=window.__taleraInlineSharedAudio;"+
+"a.pause();a.play=()=>Promise.reject(Object.assign(new Error('iOS user activation required'),{name:'NotAllowedError'}));"+
+"window.__taleraInlineTryAutoPlay?.();})()");
+assert.ok(await until('Boolean(document.querySelector("button.talera-v61-audio-permission-hint"))',80),
+  'autoplay rejection must present a REAL Beluister button');
+const permission=await evaluate("(()=>{"+
+"const btn=document.querySelector('button.talera-v61-audio-permission-hint');"+
+"const rect=btn.getBoundingClientRect(),x=rect.x+rect.width/2,y=rect.y+rect.height/2;"+
+"return {tag:btn.tagName,text:btn.textContent,pointer:getComputedStyle(btn).pointerEvents,"+
+"aria:btn.getAttribute('aria-label'),onTop:btn.contains(document.elementFromPoint(x,y)),"+
+"x:Math.round(x),y:Math.round(y),voicePaused:window.__taleraInlineSharedAudio.paused};})()");
+assert.equal(permission.tag,'BUTTON');
+assert.match(permission.text,/Beluister/);
+assert.equal(permission.pointer,'auto','permission prompt must be tappable');
+assert.equal(permission.aria,'Ingesproken herinnering afspelen');
+assert.equal(permission.onTop,true,'button may not be covered by picture or wheel');
+assert.equal(permission.voicePaused,true);
+await evaluate('delete window.__taleraInlineSharedAudio.play');
+await cmd('Input.dispatchMouseEvent',{type:'mousePressed',x:permission.x,y:permission.y,button:'left',clickCount:1});
+await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:permission.x,y:permission.y,button:'left',clickCount:1});
+assert.ok(await until('Boolean(window.__taleraInlineSharedAudio&&!window.__taleraInlineSharedAudio.paused&&window.__taleraInlineSharedAudio.currentTime>.12)',80),
+  'clicking Beluister must start the EXISTING native voice');
+assert.ok(await until('!document.querySelector("button.talera-v61-audio-permission-hint")',50),
+  'permission button disappears when narration plays');
+console.log('PASS Safari permission: clicking real Beluister button plays native narration, not photo');
 ws.close();

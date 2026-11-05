@@ -159,4 +159,61 @@ assert.deepEqual(result.errors,[]);
 assert.equal(result.iframes,0);
 console.log('PASS browser playback round '+playbackRound+': silent narration -> remaining photos -> audible video from zero, no second Beluister');
 }
+// Regression: a narrated story is ONE timeline item; photo taps do nothing,
+// and a real horizontal swipe leaves the whole active story (even mid-voice).
+const nextMemory=await evaluate("(async()=>{"+
+"const png=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZcAAAAASUVORK5CYII='),c=>c.charCodeAt(0));"+
+"const f=[new File([png],'simple-1.png',{type:'image/png'}),new File([png],'simple-2.png',{type:'image/png'})];"+
+"const row=await TaleraMemories.save({title:'Adjacent ordinary photo memory',date:'2026-11-05',time:'12:00:00',datePrecision:'exact',text:'Second memory'},f);"+
+"return {id:'pwa:'+row.id}})()",true);
+assert.ok(nextMemory?.id?.startsWith('pwa:local-'));
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))'),
+  'narrated memory must load before navigation test');
+const initial=await evaluate("(()=>{"+
+"const rt=window.__taleraTimelineRuntime,m=rt.currentMemory();"+
+"const story=document.getElementById('memoryStoryScroll');"+
+"if(!story)throw Error('Native story swipe surface missing');"+
+"const initialIndex=m._photoIndex;"+
+"story.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));"+
+"return {memoryId:m.id,indexBefore:initialIndex,indexAfter:m._photoIndex,"+
+"warmedVideos:Array.from(document.querySelectorAll('video[style*=\"-9999px\"]')).map(v=>({paused:v.paused,time:v.currentTime})),"+
+"bookList:window.__taleraPhotoBook?.list?.().map(x=>x.id),"+
+"bookIndex:window.__taleraPhotoBook?.state?.().index,"+
+"storyRect:(()=>{const r=story.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()};})()");
+assert.equal(initial.memoryId,'pwa:'+saved.id);
+assert.equal(initial.indexAfter,initial.indexBefore,'narrated tap cannot step photos');
+assert.ok(initial.warmedVideos.length);
+assert.ok(initial.warmedVideos.every(v=>v.paused),'tapping narrated photo does NOT prime any video');
+assert.ok(Array.isArray(initial.bookList)&&initial.bookList.includes(nextMemory.id),'both memories are single timeline entries');
+assert.equal(initial.bookList.filter(x=>x===initial.memoryId).length,1,'three playback phases form exactly ONE timeline item');
+console.log('PASS whole memory seal: image tap ignored, all preloaded originals paused, ONE timeline entry');
+await evaluate("(()=>{document.dispatchEvent(new Event('talera:enable-listening'));"+
+"const a=window.__taleraInlineSharedAudio;if(a.paused)a.play().catch(()=>{});})()");
+assert.ok(await until('window.__taleraInlineSharedAudio?.currentTime>.25&&window.__taleraInlineSharedAudio?.currentTime<2.6',80),
+  'speech must be actively playing before the swipe');
+const from=initial.storyRect;
+assert.ok(from.w>150&&from.h>70,'native V9 story surface must have swipe area');
+// Use the existing V13 wheel unchanged: its book.list() is a list of MEMORIES,
+// never individual narration/photo/video frame IDs. Chromium touch input mimics iPhone.
+await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+const centerY=Math.round(from.y+from.h*.50);
+const x0=Math.round(from.x+from.w*.78), x1=Math.round(from.x+from.w*.22);
+await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x0,y:centerY,id:11}]});
+for(let i=1;i<=8;i++){
+ const x=Math.round(x0+(x1-x0)*i/8);
+ await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:centerY,id:11}]});
+ await sleep(25);
+}
+await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id!=='+JSON.stringify('pwa:'+saved.id),100),
+  'swipe must leave narrated memory, not step between its internal media');
+const away=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
+"return {id:m?.id,voicePaused:window.__taleraInlineSharedAudio?.paused,"+
+"activeVideoCount:document.querySelectorAll('video.talera-v61-inline-video').length,"+
+"visibleNarration:document.body.classList.contains('talera-v61-narration-visual')};})()");
+assert.notEqual(away.id,'pwa:'+saved.id);
+assert.equal(away.voicePaused,true,'leaving story must pause speech');
+assert.equal(away.activeVideoCount,0,'leaving story must dispose current native inline video');
+console.log('PASS real touch swipe while narrating: next WHOLE memory, previous voice stopped, no orphan video');
 ws.close();

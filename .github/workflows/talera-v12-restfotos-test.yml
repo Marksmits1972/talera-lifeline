@@ -19,6 +19,8 @@ jobs:
         run: node --check r20-dev/restfotos-v12/restfotos.worker.mjs
       - name: Regression tests — native video sound before remaining photos
         run: node --test r20-dev/restfotos-v12/restfotos.test.mjs
+      - name: Verify exact read-only patch against the protected live V9 HTML
+        run: node r20-dev/restfotos-v12/smoke-live.mjs
       - name: No extra player, recording change, storage write or Cloudflare publication
         run: |
           node --input-type=module <<'NODE'

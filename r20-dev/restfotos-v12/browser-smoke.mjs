@@ -1,12 +1,21 @@
 /* Browser: native IndexedDB save -> V9 iframe opens -> true WAV audio ended
    -> three remaining stills -> same original, unmuted video round. */
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {join} from 'node:path';
 const base='https://talera-v12-restfotos-veilige-test-20261105.mark-a39.workers.dev';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const cdpDir=process.env.TALERA_CDP_DIR;
+assert.ok(cdpDir,'test browser profile directory must be set');
 let tabs=[];
-for(let i=0;i<60;i++){
- try{const r=await fetch('http://127.0.0.1:9224/json');if(r.ok){tabs=await r.json();if(tabs.some(x=>x.type==='page'))break}}
- catch{}await sleep(200);
+for(let i=0;i<100;i++){
+ try{
+  const port=Number((await readFile(join(cdpDir,'DevToolsActivePort'),'utf8')).split('\\n')[0]);
+  if(Number.isInteger(port)&&port>0){
+   const r=await fetch('http://127.0.0.1:'+port+'/json');
+   if(r.ok){tabs=await r.json();if(tabs.some(x=>x.type==='page'))break}
+  }
+ }catch{}await sleep(200);
 }
 const tab=tabs.find(x=>x.type==='page');
 assert.ok(tab?.webSocketDebuggerUrl,'Chrome remote debugging unavailable');

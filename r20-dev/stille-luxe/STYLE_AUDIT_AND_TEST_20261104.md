@@ -203,3 +203,19 @@ Dit is de technisch verantwoorde fallback naar een volledig bruikbare onderste s
 **Cloudflare apart stijltestdeployment**: `568a86a6-d070-47e7-8960-25d66bc1b20f`, Worker-versie `b617adc2-6296-4ebc-b261-9c62d15de402`. De oorspronkelijke V9 blijft `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`; alleen de `V9_BASE` servicebinding is aanwezig. Geen back-up- of data-aanpassingen.
 
 **Niet beloven dat dit bestaande iPhone-installaties corrigeert**: er zijn bekende iOS/WebKit-beperkingen waarbij statusbalkmodus op installatie/startmoment wordt vastgezet. Code- en HTTP-tests bewijzen correcte HTML-output, **niet** de feitelijke iOS fullscreen-chrome. Herstarten zonder verwijderen is de veiligste test. De geïnstalleerde PWA **niet verwijderen**, want lokale herinneringen kunnen daarmee verloren gaan. Referentie: https://bugs.webkit.org/show_bug.cgi?id=316008 (relevantie install-time), https://bugs.webkit.org/show_bug.cgi?id=313800 (onpaintable bottom). Als iOS de oude instelling blijft gebruiken, eerst een niet-destructieve verificatievariant bedenken voor de echte telefoon in plaats van nieuwe fotoposities te hacken.
+
+
+## Directe kleurwisseling bij begin uitklappen — 05-11-2026
+
+**Aangescherpte gebruikersafspraak:** de kleur mag niet pas op een browser-animatieframe worden bepaald of na aflooptijd van iOS-overname worden gekozen; beide kleuren zijn reeds bij eerste HTML-paint geprogrammeerd. Foto staat bovenaan achter de statusbalk; alleen in de presentatie is de onderrand zwart bij ruststand, en warm papier bij de eerste omhoogbeweging van het verhaal.
+
+**Geïmplementeerd in dezelfde geïsoleerde stijlstaging:**
+- De server levert in de presentatiehead direct statische CSS voor **fotostand `#000000`** én voor **leesstand `rgb(var(--talera-present-paper-rgb))`**. De bestaande V9-`--story-neutral` van het uitklapscherm wordt **éénmaal bij het laden**, dus vóór de gebruiker het paneel aanraakt, gelezen en als gedeelde papier-RGB klaargezet (normaliter `247,244,239` = `#F7F4EF`).
+- Bij het **eerste** `scrollTop > 0` wordt meteen `data-talera-present-reading="true"` op `html` gezet; vooraf aanwezige CSS schakelt daardoor direct de achtergrond van `html` en `body` om. Geen requestAnimationFrame, timer, afbeeldinganalyse of vertraging bij de overgang. De reeds bestaande V9-leesclassen fungeren als extra vangnet.
+- In **dezelfde scroll-handler** wordt zonder wachtrij `meta[name=theme-color]` op exact diezelfde papierkleur gezet als verzoek aan iOS. Wanneer het paneel dichtgaat, schakelen beide direct terug op `#000000`.
+- De gewone hoofd-, invoer-, import- en bewerkpagina's hebben een witte pagina-achtergrond. Alle iOS standalone ingangsmeta gebruiken dezelfde eerder op de telefoon bewezen `black-translucent`-statusstand zodat de foto in presentatie achter de klok doorloopt.
+- Op `/present` wordt alleen head-CSS/JS geïnjecteerd. Het originele R20/V9-`<body>` blijft byte-voor-byte identiek; de vertelcyclus, tijdlijn en swipes blijven ongewijzigd.
+
+**Validatie:** er is een regressietest die een `scrollTop=1` simuleert, direct het nieuwe HTML-attribuut en dezelfde kleur in `theme-color` toetst, en bewijst dat er nul requestAnimationFrame-calls zijn. De live smoke controleert de voorgeserveerde CSS en oorspronkelijke body. Deze test kan niet garanderen dat de door iOS gereserveerde onderste systeemstrook ook direct een nieuwe kleur krijgt; dat hangt af van iOS-caching en wordt op het toestel gecontroleerd. De webpagina zelf hoeft in ieder geval niet meer op een volgend animatieframe of fotoberekening te wachten.
+
+**Test-Worker-versie:** `d630a9e4-e118-4f77-9217-ef17ec527af1`, deployment `459ea075-8cd1-44ab-a3b3-695d68b2eed0`; beschermde V9 blijft `683c6aaf-8dd0-42de-b6e4-f3bd80d7de06`. GitHub Actions validatierun: https://github.com/Marksmits1972/talera-lifeline/actions/runs/42000020592.

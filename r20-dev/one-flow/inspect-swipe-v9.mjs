@@ -77,3 +77,13 @@ for(const needle of ["phone-v1","videoPoster","captureVideo","currentTime=0","ca
   n++;i+=needle.length;
  }
 }
+
+for(const needle of ["showPhoto(","__taleraV31SelectPhoto(","addEventListener('touchend'","addEventListener('touchstart'","addEventListener('pointerup'","_photoIndex++","_photoIndex + 1","_photoIndex+1","function onStory","function setupPhoto","function photoTouch","talera:wheel-motion"]){
+ let at=0,n=0;
+ while((at=html.indexOf(needle,at))>=0&&n<45){
+  if(needle==="showPhoto("||needle==="__taleraV31SelectPhoto("||needle.includes("touch")||needle.includes("pointer"))
+    console.log("NARRATED_GESTURE_AUDIT",needle,n,at,JSON.stringify(html.slice(Math.max(0,at-1750),Math.min(html.length,at+2500))));
+  n++;at+=needle.length;
+ }
+ console.log("NARRATED_GESTURE_TOTAL",needle,n);
+}

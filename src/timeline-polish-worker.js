@@ -1,5 +1,6 @@
 import baseWorker from './index.js';
 import { businessFilmstripHtml } from './business-filmstrip-page.js';
+import { iosImportVisualHtml } from './ios-import-visual-page.js';
 
 const POLISH_REVISION = 'timeline-photo-handoff-polish-20260917-r1';
 
@@ -152,6 +153,11 @@ function decorateTimeline(response, request) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if ((url.pathname === '/experiments/ios-import/' || url.pathname === '/experiments/ios-import/index.html') && (request.method === 'GET' || request.method === 'HEAD')) {
+      return new Response(request.method === 'HEAD' ? null : iosImportVisualHtml, {
+        headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store, max-age=0', 'x-talera-experiment': 'ios-import-visual-20261106' },
+      });
+    }
     if ((url.pathname === '/experiments/business-filmstrip/' || url.pathname === '/experiments/business-filmstrip/index.html') && (request.method === 'GET' || request.method === 'HEAD')) {
       return new Response(request.method === 'HEAD' ? null : businessFilmstripHtml, {
         headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store, max-age=0' },

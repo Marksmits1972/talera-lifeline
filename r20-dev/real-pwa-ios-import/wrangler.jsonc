@@ -1,0 +1,10 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "talera-real-pwa-ios-import-lab-20261106",
+  "main": "./worker.mjs",
+  "compatibility_date": "2026-11-06",
+  "workers_dev": true,
+  "services": [
+    {"binding":"STYLE_BASE","service":"talera-v9-stille-luxe-stijlstaging-20261104"}
+  ]
+}

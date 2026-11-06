@@ -26,6 +26,8 @@ const nativePage='<html><script>'+
   "  document.addEventListener('click',e=>{\n"+
   "    if(s?.engine!=='narrated'||s.phase!=='narration')return;},true);\n"+nativeVoiceHint+"\n}"+
   "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
+  "function hydrate(memory){loaded.set(memory.id,urls);}\n"+
+  "function registerThem(memories){runtime.registerMemories(memories);}\n"+
   AUDIO_END_BEFORE+'</script></html>';
 
 function fixture({ordered=frames(),recorded=cues(),lastVideo=null,soundEnabled=true}={}){
@@ -438,4 +440,38 @@ test('visual-only swipe: existing V13 wheel becomes visible at the FIRST horizon
   assert.equal(shown(),false);
   assert.equal(typeof listeners.get('talera:enable-listening'),'function',
     'working Beluister control is retained untouched');
+});
+
+test('cover is ONLY for narrated memories, selects the first actually narrated photo, never a video',()=>{
+  const env={document:{addEventListener(){}},window:{},URL:{createObjectURL:()=> 'blob:cover'}};
+  vm.runInNewContext(INLINE_TAIL,env);
+  const regular={id:'pwa:normal',_taleraLocal:true,
+    _zeroItems:[{kind:'photo',key:'ordinary'}],_taleraNarrationCues:[]};
+  assert.equal(env.taleraSwipeCoverFirst(regular),null);
+  const narrated={id:'pwa:narrated',_taleraLocal:true,_zeroItems:[
+    {kind:'video',key:'silent-video'},{kind:'photo',key:'first-photo'},
+    {kind:'photo',key:'later-photo'},{kind:'audio',key:'voice'}
+  ],_taleraNarrationCues:[{t:2500,index:2},{t:1200,index:1},{t:0,index:0}]};
+  assert.equal(env.taleraSwipeCoverFirst(narrated).key,'first-photo');
+  assert.equal(narrated.previewImage,undefined,'the selection does not add a new photo');
+  const changed={...narrated,_taleraNarrationCues:[{t:0,mediaId:'later-photo',index:2}]};
+  assert.equal(env.taleraSwipeCoverFirst(changed).key,'later-photo',
+    'new first selected photo invalidates prior cover key');
+});
+
+test('exact existing V9 hooks are required; cached cover never enters the ordinary media sequence',()=>{
+  const patched=applyUnifiedTail(nativePage);
+  assert.equal(patched.status,'installed');
+  assert.equal(patched.html.split("loaded.set(memory.id,urls);taleraSwipeCoverEnsure(memory,true);").length-1,1);
+  assert.equal(patched.html.split("runtime.registerMemories(memories);taleraSwipeCoverObserve(memories);").length-1,1);
+  assert.ok(patched.html.includes('window.__taleraPhotoBook?.list?.().find(x=>x.id===memory.id)'));
+  assert.ok(patched.html.includes('talera-narrated-swipe-covers-v1'));
+  assert.ok(patched.html.includes("720/Math.max(w,h)"));
+  assert.equal(restoreApprovedV9(patched.html),nativePage,'the approved V9 is byte-identical when reverted');
+  const noHydrate=nativePage.replace('loaded.set(memory.id,urls);','');
+  assert.equal(applyUnifiedTail(noHydrate).status,'anchor-unmatched',
+    'fail closed if memory hydration source changes');
+  const noRegister=nativePage.replace('runtime.registerMemories(memories);','');
+  assert.equal(applyUnifiedTail(noRegister).status,'anchor-unmatched',
+    'fail closed if original memory registry changes');
 });

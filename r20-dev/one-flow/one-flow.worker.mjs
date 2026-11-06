@@ -69,6 +69,54 @@ function block(html,from,until,replace){
   if(a<0||b<0||html.indexOf(from,a+1)>=0||html.indexOf(until,b+1)>=0)return null;
   return html.slice(0,a)+replace+'\n'+html.slice(b);
 }
+// Frame-zero cover is ONE still image; decoder never plays, enters DOM or stores a new memory.
+export const CLOSED_COVER=String.raw`async function taleraClosedMakeCover(memory,frame,index,urls){
+  if(!frame||frame.kind!=='video'||frame.url)return;
+  let src=null;
+  try{
+    src=await store.mediaUrl(frame.key);
+    if(!src)return;
+    const blob=await new Promise(resolve=>{
+      const v=document.createElement('video');
+      let done=false,timeout=null;
+      const finish=blob=>{
+        if(done)return;done=true;clearTimeout(timeout);
+        v.onloadedmetadata=v.onloadeddata=v.oncanplay=v.onseeked=v.onerror=null;
+        v.pause();v.removeAttribute('src');v.load();resolve(blob||null);
+      };
+      const draw=()=>{
+        if(v.readyState<2||!v.videoWidth||!v.videoHeight)return;
+        try{
+          const factor=Math.min(1,720/Math.max(v.videoWidth,v.videoHeight));
+          const c=document.createElement('canvas');
+          c.width=Math.max(1,Math.round(v.videoWidth*factor));
+          c.height=Math.max(1,Math.round(v.videoHeight*factor));
+          c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+          c.toBlob(finish,'image/jpeg',.78);
+        }catch(e){finish(null)}
+      };
+      v.muted=true;v.defaultMuted=true;v.playsInline=true;
+      v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');
+      v.preload='auto';v.onloadeddata=v.oncanplay=v.onseeked=draw;
+      v.onloadedmetadata=()=>{
+        try{v.currentTime=Math.min(.001,Number.isFinite(v.duration)&&v.duration>0?v.duration/2:.001)}catch(e){}
+        draw();
+      };
+      v.onerror=()=>finish(null);
+      timeout=setTimeout(()=>finish(null),6000);
+      v.src=src;v.load();
+    });
+    if(!blob?.size||!loaded.has(memory.id))return;
+    const cover=URL.createObjectURL(blob);
+    urls.push(cover);memory.previewImage=cover;memory.photos[index]=cover;
+    if(memory._photoIndex===index){
+      memory.image=cover;
+      if(runtime.currentMemory()?.id===memory.id)window.__taleraV31SelectPhoto?.(memory.id,index,false);
+    }
+  }catch(e){console.warn('TALERA videostill niet beschikbaar',e)}
+  finally{if(src)URL.revokeObjectURL(src)}
+}`;
+
 export function applyClosedCore(html){
   if(typeof html!=='string')return {html,status:'not-html'};
   if(html.includes(CORE_MARKER))return {html,status:'already-installed'};
@@ -82,7 +130,7 @@ export function applyClosedCore(html){
   const nativeClick="    if(s?.engine!=='narrated'||s.phase!=='narration')return;";
   const allPhasesClick="    if(!runtime.currentMemory()?._zeroItems?.some(item=>item.kind==='audio'))return;";
   const hydrate="       memory._photoIndex=0;\n       memory.image=photos[0]||placeholder;";
-  const stableCover="       memory._photoIndex=0;\n       const firstCue=(memory._taleraNarrationCues||[]).slice().sort((a,b)=>(Number(a.t)||0)-(Number(b.t)||0))\n         .find(c=>Number.isInteger(c?.index)&&frames[c.index]&&['photo','video'].includes(frames[c.index].kind));\n       const coverIndex=firstCue?firstCue.index:0;\n       if(memory._zeroItems?.some(x=>x.kind==='audio'))memory.previewImage=photos[coverIndex]||photos[0]||placeholder;\n       memory.image=photos[0]||placeholder;";
+  const stableCover="       memory._photoIndex=0;\n       const firstCue=(memory._taleraNarrationCues||[]).slice().sort((a,b)=>(Number(a.t)||0)-(Number(b.t)||0))\n         .find(c=>Number.isInteger(c?.index)&&frames[c.index]&&['photo','video'].includes(frames[c.index].kind));\n       const coverIndex=firstCue?firstCue.index:0;\n       if(memory._zeroItems?.some(x=>x.kind==='audio'))memory.previewImage=photos[coverIndex]||photos[0]||placeholder;\n       memory.image=photos[0]||placeholder;\n       if(frames[coverIndex]?.kind==='video'&&!frames[coverIndex].url)\n         void taleraClosedMakeCover(memory,frames[coverIndex],coverIndex,urls);";
   const oldAssign="if(tile.index===index)return;";
   const newAssign="if(tile.index===index&&tile.el.dataset.url===(mem?.previewImage||mem?.thumbnail||mem?.image))return;";
   const voiceHint="    const hint=document.createElement('div');\n    hint.className='talera-v61-audio-permission-hint';\n    hint.textContent='Tik op de foto om het geluid te starten';";
@@ -110,6 +158,10 @@ export function applyClosedCore(html){
     if(next===null)return {html,status:'anchor-unmatched:'+reason};
     result=next;
   }
+  const nativeHydrate=' async function hydrate(memory){';
+  const withCover=once(result,nativeHydrate,CLOSED_COVER+'\n'+nativeHydrate);
+  if(withCover===null)return {html,status:'anchor-unmatched:cover-decoder'};
+  result=withCover;
   // The native functions are edited IN PLACE; no event listeners, hidden
   // media elements, iframe players, alternate photo wheels, or tail adapters.
   result=result.replace(voiceStart,CLOSED_VOICE_END.slice(0,voiceStart.length));

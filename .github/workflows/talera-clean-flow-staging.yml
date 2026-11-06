@@ -1,7 +1,7 @@
 name: TALERA clean one-memory test deployment through GitHub
 on:
   push:
-    branches: [feature/clean-one-memory-flow-20261105]
+    branches: [feature/one-closed-memory-core-20261106]
     paths:
       - r20-dev/one-flow/one-flow.worker.mjs
       - r20-dev/one-flow/one-flow.worker.test.mjs
@@ -29,7 +29,7 @@ jobs:
         run: npm ci
       - name: Single-memory timing regressions
         run: node --test test/one-memory-flow.test.mjs
-      - name: Native V9 tail adapter regressions
+      - name: Native V9 closed-core lifecycle tests
         run: node --test r20-dev/one-flow/one-flow.worker.test.mjs
       - name: Validate actual approved V9 source, no changes to recorder
         run: node r20-dev/one-flow/check-v9.mjs

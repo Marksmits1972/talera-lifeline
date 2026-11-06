@@ -1,0 +1,66 @@
+name: TALERA real PWA - isolated iPhone import design worker
+on:
+  push:
+    branches: [experiment/real-pwa-iphone-import-ui-20261106]
+    paths:
+      - 'r20-dev/real-pwa-ios-import/**'
+      - '.github/workflows/talera-real-pwa-ios-import.yml'
+  pull_request:
+    branches: [feature/clean-one-memory-flow-20261105]
+    paths:
+      - 'r20-dev/real-pwa-ios-import/**'
+      - '.github/workflows/talera-real-pwa-ios-import.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talera-real-pwa-ios-import-design-20261106
+  cancel-in-progress: false
+jobs:
+  publish-isolated-pwa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Assert unchanged navigation, buttons, paths and player
+        run: node --test r20-dev/real-pwa-ios-import/worker.test.mjs
+      - name: Regress frozen one-memory player (no modifications)
+        run: node --test r20-dev/one-flow/one-flow.worker.test.mjs
+      - name: Validate exact approved V9 source and recorder
+        run: node r20-dev/one-flow/check-v9.mjs
+      - name: Verify unique Worker target and unchanged base service
+        run: |
+          node -e "const fs=require('node:fs');const c=JSON.parse(fs.readFileSync('r20-dev/real-pwa-ios-import/wrangler.jsonc','utf8'));if(c.name!=='talera-real-pwa-ios-import-lab-20261106'||c.services?.length!==1||c.services[0].binding!=='STYLE_BASE'||c.services[0].service!=='talera-v9-stille-luxe-stijlstaging-20261104'||c.r2_buckets||c.d1_databases||c.routes)process.exit(1);console.log('PASS: own worker, original V9 service, no direct database or storage bindings');"
+      - name: Require GitHub deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing secret CLOUDFLARE_API_TOKEN'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing secret CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+      - name: Publish exclusively independent real PWA design Worker
+        run: |
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
+          npx wrangler deploy --config r20-dev/real-pwa-ios-import/wrangler.jsonc
+      - name: Confirm exact PWA and locked playback on dedicated URL
+        run: |
+          URL='https://talera-real-pwa-ios-import-lab-20261106.mark-a39.workers.dev'
+          for ATTEMPT in 1 2 3 4 5 6 7 8; do
+            TELL_STATUS="$(curl -sS -o /tmp/talera-pwa-tell.html -w '%{http_code}' --max-time 12 "$URL/tell" || true)"
+            TELL_HEADER="$(curl -sS -D - -o /dev/null --max-time 10 "$URL/tell" | tr -d '\r' | grep -i '^x-talera-pwa-visual-only:' || true)"
+            PRESENT_HEADER="$(curl -sS -D - -o /dev/null --max-time 10 "$URL/present" | tr -d '\r' | grep -i '^x-talera-clean-one-memory:' || true)"
+            if [ "$TELL_STATUS" = '200' ] && printf '%s' "$TELL_HEADER" | grep -q 'passive-file-input-observer' && printf '%s' "$PRESENT_HEADER" | grep -q 'installed'; then
+              echo "PASS original PWA + isolated skin /tell and frozen player /present"
+              printf '%s\n' '### TALERA - echte PWA in aparte Worker' "$URL/tell" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "FAIL: source PWA or isolated visual layer unavailable. No test link approved."
+          exit 1

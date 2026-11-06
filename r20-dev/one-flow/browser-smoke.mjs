@@ -48,6 +48,12 @@ const saved=await evaluate(`(async()=>{
  const canvas=document.createElement('canvas');canvas.width=60;canvas.height=60;
  const ctx=canvas.getContext('2d');ctx.fillStyle='#244b71';ctx.fillRect(0,0,60,60);
  const stream=canvas.captureStream(12);
+ // Prime the synthetic canvas stream before recording. Otherwise Chrome may
+ // sporadically encode a black frame at t=0, making the BLUE-cover assertion
+ // flaky even though TALERA selects the correct source video.
+ await new Promise(resolve=>setTimeout(resolve,180));
+ ctx.fillRect(0,0,60,60);
+ stream.getVideoTracks()[0]?.requestFrame?.();
  // Give the video an actual audible track, not just an unmuted-but-silent picture.
  const audioContext=new AudioContext(),destination=audioContext.createMediaStreamDestination();
  const oscillator=audioContext.createOscillator(),gain=audioContext.createGain();
@@ -61,7 +67,10 @@ const saved=await evaluate(`(async()=>{
    const r=new MediaRecorder(mixedStream,{mimeType:mime}),pieces=[];
    r.ondataavailable=e=>{if(e.data?.size)pieces.push(e.data)};
    r.onstop=()=>resolve(new Blob(pieces,{type:mime}));
-   r.onerror=reject;r.start();setTimeout(()=>r.stop(),1300);
+   r.onerror=reject;r.start();
+   // Force blue opening keyframes after recording is actively running.
+   ctx.fillRect(0,0,60,60);stream.getVideoTracks()[0]?.requestFrame?.();
+   setTimeout(()=>r.stop(),1300);
  });
  oscillator.stop();
  mixedStream.getTracks().forEach(t=>t.stop());

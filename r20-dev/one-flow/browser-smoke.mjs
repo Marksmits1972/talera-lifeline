@@ -229,4 +229,39 @@ console.log('PASS three replay cycles, closed internal media, normal V13 whole-m
 // End of test: 3 complete real browser rounds already verified, including
 // no extra Beluister on original video and post-video whole-memory swipes.
 assert.equal(requiredVideoTap,0,'original video must never need a separate Beluister action');
+
+// The ACTUAL iPhone failure occurred MID-NARRATION, not only after DONE.
+// Navigate back into the whole story, let the voice + silent video move,
+// then swipe while they are still playing. That swipe must go DIRECTLY to
+// the neighboring memory. It MUST NOT reveal any internal photo or leave
+// the old spoken voice playing under the next memory.
+const nextWhole=await quiet("(()=>{const b=window.__taleraPhotoBook,l=b.list(),m=window.__taleraTimelineRuntime.currentMemory(),i=l.findIndex(x=>x.id===m.id);return{id:l[i+1]?.id||l[i-1]?.id,dir:l[i+1]?1:-1}})()");
+assert.ok(nextWhole.id,'need an adjacent WHOLE memory for mid-narration regression');
+await swipe(nextWhole.dir);
+assert.ok(await wait('window.__taleraTimelineRuntime.currentMemory()?.id==='+JSON.stringify(nextWhole.id),105));
+await swipe(-nextWhole.dir);
+assert.ok(await wait('window.__taleraTimelineRuntime.currentMemory()?.id==='+JSON.stringify(idOfStory),105));
+assert.ok(await wait("Boolean(window.__taleraInlineSharedAudio?.src)",105));
+if(!await wait('window.__taleraInlineSharedAudio.currentTime>.12',10)){
+ // Strict Chrome may require the FIRST voice gesture, but no extra video
+ // gesture is given; progress checks never grant a hidden gesture.
+ await evaluate("window.__taleraInlineSharedAudio.play().catch(()=>{})",false,true);
+}
+assert.ok(await wait("(()=>{const a=window.__taleraInlineSharedAudio,v=document.querySelector('video.talera-v61-inline-video');return a?.currentTime>.12&&a.currentTime<2.75&&v?.muted&&v.currentTime>.06})()",35),
+  'voice and first silent VIDEO must move together before the swipe');
+const midBefore=await quiet("(()=>{const m=window.__taleraTimelineRuntime.currentMemory(),b=window.__taleraPhotoBook;return{id:m.id,frame:m._photoIndex,entries:b.list().filter(x=>x.id===m.id).length}})()");
+assert.equal(midBefore.entries,1,'story is ONE memory ID even during moving video');
+await swipe(nextWhole.dir);
+assert.ok(await wait('window.__taleraTimelineRuntime.currentMemory()?.id==='+JSON.stringify(nextWhole.id),105),
+ 'swipe MID-VOICE must land at the neighboring entire memory, never an internal photo');
+const midAfter=await quiet("(()=>{const b=window.__taleraPhotoBook,m=window.__taleraTimelineRuntime.currentMemory(),"+
+"old=b.list().find(x=>x.id==="+JSON.stringify(idOfStory)+"),state=b.state();"+
+"return{id:m.id,oldIndex:old?._photoIndex,oldEntries:b.list().filter(x=>x.id===old.id).length,"+
+"bookId:b.list()[state.index]?.id,oldAudioPaused:window.__taleraInlineSharedAudio?.paused}})()");
+assert.equal(midAfter.id,nextWhole.id);
+assert.equal(midAfter.bookId,nextWhole.id,'V13 wheel must select exactly the whole next memory');
+assert.equal(midAfter.oldEntries,1);
+assert.equal(midAfter.oldIndex,midBefore.frame,'swiping must NOT step through any photos inside the old memory');
+assert.equal(midAfter.oldAudioPaused,true,'old narration audio must stop when leaving its memory');
+console.log('PASS MID-NARRATION swipe: voice+silent VIDEO stopped and wheel selected ONE neighboring memory; internal media remained sealed');
 ws.close();

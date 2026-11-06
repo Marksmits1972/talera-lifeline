@@ -184,7 +184,10 @@ for(let round=1;round<=3;round++){
   originalMoved=await wait('window.__taleraClosedTrace.original>.18',60);
  }
  assert.ok(originalMoved,'original VIDEO soundtrack must play');
- assert.ok(await wait('window.__taleraClosedTrace.originalVisualPlaying&&window.__taleraClosedTrace.originalVideoTime>.3&&window.__taleraClosedTrace.originalPaintedFrames>=3&&window.__taleraClosedTrace.originalVisualVisible',60),
+ const visibleVideoPassed=await wait('window.__taleraClosedTrace.originalVisualPlaying&&window.__taleraClosedTrace.originalVideoTime>.3&&window.__taleraClosedTrace.originalPaintedFrames>=3&&window.__taleraClosedTrace.originalVisualVisible',60);
+ const visualDiag=await quiet("(()=>{const t=window.__taleraClosedTrace,v=document.querySelector('video.talera-v61-inline-video'),a=window.__taleraInlineSharedAudio;return{originalSound:t.original,originalVideoTime:t.originalVideoTime,originalVisualPlaying:t.originalVisualPlaying,originalPaintedFrames:t.originalPaintedFrames,originalVisualVisible:t.originalVisualVisible,audioPaused:a?.paused,audioEnded:a?.ended,videoPaused:v?.paused,videoEnded:v?.ended,videoReadyState:v?.readyState,videoCurrentTime:v?.currentTime,videoFrames:v?.getVideoPlaybackQuality?.().totalVideoFrames,videoStyle:v?.style.cssText,hint:document.querySelector('button.talera-v61-audio-permission-hint')?.textContent||null}})()");
+ console.log('ORIGINAL VISUAL DIAGNOSTIC',JSON.stringify(visualDiag));
+ assert.ok(visibleVideoPassed,
   'original VIDEO must display moving decoded frames in the native viewport, NOT only a still preview with audio');
  assert.ok(await wait('window.__taleraClosedTrace.originalEnded',60),'the original video must end');
  const out=await quiet("(()=>{const t=window.__taleraClosedTrace,m=window.__taleraTimelineRuntime.currentMemory();"+

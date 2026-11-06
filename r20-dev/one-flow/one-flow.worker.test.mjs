@@ -28,6 +28,8 @@ const nativePage='<html><script>'+
   "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
   "function hydrate(memory){loaded.set(memory.id,urls);}\n"+
   "function registerThem(memories){runtime.registerMemories(memories);}\n"+
+  "/* TALERA V13: V3 continuous wheel is sole owner of photo gestures and position. */"+
+  "function assign(tile,index,mem){if(tile.index===index)return;}"+
   AUDIO_END_BEFORE+'</script></html>';
 
 function fixture({ordered=frames(),recorded=cues(),lastVideo=null,soundEnabled=true}={}){
@@ -467,6 +469,14 @@ test('exact existing V9 hooks are required; cached cover never enters the ordina
   assert.ok(patched.html.includes('window.__taleraPhotoBook?.list?.().find(x=>x.id===memory.id)'));
   assert.ok(patched.html.includes('talera-narrated-swipe-covers-v1'));
   assert.ok(patched.html.includes("720/Math.max(w,h)"));
+  assert.ok(patched.html.includes("taleraSwipeCoverEnsure(list[i],true)"),
+    'upcoming narrated neighbors must get their cover before the first swipe');
+  assert.ok(patched.html.includes("store.displayUrl(first.key)"),
+    'unvisited narrated neighbor reads ONLY first chosen photo, never all media');
+  assert.ok(patched.html.includes("tile.el.dataset.url!==mem.previewImage"),
+    'narrated wheel must refresh a stale tile when the cover arrives after render');
+  assert.ok(!patched.html.includes("if(tile.index===index)return;"),
+    'stale V13 tile shortcut is revised in staging only');
   assert.equal(restoreApprovedV9(patched.html),nativePage,'the approved V9 is byte-identical when reverted');
   const noHydrate=nativePage.replace('loaded.set(memory.id,urls);','');
   assert.equal(applyUnifiedTail(noHydrate).status,'anchor-unmatched',
@@ -474,4 +484,29 @@ test('exact existing V9 hooks are required; cached cover never enters the ordina
   const noRegister=nativePage.replace('runtime.registerMemories(memories);','');
   assert.equal(applyUnifiedTail(noRegister).status,'anchor-unmatched',
     'fail closed if original memory registry changes');
+  const noWheel=nativePage.replace("if(tile.index===index)return;",'');
+  assert.equal(applyUnifiedTail(noWheel).status,'anchor-unmatched',
+    'fail closed if native wheel renderer changes');
+
+});
+
+test('wheel refresh only when narrated cover changes; ordinary images remain unchanged',()=>{
+  const p=applyUnifiedTail(nativePage);
+  assert.equal(p.status,'installed');
+  const old="if(tile.index===index)return;";
+  const changed="if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;";
+  assert.ok(p.html.includes(changed));
+  assert.equal(p.html.split(changed).length-1,1);
+  assert.ok(!p.html.includes(old));
+  const fixtureSource="function check(tile,index,mem){"+changed+"return true;}";
+  const env={};
+  vm.runInNewContext(fixtureSource,env);
+  const same={index:0,el:{dataset:{url:'blob:old'}}};
+  assert.equal(env.check(same,0,{_zeroItems:[{kind:'photo'}],previewImage:'blob:new'}),undefined,
+    'normal photo remains untouched even if preview URL differs');
+  assert.equal(env.check(same,0,{_zeroItems:[{kind:'audio'}],previewImage:'blob:new'}),true,
+    'narrated page is reassigned if its cover changed');
+  assert.equal(env.check(same,0,{_zeroItems:[{kind:'audio'}],previewImage:'blob:old'}),undefined,
+    'same narrated cover is already ready and requires no repaint');
+  assert.equal(restoreApprovedV9(p.html),nativePage);
 });

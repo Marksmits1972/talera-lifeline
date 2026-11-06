@@ -88,37 +88,45 @@ assert.ok(saved?.id?.startsWith('local-'),JSON.stringify(saved));
 assert.equal(saved.files,7);assert.equal(saved.cues,3);
 console.log('PASS native IndexedDB: five photos, narrated video WITH audio track, real WAV and three cues');
 
-// Narrated memory only: the first narrated PHOTO is cached as ONE locally
-// persistent 720px JPEG cover, not added to the real photo or video sequence.
+// Narrated memory only: the FIRST visual cue is a VIDEO in this fixture.
+// The wheel should show JPEG frame zero of that VIDEO, not the next photo.
 await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
 assert.ok(await until('Boolean(window.__taleraTimelineRuntime?.currentMemory()?._zeroFrames?.length)',150),
   'narrated story frames must hydrate before cover creation');
 assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==='pwa:"+saved.id+"')?.previewImage)",190),
-  'narrated first-photo cover should be attached to the ORIGINAL V13 memory wheel');
+  'video frame 0 should be attached to the ORIGINAL V13 memory wheel');
 const firstCover=await evaluate("(async()=>{"+
 "const id='pwa:"+saved.id+"';"+
 "const m=window.__taleraPhotoBook.list().find(x=>x.id===id);"+
 "const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('talera-narrated-swipe-covers-v1');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});"+
 "const row=await new Promise((resolve,reject)=>{const r=db.transaction('covers','readonly').objectStore('covers').get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});"+
 "const image=await createImageBitmap(row.blob);"+
+"const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;"+
+"const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);"+
+"const pixel=Array.from(ctx.getImageData(Math.floor(image.width/2),Math.floor(image.height/2),1,1).data);"+
 "db.close();"+
 "return {url:m.previewImage,key:row.photoKey,size:row.blob.size,type:row.blob.type,"+
-"width:image.width,height:image.height,photoCount:m.photos.length,mediaCount:m._zeroItems.length};})()",true);
+"width:image.width,height:image.height,pixel,openingKey:m._zeroItems[0].key,"+
+"openingKind:m._zeroItems[0].kind,photoCount:m.photos.length,mediaCount:m._zeroItems.length};})()",true);
 assert.ok(firstCover.url.startsWith('blob:'));
 assert.equal(firstCover.type,'image/jpeg');
+assert.equal(firstCover.openingKind,'video','this test narration begins with a video');
+assert.equal(firstCover.key,firstCover.openingKey,'the cover MUST reference the opening video, not the first later photo');
+assert.ok(firstCover.pixel[2]>firstCover.pixel[0]+30&&firstCover.pixel[2]>firstCover.pixel[1]+15,
+  'frame-zero JPEG should contain the BLUE video opening, not the following photo');
 assert.ok(firstCover.size>100);
 assert.ok(Math.max(firstCover.width,firstCover.height)<=720);
 assert.equal(firstCover.photoCount,6,'cover is NOT another photo in narrated memory');
 assert.equal(firstCover.mediaCount,7,'original video, photos and voice remain untouched');
-console.log('PASS narrated cover: one persisted, optimized first-photo thumbnail, native V13 uses previewImage');
+console.log('PASS narrated cover: FRAME ZERO of opening video, not later photograph; persistent V13 cover');
 await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
 assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==='pwa:"+saved.id+"')?.previewImage)",150),
-  'the same first-photo thumbnail must be restored from browser storage on reload');
+  'the same first-video-frame thumbnail must be restored from browser storage on reload');
 const secondCover=await evaluate("(()=>{const m=window.__taleraPhotoBook.list().find(x=>x.id==='pwa:"+saved.id+"');"+
 "return {url:m?.previewImage,mediaCount:m?._zeroItems?.length};})()");
 assert.ok(secondCover.url.startsWith('blob:'));
 assert.equal(secondCover.mediaCount,7);
-console.log('PASS narrated cover reused after reload, without creating a seventh photo');
+console.log('PASS video frame-zero cover reused after reload, no extra photo or player');
 
 for(const playbackRound of [1,2,3]){
 console.log('BEGIN playback round',playbackRound);
@@ -396,7 +404,7 @@ assert.ok(await until('!document.querySelector("button.talera-v61-audio-permissi
 console.log('PASS Safari permission: clicking real Beluister button plays native narration, not photo');
 
 // Regression from REAL iPhone screenshots: a new, NEVER-OPENED narrated
-// neighbor must have its first-photo cover BEFORE a swipe. Otherwise the
+// neighbor must have its FIRST-VISUAL cover BEFORE a swipe. Otherwise the
 // native wheel paints an all-white rectangle until hydration after landing.
 const unopenedNarrated=await evaluate("(async()=>{"+
 "const png=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZcAAAAASUVORK5CYII='),c=>c.charCodeAt(0));"+
@@ -406,7 +414,11 @@ const unopenedNarrated=await evaluate("(async()=>{"+
 "v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);"+
 "v.setUint32(24,8000,true);v.setUint32(28,16000,true);v.setUint16(32,2,true);"+
 "v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);"+
-"const files=[new File([png],'cover-only-photo.png',{type:'image/png'}),"+
+"const original=await TaleraMemories.get('"+saved.id+"');"+
+"const first=original.items.find(x=>x.kind==='video');"+
+"const video=await TaleraMemories.blob(first.key);"+
+"const files=[new File([video],'neighbor-opening-video.webm',{type:video.type}),"+
+"new File([png],'cover-only-photo.png',{type:'image/png'}),"+
 "new File([b],'neighbor-voice.wav',{type:'audio/wav'})];"+
 "const row=await TaleraMemories.save({title:'Unopened narrated neighbor',"+
 "date:'2026-11-04',time:'11:59:00',datePrecision:'exact',"+
@@ -422,15 +434,15 @@ const coverAhead=await evaluate("(()=>{const l=window.__taleraPhotoBook.list(),"
 "b=l.findIndex(x=>x.id==="+JSON.stringify('pwa:'+saved.id)+");"+
 "const neighbor=l[a],current=l[b];"+
 "return {distance:Math.abs(a-b),neighborHydrated:!neighbor._photoLoading,"+
-"neighborHasCover:!!neighbor.previewImage,neighborFirstKey:neighbor._zeroItems.find(x=>x.kind==='photo').key,"+
+"neighborHasCover:!!neighbor.previewImage,neighborFirstKey:neighbor._zeroItems.find(x=>x.kind==='video').key,"+
 "neighborFrameCount:neighbor._zeroFrames?.length||0,currentHasCover:!!current.previewImage};})()");
 assert.equal(coverAhead.distance,1,'new narrated memory should be next to the current one');
 assert.equal(coverAhead.neighborHydrated,false,
- 'neighbor is NOT opened or hydrated: cover is prepared from exactly one stored photo');
+ 'neighbor is NOT opened or hydrated: cover comes from exactly one original video');
 assert.equal(coverAhead.neighborHasCover,true);
 assert.equal(coverAhead.neighborFrameCount,0);
 assert.equal(coverAhead.currentHasCover,true);
-console.log('PASS adjacent narrated cover: generated BEFORE first visit, with zero original media frames hydrated');
+console.log('PASS adjacent VIDEO frame-zero cover: generated BEFORE first visit with zero original frames hydrated');
 const rect=await evaluate("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
 "return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
 await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});

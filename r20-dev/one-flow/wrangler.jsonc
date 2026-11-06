@@ -1,5 +1,5 @@
 {
-  "name": "talera-one-memory-clean-test-20261105",
+  "name": "talera-closed-memory-core-test-20261106",
   "main": "./one-flow.worker.mjs",
   "compatibility_date": "2026-11-05",
   "workers_dev": true,

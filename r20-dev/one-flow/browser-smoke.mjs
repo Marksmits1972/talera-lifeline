@@ -36,7 +36,9 @@ const evaluate=async(expression,awaitPromise=false,userGesture=true)=>{
  return r.result?.value;
 };
 const until=async(expression,tries=240)=>{
- for(let i=0;i<tries;i++){if(await evaluate(expression))return true;await sleep(80)}
+ // User-gesture-free waits: simulated CDP gestures on every poll hid Safari
+ // autoplay denial on the SECOND timeline playback.
+ for(let i=0;i<tries;i++){if(await evaluate(expression,false,false))return true;await sleep(80)}
  return false;
 };
 await cmd('Page.enable');await cmd('Runtime.enable');
@@ -167,7 +169,8 @@ await evaluate(`(()=>{
     if(!t.videos.some(v=>v.elementId===video.dataset.testID)){
       video.dataset.testID=String(t.videos.length+1);
       const item={elementId:video.dataset.testID,muted:video.muted,at:performance.now(),
-        warmed:video.dataset.primedVideo==='yes',progress:0,duration:0};
+        warmed:video.dataset.primedVideo==='yes',
+        sameAudible:video===window.__taleraInlineSharedAudio,progress:0,duration:0};
       t.videos.push(item);
       video.addEventListener('timeupdate',()=>{
         item.progress=Math.max(item.progress,video.currentTime||0);
@@ -182,12 +185,19 @@ await evaluate(`(()=>{
  const a=window.__taleraInlineSharedAudio;
  a.addEventListener('ended',()=>{t.voiceEndedAt=performance.now();record()},{once:true});
  record();
- // Reuse the existing listening UI control as the only video authorization.
- // It is OUTSIDE the closed story photo. No synthetic photo tap is needed.
- const consent=document.querySelector('button.talera-audio-consent');
- if(consent&&!consent.hidden)consent.click();
- else document.dispatchEvent(new Event('talera:enable-listening'));
- if(a.paused)a.play().catch(e=>{t.errors.push('voice play '+String(e))});
+ // First playback uses the normal listening setting. On timeline replay
+ // there is NO repeated Beluister click or talera:enable-listening event.
+ // If strict Chrome blocks the VOICE too, allow the voice to start with
+ // one gesture; the original video may NOT receive a new gesture.
+ if(${playbackRound}===1){
+   const consent=document.querySelector('button.talera-audio-consent');
+   if(consent&&!consent.hidden)consent.click();
+   else document.dispatchEvent(new Event('talera:enable-listening'));
+ }
+ if(a.paused){
+   t.voiceStartedWithGesture=true;
+   a.play().catch(e=>{t.errors.push('voice play '+String(e))});
+ }else t.voiceStartedWithGesture=false;
 })()`);
 if(playbackRound===1)console.log('AUDIO_UI_CONTROLS',JSON.stringify(await evaluate('window.__taleraAudioUiControls')));
 assert.ok(await until('window.__oneFlowTest.voiceEndedAt>0'),'real narration must finish');
@@ -200,25 +210,27 @@ for(const index of [3,4,5]){
 const result=await evaluate(`(()=>{
  const t=window.__oneFlowTest;
  return {voiceEndedAt:t.voiceEndedAt,photos:t.photos,videos:t.videos,
- errors:t.errors,iframes:document.querySelectorAll('iframe.talera-zero-present-frame').length}
-})()`);
+ errors:t.errors,iframes:document.querySelectorAll('iframe.talera-zero-present-frame').length,
+ voiceStartedWithGesture:t.voiceStartedWithGesture}
+})()`,false,false);
 const remaining=result.photos.filter(p=>p.index>=3&&p.at>=result.voiceEndedAt-100);
 assert.deepEqual(remaining.map(p=>p.index),[3,4,5]);
 assert.ok(remaining[1].at-remaining[0].at>=3200);
 assert.ok(remaining[2].at-remaining[1].at>=3200);
 assert.ok(await until('window.__oneFlowTest.videos.some(v=>!v.muted&&v.progress>.6)',200),
  'the original video must replay from 0 with sound after the remaining photos');
-const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,warmed:v.warmed,progress:v.progress,duration:v.duration}))`);
+const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,warmed:v.warmed,sameAudible:v.sameAudible,progress:v.progress,duration:v.duration}))`,false,false);
 const narrated=videoPlayback.find(v=>v.muted&&v.at<result.voiceEndedAt);
 const replay=videoPlayback.find(v=>!v.muted&&v.at>remaining.at(-1).at);
 assert.ok(narrated,'narrated video exists and was muted');
 assert.ok(replay,'original native video replay starts AFTER the last remaining photo');
-assert.equal(replay.warmed,true,'native replay MUST reuse video authorized by the FIRST listener gesture');
+assert.equal(replay.sameAudible,true,'original MUST be the SAME authorized media element as the voice');
+assert.equal(replay.warmed,false,'do not promote a separate hidden video as audible replay');
 assert.ok(replay.progress>.6,'unmuted replay advanced from t=0');
 assert.ok(replay.duration>=1,'replay has the original full clip duration');
 assert.deepEqual(result.errors,[]);
 assert.equal(result.iframes,0);
-console.log('PASS browser playback round '+playbackRound+': silent narration -> remaining photos -> audible video from zero, no second Beluister');
+console.log('PASS browser playback round '+playbackRound+': voice->original SAME media element, no second Beluister; voice needed gesture='+result.voiceStartedWithGesture);
 }
 // Regression: a narrated story is ONE timeline item; photo taps do nothing,
 // and a real horizontal swipe leaves the whole active story (even mid-voice).

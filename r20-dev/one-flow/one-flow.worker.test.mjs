@@ -218,7 +218,9 @@ test('first genuine listening gesture unlocks each *original* video element for 
   await env.taleraUnifiedWarmVideos(s);
   assert.equal(s.taleraUnifiedPrepared.size,1);
   assert.equal(playCalls,0,'do not autoplay an audible video before a user gesture');
-  assert.equal(listeners.has('pointerup'),false,'swiping may never be a video-prime handler');
+  assert.equal(listeners.has('pointerup'),true,'visual-only pointer handler may observe swipe release');
+  listeners.get('pointerup')({pointerId:123});
+  assert.equal(playCalls,0,'pointer swipe release must never prime any video');
   assert.equal(listeners.has('touchend'),false,'touch swipe may never prime videos');
   const photoTap={target:{closest:()=>null}};
   listeners.get('click')(photoTap);
@@ -268,9 +270,14 @@ test('narrated photo is closed: no pointer, touch or click handler primes origin
     URL:{revokeObjectURL(){}},console:{warn(){}},taleraInline:s};
   vm.runInNewContext(INLINE_TAIL,env);
   await env.taleraUnifiedWarmVideos(s);
-  for(const event of ['pointerup','touchend','pointerdown','touchstart']){
+  for(const event of ['pointerdown','pointermove','pointerup']){
+    assert.equal(listeners.has(event),true,event+' observes only visual wheel reveal');
+  }
+  for(const event of ['touchend','touchstart']){
     assert.equal(listeners.has(event),false,event+' must not create playback or internal navigation');
   }
+  listeners.get('pointerup')({pointerId:456});
+  assert.deepEqual(plays,[],'visual-only pointer release cannot start audio');
   listeners.get('click')({target:{closest:()=>null}});
   assert.deepEqual(plays,[],'story photo tapping cannot call video.play');
   assert.equal(s.taleraUnifiedPrepared.size,1);

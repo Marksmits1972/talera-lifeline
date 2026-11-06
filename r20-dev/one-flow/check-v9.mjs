@@ -51,6 +51,14 @@ const scriptCount=(actual.split('<script').length-1);
 const scriptHeads=actual.split('<script').slice(1).map(s=>s.slice(0,s.indexOf('>')).trim().slice(0,220));
 const probes=['Beluister','beluister','play()','play(','autoplay','playsinline','video','Video','onclick','media','iframe','src=','import(','<button','controls'];
 const probeReport=Object.fromEntries(probes.map(needle=>{const pos=actual.indexOf(needle);return [needle,{at:pos,context:pos<0?'':actual.slice(Math.max(0,pos-160),pos+360)}]}));
+const relevantTags=['talera-v8-handoff-script','talera-v18-phases-js','talera-flow-v16','talera-flow-v17-time'];
+for(const id of relevantTags){
+ const start=actual.indexOf('<script id="'+id+'"');
+ const open=start>=0?actual.indexOf('>',start):-1;
+ const end=open>=0?actual.indexOf('</script>',open):-1;
+ const source=open>=0&&end>=0?actual.slice(open+1,end):'';
+ console.log('MYN_LEVEN_SCRIPT_'+id,JSON.stringify({length:source.length,source:source.slice(0,22000)}));
+}
 console.log('MYN_LEVEN_DEEP_SOURCE',JSON.stringify({scripts:scriptHeads,probes:probeReport}));
 console.log('MYN_LEVEN_CODE_AUDIT',JSON.stringify({status:actualRes.status,
  bytes:actual.length,url:actualRes.url,patchStatus:attempted.status,

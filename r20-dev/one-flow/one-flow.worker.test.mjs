@@ -26,6 +26,10 @@ const nativePage='<html><script>'+
   "  document.addEventListener('click',e=>{\n"+
   "    if(s?.engine!=='narrated'||s.phase!=='narration')return;},true);\n"+nativeVoiceHint+"\n}"+
   "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
+  "function showPhoto(memory,index,manual=false){\n"+ 
+  "if(!memory||!Array.isArray(memory.photos)||memory.photos.length<=1)return;\n"+
+  "memory._photoIndex=((index%memory.photos.length)+memory.photos.length)%memory.photos.length;\n"+
+  "memory.image=memory.photos[memory._photoIndex];}\n"+
   "function hydrate(memory){loaded.set(memory.id,urls);}\n"+
   "function registerThem(memories){runtime.registerMemories(memories);}\n"+
   "/* TALERA V13: V3 continuous wheel is sole owner of photo gestures and position. */"+
@@ -629,4 +633,37 @@ test('native originals keep the exact SAME blob URL instead of reassigning it an
     'ordinary player unchanged; narrated originals may reuse their prepared video');
   assert.equal(restoreApprovedV9(patched.html),nativePage,
     'approved V9 must remain byte-for-byte reversible');
+});
+
+test('narrated story remains ONE sealed memory after the FINAL video, not only while voice plays',()=>{
+  const patched=applyUnifiedTail(nativePage);
+  assert.equal(patched.status,'installed');
+  const guarded="function showPhoto(memory,index,manual=false){\\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;";
+  assert.ok(patched.html.includes(guarded),
+    'manual RH19 photo stepping must be denied for narrated memory even after original video');
+  const first=patched.html.indexOf('function showPhoto(memory,index,manual=false){');
+  const end=patched.html.indexOf('}\\n',first);
+  const fn=patched.html.slice(first,end+1);
+  assert.ok(first>0&&end>first);
+  const env={};vm.runInNewContext(fn,env);
+  const narrated={id:'one-story',photos:['video-first','second-photo','third-photo'],
+    _photoIndex:0,image:'video-first',
+    _zeroItems:[{kind:'video',key:'opening'},{kind:'photo',key:'second'},{kind:'audio',key:'voice'}]};
+  // Session has already ended; no audio and video element remain. Still sealed.
+  env.showPhoto(narrated,1,true);
+  assert.equal(narrated._photoIndex,0,'legacy manual photo event must NOT advance narrated media');
+  assert.equal(narrated.image,'video-first');
+  env.showPhoto(narrated,2,false);
+  assert.equal(narrated._photoIndex,2,'narrator programmatic cue selection must still work');
+  assert.equal(narrated.image,'third-photo');
+  env.showPhoto(narrated,0,true);
+  assert.equal(narrated._photoIndex,2,'manual taps must remain blocked after any phase');
+  const ordinary={id:'simple-photos',photos:['a','b','c'],image:'a',
+    _photoIndex:0,_zeroItems:[{kind:'photo',key:'a'},{kind:'photo',key:'b'}]};
+  env.showPhoto(ordinary,1,true);
+  assert.equal(ordinary._photoIndex,1,'ordinary memories retain native tap-to-next-photo');
+  assert.equal(ordinary.image,'b');
+  assert.equal(restoreApprovedV9(patched.html),nativePage,'every V9 byte must restore exactly');
+  assert.equal(applyUnifiedTail(nativePage.replace('function showPhoto(memory,index,manual=false){','')).status,
+    'anchor-unmatched','fail closed if RH19 changes');
 });

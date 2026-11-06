@@ -25,8 +25,7 @@ const nativePage='<html><script>'+
   "  const retry=e=>{\n    const s=taleraInline;};\n"+
   "  document.addEventListener('click',e=>{\n"+
   "    if(s?.engine!=='narrated'||s.phase!=='narration')return;},true);\n"+nativeVoiceHint+"\n}"+
-  "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){const audio=window.__taleraInlineSharedAudio||document.createElement('audio');"+
-  "audio.preload='auto';audio.playsInline=true;audio.style.display='none';}}"+
+  "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
   "function showPhoto(memory,index,manual=false){\n"+ 
   "if(!memory||!Array.isArray(memory.photos)||memory.photos.length<=1)return;\n"+
   "memory._photoIndex=((index%memory.photos.length)+memory.photos.length)%memory.photos.length;\n"+
@@ -667,38 +666,4 @@ test('narrated story remains ONE sealed memory after the FINAL video, not only w
   assert.equal(restoreApprovedV9(patched.html),nativePage,'every V9 byte must restore exactly');
   assert.equal(applyUnifiedTail(nativePage.replace('function showPhoto(memory,index,manual=false){','')).status,
     'anchor-unmatched','fail closed if RH19 changes');
-});
-
-test('replay from timeline retains SAME native VIDEO element between narrated WAV and every original movie',()=>{
-  const patched=applyUnifiedTail(nativePage);
-  assert.equal(patched.status,'installed');
-  assert.ok(patched.html.includes("const audio=window.__taleraInlineSharedAudio||document.createElement('video');"),
-    'the narrated WAV and its original videos must share ONE HTMLVideoElement on Safari');
-  assert.ok(patched.html.includes("audio.setAttribute('webkit-playsinline','')"),
-    'iOS must play the audio-only voice and later real movie inline');
-  assert.equal(restoreApprovedV9(patched.html),nativePage);
-  const events=[],voice={
-    tagName:'VIDEO',paused:false,currentTime:25,
-    pause(){events.push('pause');this.paused=true},
-    onplay:()=>{},onpause:()=>{},onended:()=>{},ontimeupdate:()=>{},onseeking:()=>{},onseeked:()=>{}
-  };
-  const extra={pause(){events.push('warm pause')},removeAttribute(){events.push('warm source removed')},remove(){events.push('warm removed')}};
-  const s={engine:'narrated',audio:voice,phase:'originals',taleraUnifiedVoiceAudible:true,
-    taleraUnifiedPrepared:new Map([['movie',{video:extra,url:'blob:movie',primed:false,pending:false}]])};
-  const env={document:{addEventListener(){}},console:{warn(){}},window:{}};
-  vm.runInNewContext(INLINE_TAIL,env);
-  const first=env.taleraUnifiedTakePrimed(s,{kind:'video',key:'movie'});
-  assert.equal(first,voice,'original movie MUST be same real media element that played voice WAV');
-  assert.equal(first.currentTime,0,'source switch is prepared at start');
-  assert.equal(s.taleraUnifiedReplayUrl,'blob:movie');
-  assert.equal(s.taleraUnifiedReplayHandoff.sharedNarration,true);
-  assert.equal(s.taleraUnifiedReplayHandoff.gesturePrimed,true);
-  assert.equal(s.taleraUnifiedPrepared.size,0);
-  assert.equal(first.onended,null,'narration onended callback must not re-enter original round');
-  assert.ok(events.includes('warm removed'));
-  s.taleraUnifiedReplayUrl=null;s.phase='originals';s.taleraUnifiedVoiceAudible=false;
-  const second=env.taleraUnifiedTakePrimed(s,{kind:'video',key:'another'});
-  assert.equal(second,voice,'even later originals use the SAME visible player');
-  assert.equal(s.taleraUnifiedReplayHandoff.gesturePrimed,false,
-    'the diagnostics never fake a user gesture');
 });

@@ -531,11 +531,20 @@ export function applyUnifiedTail(html){
   // When a narrated cover arrives AFTER that tile's first render, its stale
   // placeholder remained until navigating away. Invalidate ONLY if the cover
   // URL changed; normal photo memories keep the original assign shortcut.
+  // Native RH19 still exposes showPhoto() to its legacy tap handler, even
+  // AFTER the last narrated video has ended. Close that entry point at the
+  // SOURCE, rather than relying on a document click guard that iOS can miss.
+  // The narration engine calls __taleraV31SelectPhoto with manual=false and
+  // therefore retains complete authority over its own timed media frames.
+  const nativeManualPhoto="function showPhoto(memory,index,manual=false){";
+  const sealedManualPhoto="function showPhoto(memory,index,manual=false){\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;";
   const nativeWheelAssign="if(tile.index===index)return;";
   const newWheelAssign="if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;";
   if(result.split(nativeCoverHydrated).length!==2||
      result.split(nativeCoverRegistered).length!==2||
-     result.split(nativeWheelAssign).length!==2)return {html,status:'anchor-unmatched'};
+     result.split(nativeWheelAssign).length!==2||
+     result.split(nativeManualPhoto).length!==2)return {html,status:'anchor-unmatched'};
+  result=result.replace(nativeManualPhoto,sealedManualPhoto);
   result=result.replace(nativeCoverHydrated,nativeCoverHydrated+"taleraSwipeCoverEnsure(memory,true);");
   result=result.replace(nativeCoverRegistered,nativeCoverRegistered+"taleraSwipeCoverObserve(memories);");
   result=result.replace(nativeWheelAssign,newWheelAssign);
@@ -592,6 +601,8 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
+    .replace("function showPhoto(memory,index,manual=false){\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;",
+      "function showPhoto(memory,index,manual=false){")
     .replace("if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;",
       "if(tile.index===index)return;")
     .replace("runtime.registerMemories(memories);taleraSwipeCoverObserve(memories);",

@@ -69,3 +69,11 @@ for(const needle of ['talera:enable-listening','__taleraAudioControls','Beluiste
  }
  console.log('LISTEN_COUNTS',needle,count);
 }
+
+for(const needle of ["phone-v1","videoPoster","captureVideo","currentTime=0","captureStream","drawImage(video","video.currentTime","store.blob(item.key+':phone-v1')"]){
+ let i=0,n=0;
+ while((i=html.indexOf(needle,i))>=0&&n<20){
+  console.log('VIDEO_POSTER_AUDIT',needle,n,i,JSON.stringify(html.slice(Math.max(0,i-2200),Math.min(html.length,i+2400))));
+  n++;i+=needle.length;
+ }
+}

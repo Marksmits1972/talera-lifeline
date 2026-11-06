@@ -5,9 +5,15 @@ on:
     paths:
       - 'r20-dev/ios-picker-lab/**'
       - '.github/workflows/talera-ios-picker-lab-deploy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'r20-dev/ios-picker-lab/**'
+      - '.github/workflows/talera-ios-picker-lab-deploy.yml'
   workflow_dispatch:
 permissions:
   contents: read
+  issues: write
 concurrency:
   group: talera-iphone-photo-picker-lab
   cancel-in-progress: false
@@ -54,3 +60,9 @@ jobs:
           curl -fLsS "$URL/" | grep -q 'Open echte iPhone' || { echo 'Lab HTML is missing'; exit 1; }
           printf '%s\n' "### Isolated iPhone layout lab" "$URL/" >> "$GITHUB_STEP_SUMMARY"
           echo "Dedicated test URL: $URL/"
+
+      - name: Publish verified test link back into GitHub PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/"$GITHUB_REPOSITORY"/issues/73/comments --method POST -f body="✅ **Afzonderlijke TALERA iPhone-testworker gepubliceerd en gecontroleerd.**\n\nOpen op iPhone: https://talera-iphone-photo-picker-lab-20261106.mark-a39.workers.dev/\n\nGET /health bevestigd. Geen R2/D1/services of productie-updates. Via deze PR is alleen de onafhankelijke testworker uitgerold."

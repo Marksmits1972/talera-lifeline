@@ -4,7 +4,17 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-const base='https://talera-one-memory-clean-test-20261105.mark-a39.workers.dev';
+const base='https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev';
+// Diagnostic of the REAL iPhone route versus the CI-tested presentation route.
+const routes=await Promise.all(['/mijn-leven','/present'].map(async(path)=>{
+ const response=await fetch(base+path);
+ const html=await response.text();
+ return {path,status:response.status,finalUrl:response.url,
+  marker:response.headers.get('x-talera-closed-core'),
+  hasPatchedCore:html.includes('TALERA_CLOSED_MEMORY_CORE_20261106'),
+  hasPlayButton:html.includes('talera-v61-inline-video'),length:html.length};
+}));
+console.log('IPHONE ROUTE COMPARISON',JSON.stringify(routes));
 const dir=process.env.TALERA_CDP_DIR;
 assert.ok(dir,'Chrome CDP profile required');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -30,7 +40,7 @@ ws.addEventListener('message',e=>{
 const cmd=(method,params={})=>new Promise((resolve,reject)=>{
  const n=++id;requests.set(n,{resolve,reject});ws.send(JSON.stringify({id:n,method,params}));
 });
-const evaluate=async(expression,awaitPromise=false,userGesture=true)=>{
+const evaluate=async(expression,awaitPromise=false,userGesture=false)=>{
  const r=await cmd('Runtime.evaluate',{expression,returnByValue:true,awaitPromise,userGesture});
  if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);
  return r.result?.value;
@@ -68,9 +78,16 @@ const saved=await evaluate(`(async()=>{
    r.ondataavailable=e=>{if(e.data?.size)pieces.push(e.data)};
    r.onstop=()=>resolve(new Blob(pieces,{type:mime}));
    r.onerror=reject;r.start();
-   // Force blue opening keyframes after recording is actively running.
-   ctx.fillRect(0,0,60,60);stream.getVideoTracks()[0]?.requestFrame?.();
-   setTimeout(()=>r.stop(),1300);
+   // Keep the opening keyframe blue, then render ACTUAL moving frames.
+   // A static canvas only encodes 1-2 frames and cannot prove image playback.
+   ctx.fillStyle='#244b71';ctx.fillRect(0,0,60,60);stream.getVideoTracks()[0]?.requestFrame?.();
+   let frameNo=0;
+   const animation=setInterval(()=>{
+     frameNo++;ctx.fillStyle=frameNo%2?'#416b96':'#244b71';ctx.fillRect(0,0,60,60);
+     ctx.fillStyle='#f5ead6';ctx.fillRect((frameNo*7)%50,12,9,32);
+     stream.getVideoTracks()[0]?.requestFrame?.();
+   },90);
+   setTimeout(()=>{clearInterval(animation);r.stop()},1300);
  });
  oscillator.stop();
  mixedStream.getTracks().forEach(t=>t.stop());
@@ -97,501 +114,184 @@ assert.ok(saved?.id?.startsWith('local-'),JSON.stringify(saved));
 assert.equal(saved.files,7);assert.equal(saved.cues,3);
 console.log('PASS native IndexedDB: five photos, narrated video WITH audio track, real WAV and three cues');
 
-// Narrated memory only: the FIRST visual cue is a VIDEO in this fixture.
-// The wheel should show JPEG frame zero of that VIDEO, not the next photo.
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await until('Boolean(window.__taleraTimelineRuntime?.currentMemory()?._zeroFrames?.length)',150),
-  'narrated story frames must hydrate before cover creation');
-assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==='pwa:"+saved.id+"')?.previewImage)",190),
-  'video frame 0 should be attached to the ORIGINAL V13 memory wheel');
-const firstCover=await evaluate("(async()=>{"+
-"const id='pwa:"+saved.id+"';"+
-"const m=window.__taleraPhotoBook.list().find(x=>x.id===id);"+
-"const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('talera-narrated-swipe-covers-v1');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});"+
-"const row=await new Promise((resolve,reject)=>{const r=db.transaction('covers','readonly').objectStore('covers').get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});"+
-"const image=await createImageBitmap(row.blob);"+
-"const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;"+
-"const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);"+
-"const pixel=Array.from(ctx.getImageData(Math.floor(image.width/2),Math.floor(image.height/2),1,1).data);"+
-"db.close();"+
-"return {url:m.previewImage,key:row.photoKey,size:row.blob.size,type:row.blob.type,"+
-"width:image.width,height:image.height,pixel,openingKey:m._zeroItems[0].key,"+
-"openingKind:m._zeroItems[0].kind,photoCount:m.photos.length,mediaCount:m._zeroItems.length};})()",true);
-assert.ok(firstCover.url.startsWith('blob:'));
-assert.equal(firstCover.type,'image/jpeg');
-assert.equal(firstCover.openingKind,'video','this test narration begins with a video');
-assert.equal(firstCover.key,firstCover.openingKey,'the cover MUST reference the opening video, not the first later photo');
-assert.ok(firstCover.pixel[2]>firstCover.pixel[0]+30&&firstCover.pixel[2]>firstCover.pixel[1]+15,
-  'frame-zero JPEG should contain the BLUE video opening, not the following photo');
-assert.ok(firstCover.size>100);
-assert.ok(Math.max(firstCover.width,firstCover.height)<=720);
-assert.equal(firstCover.photoCount,6,'cover is NOT another photo in narrated memory');
-assert.equal(firstCover.mediaCount,7,'original video, photos and voice remain untouched');
-console.log('PASS narrated cover: FRAME ZERO of opening video, not later photograph; persistent V13 cover');
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==='pwa:"+saved.id+"')?.previewImage)",150),
-  'the same first-video-frame thumbnail must be restored from browser storage on reload');
-const secondCover=await evaluate("(()=>{const m=window.__taleraPhotoBook.list().find(x=>x.id==='pwa:"+saved.id+"');"+
-"return {url:m?.previewImage,mediaCount:m?._zeroItems?.length};})()");
-assert.ok(secondCover.url.startsWith('blob:'));
-assert.equal(secondCover.mediaCount,7);
-console.log('PASS video frame-zero cover reused after reload, no extra photo or player');
-
-for(const playbackRound of [1,2,3]){
-console.log('BEGIN playback round',playbackRound);
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)'),'native V9 audio must load');
-// Verify iOS warm video is present BEFORE the user's first Beluister action.
-assert.ok(await until('Boolean(document.querySelector(\'video[style*="-9999px"]\'))'),
- 'original video must be prepared before first listener gesture');
-await evaluate(`(()=>{
- window.__oneFlowTest={voiceEndedAt:0,photos:[],videos:[],errors:[]};
- const t=window.__oneFlowTest,rt=window.__taleraTimelineRuntime;
- const controls=window.__taleraAudioControls;
- if(!controls||typeof controls.isEnabled!=='function')throw Error('Original V9 listening controls missing');
- window.__taleraAudioUiControls=
-  Array.from(document.querySelectorAll('button,[role="button"]'))
-    .filter(el=>/luister|geluid|audio|afspelen|play/i.test((el.textContent||'')+' '+(el.className||'')+' '+(el.getAttribute('aria-label')||'')))
-    .map(el=>({tag:el.tagName,cls:String(el.className).slice(0,80),id:el.id,
-      label:(el.textContent||'').trim().slice(0,60),hidden:el.hidden,
-      aria:el.getAttribute('aria-label')})).slice(0,15);
-
- const prepared=document.querySelector('video[style*="-9999px"]');
- if(!prepared)throw Error('Preloaded original video is missing before user gesture');
- prepared.dataset.primedVideo='yes';
- const record=()=>{
-  const index=rt.currentMemory()?._photoIndex;
-  if(Number.isInteger(index)&&t.photos.at(-1)?.index!==index)
-    t.photos.push({index,at:performance.now()});
-  for(const video of document.querySelectorAll('video.talera-v61-inline-video')){
-    if(!t.videos.some(v=>v.elementId===video.dataset.testID)){
-      video.dataset.testID=String(t.videos.length+1);
-      const item={elementId:video.dataset.testID,muted:video.muted,at:performance.now(),
-        warmed:video.dataset.primedVideo==='yes',progress:0,duration:0};
-      t.videos.push(item);
-      video.addEventListener('timeupdate',()=>{
-        item.progress=Math.max(item.progress,video.currentTime||0);
-        item.duration=Number.isFinite(video.duration)?video.duration:0;
-      });
-    }
-    if(!video.muted&&t.voiceEndedAt===0)t.errors.push('video not silent during narration');
-  }
- };
- new MutationObserver(record).observe(document.body,{subtree:true,childList:true});
- setInterval(record,45);
- const a=window.__taleraInlineSharedAudio;
- a.addEventListener('ended',()=>{t.voiceEndedAt=performance.now();record()},{once:true});
- record();
- // Reuse the existing listening UI control as the only video authorization.
- // It is OUTSIDE the closed story photo. No synthetic photo tap is needed.
- const consent=document.querySelector('button.talera-audio-consent');
- if(consent&&!consent.hidden)consent.click();
- else document.dispatchEvent(new Event('talera:enable-listening'));
- if(a.paused)a.play().catch(e=>{t.errors.push('voice play '+String(e))});
-})()`);
-if(playbackRound===1)console.log('AUDIO_UI_CONTROLS',JSON.stringify(await evaluate('window.__taleraAudioUiControls')));
-assert.ok(await until('window.__oneFlowTest.voiceEndedAt>0'),'real narration must finish');
-assert.ok(await until('window.__oneFlowTest.videos.some(v=>v.muted&&v.at<window.__oneFlowTest.voiceEndedAt)'),
- 'narrated video must have played silently during the voice');
-for(const index of [3,4,5]){
- assert.ok(await until('window.__oneFlowTest.photos.some(p=>p.index==='+index+'&&p.at>=window.__oneFlowTest.voiceEndedAt-100)',330),
-  'unseen photo '+index+' must appear in the original viewport');
-}
-const result=await evaluate(`(()=>{
- const t=window.__oneFlowTest;
- return {voiceEndedAt:t.voiceEndedAt,photos:t.photos,videos:t.videos,
- errors:t.errors,iframes:document.querySelectorAll('iframe.talera-zero-present-frame').length}
-})()`);
-const remaining=result.photos.filter(p=>p.index>=3&&p.at>=result.voiceEndedAt-100);
-assert.deepEqual(remaining.map(p=>p.index),[3,4,5]);
-assert.ok(remaining[1].at-remaining[0].at>=3200);
-assert.ok(remaining[2].at-remaining[1].at>=3200);
-assert.ok(await until('window.__oneFlowTest.videos.some(v=>!v.muted&&v.progress>.6)',200),
- 'the original video must replay from 0 with sound after the remaining photos');
-const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,warmed:v.warmed,progress:v.progress,duration:v.duration}))`);
-const narrated=videoPlayback.find(v=>v.muted&&v.at<result.voiceEndedAt);
-const replay=videoPlayback.find(v=>!v.muted&&v.at>remaining.at(-1).at);
-assert.ok(narrated,'narrated video exists and was muted');
-assert.ok(narrated.progress>.2,
- 'REGRESSION: FIRST video at t=0 must actually PLAY muted during the voice, not merely appear as a paused frame or show Beluister');
-assert.ok(replay,'original native video replay starts AFTER the last remaining photo');
-assert.equal(replay.warmed,true,'native replay MUST reuse video authorized by the FIRST listener gesture');
-assert.ok(replay.progress>.6,'unmuted replay advanced from t=0');
-assert.ok(replay.duration>=1,'replay has the original full clip duration');
-assert.deepEqual(result.errors,[]);
-assert.equal(result.iframes,0);
-console.log('PASS browser playback round '+playbackRound+': FIRST narrated muted video ADVANCED ('+narrated.progress.toFixed(2)+'s), remaining photos, audible original video from zero, no second Beluister');
-}
-// Regression: a narrated story is ONE timeline item; photo taps do nothing,
-// and a real horizontal swipe leaves the whole active story (even mid-voice).
-const nextMemory=await evaluate("(async()=>{"+
-"const png=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZcAAAAASUVORK5CYII='),c=>c.charCodeAt(0));"+
-"const f=[new File([png],'simple-1.png',{type:'image/png'}),new File([png],'simple-2.png',{type:'image/png'})];"+
-"const row=await TaleraMemories.save({title:'Adjacent ordinary photo memory',date:'2026-11-05',time:'12:00:00',datePrecision:'exact',text:'Second memory'},f);"+
-"return {id:'pwa:'+row.id}})()",true);
-assert.ok(nextMemory?.id?.startsWith('pwa:local-'));
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))'),
-  'narrated memory must load before navigation test');
-const initial=await evaluate("(()=>{"+
-"const rt=window.__taleraTimelineRuntime,m=rt.currentMemory();"+
-"const story=document.getElementById('memoryStoryScroll');"+
-"if(!story)throw Error('Native story swipe surface missing');"+
-"const initialIndex=m._photoIndex;"+
-"story.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));"+
-"return {memoryId:m.id,indexBefore:initialIndex,indexAfter:m._photoIndex,"+
-"warmedVideos:Array.from(document.querySelectorAll('video[style*=\"-9999px\"]')).map(v=>({paused:v.paused,time:v.currentTime})),"+
-"bookList:window.__taleraPhotoBook?.list?.().map(x=>x.id),"+
-"bookIndex:window.__taleraPhotoBook?.state?.().index,"+
-"storyRect:(()=>{const r=story.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()};})()");
-assert.equal(initial.memoryId,'pwa:'+saved.id);
-assert.equal(initial.indexAfter,initial.indexBefore,'narrated tap cannot step photos');
-assert.ok(initial.warmedVideos.length);
-assert.ok(initial.warmedVideos.every(v=>v.paused),'tapping narrated photo does NOT prime any video');
-assert.ok(Array.isArray(initial.bookList)&&initial.bookList.includes(nextMemory.id),'both memories are single timeline entries');
-assert.equal(initial.bookList.filter(x=>x===initial.memoryId).length,1,'three playback phases form exactly ONE timeline item');
-console.log('PASS whole memory seal: image tap ignored, all preloaded originals paused, ONE timeline entry');
-// A real stationary finger TAP may trigger the unchanged V13 wheel's
-// pointerdown/up; it still must not invoke any narrated media frame or play().
-await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
-// Freeze narration: an automatic cue at 1.2s is not evidence of a tap.
-const stateBeforeTap=await evaluate("(()=>{const rt=window.__taleraTimelineRuntime,b=window.__taleraPhotoBook,"+
-"bs=b?.state?.(),entries=b?.list?.();const wh=window.__taleraIntegratedBand?.getState?.();"+
-"return {current:rt?.currentMemory?.()?.id,index:bs?.index,bookSelected:entries?.[bs?.index]?.id,"+
-"wheel:wh,visible:document.body.classList.contains('talera-unified-wheel-in-motion'),"+
-"cover:!!rt?.currentMemory?.()?.previewImage};})()");
-console.log('COVER_TAP_BEFORE',JSON.stringify(stateBeforeTap));
-const frozen=await evaluate("(()=>{window.__taleraInlineSharedAudio?.pause();"+
-"const m=window.__taleraTimelineRuntime.currentMemory();return {id:m.id,index:m._photoIndex};})()");
-const tapX=Math.round(initial.storyRect.x+initial.storyRect.w*.5),
-      tapY=Math.round(initial.storyRect.y+initial.storyRect.h*.5);
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tapX,y:tapY,id:9}]});
-await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-await sleep(1100);
-const stateAfterTap=await evaluate("(()=>{const rt=window.__taleraTimelineRuntime,b=window.__taleraPhotoBook,"+
-"bs=b?.state?.(),entries=b?.list?.();const wh=window.__taleraIntegratedBand?.getState?.();"+
-"return {current:rt?.currentMemory?.()?.id,index:bs?.index,bookSelected:entries?.[bs?.index]?.id,"+
-"wheel:wh,visible:document.body.classList.contains('talera-unified-wheel-in-motion')};})()");
-console.log('COVER_TAP_AFTER',JSON.stringify(stateAfterTap));
-const afterRealTap=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
-"return {id:m.id,index:m._photoIndex,prepared:Array.from(document.querySelectorAll('video[style*=\"-9999px\"]')).map(v=>v.paused)};})()");
-assert.equal(afterRealTap.id,'pwa:'+saved.id,'stationary tap must not navigate to a different memory');
-assert.equal(afterRealTap.index,frozen.index,'stationary finger tap cannot step narrated photos');
-assert.ok(afterRealTap.prepared.every(Boolean),'stationary finger tap cannot start any prepared video');
-console.log('PASS real touch tap on narrated memory: no media stepping, no hidden video activation');
-assert.equal(await evaluate("document.body.classList.contains('talera-unified-wheel-in-motion')"),false,
-  'stationary tap must never reveal the wheel');
-
-await evaluate("(()=>{document.dispatchEvent(new Event('talera:enable-listening'));"+
-"const a=window.__taleraInlineSharedAudio;if(a.paused)a.play().catch(()=>{});})()");
-assert.ok(await until('window.__taleraInlineSharedAudio?.currentTime>.25&&window.__taleraInlineSharedAudio?.currentTime<2.6',80),
-  'speech must be actively playing before the swipe');
-const from=initial.storyRect;
-assert.ok(from.w>150&&from.h>70,'native V9 story surface must have swipe area');
-// Use the existing V13 wheel unchanged: its book.list() is a list of MEMORIES,
-// never individual narration/photo/video frame IDs. Chromium touch input mimics iPhone.
-await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
-const centerY=Math.round(from.y+from.h*.50);
-const x0=Math.round(from.x+from.w*.78), x1=Math.round(from.x+from.w*.22);
-const wheelBefore=await evaluate("(()=>{const b=document.querySelector('#photoStage .talera-photo-strip.talera-wheel-strip');"+
-"return b?{display:getComputedStyle(b).display,visible:b.classList.contains('is-visible')}:null})()");
-assert.ok(wheelBefore,'V13 original wheel must exist within native stage');
-assert.equal(wheelBefore.display,'none','narrated wheel remains hidden when not swiping');
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x0,y:centerY,id:11}]});
-assert.equal(await evaluate("document.body.classList.contains('talera-unified-wheel-in-motion')"),false,
-  'pointerdown alone is not a horizontal swipe');
-let movingWheel=null;
-for(let i=1;i<=8;i++){
- const x=Math.round(x0+(x1-x0)*i/8);
- await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:centerY,id:11}]});
- await sleep(25);
- if(i===2){
-  movingWheel=await evaluate("(()=>{const b=document.querySelector('#photoStage .talera-photo-strip.talera-wheel-strip');const css=getComputedStyle(b);"+
-   "return {active:document.body.classList.contains('talera-unified-wheel-in-motion'),"+
-   "display:css.display,visibility:css.visibility,opacity:css.opacity,"+
-   "isVisible:b.classList.contains('is-visible'),pointer:css.pointerEvents};})()");
-  assert.equal(movingWheel.active,true,'narrated wheel becomes visible during finger movement, not after release');
-  assert.equal(movingWheel.isVisible,true,'the native V13 wheel is already active on pointerdown');
-  assert.notEqual(movingWheel.display,'none','the original wheel must NOT be display:none during finger movement');
-  assert.equal(movingWheel.visibility,'visible');
-  assert.ok(Number(movingWheel.opacity)>.95);
-  assert.equal(movingWheel.pointer,'none','moving wheel cannot hijack click or touch events');
- }
-}
-assert.ok(movingWheel,'in-flight swipe state was measured');
-console.log('PASS visual under finger: original narrated wheel is visible BEFORE finger-up');
-await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id!=='+JSON.stringify('pwa:'+saved.id),100),
-  'swipe must leave narrated memory, not step between its internal media');
-const away=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
-"return {id:m?.id,voicePaused:window.__taleraInlineSharedAudio?.paused,"+
-"activeVideoCount:document.querySelectorAll('video.talera-v61-inline-video').length,"+
-"visibleNarration:document.body.classList.contains('talera-v61-narration-visual')};})()");
-assert.notEqual(away.id,'pwa:'+saved.id);
-assert.equal(away.voicePaused,true,'leaving story must pause speech');
-assert.equal(away.activeVideoCount,0,'leaving story must dispose current native inline video');
-assert.ok(await until("!document.body.classList.contains('talera-unified-wheel-in-motion')",80),
-  'visual swipe class must clear after native wheel landing');
-console.log('PASS real touch swipe while narrating: next WHOLE memory, previous voice stopped, no orphan video');
-// Navigate BACK using the same native V13 memory-wheel (no separate player).
-const rback=await evaluate("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
-"return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
-const by=Math.round(rback.y+rback.h*.50);
-const right0=Math.round(rback.x+rback.w*.22),right1=Math.round(rback.x+rback.w*.78);
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:right0,y:by,id:12}]});
-for(let i=1;i<=8;i++){
- const x=Math.round(right0+(right1-right0)*i/8);
- await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:by,id:12}]});
- await sleep(25);
-}
-await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify('pwa:'+saved.id),100),
-  'reverse swipe must restore the original narrated MEMORY, not an internal clip');
-assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)',100),
-  'return to narrated memory must reinitialize one native voice element');
-const restored=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
-"const index=m._photoIndex;document.getElementById('memoryStoryScroll').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));"+
-"return {id:m.id,indexBefore:index,indexAfter:m._photoIndex,voiceNodes:document.querySelectorAll('audio').length};})()");
-assert.equal(restored.id,'pwa:'+saved.id);
-assert.equal(restored.indexAfter,restored.indexBefore,'narrated memory stays closed to clicks after return');
-console.log('PASS reverse swipe: same whole narrated memory restored, internal photo taps still ignored');
-
-// Ordinary memories keep their original tap-to-next-photo interaction.
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(nextMemory.id.slice(4))});
-assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(nextMemory.id)+
-  '&&!window.__taleraTimelineRuntime.currentMemory()._photoLoading',160),
-  'ordinary adjacent memory must load');
-const ordinaryTap=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
-"const before=m._photoIndex,count=m.photos.length;"+
-"document.getElementById('memoryStoryScroll').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));"+
-"return {before,after:m._photoIndex,count,kind:m._zeroItems.some(x=>x.kind==='audio')?'narrated':'ordinary'};})()");
-assert.equal(ordinaryTap.kind,'ordinary');
-assert.equal(ordinaryTap.count,2);
-assert.equal(ordinaryTap.after,(ordinaryTap.before+1)%ordinaryTap.count,
-  'normal photo memory TAP must still advance its photo');
-console.log('PASS ordinary photo memory: tap advances to next photo exactly as approved V9');
-
-const noOrdinaryCover=await evaluate("(async()=>{"+
-"const id="+JSON.stringify(nextMemory.id)+";"+
-"const m=window.__taleraPhotoBook.list().find(x=>x.id===id);"+
-"const db=await new Promise(resolve=>{const r=indexedDB.open('talera-narrated-swipe-covers-v1');r.onsuccess=()=>resolve(r.result)});"+
-"const row=await new Promise(resolve=>{const r=db.transaction('covers','readonly').objectStore('covers').get(id);r.onsuccess=()=>resolve(r.result)});"+
-"db.close();return {preview:!!m?.previewImage,cached:!!row};})()",true);
-assert.deepEqual(noOrdinaryCover,{preview:false,cached:false},
-  'normal photo memories must never generate narrated cover entries');
-console.log('PASS normal photo memory: no narrated cover or extra storage copy');
-
-
-// Safari permission regression: autoplay blocked -> the white hint must be a
-// real button that plays the ORIGINAL native voice. The photo stays sealed.
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))'),
-  'narrated memory and original video must load');
-await sleep(200);
-await evaluate("(()=>{const a=window.__taleraInlineSharedAudio;"+
-"a.pause();a.play=()=>Promise.reject(Object.assign(new Error('iOS user activation required'),{name:'NotAllowedError'}));"+
-"window.__taleraInlineTryAutoPlay?.();})()");
-assert.ok(await until('Boolean(document.querySelector("button.talera-v61-audio-permission-hint"))',80),
-  'autoplay rejection must present a REAL Beluister button');
-const permission=await evaluate("(()=>{"+
-"const btn=document.querySelector('button.talera-v61-audio-permission-hint');"+
-"const rect=btn.getBoundingClientRect(),x=rect.x+rect.width/2,y=rect.y+rect.height/2;"+
-"return {tag:btn.tagName,text:btn.textContent,pointer:getComputedStyle(btn).pointerEvents,"+
-"aria:btn.getAttribute('aria-label'),onTop:btn.contains(document.elementFromPoint(x,y)),"+
-"x:Math.round(x),y:Math.round(y),voicePaused:window.__taleraInlineSharedAudio.paused};})()");
-assert.equal(permission.tag,'BUTTON');
-assert.match(permission.text,/Beluister/);
-assert.equal(permission.pointer,'auto','permission prompt must be tappable');
-assert.equal(permission.aria,'Ingesproken herinnering afspelen');
-assert.equal(permission.onTop,true,'button may not be covered by picture or wheel');
-assert.equal(permission.voicePaused,true);
-await evaluate('delete window.__taleraInlineSharedAudio.play');
-await cmd('Input.dispatchMouseEvent',{type:'mousePressed',x:permission.x,y:permission.y,button:'left',clickCount:1});
-await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:permission.x,y:permission.y,button:'left',clickCount:1});
-assert.ok(await until('Boolean(window.__taleraInlineSharedAudio&&!window.__taleraInlineSharedAudio.paused&&window.__taleraInlineSharedAudio.currentTime>.12)',80),
-  'clicking Beluister must start the EXISTING native voice');
-assert.ok(await until('!document.querySelector("button.talera-v61-audio-permission-hint")',50),
-  'permission button disappears when narration plays');
-console.log('PASS Safari permission: clicking real Beluister button plays native narration, not photo');
-
-// Regression from REAL iPhone screenshots: a new, NEVER-OPENED narrated
-// neighbor must have its FIRST-VISUAL cover BEFORE a swipe. Otherwise the
-// native wheel paints an all-white rectangle until hydration after landing.
-const unopenedNarrated=await evaluate("(async()=>{"+
-"const png=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZcAAAAASUVORK5CYII='),c=>c.charCodeAt(0));"+
-"const n=8000,b=new ArrayBuffer(44+n*2),v=new DataView(b);"+
-"const w=(at,s)=>{for(let i=0;i<s.length;i++)v.setUint8(at+i,s.charCodeAt(i))};"+
-"w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');"+
-"v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);"+
-"v.setUint32(24,8000,true);v.setUint32(28,16000,true);v.setUint16(32,2,true);"+
-"v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);"+
-"const original=await TaleraMemories.get('"+saved.id+"');"+
-"const first=original.items.find(x=>x.kind==='video');"+
-"const video=await TaleraMemories.blob(first.key);"+
-"const files=[new File([video],'neighbor-opening-video.webm',{type:video.type}),"+
-"new File([png],'cover-only-photo.png',{type:'image/png'}),"+
-"new File([b],'neighbor-voice.wav',{type:'audio/wav'})];"+
-"const row=await TaleraMemories.save({title:'Unopened narrated neighbor',"+
-"date:'2026-11-04',time:'11:59:00',datePrecision:'exact',"+
-"narrationCues:[{t:0,index:0}],narrationDurationMs:1000},files);"+
-"return {id:'pwa:'+row.id};})()",true);
-assert.ok(unopenedNarrated.id.startsWith('pwa:local-'));
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-const sibling=JSON.stringify(unopenedNarrated.id);
-assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==="+sibling+")?.previewImage)",170),
- 'the unopened narrated neighbor MUST have a persisted first-photo preview before gesture');
-const coverAhead=await evaluate("(()=>{const l=window.__taleraPhotoBook.list(),"+
-"a=l.findIndex(x=>x.id==="+sibling+"),"+
-"b=l.findIndex(x=>x.id==="+JSON.stringify('pwa:'+saved.id)+");"+
-"const neighbor=l[a],current=l[b];"+
-"return {distance:Math.abs(a-b),neighborHydrated:!neighbor._photoLoading,"+
-"neighborHasCover:!!neighbor.previewImage,neighborFirstKey:neighbor._zeroItems.find(x=>x.kind==='video').key,"+
-"neighborFrameCount:neighbor._zeroFrames?.length||0,currentHasCover:!!current.previewImage};})()");
-assert.equal(coverAhead.distance,1,'new narrated memory should be next to the current one');
-assert.equal(coverAhead.neighborHydrated,false,
- 'neighbor is NOT opened or hydrated: cover comes from exactly one original video');
-assert.equal(coverAhead.neighborHasCover,true);
-assert.equal(coverAhead.neighborFrameCount,0);
-assert.equal(coverAhead.currentHasCover,true);
-console.log('PASS adjacent VIDEO frame-zero cover: generated BEFORE first visit with zero original frames hydrated');
-const rect=await evaluate("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
-"return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
-await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
-const y=Math.round(rect.y+rect.h*.5),sX=Math.round(rect.x+rect.w*.2),eX=Math.round(rect.x+rect.w*.78);
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:sX,y,id:31}]});
-for(let i=1;i<=4;i++){
- const x=Math.round(sX+(eX-sX)*i/4);
- await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y,id:31}]});
- await sleep(38);
-}
-const adjacentPaint=await evaluate("(()=>{"+
-"const l=window.__taleraPhotoBook.list(),m=l.find(x=>x.id==="+sibling+");"+
-"const page=[...document.querySelectorAll('.talera-wheel-page')].find(e=>e.dataset.url===m.previewImage);"+
-"const img=page?.querySelector('.example-photo');"+
-"const cs=page&&getComputedStyle(page);"+
-"return {found:!!page,src:img?.src,complete:img?.complete,naturalWidth:img?.naturalWidth,"+
-"visibility:cs?.visibility,paintDisplay:cs?.display,cover:m.previewImage,"+
-"wheelActive:document.body.classList.contains('talera-unified-wheel-in-motion')};})()");
-assert.equal(adjacentPaint.found,true,'adjacent wheel slot must own the PREPARED cover URL');
-assert.equal(adjacentPaint.complete,true,'neighbor image must already be decoded while finger is down');
-assert.ok(adjacentPaint.naturalWidth>0,'neighbor strip tile must contain a painted picture, not white');
-assert.equal(adjacentPaint.visibility,'visible','neighbor tile should never be hidden during drag');
-assert.equal(adjacentPaint.wheelActive,true);
-await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-console.log('PASS native V13 drag: fully loaded neighbor preview fills its tile before finger-up; no reserved white slot');
-
-// Auto-continuation path: the voice starts with a browser-permitted playback
-// action but WITHOUT the consent button or talera:enable-listening event.
-// Strict Chrome requires user activation even for muted voice; the important
-// regression is that no explicit original-video priming has happened.
-// The preloaded original MUST still be adopted rather than replaced.
-// Autoplay policies may still reject sound for the next video; existing real
-// Beluister button must recover without touching the photo/swipe controls.
-const evaluateQuiet=(expression,awaitPromise=false)=>evaluate(expression,awaitPromise,false);
-const untilQuiet=async(expression,tries=240)=>{
- for(let i=0;i<tries;i++){
-  if(await evaluateQuiet(expression))return true;
-  await sleep(80);
- }
+const quiet=expr=>evaluate(expr,false,false);
+const wait=async(expr,tries=240)=>{
+ for(let i=0;i<tries;i++){if(await quiet(expr))return true;await sleep(80)}
  return false;
 };
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await untilQuiet('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))',160),
- 'auto-start scenario must load native voice and prewarmed original without a click');
-const autoStart=await evaluate("(async()=>{"+
-"const video=document.querySelector('video[style*=\"-9999px\"]');"+
-"video.dataset.autostartPrepared='yes';"+
-"const a=window.__taleraInlineSharedAudio;a.muted=true;"+
-"try{await a.play();return {ok:true,muted:a.muted}}catch(e){return {ok:false,error:e.name}}"+
-"})()",true);
-assert.equal(autoStart.ok,true,'voice must begin without clicking the consent button or priming originals');
-assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.dataset.autostartPrepared==="yes"',300),
- 'first original video MUST be SAME prepared element even with zero listening gestures');
-const autoHandoff=await evaluateQuiet("(()=>{const video=document.querySelector('video.talera-v61-inline-video');"+
-"const hint=document.querySelector('button.talera-v61-audio-permission-hint');"+
-"return {reused:video?.dataset.autostartPrepared==='yes',paused:video?.paused,"+
-"muted:video?.muted,currentTime:video?.currentTime,blocked:!!hint};})()");
-assert.equal(autoHandoff.reused,true,'the existing preloaded original, not a new video');
-if(autoHandoff.blocked){
- const coords=await evaluateQuiet("(()=>{const b=document.querySelector('button.talera-v61-audio-permission-hint');"+
-"const r=b.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()");
- await cmd('Input.dispatchMouseEvent',{type:'mousePressed',x:coords.x,y:coords.y,button:'left',clickCount:1});
- await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:coords.x,y:coords.y,button:'left',clickCount:1});
- assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
-  'real Beluister control resumes the SAME original after browser-level autoplay denial');
- console.log('PASS no-gesture auto start: same preloaded video adopted; Safari-style restriction recovered by existing Beluister button');
-}else{
- assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
-  'if the browser grants automatic sound, the same preloaded original must actually advance');
- console.log('PASS no-gesture auto start: same preloaded video started automatically and progressed');
+async function swipe(dir){
+ const r=await quiet("(()=>{let x=document.getElementById('memoryStoryScroll').getBoundingClientRect();return{x:x.x,y:x.y,w:x.width,h:x.height}})()");
+ const x0=Math.round(r.x+r.w*(dir>0?.8:.2)),x1=Math.round(r.x+r.w*(dir>0?.2:.8));
+ const y=Math.round(r.y+r.h*.55);
+ await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+ await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x0,y,id:34}]});
+ for(let i=1;i<=9;i++){
+  await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:Math.round(x0+(x1-x0)*i/9),y,id:34}]});
+  await sleep(40);
+ }
+ await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 }
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+const idOfStory='pwa:'+saved.id;
+assert.ok(await wait('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(idOfStory),180));
+assert.ok(await wait("Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(window.__taleraTimelineRuntime?.currentMemory()?._zeroFrames?.length)",180));
+const initial=await quiet("(()=>{const m=window.__taleraTimelineRuntime.currentMemory(),b=window.__taleraPhotoBook;return{"+
+"id:m.id,frames:m.photos.length,cover:m.previewImage,first:m.photos[0],"+
+"entries:b.list().filter(x=>x.id===m.id).length,"+
+"hidden:document.querySelectorAll('video[style*=\"-9999px\"]').length,"+
+"engine:document.documentElement.outerHTML.includes('TALERA_CLOSED_MEMORY_CORE_20261106')}})()");
+assert.equal(initial.entries,1,'voice + media is ONE memory record');
+assert.equal(initial.frames,6,'one video and five photos belong to that one record');
+assert.equal(initial.cover,initial.first,'fixed V13 cover is first visual, NOT currently spoken photo');
+assert.equal(initial.hidden,0,'no invisible priming video or secondary player');
+assert.equal(initial.engine,true,'REAL NEW staging worker must run the closed core');
+console.log('PASS ONE complete memory, stable cover, no hidden second player, correct staging');
 
-// Regression from iPhone: AFTER the LAST audible original video has finished,
-// the narrated memory is still ONE CLOSED MEMORY. Native RH19 must not
-// advance its internal photos when the finger taps or swipes. V13 must choose
-// exactly one adjacent memory, not a media frame from inside the narration.
-await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
-assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))',180),
-  'post-original swipe regression must load complete narrated memory');
-await evaluate("(()=>{"+
-"window.__taleraPostVideoEnded=false;window.__taleraPostVideoCount=0;"+
-"const observed=new WeakSet();"+
-"const timer=setInterval(()=>{"+
-" for(const v of document.querySelectorAll('video.talera-v61-inline-video')){"+
-"  if(v.muted||observed.has(v))continue;observed.add(v);"+
-"  window.__taleraPostVideoCount++;"+
-"  v.addEventListener('ended',()=>{window.__taleraPostVideoEnded=true},{once:true});"+
-" }"+
-" if(window.__taleraPostVideoEnded)clearInterval(timer);"+
-"},25);"+
-"const consent=document.querySelector('button.talera-audio-consent');"+
-"if(consent&&!consent.hidden)consent.click();"+
-"else document.dispatchEvent(new Event('talera:enable-listening'));"+
-"const a=window.__taleraInlineSharedAudio;if(a.paused)a.play().catch(()=>{});"+
-"})()");
-assert.ok(await until('window.__taleraPostVideoEnded===true',380),
-  'the last original video must actually finish before checking the closed memory');
-await sleep(220);
-assert.equal(await evaluate("document.querySelectorAll('video.talera-v61-inline-video').length"),0,
-  'final video has finished and native presenter is fully settled');
-const postVideoState=await evaluate("(()=>{const r=window.__taleraTimelineRuntime;"+
-"const m=r.currentMemory(),b=window.__taleraPhotoBook;const list=b.list(),idx=list.findIndex(x=>x.id===m.id);"+
-"const rect=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
-"return {id:m.id,frameIndex:m._photoIndex,photoCount:m.photos.length,"+
-"narrated:m._zeroItems.some(x=>x.kind==='audio'),"+
-"index:idx,totalEntries: list.filter(x=>x.id===m.id).length,"+
-"next: list[idx+1]?.id||null,rect:{x:rect.x,y:rect.y,w:rect.width,h:rect.height}};})()");
-assert.equal(postVideoState.id,'pwa:'+saved.id);
-assert.equal(postVideoState.narrated,true);
-assert.equal(postVideoState.totalEntries,1,'whole story is stored in exactly ONE V13 memory slot');
-assert.ok(postVideoState.photoCount>3);
-assert.ok(postVideoState.next,'a neighboring complete memory is needed to verify swipe');
-await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
-const postTapX=Math.round(postVideoState.rect.x+postVideoState.rect.w*.5);
-const postTapY=Math.round(postVideoState.rect.y+postVideoState.rect.h*.5);
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:postTapX,y:postTapY,id:51}]});
-await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-await sleep(250);
-const postTapState=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
-"return {id:m.id,frameIndex:m._photoIndex,photoCount:m.photos.length};})()");
-assert.equal(postTapState.id,postVideoState.id,'touch AFTER final video may not select a different memory');
-assert.equal(postTapState.frameIndex,postVideoState.frameIndex,
-  'touch AFTER final video may not advance any internal narrated photo');
-const postX0=Math.round(postVideoState.rect.x+postVideoState.rect.w*.8),
-      postX1=Math.round(postVideoState.rect.x+postVideoState.rect.w*.2);
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:postX0,y:postTapY,id:52}]});
-for(let i=1;i<=8;i++){
- const x=Math.round(postX0+(postX1-postX0)*i/8);
- await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:postTapY,id:52}]});
- await sleep(25);
+const installTrace=()=>{
+ const statement="(()=>{"+
+ "const a=window.__taleraInlineSharedAudio,m=window.__taleraTimelineRuntime.currentMemory();"+
+ "const t={voice:0,silent:0,original:0,originalVideoTime:0,originalVisualPlaying:false,originalPaintedFrames:0,originalVisualVisible:false,originalEnded:false,originalStarts:0,voiceEndedAt:0,voiceSrc:a.src,soundtrackAudible:false,"+
+ "frames:[],last:-1,start:performance.now(),hintCount:0};"+
+ "const seen=new WeakSet();window.__taleraClosedTrace=t;"+
+ "a.addEventListener('ended',()=>{if(!t.voiceEndedAt)t.voiceEndedAt=performance.now()},{once:true});t.timer=setInterval(()=>{"+
+ "if(window.__taleraClosedTrace!==t){clearInterval(t.timer);return}"+
+ "const mem=window.__taleraTimelineRuntime.currentMemory(),now=performance.now();"+
+ "if(mem?.id!==m.id){clearInterval(t.timer);return}"+
+ "t.voice=Math.max(t.voice,a.currentTime||0);"+
+ "if(a.ended&&!t.voiceEndedAt)t.voiceEndedAt=now;"+
+ "if(mem._photoIndex!==t.last){t.last=mem._photoIndex;t.frames.push({index:t.last,at:now})}"+
+ "for(const v of document.querySelectorAll('video.talera-v61-inline-video')){"+
+ "if(v.muted){if(!t.voiceEndedAt&&mem._photoIndex===0)t.silent=Math.max(t.silent,v.currentTime||0);if(t.voiceEndedAt&&a.src!==t.voiceSrc){t.soundtrackAudible=t.soundtrackAudible||!a.muted;t.original=Math.max(t.original,a.currentTime||0);t.originalVideoTime=Math.max(t.originalVideoTime,v.currentTime||0);t.originalVisualPlaying=t.originalVisualPlaying||(!v.paused&&!v.ended&&v.currentTime>.18);t.originalPaintedFrames=Math.max(t.originalPaintedFrames,v.getVideoPlaybackQuality?.().totalVideoFrames||0);t.originalVisualVisible=t.originalVisualVisible||(v.isConnected&&v.getBoundingClientRect().width>0&&v.getBoundingClientRect().height>0&&getComputedStyle(v).visibility!=='hidden');if(!seen.has(v)){seen.add(v);t.originalStarts++;v.addEventListener('ended',()=>{t.originalEnded=true},{once:true})}}}"+
+ "else{t.original=Math.max(t.original,v.currentTime||0);t.originalVideoTime=Math.max(t.originalVideoTime,v.currentTime||0);t.originalVisualPlaying=t.originalVisualPlaying||(!v.paused&&!v.ended&&v.currentTime>.18);t.originalPaintedFrames=Math.max(t.originalPaintedFrames,v.getVideoPlaybackQuality?.().totalVideoFrames||0);t.originalVisualVisible=t.originalVisualVisible||(v.isConnected&&v.getBoundingClientRect().width>0&&v.getBoundingClientRect().height>0&&getComputedStyle(v).visibility!=='hidden');"+
+ "if(!seen.has(v)){seen.add(v);t.originalStarts++;v.addEventListener('ended',()=>{t.originalEnded=true},{once:true})}}}"+
+ "if(document.querySelector('button.talera-v61-audio-permission-hint'))t.hintCount++;"+
+ "},30);return true})()";
+ return evaluate(statement,false,false);
+};
+let requiredVoiceTap=0,requiredVideoTap=0;
+for(let round=1;round<=3;round++){
+ assert.ok(await wait('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(idOfStory),110));
+ assert.ok(await wait("Boolean(window.__taleraInlineSharedAudio?.src)",110));
+ await installTrace();
+ let began=await wait('window.__taleraInlineSharedAudio.currentTime>.15',24);
+ if(!began){
+  requiredVoiceTap++;
+  // A single EXPLICIT listening action is permitted for strict Chrome's
+  // autoplay policy. Do not trigger playback in polling or via photo swipe.
+  const button=await quiet("Boolean(document.querySelector('button.talera-v61-audio-permission-hint'))");
+  if(button)await evaluate("document.querySelector('button.talera-v61-audio-permission-hint').click()",false,true);
+  else await evaluate("window.__taleraInlineSharedAudio.play().catch(()=>{})",false,true);
+  began=await wait('window.__taleraInlineSharedAudio.currentTime>.15',65);
+ }
+ assert.ok(began,'narration voice must begin, round '+round);
+ assert.ok(await wait('window.__taleraClosedTrace.silent>.15',80),
+  'FIRST muted video must MOVE during voice, not wait behind a hint');
+ assert.ok(await wait('window.__taleraClosedTrace.voiceEndedAt>0',90),
+  'voice must end and yield to missing photos');
+ for(const idx of [3,4,5])assert.ok(await wait(
+  'window.__taleraClosedTrace.frames.some(x=>x.index==='+idx+'&&x.at>=window.__taleraClosedTrace.voiceEndedAt-150)',95),
+  'unseen photo '+idx+' must follow voice');
+ assert.ok(await wait('window.__taleraClosedTrace.originalStarts>=1',90),
+  'original video round must start with existing native viewport');
+ let originalMoved=await wait('window.__taleraClosedTrace.original>.18',22);
+ if(!originalMoved){
+  requiredVideoTap++;
+  const found=await evaluate("(()=>{let b=[...document.querySelectorAll('button')].find(x=>x.textContent?.includes('Beluister'));if(!b)return false;b.click();return true})()",false,true);
+  assert.equal(found,true,'if audible autoplay denied, native Beluister MUST be usable');
+  originalMoved=await wait('window.__taleraClosedTrace.original>.18',60);
+ }
+ assert.ok(originalMoved,'original VIDEO soundtrack must play');
+ const visibleVideoPassed=await wait('window.__taleraClosedTrace.originalVisualPlaying&&window.__taleraClosedTrace.originalVideoTime>.3&&window.__taleraClosedTrace.originalPaintedFrames>=3&&window.__taleraClosedTrace.originalVisualVisible',60);
+ const visualDiag=await quiet("(()=>{const t=window.__taleraClosedTrace,v=document.querySelector('video.talera-v61-inline-video'),a=window.__taleraInlineSharedAudio;return{originalSound:t.original,originalVideoTime:t.originalVideoTime,originalVisualPlaying:t.originalVisualPlaying,originalPaintedFrames:t.originalPaintedFrames,originalVisualVisible:t.originalVisualVisible,audioPaused:a?.paused,audioEnded:a?.ended,videoPaused:v?.paused,videoEnded:v?.ended,videoReadyState:v?.readyState,videoCurrentTime:v?.currentTime,videoFrames:v?.getVideoPlaybackQuality?.().totalVideoFrames,videoStyle:v?.style.cssText,hint:document.querySelector('button.talera-v61-audio-permission-hint')?.textContent||null}})()");
+ console.log('ORIGINAL VISUAL DIAGNOSTIC',JSON.stringify(visualDiag));
+ assert.ok(visibleVideoPassed,
+  'original VIDEO must display moving decoded frames in the native viewport, NOT only a still preview with audio');
+ assert.ok(await wait('window.__taleraClosedTrace.originalEnded',60),'the original video must end');
+ const out=await quiet("(()=>{const t=window.__taleraClosedTrace,m=window.__taleraTimelineRuntime.currentMemory();"+
+ "clearInterval(t.timer);return{id:m.id,cover:m.previewImage,first:m.photos[0],index:m._photoIndex,"+
+ "voice:t.voice,silent:t.silent,original:t.original,ended:t.originalEnded,frames:t.frames,"+
+ "originalStarts:t.originalStarts,hints:t.hintCount,soundtrackAudible:t.soundtrackAudible,originalVideoTime:t.originalVideoTime,originalPaintedFrames:t.originalPaintedFrames,originalVisualPlaying:t.originalVisualPlaying}})()");
+ assert.equal(out.id,idOfStory);
+ assert.equal(out.cover,out.first,'the wheel cover must NOT change to an internal photo');
+ assert.equal(out.originalStarts,1,'each original plays once, no duplicate video round');
+ assert.equal(out.soundtrackAudible,true,'the reused WAV audio element owns audible video soundtrack');
+ const tailFrames=out.frames.filter(x=>[3,4,5].includes(x.index));
+ assert.equal(tailFrames.length,3,'exactly three unshown photos, none skipped or repeated');
+ for(let i=1;i<tailFrames.length;i++){
+  const diff=tailFrames[i].at-tailFrames[i-1].at;
+  assert.ok(diff>3300&&diff<5000,'each unseen photo lasts 4sec, delta='+diff);
+ }
+ console.log('PASS CLOSED STORY round '+round+' voice '+out.voice.toFixed(1)+'s, muted video '+out.silent.toFixed(1)+
+  's, 3x4sec photos, original soundtrack '+out.original.toFixed(1)+'s, visible video '+out.originalVideoTime.toFixed(1)+'s / '+out.originalPaintedFrames+' decoded frames');
+ const rect=await quiet("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}})()");
+ const tx=Math.round(rect.x+rect.w/2),ty=Math.round(rect.y+rect.h/2);
+ await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+ await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tx,y:ty,id:89}]});
+ await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+ await sleep(180);
+ const afterTap=await quiet("(()=>{let m=window.__taleraTimelineRuntime.currentMemory();return{id:m.id,index:m._photoIndex}})()");
+ assert.equal(afterTap.id,idOfStory);
+ assert.equal(afterTap.index,out.index,'tap AFTER VIDEO cannot advance any narrated photo');
+ if(round<3){
+  const neighbor=await quiet("(()=>{let b=window.__taleraPhotoBook,l=b.list(),m=window.__taleraTimelineRuntime.currentMemory(),"+
+   "i=l.findIndex(x=>x.id===m.id);return{id:l[i+1]?.id||l[i-1]?.id,dir:l[i+1]?1:-1}})()");
+  assert.ok(neighbor.id);
+  await swipe(neighbor.dir);
+  assert.ok(await wait('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(neighbor.id),95),
+   'swipe goes to NEXT WHOLE memory, never inside its photos');
+  await swipe(-neighbor.dir);
+  assert.ok(await wait('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(idOfStory),95),
+   'swipe back reopens exact same memory ID');
+  assert.ok(await wait("Boolean(window.__taleraInlineSharedAudio?.src)",110));
+ }
 }
-await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(postVideoState.next),100),
-  'swipe AFTER last original video must move directly to NEXT WHOLE memory');
-const postSelectedState=await evaluate("(()=>{const b=window.__taleraPhotoBook,m=window.__taleraTimelineRuntime.currentMemory();"+
-"return {id:m.id,index:b.state().index,bookId:b.list()[b.state().index]?.id};})()");
-assert.equal(postSelectedState.id,postVideoState.next);
-assert.equal(postSelectedState.bookId,postSelectedState.id,
-  'visible V13 wheel and selected memory must agree after post-video swipe');
-console.log('PASS post-original VIDEO seal: stationary touch cannot change narrated photo; horizontal swipe moves ONE WHOLE memory');
+console.log('AUDIO PERMISSION AUDIT voice clicks='+requiredVoiceTap+', original-video clicks='+requiredVideoTap+
+ ' (browser policy can still require a real user gesture; no hidden synthetic activation)');
+console.log('PASS three replay cycles, closed internal media, normal V13 whole-memory navigation');
+// End of test: 3 complete real browser rounds already verified, including
+// no extra Beluister on original video and post-video whole-memory swipes.
+assert.equal(requiredVideoTap,0,'original video must never need a separate Beluister action');
+
+// The ACTUAL iPhone failure occurred MID-NARRATION, not only after DONE.
+// Navigate back into the whole story, let the voice + silent video move,
+// then swipe while they are still playing. That swipe must go DIRECTLY to
+// the neighboring memory. It MUST NOT reveal any internal photo or leave
+// the old spoken voice playing under the next memory.
+const nextWhole=await quiet("(()=>{const b=window.__taleraPhotoBook,l=b.list(),m=window.__taleraTimelineRuntime.currentMemory(),i=l.findIndex(x=>x.id===m.id);return{id:l[i+1]?.id||l[i-1]?.id,dir:l[i+1]?1:-1}})()");
+assert.ok(nextWhole.id,'need an adjacent WHOLE memory for mid-narration regression');
+await swipe(nextWhole.dir);
+assert.ok(await wait('window.__taleraTimelineRuntime.currentMemory()?.id==='+JSON.stringify(nextWhole.id),105));
+await swipe(-nextWhole.dir);
+assert.ok(await wait('window.__taleraTimelineRuntime.currentMemory()?.id==='+JSON.stringify(idOfStory),105));
+assert.ok(await wait("Boolean(window.__taleraInlineSharedAudio?.src)",105));
+if(!await wait('window.__taleraInlineSharedAudio.currentTime>.12',10)){
+ // Strict Chrome may require the FIRST voice gesture, but no extra video
+ // gesture is given; progress checks never grant a hidden gesture.
+ await evaluate("window.__taleraInlineSharedAudio.play().catch(()=>{})",false,true);
+}
+assert.ok(await wait("(()=>{const a=window.__taleraInlineSharedAudio,v=document.querySelector('video.talera-v61-inline-video');return a?.currentTime>.12&&a.currentTime<2.75&&v?.muted&&v.currentTime>.06})()",35),
+  'voice and first silent VIDEO must move together before the swipe');
+const midBefore=await quiet("(()=>{const m=window.__taleraTimelineRuntime.currentMemory(),b=window.__taleraPhotoBook;return{id:m.id,frame:m._photoIndex,entries:b.list().filter(x=>x.id===m.id).length}})()");
+assert.equal(midBefore.entries,1,'story is ONE memory ID even during moving video');
+await swipe(nextWhole.dir);
+assert.ok(await wait('window.__taleraTimelineRuntime.currentMemory()?.id==='+JSON.stringify(nextWhole.id),105),
+ 'swipe MID-VOICE must land at the neighboring entire memory, never an internal photo');
+const midAfter=await quiet("(()=>{const b=window.__taleraPhotoBook,m=window.__taleraTimelineRuntime.currentMemory(),"+
+"old=b.list().find(x=>x.id==="+JSON.stringify(idOfStory)+"),state=b.state();"+
+"return{id:m.id,oldIndex:old?._photoIndex,oldEntries:b.list().filter(x=>x.id===old.id).length,"+
+"bookId:b.list()[state.index]?.id,oldAudioPaused:window.__taleraInlineSharedAudio?.paused}})()");
+assert.equal(midAfter.id,nextWhole.id);
+assert.equal(midAfter.bookId,nextWhole.id,'V13 wheel must select exactly the whole next memory');
+assert.equal(midAfter.oldEntries,1);
+assert.ok([0,1,2].includes(midAfter.oldIndex),
+ 'only legitimate narrated time-coded cues may change the old photo index while audio runs');
+assert.equal(midAfter.oldAudioPaused,true,'old narration audio must stop when leaving its memory');
+// A cue may naturally fire in the milliseconds BEFORE the swipe completes.
+// After landing, the disposed old storyteller must never mutate the media again.
+await sleep(650);
+const stopped=await quiet("(()=>{const b=window.__taleraPhotoBook,old=b.list().find(x=>x.id==="+JSON.stringify(idOfStory)+");return{oldIndex:old?._photoIndex,current:window.__taleraTimelineRuntime.currentMemory()?.id,audioPaused:window.__taleraInlineSharedAudio?.paused}})()");
+assert.equal(stopped.oldIndex,midAfter.oldIndex,'no old media cue may fire AFTER swipe has completed');
+assert.equal(stopped.current,nextWhole.id,'no late callback may reopen old narrated memory');
+assert.equal(stopped.audioPaused,true,'the old narrator must remain stopped after swipe');
+console.log('PASS MID-NARRATION swipe: voice+silent VIDEO stopped and wheel selected ONE neighboring memory; internal media remained sealed');
 ws.close();

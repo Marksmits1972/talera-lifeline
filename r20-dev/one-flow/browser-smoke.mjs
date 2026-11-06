@@ -394,4 +394,66 @@ assert.ok(await until('Boolean(window.__taleraInlineSharedAudio&&!window.__taler
 assert.ok(await until('!document.querySelector("button.talera-v61-audio-permission-hint")',50),
   'permission button disappears when narration plays');
 console.log('PASS Safari permission: clicking real Beluister button plays native narration, not photo');
+
+// Regression from REAL iPhone screenshots: a new, NEVER-OPENED narrated
+// neighbor must have its first-photo cover BEFORE a swipe. Otherwise the
+// native wheel paints an all-white rectangle until hydration after landing.
+const unopenedNarrated=await evaluate("(async()=>{"+
+"const png=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZcAAAAASUVORK5CYII='),c=>c.charCodeAt(0));"+
+"const n=8000,b=new ArrayBuffer(44+n*2),v=new DataView(b);"+
+"const w=(at,s)=>{for(let i=0;i<s.length;i++)v.setUint8(at+i,s.charCodeAt(i))};"+
+"w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');"+
+"v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);"+
+"v.setUint32(24,8000,true);v.setUint32(28,16000,true);v.setUint16(32,2,true);"+
+"v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);"+
+"const files=[new File([png],'cover-only-photo.png',{type:'image/png'}),"+
+"new File([b],'neighbor-voice.wav',{type:'audio/wav'})];"+
+"const row=await TaleraMemories.save({title:'Unopened narrated neighbor',"+
+"date:'2026-11-04',time:'11:59:00',datePrecision:'exact',"+
+"narrationCues:[{t:0,index:0}],narrationDurationMs:1000},files);"+
+"return {id:'pwa:'+row.id};})()",true);
+assert.ok(unopenedNarrated.id.startsWith('pwa:local-'));
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+const sibling=JSON.stringify(unopenedNarrated.id);
+assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==="+sibling+")?.previewImage)",170),
+ 'the unopened narrated neighbor MUST have a persisted first-photo preview before gesture');
+const coverAhead=await evaluate("(()=>{const l=window.__taleraPhotoBook.list(),"+
+"a=l.findIndex(x=>x.id==="+sibling+"),"+
+"b=l.findIndex(x=>x.id==="+JSON.stringify('pwa:'+saved.id)+");"+
+"const neighbor=l[a],current=l[b];"+
+"return {distance:Math.abs(a-b),neighborHydrated:!neighbor._photoLoading,"+
+"neighborHasCover:!!neighbor.previewImage,neighborFirstKey:neighbor._zeroItems.find(x=>x.kind==='photo').key,"+
+"neighborFrameCount:neighbor._zeroFrames?.length||0,currentHasCover:!!current.previewImage};})()");
+assert.equal(coverAhead.distance,1,'new narrated memory should be next to the current one');
+assert.equal(coverAhead.neighborHydrated,false,
+ 'neighbor is NOT opened or hydrated: cover is prepared from exactly one stored photo');
+assert.equal(coverAhead.neighborHasCover,true);
+assert.equal(coverAhead.neighborFrameCount,0);
+assert.equal(coverAhead.currentHasCover,true);
+console.log('PASS adjacent narrated cover: generated BEFORE first visit, with zero original media frames hydrated');
+const rect=await evaluate("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
+"return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
+await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+const y=Math.round(rect.y+rect.h*.5),sX=Math.round(rect.x+rect.w*.2),eX=Math.round(rect.x+rect.w*.78);
+await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:sX,y,id:31}]});
+for(let i=1;i<=4;i++){
+ const x=Math.round(sX+(eX-sX)*i/4);
+ await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y,id:31}]});
+ await sleep(38);
+}
+const adjacentPaint=await evaluate("(()=>{"+
+"const l=window.__taleraPhotoBook.list(),m=l.find(x=>x.id==="+sibling+");"+
+"const page=[...document.querySelectorAll('.talera-wheel-page')].find(e=>e.dataset.url===m.previewImage);"+
+"const img=page?.querySelector('.example-photo');"+
+"const cs=page&&getComputedStyle(page);"+
+"return {found:!!page,src:img?.src,complete:img?.complete,naturalWidth:img?.naturalWidth,"+
+"visibility:cs?.visibility,paintDisplay:cs?.display,cover:m.previewImage,"+
+"wheelActive:document.body.classList.contains('talera-unified-wheel-in-motion')};})()");
+assert.equal(adjacentPaint.found,true,'adjacent wheel slot must own the PREPARED cover URL');
+assert.equal(adjacentPaint.complete,true,'neighbor image must already be decoded while finger is down');
+assert.ok(adjacentPaint.naturalWidth>0,'neighbor strip tile must contain a painted picture, not white');
+assert.equal(adjacentPaint.visibility,'visible','neighbor tile should never be hidden during drag');
+assert.equal(adjacentPaint.wheelActive,true);
+await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+console.log('PASS native V13 drag: fully loaded neighbor preview fills its tile before finger-up; no reserved white slot');
 ws.close();

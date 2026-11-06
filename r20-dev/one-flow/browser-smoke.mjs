@@ -552,44 +552,44 @@ assert.ok(await until('window.__taleraPostVideoEnded===true',380),
 await sleep(220);
 assert.equal(await evaluate("document.querySelectorAll('video.talera-v61-inline-video').length"),0,
   'final video has finished and native presenter is fully settled');
-const afterVideo=await evaluate("(()=>{const r=window.__taleraTimelineRuntime;"+
+const postVideoState=await evaluate("(()=>{const r=window.__taleraTimelineRuntime;"+
 "const m=r.currentMemory(),b=window.__taleraPhotoBook;const list=b.list(),idx=list.findIndex(x=>x.id===m.id);"+
 "const rect=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
 "return {id:m.id,frameIndex:m._photoIndex,photoCount:m.photos.length,"+
 "narrated:m._zeroItems.some(x=>x.kind==='audio'),"+
 "index:idx,totalEntries: list.filter(x=>x.id===m.id).length,"+
 "next: list[idx+1]?.id||null,rect:{x:rect.x,y:rect.y,w:rect.width,h:rect.height}};})()");
-assert.equal(afterVideo.id,'pwa:'+saved.id);
-assert.equal(afterVideo.narrated,true);
-assert.equal(afterVideo.totalEntries,1,'whole story is stored in exactly ONE V13 memory slot');
-assert.ok(afterVideo.photoCount>3);
-assert.ok(afterVideo.next,'a neighboring complete memory is needed to verify swipe');
+assert.equal(postVideoState.id,'pwa:'+saved.id);
+assert.equal(postVideoState.narrated,true);
+assert.equal(postVideoState.totalEntries,1,'whole story is stored in exactly ONE V13 memory slot');
+assert.ok(postVideoState.photoCount>3);
+assert.ok(postVideoState.next,'a neighboring complete memory is needed to verify swipe');
 await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
-const tapX=Math.round(afterVideo.rect.x+afterVideo.rect.w*.5);
-const tapY=Math.round(afterVideo.rect.y+afterVideo.rect.h*.5);
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tapX,y:tapY,id:51}]});
+const postTapX=Math.round(postVideoState.rect.x+postVideoState.rect.w*.5);
+const postTapY=Math.round(postVideoState.rect.y+postVideoState.rect.h*.5);
+await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:postTapX,y:postTapY,id:51}]});
 await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 await sleep(250);
-const afterTap=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
+const postTapState=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
 "return {id:m.id,frameIndex:m._photoIndex,photoCount:m.photos.length};})()");
-assert.equal(afterTap.id,afterVideo.id,'touch AFTER final video may not select a different memory');
-assert.equal(afterTap.frameIndex,afterVideo.frameIndex,
+assert.equal(postTapState.id,postVideoState.id,'touch AFTER final video may not select a different memory');
+assert.equal(postTapState.frameIndex,postVideoState.frameIndex,
   'touch AFTER final video may not advance any internal narrated photo');
-const x0=Math.round(afterVideo.rect.x+afterVideo.rect.w*.8),
-      x1=Math.round(afterVideo.rect.x+afterVideo.rect.w*.2);
-await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x0,y:tapY,id:52}]});
+const postX0=Math.round(postVideoState.rect.x+postVideoState.rect.w*.8),
+      postX1=Math.round(postVideoState.rect.x+postVideoState.rect.w*.2);
+await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:postX0,y:postTapY,id:52}]});
 for(let i=1;i<=8;i++){
- const x=Math.round(x0+(x1-x0)*i/8);
- await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:tapY,id:52}]});
+ const x=Math.round(postX0+(postX1-postX0)*i/8);
+ await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:postTapY,id:52}]});
  await sleep(25);
 }
 await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(afterVideo.next),100),
+assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(postVideoState.next),100),
   'swipe AFTER last original video must move directly to NEXT WHOLE memory');
-const selectedAfter=await evaluate("(()=>{const b=window.__taleraPhotoBook,m=window.__taleraTimelineRuntime.currentMemory();"+
+const postSelectedState=await evaluate("(()=>{const b=window.__taleraPhotoBook,m=window.__taleraTimelineRuntime.currentMemory();"+
 "return {id:m.id,index:b.state().index,bookId:b.list()[b.state().index]?.id};})()");
-assert.equal(selectedAfter.id,afterVideo.next);
-assert.equal(selectedAfter.bookId,selectedAfter.id,
+assert.equal(postSelectedState.id,postVideoState.next);
+assert.equal(postSelectedState.bookId,postSelectedState.id,
   'visible V13 wheel and selected memory must agree after post-video swipe');
 console.log('PASS post-original VIDEO seal: stationary touch cannot change narrated photo; horizontal swipe moves ONE WHOLE memory');
 ws.close();

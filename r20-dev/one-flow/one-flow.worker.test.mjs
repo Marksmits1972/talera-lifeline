@@ -712,3 +712,20 @@ test('no change to ordinary photo/video memories: shared audible handoff require
   assert.equal(env.taleraUnifiedTakePrimed(s,{key:'v'}),null);
   assert.equal(restoreApprovedV9(applyUnifiedTail(nativePage).html),nativePage);
 });
+
+test('normal sound setting: shared narrator element makes hidden video priming unnecessary',()=>{
+  let hiddenPlay=0;
+  const hidden={play(){hiddenPlay++;return Promise.resolve()},pause(){}};
+  const s={engine:'narrated',phase:'narration',
+    audio:{tagName:'VIDEO'},taleraUnifiedPrepared:new Map([
+      ['video-1',{video:hidden,primed:false,pending:false}]
+    ])};
+  const env={taleraInline:s,window:{},document:{addEventListener(){}}};
+  vm.runInNewContext(INLINE_TAIL,env);
+  env.taleraUnifiedPrimeCurrent();
+  assert.equal(hiddenPlay,0,
+    'NO second hidden video may start when the native voice element itself can play the originals');
+  assert.equal(s.taleraUnifiedPrepared.size,1,
+    'preloaded original URL must remain available until original replay');
+  assert.equal(restoreApprovedV9(applyUnifiedTail(nativePage).html),nativePage);
+});

@@ -24,6 +24,34 @@ assert.equal(scripts.length,1,'one native V9 script must own the full cycle');
 assert.doesNotThrow(()=>new Script(scripts[0]),
  'live native HTML must compile with the rewritten engine');
 console.log('PASS one closed native storyteller compiled; old layers ABSENT');
+// Read-only audit of the ACTUAL /mijn-leven page, never assume /present is equivalent.
+const actualRes=await fetch(origin+'/mijn-leven',{headers:{accept:'text/html'}});
+const actual=await actualRes.text();
+const needles=[
+ 'function taleraInlinePlayMedia(s,frame,muted,finished){',
+ 'function taleraInlineReplayNext(s){',
+ 'function taleraInlineVoiceEnded(s){',
+ 'function showPhoto(memory,index,manual=false){',
+ 'function taleraInlineLoadVideo(',
+ 'function taleraInlineSetFrame(',
+ 'function taleraInlineInstallAudioControls()',
+ 'memoryStoryScroll',
+ 'talera-v61-inline-video',
+ 'talera-v61-audio-permission-hint',
+ 'TALERA_CLOSED_MEMORY_CORE_20261106',
+ 'video.autoplay=true',
+ 'video.play()',
+ 'audio.play()',
+ '<video',
+ 'play-button'
+];
+const locs=Object.fromEntries(needles.map(needle=>[needle,actual.indexOf(needle)]));
+const attempted=applyClosedCore(actual);
+const scriptsAtPage=[...actual.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)].map(m=>m[1]);
+console.log('MYN_LEVEN_CODE_AUDIT',JSON.stringify({status:actualRes.status,
+ bytes:actual.length,url:actualRes.url,patchStatus:attempted.status,
+ title:(actual.match(/<title[^>]*>([^<]*)<\\/title>/i)||[])[1]||null,
+ anchors:locs,scriptLengths:scriptsAtPage.map(x=>x.length).sort((a,b)=>b-a).slice(0,12)}));
 for(const path of ['/','/tell','/vertelmodus-embed?mode=record']){
  const r=await fetch(origin+path);
  assert.equal(r.status,200);

@@ -110,6 +110,10 @@ test('swipe away invalidates callbacks: no late internal photo or video transiti
 test('source transform denies old photo tap, audio retry on swipe, and refreshes first-frame cover',()=>{
  const src=[
  'function taleraInlineVoiceEnded(s){return 123;}',
+ 'function taleraInlinePlayMedia(s,frame,muted,finished){}',
+ 'function taleraInlineReplayNext(s){}',
+ "      else if(s.phase==='originals'&&s.video){\\n        s.video.muted=!enabled();\\n        if(s.video.paused)void s.video.play().catch(err=>{\\n          if(err?.name==='NotAllowedError'&&enabled())informGesture(s);\\n        });\\n      }",
+ "    }else if(s.engine==='narrated'&&s.phase==='narration')tryVoice(s);\\n    else if(s.video?.paused&&!s.video.ended)void s.video.play().catch(()=>{});",
  'function taleraInlineOrdinaryStep(s,index){}',
  'function showPhoto(memory,index,manual=false){return index;}',
  '  const retry=e=>{\n    const s=taleraInline;',
@@ -126,6 +130,8 @@ test('source transform denies old photo tap, audio retry on swipe, and refreshes
  const r=applyClosedCore(src);
  assert.equal(r.status,'installed',r.status);
  assert.equal(r.html.includes(CORE_MARKER),true);
+ assert.equal(r.html.includes('s.closedAudioSoundtrack=true'),true,'same audible element plays WAV and original sound');
+ assert.equal(r.html.includes("video.muted=muted||audioOwner"),true,'original video remains muted while audio element plays track');
  assert.equal(r.html.includes("if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;"),true);
  assert.equal(r.html.includes("if(s?.engine==='narrated')return;"),true);
  assert.equal(r.html.includes("memory.previewImage=photos[coverIndex]"),true);

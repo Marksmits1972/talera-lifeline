@@ -68,9 +68,16 @@ const saved=await evaluate(`(async()=>{
    r.ondataavailable=e=>{if(e.data?.size)pieces.push(e.data)};
    r.onstop=()=>resolve(new Blob(pieces,{type:mime}));
    r.onerror=reject;r.start();
-   // Force blue opening keyframes after recording is actively running.
-   ctx.fillRect(0,0,60,60);stream.getVideoTracks()[0]?.requestFrame?.();
-   setTimeout(()=>r.stop(),1300);
+   // Keep the opening keyframe blue, then render ACTUAL moving frames.
+   // A static canvas only encodes 1-2 frames and cannot prove image playback.
+   ctx.fillStyle='#244b71';ctx.fillRect(0,0,60,60);stream.getVideoTracks()[0]?.requestFrame?.();
+   let frameNo=0;
+   const animation=setInterval(()=>{
+     frameNo++;ctx.fillStyle=frameNo%2?'#416b96':'#244b71';ctx.fillRect(0,0,60,60);
+     ctx.fillStyle='#f5ead6';ctx.fillRect((frameNo*7)%50,12,9,32);
+     stream.getVideoTracks()[0]?.requestFrame?.();
+   },90);
+   setTimeout(()=>{clearInterval(animation);r.stop()},1300);
  });
  oscillator.stop();
  mixedStream.getTracks().forEach(t=>t.stop());

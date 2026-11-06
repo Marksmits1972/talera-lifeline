@@ -1,5 +1,7 @@
 name: TALERA goal and scope guard
 on:
+  push:
+    branches: [process/talera-goal-guard-protocol-20261106]
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -11,8 +13,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
-      TALERA_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      TALERA_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TALERA_BASE_SHA: ${{ github.event.pull_request.base.sha || 'e117272f8d02ee63b660962d57ceb11972be1699' }}
+      TALERA_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout candidate source and full history
         uses: actions/checkout@v4

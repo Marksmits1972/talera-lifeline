@@ -25,6 +25,14 @@ assert.doesNotThrow(()=>new Script(scripts[0]),
  'live native HTML must compile with the rewritten engine');
 console.log('PASS one closed native storyteller compiled; old layers ABSENT');
 // Read-only audit of the ACTUAL /mijn-leven page, never assume /present is equivalent.
+const videoStart=original.indexOf('function taleraInlineLoadVideo(');
+const videoEnd=original.indexOf('function taleraInlineSetFrame(',videoStart);
+console.log('NATIVE_V9_SILENT_VIDEO_SOURCE',JSON.stringify({start:videoStart,end:videoEnd,source:videoStart>=0?original.slice(videoStart,Math.min(videoEnd>videoStart?videoEnd:videoStart+11000,videoStart+11000)):''}));
+for(const route of ['/sw.js']){
+ const res=await fetch(origin+route);
+ const js=await res.text();
+ console.log('NATIVE_V9_SERVICE_WORKER',JSON.stringify({route,status:res.status,length:js.length,source:js.slice(0,12500)}));
+}
 const actualRes=await fetch(origin+'/mijn-leven',{headers:{accept:'text/html'}});
 const actual=await actualRes.text();
 const needles=[

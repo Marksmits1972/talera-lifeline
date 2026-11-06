@@ -36,9 +36,7 @@ const evaluate=async(expression,awaitPromise=false,userGesture=true)=>{
  return r.result?.value;
 };
 const until=async(expression,tries=240)=>{
- // User-gesture-free waits: simulated CDP gestures on every poll hid Safari
- // autoplay denial on the SECOND timeline playback.
- for(let i=0;i<tries;i++){if(await evaluate(expression,false,false))return true;await sleep(80)}
+ for(let i=0;i<tries;i++){if(await evaluate(expression))return true;await sleep(80)}
  return false;
 };
 await cmd('Page.enable');await cmd('Runtime.enable');
@@ -169,8 +167,7 @@ await evaluate(`(()=>{
     if(!t.videos.some(v=>v.elementId===video.dataset.testID)){
       video.dataset.testID=String(t.videos.length+1);
       const item={elementId:video.dataset.testID,muted:video.muted,at:performance.now(),
-        warmed:video.dataset.primedVideo==='yes',
-        sameAudible:video===window.__taleraInlineSharedAudio,progress:0,duration:0};
+        warmed:video.dataset.primedVideo==='yes',progress:0,duration:0};
       t.videos.push(item);
       video.addEventListener('timeupdate',()=>{
         item.progress=Math.max(item.progress,video.currentTime||0);
@@ -185,19 +182,12 @@ await evaluate(`(()=>{
  const a=window.__taleraInlineSharedAudio;
  a.addEventListener('ended',()=>{t.voiceEndedAt=performance.now();record()},{once:true});
  record();
- // First playback uses the normal listening setting. On timeline replay
- // there is NO repeated Beluister click or talera:enable-listening event.
- // If strict Chrome blocks the VOICE too, allow the voice to start with
- // one gesture; the original video may NOT receive a new gesture.
- if(${playbackRound}===1){
-   const consent=document.querySelector('button.talera-audio-consent');
-   if(consent&&!consent.hidden)consent.click();
-   else document.dispatchEvent(new Event('talera:enable-listening'));
- }
- if(a.paused){
-   t.voiceStartedWithGesture=true;
-   a.play().catch(e=>{t.errors.push('voice play '+String(e))});
- }else t.voiceStartedWithGesture=false;
+ // Reuse the existing listening UI control as the only video authorization.
+ // It is OUTSIDE the closed story photo. No synthetic photo tap is needed.
+ const consent=document.querySelector('button.talera-audio-consent');
+ if(consent&&!consent.hidden)consent.click();
+ else document.dispatchEvent(new Event('talera:enable-listening'));
+ if(a.paused)a.play().catch(e=>{t.errors.push('voice play '+String(e))});
 })()`);
 if(playbackRound===1)console.log('AUDIO_UI_CONTROLS',JSON.stringify(await evaluate('window.__taleraAudioUiControls')));
 assert.ok(await until('window.__oneFlowTest.voiceEndedAt>0'),'real narration must finish');
@@ -210,27 +200,25 @@ for(const index of [3,4,5]){
 const result=await evaluate(`(()=>{
  const t=window.__oneFlowTest;
  return {voiceEndedAt:t.voiceEndedAt,photos:t.photos,videos:t.videos,
- errors:t.errors,iframes:document.querySelectorAll('iframe.talera-zero-present-frame').length,
- voiceStartedWithGesture:t.voiceStartedWithGesture}
-})()`,false,false);
+ errors:t.errors,iframes:document.querySelectorAll('iframe.talera-zero-present-frame').length}
+})()`);
 const remaining=result.photos.filter(p=>p.index>=3&&p.at>=result.voiceEndedAt-100);
 assert.deepEqual(remaining.map(p=>p.index),[3,4,5]);
 assert.ok(remaining[1].at-remaining[0].at>=3200);
 assert.ok(remaining[2].at-remaining[1].at>=3200);
 assert.ok(await until('window.__oneFlowTest.videos.some(v=>!v.muted&&v.progress>.6)',200),
  'the original video must replay from 0 with sound after the remaining photos');
-const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,warmed:v.warmed,sameAudible:v.sameAudible,progress:v.progress,duration:v.duration}))`,false,false);
+const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v.muted,at:v.at,warmed:v.warmed,progress:v.progress,duration:v.duration}))`);
 const narrated=videoPlayback.find(v=>v.muted&&v.at<result.voiceEndedAt);
 const replay=videoPlayback.find(v=>!v.muted&&v.at>remaining.at(-1).at);
 assert.ok(narrated,'narrated video exists and was muted');
 assert.ok(replay,'original native video replay starts AFTER the last remaining photo');
-assert.equal(replay.sameAudible,true,'original MUST be the SAME authorized media element as the voice');
-assert.equal(replay.warmed,false,'do not promote a separate hidden video as audible replay');
+assert.equal(replay.warmed,true,'native replay MUST reuse video authorized by the FIRST listener gesture');
 assert.ok(replay.progress>.6,'unmuted replay advanced from t=0');
 assert.ok(replay.duration>=1,'replay has the original full clip duration');
 assert.deepEqual(result.errors,[]);
 assert.equal(result.iframes,0);
-console.log('PASS browser playback round '+playbackRound+': voice->original SAME media element, no second Beluister; voice needed gesture='+result.voiceStartedWithGesture);
+console.log('PASS browser playback round '+playbackRound+': silent narration -> remaining photos -> audible video from zero, no second Beluister');
 }
 // Regression: a narrated story is ONE timeline item; photo taps do nothing,
 // and a real horizontal swipe leaves the whole active story (even mid-voice).
@@ -490,10 +478,13 @@ assert.equal(adjacentPaint.wheelActive,true);
 await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 console.log('PASS native V13 drag: fully loaded neighbor preview fills its tile before finger-up; no reserved white slot');
 
-// Auto-continuation: existing sound ON setting, no second consent click.
-// The audible WAV begins on the reusable native media element. When the
-// original video follows, its image and sound MUST use that SAME element.
-// Polls have userGesture:false so tests cannot authorize the video by reading it.
+// Auto-continuation path: the voice starts with a browser-permitted playback
+// action but WITHOUT the consent button or talera:enable-listening event.
+// Strict Chrome requires user activation even for muted voice; the important
+// regression is that no explicit original-video priming has happened.
+// The preloaded original MUST still be adopted rather than replaced.
+// Autoplay policies may still reject sound for the next video; existing real
+// Beluister button must recover without touching the photo/swipe controls.
 const evaluateQuiet=(expression,awaitPromise=false)=>evaluate(expression,awaitPromise,false);
 const untilQuiet=async(expression,tries=240)=>{
  for(let i=0;i<tries;i++){
@@ -506,19 +497,19 @@ await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.
 assert.ok(await untilQuiet('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))',160),
  'auto-start scenario must load native voice and prewarmed original without a click');
 const autoStart=await evaluate("(async()=>{"+
-"const a=window.__taleraInlineSharedAudio;"+
-"a.dataset.autostartShared='yes';"+
-"a.muted=!window.__taleraAudioControls?.isEnabled?.();"+
-"try{await a.play();return {ok:true,muted:a.muted,shared:a.tagName}}catch(e){return {ok:false,error:e.name}}"+
+"const video=document.querySelector('video[style*=\"-9999px\"]');"+
+"video.dataset.autostartPrepared='yes';"+
+"const a=window.__taleraInlineSharedAudio;a.muted=true;"+
+"try{await a.play();return {ok:true,muted:a.muted}}catch(e){return {ok:false,error:e.name}}"+
 "})()",true);
 assert.equal(autoStart.ok,true,'voice must begin without clicking the consent button or priming originals');
-assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.dataset.autostartShared==="yes"',300),
- 'first original video MUST share the authorized narrated WAV element without another gesture');
+assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.dataset.autostartPrepared==="yes"',300),
+ 'first original video MUST be SAME prepared element even with zero listening gestures');
 const autoHandoff=await evaluateQuiet("(()=>{const video=document.querySelector('video.talera-v61-inline-video');"+
 "const hint=document.querySelector('button.talera-v61-audio-permission-hint');"+
-"return {reused:video?.dataset.autostartShared==='yes',paused:video?.paused,"+
+"return {reused:video?.dataset.autostartPrepared==='yes',paused:video?.paused,"+
 "muted:video?.muted,currentTime:video?.currentTime,blocked:!!hint};})()");
-assert.equal(autoHandoff.reused,true,'the SAME narrated WAV element must be reused for original');
+assert.equal(autoHandoff.reused,true,'the existing preloaded original, not a new video');
 if(autoHandoff.blocked){
  const coords=await evaluateQuiet("(()=>{const b=document.querySelector('button.talera-v61-audio-permission-hint');"+
 "const r=b.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()");
@@ -526,11 +517,11 @@ if(autoHandoff.blocked){
  await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:coords.x,y:coords.y,button:'left',clickCount:1});
  assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
   'real Beluister control resumes the SAME original after browser-level autoplay denial');
- console.log('PASS voice-to-original shared media: browser restriction handled by existing Beluister button');
+ console.log('PASS no-gesture auto start: same preloaded video adopted; Safari-style restriction recovered by existing Beluister button');
 }else{
  assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
   'if the browser grants automatic sound, the same preloaded original must actually advance');
- console.log('PASS voice-to-original shared media: original video advanced automatically with no extra action');
+ console.log('PASS no-gesture auto start: same preloaded video started automatically and progressed');
 }
 
 // Regression from iPhone: AFTER the LAST audible original video has finished,

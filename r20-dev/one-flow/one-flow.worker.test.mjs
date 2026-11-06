@@ -115,6 +115,7 @@ test('source transform denies old photo tap, audio retry on swipe, and refreshes
  '  const retry=e=>{\n    const s=taleraInline;',
  "    if(s?.engine!=='narrated'||s.phase!=='narration')return;",
  '       memory._photoIndex=0;\n       memory.image=photos[0]||placeholder;',
+ ' async function hydrate(memory){}',
  'function assign(tile,index,mem){if(tile.index===index)return;}',
  "    const hint=document.createElement('div');\n    hint.className='talera-v61-audio-permission-hint';\n    hint.textContent='Tik op de foto om het geluid te starten';",
  "    hint.style.cssText='pointer-events:none';\n    (stage.parentElement||stage).appendChild(hint);s.hint=hint;",

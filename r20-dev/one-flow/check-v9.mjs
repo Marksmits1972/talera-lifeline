@@ -47,11 +47,11 @@ const needles=[
 ];
 const locs=Object.fromEntries(needles.map(needle=>[needle,actual.indexOf(needle)]));
 const attempted=applyClosedCore(actual);
-const scriptsAtPage=[...actual.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)].map(m=>m[1]);
+const scriptCount=(actual.split('<script').length-1);
 console.log('MYN_LEVEN_CODE_AUDIT',JSON.stringify({status:actualRes.status,
  bytes:actual.length,url:actualRes.url,patchStatus:attempted.status,
- title:(actual.match(/<title[^>]*>([^<]*)<\\/title>/i)||[])[1]||null,
- anchors:locs,scriptLengths:scriptsAtPage.map(x=>x.length).sort((a,b)=>b-a).slice(0,12)}));
+ title:actual.includes('<title>')?actual.split('<title>')[1].split('</title>')[0]:null,
+ anchors:locs,scriptCount}));
 for(const path of ['/','/tell','/vertelmodus-embed?mode=record']){
  const r=await fetch(origin+path);
  assert.equal(r.status,200);

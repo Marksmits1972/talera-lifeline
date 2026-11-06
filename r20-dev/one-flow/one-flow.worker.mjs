@@ -75,6 +75,55 @@ document.addEventListener('click',e=>{
   if(e.target?.closest?.('.talera-audio-consent,.talera-memory-audio'))taleraUnifiedPrimeCurrent();
 },true);
 document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);
+/* VISUAL ONLY: approved V9 hides every photo-strip while narration owns
+   the image. V13's ORIGINAL wheel still tracks the finger on every pointermove,
+   but remains invisible until landing. Expose ONLY its already-moving strip
+   during an actual horizontal drag; never on a stationary tap. */
+(function taleraUnifiedRevealWheelDuringSwipe(){
+  const styleId='talera-unified-wheel-visual-style';
+  const motionClass='talera-unified-wheel-in-motion';
+  if(document.head?.appendChild&&!document.getElementById?.(styleId)){
+    const css=document.createElement('style');
+    css.id=styleId;
+    css.textContent='body.talera-v61-narration-visual.talera-unified-wheel-in-motion #photoStage .talera-photo-strip.talera-wheel-strip.is-visible{display:block!important;visibility:visible!important;opacity:1!important}';
+    document.head.appendChild(css);
+  }
+  let gesture=null;
+  document.addEventListener('pointerdown',e=>{
+    if(e.isPrimary===false||(e.pointerType==='mouse'&&e.button!==0))return;
+    if(!e.target?.closest?.('#memoryStoryScroll'))return;
+    if(e.target.closest('button,a,input,textarea,select,nav,[role="button"],.talera-memory-audio'))return;
+    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,shown:false};
+  },{capture:true,passive:true});
+  document.addEventListener('pointermove',e=>{
+    const g=gesture;
+    if(!g||g.id!==e.pointerId||g.shown)return;
+    const dx=e.clientX-g.x,dy=e.clientY-g.y;
+    if(Math.abs(dx)<13||Math.abs(dx)<Math.abs(dy)*1.05)return;
+    // The native V13 wheel owns the gesture and must already be rolling.
+    if(!window.__taleraBandRolling)return;
+    g.shown=true;
+    document.body.classList.add(motionClass);
+  },{capture:true,passive:true});
+  document.addEventListener('pointerup',e=>{
+    if(gesture?.id===e.pointerId)gesture=null;
+  },{capture:true,passive:true});
+  document.addEventListener('pointercancel',e=>{
+    if(gesture?.id===e.pointerId)gesture=null;
+  },{capture:true,passive:true});
+  document.addEventListener('talera:wheel-motion',e=>{
+    if(e.detail?.active===false){
+      gesture=null;
+      document.body.classList.remove(motionClass);
+    }
+  },{passive:true});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      gesture=null;
+      document.body.classList.remove(motionClass);
+    }
+  },{passive:true});
+})();
 /* Restores the permission prompt as a REAL button. The gesture resumes
    this memory's EXISTING native audio/video element, never advances photos
    and never creates a second player. The picture itself stays untappable. */

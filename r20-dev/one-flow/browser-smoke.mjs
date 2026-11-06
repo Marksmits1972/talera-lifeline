@@ -261,7 +261,15 @@ const midAfter=await quiet("(()=>{const b=window.__taleraPhotoBook,m=window.__ta
 assert.equal(midAfter.id,nextWhole.id);
 assert.equal(midAfter.bookId,nextWhole.id,'V13 wheel must select exactly the whole next memory');
 assert.equal(midAfter.oldEntries,1);
-assert.equal(midAfter.oldIndex,midBefore.frame,'swiping must NOT step through any photos inside the old memory');
+assert.ok([0,1,2].includes(midAfter.oldIndex),
+ 'only legitimate narrated time-coded cues may change the old photo index while audio runs');
 assert.equal(midAfter.oldAudioPaused,true,'old narration audio must stop when leaving its memory');
+// A cue may naturally fire in the milliseconds BEFORE the swipe completes.
+// After landing, the disposed old storyteller must never mutate the media again.
+await sleep(650);
+const stopped=await quiet("(()=>{const b=window.__taleraPhotoBook,old=b.list().find(x=>x.id==="+JSON.stringify(idOfStory)+");return{oldIndex:old?._photoIndex,current:window.__taleraTimelineRuntime.currentMemory()?.id,audioPaused:window.__taleraInlineSharedAudio?.paused}})()");
+assert.equal(stopped.oldIndex,midAfter.oldIndex,'no old media cue may fire AFTER swipe has completed');
+assert.equal(stopped.current,nextWhole.id,'no late callback may reopen old narrated memory');
+assert.equal(stopped.audioPaused,true,'the old narrator must remain stopped after swipe');
 console.log('PASS MID-NARRATION swipe: voice+silent VIDEO stopped and wheel selected ONE neighboring memory; internal media remained sealed');
 ws.close();

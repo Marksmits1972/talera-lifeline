@@ -169,22 +169,39 @@ function taleraSwipeCoverResize(src){
 function taleraSwipeCoverGenerate(memory,first,entry){
   if(entry.creating||entry.url)return;
   const frame=memory._zeroFrames?.find(x=>x.kind==='photo'&&x.key===first.key);
-  if(!frame?.url)return; // do not request/modify original media a second time
   entry.creating=true;
   const run=async()=>{
+    // Never decode or draw during a finger gesture or the V13 landing.
     if(window.__taleraBandRolling||window.__taleraTimelineRuntime?.isMoving?.()){
-      setTimeout(run,200);return;
+      setTimeout(run,160);return;
     }
-    const blob=await taleraSwipeCoverResize(frame.url);
-    entry.creating=false;
-    if(!blob||taleraSwipeCovers.get(memory.id)!==entry)return;
-    taleraSwipeCoverApply(memory,first.key,blob);
-    // Cached locally once; a different first photo replaces the same entry.
-    void taleraSwipeCoverSave(memory.id,first.key,blob);
+    let src=frame?.url||null,temporary=false;
+    try{
+      if(!src){
+        // Adjacent narrated stories have NOT been opened/hydrated yet.
+        // Fetch ONLY their first selected photo; never the whole media set.
+        src=await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));
+        temporary=!!src;
+      }
+      if(!src)throw Error('Eerste foto nog niet beschikbaar');
+      const blob=await taleraSwipeCoverResize(src);
+      if(blob&&taleraSwipeCovers.get(memory.id)===entry){
+        taleraSwipeCoverApply(memory,first.key,blob);
+        // Persist one cover per narrated memory, not a new media frame.
+        void taleraSwipeCoverSave(memory.id,first.key,blob);
+      }
+    }catch(e){
+      // A missing optional preview may not block native V9 story playback.
+      console.warn('TALERA omslagfoto niet klaar',e);
+    }finally{
+      entry.creating=false;
+      if(temporary&&typeof src==='string'&&src.startsWith('blob:'))
+        URL.revokeObjectURL(src);
+    }
   };
   if(typeof window.requestIdleCallback==='function')
-    window.requestIdleCallback(run,{timeout:1600});
-  else setTimeout(run,350);
+    window.requestIdleCallback(run,{timeout:1100});
+  else setTimeout(run,120);
 }
 function taleraSwipeCoverEnsure(memory,create=false){
   const first=taleraSwipeCoverFirst(memory);
@@ -228,8 +245,10 @@ function taleraSwipeCoverObserve(memories){
       index=list.findIndex(x=>x.ms>=current.ms);
       if(index<0)index=list.length-1;
     }
-    for(let i=Math.max(0,index-5);i<=Math.min(list.length-1,index+5);i++)
-      taleraSwipeCoverEnsure(list[i]);
+    for(let i=Math.max(0,index-2);i<=Math.min(list.length-1,index+2);i++)
+      // Crucial: CREATE missing first-photo covers BEFORE visiting the neighbor.
+      // Merely reading cached covers left the first swipe through blank tiles.
+      taleraSwipeCoverEnsure(list[i],true);
   };
   window.__taleraTimelineRuntime?.subscribe?.(inspect);
   inspect();
@@ -440,10 +459,18 @@ export function applyUnifiedTail(html){
   // Add only two guarded hooks to the existing V9 presenter (not recorder).
   const nativeCoverHydrated="loaded.set(memory.id,urls);";
   const nativeCoverRegistered="runtime.registerMemories(memories);";
+  // V13 wheel previously skipped reassigning a tile with an unchanged index.
+  // When a narrated cover arrives AFTER that tile's first render, its stale
+  // placeholder remained until navigating away. Invalidate ONLY if the cover
+  // URL changed; normal photo memories keep the original assign shortcut.
+  const nativeWheelAssign="if(tile.index===index)return;";
+  const newWheelAssign="if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;";
   if(result.split(nativeCoverHydrated).length!==2||
-     result.split(nativeCoverRegistered).length!==2)return {html,status:'anchor-unmatched'};
+     result.split(nativeCoverRegistered).length!==2||
+     result.split(nativeWheelAssign).length!==2)return {html,status:'anchor-unmatched'};
   result=result.replace(nativeCoverHydrated,nativeCoverHydrated+"taleraSwipeCoverEnsure(memory,true);");
   result=result.replace(nativeCoverRegistered,nativeCoverRegistered+"taleraSwipeCoverObserve(memories);");
+  result=result.replace(nativeWheelAssign,newWheelAssign);
   // Target only the existing inline presenter, not its voice recorder.
   const nativeVideoStart=result.indexOf('function taleraInlinePlayMedia(s,frame,muted,finished){');
   const nativeVideoEnd=result.indexOf('function taleraInlineReplayNext(s){',nativeVideoStart);
@@ -491,6 +518,8 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
+    .replace("if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;",
+      "if(tile.index===index)return;")
     .replace("runtime.registerMemories(memories);taleraSwipeCoverObserve(memories);",
       "runtime.registerMemories(memories);")
     .replace("loaded.set(memory.id,urls);taleraSwipeCoverEnsure(memory,true);",

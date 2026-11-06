@@ -87,6 +87,39 @@ const saved=await evaluate(`(async()=>{
 assert.ok(saved?.id?.startsWith('local-'),JSON.stringify(saved));
 assert.equal(saved.files,7);assert.equal(saved.cues,3);
 console.log('PASS native IndexedDB: five photos, narrated video WITH audio track, real WAV and three cues');
+
+// Narrated memory only: the first narrated PHOTO is cached as ONE locally
+// persistent 720px JPEG cover, not added to the real photo or video sequence.
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+assert.ok(await until('Boolean(window.__taleraTimelineRuntime?.currentMemory()?._zeroFrames?.length)',150),
+  'narrated story frames must hydrate before cover creation');
+assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==='pwa:"+saved.id+"')?.previewImage)",190),
+  'narrated first-photo cover should be attached to the ORIGINAL V13 memory wheel');
+const firstCover=await evaluate("(async()=>{"+
+"const id='pwa:"+saved.id+"';"+
+"const m=window.__taleraPhotoBook.list().find(x=>x.id===id);"+
+"const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('talera-narrated-swipe-covers-v1');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});"+
+"const row=await new Promise((resolve,reject)=>{const r=db.transaction('covers','readonly').objectStore('covers').get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});"+
+"const image=await createImageBitmap(row.blob);"+
+"db.close();"+
+"return {url:m.previewImage,key:row.photoKey,size:row.blob.size,type:row.blob.type,"+
+"width:image.width,height:image.height,photoCount:m.photos.length,mediaCount:m._zeroItems.length};})()",true);
+assert.ok(firstCover.url.startsWith('blob:'));
+assert.equal(firstCover.type,'image/jpeg');
+assert.ok(firstCover.size>100);
+assert.ok(Math.max(firstCover.width,firstCover.height)<=720);
+assert.equal(firstCover.photoCount,6,'cover is NOT another photo in narrated memory');
+assert.equal(firstCover.mediaCount,7,'original video, photos and voice remain untouched');
+console.log('PASS narrated cover: one persisted, optimized first-photo thumbnail, native V13 uses previewImage');
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+assert.ok(await until("Boolean(window.__taleraPhotoBook?.list?.().find(x=>x.id==='pwa:"+saved.id+"')?.previewImage)",150),
+  'the same first-photo thumbnail must be restored from browser storage on reload');
+const secondCover=await evaluate("(()=>{const m=window.__taleraPhotoBook.list().find(x=>x.id==='pwa:"+saved.id+"');"+
+"return {url:m?.previewImage,mediaCount:m?._zeroItems?.length};})()");
+assert.ok(secondCover.url.startsWith('blob:'));
+assert.equal(secondCover.mediaCount,7);
+console.log('PASS narrated cover reused after reload, without creating a seventh photo');
+
 for(const playbackRound of [1,2,3]){
 console.log('BEGIN playback round',playbackRound);
 await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
@@ -307,6 +340,17 @@ assert.equal(ordinaryTap.count,2);
 assert.equal(ordinaryTap.after,(ordinaryTap.before+1)%ordinaryTap.count,
   'normal photo memory TAP must still advance its photo');
 console.log('PASS ordinary photo memory: tap advances to next photo exactly as approved V9');
+
+const noOrdinaryCover=await evaluate("(async()=>{"+
+"const id="+JSON.stringify(nextMemory.id)+";"+
+"const m=window.__taleraPhotoBook.list().find(x=>x.id===id);"+
+"const db=await new Promise(resolve=>{const r=indexedDB.open('talera-narrated-swipe-covers-v1');r.onsuccess=()=>resolve(r.result)});"+
+"const row=await new Promise(resolve=>{const r=db.transaction('covers','readonly').objectStore('covers').get(id);r.onsuccess=()=>resolve(r.result)});"+
+"db.close();return {preview:!!m?.previewImage,cached:!!row};})()",true);
+assert.deepEqual(noOrdinaryCover,{preview:false,cached:false},
+  'normal photo memories must never generate narrated cover entries');
+console.log('PASS normal photo memory: no narrated cover or extra storage copy');
+
 
 // Safari permission regression: autoplay blocked -> the white hint must be a
 // real button that plays the ORIGINAL native voice. The photo stays sealed.

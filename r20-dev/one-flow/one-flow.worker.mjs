@@ -127,7 +127,10 @@ export const CLOSED_MEDIA=String.raw`function taleraInlinePlayMedia(s,frame,mute
   video.playsInline=true;video.setAttribute('playsinline','');video.setAttribute('webkit-playsinline','');
   video.preload='auto';video.controls=false;
   video.muted=muted||audioOwner;video.defaultMuted=muted||audioOwner;video.volume=1;
-  video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';
+  // iOS Safari requires an explicit muted inline video configuration for reliable image autoplay.
+  if(video.muted){video.setAttribute('muted','');video.autoplay=true}
+  // Originals must paint above the fixed photo-cover; buttons remain above at z-index 65.
+  video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:'+(audioOwner?30:12)+';pointer-events:none';
   (stage.parentElement||stage).appendChild(video);
   s.video=video;s.videoKey=frame.key;
   let completed=false;
@@ -144,7 +147,10 @@ export const CLOSED_MEDIA=String.raw`function taleraInlinePlayMedia(s,frame,mute
     button.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:65;padding:9px 15px;border:0;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:auto';
     button.addEventListener('click',e=>{
       e.preventDefault();e.stopPropagation();
-      Promise.resolve(target.play()).then(()=>{
+      // A browser-blocked image must never leave only the soundtrack running.
+      // The ONE user gesture re-enables both existing native media nodes together.
+      const starts=audioOwner&&s.audio?[video.play(),s.audio.play()]:[target.play()];
+      Promise.all(starts.map(p=>Promise.resolve(p))).then(()=>{
         if(s===taleraInline&&s.hint===button){
           button.remove();s.hint=null;s.blockedByBrowser=false;
         }
@@ -152,13 +158,21 @@ export const CLOSED_MEDIA=String.raw`function taleraInlinePlayMedia(s,frame,mute
     });
     (stage.parentElement||stage).appendChild(button);s.hint=button;
   };
+  let visualStartPending=false;
   const playVideo=()=>{
-    if(s!==taleraInline||s.video!==video||!video.paused)return;
+    if(s!==taleraInline||s.video!==video||!video.paused||visualStartPending||s.blockedByBrowser)return;
+    visualStartPending=true;
     Promise.resolve(video.play()).then(()=>{
+      visualStartPending=false;
       if(!audioOwner&&s.hint){s.hint.remove();s.hint=null}
     }).catch(e=>{
-      if(e?.name==='NotAllowedError')consent(video);
-      else if(e?.name!=='AbortError')console.warn('TALERA videobeeld niet gestart',e);
+      visualStartPending=false;
+      if(s!==taleraInline||s.video!==video)return;
+      if(e?.name==='NotAllowedError'){
+        // Never report progress with sound while the video is only its preview frame.
+        if(audioOwner&&s.audio&&!s.audio.paused)s.audio.pause();
+        consent(video);
+      }else if(e?.name!=='AbortError')console.warn('TALERA videobeeld niet gestart',e);
     });
   };
   video.onended=()=>{if(!audioOwner)done()};
@@ -189,24 +203,32 @@ export const CLOSED_MEDIA=String.raw`function taleraInlinePlayMedia(s,frame,mute
       audio.pause();audio.src=url;audio.muted=false;audio.volume=1;
       audio.onended=done;
       audio.onplay=playVideo;
-      audio.onpause=()=>{if(!audio.ended&&s===taleraInline&&s.video===video)video.pause()};
+      audio.onpause=()=>{
+        // Ignore a queued pause event from the previous WAV when the new soundtrack is already running.
+        if(audio.paused&&!audio.ended&&s===taleraInline&&s.video===video)video.pause();
+      };
       audio.ontimeupdate=()=>{
-        if(s!==taleraInline||s.video!==video||video.readyState<2||video.seeking)return;
+        if(s!==taleraInline||s.video!==video)return;
+        // Recovery from a late metadata/event handoff; never treat audio time as video proof.
+        if(!audio.paused&&video.paused&&!s.blockedByBrowser)playVideo();
+        if(video.readyState<2||video.seeking)return;
         const target=Math.max(0,Number(audio.currentTime)||0);
         if(Math.abs((video.currentTime||0)-target)>.4){
           try{video.currentTime=Math.min(target,Math.max(0,(video.duration||0)-.02))}catch(e){}
         }
       };
       video.onloadedmetadata=playVideo;
+      video.oncanplay=()=>{if(!audio.paused)playVideo()};
       const playSound=()=>{
         if(s!==taleraInline||s.video!==video)return;
         Promise.resolve(audio.play()).then(()=>{
+          playVideo();
           if(s.hint){s.hint.remove();s.hint=null;s.blockedByBrowser=false}
         }).catch(e=>{
           if(e?.name==='NotSupportedError'){
             // Codec fallback is the original V9 audible-video behavior.
             s.closedAudioSoundtrack=false;
-            video.muted=false;video.defaultMuted=false;
+            video.muted=false;video.defaultMuted=false;video.removeAttribute('muted');
             video.onended=done;
             Promise.resolve(video.play()).catch(err=>{
               if(err?.name==='NotAllowedError')consent(video);

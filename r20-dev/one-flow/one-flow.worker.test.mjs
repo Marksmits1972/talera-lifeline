@@ -371,3 +371,64 @@ test('the native voice and audible-video permission prompts both use one clickab
   assert.ok(!patched.html.includes("hint.textContent='Tik op de foto om het geluid te starten';"));
   assert.equal(restoreApprovedV9(patched.html),nativePage);
 });
+
+test('visual-only swipe: existing V13 wheel becomes visible at the FIRST horizontal drag, never for taps or vertical motion',()=>{
+  const listeners=new Map(),styles=[],set=new Set();
+  const classes={add:name=>set.add(name),remove:name=>set.delete(name),
+    contains:name=>set.has(name)};
+  const document={hidden:false,body:{classList:classes},head:{appendChild:style=>styles.push(style)},
+    getElementById:id=>styles.find(x=>x.id===id)||null,
+    createElement:tag=>{assert.equal(tag,'style');return {id:'',textContent:''}},
+    addEventListener:(type,fn)=>{listeners.set(type,fn)}};
+  const window={__taleraBandRolling:false};
+  const env={document,window};
+  vm.runInNewContext(INLINE_TAIL,env);
+  assert.equal(styles.length,1);
+  assert.match(styles[0].textContent,/body\.talera-v61-narration-visual\.talera-unified-wheel-in-motion/);
+  assert.match(styles[0].textContent,/\.talera-photo-strip\.talera-wheel-strip\.is-visible/);
+  assert.match(styles[0].textContent,/display:block!important/);
+  const photo={closest:selector=>selector==='#memoryStoryScroll'?{}:null};
+  const button={closest:selector=>selector==='#memoryStoryScroll'||selector.includes('button,')?{}:null};
+  const evt=(id,x,y,target=photo)=>({pointerId:id,pointerType:'touch',isPrimary:true,
+    clientX:x,clientY:y,target});
+  const shown=()=>classes.contains('talera-unified-wheel-in-motion');
+  // Neither touching nor leaving a stationary finger should change visibility.
+  listeners.get('pointerdown')(evt(1,80,90));
+  window.__taleraBandRolling=true;
+  listeners.get('pointermove')(evt(1,85,92));
+  assert.equal(shown(),false,'subthreshold movement must not reveal wheel');
+  listeners.get('pointerup')(evt(1,85,92));
+  assert.equal(shown(),false,'stationary finger-up never reveals wheel');
+  // A vertical drag is not a timeline memory swipe.
+  listeners.get('pointerdown')(evt(2,80,90));
+  listeners.get('pointermove')(evt(2,94,125));
+  assert.equal(shown(),false,'vertical motion must not reveal wheel');
+  listeners.get('pointerup')(evt(2,94,125));
+  // Control gestures are excluded even if the finger moves far horizontally.
+  listeners.get('pointerdown')(evt(3,80,90,button));
+  listeners.get('pointermove')(evt(3,180,90,button));
+  assert.equal(shown(),false,'audio/playback buttons stay independent of wheel visual');
+  // The native wheel must be active: this is ONLY a visual overlay, not a motor.
+  window.__taleraBandRolling=false;
+  listeners.get('pointerdown')(evt(4,80,90));
+  listeners.get('pointermove')(evt(4,160,90));
+  assert.equal(shown(),false,'no wheel movement is fabricated');
+  // Native V13 is rolling. Reveal immediately at the 13px drag threshold.
+  window.__taleraBandRolling=true;
+  listeners.get('pointerdown')(evt(5,80,90));
+  listeners.get('pointermove')(evt(5,93,91));
+  assert.equal(shown(),true,'pre-existing wheel becomes visible during active drag');
+  listeners.get('pointerup')(evt(5,120,90));
+  assert.equal(shown(),true,'wheel stays visible through its native landing animation');
+  listeners.get('talera:wheel-motion')({detail:{active:false}});
+  assert.equal(shown(),false,'old narration frame returns when the existing wheel settles');
+  // Native document visibility / tab pause must not leave the strip exposed.
+  listeners.get('pointerdown')(evt(6,80,90));
+  listeners.get('pointermove')(evt(6,120,90));
+  assert.equal(shown(),true);
+  document.hidden=true;
+  listeners.get('visibilitychange')();
+  assert.equal(shown(),false);
+  assert.equal(typeof listeners.get('talera:enable-listening'),'function',
+    'working Beluister control is retained untouched');
+});

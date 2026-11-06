@@ -5,6 +5,16 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 const base='https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev';
+// Diagnostic of the REAL iPhone route versus the CI-tested presentation route.
+const routes=await Promise.all(['/mijn-leven','/present'].map(async(path)=>{
+ const response=await fetch(base+path);
+ const html=await response.text();
+ return {path,status:response.status,finalUrl:response.url,
+  marker:response.headers.get('x-talera-closed-core'),
+  hasPatchedCore:html.includes('TALERA_CLOSED_MEMORY_CORE_20261106'),
+  hasPlayButton:html.includes('talera-v61-inline-video'),length:html.length};
+}));
+console.log('IPHONE ROUTE COMPARISON',JSON.stringify(routes));
 const dir=process.env.TALERA_CDP_DIR;
 assert.ok(dir,'Chrome CDP profile required');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));

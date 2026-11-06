@@ -1,0 +1,53 @@
+{
+  "id": "TALERA-20261106-PROTOCOL",
+  "phase": "EXACT_BUILD",
+  "goal": "Leg het TALERA samenwerkingsprotocol in Drive en GitHub vast en voeg scopecontroles toe, zonder bestaande app-, presentatie-, media- of opslagcode te veranderen.",
+  "decision_source": "Gesprek 6 november 2026 in LIFELINE - PROJECT: gebruiker stemt in met doelbewaking en expliciete borging van vrijheid bij programmeren.",
+  "baseline": {
+    "repository": "Marksmits1972/talera-lifeline",
+    "commit": "e117272f8d02ee63b660962d57ceb11972be1699",
+    "acceptance_status": "Vastgestelde main-bron bij het aanmaken van de procesbranch; geen nieuwe app-acceptatie beweerd."
+  },
+  "protected_paths": [
+    "src/",
+    "r20-dev/",
+    "wrangler.jsonc",
+    "package.json",
+    "package-lock.json",
+    "test/"
+  ],
+  "allowed_files": [
+    "AGENTS.md",
+    "docs/TALERA_WORK_PROTOCOL_CURRENT.md",
+    "docs/work-orders/README.md",
+    "docs/work-orders/TALERA-20261106-PROTOCOL.json",
+    "scripts/check-talera-goal.mjs",
+    "scripts/check-talera-goal.test.mjs",
+    ".github/workflows/talera-goal-guard.yml"
+  ],
+  "critical_assumptions": [
+    {
+      "question": "Kunnen we het protocol zonder wijziging van TALERA-appcode registreren?",
+      "status": "VERIFIED",
+      "evidence": "Deze aparte GitHub-branch voegt alleen AGENTS, docs, work-order, scripts en GitHub workflow toe."
+    },
+    {
+      "question": "Kan een GitHub-check exact beoordelen of de app het gebruikersdoel bereikt?",
+      "status": "NOT_APPLICABLE",
+      "evidence": "Deze guard kan alleen diff-bestanden en velden verifiëren; echte UX-acceptatie staat expliciet buiten de checker."
+    },
+    {
+      "question": "Kunnen ChatGPT-projectinstructies rechtstreeks door GitHub of Google Drive worden ingesteld?",
+      "status": "NOT_APPLICABLE",
+      "evidence": "Projectinstructies worden door de gebruiker zelf in ChatGPT-projectinstellingen geplakt."
+    }
+  ],
+  "acceptance_tests": [
+    "Automatische tests tonen dat nieuwe codewijzigingen buiten de work-order worden afgewezen.",
+    "De PR bevat geen veranderingen aan src, r20-dev, wrangler, package of tests van de TALERA-app.",
+    "Het protocol bestaat leesbaar in Google Drive en als instructiebestand in de GitHub-branch.",
+    "Er is geen merge naar main en geen doelbewaking als definitief actief geclaimd vóór gebruikersakkoord."
+  ],
+  "rollback": "Sluit de concept-PR en laat de procesbranch ongemergd; app- en databaseversies blijven ongewijzigd.",
+  "user_acceptance": "PENDING"
+}

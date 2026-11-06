@@ -75,6 +75,170 @@ document.addEventListener('click',e=>{
   if(e.target?.closest?.('.talera-audio-consent,.talera-memory-audio'))taleraUnifiedPrimeCurrent();
 },true);
 document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);
+
+/* ONE cached cover for the FIRST chosen photo of each narrated memory.
+   The native V13 wheel reads previewImage. No timeline item or media change. */
+const taleraSwipeCovers=new Map();
+let taleraSwipeCoverDbPromise=null;
+function taleraSwipeCoverFirst(memory){
+  if(!memory?._taleraLocal||!memory._zeroItems?.some(x=>x.kind==='audio'))return null;
+  const visual=memory._zeroItems.filter(x=>x.kind==='photo'||x.kind==='video');
+  const cues=Array.isArray(memory._taleraNarrationCues)?memory._taleraNarrationCues.slice():[];
+  cues.sort((a,b)=>(Number(a?.t)||0)-(Number(b?.t)||0));
+  for(const cue of cues){
+    const x=typeof cue.mediaId==='string'?visual.find(item=>item.key===cue.mediaId):visual[Number(cue.index)];
+    if(x?.kind==='photo'&&x.key)return x;
+  }
+  return visual.find(x=>x.kind==='photo'&&x.key)||null;
+}
+function taleraSwipeCoverDB(){
+  if(taleraSwipeCoverDbPromise)return taleraSwipeCoverDbPromise;
+  taleraSwipeCoverDbPromise=new Promise(resolve=>{
+    try{
+      if(!window.indexedDB){resolve(null);return}
+      const r=window.indexedDB.open('talera-narrated-swipe-covers-v1',1);
+      r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('covers'))
+        r.result.createObjectStore('covers',{keyPath:'id'})};
+      r.onsuccess=()=>resolve(r.result);
+      r.onerror=()=>resolve(null);r.onblocked=()=>resolve(null);
+    }catch(e){resolve(null)}
+  });
+  return taleraSwipeCoverDbPromise;
+}
+async function taleraSwipeCoverRead(id){
+  const db=await taleraSwipeCoverDB();
+  if(!db)return null;
+  return new Promise(resolve=>{
+    try{
+      const r=db.transaction('covers','readonly').objectStore('covers').get(id);
+      r.onsuccess=()=>resolve(r.result||null);
+      r.onerror=()=>resolve(null);
+    }catch(e){resolve(null)}
+  });
+}
+async function taleraSwipeCoverSave(id,photoKey,blob){
+  const db=await taleraSwipeCoverDB();
+  if(!db)return;
+  await new Promise(resolve=>{
+    try{
+      const tx=db.transaction('covers','readwrite');
+      tx.oncomplete=resolve;tx.onerror=resolve;tx.onabort=resolve;
+      tx.objectStore('covers').put({id,photoKey,blob});
+    }catch(e){resolve()}
+  });
+}
+function taleraSwipeCoverApply(memory,photoKey,blob){
+  const entry=taleraSwipeCovers.get(memory.id);
+  if(!entry||entry.key!==photoKey||entry.url||
+     taleraSwipeCoverFirst(memory)?.key!==photoKey||!blob?.size)return;
+  const url=URL.createObjectURL(blob);
+  entry.url=url;
+  memory.previewImage=url;
+  // The V13 wheel may hold a different timeline object from the presenter.
+  const wheel=window.__taleraPhotoBook?.list?.().find(x=>x.id===memory.id);
+  if(wheel)wheel.previewImage=url;
+}
+function taleraSwipeCoverResize(src){
+  return new Promise(resolve=>{
+    if(!src){resolve(null);return}
+    const image=new Image();
+    let done=false;
+    const finish=blob=>{
+      if(done)return;
+      done=true;image.onload=null;image.onerror=null;resolve(blob||null);
+    };
+    image.onerror=()=>finish(null);
+    image.onload=()=>{
+      try{
+        const w=image.naturalWidth,h=image.naturalHeight;
+        if(!w||!h){finish(null);return}
+        const r=Math.min(1,720/Math.max(w,h));
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(w*r));
+        canvas.height=Math.max(1,Math.round(h*r));
+        const ctx=canvas.getContext('2d',{alpha:false});
+        if(!ctx){finish(null);return}
+        ctx.drawImage(image,0,0,canvas.width,canvas.height);
+        canvas.toBlob(finish,'image/jpeg',.76);
+      }catch(e){finish(null)}
+    };
+    image.decoding='async';image.src=src;
+    if(image.complete&&image.naturalWidth)image.onload();
+  });
+}
+function taleraSwipeCoverGenerate(memory,first,entry){
+  if(entry.creating||entry.url)return;
+  const frame=memory._zeroFrames?.find(x=>x.kind==='photo'&&x.key===first.key);
+  if(!frame?.url)return; // do not request/modify original media a second time
+  entry.creating=true;
+  const run=async()=>{
+    if(window.__taleraBandRolling||window.__taleraTimelineRuntime?.isMoving?.()){
+      setTimeout(run,200);return;
+    }
+    const blob=await taleraSwipeCoverResize(frame.url);
+    entry.creating=false;
+    if(!blob||taleraSwipeCovers.get(memory.id)!==entry)return;
+    taleraSwipeCoverApply(memory,first.key,blob);
+    // Cached locally once; a different first photo replaces the same entry.
+    void taleraSwipeCoverSave(memory.id,first.key,blob);
+  };
+  if(typeof window.requestIdleCallback==='function')
+    window.requestIdleCallback(run,{timeout:1600});
+  else setTimeout(run,350);
+}
+function taleraSwipeCoverEnsure(memory,create=false){
+  const first=taleraSwipeCoverFirst(memory);
+  if(!first)return;
+  let entry=taleraSwipeCovers.get(memory.id);
+  if(entry&&entry.key!==first.key){
+    if(memory.previewImage===entry.url)delete memory.previewImage;
+    if(entry.url)URL.revokeObjectURL(entry.url);
+    entry=null;
+  }
+  if(!entry){
+    entry={key:first.key,url:null,loading:false,checked:false,create:false,creating:false};
+    taleraSwipeCovers.set(memory.id,entry);
+  }
+  if(create)entry.create=true;
+  if(entry.checked){
+    if(entry.create&&!entry.url)taleraSwipeCoverGenerate(memory,first,entry);
+    return;
+  }
+  if(entry.loading)return;
+  entry.loading=true;
+  void taleraSwipeCoverRead(memory.id).then(saved=>{
+    if(taleraSwipeCovers.get(memory.id)!==entry)return;
+    entry.checked=true;entry.loading=false;
+    if(saved?.photoKey===first.key&&saved.blob?.size)
+      taleraSwipeCoverApply(memory,first.key,saved.blob);
+    else if(entry.create)taleraSwipeCoverGenerate(memory,first,entry);
+  }).catch(()=>{entry.checked=true;entry.loading=false;
+    if(entry.create)taleraSwipeCoverGenerate(memory,first,entry)});
+}
+function taleraSwipeCoverObserve(memories){
+  // Only nearby timeline items: no mass-loading thousands of phone photos.
+  const list=memories.slice().sort((a,b)=>a.ms-b.ms);
+  let lastId=null;
+  const inspect=()=>{
+    const current=window.__taleraTimelineRuntime?.currentMemory?.();
+    if(!current||current.id===lastId)return;
+    lastId=current.id;
+    let index=list.findIndex(x=>x.id===current.id);
+    if(index<0){
+      index=list.findIndex(x=>x.ms>=current.ms);
+      if(index<0)index=list.length-1;
+    }
+    for(let i=Math.max(0,index-5);i<=Math.min(list.length-1,index+5);i++)
+      taleraSwipeCoverEnsure(list[i]);
+  };
+  window.__taleraTimelineRuntime?.subscribe?.(inspect);
+  inspect();
+}
+if(typeof window!=='undefined'&&window.addEventListener)
+  window.addEventListener('pagehide',()=>{
+    for(const e of taleraSwipeCovers.values())if(e.url)URL.revokeObjectURL(e.url);
+    taleraSwipeCovers.clear();
+  },{once:true});
 /* VISUAL ONLY: approved V9 hides every photo-strip while narration owns
    the image. V13's ORIGINAL wheel still tracks the finger on every pointermove,
    but remains invisible until landing. Expose ONLY its already-moving strip
@@ -273,6 +437,13 @@ export function applyUnifiedTail(html){
   if(html.indexOf(INSERT_BEFORE)>=html.indexOf(AUDIO_END_BEFORE))return {html,status:'anchor-unmatched'};
   const at=html.indexOf(INSERT_BEFORE);
   let result=html.slice(0,at)+INLINE_TAIL+'\n'+html.slice(at);
+  // Add only two guarded hooks to the existing V9 presenter (not recorder).
+  const nativeCoverHydrated="loaded.set(memory.id,urls);";
+  const nativeCoverRegistered="runtime.registerMemories(memories);";
+  if(result.split(nativeCoverHydrated).length!==2||
+     result.split(nativeCoverRegistered).length!==2)return {html,status:'anchor-unmatched'};
+  result=result.replace(nativeCoverHydrated,nativeCoverHydrated+"taleraSwipeCoverEnsure(memory,true);");
+  result=result.replace(nativeCoverRegistered,nativeCoverRegistered+"taleraSwipeCoverObserve(memories);");
   // Target only the existing inline presenter, not its voice recorder.
   const nativeVideoStart=result.indexOf('function taleraInlinePlayMedia(s,frame,muted,finished){');
   const nativeVideoEnd=result.indexOf('function taleraInlineReplayNext(s){',nativeVideoStart);
@@ -320,6 +491,10 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
+    .replace("runtime.registerMemories(memories);taleraSwipeCoverObserve(memories);",
+      "runtime.registerMemories(memories);")
+    .replace("loaded.set(memory.id,urls);taleraSwipeCoverEnsure(memory,true);",
+      "loaded.set(memory.id,urls);")
     .replace("          const hint=taleraUnifiedCreateListeningButton(s);","          const hint=document.createElement('div');\n          hint.textContent='Tik op de foto om het geluid te starten';\n          hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';")
     .replace("    const hint=taleraUnifiedCreateListeningButton(s);","    const hint=document.createElement('div');\n    hint.className='talera-v61-audio-permission-hint';\n    hint.textContent='Tik op de foto om het geluid te starten';\n    hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';")
     .replace("  const retry=e=>{\n    const s=taleraInline;\n    if(s?.engine==='narrated')return;",

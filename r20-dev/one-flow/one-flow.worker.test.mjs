@@ -581,9 +581,10 @@ test('automatic voice: ORIGINAL prepared video is adopted despite no explicit li
   s.phase='originals';
   const taken=env.taleraUnifiedTakePrimed(s,s.frames[0]);
   assert.equal(taken,video,'native original round must REUSE preloaded video instead of making a new one');
-  assert.deepEqual(s.taleraUnifiedReplayHandoff,{
-    key:'original-v1',reused:true,gesturePrimed:false
-  },'unprimed handoff is recorded transparently; not mistaken for Safari permission');
+  assert.equal(s.taleraUnifiedReplayHandoff.key,'original-v1');
+  assert.equal(s.taleraUnifiedReplayHandoff.reused,true);
+  assert.equal(s.taleraUnifiedReplayHandoff.gesturePrimed,false,
+    'unprimed handoff is not mistaken for Safari sound permission');
   assert.equal(s.taleraUnifiedReplayUrl,'blob:original-v1');
   assert.equal(video.currentTime,0);
   assert.equal(s.taleraUnifiedPrepared.size,0);

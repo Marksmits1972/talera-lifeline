@@ -216,6 +216,8 @@ assert.equal(afterRealTap.id,'pwa:'+saved.id,'stationary tap must not navigate t
 assert.equal(afterRealTap.index,frozen.index,'stationary finger tap cannot step narrated photos');
 assert.ok(afterRealTap.prepared.every(Boolean),'stationary finger tap cannot start any prepared video');
 console.log('PASS real touch tap on narrated memory: no media stepping, no hidden video activation');
+assert.equal(await evaluate("document.body.classList.contains('talera-unified-wheel-in-motion')"),false,
+  'stationary tap must never reveal the wheel');
 
 await evaluate("(()=>{document.dispatchEvent(new Event('talera:enable-listening'));"+
 "const a=window.__taleraInlineSharedAudio;if(a.paused)a.play().catch(()=>{});})()");
@@ -228,12 +230,33 @@ assert.ok(from.w>150&&from.h>70,'native V9 story surface must have swipe area');
 await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
 const centerY=Math.round(from.y+from.h*.50);
 const x0=Math.round(from.x+from.w*.78), x1=Math.round(from.x+from.w*.22);
+const wheelBefore=await evaluate("(()=>{const b=document.querySelector('#photoStage .talera-photo-strip.talera-wheel-strip');"+
+"return b?{display:getComputedStyle(b).display,visible:b.classList.contains('is-visible')}:null})()");
+assert.ok(wheelBefore,'V13 original wheel must exist within native stage');
+assert.equal(wheelBefore.display,'none','narrated wheel remains hidden when not swiping');
 await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x0,y:centerY,id:11}]});
+assert.equal(await evaluate("document.body.classList.contains('talera-unified-wheel-in-motion')"),false,
+  'pointerdown alone is not a horizontal swipe');
+let movingWheel=null;
 for(let i=1;i<=8;i++){
  const x=Math.round(x0+(x1-x0)*i/8);
  await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:centerY,id:11}]});
  await sleep(25);
+ if(i===2){
+  movingWheel=await evaluate("(()=>{const b=document.querySelector('#photoStage .talera-photo-strip.talera-wheel-strip');const css=getComputedStyle(b);"+
+   "return {active:document.body.classList.contains('talera-unified-wheel-in-motion'),"+
+   "display:css.display,visibility:css.visibility,opacity:css.opacity,"+
+   "isVisible:b.classList.contains('is-visible'),pointer:css.pointerEvents};})()");
+  assert.equal(movingWheel.active,true,'narrated wheel becomes visible during finger movement, not after release');
+  assert.equal(movingWheel.isVisible,true,'the native V13 wheel is already active on pointerdown');
+  assert.notEqual(movingWheel.display,'none','the original wheel must NOT be display:none during finger movement');
+  assert.equal(movingWheel.visibility,'visible');
+  assert.ok(Number(movingWheel.opacity)>.95);
+  assert.equal(movingWheel.pointer,'none','moving wheel cannot hijack click or touch events');
+ }
 }
+assert.ok(movingWheel,'in-flight swipe state was measured');
+console.log('PASS visual under finger: original narrated wheel is visible BEFORE finger-up');
 await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id!=='+JSON.stringify('pwa:'+saved.id),100),
   'swipe must leave narrated memory, not step between its internal media');
@@ -244,6 +267,8 @@ const away=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentM
 assert.notEqual(away.id,'pwa:'+saved.id);
 assert.equal(away.voicePaused,true,'leaving story must pause speech');
 assert.equal(away.activeVideoCount,0,'leaving story must dispose current native inline video');
+assert.ok(await until("!document.body.classList.contains('talera-unified-wheel-in-motion')",80),
+  'visual swipe class must clear after native wheel landing');
 console.log('PASS real touch swipe while narrating: next WHOLE memory, previous voice stopped, no orphan video');
 // Navigate BACK using the same native V13 memory-wheel (no separate player).
 const rback=await evaluate("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+

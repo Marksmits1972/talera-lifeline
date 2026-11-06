@@ -490,13 +490,10 @@ assert.equal(adjacentPaint.wheelActive,true);
 await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 console.log('PASS native V13 drag: fully loaded neighbor preview fills its tile before finger-up; no reserved white slot');
 
-// Auto-continuation path: the voice starts with a browser-permitted playback
-// action but WITHOUT the consent button or talera:enable-listening event.
-// Strict Chrome requires user activation even for muted voice; the important
-// regression is that no explicit original-video priming has happened.
-// The preloaded original MUST still be adopted rather than replaced.
-// Autoplay policies may still reject sound for the next video; existing real
-// Beluister button must recover without touching the photo/swipe controls.
+// Auto-continuation: existing sound ON setting, no second consent click.
+// The audible WAV begins on the reusable native media element. When the
+// original video follows, its image and sound MUST use that SAME element.
+// Polls have userGesture:false so tests cannot authorize the video by reading it.
 const evaluateQuiet=(expression,awaitPromise=false)=>evaluate(expression,awaitPromise,false);
 const untilQuiet=async(expression,tries=240)=>{
  for(let i=0;i<tries;i++){
@@ -509,19 +506,19 @@ await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.
 assert.ok(await untilQuiet('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))',160),
  'auto-start scenario must load native voice and prewarmed original without a click');
 const autoStart=await evaluate("(async()=>{"+
-"const video=document.querySelector('video[style*=\"-9999px\"]');"+
-"video.dataset.autostartPrepared='yes';"+
-"const a=window.__taleraInlineSharedAudio;a.muted=true;"+
-"try{await a.play();return {ok:true,muted:a.muted}}catch(e){return {ok:false,error:e.name}}"+
+"const a=window.__taleraInlineSharedAudio;"+
+"a.dataset.autostartShared='yes';"+
+"a.muted=!window.__taleraAudioControls?.isEnabled?.();"+
+"try{await a.play();return {ok:true,muted:a.muted,shared:a.tagName}}catch(e){return {ok:false,error:e.name}}"+
 "})()",true);
 assert.equal(autoStart.ok,true,'voice must begin without clicking the consent button or priming originals');
-assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.dataset.autostartPrepared==="yes"',300),
- 'first original video MUST be SAME prepared element even with zero listening gestures');
+assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.dataset.autostartShared==="yes"',300),
+ 'first original video MUST share the authorized narrated WAV element without another gesture');
 const autoHandoff=await evaluateQuiet("(()=>{const video=document.querySelector('video.talera-v61-inline-video');"+
 "const hint=document.querySelector('button.talera-v61-audio-permission-hint');"+
-"return {reused:video?.dataset.autostartPrepared==='yes',paused:video?.paused,"+
+"return {reused:video?.dataset.autostartShared==='yes',paused:video?.paused,"+
 "muted:video?.muted,currentTime:video?.currentTime,blocked:!!hint};})()");
-assert.equal(autoHandoff.reused,true,'the existing preloaded original, not a new video');
+assert.equal(autoHandoff.reused,true,'the SAME narrated WAV element must be reused for original');
 if(autoHandoff.blocked){
  const coords=await evaluateQuiet("(()=>{const b=document.querySelector('button.talera-v61-audio-permission-hint');"+
 "const r=b.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()");
@@ -529,11 +526,11 @@ if(autoHandoff.blocked){
  await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:coords.x,y:coords.y,button:'left',clickCount:1});
  assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
   'real Beluister control resumes the SAME original after browser-level autoplay denial');
- console.log('PASS no-gesture auto start: same preloaded video adopted; Safari-style restriction recovered by existing Beluister button');
+ console.log('PASS voice-to-original shared media: browser restriction handled by existing Beluister button');
 }else{
  assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
   'if the browser grants automatic sound, the same preloaded original must actually advance');
- console.log('PASS no-gesture auto start: same preloaded video started automatically and progressed');
+ console.log('PASS voice-to-original shared media: original video advanced automatically with no extra action');
 }
 
 // Regression from iPhone: AFTER the LAST audible original video has finished,

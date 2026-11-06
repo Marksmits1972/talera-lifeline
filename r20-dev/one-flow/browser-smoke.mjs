@@ -212,13 +212,15 @@ const videoPlayback=await evaluate(`window.__oneFlowTest.videos.map(v=>({muted:v
 const narrated=videoPlayback.find(v=>v.muted&&v.at<result.voiceEndedAt);
 const replay=videoPlayback.find(v=>!v.muted&&v.at>remaining.at(-1).at);
 assert.ok(narrated,'narrated video exists and was muted');
+assert.ok(narrated.progress>.2,
+ 'REGRESSION: FIRST video at t=0 must actually PLAY muted during the voice, not merely appear as a paused frame or show Beluister');
 assert.ok(replay,'original native video replay starts AFTER the last remaining photo');
 assert.equal(replay.warmed,true,'native replay MUST reuse video authorized by the FIRST listener gesture');
 assert.ok(replay.progress>.6,'unmuted replay advanced from t=0');
 assert.ok(replay.duration>=1,'replay has the original full clip duration');
 assert.deepEqual(result.errors,[]);
 assert.equal(result.iframes,0);
-console.log('PASS browser playback round '+playbackRound+': silent narration -> remaining photos -> audible video from zero, no second Beluister');
+console.log('PASS browser playback round '+playbackRound+': FIRST narrated muted video ADVANCED ('+narrated.progress.toFixed(2)+'s), remaining photos, audible original video from zero, no second Beluister');
 }
 // Regression: a narrated story is ONE timeline item; photo taps do nothing,
 // and a real horizontal swipe leaves the whole active story (even mid-voice).

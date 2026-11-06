@@ -30,8 +30,8 @@ ws.addEventListener('message',e=>{
 const cmd=(method,params={})=>new Promise((resolve,reject)=>{
  const n=++id;requests.set(n,{resolve,reject});ws.send(JSON.stringify({id:n,method,params}));
 });
-const evaluate=async(expression,awaitPromise=false)=>{
- const r=await cmd('Runtime.evaluate',{expression,returnByValue:true,awaitPromise,userGesture:true});
+const evaluate=async(expression,awaitPromise=false,userGesture=true)=>{
+ const r=await cmd('Runtime.evaluate',{expression,returnByValue:true,awaitPromise,userGesture});
  if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);
  return r.result?.value;
 };
@@ -468,4 +468,49 @@ assert.equal(adjacentPaint.visibility,'visible','neighbor tile should never be h
 assert.equal(adjacentPaint.wheelActive,true);
 await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 console.log('PASS native V13 drag: fully loaded neighbor preview fills its tile before finger-up; no reserved white slot');
+
+// True automatic start path: NO gesture or listening event is issued. The
+// spoken voice is permitted in the test only because its element is MUTED;
+// the original video remains audible (enabled preference). The preloaded
+// video MUST be adopted, not replaced by an unprepared first-video element.
+// Autoplay policies may still reject audible sound; then the existing real
+// Beluister button must recover without touching the photo/swipe controls.
+const evaluateQuiet=(expression,awaitPromise=false)=>evaluate(expression,awaitPromise,false);
+const untilQuiet=async(expression,tries=240)=>{
+ for(let i=0;i<tries;i++){
+  if(await evaluateQuiet(expression))return true;
+  await sleep(80);
+ }
+ return false;
+};
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+assert.ok(await untilQuiet('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))',160),
+ 'auto-start scenario must load native voice and prewarmed original without a click');
+const autoStart=await evaluateQuiet("(async()=>{"+
+"const video=document.querySelector('video[style*=\"-9999px\"]');"+
+"video.dataset.autostartPrepared='yes';"+
+"const a=window.__taleraInlineSharedAudio;a.muted=true;"+
+"try{await a.play();return {ok:true,muted:a.muted}}catch(e){return {ok:false,error:e.name}}"+
+"})()",true);
+assert.equal(autoStart.ok,true,'muted automatic voice must begin without a synthetic user activation');
+assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.dataset.autostartPrepared==="yes"',300),
+ 'first original video MUST be SAME prepared element even with zero listening gestures');
+const autoHandoff=await evaluateQuiet("(()=>{const video=document.querySelector('video.talera-v61-inline-video');"+
+"const hint=document.querySelector('button.talera-v61-audio-permission-hint');"+
+"return {reused:video?.dataset.autostartPrepared==='yes',paused:video?.paused,"+
+"muted:video?.muted,currentTime:video?.currentTime,blocked:!!hint};})()");
+assert.equal(autoHandoff.reused,true,'the existing preloaded original, not a new video');
+if(autoHandoff.blocked){
+ const coords=await evaluateQuiet("(()=>{const b=document.querySelector('button.talera-v61-audio-permission-hint');"+
+"const r=b.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()");
+ await cmd('Input.dispatchMouseEvent',{type:'mousePressed',x:coords.x,y:coords.y,button:'left',clickCount:1});
+ await cmd('Input.dispatchMouseEvent',{type:'mouseReleased',x:coords.x,y:coords.y,button:'left',clickCount:1});
+ assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
+  'real Beluister control resumes the SAME original after browser-level autoplay denial');
+ console.log('PASS no-gesture auto start: same preloaded video adopted; Safari-style restriction recovered by existing Beluister button');
+}else{
+ assert.ok(await untilQuiet('document.querySelector("video.talera-v61-inline-video")?.currentTime>.25',80),
+  'if the browser grants automatic sound, the same preloaded original must actually advance');
+ console.log('PASS no-gesture auto start: same preloaded video started automatically and progressed');
+}
 ws.close();

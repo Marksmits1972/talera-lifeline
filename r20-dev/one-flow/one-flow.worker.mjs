@@ -117,6 +117,115 @@ export const CLOSED_COVER=String.raw`async function taleraClosedMakeCover(memory
   finally{if(src)URL.revokeObjectURL(src)}
 }`;
 
+export const CLOSED_MEDIA=String.raw`function taleraInlinePlayMedia(s,frame,muted,finished){
+  if(s!==taleraInline||!frame)return;
+  taleraInlineCleanVideo(s);
+  const serial=s.videoSerial;
+  const audioOwner=s.engine==='narrated'&&s.phase==='originals'&&s.audio&&!muted;
+  const video=document.createElement('video');
+  video.className='talera-v61-inline-video';
+  video.playsInline=true;video.setAttribute('playsinline','');video.setAttribute('webkit-playsinline','');
+  video.preload='auto';video.controls=false;
+  video.muted=muted||audioOwner;video.defaultMuted=muted||audioOwner;video.volume=1;
+  video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';
+  (stage.parentElement||stage).appendChild(video);
+  s.video=video;s.videoKey=frame.key;
+  let completed=false;
+  const done=()=>{
+    if(completed||s!==taleraInline||s.video!==video)return;
+    completed=true;finished?.();
+  };
+  const consent=(target)=>{
+    if(s.hint)return;
+    s.blockedByBrowser=true;
+    const button=document.createElement('button');
+    button.type='button';button.className='talera-v61-audio-permission-hint';
+    button.textContent='▶ Beluister';
+    button.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:65;padding:9px 15px;border:0;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:auto';
+    button.addEventListener('click',e=>{
+      e.preventDefault();e.stopPropagation();
+      Promise.resolve(target.play()).then(()=>{
+        if(s===taleraInline&&s.hint===button){
+          button.remove();s.hint=null;s.blockedByBrowser=false;
+        }
+      }).catch(()=>{});
+    });
+    (stage.parentElement||stage).appendChild(button);s.hint=button;
+  };
+  const playVideo=()=>{
+    if(s!==taleraInline||s.video!==video||!video.paused)return;
+    Promise.resolve(video.play()).then(()=>{
+      if(!audioOwner&&s.hint){s.hint.remove();s.hint=null}
+    }).catch(e=>{
+      if(e?.name==='NotAllowedError')consent(video);
+      else if(e?.name!=='AbortError')console.warn('TALERA videobeeld niet gestart',e);
+    });
+  };
+  video.onended=()=>{if(!audioOwner)done()};
+  video.onerror=()=>{
+    if(s!==taleraInline||s.video!==video)return;
+    console.warn('TALERA originele video niet afspeelbaar');
+    if(s.engine==='narrated')s.phase='error';else done();
+  };
+  void (async()=>{
+    try{
+      const url=await store.mediaUrl(frame.key);
+      if(s!==taleraInline||s.video!==video||s.videoSerial!==serial){
+        if(url)URL.revokeObjectURL(url);return;
+      }
+      if(!url)throw Error('Originele video ontbreekt');
+      s.videoUrl=url;video.src=url;
+      if(!audioOwner){
+        s.closedAudioSoundtrack=false;
+        video.onloadedmetadata=playVideo;
+        playVideo();
+        return;
+      }
+      // The SAME native audio element plays both the recorded WAV and the
+      // original video soundtrack. No second audible media permission needed.
+      // The native video plane displays the image muted, synced to this audio.
+      const audio=s.audio;
+      s.closedAudioSoundtrack=true;
+      audio.pause();audio.src=url;audio.muted=false;audio.volume=1;
+      audio.onended=done;
+      audio.onplay=playVideo;
+      audio.onpause=()=>{if(!audio.ended&&s===taleraInline&&s.video===video)video.pause()};
+      audio.ontimeupdate=()=>{
+        if(s!==taleraInline||s.video!==video||video.readyState<2||video.seeking)return;
+        const target=Math.max(0,Number(audio.currentTime)||0);
+        if(Math.abs((video.currentTime||0)-target)>.4){
+          try{video.currentTime=Math.min(target,Math.max(0,(video.duration||0)-.02))}catch(e){}
+        }
+      };
+      video.onloadedmetadata=playVideo;
+      const playSound=()=>{
+        if(s!==taleraInline||s.video!==video)return;
+        Promise.resolve(audio.play()).then(()=>{
+          if(s.hint){s.hint.remove();s.hint=null;s.blockedByBrowser=false}
+        }).catch(e=>{
+          if(e?.name==='NotSupportedError'){
+            // Codec fallback is the original V9 audible-video behavior.
+            s.closedAudioSoundtrack=false;
+            video.muted=false;video.defaultMuted=false;
+            video.onended=done;
+            Promise.resolve(video.play()).catch(err=>{
+              if(err?.name==='NotAllowedError')consent(video);
+              else console.warn('TALERA geluid niet gestart',err);
+            });
+          }else if(e?.name==='NotAllowedError')consent(audio);
+          else console.warn('TALERA geluid niet gestart',e);
+        });
+      };
+      playVideo();playSound();
+    }catch(e){
+      if(s===taleraInline&&s.video===video){
+        console.warn('TALERA videobestand niet beschikbaar',e);
+        if(s.engine==='narrated')s.phase='error';else done();
+      }
+    }
+  })();
+}`;
+
 export function applyClosedCore(html){
   if(typeof html!=='string')return {html,status:'not-html'};
   if(html.includes(CORE_MARKER))return {html,status:'already-installed'};
@@ -162,6 +271,23 @@ export function applyClosedCore(html){
   const withCover=once(result,nativeHydrate,CLOSED_COVER+'\n'+nativeHydrate);
   if(withCover===null)return {html,status:'anchor-unmatched:cover-decoder'};
   result=withCover;
+  // One native video surface, but the existing WAV audio element also
+  // plays every original video's sound. The video itself remains muted.
+  const videoStart='function taleraInlinePlayMedia(s,frame,muted,finished){';
+  const videoEnd='function taleraInlineReplayNext(s){';
+  const changedVideo=block(result,videoStart,videoEnd,CLOSED_MEDIA);
+  if(changedVideo===null)return {html,status:'anchor-unmatched:video-core'};
+  result=changedVideo;
+  const originalSettings="      else if(s.phase==='originals'&&s.video){\n        s.video.muted=!enabled();\n        if(s.video.paused)void s.video.play().catch(err=>{\n          if(err?.name==='NotAllowedError'&&enabled())informGesture(s);\n        });\n      }";
+  const closedSettings="      else if(s.phase==='originals'&&s.video){\n        if(s.closedAudioSoundtrack){\n          s.video.muted=true;s.audio.muted=!enabled();\n          if(s.audio.paused)void s.audio.play().catch(err=>{if(err?.name==='NotAllowedError'&&enabled())informGesture(s)});\n        }else{\n          s.video.muted=!enabled();\n          if(s.video.paused)void s.video.play().catch(err=>{if(err?.name==='NotAllowedError'&&enabled())informGesture(s)});\n        }\n      }";
+  const settings=once(result,originalSettings,closedSettings);
+  if(settings===null)return {html,status:'anchor-unmatched:settings'};
+  result=settings;
+  const originalVisibility="    }else if(s.engine==='narrated'&&s.phase==='narration')tryVoice(s);\n    else if(s.video?.paused&&!s.video.ended)void s.video.play().catch(()=>{});";
+  const closedVisibility="    }else if(s.engine==='narrated'&&s.phase==='narration')tryVoice(s);\n    else if(s.phase==='originals'&&s.closedAudioSoundtrack){\n      if(s.audio?.paused&&!s.audio.ended)void s.audio.play().catch(()=>{});\n      if(s.video?.paused&&!s.video.ended)void s.video.play().catch(()=>{});\n    }else if(s.video?.paused&&!s.video.ended)void s.video.play().catch(()=>{});";
+  const visibility=once(result,originalVisibility,closedVisibility);
+  if(visibility===null)return {html,status:'anchor-unmatched:visibility'};
+  result=visibility;
   // The native functions are edited IN PLACE; no event listeners, hidden
   // media elements, iframe players, alternate photo wheels, or tail adapters.
   result=result.replace(voiceStart,CLOSED_VOICE_END.slice(0,voiceStart.length));

@@ -523,4 +523,73 @@ if(autoHandoff.blocked){
   'if the browser grants automatic sound, the same preloaded original must actually advance');
  console.log('PASS no-gesture auto start: same preloaded video started automatically and progressed');
 }
+
+// Regression from iPhone: AFTER the LAST audible original video has finished,
+// the narrated memory is still ONE CLOSED MEMORY. Native RH19 must not
+// advance its internal photos when the finger taps or swipes. V13 must choose
+// exactly one adjacent memory, not a media frame from inside the narration.
+await cmd('Page.navigate',{url:base+'/present?memory='+encodeURIComponent(saved.id)});
+assert.ok(await until('Boolean(window.__taleraInlineSharedAudio?.src)&&Boolean(document.querySelector(\'video[style*="-9999px"]\'))',180),
+  'post-original swipe regression must load complete narrated memory');
+await evaluate("(()=>{"+
+"window.__taleraPostVideoEnded=false;window.__taleraPostVideoCount=0;"+
+"const observed=new WeakSet();"+
+"const timer=setInterval(()=>{"+
+" for(const v of document.querySelectorAll('video.talera-v61-inline-video')){"+
+"  if(v.muted||observed.has(v))continue;observed.add(v);"+
+"  window.__taleraPostVideoCount++;"+
+"  v.addEventListener('ended',()=>{window.__taleraPostVideoEnded=true},{once:true});"+
+" }"+
+" if(window.__taleraPostVideoEnded)clearInterval(timer);"+
+"},25);"+
+"const consent=document.querySelector('button.talera-audio-consent');"+
+"if(consent&&!consent.hidden)consent.click();"+
+"else document.dispatchEvent(new Event('talera:enable-listening'));"+
+"const a=window.__taleraInlineSharedAudio;if(a.paused)a.play().catch(()=>{});"+
+"})()");
+assert.ok(await until('window.__taleraPostVideoEnded===true',380),
+  'the last original video must actually finish before checking the closed memory');
+await sleep(220);
+assert.equal(await evaluate("document.querySelectorAll('video.talera-v61-inline-video').length"),0,
+  'final video has finished and native presenter is fully settled');
+const afterVideo=await evaluate("(()=>{const r=window.__taleraTimelineRuntime;"+
+"const m=r.currentMemory(),b=window.__taleraPhotoBook;const list=b.list(),idx=list.findIndex(x=>x.id===m.id);"+
+"const rect=document.getElementById('memoryStoryScroll').getBoundingClientRect();"+
+"return {id:m.id,frameIndex:m._photoIndex,photoCount:m.photos.length,"+
+"narrated:m._zeroItems.some(x=>x.kind==='audio'),"+
+"index:idx,totalEntries: list.filter(x=>x.id===m.id).length,"+
+"next: list[idx+1]?.id||null,rect:{x:rect.x,y:rect.y,w:rect.width,h:rect.height}};})()");
+assert.equal(afterVideo.id,'pwa:'+saved.id);
+assert.equal(afterVideo.narrated,true);
+assert.equal(afterVideo.totalEntries,1,'whole story is stored in exactly ONE V13 memory slot');
+assert.ok(afterVideo.photoCount>3);
+assert.ok(afterVideo.next,'a neighboring complete memory is needed to verify swipe');
+await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+const tapX=Math.round(afterVideo.rect.x+afterVideo.rect.w*.5);
+const tapY=Math.round(afterVideo.rect.y+afterVideo.rect.h*.5);
+await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tapX,y:tapY,id:51}]});
+await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+await sleep(250);
+const afterTap=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
+"return {id:m.id,frameIndex:m._photoIndex,photoCount:m.photos.length};})()");
+assert.equal(afterTap.id,afterVideo.id,'touch AFTER final video may not select a different memory');
+assert.equal(afterTap.frameIndex,afterVideo.frameIndex,
+  'touch AFTER final video may not advance any internal narrated photo');
+const x0=Math.round(afterVideo.rect.x+afterVideo.rect.w*.8),
+      x1=Math.round(afterVideo.rect.x+afterVideo.rect.w*.2);
+await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x0,y:tapY,id:52}]});
+for(let i=1;i<=8;i++){
+ const x=Math.round(x0+(x1-x0)*i/8);
+ await cmd('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:tapY,id:52}]});
+ await sleep(25);
+}
+await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+assert.ok(await until('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(afterVideo.next),100),
+  'swipe AFTER last original video must move directly to NEXT WHOLE memory');
+const selectedAfter=await evaluate("(()=>{const b=window.__taleraPhotoBook,m=window.__taleraTimelineRuntime.currentMemory();"+
+"return {id:m.id,index:b.state().index,bookId:b.list()[b.state().index]?.id};})()");
+assert.equal(selectedAfter.id,afterVideo.next);
+assert.equal(selectedAfter.bookId,selectedAfter.id,
+  'visible V13 wheel and selected memory must agree after post-video swipe');
+console.log('PASS post-original VIDEO seal: stationary touch cannot change narrated photo; horizontal swipe moves ONE WHOLE memory');
 ws.close();

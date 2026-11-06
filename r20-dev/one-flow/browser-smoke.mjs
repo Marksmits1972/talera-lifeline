@@ -133,10 +133,10 @@ console.log('PASS ONE complete memory, stable cover, no hidden second player, co
 const installTrace=()=>{
  const statement="(()=>{"+
  "const a=window.__taleraInlineSharedAudio,m=window.__taleraTimelineRuntime.currentMemory();"+
- "const t={voice:0,silent:0,original:0,originalEnded:false,originalStarts:0,voiceEndedAt:0,"+
+ "const t={voice:0,silent:0,original:0,originalEnded:false,originalStarts:0,voiceEndedAt:0,voiceSrc:a.src,soundtrackAudible:false,"+
  "frames:[],last:-1,start:performance.now(),hintCount:0};"+
  "const seen=new WeakSet();window.__taleraClosedTrace=t;"+
- "t.timer=setInterval(()=>{"+
+ "a.addEventListener('ended',()=>{if(!t.voiceEndedAt)t.voiceEndedAt=performance.now()},{once:true});t.timer=setInterval(()=>{"+
  "if(window.__taleraClosedTrace!==t){clearInterval(t.timer);return}"+
  "const mem=window.__taleraTimelineRuntime.currentMemory(),now=performance.now();"+
  "if(mem?.id!==m.id){clearInterval(t.timer);return}"+
@@ -144,7 +144,7 @@ const installTrace=()=>{
  "if(a.ended&&!t.voiceEndedAt)t.voiceEndedAt=now;"+
  "if(mem._photoIndex!==t.last){t.last=mem._photoIndex;t.frames.push({index:t.last,at:now})}"+
  "for(const v of document.querySelectorAll('video.talera-v61-inline-video')){"+
- "if(v.muted){if(!a.ended&&mem._photoIndex===0)t.silent=Math.max(t.silent,v.currentTime||0)}"+
+ "if(v.muted){if(!t.voiceEndedAt&&mem._photoIndex===0)t.silent=Math.max(t.silent,v.currentTime||0);if(t.voiceEndedAt&&a.src!==t.voiceSrc){t.soundtrackAudible=t.soundtrackAudible||!a.muted;t.original=Math.max(t.original,a.currentTime||0);if(!seen.has(v)){seen.add(v);t.originalStarts++;v.addEventListener('ended',()=>{t.originalEnded=true},{once:true})}}}"+
  "else{t.original=Math.max(t.original,v.currentTime||0);"+
  "if(!seen.has(v)){seen.add(v);t.originalStarts++;v.addEventListener('ended',()=>{t.originalEnded=true},{once:true})}}}"+
  "if(document.querySelector('button.talera-v61-audio-permission-hint'))t.hintCount++;"+
@@ -188,10 +188,11 @@ for(let round=1;round<=3;round++){
  const out=await quiet("(()=>{const t=window.__taleraClosedTrace,m=window.__taleraTimelineRuntime.currentMemory();"+
  "clearInterval(t.timer);return{id:m.id,cover:m.previewImage,first:m.photos[0],index:m._photoIndex,"+
  "voice:t.voice,silent:t.silent,original:t.original,ended:t.originalEnded,frames:t.frames,"+
- "originalStarts:t.originalStarts,hints:t.hintCount}})()");
+ "originalStarts:t.originalStarts,hints:t.hintCount,soundtrackAudible:t.soundtrackAudible}})()");
  assert.equal(out.id,idOfStory);
  assert.equal(out.cover,out.first,'the wheel cover must NOT change to an internal photo');
  assert.equal(out.originalStarts,1,'each original plays once, no duplicate video round');
+ assert.equal(out.soundtrackAudible,true,'the reused WAV audio element owns audible video soundtrack');
  const tailFrames=out.frames.filter(x=>[3,4,5].includes(x.index));
  assert.equal(tailFrames.length,3,'exactly three unshown photos, none skipped or repeated');
  for(let i=1;i<tailFrames.length;i++){
@@ -199,7 +200,7 @@ for(let round=1;round<=3;round++){
   assert.ok(diff>3300&&diff<5000,'each unseen photo lasts 4sec, delta='+diff);
  }
  console.log('PASS CLOSED STORY round '+round+' voice '+out.voice.toFixed(1)+'s, muted video '+out.silent.toFixed(1)+
-  's, 3x4sec photos, original video '+out.original.toFixed(1)+'s');
+  's, 3x4sec photos, original audio-on-same-WAV-player '+out.original.toFixed(1)+'s');
  const rect=await quiet("(()=>{const r=document.getElementById('memoryStoryScroll').getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}})()");
  const tx=Math.round(rect.x+rect.w/2),ty=Math.round(rect.y+rect.h/2);
  await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});

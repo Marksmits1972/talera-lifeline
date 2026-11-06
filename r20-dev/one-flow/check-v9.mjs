@@ -48,6 +48,10 @@ const needles=[
 const locs=Object.fromEntries(needles.map(needle=>[needle,actual.indexOf(needle)]));
 const attempted=applyClosedCore(actual);
 const scriptCount=(actual.split('<script').length-1);
+const scriptHeads=actual.split('<script').slice(1).map(s=>s.slice(0,s.indexOf('>')).trim().slice(0,220));
+const probes=['Beluister','beluister','play()','play(','autoplay','playsinline','video','Video','onclick','media','iframe','src=','import(','<button','controls'];
+const probeReport=Object.fromEntries(probes.map(needle=>{const pos=actual.indexOf(needle);return [needle,{at:pos,context:pos<0?'':actual.slice(Math.max(0,pos-160),pos+360)}]}));
+console.log('MYN_LEVEN_DEEP_SOURCE',JSON.stringify({scripts:scriptHeads,probes:probeReport}));
 console.log('MYN_LEVEN_CODE_AUDIT',JSON.stringify({status:actualRes.status,
  bytes:actual.length,url:actualRes.url,patchStatus:attempted.status,
  title:actual.includes('<title>')?actual.split('<title>')[1].split('</title>')[0]:null,

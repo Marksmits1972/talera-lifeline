@@ -13,6 +13,13 @@ on:
 permissions:
   contents: read
 jobs:
+  route_audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only source inspection for actual mijn-leven route
+        run: node r20-dev/one-flow/check-v9.mjs
   stage:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

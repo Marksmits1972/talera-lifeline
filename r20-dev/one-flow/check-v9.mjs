@@ -51,6 +51,17 @@ const scriptCount=(actual.split('<script').length-1);
 const scriptHeads=actual.split('<script').slice(1).map(s=>s.slice(0,s.indexOf('>')).trim().slice(0,220));
 const probes=['Beluister','beluister','play()','play(','autoplay','playsinline','video','Video','onclick','media','iframe','src=','import(','<button','controls'];
 const probeReport=Object.fromEntries(probes.map(needle=>{const pos=actual.indexOf(needle);return [needle,{at:pos,context:pos<0?'':actual.slice(Math.max(0,pos-160),pos+360)}]}));
+const iframeKeys=['talera-zero-present-frame','createElement(\'iframe\')','createElement("iframe")','/present?','/present','contentWindow','frame.src','iframe.src','taleraZero','new URL('];
+const iframeSpots={};
+for(const key of iframeKeys){
+ let at=0,found=[],count=0;
+ while((at=actual.indexOf(key,at))>=0&&count<16){
+  found.push({at,near:actual.slice(Math.max(0,at-270),Math.min(actual.length,at+480))});
+  at+=key.length;count++;
+ }
+ iframeSpots[key]=found;
+}
+console.log('MYN_LEVEN_IFRAME_BINDINGS',JSON.stringify(iframeSpots));
 const relevantTags=['talera-v8-handoff-script','talera-v18-phases-js','talera-flow-v16','talera-flow-v17-time'];
 for(const id of relevantTags){
  const start=actual.indexOf('<script id="'+id+'"');

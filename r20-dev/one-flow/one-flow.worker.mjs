@@ -47,6 +47,10 @@ async function taleraUnifiedWarmVideos(s){
 function taleraUnifiedPrimeCurrent(){
   const s=taleraInline;
   if(!s||s.engine!=='narrated'||!s.taleraUnifiedPrepared||s.phase==='done')return;
+  // With normal autoplay+sound ON, the actual WAV and original clips share
+  // the same native VIDEO element. No hidden second video needs 'unlocking'.
+  // Keep legacy priming only for fallback / older media elements.
+  if(s.audio?.tagName==='VIDEO')return;
   for(const entry of s.taleraUnifiedPrepared.values()){
     if(entry.primed||entry.pending)continue;
     entry.pending=true;

@@ -236,6 +236,12 @@ console.log('PASS whole memory seal: image tap ignored, all preloaded originals 
 // pointerdown/up; it still must not invoke any narrated media frame or play().
 await cmd('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
 // Freeze narration: an automatic cue at 1.2s is not evidence of a tap.
+const stateBeforeTap=await evaluate("(()=>{const rt=window.__taleraTimelineRuntime,b=window.__taleraPhotoBook,"+
+"bs=b?.state?.(),entries=b?.list?.();const wh=window.__taleraIntegratedBand?.getState?.();"+
+"return {current:rt?.currentMemory?.()?.id,index:bs?.index,bookSelected:entries?.[bs?.index]?.id,"+
+"wheel:wh,visible:document.body.classList.contains('talera-unified-wheel-in-motion'),"+
+"cover:!!rt?.currentMemory?.()?.previewImage};})()");
+console.log('COVER_TAP_BEFORE',JSON.stringify(stateBeforeTap));
 const frozen=await evaluate("(()=>{window.__taleraInlineSharedAudio?.pause();"+
 "const m=window.__taleraTimelineRuntime.currentMemory();return {id:m.id,index:m._photoIndex};})()");
 const tapX=Math.round(initial.storyRect.x+initial.storyRect.w*.5),
@@ -243,6 +249,11 @@ const tapX=Math.round(initial.storyRect.x+initial.storyRect.w*.5),
 await cmd('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tapX,y:tapY,id:9}]});
 await cmd('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 await sleep(1100);
+const stateAfterTap=await evaluate("(()=>{const rt=window.__taleraTimelineRuntime,b=window.__taleraPhotoBook,"+
+"bs=b?.state?.(),entries=b?.list?.();const wh=window.__taleraIntegratedBand?.getState?.();"+
+"return {current:rt?.currentMemory?.()?.id,index:bs?.index,bookSelected:entries?.[bs?.index]?.id,"+
+"wheel:wh,visible:document.body.classList.contains('talera-unified-wheel-in-motion')};})()");
+console.log('COVER_TAP_AFTER',JSON.stringify(stateAfterTap));
 const afterRealTap=await evaluate("(()=>{const m=window.__taleraTimelineRuntime.currentMemory();"+
 "return {id:m.id,index:m._photoIndex,prepared:Array.from(document.querySelectorAll('video[style*=\"-9999px\"]')).map(v=>v.paused)};})()");
 assert.equal(afterRealTap.id,'pwa:'+saved.id,'stationary tap must not navigate to a different memory');

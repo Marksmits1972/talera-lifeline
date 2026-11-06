@@ -638,11 +638,11 @@ test('native originals keep the exact SAME blob URL instead of reassigning it an
 test('narrated story remains ONE sealed memory after the FINAL video, not only while voice plays',()=>{
   const patched=applyUnifiedTail(nativePage);
   assert.equal(patched.status,'installed');
-  const guarded="function showPhoto(memory,index,manual=false){\\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;";
+  const guarded="function showPhoto(memory,index,manual=false){"+String.fromCharCode(10)+"    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;";
   assert.ok(patched.html.includes(guarded),
     'manual RH19 photo stepping must be denied for narrated memory even after original video');
   const first=patched.html.indexOf('function showPhoto(memory,index,manual=false){');
-  const end=patched.html.indexOf('}\\n',first);
+  const end=patched.html.indexOf('}'+String.fromCharCode(10),first);
   const fn=patched.html.slice(first,end+1);
   assert.ok(first>0&&end>first);
   const env={};vm.runInNewContext(fn,env);

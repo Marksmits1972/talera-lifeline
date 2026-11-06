@@ -5,6 +5,11 @@ on:
     paths:
       - 'r20-dev/real-pwa-ios-import/**'
       - '.github/workflows/talera-real-pwa-ios-import.yml'
+  pull_request:
+    branches: [feature/clean-one-memory-flow-20261105]
+    paths:
+      - 'r20-dev/real-pwa-ios-import/**'
+      - '.github/workflows/talera-real-pwa-ios-import.yml'
   workflow_dispatch:
 permissions:
   contents: read

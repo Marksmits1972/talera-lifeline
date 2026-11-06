@@ -17,7 +17,7 @@ const nativePage='<html><script>'+
   'function taleraInlineSetFrame(s,index){}'+
   "function taleraInlinePlayMedia(s,frame,muted,finished){"+
   "const video=document.createElement('video');"+
-  "async function load(){const url=await store.mediaUrl(frame.key);}\n"+nativeVideoHint+"\n}"+
+  "async function load(){const url=await store.mediaUrl(frame.key);s.videoUrl=url;video.src=url;}\n"+nativeVideoHint+"\n}"+
   'function taleraInlineCleanVideo(s){}'+
   'function taleraInlineReplayNext(s){}'+
   INSERT_BEFORE+'}'+
@@ -557,4 +557,75 @@ test('video cover uses exact first decoded video frame, entirely muted, never pl
   assert.equal(calls.filter(c=>c==='load').length,2,'decoder loads and disposes exactly once');
   assert.equal(calls.filter(c=>c.startsWith('jpeg:')).length,1);
   assert.ok(!calls.includes('play'));
+});
+
+test('automatic voice: ORIGINAL prepared video is adopted despite no explicit listening gesture',async()=>{
+  const events=[],revoked=[];
+  const s={frames:[{kind:'video',key:'original-v1'}],engine:'narrated',phase:'narration'};
+  const video={
+    style:{},paused:true,currentTime:0,muted:false,volume:0,
+    setAttribute(){},load(){events.push('loaded')},
+    play(){events.push('play');this.paused=false;return Promise.resolve()},
+    pause(){events.push('pause');this.paused=true},
+    removeAttribute(){events.push('removeAttribute')},remove(){events.push('remove')}
+  };
+  const env={taleraInline:s,document:{addEventListener(){},createElement:tag=>{
+    assert.equal(tag,'video');return video
+  }},stage:{appendChild(){}},console:{warn(){}},
+    URL:{revokeObjectURL:url=>revoked.push(url)},
+    store:{mediaUrl:async()=> 'blob:original-v1'}};
+  vm.runInNewContext(INLINE_TAIL,env);
+  await env.taleraUnifiedWarmVideos(s);
+  assert.equal(events.filter(e=>e==='play').length,0,
+    'unprompted automatic narration must NOT start silent/hidden video as a second player');
+  s.phase='originals';
+  const taken=env.taleraUnifiedTakePrimed(s,s.frames[0]);
+  assert.equal(taken,video,'native original round must REUSE preloaded video instead of making a new one');
+  assert.deepEqual(s.taleraUnifiedReplayHandoff,{
+    key:'original-v1',reused:true,gesturePrimed:false
+  },'unprimed handoff is recorded transparently; not mistaken for Safari permission');
+  assert.equal(s.taleraUnifiedReplayUrl,'blob:original-v1');
+  assert.equal(video.currentTime,0);
+  assert.equal(s.taleraUnifiedPrepared.size,0);
+  env.taleraUnifiedDropPrepared(s);
+  assert.deepEqual(revoked,[],'original native video now owns its source URL');
+});
+
+test('a delayed Safari prime promise cannot pause the already-adopted original video',async()=>{
+  let resolveStart;const events=[];
+  const video={style:{},paused:true,currentTime:0,
+    setAttribute(){},load(){},
+    play(){events.push('prime');this.paused=false;
+      return new Promise(resolve=>{resolveStart=resolve})},
+    pause(){events.push('pause');this.paused=true},
+    removeAttribute(){},remove(){}};
+  const s={frames:[{kind:'video',key:'clip'}],phase:'narration',engine:'narrated'};
+  const handlers=new Map();
+  const env={taleraInline:s,document:{addEventListener:(name,fn)=>handlers.set(name,fn),
+    createElement:()=>video},stage:{appendChild(){}},console:{warn(){}},
+    URL:{revokeObjectURL(){}},store:{mediaUrl:async()=> 'blob:clip'}};
+  vm.runInNewContext(INLINE_TAIL,env);
+  await env.taleraUnifiedWarmVideos(s);
+  handlers.get('talera:enable-listening')();
+  assert.deepEqual(events,['prime']);
+  s.phase='originals';
+  assert.equal(env.taleraUnifiedTakePrimed(s,s.frames[0]),video);
+  const pauseCount=events.filter(e=>e==='pause').length;
+  video.paused=false; // original V9 replay has now started in the SAME video
+  resolveStart();
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.equal(events.filter(e=>e==='pause').length,pauseCount,
+    'resolved prewarm must never stop a video already adopted by original replay');
+  assert.equal(video.paused,false);
+});
+
+test('native originals keep the exact SAME blob URL instead of reassigning it and losing Safari activation',()=>{
+  const patched=applyUnifiedTail(nativePage);
+  assert.equal(patched.status,'installed');
+  assert.ok(patched.html.includes('s.videoUrl=url;if(video.src!==url)video.src=url;'),
+    'setting src on an already prepared media element is a fresh resource load');
+  assert.ok(patched.html.includes('taleraUnifiedTakePrimed(s,frame)||document.createElement(\'video\')'),
+    'ordinary player unchanged; narrated originals may reuse their prepared video');
+  assert.equal(restoreApprovedV9(patched.html),nativePage,
+    'approved V9 must remain byte-for-byte reversible');
 });

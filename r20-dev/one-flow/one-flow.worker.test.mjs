@@ -444,7 +444,7 @@ test('visual-only swipe: existing V13 wheel becomes visible at the FIRST horizon
     'working Beluister control is retained untouched');
 });
 
-test('cover is ONLY for narrated memories, selects the first actually narrated photo, never a video',()=>{
+test('cover is ONLY for narrated memories, selects first visual cue EVEN IF VIDEO',()=>{
   const env={document:{addEventListener(){}},window:{},URL:{createObjectURL:()=> 'blob:cover'}};
   vm.runInNewContext(INLINE_TAIL,env);
   const regular={id:'pwa:normal',_taleraLocal:true,
@@ -454,11 +454,15 @@ test('cover is ONLY for narrated memories, selects the first actually narrated p
     {kind:'video',key:'silent-video'},{kind:'photo',key:'first-photo'},
     {kind:'photo',key:'later-photo'},{kind:'audio',key:'voice'}
   ],_taleraNarrationCues:[{t:2500,index:2},{t:1200,index:1},{t:0,index:0}]};
-  assert.equal(env.taleraSwipeCoverFirst(narrated).key,'first-photo');
+  assert.equal(env.taleraSwipeCoverFirst(narrated).key,'silent-video');
+  assert.equal(env.taleraSwipeCoverFirst(narrated).kind,'video');
+  // The still is an artifact of the video frame 0, not the second photo.
   assert.equal(narrated.previewImage,undefined,'the selection does not add a new photo');
   const changed={...narrated,_taleraNarrationCues:[{t:0,mediaId:'later-photo',index:2}]};
   assert.equal(env.taleraSwipeCoverFirst(changed).key,'later-photo',
-    'new first selected photo invalidates prior cover key');
+    'new opening visual must invalidate old video-frame cover');
+  assert.equal(env.taleraSwipeCoverFirst({...narrated,_taleraNarrationCues:[]}).key,
+    'silent-video','older stories without cues start with first original media frame');
 });
 
 test('exact existing V9 hooks are required; cached cover never enters the ordinary media sequence',()=>{
@@ -509,4 +513,48 @@ test('wheel refresh only when narrated cover changes; ordinary images remain unc
   assert.equal(env.check(same,0,{_zeroItems:[{kind:'audio'}],previewImage:'blob:old'}),undefined,
     'same narrated cover is already ready and requires no repaint');
   assert.equal(restoreApprovedV9(p.html),nativePage);
+});
+
+test('video cover uses exact first decoded video frame, entirely muted, never plays video',async()=>{
+  const calls=[],still={size:12500,type:'image/jpeg'};
+  const video={
+    readyState:2,videoWidth:1280,videoHeight:720,duration:2,
+    currentTime:0,playsInline:false,muted:false,defaultMuted:false,
+    setAttribute(k){calls.push('attribute:'+k)},
+    pause(){calls.push('pause')},
+    removeAttribute(k){calls.push('removed:'+k)},
+    load(){
+      calls.push('load');
+      if(this.src&&this.onloadedmetadata)this.onloadedmetadata();
+    },
+    play(){throw Error('video preview MAY NOT autoplay')}
+  };
+  const canvas={width:0,height:0,
+    getContext(){return {drawImage:(source,x,y,w,h)=>{
+      assert.equal(source,video);calls.push('draw:'+source.currentTime+':'+w+'x'+h);
+    }}},
+    toBlob(callback,type,quality){calls.push('jpeg:'+type+':'+quality);callback(still)}
+  };
+  const env={window:{},document:{
+    addEventListener(){},
+    createElement(tag){
+      if(tag==='video')return video;
+      if(tag==='canvas')return canvas;
+      throw Error(tag)
+    }
+  },setTimeout,clearTimeout};
+  vm.runInNewContext(INLINE_TAIL,env);
+  const output=await env.taleraSwipeCoverVideoFrame('blob:original-video');
+  assert.equal(output,still);
+  assert.equal(video.muted,true);
+  assert.equal(video.defaultMuted,true);
+  assert.equal(video.playsInline,true);
+  assert.equal(video.currentTime,0);
+  assert.equal(canvas.width,720);
+  assert.equal(canvas.height,405);
+  assert.ok(calls.includes('draw:0:720x405'));
+  assert.equal(calls.filter(c=>c==='pause').length,1);
+  assert.equal(calls.filter(c=>c==='load').length,2,'decoder loads and disposes exactly once');
+  assert.equal(calls.filter(c=>c.startsWith('jpeg:')).length,1);
+  assert.ok(!calls.includes('play'));
 });

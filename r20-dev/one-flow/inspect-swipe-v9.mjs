@@ -87,3 +87,12 @@ for(const needle of ["showPhoto(","__taleraV31SelectPhoto(","addEventListener('t
  }
  console.log("NARRATED_GESTURE_TOTAL",needle,n);
 }
+
+for(const needle of ["autoplay","autoPlay","autostart","autoStart","AUTO_START","auto start","video-autoplay","videoAuto","video.play()","talera-v61-listening-enabled"]){
+ let pos=0,count=0;
+ while((pos=html.indexOf(needle,pos))>=0){
+   if(count<20)console.log('AUTOSETTING_AUDIT',needle,count,pos,JSON.stringify(html.slice(Math.max(0,pos-450),Math.min(html.length,pos+850))));
+   pos+=needle.length;count++;
+ }
+ console.log('AUTOSETTING_TOTAL',needle,count);
+}

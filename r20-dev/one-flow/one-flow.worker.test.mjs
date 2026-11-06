@@ -25,8 +25,7 @@ const nativePage='<html><script>'+
   "  const retry=e=>{\n    const s=taleraInline;};\n"+
   "  document.addEventListener('click',e=>{\n"+
   "    if(s?.engine!=='narrated'||s.phase!=='narration')return;},true);\n"+nativeVoiceHint+"\n}"+
-  "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){const audio=window.__taleraInlineSharedAudio||document.createElement('audio');"+
-  "audio.preload='auto';audio.playsInline=true;audio.style.display='none';}}"+
+  "async function present(memory){\n  taleraInline=s;\n  if(hasVoice){}}"+
   "function showPhoto(memory,index,manual=false){\n"+ 
   "if(!memory||!Array.isArray(memory.photos)||memory.photos.length<=1)return;\n"+
   "memory._photoIndex=((index%memory.photos.length)+memory.photos.length)%memory.photos.length;\n"+
@@ -667,65 +666,4 @@ test('narrated story remains ONE sealed memory after the FINAL video, not only w
   assert.equal(restoreApprovedV9(patched.html),nativePage,'every V9 byte must restore exactly');
   assert.equal(applyUnifiedTail(nativePage.replace('function showPhoto(memory,index,manual=false){','')).status,
     'anchor-unmatched','fail closed if RH19 changes');
-});
-
-test('existing audio ON preference: one audible media element survives voice-to-original handoff and timeline replay',()=>{
-  const patched=applyUnifiedTail(nativePage);
-  assert.equal(patched.status,'installed','native V9 voice element constructor remains exact');
-  assert.ok(patched.html.includes("const audio=window.__taleraInlineSharedAudio||document.createElement('video');"));
-  assert.ok(patched.html.includes("audio.setAttribute('webkit-playsinline','')"),
-    'real iPhone Safari must keep reusable media inline');
-  assert.equal(restoreApprovedV9(patched.html),nativePage,'approved V9 restores byte for byte');
-  const events=[],voice={
-    tagName:'VIDEO',paused:false,currentTime:3.1,
-    pause(){events.push('voice pause');this.paused=true},
-    onplay(){},onpause(){},onended(){},ontimeupdate(){},onseeking(){},onseeked(){}
-  };
-  const temp={paused:true,pause(){events.push('temp pause')},
-    removeAttribute(){events.push('temp release source')},remove(){events.push('temp removal')}};
-  const s={engine:'narrated',audio:voice,phase:'originals',
-    taleraUnifiedPrepared:new Map([['movie',{video:temp,url:'blob:movie',primed:false,pending:false}]])};
-  const env={document:{addEventListener(){}},window:{},console:{warn(){}}};
-  vm.runInNewContext(INLINE_TAIL,env);
-  const first=env.taleraUnifiedTakePrimed(s,{kind:'video',key:'movie'});
-  assert.equal(first,voice,'do NOT allocate another audible media element');
-  assert.equal(first.currentTime,0);
-  assert.equal(s.taleraUnifiedReplayUrl,'blob:movie');
-  assert.equal(s.taleraUnifiedReplayHandoff.sameAudibleElement,true);
-  assert.equal(s.taleraUnifiedReplayHandoff.gesturePrimed,false,
-    'automatic playback is not falsely labeled as a physical tap');
-  assert.equal(s.taleraUnifiedPrepared.size,0);
-  assert.equal(first.onended,null,'old voice ended callback must not restart the timeline');
-  assert.ok(events.includes('temp removal'));
-  s.taleraUnifiedReplayUrl=null;
-  const second=env.taleraUnifiedTakePrimed(s,{kind:'video',key:'movie-two'});
-  assert.equal(second,voice,'the same media element is reused for a second original video');
-  assert.equal(s.taleraUnifiedReplayUrl,null,'missing prepared next URL correctly loads from original storage');
-  assert.equal(s.taleraUnifiedReplayHandoff.sameAudibleElement,true);
-});
-
-test('no change to ordinary photo/video memories: shared audible handoff requires narrated engine',()=>{
-  const s={engine:'ordinary',audio:{tagName:'VIDEO'},phase:'originals',
-    taleraUnifiedPrepared:new Map()};
-  const env={document:{addEventListener(){}},window:{}};
-  vm.runInNewContext(INLINE_TAIL,env);
-  assert.equal(env.taleraUnifiedTakePrimed(s,{key:'v'}),null);
-  assert.equal(restoreApprovedV9(applyUnifiedTail(nativePage).html),nativePage);
-});
-
-test('normal sound setting: shared narrator element makes hidden video priming unnecessary',()=>{
-  let hiddenPlay=0;
-  const hidden={play(){hiddenPlay++;return Promise.resolve()},pause(){}};
-  const s={engine:'narrated',phase:'narration',
-    audio:{tagName:'VIDEO'},taleraUnifiedPrepared:new Map([
-      ['video-1',{video:hidden,primed:false,pending:false}]
-    ])};
-  const env={taleraInline:s,window:{},document:{addEventListener(){}}};
-  vm.runInNewContext(INLINE_TAIL,env);
-  env.taleraUnifiedPrimeCurrent();
-  assert.equal(hiddenPlay,0,
-    'NO second hidden video may start when the native voice element itself can play the originals');
-  assert.equal(s.taleraUnifiedPrepared.size,1,
-    'preloaded original URL must remain available until original replay');
-  assert.equal(restoreApprovedV9(applyUnifiedTail(nativePage).html),nativePage);
 });

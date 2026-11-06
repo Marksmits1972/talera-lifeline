@@ -76,8 +76,8 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('talera:enable-listening',taleraUnifiedPrimeCurrent,true);
 
-/* ONE cached cover for the FIRST chosen photo of each narrated memory.
-   The native V13 wheel reads previewImage. No timeline item or media change. */
+/* ONE cached cover for the FIRST VISUAL CUE (photo or video frame 0)
+   of each narrated memory. V13 reads previewImage; no extra timeline item. */
 const taleraSwipeCovers=new Map();
 let taleraSwipeCoverDbPromise=null;
 function taleraSwipeCoverFirst(memory){
@@ -85,11 +85,14 @@ function taleraSwipeCoverFirst(memory){
   const visual=memory._zeroItems.filter(x=>x.kind==='photo'||x.kind==='video');
   const cues=Array.isArray(memory._taleraNarrationCues)?memory._taleraNarrationCues.slice():[];
   cues.sort((a,b)=>(Number(a?.t)||0)-(Number(b?.t)||0));
+  // Use the first VISUAL cue, not the first photograph in the story.
+  // A video-first story is represented by a JPEG extracted from video t=0.
   for(const cue of cues){
-    const x=typeof cue.mediaId==='string'?visual.find(item=>item.key===cue.mediaId):visual[Number(cue.index)];
-    if(x?.kind==='photo'&&x.key)return x;
+    const x=typeof cue?.mediaId==='string'?visual.find(item=>item.key===cue.mediaId):visual[Number(cue?.index)];
+    if((x?.kind==='photo'||x?.kind==='video')&&x.key)return x;
   }
-  return visual.find(x=>x.kind==='photo'&&x.key)||null;
+  // Old narrated stories without cues start at their first visual item.
+  return visual[0]||null;
 }
 function taleraSwipeCoverDB(){
   if(taleraSwipeCoverDbPromise)return taleraSwipeCoverDbPromise;
@@ -166,9 +169,63 @@ function taleraSwipeCoverResize(src){
     if(image.complete&&image.naturalWidth)image.onload();
   });
 }
+/* Decode ONE video frame into a thumbnail, while paused and muted.
+   This temporary decoder is never attached as a player, never calls play(),
+   never changes the already approved narrated-video playback. */
+function taleraSwipeCoverVideoFrame(src){
+  return new Promise(resolve=>{
+    if(!src){resolve(null);return}
+    let done=false,video=null,timeout=null;
+    const finish=blob=>{
+      if(done)return;done=true;
+      clearTimeout(timeout);
+      if(video){
+        video.onloadedmetadata=video.onloadeddata=video.oncanplay=video.onseeked=video.onerror=null;
+        video.pause();video.removeAttribute('src');video.load();
+      }
+      resolve(blob||null);
+    };
+    const capture=()=>{
+      if(done||!video||video.readyState<2||!video.videoWidth||!video.videoHeight)return;
+      try{
+        const ratio=Math.min(1,720/Math.max(video.videoWidth,video.videoHeight));
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(video.videoWidth*ratio));
+        canvas.height=Math.max(1,Math.round(video.videoHeight*ratio));
+        const ctx=canvas.getContext('2d',{alpha:false});
+        if(!ctx){finish(null);return}
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        canvas.toBlob(blob=>finish(blob),'image/jpeg',.76);
+      }catch(e){finish(null)}
+    };
+    try{
+      video=document.createElement('video');
+      video.muted=true;video.defaultMuted=true;video.volume=0;
+      video.playsInline=true;video.setAttribute('playsinline','');
+      video.setAttribute('webkit-playsinline','');
+      video.preload='auto';
+      video.onloadeddata=capture;
+      video.oncanplay=capture;
+      video.onseeked=capture;
+      video.onloadedmetadata=()=>{
+        // On some iPhone versions a zero-time seek explicitly asks Safari
+        // to decode the first frame even when the file is not playing.
+        try{
+          if(video.readyState<2)video.currentTime=Math.min(.001,
+            Number.isFinite(video.duration)&&video.duration>0?video.duration/2:.001);
+        }catch(e){}
+        capture();
+      };
+      video.onerror=()=>finish(null);
+      timeout=setTimeout(()=>finish(null),6500);
+      video.src=src;
+      video.load();
+    }catch(e){finish(null)}
+  });
+}
 function taleraSwipeCoverGenerate(memory,first,entry){
   if(entry.creating||entry.url)return;
-  const frame=memory._zeroFrames?.find(x=>x.kind==='photo'&&x.key===first.key);
+  const frame=first.kind==='photo'?memory._zeroFrames?.find(x=>x.kind==='photo'&&x.key===first.key):null;
   entry.creating=true;
   const run=async()=>{
     // Never decode or draw during a finger gesture or the V13 landing.
@@ -179,12 +236,14 @@ function taleraSwipeCoverGenerate(memory,first,entry){
     try{
       if(!src){
         // Adjacent narrated stories have NOT been opened/hydrated yet.
-        // Fetch ONLY their first selected photo; never the whole media set.
-        src=await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));
+        // Fetch ONLY the first selected visual asset, not the full media set.
+        src=first.kind==='video'?await store.mediaUrl(first.key):
+          await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));
         temporary=!!src;
       }
-      if(!src)throw Error('Eerste foto nog niet beschikbaar');
-      const blob=await taleraSwipeCoverResize(src);
+      if(!src)throw Error('Eerste beeld nog niet beschikbaar');
+      const blob=first.kind==='video'?await taleraSwipeCoverVideoFrame(src):
+        await taleraSwipeCoverResize(src);
       if(blob&&taleraSwipeCovers.get(memory.id)===entry){
         taleraSwipeCoverApply(memory,first.key,blob);
         // Persist one cover per narrated memory, not a new media frame.
@@ -246,7 +305,7 @@ function taleraSwipeCoverObserve(memories){
       if(index<0)index=list.length-1;
     }
     for(let i=Math.max(0,index-2);i<=Math.min(list.length-1,index+2);i++)
-      // Crucial: CREATE missing first-photo covers BEFORE visiting the neighbor.
+      // Create missing first-VISUAL covers BEFORE visiting the neighbor.
       // Merely reading cached covers left the first swipe through blank tiles.
       taleraSwipeCoverEnsure(list[i],true);
   };

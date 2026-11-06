@@ -400,29 +400,7 @@ function taleraUnifiedCreateListeningButton(s){
 }
 function taleraUnifiedTakePrimed(s,frame){
   if(s.phase!=='originals')return null;
-  // WebKit authorizes audible media PER ELEMENT, not per saved memory.
-  // The same persistent <video> plays the narrated WAV as audio-only first,
-  // then plays each original clip with image+sound, across timeline replays.
-  // Native V9 still owns cues, timers, media IDs and the visible video.
-  const shared=s.engine==='narrated'&&s.audio?.tagName==='VIDEO'?s.audio:null;
   const entry=s.taleraUnifiedPrepared?.get(frame.key);
-  if(shared){
-    // The first genuine voice playback already authorized THIS media element.
-    // Keep its identity when changing from the WAV to the original video.
-    // Prepared clip blobs may be reused without another IDB media fetch.
-    if(entry){
-      s.taleraUnifiedPrepared.delete(frame.key);entry.released=true;
-      entry.video.pause();entry.video.removeAttribute('src');entry.video.remove();
-      s.taleraUnifiedReplayUrl=entry.url;
-    }
-    shared.pause();
-    shared.onplay=shared.onpause=shared.onended=null;
-    shared.ontimeupdate=shared.onseeking=shared.onseeked=null;
-    try{shared.currentTime=0}catch(e){}
-    s.taleraUnifiedReplayHandoff={key:frame.key,reused:true,
-      sharedNarration:true,gesturePrimed:Boolean(s.taleraUnifiedVoiceAudible)};
-    return shared;
-  }
   if(!entry)return null;
   // Reuse the PRELOADED original even when narration auto-started without
   // a new user gesture. Creating a different video here loses the existing
@@ -560,24 +538,12 @@ export function applyUnifiedTail(html){
   // therefore retains complete authority over its own timed media frames.
   const nativeManualPhoto="function showPhoto(memory,index,manual=false){";
   const sealedManualPhoto="function showPhoto(memory,index,manual=false){\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;";
-  // Voice must use an HTMLVideoElement so that Safari's per-element audible
-  // playback authorization survives the later original VIDEO of the story.
-  // A video element can also decode the voice WAV (audio-only); no new player
-  // layer is introduced and it stays inside the original V9 presenter.
-  const nativeVoiceElement="const audio=window.__taleraInlineSharedAudio||document.createElement('audio');";
-  const newVoiceElement="const audio=window.__taleraInlineSharedAudio||document.createElement('video');";
-  const nativeVoiceInline="audio.preload='auto';audio.playsInline=true;audio.style.display='none';";
-  const newVoiceInline="audio.preload='auto';audio.playsInline=true;audio.setAttribute('playsinline','');audio.setAttribute('webkit-playsinline','');audio.style.display='none';";
   const nativeWheelAssign="if(tile.index===index)return;";
   const newWheelAssign="if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;";
   if(result.split(nativeCoverHydrated).length!==2||
      result.split(nativeCoverRegistered).length!==2||
      result.split(nativeWheelAssign).length!==2||
-     result.split(nativeManualPhoto).length!==2||
-     result.split(nativeVoiceElement).length!==2||
-     result.split(nativeVoiceInline).length!==2)return {html,status:'anchor-unmatched'};
-  result=result.replace(nativeVoiceElement,newVoiceElement);
-  result=result.replace(nativeVoiceInline,newVoiceInline);
+     result.split(nativeManualPhoto).length!==2)return {html,status:'anchor-unmatched'};
   result=result.replace(nativeManualPhoto,sealedManualPhoto);
   result=result.replace(nativeCoverHydrated,nativeCoverHydrated+"taleraSwipeCoverEnsure(memory,true);");
   result=result.replace(nativeCoverRegistered,nativeCoverRegistered+"taleraSwipeCoverObserve(memories);");
@@ -635,10 +601,6 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
-    .replace("const audio=window.__taleraInlineSharedAudio||document.createElement('video');",
-      "const audio=window.__taleraInlineSharedAudio||document.createElement('audio');")
-    .replace("audio.preload='auto';audio.playsInline=true;audio.setAttribute('playsinline','');audio.setAttribute('webkit-playsinline','');audio.style.display='none';",
-      "audio.preload='auto';audio.playsInline=true;audio.style.display='none';")
     .replace("function showPhoto(memory,index,manual=false){\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;",
       "function showPhoto(memory,index,manual=false){")
     .replace("if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;",

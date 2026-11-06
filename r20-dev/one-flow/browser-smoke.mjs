@@ -226,30 +226,7 @@ for(let round=1;round<=3;round++){
 console.log('AUDIO PERMISSION AUDIT voice clicks='+requiredVoiceTap+', original-video clicks='+requiredVideoTap+
  ' (browser policy can still require a real user gesture; no hidden synthetic activation)');
 console.log('PASS three replay cycles, closed internal media, normal V13 whole-memory navigation');
-// READ-ONLY TECHNICAL DIAGNOSIS in the synthetic test browser: would reusing
-// the SAME already-authorized WAV audio element also play the sound track
-// of the original video without a SECOND gesture? Do not change app code.
-const n=await quiet("(()=>{let b=window.__taleraPhotoBook,l=b.list(),m=window.__taleraTimelineRuntime.currentMemory(),i=l.findIndex(x=>x.id===m.id);return{id:l[i+1]?.id||l[i-1]?.id,dir:l[i+1]?1:-1}})()");
-await swipe(n.dir);
-assert.ok(await wait('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(n.id),90));
-await swipe(-n.dir);
-assert.ok(await wait('window.__taleraTimelineRuntime?.currentMemory()?.id==='+JSON.stringify(idOfStory),90));
-await wait('Boolean(window.__taleraInlineSharedAudio?.src)',100);
-// If Safari blocks starting voice with sound, explicitly authorize ONLY voice.
-if(!await wait('window.__taleraInlineSharedAudio.currentTime>.15',23)){
- await evaluate("window.__taleraInlineSharedAudio.play().catch(()=>{})",false,true);
- assert.ok(await wait('window.__taleraInlineSharedAudio.currentTime>.15',55));
-}
-assert.ok(await wait("document.querySelector('video.talera-v61-inline-video:not([muted])')!==null",270),
- 'after WAV + 3 photos, original video must enter the native presenter');
-const probe=await evaluate("(async()=>{"+
-"const a=window.__taleraInlineSharedAudio,v=document.querySelector('video.talera-v61-inline-video');"+
-"v.muted=true;v.defaultMuted=true;"+
-"const src=v.src;a.pause();a.src=src;a.muted=false;"+
-"let result='';try{await a.play();result='allowed'}catch(e){result='blocked:'+e.name}"+
-"try{await v.play()}catch(e){}"+
-"await new Promise(r=>setTimeout(r,450));"+
-"return{result,aTime:a.currentTime,videoTime:v.currentTime,aMuted:a.muted,videoMuted:v.muted,format:a.currentSrc?new URL(a.currentSrc).protocol:null};"+
-"})()",true,false);
-console.log('SAME_AUDIO_ELEMENT_DIAGNOSTIC',JSON.stringify(probe));
+// End of test: 3 complete real browser rounds already verified, including
+// no extra Beluister on original video and post-video whole-memory swipes.
+assert.equal(requiredVideoTap,0,'original video must never need a separate Beluister action');
 ws.close();

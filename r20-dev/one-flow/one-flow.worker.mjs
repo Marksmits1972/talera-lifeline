@@ -47,10 +47,6 @@ async function taleraUnifiedWarmVideos(s){
 function taleraUnifiedPrimeCurrent(){
   const s=taleraInline;
   if(!s||s.engine!=='narrated'||!s.taleraUnifiedPrepared||s.phase==='done')return;
-  // With normal autoplay+sound ON, the actual WAV and original clips share
-  // the same native VIDEO element. No hidden second video needs 'unlocking'.
-  // Keep legacy priming only for fallback / older media elements.
-  if(s.audio?.tagName==='VIDEO')return;
   for(const entry of s.taleraUnifiedPrepared.values()){
     if(entry.primed||entry.pending)continue;
     entry.pending=true;
@@ -405,26 +401,6 @@ function taleraUnifiedCreateListeningButton(s){
 function taleraUnifiedTakePrimed(s,frame){
   if(s.phase!=='originals')return null;
   const entry=s.taleraUnifiedPrepared?.get(frame.key);
-  // Same native media element for the WAV narration and every audible
-  // original video. Safari ties audible-play permission to the element:
-  // merely remembering the setting 'sound on' does not authorize a new one.
-  // This is an in-place source handoff, NOT a second player or timeline frame.
-  const shared=s.engine==='narrated'&&s.audio?.tagName==='VIDEO'?s.audio:null;
-  if(shared){
-    if(entry){
-      s.taleraUnifiedPrepared.delete(frame.key);
-      entry.released=true;
-      entry.video.pause();entry.video.removeAttribute('src');entry.video.remove();
-      s.taleraUnifiedReplayUrl=entry.url;
-    }
-    shared.pause();
-    shared.onplay=shared.onpause=shared.onended=null;
-    shared.ontimeupdate=shared.onseeking=shared.onseeked=null;
-    try{shared.currentTime=0}catch(e){}
-    s.taleraUnifiedReplayHandoff={key:frame.key,reused:true,
-      sameAudibleElement:true,gesturePrimed:Boolean(entry?.primed)};
-    return shared;
-  }
   if(!entry)return null;
   // Reuse the PRELOADED original even when narration auto-started without
   // a new user gesture. Creating a different video here loses the existing
@@ -562,24 +538,12 @@ export function applyUnifiedTail(html){
   // therefore retains complete authority over its own timed media frames.
   const nativeManualPhoto="function showPhoto(memory,index,manual=false){";
   const sealedManualPhoto="function showPhoto(memory,index,manual=false){\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;";
-  // Native V9 uses a reusable hidden audio element for the voice.
-  // Use a VIDEO element instead: it supports the same audio-only WAV, and
-  // can display the original clip on the SAME authorized element later.
-  // Only this one existing V9 constructor is changed.
-  const nativeVoiceElement="const audio=window.__taleraInlineSharedAudio||document.createElement('audio');";
-  const newVoiceElement="const audio=window.__taleraInlineSharedAudio||document.createElement('video');";
-  const nativeVoiceInline="audio.preload='auto';audio.playsInline=true;audio.style.display='none';";
-  const newVoiceInline="audio.preload='auto';audio.playsInline=true;audio.setAttribute('playsinline','');audio.setAttribute('webkit-playsinline','');audio.style.display='none';";
   const nativeWheelAssign="if(tile.index===index)return;";
   const newWheelAssign="if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;";
   if(result.split(nativeCoverHydrated).length!==2||
      result.split(nativeCoverRegistered).length!==2||
      result.split(nativeWheelAssign).length!==2||
-     result.split(nativeManualPhoto).length!==2||
-     result.split(nativeVoiceElement).length!==2||
-     result.split(nativeVoiceInline).length!==2)return {html,status:'anchor-unmatched'};
-  result=result.replace(nativeVoiceElement,newVoiceElement);
-  result=result.replace(nativeVoiceInline,newVoiceInline);
+     result.split(nativeManualPhoto).length!==2)return {html,status:'anchor-unmatched'};
   result=result.replace(nativeManualPhoto,sealedManualPhoto);
   result=result.replace(nativeCoverHydrated,nativeCoverHydrated+"taleraSwipeCoverEnsure(memory,true);");
   result=result.replace(nativeCoverRegistered,nativeCoverRegistered+"taleraSwipeCoverObserve(memories);");
@@ -637,10 +601,6 @@ export function applyUnifiedTail(html){
 export function restoreApprovedV9(patched){
   if(typeof patched!=='string')return patched;
   return patched
-    .replace("const audio=window.__taleraInlineSharedAudio||document.createElement('video');",
-      "const audio=window.__taleraInlineSharedAudio||document.createElement('audio');")
-    .replace("audio.preload='auto';audio.playsInline=true;audio.setAttribute('playsinline','');audio.setAttribute('webkit-playsinline','');audio.style.display='none';",
-      "audio.preload='auto';audio.playsInline=true;audio.style.display='none';")
     .replace("function showPhoto(memory,index,manual=false){\n    if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;",
       "function showPhoto(memory,index,manual=false){")
     .replace("if(tile.index===index&&!(mem?._zeroItems?.some(x=>x.kind==='audio')&&mem.previewImage&&tile.el.dataset.url!==mem.previewImage))return;",

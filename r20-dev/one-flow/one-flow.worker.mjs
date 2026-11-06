@@ -58,7 +58,9 @@ function taleraUnifiedPrimeCurrent(){
     try{result=video.play()}
     catch(e){entry.pending=false;continue}
     Promise.resolve(result).then(()=>{
-      if(s!==taleraInline)return;
+      // The native original-video round may have adopted this element while
+      // Safari's first play() was still resolving. Never pause that replay.
+      if(s!==taleraInline||entry.released)return;
       video.pause();
       try{video.currentTime=0}catch(e){}
       entry.primed=true;
@@ -399,10 +401,17 @@ function taleraUnifiedCreateListeningButton(s){
 function taleraUnifiedTakePrimed(s,frame){
   if(s.phase!=='originals')return null;
   const entry=s.taleraUnifiedPrepared?.get(frame.key);
-  if(!entry?.primed)return null;
+  if(!entry)return null;
+  // Reuse the PRELOADED original even when narration auto-started without
+  // a new user gesture. Creating a different video here loses the existing
+  // media element and forces a second decode / Safari authorization attempt.
   s.taleraUnifiedPrepared.delete(frame.key);
+  entry.released=true;
   s.taleraUnifiedReplayUrl=entry.url;
-  entry.video.pause();
+  s.taleraUnifiedReplayHandoff={
+    key:frame.key,reused:true,gesturePrimed:entry.primed===true
+  };
+  if(!entry.video.paused)entry.video.pause();
   try{entry.video.currentTime=0}catch(e){}
   return entry.video;
 }
@@ -537,11 +546,17 @@ export function applyUnifiedTail(html){
   const nativeVideo=result.slice(nativeVideoStart,nativeVideoEnd);
   const oldCreate="const video=document.createElement('video');";
   const oldUrl="const url=await store.mediaUrl(frame.key);";
-  if(nativeVideo.split(oldCreate).length!==2||nativeVideo.split(oldUrl).length!==2)
+  const oldSource="s.videoUrl=url;video.src=url;";
+  if(nativeVideo.split(oldCreate).length!==2||
+     nativeVideo.split(oldUrl).length!==2||
+     nativeVideo.split(oldSource).length!==2)
     return {html,status:'anchor-unmatched'};
   const changedVideo=nativeVideo
     .replace(oldCreate,"const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');")
-    .replace(oldUrl,"const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;");
+    .replace(oldUrl,"const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;")
+    // On Safari, reassigning the SAME blob: URL can reset a previously
+    // authorized video into a fresh media resource and block its sound.
+    .replace(oldSource,"s.videoUrl=url;if(video.src!==url)video.src=url;");
   const beforeVideoHint="          const hint=document.createElement('div');\n          hint.textContent='Tik op de foto om het geluid te starten';\n          hint.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:20;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:none';";
   const afterVideoHint="          const hint=taleraUnifiedCreateListeningButton(s);";
   if(changedVideo.split(beforeVideoHint).length!==2)return {html,status:'anchor-unmatched'};
@@ -593,6 +608,8 @@ export function restoreApprovedV9(patched){
     .replace(AUDIO_END_AFTER,AUDIO_END_BEFORE)
     .replace("const video=taleraUnifiedTakePrimed(s,frame)||document.createElement('video');",
       "const video=document.createElement('video');")
+    .replace("s.videoUrl=url;if(video.src!==url)video.src=url;",
+      "s.videoUrl=url;video.src=url;")
     .replace("const url=s.taleraUnifiedReplayUrl||await store.mediaUrl(frame.key);s.taleraUnifiedReplayUrl=null;",
       "const url=await store.mediaUrl(frame.key);")
     .replace("  taleraInline=s;\n  if(hasVoice)await taleraUnifiedWarmVideos(s);\n  if(s!==taleraInline)return;\n  if(hasVoice){",

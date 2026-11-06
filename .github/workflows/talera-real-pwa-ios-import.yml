@@ -53,7 +53,7 @@ jobs:
           URL='https://talera-real-pwa-ios-import-lab-20261106.mark-a39.workers.dev'
           for ATTEMPT in 1 2 3 4 5 6 7 8; do
             TELL_STATUS="$(curl -sS -o /tmp/talera-pwa-tell.html -w '%{http_code}' --max-time 12 "$URL/tell" || true)"
-            TELL_HEADER="$(curl -sSI --max-time 10 "$URL/tell" | tr -d '\r' | grep -i '^x-talera-pwa-visual-only:' || true)"
+            TELL_HEADER="$(curl -sS -D - -o /dev/null --max-time 10 "$URL/tell" | tr -d '\r' | grep -i '^x-talera-pwa-visual-only:' || true)"
             PRESENT_HEADER="$(curl -sS -D - -o /dev/null --max-time 10 "$URL/present" | tr -d '\r' | grep -i '^x-talera-clean-one-memory:' || true)"
             if [ "$TELL_STATUS" = '200' ] && printf '%s' "$TELL_HEADER" | grep -q 'passive-file-input-observer' && printf '%s' "$PRESENT_HEADER" | grep -q 'installed'; then
               echo "PASS original PWA + isolated skin /tell and frozen player /present"

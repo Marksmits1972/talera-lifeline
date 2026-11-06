@@ -132,6 +132,12 @@ test('source transform denies old photo tap, audio retry on swipe, and refreshes
  assert.equal(r.html.includes(CORE_MARKER),true);
  assert.equal(r.html.includes('s.closedAudioSoundtrack=true'),true,'same audible element plays WAV and original sound');
  assert.equal(r.html.includes("video.muted=muted||audioOwner"),true,'original video remains muted while audio element plays track');
+ assert.equal(r.html.includes('video.autoplay=true'),false,
+  'never create iOS Low Power Mode native giant play overlay using autoplay attribute');
+ assert.equal(r.html.includes("if(video.muted)video.setAttribute('muted','');"),true,
+  'keep original video muted and inline for normal Safari');
+ assert.equal(r.html.includes('const starts=audioOwner&&s.audio?[video.play(),s.audio.play()]:[target.play()]'),true,
+  'one Beluister fallback must launch the existing picture and soundtrack together');
  assert.equal(r.html.includes("if(manual&&memory?._zeroItems?.some(item=>item.kind==='audio'))return;"),true);
  assert.equal(r.html.includes("if(s?.engine==='narrated')return;"),true);
  assert.equal(r.html.includes("memory.previewImage=photos[coverIndex]"),true);

@@ -127,8 +127,10 @@ export const CLOSED_MEDIA=String.raw`function taleraInlinePlayMedia(s,frame,mute
   video.playsInline=true;video.setAttribute('playsinline','');video.setAttribute('webkit-playsinline','');
   video.preload='auto';video.controls=false;
   video.muted=muted||audioOwner;video.defaultMuted=muted||audioOwner;video.volume=1;
-  // iOS Safari requires an explicit muted inline video configuration for reliable image autoplay.
-  if(video.muted){video.setAttribute('muted','');video.autoplay=true}
+  // Safari Low Power Mode shows its OWN giant play overlay for <video autoplay>,
+  // and may reject autoplay entirely. Use explicit .play() below (same native
+  // viewport), with one Beluister fallback if a real gesture is required.
+  if(video.muted)video.setAttribute('muted','');
   // Originals must paint above the fixed photo-cover; buttons remain above at z-index 65.
   video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:'+(audioOwner?30:12)+';pointer-events:none';
   (stage.parentElement||stage).appendChild(video);

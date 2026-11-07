@@ -253,3 +253,36 @@ De HTML is in een geïsoleerde headless Chromium-browser via `set_content` getes
 - **Geen aanpassing aan de online TALERA-PWA gedaan voor dit schaalontwerp.** De vaste drempels van de bestaande app zijn dus nog niet veranderd. Aanpassing vereist specifiek toestemming om de **bestaande** `talera-flow-v17-time`-weergavefunctie (geen opname-/presentatiecode) te wijzigen: die wijziging is niet puur CSS/tekst en valt buiten het eerdere masterbouwbesluit.
 - Geen wijzigingen aan opname/vertelcyclus, media-ID's, swipes, video, WhatsApp, tekstpaneel, opslag, account, PWA-versies, beschermde balken of versieregister.
 - Op het toestel de precieze PWA-launch-URL achter het oude beginschermicoon vaststellen zonder de bestaande app of lokale data te verwijderen. Niet promoveren naar officiële versie vóór acceptatie.
+
+## UX-ronde 3 — zelfschalende tijdlijn in staging geïmplementeerd (7 november 2026)
+
+**Gebruikersopdracht:** pas nu expliciet de relatieve schaal uit de vooraf goedgekeurde 300/3.000/10.000-verhalenproef uitsluitend toe op de bestaande tijdlijn op `Mijn leven`. Geen enkele andere code, stijl, knop, tekst, pagina, mediafunctie, opnamecyclus of PWA-balk wijzigen.
+
+### Uitvoering en herstelbaarheid
+- Herstelbranch van vlak vóór deze wijziging: `backup/deepblue-before-timeline-relative-scale-20261107`.
+- Eén bronbestand op de bestaande GitHub-featurebranch gewijzigd; broncommit: `86b4b69d60511e18ea29d9857ffcadfc7e574d56`.
+- Exacte diffcontrole tussen herstelbranch en huidige featurebranch: **alle brontekst buiten één stringconstante `TALERA_HOME_MARKS_DENSITY` is byte-identiek.** `BRAND_CSS` en alle andere CSS, HTML-transformaties, Workers-bindings en JavaScript blijven intact.
+- De ene gewijzigde renderer bevindt zich exclusief in de reeds bestaande `talera-flow-v17-time` binnen `/mijn-leven`. De patch vervangt de originele V17-`drawMarks()` op dezelfde bestaande plek, alleen wanneer de bron exact overeenkomt; geen extra eventhandlers, scripts, renderlagen of navigatie.
+- Bestaande aantallen per jaar voor uitsluitend **eigen** herinneringen; de 500 `demo:true`-voorbeelden blijven buiten de persoonlijke intensiteit. Alle 500 voorbeeldherinneringen blijven wel beschikbaar in preview/jaarselectie.
+- Nieuwe formule: deel elk periodeaantal door de kalenderjaren in het visuele tijdvak (verhalen per jaar); neem de mediaan van uitsluitend de niet-lege periodewaarden als referentie (`anchor=max(1,mediaan)`). Nul blijft intensiteit 0. Voor positieve waarden `r = (verhalen per jaar)/anchor`: `r<0.45` niveau 1, `r<1.45` niveau 2, `r<2.8` niveau 3, anders niveau 4. Dit is dezelfde zelfschalende verdeling als de goedgekeurde demonstratie.
+- Alle bestaande tick-renderinstructies, CSS-klassen, vijf visuele groottes en kleuren, individuele jaren, ronde geselecteerde slider, jaarlabels en de verwijderde horizontale doorlopende lijn blijven **byte-identiek**, dus zonder visuele herbouw.
+- De wijziging is op de reeds bestaande geïsoleerde Worker `talera-style-diepblauw-20261107` gedeployed op `2026-11-07T11:46:43.279598Z`. De goedgekeurde originele Worker van 6 november en de functionele staging-Worker zijn niet aangepast.
+
+### Browser-Rendering-regressie
+Getest op 390×844 in de nieuwe gehoste stagingpagina met tijdelijke in-memory verhaalobjecten (er is geen persoonlijk verhaal aan opslag toegevoegd). Dezelfde 42 jaarposities als het HTML-voorbeeld:
+- 0 eigen verhalen: 42 dunne lege jaren.
+- 300 verhalen: 10 lege, 11 rustige, 9 gewone, 7 drukke, 5 zeer drukke jaren.
+- 3.000 verhalen: 10 lege, 10 rustige, 10 gewone, 7 drukke, 5 zeer drukke jaren.
+- 10.000 verhalen: 10 lege, 10 rustige, 10 gewone, 7 drukke, 5 zeer drukke jaren.
+- De daadwerkelijk door de browser berekende totalen waren precies 0, 300, 3.000 en 10.000; dus geen verhaal ging verloren in de proef. De testverdeling is identiek aan die uit de losse 10.000-verhalen-demo, niet gelijk aan opgeslagen gebruikersdata.
+- Zonder eigen herinneringen met de 500 gewone referentievoorbeelden aanwezig: alle 42 markeringen blijven niveau 0. Dit is expliciet opnieuw in de actuele kandidaat gecontroleerd.
+- De bestaande jaarselector kon van 1985 naar 1995 worden verschoven, waarna het zichtbare jaar 1995 werd; de 42 markeringen bleven aanwezig. Geen wijziging van selectieflow.
+- Visuele A/B stijlcontrole op 360, 390 en 430 pixels breed: alle geteste beschermde balken op `/mijn-leven` (`.mast`, `.flow-nav`, `.sheet-handle`), `/tell` (`#app .top`) en `/present?talera_menu=hub` (menu-header, headbutton, presentatie-appbar, reactiesbar) exact gelijk aan goedgekeurde basis qua kleur/achtergrond, geometrie, zichtbaarheid en opaciteit.
+- Bij lange levensperioden (> beschikbaar aantal pixelposities) worden visuele jaren nog steeds gebundeld via de **ongewijzigde** bestaande bucketing. De nieuwe formule normaliseert daarbij voor het aantal jaren per blok. De daadwerkelijke lange-periodevisualisatie op een iPhone is nog **niet** handmatig geaccepteerd.
+
+### Grenzen en status
+- De gebruiker heeft nu **expliciet** toestemming gegeven voor uitsluitend deze ene technische wijziging aan de tijdlijnschaal. Het eerdere algemene verbod op technische aanpassingen blijft onverminderd gelden voor de rest van TALERA.
+- De volledige vertelmodus, tijdstempels, opslag, upload, audio, video, WhatsApp, witte verhaaltekst, reacties, schermvolgorde, oorspronkelijke boven-/onderbalken, overige CSS en iPhone-icoon zijn niet aangeraakt.
+- **Testkandidaat:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
+- **Goedgekeurde voorkeursversie ongewijzigd:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
+- Nog geen productiepromotie of acceptatietest met 300–10.000 daadwerkelijk op iPhone opgeslagen herinneringen; voor herinstallatie/verwijderen van een PWA wordt niet geadviseerd wegens mogelijk lokale data.

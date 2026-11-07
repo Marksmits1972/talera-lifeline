@@ -21,3 +21,14 @@ Status: afzonderlijke Cloudflare-staging gebouwd en via Browser Rendering gecont
 - Origin isolation: a different workers.dev hostname has a different local IndexedDB/localStorage, so private local memories from the current preferred app are NOT automatically copied or available in staging. Backend service bindings further down the existing chain may still share remote storage; do not perform destructive tests on real data.
 - Original TALERA preferred PWA remains https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven . Do NOT replace it in the central link register until user explicitly approves the candidate.
 - Remaining: account/More/Settings visual checks on iPhone, logo assets only outside bars, full regressive flow checks, user review; no production publication.
+
+## Ronde 2: Mijn TALERA en subpagina's, 7 november 2026
+
+- Staging STYLE worker update: `talera-style-diepblauw-20261107`; GitHub style commit `0d9aad3e415d926fcfb65a9ea90f983a779c88bd`.
+- Alleen `#talera-more-menu .body ...`-selectors (25 regels) toegevoegd voor accountkaart, instellingen, menuopties, koppen, velden, knoppen en details. De CSS wordt als één style block in de bestaande `/present`-response toegevoegd. GEEN wijzigingen aan presentatie-HTML of JS, buiten deze expliciete CSS-injectie.
+- Beschermd: presentatie-overlaybalken, foto-/video-achtergrond, `.mast`, `.flow-nav`, `#talera-more-menu header` en `.headbutton`, alle iOS-safe areas en overige boven- en onderbalken.
+- Automatische Browser Rendering screenshots gecontroleerd: Mijn TALERA (hub), Instellingen, Mijn account. Bestaande kopbalk van de menu-overlay ongewijzigd.
+- HTML regressie: `/present`, `/present?talera_menu=hub`, `/tell` byte-identiek na normalisatie van hostnaam en toegevoegde stijlblokken. Functionele closed-core ongewijzigd.
+- Computed-style guard: mobiel viewport 390x844: `.mast`, `.flow-nav`, `#talera-more-menu header`, `.headbutton`, `.panel`, `#talera-v15-appbar`, `#talera-v12-reactions-bar` geven dezelfde berekende layout/kleuren terug als de goedgekeurde voorkeurs-PWA; alleen doelbewust aangepaste inhoudsteksten verschillen.
+- Veiligheidscontract: de volledige originele stijl-Worker is uit de nieuwe terug te reconstrueren door alleen de extra centrale CSS-, menu-CSS-constanten en de ene injectieregel ongedaan te maken. Alle oorspronkelijke Workerfuncties behouden.
+- Open: echte iPhone-acceptatie, volledige video- en opname-/upload-regressie en aanvullende visuele controle. GEEN productiepromotie of wijziging van huidige voorkeurs-URL.

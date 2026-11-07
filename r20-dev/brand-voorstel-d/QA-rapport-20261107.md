@@ -479,3 +479,23 @@ De tijdlijnwijzigingen op `/mijn-leven` en `/present` zijn inmiddels door de geb
 - De volledige eindgebruikersketen `Plaatsen → Mijn leven → /present → audio-en-video synchroon terugkijken` is met een echte iPhone/testherinnering **nog niet voltooid**. Ook het daadwerkelijke afspelen van langer opgenomen persoonlijke iPhone-video's vraagt handmatige controle; video-in-de-opname is wel synthetisch bewezen.
 - De huidige `/present` met twee eerder goedgekeurde tijdlijnen is niet gewijzigd; uitdrukkelijke bescherming van opname, media-ID's, timestamps en native inline-video is gerespecteerd.
 - Testkandidaat `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven` en goedgekeurde basis `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven` beide **ongewijzigd** in deze testronde.
+
+## Presentatie: social/terug/bewerken — alleen kleurafwerking (7 november 2026)
+
+**Aanleiding:** gebruiker stuurde iPhone-screenshot met omhooggetrokken witte leeslaag. Onderin waren het hartje, de berichtenballon, de deelactie en de tellers nauwelijks zichtbaar (wit op zeer lichte achtergrond); bovendien hadden de ronde Terug- en Bewerkenknop verschillende kleuren.
+
+**Geautoriseerde grens:** alleen CSS-kleuren, contrast, borders en schaduwen. Geen wijzigingen aan posities, groottes, scroll-/swipe-/timingcode, navigatie, interacties, opname-, foto-, video-, audio-, timeline- of opslagfuncties. De gebruiker heeft de complete vertelcyclus reeds goedgekeurd en die blijft onaangeroerd.
+
+- Herstelbranch: `backup/deepblue-before-presentation-social-button-style-20261107`.
+- CSS-sourcecommit: `42d296f1d54fc096230c8dcb2238e5775add378b`.
+- Eén bestaande CSS-string `TALERA_MORE_CONTENT_ONLY_CSS` aan de bestaande geïsoleerde stijlworker toegevoegd met **uitsluitend** selectoren `body:not(.talera-recipient-presentation) #talera-flow-home`, `#talera-v5-editor-pencil` en `body.talera-v18-reading:not(.talera-recipient-presentation) #talera-clean-social` inclusief de daarin liggende buttons en actieve hartjes-SVG. Alle bestaande CSS vóór de uitbreiding is byte-identiek.
+- De beide ronde knoppen hebben nu identiek `background rgba(7,26,61,.80)`, wit pictogram, witte rand `rgba(255,255,255,.82)` en dezelfde zachte schaduw. Bestaande radius, 45×45px, positie, href/acties en alle scripts onaangeraakt.
+- **Uitsluitend in de bestaande leesstand** `body.talera-v18-reading`: reactiebalk `background rgba(247,245,240,.97)`, rand `rgba(85,121,169,.48)`, donkerblauwe button-/teller-/SVG-stroke-kleur `#071A3D` en donkere actieve hartvulling. De originele rustige fotostand van de reactiebalk blijft wit op translucent glas. Geen extra klasses, JS, events of renderlagen.
+- Cloudflare-deployment naar alleen bestaande `talera-style-diepblauw-20261107`, tijd `2026-11-07T15:56:19.225679Z`.
+- Browser-Rendering op de **daadwerkelijk gepubliceerde URL** bij viewport 360×844, 390×844 en 430×844: alle drie breedtes geverifieerd vóór scroll (photo mode) en na `#memoryStoryScroll` naar leesstand (body krijgt bestaande `talera-v18-reading`). De beide 45×45px knoppen waren in beide toestanden gelijkgekleurd; hun geometrie bleef intact. Sociale toolbar bleef 168×60px en op dezelfde horizontale positie, met nieuwe donkere SVG-stroke en tellers in leesstand. In fotostand bleef de originele `rgba(250,252,255,.2)` achtergrond met witte pictogrammen behouden.
+- Visueel geëvalueerd met browser-screenshot van omhooggetrokken leeslaag op 390×844: hart, reactieballon, deelicoon en tellers zijn duidelijk diepblauw tegen ivoor; Terug en Bewerken dragen dezelfde diepblauwe stijl.
+- GitHub bron-DIFF is exact: alle andere Worker-code **en alle bestaande CSS** behalve de aangehechte 1138 CSS-karakters volledig identiek. Beide tijdlijnfuncties `TALERA_HOME_MARKS_DENSITY` en `rewritePresentationDensity`, de 29 presentatiecontrollers, photo/video/audio en alle andere routes zijn niet gewijzigd.
+- Geen promotie naar de officiële 6-novemberversie; persoonlijke iPhone-acceptatie van deze stijlwijziging nog door gebruiker te doen.
+
+**Huidige testlink:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`.
+**Onaangeroerde goedgekeurde voorkeursversie:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.

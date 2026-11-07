@@ -198,9 +198,13 @@ async function register(req,env){
  if(!upstream.ok)return upstream;
  let result;try{result=await upstream.clone().json()}catch{return json({error:'De registratie is niet afgerond. Probeer aan te melden.'},502)}
  if(!result?.account?.id)return json({error:'Account-ID ontbreekt na registratie.'},502);
- try{await writeBirth(result.account.id,birthDate,env)}
- catch{return json({error:'Account aangemaakt, maar de geboortedatum is nog niet opgeslagen. Meld je aan en vul deze in bij Mijn account.'},503)}
- result.account.birthDate=birthDate;
+ // Account creation may succeed even when the separate DOB store is unavailable.
+ // Preserve the login cookie and report a recoverable partial result.
+ let dateSaved=false;
+ try{await writeBirth(result.account.id,birthDate,env);dateSaved=true}
+ catch(e){console.warn('TALERA private birthday write unavailable')}
+ result.account.birthDate=dateSaved?birthDate:null;
+ if(!dateSaved)result.birthDatePending=true;
  const headersOut=new Headers(upstream.headers);
  headersOut.delete('content-length');headersOut.delete('content-encoding');headersOut.delete('etag');
  headersOut.set('content-type','application/json; charset=utf-8');
@@ -219,15 +223,15 @@ async function me(req,env){
 }
 async function birthProfile(req,env){
  const acc=await sessionAccount(req,env);
- if(!acc)return json({error:'Meld je aan bij TALERA.'},401);
+ if(!acc)return json({code:'AUTH_REQUIRED',error:'Meld je aan bij TALERA.'},401);
  if(req.method==='GET')return json({birthDate:await readBirth(acc.id,env)});
  if(req.method!=='POST')return json({error:'Methode niet toegestaan.'},405);
- if(!sameOrigin(req))return json({error:'Ongeldige herkomst.'},403);
- let data;try{data=await readBody(req)}catch{return json({error:'Ongeldige aanvraag.'},400)}
+ if(!sameOrigin(req))return json({code:'INVALID_ORIGIN',error:'Ongeldige herkomst.'},403);
+ let data;try{data=await readBody(req)}catch{return json({code:'INVALID_REQUEST',error:'Ongeldige aanvraag.'},400)}
  const dob=checkBirthDate(data.birthDate);
- if(!dob)return json({error:'Vul een geldige geboortedatum in.'},400);
+ if(!dob)return json({code:'INVALID_BIRTH_DATE',error:'Vul een geldige geboortedatum in.'},400);
  try{await writeBirth(acc.id,dob,env)}
- catch{return json({error:'De geboortedatum kon niet worden bewaard.'},503)}
+ catch{return json({code:'STORAGE_ERROR',error:'De geboortedatum kon niet worden bewaard.'},503)}
  return json({birthDate:dob,saved:true});
 }
 function changeOne(source,oldToken,newToken){
@@ -284,13 +288,15 @@ async function patchedMenuIntegration(req,env){
  const original=await upstream.text();
  const needle="const result=await api('/api/register','POST',{displayName:data.displayName,username:data.username,email:data.email,password:data['register-password']});";
  const patched="const result=await api('/api/register','POST',{displayName:data.displayName,username:data.username,birthDate:data.birthDate,email:data.email,password:data['register-password']});";
- if(original.split(needle).length!==2){
+ const successToken="document.dispatchEvent(new CustomEvent('talera:account-changed',{detail:{intent}}));return 'Je account is aangemaakt.'";
+ const successReplacement="document.dispatchEvent(new CustomEvent('talera:account-changed',{detail:{intent}}));return result.birthDatePending?(window.TaleraI18n?.t('account.birth.createdPending')||'Je account is aangemaakt. Vul je geboortedatum in bij Mijn account.'):'Je account is aangemaakt.'";
+ if(original.split(needle).length!==2||original.split(successToken).length!==2){
   return new Response('TALERA registratie-update tijdelijk niet beschikbaar.',{status:503,headers:{'cache-control':'no-store','content-type':'text/plain; charset=utf-8'}});
  }
  const headers=new Headers(upstream.headers);
  for(const h of ['content-length','content-encoding','etag'])headers.delete(h);
  headers.set('cache-control','no-store');
- return new Response(original.replace(needle,patched),{status:upstream.status,statusText:upstream.statusText,headers});
+ return new Response(original.replace(needle,patched).replace(successToken,successReplacement),{status:upstream.status,statusText:upstream.statusText,headers});
 }
 export default {
  async fetch(request,env){

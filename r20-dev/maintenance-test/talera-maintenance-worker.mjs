@@ -302,7 +302,7 @@ async function page(req,env){
  html=languageUpdate.html;
  let visualUpdate={applied:false};
  if(path==='/present'){visualUpdate=tidyPresentationButtons(html);html=visualUpdate.html;}
- if(html.includes('</head>')&&!html.includes('id="talera-birthdate-ui"')){
+ if(html.includes('id="talera-more-menu"')&&html.includes('</head>')&&!html.includes('id="talera-birthdate-ui"')){
   html=html.replace('</head>','<script id="talera-birthdate-ui">'+JS_UI+'</script></head>');
  }
   const headers=new Headers(upstream.headers);

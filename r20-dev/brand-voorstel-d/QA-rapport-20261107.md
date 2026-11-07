@@ -84,3 +84,36 @@ Totaal **84 identieke scriptinhouden**. De inhoudelijke kleurwijziging heeft dus
 - Echte iPhone-acceptatie, lokaal geïnstalleerde PWA, opnamecyclus, video-upload/playback, rechten en herstel blijven te controleren. Niet claimen dat deze functies volledig zijn getest.
 
 **Status: Styling afgerond voor de onderzochte inhoudsschermen op staging; officiële voorkeurs-PWA ongewijzigd.**
+
+## Laatste opschoon- en controleronde — 7 november 2026
+
+**Status: technische stijlcontrole van de onderzochte schermen geslaagd; kandidaat voor iPhone-eindacceptatie. Nog geen productiepromotie.**
+
+### Laatste gerichte kleurcorrecties
+- De helptekst bij voorbeeldcategorieën onder Mijn leven had nog het oude grijsblauw `rgb(88,112,131)`; deze heeft nu `#23497E` via één `#sheetBody .talera-topics-note`-regel. GitHub commit `38739189fd74dd43a925f486958e22b70c33ba1e`.
+- De demonstratie-toelichting binnen `#sheetBody .main-only>p.hint` gebruikte nog `rgb(113,141,154)`; ook deze gebruikt nu `#23497E`. GitHub commit `1a063388e8750616681f2299c24835b4493e1c2a`.
+- Beide wijzigingen betroffen uitsluitend `BRAND_CSS` in de bestaande aparte teststijl-Worker `talera-style-diepblauw-20261107`; géén JS, routing, opslag, gebruikersdata of nieuwe Worker.
+- Foto-overlays met witte tekst zijn bewust wit gebleven.
+
+### Eindcontrole visuele stijl
+- In de browserzichtbare inhoudelijke eindteksten op `/mijn-leven`, `/tell` en `/present?talera_menu=hub` zijn de oude vier expliciet geteste grijsblauwe kleurwaarden niet meer aangetroffen.
+- A/B-berekeningen op 360×780, 390×844 en 430×932: beschermde boven- en onderbalken op `/mijn-leven`, `/tell` en Mijn TALERA-menu blijven qua onderzochte afmetingen, positie, achtergronden en zichtbaarheid identiek.
+- De presentatie zelf is ook in twee standen expliciet gecontroleerd: foto op volledig scherm (`#memoryStoryScroll.scrollTop=0`, `data-talera-present-reading=false`) en leestekst open (`scrollTop=260`, `data-talera-present-reading=true`). Voor `#memoryCaption`, `#memoryStory`, `#memoryStoryMore`, sociale actiebalk, appbar en tijdlijn zijn geen berekende stijlafwijkingen gevonden. De statusbalk- en `theme-color`-metadata zijn in beide standen identiek.
+- Het originele TALERA-logo staat in de menu-accountkaart op de plaats van de vorige letter T; de oorspronkelijke geometrie en witte route blijven intact. De accountkaart en de avatargeometrie bleven gelijk.
+
+### Niet-functionele codecontrole
+Op 7 november opnieuw de in de browser ontvangen scripts vergeleken met de goedgekeurde basis van 6 november, na normalisatie van de verschillende hostnamen:
+- `/mijn-leven`: 17/17 identiek.
+- `/tell`: 9/9 identiek.
+- `/present`: 29/29 identiek.
+- `/present?talera_menu=hub`: 29/29 identiek.
+
+In totaal zijn 84 scriptinhouden gelijk gebleven. Dit bewijst codepariteit op deze routes, maar géén volledige iPhone-regressietest.
+
+### Besluit en resterende acceptatie
+- **Nieuwe kandidaat:** https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven
+- **Huidige officiële voorkeur:** https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven
+- De huidige voorkeur en de oorspronkelijke gedeelde stijl-Worker zijn niet aangepast. Er is geen productiepromotie uitgevoerd.
+- Openstaand: handmatige test op een echte iPhone met eigen tijdelijk/testherinnering, foto + video uploaden, één opname met wisselende beelden, pauzeren, beëindigen, afspelen, audiovideo-synchronisatie, werkende inline-video en herhaald weergeven. Verder delen, back-ups en account/Free/Premium waar relevant, zonder destructieve tests.
+- Staging draait op een andere origin: bestaande lokale IndexedDB/LocalStorage-herinneringen worden niet automatisch overgenomen. De hoofd-PWA niet verwijderen of herinstalleren wegens risico op verlies van lokale data.
+- Pas na expliciete gebruikersgoedkeuring de nieuwe link tot officiële voorkeur promoveren.

@@ -34,9 +34,9 @@ function tidyPresentationButtons(html){
  const old=css.slice(a,b);
  if(!old.includes(' width:34px!important;')||!old.includes(' top:121.5px!important;')||!old.includes(' border-radius:50%!important;'))return {html,applied:false};
  css=css.slice(0,a)+css.slice(b);
- const activeAnchor=' max-height:45px!important;\n top:116px!important;';
+ const activeAnchor=' max-width:45px!important;max-height:45px!important;\n top:116px!important;';
  if(css.split(activeAnchor).length!==2)return {html,applied:false};
- css=css.replace(activeAnchor,' max-height:45px!important;\n border-radius:50%!important;\n top:116px!important;');
+ css=css.replace(activeAnchor,' max-width:45px!important;max-height:45px!important;\n border-radius:50%!important;\n top:116px!important;');
  return {html:html.slice(0,start)+css+html.slice(end),applied:true};
 }
 const HOME_TAG = '<script id="talera-flow-v17-time">';

@@ -25,11 +25,13 @@ const JS_UI = String.raw`(()=>{
  if(window.__taleraBirthdateUi)return;
  window.__taleraBirthdateUi=true;
  const root=()=>document.querySelector('#talera-more-menu');
- const isAccountTitle=s=>/^(mijn account|my account)$/i.test((s||'').trim());
+ const say=k=>window.TaleraI18n?.t?.(k)||k;
+ const showMessage=(el,k)=>{el.setAttribute('data-i18n',k);el.textContent=say(k)};
+ const fallbackError=e=>String(e?.message||'').startsWith('account.birth.')?e.message:'account.birth.saveFailed';
  function dobLabel(){
   const label=document.createElement('label');
   label.className='talera-date-of-birth-label';
-  label.textContent='Geboortedatum';
+  label.setAttribute('data-i18n','account.birth.label');label.textContent=say('account.birth.label');
   const input=document.createElement('input');
   input.type='date';input.name='birthDate';input.required=true;
   input.autocomplete='bday';input.max=new Date().toISOString().slice(0,10);
@@ -57,26 +59,26 @@ const JS_UI = String.raw`(()=>{
    const input=box.querySelector('[name="birthDate"]');
    if(input)input.value=current;
    const status=box.querySelector('[role="status"]');
-   if(status&&current)status.textContent='Geboortedatum opgeslagen bij je account.';
+   if(status&&current)showMessage(status,'account.birth.currentSaved');
   }catch{}
  }
  function decorateAccount(shell){
   const body=shell.querySelector('.body');
-  if(!body||!isAccountTitle(body.querySelector('h1')?.textContent))return;
+  if(!body)return; // Real account heading is in the menu header, not in .body.
   if(!body.querySelector('[data-action="logout"]'))return;
   if(body.querySelector('#talera-private-birthdate'))return;
   const section=document.createElement('section');
   section.id='talera-private-birthdate';
   const title=document.createElement('h2');
-  title.textContent='Mijn geboortedatum';
+  title.setAttribute('data-i18n','account.birth.title');title.textContent=say('account.birth.title');
   const sub=document.createElement('p');
-  sub.textContent='Alleen voor je eigen tijdlijnen. Niet zichtbaar voor andere gebruikers.';
+  sub.setAttribute('data-i18n','account.birth.privacy');sub.textContent=say('account.birth.privacy');
   const form=document.createElement('form');
   form.id='talera-birthdate-profile';
   const label=dobLabel();
   const save=document.createElement('button');
   save.type='submit';save.className='secondary';
-  save.textContent='Geboortedatum bewaren';
+  save.setAttribute('data-i18n','account.birth.save');save.textContent=say('account.birth.save');
   const status=document.createElement('p');
   status.setAttribute('role','status');
   form.append(label,save,status);
@@ -84,7 +86,7 @@ const JS_UI = String.raw`(()=>{
    ev.preventDefault();ev.stopPropagation();
    if(save.disabled)return;
    save.disabled=true;
-   status.textContent='';
+   status.removeAttribute('data-i18n');status.textContent='';
    try{
     const date=label.querySelector('input').value;
     const res=await fetch('/api/profile/birthdate',{
@@ -92,10 +94,11 @@ const JS_UI = String.raw`(()=>{
       headers:{'content-type':'application/json',accept:'application/json'},
       body:JSON.stringify({birthDate:date})
     });
-    const data=await res.json();
-    if(!res.ok)throw Error(data.error||'Opslaan is niet gelukt.');
-    status.textContent='Geboortedatum bewaard. Bij het opnieuw openen gebruiken beide tijdlijnen deze datum.';
-   }catch(e){status.textContent=e.message||'Opslaan is niet gelukt.'}
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw Error(data.code==='AUTH_REQUIRED'?'account.birth.signIn':
+     data.code==='INVALID_BIRTH_DATE'?'account.birth.invalid':'account.birth.saveFailed');
+    showMessage(status,'account.birth.saved');
+   }catch(e){showMessage(status,fallbackError(e))}
    finally{save.disabled=false}
   });
   section.append(title,sub,form);

@@ -159,3 +159,39 @@ Gebruikersverduidelijking: geen doorlopende horizontale lijn op de tijdlijnkaart
 - Browser Rendering A/B: `#v17-ruler`, `#v17-progress` en `::-webkit-slider-runnable-track` hebben een transparante achtergrond; 42 neutrale individuele jaarstreepjes blijven aanwezig bij nul eigen herinneringen.
 - Jaarselectie in test: `1985 → 1995`, jaarpreview met drie kinderen zichtbaar en daarna `1985` hersteld. Automatische screenshot 390×844 bevestigt visueel geen doorlopende lijn, wel losse markeringen en de originele ronde selector.
 - Echt iPhone-gebruik en geheugen-/videoregressie zijn hiermee **niet** voltooid. De goedgekeurde huidige voorkeurs-Worker van 6 november is niet overschreven. De nieuwe diepblauwe testversie blijft kandidaat.
+
+## Intuïtieve bediening — veilige kleur- en tekstronde (7 november 2026)
+
+**Opdracht:** voer de eerder opgestelde bouwprompt uit, **zonder enige functiewijziging**. Toegestaan: uitsluitend kleur van inhoudsbediening en visueel weglaten van aantoonbaar overbodige inhoudsinstructies. Alle huidige boven-/onderbalken, hun inhoud, de vertel-/opnametechniek, media-ID's, tijdstempels, de presentatiewerking, WhatsApp, reacties en opslag blijven beschermd.
+
+### Herstelpunt en broncode
+- Vóór wijzigingen de branch `backup/deepblue-before-intuitive-ux-20261107` aangemaakt vanaf `feature/deepblue-style-bars-locked-20261107`.
+- Bestaande geïsoleerde testcandidate gebruikt; uitsluitend `talera-style-diepblauw-20261107` gedeployed (omstreeks 10:43 UTC). Geen nieuwe functionele Worker, andere binding of productiepromotie.
+- GitHub wijzigingscommits `5d1fb002d018f1c11663a3d28ae755bae602f8e9` en `c21cd4c5fc58f687f121723c3c9fdd484d3557d7`.
+- Diff tussen het herstelpunt en de actuele stylesheet: **buiten de twee CSS-stringconstanten `BRAND_CSS` en `TALERA_MORE_CONTENT_ONLY_CSS` zijn de volledige bronteksten byte-voor-byte identiek**. Binnen deze constanten zijn enkel de hieronder genoemde nauw gescopeerde regels toegevoegd; niets verwijderd van bestaande CSS.
+- Actuele candidate: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
+- Huidige goedgekeurde versie: `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`, **niet aangepast**.
+
+### Uitgevoerde veilige inhoudsverbeteringen
+1. Op `/tell` startpagina is uitsluitend de redundante uitleg `#app #main > p.p` visueel verborgen. Beide ingangen (foto's toevoegen en zonder foto's vertellen) blijven aanwezig. Het zichtbare maximum 25 foto's en de informatie dat het concept wordt bewaard blijven behouden.
+2. Op `/mijn-leven` is alleen de redundante instructie onder de onderwerpkaarten `#sheetBody .talera-topics-note` visueel verborgen. Alle zes onderwerpkaarten, de jaarblokken en de bestaande tijdlijn blijven aanwezig en werken volgens de oorspronkelijke code.
+3. In het herinneringswerkblad zijn uitsluitend de bestaande knopkleuren van `#speak` en `#write` naar officieel middenblauw `#23497E`, hun randkleur naar `#5579A9` en de `#publish`-knop naar diep donkerblauw `#071A3D` gebracht. Exact dezelfde element-ID's, posities, afmetingen en clickhandlers bleven behouden.
+4. De bestaande datumknop `#dateToggle` gebruikt nu `#23497E`, zodat hij niet langer van het officiële palet afwijkt. De datumkeuze en datumbevestigingslogica zijn onaangeroerd.
+5. In de inhoud van de Instellingen-weergave is uitsluitend de redundant beschrijvende `intro` visueel verborgen. Zeven menuopties en de menubalk blijven aanwezig. De accounts- en privacymeldingen blijven staan.
+
+### Automatische regressiecontrole
+- Op mobiel `360×780`, `390×844`, `430×932`: A/B met de werkende versie van 6 november op `/mijn-leven`, `/tell`, `/present?talera_menu=hub`. De gecontroleerde elementen `.mast`, `.flow-nav`, `.sheet-handle`, `#app .top`, `#talera-more-menu header`, `#talera-more-menu .headbutton`, `#talera-v15-appbar`, `#talera-v12-reactions-bar` zijn qua berekende kleur/achtergrond, zichtbaarheid, positie, afmeting en opaciteit gelijk gebleven.
+- `/tell`: uitleg visueel verborgen, foto-kiezer blijft bruikbaar, optie zonder foto's en conceptstatus blijven zichtbaar. In een tijdelijke browser werd het bestaande werkblad geopend; de drie werkbalkknoppen hadden dezelfde posities/afmetingen. Kleuren als voorzien.
+- `/present?talera_menu=hub` → Instellingen: `data-view=settings`, inhoudelijke intro `display:none`, alle **7** opties aanwezig.
+- Veilig klikgedrag op een tijdelijk leeg werkblad: `Vertellen` opent het bestaande paneel met Opnemen en Klaar; `Schrijven` opent het bestaande schrijfvenster met tekstveld en Klaar; `Plaatsen` toont dezelfde bestaande melding voor een leeg concept. Geen microfoon aangevraagd, geen echte media opgeslagen.
+- Javascript-bronvergelijking met de voorkeursversie: `/tell` 9/9 scripts gelijk, `/present` 29/29 gelijk, `/present?talera_menu=hub` 29/29 gelijk. `/mijn-leven` heeft van 17 scripts alleen de **eerder goedgekeurde V17-tijdlijndichtheidsfunctie** anders. In déze UX-ronde is geen enkel script gewijzigd.
+
+### Bewust NIET uitgevoerd
+- `Opnemen` na het bewaren visueel laten wijken voor `Klaar`: de bestaande `Klaar`-knop staat in de **beschermde opnamepaneel-bovenbalk**. Geen CSS of code aan de beschermde bar/opnamebediening geraakt. Afzonderlijke expliciete uitzondering/acceptatie nodig.
+- `Plaatsen` voor lege herinneringen grijs of niet-actief maken: de bestaande HTML biedt niet op iedere route een betrouwbare CSS-only toestand voor gesproken, geschreven én beeldherinneringen; dit zou mensen misleiden. Bestaande knop en validatie blijven.
+- Andere teksten en hints die limieten, back-ups, datumzekerheid, opslag, fouten, privacy en toestemmingen betreffen zijn behouden.
+- Eventuele oorspronkelijke tekortkomingen met WhatsApp, het witte uitschuifbare verhaalpaneel en afspelen zijn hier niet gerepareerd omdat deze opdracht wijzigingen aan techniek verbood.
+
+### Openstaande controle
+- Geen echte iPhone- of toegankelijkheids-/spraakopnametest uitgevoerd. De gebruiker dient de nieuwe kleuren en tekstminimalisatie zelf te beoordelen, inclusief opname-/video-/WhatsAppfunctionaliteit.
+- Geen officiële linkpromotie zonder expliciete goedkeuring.

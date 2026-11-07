@@ -18,6 +18,27 @@ function patchLangPacks(html){
  code=code.replace(anchor,injection+anchor);
  return {html:html.slice(0,start)+code+html.slice(end),applied:true};
 }
+// Design-only cleanup: retire the superseded 34px hitbox override while preserving
+// the sole surviving 50% border-radius on the later 45px accessible hitbox rule.
+function tidyPresentationButtons(html){
+ const marker='<style id="talera-deepblue-menu-content">';
+ const i=html.indexOf(marker);
+ if(i<0)return {html,applied:false};
+ const start=i+marker.length,end=html.indexOf('</style>',start);
+ if(end<0)return {html,applied:false};
+ let css=html.slice(start,end);
+ const oldStart='/* TALERA round control geometry: shrink CIRCLES 25%, not the existing arrow/pencil artwork. */';
+ const nextStart='/* TALERA touch repair: restore original 45px interactive hitboxes, retain 34px visible circles. */';
+ const a=css.indexOf(oldStart),b=css.indexOf(nextStart);
+ if(a<0||b<=a||css.indexOf(oldStart,a+1)>=0)return {html,applied:false};
+ const old=css.slice(a,b);
+ if(!old.includes(' width:34px!important;')||!old.includes(' top:121.5px!important;')||!old.includes(' border-radius:50%!important;'))return {html,applied:false};
+ css=css.slice(0,a)+css.slice(b);
+ const activeAnchor=' max-height:45px!important;\n top:116px!important;';
+ if(css.split(activeAnchor).length!==2)return {html,applied:false};
+ css=css.replace(activeAnchor,' max-height:45px!important;\n border-radius:50%!important;\n top:116px!important;');
+ return {html:html.slice(0,start)+css+html.slice(end),applied:true};
+}
 const HOME_TAG = '<script id="talera-flow-v17-time">';
 const PRESENT_START = 'const LIFE_START = new Date(1976,8,6).getTime();';
 const JS_UI = String.raw`(()=>{

@@ -1,0 +1,53 @@
+name: TALERA Fase 1 - Design-only CSS preview (GitHub)
+on:
+  push:
+    branches: [feature/design-only-css-cascade-cleanup-20261107]
+    paths:
+      - r20-dev/css-cleanup-preview/**
+      - r20-dev/brand-voorstel-d/style-worker-blue-content.mjs
+      - .github/workflows/talera-css-cleanup-preview.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test_and_publish_isolated_preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Wrangler
+        run: npm ci
+      - name: Validate isolated preview source
+        run: |
+          node --check r20-dev/css-cleanup-preview/preview.worker.mjs
+          node --test r20-dev/css-cleanup-preview/preview.test.mjs
+      - name: Make sure the existing deployment secrets are available
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing GitHub Cloudflare API token; no publish"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing GitHub Cloudflare account id; no publish"; exit 1; }
+      - name: Publish ONLY NEW CSS phase 1 test Worker through GitHub
+        run: |
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
+          npx wrangler deploy --config r20-dev/css-cleanup-preview/wrangler.jsonc
+      - name: Check live CSS preview route (read-only)
+        run: |
+          set -eu
+          URL='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev/mijn-leven'
+          for attempt in 1 2 3 4 5 6; do
+            http=$(curl --max-time 25 -sS -o /tmp/talera-fase1.html -D /tmp/talera-fase1.headers -w '%{http_code}' "$URL") || http=000
+            if [ "$http" = "200" ] && grep -qi '^x-talera-css-cleanup-phase1: applied' /tmp/talera-fase1.headers; then
+              echo "CSS rewrite applied on isolated test Worker."
+              exit 0
+            fi
+            echo "Attempt $attempt failed: HTTP $http; expected x-talera-css-cleanup-phase1: applied"
+            sleep 5
+          done
+          echo "Live phase-1 candidate not verified. DO NOT claim user-facing iPhone readiness."
+          exit 1

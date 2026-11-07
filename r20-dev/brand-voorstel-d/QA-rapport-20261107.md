@@ -313,3 +313,33 @@ Getest op 390×844 in de nieuwe gehoste stagingpagina met tijdelijke in-memory v
 - Geen officiële promotie of vervanging van de bestaande voorkeurslink. De gebruiker moet het uiterlijk nog op eigen iPhone beoordelen.
 - Testkandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
 - Goedkeurde voorkeur onveranderd: `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
+
+## Tijdlijn 2D: bezetting én relatieve intensiteit — 7 november 2026
+
+**Gebruikersaanleiding:** Bij een gelijkmatige verdeling zien 300, 3.000 en 10.000 herinneringen er met uitsluitend de mediane relatieve kleurintensiteit vrijwel hetzelfde uit. De tijdlijn moet óók het absolute aantal verhalen per periode visualiseren, zonder een doorlopende donkere lijn te worden.
+
+### Goedgekeurd begrensd wijzigingsvlak
+- Alleen het bestaande tijdlijn-tekenalgoritme in de HTML-route `/mijn-leven`, binnen `talera-flow-v17-time` via de eerder gebruikte exacte rendererconstante `TALERA_HOME_MARKS_DENSITY`.
+- Herstelbranch vóór wijziging: `backup/deepblue-before-dual-axis-timeline-20261107`.
+- GitHub broncommit: `e13b80009d38d09339ea3b05ec4e3222acac70e4`.
+- Diff tussen herstelbranch en broncommit: **alle broncode buiten die ene tijdlijnrenderer-string is byte-identiek**. Geen CSS aangepast. Binnen de renderer zijn uitsluitend nieuwe berekening en inline `height`/`top` op bestaande `.v17-mark`-elementen toegevoegd; alle oorspronkelijke tellingen, de eigen-vs-voorbeeld fallback, relatieve klassen, jaarlabels, tooltips, positie, breedte en eventhandlers ongewijzigd.
+- Bestaande voorbeelden tellen alleen als intensiteitsbron zolang er geen eigen herinneringen zijn. De 500 voorbeelden blijven ongewijzigd; 468 vallen in het bestaande bereik 1985–2026. Na een eigen verhaal telt uitsluitend eigen inhoud, zoals voor deze ronde was goedgekeurd.
+
+### Dubbel algoritme
+1. **Relatieve intensiteit, bestaand en behouden:** bepaal het aantal verhalen per kalenderjaar (eventuele visuele jaarbundels worden genormaliseerd per jaar), vergelijk het met de mediaan van alle niet-lege tijdvakken. Laat de vijf bestaande kleuren en breedtes staan: 0, <0.45×, <1.45×, <2.8× en ≥2.8× de mediaan.
+2. **Absolute bezetting, nieuw en onafhankelijk:** bij een gevuld tijdvak met `n = verhalen per kalenderjaar`, bereken `fill=min(1, ln(1+n)/ln(1001))`. Zet de streephoogte op `round(7+18×fill)` pixels, met gecentreerde verticale uitlijning. Lege perioden blijven ongewijzigd op 7 px/1 px breed.
+3. Daardoor levert ongeveer 7 verhalen/jaar een 12–13 px hoog streepje, ongeveer 71 verhalen/jaar een 18 px streepje, ongeveer 238 verhalen/jaar een 21 px streepje. Ook bij hoge bezetting blijft de streephoogte begrensd tot 25 px, en laat de ongewijzigde breedte van bijvoorbeeld 3 px de noodzakelijke witte ruimte tussen de jaren intact. Een gelijkmatige verdeling heeft logischerwijs geen kunstmatige kleurpieken.
+
+### Browseronderzoek en resultaten
+- Deployment op uitsluitend bestaande geïsoleerde stijlworker `talera-style-diepblauw-20261107`, op `2026-11-07T12:21:53.2137Z`.
+- Browser-Rendering op actuele diepblauwe `/mijn-leven` bij 390×844: met **0** verhalen = 42 oorspronkelijke fijne markeringen 7 px hoog/1 px breed; met **300** gelijkmatig verdeelde verhalen = 42 markeringen van 12–13 px hoog/3 px breed; met **500** gelijkmatig verdeelde voorbeelden = 13–14 px/3 px; met **3.000** gelijkmatig verdeelde verhalen = 18 px/3 px; met **10.000** gelijkmatig verdeelde verhalen = 21 px/3 px.
+- In de gelijkmatige simulaties bleven alle 42 markeringen in de middelste relatieve kleurklasse (geen kunstmatige pieken). De interne telling en het beschrijvende jaarlabel waren correct. Geen herinneringen aan gebruikersopslag toegevoegd; uitsluitend tijdelijke in-memory browserfixtures.
+- Aparte mobiele HTML-demonstratie (390px), onafhankelijk van de PWA, met vier vergelijkbare rijen (300 gelijkmatig, 3.000 gelijkmatig, 10.000 gelijkmatig, 3.000 met echte pieken/dalen) heeft 42 ticks per rij en totale tellingen 300/3000/10000/3000. Met 3000 ongelijkmatige verhalen: 10 lege, 10 rustige, 10 gewone, 7 drukke, 5 zeer drukke tijdvakken; streephoogtes 7–21px. Gecontroleerd met lokale headless Chromium, geen JavaScriptfouten. Het demo-HTML en de afbeelding zijn afzonderlijke gespreksbijlagen, **niet** gedeployed naar TALERA.
+- De online app is eveneens met Browser-Rendering-screenshot visueel beoordeeld: de bestaande 500 voorbeeldherinneringen tonen een nette rij afzonderlijke markeringen, geen horizontale verbindingslijn en de oorspronkelijke jaarknop.
+- Browser A/B stijlcontrole op 360×844, 390×844 en 430×844: de beschermde `.mast`, `.flow-nav`, `.sheet-handle`, `#app .top`, `#talera-more-menu header`, `.headbutton`, `#talera-v15-appbar` en `#talera-v12-reactions-bar` blijven qua berekende geometrie, kleur, achtergrond, display en opaciteit gelijk aan de goedgekeurde basis. De kaart heeft eerdere bewust geautoriseerde andere merkstijl, niet veroorzaakt door deze wijziging.
+- De technische browserproeven zijn **geen** volledige test met daadwerkelijke 10.000 lokaal opgeslagen herinneringen op een iPhone. App-prestaties met grote eigen verzamelingen en langjarige tijdvakbundels verdienen aanvullende echte iPhone-test.
+
+### Strikte bewaking
+- Alle vertel-, opname-, video-, foto-, upload-, reactie-, WhatsApp-, opslag-, account- en presentatiefuncties zijn niet gewijzigd.
+- De goedgekeurde werkende versie `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven` is niet bijgewerkt.
+- De nieuwe algoritmeversie blijft een **testkandidaat** op `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`. Promotie pas na expliciete acceptatie.

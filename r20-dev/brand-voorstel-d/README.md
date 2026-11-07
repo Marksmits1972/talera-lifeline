@@ -32,3 +32,14 @@ Status: afzonderlijke Cloudflare-staging gebouwd en via Browser Rendering gecont
 - Computed-style guard: mobiel viewport 390x844: `.mast`, `.flow-nav`, `#talera-more-menu header`, `.headbutton`, `.panel`, `#talera-v15-appbar`, `#talera-v12-reactions-bar` geven dezelfde berekende layout/kleuren terug als de goedgekeurde voorkeurs-PWA; alleen doelbewust aangepaste inhoudsteksten verschillen.
 - Veiligheidscontract: de volledige originele stijl-Worker is uit de nieuwe terug te reconstrueren door alleen de extra centrale CSS-, menu-CSS-constanten en de ene injectieregel ongedaan te maken. Alle oorspronkelijke Workerfuncties behouden.
 - Open: echte iPhone-acceptatie, volledige video- en opname-/upload-regressie en aanvullende visuele controle. GEEN productiepromotie of wijziging van huidige voorkeurs-URL.
+
+## Ronde 3: origineel TALERA-logo in voorstel D, 7 november 2026
+
+- Officieel kleurenpaar voor de bestaande drie logopanelen: `#071A3D`, `#23497E`, `#5579A9` (RGB 7/26/61, 35/73/126, 85/121/169).
+- Originele PWA PNG-asset wordt via de reeds bestaande `recolorPng()` functie gebruikt; **geen nieuwe geometrie of weg**. Alleen de drie `picks` vervangen.
+- Unieke versiegebonden logo-URL's `/talera-brand-voorstel-d-icon-{180,192,512}.png` op dezelfde afzonderlijke staging Worker; dit vermijdt oude browsercache. Bestaande CSS-logo achtergrondafbeelding gebruikt nu 180px variant zonder positie, afmetingen of zichtbaarheid te veranderen.
+- Op /mijn-leven en /tell alleen bestaande HTML-icoon- en Apple-touch-icon-hrefs naar de nieuwe asset URL's aangepast. Bestaande meta statusbar `black-translucent` onaangeroerd. PWA-manifest icon URLs zijn nu ook versioned. /present markup en afspeelfuncties blijven zoals eerder; bestaande originele assetaliases worden technisch ook met de nieuw gekozen RGB's gekleurd binnen staging.
+- GitHub commit `5f36668c82a60da6c634eca9e00ae47e725fa674` (voorgaande `2feae0b6590958d5b55e324382a1b139fef11d7b`). Alleen geïsoleerde branch.
+- Cloudflare staging-update: `talera-style-diepblauw-20261107` om 8:02 UTC; huidige voorkeurs-PWA en originele shared style Worker niet gewijzigd.
+- Browser Rendering heeft 512px logo en PWA-home visueel geladen. Computed-style vergelijkingen met de oude basis op 390x844: .mast, .flow-nav, .sheet-handle, alle vaste presentatie/menu bars dezelfde achtergrond, positie en afmetingen. Verschillen uitsluitend bedoelde hoofdinhoudskleur en de nieuwe logoafbeeldings-URL. Presentatie/menu bar vergelijken met originele versie: geen verschillen.
+- Functionele opname/video-upload/volledig iPhone-PWA gedrag nog niet opnieuw getest; de kandidaat mag NIET de officiële voorkeurs-URL vervangen zonder gebruikersakkoord. iOS geïnstalleerde icoon kan door het systeem gecachet zijn; niet aanraden de oude app te verwijderen of opnieuw te installeren vanwege lokale opslag.

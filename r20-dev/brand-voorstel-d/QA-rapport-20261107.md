@@ -499,3 +499,26 @@ De tijdlijnwijzigingen op `/mijn-leven` en `/present` zijn inmiddels door de geb
 
 **Huidige testlink:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`.
 **Onaangeroerde goedgekeurde voorkeursversie:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
+
+## Presentatie: glasstijl knopjes en gecentreerde terugchevron — 7 november 2026
+
+Gebruiker stuurde screenshot van gewone foto-/presentatiestand. De ronde Terugknop en Bewerkenknop waren nog **donkerblauw**, terwijl de bestaande socialmediabalk een **lichte transparante frosted-glass stijl** gebruikte. Gebruiker wilde uitdrukkelijk dat beide knopjes dezelfde kleurstijl als de socialmediabalk krijgen en dat de terugpijl optisch exact gecentreerd wordt. **Alleen CSS toegestaan, geen technische/gedragswijzigingen.**
+
+### Uitvoering
+- Herstelbranch vóór aanpassing: `backup/deepblue-before-glass-buttons-arrow-center-20261107`.
+- GitHub codecommit: `4af215c1616326b1bffbb29afbd4e07f5943a558`.
+- Bestaande stijlworker `talera-style-diepblauw-20261107` bijgewerkt op `2026-11-07T16:14:57.211256Z`. Alleen diepblauwe testkandidaat; officiële voorkeursworker van 6 november niet gewijzigd.
+- Toegevoegd aan bestaande presentatiestijlconstante `TALERA_MORE_CONTENT_ONLY_CSS`; verder **volledige Worker-bron byte-identiek** aan herstelbranch, en alle reeds bestaande CSS volledig behouden. Geen HTML, JS, opname-, media-, timeline-, player-, sharing- of navigatiewijziging.
+- In normale fotostand nu beide ronde `#talera-flow-home` en `#talera-v5-editor-pencil` identiek aan `#talera-clean-social`: `background rgba(250,252,255,.20)`, `border rgba(255,255,255,.72)`, `backdrop-filter blur(18px)`, `box-shadow rgba(0,0,0,.20) 0 5px 22px`; witte iconen met subtiele donkere leesbaarheidsschaduw.
+- In bestaande omhooggetrokken leesstand `body.talera-v18-reading`: beide knoppen wijzigen exact mee met socialbalk naar `background rgba(247,245,240,.97)`, `border rgba(85,121,169,.48)`, `box-shadow rgba(7,26,61,.15) 0 4px 18px` en donkerblauwe iconen `#071A3D`.
+- Terugpijl stond door font-basislijn optisch iets te laag. Bestaand anker `#talera-flow-home` blijft met originele `href=/`, formaat 45×45 en klikvlak. Alleen oorspronkelijke typografische glyph visueel onderdrukt met `font-size:0` en een geometrisch gecentreerde CSS-chevron via `::before` getekend (`15×15px`, 4px gekantelde randen, `top:50%`, `left:calc(50% + 2px)` als optische x-correctie, `rotate(45deg)`, `pointer-events:none`). Geen nieuwe DOM of scripts. De visuele centrering is in browser-screenshots voor foto- en leesstand bekeken.
+
+### QA
+- Headless-browsercontrole op **gepubliceerde** diepblauwe `/present` bij 360×844, 390×844 en 430×844, telkens normale fotostand én omhooggeschoven leesstand.
+- In alle 6 gevallen is de complete glaskleur-/rand-/schaduw-/blurset van Terug en Bewerken **exact gelijk** aan het reactieblok. De knopdiameter bleef 45×45, positie links 15px / rechts 15px, y=116px; de socialbalk bleef 168×60. De teruglink is nog `href=/`, het pseudo-chevron is `pointer-events:none`.
+- Browser-Rendering-screenshots vóór deployment in de twee toestanden visueel nagekeken, inclusief scherp getekende, gecentreerde chevron. Het eerste prototype met SVG-mask is NIET geïnstalleerd, omdat dat bij preview leeg kon lijken; gekozen oplossing is uitsluitend robuuste CSS-randen.
+- GitHub bronvergelijking tussen herstelbranch en actieve code: **alle tekst behalve exact de toegevoegde 2136 CSS-tekens aan bestaande CSS-constante is byte-identiek**. Beide eerder goedgekeurde tijdlijnlogica’s, complete vertelcyclus en alle 29 presentatiecontrollers onaangeroerd.
+- Nog geen echte iPhone-acceptatie van dit nieuwe uiterlijk; gebruiker kan de live testlink beoordelen. Geen promotie naar de officiële goede basisversie.
+
+**Testlink:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`.
+**Oude officiële werkende versie:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.

@@ -1,0 +1,12 @@
+{
+  "name": "talera-design-cleanup-fase4-test-20261107",
+  "main": "./preview.worker.mjs",
+  "compatibility_date": "2026-11-07",
+  "workers_dev": true,
+  "services": [
+    {
+      "binding": "TALERA_BASE",
+      "service": "talera-vijftalen-onderhoud-test-20261107"
+    }
+  ]
+}

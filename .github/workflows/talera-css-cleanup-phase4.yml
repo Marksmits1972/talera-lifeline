@@ -1,0 +1,68 @@
+name: TALERA Fase 4 - Cleanup invisible timeline rail CSS via GitHub
+on:
+  push:
+    branches: [feature/design-only-timeline-rail-css-cleanup-phase4-20261107]
+    paths:
+      - r20-dev/css-cleanup-phase4/**
+      - r20-dev/brand-voorstel-d/style-worker-blue-content.mjs
+      - .github/workflows/talera-css-cleanup-phase4.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test_and_preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Wrangler
+        run: npm ci
+      - name: Validate cumulative CSS-only rewrite and route isolation
+        run: |
+          node --check r20-dev/css-cleanup-phase4/preview.worker.mjs
+          node --check r20-dev/css-cleanup-phase4/browser-compare.mjs
+          node --test r20-dev/css-cleanup-phase4/preview.test.mjs
+      - name: Require existing GitHub Worker deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || exit 1
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || exit 1
+      - name: Deploy NEW isolated phase4 test Worker only
+        run: |
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
+          npx wrangler deploy --config r20-dev/css-cleanup-phase4/wrangler.jsonc
+      - name: Verify live rewrite status on all three routes
+        run: |
+          set -eu
+          ROOT='https://talera-design-cleanup-fase4-test-20261107.mark-a39.workers.dev'
+          for page in mijn-leven present tell; do
+            good=0
+            for attempt in 1 2 3 4 5 6; do
+              http=$(curl --max-time 25 -sS -D /tmp/talera-headers -o /tmp/talera-page -w '%{http_code}' "$ROOT/$page") || http=000
+              if [ "$http" = 200 ] && grep -qi '^x-talera-css-cleanup-phase4: applied' /tmp/talera-headers; then
+                if [ "$page" != tell ] || grep -qi '^x-talera-tell-header-fix: applied' /tmp/talera-headers; then
+                  good=1
+                  echo "$page : OK HTTP 200, isolated CSS applied"
+                  break
+                fi
+              fi
+              echo "$page attempt $attempt failed ($http)"
+              sleep 4
+            done
+            test "$good" = 1 || exit 1
+          done
+      - name: Verify approved warm header and invisible rails versus phase4 in mobile Chrome
+        run: |
+          BROWSER=$(command -v google-chrome-stable || command -v google-chrome || command -v chromium)
+          PROFILE="$RUNNER_TEMP/talera-header-check-$GITHUB_RUN_ATTEMPT-$$"
+          mkdir -p "$PROFILE"
+          "$BROWSER" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --remote-allow-origins='*' --remote-debugging-port=0 --user-data-dir="$PROFILE" about:blank >/tmp/talera-header-chrome.log 2>&1 &
+          PID=$!
+          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          TALERA_CDP_DIR="$PROFILE" node r20-dev/css-cleanup-phase4/browser-compare.mjs || { tail -n 60 /tmp/talera-header-chrome.log; exit 1; }

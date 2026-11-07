@@ -45,7 +45,7 @@ jobs:
             for attempt in 1 2 3 4 5 6; do
               http=$(curl --max-time 25 -sS -o /tmp/talera-fase2.html -D /tmp/talera-fase2.headers -w '%{http_code}' "$ROOT/$page") || http=000
               if [ "$http" = "200" ] && grep -qi '^x-talera-css-cleanup-phase3: applied' /tmp/talera-fase2.headers; then
-                echo "$page: HTTP 200 and CSS phase 2 applied"
+                echo "$page: HTTP 200 and CSS phase 3 applied"
                 success=1
                 break
               fi

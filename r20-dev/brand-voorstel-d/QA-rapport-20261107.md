@@ -72,3 +72,15 @@ Totaal **84 identieke scriptinhouden**. De inhoudelijke kleurwijziging heeft dus
 - Cloudflare Browser Rendering: logo zichtbaar in Mijn TALERA-menu op mobiele breedte 390×844. Computed-style A/B test met de goedgekeurde voorkeursversie: `#talera-more-menu header`, `.headbutton`, `.panel`, `#talera-v15-appbar` en `#talera-v12-reactions-bar` zijn identiek; accountkaart is op dezelfde positie en 354×82 px. De avatar is nog steeds 52×52 px op dezelfde positie, uitsluitend de achtergrondafbeelding en bijbehorende tekstpresentatie zijn gewijzigd.
 - Alle boven- en onderbalken inclusief statusbalk, transparante fotobovenkant en zwarte/witte presentatieranden blijven beschermd. Opname-, video-, presentatie- en opslagcode niet gewijzigd.
 - De kandidaat-URL blijft `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`. De werkende voorkeursversie van 6 november blijft intact. Echte iPhone- en volledige opname-/video-regressietests blijven open.
+
+## Ronde 4 — Privacy, abonnement en aanmeldformulier (7 november 2026)
+
+- Voortgebouwd op exact dezelfde beschermde GitHub-branch en geïsoleerde stijl-Worker; geen nieuwe Worker of wijziging aan de officiële huidige voorkeurs-URL.
+- Broncommit `a4a0f6647c531f86adf4e10cf3bbbc9fb19d7758`: negen uitsluitend aan `#talera-more-menu .body` gebonden CSS-regels voor de titels en toelichtingen in informatiekaarten, ingevulde formuliervelden, placeholder/focus-kleuren en de wachtwoord-zichtbaarheidsknop. Kleuren `#071A3D` en `#23497E`; bestaande layout en functionele knoppen intact.
+- A/B-test Cloudflare Browser Rendering op `/present?talera_menu=hub`: `privacy` en `login` tonen de nieuwe tekstkleur, zonder positie-, maat- of displaywijzigingen. Bij het wachtwoord-oogje is de bedieningszone 48 × 44 CSS-pixels gebleven.
+- Responsieve beschermingscontrole geslaagd: Privacy op 360 × 780, Abonnement op 430 × 932, Aanmelden op 390 × 844. Vergelijking op vaste menuheader, terug-/sluitknoppen, paneel, presentatie-appbar en sociale actiebalk: geen berekende stijl- of geometrieverschillen.
+- JavaScript-bronvergelijking na deze wijziging: `/mijn-leven` 17, `/tell` 9, `/present` 29, `/present?talera_menu=hub` 29. Alle 84 scripts gelijk aan de geregistreerde voorkeursversie na normalisatie van de hostname. Er is geen extra logica toegevoegd voor presentatie, video, opname, delen, opslag, accounts of betalingen.
+- De menuavatar gebruikt het **echte originele TALERA-logo** in diepblauw; de T blijft als verborgen tekst in de bestaande DOM-markup aanwezig (geometrie en bronscripts zijn niet aangepast). Een eventuele toegankelijkheidsverbetering van de semantiek vereist afzonderlijk afgewogen markupwijziging; niet in deze CSS-only stijlronden.
+- Echte iPhone-acceptatie, lokaal geïnstalleerde PWA, opnamecyclus, video-upload/playback, rechten en herstel blijven te controleren. Niet claimen dat deze functies volledig zijn getest.
+
+**Status: Styling afgerond voor de onderzochte inhoudsschermen op staging; officiële voorkeurs-PWA ongewijzigd.**

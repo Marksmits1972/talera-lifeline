@@ -548,3 +548,15 @@ Gebruiker vroeg om **slechts twee subtiele kleurgradaties** van de terug- en bew
 **Testlink:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`.
 
 **Onaangeroerde goedgekeurde versie:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
+
+## Presentatie: kleinere neutraalgrijze terugchevron — 7 november 2026
+
+Gebruiker vroeg na de automatische rookgrijze contrastregeling de **zichtbare terugchevron ("vinkje") kleiner te maken en expliciet geen donkerblauw te gebruiken**. De knop zelf, bewerkknop en alle presentatietechniek moesten behouden blijven.
+
+- Herstelbranch: `backup/deepblue-before-small-neutral-back-chevron-20261107`.
+- Broncommit: `ac63a759c5b222cfd1d46c77da247363e0bbad23`.
+- Uitsluitend een optellend CSS-blok aan de bestaande `TALERA_MORE_CONTENT_ONLY_CSS` toegevoegd. De bestaande `#talera-flow-home::before`-chevron is van 15×15 naar **12×12px** en de lijn van 4 naar **3px** gebracht. Optische centrering `left:calc(50% + 1.5px)` i.p.v. +2px; subtiele neutraalgrijze schaduw. In sterke lichtfoto-contraststand en op ivoorkleurig tekstscherm worden beide chevronranden **`#606266`**, RGB 96,98,102; de standaard witte foto-op-donkere-foto-chevron blijft behouden. Geen donkerblauw in de grijze chevron.
+- Knopdiameter 45×45px, teruglink `href=/`, positie (x=15, y=116), bewerkknop, sociale balk, foto/video/audio en de automatisch wisselende rookgrijze achtergrond zijn volledig ongewijzigd. Geen JS-, HTML- of dynamische logica-aanpassing; slechts deze CSS.
+- Cloudflare deploy van alleen de bestaande diepblauwe stijlworker `talera-style-diepblauw-20261107` op `2026-11-07T16:46:04.133305Z`. De goedgekeurde 6-novemberkern onaangeroerd.
+- Browser Rendering QA op de gepubliceerde `/present`, **360×844, 390×844 en 430×844**; in foto-/lichte-contraststand én omhooggetrokken leesstand worden voor de chevron daadwerkelijk 12×12px, 3px-randen en `rgb(96,98,102)` gemeten. Het bestaande 45×45px klikvlak en de href blijven ongewijzigd. Een voorafgaande screenshotproef van deze CSS is visueel gecontroleerd.
+- Testlink `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`. Definitieve iPhone-acceptatie door gebruiker nog te doen.

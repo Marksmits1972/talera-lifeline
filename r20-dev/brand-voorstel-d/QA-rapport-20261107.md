@@ -286,3 +286,30 @@ Getest op 390×844 in de nieuwe gehoste stagingpagina met tijdelijke in-memory v
 - **Testkandidaat:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
 - **Goedgekeurde voorkeursversie ongewijzigd:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
 - Nog geen productiepromotie of acceptatietest met 300–10.000 daadwerkelijk op iPhone opgeslagen herinneringen; voor herinstallatie/verwijderen van een PWA wordt niet geadviseerd wegens mogelijk lokale data.
+
+## Tijdelijke intensiteitsbron: 500 voorbeelden totdat er eigen verhalen zijn — 7 november 2026
+
+**Uitdrukkelijk akkoord van gebruiker:** maak de inhoudelijke tijdlijn van Mijn leven controleerbaar door voorlopig de bestaande 500 voorbeeldherinneringen als zichtbare intensiteitsbron te gebruiken als de gebruiker nog helemaal geen eigen herinneringen heeft. Zodra er één of meer eigen herinneringen zijn, moet de berekening alleen de eigen verhalen tellen. Verander verder niets.
+
+### Technische uitvoering
+- Isolatie: uitsluitend in de bestaande diepblauwe stijltestworker `talera-style-diepblauw-20261107` en alleen op de bestaande pagina `/mijn-leven`, via de al aanwezige `TALERA_HOME_MARKS_DENSITY` renderer van `talera-flow-v17-time`.
+- GitHub broncodecommit: `cceb4f4dab355dc78ea001e0476b4552385e277c`.
+- Herstelbranch vóór wijziging: `backup/deepblue-before-demo-density-fallback-20261107`.
+- GitHub bronvergelijking vóór/na: **alle tekst buiten die ene tijdlijnrenderer-constante is byte-identiek**. Bestaande mediane zelfschalingsformule, visuele niveaus 0–4, relatieve drempels, tick-rendering, kleuren, blokmaten, schuifbediening, jaartallen, layout en overige scripts identiek.
+- In de renderer worden al beschikbare items gescheiden in `referenceCounts` (`demo:true`) en `ownCounts` (`demo:false`). Wanneer `ownCounts.size===0`, wordt alleen `referenceCounts` gebruikt voor de relatieve intensiteit; bij één of meer eigen verhalen uitsluitend `ownCounts`. Er worden geen voorbeeldherinneringen naar privéopslag gekopieerd en geen eigen herinneringen toegevoegd.
+- De tooltip van een jaarstreepje onderscheidt nu `voorbeeldherinneringen` en `eigen herinneringen`.
+- Cloudflare deployment geslaagd op `2026-11-07T12:01:00.154153Z`. Geen nieuwe PWA, geen nieuwe Worker of een andere binding gemaakt.
+
+### Controle op daadwerkelijke gehoste testversie
+- De bestaande 500 voorbeelden omvatten ook 32 herinneringen uit 1982–1984, **buiten** het bestaande tijdlijnbereik 1985–2026. De 42 zichtbare jaarposities krijgen dus samen 468 voorbeelden. Jaar 1985: 11; 1995: 13; 2026: 11.
+- De werkelijk gemeten intensiteiten van de 42 jaarposities zijn `[0,0,42,0,0]` (volgorde niveaus 0 t/m 4). **Alle jaren krijgen dezelfde middelmatige intensiteit, omdat de voorbeelden bijna gelijkmatig zijn verdeeld met circa 10–15 per jaar.** Dit is een correct gevolg van de relatieve schaal, geen defect. Gebruik voor afwisselende pieken/dalen liever de aparte interactieve 300/3000/10000-verhalen-demo; de echte referenties mogen niet kunstmatig worden herverdeeld zonder aparte instructie.
+- Tijdelijke browserproef zónder opslaan van data: 500 demo's alleen → totaal 468 in huidig jaarbereik; 500 demo's plus één eigen verhaal in 1995 → uitsluitend één markering van eigen herinnering, alle andere jaren haarlijn; 500 demo's plus drie eigen verhalen (2 in 1995 en 1 in 2001) → uitsluitend twee gevulde jaarmarkeringen.
+- Beschermde balken `.mast`, `.flow-nav`, `.sheet-handle` qua geteste posities, afmetingen, kleuren en zichtbaarheid bij 360, 390 en 430 pixels breed gelijk aan de goedgekeurde oorspronkelijke PWA.
+- Worker timestamps gecontroleerd: de oorspronkelijke voorkeursworker (6 november), oorspronkelijke gedeelde stijlworker en functionele diepblauwe kernworker bleven onaangeroerd.
+
+### Niet gewijzigd
+- Geen opname-, video-, foto-, presentatie-, commentaar-, WhatsApp-, tekst-, account-, opslag- of navigatielogica.
+- Geen nieuwe voorbeeldverhalen, geen andere intenser/donkerder CSS, geen verandering van bestaande datumrange of selectie. Geen ingreep aan beschermde appbalken of de eerder afgesproken kleur- en tekstverbeteringen.
+- Geen officiële promotie of vervanging van de bestaande voorkeurslink. De gebruiker moet het uiterlijk nog op eigen iPhone beoordelen.
+- Testkandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
+- Goedkeurde voorkeur onveranderd: `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.

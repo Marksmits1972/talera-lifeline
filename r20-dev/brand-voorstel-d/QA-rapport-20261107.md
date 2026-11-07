@@ -369,3 +369,43 @@ Aanbevolen later te bouwen implementatie **alleen binnen dichtheidstekenpad**:
 ### Status
 - **GEEN codewijziging of deployment in deze onderzoeksronde.** Huidige kandidaat blijft `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
 - Goedkeurde werkende kern van 6 november blijft ongewijzigd.
+
+## Bouwresultaat — gedeelde bezettingsschaal presentatietijdlijn (7 november 2026)
+
+**Gebruiker gaf expliciet opdracht:** voer de eerder goedgekeurde bouwprompt uit; uitsluitend de indicatie van het aantal verhalen via de dichtheidsstreepjes op het presentatiescherm aanpassen. Alle bestaande kleurwaarden, oplichten, animaties, zoom, tijd-as, beacons, foto-/video-/audiosynchronisatie, verhaaltekst, besturing, opslag en vaste schermbalken moeten blijven.
+
+### Source-control en terugdraaiing
+- Herstelbranch vóór de wijziging: `backup/deepblue-before-presentation-density-20261107`.
+- GitHub sourcecommit `760a378ae00cf11aef492dba8038f5d9ab1b937b` op `feature/deepblue-style-bars-locked-20261107`.
+- Gewijzigd bestand: uitsluitend `r20-dev/brand-voorstel-d/style-worker-blue-content.mjs` van de reeds bestaande aparte teststijl-Worker.
+- GitHub vóór/na codecontrole: na het verwijderen van de toegevoegde, exact gescopeerde `rewritePresentationDensity(html)`-functie, één lege regel en de ene gewijzigde aanroep in de bestaande `/present`-route is de hele Worker-bron **byte-identiek** aan het herstelpunt. Geen CSS-kleur/markeringstijl, routing van andere schermen, opnameproces, PWA-manifest of binding gewijzigd.
+- De herstelbare `rewritePresentationDensity`-functie herschrijft alleen de al bestaande inline presentatietekenfunctie `drawDensity(level,startMs,endMs,w,axisY)` en voegt **uitsluitend een cache-invalidatieregel** toe aan de bestaande `taleraRebuildDensity()`. Fail-closed wanneer niet precies de bekende codepatronen worden gevonden. Geen extra script, presentatiemotor, eventlistener of tijdlijnlaag toegevoegd.
+- Andere bestaande geheugen-, media- en presentatiecode inclusief `drawMemoryBeacons`, `drawScale`, `window.__taleraTimelineRuntime`, `MEMORIES`, `dayCounts`, pointers en audio/video's blijft byte-identiek aan de vorige test-/officiële versie.
+
+### Berekening en bronprioriteit
+- Dezelfde absolute bezettingsfractie als op `Mijn leven`: `occupancy = min(1, ln(1 + verhalenPerKalenderjaar) / ln(1001))`.
+- De bestaande presentatietijdlijn gebruikt een 5..61 px canvasstreepjesgebied: `height = 5 + 56*occupancy`. De thuislijn heeft 7..25px hoogte. De **fractie is identiek**, de pixelomvang is afgestemd op de al bestaande presentatietekening.
+- Presentatie telt initieel de 50 bestaande oorspronkelijke (ID 1..50) plus de 450 `isDemo`-testherinneringen voor de streephoogtes. Zodra een eigen verhaal wordt geregistreerd, gebruikt de dichtheidsweergave alleen eigen verhalen; de 500 voorbeelden blijven beschikbaar in bestaande navigatie.
+- De eigen/verhalen-voorrang wordt gerealiseerd door een **read-only, gecachte** dag- en jaarindex in `drawDensity`. De index ververst automatisch wanneer de bestaande code `taleraRebuildDensity` aanroept, bijvoorbeeld bij toevoegen van herinneringen. `MEMORIES` en het oorspronkelijke `dayCounts` worden niet gewijzigd.
+- De oorspronkelijke zoomdag-buckets (60/7/1 dag) worden voor *waar echt een verhaal staat* op basis van gekozen bron geteld. Hoogte komt uit het werkelijke aantal verhalen in het kalenderjaar, zodat één verhaal op één dag niet wordt vermenigvuldigd met 365. De zoom-6 (`24 uur`) losse gebeurtenisdots blijven geheel ongewijzigd.
+- De bestaande `intensity=1-Math.exp(-rate/(level===0?.055:.48))` en originele canvas-`fillStyle` / alpha, stralende visuele effecten, kleuren, breedtes en afgeronde tekenvormen **zijn tekstueel identiek behouden**. Alleen de input `rate` gebruikt de afgesproken demo/eigen-bronprioriteit; daarom volgt de bestaande oplichtintensiteit vanzelf de gekozen verhalen. Geen nieuwe kleur-/glowregel.
+
+### Automatische tests op de gehoste kandidaat
+- Worker deploy geslaagd op **`2026-11-07T13:30:54.923202Z`** naar uitsluitend `talera-style-diepblauw-20261107`.
+- De complete inline presentatiescript van 59.661 tekens is vóór deployment op JS-syntaxis gecontroleerd: **geldig**. De originele presentatiecode van 57.770 tekens verschilt uitsluitend in één `drawDensity`-functie en één `taleraRebuildDensity`-cache-reset; alle overige bronbytes gelijk.
+- Browser Rendering 390×844: 500 demo's in default 15-jaarvenster → 41 zichtbare dichtheidsbalkjes met 25,1–27,5px hoogte.
+- Tijdelijke, **niet opgeslagen** eigen herinneringen over 42 jaren, gelijkmatig verdeeld:
+  - 300 verhalen → 30 zichtbare streepjes in standaard 15-jaarvenster, hoogte **21,9px**.
+  - 3.000 verhalen → 47 zichtbare streepjes, hoogte **39,1–39,7px**.
+  - 10.000 verhalen → 47 zichtbare streepjes, hoogte **48,3–49,4px**.
+  - Aantal streepjes in het venster verschilt doordat herinneringen in de tests op verschillende kalenderdagen voorkomen; het totale ingevoerde aantal is correct en wordt niet opgeslagen.
+- 3.000 ongelijkmatig verdeelde verhalen, 10 lege jaren, 42 jaarposities totaal: 47 zichtbare dichtheidsstreepjes in het standaard presentatievenster met uiteenlopende hoogtes **30,05–47,66px** en 12 bestaande berekende transparantiewaarden. De perioden met lege jaren krijgen geen fictieve dichtheidsstreepjes.
+- Bronprioriteitstest: 500 voorbeelden gaven 41 streepjes in standaardvenster; nadat er exact één tijdelijk eigen verhaal in 2021 werd toegevoegd, werd uitsluitend één dichtheidsstreepje van **10,62px** getekend, overeenkomstig de exacte logaritmische formule.
+- Alle **zes** bestaande zoomstanden zijn getest via de originele debug-zoomknoppen: 15 jaar, 2 jaar, 3 maanden, 2 weken en 1 dag tekenen correcte dichtheidsbalkjes; zoom-6 24 uur blijft de originele gebeurtenispuntjes gebruiken. Jaar-/datumfocus en originele tijdlijnruntime bleven aanwezig.
+- Responsieve A/B vergelijking op **360/390/430×844** met de ongewijzigde goedgekeurde basis: `#timelineCanvas`, `.timeline`, `#photoStage`, `#memoryStoryScroll`, `#talera-v15-appbar`, `#talera-v12-reactions-bar` en menukop behouden identieke berekende kleuren, backgrounds, opacity, display, zichtbaarheid en rechthoekgeometrie.
+- `/present` toont op elk van die breedtes nog steeds precies **29 scripts**. Slechts één inline script is inhoudelijk gewijzigd: de bedoelde presentatiedichtheidsfunctie (plus de cache-reset daarbinnen). De andere 28 scripts, waaronder alle audiovideo-, foto-, verhaal- en besturingscontrollers, blijven byte-identiek.
+
+### Afbakening en acceptatie
+- Goedkeurde kern-/voorkeurs-Worker `talera-closed-memory-core-test-20261106` blijft ongewijzigd (laatste wijziging 6 nov 21:00:40Z). Test-kernworker `talera-closed-memory-diepblauw-test-20261107` blijft ongewijzigd (7 nov 06:57:41Z). Oorspronkelijke gedeelde stijlworker blijft ongewijzigd (5 nov).
+- Testlink presentatie: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`; standaard app via `/mijn-leven`.
+- **Niet als officieel gepromoveerd.** Opname-/video-/audio-/swipecontrollers zijn niet aangeraakt, maar een echte opname-/iPhone-regressietest is nog nodig voor definitieve acceptatie. Niet claimen dat alle media- en accountfuncties op echte hardware zijn geverifieerd.

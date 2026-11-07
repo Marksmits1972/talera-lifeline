@@ -435,3 +435,10 @@ De tijdlijnwijzigingen op `/mijn-leven` en `/present` zijn inmiddels door de geb
 - Huidige diepblauwe afbouw-/testkandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
 - Ongewijzigde door gebruiker goedgekeurde vorige voorkeursversie: `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
 - Er is geen nieuwe officiële versie gepromoveerd en niets met persoonlijke lokale data gedaan.
+
+### Aanvullende niet-destructieve bedieningstoets na UX-randcorrectie
+
+- Op `/tell` via de bestaande keuze `Zonder foto's vertellen` en vervolgens `Vertellen` het **bestaande opnamepaneel** geopend. Headless-browser-screenshot op 390×844 bevestigt bestaande inhoud `Your story starts here`, paneel `Tell`, de knop `Opnemen` en `Klaar`. **Opnemen is niet aangeraakt**, er zijn geen microfoonrechten aangevraagd en geen opname gestart.
+- In een tweede tijdelijke browsersessie opent de bestaande datumknop het originele modal met exacte datum, optie om de exacte dag niet te weten, `Bewaren` en `Cancel`. Geen datum aangepast of opgeslagen.
+- De afzonderlijke `Schrijven`-toets toont het bestaande `taleraWriterOverlay` met tekstvak `taleraWriterText` en `Klaar`-knop `taleraWriterDone`. Er is geen tekst ingevoerd.
+- Deze drie tests zijn **alleen het openen van panelen**: geen volledige regressietest van audio/video, foto-timing of bewaren. Het gemengde Engelse/Nederlandse label in de tests hangt samen met de testbrowser/locale en is niet in deze visuele CSS-ronde gewijzigd.

@@ -195,3 +195,29 @@ Gebruikersverduidelijking: geen doorlopende horizontale lijn op de tijdlijnkaart
 ### Openstaande controle
 - Geen echte iPhone- of toegankelijkheids-/spraakopnametest uitgevoerd. De gebruiker dient de nieuwe kleuren en tekstminimalisatie zelf te beoordelen, inclusief opname-/video-/WhatsAppfunctionaliteit.
 - Geen officiële linkpromotie zonder expliciete goedkeuring.
+
+## UX-vervolgronde — extra media toevoegen (7 november 2026)
+
+De gebruiker heeft toestemming gegeven om de eerder vastgelegde **uitsluitend kleur- en tekstgebaseerde** intuïtiviteitsverbeteringen voorzichtig voort te zetten. Geen enkele technische of functionele verandering toegestaan, en bij twijfel niets wijzigen.
+
+### Uitgevoerd
+- Uitgebreide inspectie op mobiele browser van acht toestanden van de content in `Mijn TALERA` (hub, instellingen, hulp, abonnement, privacy, account, mensen en delen). Alle belangrijke uitleg over accounts, inloggen, privacy en nog niet beschikbare onderdelen behouden. De bestaande hoofdnavigatie en instellingen worden niet gewijzigd.
+- Onjuiste restkleur gevonden op het **bestaande mediaplusknopje** `#app #main .work .talera-v9-add-media`: oude tekstkleur `rgb(32,81,107)`, achtergrond `rgb(241,246,248)`.
+- Uitsluitend CSS-kleuren op dit bestaande inhoudsknopje aangepast naar officiële `#23497E` (tekst/plus) en `#F7F5F0` (warm ivoor, achtergrond).
+- Uitsluitend de overgebleven oude tekstkleur van de grote `#app #main .picker` op het startscherm met de fotoselectie vervangen door `#23497E`. De labels en media-input blijven intact.
+- Er zijn **geen andere teksten verborgen of aangepast**, omdat de resterende aangetroffen teksten noodzakelijke informatie over inhoud, privacy, opslag of beschikbaarheid kunnen bieden.
+- De grote wens om opnameknop en Klaar statusafhankelijk in kleur te wisselen is **niet uitgevoerd**: die knoppen zitten in de beschermde vertelbediening en zouden nieuwe toestemming voor wijziging vereisen.
+- De knop `Plaatsen` is niet kunstmatig inactief gemaakt; de bestaande validatie blijft.
+
+### Technische controle
+- GitHub herstelpunt vóór deze vervolgronde: `backup/deepblue-before-ux-polish-2-20261107`.
+- Alleen `BRAND_CSS` is uitgebreid met twee aan `#app #main` gebonden selectors. De rest van het Worker-bestand is byte-identiek aan het herstelpunt; ook `TALERA_MORE_CONTENT_ONLY_CSS` is exact gelijk gebleven.
+- GitHub codecommit: `cf57601bc62d67c4dba1d4442422275f82bd381b`.
+- Cloudflare live bijgewerkt: uitsluitend bestaande geïsoleerde stijl-Worker `talera-style-diepblauw-20261107`, gewijzigd `2026-11-07T10:56:21.791323Z`. De functionele test-Worker, de huidige goedgekeurde Worker en de originele gedeelde stijl-Worker zijn niet gewijzigd.
+- Browser Rendering op 360×844, 390×844 en 430×844: de plus/media-kaart heeft nu `rgb(35,73,126)` op `rgb(247,245,240)` en blijft op dezelfde plek met dezelfde bestaande responsieve afmetingen. `#speak`, `#write`, `#publish` en `#dateToggle` blijven op hun bestaande plek en in hun vorige status.
+- A/B-stijlen op 390×844 tegenover de goedgekeurde 6 november-versie: `#app .top`, `.mast`, `.flow-nav`, `.sheet-handle`, `#talera-more-menu header`, `#talera-more-menu .headbutton`, `#talera-v15-appbar` en `#talera-v12-reactions-bar` exact gelijk in onderzochte berekende posities, afmetingen, kleur, achtergrond, display en opaciteit.
+- Geen opname, media-upload of iPhone op echte hardware getest. Bij vergelijking van de Worker-broncode staat vast dat alleen CSS is gewijzigd; de vooraf uitgevoerde test van het openen van Vertellen, Schrijven en Plaatsen blijft leidend voor de eerder geteste functies.
+
+### Besluit
+Huidige kandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
+Officiële voorkeur blijft `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`. Nog geen promotie of iPhone-acceptatie.

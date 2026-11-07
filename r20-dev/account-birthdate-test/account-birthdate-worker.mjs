@@ -258,9 +258,25 @@ async function page(req,env){
  headers.set('x-talera-birthdate-test','isolated');
  return new Response(html,{status:upstream.status,statusText:upstream.statusText,headers});
 }
+// Preserve the original account UI and handlers, changing exactly one registration payload.
+async function patchedMenuIntegration(req,env){
+ const upstream=await env.TALERA_BASE.fetch(req);
+ if(!upstream.ok)return upstream;
+ const original=await upstream.text();
+ const needle="const result=await api('/api/register','POST',{displayName:data.displayName,username:data.username,email:data.email,password:data['register-password']});";
+ const patched="const result=await api('/api/register','POST',{displayName:data.displayName,username:data.username,birthDate:data.birthDate,email:data.email,password:data['register-password']});";
+ if(original.split(needle).length!==2){
+  return new Response('TALERA registratie-update tijdelijk niet beschikbaar.',{status:503,headers:{'cache-control':'no-store','content-type':'text/plain; charset=utf-8'}});
+ }
+ const headers=new Headers(upstream.headers);
+ for(const h of ['content-length','content-encoding','etag'])headers.delete(h);
+ headers.set('cache-control','no-store');
+ return new Response(original.replace(needle,patched),{status:upstream.status,statusText:upstream.statusText,headers});
+}
 export default {
  async fetch(request,env){
   const url=new URL(request.url),path=url.pathname;
+  if(path==='/__clean/menu-integration.mjs'&&request.method==='GET')return patchedMenuIntegration(request,env);
   if(path==='/api/register'&&request.method==='POST')return register(request,env);
   if(path==='/api/me'&&request.method==='GET')return me(request,env);
   if(path==='/api/profile/birthdate')return birthProfile(request,env);

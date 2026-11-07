@@ -170,6 +170,73 @@ async function icon(request,env,path){
  * No R20 presentation body or playback code changes. */
 const PRESENTATION_BOTTOM_TINT_JS = "(() => {\n  'use strict';\n  if (window.__taleraPresentEdgeTint) return;\n  window.__taleraPresentEdgeTint = true;\n\n  // Presentation only: pure-black photo-frame footer.\n  // Opened reading sheet: its existing opaque bottom paper colour.\n  const BLACK = '#000000';\n  const PAPER_FALLBACK = '#F7F4EF';\n  // The V28 story paper took 155 CSS px to fade. Only for this staging\n  // Final iPhone-photo refinement: 78px sheet fade (original V28: 155px).\n  // Ask iOS for the preloaded sheet colour at 60px (~86.5% opacity):\n  // an earlier request gives WebKit time to paint the bottom system strip.\n  // Both colours still come from the same original V9 paper token.\n  const SHEET_FADE_PX = 78;\n  const FOOTER_PAPER_AT_PX = 60;\n  const doc = document.documentElement;\n  let applied = '';\n  let paper = PAPER_FALLBACK;\n  let lastReading = false;\n  const debug = typeof location !== 'undefined' &&\n    new URLSearchParams(location.search).has('taleraTintTest');\n  const tick = () => typeof performance !== 'undefined' && performance.now\n    ? performance.now() : Date.now();\n  let eventAt = tick();\n  let debugEl = null;\n\n  function showRequest(color, reason) {\n    if (!debug || !document.body) return;\n    if (!debugEl) {\n      debugEl = document.createElement('div');\n      debugEl.id = 'talera-edge-tint-test';\n      debugEl.style.cssText = 'position:fixed;bottom:calc(110px + env(safe-area-inset-bottom,0px));' +\n        'right:10px;z-index:99999;pointer-events:none;background:#FFFFFF;' +\n        'color:#304653;padding:7px 10px;border-radius:8px;' +\n        'border:1px solid #B5C6CD;font:11px/1.35 system-ui,sans-serif;max-width:210px';\n      document.body.appendChild(debugEl);\n    }\n    debugEl.textContent = 'Onderrand ' + color + ' · ' + reason +\n      ' · aanvraag ' + Math.round(Math.max(0, tick() - eventAt)) + ' ms';\n  }\n\n  function setBottomColor(color, reason) {\n    if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = PAPER_FALLBACK;\n    if (color !== applied) {\n      applied = color;\n      // Only the native iOS colour request needs JavaScript.\n      // The visible background is switched INSTANTLY by preloaded CSS\n      // according to html[data-talera-present-reading].\n      const theme = document.querySelector('meta[name=\"theme-color\"]');\n      if (theme) theme.setAttribute('content', color);\n    }\n    showRequest(color, reason);\n  }\n\n  function isReading() {\n    const scroll = document.getElementById('memoryStoryScroll');\n    // Ignore the existing V14/V26 \"reading\" class for the footer: those\n    // classes activate at 2/18px, before the pane becomes opaque.\n    return !!(scroll && scroll.scrollTop >= FOOTER_PAPER_AT_PX);\n  }\n\n  function syncSheetAppearance() {\n    const scroll = document.getElementById('memoryStoryScroll');\n    const y = scroll ? Math.max(0, scroll.scrollTop) : 0;\n    // Linear fade: each pixel of the existing 78px scroll distance adds\n    // exactly the same amount of opaque paper. No slow start or sudden jump.\n    const p = Math.min(1, y / SHEET_FADE_PX);\n    const alpha = p;\n    // Keep text sharp: remove the photo-mode blur/shadow BEFORE the title\n    // blends from white to its existing navy ink, with almost no overlap.\n    const ink = Math.min(1, Math.max(0, (p - .55) / .23));\n    const shadow = Math.min(1, Math.max(0, (.58 - p) / .25));\n    const rgb = [255, 255, 255].map((v, i) =>\n      Math.round(v + ([15, 39, 71][i] - v) * ink));\n    doc.style.setProperty('--talera-present-sheet-alpha', alpha.toFixed(4));\n    doc.style.setProperty('--talera-present-sheet-title', 'rgb(' + rgb.join(',') + ')');\n    doc.style.setProperty('--talera-present-sheet-shadow', shadow.toFixed(3));\n  }\n\n  function sheetPaperColor() {\n    // The V9 presentation uses --story-neutral for the OPAQUE final colour\n    // of the raised reading sheet (rather than ordinary pure white).\n    // Read that same source token; no separate approximation or photo sampling.\n    const space = document.querySelector('.memory-space');\n    if (space) {\n      const raw = getComputedStyle(space).getPropertyValue('--story-neutral').trim();\n      const parts = raw.split(',').map(x => Number(x.trim()));\n      if (parts.length === 3 && parts.every(x => Number.isInteger(x) && x >= 0 && x <= 255)) {\n        return '#' + parts.map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();\n      }\n    }\n    const card = document.getElementById('memoryCaption');\n    if (card) {\n      // Other V9 screen variants may have an explicit solid card background.\n      const value = getComputedStyle(card).backgroundColor || '';\n      const match = /^rgba?\\(\\s*(\\d+)[, ]+\\s*(\\d+)[, ]+\\s*(\\d+)(?:[, /]+\\s*([\\d.]+))?\\s*\\)$/.exec(value);\n      if (match && (match[4] === undefined || Number(match[4]) === 1)) {\n        return '#' + [1,2,3].map(i => Number(match[i]).toString(16).padStart(2, '0')).join('').toUpperCase();\n      }\n    }\n    return PAPER_FALLBACK;\n  }\n\n  function sync() {\n    // Keep the photo border black while the paper is translucent. Change\n    // it only when the shorter fade is already almost complete.\n    eventAt = tick();\n    syncSheetAppearance();\n    const reading = isReading();\n    if (lastReading !== reading) {\n      lastReading = reading;\n      doc.setAttribute('data-talera-present-reading', reading ? 'true' : 'false');\n    }\n    setBottomColor(reading ? paper : BLACK, reading ? 'tekstpaneel' : 'foto');\n  }\n  function preparePaper() {\n    // One initial read from V9's own sheet token, not during a gesture.\n    paper = sheetPaperColor();\n    const rgb = [0,2,4].map(i => parseInt(paper.slice(i+1,i+3),16)).join(',');\n    doc.style.setProperty('--talera-present-paper-rgb', rgb);\n    doc.setAttribute('data-talera-present-reading','false');\n  }\n  function install() {\n    const scroll = document.getElementById('memoryStoryScroll');\n    const space = document.querySelector('.memory-space');\n    preparePaper();\n    if (scroll) scroll.addEventListener('scroll', sync, {passive:true});\n    if (space) new MutationObserver(sync).observe(space, {\n      attributes:true, attributeFilter:['class','style']\n    });\n    window.addEventListener('pageshow', sync, {passive:true});\n    document.addEventListener('visibilitychange', sync);\n    sync();\n  }\n  if (document.readyState === 'loading')\n    document.addEventListener('DOMContentLoaded', install, {once:true});\n  else install();\n})();";
 const PRESENTATION_BOTTOM_TINT_CSS = "html{--talera-present-paper-rgb:247,244,239;--talera-present-edge-color:#000000}\nhtml,body{background-color:#000000!important;transition:background-color 0s linear!important}\nhtml[data-talera-present-reading=\"true\"],html[data-talera-present-reading=\"true\"] body{background-color:rgb(var(--talera-present-paper-rgb))!important}\n/* Only the already-present reading sheet: shorten the existing V28 paper\n   and matching title-color transition, without changing stage/layout/swipes. */\n#memoryCaption{\n  --talera-v28-paper-alpha:var(--talera-present-sheet-alpha,0)!important;\n  --talera-v28-title-color:var(--talera-present-sheet-title,#FFFFFF)!important;\n  --talera-v28-shadow:var(--talera-present-sheet-shadow,1)!important;\n}";
+
+/* Presentation only: adjust the existing density marks' occupied height.
+   Preserve every original palette, glow/opacity expression, marker shape,
+   zoom/gesture controller, memory beacon and presentation player. */
+function rewritePresentationDensity(html){
+  const head='function drawDensity(level,startMs,endMs,w,axisY) {';
+  const next='\nfunction drawMemoryBeacons(';
+  const start=html.indexOf(head);
+  if(start<0||html.indexOf(head,start+head.length)!==-1)return html;
+  const end=html.indexOf(next,start);
+  if(end<0)return html;
+  const old=html.slice(start,end);
+  const bucket='  const bucket=densityBucket(level);';
+  const rate='    const rate=aggregatePerDay(bs,be);';
+  const height='    const bh=5+intensity*56;';
+  const originalColor='    ctx.fillStyle=`rgba(91,143,185,${(.24+intensity*.66).toFixed(3)})`;';
+  if(!old.includes('if(level===5)')||!old.includes(originalColor)||
+     [bucket,rate,height].some(line=>old.split(line).length!==2))return html;
+  const index=`  // Visual-only occupancy source. Never change MEMORIES, dayCounts or navigation.
+  // The fifty original examples have IDs 1..50; stress examples carry isDemo.
+  let densityData=drawDensity._taleraOccupancyCache;
+  if(!densityData){
+    const own=[],examples=[];
+    for(const memory of MEMORIES){
+      if(!Number.isFinite(memory.ms))continue;
+      const owned=!!(memory._taleraLocal||memory._taleraLive||memory.storyId||memory._taleraShared);
+      const example=!owned&&(memory.isDemo||memory.stressTest||
+        (typeof memory.id==='number'&&memory.id>=1&&memory.id<=50));
+      (example?examples:own).push(memory);
+    }
+    // Home uses examples until the first own memory exists, then only own.
+    const selected=own.length?own:examples;
+    const perDay=new Uint32Array(TOTAL_DAYS),years=new Map();
+    for(const memory of selected){
+      const day=Math.floor((memory.ms-LIFE_START)/MS_DAY);
+      if(day<0||day>=TOTAL_DAYS)continue;
+      perDay[day]++;
+      const year=new Date(memory.ms).getFullYear();
+      years.set(year,(years.get(year)||0)+1);
+    }
+    const sums=new Uint32Array(TOTAL_DAYS+1);
+    for(let i=0;i<TOTAL_DAYS;i++)sums[i+1]=sums[i]+perDay[i];
+    densityData={sums,years};
+    drawDensity._taleraOccupancyCache=densityData;
+  }
+`;
+  const filteredRate=`    // Respect the current zoom bucket, without annualizing one day as 365 stories.
+    const first=clamp(Math.floor(bs),0,TOTAL_DAYS);
+    const last=clamp(Math.ceil(be),0,TOTAL_DAYS);
+    const rate=last>first
+      ?(densityData.sums[last]-densityData.sums[first])/(last-first):0;`;
+  const occupiedHeight=`    // Identical 0..1 log occupancy fraction as the My Life year markers.
+    // Keep the PRESENTATION canvas' established 5..61px rendering range.
+    const year=new Date(LIFE_START+mid*MS_DAY).getFullYear();
+    const annualCount=densityData.years.get(year)||0;
+    const occupancy=Math.min(1,Math.log1p(annualCount)/Math.log1p(1000));
+    const bh=5+occupancy*56;`;
+  const changed=old.replace(bucket,index+bucket).replace(rate,filteredRate).replace(height,occupiedHeight);
+  if(!changed.includes(originalColor)||changed===old)return html;
+  // Cache is invalidated on all existing presentation density rebuilds.
+  const originalRebuild='function taleraRebuildDensity(){\n  EVENT_OFFSETS.splice(';
+  if(html.split(originalRebuild).length!==2)return html;
+  const invalidate='function taleraRebuildDensity(){\n  drawDensity._taleraOccupancyCache=null;\n  EVENT_OFFSETS.splice(';
+  const result=html.slice(0,start)+changed+html.slice(end);
+  return result.replace(originalRebuild,invalidate);
+}
+
 function restorePresentationStatusArea(html){
   return html.replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/i,head=>{
     function setMeta(name,value){
@@ -217,7 +284,7 @@ export default {
     if((path==='/present'||path==='/present/') &&
         (upstream.headers.get('content-type')||'').toLowerCase().includes('text/html')){
       const html=await upstream.text();
-      const changed=restorePresentationStatusArea(html).replace('</head>','<style id="talera-deepblue-menu-content">'+TALERA_MORE_CONTENT_ONLY_CSS+'</style></head>');
+      const changed=rewritePresentationDensity(restorePresentationStatusArea(html)).replace('</head>','<style id="talera-deepblue-menu-content">'+TALERA_MORE_CONTENT_ONLY_CSS+'</style></head>');
       const headers=new Headers(upstream.headers);
       for(const h of ['content-length','content-encoding','etag'])headers.delete(h);
       headers.set('cache-control','no-store');

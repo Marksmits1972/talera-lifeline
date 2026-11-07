@@ -147,3 +147,15 @@ De verticale markeringen in de horizontale jaarbalk op `Mijn leven` moeten de ho
 - Niets aan vertelmodus, fotowissels, audio, video, presentatie, WhatsApp, deelpaneel, opgetrokken witte verhaaltekst, boven-/onderbalken, accounts, Free/Premium, API, opslag of gebruikersdata gewijzigd.
 - Openstaand: praktijkcontrole met echte eigen herinneringen op de iPhone; bijzondere gevallen zoals lokale jaren vóór 1985, veel verhalen in één jaar en weergave bij toestelrotatie.
 - **Nog geen nieuwe officiële voorkeur**: huidige goedgekeurde link blijft `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`. Testkandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`. Verwijder of herinstalleer de PWA niet vanwege lokale gegevens.
+
+## Verwijderde horizontale verbindingslijn — 7 november 2026
+
+Gebruikersverduidelijking: geen doorlopende horizontale lijn op de tijdlijnkaart `Mijn leven → Door de tijd`; uitsluitend losse fijne jaarstreepjes en de aan de hoeveelheid eigen verhalen gekoppelde intensiteitsblokken. De bestaande selecteerbare jaar-cirkel en jaartallen blijven.
+
+- GitHub broncommit: `a680f68831dc49643c878dfefa4ab767a012f8ab` op branch `feature/deepblue-style-bars-locked-20261107`.
+- Alleen vijf strikt gescopeerde CSS-regels toegevoegd aan de bestaande `BRAND_CSS` van `talera-style-diepblauw-20261107`: `#sheetBody #v17-timebox .v17-rail-ruler`, `.v17-rail-progress`, `#v17-year-slider::-webkit-slider-runnable-track`, `::-moz-range-track`, `::-moz-range-progress`. Achtergrond transparant, geen rand of schaduw. De losse `.v17-mark.talera-density-*`-regels zijn niet gewijzigd.
+- Er zijn GEEN nieuwe Worker-ketens, scripts, uploaders of functionaliteitsaanpassingen gemaakt. Geen wijzigingen aan presentatie, vertelmodus, reacties, WhatsApp, boven-/onderbalken of lokaal opgeslagen herinneringen.
+- Deployment op uitsluitend de reeds bestaande geïsoleerde kandidaat: `talera-style-diepblauw-20261107` op 7 november 2026 09:42 UTC.
+- Browser Rendering A/B: `#v17-ruler`, `#v17-progress` en `::-webkit-slider-runnable-track` hebben een transparante achtergrond; 42 neutrale individuele jaarstreepjes blijven aanwezig bij nul eigen herinneringen.
+- Jaarselectie in test: `1985 → 1995`, jaarpreview met drie kinderen zichtbaar en daarna `1985` hersteld. Automatische screenshot 390×844 bevestigt visueel geen doorlopende lijn, wel losse markeringen en de originele ronde selector.
+- Echt iPhone-gebruik en geheugen-/videoregressie zijn hiermee **niet** voltooid. De goedgekeurde huidige voorkeurs-Worker van 6 november is niet overschreven. De nieuwe diepblauwe testversie blijft kandidaat.

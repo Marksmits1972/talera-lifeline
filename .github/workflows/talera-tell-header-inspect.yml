@@ -36,6 +36,15 @@ jobs:
                 console.log('EXCERPT',html.slice(Math.max(0,i-180),Math.min(html.length,i+330)).replace(/\s+/g,' ').slice(0,520));
               }
             }
+            const styles=[...html.matchAll(/<style\\b([^>]*)>([\\s\\S]*?)<\\/style>/gi)];
+            console.log('STYLES_COUNT',styles.length);
+            styles.forEach((block,idx)=>{
+              const selectorRules=[...block[2].matchAll(/([^{}]+)\\{([^{}]*)\\}/g)]
+                .map(x=>({selector:x[1].replace(/\\/\\*[\\s\\S]*?\\*\\//g,'').trim().replace(/\\s+/g,' '),body:x[2].trim().replace(/\\s+/g,' ')}))
+                .filter(x=>/(^|[^\\w-])(header\\.top|header:not|\\.top(?:[\\s,:.#>]|$)|#app\\s*>\\s*header)/.test(x.selector))
+                .slice(0,24);
+              if(selectorRules.length)console.log('HEADER_CSS',idx,block[1].slice(0,120),JSON.stringify(selectorRules).slice(0,4800));
+            });
             const headers=[...html.matchAll(/<header\b[^>]*>/gi)].map(x=>x[0].slice(0,350));
             console.log('HEADERS',JSON.stringify(headers.slice(0,30)));
           }

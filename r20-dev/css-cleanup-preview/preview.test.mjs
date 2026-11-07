@@ -13,12 +13,12 @@ const before=getLiteral('BEFORE_CSS');
 const after=getLiteral('AFTER_CSS');
 const tag='<style id="talera-stille-luxe">';
 function winners(css){
- const rules=[...css.matchAll(/([^{}]+)\\{([^{}]*)\\}/g)];
+ const rules=[...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
  const map=new Map();
  for(const rule of rules){
-  const sel=rule[1].replace(/\\/\\*[\\s\\S]*?\\*\\//g,'').trim().replace(/\\s+/g,' ');
+  const sel=rule[1].replace(/\/\*[\s\S]*?\*\//g,'').trim().replace(/\s+/g,' ');
   if(!sel||sel.startsWith('@'))continue;
-  for(const d of rule[2].matchAll(/([\\w-]+)\\s*:\\s*([^;]+);/g)){
+  for(const d of rule[2].matchAll(/([\w-]+)\s*:\s*([^;]+);/g)){
    const key=sel+'||'+d[1], value=d[2].trim(),important=value.includes('!important');
    const existing=map.get(key);
    if(!existing||!existing.important||important)map.set(key,{value,important});
@@ -36,7 +36,7 @@ test('Rewrites one existing style, leaving scripts and other HTML identical',()=
  const value=cleanPreviewHtml(html);
  assert.equal(value.status,'applied');
  assert.equal(value.html,html.replace(before,after));
- assert.match(value.html,/window\\.talera=1/);
+ assert.match(value.html,/window\.talera=1/);
 });
 test('Never rewrites unmatched / missing / ambiguous style',()=>{
  for(const input of [

@@ -409,3 +409,29 @@ Aanbevolen later te bouwen implementatie **alleen binnen dichtheidstekenpad**:
 - Goedkeurde kern-/voorkeurs-Worker `talera-closed-memory-core-test-20261106` blijft ongewijzigd (laatste wijziging 6 nov 21:00:40Z). Test-kernworker `talera-closed-memory-diepblauw-test-20261107` blijft ongewijzigd (7 nov 06:57:41Z). Oorspronkelijke gedeelde stijlworker blijft ongewijzigd (5 nov).
 - Testlink presentatie: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`; standaard app via `/mijn-leven`.
 - **Niet als officieel gepromoveerd.** Opname-/video-/audio-/swipecontrollers zijn niet aangeraakt, maar een echte opname-/iPhone-regressietest is nog nodig voor definitieve acceptatie. Niet claimen dat alle media- en accountfuncties op echte hardware zijn geverifieerd.
+
+## Afbouw na tijdlijn — laatste veilige werkbladkleurcorrectie (7 november 2026)
+
+De tijdlijnwijzigingen op `/mijn-leven` en `/present` zijn inmiddels door de gebruiker gezien en goedgekeurd als testuitvoering. De gebruiker gaf daarna opdracht de eerdere afbouw van de intuïtieve diepblauwe UI weer op te pakken. Deze ronde houdt zich aan de eerder vastgelegde CSS-only/no-logic grenzen.
+
+### Werkelijke bevinding
+- De zichtbare inhoud van `/mijn-leven`, `/tell` en het Mijn TALERA-menu is via headless mobiele browser onderzocht. De concrete redelijke restafwijking was het bestaande **gestippelde randje** van `#app #main .work .talera-v9-add-media`: `rgb(189,209,217)` (legacy grijsblauw) rond een al eerder goedgekeurd blauw plus-teken op ivoorkleurige achtergrond. Bijbehorende iPhone-achtige 390×844-screenshot van het lege werkblad visueel nagekeken.
+- Overige legacy tekstkleurwaarden kwamen vooral uit containers, onzichtbare invoervelden of geërfde basiskleuren en zijn niet blind overschreven. De aantoonbaar onnodige teksten bleven verborgen zoals eerder goedgekeurd. Niet aan persoonlijke scherm-/presentatiestructuur geraakt.
+
+### Uitsluitend één CSS-correctie
+- Herstelbranch: `backup/deepblue-before-final-editor-border-20261107`.
+- Broncommit: `4275672d306a3b1d97faf6abe78babc0d939919f`.
+- Slechts één bestaande, strikt tot het inhoudelijke mediavak van het werkblad gescopeerde CSS-regel aangevuld met `border-color:rgba(85,121,169,.45)!important`. De achtergrond, het plusteken, streepstijl, randdikte, afmetingen, klikacties, invoer of code zijn verder identiek gebleven.
+- Broncode vóór/na GitHub: **het hele Worker-bestand behalve die ene CSS-regel byte-identiek**. Specifiek het eerder goedgekeurde `TALERA_HOME_MARKS_DENSITY` en `rewritePresentationDensity` (beide tijdlijnen) ongewijzigd.
+- Geïsoleerde diepblauwe stijlworker opnieuw gepubliceerd op `2026-11-07T13:46:57.641289Z`, niet de functionele Worker, de officiële goedgekeurde basis of de oorspronkelijke gedeelde stijlworker.
+
+### Browser-QA en grenzen
+- Op de gehoste diepblauwe `/tell` in mobiel 360, 390 en 430 px breed is via de bestaande knop **zonder foto's vertellen** het al bestaande werkblad geopend, zonder persoonsgegevens, media of opnames op te slaan. De bestaande add-media-tegel heeft nu berekende rand `rgba(85,121,169,.45)`, nog altijd `dashed`, met bestaande responsive afmetingen ongeveer 105×105, 113×113 en 126×126 px.
+- Bij alle drie breedtes blijft de kop exact 48 px hoog; de originele bestandenkiezer is aanwezig en blijft `accept=image/*,video/*` en `multiple=true` gebruiken.
+- De eerdere goedgekeurde knopkleuren van **Vertellen**, **Schrijven**, **Plaatsen** en de datumknop zijn bij een werkbladinspectie correct. Er zijn geen opname- of videofuncties gestart of gewijzigd.
+- **Geen re-design**, geen uitbreiding of extra speler/JS-laag, geen verandering aan presentatie, voice, camera, plaatsing, opslag, deelacties, vaste balken, tijdlijnberekeningen of PWA-versie. Nog steeds afzonderlijk iPhone-hardwareacceptatie nodig voor de vertelcyclus, foto/video, playback en opgeslagen herinneringen.
+
+### Versies
+- Huidige diepblauwe afbouw-/testkandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
+- Ongewijzigde door gebruiker goedgekeurde vorige voorkeursversie: `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
+- Er is geen nieuwe officiële versie gepromoveerd en niets met persoonlijke lokale data gedaan.

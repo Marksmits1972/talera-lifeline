@@ -522,3 +522,29 @@ Gebruiker stuurde screenshot van gewone foto-/presentatiestand. De ronde Terugkn
 
 **Testlink:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`.
 **Oude officiële werkende versie:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.
+
+## Automatische, subtiele fotocontrastkeuze — 7 november 2026
+
+Gebruiker vroeg om **slechts twee subtiele kleurgradaties** van de terug- en bewerkknop op `/present`: behoud de al goedgekeurde lichte glasstijl op normaal/donker fotomateriaal, en zet bij bijna wit beeld automatisch naar een **net iets grijzere, goed leesbare** glasvariant. De gebruiker corrigeerde ons toen een eerste testuitvoering te donkerblauw was: "niet meteen naar diep blauw". Die correctie is onmiddellijk gepubliceerd vóór deze QA-afronding.
+
+### Implementatie, uitzonderlijk alleen visuele software
+- GitHub herstelbranch vóór automatische contrastdetectie: `backup/deepblue-before-auto-photo-contrast-20261107`, bron SHA vooraf `36cf5e81be6cfb0ace28fd87275f1fb3c2bb8930`.
+- GitHub tijdelijke commit `89f661e5ae94f29b35753d4688c39c1cdcc35325` bevatte te donkere `rgba(7,26,61,.38)` glasstand; gebruiker heeft dit meteen gecorrigeerd. **NIET de finale geaccepteerde kleur**.
+- Correctie GitHub commit `f2ff69e834b7dea76c5d2b42d908d83ab7780ca7`: sterkere maar **zacht rookgrijze** contraststand `rgba(206,213,221,.80)`, pictogram `#405267`, lichte rand `rgba(255,255,255,.84)` en zachte grijze schaduw. Geen diepe donkerblauwe knop. Oorspronkelijke transparant-witte glasstand blijft intact als norm.
+- Eén *uitsluitend visueel* script `TALERA_PRESENT_AUTO_GLASS_JS` ingespoten in bestaande `/present` HTML-head om lokale luminantie van de zichtbare foto achter de twee knoppen te meten: bij een van de twee bijna witte delen kiezen **beide knoppen samen** de grijze variant. CSS-class via `data-talera-photo-contrast="strong"`; geen knopvervanging, eventlisteners op knoppen of tijdlijncode gewijzigd. Berekent gemiddelde lineaire sRGB-luminantie met 12x12 pixels per knop op downscaled, CORS-safe afbeelding (`fetch` en `createImageBitmap`). Een bron zonder leesrechten faalt zonder dat media/speler geraakt worden en laat de standaard lichte glasstand staan. Fotowissels volgen bestaande DOM-mutaties; video-check slechts elke 2,5s; hysterese `0.73` aan / `0.65` uit voorkomt nerveus wisselen. Geen netwerkverkeer naar een nieuwe dienst; alleen ophalen van de al getoonde foto indien browser dat toestaat.
+- Initiële boot is na test aangepast: presentatiewerkblad bouwt navigatieknoppen soms na `DOMContentLoaded` op; daarom wacht de **visuele helper** maximaal 80×180ms tot de bestaande knoppen en fotostage beschikbaar zijn. Dit raakt geen presentatietechniek.
+- In omhooggetrokken leesstand blijven de bestaande ivoorkleurige knoppen, donkerblauwe iconen en socialbalk **exact ongewijzigd**.
+- Uit GitHub bronvergelijking herstelbranch tegen huidige branch blijkt: alle oorspronkelijke bronnen buiten (1) een aangehechte ~735-karakter CSS-regel aan bestaande presentatiestijlconstante, (2) de nieuwe geïsoleerde contrastanalyse-scriptconstante (~5.181 tekens) en (3) een `script`-inclusie in de reeds bestaande `/present`-stijlroute zijn byte-identiek. Met name `TALERA_HOME_MARKS_DENSITY`, `rewritePresentationDensity`, `drawDensity`, vertelcyclus, audio/video/recorder, tijdstempels, media-ID, opslag, swipe en navigatie onaangeroerd.
+- Alleen geïsoleerde Cloudflare teststijlworker `talera-style-diepblauw-20261107` is bijgewerkt, gecorrigeerde deploy `2026-11-07T16:31:28.662966Z`; de goedgekeurde bron van 6 november is niet gewijzigd.
+
+### Tests
+- Browser-Rendering op actuele `/present`, zonder aangepaste appdata, viewport 360x844/390x844/430x844. Bij de bestaande lichte foto is de **echte door de app gekozen** status `strong` voor beide 45×45px knoppen, met exact berekende `rgba(206,213,221,.80)` achtergrond en iconen `rgb(64,82,103)`.
+- Na tijdelijk in de geïsoleerde browser vervangen van de zichtbare afbeelding met een donker `data:image/png` fixture schakelt de automatische helper zelfstandig terug naar `normal`; beide behouden de bestaande `rgba(250,252,255,.20)` glasachtergrond en witte iconen. De testafbeelding wordt niet opgeslagen, gepubliceerd of verwerkt in gebruikersdata.
+- Na omhoogscrollen naar de bestaande `talera-v18-reading` toestand krijgen beide knoppen onafhankelijk van de tijdelijke fotostatus weer exact dezelfde `rgba(247,245,240,.97)` achtergrond en `rgb(7,26,61)` iconen als de socialbalk. Normale socialbalk is ongewijzigd.
+- Geometrie bleef op alle schermbreedtes 45×45px, back-knop links 15px, edit-knop rechts 15px, y 116px. Teruglink blijft `href=/`; de CSS-gecentreerde terugchevron blijft ongewijzigd.
+- De volledige, gecorrigeerde actuele staging op 390px is ook per Browser-Rendering screenshot visueel gecontroleerd: beide iconen zijn goed leesbaar op licht fotodeel en knoppen ogen lichtgrijs, niet diepblauw.
+- Betreft *automatische browsertests*, geen echte iPhone Safari/PWA-hardwareacceptatie. Bij afbeeldingen waarop browser CORS het uitlezen weigert, blijft (veilig) de standaardglasstijl zichtbaar; dat is een bekende beperking van helderheidsdetectie en geen verandering aan media-/presentatiefunctionaliteit.
+
+**Testlink:** `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/present`.
+
+**Onaangeroerde goedgekeurde versie:** `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`.

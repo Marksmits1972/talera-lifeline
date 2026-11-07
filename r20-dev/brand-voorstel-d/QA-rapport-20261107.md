@@ -442,3 +442,40 @@ De tijdlijnwijzigingen op `/mijn-leven` en `/present` zijn inmiddels door de geb
 - In een tweede tijdelijke browsersessie opent de bestaande datumknop het originele modal met exacte datum, optie om de exacte dag niet te weten, `Bewaren` en `Cancel`. Geen datum aangepast of opgeslagen.
 - De afzonderlijke `Schrijven`-toets toont het bestaande `taleraWriterOverlay` met tekstvak `taleraWriterText` en `Klaar`-knop `taleraWriterDone`. Er is geen tekst ingevoerd.
 - Deze drie tests zijn **alleen het openen van panelen**: geen volledige regressietest van audio/video, foto-timing of bewaren. Het gemengde Engelse/Nederlandse label in de tests hangt samen met de testbrowser/locale en is niet in deze visuele CSS-ronde gewijzigd.
+
+## Functionele eindcontrole — synthetische media en opname (7 november 2026)
+
+**Gebruikersopdracht:** ga verder met de functionele eindcontrole, na de visuele UX-afbouw. **Deze ronde: volledig read-only onderzoek en synthetische testdata in geïsoleerde Cloudflare-browser. GEEN codewijziging of deployment.** Niet verwarren met een echte iPhone-proef en niet claimen dat het complete publiceren/afspelen als eindgebruikersflow op iOS al is gevalideerd.
+
+### Browserproef met beeld en video, op bestaande `/tell`
+- Bestaande knop "Zonder foto's vertellen" opent de huidige editor.
+- Twee *verschillende* door de testbrowser gemaakte PNG's zijn via de bestaande `input[type=file]` toegevoegd. Er ontstonden twee onafhankelijke media-ID's en twee thumbnails; `#next` werkte van 1/2 naar 2/2 en het framebeeld veranderde.
+- Nog een uitgebreide proef met twee synthetische PNG's + een **daadwerkelijk gegenereerde afspeelbare WebM-video** (browser-Canvas `captureStream` + `MediaRecorder`, geen statische preview als bron). Import leverde drie verschillende media-ID's; editor wisselde 1/3→2/3→3/3. Op 3/3 is het werkelijke `#frame > video` aanwezig met `readyState=4` en `videoWidth=96`, zonder importfout.
+- Tijdens inspreken met dezelfde 3 media: `#frame > video` speelde **daadwerkelijk** (`paused=false`, `currentTime=0.326` seconden, `videoWidth=80`). Dit is relevant voor de eerder op iPhone opgetreden fout van alleen geluid bij een stilstaand videobeeld.
+
+### Synthetische opname en tijdstempels
+- `navigator.mediaDevices.getUserMedia` is **uitsluitend in de tijdelijke browser** gestubd met een echte Web Audio oscillator-stream. De bestaande TALERA-MediaRecorderfunctie werd gewoon gebruikt; er zijn **geen persoonlijke opnamen of microfoontoestemmingen**.
+- Bestaande opnameknop ging van `Opnemen` naar `Stoppen` en terug; `Terugluisteren` verscheen, gekoppelde audio stond in een laadbaar `<audio>` element.
+- Proef met 2 foto's + 1 video en een spreekopname van circa 1,15 seconden: uit daadwerkelijk opgeslagen browser-IndexedDB-manifest `talera-lifeline-dev-local-v1` zijn 3 media-ID's, opgeslagen stemopname, `voiceDurationMs=1151` en exact 4 cues teruggelezen: foto0 op 0ms, foto1 op 361ms, video2 op 632ms (`videoAtMs=0`), terug naar foto1 op 983ms. Cues bevatten de echte bestaande media-ID's, in oplopende tijd, zonder duplicatie.
+- Onafhankelijke **daadwerkelijke horizontale TouchEvent-veegproef** met twee verschillende PNG's en synthetische audio: tijdens opnemen werd het frame 1/2 → 2/2; opnieuw opgeslagen en teruggelezen manifest bevatte exact twee cues (0ms foto0 en 442ms foto1) en `voiceDurationMs=629`. Geen dubbele registraties.
+- Eerste swipe-test met twee identieke zwarte afbeeldingen telde niet: de bestaande duplicaatbescherming voorkwam invoer; de proef is opnieuw correct uitgevoerd met bewust verschillende PNG's. Geen softwarefout.
+
+### Belangrijke gevonden UX-afwijking: pauze/hervatten verborgen
+- In de bestaande opnamepaneelcode worden `#taleraV61RecPause` en `#taleraV61RecStop` **initieel met `hidden` opgebouwd**. De bronscriptinspectie vond geen `pause.hidden=false`/ `stop.hidden=false` code.
+- In daadwerkelijk actieve recorderstatus (primaire knop `■ Stoppen`) zijn deze twee aparte knoppen nog steeds `hidden=true`, berekend `display:none` en `width=0`. **De gebruiker ziet dus geen pauze-/hervatknop.**
+- Intern werkt de bestaande functie wel: een puur programmatische klik op het verborgen pauze-element meldt `Opname gepauzeerd.`, een tweede meldt `Opname hervat.`. De opname kon daarna worden gestopt, had een laadbare preview en werd als echt concept bewaard (`voiceDurationMs=677` in deze proef).
+- **Geen code gewijzigd en geen knop geforceerd zichtbaar gemaakt in de app.** Dit betreft de beschermde vertelbediening; een gerichte oplossing moet eerst door de producteigenaar worden afgestemd op de eerder zorgvuldig goedgekeurde vertelcyclus. Of de knop in het huidige product bewust verborgen was, is nog niet bevestigd.
+
+### Bestanden opnieuw opgeslagen en gelezen
+- De bestaande `window.TaleraMemories.save/get/blob` lokaal (geen netwerkaccount/backend) is apart getest met twee PNG's, een afspeelbare WebM en een met echte `MediaRecorder` gegenereerd WebM-audiobestand. Na save→get→blob kregen alle vier items intacte, niet-lege media:
+  - photo image/png 282 bytes
+  - photo image/png 282 bytes
+  - video video/webm 1074 bytes
+  - audio audio/webm 6969 bytes.
+- Narration-cues bleven aanwezig bij de readback. Na roundtrip had de videoblob `readyState=4`, afmetingen 80×80 en dus daadwerkelijk decodeerbare videodata. **Dit is een store-API-roundtrip, geen bevestiging dat de volledige UI-publiceerflow en presentatie automatisch correct afspelen.**
+
+### Testgrenzen
+- Uitgevoerd op headless Chrome met mobiel viewport 390×844, synthetische media en kunstmatige AudioContext-stream. Dit is geen Safari iPhone, geen HEVC/MOV/AVFoundation, geen echte cameratoestemming, geen fysieke aanraking of iOS-PWA-installatie.
+- De volledige eindgebruikersketen `Plaatsen → Mijn leven → /present → audio-en-video synchroon terugkijken` is met een echte iPhone/testherinnering **nog niet voltooid**. Ook het daadwerkelijke afspelen van langer opgenomen persoonlijke iPhone-video's vraagt handmatige controle; video-in-de-opname is wel synthetisch bewezen.
+- De huidige `/present` met twee eerder goedgekeurde tijdlijnen is niet gewijzigd; uitdrukkelijke bescherming van opname, media-ID's, timestamps en native inline-video is gerespecteerd.
+- Testkandidaat `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven` en goedgekeurde basis `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven` beide **ongewijzigd** in deze testronde.

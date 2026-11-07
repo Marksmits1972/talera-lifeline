@@ -117,3 +117,33 @@ In totaal zijn 84 scriptinhouden gelijk gebleven. Dit bewijst codepariteit op de
 - Openstaand: handmatige test op een echte iPhone met eigen tijdelijk/testherinnering, foto + video uploaden, één opname met wisselende beelden, pauzeren, beëindigen, afspelen, audiovideo-synchronisatie, werkende inline-video en herhaald weergeven. Verder delen, back-ups en account/Free/Premium waar relevant, zonder destructieve tests.
 - Staging draait op een andere origin: bestaande lokale IndexedDB/LocalStorage-herinneringen worden niet automatisch overgenomen. De hoofd-PWA niet verwijderen of herinstalleren wegens risico op verlies van lokale data.
 - Pas na expliciete gebruikersgoedkeuring de nieuwe link tot officiële voorkeur promoveren.
+
+## Tijdlijnintensiteit Mijn leven — 7 november 2026
+
+**Status: beperkte stagingwijziging gebouwd en automatisch gecontroleerd; niet als officiële versie gepromoveerd.**
+
+### Gebruikersbesluit
+De verticale markeringen in de horizontale jaarbalk op `Mijn leven` moeten de hoeveelheid **eigen** herinneringen per jaar tonen. Lege jaren krijgen fijne streepjes, rijke jaren steviger blokjes. Geen jaartallen op ieder afzonderlijk blokje. De bestaande jaarselectie, voorbeeldverhalen, navigatie en alle media blijven intact. Verander niets waar onzekerheid bestaat.
+
+### Technische uitvoering
+- GitHub codecommit: `21a7080d77c04513dddb22a4e3c81bbb042cf80e`.
+- Bestaande geïsoleerde stijl-Worker: `talera-style-diepblauw-20261107`. De huidige productie-/voorkeurs-Worker en shared originele stijl-Worker zijn niet gewijzigd.
+- In plaats van een tweede tijdlijn of extra JavaScript-laag wordt in uitsluitend de HTML-route `/mijn-leven` de bestaande functie `drawMarks()` binnen `<script id="talera-flow-v17-time">` exact en fail-closed vervangen. Als de originele marker niet meer overeenkomt, wordt niets herschreven.
+- Alle andere functies binnen `talera-flow-v17-time`, inclusief jaarverschuiving, voorbeeldherinneringen, jaaroverzicht, sliderbeweging en preview, blijven ongewijzigd.
+- Eigen herinneringen komen uit het reeds bestaande `window.TaleraMemories.list()`; referentieherinneringen (`demo: true`) worden alleen van de **intensiteitsberekening** uitgesloten en blijven verder in de app beschikbaar.
+- Weergave: 0 eigen = 1px/7px neutrale haarlijn; 1 = 2px/10px lichtblauw; 2–3 = 3px/12px lichtblauw; 4–7 = 4px/14px middenblauw; 8+ = 5px/16px donkerblauw.
+- Eén markering per kalenderjaar waar er ruimte is. Voor zeer lange periodes worden meerdere jaren tot één visueel tijdvak gebundeld op basis van de beschikbare breedte (niet op basis van voorbeeldverhalen). De slider blijft op één jaar per stap werken.
+- CSS is uitsluitend aan `#sheetBody #v17-timebox .v17-mark.talera-density-*` gekoppeld. Er zijn geen regels toegevoegd voor de fullscreen presentatietijdlijn, PWA-bovenbalken, onderbalken, opname, video of bewaarfuncties.
+
+### Resultaten van automatische controle
+- Browser Rendering 390×844 op `/mijn-leven`: zonder eigen herinneringen, 42 fijne neutrale jaarmarkeringen, één per jaar van 1985 t/m 2026. De eerdere versie gaf voor alle 42 jaren een identieke dikke 'has-memory'-markering, mede doordat er 500 demoherinneringen werden meegeteld.
+- Test met **tijdelijke in-memory fixtures**, zonder lokale gegevens te bewaren: 1 eigen herinnering (1987) krijgt dichtheid 1; 3 (1992) dichtheid 2; 9 (2004) dichtheid 4. De verwerking gebruikt de eigen herinneringen, niet de demos.
+- Een pure test van 1900–2026 op een 314px-tijdlijn leverde 43 samengevoegde markeringen op, zonder de jaarselectie te veranderen. Dit lange bereik is nog niet met echte herinneringen op een iPhone getest.
+- Browserjaarselectie: 1985 naar 1995 via bestaand slider-`input`-event werkt, bijbehorende jaarlabel werd 1995; jaarpreview en 'Bewaar een nieuw moment'-actie blijven aanwezig.
+- Browser-JS-diff met voorkeursversie: `/mijn-leven` heeft precies **één** aangepast script: `talera-flow-v17-time` (het bedoelde onderdeel). `/tell` 9/9 scripts identiek; `/present` 29/29 identiek; `/present?talera_menu=hub` 29/29 identiek. De overige 16 homeschermscripts zijn ook identiek.
+- A/B stijl op 360×780, 390×844 en 430×932: `.mast`, `.flow-nav`, `.sheet-handle`, `#talera-v15-appbar`, `#talera-v12-reactions-bar`, `#memoryStoryScroll`, `#memoryCaption` ongewijzigd qua berekende waarden. De kaart `#v17-timebox` houdt exact dezelfde positie, breedte en hoogte (142px); haar achtergrondkleur/tekst verschilt door de reeds eerder ingevoerde diepblauwe stijl, niet door een nieuwe balkwijziging.
+
+### Niet gewijzigd / nog niet bevestigd
+- Niets aan vertelmodus, fotowissels, audio, video, presentatie, WhatsApp, deelpaneel, opgetrokken witte verhaaltekst, boven-/onderbalken, accounts, Free/Premium, API, opslag of gebruikersdata gewijzigd.
+- Openstaand: praktijkcontrole met echte eigen herinneringen op de iPhone; bijzondere gevallen zoals lokale jaren vóór 1985, veel verhalen in één jaar en weergave bij toestelrotatie.
+- **Nog geen nieuwe officiële voorkeur**: huidige goedgekeurde link blijft `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`. Testkandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`. Verwijder of herinstalleer de PWA niet vanwege lokale gegevens.

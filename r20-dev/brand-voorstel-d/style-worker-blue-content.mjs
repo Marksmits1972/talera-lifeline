@@ -46,6 +46,14 @@ function rewriteStyleBlock(html){
 }
 function updateHtml(html){
   let output=rewriteStyleBlock(html);
+  // Only re-target existing PWA icon metadata; DO NOT edit status bar,
+  // layout, hero mast, presentation surfaces or bottom navigation.
+  output=output.replace(/<link\b[^>]*>/gi,tag=>{
+    if(!/\brel\s*=\s*["'](?:apple-touch-icon(?:-precomposed)?|icon)["']/i.test(tag))return tag;
+    const touch=/\brel\s*=\s*["']apple-touch-icon(?:-precomposed)?["']/i.test(tag);
+    return tag.replace(/\bhref\s*=\s*["'][^"']+["']/i,
+      'href="/talera-brand-voorstel-d-icon-'+(touch?'180':'192')+'.png"');
+  });
   // Hero is an image-led welcome surface; other ordinary screens remain white.
   const hasHero=/<(?:div|section)\b[^>]*class=["'][^"']*\bhero-caption\b/i.test(html);
   if(hasHero&&!output.includes('data-talera-hero="true"'))

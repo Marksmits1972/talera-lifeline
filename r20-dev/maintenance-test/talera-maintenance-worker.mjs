@@ -287,19 +287,31 @@ async function page(req,env){
  if(!upstream.ok||!(upstream.headers.get('content-type')||'').includes('text/html'))return upstream;
  let html=await upstream.text();
  const path=new URL(req.url).pathname;
+ let anchorStatus='demo';
  if(path==='/mijn-leven'||path==='/present'){
-  const acc=await sessionAccount(req,env);
-  const dob=acc?await readBirth(acc.id,env):null;
-  if(dob)html=path==='/present'?personalizePresent(html,dob):personalizeHome(html,dob);
+  const account=await sessionAccount(req,env);
+  const dob=account?await readBirth(account.id,env):null;
+  if(dob){
+   const adjusted=path==='/present'?personalizePresent(html,dob):personalizeHome(html,dob);
+   anchorStatus=adjusted!==html?'applied':'missing';
+   if(anchorStatus==='missing')console.warn('TALERA birthday anchor needs review: '+path);
+   html=adjusted;
+  }
  }
- // Account enhancement is independent of the recorder, player and all other UI.
+ const languageUpdate=patchLangPacks(html);
+ html=languageUpdate.html;
+ let visualUpdate={applied:false};
+ if(path==='/present'){visualUpdate=tidyPresentationButtons(html);html=visualUpdate.html;}
  if(html.includes('</head>')&&!html.includes('id="talera-birthdate-ui"')){
   html=html.replace('</head>','<script id="talera-birthdate-ui">'+JS_UI+'</script></head>');
  }
- const headers=new Headers(upstream.headers);
+  const headers=new Headers(upstream.headers);
  for(const k of ['content-length','content-encoding','etag'])headers.delete(k);
  headers.set('cache-control','no-store');
  headers.set('x-talera-birthdate-test','isolated');
+ headers.set('x-talera-anchor-status',anchorStatus);
+ headers.set('x-talera-i18n-extension',languageUpdate.applied?'applied':'missing');
+ if(path==='/present')headers.set('x-talera-css-cleanup',visualUpdate.applied?'applied':'missing');
  return new Response(html,{status:upstream.status,statusText:upstream.statusText,headers});
 }
 // Preserve the original account UI and handlers, changing exactly one registration payload.
@@ -326,7 +338,7 @@ export default {
   if(path==='/api/register'&&request.method==='POST')return register(request,env);
   if(path==='/api/me'&&request.method==='GET')return me(request,env);
   if(path==='/api/profile/birthdate')return birthProfile(request,env);
-  if(request.method==='GET'&&['/','/mijn-leven','/present','/instellingen','/account'].includes(path))
+  if(request.method==='GET'&&['/','/mijn-leven','/present','/tell','/gedeeld','/meldingen','/instellingen','/account'].includes(path))
     return page(request,env);
   return env.TALERA_BASE.fetch(request);
  }

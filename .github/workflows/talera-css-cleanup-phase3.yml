@@ -1,0 +1,59 @@
+name: TALERA Fase 3 - Presentation CSS preview via GitHub
+on:
+  push:
+    branches: [feature/design-only-chevron-css-cleanup-phase3-20261107]
+    paths:
+      - r20-dev/css-cleanup-phase3/**
+      - r20-dev/brand-voorstel-d/style-worker-blue-content.mjs
+      - .github/workflows/talera-css-cleanup-phase3.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test_and_publish_isolated_preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Wrangler
+        run: npm ci
+      - name: Test CSS-only changes and protected pass-through
+        run: |
+          node --check r20-dev/css-cleanup-phase3/preview.worker.mjs
+          node --test r20-dev/css-cleanup-phase3/preview.test.mjs
+      - name: Require existing GitHub deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "No GitHub Cloudflare API token"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "No GitHub Cloudflare account ID"; exit 1; }
+      - name: Publish only new Fase 3 CSS preview Worker via GitHub
+        run: |
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
+          npx wrangler deploy --config r20-dev/css-cleanup-phase3/wrangler.jsonc
+      - name: Verify real live presentation and home CSS rewriting
+        run: |
+          set -eu
+          ROOT='https://talera-design-cleanup-fase3-test-20261107.mark-a39.workers.dev'
+          for page in mijn-leven present tell; do
+            success=0
+            for attempt in 1 2 3 4 5 6; do
+              http=$(curl --max-time 25 -sS -o /tmp/talera-fase2.html -D /tmp/talera-fase2.headers -w '%{http_code}' "$ROOT/$page") || http=000
+              if [ "$http" = "200" ] && grep -qi '^x-talera-css-cleanup-phase3: applied' /tmp/talera-fase2.headers; then
+                echo "$page: HTTP 200 and CSS phase 2 applied"
+                success=1
+                break
+              fi
+              echo "$page attempt $attempt: HTTP $http, style not confirmed"
+              sleep 4
+            done
+            if [ "$success" != "1" ]; then
+              echo "ERROR: $page not verified; never label candidate accepted."
+              exit 1
+            fi
+          done

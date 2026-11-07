@@ -221,3 +221,35 @@ De gebruiker heeft toestemming gegeven om de eerder vastgelegde **uitsluitend kl
 ### Besluit
 Huidige kandidaat: `https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/mijn-leven`.
 Officiële voorkeur blijft `https://talera-closed-memory-core-test-20261106.mark-a39.workers.dev/mijn-leven`. Nog geen promotie of iPhone-acceptatie.
+
+## UX-ronde 3 — zelfschalende tijdlijn, alleen ontwerp en demonstratie (7 november 2026)
+
+### Gebruikerssignalen
+- Twee iPhone-screenshots tonen een andere tijdlijn: de standalone TALERA-uitvoering bij een groen blad heeft 42 vrijwel gelijke, donkere streepjes; de nieuwe Safari-uitvoering toont dunne neutrale streepjes. Ook de onderste tablabels verschillen (o.a. `Berichten` versus `Meldingen`). De nieuwe browseruitvoering toont expliciet een `...20261107.mark-a39.workers.dev`-host in de Safari-balk; de precieze origin achter het bestaande PWA-icoon is vanaf de schermafbeelding niet uit te lezen.
+- Browser-Rendering A/B bevestigt: op `talera-closed-memory-core-test-20261106` blijven 42 `has-memory`-streepjes zichtbaar, omdat 500 demo's meetellen; op `talera-closed-memory-diepblauw-test-20261107` staan 42 fijne neutrale markeringen bij geen eigen verhalen. De laatste link is actueel online.
+- Beide onderzochte versies leveren dezelfde 500 voorbeeldherinneringen. De aantallen van die referenties zijn ongeveer 10–15 per jaar (1985–2026). In dit getoonde tijdvak vallen 468/500 voorbeelden; de overige 32 zijn van 1982–1984. Daardoor zouden alle voorbeeldherinneringen bij de huidige vaste drempel van 8+ onmiddellijk maximale intensiteit tonen.
+- De huidige thuis-tijdlijnlogica gebruikt vaste drempels `0, 1, 2–3, 4–7, 8+`; dat kan bij 3000 verhalen vrijwel alle jaren donker maken. Nieuwe gebruikerswens: schaalbare intensiteit per periode waarbij pieken en dalen zichtbaar blijven bij honderden, duizenden en tienduizenden verhalen, zonder een doorlopende blauwe balk.
+
+### Getest concept, uitsluitend als losse interactieve ontwerpdemonstratie
+Er is een standalone HTML-proef buiten de PWA gebouwd, niet geüpload naar de TALERA-Worker en niet verbonden met gebruikersopslag. De gebruiker kan daarin kiezen uit:
+1. Geen eigen verhalen: 42 lichte jaarstreepjes.
+2. 300 **fictief verdeelde** verhalen: 10 lege, 11 rustige, 9 gewone, 7 drukke en 5 heel drukke jaarposities.
+3. 3000 **fictief verdeelde** verhalen met dezelfde onderliggende relatieve jaarverdeling: 10 lege, 10 rustige, 10 gewone, 7 drukke en 5 heel drukke jaarposities.
+4. Selectie van **179** echte voorbeelden (hoogstens het oorspronkelijke aantal per jaar) met bewuste rustige/geselecteerde perioden; die selectie is alleen voor de demo, wordt niet aan persoonsgegevens toegevoegd.
+5. Alle 500 originele voorbeelden, waarvan 468 in het zichtbare bereik 1985–2026: verdeling vrijwel uniform; 42 jaarposities alle met een **middelmatige** intensiteit, dus nooit allemaal maximaal donker.
+
+### Ontworpen schaalregel
+1. Bepaal het aantal **eigen verhalen per kalenderjaar** (of bij hoge levensduur per visueel gelijkmatig jaarblok). Tel de 500 referentieherinneringen niet als persoonlijke herinneringen mee.
+2. Bereken de **mediaan van de niet-lege** periodeaantallen als de persoonlijke referentiewaarde. Daardoor verschuiven grenzen mee als het totaal van 300 naar 3000 groeit.
+3. Bepaal de relatieve factor `r = n / max(1, medianPositive)`; toon `n=0` als haarlijn; `0<r<0.45` als zeer licht; `0.45≤r<1.45` als gewoon; `1.45≤r<2.8` als druk; `r≥2.8` als zeer druk.
+4. Elk jaar blijft een **los streepje/blokje**, zonder horizontale verbindingslijn. Houd de bestaande jaren, slider, tekst en geselecteerde jaarcirkel ongewijzigd.
+5. Bij automatische samenvoeging van meerdere jaren per markering is een eerlijke vergelijking wenselijk: normaliseer aantallen per jaar in het betreffende tijdvak (i.v.m. kortere laatste periode). Houd nulperiodes licht en toon bij selectie het echte aantal verhalen. Dit punt is nog ontwerp, niet geïmplementeerd.
+6. Vermijd visuele sprongen bij groei van de verzameling (eventueel schaalwaarde stabiliseren); toets kleuren voor contrast en herkenbaarheid.
+
+### Browserproef van de standalone HTML
+De HTML is in een geïsoleerde headless Chromium-browser via `set_content` getest op 390×844; de vijf keuzemodi reageerden, alle waarden en 42 jaarposities werden getoond, geen JavaScript-errors. Een screenshot van de 3000-modus is lokaal gemaakt.
+
+### Strikte grenzen en vervolg
+- **Geen aanpassing aan de online TALERA-PWA gedaan voor dit schaalontwerp.** De vaste drempels van de bestaande app zijn dus nog niet veranderd. Aanpassing vereist specifiek toestemming om de **bestaande** `talera-flow-v17-time`-weergavefunctie (geen opname-/presentatiecode) te wijzigen: die wijziging is niet puur CSS/tekst en valt buiten het eerdere masterbouwbesluit.
+- Geen wijzigingen aan opname/vertelcyclus, media-ID's, swipes, video, WhatsApp, tekstpaneel, opslag, account, PWA-versies, beschermde balken of versieregister.
+- Op het toestel de precieze PWA-launch-URL achter het oude beginschermicoon vaststellen zonder de bestaande app of lokale data te verwijderen. Niet promoveren naar officiële versie vóór acceptatie.

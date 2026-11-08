@@ -6,6 +6,11 @@ on:
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - 'r20-dev/free-10m-f5/**'
+      - '.github/workflows/talera-free-f5-integration.yml'
   workflow_dispatch:
 
 permissions:

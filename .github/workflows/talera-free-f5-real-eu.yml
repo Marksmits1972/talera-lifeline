@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: talera-free-f5-eu-isolated-once
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   f5_real_eu:

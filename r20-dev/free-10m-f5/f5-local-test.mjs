@@ -125,6 +125,13 @@ async function run(){
   const publicScript=await request('GET','/__clean/menu-integration.mjs');
   assert.equal(publicScript.status,200,'Original TALERA menu script must load from approved snapshot');
   assert.ok(String(publicScript.data).length>100,'Actual menu integration JavaScript is expected');
+  const sw=await request('GET','/sw.js');
+  assert.equal(sw.status,200,'PWA service worker must be retained');
+  assert.match(String(sw.data),/self\.addEventListener/,'Real original service worker code expected');
+  const manifest=await request('GET','/manifest.webmanifest');
+  assert.equal(manifest.status,200,'Existing PWA app manifest must be retained');
+  assert.ok(manifest.data.name||manifest.data.short_name,'Installable PWA manifest expected');
+
   for(let i=0;i<3;i++){
     const res=await request('GET','/api/me',{cookie:identities[i].cookie});
     assert.equal(res.status,200);
@@ -191,7 +198,7 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:3,syntheticMemories:1,localRequests:calls,
-    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,qaBrowserCookieVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,qaBrowserCookieVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,

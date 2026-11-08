@@ -3,7 +3,8 @@
  * It changes ONLY how verified public static code is delivered.
  * Does not cache HTML, API, birth dates, account data or media.
  */
-import currentTalera from '../account-birthdate-test/account-birthdate-worker.mjs';
+import currentTalera from './free-birthdate-worker.mjs';
+export {FreeAccountHome} from './free-account-home.mjs';
 import {assetizeHtml,PUBLIC_PATHS} from './rewrite.mjs';
 import {approvedAssets,anonymousShells} from './generated/approved-assets.mjs';
 const allowed=new Set(approvedAssets);

@@ -116,9 +116,11 @@ export class FreeAuthSession extends DurableObject {
  async check(){
   const s=await this.ctx.storage.get('session');
   if(!s||s.revoked||s.expires<=Date.now())return null;
-  const account=await this.env.AUTH_ACCOUNTS.get(
-   this.env.AUTH_ACCOUNTS.idFromName('talera-free-account-v1:'+s.accountId)
-  ).activeProfile(s.epoch);
+  const binding=this.env.AUTH_ACCOUNTS;
+  const home=this.env.AUTH_STORAGE_JURISDICTION==='eu'?binding.jurisdiction('eu'):
+   this.env.AUTH_STORAGE_JURISDICTION==='local-test'?binding:null;
+  if(!home)throw Error('AUTH_JURISDICTION_NOT_EXPLICIT');
+  const account=await home.get(home.idFromName('talera-free-account-v1:'+s.accountId)).activeProfile(s.epoch);
   if(!account||account.id!==s.accountId)return null;
   return account;
  }

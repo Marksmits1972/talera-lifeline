@@ -1,15 +1,9 @@
 name: TALERA Free F5b - separate real EU Cloudflare staging
 
+# FINAL ACCEPTANCE FREE: this workflow changes staging keys on deploy.
+# To keep the iPhone test stable, NEVER automatically redeploy on a PR update.
+# Run manually only when deliberately replacing a synthetic-only staging run.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-real-eu.yml'
-      - 'r20-dev/free-10m-f5/f5-worker.mjs'
-      - 'r20-dev/free-10m-f5/f5-local-scope.mjs'
-      - 'r20-dev/free-10m-f5/f5-webkit-browser-smoke.mjs'
-      - 'r20-dev/free-10m-f5/f5-live-smoke.mjs'
-      - 'r20-dev/free-10m-f5/wrangler.staging.jsonc'
   workflow_dispatch:
 
 permissions:
@@ -22,7 +16,6 @@ concurrency:
 jobs:
   f5_real_eu:
     name: Separate EU Worker, synthetic account+social+timeline readbacks
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:

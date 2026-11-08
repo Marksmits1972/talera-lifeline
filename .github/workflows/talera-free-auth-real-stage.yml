@@ -5,6 +5,7 @@ on:
     branches: [feature/free-10m-auth-do-pilot-20261108]
     paths:
       - '.github/workflows/talera-free-auth-real-stage.yml'
+      - 'r20-dev/free-10m-auth-pilot/auth-live-smoke.mjs'
   workflow_dispatch:
 
 permissions:
@@ -65,3 +66,10 @@ jobs:
         run: sleep 8
       - name: Verify two fake accounts plus 1/5/20 bounded real EU Cloudflare session reads
         run: node r20-dev/free-10m-auth-pilot/auth-live-smoke.mjs
+      - name: Store bounded real Cloudflare staging measurements
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-real-eu-120-session-requests
+          path: r20-dev/free-10m-auth-pilot/generated/auth-remote-result.json
+          retention-days: 14

@@ -1,0 +1,30 @@
+{
+  "name": "talera-free-social-do-staging-20261108",
+  "main": "./social-worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SOCIAL_MEMORY",
+        "class_name": "FreeSocialMemory"
+      },
+      {
+        "name": "SOCIAL_POINTER",
+        "class_name": "FreeSocialSharePointer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "free-social-v1",
+      "new_sqlite_classes": [
+        "FreeSocialMemory",
+        "FreeSocialSharePointer"
+      ]
+    }
+  ],
+  "vars": {
+    "SOCIAL_STORAGE_JURISDICTION": "eu"
+  }
+}

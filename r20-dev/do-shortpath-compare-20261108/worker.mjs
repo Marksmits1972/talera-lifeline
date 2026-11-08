@@ -124,6 +124,7 @@ export default {
    }
    return fail('NOT_FOUND',404);
   }catch(error){
+   if(/^INVALID_(ACCOUNT|STORY|MEDIA)$/.test(error?.message||''))return fail('INVALID_SYNTHETIC_ID',400);
    console.warn('DO staging synthetic request failed',String(error?.message||'unknown').slice(0,110));
    return fail('SYNTHETIC_STORAGE_UNAVAILABLE',503);
   }

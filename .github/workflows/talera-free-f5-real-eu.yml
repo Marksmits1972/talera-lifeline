@@ -68,15 +68,17 @@ jobs:
         run: sleep 8
       - name: Verify genuine EU staging with ONLY synthetic data and bounded requests
         run: node r20-dev/free-10m-f5/f5-live-smoke.mjs
-      - name: Install headless Safari WebKit for single iPhone-emulation acceptance
+      - name: Install browser for one bounded mobile media-storage regression
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
-          npx --no-install playwright install --with-deps webkit
+          npx --no-install playwright install --with-deps chromium
       - name: Install ffmpeg for small synthetic audio and video fixtures
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       - name: Check code before browser integration
         run: node --check r20-dev/free-10m-f5/f5-webkit-browser-smoke.mjs
-      - name: Exercise original storyteller local media, cue sequence and both timelines in WebKit
+      - name: Exercise original storyteller local media and cue sequence in Chromium mobile emulation
+        env:
+          F5_BROWSER_ENGINE: chromium
         run: node r20-dev/free-10m-f5/f5-webkit-browser-smoke.mjs

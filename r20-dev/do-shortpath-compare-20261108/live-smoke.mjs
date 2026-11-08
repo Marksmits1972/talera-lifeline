@@ -16,6 +16,9 @@ assert.equal((await call('GET','/_demo/stats?accountId=demo-gh-do-a',null,false)
 assert.equal((await call('POST','/_demo/story',{accountId:'actual-user',storyId:'story-a',text:'no'})).status,400,
  'Invalid account names are never allowed by DO code and no real account is touched');
 const aid='demo-gh-do-a',other='demo-gh-do-b',sid='story-one',mid='media-one';
+const previous=await call('GET','/_demo/story?accountId='+aid+'&storyId='+sid);
+assert.ok([200,404].includes(previous.status),'Persisted object availability must be well-defined');
+console.log('STORY_SURVIVED_PREVIOUS_DEPLOY',previous.status===200);
 const media=await call('POST','/_demo/media',{accountId:aid,storyId:sid,mediaId:mid,
  text:'Original fictional media bytes, no personal data'});
 assert.equal(media.status,200);
@@ -38,6 +41,7 @@ const statsA=await call('GET','/_demo/stats?accountId='+aid);
 assert.equal(statsA.status,200);
 assert.equal(statsA.body.stories,1);
 assert.ok(statsA.body.sqlBytes>0);
+assert.equal(statsA.body.jurisdiction,'eu','The data object must persist in EU jurisdiction');
 const statsB=await call('GET','/_demo/stats?accountId='+other);
 assert.equal(statsB.status,200);
 assert.equal(statsB.body.stories,0);
@@ -50,7 +54,7 @@ assert.equal((await call('GET','/_demo/stats?accountId='+aid)).body.stories,1);
 console.log('REAL_EU_DO_R2_SHORTPATH_OK',JSON.stringify({
  physicalAccountObjects:2,
  accountsIsolated:true,
- persistentOwnSQLiteStorage:true,
+ persistentOwnSQLiteStorage:true,euJurisdictionConfirmed:true,
  mediaInSeparateEUBucket:true,
  validR2RefVerifiedBeforeSqlCommit:true,
  noAccountDirectory:true,

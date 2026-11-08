@@ -148,6 +148,9 @@ async function run(){
 try{
  const result=await run();
  console.log('TALERA_PREMIUM_ISOLATED_LOCAL_EXECUTION',JSON.stringify(result,null,2));
+}catch(error){
+ console.error('LOCAL_CLOUDFLARE_RUNTIME_LOG_LAST_8000',log.slice(-8000));
+ throw error;
 }finally{
  if(!exited)processHandle.kill('SIGTERM');
  await Promise.race([new Promise(resolve=>processHandle.once('exit',resolve)),sleep(3000)]);

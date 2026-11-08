@@ -1,0 +1,39 @@
+name: TALERA Free - immutable asset staging (NO DEPLOY)
+
+on:
+  push:
+    branches: [feature/free-10m-static-distribution-20261108]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  free_distribution_staging:
+    name: Build and verify Free shell, immutable assets and privacy gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install pinned Wrangler; no deployment
+        run: npm ci
+      - name: Build Free hashed static assets from existing actual Worker
+        run: node scripts/build-free-scale.mjs
+      - name: Verify no production Worker changes and run assertions
+        run: |
+          node --check src/free-scale-worker.js
+          node --check scripts/build-free-scale.mjs
+          node --test test/free-scale-distribution.test.mjs
+      - name: Validate staging Worker bundle without deploying
+        run: npx wrangler deploy --dry-run --config wrangler.free-scale.jsonc
+      - name: Record staging-only build metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-immutable-assets-staging-only
+          path: dist/free-scale-test-manifest.json
+          retention-days: 14

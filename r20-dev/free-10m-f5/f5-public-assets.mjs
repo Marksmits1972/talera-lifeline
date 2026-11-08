@@ -58,13 +58,40 @@ for(const name of paths){
 }
 assert.ok(scripts['/__clean/menu-integration.mjs'],
  'Approved account menu script must be present for login UI.');
+// Reuse the APPROVED, anonymous installable-PWA shell resources verbatim.
+const supportNames=['/sw.js','/manifest.webmanifest','/pwa-192.png',
+  '/pwa-512.png','/apple-touch-icon.png','/favicon.png','/talera-brand-v9.svg'];
+const support={};
+mkdirSync(path.join(publicDir,'__talera_free','f5support'),{recursive:true});
+for(const name of supportNames){
+ const url=new URL(name,origin);
+ async function get(){
+  const response=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(18000)});
+  if(response.status===404)return null;
+  assert.equal(response.status,200,'PWA resource unavailable '+name);
+  assert.ok(!response.headers.get('set-cookie'),'Never package cookie-bearing PWA resource');
+  const bytes=Buffer.from(await response.arrayBuffer());
+  assert.ok(bytes.length>30&&bytes.length<2_000_000,'PWA file unexpectedly sized '+name);
+  return bytes;
+ }
+ const a=await get(),b=await get();
+ if(!a&&!b)continue;
+ assert.ok(a&&b&&a.equals(b),'Unstable public PWA resource '+name);
+ const ext=name.split('.').pop(),filename=sha(a)+'.'+ext;
+ writeFileSync(path.join(publicDir,'__talera_free','f5support',filename),a);
+ support[name]='/__talera_free/f5support/'+filename;
+}
+for(const mandatory of ['/sw.js','/manifest.webmanifest'])
+ assert.ok(support[mandatory],'Missing mandatory original PWA resource '+mandatory);
 writeFileSync(path.join(generated,'public-template-map.mjs'),
   '// Generated only from current approved anonymous public TALERA source.\n'+
   'export const referencePages = Object.freeze('+JSON.stringify(refs,null,2)+');\n'+
-  'export const verifiedPublicScripts = Object.freeze('+JSON.stringify(scripts,null,2)+');\n');
+  'export const verifiedPublicScripts = Object.freeze('+JSON.stringify(scripts,null,2)+');\n'+
+  'export const verifiedPublicSupport = Object.freeze('+JSON.stringify(support,null,2)+');\n');
 const report={result:'BUILT (not browser-certified)',source:origin,
   privateDataRequested:false,customerDatabaseTouched:false,
   referencePages:Object.keys(refs),verifiedScriptRoutes:Object.keys(scripts),
+  verifiedPwaSupportRoutes:Object.keys(support),
   stagingOnly:true,fullFreePwaCertified:false};
 writeFileSync(path.join(generated,'f5-build-report.json'),JSON.stringify(report,null,2)+'\n');
 console.log('TALERA_F5_PUBLIC_REFERENCE_BUILD',JSON.stringify(report));

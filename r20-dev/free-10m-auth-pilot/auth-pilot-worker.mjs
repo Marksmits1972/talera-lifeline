@@ -6,13 +6,16 @@ import {
  validAccountId,freshToken,shaHex,namespacedHash,passwordHash,
  readSessionCookie,sessionCookie,json,sameOrigin,body
 } from './auth-util.mjs';
-export {FreeAuthAccount,FreeAuthHandle,FreeAuthSession,FreeAuthRate} from './auth-objects.mjs';
+export {FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate} from './auth-objects.mjs';
 
 const err=(status,message)=>json({error:message},status);
 const LIMIT_WINDOW=600000;
 const routeKey=async(env,type,value)=>namespacedHash(env.AUTH_NAMESPACE_KEY,type+':'+value);
-function accountStub(env,key){
- return env.AUTH_ACCOUNTS.get(env.AUTH_ACCOUNTS.idFromName('talera-free-auth-account-v1:'+key));
+function accountStub(env,id){
+ return env.AUTH_ACCOUNTS.get(env.AUTH_ACCOUNTS.idFromName('talera-free-account-v1:'+validAccountId(id)));
+}
+function emailStub(env,key){
+ return env.AUTH_EMAILS.get(env.AUTH_EMAILS.idFromName('talera-free-auth-email-v1:'+key));
 }
 function handleStub(env,key){
  return env.AUTH_HANDLES.get(env.AUTH_HANDLES.idFromName('talera-free-auth-handle-v1:'+key));
@@ -25,7 +28,7 @@ function rateStub(env,key){
 }
 async function accountForEmail(env,email){
  const hash=await routeKey(env,'email',validEmail(email));
- return {key:hash,object:accountStub(env,hash)};
+ return {key:hash,index:emailStub(env,hash)};
 }
 async function limit(env,req,category,max,identity=''){
  // Cloudflare overwrites CF-Connecting-IP on incoming public HTTPS requests.
@@ -45,7 +48,7 @@ async function sessionForRequest(env,req){
 async function issueSession(env,row){
  const token=freshToken(),hash=await shaHex(token);
  const item=await sessionStub(env,hash).open({
-  accountId:validAccountId(row.id),accountKey:row.key,epoch:row.epoch,
+  accountId:validAccountId(row.id),epoch:row.epoch,
   expires:Date.now()+AUTH_DAYS*86400000
  });
  if(!item)throw Error('SESSION_ALREADY_EXISTS');
@@ -68,29 +71,32 @@ async function signup(req,env){
  const emailRoute=await accountForEmail(env,email);
  const usernameRoute=await routeKey(env,'handle',handle);
  const usernameHome=handleStub(env,usernameRoute);
+ const emailReserved=await emailRoute.index.reserve(accountId);
+ if(!emailReserved)return err(409,'Registreren is niet gelukt');
  const reserved=await usernameHome.reserve(accountId);
- if(!reserved)return err(409,'Deze gebruikersnaam is niet beschikbaar');
+ if(!reserved){await emailRoute.index.release(accountId);return err(409,'Deze gebruikersnaam is niet beschikbaar')}
  let created=false;
  try{
   const salt=freshToken(),digest=await passwordHash(password,salt);
-  created=await emailRoute.object.create({
+  created=await accountStub(env,accountId).create({
    id:accountId,email,display_name:display,public_handle:handle,
    password_salt:salt,password_hash:digest
   });
   if(!created){
-   await usernameHome.release(accountId);
+   await Promise.all([usernameHome.release(accountId),emailRoute.index.release(accountId)]);
    return err(409,'Registreren is niet gelukt');
   }
   const activated=await usernameHome.activate(accountId);
-  if(!activated){
+  const emailActivated=await emailRoute.index.activate(accountId);
+  if(!activated||!emailActivated){
    // Crash-safe staging rule: do not issue sessions against unfinalized
    // handles. A reconciliation run is required for an interrupted activation.
    return err(503,'Registratie vereist herstelcontrole');
   }
-  return issueSession(env,{id:accountId,key:emailRoute.key,epoch:0,email,displayName:display,username:handle});
+  return issueSession(env,{id:accountId,epoch:0,email,displayName:display,username:handle});
  }catch(error){
   // Only release an uncommitted reservation; never recycle a committed handle.
-  if(!created)await usernameHome.release(accountId).catch(()=>{});
+  if(!created)await Promise.allSettled([usernameHome.release(accountId),emailRoute.index.release(accountId)]);
   throw error;
  }
 }
@@ -103,11 +109,14 @@ async function signin(req,env){
  if(!await limit(env,req,'login-email',15,email))return err(429,'Probeer later opnieuw');
  const account=await accountForEmail(env,email);
  const password=typeof input.password==='string'?input.password:'';
- const authenticated=await account.object.verify(password);
+ const id=await account.index.owner();
+ if(!id){await passwordHash(password.slice(0,128),'0'.repeat(64));return err(401,'Gegevens niet herkend')}
+ const home=accountStub(env,id);
+ const authenticated=await home.verify(password);
  if(!authenticated)return err(401,'Gegevens niet herkend');
- const publicProfile=await account.object.activeProfile(authenticated.epoch);
+ const publicProfile=await home.activeProfile(authenticated.epoch);
  if(!publicProfile)return err(401,'Gegevens niet herkend');
- return issueSession(env,{...publicProfile,key:account.key,username:publicProfile.publicHandle});
+ return issueSession(env,{...publicProfile,username:publicProfile.publicHandle});
 }
 async function me(req,env){
  const session=await sessionForRequest(env,req);
@@ -130,8 +139,7 @@ async function profile(req,env){
  if(!await limit(env,req,'profile-ip',20))return err(429,'Probeer later opnieuw');
  let payload;try{payload=await body(req)}catch{return err(400,'Ongeldige aanvraag')}
  let display;try{display=validDisplay(payload.displayName)}catch{return err(400,'Vul een geldige naam in')}
- const emailRoute=await accountForEmail(env,authenticated.profile.email);
- const updated=await emailRoute.object.setDisplay(display,authenticated.profile.epoch);
+ const updated=await accountStub(env,authenticated.profile.id).setDisplay(display,authenticated.profile.epoch);
  if(!updated)return err(401,'Meld je opnieuw aan');
  return json({account:{id:updated.id,email:updated.email,displayName:updated.displayName,username:updated.publicHandle}});
 }
@@ -141,7 +149,7 @@ export default {
   const u=new URL(req.url),p=u.pathname,m=req.method;
   if(p==='/__free-auth/health'&&m==='GET')
    return json({ok:true,product:'TALERA Free',pilot:true,realTaleraAccountsMigrated:false,sharedD1Bound:false});
-  if(!env.AUTH_NAMESPACE_KEY||!env.AUTH_ACCOUNTS?.get||!env.AUTH_HANDLES?.get||
+  if(!env.AUTH_NAMESPACE_KEY||!env.AUTH_ACCOUNTS?.get||!env.AUTH_EMAILS?.get||!env.AUTH_HANDLES?.get||
      !env.AUTH_SESSIONS?.get||!env.AUTH_RATES?.get)return err(503,'Auth testomgeving niet ingericht');
   if(u.search||!['/api/register','/api/login','/api/logout','/api/me','/api/profile'].includes(p))
    return err(404,'Niet beschikbaar in deze testomgeving');

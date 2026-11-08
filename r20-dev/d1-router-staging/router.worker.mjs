@@ -33,8 +33,16 @@ function shardBinding(env,id){
  return db;
 }
 async function getShard(accountId,env,provision=false){
- const directory=primary(env.DIRECTORY_DB);
- let record=await directory.prepare(
+ // Immutable placements may be read from a replica for more throughput.
+ // A stale/missing replica row always falls back to the primary. No negative
+ // placement is cached; the original shard is never recomputed for an account.
+ let record=null;
+ try{
+  record=await env.DIRECTORY_DB.withSession('first-unconstrained').prepare(
+   'SELECT shard_id FROM account_shard WHERE account_id=?'
+  ).bind(accountId).first();
+ }catch{/* replica unavailable, primary remains authoritative */}
+ if(!record)record=await primary(env.DIRECTORY_DB).prepare(
   'SELECT shard_id FROM account_shard WHERE account_id=?'
  ).bind(accountId).first();
  if(record){
@@ -42,7 +50,7 @@ async function getShard(accountId,env,provision=false){
   return {id:record.shard_id,created:false};
  }
  if(!provision)return null;
- const found=await directory.prepare(
+ const found=await primary(env.DIRECTORY_DB).prepare(
   "SELECT shard_id FROM shards WHERE state='active' ORDER BY shard_id"
  ).all();
  const active=(found.results||[]).map(x=>x.shard_id);

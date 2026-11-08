@@ -4,7 +4,18 @@
   "shards": [
     {
       "id": "A",
-      "database_name": "talera-d1-router-shard-a-test-20261108"
+      "database_name": "talera-d1-router-shard-a-test-20261108",
+      "desired_state": "active"
+    },
+    {
+      "id": "B",
+      "database_name": "talera-d1-router-shard-b-test-20261108",
+      "desired_state": "active"
+    },
+    {
+      "id": "C",
+      "database_name": "talera-d1-router-shard-c-test-20261108",
+      "desired_state": "standby"
     }
   ]
 }

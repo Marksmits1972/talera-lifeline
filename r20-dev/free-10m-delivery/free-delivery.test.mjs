@@ -108,7 +108,7 @@ test('Authenticated request with private date still cannot cache its HTML',async
     return Response.json({account:{id:'fake-test-account'}});
    return new Response(source,{headers:{'content-type':'text/html'}});
   }},
-  BIRTH_DB:{prepare:()=>({bind:()=>({first:async()=>({birth_date:'2000-02-29'})})})}
+  FREE_ACCOUNT:{idFromName:name=>name,get:id=>({getBirthDate:async()=> '2000-02-29'})}
  };
  const page=await freeWorker.fetch(new Request('https://fake.talera.test/present',{headers:{cookie:'talera_sid=fake'}}),env,{});
  assert.match(page.headers.get('cache-control'),/private, no-store/);

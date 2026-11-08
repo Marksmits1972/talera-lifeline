@@ -49,3 +49,25 @@ jobs:
           node-version: '22'
       - name: Three public GETs, no accounts, no writes, NO load
         run: node r20-dev/free-premium-scale-20261108/public-readonly-smoke.mjs
+
+
+  isolated_local_premium_runtime:
+    name: Genuine Cloudflare local DO/R2 runtime - small bounded requests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch prior proven ISOLATED synthetic DO/R2 Worker at pinned commit
+        uses: actions/checkout@v4
+        with:
+          ref: b28a459fa5d14d55fb4d836bb2674c9545f6a9f0
+          path: isolated-synthetic-proof
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install test runtime only, do not deploy anything
+        run: npm ci
+      - name: Exercise real Worker code locally, with 12 fake accounts and 6 fake media objects each
+        run: node r20-dev/free-premium-scale-20261108/local-premium-runtime.mjs

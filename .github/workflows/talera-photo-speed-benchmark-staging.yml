@@ -3,7 +3,7 @@ on:
   push:
     branches: [feature/photo-strip-d1-vs-do-speed-test-20261108]
     paths:
-      - r20-dev/photo-speed-benchmark-20261108/**
+      - r20-dev/photo-speed-benchmark-20261108/*.mjs
       - .github/workflows/talera-photo-speed-benchmark-staging.yml
   workflow_dispatch:
 permissions:

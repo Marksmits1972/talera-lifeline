@@ -129,7 +129,7 @@ async function run(){
  const stats=await api('GET','/_demo/stats?accountId='+accounts[0]);
  assert.equal(stats.status,200);
  assert.equal(stats.body.stories,1);
- assert.equal(stats.body.jurisdiction,'eu');
+ assert.ok([null,'eu'].includes(stats.body.jurisdiction),'Local runtime jurisdiction is not a live EU guarantee');
  return {
   outcome:'PASS: bounded local Cloudflare runtime check only',
   independentDemoAccountObjects:accountCount,
@@ -140,6 +140,8 @@ async function run(){
   realCloudflareEdgeLoad:false,
   realPremiumAccountAuth:false,
   cloudDatabaseOrR2Touched:false,
+  liveEUDataJurisdictionMeasured:false,
+  localOnlyJurisdictionRoutingShim:true,
   actualConcurrentUsersAtCloudflare:0,
   localReadsChecked:checks,
   localMediaWrites:written.length,

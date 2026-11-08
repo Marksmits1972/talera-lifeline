@@ -1,0 +1,10 @@
+{
+  "worker_name": "talera-d1-stable-router-test-20261108",
+  "directory_database": "talera-d1-router-directory-test-20261108",
+  "shards": [
+    {
+      "id": "A",
+      "database_name": "talera-d1-router-shard-a-test-20261108"
+    }
+  ]
+}

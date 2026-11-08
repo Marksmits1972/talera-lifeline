@@ -42,7 +42,9 @@ for(const entries of snapshots){
  }
  byPass.push(map);
 }
-const stable=[...byPass[0]].filter(([key,entry])=>byPass[1].get(key)?.body===entry.body);
+// Small inline fragments stay in HTML: prevent many extra phone/CDN requests.
+const MIN_SHARED_ASSET_BYTES=12*1024;
+const stable=[...byPass[0]].filter(([key,entry])=>byPass[1].get(key)?.body===entry.body && entry.bytes>=MIN_SHARED_ASSET_BYTES);
 assert.ok(stable.length>=3,'Not enough stable public code blocks: refuse unsafe build');
 rmSync(STATIC,{recursive:true,force:true});mkdirSync(path.join(STATIC,'__talera_free','assets'),{recursive:true});
 mkdirSync(GENERATED,{recursive:true});
@@ -82,6 +84,7 @@ for(const {route,html} of snapshots[0]){
  const saved=parts.filter(c=>approvedSet.has(c.sha+'.'+(c.kind==='script'?'js':'css'))).reduce((n,c)=>n+c.bytes,0);
  totals[route]={originalHtmlBytes:old,allowedSharedSourceBytes:saved,
   approxRemainingHtmlBytesBeforeTagReplacement:old-saved,
+ sharedAssetRequestsForThisPage:parts.filter(c=>approvedSet.has(c.sha+'.'+(c.kind==='script'?'js':'css'))).length,
   percentSourceMadeShared:Number((100*saved/old).toFixed(2))};
 }
 const result={
@@ -89,6 +92,7 @@ const result={
  snapshots:2,
  publicRoutes:PAGES,
  approvedImmutableAssets:approved.length,
+ minSharedAssetBytes:MIN_SHARED_ASSET_BYTES,
  anonymousShells,
  distinctApprovedAssetBytes:stable.reduce((n,[,c])=>n+c.bytes,0),
  byRoute:totals,

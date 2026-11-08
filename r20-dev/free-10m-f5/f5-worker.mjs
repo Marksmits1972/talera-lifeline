@@ -1,0 +1,165 @@
+// TALERA Free F5 - ONE ISOLATED INTEGRATION GATEWAY, synthetic test accounts ONLY.
+// There is intentionally NO TALERA_BASE, D1, R2 or existing customer service binding.
+// Auth/DO and social/DO are assembled at ONE origin, not promoted to official PWA.
+import authPilot from '../free-10m-auth-pilot/auth-pilot-worker.mjs';
+import socialPilot from '../free-10m-social-do/social-worker.mjs';
+import {
+  readSessionCookie,shaHex,safeEqualHex,json,sameOrigin,body
+} from '../free-10m-auth-pilot/auth-util.mjs';
+import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
+import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
+
+export {
+  FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
+} from '../free-10m-auth-pilot/auth-objects.mjs';
+export {
+  FreeSocialMemory,FreeSocialSharePointer
+} from '../free-10m-social-do/social-objects.mjs';
+
+const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
+const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
+const HEX64=/^[a-f0-9]{64}$/;
+const encoder=new TextEncoder();
+function deny(status=403,message='Deze testomgeving is niet toegankelijk'){
+  return json({ok:false,error:message},status);
+}
+function ns(env,name){
+  const b=env[name];
+  if(!b?.get||!b?.idFromName)throw Error('F5_AUTH_BINDING_MISSING');
+  if(env.AUTH_STORAGE_JURISDICTION==='eu')return b.jurisdiction('eu');
+  if(env.AUTH_STORAGE_JURISDICTION==='local-test')return b;
+  throw Error('F5_AUTH_JURISDICTION_NOT_EXPLICIT');
+}
+function accountHome(env,id){
+  const b=ns(env,'AUTH_ACCOUNTS');
+  return b.get(b.idFromName('talera-free-account-v1:'+id));
+}
+async function sessionAccount(request,env){
+  const token=readSessionCookie(request);
+  if(!token)return null;
+  const hash=await shaHex(token),b=ns(env,'AUTH_SESSIONS');
+  const account=await b.get(b.idFromName('talera-free-auth-session-v1:'+hash)).check();
+  return account?.id?account:null;
+}
+async function signActor(key,actor){
+  const secret=await crypto.subtle.importKey(
+    'raw',encoder.encode(key),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  return Array.from(new Uint8Array(await crypto.subtle.sign(
+    'HMAC',secret,encoder.encode(actor))),b=>b.toString(16).padStart(2,'0')).join('');
+}
+function delegatedRequest(request,name,key){
+  const h=new Headers(request.headers);
+  // Reject user-supplied internal identities and keys: the gateway owns them.
+  for(const k of ['x-qa-account','x-qa-signature','x-qa-staging-key','x-talera-staging-key'])
+    h.delete(k);
+  h.set(name,key);
+  return new Request(request,{headers:h});
+}
+async function accountApi(request,env){
+  const path=new URL(request.url).pathname;
+  if(path==='/api/register'&&request.method==='POST'){
+    // Registration must carry the private DOB from the approved TALERA form.
+    let input;
+    try{input=await body(request.clone());validatedDate(input.birthDate)}
+    catch{return deny(400,'Vul een geldige geboortedatum in')}
+    const result=await authPilot.fetch(
+      delegatedRequest(request,'x-talera-staging-key',env.STAGING_ACCESS_KEY),env);
+    if(!result.ok)return result;
+    let data;
+    try{data=await result.clone().json()}
+    catch{return deny(503,'Registratiecontrole ontbreekt')}
+    if(!data?.account?.id)return deny(503,'Account-ID ontbreekt');
+    try{await accountHome(env,data.account.id).setBirthDate(input.birthDate)}
+    catch{return deny(503,'Testaccount gemaakt; geboortedatum nog niet opgeslagen')}
+    data.account.birthDate=input.birthDate;
+    const headers=new Headers(result.headers);
+    headers.delete('content-length');headers.delete('content-encoding');
+    headers.set('cache-control','private, no-store');
+    return new Response(JSON.stringify(data),{status:result.status,headers});
+  }
+  const response=await authPilot.fetch(
+    delegatedRequest(request,'x-talera-staging-key',env.STAGING_ACCESS_KEY),env);
+  if(path!=='/api/me'||request.method!=='GET'||!response.ok)return response;
+  const data=await response.clone().json();
+  if(!data?.account?.id)return deny(503,'Ongeldig accountantwoord');
+  data.account.birthDate=await accountHome(env,data.account.id).getBirthDate();
+  const headers=new Headers(response.headers);
+  headers.delete('content-length');headers.delete('content-encoding');
+  headers.set('cache-control','private, no-store');
+  return new Response(JSON.stringify(data),{status:response.status,headers});
+}
+async function birthdateApi(request,env){
+  if(!['GET','POST'].includes(request.method))return deny(405,'Methode niet toegestaan');
+  const actor=await sessionAccount(request,env);
+  if(!actor)return deny(401,'Aanmelden vereist');
+  const home=accountHome(env,actor.id);
+  if(request.method==='GET')return json({birthDate:await home.getBirthDate()});
+  if(!sameOrigin(request))return deny(403,'Ongeldige herkomst');
+  let value;
+  try{value=validatedDate((await body(request)).birthDate)}
+  catch{return deny(400,'Ongeldige geboortedatum')}
+  return json(await home.setBirthDate(value));
+}
+async function socialApi(request,env){
+  // DO social code retains its own authorization, pointer and revocation checks.
+  // The browser can NEVER claim an actor ID or provide its own HMAC signature.
+  const actor=await sessionAccount(request,env);
+  const headers=new Headers(request.headers);
+  for(const k of ['x-qa-account','x-qa-signature','x-qa-staging-key','x-talera-staging-key'])
+    headers.delete(k);
+  headers.set('x-qa-staging-key',env.STAGING_SOCIAL_KEY);
+  if(actor){
+    headers.set('x-qa-account',actor.id);
+    headers.set('x-qa-signature',await signActor(env.DEMO_IDENTITY_KEY,actor.id));
+  }
+  return socialPilot.fetch(new Request(request,{headers}),env);
+}
+async function publicPage(request,env){
+  // DO NOT display personalized timelines with anonymous HTML. A future F5
+  // step must prove the actual approved PWA UI + birthdate integration first.
+  if(request.headers.has('cookie')||request.headers.has('authorization'))
+    return new Response('Ingelogde F5-weergave nog niet vrijgegeven.',{
+      status:503,headers:{'cache-control':'private, no-store'}});
+  const pathname=new URL(request.url).pathname;
+  const asset=anonymousShells[pathname];
+  if(!asset||!env.ASSETS)return deny(503,'Anonieme PWA-shell ontbreekt');
+  const origin=new URL(request.url).origin;
+  const r=await env.ASSETS.fetch(new Request(new URL(asset,origin)));
+  if(!r.ok)return deny(503,'Anonieme PWA-shell is niet beschikbaar');
+  const headers=new Headers(r.headers);
+  for(const key of ['content-length','etag','content-encoding','cf-cache-status','age'])headers.delete(key);
+  headers.set('cache-control','private, no-store');
+  headers.set('x-talera-free-f5','anonymous-snapshot-only');
+  headers.set('x-content-type-options','nosniff');
+  return new Response(r.body,{status:200,headers});
+}
+export default {
+  async fetch(request,env){
+    const url=new URL(request.url),p=url.pathname,m=request.method;
+    if(p==='/__f5/health'&&m==='GET')
+      return json({ok:true,stage:'F5-isolated-integration',syntheticOnly:true,
+        officialTaleraConnected:false,loggedInPwaCertified:false,tenMillionProven:false});
+    // Closed pilot. Cloudflare Access/browser access requires separate acceptance.
+    if(!HEX64.test(env.STAGING_F5_KEY||'')||
+       !HEX64.test(env.STAGING_ACCESS_KEY||'')||
+       !HEX64.test(env.STAGING_SOCIAL_KEY||'')||
+       typeof env.AUTH_NAMESPACE_KEY!=='string'||env.AUTH_NAMESPACE_KEY.length<40||
+       typeof env.DEMO_IDENTITY_KEY!=='string'||env.DEMO_IDENTITY_KEY.length<40)
+      return deny(503,'F5-testomgeving niet correct ingericht');
+    if(!safeEqualHex(request.headers.get('x-talera-f5-key')||'',env.STAGING_F5_KEY))
+      return deny();
+    if(url.search)return deny(404,'Niet gevonden');
+    try{
+      if(AUTH_PATHS.has(p))return accountApi(request,env);
+      if(p==='/api/profile/birthdate')return birthdateApi(request,env);
+      if(p.startsWith('/__social/'))return socialApi(request,env);
+      if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);
+      // No fallback to the live TALERA services; unported routes fail closed.
+      return deny(404,'Niet beschikbaar in deze geïsoleerde test');
+    }catch(error){
+      // Never log cookies, account names, passwords, signatures or tokens.
+      console.error('TALERA_F5_INTERNAL_FAILURE');
+      return deny(503,'F5-testservice tijdelijk onbereikbaar');
+    }
+  }
+};

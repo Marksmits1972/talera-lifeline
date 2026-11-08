@@ -9,7 +9,7 @@ import freeWorker from './free-worker.mjs';
 const dir=path.dirname(fileURLToPath(import.meta.url));
 const allowed=new Set(approvedAssets);
 const read=route=>readFileSync(path.join(dir,'generated','reference-'+route+'.html'),'utf8');
-const publicFile=key=>readFileSync(path.join(dir,'public','assets',key),'utf8');
+const publicFile=key=>readFileSync(path.join(dir,'public','__talera_free','assets',key),'utf8');
 test('The whitelist contains content-addressed public files only',()=>{
  assert.ok(approvedAssets.length>=3,'Minimum three real shared code blocks');
  for(const k of approvedAssets){

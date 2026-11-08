@@ -4,7 +4,7 @@
 import {
  AUTH_DAYS,validEmail,validHandle,validDisplay,validPassword,
  validAccountId,freshToken,shaHex,namespacedHash,passwordHash,
- readSessionCookie,sessionCookie,json,sameOrigin,body
+ readSessionCookie,sessionCookie,safeEqualHex,json,sameOrigin,body
 } from './auth-util.mjs';
 export {FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate} from './auth-objects.mjs';
 
@@ -149,6 +149,11 @@ export default {
   const u=new URL(req.url),p=u.pathname,m=req.method;
   if(p==='/__free-auth/health'&&m==='GET')
    return json({ok:true,product:'TALERA Free',pilot:true,realTaleraAccountsMigrated:false,sharedD1Bound:false});
+  // Pilot is intentionally closed to the public, even after Cloudflare deploy.
+  // Missing secret FAILS CLOSED; only the CI runner has a temporary QA key.
+  if(!/^[0-9a-f]{64}$/.test(env.STAGING_ACCESS_KEY||''))return err(503,'Testomgeving gesloten');
+  if(!safeEqualHex(req.headers.get('x-talera-staging-key')||'',env.STAGING_ACCESS_KEY))
+   return err(403,'Testomgeving niet toegankelijk');
   if(!env.AUTH_NAMESPACE_KEY||!env.AUTH_ACCOUNTS?.get||!env.AUTH_EMAILS?.get||!env.AUTH_HANDLES?.get||
      !env.AUTH_SESSIONS?.get||!env.AUTH_RATES?.get)return err(503,'Auth testomgeving niet ingericht');
   if(u.search||!['/api/register','/api/login','/api/logout','/api/me','/api/profile'].includes(p))

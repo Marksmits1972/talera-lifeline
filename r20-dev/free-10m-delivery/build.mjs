@@ -45,6 +45,11 @@ const stable=[...byPass[0]].filter(([key,entry])=>byPass[1].get(key)?.body===ent
 assert.ok(stable.length>=3,'Not enough stable public code blocks: refuse unsafe build');
 rmSync(STATIC,{recursive:true,force:true});mkdirSync(path.join(STATIC,'assets'),{recursive:true});
 mkdirSync(GENERATED,{recursive:true});
+// Keep anonymous reference HTML in temporary build output for parity tests only.
+for(const {route,html} of snapshots[0]){
+ const safe=route.replaceAll('/','_').replace(/^_+/,'');
+ writeFileSync(path.join(GENERATED,'reference-'+safe+'.html'),html,'utf8');
+}
 const approved=[];
 for(const [key,{body}] of stable){
  writeFileSync(path.join(STATIC,'assets',key),body,'utf8');

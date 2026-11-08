@@ -13,7 +13,7 @@ const health=await call('GET','/health',null,false);
 assert.equal(health.status,200);
 assert.equal(health.body.connectedToTalera,false);
 assert.equal((await call('GET','/_demo/stats?accountId=demo-gh-do-a',null,false)).status,401);
-assert.equal((await call('POST','/_demo/story',{accountId:'actual-user',storyId:'story-a',text:'no'})).status,503,
+assert.equal((await call('POST','/_demo/story',{accountId:'actual-user',storyId:'story-a',text:'no'})).status,400,
  'Invalid account names are never allowed by DO code and no real account is touched');
 const aid='demo-gh-do-a',other='demo-gh-do-b',sid='story-one',mid='media-one';
 const media=await call('POST','/_demo/media',{accountId:aid,storyId:sid,mediaId:mid,

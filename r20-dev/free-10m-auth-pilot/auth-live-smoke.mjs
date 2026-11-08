@@ -102,6 +102,34 @@ for(const concurrency of [1,5,20]){
   p50Ms:Number(latencies[Math.ceil(count*.50)-1].toFixed(2)),
   p95Ms:Number(latencies[Math.ceil(count*.95)-1].toFixed(2))});
 }
+// BOUNDED genuine Cloudflare edge requests: only 120 additional GETs.
+// This checks session/DO behavior under a small peak, not a 10M-user claim.
+const latencyBands=[];
+for(const concurrency of [1,5,20,40]){
+ const requestTotal=30;
+ let cursor=0;
+ const samples=[];
+ await Promise.all(Array.from({length:Math.min(concurrency,requestTotal)},async()=>{
+  while(cursor<requestTotal){
+   const i=cursor++;
+   const target=i%2===0?{cookie:anotherCookie,id:userA.value.account.id}:
+    {cookie:bCookie,id:userB.value.account.id};
+   const started=performance.now();
+   const result=await request('GET','/api/me',{cookie:target.cookie});
+   const elapsed=performance.now()-started;
+   assert.equal(result.status,200,'Session must not fail at moderate Cloudflare test traffic');
+   assert.equal(result.value?.account?.id,target.id,'Cross-account response under concurrency');
+   samples.push(elapsed);
+  }
+ }));
+ samples.sort((a,b)=>a-b);
+ latencyBands.push({
+  concurrentRequests:concurrency,successes:samples.length,
+  p50Ms:Number(samples[Math.ceil(.50*samples.length)-1].toFixed(1)),
+  p95Ms:Number(samples[Math.ceil(.95*samples.length)-1].toFixed(1)),
+  p99Ms:Number(samples[Math.ceil(.99*samples.length)-1].toFixed(1))
+ });
+}
 const report={
  result:'PASS: isolated REAL Cloudflare Free-auth EU-jurisdiction staging smoke',
  testOnly:true,
@@ -110,7 +138,9 @@ const report={
  realSessionLogoutAndRevocation:true,
  usesOriginalD1:false,
  migratedOriginalAccounts:false,
- sentNoRequestsToExistingTalera:false,
+ sentNoRequestsToExistingTalera:true,
+ observedLatencyBands:latencyBands,
+ boundedParallelSessionReads:latencyBands.reduce((n,x)=>n+x.successes,0),
  totalLiveHttpRequests:checked,
  boundedRealCloudSessionReadBands:bands,
  noNetworkLoadOnAnyExistingTaleraWorker:true,

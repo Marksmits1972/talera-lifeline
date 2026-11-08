@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root=new URL('../../',import.meta.url);
 function source(path){return readFileSync(new URL(path,root),'utf8')}
 const core=source('xxory-test/src/worker.js');
-const config=JSON.parse(source('xxory-test/wrangler.jsonc'));
+const config=JSON.parse(source('xxory-test/wrangler.jsonc').replace(/^\s*\/\/.*$/gm,''));
 const raw=source('xxory-test/src/workblad-raw-storage-api.js');
 const editor=source('xxory-test/src/workblad-integration-api.js');
 const management=source('xxory-test/src/workblad-story-management.js');

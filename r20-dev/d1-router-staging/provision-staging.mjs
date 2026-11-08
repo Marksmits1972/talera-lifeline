@@ -15,7 +15,7 @@ const safeDatabase=name=>typeof name==='string'&&name.startsWith(fixedPrefix)&&
 const safeShard=id=>typeof id==='string'&&/^[A-Z][A-Z0-9]{0,7}$/.test(id);
 if(catalog.worker_name!=='talera-d1-stable-router-test-20261108')throw Error('Unexpected Worker target');
 if(!safeDatabase(catalog.directory_database))throw Error('Invalid directory name');
-if(!Array.isArray(catalog.shards)||!catalog.shards.length||catalog.shards.length>16)throw Error('Invalid shard catalog');
+if(!Array.isArray(catalog.shards)||!catalog.shards.length||catalog.shards.length>128)throw Error('Invalid shard catalog');
 const allNames=[catalog.directory_database,...catalog.shards.map(q=>q.database_name)];
 if(new Set(allNames).size!==allNames.length)throw Error('Duplicate database name');
 const shardIds=catalog.shards.map(x=>x.id);

@@ -120,8 +120,11 @@ jobs:
           cache: npm
       - name: Prepare locally emulated Cloudflare runtime
         run: npm ci
-      - name: Verify ffmpeg available for generation of valid synthetic video
-        run: ffmpeg -version | head -n 1
+      - name: Install video fixture generator in isolated GitHub runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffmpeg -version | head -n 1
       - name: Run full binary media lifecycle, local-only and bounded
         run: node r20-dev/free-premium-scale-20261108/premium-media-local/run.mjs
       - name: Archive local-only full-media integrity proof

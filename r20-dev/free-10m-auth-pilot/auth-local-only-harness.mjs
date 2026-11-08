@@ -1,6 +1,6 @@
 // LOCAL TEST HARNESS ONLY. Never use this as a deployed Worker entrypoint.
 import pilot from './auth-pilot-worker.mjs';
-export {FreeAuthAccount,FreeAuthHandle,FreeAuthSession,FreeAuthRate} from './auth-objects.mjs';
+export {FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate} from './auth-objects.mjs';
 import {validEmail,namespacedHash,shaHex} from './auth-util.mjs';
 
 export default {
@@ -12,8 +12,9 @@ export default {
    const data=await request.json();
    const email=validEmail(data.email);
    const key=await namespacedHash(env.AUTH_NAMESPACE_KEY,'email:'+email);
-   const stub=env.AUTH_ACCOUNTS.get(env.AUTH_ACCOUNTS.idFromName('talera-free-auth-account-v1:'+key));
-   const ok=await stub.disable();
+   const index=env.AUTH_EMAILS.get(env.AUTH_EMAILS.idFromName('talera-free-auth-email-v1:'+key));
+   const id=await index.owner();
+   const ok=id?await env.AUTH_ACCOUNTS.get(env.AUTH_ACCOUNTS.idFromName('talera-free-account-v1:'+id)).disable():false;
    return Response.json({ok});
   }
   if(u.pathname==='/__local-qa/session-object'&&request.method==='GET'){

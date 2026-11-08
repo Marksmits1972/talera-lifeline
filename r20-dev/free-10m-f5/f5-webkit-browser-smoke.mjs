@@ -69,11 +69,40 @@ try{
    new File([decode(data.audio)],'synthetic-narration.wav',{type:'audio/wav'})
   ];
   const cues=[{t:0,index:0},{t:1000,index:1,videoAtMs:100},{t:2000,index:0}];
-  const item=await window.TaleraMemories.save({
-   title:'F5 WebKit fictieve audio-foto-video',
-   date:'2000-04-02',text:'Fictieve lokale opname, geen persoonsgegevens',
-   narrationDurationMs:3000,narrationCues:cues
-  },uploads);
+  const writeErrors=[];
+  const originalPut=IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put=function(...params){
+   const req=originalPut.apply(this,params);
+   req.addEventListener('error',()=>writeErrors.push({
+     name:req.error?.name||'unknown',
+     message:String(req.error?.message||'').slice(0,120)
+   }));
+   return req;
+  };
+  let item;
+  try{
+   item=await window.TaleraMemories.save({
+    title:'F5 WebKit fictieve audio-foto-video',
+    date:'2000-04-02',text:'Fictieve lokale opname, geen persoonsgegevens',
+    narrationDurationMs:3000,narrationCues:cues
+   },uploads);
+  }catch(error){
+   const subset=[];
+   for(const [kind,arr] of [
+     ['text-only',[]],['photo',[uploads[0]]],
+     ['video',[uploads[1]]],['audio',[uploads[2]]]
+   ]){
+    try{
+     const s=await window.TaleraMemories.save({
+      title:'F5 diagnostic '+kind,date:'2000-04-02',
+      text:'Only synthetic diagnostic'
+     },arr);
+     subset.push({kind,ok:true,idCreated:!!s.id});
+    }catch(e){subset.push({kind,ok:false,name:e.name,message:String(e.message).slice(0,120)})}
+   }
+   return {failure:{name:error.name,message:String(error.message).slice(0,120)},
+     subset,writeErrors};
+  }
   const itemRead=await window.TaleraMemories.get(item.id);
   const blobReads=await Promise.all(item.items.map(async i=>{
    const blob=await window.TaleraMemories.blob(i.key);
@@ -82,6 +111,7 @@ try{
   return {id:item.id,items:itemRead.items,cues:itemRead.narrationCues,
     duration:itemRead.narrationDurationMs,blobReads};
  },fixtures);
+ assert.ok(!saved.failure,'WebKit original local media save failed: '+JSON.stringify(saved));
  assert.equal(saved.items.length,3);
  assert.deepEqual(saved.items.map(x=>x.kind),['photo','video','audio']);
  assert.deepEqual(saved.cues.map(x=>x.index),[0,1,0]);

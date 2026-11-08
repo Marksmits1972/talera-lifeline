@@ -26,9 +26,15 @@ Cloudflare documentatie (gecontroleerd 8 november 2026):
 **Belangrijk:** dit is nadrukkelijk geen complete of betrouwbare Cloudflare-maandfactuur. DO-duur, PBKDF2 CPU, opslaggroei, aantal daadwerkelijke sessie-/accountcalls en betaalplan kunnen de werkelijke kosten substantieel veranderen. In het bijzonder: één externe pageview is niet automatisch één DO-aanroep. Monitor werkelijke statistieken na uitrol.
 
 ## Laatste acceptatieregel — daarna stoppen
-1. **F5 lokaal + echte EU**: nul foutieve accountoversteken, nul ongewenste fallbacks naar bestaande media/API, login/sessies/tijdlijnen/social/revoke groen.
-2. **Eén browsermediatest en één fysieke iPhone-controle**: foto, video, audio, swipes/cues, lokale save/reload en originele presentatie in dezelfde speler. Headless WebKit is hulpmiddel, **geen vervanging** voor een fysieke iPhone.
+1. **F5 lokaal + echte EU — GESLAAGD**: nul foutieve accountoversteken, nul ongewenste fallbacks naar bestaande media/API, login/sessies/tijdlijnen/social/revoke groen. Bewijs: [42516137777](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42516137777).
+2. **Browsermediatest GESLAAGD op echte EU F5-stage in Chromium met iPhone-schermprofiel**: fictieve foto/video/audio, drie narratiecues, lokale save/reload, presentatie en accountwissel. **Nog open:** echte iPhone/Safari-camera, microfoon, swipes en originele player als handmatige acceptatie. Linux-WebKit zelf kon zelfs zonder TALERA-code geen Blob of File naar IndexedDB schrijven; dit testplatform is hier ongeldig als iPhone-bewijs.
 3. **F6 verdeling en kosten**: Workers Paid en DO-limieten voldoen voor 10 miljoen `geregistreerde` accounts, mits echte belasting verspreid is; verifieer bij geleidelijke uitrol de werkelijke CPU, DO-duur en hotspotmonitoring.
 4. **Pas na expliciete goedkeuring**, een gecontroleerde overschakeling. Een migratie van bestaande accounts of lokale media kan niet stilzwijgend gebeuren, omdat IndexedDB aan de web-origin is gebonden.
 
 Dan status **Free gereed voor gecontroleerde uitrol**, niet “letterlijk tien miljoen gelijktijdige gebruikers bewezen”. Is een harde poort rood, **alleen die poort** herstellen en herhalen. Geen nieuwe zijprojecten. Premium pas daarna.
+
+## Definitieve technische status 8 november 2026
+
+**Integratiecode + cloudcontrole + mobiele browsermediastroom: GROEN.** Getest en vastgelegd in run [42516137777](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42516137777). Werkelijke 10 miljoen gelijktijdige gebruikers niet gemeten; Workers Paid + onbeperkt aantal per-account Durable Objects maakt **10 miljoen geregistreerde accounts structureel passend**, met observatie op DO-hotspots, CPU en kosten bij gefaseerde uitrol.
+
+**Enige fysieke acceptatie die niet door deze tooling kan worden uitgevoerd:** microfoon, camera en swipe/media/tijdlijn-presentatie in de daadwerkelijke iPhone/Safari-TALERA-PWA. Daarna het omschakelbesluit. Geen onnodige tests rond al groene onderdelen.

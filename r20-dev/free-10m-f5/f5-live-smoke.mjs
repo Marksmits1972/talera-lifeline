@@ -47,6 +47,15 @@ const page=await call('GET','/mijn-leven');
 assert.equal(page.status,200);assert.equal(page.stage,'anonymous-snapshot-only');
 const menu=await call('GET','/__clean/menu-integration.mjs');
 assert.equal(menu.status,200);
+const sw=await call('GET','/sw.js');
+assert.equal(sw.status,200);
+assert.match(String(sw.data),/self\.addEventListener/);
+const manifest=await call('GET','/manifest.webmanifest');
+assert.equal(manifest.status,200);
+assert.ok(manifest.data.name||manifest.data.short_name);
+assert.equal((await call('GET','/api/v9/audio')).status,404,
+ 'No accidental forwarding of legacy media API to TALERA production');
+
 const accounts=[];
 for(const u of users){
  const r=await call('POST','/api/register',{body:u});

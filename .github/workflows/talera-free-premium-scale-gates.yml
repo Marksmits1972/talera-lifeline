@@ -79,3 +79,11 @@ jobs:
           grep 'const eu=env.ACCOUNT_HOME;' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/identity.mjs
       - name: Exercise real Worker code locally, with 12 fake accounts and 6 fake media objects each
         run: node r20-dev/free-premium-scale-20261108/local-premium-runtime.mjs
+
+      - name: Archive LOCAL-only genuine Worker runtime metrics
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-premium-bounded-local-runtime
+          path: r20-dev/free-premium-scale-20261108/results-local-runtime.json
+          retention-days: 14

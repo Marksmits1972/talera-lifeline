@@ -79,13 +79,17 @@ try{
    }));
    return req;
   };
+  const limited=(pending,label)=>Promise.race([
+   pending,new Promise((_,reject)=>setTimeout(()=>reject(
+     new Error('LOCAL_IDB_TIMEOUT_'+label)),7000))
+  ]);
   let item;
   try{
-   item=await window.TaleraMemories.save({
+   item=await limited(window.TaleraMemories.save({
     title:'F5 WebKit fictieve audio-foto-video',
     date:'2000-04-02',text:'Fictieve lokale opname, geen persoonsgegevens',
     narrationDurationMs:3000,narrationCues:cues
-   },uploads);
+   },uploads),'combined');
   }catch(error){
    const subset=[];
    for(const [kind,arr] of [
@@ -93,10 +97,10 @@ try{
      ['video',[uploads[1]]],['audio',[uploads[2]]]
    ]){
     try{
-     const s=await window.TaleraMemories.save({
+     const s=await limited(window.TaleraMemories.save({
       title:'F5 diagnostic '+kind,date:'2000-04-02',
       text:'Only synthetic diagnostic'
-     },arr);
+     },arr),'subset_'+kind);
      subset.push({kind,ok:true,idCreated:!!s.id});
     }catch(e){subset.push({kind,ok:false,name:e.name,message:String(e.message).slice(0,120)})}
    }

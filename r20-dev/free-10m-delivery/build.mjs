@@ -2,10 +2,11 @@
 // TWO anonymous snapshots must agree byte-for-byte before code is shareable.
 // No login, cookies, accounts, D1/R2 writes or live performance load.
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {candidates} from './rewrite.mjs';
+import {candidates,assetizeHtml} from './rewrite.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const STATIC=path.join(here,'public');
 const GENERATED=path.join(here,'generated');
@@ -55,11 +56,24 @@ for(const [key,{body}] of stable){
  writeFileSync(path.join(STATIC,'__talera_free','assets',key),body,'utf8');
  approved.push(key);
 }
-const headers='/__talera_free/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff\n';
+const anonymousShells={};
+for(let i=0;i<PAGES.length;i++){
+ const first=snapshots[0][i],second=snapshots[1][i];
+ // Never share HTML if even ONE byte changes between independent anonymous reads.
+ if(first.html!==second.html)continue;
+ const optimized=await assetizeHtml(first.html,new Set(approved));
+ const checksum=createHash('sha256').update(optimized.html).digest('hex');
+ const filename=checksum+'.html';
+ mkdirSync(path.join(STATIC,'__talera_free','shell'),{recursive:true});
+ writeFileSync(path.join(STATIC,'__talera_free','shell',filename),optimized.html,'utf8');
+ anonymousShells[first.route]='/__talera_free/shell/'+filename;
+}
+const headers='/__talera_free/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff\n\n/__talera_free/shell/*\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff\n';
 writeFileSync(path.join(STATIC,'_headers'),headers);
 writeFileSync(path.join(GENERATED,'approved-assets.mjs'),
  '// GENERATED from two public, anonymous snapshots. Never cache personal HTML.\n'+
- 'export const approvedAssets = Object.freeze('+JSON.stringify(approved,null,2)+');\n');
+ 'export const approvedAssets = Object.freeze('+JSON.stringify(approved,null,2)+');\n'+
+ 'export const anonymousShells = Object.freeze('+JSON.stringify(anonymousShells,null,2)+');\n');
 const totals={};
 for(const {route,html} of snapshots[0]){
  const parts=await candidates(html);
@@ -75,6 +89,7 @@ const result={
  snapshots:2,
  publicRoutes:PAGES,
  approvedImmutableAssets:approved.length,
+ anonymousShells,
  distinctApprovedAssetBytes:stable.reduce((n,[,c])=>n+c.bytes,0),
  byRoute:totals,
  privateHtmlAndApiAreNotCacheable:true,

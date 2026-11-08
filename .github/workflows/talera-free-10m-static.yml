@@ -30,9 +30,13 @@ jobs:
         run: |
           npm ci
           npx wrangler deploy --dry-run --config r20-dev/free-10m-delivery/wrangler.jsonc --outdir .talera-free-buildcheck
+      - name: Run real local Cloudflare Worker plus static assets, bounded requests only
+        run: node r20-dev/free-10m-delivery/local-runtime.mjs
       - name: Preserve anonymous build measurements
         uses: actions/upload-artifact@v4
         with:
           name: talera-free-10m-code-delivery-build-only
-          path: r20-dev/free-10m-delivery/generated/build-report.json
+          path: |
+            r20-dev/free-10m-delivery/generated/build-report.json
+            r20-dev/free-10m-delivery/generated/runtime-report.json
           retention-days: 14

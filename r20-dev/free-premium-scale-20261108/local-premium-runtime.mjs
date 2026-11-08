@@ -73,6 +73,11 @@ async function run(){
  assert.ok(ready,'Local Cloudflare test Worker unavailable. '+log.slice(-5000));
  const unauthorized=await api('GET','/_demo/stats?accountId=demo-scale-00',null,{auth:false});
  assert.equal(unauthorized.status,401);
+ const earlyStats=await api('GET','/_demo/stats?accountId=demo-scale-00');
+ if(earlyStats.status!==200){
+  console.log('LOCAL_DO_STUB_PRECHECK',JSON.stringify(earlyStats));
+  throw new Error('Isolated local Durable Object unavailable before fake media upload');
+ }
  const accountCount=12,mediaPerAccount=6;
  const accounts=Array.from({length:accountCount},(_,i)=>'demo-scale-'+String(i).padStart(2,'0'));
  const uploads=[];

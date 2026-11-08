@@ -118,7 +118,7 @@ async function main(){
   }
  }
  async function readCatalog(mode,id){
-  const response=await fetchOne('/_bench/catalog?mode='+mode+'&accountId='+id,{},{});
+  const response=await fetchOne('/_bench/catalog?mode='+mode+'&accountId='+id);
   assert.equal(response.json.photos.length,12);
   assert.deepEqual(response.json.photos.map(x=>x.id),photos);
   return response;

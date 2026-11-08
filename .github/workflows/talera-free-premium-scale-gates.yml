@@ -106,3 +106,28 @@ jobs:
           name: talera-free-real-delivery-audit
           path: r20-dev/free-premium-scale-20261108/free-delivery-audit-results.json
           retention-days: 14
+
+
+  premium_real_binary_local:
+    name: Premium six PNG + WAV + MP4 bytes, isolated local DO+R2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare locally emulated Cloudflare runtime
+        run: npm ci
+      - name: Verify ffmpeg available for generation of valid synthetic video
+        run: ffmpeg -version | head -n 1
+      - name: Run full binary media lifecycle, local-only and bounded
+        run: node r20-dev/free-premium-scale-20261108/premium-media-local/run.mjs
+      - name: Archive local-only full-media integrity proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-premium-binary-photo-audio-video-local-only
+          path: r20-dev/free-premium-scale-20261108/premium-media-local/results.json
+          retention-days: 14

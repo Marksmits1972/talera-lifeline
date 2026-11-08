@@ -10,7 +10,7 @@ import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 import {approvedAssets,anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {assetizeHtml} from '../free-10m-delivery/rewrite.mjs';
 import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birthdate-worker.mjs';
-import {referencePages,verifiedPublicScripts} from './generated/public-template-map.mjs';
+import {referencePages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
 
 export {
   FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
@@ -206,6 +206,22 @@ async function publicPage(request,env){
   headers.set('x-content-type-options','nosniff');
   return new Response(r.body,{status:200,headers});
 }
+async function publicPwaSupport(request,env){
+ const pathname=new URL(request.url).pathname;
+ const asset=verifiedPublicSupport[pathname];
+ if(!asset||request.method!=='GET'||!env.ASSETS)return deny(404,'PWA-onderdeel niet beschikbaar');
+ const source=await env.ASSETS.fetch(new Request(new URL(asset,new URL(request.url).origin)));
+ if(!source.ok)return deny(503,'PWA-onderdeel kan niet worden geladen');
+ const contentType=pathname==='/sw.js'?'text/javascript; charset=utf-8':
+   pathname==='/manifest.webmanifest'?'application/manifest+json; charset=utf-8':
+   pathname.endsWith('.svg')?'image/svg+xml':'image/png';
+ const headers=new Headers({
+   'content-type':contentType,'cache-control':'private, no-store',
+   'x-content-type-options':'nosniff'
+ });
+ if(pathname==='/sw.js')headers.set('service-worker-allowed','/');
+ return new Response(source.body,{status:200,headers});
+}
 async function publicScript(request,env){
   const pathname=new URL(request.url).pathname;
   const file=verifiedPublicScripts[pathname];
@@ -241,6 +257,7 @@ export default {
       if(p.startsWith('/__social/'))return socialApi(request,env);
       if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);
       if(p.startsWith('/__clean/'))return publicScript(request,env);
+      if(Object.hasOwn(verifiedPublicSupport,p))return publicPwaSupport(request,env);
       // No fallback to the live TALERA services; unported routes fail closed.
       return deny(404,'Niet beschikbaar in deze geïsoleerde test');
     }catch(error){

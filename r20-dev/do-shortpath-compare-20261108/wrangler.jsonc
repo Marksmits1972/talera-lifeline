@@ -1,0 +1,29 @@
+{
+  "name": "talera-do-shortpath-compare-test-20261108",
+  "main": "./worker.mjs",
+  "compatibility_date": "2026-11-08",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ACCOUNT_HOME",
+        "class_name": "SyntheticAccountHome"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "SyntheticAccountHome"
+      ]
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "talera-do-shortpath-media-test-20261108",
+      "jurisdiction": "eu"
+    }
+  ]
+}

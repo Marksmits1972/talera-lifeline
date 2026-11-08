@@ -2,7 +2,7 @@
 // lives in its own independently addressable SQLite-backed object.
 // All methods are called via internal bindings ONLY, not public HTTP endpoints.
 import {DurableObject} from 'cloudflare:workers';
-import {validAccountId,passwordHash,safeEqualHex} from './auth-util.mjs';
+import {validAccountId,validEmail,validHandle,validDisplay,passwordHash,safeEqualHex} from './auth-util.mjs';
 import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 
 export class FreeAuthAccount extends DurableObject {
@@ -16,6 +16,32 @@ export class FreeAuthAccount extends DurableObject {
    if(await txn.get('account'))return false;
    await txn.put('account',{...record,status:'active',epoch:0,createdAt:Date.now()});
    return true;
+  });
+ }
+ // Migration-only RPC. Not mapped to any public HTTP route.
+ // Legacy salts/hashes are transferred unchanged; no plaintext passwords.
+ async importLegacy(record){
+  const id=validAccountId(record?.id),email=validEmail(record?.email);
+  const display=validDisplay(record?.display_name);
+  const handle=record.public_handle==null||record.public_handle===''?'':validHandle(record.public_handle);
+  if(!['active','disabled'].includes(record?.status))throw Error('INVALID_LEGACY_STATUS');
+  if(!/^[a-f0-9]{64}$/.test(record?.password_salt||'')||
+     !/^[a-f0-9]{64}$/.test(record?.password_hash||''))throw Error('INVALID_LEGACY_HASH');
+  if(!Number.isSafeInteger(record?.created_at)||record.created_at<=0)throw Error('INVALID_LEGACY_DATE');
+  return this.ctx.storage.transaction(async txn=>{
+   const existing=await txn.get('account');
+   if(existing){
+    // Idempotent only when immutable identity and password hash match.
+    if(existing.id!==id||existing.email!==email||existing.password_hash!==record.password_hash)
+     throw Error('LEGACY_ACCOUNT_CONFLICT');
+    return {imported:false,verifiedMatchingExisting:true};
+   }
+   await txn.put('account',{
+    id,email,display_name:display,public_handle:handle,
+    password_salt:record.password_salt,password_hash:record.password_hash,
+    status:record.status,epoch:0,createdAt:record.created_at
+   });
+   return {imported:true,verifiedMatchingExisting:false};
   });
  }
  async verify(password){
@@ -69,7 +95,8 @@ class FreeAuthIdentityIndex extends DurableObject {
   validAccountId(accountId);
   return this.ctx.storage.transaction(async txn=>{
    const prior=await txn.get('claim'),now=Date.now();
-   if(prior?.state==='active'||(prior?.state==='reserved'&&prior.until>now&&prior.id!==accountId))return false;
+   if(prior?.state==='active')return prior.id===accountId;
+   if(prior?.state==='reserved'&&prior.until>now&&prior.id!==accountId)return false;
    await txn.put('claim',{id:accountId,state:'reserved',until:now+120000});
    return true;
   });
@@ -77,6 +104,7 @@ class FreeAuthIdentityIndex extends DurableObject {
  async activate(accountId){
   return this.ctx.storage.transaction(async txn=>{
    const c=await txn.get('claim');
+   if(c?.state==='active')return c.id===accountId;
    if(!c||c.id!==accountId||c.state!=='reserved'||c.until<Date.now())return false;
    await txn.put('claim',{id:accountId,state:'active',until:0});
    return true;
@@ -110,6 +138,24 @@ export class FreeAuthSession extends DurableObject {
   return this.ctx.storage.transaction(async txn=>{
    if(await txn.get('session'))return false;
    await txn.put('session',{...row,revoked:false});
+   return true;
+  });
+ }
+ // Migration-only: source D1 contains SHA256(token), not the raw cookie.
+ // A session DO selected by that hash can be seeded without recovering tokens.
+ async importLegacy(row){
+  validAccountId(row?.accountId);
+  if(!Number.isSafeInteger(row?.expires)||row.expires<=Date.now())return false;
+  return this.ctx.storage.transaction(async txn=>{
+   const existing=await txn.get('session');
+   if(existing){
+    if(existing.accountId!==row.accountId||existing.expires!==row.expires)
+     throw Error('LEGACY_SESSION_CONFLICT');
+    return true;
+   }
+   await txn.put('session',{
+    accountId:row.accountId,epoch:0,expires:row.expires,revoked:false
+   });
    return true;
   });
  }

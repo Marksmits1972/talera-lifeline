@@ -85,3 +85,21 @@ Een echte geslaagde **Free-capaciteitsmeting** en een echte geslaagde **Premium-
 | Werkende autoscaling van opslag tot deze belasting | **NEE — nog niet bewezen** |
 
 **Beschermd:** geen wijziging van PWA-code, productie-Workers, accounts, D1, R2, authentificatie, videospeler of privégegevens. Alleen een aparte conceptbranch met documentatie en testhulpmiddelen. Geen merge/deployment zonder akkoord.
+
+
+## 7. Vastgestelde uitslagen van GitHub Actions, 8 november 2026
+
+**Eigen gescheiden schaal-preflight:** https://github.com/Marksmits1972/talera-lifeline/actions/runs/42475922072 — **geslaagd**.
+
+- **6/6 offline Node-tests geslaagd**: werkende formules voor Free 10 miljoen gebruikers en Premium 1 miljoen gelijktijdige sessies met zes foto's en audio; beide eindverdicts blijven **NIET BEWEZEN**.
+- **3/3 werkelijk uitgevoerde, anonieme HTTP-GET's succesvol** tegen de bestaande, door de eigenaar geregistreerde TALERA-test-PWA, zonder login en zonder schrijftaken.
+- /mijn-leven: HTTP 200, **585.945 HTML-bytes**, Cache-Control: no-store.
+- /present: HTTP 200, **518.851 HTML-bytes**, Cache-Control: no-store.
+- /tell: HTTP 200, **398.415 HTML-bytes**, Cache-Control: no-store.
+- Voor deze HTML-responsen was geen bevestigende cf-cache-status zichtbaar. **Dit zegt niets definitiefs over de caching van overige JS/CSS/foto-assets.** Wel moet het ontbreken van HTML-caching serieus worden meegenomen in de Free-10M-capaciteitsmeting: zo'n HTML-request bereikt mogelijk telkens een Worker, ongeacht het bereik van Cloudflare's netwerk.
+- Het getoonde Premium-getal van **28.000 hypothetische HTTP-operaties/s** is geen gemeten capaciteit. De extreem synchroon geopende voorbeeldpiek is **800.000 hypothetische operaties/s**.
+- Er zijn **geen** tien miljoen echte codeverzoeken en **geen** miljoen echte gelijktijdige Cloudflare-clients aangemaakt.
+
+**Bestaande algemene repo-regressieworkflow:** https://github.com/Marksmits1972/talera-lifeline/actions/runs/42475951522 — **rood**, maar om een andere reden: 91/93 tests geslaagd; twee tests vragen om xxory-test/src/tv-player.js en xxory-test/src/unified-webapp.js, die beide al op de ongewijzigde main branch ontbreken. De nieuwe schaaltestbranch heeft die bestanden niet verwijderd of aangeraakt. **Niet stiekem deze tests repareren als zijspoor**; eerst de status van de juiste repo-baseline vaststellen.
+
+**Conclusie:** de minimale teststructuur is daadwerkelijk operationeel en maakt de twee doelen meetbaar, maar **de beide uiteindelijke schaalbaarheidseisen blijven onbewezen**. Voor een echte einduitspraak is de beschreven, goedgekeurde gedistribueerde staging-belastingproef noodzakelijk.

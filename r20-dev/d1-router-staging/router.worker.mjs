@@ -50,7 +50,7 @@ async function getShard(accountId,env,provision=false){
   return {id:record.shard_id,created:false};
  }
  if(!provision)return null;
- const found=await directory.prepare(
+ const found=await primary(env.DIRECTORY_DB).prepare(
   "SELECT shard_id FROM shards WHERE state='active' ORDER BY shard_id"
  ).all();
  const active=(found.results||[]).map(x=>x.shard_id);

@@ -23,6 +23,7 @@ function start(){
  child=spawn(command,['dev','--local','--ip','127.0.0.1','--port',String(port),
  '--config',path.join(generated,'local.jsonc'),'--persist-to',path.join(generated,'storage'),
  '--var','AUTH_NAMESPACE_KEY:THIS_IS_A_LOCAL_ONLY_FAKE_TEST_NAMESPACE_KEY_20261108',
+ '--var','STAGING_ACCESS_KEY:'+'a'.repeat(64),
  '--log-level','error'],{env:{...process.env,CI:'true',BROWSER:'none',NO_COLOR:'1'},stdio:['ignore','pipe','pipe']});
  for(const stream of [child.stdout,child.stderr])stream.on('data',v=>log=(log+v.toString()).slice(-6000));
  child.on('exit',()=>{exited=true});
@@ -33,7 +34,8 @@ async function stop(){
  await Promise.race([new Promise(resolve=>child.once('exit',resolve)),delay(3000)]);
 }
 async function request(method,route,{body,cookie,ip='192.0.2.100',testOnly=false}={}){
- const headers={'accept':'application/json','origin':origin,'cf-connecting-ip':ip};
+ const headers={'accept':'application/json','origin':origin,'cf-connecting-ip':ip,
+  'x-talera-staging-key':'a'.repeat(64)};
  if(body)headers['content-type']='application/json';
  if(cookie)headers.cookie=cookie;
  if(testOnly)headers['x-local-qa-only']='LOCAL_TEST_NO_PRODUCTION';

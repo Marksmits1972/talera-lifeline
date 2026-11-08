@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {readFileSync,mkdirSync} from 'node:fs';
-import {webkit,devices} from 'playwright';
+import {webkit,chromium,devices} from 'playwright';
 const origin='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
 const key=process.env.STAGING_F5_KEY;
 assert.match(key||'',/^[a-f0-9]{64}$/);
@@ -33,7 +33,8 @@ const fixtures={
 let browser,context;
 let result={};
 try{
- browser=await webkit.launch({headless:true});
+ const engine=process.env.F5_BROWSER_ENGINE==='chromium'?chromium:webkit;
+ browser=await engine.launch({headless:true});
  context=await browser.newContext({...devices['iPhone 13'],serviceWorkers:'allow'});
  const page=await context.newPage();
  const failures=[];
@@ -87,7 +88,7 @@ try{
  });
  console.log('TALERA_WEBKIT_PRISTINE_IDB_CONTROL',JSON.stringify(idbControl));
  assert.ok(idbControl.plain.ok,'Even plain string IndexedDB storage failed in WebKit Linux: '+JSON.stringify(idbControl));
- assert.ok(idbControl.blob.ok,'Pristine WebKit Linux cannot persist Blob, NOT a TALERA story-code regression: '+JSON.stringify(idbControl));
+ assert.ok(idbControl.blob.ok,'Browser engine cannot persist pristine IndexedDB Blob, not a TALERA story regression: '+JSON.stringify(idbControl));
  const saved=await page.evaluate(async data=>{
   const decode=str=>Uint8Array.from(atob(str),ch=>ch.charCodeAt(0));
   const uploads=[
@@ -195,7 +196,7 @@ try{
  await page.waitForFunction(()=>!!window.TaleraMemories?.list,{timeout:20000});
  assert.ok((await page.evaluate(async()=>window.TaleraMemories.list()))
   .some(s=>s.id===saved.id),'Original account media must survive switching accounts');
- result={pass:true,engine:'Playwright WebKit - iPhone 13 viewport and touch emulation',
+ result={pass:true,engine:process.env.F5_BROWSER_ENGINE==='chromium'?'Playwright Chromium mobile iPhone profile (NOT Safari)':'Playwright WebKit iPhone profile',
   source:'separate real Cloudflare F5 EU staging',syntheticAccounts:2,
   originalRecorderMemoryStoreUsed:true,syntheticPhotoVideoAudioPersisted:true,
   originalNarrationCuesAndTimingPersisted:true,presentationUsesSameLocalStory:true,

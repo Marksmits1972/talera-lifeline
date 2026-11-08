@@ -8,10 +8,7 @@ on:
       - r20-dev/d1-capacity-monitor-staging/storage-guard*
       - .github/workflows/talera-d1-replenish-staging.yml
   workflow_dispatch:
-  # On a dedicated deployment/default branch, schedule becomes operational.
-  # GitHub does not run schedule events from non-default branches.
-  schedule:
-    - cron: '13 */6 * * *'
+  workflow_call:
 permissions:
   contents: write
 concurrency:

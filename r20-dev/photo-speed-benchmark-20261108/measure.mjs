@@ -133,15 +133,15 @@ async function main(){
  // The actual perceived photo-band fetch includes catalog + all image bytes;
  // mode=r2 represents a single owner-authenticated manifest followed by
  // R2 bytes only (without requerying SQL per photo).
- const bands={d1:[],do:[],r2:[]};
- const photoReqs={d1:[],do:[],r2:[]};
- for(let trial=0;trial<6;trial++){
+ const bands={d1:[],do:[],r2_d1:[],r2_do:[]};
+ const photoReqs={d1:[],do:[],r2_d1:[],r2_do:[]};
+ for(let trial=0;trial<10;trial++){
   const id=accounts[trial%accounts.length];
-  for(const mode of trial%2?['r2','do','d1']:['d1','do','r2']){
+  for(const mode of trial%2?['r2_do','r2_d1','do','d1']:['d1','do','r2_d1','r2_do']){
    const start=performance.now();
-   const manifest=await readCatalog('d1'===mode?'d1':'do',id);
+   const manifest=await readCatalog((mode==='d1'||mode==='r2_d1')?'d1':'do',id);
    const items=await Promise.all(photos.map(photoId=>fetchOne(
-    '/_bench/photo?mode='+mode+'&accountId='+id+'&photoId='+photoId,{},1)));
+    '/_bench/photo?mode='+(mode.startsWith('r2_')?'r2':mode)+'&accountId='+id+'&photoId='+photoId,{},1)));
    for(const sample of items){
     assert.ok(sample.bytes>10000,'full valid PNG bytes must be loaded');
     photoReqs[mode].push(sample);

@@ -44,8 +44,14 @@ assert.equal(health.value.realTaleraAccountsMigrated,false);
 assert.equal(health.value.sharedD1Bound,false);
 const unauthorized=await request('GET','/api/me',{useAccess:false});
 assert.equal(unauthorized.status,403,'Staging must be inaccessible without secret');
-const anonymous=await request('GET','/api/me');
-assert.equal(anonymous.status,401);
+let anonymous;
+for(let attempt=0;attempt<45;attempt++){
+ anonymous=await request('GET','/api/me');
+ if(anonymous.status===401)break;
+ assert.equal(anonymous.status,503,'Unexpected staging HTTP status during secret/binding warmup');
+ await new Promise(resolve=>setTimeout(resolve,1000));
+}
+assert.equal(anonymous.status,401,'Staging secrets and Durable Object bindings did not become ready in 45 seconds');
 const userA=await request('POST','/api/register',{data:first});
 assert.equal(userA.status,200,'Staging account A: '+JSON.stringify(userA.value));
 const userB=await request('POST','/api/register',{data:second});

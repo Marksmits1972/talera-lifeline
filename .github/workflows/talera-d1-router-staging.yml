@@ -36,6 +36,12 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo 'GitHub token missing'; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'GitHub account scope missing'; exit 1; }
+      - name: Normalize the GitHub Cloudflare account scope without printing it
+        run: |
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
+          test "${#CLEAN_ID}" -ge 16 || { echo 'Cloudflare account ID invalid'; exit 1; }
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
       - name: Create ONLY uniquely named isolated EU D1 test databases and schemas
         run: |
           node r20-dev/d1-router-staging/provision-staging.mjs prepare

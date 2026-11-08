@@ -61,6 +61,33 @@ try{
  const pageRoot=await page.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
  assert.equal(pageRoot.status(),200);
  await page.waitForFunction(()=>!!window.TaleraMemories?.save,{timeout:20000});
+ // Browser-engine control: if pristine WebKit cannot store even a small Blob,
+ // no TALERA story/media code can be fairly blamed or declared broken.
+ const idbControl=await page.evaluate(async()=>{
+  const db=await new Promise((resolve,reject)=>{
+   const open=indexedDB.open('f5-pristine-idb-control',1);
+   open.onupgradeneeded=()=>open.result.createObjectStore('samples',{keyPath:'key'});
+   open.onsuccess=()=>resolve(open.result);
+   open.onerror=()=>reject(open.error);
+  });
+  const attempt=(kind,data)=>new Promise(resolve=>{
+   const tx=db.transaction('samples','readwrite');
+   const req=tx.objectStore('samples').put({key:kind,data});
+   req.onerror=()=>resolve({ok:false,name:req.error?.name||'unknown',
+     message:String(req.error?.message||'').slice(0,120)});
+   tx.oncomplete=()=>resolve({ok:true});
+   tx.onabort=()=>resolve({ok:false,name:tx.error?.name||'aborted'});
+   setTimeout(()=>resolve({ok:false,name:'timeout'}),4000);
+  });
+  const plain=await attempt('plain','hello');
+  const blob=await attempt('blob',new Blob(['hello'],{type:'text/plain'}));
+  const file=await attempt('file',new File(['hello'],'hello.txt',{type:'text/plain'}));
+  db.close();
+  return {plain,blob,file};
+ });
+ console.log('TALERA_WEBKIT_PRISTINE_IDB_CONTROL',JSON.stringify(idbControl));
+ assert.ok(idbControl.plain.ok,'Even plain string IndexedDB storage failed in WebKit Linux: '+JSON.stringify(idbControl));
+ assert.ok(idbControl.blob.ok,'Pristine WebKit Linux cannot persist Blob, NOT a TALERA story-code regression: '+JSON.stringify(idbControl));
  const saved=await page.evaluate(async data=>{
   const decode=str=>Uint8Array.from(atob(str),ch=>ch.charCodeAt(0));
   const uploads=[

@@ -170,3 +170,30 @@ test('Any Cookie, Authorization or URL query bypasses shared Free HTML shell',as
  assert.equal(staticCalls,0,'Privileged paths must not fetch public HTML shell');
  assert.ok(originCalls>=3,'Personal requests keep original account Worker path');
 });
+
+
+test('Storage outage fails closed: no demo birthdate is silently substituted for a signed-in Free user',async()=>{
+ const html=read('present');
+ const env={
+  TALERA_BASE:{fetch:async req=>{
+   const route=new URL(req.url).pathname;
+   if(route==='/api/me')return Response.json({account:{id:'demo-failure'}});
+   return new Response(html,{headers:{'content-type':'text/html'}});
+  }},
+  FREE_ACCOUNT:{
+   idFromName:name=>name,
+   get:()=>({getBirthDate:async()=>{throw Error('synthetic DO outage')}})
+  }
+ };
+ const cookie={cookie:'talera_sid=synthetic'};
+ const requests=[
+  new Request('https://fake.talera.test/api/profile/birthdate',{headers:cookie}),
+  new Request('https://fake.talera.test/api/me',{headers:cookie}),
+  new Request('https://fake.talera.test/present',{headers:cookie})
+ ];
+ for(const request of requests){
+  const response=await freeWorker.fetch(request,env,{});
+  assert.equal(response.status,503,'Must not fabricate empty account data when Durable Object unavailable');
+  assert.match(response.headers.get('cache-control')||'',/no-store/);
+ }
+});

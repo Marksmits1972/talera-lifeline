@@ -67,6 +67,10 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps webkit
+      - name: Install ffmpeg for small synthetic audio and video fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
       - name: Check code before browser integration
         run: node --check r20-dev/free-10m-f5/f5-webkit-browser-smoke.mjs
       - name: Exercise original storyteller local media, cue sequence and both timelines in WebKit

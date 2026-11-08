@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {approvedAssets,anonymousShells} from './generated/approved-assets.mjs';
 import {assetizeHtml,candidates,eligible,PUBLIC_PATHS} from './rewrite.mjs';
-import freeWorker from './free-worker.mjs';
+import freeWorker from './free-worker-core.mjs';
 const dir=path.dirname(fileURLToPath(import.meta.url));
 const allowed=new Set(approvedAssets);
 const read=route=>readFileSync(path.join(dir,'generated','reference-'+route+'.html'),'utf8');

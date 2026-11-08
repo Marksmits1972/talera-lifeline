@@ -1,0 +1,27 @@
+name: TALERA shortest safe account-to-one-D1 route (offline only)
+on:
+  push:
+    branches: [feature/simple-account-local-routing-20261108]
+    paths:
+      - r20-dev/storage-short-path-20261108/**
+      - .github/workflows/talera-short-path-one-account.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline_contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Syntax check
+        run: |
+          node --check r20-dev/storage-short-path-20261108/short-path-contract.mjs
+          node --check r20-dev/storage-short-path-20261108/short-path-contract.test.mjs
+      - name: No network or real databases - 1M synthetic owners and signed routing tests
+        run: |
+          node --test r20-dev/storage-short-path-20261108/short-path-contract.test.mjs

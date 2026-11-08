@@ -4,7 +4,7 @@
 // It CANNOT prove 1M Premium sessions nor test actual six-photo/audio bytes.
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync,writeFileSync} from 'node:fs';
 import {performance} from 'node:perf_hooks';
 import path from 'node:path';
 
@@ -154,6 +154,7 @@ async function run(){
 }
 try{
  const result=await run();
+ writeFileSync('r20-dev/free-premium-scale-20261108/results-local-runtime.json',JSON.stringify(result,null,2)+'\n');
  console.log('TALERA_PREMIUM_ISOLATED_LOCAL_EXECUTION',JSON.stringify(result,null,2));
 }catch(error){
  console.error('LOCAL_CLOUDFLARE_RUNTIME_LOG_LAST_8000',log.slice(-8000));

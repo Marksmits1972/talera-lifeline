@@ -3,6 +3,7 @@
 // Auth staging key and namespace secret come from masked GitHub Actions env.
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {performance} from 'node:perf_hooks';
 const host='talera-free-auth-do-staging-20261108.mark-a39.workers.dev';
 const origin='https://'+host;
 const access=process.env.STAGING_ACCESS_KEY;
@@ -17,13 +18,14 @@ async function request(method,route,{data,cookie,useAccess=true}={}){
  if(cookie)headers.cookie=cookie;
  if(data){headers['content-type']='application/json';headers.origin=origin}
  if(method==='POST'&&!headers.origin)headers.origin=origin;
+ const before=performance.now();
  const response=await fetch(url,{
   method,headers,body:data?JSON.stringify(data):undefined,
   signal:AbortSignal.timeout(15000),redirect:'error'
  });
  checked++;
  const value=await response.json();
- return {status:response.status,value,headers:response.headers};
+ return {status:response.status,value,headers:response.headers,ms:performance.now()-before};
 }
 const cookieOf=response=>{
  const raw=response.headers.get('set-cookie')||'';
@@ -77,6 +79,29 @@ assert.equal(signedOut.status,200);
 assert.equal((await request('GET','/api/me',{cookie:aCookie})).status,401);
 assert.equal((await request('GET','/api/me',{cookie:anotherCookie})).status,200);
 assert.equal((await request('GET','/api/me',{cookie:bCookie})).status,200);
+// Modest real networking check on ONLY this separate staging Worker;
+// these are HTTP requests, NOT thousands of simultaneous real users.
+const bands=[];
+for(const concurrency of [1,5,20]){
+ const count=30,latencies=[];
+ let cursor=0;
+ await Promise.all(Array.from({length:concurrency},async()=>{
+  while(cursor<count){
+   const at=cursor++;
+   const cookie=at%2?bCookie:anotherCookie;
+   const expected=at%2?userB.value.account.id:userA.value.account.id;
+   const result=await request('GET','/api/me',{cookie});
+   assert.equal(result.status,200,'Real cloud account session lookup failed');
+   assert.equal(result.value.account.id,expected,'Cross-account data leak');
+   assert.equal(result.headers.get('cache-control'),'private, no-store');
+   latencies.push(result.ms);
+  }
+ }));
+ latencies.sort((a,b)=>a-b);
+ bands.push({simultaneousHttpRequests:concurrency,successes:count,
+  p50Ms:Number(latencies[Math.ceil(count*.50)-1].toFixed(2)),
+  p95Ms:Number(latencies[Math.ceil(count*.95)-1].toFixed(2))});
+}
 const report={
  result:'PASS: isolated REAL Cloudflare Free-auth EU-jurisdiction staging smoke',
  testOnly:true,
@@ -87,6 +112,8 @@ const report={
  migratedOriginalAccounts:false,
  sentNoRequestsToExistingTalera:false,
  totalLiveHttpRequests:checked,
+ boundedRealCloudSessionReadBands:bands,
+ noNetworkLoadOnAnyExistingTaleraWorker:true,
  anyActual10MillionLoadProven:false
 };
 console.log('TALERA_FREE_AUTH_REAL_CLOUDFLARE_SMOKE',JSON.stringify(report,null,2));

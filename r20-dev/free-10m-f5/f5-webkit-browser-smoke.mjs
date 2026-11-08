@@ -39,11 +39,17 @@ try{
  const failures=[];
  page.on('pageerror',err=>failures.push(String(err?.message||err).slice(0,180)));
  await page.goto(origin+'/__f5/entry',{waitUntil:'domcontentloaded'});
- await page.locator('input[name="key"]').fill(key);
- await Promise.all([
-  page.waitForURL(/\/mijn-leven/,{timeout:25000}),
-  page.locator('button[type="submit"]').click()
- ]);
+ // Use the same-origin form POST without waiting for unrelated demo photos
+ // to finish loading in WebKit; cookies remain HttpOnly and Secure.
+ const entry=await page.evaluate(async secret=>{
+  const res=await fetch('/__f5/entry',{method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/x-www-form-urlencoded'},
+   body:new URLSearchParams({key:secret}),redirect:'follow'});
+  return {status:res.status,path:new URL(res.url).pathname};
+ },key);
+ assert.equal(entry.status,200,'WebKit QA cookie must unlock the original Free PWA');
+ assert.equal(entry.path,'/mijn-leven');
+ await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
  // Only the browser issues the session cookie. No test headers in page scripts.
  const register=async user=>page.evaluate(async data=>{
   const r=await fetch('/api/register',{method:'POST',headers:{'content-type':'application/json'},

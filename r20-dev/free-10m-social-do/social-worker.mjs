@@ -32,15 +32,20 @@ async function parse(req){
  if(raw.length>4096)throw Error('BODY_TOO_LARGE');
  return raw?JSON.parse(raw):{};
 }
+function testNamespace(env,name){
+ const base=env[name];
+ if(!base?.idFromName||!base?.get)throw Error('MISSING_SOCIAL_NAMESPACE');
+ if(env.SOCIAL_STORAGE_JURISDICTION==='eu')return base.jurisdiction('eu');
+ if(env.SOCIAL_STORAGE_JURISDICTION==='local-test')return base;
+ throw Error('SOCIAL_JURISDICTION_NOT_EXPLICIT');
+}
 function memory(env,id){
  verifyStoryId(id);
- const ns=env.SOCIAL_MEMORY;
- if(!ns?.idFromName||!ns?.get)throw Error('MISSING_SOCIAL_NAMESPACE');
+ const ns=testNamespace(env,'SOCIAL_MEMORY');
  return ns.get(ns.idFromName('talera-free-social-v1:'+id));
 }
 function pointer(env,hash){
- const ns=env.SOCIAL_POINTER;
- if(!ns?.idFromName||!ns?.get)throw Error('MISSING_POINTER_NAMESPACE');
+ const ns=testNamespace(env,'SOCIAL_POINTER');
  return ns.get(ns.idFromName('talera-free-share-pointer-v1:'+hash));
 }
 function requireActor(actor){

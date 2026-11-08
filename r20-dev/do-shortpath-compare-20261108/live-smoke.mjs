@@ -12,6 +12,16 @@ async function call(method,path,data,authorized=true){
 const health=await call('GET','/health',null,false);
 assert.equal(health.status,200);
 assert.equal(health.body.connectedToTalera,false);
+// Wrangler secret updates can take a moment to become visible across edges.
+// Wait for the freshly rotated secret to work before starting correctness tests.
+let verified=false;
+for(let n=0;n<14;n++){
+ const ready=await call('GET','/_demo/stats?accountId=demo-gh-do-a');
+ if(ready.status===200){verified=true;break;}
+ if(ready.status!==401)throw Error('Unexpected non-auth status while waiting for secret propagation: '+ready.status);
+ await new Promise(resolve=>setTimeout(resolve,2500));
+}
+assert.ok(verified,'Fresh test secret was not consistently active after 35 seconds');
 assert.equal((await call('GET','/_demo/stats?accountId=demo-gh-do-a',null,false)).status,401);
 assert.equal((await call('POST','/_demo/story',{accountId:'actual-user',storyId:'story-a',text:'no'})).status,400,
  'Invalid account names are never allowed by DO code and no real account is touched');

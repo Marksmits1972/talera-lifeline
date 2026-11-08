@@ -1,0 +1,89 @@
+name: TALERA replenish isolated D1 storage reserves through GitHub
+on:
+  push:
+    branches: [feature/d1-autocapacity-cron-staging-20261108]
+    paths:
+      - r20-dev/d1-capacity-monitor-staging/replenish-staging.mjs
+      - r20-dev/d1-capacity-monitor-staging/reserve-planner*
+      - .github/workflows/talera-d1-replenish-staging.yml
+  workflow_dispatch:
+  # On a dedicated deployment/default branch, schedule becomes operational.
+  # GitHub does not run schedule events from non-default branches.
+  schedule:
+    - cron: '13 */6 * * *'
+permissions:
+  contents: write
+concurrency:
+  group: talera-router-staging-single-writer
+  cancel-in-progress: false
+jobs:
+  replenish_staging:
+    if: github.event_name != 'schedule' || github.ref == 'refs/heads/feature/d1-autocapacity-cron-staging-20261108'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/d1-autocapacity-cron-staging-20261108
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run pure append-only reserve and safe pressure policy tests
+        run: |
+          node --test r20-dev/d1-capacity-monitor-staging/reserve-planner.test.mjs
+          node --test r20-dev/d1-capacity-monitor-staging/monitor.worker.test.mjs
+          node --test r20-dev/d1-router-staging/capacity-policy.test.mjs
+          node --test r20-dev/d1-router-staging/router.worker.test.mjs
+          node --check r20-dev/d1-capacity-monitor-staging/replenish-staging.mjs
+      - name: Validate Cloudflare account ID without exposing the token
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Recover and synchronize all previously approved staging resources
+        run: |
+          node r20-dev/d1-router-staging/provision-staging.mjs prepare
+          node r20-dev/d1-router-staging/provision-staging.mjs activate
+      - name: Read REAL EU D1 file sizes and safely propose ONE new standby
+        id: plan
+        run: node r20-dev/d1-capacity-monitor-staging/replenish-staging.mjs
+      - name: Persist append-only shard catalog to audit branch BEFORE provisioning
+        if: steps.plan.outputs.replenish == 'true'
+        run: |
+          git config user.name 'talera-stage-replenisher'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add r20-dev/d1-router-staging/shard-catalog.json
+          git diff --cached --quiet && { echo 'No new staging shard required'; exit 0; }
+          git commit -m 'staging: record next approved bounded D1 reserve shard'
+          git push origin HEAD:refs/heads/feature/d1-autocapacity-cron-staging-20261108
+      - name: Provision any new EU D1 reserve and generate worker bindings
+        run: node r20-dev/d1-router-staging/provision-staging.mjs prepare
+      - name: Redeploy only isolated test router with all bindings
+        run: npx --no-install wrangler deploy --config r20-dev/d1-router-staging/wrangler.generated.jsonc
+      - name: Rotate synthetic demo secret after safe deployment
+        run: |
+          KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$KEY"
+          printf 'DEMO_TOKEN=%s\n' "$KEY" >> "$GITHUB_ENV"
+          printf '%s' "$KEY" | npx --no-install wrangler secret put DEMO_TOKEN --config r20-dev/d1-router-staging/wrangler.generated.jsonc
+      - name: Mark new standby as DISABLED, never assign accounts until explicitly activated
+        run: node r20-dev/d1-router-staging/provision-staging.mjs activate
+      - name: Enable read replicas on newly provisioned staging D1 databases
+        continue-on-error: true
+        run: node r20-dev/d1-router-staging/enable-staging-replicas.mjs
+      - name: Validate real old-account persistence after redeploy
+        run: node r20-dev/d1-router-staging/live-smoke.mjs
+      - name: Verify real A/B physical writes and untouched standby C
+        run: node r20-dev/d1-router-staging/live-multishard.mjs
+      - name: Rebuild the private Cloudflare Cron monitor for all current staging shards
+        run: node r20-dev/d1-capacity-monitor-staging/build-config.mjs
+      - name: Redeploy private Cloudflare Cron monitor with updated D1 bindings
+        run: npx --yes wrangler@4.145.0 deploy --config r20-dev/d1-capacity-monitor-staging/wrangler.generated.jsonc

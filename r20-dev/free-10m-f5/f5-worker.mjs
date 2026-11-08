@@ -39,7 +39,7 @@ async function hasQaAccess(request,env){
   if(safeEqualHex(request.headers.get('x-talera-f5-key')||'',env.STAGING_F5_KEY))
     return true;
   const cookie=request.headers.get('cookie')||'';
-  const tokens=[...cookie.matchAll(/(?:^|;\\s*)talera_f5_access=(\\d{13})\\.([a-f0-9]{32})\\.([a-f0-9]{64})(?=;|$)/g)];
+  const tokens=[...cookie.matchAll(/(?:^|;\s*)talera_f5_access=(\d{13})\.([a-f0-9]{32})\.([a-f0-9]{64})(?=;|$)/g)];
   if(tokens.length!==1)return false;
   const [,expiry,nonce,signature]=tokens[0],now=Date.now(),expires=Number(expiry);
   if(!Number.isSafeInteger(expires)||expires<=now||expires>now+30*60000)return false;

@@ -19,7 +19,7 @@ jobs:
     name: Separate EU Worker, synthetic account+social+timeline readbacks
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 16
+    timeout-minutes: 25
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -63,3 +63,11 @@ jobs:
         run: sleep 8
       - name: Verify genuine EU staging with ONLY synthetic data and bounded requests
         run: node r20-dev/free-10m-f5/f5-live-smoke.mjs
+      - name: Install headless Safari WebKit for single iPhone-emulation acceptance
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps webkit
+      - name: Check code before browser integration
+        run: node --check r20-dev/free-10m-f5/f5-webkit-browser-smoke.mjs
+      - name: Exercise original storyteller local media, cue sequence and both timelines in WebKit
+        run: node r20-dev/free-10m-f5/f5-webkit-browser-smoke.mjs

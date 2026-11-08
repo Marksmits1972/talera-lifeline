@@ -27,6 +27,7 @@ const story='story-gh-persist';
 const first=await call('/_demo/provision','POST',{accountId:account});
 assert.equal(first.status,200);
 assert.equal(first.body.shard,'A');
+console.log('PERSISTED_ACCOUNT_FROM_PRIOR_DEPLOY',!first.body.newAssignment);
 const repeat=await call('/_demo/provision','POST',{accountId:account});
 assert.equal(repeat.status,200);
 assert.equal(repeat.body.shard,'A');

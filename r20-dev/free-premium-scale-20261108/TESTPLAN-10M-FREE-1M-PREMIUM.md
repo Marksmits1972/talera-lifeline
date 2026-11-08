@@ -103,3 +103,24 @@ Een echte geslaagde **Free-capaciteitsmeting** en een echte geslaagde **Premium-
 **Bestaande algemene repo-regressieworkflow:** https://github.com/Marksmits1972/talera-lifeline/actions/runs/42475951522 — **rood**, maar om een andere reden: 91/93 tests geslaagd; twee tests vragen om xxory-test/src/tv-player.js en xxory-test/src/unified-webapp.js, die beide al op de ongewijzigde main branch ontbreken. De nieuwe schaaltestbranch heeft die bestanden niet verwijderd of aangeraakt. **Niet stiekem deze tests repareren als zijspoor**; eerst de status van de juiste repo-baseline vaststellen.
 
 **Conclusie:** de minimale teststructuur is daadwerkelijk operationeel en maakt de twee doelen meetbaar, maar **de beide uiteindelijke schaalbaarheidseisen blijven onbewezen**. Voor een echte einduitspraak is de beschreven, goedgekeurde gedistribueerde staging-belastingproef noodzakelijk.
+
+
+## 8. Vervolgproef op 8 november — ECHTE maar LOKALE Worker-uitvoering
+
+**CI-bewijs van de eerste volledig geslaagde uitvoering:** https://github.com/Marksmits1972/talera-lifeline/actions/runs/42486994136 .
+
+**Wat de proef nu werkelijk bewijst:** de bestaande, afzonderlijk voor dit onderzoek geschreven **synthetische Cloudflare Durable Object/SQLite + R2 Worker** van commit b28a459fa5d14d55fb4d836bb2674c9545f6a9f0 draait ook lokaal via Wrangler, met gescheiden opslag voor meerdere fictieve account-ID's en een serie gelijktijdige HTTP-verzoeken. Er is geen werkelijk Cloudflare-netwerk of echte klantopslag gebruikt.
+
+- 12 gescheiden fictieve accountobjecten; 72 kleine *tekst*-mediaobjecten (zes per account) correct geschreven en gelezen. De bestaande testworker verbindt daarvan **één** mediaobject met het fictieve verhaal; dit is **GEEN zes-foto-storytest**.
+- 12 synthetische verhalen geschreven in de accountlokale SQLite-opslag, 336 gegevensdownloads gevalideerd; onbekend/nepaccount kreeg geen verhaal terug, onbevoegde verzoeken geweigerd met HTTP 401.
+- Op één GitHub-runner: 84 herhaalde read-operaties per golf met **1, 5, 10 en 25 gelijktijdige lokale verzoeken**; nul mislukte controles na succesvolle start.
+- **Alleen deze ene runner, geen netwerkbenchmarks**: gemeten lokale p95 per golf waren respectievelijk **7,23 ms**, **22,87 ms**, **41,26 ms** en **109,56 ms**. Dit zijn geen Cloudflare-edge-tijden; absoluut NIET extrapoleren naar miljoenen gebruikers, wereldwijde gebruikerservaring of kosten.
+- De eerste proef werkte niet omdat de lokale workerd-binary de broncompatibiliteitsdatum 2026-11-08 nog niet ondersteunde. In een **tijdelijk gekopieerd testbestand** is de datum alleen voor de runner teruggezet naar de maximaal ondersteunde 2026-09-18; de echte bron is niet gewijzigd.
+- Bij het lokale uitvoeren gaf de Europese namespace-jurisdiction-route een 503; op de **tijdelijke runnerkopie** gebruikt de test daarom de standaard lokale DO-namespace. De echte EU-jurisdictie is in dit experiment dus **NIET** getest; een eerdere **afzonderlijke echte Cloudflare-proef** toonde EU-mapping in de remote testomgeving aan. We verbergen deze plaatselijke afwijking niet.
+- **Geen enkele echte foto**, audio, video, stream, account-login, privé-D1, publieke TALERA-PWA, echte Cloudflare-R2 of live concurrentie gebruikt. Alle bestanden zijn fictief en tijdelijk op de GitHub-runner.
+
+**Nog te bouwen voordat een Premium-capaciteitscijfer gerechtvaardigd is:** complete oorspronkelijke accountauthenticatie, één daadwerkelijk opgeslagen verhaalmanifest met zes echte foto-onderdelen + gesproken audio en optioneel video met representatieve grootten; servermatige toegang, save→GET→herstel, foutinjectie en onafhankelijke objecten. Alleen daarna gecontroleerde fysieke staging-belasting met vooraf goedgekeurde kosten en een oplopend aantal actieve clients. Dit is geen opdracht om de reeds werkende vertelcyclus te veranderen.
+
+**Free blijft afzonderlijk:** de Free-preflight heeft opnieuw 3/3 bestaande anonieme PWA-pagina's gelezen, maar voor Free moet caching én de 10M-bezoekersverdeling nog met *echt anoniem statisch/app-verkeer* worden getest, zonder het bestaande origin te overbelasten.
+
+**Actueel oordeel:** minimale offline-modellen geslaagd; 3 openbare pagina's bereikbaar; de lokale Premium-DO/R2-uitvoeringsproef geslaagd; grote **Free-10M- en Premium-1M-capaciteit beiden nog NIET BEWEZEN**.

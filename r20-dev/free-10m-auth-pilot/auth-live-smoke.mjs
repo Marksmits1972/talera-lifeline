@@ -3,6 +3,7 @@
 // Auth staging key and namespace secret come from masked GitHub Actions env.
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {mkdirSync,writeFileSync} from 'node:fs';
 import {performance} from 'node:perf_hooks';
 const host='talera-free-auth-do-staging-20261108.mark-a39.workers.dev';
 const origin='https://'+host;
@@ -146,4 +147,6 @@ const report={
  noNetworkLoadOnAnyExistingTaleraWorker:true,
  anyActual10MillionLoadProven:false
 };
+mkdirSync('r20-dev/free-10m-auth-pilot/generated',{recursive:true});
+writeFileSync('r20-dev/free-10m-auth-pilot/generated/auth-remote-result.json',JSON.stringify(report,null,2)+'\n');
 console.log('TALERA_FREE_AUTH_REAL_CLOUDFLARE_SMOKE',JSON.stringify(report,null,2));

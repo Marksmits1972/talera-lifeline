@@ -1,21 +1,36 @@
 {
- "name": "talera-free-10m-assets-staging-uncreated",
- "main": "./free-worker.mjs",
- "compatibility_date": "2026-09-18",
- "workers_dev": true,
- "assets": {
-  "directory": "./public",
-  "binding": "ASSETS",
-  "run_worker_first": ["/*","!/__talera_free/assets/*"]
- },
- "services": [
-  {"binding":"TALERA_BASE","service":"talera-free-staging-backend-UNCREATED"}
- ],
- "d1_databases": [
-  {
-   "binding":"BIRTH_DB",
-   "database_name":"talera-free-birthdate-staging-UNCREATED",
-   "database_id":"00000000-0000-4000-8000-000000000000"
-  }
- ]
+  "name": "talera-free-10m-assets-staging-uncreated",
+  "main": "./free-worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/*",
+      "!/__talera_free/assets/*"
+    ]
+  },
+  "services": [
+    {
+      "binding": "TALERA_BASE",
+      "service": "talera-free-staging-backend-UNCREATED"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "FREE_ACCOUNT",
+        "class_name": "FreeAccountHome"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "free-account-home-v1",
+      "new_sqlite_classes": [
+        "FreeAccountHome"
+      ]
+    }
+  ]
 }

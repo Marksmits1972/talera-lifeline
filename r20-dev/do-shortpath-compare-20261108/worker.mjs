@@ -37,7 +37,7 @@ export class SyntheticAccountHome extends DurableObject {
  }
  async stats(){
   const row=this.sql.exec('SELECT COUNT(*) AS stories FROM synthetic_stories').toArray()[0];
-  return {stories:row?.stories||0,bytes:this.ctx.storage.sql.databaseSize};
+  return {stories:row?.stories||0,bytes:this.ctx.storage.sql.databaseSize,jurisdiction:this.ctx.id.jurisdiction||null};
  }
 }
 const json=(value,status=200)=>Response.json(value,{
@@ -120,7 +120,7 @@ export default {
    }
    if(url.pathname==='/_demo/stats'&&request.method==='GET'){
     const result=await objectStub(env,accountId(url.searchParams.get('accountId'))).stats();
-    return json({ok:true,stories:result.stories,sqlBytes:result.bytes});
+    return json({ok:true,stories:result.stories,sqlBytes:result.bytes,jurisdiction:result.jurisdiction});
    }
    return fail('NOT_FOUND',404);
   }catch(error){

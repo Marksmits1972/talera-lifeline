@@ -73,5 +73,9 @@ jobs:
         run: |
           sed -i 's/"compatibility_date": "2026-11-08"/"compatibility_date": "2026-09-18"/' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
           grep '"compatibility_date": "2026-09-18"' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
+      - name: Local-only routing adapter (no real EU jurisdiction in runner)
+        run: |
+          sed -i "s/const eu=env.ACCOUNT_HOME.jurisdiction('eu');/const eu=env.ACCOUNT_HOME;/" isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/identity.mjs
+          grep 'const eu=env.ACCOUNT_HOME;' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/identity.mjs
       - name: Exercise real Worker code locally, with 12 fake accounts and 6 fake media objects each
         run: node r20-dev/free-premium-scale-20261108/local-premium-runtime.mjs

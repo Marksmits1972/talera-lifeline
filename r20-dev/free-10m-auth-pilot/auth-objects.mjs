@@ -3,6 +3,7 @@
 // All methods are called via internal bindings ONLY, not public HTTP endpoints.
 import {DurableObject} from 'cloudflare:workers';
 import {validAccountId,passwordHash,safeEqualHex} from './auth-util.mjs';
+import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 
 export class FreeAuthAccount extends DurableObject {
  async create(record){
@@ -42,6 +43,15 @@ export class FreeAuthAccount extends DurableObject {
    return {id:a.id,email:a.email,displayName:name,publicHandle:a.public_handle,epoch:a.epoch};
   });
  }
+ async getBirthDate(){
+  const value=await this.ctx.storage.get('birthdate');
+  return value===undefined?null:validatedDate(value);
+ }
+ async setBirthDate(value){
+  const date=validatedDate(value);
+  await this.ctx.storage.put('birthdate',date);
+  return {saved:true,birthDate:date};
+ }
  // Not reachable through a public HTTP endpoint.
  async disable(){
   return this.ctx.storage.transaction(async txn=>{
@@ -54,7 +64,7 @@ export class FreeAuthAccount extends DurableObject {
 }
 
 // A single handle can have only one owner; separate handles never contend.
-export class FreeAuthHandle extends DurableObject {
+class FreeAuthIdentityIndex extends DurableObject {
  async reserve(accountId){
   validAccountId(accountId);
   return this.ctx.storage.transaction(async txn=>{
@@ -86,13 +96,16 @@ export class FreeAuthHandle extends DurableObject {
  }
 }
 
+// Separate hashed identity locators. Only account UUIDs are stored in indices.
+export class FreeAuthHandle extends FreeAuthIdentityIndex {}
+export class FreeAuthEmail extends FreeAuthIdentityIndex {}
+
 // Session key is SHA-256(random 256-bit token); never raw cookie.
 export class FreeAuthSession extends DurableObject {
  constructor(ctx,env){super(ctx,env);this.env=env}
  async open(row){
   validAccountId(row?.accountId);
-  if(!/^[a-f0-9]{64}$/.test(row?.accountKey||'')||
-      !Number.isInteger(row?.epoch)||row.epoch<0||
+  if(!Number.isInteger(row?.epoch)||row.epoch<0||
       !Number.isSafeInteger(row?.expires)||row.expires<=Date.now())throw Error('INVALID_SESSION');
   return this.ctx.storage.transaction(async txn=>{
    if(await txn.get('session'))return false;
@@ -104,7 +117,7 @@ export class FreeAuthSession extends DurableObject {
   const s=await this.ctx.storage.get('session');
   if(!s||s.revoked||s.expires<=Date.now())return null;
   const account=await this.env.AUTH_ACCOUNTS.get(
-   this.env.AUTH_ACCOUNTS.idFromName('talera-free-auth-account-v1:'+s.accountKey)
+   this.env.AUTH_ACCOUNTS.idFromName('talera-free-account-v1:'+s.accountId)
   ).activeProfile(s.epoch);
   if(!account||account.id!==s.accountId)return null;
   return account;

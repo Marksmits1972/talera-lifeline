@@ -10,7 +10,8 @@
 | F3b. Kleine echte belasting op Cloudflare | 120 succesvolle parallelle sessiecontroles, in trappen met maximaal 30 gelijktijdige verzoeken en gemeten p95 359–424 ms vanaf GitHub-runner | Run 42506218404 |
 | F3c. Bestaande accounts veilig overzetten | Migratie-preflight met synthetische gegevens gebouwd; 9/9 tests geslaagd. Geen echte migratie uitgevoerd | Run 42506887577 |
 | F4. Delen, likes en reacties | Per-herinnering SQLite Durable Objects en afzonderlijke intrekbare deelkoppelingen nu echt gebouwd, lokaal en in EU Cloudflare getest. **Nog niet geïntegreerd, oude links en berichten niet verhuisd.** | PR #96, run 42507774180 |
-| F5. Gehele Free-PWA op iPhone/Safari | **Niet getest** met nieuwe backend | Nog open |
+| F5a. Free-backend en originele twee persoonlijke tijdlijnpagina's, menu scripts, browser-gate | **Geïntegreerd en succesvol getest in échte lokale Cloudflare-runtime**, uitsluitend fictieve accounts | PR #97, run 42511659255 |
+| F5b. Complete originele Free-PWA inclusief foto/video/audio/vertellen op iPhone/Safari | **Nog niet als complete gebruikersstroom getest** | Nog open |
 | F6. De volledige tienmiljoen-gebruikersbelasting, kosten en piekcapaciteit | **Niet bewezen** | Nog open |
 
 ## Alleen-lezen inventaris oorspronkelijke Cloudflare-databases
@@ -34,3 +35,7 @@ Bewijs: https://github.com/Marksmits1972/talera-lifeline/pull/93 , https://githu
 ## F4-update: nieuwe sociale route
 
 Sociale DO-staging op echte EU Cloudflare geslaagd: 48 kleine, synthetische HTTP-verzoeken, delen en revocatie en 36 parallelle reads zonder fouten. Eén 12-requestsband had circa 2,7 seconde p95, zodat dit **geen snelheidsgarantie** is. Het hotstory-risico, berichten/discovery, migratie van oude rechten en integratie in de gehele app staan nog open. PR #96: https://github.com/Marksmits1972/talera-lifeline/pull/96 . Bestaande D1 en verhalen niet gewijzigd.
+
+## F5a-update — geïntegreerde Free-stage
+
+PR #97 bouwt één nieuwe, strikt gescheiden F5-Worker waarin de F1 publieke appcode, F3 sessie/account-DO en F4 sociale storage-DO achter één origin werken. De persoonlijke `/mijn-leven` en `/present` tijdlijnen worden vanuit het individuele account en dezelfde bestaande personalisatielogica opgesteld. Het oorspronkelijke menu-JS en drie andere publieke scripts zijn identiek geverifieerd; een korte private QA-cookie maakt browsernavigatie mogelijk zonder blootstellen van testgeheimen in de frontend. GitHub Actions **42511659255 is geslaagd** na lokale Cloudflare-integratietests met fictieve gegevens. De productielink en klantdata zijn onaangetast. Alleen een lokale CI-run, dus geen F5 EU-cloudtest of Safari-acceptatie en geen bewijs voor 10 miljoen gebruikers. Free blijft onvoltooid totdat de complete verhaalcyclus in F5b, veilige migratie en gerichte schaalpoort zijn geaccepteerd.

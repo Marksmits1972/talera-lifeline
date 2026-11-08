@@ -60,6 +60,9 @@ export async function monitorCapacity(env,now=new Date()){
  ]);
  if(!Array.isArray(changed)||changed.length!==2||changed.some(x=>x.success===false))
   throw new Error('Atomic staging activation failed');
+ if(Number(changed[0].meta?.changes)===0)return {action:'none',reason:'ALREADY_ACTIVATED_BY_ANOTHER_TASK'};
+ if(Number(changed[0].meta?.changes)!==1||Number(changed[1].meta?.changes)!==1)
+  throw new Error('Atomic staging activation did not record exactly one audit event');
  const updated=await primary(env.DIRECTORY_DB).prepare(
   'SELECT state FROM shards WHERE shard_id=?'
  ).bind(candidate).first();

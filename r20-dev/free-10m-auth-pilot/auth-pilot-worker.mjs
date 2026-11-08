@@ -11,20 +11,30 @@ export {FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRat
 const err=(status,message)=>json({error:message},status);
 const LIMIT_WINDOW=600000;
 const routeKey=async(env,type,value)=>namespacedHash(env.AUTH_NAMESPACE_KEY,type+':'+value);
+function ns(env,name){
+ const base=env[name];
+ if(!base?.get||!base?.idFromName)throw Error('AUTH_NAMESPACE_MISSING');
+ if(env.AUTH_STORAGE_JURISDICTION==='eu'){
+  if(typeof base.jurisdiction!=='function')throw Error('EU_JURISDICTION_UNAVAILABLE');
+  return base.jurisdiction('eu');
+ }
+ if(env.AUTH_STORAGE_JURISDICTION==='local-test')return base;
+ throw Error('AUTH_JURISDICTION_NOT_EXPLICIT');
+}
 function accountStub(env,id){
- return env.AUTH_ACCOUNTS.get(env.AUTH_ACCOUNTS.idFromName('talera-free-account-v1:'+validAccountId(id)));
+ const home=ns(env,'AUTH_ACCOUNTS');return home.get(home.idFromName('talera-free-account-v1:'+validAccountId(id)));
 }
 function emailStub(env,key){
- return env.AUTH_EMAILS.get(env.AUTH_EMAILS.idFromName('talera-free-auth-email-v1:'+key));
+ const home=ns(env,'AUTH_EMAILS');return home.get(home.idFromName('talera-free-auth-email-v1:'+key));
 }
 function handleStub(env,key){
- return env.AUTH_HANDLES.get(env.AUTH_HANDLES.idFromName('talera-free-auth-handle-v1:'+key));
+ const home=ns(env,'AUTH_HANDLES');return home.get(home.idFromName('talera-free-auth-handle-v1:'+key));
 }
 function sessionStub(env,hash){
- return env.AUTH_SESSIONS.get(env.AUTH_SESSIONS.idFromName('talera-free-auth-session-v1:'+hash));
+ const home=ns(env,'AUTH_SESSIONS');return home.get(home.idFromName('talera-free-auth-session-v1:'+hash));
 }
 function rateStub(env,key){
- return env.AUTH_RATES.get(env.AUTH_RATES.idFromName('talera-free-auth-rate-v1:'+key));
+ const home=ns(env,'AUTH_RATES');return home.get(home.idFromName('talera-free-auth-rate-v1:'+key));
 }
 async function accountForEmail(env,email){
  const hash=await routeKey(env,'email',validEmail(email));

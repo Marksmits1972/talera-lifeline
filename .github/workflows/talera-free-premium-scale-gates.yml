@@ -69,5 +69,9 @@ jobs:
           cache: npm
       - name: Install test runtime only, do not deploy anything
         run: npm ci
+      - name: Adjust only ephemeral local workerd compatibility date (pinned runner)
+        run: |
+          sed -i 's/"compatibility_date": "2026-11-08"/"compatibility_date": "2026-09-18"/' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
+          grep '"compatibility_date": "2026-09-18"' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
       - name: Exercise real Worker code locally, with 12 fake accounts and 6 fake media objects each
         run: node r20-dev/free-premium-scale-20261108/local-premium-runtime.mjs

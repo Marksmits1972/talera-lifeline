@@ -1,0 +1,57 @@
+name: TALERA - isolated EU per-account Durable Object versus D1 storage proof
+on:
+  push:
+    branches: [feature/do-vs-d1-shortpath-proof-20261108]
+    paths:
+      - r20-dev/do-shortpath-compare-20261108/**
+      - .github/workflows/talera-do-shortpath-isolated.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talera-do-shortpath-isolated-release
+  cancel-in-progress: false
+jobs:
+  real_eu_shortpath_proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install project-locked Wrangler
+        run: npm ci
+      - name: Verify 1M distinct synthetic account-object keys and media-scoping
+        run: |
+          node --check r20-dev/do-shortpath-compare-20261108/worker.mjs
+          node --check r20-dev/do-shortpath-compare-20261108/identity.mjs
+          node --check r20-dev/do-shortpath-compare-20261108/provision-eu-r2.mjs
+          node --test r20-dev/do-shortpath-compare-20261108/identity.test.mjs
+      - name: Require and normalize GitHub Cloudflare account scope
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || exit 1
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32 || exit 1
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Create only a new isolated fake-media R2 bucket with EU jurisdiction
+        run: node r20-dev/do-shortpath-compare-20261108/provision-eu-r2.mjs
+      - name: Deploy only separate synthetic Durable Objects Worker
+        run: |
+          npx --no-install wrangler deploy --config r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
+      - name: Generate disposable bearer test token (never checked in)
+        run: |
+          KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$KEY"
+          printf 'DEMO_TOKEN=%s\n' "$KEY" >> "$GITHUB_ENV"
+      - name: Protect the test Worker secret
+        run: |
+          printf '%s' "$DEMO_TOKEN" | npx --no-install wrangler secret put DEMO_TOKEN --config r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
+      - name: Real EU Durable Objects plus R2 account-isolation and save/read smoke test
+        run: |
+          node r20-dev/do-shortpath-compare-20261108/live-smoke.mjs

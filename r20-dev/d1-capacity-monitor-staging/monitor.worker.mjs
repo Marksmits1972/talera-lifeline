@@ -11,7 +11,9 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACCOUNT_SHARD=/^[A-Z][A-Z0-9]{0,7}$/;
 function getMap(raw){
  const obj=JSON.parse(raw||'null');
- if(!obj||Object.keys(obj).length!==3||Object.keys(obj).some(k=>!['A','B','C'].includes(k)||!UUID.test(obj[k])))
+ const keys=obj&&typeof obj==='object'&&!Array.isArray(obj)?Object.keys(obj):[];
+ if(!keys.length||keys.length>16||keys.some(k=>!ACCOUNT_SHARD.test(k)||!UUID.test(obj[k]))||
+  new Set(Object.values(obj).map(v=>v.toLowerCase())).size!==keys.length)
   throw new Error('Unverified staging shard UUID map');
  return obj;
 }
@@ -25,7 +27,7 @@ export async function monitorCapacity(env,now=new Date()){
   !['active','disabled','draining'].includes(s.state)))
   throw new Error('Unexpected staging shard catalog');
  const active=states.filter(s=>s.state==='active');
- const standby=states.filter(s=>s.state==='disabled'&&s.shard_id==='C');
+ const standby=states.filter(s=>s.state==='disabled');
  if(!active.length)return {action:'block',reason:'NO_ACTIVE_DATABASE'};
  if(!standby.length)return {action:'none',reason:'NO_SPARE_DATABASE'};
  const activeIds=active.map(s=>map[s.shard_id].toLowerCase());

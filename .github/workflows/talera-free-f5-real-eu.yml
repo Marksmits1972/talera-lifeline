@@ -1,8 +1,8 @@
 name: TALERA Free F5b - separate real EU Cloudflare staging
 
 on:
-  push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108]
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
     paths:
       - '.github/workflows/talera-free-f5-real-eu.yml'
   workflow_dispatch:
@@ -17,6 +17,7 @@ concurrency:
 jobs:
   f5_real_eu:
     name: Separate EU Worker, synthetic account+social+timeline readbacks
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 16
     env:

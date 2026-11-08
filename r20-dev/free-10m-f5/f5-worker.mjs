@@ -23,6 +23,17 @@ export {
 const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
 const HEX64=/^[a-f0-9]{64}$/;
+const F5_BROWSER_CSP=[
+  "default-src 'self' blob: data:",
+  "base-uri 'self'","object-src 'none'","frame-ancestors 'none'",
+  "connect-src 'self'","form-action 'self'",
+  "img-src 'self' https: blob: data:",
+  "media-src 'self' blob: data: https:",
+  "font-src 'self' https: data:",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' blob:",
+  "worker-src 'self' blob:"
+].join('; ');
 const encoder=new TextEncoder();
 function deny(status=403,message='Deze testomgeving is niet toegankelijk'){
   return json({ok:false,error:message},status);
@@ -54,7 +65,8 @@ function qaEntry(){
     '<button type="submit" style="padding:12px 20px">Open testversie</button></form></body></html>';
   return new Response(html,{status:200,headers:{
     'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
-    'x-content-type-options':'nosniff','referrer-policy':'no-referrer'
+    'x-content-type-options':'nosniff','referrer-policy':'no-referrer',
+    'content-security-policy':F5_BROWSER_CSP
   }});
 }
 async function authorizeQaBrowser(request,env){
@@ -196,7 +208,8 @@ async function publicPage(request,env){
     return new Response(converted.html,{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
-        'x-content-type-options':'nosniff','x-talera-free-f5':'personalized-durable-account'
+        'x-content-type-options':'nosniff','x-talera-free-f5':'personalized-durable-account',
+        'content-security-policy':F5_BROWSER_CSP
       }
     });
   }
@@ -208,6 +221,7 @@ async function publicPage(request,env){
   for(const key of ['content-length','etag','content-encoding','cf-cache-status','age'])headers.delete(key);
   headers.set('cache-control','private, no-store');
   headers.set('x-talera-free-f5','anonymous-snapshot-only');
+  headers.set('content-security-policy',F5_BROWSER_CSP);
   headers.set('x-content-type-options','nosniff');
   return new Response(r.body,{status:200,headers});
 }

@@ -1,0 +1,26 @@
+name: TALERA - prototype automatische D1-verdeling, alleen fictieve data
+on:
+  push:
+    branches: [feature/elastic-data-routing-prototype-20261108]
+    paths:
+      - r20-dev/elastic-data-prototype-20261108/**
+      - .github/workflows/talera-elastic-d1-offline.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test_offline_router:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check — no Cloudflare or real account dependencies
+        run: |
+          node --check r20-dev/elastic-data-prototype-20261108/offline-shard-router.mjs
+          node --check r20-dev/elastic-data-prototype-20261108/offline-shard-router.test.mjs
+      - name: One million fake-user stable allocation, no real database calls
+        run: |
+          node --test r20-dev/elastic-data-prototype-20261108/offline-shard-router.test.mjs

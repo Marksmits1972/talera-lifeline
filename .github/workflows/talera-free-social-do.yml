@@ -1,0 +1,42 @@
+name: TALERA Free - per-memory social Durable Objects and share revocation
+
+on:
+  push:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - 'r20-dev/free-10m-social-do/**'
+      - '.github/workflows/talera-free-social-do.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated_free_social:
+    name: Real local SQLite DO - account and guest rights, link revoke and restart
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Check new synthetic social worker syntax
+        run: |
+          node --check r20-dev/free-10m-social-do/social-objects.mjs
+          node --check r20-dev/free-10m-social-do/social-worker.mjs
+          node --check r20-dev/free-10m-social-do/social-local-test.mjs
+      - name: Install local Cloudflare runtime
+        run: npm ci
+      - name: Verify Cloudflare build without deploying anywhere
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-social-do/wrangler.jsonc --outdir .talera-free-social-buildcheck
+      - name: Exercise actual local Durable Objects with no real accounts/media
+        run: node r20-dev/free-10m-social-do/social-local-test.mjs
+      - name: Archive local-only factual test results
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-social-do-local-only
+          path: r20-dev/free-10m-social-do/generated/social-result.json
+          retention-days: 14

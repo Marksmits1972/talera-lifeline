@@ -36,11 +36,15 @@ jobs:
       - name: GET ONLY reachable Worker binding labels, redact identifiers and secrets
         run: |
           node r20-dev/storage-inventory-20261108/read-only-cloudflare-bindings.mjs
+      - name: GET ONLY selected live Worker code and emit sanitized SQL/API identifiers
+        run: |
+          node --check r20-dev/storage-inventory-20261108/read-only-live-source-contract.mjs
+          node r20-dev/storage-inventory-20261108/read-only-live-source-contract.mjs
       - name: Store sanitized metadata graph, never user data
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: talera-worker-storage-routing-readonly-20261108
-          path: r20-dev/storage-inventory-20261108/results/cloudflare-routing-sanitized.json
+          path: r20-dev/storage-inventory-20261108/results/*-sanitized.json
           if-no-files-found: ignore
           retention-days: 14

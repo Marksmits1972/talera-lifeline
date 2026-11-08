@@ -81,6 +81,22 @@ async function run(){
   const noGate=await request('GET','/mijn-leven',{gate:false});
   assert.equal(noGate.status,403,'No public staging HTML without F5 gate');
   assert.equal((await request('GET','/api/me',{gate:false})).status,403);
+  const entry=await request('GET','/__f5/entry',{gate:false});
+  assert.equal(entry.status,200);
+  assert.match(String(entry.data),/TALERA Free — testversie/);
+  const browserOpen=await fetch(origin+'/__f5/entry',{
+    method:'POST',headers:{origin,'content-type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({key:f5}),redirect:'manual',signal:AbortSignal.timeout(15000)
+  });
+  assert.equal(browserOpen.status,303,'Private browser testing gets signed QA cookie');
+  const qaCookie=/talera_f5_access=[^;]+/.exec(browserOpen.headers.get('set-cookie')||'')?.[0];
+  assert.ok(qaCookie,'QA authorization must be HttpOnly browser cookie');
+  assert.match(browserOpen.headers.get('set-cookie')||'',/HttpOnly; Secure/);
+  assert.equal((await request('GET','/mijn-leven',{gate:false,cookie:qaCookie})).status,200,
+    'Original PWA accessible to authorized browser without injecting headers into JS');
+  const fakeQa=qaCookie.replace(/.$/,'0');
+  assert.equal((await request('GET','/mijn-leven',{gate:false,cookie:fakeQa})).status,403,
+    'A modified QA cookie must not unlock test PWA');
   const shell=await request('GET','/mijn-leven');
   assert.equal(shell.status,200,'Real approved anonymous shell served locally');
   assert.equal(shell.stage,'anonymous-snapshot-only');
@@ -95,7 +111,8 @@ async function run(){
     identities.push({id:r.data.account.id,cookie:cookieOf(r)});
   }
   assert.equal(new Set(identities.map(x=>x.id)).size,3);
-  const signedHome=await request('GET','/mijn-leven',{cookie:identities[0].cookie});
+  const signedHome=await request('GET','/mijn-leven',{
+    gate:false,cookie:identities[0].cookie+'; '+qaCookie});
   assert.equal(signedHome.status,200,'Registered user gets a separate private timeline');
   assert.equal(signedHome.stage,'personalized-durable-account');
   assert.match(String(signedHome.data),/let current=1974;/,
@@ -174,7 +191,7 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:3,syntheticMemories:1,localRequests:calls,
-    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,qaBrowserCookieVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,

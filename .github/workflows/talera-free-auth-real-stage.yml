@@ -63,5 +63,5 @@ jobs:
           printf '%s' "$AUTH_NAMESPACE_KEY" | npx --no-install wrangler secret put AUTH_NAMESPACE_KEY --config r20-dev/free-10m-auth-pilot/wrangler.staging.jsonc
       - name: Allow edge configuration to settle before authenticated test
         run: sleep 8
-      - name: Test two synthetic Free accounts on real remote EU Durable Objects
+      - name: Verify two fake accounts plus 1/5/20 bounded real EU Cloudflare session reads
         run: node r20-dev/free-10m-auth-pilot/auth-live-smoke.mjs

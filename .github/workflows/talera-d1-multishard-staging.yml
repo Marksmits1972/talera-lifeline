@@ -1,0 +1,75 @@
+name: TALERA real multi-D1 A+B and standby C - isolated GitHub stage
+on:
+  push:
+    branches: [feature/d1-multishard-autoscale-staging-20261108]
+    paths:
+      - r20-dev/d1-router-staging/**
+      - .github/workflows/talera-d1-multishard-staging.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talera-router-staging-single-writer
+  cancel-in-progress: false
+jobs:
+  provision_and_smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Wrangler without upgrades
+        run: npm ci
+      - name: Unit tests, security and missing-shard failure protections
+        run: |
+          node --check r20-dev/d1-router-staging/router.worker.mjs
+          node --check r20-dev/d1-router-staging/provision-staging.mjs
+          node --check r20-dev/d1-router-staging/live-smoke.mjs
+          node --test r20-dev/d1-router-staging/router.worker.test.mjs
+          node --test r20-dev/d1-router-staging/capacity-policy.test.mjs
+          node --check r20-dev/d1-router-staging/watch-capacity.mjs
+          node --check r20-dev/d1-router-staging/enable-staging-replicas.mjs
+          node --check r20-dev/d1-router-staging/live-multishard.mjs
+      - name: Require existing Cloudflare credentials in GitHub
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'GitHub token missing'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'GitHub account scope missing'; exit 1; }
+      - name: Normalize the GitHub Cloudflare account scope without printing it
+        run: |
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
+          test "${#CLEAN_ID}" -ge 16 || { echo 'Cloudflare account ID invalid'; exit 1; }
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Create ONLY uniquely named isolated EU D1 test databases and schemas
+        run: |
+          node r20-dev/d1-router-staging/provision-staging.mjs prepare
+      - name: Deploy ONLY separate router staging Worker through GitHub
+        run: |
+          npx --no-install wrangler deploy --config r20-dev/d1-router-staging/wrangler.generated.jsonc
+      - name: Generate one-run synthetic API key (never commit or print)
+        run: |
+          KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$KEY"
+          printf 'DEMO_TOKEN=%s\n' "$KEY" >> "$GITHUB_ENV"
+      - name: Protect synthetic write endpoints with the generated Worker secret
+        run: |
+          printf '%s' "$DEMO_TOKEN" | npx --no-install wrangler secret put DEMO_TOKEN --config r20-dev/d1-router-staging/wrangler.generated.jsonc
+      - name: Activate only initialized and deployed staging shard bindings
+        run: |
+          node r20-dev/d1-router-staging/provision-staging.mjs activate
+      - name: Verify REAL D1 create, persist, read, stable routing and access control
+        run: |
+          node r20-dev/d1-router-staging/live-smoke.mjs
+      - name: Verify TWO real physical write databases and reserved cold standby
+        run: |
+          node r20-dev/d1-router-staging/live-multishard.mjs
+      - name: Enable automatic read replicas on the isolated D1 test databases
+        continue-on-error: true
+        run: |
+          node r20-dev/d1-router-staging/enable-staging-replicas.mjs

@@ -19,7 +19,7 @@ const args=[
  '--config',path.join(workdir,'wrangler.jsonc'),
  '--persist-to',path.resolve('.talera-local-runtime-proof'),
  '--var','DEMO_TOKEN:'+TOKEN,
- '--log-level','error'
+ '--log-level','debug'
 ];
 const processHandle=spawn(path.resolve('node_modules/.bin/wrangler'),args,{
  env:{...process.env,CI:'true',BROWSER:'none',NO_COLOR:'1'},

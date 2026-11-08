@@ -9,7 +9,7 @@
 | F3. Login, registratie, individuele sessies, directe intrekking zonder centrale D1 | Nieuw geïsoleerd pilot gebouwd en lokaal plus op echte EU Cloudflare getest | PR #95, GitHub run 42506218404 |
 | F3b. Kleine echte belasting op Cloudflare | 120 succesvolle parallelle sessiecontroles, in trappen met maximaal 30 gelijktijdige verzoeken en gemeten p95 359–424 ms vanaf GitHub-runner | Run 42506218404 |
 | F3c. Bestaande accounts veilig overzetten | Migratie-preflight met synthetische gegevens gebouwd; 9/9 tests geslaagd. Geen echte migratie uitgevoerd | Run 42506887577 |
-| F4. Delen, berichten, sociale interacties en oude verwijzingen | **Nog niet schaalbaar aangetoond**: bestaande TALERA-core gebruikt hiervoor eveneens D1 | Nog te bouwen/testen |
+| F4. Delen, likes en reacties | Per-herinnering SQLite Durable Objects en afzonderlijke intrekbare deelkoppelingen nu echt gebouwd, lokaal en in EU Cloudflare getest. **Nog niet geïntegreerd, oude links en berichten niet verhuisd.** | PR #96, run 42507774180 |
 | F5. Gehele Free-PWA op iPhone/Safari | **Niet getest** met nieuwe backend | Nog open |
 | F6. De volledige tienmiljoen-gebruikersbelasting, kosten en piekcapaciteit | **Niet bewezen** | Nog open |
 
@@ -30,3 +30,7 @@ De nieuwe authenticatieservice bezit eigen Durable Objects per account, sessie e
 5. Pas bij volledig bewezen Free-capaciteit gaan we naar Premium.
 
 Bewijs: https://github.com/Marksmits1972/talera-lifeline/pull/93 , https://github.com/Marksmits1972/talera-lifeline/pull/94 , https://github.com/Marksmits1972/talera-lifeline/pull/95 ; echte EU-cloudtest https://github.com/Marksmits1972/talera-lifeline/actions/runs/42506218404 ; migratiepreflight https://github.com/Marksmits1972/talera-lifeline/actions/runs/42506887577 .
+
+## F4-update: nieuwe sociale route
+
+Sociale DO-staging op echte EU Cloudflare geslaagd: 48 kleine, synthetische HTTP-verzoeken, delen en revocatie en 36 parallelle reads zonder fouten. Eén 12-requestsband had circa 2,7 seconde p95, zodat dit **geen snelheidsgarantie** is. Het hotstory-risico, berichten/discovery, migratie van oude rechten en integratie in de gehele app staan nog open. PR #96: https://github.com/Marksmits1972/talera-lifeline/pull/96 . Bestaande D1 en verhalen niet gewijzigd.

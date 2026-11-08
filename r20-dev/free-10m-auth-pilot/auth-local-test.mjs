@@ -1,6 +1,8 @@
 // LOCAL ONLY: isolated Cloudflare Durable Object QA with synthetic accounts.
 // No connection to TALERA customer accounts or Cloudflare production services.
 import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {passwordHash,shaHex} from './auth-util.mjs';
 import {spawn} from 'node:child_process';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -116,11 +118,64 @@ async function run(){
  assert.equal(disabled.status,200);assert.equal(disabled.data.ok,true);
  assert.equal((await request('GET','/api/me',{cookie:created[0].cookie})).status,401);
  assert.equal((await request('GET','/api/me',{cookie:created[1].cookie})).status,200);
+ // Synthetic copy of an OLD TALERA account without username, using the
+ // original 100,000-iteration SHA-256 PBKDF2 salt and password hash format.
+ const legacyToken='b'.repeat(64),legacyId=randomUUID(),legacySalt='a'.repeat(64);
+ const legacyPassword='Synthetic_old_passphrase_12345';
+ const legacyRecord={
+  id:legacyId,email:'legacy-no-handle@example.invalid',
+  display_name:'Oud fictief account',public_handle:null,
+  password_salt:legacySalt,
+  password_hash:await passwordHash(legacyPassword,legacySalt),
+  status:'active',created_at:Date.now()-86400000
+ };
+ const copied=await request('POST','/__local-qa/import-account',{
+  testOnly:true,body:legacyRecord
+ });
+ assert.equal(copied.status,200,'Legacy account import failed: '+JSON.stringify(copied.data));
+ assert.equal(copied.data.accountId,legacyId);
+ assert.equal(copied.data.legacyHadHandle,false);
+ const again=await request('POST','/__local-qa/import-account',{
+  testOnly:true,body:legacyRecord
+ });
+ assert.equal(again.status,200,'Repeat import must be idempotent');
+ assert.equal(again.data.imported,false);
+ const importedSession=await request('POST','/__local-qa/import-session',{
+  testOnly:true,body:{
+   id_hash:await shaHex(legacyToken),
+   account_id:legacyId,
+   expires_at:Date.now()+86400000
+  }
+ });
+ assert.equal(importedSession.status,200,'Old hashed cookie not imported');
+ const recognized=await request('GET','/api/me',{
+  cookie:'talera_sid='+legacyToken
+ });
+ assert.equal(recognized.status,200,'Migrated unexpired legacy cookie should work');
+ assert.equal(recognized.data.account.id,legacyId);
+ assert.equal(recognized.data.account.username,'','Missing historical username must be permitted');
+ const oldLogin=await request('POST','/api/login',{
+  ip:'192.0.2.55',
+  body:{email:legacyRecord.email,password:legacyPassword}
+ });
+ assert.equal(oldLogin.status,200,'Existing password hash must verify without changing password');
+ const expired=await request('POST','/__local-qa/import-session',{
+  testOnly:true,body:{
+   id_hash:await shaHex('c'.repeat(64)),
+   account_id:legacyId,
+   expires_at:Date.now()-1000
+  }
+ });
+ assert.equal(expired.status,409,'Expired legacy session must not be imported');
  return {result:'PASS',isolatedAccounts:6,individualAccountDOs:true,
   uniqueEmailAndHandle:true,originalPasswordMethodPreserved:true,
   sessionsSurviveWorkerRestart:true,individualLogoutRevokesOneSession:true,
   disabledAccountRevokesAllSessions:true,credentialsAndBirthdateShareOneAccountHome:true,
   anyRealAccountsReadOrModified:false,anyD1Attached:false,
+  legacyMissingUsernameMigrated:true,
+  legacySaltAndHashPreserved:true,
+  legacyUnexpiredSessionRestoredByHash:true,
+  expiredLegacySessionExcluded:true,
   fullTenMillionFreeUsersProven:false};
 }
 try{

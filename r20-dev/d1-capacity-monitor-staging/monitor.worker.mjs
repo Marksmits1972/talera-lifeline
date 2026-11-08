@@ -12,7 +12,7 @@ const ACCOUNT_SHARD=/^[A-Z][A-Z0-9]{0,7}$/;
 function getMap(raw){
  const obj=JSON.parse(raw||'null');
  const keys=obj&&typeof obj==='object'&&!Array.isArray(obj)?Object.keys(obj):[];
- if(!keys.length||keys.length>16||keys.some(k=>!ACCOUNT_SHARD.test(k)||!UUID.test(obj[k]))||
+ if(!keys.length||keys.length>128||keys.some(k=>!ACCOUNT_SHARD.test(k)||!UUID.test(obj[k]))||
   new Set(Object.values(obj).map(v=>v.toLowerCase())).size!==keys.length)
   throw new Error('Unverified staging shard UUID map');
  return obj;

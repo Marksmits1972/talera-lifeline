@@ -1,0 +1,27 @@
+{
+  "name": "talera-free-social-local-only-uncreated",
+  "main": "./social-worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SOCIAL_MEMORY",
+        "class_name": "FreeSocialMemory"
+      },
+      {
+        "name": "SOCIAL_POINTER",
+        "class_name": "FreeSocialSharePointer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "free-social-v1",
+      "new_sqlite_classes": [
+        "FreeSocialMemory",
+        "FreeSocialSharePointer"
+      ]
+    }
+  ]
+}

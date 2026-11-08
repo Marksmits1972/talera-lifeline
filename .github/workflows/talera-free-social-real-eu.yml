@@ -1,0 +1,71 @@
+name: TALERA Free social - isolated real EU Cloudflare test
+
+on:
+  push:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - '.github/workflows/talera-free-social-real-eu.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-free-social-independent-eu-stage
+  cancel-in-progress: false
+
+jobs:
+  real_eu_social:
+    name: Synthetic social DO + revocable links on isolated EU Cloudflare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install pinned Cloudflare tools
+        run: npm ci
+      - name: Validate fully separate EU test worker with no D1, media or existing service binding
+        run: |
+          node -e "
+          const fs=require('node:fs');
+          const x=JSON.parse(fs.readFileSync('r20-dev/free-10m-social-do/wrangler.staging.jsonc','utf8'));
+          if(x.name!=='talera-free-social-do-staging-20261108'||x.main!=='./social-worker.mjs'||x.vars?.SOCIAL_STORAGE_JURISDICTION!=='eu'||x.d1_databases?.length||x.r2_buckets?.length||x.services?.length||x.durable_objects?.bindings?.length!==2)process.exit(1);
+          "
+      - name: Check cloud credentials and isolate account scope
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || exit 1
+          ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#ID}" -eq 32 || exit 1
+          echo "::add-mask::$ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$ID" >> "$GITHUB_ENV"
+      - name: Deploy ONLY separate social test Worker; inaccessible while not sealed
+        run: npx --no-install wrangler deploy --config r20-dev/free-10m-social-do/wrangler.staging.jsonc
+      - name: Make masked temporary QA-only access/identity secrets
+        run: |
+          GATEWAY="$(openssl rand -hex 32)"
+          IDENTITY="$(openssl rand -hex 32)"
+          echo "::add-mask::$GATEWAY"
+          echo "::add-mask::$IDENTITY"
+          printf 'STAGING_SOCIAL_KEY=%s\n' "$GATEWAY" >> "$GITHUB_ENV"
+          printf 'DEMO_IDENTITY_KEY=%s\n' "$IDENTITY" >> "$GITHUB_ENV"
+      - name: Lock new social staging behind secrets
+        run: |
+          printf '%s' "$STAGING_SOCIAL_KEY" | npx --no-install wrangler secret put STAGING_SOCIAL_KEY --config r20-dev/free-10m-social-do/wrangler.staging.jsonc
+          printf '%s' "$DEMO_IDENTITY_KEY" | npx --no-install wrangler secret put DEMO_IDENTITY_KEY --config r20-dev/free-10m-social-do/wrangler.staging.jsonc
+      - name: Wait for Cloudflare edge configuration to settle
+        run: sleep 8
+      - name: Try one synthetic memory, two rights, revoke link, 36 bounded reads
+        run: node r20-dev/free-10m-social-do/social-live-smoke.mjs
+      - name: Save real only-fake Cloudflare verification
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-social-real-eu-synthetic
+          path: r20-dev/free-10m-social-do/generated/social-remote-result.json
+          retention-days: 14

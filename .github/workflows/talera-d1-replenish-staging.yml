@@ -5,6 +5,7 @@ on:
     paths:
       - r20-dev/d1-capacity-monitor-staging/replenish-staging.mjs
       - r20-dev/d1-capacity-monitor-staging/reserve-planner*
+      - r20-dev/d1-capacity-monitor-staging/storage-guard*
       - .github/workflows/talera-d1-replenish-staging.yml
   workflow_dispatch:
   # On a dedicated deployment/default branch, schedule becomes operational.
@@ -37,6 +38,7 @@ jobs:
       - name: Run pure append-only reserve and safe pressure policy tests
         run: |
           node --test r20-dev/d1-capacity-monitor-staging/reserve-planner.test.mjs
+          node --test r20-dev/d1-capacity-monitor-staging/storage-guard.test.mjs
           node --test r20-dev/d1-capacity-monitor-staging/monitor.worker.test.mjs
           node --test r20-dev/d1-router-staging/capacity-policy.test.mjs
           node --test r20-dev/d1-router-staging/router.worker.test.mjs

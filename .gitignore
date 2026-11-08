@@ -1,3 +1,8 @@
 node_modules/
 .wrangler/
 .dev.vars
+
+# Free 10M staging build artifacts (generated from source)
+dist/free-scale-assets/
+dist/free-scale-test-manifest.json
+src/generated/free-scale-shell.mjs

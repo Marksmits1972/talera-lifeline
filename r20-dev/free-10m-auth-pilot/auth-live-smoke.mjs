@@ -1,0 +1,82 @@
+// Bounded live Cloudflare EU Durable Object staging test.
+// Exactly TWO randomly named, fictional accounts. No production TALERA data.
+// Auth staging key and namespace secret come from masked GitHub Actions env.
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+const host='talera-free-auth-do-staging-20261108.mark-a39.workers.dev';
+const origin='https://'+host;
+const access=process.env.STAGING_ACCESS_KEY;
+assert.match(access||'',/^[0-9a-f]{64}$/,'Missing masked disposable staging test key');
+const prefix=randomUUID().replaceAll('-','').slice(0,18);
+let checked=0;
+async function request(method,route,{data,cookie,useAccess=true}={}){
+ const url=new URL(route,origin);
+ assert.equal(url.hostname,host,'Never call another Worker from the staging smoke test');
+ const headers={accept:'application/json'};
+ if(useAccess)headers['x-talera-staging-key']=access;
+ if(cookie)headers.cookie=cookie;
+ if(data){headers['content-type']='application/json';headers.origin=origin}
+ if(method==='POST'&&!headers.origin)headers.origin=origin;
+ const response=await fetch(url,{
+  method,headers,body:data?JSON.stringify(data):undefined,
+  signal:AbortSignal.timeout(15000),redirect:'error'
+ });
+ checked++;
+ const value=await response.json();
+ return {status:response.status,value,headers:response.headers};
+}
+const cookieOf=response=>{
+ const raw=response.headers.get('set-cookie')||'';
+ assert.match(raw,/HttpOnly/);assert.match(raw,/Secure/);
+ const match=/\btalera_sid=([0-9a-f]{64})/.exec(raw);
+ assert.ok(match,'No private 256-bit session cookie issued');
+ return 'talera_sid='+match[1];
+};
+const first={email:'synthetic-'+prefix+'-a@example.invalid',
+ username:'demo-'+prefix.slice(0,12)+'-a',displayName:'Fictief A',
+ password:'Fictional_staging_password_A_2026'};
+const second={email:'synthetic-'+prefix+'-b@example.invalid',
+ username:'demo-'+prefix.slice(0,12)+'-b',displayName:'Fictief B',
+ password:'Fictional_staging_password_B_2026'};
+const health=await request('GET','/__free-auth/health',{useAccess:false});
+assert.equal(health.status,200);
+assert.equal(health.value.realTaleraAccountsMigrated,false);
+assert.equal(health.value.sharedD1Bound,false);
+const unauthorized=await request('GET','/api/me',{useAccess:false});
+assert.equal(unauthorized.status,403,'Staging must be inaccessible without secret');
+const anonymous=await request('GET','/api/me');
+assert.equal(anonymous.status,401);
+const userA=await request('POST','/api/register',{data:first});
+assert.equal(userA.status,200,'Staging account A: '+JSON.stringify(userA.value));
+const userB=await request('POST','/api/register',{data:second});
+assert.equal(userB.status,200,'Staging account B: '+JSON.stringify(userB.value));
+assert.notEqual(userA.value.account.id,userB.value.account.id);
+const aCookie=cookieOf(userA),bCookie=cookieOf(userB);
+const aProfile=await request('GET','/api/me',{cookie:aCookie});
+assert.equal(aProfile.status,200);
+assert.equal(aProfile.value.account.email,first.email);
+const bProfile=await request('GET','/api/me',{cookie:bCookie});
+assert.equal(bProfile.status,200);
+assert.equal(bProfile.value.account.id,userB.value.account.id);
+assert.equal(bProfile.headers.get('cache-control'),'private, no-store');
+const signedIn=await request('POST','/api/login',{data:{email:first.email,password:first.password}});
+assert.equal(signedIn.status,200);
+const anotherCookie=cookieOf(signedIn);
+const signedOut=await request('POST','/api/logout',{cookie:aCookie});
+assert.equal(signedOut.status,200);
+assert.equal((await request('GET','/api/me',{cookie:aCookie})).status,401);
+assert.equal((await request('GET','/api/me',{cookie:anotherCookie})).status,200);
+assert.equal((await request('GET','/api/me',{cookie:bCookie})).status,200);
+const report={
+ result:'PASS: isolated REAL Cloudflare Free-auth EU-jurisdiction staging smoke',
+ testOnly:true,
+ newFictionalAccounts:2,
+ verifiedSeparateAccountSessionReadbacks:true,
+ realSessionLogoutAndRevocation:true,
+ usesOriginalD1:false,
+ migratedOriginalAccounts:false,
+ sentNoRequestsToExistingTalera:false,
+ totalLiveHttpRequests:checked,
+ anyActual10MillionLoadProven:false
+};
+console.log('TALERA_FREE_AUTH_REAL_CLOUDFLARE_SMOKE',JSON.stringify(report,null,2));

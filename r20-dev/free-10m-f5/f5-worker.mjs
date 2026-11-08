@@ -11,6 +11,7 @@ import {approvedAssets,anonymousShells} from '../free-10m-delivery/generated/app
 import {assetizeHtml} from '../free-10m-delivery/rewrite.mjs';
 import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birthdate-worker.mjs';
 import {referencePages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
+import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 
 export {
   FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
@@ -187,7 +188,11 @@ async function publicPage(request,env){
     // Refuse to show a wrong or default timeline if source markers changed.
     if((pathname==='/mijn-leven'||pathname==='/present')&&privateHtml===original)
       return deny(503,'De persoonlijke tijdlijn kon niet veilig worden gemaakt');
-    const converted=await assetizeHtml(privateHtml,new Set(approvedAssets));
+    // Isolate *local* originals, audio, video, photo and cue records by
+    // verified account, without changing recorder, swipe or presentation logic.
+    // If the upstream memory-store script ever changes, fail closed.
+    const scoped=scopeLocalMemories(privateHtml,await privateAccountScope(actor.id));
+    const converted=await assetizeHtml(scoped,new Set(approvedAssets));
     return new Response(converted.html,{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',

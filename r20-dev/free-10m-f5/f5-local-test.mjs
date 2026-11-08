@@ -115,11 +115,26 @@ async function run(){
     gate:false,cookie:identities[0].cookie+'; '+qaCookie});
   assert.equal(signedHome.status,200,'Registered user gets a separate private timeline');
   assert.equal(signedHome.stage,'personalized-durable-account');
+  const scopedName=/talera-free-local-([a-f0-9]{32})-v1/.exec(String(signedHome.data))?.[0];
+  assert.ok(scopedName,'The existing IndexedDB media store must be scoped to current account');
+  assert.ok(!String(signedHome.data).includes("DB_NAME='talera-lifeline-dev-local-v1'"),
+    'A signed-in user must never write to the shared legacy local database');
+  const otherHome=await request('GET','/mijn-leven',{cookie:identities[1].cookie});
+  assert.equal(otherHome.status,200);
+  const otherName=/talera-free-local-([a-f0-9]{32})-v1/.exec(String(otherHome.data))?.[0];
+  assert.ok(otherName&&otherName!==scopedName,
+    'Different accounts on the same iPhone must use separate local memories');
+  const storyEditor=await request('GET','/tell',{cookie:identities[0].cookie});
+  assert.equal(storyEditor.status,200);
+  assert.ok(String(storyEditor.data).includes(scopedName),
+    'The storyteller must use the same individual local media store as Mijn leven');
   assert.match(String(signedHome.data),/let current=1974;/,
     'Birth-year must come from the individual account DO, not the demo shell');
   const signedPresent=await request('GET','/present',{cookie:identities[0].cookie});
   assert.equal(signedPresent.status,200,'Presentation must get its own private timeline');
   assert.equal(signedPresent.stage,'personalized-durable-account');
+  assert.ok(String(signedPresent.data).includes(scopedName),
+    'Presentation must access the very same private local story and media store');
   assert.match(String(signedPresent.data),/const LIFE_START = new Date\(1974,3,2\)\.getTime\(\);/,
     'Presentation start must match account private birthdate');
   const publicScript=await request('GET','/__clean/menu-integration.mjs');
@@ -198,7 +213,7 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:3,syntheticMemories:1,localRequests:calls,
-    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,qaBrowserCookieVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,

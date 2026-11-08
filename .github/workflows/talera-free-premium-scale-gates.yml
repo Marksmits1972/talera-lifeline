@@ -1,0 +1,136 @@
+name: TALERA - Free 10M and Premium 1M separate preflight (not load)
+
+on:
+  push:
+    branches: [feature/free-premium-scale-gates-20261108]
+    paths:
+      - 'r20-dev/free-premium-scale-20261108/**'
+      - '.github/workflows/talera-free-premium-scale-gates.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline_workload_math:
+    name: OFFLINE model only - no million real sessions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check model code
+        run: |
+          node --check r20-dev/free-premium-scale-20261108/scale-model.mjs
+          node --check r20-dev/free-premium-scale-20261108/scale-model.test.mjs
+          node --check r20-dev/free-premium-scale-20261108/run-offline.mjs
+          node --check r20-dev/free-premium-scale-20261108/public-readonly-smoke.mjs
+      - name: Run separate 10M Free and 1M Premium math assertions
+        run: node --test r20-dev/free-premium-scale-20261108/scale-model.test.mjs
+      - name: Generate explicit assumptions and NOT PROVEN verdict
+        run: node r20-dev/free-premium-scale-20261108/run-offline.mjs
+      - name: Archive offline scenario only
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-premium-offline-envelope
+          path: r20-dev/free-premium-scale-20261108/results-offline.json
+          retention-days: 14
+
+  anonymous_three_gets:
+    name: 3 anonymous GETs only - existing TALERA preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Three public GETs, no accounts, no writes, NO load
+        run: node r20-dev/free-premium-scale-20261108/public-readonly-smoke.mjs
+
+
+  isolated_local_premium_runtime:
+    name: Genuine Cloudflare local DO/R2 runtime - small bounded requests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch prior proven ISOLATED synthetic DO/R2 Worker at pinned commit
+        uses: actions/checkout@v4
+        with:
+          ref: b28a459fa5d14d55fb4d836bb2674c9545f6a9f0
+          path: isolated-synthetic-proof
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install test runtime only, do not deploy anything
+        run: npm ci
+      - name: Adjust only ephemeral local workerd compatibility date (pinned runner)
+        run: |
+          sed -i 's/"compatibility_date": "2026-11-08"/"compatibility_date": "2026-09-18"/' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
+          grep '"compatibility_date": "2026-09-18"' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/wrangler.jsonc
+      - name: Local-only routing adapter (no real EU jurisdiction in runner)
+        run: |
+          sed -i "s/const eu=env.ACCOUNT_HOME.jurisdiction('eu');/const eu=env.ACCOUNT_HOME;/" isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/identity.mjs
+          grep 'const eu=env.ACCOUNT_HOME;' isolated-synthetic-proof/r20-dev/do-shortpath-compare-20261108/identity.mjs
+      - name: Exercise real Worker code locally, with 12 fake accounts and 6 fake media objects each
+        run: node r20-dev/free-premium-scale-20261108/local-premium-runtime.mjs
+
+      - name: Archive LOCAL-only genuine Worker runtime metrics
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-premium-bounded-local-runtime
+          path: r20-dev/free-premium-scale-20261108/results-local-runtime.json
+          retention-days: 14
+
+
+  free_real_delivery_audit:
+    name: Free REAL anonymous code delivery (3 GETs, no load)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read three actual Free PWA pages and cache/inline-code properties
+        run: node r20-dev/free-premium-scale-20261108/free-delivery-audit.mjs
+      - name: Archive actual public delivery metrics (no private content)
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-real-delivery-audit
+          path: r20-dev/free-premium-scale-20261108/free-delivery-audit-results.json
+          retention-days: 14
+
+
+  premium_real_binary_local:
+    name: Premium six PNG + WAV + MP4 bytes, isolated local DO+R2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare locally emulated Cloudflare runtime
+        run: npm ci
+      - name: Install video fixture generator in isolated GitHub runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffmpeg -version | head -n 1
+      - name: Run full binary media lifecycle, local-only and bounded
+        run: node r20-dev/free-premium-scale-20261108/premium-media-local/run.mjs
+      - name: Archive local-only full-media integrity proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-premium-binary-photo-audio-video-local-only
+          path: r20-dev/free-premium-scale-20261108/premium-media-local/results.json
+          retention-days: 14

@@ -1,0 +1,15 @@
+{
+  "name": "talera-premium-media-local-only-no-deployment-20261108",
+  "main": "./worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [{"name":"ACCOUNT_HOME","class_name":"BinaryTestAccountHome"}]
+  },
+  "migrations": [
+    {"tag":"v1","new_sqlite_classes":["BinaryTestAccountHome"]}
+  ],
+  "r2_buckets": [
+    {"binding":"MEDIA","bucket_name":"talera-premium-local-binary-media-uncreated-20261108"}
+  ]
+}

@@ -5,6 +5,11 @@ on:
     branches: [feature/free-10m-social-memory-do-20261108]
     paths:
       - '.github/workflows/talera-free-f5-real-eu.yml'
+      - 'r20-dev/free-10m-f5/f5-worker.mjs'
+      - 'r20-dev/free-10m-f5/f5-local-scope.mjs'
+      - 'r20-dev/free-10m-f5/f5-webkit-browser-smoke.mjs'
+      - 'r20-dev/free-10m-f5/f5-live-smoke.mjs'
+      - 'r20-dev/free-10m-f5/wrangler.staging.jsonc'
   workflow_dispatch:
 
 permissions:

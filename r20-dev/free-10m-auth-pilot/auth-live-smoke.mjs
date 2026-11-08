@@ -51,6 +51,10 @@ for(let attempt=0;attempt<45;attempt++){
  assert.equal(anonymous.status,503,'Unexpected staging HTTP status during secret/binding warmup');
  await new Promise(resolve=>setTimeout(resolve,1000));
 }
+if(anonymous.status!==401){
+ const diagnostic=await request('GET','/__free-auth/diagnostic');
+ console.error('TALERA_FREE_AUTH_STAGING_BINDING_READINESS',JSON.stringify(diagnostic.value));
+}
 assert.equal(anonymous.status,401,'Staging secrets and Durable Object bindings did not become ready in 45 seconds');
 const userA=await request('POST','/api/register',{data:first});
 assert.equal(userA.status,200,'Staging account A: '+JSON.stringify(userA.value));

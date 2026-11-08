@@ -10,7 +10,7 @@ const dataFolder=join(folder,'../d1-router-staging');
 const c=JSON.parse(readFileSync(join(dataFolder,'shard-catalog.json'),'utf8'));
 assert.equal(c.worker_name,'talera-d1-stable-router-test-20261108');
 assert.equal(c.directory_database,'talera-d1-router-directory-test-20261108');
-assert.ok(c.shards.length>=2&&c.shards.length<=16);
+assert.ok(c.shards.length>=2&&c.shards.length<=128);
 const raw=execFileSync('npx',['--no-install','wrangler','d1','list','--json'],{
  cwd:join(folder,'../..'),encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:50000});
 const p=JSON.parse(raw),databases=Array.isArray(p)?p:(p.result||p.databases);

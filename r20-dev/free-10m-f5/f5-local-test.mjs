@@ -94,7 +94,7 @@ async function run(){
   assert.match(browserOpen.headers.get('set-cookie')||'',/HttpOnly; Secure/);
   assert.equal((await request('GET','/mijn-leven',{gate:false,cookie:qaCookie})).status,200,
     'Original PWA accessible to authorized browser without injecting headers into JS');
-  const fakeQa=qaCookie.replace(/.$/,'0');
+  const fakeQa=qaCookie.slice(0,-1)+(qaCookie.endsWith('0')?'1':'0');
   assert.equal((await request('GET','/mijn-leven',{gate:false,cookie:fakeQa})).status,403,
     'A modified QA cookie must not unlock test PWA');
   const shell=await request('GET','/mijn-leven');

@@ -43,7 +43,7 @@ for(const entries of snapshots){
 }
 const stable=[...byPass[0]].filter(([key,entry])=>byPass[1].get(key)?.body===entry.body);
 assert.ok(stable.length>=3,'Not enough stable public code blocks: refuse unsafe build');
-rmSync(STATIC,{recursive:true,force:true});mkdirSync(path.join(STATIC,'assets'),{recursive:true});
+rmSync(STATIC,{recursive:true,force:true});mkdirSync(path.join(STATIC,'__talera_free','assets'),{recursive:true});
 mkdirSync(GENERATED,{recursive:true});
 // Keep anonymous reference HTML in temporary build output for parity tests only.
 for(const {route,html} of snapshots[0]){
@@ -52,7 +52,7 @@ for(const {route,html} of snapshots[0]){
 }
 const approved=[];
 for(const [key,{body}] of stable){
- writeFileSync(path.join(STATIC,'assets',key),body,'utf8');
+ writeFileSync(path.join(STATIC,'__talera_free','assets',key),body,'utf8');
  approved.push(key);
 }
 const headers='/__talera_free/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff\n';

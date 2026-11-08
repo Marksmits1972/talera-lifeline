@@ -1,4 +1,4 @@
-import {getAccountBirthDate,putAccountBirthDate} from './free-account-home.mjs';
+import {getAccountBirthDate,putAccountBirthDate} from './free-account-router.mjs';
 /* TALERA | account birth date + timeline anchors, test-only Worker.
  * Service proxy preserves the entire approved TALERA implementation unchanged.
  * Sole persistent new data: private account_id -> ISO birth_date in dedicated D1.

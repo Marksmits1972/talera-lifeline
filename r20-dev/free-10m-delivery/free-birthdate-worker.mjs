@@ -188,7 +188,10 @@ async function me(req,env){
  const upstream=await env.TALERA_BASE.fetch(req);
  if(!upstream.ok)return upstream;
  let data;try{data=await upstream.clone().json()}catch{return upstream}
- if(data?.account?.id)data.account.birthDate=await readBirth(data.account.id,env);
+ if(data?.account?.id){
+  try{data.account.birthDate=await readBirth(data.account.id,env)}
+  catch{return json({error:'De accountopslag is tijdelijk niet bereikbaar. Je gegevens blijven bewaard.'},503)}
+ }
  const headers=new Headers(upstream.headers);
  for(const k of ['content-length','content-encoding','etag'])headers.delete(k);
  headers.set('cache-control','no-store');
@@ -197,7 +200,10 @@ async function me(req,env){
 async function birthProfile(req,env){
  const acc=await sessionAccount(req,env);
  if(!acc)return json({error:'Meld je aan bij TALERA.'},401);
- if(req.method==='GET')return json({birthDate:await readBirth(acc.id,env)});
+ if(req.method==='GET'){
+  try{return json({birthDate:await readBirth(acc.id,env)})}
+  catch{return json({error:'De accountopslag is tijdelijk niet bereikbaar. Je gegevens blijven bewaard.'},503)}
+ }
  if(req.method!=='POST')return json({error:'Methode niet toegestaan.'},405);
  if(!sameOrigin(req))return json({error:'Ongeldige herkomst.'},403);
  let data;try{data=await readBody(req)}catch{return json({error:'Ongeldige aanvraag.'},400)}
@@ -241,7 +247,11 @@ async function page(req,env){
  const path=new URL(req.url).pathname;
  if(path==='/mijn-leven'||path==='/present'){
   const acc=await sessionAccount(req,env);
-  const dob=acc?await readBirth(acc.id,env):null;
+  let dob=null;
+  if(acc){
+   try{dob=await readBirth(acc.id,env)}
+   catch{return new Response('Je tijdlijn kan nu niet veilig worden geladen. Probeer het later opnieuw.',{status:503,headers:{'cache-control':'no-store','content-type':'text/plain; charset=utf-8'}})}
+  }
   if(dob)html=path==='/present'?personalizePresent(html,dob):personalizeHome(html,dob);
  }
  // Account enhancement is independent of the recorder, player and all other UI.

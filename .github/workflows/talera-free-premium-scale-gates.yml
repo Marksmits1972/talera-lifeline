@@ -1,0 +1,51 @@
+name: TALERA - Free 10M and Premium 1M separate preflight (not load)
+
+on:
+  push:
+    branches: [feature/free-premium-scale-gates-20261108]
+    paths:
+      - 'r20-dev/free-premium-scale-20261108/**'
+      - '.github/workflows/talera-free-premium-scale-gates.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline_workload_math:
+    name: OFFLINE model only - no million real sessions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check model code
+        run: |
+          node --check r20-dev/free-premium-scale-20261108/scale-model.mjs
+          node --check r20-dev/free-premium-scale-20261108/scale-model.test.mjs
+          node --check r20-dev/free-premium-scale-20261108/run-offline.mjs
+          node --check r20-dev/free-premium-scale-20261108/public-readonly-smoke.mjs
+      - name: Run separate 10M Free and 1M Premium math assertions
+        run: node --test r20-dev/free-premium-scale-20261108/scale-model.test.mjs
+      - name: Generate explicit assumptions and NOT PROVEN verdict
+        run: node r20-dev/free-premium-scale-20261108/run-offline.mjs
+      - name: Archive offline scenario only
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-premium-offline-envelope
+          path: r20-dev/free-premium-scale-20261108/results-offline.json
+          retention-days: 14
+
+  anonymous_three_gets:
+    name: 3 anonymous GETs only - existing TALERA preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Three public GETs, no accounts, no writes, NO load
+        run: node r20-dev/free-premium-scale-20261108/public-readonly-smoke.mjs

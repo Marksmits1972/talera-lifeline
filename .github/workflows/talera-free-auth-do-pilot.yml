@@ -1,0 +1,44 @@
+name: TALERA Free 10M - isolated account and login scale architecture
+
+on:
+  push:
+    branches: [feature/free-10m-auth-do-pilot-20261108]
+    paths:
+      - 'r20-dev/free-10m-auth-pilot/**'
+      - '.github/workflows/talera-free-auth-do-pilot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verified_free_auth_staging:
+    name: D1-free Free authentication - synthetic local workerd only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Validate syntax and original credential constraints
+        run: |
+          node --check r20-dev/free-10m-auth-pilot/auth-util.mjs
+          node --check r20-dev/free-10m-auth-pilot/auth-objects.mjs
+          node --check r20-dev/free-10m-auth-pilot/auth-pilot-worker.mjs
+          node --check r20-dev/free-10m-auth-pilot/auth-local-test.mjs
+          node --test r20-dev/free-10m-auth-pilot/auth-util.test.mjs r20-dev/free-10m-auth-pilot/legacy-migration-preflight.test.mjs
+      - name: Install local Cloudflare runtime
+        run: npm ci
+      - name: Verify actual Workers/Durable Objects compilation WITHOUT deployment
+        run: npx wrangler deploy --dry-run --config r20-dev/free-10m-auth-pilot/wrangler.jsonc --outdir .talera-free-auth-build-only
+      - name: Start local Cloudflare runtime; register, login, revoke and restart only fake accounts
+        run: node r20-dev/free-10m-auth-pilot/auth-local-test.mjs
+      - name: Archive synthetic results only
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-auth-do-local-staging-results
+          path: r20-dev/free-10m-auth-pilot/generated/auth-results.json
+          retention-days: 14

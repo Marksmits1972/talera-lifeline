@@ -1,0 +1,42 @@
+{
+  "name": "talera-free-auth-do-local-pilot-uncreated-20261108",
+  "main": "./auth-pilot-worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTH_ACCOUNTS",
+        "class_name": "FreeAuthAccount"
+      },
+      {
+        "name": "AUTH_EMAILS",
+        "class_name": "FreeAuthEmail"
+      },
+      {
+        "name": "AUTH_HANDLES",
+        "class_name": "FreeAuthHandle"
+      },
+      {
+        "name": "AUTH_SESSIONS",
+        "class_name": "FreeAuthSession"
+      },
+      {
+        "name": "AUTH_RATES",
+        "class_name": "FreeAuthRate"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "free-auth-local-v1",
+      "new_sqlite_classes": [
+        "FreeAuthAccount",
+        "FreeAuthEmail",
+        "FreeAuthHandle",
+        "FreeAuthSession",
+        "FreeAuthRate"
+      ]
+    }
+  ]
+}

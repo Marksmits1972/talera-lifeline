@@ -1,0 +1,45 @@
+{
+  "name": "talera-free-auth-do-staging-20261108",
+  "main": "./auth-pilot-worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTH_ACCOUNTS",
+        "class_name": "FreeAuthAccount"
+      },
+      {
+        "name": "AUTH_EMAILS",
+        "class_name": "FreeAuthEmail"
+      },
+      {
+        "name": "AUTH_HANDLES",
+        "class_name": "FreeAuthHandle"
+      },
+      {
+        "name": "AUTH_SESSIONS",
+        "class_name": "FreeAuthSession"
+      },
+      {
+        "name": "AUTH_RATES",
+        "class_name": "FreeAuthRate"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "free-auth-local-v1",
+      "new_sqlite_classes": [
+        "FreeAuthAccount",
+        "FreeAuthEmail",
+        "FreeAuthHandle",
+        "FreeAuthSession",
+        "FreeAuthRate"
+      ]
+    }
+  ],
+  "vars": {
+    "AUTH_STORAGE_JURISDICTION": "eu"
+  }
+}

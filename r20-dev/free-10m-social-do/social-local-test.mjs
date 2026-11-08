@@ -14,6 +14,7 @@ const generated=path.join(dir,'generated');
 mkdirSync(generated,{recursive:true});
 const cfg=path.join(generated,'social-local.jsonc');
 config.main='../social-worker.mjs';config.name='talera-social-local-proof';
+config.vars={SOCIAL_STORAGE_JURISDICTION:'local-test'};
 writeFileSync(cfg,JSON.stringify(config));
 const gatewayKey='d'.repeat(64),authKey='SYNTHETIC_SOCIAL_SIGNING_TEST_20261108_NOT_FOR_LIVE';
 const port=8798,root='http://127.0.0.1:'+port;

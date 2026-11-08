@@ -1,0 +1,46 @@
+name: TALERA Free - per-account DO storage, no shared birthdate D1
+
+on:
+  push:
+    branches: [feature/free-10m-account-home-sharding-20261108]
+    paths:
+      - 'r20-dev/free-10m-delivery/**'
+      - '.github/workflows/talera-free-account-home.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline_and_local:
+    name: Free static + per-account Durable Objects (NO LIVE writes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Assemble static code from two anonymous reference snapshots
+        run: node r20-dev/free-10m-delivery/build.mjs
+      - name: Validate current existing Free account scripts and new per-user router
+        run: |
+          node --check r20-dev/free-10m-delivery/free-birthdate-worker.mjs
+          node --check r20-dev/free-10m-delivery/free-account-router.mjs
+          node --test r20-dev/free-10m-delivery/free-delivery.test.mjs r20-dev/free-10m-delivery/free-account-router.test.mjs
+      - name: Install pinned Cloudflare local test runtime
+        run: npm ci
+      - name: Compile real Cloudflare account/DO plus Static Assets without deployment
+        run: npx wrangler deploy --dry-run --config r20-dev/free-10m-delivery/wrangler.jsonc --outdir .talera-free-account-compile
+      - name: Run local 64-account SQL-backed DO persistence and privacy test
+        run: node r20-dev/free-10m-delivery/free-account-local-test.mjs
+      - name: Archive only synthetic test outputs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-per-account-do-local-validation
+          path: |
+            r20-dev/free-10m-delivery/generated/build-report.json
+            r20-dev/free-10m-delivery/generated/account-home-run.json
+          retention-days: 14

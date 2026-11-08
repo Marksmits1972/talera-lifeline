@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {approvedAssets,anonymousShells} from './generated/approved-assets.mjs';
 import {assetizeHtml,candidates,eligible,PUBLIC_PATHS} from './rewrite.mjs';
-import freeWorker from './free-worker.mjs';
+import freeWorker from './free-worker-core.mjs';
 const dir=path.dirname(fileURLToPath(import.meta.url));
 const allowed=new Set(approvedAssets);
 const read=route=>readFileSync(path.join(dir,'generated','reference-'+route+'.html'),'utf8');
@@ -108,7 +108,7 @@ test('Authenticated request with private date still cannot cache its HTML',async
     return Response.json({account:{id:'fake-test-account'}});
    return new Response(source,{headers:{'content-type':'text/html'}});
   }},
-  BIRTH_DB:{prepare:()=>({bind:()=>({first:async()=>({birth_date:'2000-02-29'})})})}
+  FREE_ACCOUNT:{idFromName:name=>name,get:id=>({getBirthDate:async()=> '2000-02-29'})}
  };
  const page=await freeWorker.fetch(new Request('https://fake.talera.test/present',{headers:{cookie:'talera_sid=fake'}}),env,{});
  assert.match(page.headers.get('cache-control'),/private, no-store/);
@@ -169,4 +169,31 @@ test('Any Cookie, Authorization or URL query bypasses shared Free HTML shell',as
  }
  assert.equal(staticCalls,0,'Privileged paths must not fetch public HTML shell');
  assert.ok(originCalls>=3,'Personal requests keep original account Worker path');
+});
+
+
+test('Storage outage fails closed: no demo birthdate is silently substituted for a signed-in Free user',async()=>{
+ const html=read('present');
+ const env={
+  TALERA_BASE:{fetch:async req=>{
+   const route=new URL(req.url).pathname;
+   if(route==='/api/me')return Response.json({account:{id:'demo-failure'}});
+   return new Response(html,{headers:{'content-type':'text/html'}});
+  }},
+  FREE_ACCOUNT:{
+   idFromName:name=>name,
+   get:()=>({getBirthDate:async()=>{throw Error('synthetic DO outage')}})
+  }
+ };
+ const cookie={cookie:'talera_sid=synthetic'};
+ const requests=[
+  new Request('https://fake.talera.test/api/profile/birthdate',{headers:cookie}),
+  new Request('https://fake.talera.test/api/me',{headers:cookie}),
+  new Request('https://fake.talera.test/present',{headers:cookie})
+ ];
+ for(const request of requests){
+  const response=await freeWorker.fetch(request,env,{});
+  assert.equal(response.status,503,'Must not fabricate empty account data when Durable Object unavailable');
+  assert.match(response.headers.get('cache-control')||'',/no-store/);
+ }
 });

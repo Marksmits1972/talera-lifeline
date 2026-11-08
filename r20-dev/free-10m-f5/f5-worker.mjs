@@ -7,7 +7,10 @@ import {
   readSessionCookie,shaHex,safeEqualHex,json,sameOrigin,body
 } from '../free-10m-auth-pilot/auth-util.mjs';
 import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
-import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
+import {approvedAssets,anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
+import {assetizeHtml} from '../free-10m-delivery/rewrite.mjs';
+import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birthdate-worker.mjs';
+import {referencePages,verifiedPublicScripts} from './generated/public-template-map.mjs';
 
 export {
   FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
@@ -115,15 +118,36 @@ async function socialApi(request,env){
   return socialPilot.fetch(new Request(request,{headers}),env);
 }
 async function publicPage(request,env){
-  // DO NOT display personalized timelines with anonymous HTML. A future F5
-  // step must prove the actual approved PWA UI + birthdate integration first.
-  if(request.headers.has('cookie')||request.headers.has('authorization'))
-    return new Response('Ingelogde F5-weergave nog niet vrijgegeven.',{
-      status:503,headers:{'cache-control':'private, no-store'}});
-  const pathname=new URL(request.url).pathname;
+  const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
+  if(!env.ASSETS)return deny(503,'PWA-bestanden niet beschikbaar');
+  const sessionToken=readSessionCookie(request);
+  if(sessionToken||request.headers.has('authorization')){
+    // A signed-in page must use the server-verified account and its PRIVATE DOB.
+    const actor=await sessionAccount(request,env);
+    if(!actor)return deny(401,'Sessie verlopen; meld je opnieuw aan');
+    const date=await accountHome(env,actor.id).getBirthDate();
+    if((pathname==='/mijn-leven'||pathname==='/present')&&!date)
+      return deny(503,'Geboortedatum ontbreekt; persoonlijke tijdlijn kan niet worden getoond');
+    const originalRef=referencePages[pathname];
+    if(!originalRef)return deny(503,'Originele PWA-bron ontbreekt');
+    const response=await env.ASSETS.fetch(new Request(new URL(originalRef,origin)));
+    if(!response.ok)return deny(503,'PWA-bron niet bereikbaar');
+    const original=await response.text();
+    const privateHtml=pathname==='/mijn-leven'?personalizeHome(original,date):
+      pathname==='/present'?personalizePresent(original,date):original;
+    // Refuse to show a wrong or default timeline if source markers changed.
+    if((pathname==='/mijn-leven'||pathname==='/present')&&privateHtml===original)
+      return deny(503,'De persoonlijke tijdlijn kon niet veilig worden gemaakt');
+    const converted=await assetizeHtml(privateHtml,new Set(approvedAssets));
+    return new Response(converted.html,{
+      status:200,headers:{
+        'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
+        'x-content-type-options':'nosniff','x-talera-free-f5':'personalized-durable-account'
+      }
+    });
+  }
   const asset=anonymousShells[pathname];
-  if(!asset||!env.ASSETS)return deny(503,'Anonieme PWA-shell ontbreekt');
-  const origin=new URL(request.url).origin;
+  if(!asset)return deny(503,'Anonieme PWA-shell ontbreekt');
   const r=await env.ASSETS.fetch(new Request(new URL(asset,origin)));
   if(!r.ok)return deny(503,'Anonieme PWA-shell is niet beschikbaar');
   const headers=new Headers(r.headers);
@@ -132,6 +156,18 @@ async function publicPage(request,env){
   headers.set('x-talera-free-f5','anonymous-snapshot-only');
   headers.set('x-content-type-options','nosniff');
   return new Response(r.body,{status:200,headers});
+}
+async function publicScript(request,env){
+  const pathname=new URL(request.url).pathname;
+  const file=verifiedPublicScripts[pathname];
+  if(!file||request.method!=='GET'||!env.ASSETS)
+    return deny(404,'Dit statische PWA-script is niet beschikbaar');
+  const r=await env.ASSETS.fetch(new Request(new URL(file,new URL(request.url).origin)));
+  if(!r.ok)return deny(503,'Gecontroleerd PWA-script niet bereikbaar');
+  return new Response(r.body,{status:200,headers:{
+    'content-type':'text/javascript; charset=utf-8','cache-control':'private, no-store',
+    'x-content-type-options':'nosniff'
+  }});
 }
 export default {
   async fetch(request,env){
@@ -154,6 +190,7 @@ export default {
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);
+      if(p.startsWith('/__clean/'))return publicScript(request,env);
       // No fallback to the live TALERA services; unported routes fail closed.
       return deny(404,'Niet beschikbaar in deze geïsoleerde test');
     }catch(error){

@@ -16,6 +16,11 @@
       "id": "C",
       "database_name": "talera-d1-router-shard-c-test-20261108",
       "desired_state": "standby"
+    },
+    {
+      "id": "D",
+      "database_name": "talera-d1-router-shard-d-test-20261108",
+      "desired_state": "standby"
     }
   ]
 }

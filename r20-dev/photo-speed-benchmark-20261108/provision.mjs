@@ -45,6 +45,24 @@ async function request(path,headers={}){
 const d1=await request('/d1/database/'+d1Id);
 assert.equal(d1?.name,d1Name);
 assert.equal(d1?.jurisdiction,'eu','D1 must be EU locked');
+
+async function executeIsolatedSql(sql){
+ const endpoint='https://api.cloudflare.com/client/v4/accounts/'+account+'/d1/database/'+d1Id+'/query';
+ const response=await fetch(endpoint,{
+  method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},
+  body:JSON.stringify({sql,params:[]}),signal:AbortSignal.timeout(25000)
+ });
+ const body=await response.json();
+ if(!response.ok||body.success!==true||!body.result?.[0]?.success)
+  throw Error('Unable to create dedicated EU benchmark D1 schema HTTP '+response.status);
+}
+await executeIsolatedSql('CREATE TABLE IF NOT EXISTS photo_manifest ('+
+ 'account_id TEXT NOT NULL,photo_id TEXT NOT NULL,object_key TEXT NOT NULL,'+
+ 'display_order INTEGER NOT NULL, PRIMARY KEY(account_id,photo_id))');
+await executeIsolatedSql('CREATE INDEX IF NOT EXISTS ix_photo_manifest_account_order '+
+ 'ON photo_manifest(account_id,display_order)');
+console.log('ISOLATED_EU_D1_PHOTOBAND_SCHEMA_READY',d1Name);
+
 let r2=await request('/r2/buckets/'+r2Name,{'cf-r2-jurisdiction':'eu'});
 if(!r2){
  console.log('CREATING_ISOLATED_EU_R2_BENCHMARK',r2Name);

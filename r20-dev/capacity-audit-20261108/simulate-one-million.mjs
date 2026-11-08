@@ -3,6 +3,7 @@
 // repetitions locally with in-memory mock bindings. No real registrations,
 // no database writes, no authenticated requests and no load flood.
 import assert from 'node:assert/strict';
+import {writeFileSync} from 'node:fs';
 import {performance} from 'node:perf_hooks';
 import maintenance from '../maintenance-test/talera-maintenance-worker.mjs';
 
@@ -139,4 +140,5 @@ const output={scope:'hypothetical local-only',settings,synthetic:simulation,work
   'Media delivery bitrate, caching, real video performance, upload errors and login throughput remain untested.'
  ]};
 console.log('CAPACITY_MATRIX',JSON.stringify(matrix));
+writeFileSync(new URL('./results-one-million.json',import.meta.url),JSON.stringify(output,null,2)+'\n');
 console.log('SYNTHETIC_REPORT',JSON.stringify(output));

@@ -1,5 +1,5 @@
 {
-  "name": "talera-free-f5-integrated-UNDEPLOYED",
+  "name": "talera-free-f5-integrated-undeployed",
   "main": "./f5-worker.mjs",
   "compatibility_date": "2026-09-18",
   "workers_dev": true,

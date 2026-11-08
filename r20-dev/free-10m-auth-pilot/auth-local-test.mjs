@@ -12,6 +12,7 @@ const config=JSON.parse(readFileSync(path.join(here,'wrangler.jsonc'),'utf8'));
 assert.equal(config.durable_objects.bindings.length,5);
 assert.ok(!config.d1_databases);
 config.main='../auth-local-only-harness.mjs';
+config.vars={AUTH_STORAGE_JURISDICTION:'local-test'};
 config.name='talera-auth-qa-local-only';
 writeFileSync(path.join(generated,'local.jsonc'),JSON.stringify(config));
 const command=path.resolve('node_modules/.bin/wrangler');

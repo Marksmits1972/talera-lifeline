@@ -1,11 +1,10 @@
 {
- "name": "talera-free-10m-assets-isolated-NOT-DEPLOYED",
+ "name": "talera-free-10m-assets-staging-uncreated",
  "main": "./free-worker.mjs",
  "compatibility_date": "2026-09-18",
  "workers_dev": true,
  "assets": {
   "directory": "./public",
-  "base_path": "/__talera_free",
   "binding": "ASSETS",
   "run_worker_first": ["/*","!/__talera_free/assets/*"]
  },

@@ -1,0 +1,43 @@
+name: TALERA Free F5 - isolated single-origin integration tests
+
+on:
+  push:
+    branches: [feature/free-10m-f5-integrated-staging-20261108]
+    paths:
+      - 'r20-dev/free-10m-f5/**'
+      - '.github/workflows/talera-free-f5-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  f5_isolated_local:
+    name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install existing locked Cloudflare Wrangler
+        run: npm ci
+      - name: Build approved public code using only six anonymous GETs
+        run: node r20-dev/free-10m-delivery/build.mjs
+      - name: Verify F5 Worker and tests parse
+        run: |
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node --check r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Verify Cloudflare compilation without deployment
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
+      - name: Execute synthetic auth + private DOB + social privacy and persistence
+        run: node r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Archive factual test result only
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-f5-local-integration
+          path: r20-dev/free-10m-f5/generated/f5-results.json
+          retention-days: 14

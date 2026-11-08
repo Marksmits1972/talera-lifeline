@@ -21,7 +21,7 @@ if(new Set(allNames).size!==allNames.length)throw Error('Duplicate database name
 const shardIds=catalog.shards.map(x=>x.id);
 if(new Set(shardIds).size!==shardIds.length)throw Error('Duplicate shard ID');
 for(const entry of catalog.shards){
- if(!safeShard(entry.id)||!safeDatabase(entry.database_name))throw Error('Invalid shard entry');
+ if(!safeShard(entry.id)||!safeDatabase(entry.database_name)||!['active','standby'].includes(entry.desired_state))throw Error('Invalid shard entry');
 }
 const run=(...args)=>execFileSync('npx',['--no-install','wrangler',...args],{
  cwd:resolve(folder,'../..'),encoding:'utf8',timeout:120000,
@@ -71,16 +71,24 @@ if(phase==='prepare'){
  }
  run('d1','execute',catalog.directory_database,'--remote',
    '--file',join(folder,'sql/001-directory.sql'),'--yes');
+ run('d1','execute',catalog.directory_database,'--remote',
+   '--file',join(folder,'sql/002-capacity-events.sql'),'--yes');
  console.log('DIRECTORY_SCHEMA_READY');
  console.log('PROVISION_PREPARED',catalog.worker_name,bindings.map(x=>x.binding).join(','));
 }
 if(phase==='activate'){
  for(const item of catalog.shards){
   const id=item.id;
-  // After deploy, set new write shard ACTIVE for future synthetic accounts only.
-  // Existing account_shard rows remain pinned for their lifetime.
-  const sql="INSERT OR IGNORE INTO shards(shard_id,state) VALUES ('"+id+"','active')";
+  const initial=item.desired_state==='active'?'active':'disabled';
+  // Pre-provision cold standby without accepting any new assignments yet.
+  const sql="INSERT OR IGNORE INTO shards(shard_id,state) VALUES ('"+id+"','"+initial+"')";
   run('d1','execute',catalog.directory_database,'--remote','--command',sql,'--yes');
-  console.log('STAGING_SHARD_ENABLED',id);
+  // Only explicitly wanted ACTIVE shards are promoted at deployment time.
+  // Existing assignments cannot be changed by this administration step.
+  if(item.desired_state==='active'){
+   run('d1','execute',catalog.directory_database,'--remote',
+      '--command',"UPDATE shards SET state='active' WHERE shard_id='"+id+"' AND state='disabled'",'--yes');
+  }
+  console.log('STAGING_SHARD_CATALOG',id,item.desired_state);
  }
 }

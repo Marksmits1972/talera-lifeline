@@ -81,3 +81,30 @@ Voor daadwerkelijk privé materiaal mag 'direct uit R2' NIET betekenen dat de bu
 Cloudflare-documentatie: https://developers.cloudflare.com/workers/platform/storage-options/ (D1 vs DO), https://developers.cloudflare.com/r2/buckets/public-buckets/ (R2/CDN, let op private toegang) en https://developers.cloudflare.com/workers/cache/ (Worker-respons-caching).
 
 **Privacy/release:** alleen nieuwe geïsoleerde EU-D1 en EU-R2-resources plus een eigen benchmark-Durable Object; geen productie-Wrangler, bestaande PWA, accounts, echte herinneringen, video-/audiobestanden of officiële TALERA-link gewijzigd.
+
+## Aanvullende codecontrole — daadwerkelijke beste TALERA-PWA (8 november 2026)
+
+**Status: daadwerkelijk gepubliceerde Cloudflare-code gecontroleerd, maar geen iPhone-netwerkmeting uitgevoerd.** De officiële test-PWA 'talera-account-birthdate-test-20261107' roept via servicebindings onder meer 'talera-pwa-v56-whatsapp-foto-social-20261031' aan. Deze heeft D1 en R2 beschikbaar, maar niet alle fotobanden halen hun beelden op dezelfde manier op.
+
+### A. Lokale herinneringen: fotoband van de telefoon zelf
+
+- In de gedeployde code bestaat window.TaleraMemories met 'localOnly:true'. Verhalen en originele mediablobs worden in IndexedDB ('talera-lifeline-dev-local-v1', object stores 'stories' en 'files') opgeslagen, in een gezamenlijke transactie.
+- Grote foto's kunnen apart als kleinere telefoonweergave in dezelfde lokale opslag worden bewaard; de originelen blijven behouden.
+- De browser maakt vanuit de lokaal bewaarde foto een blob-URL. De V13-fotoband leest de lijst al uit het geheugen, gebruikt 11 herbruikbare pagina-elementen en een begrensde foto-voorlaadcache. **Een swipe is dus geen nieuwe D1-query per foto.**
+- **Apart belangrijk risico voor de toekomstige livegang:** de lokale opslagcode heeft 'cloudBackup:false' en 'localOnly:true'. Daarmee is geen automatische herstelbare cloudkopie van deze lokaal opgeslagen herinneringen bewezen. Opslag uitsluitend op de telefoon is niet voldoende om gegevensbehoud bij verlies, schade of wissen te garanderen. Dit verdient een afzonderlijke veilige back-up- en hersteltest.
+
+### B. Via TALERA-server opgeslagen herinneringen
+
+- De tijdlijn vraagt per verhaal één manifest met de media-ID's op via '/api/linked/stories/:storyId'.
+- De fotoband haalt daarna maximaal twaalf beeldbestanden parallel op, elk via '/api/linked/stories/:storyId/media/:photoId'. De proxy vraagt daarvoor de server-API aan. Elke download wordt daarna een lokale blob-URL. **Een swipe tussen al geladen beelden vraagt niet opnieuw D1.**
+- In de gedeployde servercode zoekt 'getPrivateMedia' voor ieder afzonderlijk fotobestand eerst via 'authorizedStory' het verhaal en de geldige toegang in D1 op, daarna in 'story_media' de foto-ID en de R2-objectkey. Vervolgens wordt de foto uit R2 gelezen. In dit normale pad zijn dat **twee D1-queries per eerste fotodownload**, exclusief de initiële manifestquery. Beveiliging mag niet zomaar worden verwijderd.
+- Sommige gedeelde/sociale foto's controleren ook eigenaar- en deelrechten. Die controles moeten blijven werken, inclusief intrekking.
+- De code laadt andere herinneringen na elkaar op de achtergrond; met duizenden verhalen kan dat bij heropenen extra tijd kosten, ook al worden foto's van één verhaal onderling parallel opgevraagd.
+
+### Beslissing voor de toekomst
+
+**D1 alleen vervangen door Durable Objects zal de fotoband niet aantoonbaar sneller maken.** De huidige swipe-motor is al gericht op hergebruik van beelden. Potentiële winst zit in minder initiële cloudverzoeken en minder herhaalde metadatazoekacties per gedownloade foto, zonder toegangscontrole te verzwakken.
+
+Een toekomstige proef kan één geautoriseerd manifest met kortlevende, accountgebonden mediatoegang onderzoeken. Vermijd publiek toegankelijke of langdurige R2-links; onderzoek expliciet rechtencontrole en intrekking. Geef voorrang aan metingen met echte iPhone, netwerk, afbeeldingen en gecachte/ongecachete media. **Geen wijzigingen aan bestaande TALERA-code of privédata.**
+
+**Bewijs:** read-only broncontrole van de reeds gedeployde Cloudflare Workers, inclusief servicebindings en de functies 'proxyLinkedMemory', 'getPrivateMedia', 'authorizedStory', 'MEMORY_STORE_SCRIPT' en de V13-fotoband. De eerdere benchmark vergelijkt hypothetische API-paden en meet niet rechtstreeks de huidige iPhone-PWA.

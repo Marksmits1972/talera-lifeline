@@ -87,3 +87,22 @@ jobs:
           name: talera-premium-bounded-local-runtime
           path: r20-dev/free-premium-scale-20261108/results-local-runtime.json
           retention-days: 14
+
+
+  free_real_delivery_audit:
+    name: Free REAL anonymous code delivery (3 GETs, no load)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read three actual Free PWA pages and cache/inline-code properties
+        run: node r20-dev/free-premium-scale-20261108/free-delivery-audit.mjs
+      - name: Archive actual public delivery metrics (no private content)
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-real-delivery-audit
+          path: r20-dev/free-premium-scale-20261108/free-delivery-audit-results.json
+          retention-days: 14

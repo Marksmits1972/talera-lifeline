@@ -1,0 +1,35 @@
+{
+  "name": "talera-free-f5-combined-stage-20261108",
+  "main": "./f5-worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../free-10m-delivery/public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/*", "!/__talera_free/assets/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      {"name":"AUTH_ACCOUNTS","class_name":"FreeAuthAccount"},
+      {"name":"AUTH_EMAILS","class_name":"FreeAuthEmail"},
+      {"name":"AUTH_HANDLES","class_name":"FreeAuthHandle"},
+      {"name":"AUTH_SESSIONS","class_name":"FreeAuthSession"},
+      {"name":"AUTH_RATES","class_name":"FreeAuthRate"},
+      {"name":"SOCIAL_MEMORY","class_name":"FreeSocialMemory"},
+      {"name":"SOCIAL_POINTER","class_name":"FreeSocialSharePointer"}
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "free-f5-eu-stage-v1",
+      "new_sqlite_classes": [
+        "FreeAuthAccount","FreeAuthEmail","FreeAuthHandle",
+        "FreeAuthSession","FreeAuthRate","FreeSocialMemory","FreeSocialSharePointer"
+      ]
+    }
+  ],
+  "vars": {
+    "AUTH_STORAGE_JURISDICTION": "eu",
+    "SOCIAL_STORAGE_JURISDICTION": "eu"
+  }
+}

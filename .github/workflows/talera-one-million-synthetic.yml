@@ -1,0 +1,32 @@
+name: TALERA - fictieve miljoen-gebruikers-capaciteitstest (geen live belasting)
+on:
+  push:
+    branches: [feature/synthetic-capacity-1m-audit-20261108]
+    paths:
+      - r20-dev/capacity-audit-20261108/**
+      - .github/workflows/talera-one-million-synthetic.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic_offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate offline synthetic workload model
+        run: |
+          node --check r20-dev/capacity-audit-20261108/simulate-one-million.mjs
+      - name: Three read-only anonymous pages + local Worker replay and 1M synthetic users
+        run: |
+          node r20-dev/capacity-audit-20261108/simulate-one-million.mjs
+      - name: Archive synthetic metrics (no private data)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-one-million-synthetic-results
+          path: r20-dev/capacity-audit-20261108/results-one-million.json
+          retention-days: 14

@@ -26,6 +26,55 @@ const encoder=new TextEncoder();
 function deny(status=403,message='Deze testomgeving is niet toegankelijk'){
   return json({ok:false,error:message},status);
 }
+const QA_COOKIE='talera_f5_access';
+async function qaSignature(env,text){
+  const key=await crypto.subtle.importKey('raw',encoder.encode(env.STAGING_F5_KEY),
+    {name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const bytes=await crypto.subtle.sign('HMAC',key,encoder.encode(text));
+  return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function hasQaAccess(request,env){
+  // CLI/CI uses a staging-only request header; browsers use a short-lived
+  // signed HttpOnly cookie and need NEVER expose secrets to front-end scripts.
+  if(safeEqualHex(request.headers.get('x-talera-f5-key')||'',env.STAGING_F5_KEY))
+    return true;
+  const cookie=request.headers.get('cookie')||'';
+  const tokens=[...cookie.matchAll(/(?:^|;\\s*)talera_f5_access=(\\d{13})\\.([a-f0-9]{32})\\.([a-f0-9]{64})(?=;|$)/g)];
+  if(tokens.length!==1)return false;
+  const [,expiry,nonce,signature]=tokens[0],now=Date.now(),expires=Number(expiry);
+  if(!Number.isSafeInteger(expires)||expires<=now||expires>now+30*60000)return false;
+  return safeEqualHex(signature,await qaSignature(env,expiry+'.'+nonce));
+}
+function qaEntry(){
+  const html='<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>TALERA Free besloten test</title><body style="max-width:480px;margin:12vh auto;padding:24px;font-family:system-ui">'+
+    '<h1>TALERA Free — testversie</h1><p>Alleen voor de afgesloten test. Geen echte accounts gebruiken.</p>'+
+    '<form action="/__f5/entry" method="post"><label>Testtoegang <input type="password" name="key" autocomplete="off" required maxlength="64" style="display:block;width:100%;padding:12px;margin:12px 0"></label>'+
+    '<button type="submit" style="padding:12px 20px">Open testversie</button></form></body></html>';
+  return new Response(html,{status:200,headers:{
+    'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
+    'x-content-type-options':'nosniff','referrer-policy':'no-referrer'
+  }});
+}
+async function authorizeQaBrowser(request,env){
+  if(!sameOrigin(request))return deny(403,'Ongeldige herkomst');
+  const len=Number(request.headers.get('content-length')||0);
+  if(len>1024)return deny(400,'Ongeldige testaanvraag');
+  let form;
+  try{form=await request.formData()}catch{return deny(400,'Ongeldige testaanvraag')}
+  const secret=form.get('key');
+  if(!safeEqualHex(typeof secret==='string'?secret:'',env.STAGING_F5_KEY))
+    return deny(403,'Geen toegang');
+  const expiry=String(Date.now()+30*60000);
+  const nonce=[...crypto.getRandomValues(new Uint8Array(16))]
+    .map(b=>b.toString(16).padStart(2,'0')).join('');
+  const proof=await qaSignature(env,expiry+'.'+nonce);
+  const cookie=QA_COOKIE+'='+expiry+'.'+nonce+'.'+proof+
+    '; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800';
+  return new Response(null,{status:303,headers:{
+    location:'/mijn-leven','set-cookie':cookie,'cache-control':'private, no-store'
+  }});
+}
 function ns(env,name){
   const b=env[name];
   if(!b?.get||!b?.idFromName)throw Error('F5_AUTH_BINDING_MISSING');
@@ -182,8 +231,9 @@ export default {
        typeof env.AUTH_NAMESPACE_KEY!=='string'||env.AUTH_NAMESPACE_KEY.length<40||
        typeof env.DEMO_IDENTITY_KEY!=='string'||env.DEMO_IDENTITY_KEY.length<40)
       return deny(503,'F5-testomgeving niet correct ingericht');
-    if(!safeEqualHex(request.headers.get('x-talera-f5-key')||'',env.STAGING_F5_KEY))
-      return deny();
+    if(p==='/__f5/entry'&&m==='GET')return qaEntry();
+    if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
+    if(!await hasQaAccess(request,env))return deny();
     if(url.search)return deny(404,'Niet gevonden');
     try{
       if(AUTH_PATHS.has(p))return accountApi(request,env);

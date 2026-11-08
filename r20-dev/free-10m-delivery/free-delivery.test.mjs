@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {approvedAssets} from './generated/approved-assets.mjs';
+import {approvedAssets,anonymousShells} from './generated/approved-assets.mjs';
 import {assetizeHtml,candidates,eligible,PUBLIC_PATHS} from './rewrite.mjs';
 import freeWorker from './free-worker.mjs';
 const dir=path.dirname(fileURLToPath(import.meta.url));
@@ -84,7 +84,7 @@ test('Existing TALERA auth and private API stay untouched, HTML remains no-store
  };
  const userHtml=src.replace('</head>','<meta name="account-personal-test" content="NOT_PUBLIC_A_123"></head>');
  const fakeEnv={...env,TALERA_BASE:{fetch:async()=>{upstreamCalls++;return new Response(userHtml,{headers:{'content-type':'text/html','cache-control':'no-store'}})}}};
- const page=await freeWorker.fetch(new Request('https://fake.talera.test/mijn-leven'),fakeEnv,{});
+ const page=await freeWorker.fetch(new Request('https://fake.talera.test/mijn-leven?private=1'),fakeEnv,{});
  const html=await page.text();
  assert.equal(page.status,200);
  assert.match(page.headers.get('cache-control'),/no-store/);
@@ -115,4 +115,58 @@ test('Authenticated request with private date still cannot cache its HTML',async
  const html=await page.text();
  assert.ok(html.includes('new Date(2000,1,29)'),'Personal DOB replaced inside the correct timeline');
  assert.ok(!html.includes('src="/__talera_free/assets/"'));
+});
+
+
+test('Verified anonymous shells skip all account Workers and D1 without caching personal HTML',async()=>{
+ const routes=Object.keys(anonymousShells);
+ assert.ok(routes.length>0,'At least one byte-identical anonymous shell expected');
+ assert.ok(routes.every(route=>['/mijn-leven','/present','/tell'].includes(route)));
+ for(const route of routes){
+  let originCalls=0;
+  let assetCalls=0;
+  const env={
+   TALERA_BASE:{fetch:async()=>{originCalls++;return new Response('ORIGIN_IS_PRIVATE')}},
+   ASSETS:{fetch:async req=>{
+    assetCalls++;
+    const pathname=new URL(req.url).pathname;
+    assert.equal(pathname,anonymousShells[route],'Must read ONLY exactly whitelisted shell');
+    const local=path.join(dir,'public',pathname.slice(1));
+    return new Response(readFileSync(local),{headers:{'content-type':'text/html','cache-control':'public, max-age=31536000, immutable'}});
+   }}
+  };
+  const response=await freeWorker.fetch(new Request('https://fake.talera.test'+route),env,{});
+  assert.equal(response.status,200);
+  assert.equal(response.headers.get('cache-control'),'private, no-store','Browser HTML cannot be cached across login');
+  assert.equal(response.headers.get('x-talera-free-shared-code'),'edge-anonymous-shell');
+  const content=await response.text();
+  assert.ok(content.length<read(route.slice(1)).length);
+  assert.equal(originCalls,0,'No per-user database or origin request for anonymous Free');
+  assert.equal(assetCalls,1);
+ }
+});
+test('Any Cookie, Authorization or URL query bypasses shared Free HTML shell',async()=>{
+ const route=Object.keys(anonymousShells)[0];
+ assert.ok(route);
+ let originCalls=0,staticCalls=0;
+ const env={
+  TALERA_BASE:{fetch:async req=>{
+   originCalls++;
+   if(new URL(req.url).pathname==='/api/me')return Response.json({account:null},{status:401});
+   return new Response(read(route.slice(1)),{headers:{'content-type':'text/html'}});
+  }},
+  ASSETS:{fetch:async()=>{staticCalls++;return new Response('FORBIDDEN_SHARED_RESPONSE')}}
+ };
+ for(const request of [
+  new Request('https://fake.talera.test'+route,{headers:{cookie:'talera_sid=dummy'}}),
+  new Request('https://fake.talera.test'+route,{headers:{authorization:'Bearer private'}}),
+  new Request('https://fake.talera.test'+route+'?talera_invite=aaa')
+ ]){
+  const res=await freeWorker.fetch(request,env,{});
+  assert.notEqual(res.headers.get('x-talera-free-shared-code'),'edge-anonymous-shell');
+  assert.match(res.headers.get('cache-control'),/no-store/);
+  assert.ok((await res.text()).includes('talera'));
+ }
+ assert.equal(staticCalls,0,'Privileged paths must not fetch public HTML shell');
+ assert.ok(originCalls>=3,'Personal requests keep original account Worker path');
 });

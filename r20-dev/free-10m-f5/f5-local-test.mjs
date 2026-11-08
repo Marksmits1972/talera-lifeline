@@ -15,7 +15,7 @@ const f5='1'.repeat(64),auth='2'.repeat(64),social='3'.repeat(64);
 const authNamespace='SYNTHETIC_F5_AUTH_NAMESPACE_NOT_PRODUCTION_20261108';
 const signatureSecret='SYNTHETIC_F5_SOCIAL_IDENTITY_NOT_PRODUCTION_20261108';
 const users=[
- {email:'f5-owner@example.invalid',username:'f5-owner',displayName:'F5 fictieve eigenaar',password:'Fake_Test_Password_1001',birthDate:'1976-09-06'},
+ {email:'f5-owner@example.invalid',username:'f5-owner',displayName:'F5 fictieve eigenaar',password:'Fake_Test_Password_1001',birthDate:'1974-04-02'},
  {email:'f5-reader@example.invalid',username:'f5-reader',displayName:'F5 fictieve lezer',password:'Fake_Test_Password_1002',birthDate:'1980-01-03'},
  {email:'f5-other@example.invalid',username:'f5-other',displayName:'F5 fictieve derde',password:'Fake_Test_Password_1003',birthDate:'1995-12-31'}
 ];
@@ -95,8 +95,19 @@ async function run(){
     identities.push({id:r.data.account.id,cookie:cookieOf(r)});
   }
   assert.equal(new Set(identities.map(x=>x.id)).size,3);
-  assert.equal((await request('GET','/mijn-leven',{cookie:identities[0].cookie})).status,503,
-    'Never show anonymous timeline to a signed-in user');
+  const signedHome=await request('GET','/mijn-leven',{cookie:identities[0].cookie});
+  assert.equal(signedHome.status,200,'Registered user gets a separate private timeline');
+  assert.equal(signedHome.stage,'personalized-durable-account');
+  assert.match(String(signedHome.data),/let current=1974;/,
+    'Birth-year must come from the individual account DO, not the demo shell');
+  const signedPresent=await request('GET','/present',{cookie:identities[0].cookie});
+  assert.equal(signedPresent.status,200,'Presentation must get its own private timeline');
+  assert.equal(signedPresent.stage,'personalized-durable-account');
+  assert.match(String(signedPresent.data),/const LIFE_START = new Date\(1974,3,2\)\.getTime\(\);/,
+    'Presentation start must match account private birthdate');
+  const publicScript=await request('GET','/__clean/menu-integration.mjs');
+  assert.equal(publicScript.status,200,'Original TALERA menu script must load from approved snapshot');
+  assert.ok(String(publicScript.data).length>100,'Actual menu integration JavaScript is expected');
   for(let i=0;i<3;i++){
     const res=await request('GET','/api/me',{cookie:identities[i].cookie});
     assert.equal(res.status,200);
@@ -104,10 +115,13 @@ async function run(){
     assert.equal(res.data.account.birthDate,users[i].birthDate);
   }
   const changed=await request('POST','/api/profile/birthdate',{
-    cookie:identities[0].cookie,body:{birthDate:'1976-09-07'}});
+    cookie:identities[0].cookie,body:{birthDate:'1974-04-03'}});
   assert.equal(changed.status,200);
   assert.equal((await request('GET','/api/me',{cookie:identities[0].cookie}))
-    .data.account.birthDate,'1976-09-07');
+    .data.account.birthDate,'1974-04-03');
+  assert.match(String((await request('GET','/present',{cookie:identities[0].cookie})).data),
+    /const LIFE_START = new Date\(1974,3,3\)\.getTime\(\);/,
+    'Changing private account birthdate updates presentation as well');
   assert.equal((await request('POST','/api/profile/birthdate',{
     body:{birthDate:'1982-02-02'}})).status,401);
   assert.equal((await request('POST','/api/profile/birthdate',{
@@ -151,7 +165,7 @@ async function run(){
     'Premium/legacy API must not be called through old backend');
   await stop();start();await ready();
   assert.equal((await request('GET','/api/me',{
-    cookie:identities[0].cookie})).data.account.birthDate,'1976-09-07');
+    cookie:identities[0].cookie})).data.account.birthDate,'1974-04-03');
   assert.equal((await request('GET',route('view'),{
     cookie:identities[0].cookie})).data.commentCount,1);
   assert.equal((await request('GET',link.data.link)).status,403);
@@ -160,7 +174,7 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:3,syntheticMemories:1,localRequests:calls,
-    realTaleraStaticShellCopied:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,

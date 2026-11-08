@@ -1,0 +1,20 @@
+# TALERA: only automated staging maintenance schedule. This file contains
+# NO application code, no database credentials, and no D1 names.
+# A called GitHub workflow acts solely on pre-approved, isolated D1 test names.
+name: TALERA stage D1 reserve replenishment scheduler
+on:
+  schedule:
+    - cron: '13 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/talera-d1-reserve-schedule.yml
+permissions:
+  contents: write
+jobs:
+  replenish_isolated_staging:
+    uses: Marksmits1972/talera-lifeline/.github/workflows/talera-d1-replenish-staging.yml@feature/d1-autocapacity-cron-staging-20261108
+    permissions:
+      contents: write
+    secrets: inherit

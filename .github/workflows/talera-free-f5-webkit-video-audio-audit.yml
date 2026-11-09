@@ -1,0 +1,40 @@
+name: TALERA F5 - WebKit audio and video-cover regression without deployment
+on:
+  push:
+    branches: [feature/free-f5-safe-iphone-stage-20261109]
+    paths: ['.github/workflows/talera-free-f5-webkit-video-audio-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talera-f5-readonly-webkit-audit-20261109
+  cancel-in-progress: false
+jobs:
+  original_player_webkit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exact app dependencies
+        run: npm ci
+      - name: Build original TALERA reference and guarded editor preview only
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node r20-dev/free-10m-f5/f5-editor-video-mute-regression.mjs
+          node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
+      - name: Install local Linux WebKit and generated synthetic audio/video support
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps webkit
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Test actual F5 /tell in WebKit with audio-bearing MOV and WebM
+        run: node r20-dev/free-10m-f5/f5-webkit-video-audio-poster-audit.mjs
+      - name: Report only automation evidence
+        if: success()
+        run: echo 'TALERA_F5_WEBKIT_AUTOMATED_AUDIO_COVER_AUDIT_COMPLETE_NOT_PHYSICAL_IPHONE'

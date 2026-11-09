@@ -18,15 +18,26 @@ export function scopeLocalMemories(html,accountHash){
  if(occurrences(script,OLD_DB)!==1)throw Error('MEMORY_DB_MARKER_MISMATCH');
  // Hash is generated from the authenticated UUID. It is only a namespace,
  // not an authorization proof; the signed-in account still determines it.
- const db="var DB_NAME='talera-free-local-"+accountHash.slice(0,32)+"-v1'";
- let rewritten=script.replace(OLD_DB,db);
- const oldCount=occurrences(rewritten,OLD_BIRTH)+occurrences(rewritten,OLD_BIRTH_ALT);
- if(oldCount>0){
-  const key="talera-free-birthyear-"+accountHash.slice(0,32)+"-v1";
-  rewritten=rewritten.replaceAll(OLD_BIRTH,"'"+key+"'")
-    .replaceAll(OLD_BIRTH_ALT,'"'+key+'"');
- }
- return html.slice(0,start)+rewritten+html.slice(end);
+ const dbName='talera-free-local-'+accountHash.slice(0,32)+'-v1';
+ // Critical: /tell has THREE independent IndexedDB.open sites. The original
+ // TaleraMemories.save/get store, the editor's dbOpen() for drafts/media-ID
+ // cue metadata, and the full-delete helper MUST select the SAME database.
+ // Previously only DB_NAME inside the first script was rewritten, so save()
+ // wrote the scoped story but the editor's cue writer modified an entirely
+ // different, shared legacy DB. The immediate readback then failed.
+ const oldName='talera-lifeline-dev-local-v1';
+ const originalReferences=occurrences(html,oldName);
+ if(originalReferences<1||occurrences(script,oldName)!==1)
+   throw Error('MEMORY_DB_REFERENCE_MISMATCH');
+ let rewritten=html.replaceAll(oldName,dbName);
+ if(rewritten.includes(oldName))throw Error('LEGACY_LOCAL_DB_REFERENCE_REMAINED');
+ if(!rewritten.includes("var DB_NAME='"+dbName+"'"))
+   throw Error('MEMORY_DB_SCOPE_NOT_APPLIED');
+ // Independent local birthday readers must never cross account boundaries.
+ const birthKey='talera-free-birthyear-'+accountHash.slice(0,32)+'-v1';
+ rewritten=rewritten.replaceAll(OLD_BIRTH,"'"+birthKey+"'")
+   .replaceAll(OLD_BIRTH_ALT,'"'+birthKey+'"');
+ return rewritten;
 }
 export async function privateAccountScope(accountId){
  if(typeof accountId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId))

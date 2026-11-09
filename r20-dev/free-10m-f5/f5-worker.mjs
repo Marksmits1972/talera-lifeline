@@ -30,11 +30,14 @@ function allowedLocalUiSearch(url){
   const pairs=[...url.searchParams.entries()];
   if(pairs.length!==1)return false;
   const [key,id]=pairs[0];
-  // The unchanged TALERA editor redirects after a successful publish to
-  // /mijn-leven?published=<local-id>, and opens an edit via /tell?edit=<id>.
-  // Never accept arbitrary query keys, remote origins or non-local IDs.
+  // The approved TALERA UI opens a published local memory through
+  // /present?memory=<local-id>. Older F5 allowed only publishing and editing,
+  // causing a 404 when "Bekijk herinnering" was tapped despite a saved story.
+  // Permit exactly the original first-party local-memory navigation URLs;
+  // no broad query passthrough or production API fallback.
   return ((url.pathname==='/mijn-leven'&&key==='published')||
-      (url.pathname==='/tell'&&key==='edit'))&&LOCAL_STORY_ID.test(id);
+      (url.pathname==='/tell'&&key==='edit')||
+      (url.pathname==='/present'&&key==='memory'))&&LOCAL_STORY_ID.test(id);
 }
 const F5_BROWSER_CSP=[
   "default-src 'self' blob: data:",

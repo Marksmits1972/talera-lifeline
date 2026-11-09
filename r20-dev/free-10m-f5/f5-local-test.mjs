@@ -191,6 +191,24 @@ async function run(){
     gate:false,cookie:identities[0].cookie+'; '+qaCookie});
   assert.equal(signedHome.status,200,'Registered user gets a separate private timeline');
   assert.equal(signedHome.stage,'personalized-durable-account');
+  // Original editor redirects here *after* a successful local save.
+  const fixedPublished=await request('GET',
+    '/mijn-leven?published=local-f5-test-story-001',{cookie:identities[0].cookie});
+  assert.equal(fixedPublished.status,200,
+    'Successful Free publish must return to Mijn leven, not a 404');
+  const editLocal=await request('GET',
+    '/tell?edit=local-f5-test-story-001',{cookie:identities[0].cookie});
+  assert.equal(editLocal.status,200,
+    'Original editor must allow opening an existing account-local story');
+  assert.equal((await request('GET',
+    '/mijn-leven?published=https%3A%2F%2Fevil.example',
+    {cookie:identities[0].cookie})).status,404,
+    'Remote/nonlocal story IDs must remain forbidden');
+  assert.equal((await request('GET',
+    '/mijn-leven?other=local-f5-test-story-001',
+    {cookie:identities[0].cookie})).status,404,
+    'Unknown query parameters must remain forbidden');
+
   const scopedName=/talera-free-local-([a-f0-9]{32})-v1/.exec(String(signedHome.data))?.[0];
   assert.ok(scopedName,'The existing IndexedDB media store must be scoped to current account');
   assert.ok(!String(signedHome.data).includes("DB_NAME='talera-lifeline-dev-local-v1'"),
@@ -293,7 +311,7 @@ async function run(){
     cookie:identities[1].cookie})).status,401);
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
-    syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,localRequests:calls,
+    syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,localRequests:calls,
     realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,

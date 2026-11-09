@@ -8,6 +8,14 @@ Status: **Free-code geïntegreerd en aantoonbaar groen in aparte EU-stage; niet 
 - Deze browsertest heeft met uitsluitend fictieve bestanden een foto, MP4-video, WAV-audio, tijdstempels, cue-volgorde, herladen, dezelfde lokale opslag in Mijn leven en Presentatie en accountisolatie bewezen.
 - Pristine Linux WebKit faalde al zonder TALERA-code bij het schrijven van Blob/File naar IndexedDB; dat testplatform is daarom niet geschikt om iPhone-Safari-mediaopslag te beoordelen. Geen wijzigingen aan recorder/player door dit Linux-testprobleem.
 
+## Safari/in-app-browser toegang gerepareerd op 9 november 2026
+
+De eerdere foutmelding `{"ok":false,"error":"Ongeldige herkomst"}` ontstond doordat de F5-code bij de toegangspagina vereiste dat ieder normaal iPhone-formulier de HTTP-`Origin`-header meestuurde. Die header kan bij Safari of een in-app browser ontbreken. **Het is niet veroorzaakt door het kopiëren van de toegangscode via WhatsApp.**
+
+Oplossing in **uitsluitend de geïsoleerde F5 Worker**: het formulier krijgt bij GET een HMAC-ondertekend CSRF-veld en een Secure/HttpOnly/SameSite=Strict-cookie die tien minuten geldig zijn. Bij POST is een uitdrukkelijk vreemde Origin nog steeds verboden; als de browser Origin weglaat, wordt de aanvraag alleen aanvaard met de geldige ondertekende form- en cookiecombinatie. De toegangscode zelf blijft een aparte geheimcontrole. Live deployment en drie specifieke security-tests zijn geslaagd in [GitHub Actions run 42584185216](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42584185216). Hierna is de automatische hotfix-uitrol weer uitgezet om sleutels en iPhone-test stabiel te laten.
+
+**Aandachtspunt:** de eerder aan de gebruiker getoonde toegangscode werkt alleen wanneer exact dezelfde waarde ook als `STAGING_F5_KEY` op deze specifieke testworker in Cloudflare is opgeslagen. Een code kopiëren naar WhatsApp en het formulier invullen wijzigt deze Cloudflare-secret niet. Een mismatch toont nu de duidelijkere melding `Toegangscode niet herkend. Controleer of deze in Cloudflare is opgeslagen.` Bewaar de geheime code buiten GitHub en screenshots. Open de link opnieuw zodat de verse ondertekende formcookie wordt gezet; gebruik bij voorkeur Safari rechtstreeks voor de opname-/cameraacceptatie.
+
 ## ECHTE iPhone: precies één laatste acceptatieronde
 **Testlink**: https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev/__f5/entry
 

@@ -453,7 +453,28 @@ try{
           JSON.stringify(touchContext)+'; '+error.message);
       });
       await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===1,
-        null,{timeout:9000});
+        null,{timeout:9000}).catch(async error=>{
+        const visibleAfterTap=await visibleState();
+        const eventHit=await page.evaluate(()=>{
+          const el=document.getElementById('memoryStoryScroll');
+          const r=el?.getBoundingClientRect();
+          if(!r)return {noStorySurface:true};
+          const x=r.left+r.width*.5,y=r.top+r.height*.5;
+          const hit=document.elementFromPoint(x,y);
+          return {id:hit?.id||'',tag:hit?.tagName||'',
+            className:String(hit?.className||''),
+            inSurface:!!hit?.closest?.('#memoryStoryScroll'),
+            inTimeline:!!hit?.closest?.('.timeline'),
+            rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+            scroll:el.scrollTop,possibleGestureHandlers:[
+              document.querySelector('#photoStage')?.outerHTML.slice(0,180),
+              document.querySelector('#memoryStoryScroll')?.outerHTML.slice(0,180)
+            ]};
+        });
+        throw Error('Five-photo-plus-video ordinary native touch did NOT advance: '+
+          JSON.stringify({target,touchContext,after:visibleAfterTap,eventHit})+
+          '; '+error.message);
+      });
       await page.waitForTimeout(650);
       const after=await visibleState();
       const photoAfter=await page.locator('#photoStage').screenshot();

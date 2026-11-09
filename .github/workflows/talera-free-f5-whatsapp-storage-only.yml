@@ -47,6 +47,12 @@ jobs:
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-storage-only-check
       - name: Local integrated auth + account birthday + local media + social DO tests
         run: node r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Install pinned synthetic-only Chromium test tooling
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+      - name: Actual mobile Chromium original-menu account switch and local photo isolation
+        run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
       - name: Persist minimal test report
         if: success()
         run: |

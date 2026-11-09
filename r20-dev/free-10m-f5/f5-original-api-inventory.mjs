@@ -53,6 +53,15 @@ const menuContexts=menuAnchors.map(term=>{
  return {term,found:i>=0,excerpt:i>=0?menuSource.slice(Math.max(0,i-1050),i+1750):''};
 });
 console.log('TALERA_F5_ORIGINAL_MENU_CONTRACT',JSON.stringify(menuContexts));
+// Read the original menu's exact share/grant rendering and click contract.
+// No account data, URLs with tokens or customer media are accessed.
+const menuParts=['case \'mine\':','case \'shared\':',"data-action=\"revoke",'/api/my-grants','/api/shares','/api/shared-with-me'];
+console.log('TALERA_F5_MENU_SOCIAL_RENDER_CONTRACT',JSON.stringify(
+ menuParts.map(term=>{
+   const at=menuSource.indexOf(term);
+   return {term,found:at>=0,context:at<0?'':menuSource.slice(Math.max(0,at-180),Math.min(menuSource.length,at+3500))};
+ })));
+
 const native=new Set(['/api/register','/api/login','/api/logout','/api/me',
  '/api/profile','/api/profile/birthdate','/api/version','/api/discovery']);
 const routes=[...seen.keys()].sort().map(route=>({

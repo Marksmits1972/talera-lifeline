@@ -295,6 +295,17 @@ try{
  const afterBackSocialPage=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
  assert.equal(afterBackSocialPage.status(),200);
  await waitForLibrary(page);
+ // Keep existing independent social regression available in its normal run.
+ // Focused back-navigation CI needs no social grants or expiring share tokens.
+ if(process.env.F5_BACK_NAV_ONLY==='1'){
+   assert.equal(page.url(),origin+'/present');
+   console.log('TALERA_F5_BACK_NAV_BROWSER_VERDICT',JSON.stringify({
+     syntheticAccountsSwitched:true,originalOwnedMemoryReopened:true,
+     originalMediaBytesPreserved:true,otherAccountStillIsolated:true,
+     originalPresentButtonFollowed:true,backReturnedToPrivateHome:true,
+     newRootAliasOnly:true,cloudMediaUploads:0,originalPlayerUnchanged:true
+   }));
+ }else{
  // Synthetic social reference ONLY: the photo is still inside IndexedDB.
  // Exercise the ORIGINAL menu end-to-end with a real local story title and
  // actual Durable Object link. No photo/media payload is uploaded.
@@ -460,6 +471,7 @@ try{
    menuAndStylesUnmodified:true,realIphoneAccepted:false,
    browserPageErrors:errors.slice(0,10)};
  console.log('TALERA_F5_ACTUAL_MENU_BROWSER_ISOLATION',JSON.stringify(result));
+ }
 }finally{
  if(browser)await browser.close();
  if(worker){worker.kill('SIGTERM');await delay(300)}

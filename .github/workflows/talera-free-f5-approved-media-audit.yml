@@ -19,5 +19,5 @@ jobs:
       - run: npm ci
       - name: Read-only anonymous original WhatsApp public source snapshots
         run: node r20-dev/free-10m-delivery/build.mjs
-      - name: Compare current approved and previously proven audio/poster handlers
+      - name: Compare exact current and previous audio/video/poster handlers
         run: node r20-dev/free-10m-f5/f5-approved-media-inventory.mjs

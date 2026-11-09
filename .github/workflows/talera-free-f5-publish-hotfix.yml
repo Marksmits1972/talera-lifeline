@@ -1,10 +1,8 @@
 name: TALERA Free – fix iPhone media-ID publish in isolated F5 only
 
+# The actual iPhone media-ID correction is deployed and verified on F5.
+# Do not redeploy while the user is testing real, locally held media.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-publish-hotfix.yml'
   workflow_dispatch:
 
 permissions:

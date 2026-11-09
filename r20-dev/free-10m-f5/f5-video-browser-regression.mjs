@@ -155,6 +155,10 @@ try{
   assert.ok(beforeReload.files.filter(f=>f.type.startsWith('video/')).length>=1,
     'Actual selected video must already be durably stored before reload');
   await page.reload({waitUntil:'domcontentloaded',timeout:25000});
+  // TALERA deliberately starts in the memories OVERVIEW when saved drafts
+  // exist. Reopen the same draft before asserting the six media tiles.
+  await page.locator('[data-open]').first().waitFor({state:'visible',timeout:18000});
+  await page.locator('[data-open]').first().click();
   try{await status(page,5,1);}
   catch(error){
    const diagnostic=await page.evaluate(()=>({

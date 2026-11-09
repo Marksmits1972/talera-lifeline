@@ -61,8 +61,25 @@ async function createUser(user,i){
  return data.account.id;
 }
 async function waitForLibrary(page){
- await page.waitForFunction(()=>!!window.TaleraMemories?.list&&
-   !!document.getElementById('talera-more-menu'),null,{timeout:18000});
+ try{
+   await page.waitForFunction(()=>!!window.TaleraMemories?.list&&
+     !!document.getElementById('talera-more-menu'),null,{timeout:18000});
+ }catch(e){
+   const diagnostic=await page.evaluate(()=>({
+     url:location.href,title:document.title,ready:document.readyState,
+     menu:!!document.getElementById('talera-more-menu'),
+     memories:typeof window.TaleraMemories,
+     scripts:[...document.querySelectorAll('script')].map(x=>({
+       type:x.type,src:x.src?.slice(0,180),length:x.textContent?.length
+     })).slice(-22),
+     body:(document.body?.innerText||'').slice(0,750),
+     nav:[...document.querySelectorAll('nav button')].map(n=>({
+       id:n.id,aria:n.getAttribute('aria-label'),text:n.textContent?.slice(0,45)
+     })).slice(0,24)
+   }));
+   console.log('TALERA_F5_BROWSER_BOOT_DIAGNOSTIC',JSON.stringify(diagnostic));
+   throw e;
+ }
 }
 async function menu(page){
  const state=await page.evaluate(()=>{
@@ -170,6 +187,12 @@ try{
  const page=await context.newPage();
  const errors=[];
  page.on('pageerror',e=>errors.push(String(e?.message||e).slice(0,180)));
+ page.on('requestfailed',r=>console.log('TALERA_F5_BROWSER_FAILED_REQUEST',
+   r.url().slice(0,200),r.failure()?.errorText));
+ page.on('console',m=>{
+   if(['error','warning'].includes(m.type()))
+     console.log('TALERA_F5_BROWSER_JS_CONSOLE',m.type(),m.text().slice(0,320));
+ });
  const start=await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
  assert.equal(start.status(),200);
  await waitForLibrary(page);

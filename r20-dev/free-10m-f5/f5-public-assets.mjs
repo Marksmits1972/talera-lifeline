@@ -33,7 +33,7 @@ async function fetchApprovedPlayer(mode){
  const r=await fetch(u,{method:'GET',headers:{accept:'text/html'},
    redirect:'error',signal:AbortSignal.timeout(25000)});
  assert.equal(r.status,200,'Approved embedded narrator unavailable: '+mode);
- assert.match(r.headers.get('content-type')||'',/text\\/html/i,
+ assert.match(r.headers.get('content-type')||'',/text\/html/i,
    'Original player must be delivered as HTML');
  assert.ok(!r.headers.get('set-cookie'),
    'Refuse embedded player emitting customer session cookies');

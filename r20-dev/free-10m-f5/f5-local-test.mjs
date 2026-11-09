@@ -361,6 +361,9 @@ async function run(){
   const publicScript=await request('GET','/__clean/menu-integration.mjs');
   assert.equal(publicScript.status,200,'Original TALERA menu script must load from approved snapshot');
   assert.ok(String(publicScript.data).length>100,'Actual menu integration JavaScript is expected');
+  assert.equal((String(publicScript.data).match(/location\.reload\(\);/g)||[]).length,3,
+    'Login, registration and logout MUST refresh the account-scoped local library');
+
   // Active original /api/version?check=Date.now() must work within this
   // SAME isolated origin, but must not expose a broad legacy API gateway.
   const originalVersion='talera-storage-v37-20261022';

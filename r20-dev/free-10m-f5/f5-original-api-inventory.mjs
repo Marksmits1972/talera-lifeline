@@ -38,7 +38,7 @@ for(const file of paths){
  }
 }
 const native=new Set(['/api/register','/api/login','/api/logout','/api/me',
- '/api/profile','/api/profile/birthdate']);
+ '/api/profile','/api/profile/birthdate','/api/version']);
 const routes=[...seen.keys()].sort().map(route=>({
  route,explicitF5Route:native.has(route),sourceFiles:[...seen.get(route)].slice(0,8),
  examples:contextByRoute.get(route)
@@ -47,6 +47,7 @@ const unported=routes.filter(x=>!x.explicitF5Route);
 const result={
  source:'https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev',
  analysis:'STATIC_REFERENCES_ONLY_NOT_A_RUNTIME_TRAFFIC_TRACE',
+ explicitlyImplemented:'GET /api/version and existing Free auth/birthdate routes are counted as implemented; never count a string-only reference as a live call',
  routesFound:routes.length,possibleUnportedRoutes:unported.length,
  warning:'F5 returns 404 for unported routes; determine which are active before declaring unchanged app functionality.',
  routes

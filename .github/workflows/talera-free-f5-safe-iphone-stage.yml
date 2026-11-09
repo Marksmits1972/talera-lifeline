@@ -28,6 +28,8 @@ jobs:
       F5_INVITE_HASH: 9e5da8ed7d8ad9f23dc0b3195c7fc47a6cc41444472af5931a499d09b3c52561
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

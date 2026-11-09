@@ -1,0 +1,75 @@
+name: TALERA Free F5 - isolated single-origin integration tests
+
+on:
+  push:
+    branches: [feature/free-10m-f5-integrated-staging-20261108]
+    paths:
+      - 'r20-dev/free-10m-f5/**'
+      - '.github/workflows/talera-free-f5-integration.yml'
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - 'r20-dev/free-10m-f5/**'
+      - '.github/workflows/talera-free-f5-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  f5_isolated_local:
+    name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install existing locked Cloudflare Wrangler
+        run: npm ci
+      - name: Build approved public code using only six anonymous GETs
+        run: node r20-dev/free-10m-delivery/build.mjs
+      - name: Package only public PWA references and stable external JavaScript
+        run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
+        run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+      - name: Preserve saved narration media IDs and cue times when reopening an existing iPhone memory
+        run: node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+      - name: Verify cold first swipe uses no blank local media and keeps original RH19 animation
+        run: node r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs
+      - name: Diagnose the CURRENT approved inline presentation engine, not old iframe assumptions
+        run: node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs
+      - name: Assert original TALERA editor remains intact and video picker reports every selected video
+        run: node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
+        # Exact video-picker source inspected once before the narrow F5 hotfix
+      - name: Verify F5 Worker and tests parse
+        run: |
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node --check r20-dev/free-10m-f5/f5-local-test.mjs
+          node --check r20-dev/free-10m-f5/f5-public-assets.mjs
+          node --check r20-dev/free-10m-f5/f5-video-picker.mjs
+          node --check r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+          node --check r20-dev/free-10m-f5/f5-neighbor-preview.mjs
+      - name: Verify Cloudflare compilation without deployment
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
+      - name: Execute synthetic auth + private DOB + social privacy and persistence
+        run: node r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Install headless mobile browser and small synthetic video generator for the reported issue
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Browser regression - five actual synthetic photos plus one MP4, mixed and separate video choices
+        run: |
+          node --check r20-dev/free-10m-f5/f5-video-browser-regression.mjs
+          node r20-dev/free-10m-f5/f5-video-browser-regression.mjs
+      - name: Archive factual test result only
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-f5-local-integration
+          path: r20-dev/free-10m-f5/generated/f5-results.json
+          retention-days: 14

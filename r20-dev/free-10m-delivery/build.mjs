@@ -1,4 +1,4 @@
-// Build only from the LAST APPROVED public TALERA candidate.
+// Build from the latest user-specified working design-cleanup candidate (2026-11-07). Preserve separately approved official fallback; DO NOT promote this test link.
 // TWO anonymous snapshots must agree byte-for-byte before code is shareable.
 // No login, cookies, accounts, D1/R2 writes or live performance load.
 import assert from 'node:assert/strict';
@@ -10,11 +10,11 @@ import {candidates,assetizeHtml} from './rewrite.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const STATIC=path.join(here,'public');
 const GENERATED=path.join(here,'generated');
-const ORIGIN='https://talera-account-birthdate-test-20261107.mark-a39.workers.dev';
+const ORIGIN='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
 const PAGES=['/mijn-leven','/present','/tell'];
 async function fetchPublic(pathname){
  const uri=new URL(pathname,ORIGIN);
- assert.equal(uri.hostname,'talera-account-birthdate-test-20261107.mark-a39.workers.dev');
+ assert.equal(uri.hostname,'talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev');
  const res=await fetch(uri,{method:'GET',headers:{accept:'text/html'},redirect:'error',signal:AbortSignal.timeout(18000)});
  assert.equal(res.status,200,'Approved anonymous page unavailable: '+pathname);
  assert.match(res.headers.get('content-type')||'',/text\/html/i);

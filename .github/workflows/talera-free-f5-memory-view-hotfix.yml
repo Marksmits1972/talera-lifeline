@@ -1,0 +1,121 @@
+name: TALERA Free - herstel Bekijk herinnering op F5 iPhone
+
+# Design-cleanup Free baseline was deployed and verified on isolated F5.
+# Stay FROZEN during iPhone testing; no automatic PR redeploy or key rotation.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-free-f5-memory-view-fix-once
+  cancel-in-progress: false
+
+jobs:
+  deploy_only_f5_test:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 13
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install existing lockfile tools
+        run: npm ci
+      - name: Fail closed unless isolated F5 worker and existing private DOs
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const w=JSON.parse(readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          assert.equal(w.name,'talera-free-f5-combined-stage-20261108');
+          assert.equal(w.durable_objects.bindings.length,7);
+          assert.equal(w.vars.AUTH_STORAGE_JURISDICTION,'eu');
+          assert.equal(w.vars.SOCIAL_STORAGE_JURISDICTION,'eu');
+          assert.ok(!w.services&&!w.d1_databases&&!w.r2_buckets);
+          const s=readFileSync('r20-dev/free-10m-f5/f5-worker.mjs','utf8');
+          assert.ok(s.includes("url.pathname==='/present'&&key==='memory'"),
+            'Missing approved original view-memory route');
+          assert.ok(s.includes("url.pathname==='/tell'&&key==='edit'"));
+          assert.ok(s.includes("url.pathname==='/mijn-leven'&&key==='published'"));
+          JS
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Build approved anonymous PWA, without customer data
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Confirm source is the user's later design-cleanup candidate, not the official older fallback
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const expected='talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
+          for(const file of [
+            'r20-dev/free-10m-delivery/build.mjs',
+            'r20-dev/free-10m-f5/f5-public-assets.mjs'
+          ]){
+            const src=readFileSync(file,'utf8');
+            assert.ok(src.includes(expected),'Wrong public source in '+file);
+            assert.ok(!src.includes('talera-account-birthdate-test-20261107.mark-a39.workers.dev'),
+              'Old registered source must not be substituted for later candidate');
+          }
+          const pages=['mijn-leven','present','tell'];
+          for(const p of pages){
+            const html=readFileSync(
+              'r20-dev/free-10m-delivery/generated/reference-'+p+'.html','utf8');
+            assert.ok(html.length>50000,'Incomplete approved PWA snapshot '+p);
+          }
+          const present=readFileSync(
+            'r20-dev/free-10m-delivery/generated/reference-present.html','utf8');
+          assert.ok(present.includes('taleraInlineSync'),
+            'Approved V61/R20 in-place presentation engine must be retained');
+          assert.ok(present.includes('talera-zero-memory-adapter'));
+          console.log('TALERA_USER_DESIGN_CLEANUP_BASELINE_VERIFIED',
+            JSON.stringify({source:expected,
+              preservesInlinePlayer:true,originalSourcePromoted:false}));
+          JS
+
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+          node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
+      - name: Deploy only existing isolated EU F5 test worker, preserve DO and staging keys
+        run: npx --no-install wrangler deploy --config r20-dev/free-10m-f5/wrangler.staging.jsonc
+      - name: Verify public test start and private timeline remain gated
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const root='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+          let result;
+          for(let i=0;i<15;i++){
+            result=await fetch(root+'/__f5/start',{cache:'no-store',
+              signal:AbortSignal.timeout(16000)});
+            const html=await result.text();
+            if(result.status===200&&html.includes('location.hash'))break;
+            if(i===14)throw Error('Original one-click iPhone test entry unavailable');
+            await new Promise(r=>setTimeout(r,800));
+          }
+          const h=await fetch(root+'/__f5/health',{signal:AbortSignal.timeout(16000)});
+          const data=await h.json();
+          assert.equal(data.ok,true);
+          assert.equal(data.officialTaleraConnected,false);
+          const privatePage=await fetch(root+'/present?memory=local-f5-smoke-story-001',{
+            signal:AbortSignal.timeout(16000)});
+          assert.equal(privatePage.status,403,
+            'Untrusted visitors must not open private presentation links');
+          console.log('TALERA_F5_OWN_MEMORY_VIEW_HOTFIX_LIVE',JSON.stringify({
+            pass:true,onlySeparateSyntheticEUWorker:true,
+            originalOneClickTestPreserved:true,untrustedPrivatePresentationBlocked:true,
+            originalTaleraNotConnected:true,originalPlayerUnchanged:true,
+            stagingSecretsAndDurableObjectsPreserved:true
+          }));
+          JS

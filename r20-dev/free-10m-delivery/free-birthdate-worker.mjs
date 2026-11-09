@@ -291,3 +291,6 @@ export default {
   return env.TALERA_BASE.fetch(request);
  }
 };
+
+// F5 reuses the SAME approved private-time-line personalization functions.
+export {personalizeHome,personalizePresent};

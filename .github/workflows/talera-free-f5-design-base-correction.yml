@@ -1,0 +1,98 @@
+name: TALERA Free F5 - development-base correction to design-cleanup 20261107
+
+# Safely deployed and Cloudflare verified: editing stored narration cue IDs.
+# No automatic redeployment while existing Free iPhone memories are tested.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-free-f5-design-base-correction-once
+  cancel-in-progress: false
+
+jobs:
+  deploy_isolated_f5_only:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked existing tooling
+        run: npm ci
+      - name: Verify exact user-directed development base, isolated EU worker and retained account schema
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const origin='talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
+          for(const path of ['r20-dev/free-10m-delivery/build.mjs',
+                           'r20-dev/free-10m-f5/f5-public-assets.mjs']){
+            const src=readFileSync(path,'utf8');
+            assert.ok(src.includes(origin),path+' MUST use selected latest design-cleanup base');
+          }
+          const w=JSON.parse(readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          assert.equal(w.name,'talera-free-f5-combined-stage-20261108');
+          assert.equal(w.durable_objects.bindings.length,7);
+          assert.equal(w.vars.AUTH_STORAGE_JURISDICTION,'eu');
+          assert.equal(w.vars.SOCIAL_STORAGE_JURISDICTION,'eu');
+          assert.ok(!w.services&&!w.d1_databases&&!w.r2_buckets);
+          const story=readFileSync('r20-dev/free-10m-f5/f5-video-browser-regression.mjs','utf8');
+          assert.ok(story.includes('validatedLatestInlinePlayerNotLegacyIframe:true'));
+          assert.ok(story.includes('The large visible photo must actually change'));
+          JS
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Rebuild only anonymous public assets from newly identified base
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node --check r20-dev/free-10m-f5/f5-video-picker.mjs
+          node --check r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+      - name: Test private IndexedDB alignment and unchanged video import
+        run: |
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+          node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
+          node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+      - name: Update SAME separate Free EU staging worker without touching 5 sessions or upstream
+        run: npx --no-install wrangler deploy --config r20-dev/free-10m-f5/wrangler.staging.jsonc
+      - name: Real cloud smoke - old entry available and customer stories protected
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const origin='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+          let entry,html;
+          for(let n=0;n<15;n++){
+            entry=await fetch(origin+'/__f5/start',{cache:'no-store',
+              signal:AbortSignal.timeout(18000)});
+            html=await entry.text();
+            if(entry.status===200&&html.includes('location.hash'))break;
+            if(n===14)throw Error('One-tap iPhone stage entry unavailable');
+            await new Promise(r=>setTimeout(r,800));
+          }
+          assert.equal(entry.status,200);
+          const health=await fetch(origin+'/__f5/health',{signal:AbortSignal.timeout(18000)});
+          const h=await health.json();
+          assert.equal(h.ok,true);
+          assert.equal(h.officialTaleraConnected,false);
+          const privateStory=await fetch(origin+'/present?memory=local-f5-synthetic-test-001',
+            {signal:AbortSignal.timeout(18000)});
+          assert.equal(privateStory.status,403);
+          console.log('TALERA_DESIGN_CLEANUP_BASE_F5_STAGE_LIVE',JSON.stringify({
+            latestUserDevelopmentBase:true,postDesignFreeFixesRetained:true,
+            freeEuStageOnly:true,officialUrlUnchanged:true,
+            accountAndLocalMemoriesUnchanged:true,originalWorkerUntouched:true
+          }));
+          JS

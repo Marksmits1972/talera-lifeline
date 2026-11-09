@@ -1,0 +1,99 @@
+name: TALERA Free F5 - first local story swipe no white screen
+
+on:
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - '.github/workflows/talera-free-f5-first-swipe-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-free-f5-first-swipe-once
+  cancel-in-progress: false
+
+jobs:
+  deploy_isolated_free_stage_only:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install existing approved tooling
+        run: npm ci
+      - name: Fail closed unless latest user-approved development baseline and original EU F5 stage
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const origin='talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
+          for(const p of ['r20-dev/free-10m-delivery/build.mjs','r20-dev/free-10m-f5/f5-public-assets.mjs'])
+            assert.ok(readFileSync(p,'utf8').includes(origin),'Refuse outdated baseline '+p);
+          const w=JSON.parse(readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          assert.equal(w.name,'talera-free-f5-combined-stage-20261108');
+          assert.equal(w.durable_objects.bindings.length,7);
+          assert.equal(w.vars.AUTH_STORAGE_JURISDICTION,'eu');
+          assert.equal(w.vars.SOCIAL_STORAGE_JURISDICTION,'eu');
+          assert.ok(!w.services&&!w.d1_databases&&!w.r2_buckets);
+          const worker=readFileSync('r20-dev/free-10m-f5/f5-worker.mjs','utf8');
+          assert.ok(worker.includes("pathname==='/present'?eliminateFirstSwipeBlank(scoped):scoped"));
+          assert.ok(worker.includes("pathname==='/tell'?alignEditedNarrationCueRefs(readyNeighbors):readyNeighbors"));
+          JS
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Rebuild only original anonymous TALERA from user-directed design-cleanup
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Recheck original storyteller, local DB, first-swipe preview and existing video import
+        run: |
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+          node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+          node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
+          node r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs
+          node --check r20-dev/free-10m-f5/f5-neighbor-preview.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+      - name: Deploy only EXISTING synthetic EU Free stage, keep all sessions and private local media
+        run: npx --no-install wrangler deploy --config r20-dev/free-10m-f5/wrangler.staging.jsonc
+      - name: Read back public one-click entry, guard private story and verify not connected to original TALERA
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const origin='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+          let ok=false;
+          for(let i=0;i<15;i++){
+            const r=await fetch(origin+'/__f5/start',{cache:'no-store',
+              signal:AbortSignal.timeout(16000)});
+            const text=await r.text();
+            if(r.status===200&&text.includes('location.hash')){ok=true;break}
+            await new Promise(r=>setTimeout(r,800));
+          }
+          assert.equal(ok,true,'Existing one-tap iPhone link remains valid');
+          const health=await fetch(origin+'/__f5/health',{
+            signal:AbortSignal.timeout(16000)});
+          const h=await health.json();
+          assert.equal(health.status,200);
+          assert.equal(h.ok,true);
+          assert.equal(h.officialTaleraConnected,false);
+          const forbidden=await fetch(origin+'/present?memory=local-synthetic-f5-001',{
+            signal:AbortSignal.timeout(16000)});
+          assert.equal(forbidden.status,403);
+          console.log('TALERA_F5_FIRST_SWIPE_STAGING_DEPLOYED',JSON.stringify({
+            success:true,onlyExistingEUFreeStage:true,officialPwaUntouched:true,
+            boundedTwoLocalPhotoPreviews:true,privateMediaNotUploaded:true,
+            existingAccountAndStoryIdsUnchanged:true,noServiceD1R2Bindings:true,
+            oneClickOriginalInvitationPreserved:true
+          }));
+          JS

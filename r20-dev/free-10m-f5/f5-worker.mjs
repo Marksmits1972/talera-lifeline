@@ -353,7 +353,89 @@ async function socialApi(request,env){
     headers.set('x-qa-account',actor.id);
     headers.set('x-qa-signature',await signActor(env.DEMO_IDENTITY_KEY,actor.id));
   }
-  return socialPilot.fetch(new Request(request,{headers}),env);
+  const response=await socialPilot.fetch(new Request(request,{headers}),env);
+  // Every successful social mutation is first authorized and persisted by
+  // SOCIAL_MEMORY. Index only metadata after success in the EXISTING owner DO.
+  // Re-read the social DO for actual grants/revocation when listing.
+  if(actor&&request.method==='POST'&&response.ok){
+    const match=/^\\/__social\\/memory\\/([A-Za-z0-9_-]{8,80})\\/(init|share)$/
+      .exec(new URL(request.url).pathname);
+    if(match){
+      const [,storyId,operation]=match,account=accountHome(env,actor.id);
+      if(operation==='init'){
+        await account.rememberSocialStory(storyId);
+      }else{
+        const data=await response.clone().json();
+        const token=/^\\/__social\\/shared\\/([a-f0-9]{64})$/.exec(data.link||'')?.[1];
+        if(!token)throw Error('INVALID_SOCIAL_SHARE_RESPONSE');
+        const hash=await shaHex(token);
+        try{await account.rememberSocialStory(storyId);
+          await account.rememberSocialShare(hash,storyId)}
+        catch(e){
+          // No successful-looking unindexed link may remain active after
+          // partial index failure; attempt to withdraw this synthetic link.
+          try{await socialMemoryHome(env,storyId).revokeShare(actor.id,hash)}catch{}
+          throw e;
+        }
+      }
+    }
+  }
+  return response;
+}
+// The social index stores only story IDs inside the same account DO; it is
+// NOT a second story database and is never the authority for access rights.
+function socialMemoryHome(env,storyId){
+  if(!/^[A-Za-z0-9_-]{8,80}$/.test(storyId))
+    throw Error('INVALID_SOCIAL_STORY');
+  const binding=env.SOCIAL_MEMORY;
+  if(!binding?.get||!binding?.idFromName)throw Error('MISSING_SOCIAL_NAMESPACE');
+  const place=env.SOCIAL_STORAGE_JURISDICTION==='eu'?binding.jurisdiction('eu'):
+    env.SOCIAL_STORAGE_JURISDICTION==='local-test'?binding:null;
+  if(!place)throw Error('SOCIAL_JURISDICTION_NOT_EXPLICIT');
+  return place.get(place.idFromName('talera-free-social-v1:'+storyId));
+}
+async function accountSocialLists(request,env){
+  if(request.method!=='GET')return deny(405,'Methode niet toegestaan');
+  const actor=await sessionAccount(request,env);
+  if(!actor)return deny(401,'Aanmelden vereist');
+  const p=new URL(request.url).pathname;
+  const ids=await accountHome(env,actor.id).socialStoryIds();
+  if(!Array.isArray(ids)||ids.length>10000)throw Error('INVALID_SOCIAL_OWNER_INDEX');
+  const result=[];
+  // Bound fan-out: one social DO per actual shared story, no global index.
+  for(let start=0;start<ids.length;start+=20){
+    const overviews=await Promise.all(ids.slice(start,start+20).map(
+      id=>socialMemoryHome(env,id).ownerOverview(actor.id)));
+    for(const info of overviews){
+      if(p==='/api/shares'){
+        for(const entry of info.shares)result.push({
+          id:entry.token_hash,memory_id:info.storyId,
+          expires_at:Number(entry.expires_at),
+          revoked_at:entry.revoked_at===null?null:Number(entry.revoked_at)
+        });
+      }else{
+        for(const entry of info.grants){
+          if(entry.revoked_at!==null)continue;
+          const profile=await accountHome(env,entry.recipient_id).getProfile();
+          result.push({memory_id:info.storyId,
+            recipient_account_id:entry.recipient_id,
+            recipient_name:profile?.displayName||'een gebruiker'});
+        }
+      }
+    }
+  }
+  return json({items:result});
+}
+async function revokeAccountShare(request,env,shareHash){
+  if(request.method!=='POST'&&request.method!=='DELETE')
+    return deny(405,'Methode niet toegestaan');
+  if(!sameOrigin(request))return deny(403,'Ongeldige herkomst');
+  const actor=await sessionAccount(request,env);
+  if(!actor)return deny(401,'Aanmelden vereist');
+  const home=accountHome(env,actor.id),storyId=await home.socialShareStory(shareHash);
+  if(!storyId)return deny(404,'Deze deellink is niet van dit account');
+  const result=await socialMemoryHome(env,storyId).revokeShare(actor.id,shareHash);
+  return json(result,result.ok?200:404);
 }
 async function publicPage(request,env){
   const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
@@ -496,6 +578,17 @@ export default {
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);
       if(p==='/api/discovery')return discoveryApi(request,env);
+      // The original menu consumes local IndexedDB for /api/memories;
+      // a network request can never retrieve Free originals from this Worker.
+      if(p==='/api/memories'){
+        const actor=await sessionAccount(request,env);
+        return actor?deny(409,'Herinneringen staan alleen lokaal op je telefoon'):
+          deny(401,'Aanmelden vereist');
+      }
+      if(p==='/api/shares'||p==='/api/my-grants')
+        return accountSocialLists(request,env);
+      const revoke=/^\\/api\\/shares\\/([a-f0-9]{64})(?:\\/revoke)?$/.exec(p);
+      if(revoke)return revokeAccountShare(request,env,revoke[1]);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);
       if(p.startsWith('/__clean/'))return publicScript(request,env);

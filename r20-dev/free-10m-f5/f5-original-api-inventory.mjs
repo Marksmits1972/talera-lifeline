@@ -13,7 +13,7 @@ const queue=[
 const paths=[];
 while(queue.length){
  const current=queue.shift();
- const entry=readdirSync?null:null;
+
  if(current.endsWith('/assets')){
    for(const f of readdirSync(current))queue.push(path.join(current,f));
    continue;
@@ -23,9 +23,9 @@ while(queue.length){
 const seen=new Map();
 for(const file of paths){
  const source=readFileSync(file,'utf8');
- const matches=[...source.matchAll(/\\/api\\/[a-zA-Z0-9_/-]+/g)];
+ const matches=[...source.matchAll(new RegExp('/api/[A-Za-z0-9_/-]+','g'))];
  for(const item of matches){
-   const route=item[0].replace(/\\/$/,'');
+   const route=item[0].replace(/[/]$/,'');
    if(!seen.has(route))seen.set(route,new Set());
    seen.get(route).add(file.replace(top+'/',''));
  }

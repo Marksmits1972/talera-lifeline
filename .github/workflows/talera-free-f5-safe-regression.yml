@@ -44,7 +44,7 @@ jobs:
           npx --no-install playwright install --with-deps chromium
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
-      - name: Actual original video poster extraction with an AAC audio soundtrack
+      - name: Actual original video poster extraction with a decodable Opus audio soundtrack
         run: node r20-dev/free-10m-f5/f5-soundtrack-poster-original-browser.mjs
       - name: Original app account menu and local media separation in mobile Chromium
         run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs

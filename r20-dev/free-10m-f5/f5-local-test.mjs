@@ -84,10 +84,29 @@ async function run(){
   const entry=await request('GET','/__f5/entry',{gate:false});
   assert.equal(entry.status,200);
   assert.match(String(entry.data),/TALERA Free — testversie/);
-  const browserOpen=await fetch(origin+'/__f5/entry',{
-    method:'POST',headers:{origin,'content-type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams({key:f5}),redirect:'manual',signal:AbortSignal.timeout(15000)
+  const challenge=await fetch(origin+'/__f5/entry',{
+    method:'GET',signal:AbortSignal.timeout(15000)
   });
+  assert.equal(challenge.status,200);
+  const csrfCookie=/talera_f5_entry=[^;]+/.exec(
+    challenge.headers.get('set-cookie')||'')?.[0];
+  const csrfToken=/name="csrf" value="([0-9a-f.]+)"/.exec(await challenge.text())?.[1];
+  assert.ok(csrfCookie&&csrfToken,'Signed Safari form token and cookie required');
+  const openOptions={
+    method:'POST',
+    headers:{'content-type':'application/x-www-form-urlencoded',cookie:csrfCookie},
+    body:new URLSearchParams({key:f5,csrf:csrfToken}),
+    redirect:'manual',signal:AbortSignal.timeout(15000)
+  };
+  const noCsrf=await fetch(origin+'/__f5/entry',{...openOptions,
+    body:new URLSearchParams({key:f5})});
+  assert.equal(noCsrf.status,403,'Forged form without CSRF proof must be rejected');
+  const foreign=await fetch(origin+'/__f5/entry',{...openOptions,
+    headers:{...openOptions.headers,origin:'https://attacker.example'}});
+  assert.equal(foreign.status,403,'Foreign Origin must still be rejected');
+  // Safari native form can omit Origin entirely: keep accepting it only
+  // when the signed same-origin double-submit challenge is present.
+  const browserOpen=await fetch(origin+'/__f5/entry',openOptions);
   assert.equal(browserOpen.status,303,'Private browser testing gets signed QA cookie');
   const qaCookie=/talera_f5_access=[^;]+/.exec(browserOpen.headers.get('set-cookie')||'')?.[0];
   assert.ok(qaCookie,'QA authorization must be HttpOnly browser cookie');
@@ -213,7 +232,7 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:3,syntheticMemories:1,localRequests:calls,
-    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,

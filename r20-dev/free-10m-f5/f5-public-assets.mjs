@@ -24,6 +24,35 @@ for(const [route,filename] of Object.entries(routes)){
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;
 }
+// The approved /present page creates a SAME-ORIGIN iframe at
+// /vertelmodus-embed?mode=present. Its unchanged zero-based video/audio
+// player MUST be present or the RH19 dots advance over a frozen base image.
+// Package this public, cookie-free upstream player exactly, not a substitute.
+async function fetchApprovedPlayer(mode){
+ const u=new URL('/vertelmodus-embed?mode='+mode,origin);
+ const r=await fetch(u,{method:'GET',headers:{accept:'text/html'},
+   redirect:'error',signal:AbortSignal.timeout(25000)});
+ assert.equal(r.status,200,'Approved embedded narrator unavailable: '+mode);
+ assert.match(r.headers.get('content-type')||'',/text\\/html/i,
+   'Original player must be delivered as HTML');
+ assert.ok(!r.headers.get('set-cookie'),
+   'Refuse embedded player emitting customer session cookies');
+ const html=await r.text();
+ assert.ok(html.length>12000&&html.length<1_500_000,
+   'Unexpected original embed size');
+ for(const word of ['taleraZero','READY','INIT','VIDEO','voice','postMessage']){
+  assert.ok(html.includes(word),'Missing original zero-player marker: '+word);
+ }
+ return html;
+}
+const approvedPlayerA=await fetchApprovedPlayer('present');
+const approvedPlayerB=await fetchApprovedPlayer('record');
+assert.equal(approvedPlayerA,approvedPlayerB,
+  'Approved recording and presentation must use IDENTICAL embedded player');
+const approvedPlayerFile=sha(approvedPlayerA)+'.html';
+writeFileSync(path.join(publicDir,'__talera_free','f5references',approvedPlayerFile),
+  approvedPlayerA,'utf8');
+refs['/vertelmodus-embed']='/__talera_free/f5references/'+approvedPlayerFile;
 const scripts={};
 const paths=[
  '/__clean/menu-integration.mjs',

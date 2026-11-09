@@ -1,12 +1,8 @@
 name: TALERA Free - herstel Bekijk herinnering op F5 iPhone
 
-# ONE guarded redeployment to sync F5 with the user-specified design-cleanup
-# 2026-11-07 source. Re-freeze immediately after live verification.
+# Design-cleanup Free baseline was deployed and verified on isolated F5.
+# Stay FROZEN during iPhone testing; no automatic PR redeploy or key rotation.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-memory-view-hotfix.yml'
   workflow_dispatch:
 
 permissions:

@@ -30,8 +30,8 @@ async function workerStart(){
     path.join(generated,'browser-account-test-'+testKey),
     '--var','STAGING_F5_KEY:'+gate,'--var','STAGING_ACCESS_KEY:'+'2'.repeat(64),
     '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
-    '--var','AUTH_NAMESPACE_KEY:LOCAL_F5_ACCOUNT_BROWSER_SYNTHETIC_ONLY',
-    '--var','DEMO_IDENTITY_KEY:LOCAL_F5_ACCOUNT_SOCIAL_SYNTHETIC_ONLY',
+    '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_F5_ACCOUNT_BROWSER_ONLY_NEVER_PRODUCTION_20261109',
+    '--var','DEMO_IDENTITY_KEY:SYNTHETIC_F5_ACCOUNT_SOCIAL_ONLY_NEVER_PRODUCTION_20261109',
     '--log-level','error'],{
     env:{...process.env,CI:'true',BROWSER:'none'},
     stdio:['ignore','pipe','pipe']

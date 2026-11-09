@@ -8,13 +8,17 @@ const queue=[
  path.join(top,'generated/reference-mijn-leven.html'),
  path.join(top,'generated/reference-present.html'),
  path.join(top,'generated/reference-tell.html'),
- path.join(top,'public/__talera_free/assets')
+ path.join(top,'public/__talera_free/assets'),
+ // Approved public external scripts drive the real menu/account/share actions.
+ path.join(top,'public/__talera_free/f5scripts'),
+ // Includes the original embedded narrator and the three untouched sources.
+ path.join(top,'public/__talera_free/f5references')
 ];
 const paths=[];
 while(queue.length){
  const current=queue.shift();
 
- if(current.endsWith('/assets')){
+ if(['/assets','/f5scripts','/f5references'].some(x=>current.endsWith(x))){
    for(const f of readdirSync(current))queue.push(path.join(current,f));
    continue;
  }
@@ -47,6 +51,9 @@ const unported=routes.filter(x=>!x.explicitF5Route);
 const result={
  source:'https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev',
  analysis:'STATIC_REFERENCES_ONLY_NOT_A_RUNTIME_TRAFFIC_TRACE',
+ auditedSources:['anonymous-home','anonymous-present','anonymous-tell',
+  'external-approved-scripts','approved-snapshot-inline-and-narrator'],
+ scannedFiles:paths.length,
  explicitlyImplemented:'GET /api/version and existing Free auth/birthdate routes are counted as implemented; never count a string-only reference as a live call',
  routesFound:routes.length,possibleUnportedRoutes:unported.length,
  warning:'F5 returns 404 for unported routes; determine which are active before declaring unchanged app functionality.',

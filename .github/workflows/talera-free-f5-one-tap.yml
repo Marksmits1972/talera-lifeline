@@ -1,10 +1,8 @@
 name: TALERA Free final one-click iPhone test stage
 
+# Verified: deployed successfully. Keep iPhone stage stable: no automatic
+# redeploy or key rotation while the owner is using the final one-click link.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-one-tap.yml'
   workflow_dispatch:
 
 permissions:

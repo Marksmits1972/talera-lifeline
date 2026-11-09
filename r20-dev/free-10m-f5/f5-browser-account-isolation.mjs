@@ -94,7 +94,7 @@ async function menu(page){
      if(node&&!shell.contains(node)){node.click();break}
    }
    if(shell.hidden){
-     const buttons=[...document.querySelectorAll('nav.flow-nav button,nav.flow-nav a')];
+     const buttons=[...document.querySelectorAll('button,a')].filter(n=>!shell.contains(n));
      const trigger=buttons.find(n=>/meer|mijn talera|account/i.test(
        n.getAttribute('aria-label')||n.textContent||''));
      if(trigger)trigger.click();

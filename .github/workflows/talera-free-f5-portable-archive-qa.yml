@@ -17,7 +17,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Recover archive metadata, native blobs and check media checksums without network
+      - name: Verify archive/restore of full story record object, media bytes and checksums
         run: node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
       - name: Verify no editor, presentation, worker or auth source was modified
         shell: bash

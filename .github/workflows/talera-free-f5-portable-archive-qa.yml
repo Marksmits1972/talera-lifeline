@@ -21,6 +21,12 @@ jobs:
       - run: npm ci
       - name: Verify archive/restore of full story record object, media bytes and checksums
         run: node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+      - name: Install isolated mobile Chromium for realistic two-origin restore proof
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+      - name: Restore synthetic archive between two real browser origins without overwriting other memories
+        run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
       - name: Verify no editor, presentation, worker or auth source was modified
         shell: bash
         run: |

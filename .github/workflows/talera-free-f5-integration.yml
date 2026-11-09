@@ -37,6 +37,8 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
       - name: Preserve saved narration media IDs and cue times when reopening an existing iPhone memory
         run: node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+      - name: Verify cold first swipe uses no blank local media and keeps original RH19 animation
+        run: node r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs
       - name: Diagnose the CURRENT approved inline presentation engine, not old iframe assumptions
         run: node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs
       - name: Assert original TALERA editor remains intact and video picker reports every selected video
@@ -49,6 +51,7 @@ jobs:
           node --check r20-dev/free-10m-f5/f5-public-assets.mjs
           node --check r20-dev/free-10m-f5/f5-video-picker.mjs
           node --check r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+          node --check r20-dev/free-10m-f5/f5-neighbor-preview.mjs
       - name: Verify Cloudflare compilation without deployment
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
       - name: Execute synthetic auth + private DOB + social privacy and persistence

@@ -31,6 +31,8 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Inventory original WhatsApp API references without calling any private endpoint
+        run: node r20-dev/free-10m-f5/f5-original-api-inventory.mjs
       - name: Check all three original IDB writers and publisher media IDs
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
       - name: Check pre-save cue media-ID reconnection without altering times
@@ -50,5 +52,7 @@ jobs:
         if: success()
         with:
           name: talera-free-whatsapp-storage-only-ci
-          path: r20-dev/free-10m-f5/generated/storage-only-result.json
+          path: |
+            r20-dev/free-10m-f5/generated/storage-only-result.json
+            r20-dev/free-10m-f5/generated/storage-route-inventory.json
           retention-days: 14

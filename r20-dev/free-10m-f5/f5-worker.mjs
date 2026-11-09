@@ -173,7 +173,7 @@ async function easyStart(request,env){
   const site=request.headers.get('sec-fetch-site');
   if(site&&site!=='same-origin'&&site!=='none')
     return deny(403,'Ongeldige herkomst');
-  if(!/application\\/json/i.test(request.headers.get('content-type')||''))
+  if(!/application\/json/i.test(request.headers.get('content-type')||''))
     return deny(415,'Verkeerd berichtformaat');
   if(Number(request.headers.get('content-length')||0)>300)
     return deny(413,'Aanvraag te groot');

@@ -65,7 +65,7 @@ const prepare=async sid=>{
   extraHTTPHeaders:{'x-talera-f5-key':gate}
  });
  await ctx.addCookies([{
-  name:'talera_sid',value:sid,url:origin,path:'/',
+  name:'talera_sid',value:sid,domain:'127.0.0.1',path:'/',
   secure:false,httpOnly:true,sameSite:'Lax'
  }]);
  const page=await ctx.newPage(),errors=[];

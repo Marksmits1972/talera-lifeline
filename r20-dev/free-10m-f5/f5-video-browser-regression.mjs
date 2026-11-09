@@ -406,23 +406,47 @@ try{
         throw Error('Identical timestamp story selection: '+JSON.stringify(state)+
           '; '+error.message);
       });
-      const first=await page.evaluate(()=>({
-        index:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
-        background:getComputedStyle(document.getElementById('photoLayerA')).backgroundImage,
-        narrated:document.body.classList.contains('talera-v61-narration-visual')
-      }));
+      const visibleState=()=>page.evaluate(()=>{
+        const memory=window.__taleraTimelineRuntime?.currentMemory?.();
+        const layer=id=>{
+          const e=document.getElementById(id);
+          if(!e)return null;
+          const st=getComputedStyle(e);
+          return {display:st.display,opacity:st.opacity,visibility:st.visibility,
+            background:st.backgroundImage,style:e.getAttribute('style'),
+            html:e.outerHTML.slice(0,950),image:e.querySelector('img')?.currentSrc||''};
+        };
+        const stage=document.getElementById('photoStage');
+        return {
+          index:memory?._photoIndex,storyId:memory?.storyId,
+          photoUrls:(memory?.photos||[]).slice(0,3).map(x=>String(x).slice(0,95)),
+          narrationVisual:document.body.classList.contains('talera-v61-narration-visual'),
+          layerA:layer('photoLayerA'),layerB:layer('photoLayerB'),
+          stage:stage?.outerHTML.slice(0,1750),
+          covers:[...(stage?.querySelectorAll('img,video')||[])].slice(0,6)
+            .map(e=>({tag:e.tagName,src:e.currentSrc||e.src||'',class:e.className}))
+        };
+      });
+      const first=await visibleState();
       assert.equal(first.index,0);
-      assert.equal(first.narrated,false,
-        'Unvoiced memory must use ordinary tap mode, never voice cues');
+      assert.equal(first.narrationVisual,false,
+        'An unvoiced memory must stay in ordinary tap mode');
+      const photoBefore=await page.locator('#photoStage').screenshot();
       await page.locator('#photoStage').tap({force:true});
       await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===1,
         null,{timeout:9000});
-      const after=await page.evaluate(()=>({
-        index:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
-        background:getComputedStyle(document.getElementById('photoLayerA')).backgroundImage
-      }));
-      assert.notEqual(first.background,after.background,
-        'A single photograph MUST visibly change on tap, not only its dot');
+      await page.waitForTimeout(650);
+      const after=await visibleState();
+      const photoAfter=await page.locator('#photoStage').screenshot();
+      if(photoBefore.equals(photoAfter)){
+        console.error('TALERA_F5_ONE_FROZEN_STORY_REPRO',JSON.stringify({
+          target,sameDate:true,first,after,
+          imageHasChanged:false,
+          existingRecords:plainIds.length
+        }));
+        throw Error('Ordinary 5-photo+1-video story: index changes but visible photo stays');
+      }
+      assert.equal(after.storyId,target,'Selected duplicate-date memory must not change');
       result[result.length-1].ordinarySameDateMultipleStoryTapPassed=true;
     }
 

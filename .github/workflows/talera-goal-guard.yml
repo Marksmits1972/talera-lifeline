@@ -1,0 +1,32 @@
+name: TALERA goal and scope guard
+on:
+  push:
+    branches: [process/talera-goal-guard-protocol-20261106]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  check-goal-and-scope:
+    name: Work-order, proof and protected scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      TALERA_BASE_SHA: ${{ github.event.pull_request.base.sha || 'e117272f8d02ee63b660962d57ceb11972be1699' }}
+      TALERA_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout candidate source and full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Node for independent scope checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check guard rules with negative tests
+        run: node --test scripts/check-talera-goal.test.mjs
+      - name: Verify PR follows exactly one agreed work-order
+        run: node scripts/check-talera-goal.mjs --base "$TALERA_BASE_SHA" --head "$TALERA_HEAD_SHA"
+      - name: Reminder: tests do not replace user or iPhone acceptance
+        run: echo 'PASS is only file scope + work-order integrity; visual/functional acceptance is separately required.'

@@ -128,6 +128,11 @@ try{
    '-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',
    '-movflags','+faststart',path.join(out,'f5-video-picker-test.mp4')],{timeout:20000});
  const videoB64=readFileSync(path.join(out,'f5-video-picker-test.mp4')).toString('base64');
+ execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-nostdin','-y',
+   '-f','lavfi','-i','sine=frequency=440:duration=4',
+   '-ac','1','-ar','16000','-c:a','pcm_s16le',
+   path.join(out,'f5-presentation-voice.wav')],{timeout:20000});
+ const wavB64=readFileSync(path.join(out,'f5-presentation-voice.wav')).toString('base64');
  await start();
  browser=await chromium.launch({headless:true});
  const result=[];
@@ -224,13 +229,68 @@ try{
     assert.equal(onPlayer.hasStory,true);
     result[result.length-1].ownMemoryViewOpen=true;
     result[result.length-1].ownMemoryVideoVisibleToPlayer=true;
+    // Real regression for the user's iPhone: timeline dots advance but the
+    // full-screen photo remains fixed. The original parent loads an
+    // authenticated /vertelmodus-embed iframe and passes actual media and
+    // recorded narration cues. Check the visible DOM changes on the PLAYER.
+    const narrated=await page.evaluate(async({videoB64,wavB64})=>{
+      const files=[];
+      for(const color of ['#ec1717','#165ff2']){
+        const canvas=document.createElement('canvas');
+        canvas.width=120;canvas.height=120;
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle=color;ctx.fillRect(0,0,120,120);
+        const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+        files.push(new File([blob],'kleur-'+files.length+'.png',{type:'image/png'}));
+      }
+      files.push(new File([Uint8Array.from(atob(videoB64),x=>x.charCodeAt(0))],
+        'f5-bewegende-video.mp4',{type:'video/mp4'}));
+      files.push(new File([Uint8Array.from(atob(wavB64),x=>x.charCodeAt(0))],
+        'f5-gesproken-tekst.wav',{type:'audio/wav'}));
+      const saved=await window.TaleraMemories.save({
+        title:'F5 presentatie met wisselende beelden en gesproken tekst',
+        date:'2026-11-09',text:'Vijf echte synthetic-only acceptatieframes',
+        narrationCues:[{t:0,index:0},{t:900,index:1},
+          {t:2200,index:2,videoAtMs:100}],
+        narrationDurationMs:4000
+      },files);
+      return {id:saved.id,types:(saved.items||[]).map(x=>x.kind)};
+    },{videoB64,wavB64});
+    assert.deepEqual(narrated.types,['photo','photo','video','audio'],
+      'Original local store must preserve exact narrated media order');
+    const presentResponse=await page.goto(
+      origin+'/present?memory='+narrated.id,
+      {waitUntil:'domcontentloaded',timeout:25000});
+    assert.equal(presentResponse.status(),200);
+    const child=page.frameLocator('iframe.talera-zero-present-frame');
+    await child.locator('#play').waitFor({state:'visible',timeout:24000});
+    const initial=await child.locator('#view [data-index]').first()
+      .getAttribute('data-index');
+    assert.equal(initial,'0','Original narrator must show first photo on opening');
+    const childFrame=page.locator('iframe.talera-zero-present-frame');
+    assert.ok((await childFrame.getAttribute('src')).startsWith(
+      '/vertelmodus-embed?mode=present'));
+    await child.locator('#play').click();
+    await child.locator('#view [data-index="1"]').waitFor({
+      state:'attached',timeout:12000
+    });
+    await child.locator('#view video[data-index="2"]').waitFor({
+      state:'attached',timeout:12000
+    });
+    const progression=await child.locator('#view [data-index]').first()
+      .getAttribute('data-index');
+    assert.equal(progression,'2',
+      'The full-screen player must replace the fixed photo with actual video');
+    result[result.length-1].narratedVideoPresentedOnSingleStage=true;
+    result[result.length-1].actualImage0ToImage1ToVideo2=true;
+
   }
   await ctx.close();
  }
  console.log('TALERA_F5_IPHONE_VIDEO_IMPORT_PASS',JSON.stringify({
   passed:true,syntheticOnly:true,originalPhotosRetained:true,
   originalVideoPersisted:true,explicitPickerVisible:true,
-  mixedPickerNoSilentDrop:true,originalOwnMemoryViewRouteChecked:true,realIphoneDeviceTested:false,
+  mixedPickerNoSilentDrop:true,originalOwnMemoryViewRouteChecked:true,originalVoiceAnd3CuePhotoVideoPresentationRegression:true,realIphoneDeviceTested:false,
   scenarios:result
  }));
 }finally{await stop()}

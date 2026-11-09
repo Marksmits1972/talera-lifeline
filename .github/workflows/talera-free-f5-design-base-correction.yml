@@ -1,8 +1,13 @@
 name: TALERA Free F5 - development-base correction to design-cleanup 20261107
 
-# The intended development base is now deployed and verified. Do not
-# automatically redeploy while iPhone test accounts/media are present.
+# Single isolated hotfix: retain latest approved design-cleanup and
+# preserve original narrator media IDs when an edited story is reopened.
+# Freeze again immediately after verified stage deploy.
 on:
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - '.github/workflows/talera-free-f5-design-base-correction.yml'
   workflow_dispatch:
 
 permissions:
@@ -60,10 +65,12 @@ jobs:
           node r20-dev/free-10m-f5/f5-public-assets.mjs
           node --check r20-dev/free-10m-f5/f5-worker.mjs
           node --check r20-dev/free-10m-f5/f5-video-picker.mjs
+          node --check r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
       - name: Test private IndexedDB alignment and unchanged video import
         run: |
           node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
           node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
+          node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
       - name: Update SAME separate Free EU staging worker without touching 5 sessions or upstream
         run: npx --no-install wrangler deploy --config r20-dev/free-10m-f5/wrangler.staging.jsonc
       - name: Real cloud smoke - old entry available and customer stories protected

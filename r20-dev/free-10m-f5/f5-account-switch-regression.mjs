@@ -16,7 +16,8 @@ for(const k of ['\/api\/register','\/api\/login','\/api\/logout'])assert.ok(serv
  'Original auth route lost: '+k);
 assert.ok(!source.includes('location.reload();'),
  'Do not duplicate an existing source reload without review');
-assert.throws(()=>secureAccountMenuTransitions(source.replace('state.history=[];','state.history=undefined;')),
+assert.throws(()=>secureAccountMenuTransitions(source.replace('setActiveAccount(result.account||null);state.history=[];',
+ 'setActiveAccount(result.account||null);state.history=undefined;')),
  /ORIGINAL_ACCOUNT_MENU_TRANSITION_MARKER_CHANGED/,
  'Fail closed if original approved account menu changes');
 console.log('TALERA_F5_ACCOUNT_REBIND_AFTER_AUTH_PASS',JSON.stringify({

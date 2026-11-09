@@ -56,6 +56,18 @@ export class FreeSocialMemory extends DurableObject{
   }
   return false;
  }
+ // Internal OWNER-ONLY read model: true DO grants and share expiry,
+ // without titles, story bodies, media, or raw capability tokens.
+ async ownerOverview(actor){
+  this.checkOwner(actor);
+  const owner=this.owner();
+  if(!owner)throw Error('OWNER_REQUIRED');
+  return {
+   storyId:owner.story_id,
+   shares:this.sql.exec('SELECT token_hash,expires_at,revoked_at FROM shares ORDER BY expires_at DESC LIMIT 1000').toArray(),
+   grants:this.sql.exec('SELECT recipient_id,revoked_at FROM grants ORDER BY recipient_id LIMIT 1000').toArray()
+  };
+ }
  async grant(actor,recipientId){
   this.checkOwner(actor);verifyAccountId(recipientId);
   this.sql.exec("INSERT INTO grants(recipient_id,revoked_at) VALUES (?,NULL) ON CONFLICT(recipient_id) DO UPDATE SET revoked_at=NULL",recipientId);

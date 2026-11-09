@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
-import {mkdirSync,writeFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -130,6 +130,29 @@ async function run(){
     identities.push({id:r.data.account.id,cookie:cookieOf(r)});
   }
   assert.equal(new Set(identities.map(x=>x.id)).size,3);
+  // F5 may not silently proxy legacy share/media routes to the customer's
+  // older Cloudflare backend. The original UI still references some of them,
+  // but Free personal originals MUST stay in the phone's IndexedDB.
+  const legacyPrivateRoutes=[
+    ['POST','/api/account-social/stories'],
+    ['POST','/api/account-social/stories/local-f5-test-story-001/media'],
+    ['GET','/api/linked/stories/local-f5-test-story-001'],
+    ['GET','/api/integration/stories/local-f5-test-story-001'],
+    ['POST','/api/v12-invites/story'],
+    ['POST','/api/v12-invites/revoke'],
+    ['GET','/api/share-preview/meta/'+('b'.repeat(64))],
+    ['GET','/api/v25/social/memory/v25-demo-1450']
+  ];
+  for(const [verb,path] of legacyPrivateRoutes){
+    const response=await request(verb,path,{
+      cookie:identities[0].cookie,
+      body:verb==='POST'?{storyId:'local-f5-test-story-001',
+        syntheticOnly:true,neverUploadLocalMedia:true}:undefined
+    });
+    assert.equal(response.status,404,
+      'Legacy share/media endpoint must NOT write local Free originals to cloud: '+path);
+  }
+
   // Test final simple one-tap iPhone link without any Cloudflare setup,
   // manually typed test code, real account, or leaked live bearer token.
   const easyHtml=await request('GET','/__f5/start',{gate:false});
@@ -264,6 +287,41 @@ async function run(){
 
   const scopedName=/talera-free-local-([a-f0-9]{32})-v1/.exec(String(signedHome.data))?.[0];
   assert.ok(scopedName,'The existing IndexedDB media store must be scoped to current account');
+  // Free re-login must reopen exactly the same private local library namespace.
+  const rejectedLogin=await request('POST','/api/login',{
+    body:{email:users[0].email,password:'wrong-synthetic-password'}
+  });
+  assert.equal(rejectedLogin.status,401,'Wrong password cannot expose local originals');
+  const renewedLogin=await request('POST','/api/login',{
+    body:{email:users[0].email,password:users[0].password}
+  });
+  assert.equal(renewedLogin.status,200,'Original menu login must work');
+  assert.equal(renewedLogin.data.account.id,identities[0].id,
+    'Re-login cannot create a fresh account with an empty library');
+  const renewedCookie=cookieOf(renewedLogin);
+  const discovery=await request('GET','/api/discovery',{cookie:renewedCookie});
+  assert.equal(discovery.status,200,'Original account menu needs safe discovery GET');
+  assert.deepEqual(discovery.data,{publicHandle:users[0].username,discoverable:false},
+    'Never expose another account or claim live people search');
+  assert.equal((await request('GET','/api/discovery')).status,401,
+    'Signed-out user cannot read another persons account preference');
+  assert.equal((await request('GET','/api/discovery',{cookie:identities[1].cookie}))
+    .data.publicHandle,users[1].username,
+    'Another account only sees its own verified username');
+  assert.equal((await request('POST','/api/discovery',{
+    cookie:renewedCookie,body:{discoverable:true,username:'different-handle'}
+  })).status,409,'Do not pretend discoverability was saved or reserve an invalid handle');
+  assert.equal((await request('GET','/api/discovery',{cookie:renewedCookie}))
+    .data.discoverable,false,'Unsupported privacy setting must remain inactive');
+  assert.equal((await request('GET','/api/discovery?all=1',{cookie:renewedCookie}))
+    .status,404,'No account discovery or enumeration via query strings');
+  const reopenedHome=await request('GET','/mijn-leven',{cookie:renewedCookie});
+  assert.equal(reopenedHome.status,200);
+  assert.ok(String(reopenedHome.data).includes(scopedName),
+    'Re-login must use same IndexedDB for photos, video, audio and cues');
+  assert.equal((await request('GET','/api/me',{cookie:renewedCookie})).data.account.birthDate,
+    '1974-04-02','Birthdate must remain linked to the original person');
+
   assert.ok(!String(signedHome.data).includes("DB_NAME='talera-lifeline-dev-local-v1'"),
     'A signed-in user must never write to the shared legacy local database');
   const otherHome=await request('GET','/mijn-leven',{cookie:identities[1].cookie});
@@ -289,9 +347,41 @@ async function run(){
     'Presentation must access the very same private local story and media store');
   assert.match(String(signedPresent.data),/const LIFE_START = new Date\(1974,3,2\)\.getTime\(\);/,
     'Presentation start must match account private birthdate');
+  // HARD CONTRACT: chosen WhatsApp CSS-cleanup origin is the complete UI.
+  // Storage-only integration must never introduce its own controls or RH19 CSS.
+  const protectedPages=[String(signedHome.data),String(signedPresent.data),
+    String(storyEditor.data)];
+  for(const html of protectedPages){
+    for(const forbidden of ['taleraF5AddVideoButton','talera-f5-narrated-swipe-band',
+      'f5PrewarmFirstAdjacent','talera-f5-media-status']){
+      assert.ok(!html.includes(forbidden),
+        'Free storage integration must not mutate approved UX: '+forbidden);
+    }
+  }
   const publicScript=await request('GET','/__clean/menu-integration.mjs');
   assert.equal(publicScript.status,200,'Original TALERA menu script must load from approved snapshot');
   assert.ok(String(publicScript.data).length>100,'Actual menu integration JavaScript is expected');
+  assert.equal((String(publicScript.data).match(/location\.reload\(\);/g)||[]).length,3,
+    'Login, registration and logout MUST refresh the account-scoped local library');
+
+  // Active original /api/version?check=Date.now() must work within this
+  // SAME isolated origin, but must not expose a broad legacy API gateway.
+  const originalVersion='talera-storage-v37-20261022';
+  for(const file of ['reference-mijn-leven.html','reference-present.html']){
+    const html=readFileSync(path.join('r20-dev/free-10m-delivery/generated',file),'utf8');
+    const match=html.match(/const CURRENT=['\"](talera-[^'\"]+)['\"]/);
+    assert.ok(match,'Original version checker missing in '+file);
+    assert.equal(match[1],originalVersion,'Do not invent a version for '+file);
+  }
+  const version=await request('GET','/api/version?check='+Date.now());
+  assert.equal(version.status,200,'Original iPhone version polling must work');
+  assert.equal(version.data.version,originalVersion,'Approved source version must match exactly');
+  assert.equal((await request('GET','/api/version?check='+Date.now()+'&extra=1')).status,404,
+    'Version endpoint must reject arbitrary query parameters');
+  assert.equal((await request('POST','/api/version')).status,404,
+    'Version check must be read-only');
+  assert.equal((await request('GET','/api/version?check='+Date.now(),{gate:false})).status,403,
+    'Closed staging version endpoint must still require the QA gate');
   const sw=await request('GET','/sw.js');
   assert.equal(sw.status,200,'PWA service worker must be retained');
   assert.match(String(sw.data),/self\.addEventListener/,'Real original service worker code expected');
@@ -318,7 +408,21 @@ async function run(){
   assert.equal((await request('POST','/api/profile/birthdate',{
     cookie:identities[0].cookie,body:{birthDate:'2026-02-30'}})).status,400);
   const made=await request('POST',route('init'),{cookie:identities[0].cookie});
+  assert.equal((await request('GET','/api/shares')).status,401);
+  assert.equal((await request('GET','/api/my-grants')).status,401);
+  assert.equal((await request('GET','/api/memories',{cookie:identities[0].cookie}))
+    .status,409,'Free local stories cannot be read via a server route');
+
   assert.equal(made.status,200,'Real auth session identifies social owner');
+  for(const endpoint of ['/api/shares','/api/my-grants']){
+    const listing=await request('GET',endpoint,{cookie:identities[0].cookie});
+    assert.equal(listing.status,200,'Actual menu social list: '+endpoint);
+    assert.deepEqual(listing.data.items,[],
+      'A newly created synthetic account has not shared anything');
+    assert.deepEqual((await request('GET',endpoint,{cookie:identities[1].cookie}))
+      .data.items,[],'Another account cannot list these rights');
+  }
+
   assert.equal((await request('GET',route('view'),{
     cookie:identities[1].cookie})).status,403);
   assert.equal((await request('POST',route('init'),{
@@ -328,6 +432,15 @@ async function run(){
   const grant=await request('POST',route('grant'),{
     cookie:identities[0].cookie,body:{recipientId:identities[1].id}});
   assert.equal(grant.status,200);
+  const grantedRows=await request('GET','/api/my-grants',{cookie:identities[0].cookie});
+  assert.equal(grantedRows.status,200);
+  assert.equal(grantedRows.data.items.length,1);
+  assert.equal(grantedRows.data.items[0].memory_id,storyId);
+  assert.equal(grantedRows.data.items[0].recipient_account_id,identities[1].id);
+  assert.equal(grantedRows.data.items[0].recipient_name,users[1].displayName);
+  assert.deepEqual((await request('GET','/api/my-grants',{cookie:identities[1].cookie}))
+    .data.items,[],'Recipient does not own that grant');
+
   assert.equal((await request('GET',route('view'),{
     cookie:identities[1].cookie})).status,200);
   assert.equal((await request('POST',route('like'),{
@@ -338,12 +451,40 @@ async function run(){
   assert.equal(link.status,200);
   const token=/^\/__social\/shared\/([a-f0-9]{64})$/.exec(link.data.link)?.[1];
   assert.ok(token,'Share capability expected');
+  const issued=await request('GET','/api/shares',{cookie:identities[0].cookie});
+  assert.equal(issued.status,200,'Issued link is visible to the real menu');
+  assert.equal(issued.data.items.length,1);
+  assert.equal(issued.data.items[0].memory_id,storyId);
+  assert.equal(issued.data.items[0].revoked_at,null);
+  assert.equal(issued.data.items[0].expires_at,link.data.expiresAt);
+  assert.deepEqual((await request('GET','/api/shares',{cookie:identities[1].cookie}))
+    .data.items,[],'A different account cannot see owner links');
+
   assert.equal((await request('GET',link.data.link)).status,200);
   assert.equal((await request('POST',route('revoke-share'),{
     cookie:identities[0].cookie,body:{token}})).status,200);
   assert.equal((await request('GET',link.data.link)).status,403);
+  const originalGrantRevoke='/api/memories/'+storyId+'/grants/'+identities[1].id+'/revoke';
+  assert.equal((await request('POST',originalGrantRevoke,{
+    cookie:identities[2].cookie,body:{}})).status,404,
+    'Unrelated account cannot revoke a different owner grant');
+  assert.equal((await request('POST',originalGrantRevoke,{
+    cookie:identities[0].cookie,body:{}})).status,200,
+    'Exact approved original menu route must revoke actual DO right');
+  assert.deepEqual((await request('GET','/api/my-grants',{
+    cookie:identities[0].cookie})).data.items,[]);
+  const revokedMenu=await request('GET','/api/shares',{cookie:identities[0].cookie});
+  assert.equal(revokedMenu.status,200);
+  assert.ok(revokedMenu.data.items[0].revoked_at,
+    'Menu must show real withdrawn state, not a made-up empty list');
+
   assert.equal((await request('POST',route('revoke-grant'),{
     cookie:identities[0].cookie,body:{recipientId:identities[1].id}})).status,200);
+  const noGrant=await request('GET','/api/my-grants',{cookie:identities[0].cookie});
+  assert.equal(noGrant.status,200);
+  assert.deepEqual(noGrant.data.items,[],
+    'Real revoked direct grant is no longer listed as active');
+
   assert.equal((await request('GET',route('view'),{
     cookie:identities[1].cookie})).status,403);
   assert.equal((await request('POST','/api/logout',{
@@ -365,10 +506,11 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,originalLocalMemoryPresentationRouteVerified:true,originalStandaloneIframePlayerActuallyLoaded:true,localRequests:calls,
-    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,loginReturnsSamePrivateDbVerified:true,readOnlyAccountMenuDiscoveryVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,
+    legacyMediaAndInviteEndpointsFailClosed:true,
     realCustomerDataUsed:false,officialTaleraConnected:false,
     loggedInPwaUiCertified:false,tenMillionCapacityProven:false
   };

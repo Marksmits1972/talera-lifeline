@@ -2,6 +2,7 @@
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
+import {secureAccountMenuTransitions} from './f5-account-switch-guard.mjs';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -81,8 +82,16 @@ for(const name of paths){
  assert.equal(second.status,200,'F5 public script repeat must exist: '+name);
  assert.equal(first.body,second.body,'Unstable/possibly personalized public JS: '+name);
  const ext=name.endsWith('.mjs')?'mjs':'js';
- const filename=sha(first.body)+'.'+ext;
- writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),first.body,'utf8');
+ let shipped=first.body;
+ // The original menu signs in/out IN PLACE, leaving the already loaded
+ // account-scoped IndexedDB code bound to the PREVIOUS person. Reopen the
+ // exact SAME URL only after a successful auth transition; no UI changes.
+ if(name==='/__clean/menu-integration.mjs'){
+   writeFileSync(path.join(generated,'approved-menu-original.mjs'),first.body);
+   shipped=secureAccountMenuTransitions(first.body);
+ }
+ const filename=sha(shipped)+'.'+ext;
+ writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');
  scripts[name]='/__talera_free/f5scripts/'+filename;
 }
 assert.ok(scripts['/__clean/menu-integration.mjs'],

@@ -358,7 +358,7 @@ async function socialApi(request,env){
   // SOCIAL_MEMORY. Index only metadata after success in the EXISTING owner DO.
   // Re-read the social DO for actual grants/revocation when listing.
   if(actor&&request.method==='POST'&&response.ok){
-    const match=/^\\/__social\\/memory\\/([A-Za-z0-9_-]{8,80})\\/(init|share)$/
+    const match=/^\/__social\/memory\/([A-Za-z0-9_-]{8,80})\/(init|share)$/
       .exec(new URL(request.url).pathname);
     if(match){
       const [,storyId,operation]=match,account=accountHome(env,actor.id);
@@ -366,7 +366,7 @@ async function socialApi(request,env){
         await account.rememberSocialStory(storyId);
       }else{
         const data=await response.clone().json();
-        const token=/^\\/__social\\/shared\\/([a-f0-9]{64})$/.exec(data.link||'')?.[1];
+        const token=/^\/__social\/shared\/([a-f0-9]{64})$/.exec(data.link||'')?.[1];
         if(!token)throw Error('INVALID_SOCIAL_SHARE_RESPONSE');
         const hash=await shaHex(token);
         try{await account.rememberSocialStory(storyId);
@@ -587,7 +587,7 @@ export default {
       }
       if(p==='/api/shares'||p==='/api/my-grants')
         return accountSocialLists(request,env);
-      const revoke=/^\\/api\\/shares\\/([a-f0-9]{64})(?:\\/revoke)?$/.exec(p);
+      const revoke=/^\/api\/shares\/([a-f0-9]{64})(?:\/revoke)?$/.exec(p);
       if(revoke)return revokeAccountShare(request,env,revoke[1]);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);

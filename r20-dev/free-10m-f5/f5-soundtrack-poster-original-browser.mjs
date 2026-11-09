@@ -6,12 +6,12 @@ import {readFileSync,mkdirSync} from 'node:fs';
 import {chromium,devices} from 'playwright';
 const dir='r20-dev/free-10m-f5/generated';
 mkdirSync(dir,{recursive:true});
-const file=dir+'/regression-soundtrack.mp4';
+const file=dir+'/regression-soundtrack.webm';
 execFileSync('ffmpeg',['-nostdin','-hide_banner','-loglevel','error','-y',
 '-f','lavfi','-i','color=c=blue:s=320x180:r=15:d=2',
 '-f','lavfi','-i','sine=frequency=523:duration=2',
-'-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',
-'-c:a','aac','-b:a','96k','-shortest','-movflags','+faststart',file]);
+'-c:v','libvpx','-deadline','realtime','-cpu-used','6',
+'-c:a','libopus','-b:a','96k','-shortest',file]);
 const streams=execFileSync('ffprobe',['-v','error',
 '-show_entries','stream=codec_type','-of','csv=p=0',file],{encoding:'utf8'});
 assert.ok(streams.includes('audio')&&streams.includes('video'));
@@ -33,7 +33,7 @@ const origin='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers
 const response=await page.goto(origin+'/tell',{waitUntil:'domcontentloaded',timeout:30000});
 assert.equal(response.status(),200);
 await page.locator('#photoInput').setInputFiles({
- name:'video-met-hoorbaar-geluid.mp4',mimeType:'video/mp4',buffer:readFileSync(file)});
+ name:'video-met-hoorbaar-geluid.webm',mimeType:'video/webm',buffer:readFileSync(file)});
 await page.locator('.talera-work-tiles .tile[data-id]').first().waitFor({timeout:30000});
 await page.waitForTimeout(13000);
 const result=await page.evaluate(()=>{
@@ -46,7 +46,7 @@ const result=await page.evaluate(()=>{
   videoPlays:window.__videoPlays.slice(0,10)};
 });
 console.log('TALERA_ORIGINAL_SOUND_VIDEO_POSTER_BROWSE',JSON.stringify({
-  ...result,errors,videoHasActualAacAudio:true,sourceOriginalUI:true
+  ...result,errors,videoHasActualOpusAudio:true,sourceOriginalUI:true
 }));
 assert.equal(errors.length,0);
 assert.equal(result.imageSrcKind,'blob','Actual video must have JPEG thumbnail, not placeholder');

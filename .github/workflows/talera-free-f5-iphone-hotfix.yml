@@ -1,0 +1,94 @@
+name: TALERA Free F5 iPhone formulier hotfix - isolated stage only
+
+on:
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - '.github/workflows/talera-free-f5-iphone-hotfix.yml'
+      - 'r20-dev/free-10m-f5/f5-worker.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-f5-iphone-form-hotfix-stage
+  cancel-in-progress: false
+
+jobs:
+  deploy_only_isolated_free_stage:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Pinned dependencies
+        run: npm ci
+      - name: Verify exact isolated target; never point to TALERA production
+        run: |
+          node --input-type=module -e "import fs from 'node:fs';import assert from 'node:assert/strict';const w=JSON.parse(fs.readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));assert.equal(w.name,'talera-free-f5-combined-stage-20261108');assert.equal(w.durable_objects.bindings.length,7);assert.ok(!w.d1_databases&&!w.r2_buckets&&!w.services);"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Build verified public PWA assets from six anonymous GETs
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+      - name: Upload only isolated Worker code preserving ALL existing staging secrets
+        run: |
+          npx --no-install wrangler deploy --config r20-dev/free-10m-f5/wrangler.staging.jsonc
+      - name: Verify Safari form without Origin, CSRF, and foreign Origin rejection
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const root='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+          const signal=()=>AbortSignal.timeout(20000);
+          let html,cookie,csrf;
+          for(let i=0;i<12;i++){
+            const r=await fetch(root+'/__f5/entry',{signal:signal(),cache:'no-store'});
+            html=await r.text();
+            cookie=/talera_f5_entry=[^;]+/.exec(r.headers.get('set-cookie')||'')?.[0];
+            csrf=/name="csrf" value="([a-f0-9.]+)"/.exec(html)?.[1];
+            if(r.status===200&&cookie&&csrf)break;
+            await new Promise(resolve=>setTimeout(resolve,800));
+          }
+          assert.ok(cookie&&csrf,'New signed form must be live on separate stage');
+          const base={method:'POST',redirect:'manual',
+            headers:{'content-type':'application/x-www-form-urlencoded',cookie},
+            signal:signal()};
+          const key='0'.repeat(64);
+          const valid=await fetch(root+'/__f5/entry',{...base,
+            body:new URLSearchParams({key,csrf})});
+          const validBody=await valid.json();
+          assert.equal(valid.status,403);
+          assert.match(validBody.error,/Toegangscode niet herkend/);
+          // Safari without Origin passed SAME-ORIGIN CSRF verification,
+          // reaching the (intentionally invalid) access-code check.
+          const noCsrf=await fetch(root+'/__f5/entry',{...base,
+            body:new URLSearchParams({key})});
+          assert.equal(noCsrf.status,403);
+          assert.match((await noCsrf.json()).error,/Open de testpagina/);
+          const attack=await fetch(root+'/__f5/entry',{...base,
+            headers:{...base.headers,origin:'https://attacker.example'},
+            body:new URLSearchParams({key,csrf})});
+          assert.equal(attack.status,403);
+          assert.match((await attack.json()).error,/Ongeldige herkomst/);
+          const protectedPage=await fetch(root+'/mijn-leven',{signal:signal()});
+          assert.equal(protectedPage.status,403,'F5 customer pages remain access-controlled');
+          console.log('TALERA_IPHONE_FORM_HOTFIX_PASS',JSON.stringify({
+            separateStageOnly:true,stagingSecretsPreserved:true,
+            safariMissingOriginAcceptedWithSignedForm:true,
+            rejectedForgedForm:true,rejectedForeignOrigin:true,
+            originalTaleraUntouched:true
+          }));
+          JS

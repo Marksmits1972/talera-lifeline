@@ -292,6 +292,9 @@ try{
    accountLibraryRetained:true,originalMediaRetained:true,
    otherAccountIsolated:true,playerUnchanged:true,realPhysicalIphone:false
  }));
+ const afterBackSocialPage=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+ assert.equal(afterBackSocialPage.status(),200);
+ await waitForLibrary(page);
  // Synthetic social reference ONLY: the photo is still inside IndexedDB.
  // Exercise the ORIGINAL menu end-to-end with a real local story title and
  // actual Durable Object link. No photo/media payload is uploaded.

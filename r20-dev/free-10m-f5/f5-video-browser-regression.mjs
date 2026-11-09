@@ -278,6 +278,51 @@ try{
     },{videoB64,wavB64});
     assert.deepEqual(narrated.types,['photo','photo','video','audio'],
       'Original local store must preserve exact narrated media order');
+    // Inject diagnosis ONLY in the synthetic HTTP response via Playwright.
+    // The original TALERA app and F5 Worker files are not edited here.
+    await page.route('**/present?memory=*',async route=>{
+      const response=await route.fetch();
+      let html=await response.text();
+      const edits=[
+        ["const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;",
+         "const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;"+
+         "window.__f5AdapterTrace=[];"+
+         "function __f5Log(step,detail){window.__f5AdapterTrace.push({"+
+         "t:Math.round(performance.now()),step,detail:detail||null});}"+
+         "__f5Log('start',{store:!!store,runtime:!!runtime});"],
+        ["const stage=document.getElementById('photoStage');",
+         "const stage=document.getElementById('photoStage');"+
+         "__f5Log('stage',{exists:!!stage});"],
+        ["async function hydrate(memory){",
+         "async function hydrate(memory){"+
+         "__f5Log('hydrate-start',{id:memory?.id});"],
+        ["memory._photoLoading=false;",
+         "memory._photoLoading=false;"+
+         "__f5Log('hydrated',{id:memory.id});"],
+        ["async function present(memory){",
+         "async function present(memory){"+
+         "__f5Log('present-called',{id:memory?.id,stage:!!stage});"],
+        ["function activate(memory){",
+         "function activate(memory){"+
+         "__f5Log('activate',{id:memory?.id,local:!!memory?._taleraLocal,"+
+         "loading:memory?._photoLoading,types:memory?._zeroItems?.map(x=>x.kind)});"],
+        ["runtime.subscribe(activate);",
+         "runtime.subscribe(activate);__f5Log('subscribed');"],
+        ["const rows=await store.list();",
+         "__f5Log('list-start');const rows=await store.list();"+
+         "__f5Log('list-loaded',{count:rows.length});"],
+        ["await hydrate(selected);",
+         "await hydrate(selected);__f5Log('selected-hydrated',{loading:selected._photoLoading});"],
+        ["activate(selected);",
+         "__f5Log('selected-explicit-activate');activate(selected);"]
+      ];
+      for(const [find,repl] of edits){
+        if(!html.includes(find))
+          throw Error('Diagnostic marker absent in ORIGINAL presentation: '+find);
+        html=html.replace(find,repl);
+      }
+      await route.fulfill({response,body:html});
+    });
     const presentResponse=await page.goto(
       origin+'/present?memory='+narrated.id,
       {waitUntil:'domcontentloaded',timeout:25000});
@@ -319,6 +364,7 @@ try{
       console.error('TALERA_FREE_ORIGINAL_PLAYER_DIAGNOSTIC',JSON.stringify({
         diagnostics,frameChecks,pageErrors:errors,consoleWarnings:warnings,
         playerEvents:await page.evaluate(()=>window.__taleraF5PresentationEvents||[]),
+        adapterEvents:await page.evaluate(()=>window.__f5AdapterTrace||[]),
         originalError:String(error.message)
       }));
       throw error;

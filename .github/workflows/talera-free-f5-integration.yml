@@ -33,6 +33,8 @@ jobs:
         run: node r20-dev/free-10m-delivery/build.mjs
       - name: Package only public PWA references and stable external JavaScript
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Diagnose exact original publish and media-ID timeline contract
+        run: node r20-dev/free-10m-f5/f5-public-timeline-diagnostic.mjs
       - name: Verify F5 Worker and tests parse
         run: |
           node --check r20-dev/free-10m-f5/f5-worker.mjs

@@ -1,0 +1,88 @@
+name: TALERA Free - iPhone video import transparency hotfix F5 only
+
+on:
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - '.github/workflows/talera-free-f5-video-hotfix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-f5-iphone-video-hotfix-isolated-once
+  cancel-in-progress: false
+
+jobs:
+  deploy_single_isolated_stage:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    name: F5 only - preserve iPhone photos, DOs, staging secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify exact F5 EU stage, no original TALERA databases
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const c=JSON.parse(readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          assert.equal(c.name,'talera-free-f5-combined-stage-20261108');
+          assert.equal(c.durable_objects.bindings.length,7);
+          assert.equal(c.vars.AUTH_STORAGE_JURISDICTION,'eu');
+          assert.equal(c.vars.SOCIAL_STORAGE_JURISDICTION,'eu');
+          assert.ok(!c.services&&!c.d1_databases&&!c.r2_buckets);
+          JS
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Package unchanged approved anonymous TALERA
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Require unchanged original narrator and working explicit video picker
+        run: |
+          node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node --check r20-dev/free-10m-f5/f5-video-picker.mjs
+      - name: Deploy only isolated F5 Worker without changing private staging secrets or DO storage
+        run: npx --no-install wrangler deploy --config r20-dev/free-10m-f5/wrangler.staging.jsonc
+      - name: Check live one-click page, clean state and no accidental public access
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const root='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+          for(let i=0;i<15;i++){
+           const r=await fetch(root+'/__f5/start',{cache:'no-store',signal:AbortSignal.timeout(18000)});
+           const html=await r.text();
+           if(r.status===200&&html.includes('location.hash'))break;
+           if(i===14)throw Error('F5 one-click entry is not available');
+           await new Promise(resolve=>setTimeout(resolve,1000));
+          }
+          const health=await fetch(root+'/__f5/health',{signal:AbortSignal.timeout(18000)});
+          const state=await health.json();
+          assert.equal(health.status,200);
+          assert.equal(state.officialTaleraConnected,false);
+          const closed=await fetch(root+'/mijn-leven',{signal:AbortSignal.timeout(18000)});
+          assert.equal(closed.status,403);
+          console.log('TALERA_F5_IPHONE_VIDEO_HOTFIX_LIVE',JSON.stringify({
+            success:true,oneClickInviteStillAvailable:true,
+            originalVideoFilesRemainOnDevice:true,
+            isolatedFreeEUWorker:true,privateCodeAndAccountDOsPreserved:true,
+            stagingSecretsUnchanged:true,noCustomerDataAccess:true,
+            noChangesToOriginalNarrationPlayer:true
+          }));
+          JS

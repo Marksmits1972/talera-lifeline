@@ -1,8 +1,12 @@
 name: TALERA Free - herstel Bekijk herinnering op F5 iPhone
 
-# The tested original-story-view link is live on the isolated EU F5 stage.
-# Disable automatic redeploy during actual iPhone acceptance.
+# ONE guarded redeployment to sync F5 with the user-specified design-cleanup
+# 2026-11-07 source. Re-freeze immediately after live verification.
 on:
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - '.github/workflows/talera-free-f5-memory-view-hotfix.yml'
   workflow_dispatch:
 
 permissions:
@@ -54,6 +58,37 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Confirm source is the user's later design-cleanup candidate, not the official older fallback
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const expected='talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
+          for(const file of [
+            'r20-dev/free-10m-delivery/build.mjs',
+            'r20-dev/free-10m-f5/f5-public-assets.mjs'
+          ]){
+            const src=readFileSync(file,'utf8');
+            assert.ok(src.includes(expected),'Wrong public source in '+file);
+            assert.ok(!src.includes('talera-account-birthdate-test-20261107.mark-a39.workers.dev'),
+              'Old registered source must not be substituted for later candidate');
+          }
+          const pages=['mijn-leven','present','tell'];
+          for(const p of pages){
+            const html=readFileSync(
+              'r20-dev/free-10m-delivery/generated/reference-'+p+'.html','utf8');
+            assert.ok(html.length>50000,'Incomplete approved PWA snapshot '+p);
+          }
+          const present=readFileSync(
+            'r20-dev/free-10m-delivery/generated/reference-present.html','utf8');
+          assert.ok(present.includes('taleraInlineSync'),
+            'Approved V61/R20 in-place presentation engine must be retained');
+          assert.ok(present.includes('talera-zero-memory-adapter'));
+          console.log('TALERA_USER_DESIGN_CLEANUP_BASELINE_VERIFIED',
+            JSON.stringify({source:expected,
+              preservesInlinePlayer:true,originalSourcePromoted:false}));
+          JS
+
           node --check r20-dev/free-10m-f5/f5-worker.mjs
           node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
           node r20-dev/free-10m-f5/f5-video-picker-regression.mjs

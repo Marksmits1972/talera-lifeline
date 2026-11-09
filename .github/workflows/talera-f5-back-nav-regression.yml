@@ -39,7 +39,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps chromium
-      - name: Real browser account, original back button, photo readback, privacy and social regression
+      - name: Real browser complete account and sharing regression with safe return to owned memory
         run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
       - name: Completed evidence, NOT iPhone physical acceptance
         if: success()

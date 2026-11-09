@@ -22,3 +22,19 @@ for(const page of paths){
  }
  console.log('TALERA_PUBLIC_TIMELINE_DIAG',JSON.stringify({page,htmlLength:s.length,terms:lines}));
 }
+
+const tell=readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
+const markers=[
+  'talera-lifeline-dev-local-v1','function dbOpen','const dbOpen',
+  'async function taleraV61PersistMediaIds',
+  'const updated={...persisted,narrationCues:mapped,narrationSchema:',
+  'function safeCues','async function get('
+];
+for(const mark of markers){
+ let i=-1,positions=[],samples=[];
+ while((i=tell.indexOf(mark,i+1))>=0){
+   positions.push(i);
+   if(samples.length<3)samples.push(tell.slice(Math.max(0,i-500),i+1350));
+ }
+ console.log('TALERA_DB_PUBLISH_CONTRACT',JSON.stringify({marker:mark,count:positions.length,positions,samples}));
+}

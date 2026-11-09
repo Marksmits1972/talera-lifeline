@@ -35,6 +35,8 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
       - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+      - name: Diagnose the CURRENT approved inline presentation engine, not old iframe assumptions
+        run: node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs
       - name: Assert original TALERA editor remains intact and video picker reports every selected video
         run: node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
         # Exact video-picker source inspected once before the narrow F5 hotfix

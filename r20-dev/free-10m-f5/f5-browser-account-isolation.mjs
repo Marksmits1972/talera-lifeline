@@ -185,6 +185,17 @@ try{
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
  });
  const page=await context.newPage();
+ // Passive synthetic-only trace: which original UI account/settings screens
+ // actually call a Free API? Never record queries, bodies, cookies or tokens.
+ const apiTrace=[];
+ page.on('response',response=>{
+   try{
+     const u=new URL(response.url());
+     if(u.origin===origin&&u.pathname.startsWith('/api/'))
+       apiTrace.push({path:u.pathname,method:response.request().method(),
+         status:response.status()});
+   }catch{}
+ });
  const errors=[];
  page.on('pageerror',e=>errors.push(String(e?.message||e).slice(0,180)));
  page.on('requestfailed',r=>console.log('TALERA_F5_BROWSER_FAILED_REQUEST',
@@ -266,6 +277,31 @@ try{
    secondOwnerNewPrivateDatabases:newlyOpenedB.length,
    noOriginalDatabaseDeleted:true
  }));
+ // This complements the STATIC source-route inventory with REAL requests
+ // made by existing menu controls, without activating any privacy toggle,
+ // publishing, sharing, or unported media/upload path.
+ const visitedViews=[];
+ for(const name of ['hub','account','privacy','settings']){
+   await menu(page);
+   const nav=page.locator('#talera-more-menu [data-view="'+name+'"]').first();
+   if(!(await nav.count())||!(await nav.isVisible()))continue;
+   await nav.click();
+   await page.waitForTimeout(650);
+   visitedViews.push(name);
+ }
+ const distinct=Array.from(new Map(apiTrace.map(r=>[
+   r.method+' '+r.path+' '+r.status,r])).values());
+ const unexpectedReads=distinct.filter(r=>r.method==='GET'&&r.status>=400&&
+    r.path!=='/api/me');
+ const traceSummary={syntheticOnly:true,approvedUiUntouched:true,
+   visitedViews,requests:distinct,
+   failedActiveReads:unexpectedReads,
+   scanIsLimitedToMenuViews:true,allFreeActionsProven:false};
+ console.log('TALERA_F5_ACTIVE_MENU_API_TRACE',JSON.stringify(traceSummary));
+ // An existing account/menu screen must not lose server access silently.
+ // Report missing old flows explicitly, but do not pretend 404 is success.
+ assert.ok(visitedViews.length>=1,'Original signed-in menu views not reachable');
+ assert.ok(!distinct.some(r=>r.status>=500),'Original Free account view caused server error');
  result={ok:true,syntheticOnly:true,realBrowser:'Chromium iPhone mobile emulation',
    accounts:2,accountTransitions:5,
    originalLocalStoryAndBlobPreserved:true,secondAccountCannotReadFirst:true,

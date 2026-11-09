@@ -35,6 +35,8 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
       - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+      - name: Inspect current approved picker, MIME, videos and editor reference once
+        run: node r20-dev/free-10m-f5/f5-video-import-diagnostic.mjs
       - name: Verify F5 Worker and tests parse
         run: |
           node --check r20-dev/free-10m-f5/f5-worker.mjs

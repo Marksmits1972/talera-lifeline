@@ -124,6 +124,103 @@ async function authorizeQaBrowser(request,env){
   headers.append('set-cookie',ENTRY_COOKIE+'=; HttpOnly; Secure; SameSite=Strict; Path=/__f5/entry; Max-Age=0');
   return new Response(null,{status:303,headers});
 }
+// One-click, short-lived *synthetic-only* access for the final iPhone test.
+// The actual 256-bit invite is NOT in GitHub or the Worker. Only its SHA256
+// fingerprint is configured. The URL uses a #fragment, so browser HTTP
+// requests, referrers and Cloudflare logs never receive the invite from GET.
+function easyEntryPage(){
+  const html=`<!doctype html><html lang="nl"><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>TALERA Free – directe test</title>
+  <body style="font:16px system-ui;max-width:500px;margin:12vh auto;padding:24px">
+  <h2>TALERA Free</h2><p id="status" role="status">De testversie wordt geopend…</p>
+  <script>
+  (async()=>{
+    const status=document.getElementById('status');
+    const invite=location.hash.slice(1);
+    history.replaceState(null,'','/__f5/start');
+    if(!/^[a-f0-9]{64}$/.test(invite)){
+      status.textContent='Deze testlink is niet compleet. Open de volledige link uit de chat.';return;
+    }
+    try{
+      const r=await fetch('/__f5/start',{method:'POST',
+        credentials:'same-origin',cache:'no-store',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({invite})});
+      const data=await r.json();
+      if(!r.ok||!data.ok)throw Error(data.error||'De testversie kan niet worden geopend');
+      location.replace('/mijn-leven');
+    }catch(e){status.textContent=String(e.message||e)+
+      '. Je hoeft niets in Cloudflare te wijzigen.';}
+  })();
+  </script></body></html>`;
+  return new Response(html,{status:200,headers:{
+    'content-type':'text/html; charset=utf-8','cache-control':'no-store',
+    'x-content-type-options':'nosniff',
+    'referrer-policy':'no-referrer',
+    'content-security-policy':F5_BROWSER_CSP
+  }});
+}
+async function easyStart(request,env){
+  const expected=env.F5_EASY_INVITE_SHA256||'';
+  const deadline=Number(env.F5_EASY_INVITE_EXPIRES||0);
+  if(!HEX64.test(expected)||!Number.isSafeInteger(deadline)||Date.now()>deadline)
+    return deny(410,'Deze tijdelijke testlink is verlopen');
+  const source=new URL(request.url).origin;
+  const origin=request.headers.get('origin');
+  if(origin&&origin!==source)return deny(403,'Ongeldige herkomst');
+  const site=request.headers.get('sec-fetch-site');
+  if(site&&site!=='same-origin'&&site!=='none')
+    return deny(403,'Ongeldige herkomst');
+  if(!/application\\/json/i.test(request.headers.get('content-type')||''))
+    return deny(415,'Verkeerd berichtformaat');
+  if(Number(request.headers.get('content-length')||0)>300)
+    return deny(413,'Aanvraag te groot');
+  let provided;
+  try{provided=(await body(request.clone())).invite}catch{return deny(400,'Ongeldige aanvraag')}
+  if(!HEX64.test(provided)||!safeEqualHex(await shaHex(provided),expected))
+    return deny(403,'Deze testlink is niet geldig');
+  // Same isolated account DOs and existing rate limits, using fake data only.
+  // No original TALERA account, R2, D1, camera, microphone or private files.
+  const id=crypto.randomUUID().replaceAll('-','').slice(0,18);
+  const headers=new Headers({
+    'content-type':'application/json',
+    'origin':source
+  });
+  const ip=request.headers.get('cf-connecting-ip');
+  if(!ip)return deny(503,'Browsernetwerk niet beschikbaar voor de test');
+  headers.set('cf-connecting-ip',ip);
+  const synthetic={
+    email:'f5-quick-'+id+'@example.invalid',
+    username:'f5quick'+id,
+    displayName:'TALERA Free – fictieve test',
+    password:crypto.randomUUID()+'-synthetic-only',
+    birthDate:'1974-04-02'
+  };
+  const created=await accountApi(new Request(new URL('/api/register',request.url),{
+    method:'POST',headers,body:JSON.stringify(synthetic)
+  }),env);
+  if(!created.ok)return deny(created.status===429?429:503,
+    created.status===429?'Te veel testpogingen; probeer later opnieuw':
+    'Fictief testaccount kon niet worden geopend');
+  const sid=created.headers.get('set-cookie');
+  if(!sid||!sid.startsWith('talera_sid='))return deny(503,'Testsessie ontbreekt');
+  const expiry=String(Date.now()+30*60000);
+  const nonce=Array.from(crypto.getRandomValues(new Uint8Array(16)),
+    b=>b.toString(16).padStart(2,'0')).join('');
+  const signature=await qaSignature(env,expiry+'.'+nonce);
+  const cookie=QA_COOKIE+'='+expiry+'.'+nonce+'.'+signature+
+    '; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800';
+  const resultHeaders=new Headers({
+    'content-type':'application/json; charset=utf-8','cache-control':'no-store',
+    'x-content-type-options':'nosniff'
+  });
+  resultHeaders.append('set-cookie',sid);
+  resultHeaders.append('set-cookie',cookie);
+  return new Response(JSON.stringify({ok:true,next:'/mijn-leven',
+    syntheticOnly:true}),{status:200,headers:resultHeaders});
+}
 function ns(env,name){
   const b=env[name];
   if(!b?.get||!b?.idFromName)throw Error('F5_AUTH_BINDING_MISSING');
@@ -302,6 +399,8 @@ export default {
        typeof env.AUTH_NAMESPACE_KEY!=='string'||env.AUTH_NAMESPACE_KEY.length<40||
        typeof env.DEMO_IDENTITY_KEY!=='string'||env.DEMO_IDENTITY_KEY.length<40)
       return deny(503,'F5-testomgeving niet correct ingericht');
+    if(p==='/__f5/start'&&m==='GET')return easyEntryPage();
+    if(p==='/__f5/start'&&m==='POST')return easyStart(request,env);
     if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
     if(!await hasQaAccess(request,env))return deny();

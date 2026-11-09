@@ -13,6 +13,7 @@ import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birt
 import {referencePages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
 import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
+import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
 
 export {
   FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
@@ -485,7 +486,11 @@ async function publicPage(request,env){
     // amendments. Only server-verified private local storage and saved cue
     // media-ID reconciliation may rewrite the original approved markup.
     const stableEditedCues=pathname==='/tell'?alignEditedNarrationCueRefs(scoped):scoped;
-    const converted=await assetizeHtml(stableEditedCues,new Set(approvedAssets));
+    // Keep the editor's preview silent from the FIRST frame, even before
+    // the record panel is visible. The original present/player video round
+    // with sound after narration is untouched.
+    const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;
+    const converted=await assetizeHtml(silenced,new Set(approvedAssets));
     return new Response(converted.html,{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',

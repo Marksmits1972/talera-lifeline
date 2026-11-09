@@ -275,8 +275,7 @@ try{
    page.waitForURL(origin+'/mijn-leven',{timeout:20000}),
    page.evaluate(()=>document.querySelector('#talera-flow-home').click())
  ]);
- await page.waitForFunction(()=>typeof window.TaleraMemories?.list==='function',null,
-   {timeout:20000});
+ await waitForLibrary(page);
  const afterOriginalBack=await inventory(page);
  assert.ok(afterOriginalBack.ids.includes(a.id),
    'Original iPhone presentation return lost its local own memory');

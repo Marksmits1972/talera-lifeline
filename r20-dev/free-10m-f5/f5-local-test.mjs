@@ -203,6 +203,38 @@ async function run(){
   assert.equal(viewed.status,200,
     'Published personal memory MUST open the original presentation player');
   assert.equal(viewed.stage,'personalized-durable-account');
+  const embed=await fetch(origin+'/vertelmodus-embed?mode=present',{
+    headers:{cookie:identities[0].cookie,'x-talera-f5-key':f5},
+    signal:AbortSignal.timeout(17000)
+  });
+  const embedHtml=await embed.text();
+  assert.equal(embed.status,200,
+    'Local story presentation MUST load the actual original iframe player');
+  assert.match(embed.headers.get('content-type')||'',/text\/html/i);
+  assert.match(embed.headers.get('content-security-policy')||'',
+    /frame-ancestors 'self'/,
+    'The original same-origin narrator must be embeddable');
+  assert.equal(embed.headers.get('x-frame-options'),'SAMEORIGIN');
+  assert.equal(embed.headers.get('x-talera-free-f5'),'original-iframe-zero-player');
+  for(const marker of ['taleraZero','INIT','READY','postMessage','syncVideo','videoAtMs','follow()']){
+    assert.ok(embedHtml.includes(marker),'Original zero narrator/player missing '+marker);
+  }
+  const recordPlayer=await request('GET','/vertelmodus-embed?mode=record',{
+    cookie:identities[0].cookie
+  });
+  assert.equal(recordPlayer.status,200);
+  assert.equal(recordPlayer.data,embedHtml,
+    'Recording and presentation MUST use identical byte-for-byte player');
+  assert.equal((await request('GET','/vertelmodus-embed?mode=present&debug=1',{
+    cookie:identities[0].cookie
+  })).status,404,'No extraneous iframe player parameters');
+  assert.equal((await request('GET','/vertelmodus-embed?mode=admin',{
+    cookie:identities[0].cookie
+  })).status,404,'No unsupported player modes');
+  assert.equal((await request('GET','/vertelmodus-embed?mode=present',{
+    gate:false
+  })).status,403,'Unauthorized viewer must not load private narrator');
+
   assert.ok(String(viewed.data).includes('talera-free-local-'),
     'Memory player must read current account\'s private local media store');
   assert.equal((await request('GET',
@@ -332,7 +364,7 @@ async function run(){
     cookie:identities[1].cookie})).status,401);
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
-    syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,originalLocalMemoryPresentationRouteVerified:true,localRequests:calls,
+    syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,originalLocalMemoryPresentationRouteVerified:true,originalStandaloneIframePlayerActuallyLoaded:true,localRequests:calls,
     realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,

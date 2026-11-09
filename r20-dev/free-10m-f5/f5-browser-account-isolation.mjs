@@ -327,10 +327,22 @@ try{
    'Original menu must offer revoke on a real direct grant');
  page.on('dialog',async dialog=>{await dialog.accept()});
  await grantRevoke.click();
- await page.waitForFunction(async()=>{
-   const r=await fetch('/api/my-grants',{credentials:'same-origin'});
-   return r.ok&&(await r.json()).items?.length===0;
- },null,{timeout:15000});
+ try{
+   await page.waitForFunction(async()=>{
+     const r=await fetch('/api/my-grants',{credentials:'same-origin'});
+     return r.ok&&(await r.json()).items?.length===0;
+   },null,{timeout:7000});
+ }catch(error){
+   const snapshot=await page.evaluate(async()=>{
+     const r=await fetch('/api/my-grants',{credentials:'same-origin'});
+     return {url:location.pathname,status:r.status,
+       items:(await r.json()).items,
+       menu:(document.getElementById('talera-more-menu')?.innerText||'').slice(0,1600)};
+   });
+   console.log('TALERA_F5_DIRECT_GRANT_REVOKE_DIAGNOSTIC',JSON.stringify({
+     snapshot,trace:apiTrace.slice(-25),pageErrors:errors.slice(-10)}));
+   throw error;
+ }
 
  const menuLinkStatus=await page.locator('#talera-more-menu').innerText();
  assert.ok(menuLinkStatus.includes('synthetic ACCOUNT ISOLATION 1'),

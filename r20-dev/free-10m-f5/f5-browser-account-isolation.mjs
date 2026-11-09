@@ -297,11 +297,24 @@ try{
 
  await menu(page);
  await view(page,'mine');
+ try{
  await page.waitForFunction(title=>{
    const shell=document.getElementById('talera-more-menu');
    return !shell?.hidden&&shell.textContent.includes('WhatsApp-deellinks')&&
       shell.textContent.includes(title)&&shell.textContent.includes('Geldig tot');
  },'synthetic ACCOUNT ISOLATION 1',{timeout:15000});
+ }catch(error){
+   const diagnostic=await page.evaluate(()=>({
+     open:!document.getElementById('talera-more-menu')?.hidden,
+     text:(document.getElementById('talera-more-menu')?.innerText||'').slice(0,2000),
+     revokeButtons:document.querySelectorAll('#talera-more-menu [data-revoke]').length,
+     directButtons:document.querySelectorAll('#talera-more-menu [data-revoke-grant]').length
+   }));
+   console.log('TALERA_F5_MINE_SOCIAL_DIAGNOSTIC',JSON.stringify({
+     syntheticOnly:true,...diagnostic,lastApiRequests:apiTrace.slice(-20),
+     pageErrors:errors.slice(-8)}));
+   throw error;
+ }
  const revoke=page.locator('#talera-more-menu [data-revoke]').first();
  assert.equal(await revoke.count(),1,'Original menu must show revoke control');
  await page.waitForFunction(name=>{

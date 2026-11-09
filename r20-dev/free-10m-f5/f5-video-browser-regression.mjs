@@ -280,9 +280,14 @@ try{
       'Original local store must preserve exact narrated media order');
     // Inject diagnosis ONLY in the synthetic HTTP response via Playwright.
     // The original TALERA app and F5 Worker files are not edited here.
-    await page.route('**/present?memory=*',async route=>{
+    await page.route('**/__talera_free/assets/*.js',async route=>{
       const response=await route.fetch();
       let html=await response.text();
+      // Original 8k+ inline script is safely extracted to a fingerprinted
+      // same-origin asset by the existing F5 Worker, not kept in page HTML.
+      if(!html.includes("const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;")){
+        await route.fulfill({response});return;
+      }
       const edits=[
         ["const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;",
          "const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;"+

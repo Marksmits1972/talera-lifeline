@@ -1,13 +1,8 @@
 name: TALERA Free F5 - development-base correction to design-cleanup 20261107
 
-# Single isolated hotfix: retain latest approved design-cleanup and
-# preserve original narrator media IDs when an edited story is reopened.
-# Freeze again immediately after verified stage deploy.
+# Safely deployed and Cloudflare verified: editing stored narration cue IDs.
+# No automatic redeployment while existing Free iPhone memories are tested.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-design-base-correction.yml'
   workflow_dispatch:
 
 permissions:

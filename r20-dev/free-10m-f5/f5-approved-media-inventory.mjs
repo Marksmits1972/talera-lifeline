@@ -43,4 +43,30 @@ for(const [key,url] of Object.entries(bases)){
   }catch(e){console.log('MEDIA_SOURCE_READ_ERROR',JSON.stringify({key,suffix,error:String(e.message||e)}))}
  }
 }
+
+function exact(label,s,needle,before=650,after=4800){
+ const i=s.indexOf(needle);
+ if(i<0){console.log('MEDIA_EXACT_MISSING',JSON.stringify({label,needle}));return}
+ const block=s.slice(Math.max(0,i-before),Math.min(s.length,i+after));
+ console.log('MEDIA_EXACT_SOURCE',JSON.stringify({label,needle,at:i,excerpt:block}));
+}
+for(const [label,url] of Object.entries({whatsapp:bases.whatsapp,previouslyWorking:bases.previouslyWorking})){
+ for(const route of ['/tell','/vertelmodus-embed?mode=record']){
+  const res=await fetch(url+route,{redirect:'error',signal:AbortSignal.timeout(17000)});
+  assert.equal(res.status,200);
+  const s=await res.text();
+  if(route==='/tell'){
+   exact(label+' '+route,s,'async function taleraV61MakeVideoPreview',150,4100);
+   exact(label+' '+route,s,'function taleraV61MountNativeCover',120,3300);
+   exact(label+' '+route,s,"talera-v61-native-cover",500,2600);
+   exact(label+' '+route,s,'previewBlobs.set',120,2700);
+  }else{
+   exact(label+' '+route,s,"el.muted=true;el.defaultMuted=true",950,3100);
+   exact(label+' '+route,s,'function taleraReplayNext()',450,3200);
+   exact(label+' '+route,s,'function setMedia(',200,4200);
+   exact(label+' '+route,s,'function taleraZero',300,2000);
+  }
+ }
+}
+
 console.log('TALERA_MEDIA_SOURCE_INVENTORY_COMPLETE');

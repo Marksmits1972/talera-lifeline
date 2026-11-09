@@ -325,10 +325,12 @@ try{
    syntheticOnly:true,...actualMenu,lastApi:apiTrace.slice(-15)}));
  const revoke=page.locator('#talera-more-menu [data-revoke]').first();
  assert.equal(await revoke.count(),1,'Original menu must show revoke control');
+ // Approved menu is localized: do not rely on a Dutch heading when
+ // the exact same UI is displaying English.
  await page.waitForFunction(name=>{
    const shell=document.getElementById('talera-more-menu');
-   return shell?.textContent.includes('Rechtstreeks met TALERA-gebruikers')&&
-     shell?.textContent.includes(name);
+   return !shell?.hidden&&shell.querySelectorAll('[data-revoke-grant]').length===1&&
+     shell.textContent.includes(name);
  },users[1].displayName,{timeout:15000});
  const grantRevoke=page.locator('#talera-more-menu [data-revoke-grant]').first();
  assert.equal(await grantRevoke.count(),1,

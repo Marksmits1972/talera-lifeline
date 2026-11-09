@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync,readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium,devices} from 'playwright';
@@ -193,8 +193,35 @@ try{
    if(['error','warning'].includes(m.type()))
      console.log('TALERA_F5_BROWSER_JS_CONSOLE',m.type(),m.text().slice(0,320));
  });
- const start=await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
- assert.equal(start.status(),200);
+ // Read the three exact original public HTML snapshots first. The menu
+ // script can be shipped as a static asset without being loaded by any page.
+ const sourceChecks=['mijn-leven','present','tell'].map(route=>{
+   const src=readFileSync(path.join(here,'../free-10m-delivery/generated',
+      'reference-'+route+'.html'),'utf8');
+   return {route,length:src.length,menuMentions:
+     (src.match(/menu-integration/g)||[]).length,
+     accountMenuMentions:(src.match(/talera-more-menu/g)||[]).length,
+     externalScriptMentions:(src.match(/__clean\//g)||[]).length};
+ });
+ console.log('TALERA_F5_APPROVED_ACCOUNT_MENU_SOURCE_PAGES',JSON.stringify(sourceChecks));
+ let activeRoute=null;
+ for(const route of ['/mijn-leven','/present','/tell']){
+   const pageResult=await page.goto(origin+route,{waitUntil:'domcontentloaded'});
+   assert.equal(pageResult.status(),200,'Original page unavailable: '+route);
+   await page.waitForTimeout(1500);
+   const check=await page.evaluate(()=>({
+     menu:!!document.getElementById('talera-more-menu'),
+     library:typeof window.TaleraMemories?.list,
+     buttons:[...document.querySelectorAll('button')].slice(0,22)
+       .map(x=>({id:x.id,aria:x.getAttribute('aria-label'),
+        text:(x.textContent||'').slice(0,28)}))
+   }));
+   console.log('TALERA_F5_ACCOUNT_MENU_ROUTE_PROBE',JSON.stringify({route,...check}));
+   if(check.menu&&check.library==='function'){activeRoute=route;break}
+ }
+ assert.ok(activeRoute,
+   'No original PWA screen initializes a live account menu and local memory store');
+ console.log('TALERA_F5_ACCOUNT_MENU_TEST_ROUTE',activeRoute);
  await waitForLibrary(page);
  const owner=await login(page,users[0]);
  assert.equal(owner,ids[0],'First actual menu login must select existing account ID');

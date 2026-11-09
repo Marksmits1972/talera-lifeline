@@ -300,8 +300,9 @@ try{
  try{
  await page.waitForFunction(title=>{
    const shell=document.getElementById('talera-more-menu');
-   return !shell?.hidden&&shell.textContent.includes('WhatsApp-deellinks')&&
-      shell.textContent.includes(title)&&shell.textContent.includes('Geldig tot');
+   return !shell?.hidden&&shell.textContent.includes(title)&&
+      shell.querySelectorAll('[data-revoke]').length===1&&
+      shell.querySelectorAll('[data-revoke-grant]').length===1;
  },'synthetic ACCOUNT ISOLATION 1',{timeout:15000});
  }catch(error){
    const diagnostic=await page.evaluate(()=>({

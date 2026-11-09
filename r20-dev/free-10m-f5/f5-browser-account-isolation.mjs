@@ -315,6 +315,14 @@ try{
      pageErrors:errors.slice(-8)}));
    throw error;
  }
+ const actualMenu=await page.evaluate(async()=>{
+   const r=await fetch('/api/my-grants',{credentials:'same-origin'});
+   return {text:(document.getElementById('talera-more-menu')?.innerText||'').slice(0,1800),
+     grantStatus:r.status,grants:(await r.json()).items,
+     grantControls:document.querySelectorAll('#talera-more-menu [data-revoke-grant]').length};
+ });
+ console.log('TALERA_F5_OWNER_DIRECT_LIST_PROBE',JSON.stringify({
+   syntheticOnly:true,...actualMenu,lastApi:apiTrace.slice(-15)}));
  const revoke=page.locator('#talera-more-menu [data-revoke]').first();
  assert.equal(await revoke.count(),1,'Original menu must show revoke control');
  await page.waitForFunction(name=>{

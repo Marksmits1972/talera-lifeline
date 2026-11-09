@@ -21,6 +21,7 @@ while(queue.length){
  paths.push(current);
 }
 const seen=new Map();
+const contextByRoute=new Map();
 for(const file of paths){
  const source=readFileSync(file,'utf8');
  const matches=[...source.matchAll(new RegExp('/api/[A-Za-z0-9_/-]+','g'))];
@@ -28,12 +29,19 @@ for(const file of paths){
    const route=item[0].replace(/[/]$/,'');
    if(!seen.has(route))seen.set(route,new Set());
    seen.get(route).add(file.replace(top+'/',''));
+   if(!contextByRoute.has(route))contextByRoute.set(route,[]);
+   if(contextByRoute.get(route).length<3){
+     const start=Math.max(0,item.index-170),end=Math.min(source.length,item.index+route.length+210);
+     const excerpt=source.slice(start,end).replace(/\\s+/g,' ').slice(0,440);
+     contextByRoute.get(route).push({file:file.replace(top+'/',''),excerpt});
+   }
  }
 }
 const native=new Set(['/api/register','/api/login','/api/logout','/api/me',
  '/api/profile','/api/profile/birthdate']);
 const routes=[...seen.keys()].sort().map(route=>({
- route,explicitF5Route:native.has(route),sourceFiles:[...seen.get(route)].slice(0,8)
+ route,explicitF5Route:native.has(route),sourceFiles:[...seen.get(route)].slice(0,8),
+ examples:contextByRoute.get(route)
 }));
 const unported=routes.filter(x=>!x.explicitF5Route);
 const result={

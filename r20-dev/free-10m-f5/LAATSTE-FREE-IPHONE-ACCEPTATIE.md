@@ -16,6 +16,16 @@ Oplossing in **uitsluitend de geïsoleerde F5 Worker**: het formulier krijgt bij
 
 **Aandachtspunt:** de eerder aan de gebruiker getoonde toegangscode werkt alleen wanneer exact dezelfde waarde ook als `STAGING_F5_KEY` op deze specifieke testworker in Cloudflare is opgeslagen. Een code kopiëren naar WhatsApp en het formulier invullen wijzigt deze Cloudflare-secret niet. Een mismatch toont nu de duidelijkere melding `Toegangscode niet herkend. Controleer of deze in Cloudflare is opgeslagen.` Bewaar de geheime code buiten GitHub en screenshots. Open de link opnieuw zodat de verse ondertekende formcookie wordt gezet; gebruik bij voorkeur Safari rechtstreeks voor de opname-/cameraacceptatie.
 
+## De nieuwe eenvoudige toegang (9 november 2026)
+
+**Nieuw en live getest:** een één-klik-uitnodiging voor precies deze geïsoleerde Free-testworker. Geen Cloudflare-sleutel instellen, geen code in WhatsApp kopiëren, geen registratie of accountaanmelding. De browser opent een tijdelijke pagina die zelf één fictief Free-account met geboortedatum 1974-04-02 aanmaakt, de ondertekende testcookie én eigen sessiecookie ontvangt en automatisch naar `/mijn-leven` gaat. Dit gebruikt exact de bestaande F5-account-DO's en de goedgekeurde oorspronkelijke vertel- en presentatieschermen.
+
+**Beveiliging:** de volledige 256-bit uitnodiging is uitsluitend via een gebruikerslink met URL-`#fragment` gedeeld; de Worker bevat alleen SHA-256 van het geheim. Het fragment wordt niet bij GET verzonden en wordt onmiddellijk uit de browserhistorie gehaald. De testlink werkt tot **16 november 2026, 21:00 uur Nederlandse tijd**. Valse of cross-origin uitnodigingen worden geweigerd; de afzonderlijke TALERA-productiedata zijn niet verbonden. Een ingebouwde rate limiter voorkomt onbeperkt fictieve accounts op dezelfde IP binnen tien minuten. Deel de geheime volledige uitnodigingslink niet publiek.
+
+**Bevestigde technische checks:** echte lokale Cloudflare-integratie met volledig automatisch fictief account, sessie, QA-gate en persoonlijke tijdlijn plus expliciet afwijzen van vervalste tokens is groen; [real EU deployment + GET/reject checks 42585407955](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42585407955) groen. De werkelijke geheime uitnodiging is niet in de repository, buildlogs of workflow opgenomen. Dit is geen vervanging van handmatige echte iPhone-microfoon-/videotest. De originele permanente TALERA-app is niet gewijzigd.
+
+**De onderstaande oudere stappen met `STAGING_F5_KEY` zijn voor normale handmatige toegang en zijn niet meer nodig voor de nieuwe één-klik-uitnodiging.** 
+
 ## ECHTE iPhone: precies één laatste acceptatieronde
 **Testlink**: https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev/__f5/entry
 

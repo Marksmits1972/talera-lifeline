@@ -6,7 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {readFileSync,mkdirSync} from 'node:fs';
 import {webkit,chromium,devices} from 'playwright';
-const origin='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+const origin='https://'+(process.env.F5_STAGE_HOST||'talera-free-f5-combined-stage-20261108.mark-a39.workers.dev');
 const key=process.env.STAGING_F5_KEY;
 assert.match(key||'',/^[a-f0-9]{64}$/);
 const suffix=randomUUID().slice(0,8);

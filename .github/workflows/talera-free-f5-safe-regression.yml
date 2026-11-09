@@ -21,7 +21,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Verify approved UI with exact owner-requested editor mute changes
+      - name: Verify original UI, mute guard and Safari native video cover fallback
         run: |
           node r20-dev/free-10m-f5/f5-editor-video-mute-regression.mjs
           node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs

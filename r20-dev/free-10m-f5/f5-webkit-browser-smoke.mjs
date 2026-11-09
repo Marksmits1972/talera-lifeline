@@ -43,9 +43,11 @@ try{
  // Use the same-origin form POST without waiting for unrelated demo photos
  // to finish loading in WebKit; cookies remain HttpOnly and Secure.
  const entry=await page.evaluate(async secret=>{
+  const csrf=document.querySelector('input[name="csrf"]')?.value;
+  if(!csrf)throw Error('Missing signed entry form nonce');
   const res=await fetch('/__f5/entry',{method:'POST',credentials:'same-origin',
    headers:{'content-type':'application/x-www-form-urlencoded'},
-   body:new URLSearchParams({key:secret}),redirect:'follow'});
+   body:new URLSearchParams({key:secret,csrf}),redirect:'follow'});
   return {status:res.status,path:new URL(res.url).pathname};
  },key);
  assert.equal(entry.status,200,'WebKit QA cookie must unlock the original Free PWA');

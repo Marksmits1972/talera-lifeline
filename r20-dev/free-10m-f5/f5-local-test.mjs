@@ -130,6 +130,47 @@ async function run(){
     identities.push({id:r.data.account.id,cookie:cookieOf(r)});
   }
   assert.equal(new Set(identities.map(x=>x.id)).size,3);
+  // Test final simple one-tap iPhone link without any Cloudflare setup,
+  // manually typed test code, real account, or leaked live bearer token.
+  const easyHtml=await request('GET','/__f5/start',{gate:false});
+  assert.equal(easyHtml.status,200,'Public invitation landing works without QA cookie');
+  assert.match(String(easyHtml.data),/location\.hash/,'Fragment is read in browser');
+  assert.ok(!String(easyHtml.data).includes('b'.repeat(64)),
+    'Even the LOCAL example invite must not appear in HTML');
+  const unauthorized=await fetch(origin+'/__f5/start',{
+    method:'POST',
+    headers:{origin,'cf-connecting-ip':'192.0.2.77','content-type':'application/json'},
+    body:JSON.stringify({invite:'0'.repeat(64)}),
+    redirect:'manual'
+  });
+  assert.equal(unauthorized.status,403,'A made-up shortcut must not create an account');
+  const outside=await fetch(origin+'/__f5/start',{
+    method:'POST',
+    headers:{origin:'https://attacker.example','cf-connecting-ip':'192.0.2.77','content-type':'application/json'},
+    body:JSON.stringify({invite:'b'.repeat(64)}),
+    redirect:'manual'
+  });
+  assert.equal(outside.status,403,'Foreign form request with a known invite still rejected');
+  const fast=await fetch(origin+'/__f5/start',{
+    method:'POST',
+    headers:{origin,'cf-connecting-ip':'192.0.2.77','content-type':'application/json'},
+    body:JSON.stringify({invite:'b'.repeat(64)}),
+    redirect:'manual'
+  });
+  const easyResult=await fast.json();
+  assert.equal(fast.status,200,'One-click account provisioning must succeed');
+  assert.equal(easyResult.syntheticOnly,true);
+  const easyCookies=(typeof fast.headers.getSetCookie==='function'?
+    fast.headers.getSetCookie():[fast.headers.get('set-cookie')||'']).join('; ');
+  const quickSession=/talera_sid=([a-f0-9]{64})/.exec(easyCookies)?.[0];
+  const quickQa=/talera_f5_access=([0-9.]+[a-f0-9.]+)/.exec(easyCookies)?.[0];
+  assert.ok(quickSession&&quickQa,'Quickstart sets both private session and QA cookies');
+  const personal=await request('GET','/mijn-leven',{gate:false,
+    cookie:quickSession+'; '+quickQa});
+  assert.equal(personal.status,200,'One tap leads straight into personal Free timeline');
+  assert.equal(personal.stage,'personalized-durable-account');
+  assert.equal((await request('GET','/api/me',{gate:false,
+    cookie:quickSession+'; '+quickQa})).data.account.birthDate,'1974-04-02');
   const signedHome=await request('GET','/mijn-leven',{
     gate:false,cookie:identities[0].cookie+'; '+qaCookie});
   assert.equal(signedHome.status,200,'Registered user gets a separate private timeline');
@@ -231,7 +272,7 @@ async function run(){
     cookie:identities[1].cookie})).status,401);
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
-    syntheticAccounts:3,syntheticMemories:1,localRequests:calls,
+    syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,localRequests:calls,
     realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,

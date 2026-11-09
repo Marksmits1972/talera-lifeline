@@ -1,0 +1,53 @@
+name: TALERA Free F5 - full protected audio, poster, storage and original-player regression
+on:
+  push:
+    branches: [feature/free-f5-safe-iphone-stage-20261109]
+    paths: ['.github/workflows/talera-free-f5-safe-regression.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 29
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build original approved anonymous PWA assets
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify ONLY two exact muted editor changes and untouched video player
+        run: |
+          node r20-dev/free-10m-f5/f5-editor-video-mute-regression.mjs
+          node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
+          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
+      - name: Verify video-photo-audio IDs, saved cues, original menu/API and origin
+        run: |
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+          node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+          node r20-dev/free-10m-f5/f5-original-api-inventory.mjs
+          node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+      - name: Package actual corrected app without deploying
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-muted-editor-check
+      - name: Integrated synthetic account auth, private IndexedDB and social rights
+        run: node r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Install pinned browser and synthetic A/V test media tooling
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Actual original video poster extraction with an AAC audio soundtrack
+        run: node r20-dev/free-10m-f5/f5-soundtrack-poster-original-browser.mjs
+      - name: Original app account menu and local media separation in mobile Chromium
+        run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
+      - name: Report only tested safe facts
+        if: success()
+        run: echo 'TALERA_F5_FULL_REGRESSION_ALL_GREEN_EDITOR_AUDIO_ORIGINAL_PLAYER_ACCOUNT_STORAGE'

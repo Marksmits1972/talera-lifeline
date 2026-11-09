@@ -431,6 +431,27 @@ try{
       assert.equal(first.index,0);
       assert.equal(first.narrationVisual,false,
         'An unvoiced memory must stay in ordinary tap mode');
+      await page.evaluate(()=>{
+        const log=[];
+        window.__taleraF5GestureTrace=log;
+        for(const type of ['pointerdown','pointerup','touchstart','touchend','click']){
+          document.addEventListener(type,e=>{
+            const t=e.target;
+            log.push({type,target:t?.id||t?.tagName||'',
+              className:String(t?.className||'').slice(0,90),
+              insideStory:!!t?.closest?.('#memoryStoryScroll'),
+              insideTimeline:!!t?.closest?.('.timeline'),
+              timestamp:Math.round(performance.now()),
+              index:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
+              story:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId
+            });
+          },{capture:true,passive:true});
+        }
+        window.__taleraTimelineRuntime?.subscribe?.(m=>{
+          log.push({type:'active-memory-change',id:m?.id,
+            index:m?._photoIndex,timestamp:Math.round(performance.now())});
+        });
+      });
       const photoBefore=await page.locator('#photoStage').screenshot();
       // A forced tap on the hidden photo layer is NOT a user touch; it can
       // bypass the uppermost RH19 gesture surface and choose another memory.
@@ -471,8 +492,9 @@ try{
               document.querySelector('#memoryStoryScroll')?.outerHTML.slice(0,180)
             ]};
         });
+        const gestureTrace=await page.evaluate(()=>window.__taleraF5GestureTrace||[]);
         throw Error('Five-photo-plus-video ordinary native touch did NOT advance: '+
-          JSON.stringify({target,touchContext,after:visibleAfterTap,eventHit})+
+          JSON.stringify({target,touchContext,after:visibleAfterTap,eventHit,gestureTrace})+
           '; '+error.message);
       });
       await page.waitForTimeout(650);

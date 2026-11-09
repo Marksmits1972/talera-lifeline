@@ -83,3 +83,21 @@ Gebruiker toont vijf foto's in de Free-vertel-editor maar meldt dat er daarnaast
 - [Echte EU-clouddeploy en servercheck 42592547423](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42592547423) **groen**. Rechtstreekse Cloudflare code-/settings-readback bevestigt de F5-only videoknop en telling. Zeven bestaande DO-verbindingen, vijf geheime staging-variabelen intact, nul verbindingen naar oorspronkelijke TALERA D1/R2/productie. Automatische deploy daarna uitgezet.
 
 **Enige echte device-check die nog openstaat:** open dezelfde eenmalige Free-link op de **zelfde iPhone, in dezelfde browsercontext**, zodat het eerder begonnen concept zichtbaar blijft. In de editor eerst bestaande vijf foto's controleren, daarna **Video apart toevoegen** kiezen. Het resultaat moet expliciet **5 foto's en 1 video** tonen en na bewaren/terugopenen afspelen. **Niet op Plaatsen drukken als de video nog op 0 staat.** Als iPhone geen bestand levert of het bestand te groot is, nu de foutmelding gebruiken om uitsluitend dát geval te herstellen. Eén praktische device-acceptatie, geen nieuwe algemene testrondes.
+
+## 9 november 2026 — ‘Bekijk herinnering’ gaf ‘Niet gevonden’ ondanks vijf eigen verhalen
+
+Op de echte iPhone toonde ‘Mijn leven’ **2026 – 5 eigen** en de eigen herinneringsfoto in de achtergrond. Publicatie en lokale IndexedDB-opslag functioneerden dus, maar na ‘Bekijk herinnering’ verscheen `{"ok":false,"error":"Niet gevonden"}`.
+
+**Exacte bewezen oorzaak:** de originele TALERA HTML construeert de aangeklikte kaart met de URL `/present?memory=local-<UUID>`. De F5 Worker liet na de vorige patch uitsluitend `/mijn-leven?published=local-<UUID>` en `/tell?edit=local-<UUID>` toe. Daardoor gaf de nieuwe F5-gateway **404 vóórdat** de oorspronkelijke presentatiepagina en mediaspeler konden laden.
+
+**Gerichte reparatie, geen wijziging aan vertelcyclus of video:**
+- In `f5-worker.mjs` staat nu ook precies `/present?memory=local-<ID>` op de beperkte lijst van toegestane lokale navigatielinks. De accountgecontroleerde pagina gebruikt nog dezelfde private IndexedDB, presentatiebron, mediaplayer, voice/cues en per-account-gate.
+- Onbekende queryparameters, tweede parameters en externe URL's worden nog steeds geweigerd; er is geen fallback naar bestaande TALERA API's.
+- De eerdere vijf eigen herinneringen zijn NIET verwijderd, verplaatst of gemigreerd.
+
+**Tests en bewijs:**
+- [Volledige synthetische lokale F5 Cloudflare-/mobiele browsertest 42594668859](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42594668859): **GROEN**. Nieuwe test met echte opgeslagen synthetische video creëert een lokale herinnering, vindt de oorspronkelijke `/present?memory=local-...`-kaartlink onder ‘Mijn leven’, opent de bestaande presentatie met HTTP 200 in de mobiele browser en bevestigt de video in de persoonlijke lokale opslag. Invalide of extra queryparameters blijven HTTP 404.
+- [Herhaalde geïntegreerde F5-test 42595071141](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42595071141): **GROEN**.
+- [Gerichte EU-Cloudflare-uitrol en afgeschermde-gatecontrole 42595071195](https://github.com/Marksmits1972/talera-lifeline/actions/runs/42595071195): **GROEN**. Rechtstreekse Cloudflare-worker-readback bewijst de toegestane `/present`-memory-route; zeven DO-bindings en vijf bestaande secret-bindings blijven, zonder koppeling naar oorspronkelijke D1/R2/services. Daarna automatische heruitrol uitgezet.
+
+**Resterende fysieke check:** laat de gebruiker de **reeds bestaande** vijf herinneringen openen vanaf ‘Mijn leven’ op exact dezelfde iPhone en browsercontext. Geen nieuwe verhalen aanmaken. Controleer specifiek foto- én videoweergave in het origineel goedgekeurde presentatiescherm. De code is nu live in de aparte F5-stage, niet in de officiële TALERA-link.

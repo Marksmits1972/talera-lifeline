@@ -1,10 +1,8 @@
 name: TALERA Free - herstel Bekijk herinnering op F5 iPhone
 
+# The tested original-story-view link is live on the isolated EU F5 stage.
+# Disable automatic redeploy during actual iPhone acceptance.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-memory-view-hotfix.yml'
   workflow_dispatch:
 
 permissions:

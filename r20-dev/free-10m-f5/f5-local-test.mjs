@@ -196,6 +196,27 @@ async function run(){
     '/mijn-leven?published=local-f5-test-story-001',{cookie:identities[0].cookie});
   assert.equal(fixedPublished.status,200,
     'Successful Free publish must return to Mijn leven, not a 404');
+  // User-observed 404: the original "Bekijk herinnering" link is
+  // /present?memory=local-<id>, not a bare /present URL.
+  const viewed=await request('GET',
+    '/present?memory=local-f5-test-story-001',{cookie:identities[0].cookie});
+  assert.equal(viewed.status,200,
+    'Published personal memory MUST open the original presentation player');
+  assert.equal(viewed.stage,'personalized-durable-account');
+  assert.ok(String(viewed.data).includes('talera-free-local-'),
+    'Memory player must read current account\'s private local media store');
+  assert.equal((await request('GET',
+    '/present?memory=https%3A%2F%2Fexample.com',
+    {cookie:identities[0].cookie})).status,404,
+    'No external URL permitted as a memory identifier');
+  assert.equal((await request('GET',
+    '/present?memory=local-f5-test-story-001&other=yes',
+    {cookie:identities[0].cookie})).status,404,
+    'No unrecognized parameters for the memory player');
+  assert.equal((await request('GET',
+    '/present?evil=local-f5-test-story-001',
+    {cookie:identities[0].cookie})).status,404,
+    'No unrecognized query names permitted');
   const editLocal=await request('GET',
     '/tell?edit=local-f5-test-story-001',{cookie:identities[0].cookie});
   assert.equal(editLocal.status,200,
@@ -311,7 +332,7 @@ async function run(){
     cookie:identities[1].cookie})).status,401);
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
-    syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,localRequests:calls,
+    syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,originalLocalMemoryPresentationRouteVerified:true,localRequests:calls,
     realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,

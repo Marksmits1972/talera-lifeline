@@ -261,6 +261,58 @@ try{
  assert.equal(readback.id,a.id);
  assert.equal(readback.size,a.bytes,'Original file changed during account switches');
  assert.match(readback.type,/image\/png/);
+ // Synthetic social reference ONLY: the photo is still inside IndexedDB.
+ // Exercise the ORIGINAL menu end-to-end with a real local story title and
+ // actual Durable Object link. No photo/media payload is uploaded.
+ const linked=await page.evaluate(async id=>{
+   const base='/__social/memory/'+encodeURIComponent(id);
+   const opts={method:'POST',credentials:'same-origin'};
+   const init=await fetch(base+'/init',opts);
+   const shared=await fetch(base+'/share',opts);
+   const share=await shared.json();
+   const listing=await fetch('/api/shares',{credentials:'same-origin'});
+   return {init:init.status,shareStatus:shared.status,
+     listStatus:listing.status,link:share.link,
+     items:(await listing.json()).items};
+ },a.id);
+ assert.equal(linked.init,200,'Synthetic local story social reference must be owned');
+ assert.equal(linked.shareStatus,200,'Social metadata link failed');
+ assert.equal(linked.listStatus,200,'Original menu source list not connected');
+ assert.equal(linked.items.length,1,'Issued link is missing from real account list');
+ assert.equal(linked.items[0].memory_id,a.id,
+   'Real server social record must refer back to original IndexedDB story');
+ await menu(page);
+ await view(page,'mine');
+ await page.waitForFunction(title=>{
+   const shell=document.getElementById('talera-more-menu');
+   return !shell?.hidden&&shell.textContent.includes('WhatsApp-deellinks')&&
+      shell.textContent.includes(title)&&shell.textContent.includes('Geldig tot');
+ },'synthetic ACCOUNT ISOLATION 1',{timeout:15000});
+ const revoke=page.locator('#talera-more-menu [data-revoke]').first();
+ assert.equal(await revoke.count(),1,'Original menu must show revoke control');
+ const menuLinkStatus=await page.locator('#talera-more-menu').innerText();
+ assert.ok(menuLinkStatus.includes('synthetic ACCOUNT ISOLATION 1'),
+   'Original menu must resolve real link to LOCAL story title, not a remote copy');
+ // Click the APPROVED original revoke control, never a replacement UI.
+ page.on('dialog',async dialog=>{await dialog.accept()});
+ await revoke.click();
+ await page.waitForFunction(async()=>{
+   const r=await fetch('/api/shares',{credentials:'same-origin'});
+   if(!r.ok)return false;
+   return (await r.json()).items?.some(x=>x.revoked_at!==null);
+ },null,{timeout:15000});
+ const revokedLink=await page.evaluate(async link=>{
+   const r=await fetch(link,{credentials:'same-origin'});
+   return r.status;
+ },linked.link);
+ assert.equal(revokedLink,403,
+   'Original account menu revoke MUST prevent reuse of real share capability');
+ await page.locator('#talera-more-menu [data-action="close"]').first().click();
+ console.log('TALERA_F5_ACTUAL_MINE_MENU_LOCAL_SOCIAL',JSON.stringify({
+   syntheticOnly:true,realLocalStoryTitleShown:true,shareListedFromDO:true,
+   originalRevokeControlUsed:true,reuseDenied:true,cloudMediaUploads:0,
+   officialUiMarkupChanged:false}));
+
  // indexedDB.databases() lists ALL names on the same origin, including
  // the previous account's private DB. Comparing .find() would select that
  // previous DB twice and incorrectly reject a correctly isolated browser.

@@ -57,36 +57,72 @@ async function hasQaAccess(request,env){
   if(!Number.isSafeInteger(expires)||expires<=now||expires>now+30*60000)return false;
   return safeEqualHex(signature,await qaSignature(env,expiry+'.'+nonce));
 }
-function qaEntry(){
+// A normal Safari form POST may omit the Origin header. Protect its
+// entry with a signed same-origin form challenge instead of relying on Origin
+// always being present. Keep rejecting an explicitly foreign Origin.
+const ENTRY_COOKIE='talera_f5_entry';
+async function qaEntry(env){
+  const expiry=String(Date.now()+10*60000);
+  const nonce=Array.from(crypto.getRandomValues(new Uint8Array(16)),
+    b=>b.toString(16).padStart(2,'0')).join('');
+  const signed=expiry+'.'+nonce;
+  const ticket=signed+'.'+await qaSignature(env,'qa-entry:'+signed);
   const html='<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>TALERA Free besloten test</title><body style="max-width:480px;margin:12vh auto;padding:24px;font-family:system-ui">'+
     '<h1>TALERA Free — testversie</h1><p>Alleen voor de afgesloten test. Geen echte accounts gebruiken.</p>'+
-    '<form action="/__f5/entry" method="post"><label>Testtoegang <input type="password" name="key" autocomplete="off" required maxlength="64" style="display:block;width:100%;padding:12px;margin:12px 0"></label>'+
+    '<form action="/__f5/entry" method="post">'+
+    '<input type="hidden" name="csrf" value="'+ticket+'">'+
+    '<label>Testtoegang <input type="password" name="key" autocomplete="off" required maxlength="64" style="display:block;width:100%;padding:12px;margin:12px 0"></label>'+
     '<button type="submit" style="padding:12px 20px">Open testversie</button></form></body></html>';
   return new Response(html,{status:200,headers:{
     'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
+    'set-cookie':ENTRY_COOKIE+'='+ticket+
+      '; HttpOnly; Secure; SameSite=Strict; Path=/__f5/entry; Max-Age=600',
     'x-content-type-options':'nosniff','referrer-policy':'no-referrer',
     'content-security-policy':F5_BROWSER_CSP
   }});
 }
 async function authorizeQaBrowser(request,env){
-  if(!sameOrigin(request))return deny(403,'Ongeldige herkomst');
+  // An explicitly foreign Origin/Fetch-Site is always rejected. Browser
+  // privacy modes can omit Origin on a native HTML form; the signed
+  // double-submit ticket independently prevents cross-site form forgery.
+  const origin=request.headers.get('origin');
+  if(origin&&origin!==new URL(request.url).origin)
+    return deny(403,'Ongeldige herkomst');
+  const fetchSite=request.headers.get('sec-fetch-site');
+  if(fetchSite&&!['same-origin','none'].includes(fetchSite))
+    return deny(403,'Ongeldige herkomst');
   const len=Number(request.headers.get('content-length')||0);
   if(len>1024)return deny(400,'Ongeldige testaanvraag');
   let form;
   try{form=await request.formData()}catch{return deny(400,'Ongeldige testaanvraag')}
+  const ticket=form.get('csrf');
+  const cookies=request.headers.get('cookie')||'';
+  const matched=[...cookies.matchAll(/(?:^|;\\s*)talera_f5_entry=(\\d{13})\\.([a-f0-9]{32})\\.([a-f0-9]{64})(?=;|$)/g)];
+  if(matched.length!==1||typeof ticket!=='string')
+    return deny(403,'Open de testpagina opnieuw en probeer het nog eens');
+  const [,expiry,nonce,signature]=matched[0];
+  const expected=expiry+'.'+nonce+'.'+signature;
+  const expires=Number(expiry),now=Date.now();
+  if(!Number.isSafeInteger(expires)||expires<=now||expires>now+10*60000||
+     ticket!==expected||
+     !safeEqualHex(signature,await qaSignature(env,'qa-entry:'+expiry+'.'+nonce)))
+    return deny(403,'Open de testpagina opnieuw en probeer het nog eens');
   const secret=form.get('key');
   if(!safeEqualHex(typeof secret==='string'?secret:'',env.STAGING_F5_KEY))
-    return deny(403,'Geen toegang');
-  const expiry=String(Date.now()+30*60000);
-  const nonce=[...crypto.getRandomValues(new Uint8Array(16))]
+    return deny(403,'Toegangscode niet herkend. Controleer of deze in Cloudflare is opgeslagen.');
+  const sessionExpiry=String(Date.now()+30*60000);
+  const sessionNonce=[...crypto.getRandomValues(new Uint8Array(16))]
     .map(b=>b.toString(16).padStart(2,'0')).join('');
-  const proof=await qaSignature(env,expiry+'.'+nonce);
-  const cookie=QA_COOKIE+'='+expiry+'.'+nonce+'.'+proof+
+  const proof=await qaSignature(env,sessionExpiry+'.'+sessionNonce);
+  const cookie=QA_COOKIE+'='+sessionExpiry+'.'+sessionNonce+'.'+proof+
     '; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800';
-  return new Response(null,{status:303,headers:{
-    location:'/mijn-leven','set-cookie':cookie,'cache-control':'private, no-store'
-  }});
+  const headers=new Headers({
+    location:'/mijn-leven','cache-control':'private, no-store'
+  });
+  headers.append('set-cookie',cookie);
+  headers.append('set-cookie',ENTRY_COOKIE+'=; HttpOnly; Secure; SameSite=Strict; Path=/__f5/entry; Max-Age=0');
+  return new Response(null,{status:303,headers});
 }
 function ns(env,name){
   const b=env[name];
@@ -266,7 +302,7 @@ export default {
        typeof env.AUTH_NAMESPACE_KEY!=='string'||env.AUTH_NAMESPACE_KEY.length<40||
        typeof env.DEMO_IDENTITY_KEY!=='string'||env.DEMO_IDENTITY_KEY.length<40)
       return deny(503,'F5-testomgeving niet correct ingericht');
-    if(p==='/__f5/entry'&&m==='GET')return qaEntry();
+    if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
     if(!await hasQaAccess(request,env))return deny();
     if(url.search)return deny(404,'Niet gevonden');

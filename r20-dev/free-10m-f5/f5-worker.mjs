@@ -98,7 +98,7 @@ async function authorizeQaBrowser(request,env){
   try{form=await request.formData()}catch{return deny(400,'Ongeldige testaanvraag')}
   const ticket=form.get('csrf');
   const cookies=request.headers.get('cookie')||'';
-  const matched=[...cookies.matchAll(/(?:^|;\\s*)talera_f5_entry=(\\d{13})\\.([a-f0-9]{32})\\.([a-f0-9]{64})(?=;|$)/g)];
+  const matched=[...cookies.matchAll(/(?:^|;\s*)talera_f5_entry=(\d{13})\.([a-f0-9]{32})\.([a-f0-9]{64})(?=;|$)/g)];
   if(matched.length!==1||typeof ticket!=='string')
     return deny(403,'Open de testpagina opnieuw en probeer het nog eens');
   const [,expiry,nonce,signature]=matched[0];

@@ -1,0 +1,46 @@
+name: TALERA Free F5 - preserve iPhone story and repair back to Mijn leven
+on:
+  push:
+    branches: [fix/free-f5-iphone-memory-back-20261109]
+    paths: ['.github/workflows/talera-f5-back-nav-regression.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  return_from_present:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build original approved anonymous app without any user media
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify EXACT one Worker route added and untouched approved player and local storage
+        run: |
+          node r20-dev/free-10m-f5/f5-back-nav-regression.mjs
+          node r20-dev/free-10m-f5/f5-editor-video-mute-regression.mjs
+          node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+          node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+      - name: Verify generated Worker package but do not deploy
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-back-nav-check
+      - name: Install mobile-browser test tools
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+      - name: Real browser account, original back button, photo readback, privacy and social regression
+        run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
+      - name: Completed evidence, NOT iPhone physical acceptance
+        if: success()
+        run: echo 'TALERA_F5_IPHONE_RETURN_TO_MIJN_LEVEN_GITHUB_CI_COMPLETE'

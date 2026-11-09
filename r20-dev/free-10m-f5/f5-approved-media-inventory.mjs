@@ -82,7 +82,7 @@ for(const [label,url] of Object.entries({whatsapp:bases.whatsapp,previouslyWorki
  for(const [kind,re] of patterns){
   const matches=[...s.matchAll(re)];
   const hits=matches.slice(0,kind==='thumbnail-render'?30:80).map(m=>{
-   const p=m.index;return {at:p,text:s.slice(Math.max(0,p-500),Math.min(s.length,p+kind==='native-cover-js'?3500:1300))};
+   const p=m.index;return {at:p,text:s.slice(Math.max(0,p-500),Math.min(s.length,p+(kind==='native-cover-js'?3500:1300)))};
   });
   console.log('MEDIA_DEEP_HITS',JSON.stringify({kind,total:matches.length,hits}));
  }

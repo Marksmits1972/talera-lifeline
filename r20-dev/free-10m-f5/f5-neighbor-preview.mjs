@@ -72,6 +72,25 @@ export function eliminateFirstSwipeBlank(html){
   '    activate(selected);\n    void f5PrewarmFirstAdjacent(selected);');
  html=html.replace(matches[7],
   'if(visible?._taleraLocal){await hydrate(visible);void f5PrewarmFirstAdjacent(visible)}');
+ // R20's one-photo CSS intentionally hides its ordinary photo-strip while a
+ // narrated story rests. However V3's EXISTING 11-page continuous photo band
+ // is the sole gesture owner during a swipe. Its dynamic .is-visible class
+ // MUST override that resting-mode hide, otherwise the belt stays invisible
+ // until narration mode switches off and the next photo snaps into place.
+ // Do not change the narration engine, the two RH19 layers or any timings.
+ const ownerId='id="talera-v61-r12-one-photo-owner"';
+ if(html.split(ownerId).length!==2)
+   throw Error('TALERA_F5_APPROVED_ONE_PHOTO_OWNER_NOT_FOUND');
+ if(!html.includes('talera-photo-strip talera-wheel-strip')||
+    !html.includes("belt.classList.add('is-visible')")||
+    !html.includes("belt.classList.remove('is-visible')"))
+   throw Error('TALERA_F5_ORIGINAL_V3_BAND_NOT_FOUND');
+ if(!html.includes('</head>'))throw Error('TALERA_F5_PRESENTATION_HEAD_NOT_FOUND');
+ const gestureStyle='<style id="talera-f5-narrated-swipe-band">'+
+  'body.talera-v61-narration-visual #photoStage .talera-photo-strip.talera-wheel-strip.is-visible'+
+  '{display:block!important;visibility:visible!important;opacity:1!important}'+
+  '</style>';
+ html=html.replace('</head>',gestureStyle+'</head>');
  if(!html.includes('void f5PrewarmFirstAdjacent(selected);')||
   !html.includes('void f5PrewarmFirstAdjacent(visible)'))
   throw Error('TALERA_F5_PREVIEW_COLD_START_INCOMPLETE');

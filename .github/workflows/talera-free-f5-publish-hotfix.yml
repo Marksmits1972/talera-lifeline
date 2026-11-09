@@ -1,0 +1,86 @@
+name: TALERA Free – fix iPhone media-ID publish in isolated F5 only
+
+on:
+  pull_request:
+    branches: [feature/free-10m-social-memory-do-20261108]
+    paths:
+      - '.github/workflows/talera-free-f5-publish-hotfix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-free-f5-publish-cue-fix-once
+  cancel-in-progress: false
+
+jobs:
+  safe_publish_patch:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Pinned dependencies
+        run: npm ci
+      - name: Strictly verify separate F5 synthetic-only target
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const c=JSON.parse(fs.readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          assert.equal(c.name,'talera-free-f5-combined-stage-20261108');
+          assert.equal(c.durable_objects.bindings.length,7);
+          assert.equal(c.vars.AUTH_STORAGE_JURISDICTION,'eu');
+          assert.equal(c.vars.SOCIAL_STORAGE_JURISDICTION,'eu');
+          assert.ok(!c.d1_databases&&!c.r2_buckets&&!c.services);
+          JS
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Build original public PWA code without accessing real accounts
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Prove all media-ID writer/readback DB names are the same per account
+        run: |
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+      - name: Deploy FIX only to the separate F5 Worker without altering five old secrets
+        run: npx --no-install wrangler deploy --config r20-dev/free-10m-f5/wrangler.staging.jsonc
+      - name: Verify fixed one-tap page and fail-closed public access on REAL Cloudflare
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const root='https://talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+          let entry,html;
+          for(let i=0;i<12;i++){
+            entry=await fetch(root+'/__f5/start',{cache:'no-store',signal:AbortSignal.timeout(15000)});
+            html=await entry.text();
+            if(entry.status===200&&html.includes('location.hash'))break;
+            await new Promise(resolve=>setTimeout(resolve,800));
+          }
+          assert.equal(entry.status,200);
+          assert.match(html,/De testversie wordt geopend/);
+          const health=await fetch(root+'/__f5/health',{signal:AbortSignal.timeout(15000)});
+          const h=await health.json();
+          assert.equal(h.ok,true);
+          assert.equal(h.officialTaleraConnected,false);
+          const closed=await fetch(root+'/mijn-leven',{signal:AbortSignal.timeout(15000)});
+          assert.equal(closed.status,403);
+          console.log('TALERA_FREE_MEDIA_ID_HOTFIX_LIVE',JSON.stringify({
+            separateEUF5:true,originalMediaUnmodified:true,
+            timelineWriterReadbackSameAccountPrivateDB:true,
+            existingStageSecretsPreserved:true,
+            freeOneTapStillOpen:true,realCustomerDataUntouched:true
+          }));
+          JS

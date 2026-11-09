@@ -289,6 +289,17 @@ async function run(){
     'Presentation must access the very same private local story and media store');
   assert.match(String(signedPresent.data),/const LIFE_START = new Date\(1974,3,2\)\.getTime\(\);/,
     'Presentation start must match account private birthdate');
+  // HARD CONTRACT: chosen WhatsApp CSS-cleanup origin is the complete UI.
+  // Storage-only integration must never introduce its own controls or RH19 CSS.
+  const protectedPages=[String(signedHome.data),String(signedPresent.data),
+    String(storyEditor.data)];
+  for(const html of protectedPages){
+    for(const forbidden of ['taleraF5AddVideoButton','talera-f5-narrated-swipe-band',
+      'f5PrewarmFirstAdjacent','talera-f5-media-status']){
+      assert.ok(!html.includes(forbidden),
+        'Free storage integration must not mutate approved UX: '+forbidden);
+    }
+  }
   const publicScript=await request('GET','/__clean/menu-integration.mjs');
   assert.equal(publicScript.status,200,'Original TALERA menu script must load from approved snapshot');
   assert.ok(String(publicScript.data).length>100,'Actual menu integration JavaScript is expected');

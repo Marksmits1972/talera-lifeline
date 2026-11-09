@@ -1,7 +1,7 @@
 // Isolated EU F5 smoke: synthetic accounts only, bounded HTTP requests.
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-const host='talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
+const host=process.env.F5_STAGE_HOST||'talera-free-f5-combined-stage-20261108.mark-a39.workers.dev';
 const origin='https://'+host,key=process.env.STAGING_F5_KEY;
 assert.match(key||'',/^[a-f0-9]{64}$/);
 let calls=0;

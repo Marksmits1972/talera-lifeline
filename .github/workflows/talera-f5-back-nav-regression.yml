@@ -39,7 +39,9 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps chromium
-      - name: Real browser safe home return and approved presentation account sharing
+      - name: Real mobile browser presses original back, preserves original memories and checks account switching
+        env:
+          F5_BACK_NAV_ONLY: '1'
         run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
       - name: Completed evidence, NOT iPhone physical acceptance
         if: success()

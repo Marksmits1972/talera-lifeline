@@ -20,7 +20,7 @@ jobs:
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 24
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,6 +48,16 @@ jobs:
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
       - name: Execute synthetic auth + private DOB + social privacy and persistence
         run: node r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Install headless mobile browser and small synthetic video generator for the reported issue
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Browser regression - five actual synthetic photos plus one MP4, mixed and separate video choices
+        run: |
+          node --check r20-dev/free-10m-f5/f5-video-browser-regression.mjs
+          node r20-dev/free-10m-f5/f5-video-browser-regression.mjs
       - name: Archive factual test result only
         if: success()
         uses: actions/upload-artifact@v4

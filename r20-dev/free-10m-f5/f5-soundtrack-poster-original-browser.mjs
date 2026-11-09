@@ -21,8 +21,8 @@ const local=process.env.F5_POSTER_TEST_ORIGIN||'';
 const context=await browser.newContext({...devices['iPhone 13'],
  ...(local?{extraHTTPHeaders:{'x-talera-f5-key':process.env.F5_POSTER_TEST_GATE}}:{})});
 if(local)await context.addCookies([{name:'talera_sid',
- value:process.env.F5_POSTER_TEST_SID,domain:'127.0.0.1',path:'/',
- httpOnly:true,secure:false,sameSite:'Lax'}]);
+ value:process.env.F5_POSTER_TEST_SID,domain:new URL(local).hostname,path:'/',
+ httpOnly:true,secure:local.startsWith('https:'),sameSite:'Lax'}]);
 await context.addInitScript(()=>{
  window.__videoPlays=[];
  const original=HTMLMediaElement.prototype.play;

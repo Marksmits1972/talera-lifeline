@@ -171,6 +171,22 @@ async function run(){
   assert.equal(personal.stage,'personalized-durable-account');
   assert.equal((await request('GET','/api/me',{gate:false,
     cookie:quickSession+'; '+quickQa})).data.account.birthDate,'1974-04-02');
+  const revisit=await fetch(origin+'/__f5/start',{
+    method:'POST',
+    headers:{origin,'cf-connecting-ip':'192.0.2.77',
+      'content-type':'application/json',
+      cookie:quickSession+'; '+quickQa},
+    body:JSON.stringify({invite:'b'.repeat(64)}),redirect:'manual'
+  });
+  const reopened=await revisit.json();
+  assert.equal(revisit.status,200,'iPhone one-tap invitation can be reopened');
+  assert.equal(reopened.reusedExistingSession,true,
+    'Reopening one-tap link MUST retain original account and its saved media');
+  assert.ok(!(revisit.headers.get('set-cookie')||'').includes('talera_sid='),
+    'Never overwrite existing iPhone account session with a fresh fake user');
+  assert.equal((await request('GET','/api/me',{
+    gate:false,cookie:quickSession+'; '+quickQa})).data.account.birthDate,'1974-04-02');
+
   const signedHome=await request('GET','/mijn-leven',{
     gate:false,cookie:identities[0].cookie+'; '+qaCookie});
   assert.equal(signedHome.status,200,'Registered user gets a separate private timeline');
@@ -188,6 +204,11 @@ async function run(){
   assert.equal(storyEditor.status,200);
   assert.ok(String(storyEditor.data).includes(scopedName),
     'The storyteller must use the same individual local media store as Mijn leven');
+  assert.ok(!String(storyEditor.data).includes('talera-lifeline-dev-local-v1'),
+    'Editor must not write its media-ID timeline to the old global database');
+  assert.equal(String(storyEditor.data).split(scopedName).length-1,3,
+    'Editor, story store and deletion tool must all use the same private DB');
+
   assert.match(String(signedHome.data),/let current=1974;/,
     'Birth-year must come from the individual account DO, not the demo shell');
   const signedPresent=await request('GET','/present',{cookie:identities[0].cookie});

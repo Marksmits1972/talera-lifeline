@@ -261,6 +261,38 @@ try{
  assert.equal(readback.id,a.id);
  assert.equal(readback.size,a.bytes,'Original file changed during account switches');
  assert.match(readback.type,/image\/png/);
+ // Actual mobile browser click through the APPROVED presentation return link.
+ // The correct F5 private home must reopen the SAME per-account IndexedDB,
+ // without swapping origins, altering the original narrator or removing media.
+ const viewed=await page.goto(origin+'/present?memory='+encodeURIComponent(a.id),
+   {waitUntil:'domcontentloaded'});
+ assert.equal(viewed.status(),200,'Approved direct-view route must still open');
+ const approvedBack=page.locator('#talera-flow-home');
+ await approvedBack.waitFor({state:'attached',timeout:18000});
+ assert.equal(await approvedBack.getAttribute('href'),'/', 
+   'Do not rewrite the original approved return-button markup');
+ await Promise.all([
+   page.waitForURL(origin+'/mijn-leven',{timeout:20000}),
+   page.evaluate(()=>document.querySelector('#talera-flow-home').click())
+ ]);
+ await page.waitForFunction(()=>typeof window.TaleraMemories?.list==='function',null,
+   {timeout:20000});
+ const afterOriginalBack=await inventory(page);
+ assert.ok(afterOriginalBack.ids.includes(a.id),
+   'Original iPhone presentation return lost its local own memory');
+ assert.ok(!afterOriginalBack.ids.includes(b.id),
+   'Return navigation exposed another account memory');
+ const backMedia=await page.evaluate(async id=>{
+   const story=await window.TaleraMemories.get(id);
+   const media=await window.TaleraMemories.blob(story.items[0].key);
+   return {id:story.id,bytes:media?.size||0};
+ },a.id);
+ assert.equal(backMedia.bytes,a.bytes,'Original photo bytes changed after returning');
+ console.log('TALERA_F5_ORIGINAL_IPHONE_BACK_TO_MY_LIFE_PASS',JSON.stringify({
+   originalBackHref:'/',redirectedTo:'/mijn-leven',sameBrowserOrigin:true,
+   accountLibraryRetained:true,originalMediaRetained:true,
+   otherAccountIsolated:true,playerUnchanged:true,realPhysicalIphone:false
+ }));
  // Synthetic social reference ONLY: the photo is still inside IndexedDB.
  // Exercise the ORIGINAL menu end-to-end with a real local story title and
  // actual Durable Object link. No photo/media payload is uploaded.

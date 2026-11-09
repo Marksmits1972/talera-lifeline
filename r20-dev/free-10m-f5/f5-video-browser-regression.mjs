@@ -329,8 +329,14 @@ try{
          "__f5Log('selected-explicit-activate');activate(selected);"]
       ];
       for(const [find,repl] of edits){
-        if(!html.includes(find))
+        if(!html.includes(find)){
+          const p=html.indexOf('async function present(memory)');
+          console.error('TALERA_FREE_ADAPTER_EXPECTED_SOURCE',JSON.stringify({
+            missing:find,around:p>=0?html.slice(p,p+1150):null,
+            assetLength:html.length,externalScript:true
+          }));
           throw Error('Diagnostic marker absent in ORIGINAL presentation: '+find);
+        }
         html=html.replace(find,repl);
       }
       await route.fulfill({response,body:html});

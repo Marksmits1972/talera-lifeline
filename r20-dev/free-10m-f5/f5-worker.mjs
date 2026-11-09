@@ -590,6 +590,14 @@ export default {
     if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
     if(!await hasQaAccess(request,env))return deny();
+    // The APPROVED original presentation back button and original home nav
+    // target '/'. Reuse the SAME verified personal home page and IDB origin.
+    // No other routes, auth permissions, player code or media are changed.
+    if(p==='/'&&m==='GET'&&!url.search)
+      return new Response(null,{status:302,headers:{
+        location:'/mijn-leven','cache-control':'private, no-store',
+        'x-content-type-options':'nosniff'
+      }});
     // Exact original embedded player route is allowed before the normal
     // strict search-param gate, which intentionally covers only top pages.
     if(p==='/vertelmodus-embed')return privateEmbeddedPlayer(request,env);

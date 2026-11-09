@@ -70,6 +70,10 @@ const prepare=async sid=>{
  }]);
  const page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.message||e)));
+ page.on('console',m=>{
+   if(['warning','error'].includes(m.type()))
+     errors.push('console '+m.type()+': '+m.text().slice(0,380));
+ });
  const r=await page.goto(origin+'/tell',{waitUntil:'domcontentloaded',timeout:25000});
  assert.equal(r.status(),200);
  await page.locator('#photoInput').waitFor({state:'attached',timeout:18000});

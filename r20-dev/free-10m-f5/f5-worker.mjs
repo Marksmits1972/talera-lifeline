@@ -42,7 +42,8 @@ function allowedLocalUiSearch(url){
 const F5_BROWSER_CSP=[
   "default-src 'self' blob: data:",
   "base-uri 'self'","object-src 'none'","frame-ancestors 'none'",
-  "connect-src 'self'","form-action 'self'",
+  // Local IndexedDB media previews can use fetch(blob:...), never Cloudflare.
+  "connect-src 'self' blob:","form-action 'self'",
   "img-src 'self' https: blob: data:",
   "media-src 'self' blob: data: https:",
   "font-src 'self' https: data:",

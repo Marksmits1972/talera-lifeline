@@ -1,0 +1,25 @@
+name: TALERA F5 - source-only iPhone memory return navigation diagnosis
+on:
+  push:
+    branches: [fix/free-f5-iphone-memory-back-20261109]
+    paths: ['.github/workflows/talera-f5-back-nav-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Acquire exact approved public anonymous app source
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Determine original return link, path and click handler
+        run: node r20-dev/free-10m-f5/f5-present-back-nav-audit.mjs

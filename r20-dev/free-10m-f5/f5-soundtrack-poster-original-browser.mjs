@@ -17,7 +17,12 @@ const streams=execFileSync('ffprobe',['-v','error',
 assert.ok(streams.includes('audio')&&streams.includes('video'));
 const browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
 try{
-const context=await browser.newContext({...devices['iPhone 13']});
+const local=process.env.F5_POSTER_TEST_ORIGIN||'';
+const context=await browser.newContext({...devices['iPhone 13'],
+ ...(local?{extraHTTPHeaders:{'x-talera-f5-key':process.env.F5_POSTER_TEST_GATE}}:{})});
+if(local)await context.addCookies([{name:'talera_sid',
+ value:process.env.F5_POSTER_TEST_SID,domain:'127.0.0.1',path:'/',
+ httpOnly:true,secure:false,sameSite:'Lax'}]);
 await context.addInitScript(()=>{
  window.__videoPlays=[];
  const original=HTMLMediaElement.prototype.play;
@@ -29,7 +34,7 @@ await context.addInitScript(()=>{
 });
 const page=await context.newPage(),errors=[];
 page.on('pageerror',e=>errors.push(String(e.message)));
-const origin='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
+const origin=local||'https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
 const response=await page.goto(origin+'/tell',{waitUntil:'domcontentloaded',timeout:30000});
 assert.equal(response.status(),200);
 await page.locator('#photoInput').setInputFiles({
@@ -46,11 +51,13 @@ const result=await page.evaluate(()=>{
   videoPlays:window.__videoPlays.slice(0,10)};
 });
 console.log('TALERA_ORIGINAL_SOUND_VIDEO_POSTER_BROWSE',JSON.stringify({
-  ...result,errors,videoHasActualOpusAudio:true,sourceOriginalUI:true
+  ...result,errors,videoHasActualOpusAudio:true,sourceOriginalUI:!local
 }));
 assert.equal(errors.length,0);
 assert.equal(result.imageSrcKind,'blob','Actual video must have JPEG thumbnail, not placeholder');
 assert.ok(result.imageWidth>0);
 assert.ok(result.videoPlays.every(p=>p.muted),'Video thumbnail extraction must not play soundtrack');
+if(local)assert.equal(result.frameMuted,true,
+ 'F5 editor video must stay muted before the narration panel opens');
 await context.close();
 }finally{await browser.close()}

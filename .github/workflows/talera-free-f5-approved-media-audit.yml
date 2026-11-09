@@ -1,0 +1,23 @@
+name: TALERA F5 - read-only approved audio and poster source comparison
+on:
+  push:
+    branches: [feature/free-f5-safe-iphone-stage-20261109]
+    paths: ['.github/workflows/talera-free-f5-approved-media-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Read-only anonymous original WhatsApp public source snapshots
+        run: node r20-dev/free-10m-delivery/build.mjs
+      - name: Compare current approved and previously proven audio/poster handlers
+        run: node r20-dev/free-10m-f5/f5-approved-media-inventory.mjs

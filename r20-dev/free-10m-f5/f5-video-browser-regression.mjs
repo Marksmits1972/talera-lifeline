@@ -263,7 +263,35 @@ try{
       {waitUntil:'domcontentloaded',timeout:25000});
     assert.equal(presentResponse.status(),200);
     const child=page.frameLocator('iframe.talera-zero-present-frame');
-    await child.locator('#play').waitFor({state:'visible',timeout:24000});
+    try{await child.locator('#play').waitFor({state:'visible',timeout:13000});}
+    catch(error){
+      const diagnostics=await page.evaluate(()=>({
+        origin:location.origin,path:location.pathname,query:location.search,
+        selectedStory:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+        selectedId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
+        selectedHasVoice:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroItems?.some(x=>x.kind==='audio'),
+        selectedItems:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroItems?.map(x=>x.kind),
+        selectedLoading:window.__taleraTimelineRuntime?.currentMemory?.()?._photoLoading,
+        iframeCount:document.querySelectorAll('iframe').length,
+        iframeUrls:[...document.querySelectorAll('iframe')].map(x=>x.getAttribute('src')),
+        loadError:document.getElementById('taleraV8LoadError')?.textContent||null,
+        loadedStore:!!window.TaleraMemories?.get
+      }));
+      const frameChecks=[];
+      for(const frame of page.frames()){
+        const info={url:frame.url()};
+        try{info.title=await frame.title();info.playCount=await frame.locator('#play').count();
+          info.state=await frame.locator('body').getAttribute('data-stage');
+          info.contentLength=(await frame.locator('body').innerText()).length;
+        }catch(e){info.error=String(e.message).slice(0,150)}
+        frameChecks.push(info);
+      }
+      console.error('TALERA_FREE_ORIGINAL_PLAYER_DIAGNOSTIC',JSON.stringify({
+        diagnostics,frameChecks,pageErrors:errors,
+        originalError:String(error.message)
+      }));
+      throw error;
+    }
     const initial=await child.locator('#view [data-index]').first()
       .getAttribute('data-index');
     assert.equal(initial,'0','Original narrator must show first photo on opening');

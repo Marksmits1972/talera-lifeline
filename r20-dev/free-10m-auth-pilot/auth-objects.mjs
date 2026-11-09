@@ -69,6 +69,38 @@ export class FreeAuthAccount extends DurableObject {
    return {id:a.id,email:a.email,displayName:name,publicHandle:a.public_handle,epoch:a.epoch};
   });
  }
+ // F5 social ownership locator only. The actual grants and capability
+ // status remain authoritative in the per-memory SOCIAL_MEMORY Durable Object.
+ // No personal story, image, audio, video, title or raw link token is stored.
+ async rememberSocialStory(storyId){
+  if(typeof storyId!=='string'||!/^[A-Za-z0-9_-]{8,80}$/.test(storyId))
+   throw Error('INVALID_SOCIAL_STORY');
+  return this.ctx.storage.transaction(async txn=>{
+   const entries=await txn.get('f5-social-owned-v1')||[];
+   if(entries.includes(storyId))return true;
+   if(entries.length>=10000)throw Error('SOCIAL_INDEX_FULL');
+   await txn.put('f5-social-owned-v1',[...entries,storyId]);
+   return true;
+  });
+ }
+ async socialStoryIds(){
+  return await this.ctx.storage.get('f5-social-owned-v1')||[];
+ }
+ async rememberSocialShare(tokenHash,storyId){
+  if(!/^[a-f0-9]{64}$/.test(tokenHash)||typeof storyId!=='string'||
+    !/^[A-Za-z0-9_-]{8,80}$/.test(storyId))throw Error('INVALID_SOCIAL_SHARE');
+  const key='f5-social-share-v1:'+tokenHash;
+  return this.ctx.storage.transaction(async txn=>{
+   const previous=await txn.get(key);
+   if(previous&&previous!==storyId)throw Error('SOCIAL_SHARE_CONFLICT');
+   if(!previous)await txn.put(key,storyId);
+   return true;
+  });
+ }
+ async socialShareStory(tokenHash){
+  if(!/^[a-f0-9]{64}$/.test(tokenHash))throw Error('INVALID_SOCIAL_SHARE');
+  return await this.ctx.storage.get('f5-social-share-v1:'+tokenHash)||null;
+ }
  async getBirthDate(){
   const value=await this.ctx.storage.get('birthdate');
   return value===undefined?null:validatedDate(value);

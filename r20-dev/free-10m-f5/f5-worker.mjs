@@ -382,6 +382,39 @@ async function publicPage(request,env){
   headers.set('x-content-type-options','nosniff');
   return new Response(r.body,{status:200,headers});
 }
+// The original narrator/video player is an isolated SAME-ORIGIN iframe,
+// not another photo stage. Both /tell and /present reference this URL.
+// Authentication, QA, MIME and framing are explicit; DO/media never leaves
+// the account's own browser; absolutely no live TALERA backend fallback.
+async function privateEmbeddedPlayer(request,env){
+  const url=new URL(request.url);
+  const params=[...url.searchParams.entries()];
+  if(request.method!=='GET'||params.length!==1||
+    params[0][0]!=='mode'||!['present','record'].includes(params[0][1]))
+    return deny(404,'Ongeldige afspeelroute');
+  const actor=await sessionAccount(request,env);
+  if(!actor)return deny(401,'Sessie verlopen; meld je opnieuw aan');
+  const reference=referencePages['/vertelmodus-embed'];
+  if(!reference||!env.ASSETS)return deny(503,'Originele afspeelfunctie ontbreekt');
+  const r=await env.ASSETS.fetch(new Request(new URL(reference,url.origin)));
+  if(!r.ok)return deny(503,'Originele afspeelfunctie niet bereikbaar');
+  const source=await r.text();
+  if(!source.includes('taleraZero')||!source.includes('postMessage'))
+    return deny(503,'Originele afspeelbron niet geverifieerd');
+  // The top-level app pages are unframeable; this ONE authenticated
+  // same-origin player MUST permit framing or iPhone keeps its first image.
+  const csp=F5_BROWSER_CSP.replace("frame-ancestors 'none'",
+    "frame-ancestors 'self'");
+  return new Response(source,{status:200,headers:{
+    'content-type':'text/html; charset=utf-8',
+    'cache-control':'private, no-store',
+    'x-content-type-options':'nosniff',
+    'x-frame-options':'SAMEORIGIN',
+    'referrer-policy':'same-origin',
+    'content-security-policy':csp,
+    'x-talera-free-f5':'original-iframe-zero-player'
+  }});
+}
 async function publicPwaSupport(request,env){
  const pathname=new URL(request.url).pathname;
  const asset=verifiedPublicSupport[pathname];
@@ -428,6 +461,9 @@ export default {
     if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
     if(!await hasQaAccess(request,env))return deny();
+    // Exact original embedded player route is allowed before the normal
+    // strict search-param gate, which intentionally covers only top pages.
+    if(p==='/vertelmodus-embed')return privateEmbeddedPlayer(request,env);
     if(url.search&&!allowedLocalUiSearch(url))return deny(404,'Niet gevonden');
     try{
       if(AUTH_PATHS.has(p))return accountApi(request,env);

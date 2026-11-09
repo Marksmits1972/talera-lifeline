@@ -360,6 +360,47 @@ try{
     result[result.length-1].narratedVideoPresentedOnSingleStage=true;
     result[result.length-1].actualImage0ToImage1ToVideo2=true;
     result[result.length-1].originalV61InlinePlayerTested=true;
+    // The owner CSS hides the V3 11-page belt at REST for narrated memories.
+    // During an actual timeline/story swipe, the same original belt becomes
+    // visible. A hidden belt causes the user's observed sudden screen switch.
+    const storyBounds=await page.locator('#memoryStoryScroll').boundingBox();
+    assert.ok(storyBounds?.width>150&&storyBounds?.height>160,
+      'The original story swipe surface must exist');
+    const resting=await page.evaluate(()=>{
+      const e=document.querySelector('#photoStage .talera-photo-strip.talera-wheel-strip');
+      const style=e&&getComputedStyle(e);
+      return {belt:!!e,narrated:document.body.classList.contains('talera-v61-narration-visual'),
+        display:style?.display,visibility:style?.visibility,
+        visible:e?.classList.contains('is-visible')};
+    });
+    assert.equal(resting.belt,true);
+    assert.equal(resting.narrated,true,'Existing narration motor stays active');
+    assert.equal(resting.visible,false);
+    const swipeY=storyBounds.y+Math.min(90,storyBounds.height*.18);
+    await page.mouse.move(storyBounds.x+storyBounds.width*.83,swipeY);
+    await page.mouse.down();
+    await page.mouse.move(storyBounds.x+storyBounds.width*.32,swipeY,{steps:12});
+    const duringSwipe=await page.evaluate(()=>{
+      const belt=document.querySelector('#photoStage .talera-photo-strip.talera-wheel-strip');
+      const css=belt&&getComputedStyle(belt);
+      return {moving:belt?.classList.contains('is-visible'),
+        display:css?.display,visibility:css?.visibility,opacity:css?.opacity,
+        narrated:document.body.classList.contains('talera-v61-narration-visual'),
+        tiles:[...(belt?.children||[])].filter(e=>e.style.display!=='none').length};
+    });
+    await page.mouse.up();
+    assert.equal(duringSwipe.narrated,true,
+      'Recorded narration remains in its original engine while dragging');
+    assert.equal(duringSwipe.moving,true,
+      'The original photo-band must actually open on finger drag');
+    assert.equal(duringSwipe.display,'block',
+      'Recorded-memory swipe MUST NOT hide the native moving photo-band');
+    assert.equal(duringSwipe.visibility,'visible');
+    assert.ok(Number(duringSwipe.opacity)>.9);
+    assert.ok(duringSwipe.tiles>=2,
+      'The original moving strip must contain adjacent visible photo pages');
+    result[result.length-1].originalV3NarratedSwipeContinuous=true;
+
     // Reproduce the reported single bad story precisely: FIVE photos,
     // ONE video, no recorded voice, with the SAME day/time as other stories.
     // Ordinary memories must change frames on a real tap, NOT via an audio

@@ -21,6 +21,16 @@ assert.ok(output.includes("await picture.decode()"));
 assert.ok(output.includes("if(f5ColdAdjacentStarted||!memory?._taleraLocal)return;"));
 assert.ok(output.includes('left._taleraLocal&&left._photoLoading'));
 assert.ok(output.includes('right._taleraLocal&&right._photoLoading'));
+// Confirm the existing V61 recording presentation stays one-photo-at-rest,
+// but the SAME existing V3 swipe band is visible while .is-visible is set.
+assert.equal(output.split('id="talera-f5-narrated-swipe-band"').length-1,1);
+assert.ok(output.includes('body.talera-v61-narration-visual #photoStage .talera-photo-strip.talera-wheel-strip.is-visible'));
+assert.ok(output.includes('{display:block!important;visibility:visible!important;opacity:1!important}'));
+assert.ok(output.includes('id="talera-v61-r12-one-photo-owner"'));
+assert.ok(output.includes("belt.classList.add('is-visible')"));
+assert.ok(output.includes("belt.classList.remove('is-visible')"));
+assert.equal(output.split('function taleraInlineSync(').length-1,before.split('function taleraInlineSync(').length-1);
+
 assert.ok(output.includes('setPhotoLayer(photoLayerA, memoryPhotoA, memoryBackdropA'));
 assert.ok(output.includes('setPhotoLayer(photoLayerB, memoryPhotoB, memoryBackdropB'));
 assert.ok(output.includes('1-p, -7*p'));
@@ -48,6 +58,6 @@ console.log('TALERA_F5_FIRST_SWIPE_BOUNDED_PREWARM',JSON.stringify({
  success:true,syntheticOnly:true,accountPrivate:true,
  prewarmsMaxTwoNeighbors:true,noVideosOrFullAlbumsDecoded:true,
  firstTransitionAvoidsUnreadyLocalImage:true,
- approvedTimelineAnimationUnchanged:true,originalNarrationUntouched:true,
+ approvedTimelineAnimationUnchanged:true,narratedSwipeRestoresExistingV3Band:true,originalNarrationUntouched:true,
  scriptsParse:validated
 }));

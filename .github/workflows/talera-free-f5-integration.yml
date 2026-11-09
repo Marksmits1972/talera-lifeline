@@ -37,6 +37,7 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
       - name: Inspect current approved picker, MIME, videos and editor reference once
         run: node r20-dev/free-10m-f5/f5-video-import-diagnostic.mjs
+        # Exact video-picker source inspected once before the narrow F5 hotfix
       - name: Verify F5 Worker and tests parse
         run: |
           node --check r20-dev/free-10m-f5/f5-worker.mjs

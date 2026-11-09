@@ -181,31 +181,38 @@ async function easyStart(request,env){
   try{provided=(await body(request.clone())).invite}catch{return deny(400,'Ongeldige aanvraag')}
   if(!HEX64.test(provided)||!safeEqualHex(await shaHex(provided),expected))
     return deny(403,'Deze testlink is niet geldig');
-  // Same isolated account DOs and existing rate limits, using fake data only.
-  // No original TALERA account, R2, D1, camera, microphone or private files.
-  const id=crypto.randomUUID().replaceAll('-','').slice(0,18);
-  const headers=new Headers({
-    'content-type':'application/json',
-    'origin':source
-  });
-  const ip=request.headers.get('cf-connecting-ip');
-  if(!ip)return deny(503,'Browsernetwerk niet beschikbaar voor de test');
-  headers.set('cf-connecting-ip',ip);
-  const synthetic={
-    email:'f5-quick-'+id+'@example.invalid',
-    username:'f5quick'+id,
-    displayName:'TALERA Free – fictieve test',
-    password:crypto.randomUUID()+'-synthetic-only',
-    birthDate:'1974-04-02'
-  };
-  const created=await accountApi(new Request(new URL('/api/register',request.url),{
-    method:'POST',headers,body:JSON.stringify(synthetic)
-  }),env);
-  if(!created.ok)return deny(created.status===429?429:503,
-    created.status===429?'Te veel testpogingen; probeer later opnieuw':
-    'Fictief testaccount kon niet worden geopend');
-  const sid=created.headers.get('set-cookie');
-  if(!sid||!sid.startsWith('talera_sid='))return deny(503,'Testsessie ontbreekt');
+  // Keep the SAME account when the iPhone tester opens their invitation again.
+  // Otherwise the quicklink would silently create a second account, making
+  // their already saved local photos/stories look as if they had disappeared.
+  const existing=await sessionAccount(request,env);
+  let sid=null;
+  if(!existing){
+    // Create a fictitious account only on the FIRST visit from a browser.
+    const id=crypto.randomUUID().replaceAll('-','').slice(0,18);
+    const headers=new Headers({
+      'content-type':'application/json',
+      'origin':source
+    });
+    const ip=request.headers.get('cf-connecting-ip');
+    if(!ip)return deny(503,'Browsernetwerk niet beschikbaar voor de test');
+    headers.set('cf-connecting-ip',ip);
+    const synthetic={
+      email:'f5-quick-'+id+'@example.invalid',
+      username:'f5quick'+id,
+      displayName:'TALERA Free – fictieve test',
+      password:crypto.randomUUID()+'-synthetic-only',
+      birthDate:'1974-04-02'
+    };
+    const created=await accountApi(new Request(new URL('/api/register',request.url),{
+      method:'POST',headers,body:JSON.stringify(synthetic)
+    }),env);
+    if(!created.ok)return deny(created.status===429?429:503,
+      created.status===429?'Te veel testpogingen; probeer later opnieuw':
+      'Fictief testaccount kon niet worden geopend');
+    sid=created.headers.get('set-cookie');
+    if(!sid||!sid.startsWith('talera_sid='))
+      return deny(503,'Testsessie ontbreekt');
+  }
   const expiry=String(Date.now()+30*60000);
   const nonce=Array.from(crypto.getRandomValues(new Uint8Array(16)),
     b=>b.toString(16).padStart(2,'0')).join('');
@@ -216,10 +223,10 @@ async function easyStart(request,env){
     'content-type':'application/json; charset=utf-8','cache-control':'no-store',
     'x-content-type-options':'nosniff'
   });
-  resultHeaders.append('set-cookie',sid);
+  if(sid)resultHeaders.append('set-cookie',sid);
   resultHeaders.append('set-cookie',cookie);
   return new Response(JSON.stringify({ok:true,next:'/mijn-leven',
-    syntheticOnly:true}),{status:200,headers:resultHeaders});
+    syntheticOnly:true,reusedExistingSession:!!existing}),{status:200,headers:resultHeaders});
 }
 function ns(env,name){
   const b=env[name];

@@ -281,6 +281,20 @@ try{
  assert.equal(linked.items.length,1,'Issued link is missing from real account list');
  assert.equal(linked.items[0].memory_id,a.id,
    'Real server social record must refer back to original IndexedDB story');
+ const given=await page.evaluate(async({storyId,recipientId})=>{
+   const r=await fetch('/__social/memory/'+encodeURIComponent(storyId)+'/grant',{
+     method:'POST',credentials:'same-origin',
+     headers:{'content-type':'application/json'},
+     body:JSON.stringify({recipientId})});
+   const listing=await fetch('/api/my-grants',{credentials:'same-origin'});
+   return {grantStatus:r.status,listStatus:listing.status,
+     items:(await listing.json()).items};
+ },{storyId:a.id,recipientId:ids[1]});
+ assert.equal(given.grantStatus,200,'Synthetic grant metadata must be stored in DO');
+ assert.equal(given.listStatus,200);
+ assert.equal(given.items.length,1,'Direct recipient right must be discoverable in owner menu');
+ assert.equal(given.items[0].recipient_name,users[1].displayName);
+
  await menu(page);
  await view(page,'mine');
  await page.waitForFunction(title=>{
@@ -290,11 +304,25 @@ try{
  },'synthetic ACCOUNT ISOLATION 1',{timeout:15000});
  const revoke=page.locator('#talera-more-menu [data-revoke]').first();
  assert.equal(await revoke.count(),1,'Original menu must show revoke control');
+ await page.waitForFunction(name=>{
+   const shell=document.getElementById('talera-more-menu');
+   return shell?.textContent.includes('Rechtstreeks met TALERA-gebruikers')&&
+     shell?.textContent.includes(name);
+ },users[1].displayName,{timeout:15000});
+ const grantRevoke=page.locator('#talera-more-menu [data-revoke-grant]').first();
+ assert.equal(await grantRevoke.count(),1,
+   'Original menu must offer revoke on a real direct grant');
+ page.on('dialog',async dialog=>{await dialog.accept()});
+ await grantRevoke.click();
+ await page.waitForFunction(async()=>{
+   const r=await fetch('/api/my-grants',{credentials:'same-origin'});
+   return r.ok&&(await r.json()).items?.length===0;
+ },null,{timeout:15000});
+
  const menuLinkStatus=await page.locator('#talera-more-menu').innerText();
  assert.ok(menuLinkStatus.includes('synthetic ACCOUNT ISOLATION 1'),
    'Original menu must resolve real link to LOCAL story title, not a remote copy');
  // Click the APPROVED original revoke control, never a replacement UI.
- page.on('dialog',async dialog=>{await dialog.accept()});
  await revoke.click();
  await page.waitForFunction(async()=>{
    const r=await fetch('/api/shares',{credentials:'same-origin'});
@@ -310,7 +338,8 @@ try{
  await page.locator('#talera-more-menu [data-action="close"]').first().click();
  console.log('TALERA_F5_ACTUAL_MINE_MENU_LOCAL_SOCIAL',JSON.stringify({
    syntheticOnly:true,realLocalStoryTitleShown:true,shareListedFromDO:true,
-   originalRevokeControlUsed:true,reuseDenied:true,cloudMediaUploads:0,
+   originalRevokeControlUsed:true,originalGrantRevokeUsed:true,
+   reuseDenied:true,cloudMediaUploads:0,
    officialUiMarkupChanged:false}));
 
  // indexedDB.databases() lists ALL names on the same origin, including

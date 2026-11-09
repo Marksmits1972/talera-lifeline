@@ -1,4 +1,4 @@
-// Fail closed: only two original /tell editor mute tokens may change.
+// Fail closed: only three exact /tell editor sound and native-cover tokens may change.
 // Narrator iframe /present and all post-narration soundtrack code stay byte exact.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -27,8 +27,8 @@ assert.throws(()=>muteEditorOnlyVideo('changed source'),/F5_EDITOR_VIDEO_MUTE_SO
 assert.equal(original.includes('const mute=true'),false,
  'Original approved code should remain untouched');
 console.log('TALERA_F5_EDITOR_AUDIO_GUARD_EXACT_SOURCE_PASS',JSON.stringify({
-  exactTwoSourceAnchors:true,undoRestoresOriginal100Percent:true,
-  thumbnailGeneratorUnchanged:true,nativeSafariFallbackUnchanged:true,
+  exactThreeSourceAnchors:true,undoRestoresOriginal100Percent:true,
+  thumbnailGeneratorUnchanged:true,nativeSafariFallbackOnlyOpacityChanged:true,
   videoInsideEditorMutedFromFirstFrame:true,storyPresentPlayerUnchanged:true,
   originalApprovedSourceUnmodified:true,realIphoneStillRequiresAcceptance:true
 }));

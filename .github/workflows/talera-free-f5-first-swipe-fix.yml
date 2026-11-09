@@ -1,10 +1,8 @@
 name: TALERA Free F5 - first local story swipe no white screen
 
+# Deployed and Cloudflare readback verified. Keep the stage frozen until
+# the one true iPhone first-swipe acceptance, not every code/doc update.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-first-swipe-fix.yml'
   workflow_dispatch:
 
 permissions:

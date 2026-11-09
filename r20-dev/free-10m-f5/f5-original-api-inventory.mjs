@@ -41,6 +41,18 @@ for(const file of paths){
    }
  }
 }
+// Source-level usage proof for the account menu's API contract. This is not
+// a browser traffic trace. The script is public and contains no customer data.
+const mapping=await import('./generated/public-template-map.mjs');
+const accountMenu=mapping.verifiedPublicScripts['/__clean/menu-integration.mjs'];
+if(!accountMenu)throw Error('APPROVED_MENU_REFERENCE_MISSING');
+const menuSource=readFileSync(path.join(top,accountMenu.slice(1)),'utf8');
+const menuAnchors=["api('/api/discovery'","state.discovery","case 'privacy'","case 'forgot'","case 'login'","case 'register'","const storageState"];
+const menuContexts=menuAnchors.map(term=>{
+ const i=menuSource.indexOf(term);
+ return {term,found:i>=0,excerpt:i>=0?menuSource.slice(Math.max(0,i-1050),i+1750):''};
+});
+console.log('TALERA_F5_ORIGINAL_MENU_CONTRACT',JSON.stringify(menuContexts));
 const native=new Set(['/api/register','/api/login','/api/logout','/api/me',
  '/api/profile','/api/profile/birthdate','/api/version']);
 const routes=[...seen.keys()].sort().map(route=>({

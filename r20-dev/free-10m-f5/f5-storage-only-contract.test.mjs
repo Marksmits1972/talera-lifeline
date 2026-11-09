@@ -23,8 +23,9 @@ assert.ok(gateway.includes('scopeLocalMemories(privateHtml,await privateAccountS
   'Private local media must be bound to verified session identity');
 assert.ok(gateway.includes("pathname==='/tell'?alignEditedNarrationCueRefs(scoped):scoped"),
   'Only recording media-ID integrity is allowed as an editor storage correction');
-assert.ok(gateway.includes('assetizeHtml(stableEditedCues,new Set(approvedAssets))'),
-  'Approved markup must be assetized without extra UX transformations');
+assert.ok(gateway.includes("const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;")&&
+  gateway.includes('assetizeHtml(silenced,new Set(approvedAssets))'),
+  'Only the explicitly requested, original editor video muting guard may alter original markup');
 assert.ok(gateway.includes("if(p==='/api/version'&&m==='GET')"),
   'Restore the original periodic version check without replacing the UI');
 assert.ok(gateway.includes('allowedVersionCheck(url,m)'),

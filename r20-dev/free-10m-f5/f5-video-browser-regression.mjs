@@ -145,8 +145,29 @@ try{
    await page.locator('#taleraF5AddVideoInput').setInputFiles(payload);
    result[result.length-1].stage=await status(page,5,1);
   }
+  // The original Free importer writes originals and draft asynchronously.
+  // Never reload the page before its 'origins saved' gate has completed.
+  await page.waitForFunction(()=>{
+    const n=document.querySelector('#importNotice');
+    return n&&!String(n.textContent).includes('Originele bestanden bewaren');
+  },null,{timeout:40000});
+  const beforeReload=await readVideoFiles(page);
+  assert.ok(beforeReload.files.filter(f=>f.type.startsWith('video/')).length>=1,
+    'Actual selected video must already be durably stored before reload');
   await page.reload({waitUntil:'domcontentloaded',timeout:25000});
-  await status(page,5,1);
+  try{await status(page,5,1);}
+  catch(error){
+   const diagnostic=await page.evaluate(()=>({
+    location:location.pathname,
+    tiles:document.querySelectorAll('.talera-work-tiles .tile[data-id]').length,
+    mediaStatus:document.querySelector('#talera-f5-media-status')?.textContent||'',
+    importNotice:document.querySelector('#importNotice')?.textContent||'',
+    error:document.querySelector('#error')?.textContent||'',
+    body:document.body.textContent.slice(0,300)
+   }));
+   throw Error('Free video reload acceptance: '+JSON.stringify(diagnostic)+
+     '; '+String(error.message));
+  }
   const files=await readVideoFiles(page);
   assert.ok(files.files.some(f=>f.type.startsWith('video/')&&f.size>100),
     'An original video Blob must survive iPhone local IndexedDB storage and reload');

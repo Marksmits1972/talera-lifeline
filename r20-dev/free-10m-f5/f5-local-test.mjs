@@ -464,6 +464,15 @@ async function run(){
   assert.equal((await request('POST',route('revoke-share'),{
     cookie:identities[0].cookie,body:{token}})).status,200);
   assert.equal((await request('GET',link.data.link)).status,403);
+  const originalGrantRevoke='/api/memories/'+storyId+'/grants/'+identities[1].id+'/revoke';
+  assert.equal((await request('POST',originalGrantRevoke,{
+    cookie:identities[2].cookie,body:{}})).status,404,
+    'Unrelated account cannot revoke a different owner grant');
+  assert.equal((await request('POST',originalGrantRevoke,{
+    cookie:identities[0].cookie,body:{}})).status,200,
+    'Exact approved original menu route must revoke actual DO right');
+  assert.deepEqual((await request('GET','/api/my-grants',{
+    cookie:identities[0].cookie})).data.items,[]);
   const revokedMenu=await request('GET','/api/shares',{cookie:identities[0].cookie});
   assert.equal(revokedMenu.status,200);
   assert.ok(revokedMenu.data.items[0].revoked_at,

@@ -6,30 +6,61 @@
   "assets": {
     "directory": "../free-10m-delivery/public",
     "binding": "ASSETS",
-    "run_worker_first": ["/*", "!/__talera_free/assets/*"]
+    "run_worker_first": [
+      "/*",
+      "!/__talera_free/assets/*"
+    ]
   },
   "durable_objects": {
     "bindings": [
-      {"name":"AUTH_ACCOUNTS","class_name":"FreeAuthAccount"},
-      {"name":"AUTH_EMAILS","class_name":"FreeAuthEmail"},
-      {"name":"AUTH_HANDLES","class_name":"FreeAuthHandle"},
-      {"name":"AUTH_SESSIONS","class_name":"FreeAuthSession"},
-      {"name":"AUTH_RATES","class_name":"FreeAuthRate"},
-      {"name":"SOCIAL_MEMORY","class_name":"FreeSocialMemory"},
-      {"name":"SOCIAL_POINTER","class_name":"FreeSocialSharePointer"}
+      {
+        "name": "AUTH_ACCOUNTS",
+        "class_name": "FreeAuthAccount"
+      },
+      {
+        "name": "AUTH_EMAILS",
+        "class_name": "FreeAuthEmail"
+      },
+      {
+        "name": "AUTH_HANDLES",
+        "class_name": "FreeAuthHandle"
+      },
+      {
+        "name": "AUTH_SESSIONS",
+        "class_name": "FreeAuthSession"
+      },
+      {
+        "name": "AUTH_RATES",
+        "class_name": "FreeAuthRate"
+      },
+      {
+        "name": "SOCIAL_MEMORY",
+        "class_name": "FreeSocialMemory"
+      },
+      {
+        "name": "SOCIAL_POINTER",
+        "class_name": "FreeSocialSharePointer"
+      }
     ]
   },
   "migrations": [
     {
       "tag": "free-f5-integrated-local-v1",
       "new_sqlite_classes": [
-        "FreeAuthAccount","FreeAuthEmail","FreeAuthHandle",
-        "FreeAuthSession","FreeAuthRate","FreeSocialMemory","FreeSocialSharePointer"
+        "FreeAuthAccount",
+        "FreeAuthEmail",
+        "FreeAuthHandle",
+        "FreeAuthSession",
+        "FreeAuthRate",
+        "FreeSocialMemory",
+        "FreeSocialSharePointer"
       ]
     }
   ],
   "vars": {
     "AUTH_STORAGE_JURISDICTION": "local-test",
-    "SOCIAL_STORAGE_JURISDICTION": "local-test"
+    "SOCIAL_STORAGE_JURISDICTION": "local-test",
+    "F5_EASY_INVITE_SHA256": "a0fab1377f49a759b57f63318262ebe89fabfc990e8e93ceac2984561482b9d4",
+    "F5_EASY_INVITE_EXPIRES": "1794859200000"
   }
 }

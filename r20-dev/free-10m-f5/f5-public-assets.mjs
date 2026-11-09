@@ -1,4 +1,4 @@
-// Build F5 private runtime templates from two verified anonymous F1 snapshots.
+// Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const delivery=path.resolve(here,'../free-10m-delivery');
 const publicDir=path.join(delivery,'public');
 const generated=path.join(here,'generated');
-const origin='https://talera-account-birthdate-test-20261107.mark-a39.workers.dev';
+const origin='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
 const routes={'/mijn-leven':'mijn-leven','/present':'present','/tell':'tell'};
 const sha=buf=>createHash('sha256').update(buf).digest('hex');
 mkdirSync(generated,{recursive:true});

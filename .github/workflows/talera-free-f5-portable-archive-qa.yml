@@ -1,0 +1,31 @@
+name: TALERA Free F5 - portable memory archive codec and lossless media QA
+on:
+  push:
+    branches: [feature/free-f5-safe-memory-portability-20261109]
+    paths: ['.github/workflows/talera-free-f5-portable-archive-qa.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  archive_codec:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Recover archive metadata, native blobs and check media checksums without network
+        run: node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+      - name: Verify no editor, presentation, worker or auth source was modified
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only 4ba7829aac46145487a61d95fff31925bf069117 HEAD > /tmp/changed-files
+          if grep -E '^r20-dev/free-10m-f5/f5-worker.mjs|^r20-dev/free-10m-f5/f5-local-scope.mjs|^r20-dev/free-10m-f5/f5-editor-video-mute-guard.mjs|^r20-dev/free-10m-delivery/' /tmp/changed-files; then
+            echo 'Original application source must not be modified for this archive proof'
+            exit 1
+          fi
+          echo 'TALERA_FREE_ARCHIVE_ONLY_NO_APP_CHANGES'

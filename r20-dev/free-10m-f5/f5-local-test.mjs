@@ -408,7 +408,21 @@ async function run(){
   assert.equal((await request('POST','/api/profile/birthdate',{
     cookie:identities[0].cookie,body:{birthDate:'2026-02-30'}})).status,400);
   const made=await request('POST',route('init'),{cookie:identities[0].cookie});
+  assert.equal((await request('GET','/api/shares')).status,401);
+  assert.equal((await request('GET','/api/my-grants')).status,401);
+  assert.equal((await request('GET','/api/memories',{cookie:identities[0].cookie}))
+    .status,409,'Free local stories cannot be read via a server route');
+
   assert.equal(made.status,200,'Real auth session identifies social owner');
+  for(const endpoint of ['/api/shares','/api/my-grants']){
+    const listing=await request('GET',endpoint,{cookie:identities[0].cookie});
+    assert.equal(listing.status,200,'Actual menu social list: '+endpoint);
+    assert.deepEqual(listing.data.items,[],
+      'A newly created synthetic account has not shared anything');
+    assert.deepEqual((await request('GET',endpoint,{cookie:identities[1].cookie}))
+      .data.items,[],'Another account cannot list these rights');
+  }
+
   assert.equal((await request('GET',route('view'),{
     cookie:identities[1].cookie})).status,403);
   assert.equal((await request('POST',route('init'),{
@@ -418,6 +432,15 @@ async function run(){
   const grant=await request('POST',route('grant'),{
     cookie:identities[0].cookie,body:{recipientId:identities[1].id}});
   assert.equal(grant.status,200);
+  const grantedRows=await request('GET','/api/my-grants',{cookie:identities[0].cookie});
+  assert.equal(grantedRows.status,200);
+  assert.equal(grantedRows.data.items.length,1);
+  assert.equal(grantedRows.data.items[0].memory_id,storyId);
+  assert.equal(grantedRows.data.items[0].recipient_account_id,identities[1].id);
+  assert.equal(grantedRows.data.items[0].recipient_name,users[1].displayName);
+  assert.deepEqual((await request('GET','/api/my-grants',{cookie:identities[1].cookie}))
+    .data.items,[],'Recipient does not own that grant');
+
   assert.equal((await request('GET',route('view'),{
     cookie:identities[1].cookie})).status,200);
   assert.equal((await request('POST',route('like'),{
@@ -428,12 +451,31 @@ async function run(){
   assert.equal(link.status,200);
   const token=/^\/__social\/shared\/([a-f0-9]{64})$/.exec(link.data.link)?.[1];
   assert.ok(token,'Share capability expected');
+  const issued=await request('GET','/api/shares',{cookie:identities[0].cookie});
+  assert.equal(issued.status,200,'Issued link is visible to the real menu');
+  assert.equal(issued.data.items.length,1);
+  assert.equal(issued.data.items[0].memory_id,storyId);
+  assert.equal(issued.data.items[0].revoked_at,null);
+  assert.equal(issued.data.items[0].expires_at,link.data.expiresAt);
+  assert.deepEqual((await request('GET','/api/shares',{cookie:identities[1].cookie}))
+    .data.items,[],'A different account cannot see owner links');
+
   assert.equal((await request('GET',link.data.link)).status,200);
   assert.equal((await request('POST',route('revoke-share'),{
     cookie:identities[0].cookie,body:{token}})).status,200);
   assert.equal((await request('GET',link.data.link)).status,403);
+  const revokedMenu=await request('GET','/api/shares',{cookie:identities[0].cookie});
+  assert.equal(revokedMenu.status,200);
+  assert.ok(revokedMenu.data.items[0].revoked_at,
+    'Menu must show real withdrawn state, not a made-up empty list');
+
   assert.equal((await request('POST',route('revoke-grant'),{
     cookie:identities[0].cookie,body:{recipientId:identities[1].id}})).status,200);
+  const noGrant=await request('GET','/api/my-grants',{cookie:identities[0].cookie});
+  assert.equal(noGrant.status,200);
+  assert.deepEqual(noGrant.data.items,[],
+    'Real revoked direct grant is no longer listed as active');
+
   assert.equal((await request('GET',route('view'),{
     cookie:identities[1].cookie})).status,403);
   assert.equal((await request('POST','/api/logout',{

@@ -437,6 +437,26 @@ async function revokeAccountShare(request,env,shareHash){
   const result=await socialMemoryHome(env,storyId).revokeShare(actor.id,shareHash);
   return json(result,result.ok?200:404);
 }
+// Revoking an EXISTING direct grant is safe and does not publish local
+// photos/stories. Creating cross-device access remains deliberately gated
+// until its actual recipient media flow can be proven end-to-end.
+async function revokeAccountGrant(request,env,storyId){
+  if(request.method!=='POST')return deny(405,'Methode niet toegestaan');
+  if(!sameOrigin(request))return deny(403,'Ongeldige herkomst');
+  const actor=await sessionAccount(request,env);
+  if(!actor)return deny(401,'Aanmelden vereist');
+  const ids=await accountHome(env,actor.id).socialStoryIds();
+  if(!ids.includes(storyId))return deny(404,'Deze herinnering hoort niet bij dit account');
+  if(Number(request.headers.get('content-length')||0)>4096)
+    return deny(413,'Aanvraag te groot');
+  let recipientId;
+  try{recipientId=(await body(request)).recipientId}
+  catch{return deny(400,'Ongeldige aanvraag')}
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipientId||''))
+    return deny(400,'Ongeldige ontvanger');
+  const result=await socialMemoryHome(env,storyId).revokeGrant(actor.id,recipientId);
+  return json(result,result.ok?200:409);
+}
 async function publicPage(request,env){
   const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
   if(!env.ASSETS)return deny(503,'PWA-bestanden niet beschikbaar');
@@ -589,6 +609,8 @@ export default {
         return accountSocialLists(request,env);
       const revoke=/^\/api\/shares\/([a-f0-9]{64})(?:\/revoke)?$/.exec(p);
       if(revoke)return revokeAccountShare(request,env,revoke[1]);
+      const grantRevoke=/^\/api\/memories\/([A-Za-z0-9_-]{8,80})\/revoke-grant$/.exec(p);
+      if(grantRevoke)return revokeAccountGrant(request,env,grantRevoke[1]);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);
       if(p.startsWith('/__clean/'))return publicScript(request,env);

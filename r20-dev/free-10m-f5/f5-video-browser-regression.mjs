@@ -272,6 +272,16 @@ try{
         selectedHasVoice:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroItems?.some(x=>x.kind==='audio'),
         selectedItems:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroItems?.map(x=>x.kind),
         selectedLoading:window.__taleraTimelineRuntime?.currentMemory?.()?._photoLoading,
+        stagePresent:!!document.getElementById('photoStage'),
+        stageSize:(()=>{const e=document.getElementById('photoStage');return e?{
+          width:e.clientWidth,height:e.clientHeight}:null})(),
+        approvedAdapterPresent:!!document.getElementById('talera-zero-memory-adapter'),
+        sourcePositions:(()=>{const html=document.documentElement.outerHTML;return{
+          stage:html.indexOf('id="photoStage"'),
+          adapter:html.indexOf('id="talera-zero-memory-adapter"'),
+          scriptTimeline:html.indexOf('talera-lifeline-r19-bridge'),
+          endBody:html.lastIndexOf('</body>')}})(),
+        stageOuter:document.getElementById('photoStage')?.outerHTML.slice(0,180),
         iframeCount:document.querySelectorAll('iframe').length,
         iframeUrls:[...document.querySelectorAll('iframe')].map(x=>x.getAttribute('src')),
         loadError:document.getElementById('taleraV8LoadError')?.textContent||null,

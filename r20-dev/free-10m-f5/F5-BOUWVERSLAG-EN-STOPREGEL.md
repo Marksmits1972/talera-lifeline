@@ -35,3 +35,14 @@ Geen eindeloos testen. Alleen een falende harde poort repareren en die poort opn
 
 ## Verwantschap
 PR #93 (Static Assets) -> #94 (account-DOB DO) -> #95 (account/sessie DO) -> #96 (social DO) -> **deze F5 branch**.
+
+## 9 november 2026 — oorspronkelijke Free-API-audit, minimaal herstel
+
+De laatste geïsoleerde opslag-only CI (run 42638659480) vond **11 statische API-prefixen**, waarvan twee rechtstreeks in de nieuwe F5-gateway worden genoemd en **negen** op bronverwijzingen berustten. Een stringverwijzing bewijst niet dat een route in normale Free-interactie actief is. De negen zijn gegroepeerd om geen onnodige backend te herbouwen:
+
+- `/api/version`: de oorspronkelijke Mijn leven/Presentatie-scripts vragen bij openen/focus `/api/version?check=<timestamp>` op. De F5-gateway wees de query voorheen af. Nu uitsluitend een GET met precies één tijdstempelparameter, plus een GET zonder parameters, beantwoord met exact de bestaande originele `CURRENT`-versie; CI vergelijkt met beide originele bronnen en checkt QA-gate, extra parameters en POST.
+- `/api/v25/social`: bron verwijst naar een `v25-demo-1450`-testcontext. Niet verwarren met de daadwerkelijk gescheiden `__social`-DO-API; geen stille doorverbinding of gedragwijziging.
+- `/api/account-social`, `/api/account-social/stories`, `/api/linked/stories`, `/api/integration/stories`: de originele bron kent eerdere servergestuurde verhaal-/deelroutes, waaronder server-mediarequests. De nieuwe Free-bibliotheek bewaart bestanden lokaal. Niet naar de bestaande klantbackend doorsluizen en niet doen alsof die oude serververhalen beschikbaar zijn.
+- `/api/v12-invites/story`, `/api/v12-invites/revoke`, `/api/share-preview/meta`: eerdere uitnodigings- en server-voorvertoningsroutes. Hun complete media-/privacy-/ontvangerscontract is voor strikt lokale Free-herinneringen nog niet als interoperabel bewezen. Geen ongevraagde media-upload, tijdelijke R2-kopie of alternatieve deel-UX toevoegen.
+
+**Status:** uitsluitend de concreet aangetoonde gewone versiecheck is in de geïsoleerde F5-bron hersteld; de acht andere legacy/demo-verwijzingen blijven veilig afgewezen en zijn **geen bewijs dat alle oude deel-/ontvangersfuncties al werken**. De echte Free delen/ontvangen-acceptatie staat open. Behoud van officiële PWA, verhalen, originele media, design-cleanup-UI en centrale linkregister is ongewijzigd. Nieuwe commit nog niet uitgerold; eerst CI.

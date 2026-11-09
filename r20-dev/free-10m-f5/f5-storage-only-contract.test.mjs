@@ -25,6 +25,10 @@ assert.ok(gateway.includes("pathname==='/tell'?alignEditedNarrationCueRefs(scope
   'Only recording media-ID integrity is allowed as an editor storage correction');
 assert.ok(gateway.includes('assetizeHtml(stableEditedCues,new Set(approvedAssets))'),
   'Approved markup must be assetized without extra UX transformations');
+assert.ok(gateway.includes("if(p==='/api/version'&&m==='GET')"),
+  'Restore the original periodic version check without replacing the UI');
+assert.ok(gateway.includes('allowedVersionCheck(url,m)'),
+  'Keep strict original first-party query allowlisting');
 assert.equal(config.name,'talera-free-f5-combined-stage-20261108');
 assert.equal(config.durable_objects.bindings.length,7);
 assert.equal(config.d1_databases?.length||0,0);

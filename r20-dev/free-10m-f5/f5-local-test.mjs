@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
-import {mkdirSync,writeFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -303,6 +303,24 @@ async function run(){
   const publicScript=await request('GET','/__clean/menu-integration.mjs');
   assert.equal(publicScript.status,200,'Original TALERA menu script must load from approved snapshot');
   assert.ok(String(publicScript.data).length>100,'Actual menu integration JavaScript is expected');
+  // Active original /api/version?check=Date.now() must work within this
+  // SAME isolated origin, but must not expose a broad legacy API gateway.
+  const originalVersion='talera-storage-v37-20261022';
+  for(const file of ['reference-mijn-leven.html','reference-present.html']){
+    const html=readFileSync(path.join('r20-dev/free-10m-delivery/generated',file),'utf8');
+    const match=html.match(/const CURRENT=['\"](talera-[^'\"]+)['\"]/);
+    assert.ok(match,'Original version checker missing in '+file);
+    assert.equal(match[1],originalVersion,'Do not invent a version for '+file);
+  }
+  const version=await request('GET','/api/version?check='+Date.now());
+  assert.equal(version.status,200,'Original iPhone version polling must work');
+  assert.equal(version.data.version,originalVersion,'Approved source version must match exactly');
+  assert.equal((await request('GET','/api/version?check='+Date.now()+'&extra=1')).status,404,
+    'Version endpoint must reject arbitrary query parameters');
+  assert.equal((await request('POST','/api/version')).status,404,
+    'Version check must be read-only');
+  assert.equal((await request('GET','/api/version?check='+Date.now(),{gate:false})).status,403,
+    'Closed staging version endpoint must still require the QA gate');
   const sw=await request('GET','/sw.js');
   assert.equal(sw.status,200,'PWA service worker must be retained');
   assert.match(String(sw.data),/self\.addEventListener/,'Real original service worker code expected');

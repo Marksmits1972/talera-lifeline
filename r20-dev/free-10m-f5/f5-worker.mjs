@@ -25,6 +25,14 @@ const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
 const HEX64=/^[a-f0-9]{64}$/;
 const LOCAL_STORY_ID=/^local-[a-z0-9-]{8,90}$/i;
+// Verbatim CURRENT value from the two original approved home/present pages.
+// The CI integration test compares both frozen public source snapshots to this.
+const APPROVED_UI_VERSION='talera-storage-v37-20261022';
+function allowedVersionCheck(url,method){
+  if(method!=='GET'||url.pathname!=='/api/version')return false;
+  const pairs=[...url.searchParams.entries()];
+  return pairs.length===1&&pairs[0][0]==='check'&&/^\d{13}$/.test(pairs[0][1]);
+}
 function allowedLocalUiSearch(url){
   if(!PUBLIC_PAGES.has(url.pathname))return false;
   const pairs=[...url.searchParams.entries()];
@@ -468,8 +476,12 @@ export default {
     // Exact original embedded player route is allowed before the normal
     // strict search-param gate, which intentionally covers only top pages.
     if(p==='/vertelmodus-embed')return privateEmbeddedPlayer(request,env);
-    if(url.search&&!allowedLocalUiSearch(url))return deny(404,'Niet gevonden');
+    if(url.search&&!allowedLocalUiSearch(url)&&!allowedVersionCheck(url,m))
+      return deny(404,'Niet gevonden');
     try{
+      // Original app periodically asks for its own version. Answer on this
+      // isolated origin; never proxy to the old customer/production Worker.
+      if(p==='/api/version'&&m==='GET')return json({version:APPROVED_UI_VERSION});
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);
       if(p.startsWith('/__social/'))return socialApi(request,env);

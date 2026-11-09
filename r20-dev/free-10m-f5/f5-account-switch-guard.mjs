@@ -6,6 +6,8 @@ const LOGIN_ANCHOR='setActiveAccount(result.account||null);state.history=[];';
 const LOGOUT_ANCHOR="document.documentElement.dataset.taleraAuth='signed-out';setActiveAccount(null);state.history=[];";
 const LOGIN_PATCH='setActiveAccount(result.account||null);location.reload();state.history=[];';
 const LOGOUT_PATCH="document.documentElement.dataset.taleraAuth='signed-out';setActiveAccount(null);location.reload();state.history=[];";
+const TITLES_ANCHOR="state.titles=Object.fromEntries(state.memories.map(row=>[String(row.id),row.title||'Herinnering']));";
+const TITLES_PATCH=TITLES_ANCHOR+"\\n   state.grants=state.grants.map(row=>({...row,title:state.titles[String(row.memory_id)]||'Herinnering'}));";
 const API_ENTRY="async function api(path,method='GET',payload){\n  const requestEpoch=authEpoch;";
 const LOCAL_API_PATCH=`async function api(path,method='GET',payload){
   const requestEpoch=authEpoch;
@@ -21,18 +23,20 @@ const LOCAL_API_PATCH=`async function api(path,method='GET',payload){
 function count(source,fragment){return source.split(fragment).length-1}
 export function secureAccountMenuTransitions(source){
  if(typeof source!=='string'||count(source,LOGIN_ANCHOR)!==2||
-   count(source,LOGOUT_ANCHOR)!==1||count(source,API_ENTRY)!==1||
+   count(source,LOGOUT_ANCHOR)!==1||count(source,API_ENTRY)!==1||count(source,TITLES_ANCHOR)!==1||
    source.includes(LOGIN_PATCH)||source.includes(LOGOUT_PATCH)||
-   source.includes(LOCAL_API_PATCH))
+   source.includes(LOCAL_API_PATCH)||source.includes(TITLES_PATCH))
    throw Error('ORIGINAL_ACCOUNT_MENU_TRANSITION_MARKER_CHANGED');
  const changed=source.replaceAll(LOGIN_ANCHOR,LOGIN_PATCH)
    .replace(LOGOUT_ANCHOR,LOGOUT_PATCH)
-   .replace(API_ENTRY,LOCAL_API_PATCH);
+   .replace(API_ENTRY,LOCAL_API_PATCH)
+   .replace(TITLES_ANCHOR,TITLES_PATCH);
  if(count(changed,LOGIN_PATCH)!==2||count(changed,LOGOUT_PATCH)!==1||
-   count(changed,LOCAL_API_PATCH)!==1||
+   count(changed,LOCAL_API_PATCH)!==1||count(changed,TITLES_PATCH)!==1||
    changed.replaceAll(LOGIN_PATCH,LOGIN_ANCHOR)
      .replace(LOGOUT_PATCH,LOGOUT_ANCHOR)
-     .replace(LOCAL_API_PATCH,API_ENTRY)!==source)
+     .replace(LOCAL_API_PATCH,API_ENTRY)
+     .replace(TITLES_PATCH,TITLES_ANCHOR)!==source)
    throw Error('ACCOUNT_STORAGE_CONNECTION_CHANGE_NOT_MINIMAL');
  return changed;
 }

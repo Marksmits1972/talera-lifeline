@@ -19,5 +19,5 @@ jobs:
       - run: npm ci
       - name: Read-only anonymous original WhatsApp public source snapshots
         run: node r20-dev/free-10m-delivery/build.mjs
-      - name: Trace editor preview audio and video poster paths after source parity
+      - name: Inspect corrected source windows for editor audio and video covers
         run: node r20-dev/free-10m-f5/f5-approved-media-inventory.mjs

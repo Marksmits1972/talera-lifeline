@@ -1,0 +1,23 @@
+name: TALERA Free F5 - local story and media storage inventory (read only)
+on:
+  push:
+    branches: [feature/free-f5-safe-memory-portability-20261109]
+    paths: ['.github/workflows/talera-free-f5-storage-portability-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build only approved public original sources
+        run: node r20-dev/free-10m-delivery/build.mjs
+      - name: Inspect exact IndexedDB story and media store metadata
+        run: node r20-dev/free-10m-f5/f5-existing-storage-schema-audit.mjs

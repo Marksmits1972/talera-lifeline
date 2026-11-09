@@ -1,10 +1,8 @@
 name: TALERA Free F5 - development-base correction to design-cleanup 20261107
 
+# The intended development base is now deployed and verified. Do not
+# automatically redeploy while iPhone test accounts/media are present.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-design-base-correction.yml'
   workflow_dispatch:
 
 permissions:

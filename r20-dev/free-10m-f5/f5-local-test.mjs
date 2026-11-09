@@ -130,6 +130,29 @@ async function run(){
     identities.push({id:r.data.account.id,cookie:cookieOf(r)});
   }
   assert.equal(new Set(identities.map(x=>x.id)).size,3);
+  // F5 may not silently proxy legacy share/media routes to the customer's
+  // older Cloudflare backend. The original UI still references some of them,
+  // but Free personal originals MUST stay in the phone's IndexedDB.
+  const legacyPrivateRoutes=[
+    ['POST','/api/account-social/stories'],
+    ['POST','/api/account-social/stories/local-f5-test-story-001/media'],
+    ['GET','/api/linked/stories/local-f5-test-story-001'],
+    ['GET','/api/integration/stories/local-f5-test-story-001'],
+    ['POST','/api/v12-invites/story'],
+    ['POST','/api/v12-invites/revoke'],
+    ['GET','/api/share-preview/meta/'+('b'.repeat(64))],
+    ['GET','/api/v25/social/memory/v25-demo-1450']
+  ];
+  for(const [verb,path] of legacyPrivateRoutes){
+    const response=await request(verb,path,{
+      cookie:identities[0].cookie,
+      body:verb==='POST'?{storyId:'local-f5-test-story-001',
+        syntheticOnly:true,neverUploadLocalMedia:true}:undefined
+    });
+    assert.equal(response.status,404,
+      'Legacy share/media endpoint must NOT write local Free originals to cloud: '+path);
+  }
+
   // Test final simple one-tap iPhone link without any Cloudflare setup,
   // manually typed test code, real account, or leaked live bearer token.
   const easyHtml=await request('GET','/__f5/start',{gate:false});
@@ -398,6 +421,7 @@ async function run(){
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,
+    legacyMediaAndInviteEndpointsFailClosed:true,
     realCustomerDataUsed:false,officialTaleraConnected:false,
     loggedInPwaUiCertified:false,tenMillionCapacityProven:false
   };

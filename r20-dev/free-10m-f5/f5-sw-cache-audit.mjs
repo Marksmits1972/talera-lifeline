@@ -21,6 +21,22 @@ const summary={
   containsDynamicCacheWrites:/\.put\s*\(|\.addAll\s*\(|\.add\s*\(/.test(sw),
   hasSkipWaiting:/\bskipWaiting\s*\(/.test(sw),
 };
+// The original minimal SW only fetches each navigation and shows a 503 page
+// offline. That is safe against cross-account HTML cache leakage, but it is
+// NOT a cold-start offline solution for private local memories. Do not turn
+// the safe "no account HTML caching" result into an offline-ready claim.
+assert.equal(summary.hasCacheStorage,false,
+  'Original PWA SW must not silently persist account-specific HTML');
+assert.equal(summary.containsDynamicCacheWrites,false,
+  'Personal Free HTML must not be cached across users on one device');
+assert.match(sw,/event\.request\.mode\s*!==\s*["']navigate["']/,
+  'Original SW navigation behavior changed; re-audit cache safety');
+assert.match(sw,/respondWith\(fetch\(event\.request\)\.catch/,
+  'Original SW must not synthesize account HTML for offline navigation');
+assert.match(sw,/status\s*:\s*503/,
+  'Unknown offline fallback may expose cached account data');
+summary.cacheAccountLeakDetected=false;
+summary.offlineColdStartReady=false;
 console.log('TALERA_F5_ORIGINAL_SW_INSPECTION',JSON.stringify(summary));
 // The SW source is public; bounded logging allows a concrete manual
 // security review rather than relying on a false-positive regexp verdict.

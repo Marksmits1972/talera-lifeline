@@ -1,10 +1,8 @@
 name: TALERA Free - iPhone video import transparency hotfix F5 only
 
+# Verified F5 iPhone video fix is deployed. Do not redeploy automatically
+# while a real iPhone is holding locally imported photos and videos.
 on:
-  pull_request:
-    branches: [feature/free-10m-social-memory-do-20261108]
-    paths:
-      - '.github/workflows/talera-free-f5-video-hotfix.yml'
   workflow_dispatch:
 
 permissions:

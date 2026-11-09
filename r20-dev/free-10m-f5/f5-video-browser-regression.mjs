@@ -68,16 +68,16 @@ const prepare=async sid=>{
   name:'talera_sid',value:sid,domain:'127.0.0.1',path:'/',
   secure:false,httpOnly:true,sameSite:'Lax'
  }]);
- const page=await ctx.newPage(),errors=[];
+ const page=await ctx.newPage(),errors=[],warnings=[];
  page.on('pageerror',e=>errors.push(String(e.message||e)));
  page.on('console',m=>{
    if(['warning','error'].includes(m.type()))
-     errors.push('console '+m.type()+': '+m.text().slice(0,380));
+     warnings.push('console '+m.type()+': '+m.text().slice(0,380));
  });
  const r=await page.goto(origin+'/tell',{waitUntil:'domcontentloaded',timeout:25000});
  assert.equal(r.status(),200);
  await page.locator('#photoInput').waitFor({state:'attached',timeout:18000});
- return {ctx,page,errors};
+ return {ctx,page,errors,warnings};
 };
 const upload=async(page,videoB64,withVideo)=>{
  await page.evaluate(async({withVideo,videoB64})=>{
@@ -143,7 +143,7 @@ try{
  // Scenario one: five photos and the actual video selected together.
  for(const withVideo of [true,false]){
   const sid=await makeAccount(withVideo?1:2);
-  const {ctx,page,errors}=await prepare(sid);
+  const {ctx,page,errors,warnings}=await prepare(sid);
   await upload(page,videoB64,withVideo);
   result.push({scenario:withVideo?'combined-5-photos-1-video':'separate-video-after-5-photos',
    stage:await status(page,5,withVideo?1:0)});
@@ -301,7 +301,7 @@ try{
         frameChecks.push(info);
       }
       console.error('TALERA_FREE_ORIGINAL_PLAYER_DIAGNOSTIC',JSON.stringify({
-        diagnostics,frameChecks,pageErrors:errors,
+        diagnostics,frameChecks,pageErrors:errors,consoleWarnings:warnings,
         originalError:String(error.message)
       }));
       throw error;

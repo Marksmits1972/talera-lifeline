@@ -31,6 +31,8 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Audit original PWA service worker cache/privacy rules (read-only)
+        run: node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
       - name: Inventory original WhatsApp API references without calling any private endpoint
         run: node r20-dev/free-10m-f5/f5-original-api-inventory.mjs
       - name: Check all three original IDB writers and publisher media IDs

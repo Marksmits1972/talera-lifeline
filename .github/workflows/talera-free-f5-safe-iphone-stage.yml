@@ -53,15 +53,16 @@ jobs:
           echo "Only a NEW isolated Worker name may be used; no old test or official Worker overwritten."
       - name: Install pinned project dependencies
         run: npm ci
-      - name: Verify approved original UI and local media storage unchanged
-        run: |
-          node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
-          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
-          node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
+      - name: Verify approved source contract before building
+        run: node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
       - name: Build only approved anonymous TALERA assets and guard original account UI
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify generated original menu/account isolation, cache and API inventories
+        run: |
+          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
           node r20-dev/free-10m-f5/f5-original-api-inventory.mjs
       - name: Prepare unique account-isolated stage config with only fingerprinted invite
         shell: bash

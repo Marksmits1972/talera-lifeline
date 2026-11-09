@@ -287,6 +287,25 @@ async function run(){
 
   const scopedName=/talera-free-local-([a-f0-9]{32})-v1/.exec(String(signedHome.data))?.[0];
   assert.ok(scopedName,'The existing IndexedDB media store must be scoped to current account');
+  // Free re-login must reopen exactly the same private local library namespace.
+  const rejectedLogin=await request('POST','/api/login',{
+    body:{email:users[0].email,password:'wrong-synthetic-password'}
+  });
+  assert.equal(rejectedLogin.status,401,'Wrong password cannot expose local originals');
+  const renewedLogin=await request('POST','/api/login',{
+    body:{email:users[0].email,password:users[0].password}
+  });
+  assert.equal(renewedLogin.status,200,'Original menu login must work');
+  assert.equal(renewedLogin.data.account.id,identities[0].id,
+    'Re-login cannot create a fresh account with an empty library');
+  const renewedCookie=cookieOf(renewedLogin);
+  const reopenedHome=await request('GET','/mijn-leven',{cookie:renewedCookie});
+  assert.equal(reopenedHome.status,200);
+  assert.ok(String(reopenedHome.data).includes(scopedName),
+    'Re-login must use same IndexedDB for photos, video, audio and cues');
+  assert.equal((await request('GET','/api/me',{cookie:renewedCookie})).data.account.birthDate,
+    '1974-04-02','Birthdate must remain linked to the original person');
+
   assert.ok(!String(signedHome.data).includes("DB_NAME='talera-lifeline-dev-local-v1'"),
     'A signed-in user must never write to the shared legacy local database');
   const otherHome=await request('GET','/mijn-leven',{cookie:identities[1].cookie});
@@ -417,7 +436,7 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,originalLocalMemoryPresentationRouteVerified:true,originalStandaloneIframePlayerActuallyLoaded:true,localRequests:calls,
-    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,loginReturnsSamePrivateDbVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,

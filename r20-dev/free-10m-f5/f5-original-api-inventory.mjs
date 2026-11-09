@@ -46,7 +46,7 @@ for(const file of paths){
 const mapping=await import('./generated/public-template-map.mjs');
 const accountMenu=mapping.verifiedPublicScripts['/__clean/menu-integration.mjs'];
 if(!accountMenu)throw Error('APPROVED_MENU_REFERENCE_MISSING');
-const menuSource=readFileSync(path.join(top,accountMenu.slice(1)),'utf8');
+const menuSource=readFileSync(path.join(top,'public',accountMenu.slice(1)),'utf8');
 const menuAnchors=["api('/api/discovery'","state.discovery","case 'privacy'","case 'forgot'","case 'login'","case 'register'","const storageState"];
 const menuContexts=menuAnchors.map(term=>{
  const i=menuSource.indexOf(term);

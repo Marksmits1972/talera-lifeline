@@ -7,7 +7,7 @@ const LOGOUT_ANCHOR="document.documentElement.dataset.taleraAuth='signed-out';se
 const LOGIN_PATCH='setActiveAccount(result.account||null);location.reload();state.history=[];';
 const LOGOUT_PATCH="document.documentElement.dataset.taleraAuth='signed-out';setActiveAccount(null);location.reload();state.history=[];";
 const TITLES_ANCHOR="state.titles=Object.fromEntries(state.memories.map(row=>[String(row.id),row.title||'Herinnering']));";
-const TITLES_PATCH=TITLES_ANCHOR+"\\n   state.grants=state.grants.map(row=>({...row,title:state.titles[String(row.memory_id)]||'Herinnering'}));";
+const TITLES_PATCH=TITLES_ANCHOR+"\n   state.grants=state.grants.map(row=>({...row,title:state.titles[String(row.memory_id)]||'Herinnering'}));";
 const API_ENTRY="async function api(path,method='GET',payload){\n  const requestEpoch=authEpoch;";
 const LOCAL_API_PATCH=`async function api(path,method='GET',payload){
   const requestEpoch=authEpoch;

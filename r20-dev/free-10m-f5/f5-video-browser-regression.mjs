@@ -154,7 +154,8 @@ try{
    path.join(out,'f5-presentation-voice.wav')],{timeout:20000});
  const wavB64=readFileSync(path.join(out,'f5-presentation-voice.wav')).toString('base64');
  await start();
- browser=await chromium.launch({headless:true});
+ browser=await chromium.launch({headless:true,
+  args:['--autoplay-policy=no-user-gesture-required']});
  const result=[];
  // Scenario one: five photos and the actual video selected together.
  for(const withVideo of [true,false]){
@@ -278,134 +279,88 @@ try{
     },{videoB64,wavB64});
     assert.deepEqual(narrated.types,['photo','photo','video','audio'],
       'Original local store must preserve exact narrated media order');
-    // Inject diagnosis ONLY in the synthetic HTTP response via Playwright.
-    // The original TALERA app and F5 Worker files are not edited here.
-    await page.route('**/__talera_free/assets/*.js',async route=>{
-      const response=await route.fetch();
-      let html=await response.text();
-      // Original 8k+ inline script is safely extracted to a fingerprinted
-      // same-origin asset by the existing F5 Worker, not kept in page HTML.
-      if(!html.includes("const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;")){
-        await route.fulfill({response});return;
-      }
-      const edits=[
-        ["const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;",
-         "const store=window.TaleraMemories,runtime=window.__taleraTimelineRuntime;"+
-         "window.__f5AdapterTrace=[];"+
-         "function __f5Log(step,detail){window.__f5AdapterTrace.push({"+
-         "t:Math.round(performance.now()),step,detail:detail||null});}"+
-         "__f5Log('start',{store:!!store,runtime:!!runtime});"],
-        ["const stage=document.getElementById('photoStage');",
-         "const stage=document.getElementById('photoStage');"+
-         "__f5Log('stage',{exists:!!stage});"],
-        ["async function hydrate(memory){",
-         "async function hydrate(memory){"+
-         "__f5Log('hydrate-start',{id:memory?.id});"],
-        ["memory._photoLoading=false;",
-         "memory._photoLoading=false;"+
-         "__f5Log('hydrated',{id:memory.id});"],
-        ["async function present(memory){",
-         "async function present(memory){"+
-         "__f5Log('present-called',{id:memory?.id,stage:!!stage,activeId});"],
-        ["if(activeId===id)return;",
-         "__f5Log('present-guard',{id,activeId,same:activeId===id});if(activeId===id)return;"],
-        ["disposePresentation();\n   activeId=id;",
-         "disposePresentation();__f5Log('disposed',{activeId});\n   activeId=id;"],
-        ["document.body.append(frame);",
-         "__f5Log('before-append',{src:frame.src});"+
-         "document.body.append(frame);__f5Log('after-append',{connected:frame.isConnected});"],
-        ["function activate(memory){",
-         "function activate(memory){"+
-         "__f5Log('activate',{id:memory?.id,local:!!memory?._taleraLocal,"+
-         "loading:memory?._photoLoading,types:memory?._zeroItems?.map(x=>x.kind)});"],
-        ["runtime.subscribe(activate);",
-         "runtime.subscribe(activate);__f5Log('subscribed');"],
-        ["const rows=await store.list();",
-         "__f5Log('list-start');const rows=await store.list();"+
-         "__f5Log('list-loaded',{count:rows.length});"],
-        ["await hydrate(selected);",
-         "await hydrate(selected);__f5Log('selected-hydrated',{loading:selected._photoLoading});"],
-        ["activate(selected);",
-         "__f5Log('selected-explicit-activate');activate(selected);"]
-      ];
-      for(const [find,repl] of edits){
-        if(!html.includes(find)){
-          const p=html.indexOf('async function present(memory)');
-          console.error('TALERA_FREE_ADAPTER_EXPECTED_SOURCE',JSON.stringify({
-            missing:find,around:p>=0?html.slice(p,p+1150):null,
-            assetLength:html.length,externalScript:true
-          }));
-          throw Error('Diagnostic marker absent in ORIGINAL presentation: '+find);
-        }
-        html=html.replace(find,repl);
-      }
-      await route.fulfill({response,body:html});
-    });
+    // This is the CURRENT approved V61/R20 INLINE player, inherited by the
+    // user-specified design-cleanup candidate. The obsolete iframe assertion
+    // would ALWAYS fail because R20 deliberately removed that iframe.
+    // Check the visible RH19 layer and the native video, not progress dots.
     const presentResponse=await page.goto(
       origin+'/present?memory='+narrated.id,
       {waitUntil:'domcontentloaded',timeout:25000});
     assert.equal(presentResponse.status(),200);
-    const child=page.frameLocator('iframe.talera-zero-present-frame');
-    try{await child.locator('#play').waitFor({state:'visible',timeout:13000});}
-    catch(error){
-      const diagnostics=await page.evaluate(()=>({
-        origin:location.origin,path:location.pathname,query:location.search,
-        selectedStory:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
-        selectedId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
-        selectedHasVoice:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroItems?.some(x=>x.kind==='audio'),
-        selectedItems:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroItems?.map(x=>x.kind),
-        selectedLoading:window.__taleraTimelineRuntime?.currentMemory?.()?._photoLoading,
-        stagePresent:!!document.getElementById('photoStage'),
-        stageSize:(()=>{const e=document.getElementById('photoStage');return e?{
-          width:e.clientWidth,height:e.clientHeight}:null})(),
-        approvedAdapterPresent:!!document.getElementById('talera-zero-memory-adapter'),
-        sourcePositions:(()=>{const html=document.documentElement.outerHTML;return{
-          stage:html.indexOf('id="photoStage"'),
-          adapter:html.indexOf('id="talera-zero-memory-adapter"'),
-          scriptTimeline:html.indexOf('talera-lifeline-r19-bridge'),
-          endBody:html.lastIndexOf('</body>')}})(),
-        stageOuter:document.getElementById('photoStage')?.outerHTML.slice(0,180),
-        iframeCount:document.querySelectorAll('iframe').length,
-        iframeUrls:[...document.querySelectorAll('iframe')].map(x=>x.getAttribute('src')),
-        loadError:document.getElementById('taleraV8LoadError')?.textContent||null,
-        loadedStore:!!window.TaleraMemories?.get
-      }));
-      const frameChecks=[];
-      for(const frame of page.frames()){
-        const info={url:frame.url()};
-        try{info.title=await frame.title();info.playCount=await frame.locator('#play').count();
-          info.state=await frame.locator('body').getAttribute('data-stage');
-          info.contentLength=(await frame.locator('body').innerText()).length;
-        }catch(e){info.error=String(e.message).slice(0,150)}
-        frameChecks.push(info);
-      }
-      console.error('TALERA_FREE_ORIGINAL_PLAYER_DIAGNOSTIC',JSON.stringify({
-        diagnostics,frameChecks,pageErrors:errors,consoleWarnings:warnings,
-        playerEvents:await page.evaluate(()=>window.__taleraF5PresentationEvents||[]),
-        adapterEvents:await page.evaluate(()=>window.__f5AdapterTrace||[]),
-        originalError:String(error.message)
-      }));
-      throw error;
-    }
-    const initial=await child.locator('#view [data-index]').first()
-      .getAttribute('data-index');
-    assert.equal(initial,'0','Original narrator must show first photo on opening');
-    const childFrame=page.locator('iframe.talera-zero-present-frame');
-    assert.ok((await childFrame.getAttribute('src')).startsWith(
-      '/vertelmodus-embed?mode=present'));
-    await child.locator('#play').click();
-    await child.locator('#view [data-index="1"]').waitFor({
-      state:'attached',timeout:12000
+    await page.waitForFunction(()=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return !!m&&m._zeroItems?.length===4&&!m._photoLoading&&
+        !!document.querySelector('#photoStage audio')&&
+        document.body.classList.contains('talera-v61-narration-visual');
+    },null,{timeout:22000});
+    const currentImage=()=>page.evaluate(()=>{
+      const e=document.getElementById('photoLayerA');
+      const st=e&&getComputedStyle(e);
+      return {
+        background:st?.backgroundImage||'',
+        image:e?.querySelector('img')?.currentSrc||e?.querySelector('img')?.src||'',
+        inline:e?.style.backgroundImage||'',
+        html:e?.outerHTML.slice(0,220)||'',
+        visible:!!e&&st.display!=='none'&&st.visibility!=='hidden'&&Number(st.opacity)>0,
+        index:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
+        elapsed:document.querySelector('#photoStage audio')?.currentTime||0,
+        video:!!document.querySelector('video.talera-v61-inline-video')
+      };
     });
-    await child.locator('#view video[data-index="2"]').waitFor({
-      state:'attached',timeout:12000
+    const img0=await currentImage();
+    assert.equal(img0.index,0,'Narrator must begin on its first original photo');
+    assert.ok(img0.visible,'The front RH19 photo layer must be visible');
+    const sharedAudio=page.locator('#photoStage audio').first();
+    // Mobile browsers require a gesture, not a second storytelling engine.
+    await page.locator('#photoStage').click({force:true});
+    await page.waitForFunction(()=>{
+      const a=document.querySelector('#photoStage audio');
+      return !!a&&!a.paused&&a.currentTime>0.08;
+    },null,{timeout:12000}).catch(async error=>{
+      const diag=await page.evaluate(()=>({
+        audio:[...document.querySelectorAll('#photoStage audio')].map(x=>({
+          paused:x.paused,currentTime:x.currentTime,readyState:x.readyState,
+          duration:x.duration,muted:x.muted
+        })),
+        stage:document.getElementById('photoStage')?.outerHTML.slice(0,550),
+        bodyClass:document.body.className
+      }));
+      throw Error('Current R20 inline narration did not start: '+
+        JSON.stringify(diag)+'; '+error.message);
     });
-    const progression=await child.locator('#view [data-index]').first()
-      .getAttribute('data-index');
-    assert.equal(progression,'2',
-      'The full-screen player must replace the fixed photo with actual video');
+    await page.waitForFunction(()=>{
+      const a=document.querySelector('#photoStage audio');
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return a&&a.currentTime>=1.1&&m?._photoIndex===1;
+    },null,{timeout:11000});
+    const img1=await currentImage();
+    assert.ok(img1.visible,'Second photo must still be visibly presented');
+    assert.notEqual(img0.background+'|'+img0.image+'|'+img0.inline,
+      img1.background+'|'+img1.image+'|'+img1.inline,
+      'The large visible photo must actually change, not only the dots');
+    await page.waitForFunction(()=>{
+      const a=document.querySelector('#photoStage audio');
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const video=document.querySelector('video.talera-v61-inline-video');
+      return a&&a.currentTime>=2.3&&m?._photoIndex===2&&
+        !!video&&!!video.src&&video.isConnected;
+    },null,{timeout:11000});
+    const liveVideo=await page.locator('video.talera-v61-inline-video')
+      .first().evaluate(v=>({
+        hasSource:!!v.src,readyState:v.readyState,
+        currentTime:v.currentTime,duration:v.duration,
+        size:{width:v.clientWidth,height:v.clientHeight},
+        visible:getComputedStyle(v).display!=='none'&&
+          getComputedStyle(v).visibility!=='hidden',
+        index:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex
+      }));
+    assert.equal(liveVideo.index,2);
+    assert.ok(liveVideo.visible&&liveVideo.size.width>0&&liveVideo.size.height>0,
+      'Native original video must cover visible presentation, not only poster');
     result[result.length-1].narratedVideoPresentedOnSingleStage=true;
     result[result.length-1].actualImage0ToImage1ToVideo2=true;
+    result[result.length-1].originalV61InlinePlayerTested=true;
+
 
   }
   await ctx.close();
@@ -413,7 +368,7 @@ try{
  console.log('TALERA_F5_IPHONE_VIDEO_IMPORT_PASS',JSON.stringify({
   passed:true,syntheticOnly:true,originalPhotosRetained:true,
   originalVideoPersisted:true,explicitPickerVisible:true,
-  mixedPickerNoSilentDrop:true,originalOwnMemoryViewRouteChecked:true,originalVoiceAnd3CuePhotoVideoPresentationRegression:true,realIphoneDeviceTested:false,
+  mixedPickerNoSilentDrop:true,originalOwnMemoryViewRouteChecked:true,originalVoiceAnd3CuePhotoVideoPresentationRegression:true,validatedLatestInlinePlayerNotLegacyIframe:true,realIphoneDeviceTested:false,
   scenarios:result
  }));
 }finally{await stop()}

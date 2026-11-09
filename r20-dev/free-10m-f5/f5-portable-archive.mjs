@@ -164,7 +164,9 @@ export async function decodeFreeArchive(archive){
   }
   if(type==='obj'){
    ensure(Array.isArray(val),'INVALID_OBJECT');
-   const obj=Object.create(null);
+   // Preserve normal IndexedDB object semantics while defineProperty protects
+   // even __proto__ against prototype pollution in untrusted backup metadata.
+   const obj={};
    const keys=new Set();
    for(const entry of val){
     ensure(Array.isArray(entry)&&entry.length===2&&typeof entry[0]==='string','INVALID_FIELD');

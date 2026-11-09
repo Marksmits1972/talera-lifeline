@@ -181,12 +181,56 @@ try{
   result[result.length-1].videosPersisted=files.files.filter(f=>f.type.startsWith('video/')).length;
   result[result.length-1].photosPersisted=files.files.filter(f=>f.type.startsWith('image/')).length;
   result[result.length-1].sameAccountPrivateDB=/^talera-free-local-/.test(files.dbName);
+  if(withVideo){
+    // Reproduce the actual iPhone report: story is present in Mijn leven,
+    // but opening its "Bekijk herinnering" href used to get a 404.
+    const saved=await page.evaluate(async mediaData=>{
+      const bytes=Uint8Array.from(atob(mediaData),c=>c.charCodeAt(0));
+      const media=new File([bytes],'f5-own-memory-video.mp4',{type:'video/mp4'});
+      const story=await window.TaleraMemories.save({
+        title:'F5 fictief verhaal met bewegende video',
+        date:'2026-11-09',text:'Alleen fictief verhaal',
+        narrationCues:[{t:0,index:0}],narrationDurationMs:1000
+      },[media]);
+      return {id:story.id,mediaCount:story.items?.length||0};
+    },videoB64);
+    assert.match(saved.id,/^local-[a-z0-9-]{8,90}$/i);
+    assert.equal(saved.mediaCount,1);
+    const home=await page.goto(origin+'/mijn-leven',{
+      waitUntil:'domcontentloaded',timeout:25000
+    });
+    assert.equal(home.status(),200);
+    const link=page.locator('a[href="/present?memory='+saved.id+'"]').first();
+    await link.waitFor({state:'attached',timeout:25000});
+    const href=await link.getAttribute('href');
+    assert.equal(href,'/present?memory='+saved.id,
+      'Original Mijn leven must link to its own saved story player');
+    const player=await page.goto(origin+href,{
+      waitUntil:'domcontentloaded',timeout:25000
+    });
+    assert.equal(player.status(),200,
+      'Clicking a published Free story must render, not show Niet gevonden');
+    await page.waitForFunction(()=>!!window.TaleraMemories?.get,{
+      timeout:22000
+    });
+    const onPlayer=await page.evaluate(async storyId=>{
+      const row=await window.TaleraMemories.get(storyId);
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return {videoCount:row?.items?.filter(x=>x.kind==='video').length||0,
+        chosenId:m?.storyId||m?.localId||null,hasStory:!!row};
+    },saved.id);
+    assert.equal(onPlayer.videoCount,1,
+      'The actual video Blob must be available on the presentation origin');
+    assert.equal(onPlayer.hasStory,true);
+    result[result.length-1].ownMemoryViewOpen=true;
+    result[result.length-1].ownMemoryVideoVisibleToPlayer=true;
+  }
   await ctx.close();
  }
  console.log('TALERA_F5_IPHONE_VIDEO_IMPORT_PASS',JSON.stringify({
   passed:true,syntheticOnly:true,originalPhotosRetained:true,
   originalVideoPersisted:true,explicitPickerVisible:true,
-  mixedPickerNoSilentDrop:true,realIphoneDeviceTested:false,
+  mixedPickerNoSilentDrop:true,originalOwnMemoryViewRouteChecked:true,realIphoneDeviceTested:false,
   scenarios:result
  }));
 }finally{await stop()}

@@ -432,7 +432,26 @@ try{
       assert.equal(first.narrationVisual,false,
         'An unvoiced memory must stay in ordinary tap mode');
       const photoBefore=await page.locator('#photoStage').screenshot();
-      await page.locator('#photoStage').tap({force:true});
+      // A forced tap on the hidden photo layer is NOT a user touch; it can
+      // bypass the uppermost RH19 gesture surface and choose another memory.
+      // Test the real visible story interaction surface at its hit-tested
+      // position, as a person would on an iPhone.
+      const touchContext=await page.evaluate(()=>{
+        const e=document.getElementById('memoryStoryScroll');
+        const r=e?.getBoundingClientRect();
+        if(!r)return {missing:true};
+        const x=r.left+r.width*.5,y=r.top+r.height*.55;
+        const hit=document.elementFromPoint(x,y);
+        return {x,y,width:r.width,height:r.height,
+          hitId:hit?.id||'',hitClass:typeof hit?.className==='string'?hit.className:'',
+          insideStory:!!hit?.closest?.('#memoryStoryScroll'),
+          insideStage:!!hit?.closest?.('#photoStage')};
+      });
+      assert.ok(!touchContext.missing&&touchContext.width>40);
+      await page.locator('#memoryStoryScroll').tap({timeout:12000}).catch(error=>{
+        throw Error('Real on-screen tap not hit-testable: '+
+          JSON.stringify(touchContext)+'; '+error.message);
+      });
       await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===1,
         null,{timeout:9000});
       await page.waitForTimeout(650);
@@ -440,7 +459,7 @@ try{
       const photoAfter=await page.locator('#photoStage').screenshot();
       if(photoBefore.equals(photoAfter)){
         console.error('TALERA_F5_ONE_FROZEN_STORY_REPRO',JSON.stringify({
-          target,sameDate:true,first,after,
+          target,sameDate:true,first,after,touchContext,
           imageHasChanged:false,
           existingRecords:plainIds.length
         }));

@@ -23,6 +23,18 @@ export {
 const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
 const HEX64=/^[a-f0-9]{64}$/;
+const LOCAL_STORY_ID=/^local-[a-z0-9-]{8,90}$/i;
+function allowedLocalUiSearch(url){
+  if(!PUBLIC_PAGES.has(url.pathname))return false;
+  const pairs=[...url.searchParams.entries()];
+  if(pairs.length!==1)return false;
+  const [key,id]=pairs[0];
+  // The unchanged TALERA editor redirects after a successful publish to
+  // /mijn-leven?published=<local-id>, and opens an edit via /tell?edit=<id>.
+  // Never accept arbitrary query keys, remote origins or non-local IDs.
+  return ((url.pathname==='/mijn-leven'&&key==='published')||
+      (url.pathname==='/tell'&&key==='edit'))&&LOCAL_STORY_ID.test(id);
+}
 const F5_BROWSER_CSP=[
   "default-src 'self' blob: data:",
   "base-uri 'self'","object-src 'none'","frame-ancestors 'none'",
@@ -411,7 +423,7 @@ export default {
     if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
     if(!await hasQaAccess(request,env))return deny();
-    if(url.search)return deny(404,'Niet gevonden');
+    if(url.search&&!allowedLocalUiSearch(url))return deny(404,'Niet gevonden');
     try{
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);

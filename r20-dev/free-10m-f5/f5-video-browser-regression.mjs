@@ -360,6 +360,72 @@ try{
     result[result.length-1].narratedVideoPresentedOnSingleStage=true;
     result[result.length-1].actualImage0ToImage1ToVideo2=true;
     result[result.length-1].originalV61InlinePlayerTested=true;
+    // Reproduce the reported single bad story precisely: FIVE photos,
+    // ONE video, no recorded voice, with the SAME day/time as other stories.
+    // Ordinary memories must change frames on a real tap, NOT via an audio
+    // clock. Create two distinct same-timestamp stories to expose ID ties.
+    const plainIds=await page.evaluate(async videoData=>{
+      const files=[];
+      for(const color of ['#e72917','#248feb','#42c928','#f4bd11','#ec34c0']){
+        const canvas=document.createElement('canvas');
+        canvas.width=95;canvas.height=95;
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle=color;ctx.fillRect(0,0,95,95);
+        const b=await new Promise(r=>canvas.toBlob(r,'image/png'));
+        files.push(new File([b],'samen-dag-'+files.length+'.png',{type:'image/png'}));
+      }
+      files.push(new File([
+        Uint8Array.from(atob(videoData),c=>c.charCodeAt(0))
+      ],'zesde-is-video.mp4',{type:'video/mp4'}));
+      const ids=[];
+      for(let k=0;k<2;k++){
+        const row=await window.TaleraMemories.save({
+          title:'Gelijk tijdstip zonder stem '+k,
+          date:'2026-11-09',time:'12:00:00',
+          text:'Vijf verschillende fotos en een video zonder stemopname'
+        },files);
+        ids.push(row.id);
+      }
+      return ids;
+    },videoB64);
+    assert.equal(new Set(plainIds).size,2,'Two separate stories expected');
+    for(const target of plainIds){
+      const response=await page.goto(origin+'/present?memory='+target,{
+        waitUntil:'domcontentloaded',timeout:25000});
+      assert.equal(response.status(),200);
+      await page.waitForFunction(t=>{
+        const m=window.__taleraTimelineRuntime?.currentMemory?.();
+        return m?.storyId===t&&m._zeroFrames?.length===6&&!m._photoLoading;
+      },target,{timeout:18000}).catch(async error=>{
+        const state=await page.evaluate(t=>({
+          target:t,selected:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+          currentId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
+          selectedFrames:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length,
+          url:location.href
+        }),target);
+        throw Error('Identical timestamp story selection: '+JSON.stringify(state)+
+          '; '+error.message);
+      });
+      const first=await page.evaluate(()=>({
+        index:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
+        background:getComputedStyle(document.getElementById('photoLayerA')).backgroundImage,
+        narrated:document.body.classList.contains('talera-v61-narration-visual')
+      }));
+      assert.equal(first.index,0);
+      assert.equal(first.narrated,false,
+        'Unvoiced memory must use ordinary tap mode, never voice cues');
+      await page.locator('#photoStage').tap({force:true});
+      await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===1,
+        null,{timeout:9000});
+      const after=await page.evaluate(()=>({
+        index:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
+        background:getComputedStyle(document.getElementById('photoLayerA')).backgroundImage
+      }));
+      assert.notEqual(first.background,after.background,
+        'A single photograph MUST visibly change on tap, not only its dot');
+      result[result.length-1].ordinarySameDateMultipleStoryTapPassed=true;
+    }
+
 
 
   }

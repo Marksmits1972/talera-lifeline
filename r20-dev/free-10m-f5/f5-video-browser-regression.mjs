@@ -68,6 +68,22 @@ const prepare=async sid=>{
   name:'talera_sid',value:sid,domain:'127.0.0.1',path:'/',
   secure:false,httpOnly:true,sameSite:'Lax'
  }]);
+ // Test-only instrumentation, never shipped to TALERA or Cloudflare.
+ await ctx.addInitScript(()=>{
+   const events=[];
+   window.__taleraF5PresentationEvents=events;
+   const add=(kind,element)=>{
+     if(element?.tagName==='IFRAME'||element?.className?.toString()?.includes('talera-zero-present'))
+       events.push({t:Math.round(performance.now()),kind,tag:element.tagName,
+         src:element.getAttribute?.('src')||'',cls:String(element.className||'')});
+   };
+   const oldAppend=Element.prototype.append;
+   Element.prototype.append=function(...nodes){for(const n of nodes)add('append',n);return oldAppend.apply(this,nodes)};
+   const oldRemove=Element.prototype.remove;
+   Element.prototype.remove=function(){add('remove',this);return oldRemove.call(this)};
+   const oldAppendChild=Node.prototype.appendChild;
+   Node.prototype.appendChild=function(n){add('appendChild',n);return oldAppendChild.call(this,n)};
+ });
  const page=await ctx.newPage(),errors=[],warnings=[];
  page.on('pageerror',e=>errors.push(String(e.message||e)));
  page.on('console',m=>{
@@ -302,6 +318,7 @@ try{
       }
       console.error('TALERA_FREE_ORIGINAL_PLAYER_DIAGNOSTIC',JSON.stringify({
         diagnostics,frameChecks,pageErrors:errors,consoleWarnings:warnings,
+        playerEvents:await page.evaluate(()=>window.__taleraF5PresentationEvents||[]),
         originalError:String(error.message)
       }));
       throw error;

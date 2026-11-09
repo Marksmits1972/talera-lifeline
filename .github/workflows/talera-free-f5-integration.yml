@@ -35,14 +35,15 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
       - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
-      - name: Inspect current approved picker, MIME, videos and editor reference once
-        run: node r20-dev/free-10m-f5/f5-video-import-diagnostic.mjs
+      - name: Assert original TALERA editor remains intact and video picker reports every selected video
+        run: node r20-dev/free-10m-f5/f5-video-picker-regression.mjs
         # Exact video-picker source inspected once before the narrow F5 hotfix
       - name: Verify F5 Worker and tests parse
         run: |
           node --check r20-dev/free-10m-f5/f5-worker.mjs
           node --check r20-dev/free-10m-f5/f5-local-test.mjs
           node --check r20-dev/free-10m-f5/f5-public-assets.mjs
+          node --check r20-dev/free-10m-f5/f5-video-picker.mjs
       - name: Verify Cloudflare compilation without deployment
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
       - name: Execute synthetic auth + private DOB + social privacy and persistence

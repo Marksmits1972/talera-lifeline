@@ -1,0 +1,54 @@
+name: TALERA Free F5 - WhatsApp exact baseline storage-only integration
+
+on:
+  push:
+    branches: [feature/free-f5-exact-whatsapp-storage-only-20261109]
+    paths:
+      - 'r20-dev/free-10m-f5/**'
+      - 'r20-dev/free-10m-delivery/**'
+      - '.github/workflows/talera-free-f5-whatsapp-storage-only.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  storage_only:
+    name: Keep approved UI, verify local media/DO/auth storage, no deployment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install pinned dependencies (no package changes)
+        run: npm ci
+      - name: Guard exact WhatsApp origin, seven DOs, no UI patches, IDB account separation
+        run: node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
+      - name: Build byte-identical anonymous approved assets
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Check all three original IDB writers and publisher media IDs
+        run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+      - name: Check pre-save cue media-ID reconnection without altering times
+        run: node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+      - name: Identify original RH19 presenter (read-only diagnosis)
+        run: node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs
+      - name: Cloudflare packaging check (does not deploy)
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-storage-only-check
+      - name: Local integrated auth + account birthday + local media + social DO tests
+        run: node r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Persist minimal test report
+        if: success()
+        run: |
+          mkdir -p r20-dev/free-10m-f5/generated
+          printf '%s\n' '{"whatsappSource":"talera-design-cleanup-fase1-test-20261107","uiPreserved":true,"storageIntegration":"tested-locally","iphoneAcceptance":"open","tenMillionCertified":false,"productionSwitched":false}' > r20-dev/free-10m-f5/generated/storage-only-result.json
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: talera-free-whatsapp-storage-only-ci
+          path: r20-dev/free-10m-f5/generated/storage-only-result.json
+          retention-days: 14

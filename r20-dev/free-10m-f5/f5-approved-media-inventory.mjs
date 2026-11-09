@@ -17,18 +17,18 @@ function excerpts(label,s,expressions,max=24){
    const all=[...s.matchAll(pattern)];
    const items=all.slice(0,max).map(m=>{
      const at=m.index;
-     return {at,before:s.slice(Math.max(0,at-180),at).replace(/\\s+/g,' ').slice(-180),
-       match:s.slice(at,at+Math.min(250,kind.includes('poster')?500:260)).replace(/\\s+/g,' ').slice(0,260)};
+     return {at,before:s.slice(Math.max(0,at-180),at).replace(/\s+/g,' ').slice(-180),
+       match:s.slice(at,at+Math.min(250,kind.includes('poster')?500:260)).replace(/\s+/g,' ').slice(0,260)};
    });
    console.log('MEDIA_SOURCE_HITS',JSON.stringify({label,kind,total:all.length,items}));
  }
 }
 const patterns=[
- ['muted',/\\.muted\\s*=|\\bmuted\\b|volume\\s*=|\\bdefaultMuted\\b/gi],
+ ['muted',/\.muted\s*=|\bmuted\b|volume\s*=|\bdefaultMuted\b/gi],
  ['poster',/poster|thumbnail|thumb|preview|captureStream|toDataURL|videoFrame|videostill/gi],
- ['video creation',/createElement\\(['"]video|<video|video\\.play\\(/gi],
+ ['video creation',/createElement\(['"]video|<video|video\.play\(/gi],
  ['recorder',/MediaRecorder|VOICE|recording|recorder|mic|narration/gi],
- ['tile',/work-tiles|tile\\[|preview:|videoPoster/gi]
+ ['tile',/work-tiles|tile\[|preview:|videoPoster/gi]
 ];
 excerpts('WhatsApp tell original',source,patterns,14);
 excerpts('WhatsApp present original',present,patterns.slice(0,2),10);

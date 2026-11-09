@@ -1,0 +1,134 @@
+name: TALERA Free F5 - repair original memory back navigation, preserve existing iPhone QA
+# Guarded one-time GitHub stage patch. No new Worker, no customer data moves.
+on:
+  push:
+    branches: [fix/free-f5-iphone-memory-back-20261109]
+    paths:
+      - '.github/workflows/talera-f5-existing-qa-memory-back-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talera-free-f5-storage-only-iphone-qa-20261109
+  cancel-in-progress: false
+
+jobs:
+  reversible_test_stage_patch:
+    name: Preserve same origin, DO classes, invite and existing secret values
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
+      F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
+      F5_INVITE_HASH: 9e5da8ed7d8ad9f23dc0b3195c7fc47a6cc41444472af5931a499d09b3c52561
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Confirm this QA script exists and is NOT an official or old stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 4ba7829aac46145487a61d95fff31925bf069117 HEAD
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#CLEAN_ID}" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN_ID" >> "$GITHUB_ENV"
+          test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Build original approved TALERA code into isolated, non-customer assets
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Re-prove precise original iPhone back link, preserved narration, private library and source contracts
+        run: |
+          node r20-dev/free-10m-f5/f5-back-nav-regression.mjs
+          node r20-dev/free-10m-f5/f5-editor-video-mute-regression.mjs
+          node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
+          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
+          node r20-dev/free-10m-f5/f5-edit-cue-regression.mjs
+          node r20-dev/free-10m-f5/f5-original-api-inventory.mjs
+          node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
+          node r20-dev/free-10m-f5/f5-local-test.mjs
+      - name: Require already-existing exact isolated stage, verify no QA gate bypass
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$F5_STAGE_NAME")"
+          test "$status" = "200"
+          curl --max-time 20 -fsS "https://$F5_STAGE_HOST/__f5/health" > /tmp/f5-qa-health-before.json
+          node -e "const r=require('/tmp/f5-qa-health-before.json');if(!r.ok||!r.syntheticOnly||r.officialTaleraConnected!==false||r.tenMillionProven!==false)process.exit(1)"
+          denied="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/mijn-leven")"
+          test "$denied" = "403"
+          echo "Original isolated stage exists and refuses anonymous access. No other Worker may be touched."
+      - name: Verify original root is protected before update, never publish account data
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/")"
+          test "$status" = "403"
+          echo "Private original back route is security-gated even before patch."
+      - name: Recreate SAME seven bindings, SAME migration and SAME one-click invite without rewriting secrets
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const c=JSON.parse(fs.readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          const wanted=['FreeAuthAccount','FreeAuthEmail','FreeAuthHandle','FreeAuthSession','FreeAuthRate','FreeSocialMemory','FreeSocialSharePointer'];
+          const found=c.durable_objects?.bindings?.map(x=>x.class_name);
+          if(c.name!=='talera-free-f5-combined-stage-20261108' ||
+             JSON.stringify(found)!==JSON.stringify(wanted) ||
+             c.services?.length || c.d1_databases?.length || c.r2_buckets?.length ||
+             c.vars?.AUTH_STORAGE_JURISDICTION!=='eu' ||
+             c.vars?.SOCIAL_STORAGE_JURISDICTION!=='eu')
+            throw Error('FAIL_CLOSED_WORKER_BINDINGS_CHANGED');
+          if(process.env.F5_STAGE_NAME!=='talera-free-f5-storage-qa-20261109' ||
+             !/^[a-f0-9]{64}$/.test(process.env.F5_INVITE_HASH) ||
+             Number(c.vars.F5_EASY_INVITE_EXPIRES)<Date.now())
+            throw Error('FAIL_CLOSED_STAGE_NAME_OR_INVITE');
+          c.name=process.env.F5_STAGE_NAME;
+          c.migrations=[{tag:'free-f5-storage-iphone-qa-20261109-v1',new_sqlite_classes:wanted}];
+          c.vars.F5_EASY_INVITE_SHA256=process.env.F5_INVITE_HASH;
+          c.keep_vars=true;
+          fs.writeFileSync('r20-dev/free-10m-f5/wrangler.iphone-patch.generated.jsonc',JSON.stringify(c,null,2)+'\n');
+          console.log('F5_EXISTING_QA_BACK_NAV_BINDINGS_UNCHANGED; original session, accounts and browser origin retained');
+          NODE
+      - name: Check identical stage package without deployment
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.iphone-patch.generated.jsonc --outdir .talera-f5-existing-qa-dryrun
+      - name: Update ONLY existing QA Worker code and assets, preserving all five original secret values
+        id: deploy
+        run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.iphone-patch.generated.jsonc
+      - name: Confirm previous private origin and security gates still serve same accounts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 7
+          curl --max-time 20 -fsS "https://$F5_STAGE_HOST/__f5/health" > /tmp/f5-qa-health-after.json
+          node -e "const r=require('/tmp/f5-qa-health-after.json');if(!r.ok||!r.syntheticOnly||r.officialTaleraConnected!==false||r.tenMillionProven!==false)process.exit(1)"
+          denied="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/mijn-leven")"
+          test "$denied" = "403"
+          code="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/__f5/entry")"
+          test "$code" = "200"
+          echo 'TALERA_F5_BACK_LINK_QA_UPDATED; original accounts/IndexedDB origin and access secrets preserved'
+      - name: Verify patched root stays private, no public shortcuts to memories
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/")"
+          test "$status" = "403"
+          echo "Original back button route remains subject to the same private QA cookie gate."
+      - name: Restore previous QA version if the post-deployment security probe fails
+        if: ${{ failure() && steps.deploy.outcome == 'success' }}
+        run: |
+          npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous isolated F5 QA if root navigation patch fails health/security gate" --config r20-dev/free-10m-f5/wrangler.iphone-patch.generated.jsonc

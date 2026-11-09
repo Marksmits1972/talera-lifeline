@@ -306,7 +306,14 @@ try{
          "__f5Log('hydrated',{id:memory.id});"],
         ["async function present(memory){",
          "async function present(memory){"+
-         "__f5Log('present-called',{id:memory?.id,stage:!!stage});"],
+         "__f5Log('present-called',{id:memory?.id,stage:!!stage,activeId});"],
+        ["if(activeId===id)return;",
+         "__f5Log('present-guard',{id,activeId,same:activeId===id});if(activeId===id)return;"],
+        ["disposePresentation();\n   activeId=id;",
+         "disposePresentation();__f5Log('disposed',{activeId});\n   activeId=id;"],
+        ["document.body.append(frame);",
+         "__f5Log('before-append',{src:frame.src});"+
+         "document.body.append(frame);__f5Log('after-append',{connected:frame.isConnected});"],
         ["function activate(memory){",
          "function activate(memory){"+
          "__f5Log('activate',{id:memory?.id,local:!!memory?._taleraLocal,"+

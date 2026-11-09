@@ -95,7 +95,7 @@ async function menu(page){
    }
    if(shell.hidden){
      const buttons=[...document.querySelectorAll('button,a')].filter(n=>!shell.contains(n));
-     const trigger=buttons.find(n=>/meer|mijn talera|account/i.test(
+     const trigger=buttons.find(n=>/meer|more|mijn talera|account/i.test(
        n.getAttribute('aria-label')||n.textContent||''));
      if(trigger)trigger.click();
    }

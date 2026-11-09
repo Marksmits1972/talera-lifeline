@@ -250,9 +250,22 @@ try{
  assert.equal(readback.id,a.id);
  assert.equal(readback.size,a.bytes,'Original file changed during account switches');
  assert.match(readback.type,/image\/png/);
- assert.notEqual(a.dbs.find(x=>x?.startsWith('talera-free-local-')),
-   b.dbs.find(x=>x?.startsWith('talera-free-local-')),
-   'Two signed-in accounts were bound to same local IndexedDB');
+ // indexedDB.databases() lists ALL names on the same origin, including
+ // the previous account's private DB. Comparing .find() would select that
+ // previous DB twice and incorrectly reject a correctly isolated browser.
+ const ownedA=a.dbs.filter(x=>x?.startsWith('talera-free-local-'));
+ const ownedB=b.dbs.filter(x=>x?.startsWith('talera-free-local-'));
+ const newlyOpenedB=ownedB.filter(x=>!ownedA.includes(x));
+ assert.equal(ownedA.length,1,'First synthetic account needs its own local DB');
+ assert.equal(newlyOpenedB.length,1,
+   'Second synthetic account must open a DIFFERENT private IndexedDB');
+ assert.ok(ownedB.includes(ownedA[0]),
+   'Browser must retain original account DB without deleting photos');
+ console.log('TALERA_F5_BROWSER_PRIVATE_DB_COUNTS',JSON.stringify({
+   afterFirstOwner:ownedA.length,afterSecondOwner:ownedB.length,
+   secondOwnerNewPrivateDatabases:newlyOpenedB.length,
+   noOriginalDatabaseDeleted:true
+ }));
  result={ok:true,syntheticOnly:true,realBrowser:'Chromium iPhone mobile emulation',
    accounts:2,accountTransitions:5,
    originalLocalStoryAndBlobPreserved:true,secondAccountCannotReadFirst:true,

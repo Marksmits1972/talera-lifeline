@@ -299,6 +299,22 @@ async function run(){
   assert.equal(renewedLogin.data.account.id,identities[0].id,
     'Re-login cannot create a fresh account with an empty library');
   const renewedCookie=cookieOf(renewedLogin);
+  const discovery=await request('GET','/api/discovery',{cookie:renewedCookie});
+  assert.equal(discovery.status,200,'Original account menu needs safe discovery GET');
+  assert.deepEqual(discovery.data,{publicHandle:users[0].username,discoverable:false},
+    'Never expose another account or claim live people search');
+  assert.equal((await request('GET','/api/discovery')).status,401,
+    'Signed-out user cannot read another persons account preference');
+  assert.equal((await request('GET','/api/discovery',{cookie:identities[1].cookie}))
+    .data.publicHandle,users[1].username,
+    'Another account only sees its own verified username');
+  assert.equal((await request('POST','/api/discovery',{
+    cookie:renewedCookie,body:{discoverable:true,username:'different-handle'}
+  })).status,409,'Do not pretend discoverability was saved or reserve an invalid handle');
+  assert.equal((await request('GET','/api/discovery',{cookie:renewedCookie}))
+    .data.discoverable,false,'Unsupported privacy setting must remain inactive');
+  assert.equal((await request('GET','/api/discovery?all=1',{cookie:renewedCookie}))
+    .status,404,'No account discovery or enumeration via query strings');
   const reopenedHome=await request('GET','/mijn-leven',{cookie:renewedCookie});
   assert.equal(reopenedHome.status,200);
   assert.ok(String(reopenedHome.data).includes(scopedName),
@@ -436,7 +452,7 @@ async function run(){
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,originalLocalMemoryPresentationRouteVerified:true,originalStandaloneIframePlayerActuallyLoaded:true,localRequests:calls,
-    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,loginReturnsSamePrivateDbVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
+    realTaleraStaticShellCopied:true,originalMenuScriptVerified:true,originalPwaManifestAndSwVerified:true,perAccountIndexedDbIsolationVerified:true,loginReturnsSamePrivateDbVerified:true,readOnlyAccountMenuDiscoveryVerified:true,qaBrowserCookieVerified:true,safariMissingOriginAcceptedWithCsrf:true,privateTimelineUpdatedOnTwoScreens:true,oneGatewayForAuthBirthdateAndSocial:true,
     crossAccountIsolation:true,spoofingOfAccountHeaderRejected:true,
     revokedShareAndGrantRemainRevoked:true,sessionsCanBeRevoked:true,
     dataRetainedAfterWorkerRestart:true,legacyApiFailsClosed:true,

@@ -54,7 +54,7 @@ const menuContexts=menuAnchors.map(term=>{
 });
 console.log('TALERA_F5_ORIGINAL_MENU_CONTRACT',JSON.stringify(menuContexts));
 const native=new Set(['/api/register','/api/login','/api/logout','/api/me',
- '/api/profile','/api/profile/birthdate','/api/version']);
+ '/api/profile','/api/profile/birthdate','/api/version','/api/discovery']);
 const routes=[...seen.keys()].sort().map(route=>({
  route,explicitF5Route:native.has(route),sourceFiles:[...seen.get(route)].slice(0,8),
  examples:contextByRoute.get(route)

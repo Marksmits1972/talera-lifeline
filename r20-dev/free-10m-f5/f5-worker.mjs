@@ -330,6 +330,17 @@ async function birthdateApi(request,env){
   catch{return deny(400,'Ongeldige geboortedatum')}
   return json(await home.setBirthDate(value));
 }
+// The original 'Mijn TALERA' menu always loads /api/discovery after sign-in.
+// Read-only identity metadata is required just to open the account/settings
+// screen. We must not falsely enable discoverability before search and privacy
+// permissions are actually backed by a verified account index.
+async function discoveryApi(request,env){
+  const actor=await sessionAccount(request,env);
+  if(!actor)return deny(401,'Aanmelden vereist');
+  if(request.method!=='GET')
+    return deny(409,'Vindbaarheid is nog niet beschikbaar in deze Free-test');
+  return json({publicHandle:actor.publicHandle||'',discoverable:false});
+}
 async function socialApi(request,env){
   // DO social code retains its own authorization, pointer and revocation checks.
   // The browser can NEVER claim an actor ID or provide its own HMAC signature.
@@ -484,6 +495,7 @@ export default {
       if(p==='/api/version'&&m==='GET')return json({version:APPROVED_UI_VERSION});
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);
+      if(p==='/api/discovery')return discoveryApi(request,env);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);
       if(p.startsWith('/__clean/'))return publicScript(request,env);

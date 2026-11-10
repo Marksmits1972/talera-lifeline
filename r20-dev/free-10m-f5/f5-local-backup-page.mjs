@@ -14,7 +14,7 @@ body{font:16px system-ui,-apple-system,sans-serif;margin:0;background:#f7f5f0;co
 main{max-width:620px;margin:28px auto;padding:18px;line-height:1.48}
 section{background:white;border:1px solid #b9c6d8;border-radius:12px;padding:20px;margin:20px 0}
 h1{font-size:1.55rem}h2{font-size:1.2rem}button,.save{display:inline-block;background:#23497e;color:white;border:0;padding:12px 16px;border-radius:9px;font:inherit;cursor:pointer;text-decoration:none}
-button:disabled{opacity:.45;cursor:default}input[type=file]{display:block;max-width:100%;margin:12px 0}
+[hidden]{display:none!important}button:disabled{opacity:.45;cursor:default}input[type=file]{display:block;max-width:100%;margin:12px 0}
 label{display:block;margin:12px 0}.note{font-size:.93rem}output{display:block;white-space:pre-wrap;margin:12px 0;padding:12px;background:#eef2f7;border-radius:8px}
 </style></head>
 <body><main id="talera-free-backup" data-database="${dbName}">

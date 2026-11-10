@@ -67,6 +67,38 @@ function allowedLocalUiSearch(url){
       (url.pathname==='/tell'&&key==='edit')||
       (url.pathname==='/present'&&key==='memory'))&&LOCAL_STORY_ID.test(id);
 }
+// iPhone/embedded browsers may append passive link-open parameters.
+// Canonicalize ONLY GETs for already-existing app pages; NEVER carry extra
+// parameters into the signed-in page, account APIs, backup, or share routes.
+// A functional page parameter must still pass the original exact route check.
+function canonicalReferralUiPath(url,method){
+  if(method!=='GET'||!PUBLIC_PAGES.has(url.pathname)||
+     url.search.length>1536)return null;
+  const pairs=[...url.searchParams.entries()];
+  if(!pairs.length||pairs.length>12)return null;
+  let functional=null,passive=0;
+  const functionKeys=new Set(['talera_menu','published','edit','memory']);
+  const reserved=/^(?:account|user|db|database|scope|story|file|redirect|return|return_url|next|url|token|code|key|auth|session|password|email|birthDate|state|callback|target|share|origin|id|path)$/i;
+  for(const [key,value] of pairs){
+    if(key.length>64||value.length>256||/[\u0000-\u001f\u007f]/.test(key+value))
+      return null;
+    if(functionKeys.has(key)){
+      if(functional)return null; // No duplicates, no conflicting modes.
+      functional=[key,value];
+    }else{
+      // Strip untrusted referral tags from the address before rendering.
+      // Sensitive selectors are NOT permitted even when ignored by the UI.
+      if(!/^[a-z_][a-z0-9_-]*$/i.test(key)||reserved.test(key)||
+         key.startsWith('__'))return null;
+      passive++;
+    }
+  }
+  if(!passive)return null;
+  if(!functional)return url.pathname;
+  const canonical=new URL(url.pathname,url.origin);
+  canonical.searchParams.set(functional[0],functional[1]);
+  return allowedLocalUiSearch(canonical)?canonical.pathname+canonical.search:null;
+}
 const F5_BROWSER_CSP=[
   "default-src 'self' blob: data:",
   "base-uri 'self'","object-src 'none'","frame-ancestors 'none'",
@@ -640,8 +672,14 @@ export default {
     // Exact original embedded player route is allowed before the normal
     // strict search-param gate, which intentionally covers only top pages.
     if(p==='/vertelmodus-embed')return privateEmbeddedPlayer(request,env);
-    if(url.search&&!allowedLocalUiSearch(url)&&!allowedVersionCheck(url,m))
-      return deny(404,'Niet gevonden');
+    if(url.search&&!allowedLocalUiSearch(url)&&!allowedVersionCheck(url,m)){
+      const canonical=canonicalReferralUiPath(url,m);
+      if(!canonical)return deny(404,'Niet gevonden');
+      return new Response(null,{status:302,headers:{
+        location:canonical,'cache-control':'private, no-store',
+        'x-content-type-options':'nosniff','referrer-policy':'no-referrer'
+      }});
+    }
     try{
       // Original app periodically asks for its own version. Answer on this
       // isolated origin; never proxy to the old customer/production Worker.

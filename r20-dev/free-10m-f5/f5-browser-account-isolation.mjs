@@ -2,7 +2,7 @@
 // Uses only synthetic local Wrangler DOs and Chromium's real IndexedDB.
 // No customer browser/storage, no Cloudflare deploy, no UI design changes.
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {mkdirSync,readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -343,6 +343,11 @@ try{
  assert.equal(linked.shareStatus,200,'Social metadata link failed');
  assert.equal(linked.listStatus,200,'Original menu source list not connected');
  assert.equal(linked.items.length,1,'Issued link is missing from real account list');
+ const issuedShareHash=createHash('sha256').update(linked.link.split('/').at(-1)).digest('hex');
+ assert.equal(linked.items[0].id,issuedShareHash,
+   'Link issued to this browser must match its exact owner account share hash');
+ assert.equal(linked.items[0].revoked_at,null,
+   'Newly issued capability must start unrevoked');
  assert.equal(linked.items[0].memory_id,a.id,
    'Real server social record must refer back to original IndexedDB story');
  const given=await page.evaluate(async({storyId,recipientId})=>{
@@ -424,11 +429,20 @@ try{
    'Original menu must resolve real link to LOCAL story title, not a remote copy');
  // Click the APPROVED original revoke control, never a replacement UI.
  await revoke.click();
- await page.waitForFunction(async()=>{
-   const r=await fetch('/api/shares',{credentials:'same-origin'});
+ await page.waitForFunction(async hash=>{
+   const r=await fetch('/api/shares',{credentials:'same-origin',cache:'no-store'});
    if(!r.ok)return false;
-   return (await r.json()).items?.some(x=>x.revoked_at!==null);
- },null,{timeout:15000});
+   return (await r.json()).items?.some(x=>x.id===hash&&x.revoked_at!==null);
+ },issuedShareHash,{timeout:15000});
+ const revokedProof=await page.evaluate(async hash=>{
+   const r=await fetch('/api/shares',{credentials:'same-origin',cache:'no-store'});
+   const rows=(await r.json()).items||[];
+   const row=rows.find(x=>x.id===hash);
+   return {status:r.status,matchingRows:rows.filter(x=>x.id===hash).length,
+     revoked:row?.revoked_at!==null&&row?.revoked_at!==undefined};
+ },issuedShareHash);
+ assert.deepEqual(revokedProof,{status:200,matchingRows:1,revoked:true},
+   'Only the exact issued capability may be considered revoked');
  const cachedRead=await page.evaluate(async link=>{
    const response=await fetch(link,{credentials:'same-origin'});
    return {status:response.status,contentType:response.headers.get('content-type')||'',

@@ -245,7 +245,11 @@ try{
        const b=triggers.find(n=>n.getBoundingClientRect().width>0&&
          n.getBoundingClientRect().height>0);
        if(b)b.click();
-       return {candidates,tapped:!!b};
+       const labelNodes=[...document.querySelectorAll('body *')]
+         .filter(e=>e.children.length===0&&/^(meer|more)$/i.test((e.textContent||'').trim()))
+         .slice(0,4).map(e=>({leaf:e.outerHTML.slice(0,260),
+           parent:e.parentElement?.outerHTML.slice(0,950)}));
+       return {candidates,tapped:!!b,labelNodes};
      });
      await page.waitForTimeout(700);
      const after=await page.evaluate(()=>({
@@ -398,10 +402,25 @@ try{
    return (await r.json()).items?.some(x=>x.revoked_at!==null);
  },null,{timeout:15000});
  const revokedLink=await page.evaluate(async link=>{
-   const r=await fetch(link,{credentials:'same-origin'});
-   return r.status;
+   const r=await fetch(link,{credentials:'same-origin',cache:'no-store'});
+   const contentType=r.headers.get('content-type')||'';
+   const text=(await r.text()).slice(0,70);
+   return {status:r.status,contentType,bodyPrefix:text};
  },linked.link);
- assert.equal(revokedLink,403,
+ // Distinguish service-worker caching from real shared-link authorization.
+ const rawResponse=await page.request.get(origin+linked.link,{
+   headers:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'},
+   failOnStatusCode:false
+ });
+ const rawInfo={status:rawResponse.status(),
+   contentType:rawResponse.headers()['content-type']||'',
+   bodyPrefix:(await rawResponse.text()).slice(0,70)};
+ console.log('TALERA_F5_REVOKED_SHARE_NETWORK_DIAGNOSTIC',JSON.stringify({
+   browser:revokedLink,direct:rawInfo
+ }));
+ assert.equal(rawInfo.status,403,
+   'Direct network MUST reject revoked share, independent of PWA service worker');
+ assert.equal(revokedLink.status,403,
    'Original account menu revoke MUST prevent reuse of real share capability');
  await page.locator('#talera-more-menu [data-action="close"]').first().click();
  console.log('TALERA_F5_ACTUAL_MINE_MENU_LOCAL_SOCIAL',JSON.stringify({

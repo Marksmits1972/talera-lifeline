@@ -249,7 +249,17 @@ try{
          .filter(e=>e.children.length===0&&/^(meer|more)$/i.test((e.textContent||'').trim()))
          .slice(0,4).map(e=>({leaf:e.outerHTML.slice(0,260),
            parent:e.parentElement?.outerHTML.slice(0,950)}));
-       return {candidates,tapped:!!b,labelNodes};
+       const textNodes=[];
+       const tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+       while(tw.nextNode()&&textNodes.length<4){
+         const value=(tw.currentNode.textContent||'').trim();
+         if(/^(meer|more)$/i.test(value)){
+           const p=tw.currentNode.parentElement;
+           textNodes.push({value,parent:p?.outerHTML.slice(0,700),
+             grandparent:p?.parentElement?.outerHTML.slice(0,1200)});
+         }
+       }
+       return {candidates,tapped:!!b,labelNodes,textNodes};
      });
      await page.waitForTimeout(700);
      const after=await page.evaluate(()=>({
@@ -401,6 +411,12 @@ try{
    if(!r.ok)return false;
    return (await r.json()).items?.some(x=>x.revoked_at!==null);
  },null,{timeout:15000});
+ const cachedRead=await page.evaluate(async link=>{
+   const response=await fetch(link,{credentials:'same-origin'});
+   return {status:response.status,contentType:response.headers.get('content-type')||'',
+     bodyPrefix:(await response.text()).slice(0,70)};
+ },linked.link);
+ console.log('TALERA_F5_REVOKED_SHARE_DEFAULT_BROWSER_FETCH',JSON.stringify(cachedRead));
  const revokedLink=await page.evaluate(async link=>{
    const r=await fetch(link,{credentials:'same-origin',cache:'no-store'});
    const contentType=r.headers.get('content-type')||'';

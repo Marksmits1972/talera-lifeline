@@ -25,7 +25,7 @@ jobs:
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: c793b117c6783b346a79915ae59331e8323b754efe99e6f374e23c0965969130
-      F5_PREVIOUS_VERSION: f5d2f7ce-2cfb-481e-8d13-095545d6860f
+      F5_PREVIOUS_VERSION: cb817753-6807-496c-aeec-dc632d4884c0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,6 +41,7 @@ jobs:
           git merge-base --is-ancestor 4ba7829aac46145487a61d95fff31925bf069117 HEAD
           git merge-base --is-ancestor 5bec152f1984078e06a59fa08e571cf5951b7ad9 HEAD
           git merge-base --is-ancestor a1c39e532c36894609f980fee0242eb1e6f59922 HEAD
+          git merge-base --is-ancestor 0be78b8346f982237db65dc4ca81efcef48efc97 HEAD
           git diff --exit-code 4ba7829aac46145487a61d95fff31925bf069117 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-editor-video-mute-guard.mjs
           test -n "$CLOUDFLARE_API_TOKEN"
           CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
@@ -137,7 +138,7 @@ jobs:
           set -euo pipefail
           sleep 7
           curl --max-time 20 -fsS "https://$F5_STAGE_HOST/__f5/health" > /tmp/f5-backup-health.json
-          node -e "const x=require('/tmp/f5-backup-health.json');if(!x.ok||!x.syntheticOnly||x.officialTaleraConnected!==false||x.tenMillionProven!==false)process.exit(1)"
+          node -e "const x=require('/tmp/f5-backup-health.json');if(!x.ok||x.closedQa!==true||x.personalRegistrationPilot!==true||x.realAccountsCertified!==false||x.officialTaleraConnected!==false||x.tenMillionProven!==false)process.exit(1)"
           for path in /mijn-leven / '/present?talera_menu=hub' /__f5/backup '/__f5/backup?utm_source=chatgpt' /__f5/backup-controller.mjs /__f5/f5-portable-idb.mjs; do
             code="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$path")"
             test "$code" = 403

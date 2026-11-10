@@ -5,17 +5,26 @@ import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
 import {chromium} from 'playwright';
 import {localBackupPage} from './f5-local-backup-page.mjs';
+import {privateAccountScope} from './f5-local-scope.mjs';
 const prefix='r20-dev/free-10m-f5/';
-const dbA='talera-free-local-'+'a'.repeat(32)+'-v1';
-const dbB='talera-free-local-'+'b'.repeat(32)+'-v1';
+const accountA='11111111-1111-4111-8111-111111111111';
+const accountB='22222222-2222-4222-8222-222222222222';
+const dbA='talera-free-local-'+(await privateAccountScope(accountA)).slice(0,32)+'-v1';
+const dbB='talera-free-local-'+(await privateAccountScope(accountB)).slice(0,32)+'-v1';
+const currentAccount=new Map([[8865,accountA],[8866,accountB]]);
 const originA='http://127.0.0.1:8865',originB='http://127.0.0.1:8866';
-let serverA,serverB,browser,posts=0;
+let serverA,serverB,browser,posts=0,accountReads=0;
 function serve(port,db){
  const names=new Set(['f5-backup-controller.mjs','f5-portable-idb.mjs','f5-portable-archive.mjs']);
  const srv=createServer((req,res)=>{
   if(req.method!=='GET'){posts++;res.writeHead(405).end();return}
   res.setHeader('cache-control','no-store');
   res.setHeader('x-content-type-options','nosniff');
+  if(req.url==='/api/me'){
+   accountReads++;
+   res.setHeader('content-type','application/json');
+   res.end(JSON.stringify({ok:true,account:{id:currentAccount.get(port)}}));return;
+  }
   if(req.url==='/__f5/backup'){
    res.setHeader('content-type','text/html; charset=utf-8');
    res.end(localBackupPage(db));return;
@@ -116,6 +125,15 @@ try{
  await b.locator('#preview-restore').click();
  await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('MEDIA_CHECKSUM'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
+ // Simulate a different account logging in while this old page stays open.
+ // The UI must fail closed rather than export the previous account's library.
+ currentAccount.set(8866,accountA);
+ await b.locator('#restore-file').setInputFiles({name:'opnieuw.talera',
+  mimeType:'application/octet-stream',buffer:fileBytes});
+ await b.locator('#preview-restore').click();
+ await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('ACCOUNT_CHANGED'));
+ assert.equal(await b.locator('#run-restore').isDisabled(),true);
+ assert.ok(accountReads>=4,'Every archive action must check current account session');
  assert.equal(posts,0,'No archive or media sent to any server POST');
  assert.deepEqual(errors,[],'No browser errors allowed');
  console.log('TALERA_FREE_F5_BACKUP_UI_TWO_ORIGINS_PASS',JSON.stringify({

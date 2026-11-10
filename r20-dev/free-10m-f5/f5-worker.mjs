@@ -108,7 +108,7 @@ async function qaEntry(env){
   const ticket=signed+'.'+await qaSignature(env,'qa-entry:'+signed);
   const html='<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>TALERA Free besloten test</title><body style="max-width:480px;margin:12vh auto;padding:24px;font-family:system-ui">'+
-    '<h1>TALERA Free — testversie</h1><p>Alleen voor de afgesloten test. Geen echte accounts gebruiken.</p>'+
+    '<h1>TALERA Free — beveiligde ontwikkeltoegang</h1><p>Deze ene Free-app is nog niet openbaar vrijgegeven. Registratie en aanmelden gebruiken het bestaande Free-accountsysteem.</p>'+
     '<form action="/__f5/entry" method="post">'+
     '<input type="hidden" name="csrf" value="'+ticket+'">'+
     '<label>Testtoegang <input type="password" name="key" autocomplete="off" required maxlength="64" style="display:block;width:100%;padding:12px;margin:12px 0"></label>'+
@@ -173,7 +173,7 @@ function easyEntryPage(){
   <meta name="referrer" content="no-referrer">
   <title>TALERA Free – directe test</title>
   <body style="font:16px system-ui;max-width:500px;margin:12vh auto;padding:24px">
-  <h2>TALERA Free</h2><p id="status" role="status">De testversie wordt geopend…</p>
+  <h2>TALERA Free</h2><p id="status" role="status">De beveiligde app wordt geopend…</p>
   <script>
   (async()=>{
     const status=document.getElementById('status');
@@ -589,7 +589,8 @@ export default {
   async fetch(request,env){
     const url=new URL(request.url),p=url.pathname,m=request.method;
     if(p==='/__f5/health'&&m==='GET')
-      return json({ok:true,stage:'F5-isolated-integration',syntheticOnly:true,
+      return json({ok:true,stage:'F5-closed-integration',closedQa:true,
+        personalRegistrationPilot:true,realAccountsCertified:false,
         officialTaleraConnected:false,loggedInPwaCertified:false,tenMillionProven:false});
     // Closed pilot. Cloudflare Access/browser access requires separate acceptance.
     if(!HEX64.test(env.STAGING_F5_KEY||'')||

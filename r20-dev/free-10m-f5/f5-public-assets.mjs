@@ -112,10 +112,105 @@ function fixPhotoOnlyPresentation(original){
    'Ordinary presentation manual photo source changed unexpectedly');
  return result;
 }
+// V13's REAL 11-page wheel, not the older three-page controller. On the
+// first return to a just-saved local photo it hid a page while its Blob was
+// still decoding and then forcibly removed the wheel after 1400 ms. Preserve
+// the existing wheel, order, velocity, and gesture handlers. Keep an already
+// loaded photo painted until the target is ready; never expose a white page.
+function fixFirstSwipePhotoLoad(html){
+ const replace=(original,replacement,what)=>{
+  assert.equal(html.split(original).length,2,'F5_WHEEL_SOURCE_DRIFT_'+what);
+  html=html.replace(original,replacement);
+ };
+ const oldAssign=[
+ "  function assign(tile,index,mem){",
+ "    if(tile.index===index&&tile.el.dataset.url===(mem?.previewImage||mem?.thumbnail||mem?.image))return;",
+ "    tile.index=index;",
+ "    if(!mem||!mem.image){tile.el.style.visibility='hidden';return;}",
+ "    const url=mem.previewImage||mem.thumbnail||mem.image;",
+ "    tile.el.dataset.url=url;tile.el.style.visibility='hidden';",
+ "    const onload=()=>{",
+ "      if(tile.el.dataset.url!==url)return;",
+ "      try{fitNode(tile.sharp,tile.blur,dimension(),stage.getBoundingClientRect().height);}catch(e){}",
+ "      tile.el.style.visibility='visible';",
+ "    };",
+ "    tile.sharp.onload=onload;",
+ "    if(tile.back&&tile.back.src!==url)tile.back.src=url;",
+ "    if(tile.blur&&tile.blur.src!==url)tile.blur.src=url;",
+ "    if(tile.sharp.src!==url)tile.sharp.src=url;",
+ "    if(tile.sharp.complete&&tile.sharp.naturalWidth)onload();",
+ "  }"
+ ].join('\n');
+ const newAssign=[
+ "  function assign(tile,index,mem){",
+ "    if(tile.index===index&&tile.el.dataset.url===(mem?.previewImage||mem?.thumbnail||mem?.image))return;",
+ "    tile.index=index;",
+ "    if(!mem||!mem.image){tile.el.style.visibility='hidden';return;}",
+ "    const url=mem.previewImage||mem.thumbnail||mem.image;",
+ "    tile.el.dataset.url=url;",
+ "    // An existing painted photo stays visible while the new local Blob decodes.",
+ "    // This is only a temporary handoff; no new photo or story is created.",
+ "    const base=document.getElementById('memoryPhotoA');",
+ "    const fallback=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):null;",
+ "    if(tile.sharp.src===url&&tile.sharp.complete&&tile.sharp.naturalWidth){",
+ "      try{fitNode(tile.sharp,tile.blur,dimension(),stage.getBoundingClientRect().height);}catch(e){}",
+ "      tile.el.style.visibility='visible';return;",
+ "    }",
+ "    if(fallback){",
+ "      if(tile.sharp.src!==fallback)tile.sharp.src=fallback;",
+ "      if(tile.back&&tile.back.src!==fallback)tile.back.src=fallback;",
+ "      if(tile.blur&&tile.blur.src!==fallback)tile.blur.src=fallback;",
+ "      tile.el.style.visibility='visible';",
+ "    }else{",
+ "      tile.el.style.visibility=tile.sharp.complete&&tile.sharp.naturalWidth?'visible':'hidden';",
+ "    }",
+ "    const cached=cache.get(mem.id);",
+ "    const img=cached?.src===url?cached:new Image();",
+ "    if(img!==cached){",
+ "      img.decoding='async';img.src=url;cache.set(mem.id,img);",
+ "      if(cache.size>35)cache.delete(cache.keys().next().value);",
+ "    }",
+ "    const install=()=>{",
+ "      if(tile.index!==index||tile.el.dataset.url!==url||!img.naturalWidth)return;",
+ "      const painted=()=>{",
+ "        if(tile.index!==index||tile.el.dataset.url!==url)return;",
+ "        try{fitNode(tile.sharp,tile.blur,dimension(),stage.getBoundingClientRect().height);}catch(e){}",
+ "        if(tile.back&&tile.back.src!==url)tile.back.src=url;",
+ "        if(tile.blur&&tile.blur.src!==url)tile.blur.src=url;",
+ "        tile.el.style.visibility='visible';",
+ "      };",
+ "      tile.sharp.onload=painted;",
+ "      if(tile.sharp.src!==url)tile.sharp.src=url;",
+ "      if(tile.sharp.complete&&tile.sharp.naturalWidth)painted();",
+ "    };",
+ "    const decoded=()=>{",
+ "      if(typeof img.decode==='function')img.decode().then(install,()=>{if(img.naturalWidth)install()});",
+ "      else install();",
+ "    };",
+ "    if(img.complete&&img.naturalWidth)decoded();",
+ "    else img.addEventListener('load',decoded,{once:true});",
+ "  }"
+ ].join('\n');
+ replace(oldAssign,newAssign,'ASSIGN');
+ const before="    if(current&&current.complete&&current.naturalWidth)requestAnimationFrame(finish);\n"+
+  "    else if(current){current.addEventListener('load',finish,{once:true});setTimeout(finish,1400);}\n"+
+  "    else requestAnimationFrame(finish);";
+ const after="    // Never expose a white base photo when a freshly saved iPhone image needs\n"+
+  "    // longer than 1400 ms to load. The existing wheel remains the painted\n"+
+  "    // surface until the actual selected image has loaded.\n"+
+  "    if(current&&current.complete&&current.naturalWidth)requestAnimationFrame(finish);\n"+
+  "    else if(current)current.addEventListener('load',finish,{once:true});\n"+
+  "    else requestAnimationFrame(finish);";
+ replace(before,after,'COMMIT');
+ assert.ok(html.includes("const N=11,pages=[],cache=new Map()"),
+  'Must patch only the already existing 11-page wheel');
+ return html;
+}
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
+ if(route==='/present')html=fixFirstSwipePhotoLoad(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  const hash=sha(html),file=hash+'.html';

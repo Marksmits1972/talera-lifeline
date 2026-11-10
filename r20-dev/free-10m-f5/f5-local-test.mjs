@@ -121,6 +121,13 @@ async function run(){
   assert.equal(shell.stage,'anonymous-snapshot-only');
   assert.equal(shell.cache,'private, no-store');
   assert.ok(String(shell.data).length>10000,'Real copied TALERA anonymous HTML expected');
+  // Protect the already iPhone-accepted original present back button:
+  // original href='/' must retain its private same-origin home redirect.
+  const backDenied=await fetch(origin+'/',{redirect:'manual'});
+  assert.equal(backDenied.status,403,'Root must never bypass private F5 gate');
+  const backOk=await fetch(origin+'/',{redirect:'manual',headers:{'x-talera-f5-key':f5}});
+  assert.equal(backOk.status,302,'Original back navigation must remain enabled');
+  assert.equal(backOk.headers.get('location'),'/mijn-leven');
   const identities=[];
   for(let i=0;i<users.length;i++){
     const r=await request('POST','/api/register',{

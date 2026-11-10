@@ -91,7 +91,7 @@ await assert.rejects(()=>decodeFreeArchive(corruptLarge),/MEDIA_CHECKSUM/);
 
 // Verify existing v1 archives remain restorable after the v2 change.
 const enc=new TextEncoder();
-const md=enc.encode('TALERA-FREE-LOCAL-V1\\n');
+const md=enc.encode('TALERA-FREE-LOCAL-V1\n');
 const legacyMedia=enc.encode('old-binary-payload');
 const h=async b=>new Uint8Array(await crypto.subtle.digest('SHA-256',b));
 const digest=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');

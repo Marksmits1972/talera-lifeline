@@ -72,3 +72,6 @@ restore.addEventListener('click',async()=>{
  }finally{confirm.disabled=false;preview.disabled=false}
 });
 window.addEventListener('pagehide',()=>{if(downloadUrl)URL.revokeObjectURL(downloadUrl)});
+make.disabled=false;
+preview.disabled=false;
+root.dataset.ready='yes';

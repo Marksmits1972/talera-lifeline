@@ -3,7 +3,7 @@
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions} from './f5-account-switch-guard.mjs';
-import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync,copyFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +16,13 @@ const sha=buf=>createHash('sha256').update(buf).digest('hex');
 mkdirSync(generated,{recursive:true});
 mkdirSync(path.join(publicDir,'__talera_free','f5references'),{recursive:true});
 mkdirSync(path.join(publicDir,'__talera_free','f5scripts'),{recursive:true});
+// Isolated, authenticated F5-only archive modules. Direct public asset URLs
+// remain behind Worker-first gate. Never inject into approved TALERA pages.
+const backupAssets=path.join(publicDir,'__talera_free','f5backup');
+mkdirSync(backupAssets,{recursive:true});
+for(const name of ['f5-portable-idb.mjs','f5-portable-archive.mjs','f5-backup-controller.mjs']){
+ copyFileSync(path.join(here,name),path.join(backupAssets,name));
+}
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  const html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');

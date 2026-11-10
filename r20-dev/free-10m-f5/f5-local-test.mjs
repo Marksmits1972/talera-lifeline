@@ -233,34 +233,55 @@ async function run(){
     redirect:'manual'
   });
   const easyResult=await fast.json();
-  assert.equal(fast.status,200,'One-click account provisioning must succeed');
-  assert.equal(easyResult.syntheticOnly,true);
+  assert.equal(fast.status,200,'One-click browser authorization must succeed');
+  assert.equal(easyResult.accountCreated,false,
+    'Private access must NEVER invent an identity');
+  assert.equal(easyResult.reusedExistingSession,false);
   const easyCookies=(typeof fast.headers.getSetCookie==='function'?
     fast.headers.getSetCookie():[fast.headers.get('set-cookie')||'']).join('; ');
-  const quickSession=/talera_sid=([a-f0-9]{64})/.exec(easyCookies)?.[0];
   const quickQa=/talera_f5_access=([0-9.]+[a-f0-9.]+)/.exec(easyCookies)?.[0];
-  assert.ok(quickSession&&quickQa,'Quickstart sets both private session and QA cookies');
+  assert.ok(quickQa,'Invitation grants only signed QA browser access');
+  assert.ok(!easyCookies.includes('talera_sid='),
+    'Invitation must never set an account session cookie');
+  const visitor=await request('GET','/mijn-leven',{gate:false,cookie:quickQa});
+  assert.equal(visitor.status,200,'After invitation original Free signup/login remains available');
+  assert.equal(visitor.stage,'anonymous-snapshot-only');
+  assert.equal((await request('GET','/api/me',{gate:false,cookie:quickQa})).status,401,
+    'Visitor is not secretly registered as a fictitious user');
+  // Registration happens in the EXISTING same-origin UI/API after authorization.
+  // Synthetic values are only integration-test INPUT, not a test account
+  // auto-created for a real iPhone visitor.
+  const registered=await request('POST','/api/register',{
+    gate:false,cookie:quickQa,ip:'192.0.2.77',
+    body:{email:'f5-qa-manual@example.invalid',username:'f5-qa-manual',
+      displayName:'F5 vrijwillige registratie',password:'Fake_Test_Password_1011',
+      birthDate:'1974-04-02'}
+  });
+  assert.equal(registered.status,200,'Owner can voluntarily register using original API');
+  const quickSession=cookieOf(registered);
+  assert.equal(registered.data.account.birthDate,'1974-04-02');
   const personal=await request('GET','/mijn-leven',{gate:false,
     cookie:quickSession+'; '+quickQa});
-  assert.equal(personal.status,200,'One tap leads straight into personal Free timeline');
+  assert.equal(personal.status,200,'Manual registration opens original personal Free timeline');
   assert.equal(personal.stage,'personalized-durable-account');
+  const manualId=registered.data.account.id;
   assert.equal((await request('GET','/api/me',{gate:false,
-    cookie:quickSession+'; '+quickQa})).data.account.birthDate,'1974-04-02');
+    cookie:quickSession+'; '+quickQa})).data.account.id,manualId);
   const revisit=await fetch(origin+'/__f5/start',{
     method:'POST',
     headers:{origin,'cf-connecting-ip':'192.0.2.77',
-      'content-type':'application/json',
-      cookie:quickSession+'; '+quickQa},
+      'content-type':'application/json',cookie:quickSession+'; '+quickQa},
     body:JSON.stringify({invite:'b'.repeat(64)}),redirect:'manual'
   });
   const reopened=await revisit.json();
-  assert.equal(revisit.status,200,'iPhone one-tap invitation can be reopened');
+  assert.equal(revisit.status,200,'Invitation can be reopened without another account');
   assert.equal(reopened.reusedExistingSession,true,
-    'Reopening one-tap link MUST retain original account and its saved media');
+    'Reopening invitation preserves independently registered account');
+  assert.equal(reopened.accountCreated,false);
   assert.ok(!(revisit.headers.get('set-cookie')||'').includes('talera_sid='),
-    'Never overwrite existing iPhone account session with a fresh fake user');
+    'Invitations must never replace original personal login');
   assert.equal((await request('GET','/api/me',{
-    gate:false,cookie:quickSession+'; '+quickQa})).data.account.birthDate,'1974-04-02');
+    gate:false,cookie:quickSession+'; '+quickQa})).data.account.id,manualId);
 
   const signedHome=await request('GET','/mijn-leven',{
     gate:false,cookie:identities[0].cookie+'; '+qaCookie});

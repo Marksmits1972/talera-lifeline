@@ -31,10 +31,15 @@ function isPlain(v){
  const p=Object.getPrototypeOf(v);
  return p===Object.prototype||p===null;
 }
-export async function createFreeArchive({stories,files,sourceScope,createdAt='2026-11-09T00:00:00.000Z'}){
+export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=null,createdAt='2026-11-09T00:00:00.000Z'}){
  ensure(Array.isArray(stories)&&Array.isArray(files),'INVALID_STORES');
  ensure(stories.length+files.length<=MAX_RECORDS,'TOO_MANY_RECORDS');
  ensure(typeof sourceScope==='string'&&sourceScope.length>5&&sourceScope.length<200,'INVALID_SCOPE');
+ if(sourceOrigin!==null){
+  ensure(typeof sourceOrigin==='string'&&sourceOrigin.length<250,'INVALID_ORIGIN');
+  let u;try{u=new URL(sourceOrigin)}catch{throw Error('TALERA_ARCHIVE_INVALID_ORIGIN')}
+  ensure(u.origin===sourceOrigin&&['https:','http:'].includes(u.protocol),'INVALID_ORIGIN');
+ }
  ensure(!Number.isNaN(Date.parse(createdAt)),'INVALID_DATE');
  const binaries=[],chunks=[];
  const seen=new WeakSet();
@@ -97,6 +102,7 @@ export async function createFreeArchive({stories,files,sourceScope,createdAt='20
  const body={
   schema:'talera-free-lossless-local-2',
   sourceScope,
+  sourceOrigin,
   createdAt,
   stories:await encodeStore(stories,'stories'),
   files:await encodeStore(files,'files'),
@@ -126,6 +132,12 @@ export async function inspectFreeArchive(archive){
  const legacy=parsed?.schema==='talera-free-lossless-local-1';
  ensure(legacy||parsed?.schema==='talera-free-lossless-local-2','UNSUPPORTED_VERSION');
  ensure(typeof parsed.sourceScope==='string'&&parsed.sourceScope.length>5,'INVALID_SCOPE');
+ const provenance=parsed.sourceOrigin;
+ if(provenance!==undefined&&provenance!==null){
+  let u;try{u=new URL(provenance)}catch{throw Error('TALERA_ARCHIVE_INVALID_ORIGIN')}
+  ensure(typeof provenance==='string'&&provenance.length<250&&
+    provenance===u.origin&&['https:','http:'].includes(u.protocol),'INVALID_ORIGIN');
+ }
  ensure(Array.isArray(parsed.stories)&&Array.isArray(parsed.files)&&Array.isArray(parsed.binaries),'INVALID_STORES');
  ensure(parsed.stories.length+parsed.files.length<=MAX_RECORDS,'TOO_MANY_RECORDS');
  let offset=end;
@@ -147,7 +159,7 @@ export async function inspectFreeArchive(archive){
   offset+=bin.length;
  }
  ensure(offset===archive.size,'EXTRA_BYTES');
- return {sourceScope:parsed.sourceScope,createdAt:parsed.createdAt,
+ return {sourceScope:parsed.sourceScope,sourceOrigin:parsed.sourceOrigin??null,createdAt:parsed.createdAt,
   stories:parsed.stories.length,files:parsed.files.length,binaries:parsed.binaries.length,
   binaryBytes:parsed.binaries.reduce((total,b)=>total+b.length,0),
   parsed};
@@ -219,6 +231,6 @@ export async function decodeFreeArchive(archive){
    ensure(typeof item?.key==='string'&&keys.has(item.key),'MISSING_STORY_MEDIA');
   }
  }
- return {sourceScope:p.sourceScope,createdAt:p.createdAt,stories,files,
+ return {sourceScope:p.sourceScope,sourceOrigin:p.sourceOrigin??null,createdAt:p.createdAt,stories,files,
   verifiedBinaryCount:p.binaries.length};
 }

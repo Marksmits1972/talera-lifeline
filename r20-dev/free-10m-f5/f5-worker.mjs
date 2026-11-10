@@ -26,6 +26,13 @@ export {
 
 const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
+// iOS fetches install icons independently of the browser login cookie.
+// Expose ONLY the three non-personal original logo images and PWA manifest.
+// All app pages, accounts, media, backups and APIs remain behind the QA gate.
+const PUBLIC_INSTALL_ICON_PATHS=new Set([
+ '/apple-touch-icon.png','/pwa-192.png','/pwa-512.png',
+ '/manifest.webmanifest'
+]);
 // Separate opt-in QA page, not linked into original approved TALERA interface.
 const BACKUP_MODULES=Object.freeze({
  '/__f5/f5-portable-idb.mjs':'f5-portable-idb.mjs',
@@ -603,6 +610,8 @@ export default {
     if(p==='/__f5/start'&&m==='POST')return easyStart(request,env);
     if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
+    if(m==='GET'&&PUBLIC_INSTALL_ICON_PATHS.has(p))
+      return publicPwaSupport(request,env);
     if(!await hasQaAccess(request,env))return deny();
     // Preserve the ALREADY iPhone-approved 9-November original back route.
     // It must never regress when the separate local-backup branch is merged.

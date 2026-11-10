@@ -228,6 +228,38 @@ try{
         text:(x.textContent||'').slice(0,28)}))
    }));
    console.log('TALERA_F5_ACCOUNT_MENU_ROUTE_PROBE',JSON.stringify({route,...check}));
+   if(route==='/mijn-leven'){
+     // The home-screen Meer tap was not covered by the old successful menu
+     // test, which fell back to /present. Record the REAL home entry behavior
+     // without changing its handlers, routes, design or account.
+     const tap=await page.evaluate(()=>{
+       const triggers=[...document.querySelectorAll('button,a,[role="button"]')]
+         .filter(n=>/^(meer|more)$|^(•••\\s*)?(meer|more)$|\\bmeer\\b|\\bmore\\b/i.test(
+           [n.getAttribute('aria-label')||'',n.textContent||''].join(' ').trim()))
+         .filter(n=>!n.closest('#talera-more-menu'));
+       const candidates=triggers.slice(0,8).map(n=>({
+         tag:n.tagName,id:n.id,text:(n.textContent||'').trim().slice(0,65),
+         aria:n.getAttribute('aria-label'),href:n.getAttribute('href'),
+         dataAction:n.getAttribute('data-action'),html:n.outerHTML.slice(0,450)
+       }));
+       const b=triggers.find(n=>n.getBoundingClientRect().width>0&&
+         n.getBoundingClientRect().height>0);
+       if(b)b.click();
+       return {candidates,tapped:!!b};
+     });
+     await page.waitForTimeout(700);
+     const after=await page.evaluate(()=>({
+       href:location.href,
+       menuExists:!!document.getElementById('talera-more-menu'),
+       menuVisible:!!document.getElementById('talera-more-menu')&&
+         !document.getElementById('talera-more-menu').hidden,
+       bodyEnd:(document.body?.innerText||'').slice(-420)
+     }));
+     console.log('TALERA_F5_HOME_MORE_ACTUAL_NAV_DIAGNOSTIC',JSON.stringify({
+       tap,after
+     }));
+   }
+
    if(check.menu&&check.library==='function'){activeRoute=route;break}
  }
  assert.ok(activeRoute,

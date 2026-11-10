@@ -149,6 +149,22 @@ async function run(){
   assert.match(String(backupOwner.data),/niet versleuteld/);
   const matchedDb=/data-database="(talera-free-local-[a-f0-9]{32}-v1)"/.exec(String(backupOwner.data));
   assert.ok(matchedDb,'Backup scope must be derived by server from verified session');
+  // iOS in-app browsers may attach link-opening query tags. Such tags
+  // cannot select another private library or bypass QA/account security.
+  const annotatedRoute='/__f5/backup?utm_source=chatgpt&openExternalBrowser=1';
+  assert.equal((await request('GET',annotatedRoute,{gate:false})).status,403,
+    'Tracking tags must never bypass private QA gate');
+  assert.equal((await request('GET',annotatedRoute)).status,401,
+    'Authenticated account is still required with navigation tags');
+  const taggedBackup=await request('GET',annotatedRoute,{cookie:identities[0].cookie});
+  assert.equal(taggedBackup.status,200,'iPhone annotated backup URL should open');
+  assert.equal(taggedBackup.cache,'private, no-store');
+  assert.ok(String(taggedBackup.data).includes('data-database="'+matchedDb[1]+'"'),
+    'Tracking params must never alter the verified local database name');
+  assert.equal((await request('GET','/mijn-leven?utm_source=chatgpt',
+    {cookie:identities[0].cookie})).status,404,
+    'Do not expand existing official home page query allowlist');
+
   const backupOther=await request('GET','/__f5/backup',{cookie:identities[1].cookie});
   assert.equal(backupOther.status,200);
   const otherDb=/data-database="(talera-free-local-[a-f0-9]{32}-v1)"/.exec(String(backupOther.data));

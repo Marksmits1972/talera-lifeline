@@ -59,8 +59,8 @@ jobs:
           set -euo pipefail
           BASE=e22ee597fd25bb277e17a9c8377afb3ea5d6c8d2
           git diff --name-only "$BASE" HEAD > /tmp/changed-files
-          if grep -Ev '^(.github/workflows/talera-free-f5-portable-archive-qa.yml|r20-dev/free-10m-f5/(f5-portable-archive.mjs|f5-portable-idb.mjs|f5-public-assets.mjs|f5-worker.mjs|f5-local-test.mjs|f5-local-backup-page.mjs|f5-backup-controller.mjs|f5-backup-ui.browser.test.mjs))
- /tmp/changed-files; then
+          printf '%s\\n' '.github/workflows/talera-free-f5-portable-archive-qa.yml' 'r20-dev/free-10m-f5/f5-portable-archive.mjs' 'r20-dev/free-10m-f5/f5-portable-idb.mjs' 'r20-dev/free-10m-f5/f5-public-assets.mjs' 'r20-dev/free-10m-f5/f5-worker.mjs' 'r20-dev/free-10m-f5/f5-local-test.mjs' 'r20-dev/free-10m-f5/f5-local-backup-page.mjs' 'r20-dev/free-10m-f5/f5-backup-controller.mjs' 'r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs' > /tmp/allowed-files
+          if comm -23 <(sort /tmp/changed-files) <(sort /tmp/allowed-files) | grep .; then
             echo 'Unexpected TALERA modification; abort'
             exit 1
           fi

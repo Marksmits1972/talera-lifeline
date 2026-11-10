@@ -49,6 +49,8 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps chromium
+      - name: Test original 'Meer' button and real account separation in same Free app
+        run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
       - name: Restore synthetic archive between two real browser origins without overwriting other memories
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
       - name: Test voluntary UI backup + conflict-safe restore across real browser origins

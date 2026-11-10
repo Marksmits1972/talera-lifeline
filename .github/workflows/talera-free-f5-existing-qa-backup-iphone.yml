@@ -1,4 +1,4 @@
-name: TALERA Free F5 - no white first-swipe photo on SAME candidate
+name: TALERA Free F5 - local iPhone video first-frame thumbnail on SAME candidate
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: 12cf397c-1004-457a-a676-fd91ae82e1d5
+      F5_PREVIOUS_VERSION: a86ba135-4351-4d70-84ac-379f2e1a13e0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Check existing 11-page wheel image loading, presentation autoplay and account privacy (no accounts created)
+      - name: Verify first video frame poster on iPhone, previous presentation repairs and account privacy
         shell: bash
         run: |
           set -euo pipefail
@@ -167,11 +167,8 @@ jobs:
           // All browser-only photo inputs stay transient; no account or memory is created.
           const {referencePages:refs}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
           const readRef=route=>fs.readFileSync(path.join(root,refs[route].replace(/^\//,'')),'utf8');
-          for(const route of ['/mijn-leven','/tell']){
-            const original=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-'+
-              (route==='/tell'?'tell':'mijn-leven')+'.html','utf8');
-            assert.equal(readRef(route),original,'Only /present may change');
-          }
+          const originalHome=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-mijn-leven.html','utf8');
+          assert.equal(readRef('/mijn-leven'),originalHome,'Home must stay byte-for-byte unchanged');
           const before=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-present.html','utf8');
           const present=readRef('/present');
           assert.ok(before.includes('    scheduleAuto(memory);\n  });'),'Original timer source missing');
@@ -267,6 +264,82 @@ jobs:
           assert.equal(back.src,'newly-uploaded-local-blob');
           assert.equal(blur.src,'newly-uploaded-local-blob');
           assert.ok(wheelFit.length>=1,'Previously approved photo geometry still runs');
+          // Screenshot issue: real video shows the stock grey placeholder while
+          // its first still frame never gets cached. The original file and
+          // account remain untouched; exercise only the existing JS paths.
+          const originalTell=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
+          const tell=readRef('/tell');
+          assert.ok(originalTell.includes(
+            "video.style.cssText='position:fixed;left:-10px;top:-10px;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1'"),
+            'Existing iPhone poster capture source has moved');
+          assert.ok(tell.includes(
+            "video.style.cssText='position:fixed;left:0;top:0;width:96px;height:96px;opacity:.001;pointer-events:none;z-index:-1'"),
+            'iOS preview decoder must have a real composited surface');
+          assert.ok(tell.includes("Safari Low Power Mode may reject play()"),
+            'Autoplay denied must not abort poster capture');
+          assert.ok(tell.includes("await new Promise(done=>requestAnimationFrame(()=>done()))"),
+            'Draw the decoded video frame after Safari paints it');
+          assert.ok(tell.includes("writeFiles([['preview:'+id,image]])"),
+            'Existing IndexedDB preview cache must remain');
+          assert.ok(tell.includes("key:item.key+':phone-v1'"),
+            'Existing published media-ID JPEG sidecar must remain');
+          assert.ok(tell.includes("async function taleraV61PersistMediaIds("),
+            'Narration/media-ID storage must remain');
+          assert.ok(tell.includes("function tileHtml("),
+            'Original work screen with all media tiles must remain');
+          const nativeStart=tell.indexOf('function taleraV61AttachNativeCovers(){');
+          const nativeEnd=tell.indexOf('function tileHtml(',nativeStart);
+          assert.ok(nativeStart>0&&nativeEnd>nativeStart,
+            'Original existing Safari tile fallback must be preserved');
+          const onVideoEvent={};
+          const nativeVideo={
+            style:{},readyState:2,videoWidth:640,videoHeight:360,
+            duration:2,paused:true,isConnected:false,
+            muted:false,defaultMuted:false,playsInline:false,
+            preload:'',controls:false,src:'',currentTime:0,
+            setAttribute(){},removeAttribute(){},load(){},pause(){this.paused=true},
+            addEventListener(name,fn){onVideoEvent[name]=fn},
+            play(){return Promise.reject(Object.assign(new Error('gesture required'),{
+              name:'NotAllowedError'}))},
+            remove(){this.isConnected=false}
+          };
+          const videoTiles=[{
+            dataset:{id:'existing-local-video'},
+            querySelector:()=>null,
+            appendChild(video){assert.equal(video,nativeVideo);video.isConnected=true}
+          }];
+          const sourceVideo={type:'video/mp4',size:4048,name:'original.mov'};
+          const localFiles=new Map([['existing-local-video',sourceVideo]]);
+          const posterCache=new Map();
+          let visiblePoster=null,storedPoster=null;
+          const nativeCover=new Function(
+            'document','assets','kind','previewBlobs','drawnPreview',
+            'refreshPreview','writeFiles','originalUrl','requestAnimationFrame',
+            tell.slice(nativeStart,nativeEnd)+';return taleraV61AttachNativeCovers;')(
+            {querySelectorAll:()=>videoTiles,createElement:tag=>{
+              assert.equal(tag,'video');return nativeVideo}},
+            localFiles,()=> 'video',posterCache,
+            async()=>new Blob(['first visible frame'],{type:'image/jpeg'}),
+            id=>{visiblePoster=id},
+            async files=>{storedPoster=files},
+            id=>'blob:existing-local-video',
+            callback=>callback()
+          );
+          nativeCover();
+          assert.equal(nativeVideo.src,'blob:existing-local-video');
+          assert.equal(nativeVideo.isConnected,true);
+          onVideoEvent.loadedmetadata();
+          for(let i=0;i<12;i++)await Promise.resolve();
+          assert.equal(visiblePoster,'existing-local-video',
+            'Rejected autoplay must still show and save the first-frame poster');
+          assert.ok(posterCache.has('existing-local-video'),
+            'Only the thumbnail may be cached, never another video');
+          assert.equal(posterCache.get('existing-local-video').type,'image/jpeg');
+          assert.equal(storedPoster?.[0]?.[0],'preview:existing-local-video');
+          assert.equal(localFiles.get('existing-local-video'),sourceVideo,
+            'Original local video must remain byte-for-byte unchanged');
+          assert.equal(localFiles.size,1,'No new media or account created');
+          console.log('TALERA_IPHONE_VIDEO_FIRST_FRAME_POSTER_NO_AUTOPLAY_REQUIRED');
           console.log('TALERA_FIRST_RETURN_SWIPE_NO_BLANK_UNTIL_IMAGE_LOADED');
           console.log('TALERA_PHOTO_ONLY_AUTOPLAY_LOADED_BEFORE_VISIBLE_COMMIT');
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');

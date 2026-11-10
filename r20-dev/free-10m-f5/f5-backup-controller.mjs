@@ -22,7 +22,7 @@ async function assertCurrentAccount(){
  if(!response.ok)throw Error('TALERA_BACKUP_SESSION_EXPIRED_REOPEN');
  const result=await response.json();
  const accountId=result?.account?.id;
- if(typeof accountId!=='string'||!/^\x5b0-9a-f\x5d{8}-\x5b0-9a-f\x5d{4}-\x5b0-9a-f\x5d{4}-\x5b0-9a-f\x5d{4}-\x5b0-9a-f\x5d{12}$/i.test(accountId))
+ if(typeof accountId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId))
   throw Error('TALERA_BACKUP_SESSION_UNVERIFIED');
  const bytes=new TextEncoder().encode('TALERA_FREE_BROWSER_MEMORY_V1:'+accountId.toLowerCase());
  const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));

@@ -13,6 +13,24 @@ const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore
 let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
 const message=(element,text)=>{element.textContent=text;};
 const failText=e=>e instanceof Error?e.message:String(e);
+// The backup page may stay open while the user switches accounts in another tab.
+// Revalidate the currently signed-in server identity before any local file read
+// or write. Only an account ID is fetched: original media never leaves IndexedDB.
+async function assertCurrentAccount(){
+ const response=await fetch('/api/me',{method:'GET',credentials:'same-origin',
+  cache:'no-store',redirect:'error',headers:{accept:'application/json'}});
+ if(!response.ok)throw Error('TALERA_BACKUP_SESSION_EXPIRED_REOPEN');
+ const result=await response.json();
+ const accountId=result?.account?.id;
+ if(typeof accountId!=='string'||!/^\x5b0-9a-f\x5d{8}-\x5b0-9a-f\x5d{4}-\x5b0-9a-f\x5d{4}-\x5b0-9a-f\x5d{4}-\x5b0-9a-f\x5d{12}$/i.test(accountId))
+  throw Error('TALERA_BACKUP_SESSION_UNVERIFIED');
+ const bytes=new TextEncoder().encode('TALERA_FREE_BROWSER_MEMORY_V1:'+accountId.toLowerCase());
+ const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+ const hash=Array.from(digest,b=>b.toString(16).padStart(2,'0')).join('');
+ if(db!=='talera-free-local-'+hash.slice(0,32)+'-v1')
+  throw Error('TALERA_BACKUP_ACCOUNT_CHANGED_REOPEN');
+}
+
 function invalidate(){
  review=null;reviewFile=null;reviewCross=null;restore.disabled=true;
  message(status,'Het herstelbestand moet eerst opnieuw gecontroleerd worden.');
@@ -28,6 +46,7 @@ make.addEventListener('click',async()=>{
  save.hidden=true;save.removeAttribute('href');
  message(exportStatus,'De lokale herinneringen worden gecontroleerd. Er wordt niets verzonden.');
  try{
+  await assertCurrentAccount();
   const archive=await exportExistingFreeLibrary(db);
   downloadUrl=URL.createObjectURL(archive);
   save.href=downloadUrl;
@@ -45,6 +64,7 @@ preview.addEventListener('click',async()=>{
  preview.disabled=true;
  message(status,'Bestand en originele mediabytes worden gecontroleerd. Er wordt niets geïmporteerd.');
  try{
+  await assertCurrentAccount();
   const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:cross.checked});
   review=result;reviewFile=file;reviewCross=cross.checked;
   message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en), '+
@@ -62,6 +82,7 @@ restore.addEventListener('click',async()=>{
  restore.disabled=true;confirm.disabled=true;preview.disabled=true;
  message(status,'Herstel loopt. Sluit deze pagina niet voordat het is afgerond.');
  try{
+  await assertCurrentAccount();
   const result=await restoreFreeLibrary(file,db,{allowOtherOrigin:cross.checked,confirmed:true});
   message(status,'Herstel voltooid: '+result.restoredStories+' herinnering(en), '+
    result.restoredMediaEntries+' records toegevoegd. Controleer nu zelf je herinneringen op Mijn leven. De originele bron is niet verwijderd.');

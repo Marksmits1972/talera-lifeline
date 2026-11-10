@@ -2,7 +2,7 @@
 // This module runs only on the separately authenticated /__f5/backup route.
 import {
  exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary
-} from '/__f5/backup-idb.mjs';
+} from '/__f5/f5-portable-idb.mjs';
 const el=id=>document.getElementById(id);
 const root=el('talera-free-backup'),db=root?.dataset.database;
 if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(db||''))

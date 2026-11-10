@@ -20,7 +20,8 @@ function serve(port,db){
    res.setHeader('content-type','text/html; charset=utf-8');
    res.end(localBackupPage(db));return;
   }
-  const path=req.url?.startsWith('/__f5/')?req.url.slice('/__f5/'.length):'';
+  const requested=req.url?.startsWith('/__f5/')?req.url.slice('/__f5/'.length):'';
+  const path=requested==='backup-controller.mjs'?'f5-backup-controller.mjs':requested;
   if(!names.has(path)){res.writeHead(404).end();return}
   res.setHeader('content-type','text/javascript; charset=utf-8');
   res.end(readFileSync(prefix+path,'utf8'));

@@ -24,7 +24,7 @@ label{display:block;margin:12px 0}.note{font-size:.93rem}output{display:block;wh
 <p><strong>Privacy:</strong> het exportbestand is <strong>niet versleuteld</strong> en bevat volledige originele media en stemopnamen. Bewaar het op een privéplek in Bestanden, niet in een gedeelde map. TALERA kan niet garanderen waar Safari of iCloud een bestand bewaart.</p>
 <section><h2>1. Back-up maken</h2>
 <p>Maak eerst een archief en sla het daarna zelf op. Je huidige herinneringen blijven op dit toestel staan.</p>
-<button type="button" id="make-backup">Maak back-up</button>
+<button type="button" id="make-backup" disabled>Maak back-up</button>
 <a id="save-backup" class="save" download hidden>Bewaar back-upbestand</a>
 <output id="export-status" role="status">Nog geen back-up gemaakt.</output>
 </section>
@@ -32,7 +32,7 @@ label{display:block;margin:12px 0}.note{font-size:.93rem}output{display:block;wh
 <p>Kies zelf een eerder opgeslagen .talera-bestand. TALERA controleert de inhoud en eventuele conflicten <em>vóór</em> er iets aan je herinneringen wordt toegevoegd.</p>
 <label>Back-upbestand <input type="file" id="restore-file" accept=".talera,application/octet-stream"></label>
 <label><input type="checkbox" id="other-origin"> Ik geef toestemming om ook een archief van een andere of onbekende TALERA-webversie te controleren en eventueel te herstellen.</label>
-<button type="button" id="preview-restore">Controleer herstelbestand</button>
+<button type="button" id="preview-restore" disabled>Controleer herstelbestand</button>
 <output id="restore-status" role="status">Er is nog niets gecontroleerd.</output>
 <label><input type="checkbox" id="confirm-restore"> Ik heb de samenvatting gecontroleerd en kies er zelf voor deze herinneringen toe te voegen.</label>
 <button type="button" id="run-restore" disabled>Herstel herinneringen</button>

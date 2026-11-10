@@ -632,8 +632,16 @@ export default {
         'x-content-type-options':'nosniff'
       }});
     // Page and scripts require BOTH the existing QA gate AND actual account.
-    if(p==='/__f5/backup'&&m==='GET'&&!url.search)
+    // Some iPhone in-app browsers append harmless link-opening query tags.
+    // They must not prevent the standalone backup page from opening. Ignore
+    // such tags: the private database name is ALWAYS derived from session
+    // identity, never from the URL. Explicit data selectors still fail closed.
+    if(p==='/__f5/backup'&&m==='GET'){
+      if(url.search.length>2048||
+         [...url.searchParams.keys()].some(k=>/^(?:db|database|scope|account|user|target|story|file|redirect|url|token)$/i.test(k)))
+        return deny(404,'Niet gevonden');
       return privateBackupPage(request,env);
+    }
     if(Object.hasOwn(BACKUP_MODULES,p)&&m==='GET'&&!url.search)
       return privateBackupModule(request,env,p);
     // Exact original embedded player route is allowed before the normal

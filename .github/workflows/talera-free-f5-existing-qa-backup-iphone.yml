@@ -180,9 +180,9 @@ jobs:
           assert.ok(present.includes("if(changed||(!autoStartTimer&&!autoInterval&&!pendingAutoPhoto))scheduleAuto(memory);"));
           assert.ok(!before.includes('pendingAutoPhoto'),'Original template must be unmodified');
           assert.ok(present.includes('function taleraInlineOrdinaryStep('));
-          const start=present.indexOf('  let pendingAutoPhoto=null,photoAutoSerial=0;');
-          const end=present.indexOf('  window.__taleraV31SelectPhoto=',start);
-          assert.ok(start>0&&end>start);
+          const photoStart=present.indexOf('  let pendingAutoPhoto=null,photoAutoSerial=0;');
+          const photoEnd=present.indexOf('  window.__taleraV31SelectPhoto=',photoStart);
+          assert.ok(photoStart>0&&photoEnd>photoStart);
           let images=[],painted=[],dots=[],armed=0;
           class ManualImage{
             constructor(){this.loaded=false;this.complete=false;images.push(this)}
@@ -194,7 +194,7 @@ jobs:
             _photoIndex:0,image:'one',photos:['one','two'],
             _zeroItems:[],_zeroFrames:[]};
           const func=new Function('runtime','settleVisiblePhoto','renderDots','scheduleAuto','Image','window',
-            present.slice(start,end)+';return showPhoto;');
+            present.slice(photoStart,photoEnd)+';return showPhoto;');
           const show=func({currentMemory:()=>memory},
             m=>painted.push(m.image),m=>dots.push(m._photoIndex),
             ()=>{armed++},ManualImage,{__taleraLocalFrameChanged:()=>{}});

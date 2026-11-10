@@ -3,6 +3,7 @@
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions} from './f5-account-switch-guard.mjs';
+import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {mkdirSync,readFileSync,writeFileSync,copyFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -13,6 +14,22 @@ const generated=path.join(here,'generated');
 const origin='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
 const routes={'/mijn-leven':'mijn-leven','/present':'present','/tell':'tell'};
 const sha=buf=>createHash('sha256').update(buf).digest('hex');
+// Single-app source lock: these are the three exact anonymous app shells
+// already packaged and deployed by successful F5 QA run 42782342846.
+// The upstream reference site must never silently supply a changed app
+// on the same GitHub commit. Stop the build instead of changing TALERA UI.
+const approvedShellLock=Object.freeze({
+ '/mijn-leven':'/__talera_free/shell/1853d43d20521260078156960e4b9dd92290d5d27c75105380813a8a4e30613e.html',
+ '/present':'/__talera_free/shell/25bd6ef18932f6fb5a15a8baa17d9a1e8b5b0236b5c3f11666c3e54110142705.html',
+ '/tell':'/__talera_free/shell/9f39f4667819d05edfa35c9ad861f5e6035871c60e02407e3f9eee7362173bfe.html'
+});
+assert.deepEqual(Object.keys(anonymousShells).sort(),Object.keys(approvedShellLock).sort(),
+ 'APPROVED_FREE_UI_ROUTE_DRIFT_ABORT');
+for(const [route,pinnedAsset] of Object.entries(approvedShellLock)){
+ assert.equal(anonymousShells[route],pinnedAsset,
+  'APPROVED_FREE_UI_SOURCE_DRIFT_ABORT: '+route);
+}
+
 mkdirSync(generated,{recursive:true});
 mkdirSync(path.join(publicDir,'__talera_free','f5references'),{recursive:true});
 mkdirSync(path.join(publicDir,'__talera_free','f5scripts'),{recursive:true});

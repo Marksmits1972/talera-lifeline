@@ -1,20 +1,26 @@
-name: TALERA Free F5 - portable memory archive codec and lossless media QA
+name: TALERA Free F5 - private voluntary local backup end-to-end QA
 on:
   push:
-    branches: [feature/free-f5-chunked-recovery-20261110]
+    branches: [feature/free-f5-local-backup-ui-20261110]
     paths:
       - '.github/workflows/talera-free-f5-portable-archive-qa.yml'
       - 'r20-dev/free-10m-f5/f5-portable-archive.mjs'
       - 'r20-dev/free-10m-f5/f5-portable-archive.test.mjs'
       - 'r20-dev/free-10m-f5/f5-portable-idb.mjs'
       - 'r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs'
+      - 'r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs'
+      - 'r20-dev/free-10m-f5/f5-local-backup-page.mjs'
+      - 'r20-dev/free-10m-f5/f5-backup-controller.mjs'
+      - 'r20-dev/free-10m-f5/f5-public-assets.mjs'
+      - 'r20-dev/free-10m-f5/f5-local-test.mjs'
+      - 'r20-dev/free-10m-f5/f5-worker.mjs'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   archive_codec:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,20 +35,34 @@ jobs:
           node --check r20-dev/free-10m-f5/f5-portable-archive.mjs
           node --check r20-dev/free-10m-f5/f5-portable-idb.mjs
           node --check r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+          node --check r20-dev/free-10m-f5/f5-backup-controller.mjs
+          node --check r20-dev/free-10m-f5/f5-local-backup-page.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
           node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+      - name: Rebuild original anonymous source and isolated F5 assets (no deployment)
+        run: |
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify account-bound protected backup route on local Cloudflare Worker
+        run: node r20-dev/free-10m-f5/f5-local-test.mjs
       - name: Install isolated mobile Chromium for realistic two-origin restore proof
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps chromium
       - name: Restore synthetic archive between two real browser origins without overwriting other memories
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
-      - name: Verify no editor, presentation, worker or auth source was modified
+      - name: Test voluntary UI backup + conflict-safe restore across real browser origins
+        run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
+      - name: Verify only the seven backup integration files plus tests were modified
         shell: bash
         run: |
           set -euo pipefail
-          git diff --name-only 4ba7829aac46145487a61d95fff31925bf069117 HEAD > /tmp/changed-files
-          if grep -E '^r20-dev/free-10m-f5/f5-worker.mjs|^r20-dev/free-10m-f5/f5-local-scope.mjs|^r20-dev/free-10m-f5/f5-editor-video-mute-guard.mjs|^r20-dev/free-10m-delivery/' /tmp/changed-files; then
-            echo 'Original application source must not be modified for this archive proof'
+          BASE=e22ee597fd25bb277e17a9c8377afb3ea5d6c8d2
+          git diff --name-only "$BASE" HEAD > /tmp/changed-files
+          if grep -Ev '^(.github/workflows/talera-free-f5-portable-archive-qa.yml|r20-dev/free-10m-f5/(f5-portable-archive.mjs|f5-portable-idb.mjs|f5-public-assets.mjs|f5-worker.mjs|f5-local-test.mjs|f5-local-backup-page.mjs|f5-backup-controller.mjs|f5-backup-ui.browser.test.mjs))
+ /tmp/changed-files; then
+            echo 'Unexpected TALERA modification; abort'
             exit 1
           fi
-          echo 'TALERA_FREE_ARCHIVE_ONLY_NO_APP_CHANGES'
+          git diff --exit-code "$BASE" HEAD -- r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-editor-video-mute-guard.mjs r20-dev/free-10m-delivery/
+          echo 'TALERA_FREE_BACKUP_ONLY_NO_APPROVED_PLAYER_OR_UI_CHANGES'

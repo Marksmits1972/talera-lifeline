@@ -272,6 +272,24 @@ try{
      console.log('TALERA_F5_HOME_MORE_ACTUAL_NAV_DIAGNOSTIC',JSON.stringify({
        tap,after
      }));
+     const homeMore=page.locator('#navMore');
+     assert.equal(await homeMore.getAttribute('href'),'/present?talera_menu=hub',
+       'Original home menu href changed; preserve its navigation contract');
+     const [menuNav]=await Promise.all([
+       page.waitForResponse(r=>r.url().includes('/present?talera_menu=hub')&&
+         r.request().isNavigationRequest(),{timeout:14000}),
+       homeMore.click()
+     ]);
+     assert.equal(menuNav.status(),200,'Original home More link must not land on JSON 404');
+     await page.waitForFunction(()=>{
+       const n=document.getElementById('talera-more-menu');
+       return !!n&&!n.hidden;
+     },null,{timeout:11000});
+     console.log('TALERA_F5_HOME_MORE_END_TO_END_PASS',JSON.stringify({
+       originalMenuOpened:true,sameOrigin:true,newSeparateApp:false,
+       originalBottomNavigationMarkupUntouched:true
+     }));
+
    }
 
    if(check.menu&&check.library==='function'){activeRoute=route;break}

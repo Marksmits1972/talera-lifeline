@@ -624,6 +624,13 @@ export default {
     if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
     if(!await hasQaAccess(request,env))return deny();
+    // Preserve the ALREADY iPhone-approved 9-November original back route.
+    // It must never regress when the separate local-backup branch is merged.
+    if(p==='/'&&m==='GET'&&!url.search)
+      return new Response(null,{status:302,headers:{
+        location:'/mijn-leven','cache-control':'private, no-store',
+        'x-content-type-options':'nosniff'
+      }});
     // Page and scripts require BOTH the existing QA gate AND actual account.
     if(p==='/__f5/backup'&&m==='GET'&&!url.search)
       return privateBackupPage(request,env);

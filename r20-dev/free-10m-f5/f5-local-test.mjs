@@ -278,6 +278,24 @@ async function run(){
   assert.equal(viewed.status,200,
     'Published personal memory MUST open the original presentation player');
   assert.equal(viewed.stage,'personalized-durable-account');
+  // Exactly the approved bottom navigation href of "Meer" on Mijn leven.
+  // This does NOT create a new menu or change the source interface.
+  const originalMore=await request('GET','/present?talera_menu=hub',{
+    cookie:identities[0].cookie
+  });
+  assert.equal(originalMore.status,200,
+    'Original Mijn leven Meer button must open the existing account hub');
+  assert.equal(originalMore.stage,'personalized-durable-account');
+  assert.equal((await request('GET','/present?talera_menu=hub',{
+    gate:false
+  })).status,403,'Meer must never bypass the QA protection');
+  assert.equal((await request('GET','/present?talera_menu=admin',{
+    cookie:identities[0].cookie
+  })).status,404,'Only the exact original menu view is permitted');
+  assert.equal((await request('GET','/present?talera_menu=hub&other=1',{
+    cookie:identities[0].cookie
+  })).status,404,'Do not widen the existing original menu query contract');
+
   const embed=await fetch(origin+'/vertelmodus-embed?mode=present',{
     headers:{cookie:identities[0].cookie,'x-talera-f5-key':f5},
     signal:AbortSignal.timeout(17000)

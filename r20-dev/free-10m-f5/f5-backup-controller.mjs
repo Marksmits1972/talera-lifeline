@@ -1,4 +1,5 @@
-// Browser-only voluntary Free backup UI. No fetch, upload or account mutations.
+// Browser-only voluntary Free backup UI. Only GET /api/me checks the session;
+// archives and original media never leave local IndexedDB or reach a server.
 // This module runs only on the separately authenticated /__f5/backup route.
 import {
  exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary

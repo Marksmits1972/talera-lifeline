@@ -60,11 +60,61 @@ await assert.rejects(()=>decodeFreeArchive(new Blob([bytes.slice(0,bytes.length-
 await assert.rejects(()=>createFreeArchive({stories:[story,{...story}],files,sourceScope:scope}),/DUPLICATE_KEY/);
 await assert.rejects(()=>createFreeArchive({stories,files:[...files,{key:'oops',blob:new Map()}],sourceScope:scope}),/UNKNOWN_RECORD_TYPE/);
 await assert.rejects(()=>createFreeArchive({stories,files:files.slice(1),sourceScope:scope}).then(decodeFreeArchive),/MISSING_STORY_MEDIA/);
+// Large original video proof (> old 128 MiB cap) without a full-file arrayBuffer.
+const mib=new Uint8Array(1024*1024).fill(0xa5);
+const largeVideo=new File(Array.from({length:132},()=>mib),'grote-originele-video.mov',
+ {type:'video/quicktime',lastModified:1700000000000});
+const largeBackup=await createFreeArchive({
+ stories:[],files:[{key:'synthetic-large-video',blob:largeVideo}],
+ sourceScope:scope
+});
+const largeSummary=await inspectFreeArchive(largeBackup);
+assert.equal(largeSummary.parsed.schema,'talera-free-lossless-local-2');
+assert.equal(largeSummary.binaryBytes,132*1024*1024);
+assert.equal(largeSummary.parsed.binaries[0].sha256Chunks.length,33);
+const largeDecoded=await decodeFreeArchive(largeBackup);
+const recovered=largeDecoded.files[0].blob;
+assert.equal(recovered.size,largeVideo.size);
+assert.equal(recovered.name,largeVideo.name);
+assert.equal(recovered.lastModified,largeVideo.lastModified);
+for(const position of [0,64*1024*1024,131*1024*1024]){
+ assert.deepEqual(new Uint8Array(await recovered.slice(position,position+1024*1024).arrayBuffer()),mib);
+}
+// Tamper with one byte in a later chunk; do not load the entire archive in RAM.
+const corruptAt=largeBackup.size-12;
+const corruptLast=new Uint8Array(await largeBackup.slice(corruptAt,corruptAt+1).arrayBuffer());
+corruptLast[0]^=0x01;
+const corruptLarge=new Blob([
+ largeBackup.slice(0,corruptAt),corruptLast,largeBackup.slice(corruptAt+1)
+]);
+await assert.rejects(()=>decodeFreeArchive(corruptLarge),/MEDIA_CHECKSUM/);
+
+// Verify existing v1 archives remain restorable after the v2 change.
+const enc=new TextEncoder();
+const md=enc.encode('TALERA-FREE-LOCAL-V1\\n');
+const legacyMedia=enc.encode('old-binary-payload');
+const h=async b=>new Uint8Array(await crypto.subtle.digest('SHA-256',b));
+const digest=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+const v1Manifest=enc.encode(JSON.stringify({
+ schema:'talera-free-lossless-local-1',sourceScope:scope,createdAt:'2026-11-09T00:00:00Z',
+ stories:[],files:[['obj',[['key',['str','legacy-media']],['blob',['bin',0]]]]],
+ binaries:[{length:legacyMedia.byteLength,sha256:digest(await h(legacyMedia)),
+  type:'application/octet-stream',name:null,lastModified:null}]
+}));
+const legacyPrefix=new Uint8Array(md.length+4+32);
+legacyPrefix.set(md);
+new DataView(legacyPrefix.buffer).setUint32(md.length,v1Manifest.byteLength,true);
+legacyPrefix.set(await h(v1Manifest),md.length+4);
+const decodedV1=await decodeFreeArchive(new Blob([legacyPrefix,v1Manifest,legacyMedia]));
+assert.deepEqual(
+ new Uint8Array(await decodedV1.files[0].blob.arrayBuffer()),legacyMedia
+);
+
 console.log('TALERA_F5_PORTABLE_ARCHIVE_CODEC_PASS',JSON.stringify({
  completeStory:true,originalVideoBytes:true,originalImageBytes:true,originalVoiceBytes:true,
  originalIDs:true,orderedMedia:true,cueTiming:true,phonePreview:true,
  editorDraftManifest:true,checksumTamperingRejected:true,partialBackupRejected:true,
  duplicateIDsRejected:true,originalSourceNotModified:true,
  metadataNeverUploaded:true,physicalIPhoneRestoreCertified:false,
- maxBinaryPerFileBytesForProof:134217728
+ multiChunkLargeVideoBytes:138412032,legacyV1ArchiveSupported:true
 }));

@@ -62,7 +62,8 @@ async function ready(){
     if(exited)throw Error('F5 Cloudflare runtime exited: '+logs);
     try{
       const health=await request('GET','/__f5/health',{gate:false});
-      if(health.status===200&&health.data.syntheticOnly)return;
+      if(health.status===200&&health.data.closedQa===true&&
+         health.data.realAccountsCertified===false)return;
     }catch{}
     await pause(350);
   }
@@ -83,7 +84,7 @@ async function run(){
   assert.equal((await request('GET','/api/me',{gate:false})).status,403);
   const entry=await request('GET','/__f5/entry',{gate:false});
   assert.equal(entry.status,200);
-  assert.match(String(entry.data),/TALERA Free — testversie/);
+  assert.match(String(entry.data),/TALERA Free — beveiligde ontwikkeltoegang/);
   const challenge=await fetch(origin+'/__f5/entry',{
     method:'GET',signal:AbortSignal.timeout(15000)
   });

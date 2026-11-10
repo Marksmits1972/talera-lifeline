@@ -64,9 +64,58 @@ mkdirSync(backupAssets,{recursive:true});
 for(const name of ['f5-portable-idb.mjs','f5-portable-archive.mjs','f5-backup-controller.mjs']){
  copyFileSync(path.join(here,name),path.join(backupAssets,name));
 }
+// Restore the proven ordinary presentation click path for automatic local
+// PHOTO-ONLY changes. Decode the next photo BEFORE advancing the visible dot.
+// Existing narrated stories, videos, UI and stored memory bytes are untouched.
+function fixPhotoOnlyPresentation(original){
+ const exact=(s,a,b)=>{
+   assert.equal(s.split(a).length,2,'PRESENTATION_PHOTO_AUTOPLAY_SOURCE_DRIFT');
+   return s.replace(a,b);
+ };
+ const show="  function showPhoto(memory,index,manual=false){\n";
+ const guarded="  let pendingAutoPhoto=null,photoAutoSerial=0;\n"+
+   "  function showPhoto(memory,index,manual=false){\n"+
+   "    if(manual){photoAutoSerial++;pendingAutoPhoto=null}\n"+
+   "    if(!manual&&memory?._taleraLocal&&Array.isArray(memory.photos)&&memory.photos.length>1&&\n"+
+   "       !memory._zeroItems?.some(x=>x.kind==='audio')&&\n"+
+   "       !memory._zeroFrames?.some(x=>x.kind==='video')){\n"+
+   "      if(pendingAutoPhoto)return;\n"+
+   "      const next=((index%memory.photos.length)+memory.photos.length)%memory.photos.length;\n"+
+   "      const src=memory.photos[next],serial=++photoAutoSerial,preload=new Image();\n"+
+   "      const pending={serial};pendingAutoPhoto=pending;\n"+
+   "      const discard=()=>{if(pendingAutoPhoto===pending)pendingAutoPhoto=null};\n"+
+   "      const ready=()=>{\n"+
+   "        if(pendingAutoPhoto!==pending||serial!==photoAutoSerial||!preload.naturalWidth||\n"+
+   "           runtime.currentMemory()?.id!==memory.id)return;\n"+
+   "        clearTimeout(pending.timer);pendingAutoPhoto=null;\n"+
+   "        showPhoto(memory,next,true); // The original WORKING tap path.\n"+
+   "      };\n"+
+   "      preload.onload=ready;preload.onerror=discard;\n"+
+   "      pending.timer=setTimeout(discard,12000);\n"+
+   "      preload.src=src;if(preload.complete&&preload.naturalWidth)ready();\n"+
+   "      return;\n"+
+   "    }\n";
+ const schedule="    lastWrittenMemoryId=memory&&memory.id;\n"+
+   "    syncTaleraStoryFrame(memory);\n"+
+   "    renderDots(memory);\n"+
+   "    scheduleAuto(memory);\n"+
+   "  });";
+ const stable="    lastWrittenMemoryId=memory&&memory.id;\n"+
+   "    if(changed){photoAutoSerial++;pendingAutoPhoto=null}\n"+
+   "    syncTaleraStoryFrame(memory);\n"+
+   "    renderDots(memory);\n"+
+   "    if(changed||(!autoStartTimer&&!autoInterval&&!pendingAutoPhoto))scheduleAuto(memory);\n"+
+   "  });";
+ const result=exact(exact(original,show,guarded),schedule,stable);
+ assert.ok(result.includes('window.__taleraV31SelectPhoto=')&&
+   result.includes('function taleraInlineOrdinaryStep('),
+   'Ordinary presentation manual photo source changed unexpectedly');
+ return result;
+}
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
- const html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
+ let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
+ if(route==='/present')html=fixPhotoOnlyPresentation(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  const hash=sha(html),file=hash+'.html';

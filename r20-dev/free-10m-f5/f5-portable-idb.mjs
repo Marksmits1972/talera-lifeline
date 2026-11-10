@@ -53,11 +53,14 @@ export async function exportExistingFreeLibrary(databaseName){
   const {stories,files}=await readAll(db);
   if(!stories.length)throw Error('TALERA_RESTORE_NO_STORIES_FOUND');
   return await createFreeArchive({stories,files,sourceScope:databaseName,
+   sourceOrigin:typeof location==='object'?location.origin:null,
    createdAt:new Date().toISOString()});
  }finally{db.close()}
 }
 async function preview(decoded,name,allowOtherOrigin){
- if(decoded.sourceScope!==name&&!allowOtherOrigin)
+ const sourceMatches=decoded.sourceScope===name &&
+   decoded.sourceOrigin===location.origin;
+ if(!sourceMatches&&!allowOtherOrigin)
   throw Error('TALERA_RESTORE_DIFFERENT_ORIGIN_REQUIRES_EXPLICIT_CONSENT');
  const db=await openExisting(name,true);
  try{
@@ -67,7 +70,8 @@ async function preview(decoded,name,allowOtherOrigin){
   const collisionStories=decoded.stories.filter(x=>stories.has(x.id)).map(x=>x.id);
   const collisionFiles=decoded.files.filter(x=>files.has(x.key)).map(x=>x.key);
   return {
-   sourceScope:decoded.sourceScope,targetScope:name,
+   sourceScope:decoded.sourceScope,sourceOrigin:decoded.sourceOrigin,
+   targetScope:name,crossOrigin:!sourceMatches,
    storyCount:decoded.stories.length,mediaStoreEntries:decoded.files.length,
    alreadyPresentStories:collisionStories.length,
    alreadyPresentMediaEntries:collisionFiles.length,

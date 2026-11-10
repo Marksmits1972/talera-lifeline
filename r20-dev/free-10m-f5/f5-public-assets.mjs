@@ -14,6 +14,30 @@ const generated=path.join(here,'generated');
 const origin='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
 const routes={'/mijn-leven':'mijn-leven','/present':'present','/tell':'tell'};
 const sha=buf=>createHash('sha256').update(buf).digest('hex');
+// iOS Home Screen: retain the already approved original three-panel TALERA logo.
+// Fetch ONLY the existing approved deep-blue icon files, never user data.
+const approvedLogoOrigin='https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev';
+const approvedPwaIcons=Object.freeze({
+ '/apple-touch-icon.png':180,
+ '/pwa-192.png':192,
+ '/pwa-512.png':512
+});
+async function getApprovedLogo(size){
+ const url=new URL('/talera-brand-voorstel-d-icon-'+size+'.png',approvedLogoOrigin);
+ const response=await fetch(url,{method:'GET',redirect:'error',
+   signal:AbortSignal.timeout(25000)});
+ assert.equal(response.status,200,'Official TALERA logo unavailable: '+size);
+ assert.match(response.headers.get('content-type')||'',/image\/png/i,
+   'Official logo must be a PNG: '+size);
+ assert.ok(!response.headers.get('set-cookie'),'Reject cookie-bearing logo');
+ const bytes=Buffer.from(await response.arrayBuffer());
+ assert.ok(bytes.length>80&&bytes.length<2_000_000,'Invalid official logo bytes');
+ assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a',
+   'Official logo PNG signature invalid');
+ assert.equal(bytes.readUInt32BE(16),size,'Official logo PNG width changed');
+ assert.equal(bytes.readUInt32BE(20),size,'Official logo PNG height changed');
+ return bytes;
+}
 // Single-app source lock: these are the three exact anonymous app shells
 // already packaged and deployed by successful F5 QA run 42782342846.
 // The upstream reference site must never silently supply a changed app
@@ -136,9 +160,22 @@ for(const name of supportNames){
   assert.ok(bytes.length>30&&bytes.length<2_000_000,'PWA file unexpectedly sized '+name);
   return bytes;
  }
- const a=await get(),b=await get();
+ const iconSize=approvedPwaIcons[name];
+ let a=iconSize?await getApprovedLogo(iconSize):await get();
+ const b=iconSize?await getApprovedLogo(iconSize):await get();
  if(!a&&!b)continue;
  assert.ok(a&&b&&a.equals(b),'Unstable public PWA resource '+name);
+ if(name==='/manifest.webmanifest'){
+  // Preserve original PWA identity, start URL, display and all non-icon settings.
+  const manifest=JSON.parse(a.toString('utf8'));
+  assert.ok(manifest&&typeof manifest==='object'&&Array.isArray(manifest.icons),
+    'Original installable manifest must have icons');
+  manifest.icons=[
+   {src:'/pwa-192.png',sizes:'192x192',type:'image/png',purpose:'any'},
+   {src:'/pwa-512.png',sizes:'512x512',type:'image/png',purpose:'any'}
+  ];
+  a=Buffer.from(JSON.stringify(manifest),'utf8');
+ }
  const ext=name.split('.').pop(),filename=sha(a)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5support',filename),a);
  support[name]='/__talera_free/f5support/'+filename;

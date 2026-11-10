@@ -69,6 +69,7 @@ try{
  await seed(a,dbA,'old');await seed(b,dbB,'new');
  assert.equal(await a.locator('#talera-free-backup').getAttribute('data-database'),dbA);
  await a.getByRole('button',{name:'Maak back-up'}).click();
+ await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('Bestanden'));
  await a.locator('#save-backup').waitFor({state:'visible'});
  assert.match(await a.locator('#export-status').textContent(),/Bestanden/);
  const downloadPromise=a.waitForEvent('download');

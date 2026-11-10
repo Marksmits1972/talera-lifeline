@@ -46,6 +46,11 @@ function allowedLocalUiSearch(url){
   const pairs=[...url.searchParams.entries()];
   if(pairs.length!==1)return false;
   const [key,id]=pairs[0];
+  // The approved Mijn leven bottom-bar "Meer" points to exactly this
+  // SAME-ORIGIN original presentation/menu. It was incorrectly rejected
+  // by F5's local-memory-only query filter (real iPhone 404). Permit only
+  // the literal original hub entry, with no extra parameters or redirects.
+  if(url.pathname==='/present'&&key==='talera_menu'&&id==='hub')return true;
   // The approved TALERA UI opens a published local memory through
   // /present?memory=<local-id>. Older F5 allowed only publishing and editing,
   // causing a 404 when "Bekijk herinnering" was tapped despite a saved story.

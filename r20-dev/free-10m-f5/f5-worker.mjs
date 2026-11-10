@@ -1,11 +1,11 @@
-// TALERA Free F5 - ONE existing closed integration candidate, NOT a public release.
-// Existing QA entry grants browser access only: registration and login use the
-// original same-origin Free auth routes, never an automatically minted account.
+// TALERA Free F5 - ONE continuous Free acceptance candidate, not a public release approval.
+// Normal user registration and login control all personal data; no invitation
+// code, temporary browser gate, or automatic account creation is required.
 // There is intentionally NO TALERA_BASE, D1, R2 or existing customer binding.
 import authPilot from '../free-10m-auth-pilot/auth-pilot-worker.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
-  readSessionCookie,shaHex,safeEqualHex,json,sameOrigin,body
+  readSessionCookie,sessionCookie,shaHex,safeEqualHex,json,sameOrigin,body
 } from '../free-10m-auth-pilot/auth-util.mjs';
 import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 import {approvedAssets,anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
@@ -27,8 +27,7 @@ export {
 const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
 // iOS fetches install icons independently of the browser login cookie.
-// Expose ONLY the three non-personal original logo images and PWA manifest.
-// All app pages, accounts, media, backups and APIs remain behind the QA gate.
+// These four static install resources are public. Account data remains private.
 const PUBLIC_INSTALL_ICON_PATHS=new Set([
  '/apple-touch-icon.png','/pwa-192.png','/pwa-512.png',
  '/manifest.webmanifest'
@@ -454,10 +453,10 @@ async function publicPage(request,env){
   const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
   if(!env.ASSETS)return deny(503,'PWA-bestanden niet beschikbaar');
   const sessionToken=readSessionCookie(request);
-  if(sessionToken||request.headers.has('authorization')){
-    // A signed-in page must use the server-verified account and its PRIVATE DOB.
-    const actor=await sessionAccount(request,env);
-    if(!actor)return deny(401,'Sessie verlopen; meld je opnieuw aan');
+  const actor=sessionToken?await sessionAccount(request,env):null;
+  if(actor){
+    // Only a verified current account may load its private date and local
+    // account-scoped storage. An expired cookie instead gets the sign-in UI.
     const date=await accountHome(env,actor.id).getBirthDate();
     if((pathname==='/mijn-leven'||pathname==='/present')&&!date)
       return deny(503,'Geboortedatum ontbreekt; persoonlijke tijdlijn kan niet worden getoond');
@@ -502,6 +501,7 @@ async function publicPage(request,env){
   headers.set('x-talera-free-f5','anonymous-snapshot-only');
   headers.set('content-security-policy',F5_BROWSER_CSP);
   headers.set('x-content-type-options','nosniff');
+  if(sessionToken&&!actor)headers.set('set-cookie',sessionCookie('',0));
   return new Response(r.body,{status:200,headers});
 }
 // Strictly session-bound, same-origin, NO personal-media network endpoint.
@@ -596,23 +596,27 @@ export default {
   async fetch(request,env){
     const url=new URL(request.url),p=url.pathname,m=request.method;
     if(p==='/__f5/health'&&m==='GET')
-      return json({ok:true,stage:'F5-closed-integration',closedQa:true,
+      return json({ok:true,stage:'Free-continuous-acceptance',closedQa:false,
         personalRegistrationPilot:true,realAccountsCertified:false,
         officialTaleraConnected:false,loggedInPwaCertified:false,tenMillionProven:false});
-    // Closed pilot. Cloudflare Access/browser access requires separate acceptance.
+    // Internal backing bindings remain private; only normal account sessions
+    // authorize personal content. Retain missing-secret fail-closed checks.
     if(!HEX64.test(env.STAGING_F5_KEY||'')||
        !HEX64.test(env.STAGING_ACCESS_KEY||'')||
        !HEX64.test(env.STAGING_SOCIAL_KEY||'')||
        typeof env.AUTH_NAMESPACE_KEY!=='string'||env.AUTH_NAMESPACE_KEY.length<40||
        typeof env.DEMO_IDENTITY_KEY!=='string'||env.DEMO_IDENTITY_KEY.length<40)
       return deny(503,'F5-testomgeving niet correct ingericht');
-    if(p==='/__f5/start'&&m==='GET')return easyEntryPage();
-    if(p==='/__f5/start'&&m==='POST')return easyStart(request,env);
-    if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
-    if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
+    // Legacy private invitation paths are retired, not another app/version.
+    // Users arrive by the single normal app URL and authenticate themselves.
+    if(p==='/__f5/start'||p==='/__f5/entry'){
+      if(m!=='GET')return deny(410,'Deze tijdelijke uitnodiging wordt niet meer gebruikt');
+      return new Response(null,{status:302,headers:{
+        location:'/mijn-leven','cache-control':'no-store'
+      }});
+    }
     if(m==='GET'&&PUBLIC_INSTALL_ICON_PATHS.has(p))
       return publicPwaSupport(request,env);
-    if(!await hasQaAccess(request,env))return deny();
     // Preserve the ALREADY iPhone-approved 9-November original back route.
     // It must never regress when the separate local-backup branch is merged.
     if(p==='/'&&m==='GET'&&!url.search)
@@ -620,7 +624,7 @@ export default {
         location:'/mijn-leven','cache-control':'private, no-store',
         'x-content-type-options':'nosniff'
       }});
-    // Page and scripts require BOTH the existing QA gate AND actual account.
+    // Private pages, memories and backup require the real account session.
     // Some iPhone in-app browsers append harmless link-opening query tags.
     // They must not prevent the standalone backup page from opening. Ignore
     // such tags: the private database name is ALWAYS derived from session

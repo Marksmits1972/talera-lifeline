@@ -206,11 +206,66 @@ function fixFirstSwipePhotoLoad(html){
   'Must patch only the already existing 11-page wheel');
  return html;
 }
+// Reuse the existing V61 local video poster generator and its IndexedDB
+// preview sidecar. On iPhone a hidden 2x2 autoplay video may never present a
+// frame; the visible native tile already has a load/seek/canvas fallback, but
+// that fallback requires successful autoplay. Keep the SAME original video,
+// media ID, photo/video order and poster storage; make the existing fallback
+// work when Safari blocks autoplay, and paint the real frame before capture.
+function fixVideoFirstFramePreview(html){
+ const replace=(a,b,what)=>{
+  assert.equal(html.split(a).length,2,'F5_VIDEO_POSTER_SOURCE_DRIFT_'+what);
+  html=html.replace(a,b);
+ };
+ const originalStyle="  video.style.cssText='position:fixed;left:-10px;top:-10px;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1';";
+ const visibleToDecoder="  // A nonzero composited box lets iOS decode even when autoplay is blocked.\n"+
+  "  // It stays behind the page and does not change the TALERA layout.\n"+
+  "  video.style.cssText='position:fixed;left:0;top:0;width:96px;height:96px;opacity:.001;pointer-events:none;z-index:-1';";
+ replace(originalStyle,visibleToDecoder,'DECODER_SURFACE');
+ const oldCapture="      pending=true;v.style.opacity='1';v.pause();\n"+
+  "      try{\n"+
+  "        const image=await drawnPreview(v,v.videoWidth,v.videoHeight);";
+ const newCapture="      pending=true;v.style.opacity='1';v.pause();\n"+
+  "      try{\n"+
+  "        // Let Safari paint the decoded first video frame before canvas reads\n"+
+  "        // it. If canvas capture fails the genuine paused video stays visible.\n"+
+  "        await new Promise(done=>requestAnimationFrame(()=>done()));\n"+
+  "        if(!v.isConnected||!assets.has(id)||previewBlobs.has(id))return;\n"+
+  "        const image=await drawnPreview(v,v.videoWidth,v.videoHeight);";
+ replace(oldCapture,newCapture,'NATIVE_FRAME_PAINT');
+ const oldMeta=[
+ "    v.addEventListener('loadedmetadata',()=>{",
+ "      if(Number.isFinite(v.duration)&&v.duration>.2){try{v.currentTime=Math.min(.15,v.duration/3)}catch(e){}}",
+ "      void v.play().then(()=>setTimeout(()=>{if(v.isConnected){v.pause();void capture()}},250)).catch(()=>{});",
+ "    },{once:true});",
+ "    for(const e of ['loadeddata','seeked','canplay','timeupdate'])v.addEventListener(e,()=>void capture());"
+ ].join('\n');
+ const newMeta=[
+ "    v.addEventListener('loadedmetadata',()=>{",
+ "      if(Number.isFinite(v.duration)&&v.duration>.2){try{v.currentTime=Math.min(.15,v.duration/3)}catch(e){}}",
+ "      // Seek and loadeddata can decode a frame without a play gesture.",
+ "      // Safari Low Power Mode may reject play(): that is not poster failure.",
+ "      void v.play().then(()=>setTimeout(()=>{if(v.isConnected){v.pause();void capture()}},250))",
+ "        .catch(()=>{if(v.readyState>=2)void capture()});",
+ "    },{once:true});",
+ "    for(const e of ['loadeddata','seeked','canplay','timeupdate'])",
+ "      v.addEventListener(e,()=>{if(v.readyState>=2)void capture()});"
+ ].join('\n');
+ replace(oldMeta,newMeta,'SAFARI_AUTOPLAY_BLOCK');
+ assert.ok(html.includes("previewBlobs.set(id,image);refreshPreview(id);"),
+  'Existing direct video poster selection must remain');
+ assert.ok(html.includes("writeFiles([['preview:'+id,image]])"),
+  'Local draft poster cache must remain');
+ assert.ok(html.includes("key:item.key+':phone-v1'"),
+  'Published video poster must preserve original media ID');
+ return html;
+}
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);
+ if(route==='/tell')html=fixVideoFirstFramePreview(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  const hash=sha(html),file=hash+'.html';

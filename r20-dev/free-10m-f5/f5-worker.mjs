@@ -14,6 +14,7 @@ import {referencePages,verifiedPublicScripts,verifiedPublicSupport} from './gene
 import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
+import {localBackupPage} from './f5-local-backup-page.mjs';
 
 export {
   FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
@@ -24,6 +25,12 @@ export {
 
 const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
+// Separate opt-in QA page, not linked into original approved TALERA interface.
+const BACKUP_MODULES=Object.freeze({
+ '/__f5/f5-portable-idb.mjs':'f5-portable-idb.mjs',
+ '/__f5/f5-portable-archive.mjs':'f5-portable-archive.mjs',
+ '/__f5/backup-controller.mjs':'f5-backup-controller.mjs'
+});
 const HEX64=/^[a-f0-9]{64}$/;
 const LOCAL_STORY_ID=/^local-[a-z0-9-]{8,90}$/i;
 // Verbatim CURRENT value from the two original approved home/present pages.
@@ -511,6 +518,33 @@ async function publicPage(request,env){
   headers.set('x-content-type-options','nosniff');
   return new Response(r.body,{status:200,headers});
 }
+// Strictly session-bound, same-origin, NO personal-media network endpoint.
+// This is opt-in and separate from every approved TALERA screen. It is built
+// only in the isolated branch; do not deploy to existing F5 QA without approval.
+async function privateBackupPage(request,env){
+ const actor=await sessionAccount(request,env);
+ if(!actor)return deny(401,'Aanmelden vereist voor lokale back-up');
+ const scope=await privateAccountScope(actor.id);
+ const name='talera-free-local-'+scope.slice(0,32)+'-v1';
+ return new Response(localBackupPage(name),{status:200,headers:{
+  'content-type':'text/html; charset=utf-8',
+  'cache-control':'private, no-store','x-content-type-options':'nosniff',
+  'referrer-policy':'no-referrer','content-security-policy':F5_BROWSER_CSP
+ }});
+}
+async function privateBackupModule(request,env,pathname){
+ const actor=await sessionAccount(request,env);
+ if(!actor)return deny(401,'Aanmelden vereist voor back-upcode');
+ if(!env.ASSETS)return deny(503,'Back-upcode niet beschikbaar');
+ const asset='/__talera_free/f5backup/'+BACKUP_MODULES[pathname];
+ const res=await env.ASSETS.fetch(new Request(new URL(asset,request.url)));
+ if(!res.ok)return deny(503,'Back-upcode ontbreekt');
+ return new Response(res.body,{status:200,headers:{
+  'content-type':'text/javascript; charset=utf-8',
+  'cache-control':'private, no-store','x-content-type-options':'nosniff',
+  'referrer-policy':'no-referrer','content-security-policy':F5_BROWSER_CSP
+ }});
+}
 // The original narrator/video player is an isolated SAME-ORIGIN iframe,
 // not another photo stage. Both /tell and /present reference this URL.
 // Authentication, QA, MIME and framing are explicit; DO/media never leaves
@@ -590,6 +624,11 @@ export default {
     if(p==='/__f5/entry'&&m==='GET')return qaEntry(env);
     if(p==='/__f5/entry'&&m==='POST')return authorizeQaBrowser(request,env);
     if(!await hasQaAccess(request,env))return deny();
+    // Page and scripts require BOTH the existing QA gate AND actual account.
+    if(p==='/__f5/backup'&&m==='GET'&&!url.search)
+      return privateBackupPage(request,env);
+    if(Object.hasOwn(BACKUP_MODULES,p)&&m==='GET'&&!url.search)
+      return privateBackupModule(request,env,p);
     // Exact original embedded player route is allowed before the normal
     // strict search-param gate, which intentionally covers only top pages.
     if(p==='/vertelmodus-embed')return privateEmbeddedPlayer(request,env);

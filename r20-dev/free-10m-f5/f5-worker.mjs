@@ -1,6 +1,7 @@
-// TALERA Free F5 - ONE ISOLATED INTEGRATION GATEWAY, synthetic test accounts ONLY.
-// There is intentionally NO TALERA_BASE, D1, R2 or existing customer service binding.
-// Auth/DO and social/DO are assembled at ONE origin, not promoted to official PWA.
+// TALERA Free F5 - ONE existing closed integration candidate, NOT a public release.
+// Existing QA entry grants browser access only: registration and login use the
+// original same-origin Free auth routes, never an automatically minted account.
+// There is intentionally NO TALERA_BASE, D1, R2 or existing customer binding.
 import authPilot from '../free-10m-auth-pilot/auth-pilot-worker.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
@@ -219,38 +220,11 @@ async function easyStart(request,env){
   try{provided=(await body(request.clone())).invite}catch{return deny(400,'Ongeldige aanvraag')}
   if(!HEX64.test(provided)||!safeEqualHex(await shaHex(provided),expected))
     return deny(403,'Deze testlink is niet geldig');
-  // Keep the SAME account when the iPhone tester opens their invitation again.
-  // Otherwise the quicklink would silently create a second account, making
-  // their already saved local photos/stories look as if they had disappeared.
+  // Access invitation is NOT identity registration. It must never create a
+  // fictitious account or replace an existing real/synthetic session.
+  // A signed-out owner can now use the original registration/login UI and
+  // the SAME Free AUTH_ACCOUNTS/EMAILS/HANDLES/SESSIONS namespaces.
   const existing=await sessionAccount(request,env);
-  let sid=null;
-  if(!existing){
-    // Create a fictitious account only on the FIRST visit from a browser.
-    const id=crypto.randomUUID().replaceAll('-','').slice(0,18);
-    const headers=new Headers({
-      'content-type':'application/json',
-      'origin':source
-    });
-    const ip=request.headers.get('cf-connecting-ip');
-    if(!ip)return deny(503,'Browsernetwerk niet beschikbaar voor de test');
-    headers.set('cf-connecting-ip',ip);
-    const synthetic={
-      email:'f5-quick-'+id+'@example.invalid',
-      username:'f5quick'+id,
-      displayName:'TALERA Free – fictieve test',
-      password:crypto.randomUUID()+'-synthetic-only',
-      birthDate:'1974-04-02'
-    };
-    const created=await accountApi(new Request(new URL('/api/register',request.url),{
-      method:'POST',headers,body:JSON.stringify(synthetic)
-    }),env);
-    if(!created.ok)return deny(created.status===429?429:503,
-      created.status===429?'Te veel testpogingen; probeer later opnieuw':
-      'Fictief testaccount kon niet worden geopend');
-    sid=created.headers.get('set-cookie');
-    if(!sid||!sid.startsWith('talera_sid='))
-      return deny(503,'Testsessie ontbreekt');
-  }
   const expiry=String(Date.now()+30*60000);
   const nonce=Array.from(crypto.getRandomValues(new Uint8Array(16)),
     b=>b.toString(16).padStart(2,'0')).join('');
@@ -261,10 +235,10 @@ async function easyStart(request,env){
     'content-type':'application/json; charset=utf-8','cache-control':'no-store',
     'x-content-type-options':'nosniff'
   });
-  if(sid)resultHeaders.append('set-cookie',sid);
   resultHeaders.append('set-cookie',cookie);
   return new Response(JSON.stringify({ok:true,next:'/mijn-leven',
-    syntheticOnly:true,reusedExistingSession:!!existing}),{status:200,headers:resultHeaders});
+    accessGranted:true,reusedExistingSession:!!existing,
+    accountCreated:false}),{status:200,headers:resultHeaders});
 }
 function ns(env,name){
   const b=env[name];

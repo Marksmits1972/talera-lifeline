@@ -130,6 +130,35 @@ async function run(){
     identities.push({id:r.data.account.id,cookie:cookieOf(r)});
   }
   assert.equal(new Set(identities.map(x=>x.id)).size,3);
+  // A separate Free backup screen must remain closed without QA/session,
+  // scoped to the verified account, and never alter approved TALERA pages.
+  assert.equal((await request('GET','/__f5/backup',{gate:false})).status,403);
+  assert.equal((await request('GET','/__f5/backup')).status,401);
+  const backupOwner=await request('GET','/__f5/backup',{
+    gate:false,cookie:qaCookie+'; '+identities[0].cookie});
+  assert.equal(backupOwner.status,200);
+  assert.equal(backupOwner.cache,'private, no-store');
+  assert.match(String(backupOwner.data),/Lokale back-up en herstel/);
+  assert.match(String(backupOwner.data),/niet versleuteld/);
+  const matchedDb=/data-database="(talera-free-local-[a-f0-9]{32}-v1)"/.exec(String(backupOwner.data));
+  assert.ok(matchedDb,'Backup scope must be derived by server from verified session');
+  const backupOther=await request('GET','/__f5/backup',{cookie:identities[1].cookie});
+  assert.equal(backupOther.status,200);
+  const otherDb=/data-database="(talera-free-local-[a-f0-9]{32}-v1)"/.exec(String(backupOther.data));
+  assert.ok(otherDb);
+  assert.notEqual(otherDb[1],matchedDb[1],'Two accounts must never share same local backup namespace');
+  assert.equal((await request('GET','/__f5/backup?db='+matchedDb[1],
+    {cookie:identities[0].cookie})).status,404,'Never accept client-chosen DB namespace');
+  for(const modulePath of ['/__f5/backup-controller.mjs',
+   '/__f5/f5-portable-idb.mjs','/__f5/f5-portable-archive.mjs']){
+    assert.equal((await request('GET',modulePath,{gate:false})).status,403);
+    assert.equal((await request('GET',modulePath)).status,401);
+    const moduleOk=await request('GET',modulePath,{cookie:identities[0].cookie});
+    assert.equal(moduleOk.status,200,'Authenticated backup module missing: '+modulePath);
+    assert.equal(moduleOk.cache,'private, no-store');
+    assert.ok(String(moduleOk.data).length>900);
+  }
+
   // F5 may not silently proxy legacy share/media routes to the customer's
   // older Cloudflare backend. The original UI still references some of them,
   // but Free personal originals MUST stay in the phone's IndexedDB.

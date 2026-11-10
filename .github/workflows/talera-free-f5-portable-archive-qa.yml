@@ -1,8 +1,13 @@
 name: TALERA Free F5 - portable memory archive codec and lossless media QA
 on:
   push:
-    branches: [feature/free-f5-safe-memory-portability-20261109]
-    paths: ['.github/workflows/talera-free-f5-portable-archive-qa.yml']
+    branches: [feature/free-f5-chunked-recovery-20261110]
+    paths:
+      - '.github/workflows/talera-free-f5-portable-archive-qa.yml'
+      - 'r20-dev/free-10m-f5/f5-portable-archive.mjs'
+      - 'r20-dev/free-10m-f5/f5-portable-archive.test.mjs'
+      - 'r20-dev/free-10m-f5/f5-portable-idb.mjs'
+      - 'r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,8 +24,12 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Verify archive/restore of full story record object, media bytes and checksums
-        run: node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+      - name: Verify codec syntax, chunked 132MiB MOV, legacy restore and tamper checks
+        run: |
+          node --check r20-dev/free-10m-f5/f5-portable-archive.mjs
+          node --check r20-dev/free-10m-f5/f5-portable-idb.mjs
+          node --check r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+          node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
       - name: Install isolated mobile Chromium for realistic two-origin restore proof
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1

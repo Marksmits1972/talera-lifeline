@@ -903,7 +903,7 @@ jobs:
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');
           console.log('TALERA_NORMAL_APP_ENTRY_OK; PRIVATE_DATA_STILL_AUTH_GATED; NO_ACCOUNTS_CREATED');
           NODE
-      - name: Prove swipe wheel closes after image load, photos change visibly and narration remains exact
+      - name: Verify full unvoiced picture-to-picture swipe and original video in same memory, voice untouched
         shell: bash
         run: |
           set -euo pipefail

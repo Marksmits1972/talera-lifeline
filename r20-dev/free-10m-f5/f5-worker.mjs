@@ -729,6 +729,16 @@ export default {
       const grantRevoke=/^\/api\/memories\/([A-Za-z0-9_-]{8,80})\/grants\/([0-9a-fA-F-]{36})\/revoke$/.exec(p);
       if(grantRevoke)return revokeAccountGrant(request,env,grantRevoke[1],grantRevoke[2]);
       if(p.startsWith('/__social/'))return socialApi(request,env);
+      // The original decade shortcut linked to ?decade=N, but the existing
+      // presentation only has a working ?year=N selector. Reuse that approved
+      // year navigation at the centre of the chosen decade; no second player.
+      if(p==='/present'&&m==='GET'&&url.searchParams.size===1&&
+         url.searchParams.has('decade')&&allowedLocalUiSearch(url)){
+        const year=Math.min(Number(url.searchParams.get('decade'))+5,new Date().getFullYear());
+        return new Response(null,{status:302,headers:{
+          location:'/present?year='+year,'cache-control':'private, no-store'
+        }});
+      }
       // The V25 design retired Gedeeld in favor of the existing Meldingen tab.
       if(p==='/gedeeld'&&m==='GET'&&!url.search)
         return new Response(null,{status:302,headers:{location:'/meldingen','cache-control':'no-store'}});

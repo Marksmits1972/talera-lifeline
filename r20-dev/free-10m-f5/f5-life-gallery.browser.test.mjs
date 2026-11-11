@@ -104,14 +104,13 @@ try{
  assert.equal(await page.locator('#talera-life-gallery-rows .talera-life-example-card').count(),0);
  assert.equal(await page.locator('#talera-life-gallery-rows .talera-life-collection-head').count(),2);
  const rowTitles=await page.locator('.talera-life-row-title').allTextContents();
- assert.ok(rowTitles.includes('Familie')&&rowTitles.includes('Vrienden'),
-  'Only actually used personal tags create topic rows: '+JSON.stringify(rowTitles)+
-    ' · '+JSON.stringify(await page.evaluate(async()=>
-      (await window.TaleraMemories.list()).slice(0,4).map(x=>({id:x.id,tags:x.tags})))));
+ assert.ok(rowTitles.some(x=>x==='Familie'||x==='Family')&&
+  rowTitles.some(x=>x==='Vrienden'||x==='Friends'),
+  'Only actually used topics may be visible, localized to the iPhone language: '+JSON.stringify(rowTitles));
  assert.ok(rowTitles.some(x=>x.includes('1980'))&&rowTitles.some(x=>x.includes('2020')),
   'Decade rows must span the years of these actual memories');
  const family=page.locator('.talera-life-row').filter({
-  has:page.getByRole('heading',{name:'Familie',exact:true})
+  has:page.getByRole('heading',{name:/^(Familie|Family)$/})
  });
  assert.equal(await family.locator('a.talera-life-card').count(),10,
   'Each horizontal topic row has at most ten actual photos');

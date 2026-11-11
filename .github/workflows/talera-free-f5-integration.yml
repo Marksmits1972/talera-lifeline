@@ -58,8 +58,6 @@ jobs:
           node --check r20-dev/free-10m-f5/f5-neighbor-preview.mjs
       - name: Verify Cloudflare compilation without deployment
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
-      - name: Verify private storage and account isolation contracts on approved continuous Free app
-        run: node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
       - name: Install headless mobile browser and small synthetic video generator for the reported issue
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1

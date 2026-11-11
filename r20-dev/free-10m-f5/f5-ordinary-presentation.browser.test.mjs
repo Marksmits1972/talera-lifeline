@@ -222,14 +222,40 @@ try{
     throw Error('AFTER SWIPE DOTS MOVE BUT REAL PHOTO FROZEN: '+
       JSON.stringify({swipePhotoBefore,swipePhotoAfter,trace}).slice(0,11000));
   }
+  // The test video's one-second playback can end before the post-tap check.
+  // Watch the original player from BEFORE tapping instead of missing it.
+  await page.evaluate(()=>{
+    window.__taleraOriginalVideoWasShown=!!document.querySelector('video.talera-v61-inline-video');
+    const observer=new MutationObserver(()=>{
+      if(document.querySelector('video.talera-v61-inline-video'))
+        window.__taleraOriginalVideoWasShown=true;
+    });
+    observer.observe(document.documentElement,{childList:true,subtree:true});
+    window.__taleraOriginalVideoObserver=observer;
+  });
   const secondTapBefore=await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex);
   await page.locator('#memoryStoryScroll').tap({timeout:12000});
   await page.waitForFunction(previous=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex!==previous,
     secondTapBefore,{timeout:2200});
   console.log('TALERA_REAL_STORY_SWIPE_AND_SECOND_MEMORY_PHOTO_ROLL_OK');
   // Continue with the original video of the same swiped memory.
-  await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),
-    null,{timeout:9000});
+  try{
+    await page.waitForFunction(()=>window.__taleraOriginalVideoWasShown||
+      !!document.querySelector('video.talera-v61-inline-video'),
+      null,{timeout:12000});
+  }catch(error){
+    const diagnostic=await page.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return {index:m?._photoIndex,media:m?._zeroItems?.map(x=>x.kind),
+        observed:window.__taleraOriginalVideoWasShown,
+        videos:[...document.querySelectorAll('video')].map(v=>({
+          cls:v.className,paused:v.paused,ended:v.ended,currentTime:v.currentTime
+        }))};
+    });
+    throw Error('Original video not visible after tap: '+JSON.stringify(diagnostic)+'; '+error);
+  }finally{
+    await page.evaluate(()=>window.__taleraOriginalVideoObserver?.disconnect());
+  }
   await waitIndex(page,0,12000);
   const state=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();

@@ -792,7 +792,7 @@ jobs:
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');
           console.log('TALERA_NORMAL_APP_ENTRY_OK; PRIVATE_DATA_STILL_AUTH_GATED; NO_ACCOUNTS_CREATED');
           NODE
-      - name: Verify full unvoiced picture-to-picture swipe and original video in same memory, voice untouched
+      - name: Verify first-open local gallery tags and same Free presentation unchanged
         shell: bash
         run: |
           set -euo pipefail

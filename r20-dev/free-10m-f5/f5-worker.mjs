@@ -75,14 +75,49 @@ function hideUnselectedEntryPhoto(html,requestUrl){
    const requested=${JSON.stringify(id)};
    const root=document.documentElement;
    root.classList.add('talera-direct-memory-entering');
+   // A gallery tile carries its stable media ID in a local session hand-off.
+   // The parent story remains in the URL for the existing one-screen player.
+   const galleryKey='talera-f5-gallery-photo-return-v1';
+   let gallery=null,selected=false,watch=0;
+   const started=Date.now();
+   try{
+     const data=JSON.parse(sessionStorage.getItem(galleryKey)||'null');
+     if(data?.v===1&&data.phase==='open'&&data.story===requested&&
+        typeof data.media==='string'&&data.media.length>0&&
+        Number.isFinite(data.at)&&Date.now()-data.at<43200000)gallery=data;
+   }catch(e){}
    const isTarget=m=>m&&(
      String(m.storyId||'')===requested ||
      String(m.id)==='pwa:'+requested ||
      String(m.id)===requested
    );
    let poll=0,settling=false;
+   const selectGalleryPhoto=m=>{
+     if(!gallery)return true;
+     if(m._photoLoading||!Array.isArray(m._zeroItems)||
+        !Array.isArray(m._zeroFrames)||!m._zeroFrames.length)return false;
+     const frames=m._zeroItems.filter(x=>x&&(x.kind==='photo'||x.kind==='video'));
+     const target=frames.findIndex(x=>x.key===gallery.media);
+     if(target<0||target>=m._zeroFrames.length){
+       if(Date.now()-started>20000){
+         try{sessionStorage.removeItem(galleryKey)}catch(e){}
+         gallery=null;return true;
+       }
+       return false;
+     }
+     if(m._photoIndex!==target){
+       if(typeof window.__taleraV31SelectPhoto!=='function')return false;
+       window.__taleraV31SelectPhoto(m.id,target,true);
+       return false;
+     }
+     if(!selected){
+       selected=true;gallery.phase='active';
+       try{sessionStorage.setItem(galleryKey,JSON.stringify(gallery))}catch(e){}
+     }
+     return true;
+   };
    const photoReady=m=>{
-     if(m._photoLoading)return false;
+     if(m._photoLoading||!selectGalleryPhoto(m))return false;
      const items=m._zeroItems||[];
      const isTextOnly=!!m._taleraLocal&&!items.some(x=>x.kind==='photo'||x.kind==='video');
      if(isTextOnly)return true;
@@ -95,6 +130,16 @@ function hideUnselectedEntryPhoto(html,requestUrl){
      if(!isTarget(m)||!photoReady(m))return;
      root.classList.remove('talera-direct-memory-entering');
      clearInterval(poll);
+     if(gallery&&!watch){
+       watch=setInterval(()=>{
+         const current=window.__taleraTimelineRuntime?.currentMemory?.();
+         // An actual story swipe ends gallery return; photo changes do not.
+         if(current&&!isTarget(current)){
+           try{sessionStorage.removeItem(galleryKey)}catch(e){}
+           gallery=null;clearInterval(watch);watch=0;
+         }
+       },100);
+     }
    };
    const tick=()=>{
      const m=window.__taleraTimelineRuntime?.currentMemory?.();
@@ -107,9 +152,23 @@ function hideUnselectedEntryPhoto(html,requestUrl){
        reveal();
      }));
    };
+   // Only override the existing back arrow for a genuine gallery entry.
+   document.addEventListener('click',event=>{
+     const node=event.target?.closest?.(
+       '#talera-flow-home, a[href="/"], a[href="/mijn-leven"]');
+     if(!gallery||!node)return;
+     const current=window.__taleraTimelineRuntime?.currentMemory?.();
+     if(!isTarget(current))return;
+     event.preventDefault();event.stopImmediatePropagation();
+     gallery.phase='return';
+     try{sessionStorage.setItem(galleryKey,JSON.stringify(gallery))}catch(e){}
+     window.location.assign('/mijn-leven');
+   },true);
    poll=setInterval(tick,40);
    tick();
-   window.addEventListener('pagehide',()=>clearInterval(poll),{once:true});
+   window.addEventListener('pagehide',()=>{
+     clearInterval(poll);if(watch)clearInterval(watch);
+   },{once:true});
  })();`;
  const markup='<script id="talera-direct-memory-entry-guard">'+js+'</script>'+
   '<style id="talera-direct-memory-entry-style">'+

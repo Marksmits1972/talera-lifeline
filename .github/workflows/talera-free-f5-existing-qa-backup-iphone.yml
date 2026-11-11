@@ -899,7 +899,7 @@ jobs:
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');
           console.log('TALERA_NORMAL_APP_ENTRY_OK; PRIVATE_DATA_STILL_AUTH_GATED; NO_ACCOUNTS_CREATED');
           NODE
-      - name: Verify ordinary tap never raises the thumbnail wheel over the real photo
+      - name: Verify strict actual red-green-blue and orange-cyan photo pixels across a swipe
         shell: bash
         run: |
           set -euo pipefail

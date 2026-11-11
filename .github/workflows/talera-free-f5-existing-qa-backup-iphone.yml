@@ -928,6 +928,23 @@ jobs:
         if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'qa-deploy-TALERA-gallery-first-image-priority-20261111' }}
         id: deploy
         run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
+      - name: Verify live existing Storage menu exposes exactly one account-gated backup action
+        if: ${{ steps.deploy.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --max-time 20 -fsS "https://$F5_STAGE_HOST/__clean/menu-integration.mjs" > /tmp/talera-storage-menu-qa.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const menu=readFileSync('/tmp/talera-storage-menu-qa.mjs','utf8');
+          assert.equal(menu.split('data-action="open-backup"').length,2);
+          assert.ok(menu.includes("state.view==='storage'&&state.account"));
+          assert.ok(menu.includes("window.location.assign('/__f5/backup')"));
+          assert.ok(menu.includes('data-action="storage-refresh"'));
+          assert.ok(!menu.includes('Reservekopie en herstel worden nog ontwikkeld.'));
+          console.log('TALERA_SAME_ORIGIN_STORAGE_BACKUP_MENU_CONNECTED');
+          NODE
       - name: Assert public sign-in app and private data boundaries on the SAME origin
         shell: bash
         run: |

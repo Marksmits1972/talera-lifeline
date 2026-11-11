@@ -121,6 +121,11 @@ try{
   assert.ok(dominant(second,1),'SECOND PHOTO DOES NOT DISPLAY GREEN, DOTS ONLY: '+
     JSON.stringify({first,second}));
   await page.locator('#memoryStoryScroll').tap({timeout:12000});
+  const wheelAfterTap=await page.locator('#photoStage .talera-wheel-strip').evaluate(e=>({
+    shown:e.classList.contains('is-visible'),display:getComputedStyle(e).display
+  }));
+  assert.equal(wheelAfterTap.shown,false,
+    'Ordinary PHOTO TAP must never open the high-z swipe thumbnail wheel');
   await waitIndex(page,2,9000);
   const third=await centerPixel(page);
   if(!dominant(third,2)){

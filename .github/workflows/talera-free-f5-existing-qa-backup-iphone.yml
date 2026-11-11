@@ -1,4 +1,4 @@
-name: TALERA Free F5 - video first frame visible on initial iPhone editor open
+name: TALERA Free F5 - restore exact owner-approved original V61 video logic
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: 39dfe34f-81db-430b-a1ea-e4e762bdca31
+      F5_PREVIOUS_VERSION: 4f910d18-1e40-4bb0-924a-6341b8e575a6
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Verify video first tile on first render, prior photo/story/voice and account regression without accounts
+      - name: Verify exact approved Nov 7 video logic and original media, preserve remaining Free regressions
         shell: bash
         run: |
           set -euo pipefail
@@ -621,44 +621,37 @@ jobs:
           assert.ok(tell.includes('const CANONICAL=['),
             'Previously supported selected tag choices must stay available');
           console.log('TALERA_EXISTING_WORK_EDITOR_HUMAN_TOPIC_AND_CUSTOM_ENTRY');
-          assert.ok(originalTell.includes(
-            "video.style.cssText='position:fixed;left:-10px;top:-10px;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1'"),
-            'Existing iPhone poster capture source has moved');
-          assert.ok(tell.includes(
-            "video.style.cssText='position:fixed;left:0;top:0;width:96px;height:96px;opacity:.001;pointer-events:none;z-index:-1'"),
-            'iOS preview decoder must have a real composited surface');
-          assert.ok(tell.includes("Safari Low Power Mode may reject play()"),
-            'Autoplay denied must not abort poster capture');
-          assert.ok(tell.includes("await new Promise(done=>requestAnimationFrame(()=>done()))"),
-            'Draw the decoded video frame after Safari paints it');
-          assert.ok(tell.includes("writeFiles([['preview:'+id,image]])"),
-            'Existing IndexedDB preview cache must remain');
+          // The user's EXPLICIT decision is to restore the last registered
+          // working video logic, rather than add any new first-open algorithm.
+          // The 2026-11-07 officially preferred PWA uses the same original V61
+          // code as the pinned 2026-11-07 design-cleanup builder source.
+          // Verify all five video/media functions byte-for-byte, and do not
+          // modify the photo/timeline, recorder or account data.
+          for(const [startMarker,endMarker] of [
+            ['function taleraV61MakeVideoPreview(file){','let activeThumbs='],
+            ['function taleraV61AttachNativeCovers(){','function tileHtml('],
+            ['function tileHtml(id,gid){','/* V7 draft deletion'],
+            ['function refreshPreview(id){','function canvasImageBlob'],
+            ['function importPhotos(chosen,targetGroupId=','function bindInput()']
+          ]){
+            const a=originalTell.indexOf(startMarker),b=originalTell.indexOf(endMarker,a+startMarker.length);
+            const x=tell.indexOf(startMarker),y=tell.indexOf(endMarker,x+startMarker.length);
+            assert.ok(a>0&&b>a&&x>0&&y>x,'Original V61 source location drift '+startMarker);
+            assert.equal(tell.slice(x,y),originalTell.slice(a,b),
+              'Never reimplement/patch previously approved V61 code: '+startMarker);
+          }
+          assert.ok(tell.includes("writeFiles([['preview:'+id,preview]])")||
+            tell.includes("writeFiles([['preview:'+id,image]])"),
+            'The original preview sidecar must persist only under the matching media ID');
           assert.ok(tell.includes("key:item.key+':phone-v1'"),
             'Existing published media-ID JPEG sidecar must remain');
-          assert.ok(tell.includes("async function taleraV61PersistMediaIds("),
-            'Narration/media-ID storage must remain');
-          assert.ok(tell.includes("function tileHtml("),
-            'Original work screen with all media tiles must remain');
+          assert.ok(tell.includes('async function taleraV61PersistMediaIds('),
+            'Original media-ID persistence and narration must be preserved');
           const nativeStart=tell.indexOf('function taleraV61AttachNativeCovers(){');
           const nativeEnd=tell.indexOf('function tileHtml(',nativeStart);
           assert.ok(nativeStart>0&&nativeEnd>nativeStart,
-            'Original existing Safari tile fallback must be preserved');
-          // Regression: the owner saw a placeholder for a just-imported
-          // video on the first workbench open, but the preview appeared after
-          // leaving and reopening. The native video must mount immediately
-          // AFTER the original media tiles exist, not only at a later RAF.
-          assert.ok(tell.includes(
-            "tiles.querySelectorAll('.tile').forEach(enableDrag);taleraV9EditorMediaControls(g);taleraV61AttachNativeCovers();"),
-            'Work tiles must invoke the existing native video cover immediately after DOM insertion');
-          assert.ok(tell.includes(
-            "main.querySelectorAll('.tile').forEach(enableDrag);taleraV61AttachNativeCovers();$('addMore').onclick="),
-            'Existing overview video tiles must share the same immediate callback');
-          assert.ok(tell.includes("if(v.isConnected&&v.videoWidth&&v.videoHeight){v.pause();v.style.opacity='1';}"),
-            'The already decoded first video frame must become visible without waiting for JPEG save');
-          assert.ok(tell.includes("previewBlobs.set(id,image);refreshPreview(id);"),
-            'The original in-place thumbnail DOM refresh must remain');
-          assert.ok(tell.includes("writeFiles([['preview:'+id,image]])"),
-            'The original IndexedDB preview sidecar must remain under same media ID');
+            'Exact original Safari native video cover must be present');
+          console.log('TALERA_V61_VIDEO_LOGIC_EXACT_APPROVED_20261107_NO_REDESIGN');
           const onVideoEvent={};
           const nativeVideo={
             style:{},readyState:2,videoWidth:640,videoHeight:360,
@@ -679,8 +672,7 @@ jobs:
           const sourceVideo={type:'video/mp4',size:4048,name:'original.mov'};
           const localFiles=new Map([['existing-local-video',sourceVideo]]);
           const posterCache=new Map();
-          let visiblePoster=null,storedPoster=null,completeFirstPreview;
-          const heldFirstPreview=new Promise(resolve=>{completeFirstPreview=resolve});
+          let visiblePoster=null,storedPoster=null;
           const nativeCover=new Function(
             'document','assets','kind','previewBlobs','drawnPreview',
             'refreshPreview','writeFiles','originalUrl','requestAnimationFrame',
@@ -688,7 +680,7 @@ jobs:
             {querySelectorAll:()=>videoTiles,createElement:tag=>{
               assert.equal(tag,'video');return nativeVideo}},
             localFiles,()=> 'video',posterCache,
-            async()=>heldFirstPreview,
+            async()=>new Blob(['original first visible frame'],{type:'image/jpeg'}),
             id=>{visiblePoster=id},
             async files=>{storedPoster=files},
             id=>'blob:existing-local-video',
@@ -698,15 +690,7 @@ jobs:
           assert.equal(nativeVideo.src,'blob:existing-local-video');
           assert.equal(nativeVideo.isConnected,true);
           onVideoEvent.loadedmetadata();
-          // The decoded native frame must show BEFORE the JPEG/canvas finishes.
-          // We hold the JPEG task to reproduce cold-open iOS behavior.
           onVideoEvent.loadeddata();
-          assert.equal(nativeVideo.style.opacity,'1',
-            'First video frame must be visible in the existing tile during async JPEG generation');
-          assert.equal(visiblePoster,null,
-            'The visible first frame does not depend on completing the JPEG cache');
-          assert.equal(posterCache.has('existing-local-video'),false);
-          completeFirstPreview(new Blob(['first visible frame'],{type:'image/jpeg'}));
           for(let i=0;i<20;i++)await Promise.resolve();
           assert.equal(visiblePoster,'existing-local-video',
             'Rejected autoplay must still show and save the first-frame poster');
@@ -717,8 +701,7 @@ jobs:
           assert.equal(localFiles.get('existing-local-video'),sourceVideo,
             'Original local video must remain byte-for-byte unchanged');
           assert.equal(localFiles.size,1,'No new media or account created');
-          console.log('TALERA_IPHONE_VIDEO_FIRST_FRAME_POSTER_NO_AUTOPLAY_REQUIRED');
-          console.log('TALERA_FIRST_OPEN_VIDEO_VISIBLE_BEFORE_JPEG_READY_SAME_TILE');
+          console.log('TALERA_V61_ORIGINAL_NATIVE_COVER_SAVES_PREVIEW_WITH_SAME_ID');
           // First-open regression: at document bootstrap no personal memories
           // have hydrated yet; a later account-local runtime notification MUST
           // prefetch the same wheel, without waiting for the first swipe.

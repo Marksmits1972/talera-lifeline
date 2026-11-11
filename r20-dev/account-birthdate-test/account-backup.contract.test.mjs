@@ -41,4 +41,28 @@ assert.ok(BACKUP_STATIC_MODULES['/__f5/f5-portable-idb.mjs'].includes("name!==SO
 assert.ok(BACKUP_STATIC_MODULES['/__f5/backup-controller.mjs'].includes("accountId.toLowerCase()!==initialAccount.toLowerCase()"));
 assert.ok(html.includes('Je huidige herinneringen blijven op dit toestel staan'));
 assert.throws(()=>localBackupPage('talera-free-local-fake-v1',acc),/TALERA_BACKUP_NO_VERIFIED_LOCAL_SCOPE/);
+// Test the real original 7-Nov base-menu *before* touching the approved
+// Worker: no second menu, no visual rework, exactly one new Storage action.
+const upstreamMenuUrl='https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev/__clean/menu-integration.mjs';
+const upstreamMenuResponse=await fetch(upstreamMenuUrl,{redirect:'error',signal:AbortSignal.timeout(20000)});
+assert.equal(upstreamMenuResponse.status,200,'Approved base menu source must be reachable');
+const originalMenu=await upstreamMenuResponse.text();
+assert.ok(originalMenu.includes("option('storage','▤','Opslag en back-up'"));
+const menuEnv={TALERA_BASE:{fetch:async req=>{
+ if(new URL(req.url).pathname==='/__clean/menu-integration.mjs')
+  return new Response(originalMenu,{status:200,headers:{'content-type':'text/javascript'}});
+ return upstream.fetch(req);
+}}};
+const actualMenuResponse=await worker.fetch(new Request(origin+'/__clean/menu-integration.mjs'),menuEnv);
+assert.equal(actualMenuResponse.status,200,'Original source-exact menu linking must succeed');
+const actualMenu=await actualMenuResponse.text();
+new Function(actualMenu);
+assert.equal(actualMenu.split('data-action=\\\"open-backup\\\"').length-1,1);
+assert.ok(actualMenu.includes("window.location.assign('/__f5/backup')"));
+assert.ok(actualMenu.includes('data-action=\\\"storage-refresh\\\"'));
+assert.ok(actualMenu.includes('birthDate:data.birthDate'));
+assert.ok(actualMenu.includes('Mijn abonnement'));
+assert.ok(actualMenu.includes('Bekijk opslag en back-up')===false);
+assert.ok(!actualMenu.includes('Reservekopie en herstel worden nog ontwikkeld.'));
+console.log('TALERA_7NOV_ORIGINAL_MENU_EXACT_ONE_BACKUP_ACTION_PASS');
 console.log('TALERA_7NOV_ONLY_STORAGE_BACKUP_BOUNDARY_PASS');

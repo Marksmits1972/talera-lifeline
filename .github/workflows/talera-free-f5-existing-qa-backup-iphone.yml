@@ -219,10 +219,13 @@ jobs:
           assert.ok(ownerHome.includes(removedReferenceAppend)&&
            !ownerHome.includes(oldReferenceAppend),
            'Home may not append sample memories into personal photo rows');
-          // Compact cards only; do not touch original timeline or presentation.
-          assert.ok(ownerHome.includes('flex:0 0 min(40vw,174px);height:142px;')&&
-            ownerHome.includes('.talera-life-row{margin:0 0 14px;'),
-            'Compact iPhone gallery cards must ship on same original Free homepage');
+          // Only original Free gallery styling and generated raster removal.
+          assert.ok(ownerHome.includes('flex:0 0 min(27vw,116px);width:min(27vw,116px);height:min(27vw,116px);')&&
+            ownerHome.includes('.talera-life-row{margin:0 0 23px;'),
+            'Three square Apple-like gallery cards with calm row spacing must ship in same Free app');
+          assert.ok(!ownerHome.includes("const fallback=el('span','talera-life-photo-placeholder','▧')")&&
+            !ownerHome.includes('.talera-life-photo-placeholder{position:absolute'),
+            'White raster icon must be REMOVED from actual photo tiles, not hidden by a timing hack');
           const galleryOpen='<script id="talera-home-gallery-script">';
           const gs=ownerHome.indexOf(galleryOpen),ge=ownerHome.indexOf('</script>',gs);
           assert.ok(gs>0&&ge>gs,'New gallery must be in the existing Home');

@@ -1,4 +1,4 @@
-name: TALERA Free F5 - real local covers before first-visible timeline on SAME candidate
+name: TALERA Free F5 - first-visible local covers syntax-verified SAME candidate
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:

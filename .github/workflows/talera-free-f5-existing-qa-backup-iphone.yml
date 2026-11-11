@@ -214,7 +214,7 @@ jobs:
           assert.ok(ownTopicCode.includes("window.location.assign('/present?theme='"));
           assert.ok(ownTopicCode.includes("source==='pwa-local'"));
           assert.ok(!ownTopicCode.includes('sampleRows('),
-            'Never show hard-coded/example topics as owner's own topics');
+            'Never show hard-coded/example topics as personal topics');
           assert.ok(ownTopicCode.includes('sessionStorage.getItem(turnKey)')&&
             ownTopicCode.includes('localStorage.setItem(counterKey'),
             'Tiles must stay stable within an open app session and rotate on new session');

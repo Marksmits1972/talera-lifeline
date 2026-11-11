@@ -164,9 +164,10 @@ try{
     throw Error('AFTER SWIPE DOTS MOVE BUT REAL PHOTO FROZEN: '+
       JSON.stringify(trace).slice(0,9000));
   }
+  const secondTapBefore=await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex);
   await page.locator('#memoryStoryScroll').tap({timeout:12000});
   await page.waitForFunction(previous=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex!==previous,
-    1,{timeout:9000});
+    secondTapBefore,{timeout:2200});
   console.log('TALERA_REAL_STORY_SWIPE_AND_SECOND_MEMORY_PHOTO_ROLL_OK');
   // Re-open the exact same local video as the existing dedicated test.
   await load(page,mixed,3);

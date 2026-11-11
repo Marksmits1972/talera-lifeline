@@ -832,6 +832,7 @@ jobs:
           set -euo pipefail
           node --check r20-dev/free-10m-f5/f5-life-gallery.browser.test.mjs
           node --check r20-dev/free-10m-f5/f5-life-gallery-home.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
           timeout 180s node r20-dev/free-10m-f5/f5-life-gallery.browser.test.mjs
       - name: Recheck approved ordinary slideshow and video untouched
         shell: bash

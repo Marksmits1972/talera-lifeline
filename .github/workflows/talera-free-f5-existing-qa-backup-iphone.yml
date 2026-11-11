@@ -819,8 +819,10 @@ jobs:
         run: |
           set -euo pipefail
           timeout 180s npm install --no-save --no-package-lock playwright@1.56.1
-          timeout 180s npx --no-install playwright install --with-deps chromium
-          timeout 90s sudo apt-get install -y -qq ffmpeg
+          # GitHub Ubuntu runner has the browser system libraries; avoid the
+          # failing Azure Ubuntu apt mirror entirely during this UI-only test.
+          timeout 180s npx --no-install playwright install chromium
+          command -v ffmpeg >/dev/null || { echo 'Existing runner ffmpeg unavailable'; exit 1; }
       - name: Verify actual iPhone-sized gallery with owned photos and no overlay
         shell: bash
         timeout-minutes: 5

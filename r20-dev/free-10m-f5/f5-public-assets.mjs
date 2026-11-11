@@ -257,7 +257,20 @@ function warmUpFirstSwipePhotoStrip(html){
    'Only existing V13 photo wheel may change');
  return html;
 }
-// Reuse the existing V61 local video poster generator and its IndexedDB
+// The ORIGINAL private V8 memory adapter registered all newly discovered
+// account-local stories with a 32px blank placeholder; only after registration
+// did it asynchronously load the real cover of the selected story. Rapid
+// first swipes therefore displayed actual blank records, not merely a cold
+// wheel tile. Prime only five nearby LOCAL covers BEFORE publishing records
+// to the original timeline, and reuse each Blob URL during normal hydration.
+// No new database, no media copy, no album/reordering/narration changes.
+function primeFirstOpenLocalStoryCovers(html){
+ const exact=(before,after,label)=>{
+   assert.equal(html.split(before).length,2,'F5_FIRST_OPEN_ADAPTER_SOURCE_DRIFT_'+label);
+   html=html.replace(before,after);
+ };
+ const hydrateAnchor=" async function hydrate(memory){";
+ const prime=String.raw// Reuse the existing V61 local video poster generator and its IndexedDB
 // preview sidecar. On iPhone a hidden 2x2 autoplay video may never present a
 // frame; the visible native tile already has a load/seek/canvas fallback, but
 // that fallback requires successful autoplay. Keep the SAME original video,
@@ -317,6 +330,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);
  if(route==='/present')html=warmUpFirstSwipePhotoStrip(html);
+ if(route==='/present')html=primeFirstOpenLocalStoryCovers(html);
  if(route==='/tell')html=fixVideoFirstFramePreview(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

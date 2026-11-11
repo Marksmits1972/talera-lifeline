@@ -62,7 +62,8 @@ async function ready(){
     if(exited)throw Error('F5 Cloudflare runtime exited: '+logs);
     try{
       const health=await request('GET','/__f5/health',{gate:false});
-      if(health.status===200&&health.data.closedQa===true&&
+      if(health.status===200&&health.data.ok===true&&
+         health.data.closedQa===false&&health.data.personalRegistrationPilot===true&&
          health.data.realAccountsCertified===false)return;
     }catch{}
     await pause(350);

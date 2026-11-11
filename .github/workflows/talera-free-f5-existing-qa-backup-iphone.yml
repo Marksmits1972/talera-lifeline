@@ -361,7 +361,7 @@ jobs:
           const classList={add:k=>visibleClass.add(k),remove:k=>visibleClass.delete(k)};
           let active={id:50,image:'wrong-reference-image',_photoLoading:false};
           let foreground='wrong-reference-image',imageReady=true;
-          const dom={documentElement:{classList},getElementById:k=>k==='memoryPhotoA'?{
+          const dom={documentElement:{classList},addEventListener:()=>{},getElementById:k=>k==='memoryPhotoA'?{
             getAttribute:()=>foreground,complete:imageReady,naturalWidth:imageReady?800:0}:null};
           const entryBrowser={__taleraTimelineRuntime:{currentMemory:()=>active},addEventListener:()=>{}};
           new Function('window','document','setInterval','clearInterval','requestAnimationFrame',

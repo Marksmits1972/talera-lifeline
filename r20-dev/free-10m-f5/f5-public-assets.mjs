@@ -666,6 +666,9 @@ const scripts={};
 const paths=[
  '/__clean/menu-integration.mjs',
  '/__clean/ui-integration.mjs',
+ // The ORIGINAL presentation module imports this dependency. Without it,
+ // the heart/comment/share toolbar never mounts on /present (including voice).
+ '/__clean/social-controller.mjs',
  '/__clean/share-controller.mjs',
  '/__clean/guest-presentation-v55.js'
 ];
@@ -705,6 +708,9 @@ for(const name of paths){
 }
 assert.ok(scripts['/__clean/menu-integration.mjs'],
  'Approved account menu script must be present for login UI.');
+assert.ok(scripts['/__clean/social-controller.mjs']&&
+ scripts['/__clean/ui-integration.mjs']&&scripts['/__clean/share-controller.mjs'],
+ 'Existing TALERA heart, comments and sharing toolbar imports must all resolve');
 // Reuse the APPROVED, anonymous installable-PWA shell resources verbatim.
 const supportNames=['/sw.js','/manifest.webmanifest','/pwa-192.png',
   '/pwa-512.png','/apple-touch-icon.png','/favicon.png','/talera-brand-v9.svg'];

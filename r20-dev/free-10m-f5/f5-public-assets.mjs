@@ -205,6 +205,14 @@ function fixPhotoOnlyPresentation(original){
    "    }\n"+
    "    beginLanding(direction,v,d.startIndex);\n"+
    "    try{story.releasePointerCapture(e.pointerId)}catch(err){}");
+ // The existing 11-page swipe wheel MUST NOT paint its thumbnails at rest.
+ // Its children explicitly set visibility:visible, which overrides the
+ // parent's visibility:hidden. Hide the entire wheel by display:none
+ // outside a genuine swipe; no photo layout, media or narrator is modified.
+ result=exact(result,"</head>",
+   '<style id="talera-ordinary-wheel-rest-visibility">'+
+   '#photoStage .talera-wheel-strip:not(.is-visible){display:none!important}'+
+   '</style></head>');
  assert.ok(result.includes('window.__taleraV31SelectPhoto=')&&
    result.includes('function taleraInlineOrdinaryStep('),
    'Ordinary presentation manual photo source changed unexpectedly');

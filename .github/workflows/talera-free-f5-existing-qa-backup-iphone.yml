@@ -246,10 +246,10 @@ jobs:
            topicCode.includes('window.__taleraHomeGallery?.render(rows)')&&
            topicCode.includes('return {records:rows.length,gallery:true};'),
            'Reuse one authenticated local story list and never create sample tiles');
-          const from=galleryCode.indexOf('function spread(pool,group){');
-          const until=galleryCode.indexOf('function release(){',from);
-          assert.ok(from>0&&until>from,'Time-distributed picker is required');
-          const pick=new Function('picks',galleryCode.slice(from,until)+';return spread;')(new Map());
+          const lifePickerStart=galleryCode.indexOf('function spread(pool,group){');
+          const lifePickerEnd=galleryCode.indexOf('function release(){',lifePickerStart);
+          assert.ok(lifePickerStart>0&&lifePickerEnd>lifePickerStart,'Time-distributed picker is required');
+          const pick=new Function('picks',galleryCode.slice(lifePickerStart,lifePickerEnd)+';return spread;')(new Map());
           const years=Array.from({length:21},(_,i)=>{
            const year=1980+i*2;
            return {row:{id:'local-test-'+i,date:year+'-01-01'},item:{key:'photo-'+i},
@@ -800,6 +800,7 @@ jobs:
           npx --no-install playwright install --with-deps chromium
           sudo apt-get install -y -qq ffmpeg
           node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
+          node r20-dev/free-10m-f5/f5-life-gallery.browser.test.mjs
       - name: Build identical seven-DO deployment config without re-creating or changing secrets
         shell: bash
         run: |

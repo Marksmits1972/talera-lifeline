@@ -239,7 +239,8 @@ try{
  console.log('TALERA_GALLERY_EXACT_MEDIA_ID_AND_SAME_CARD_BACK_OK');
  // Story-to-story swipe must cancel special gallery return.
  await route.locator('a.talera-life-card').nth(7).click();
- await page.waitForURL(/\\/present\\?memory=local-/,{timeout:15000});
+ await page.waitForURL(url=>url.pathname==='/present'&&
+   url.searchParams.get('memory')?.startsWith('local-'),{timeout:15000});
  await page.waitForFunction(id=>
    window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id&&
    !document.documentElement.classList.contains('talera-direct-memory-entering'),
@@ -257,7 +258,7 @@ try{
  await page.waitForFunction(()=>sessionStorage.getItem(
    'talera-f5-gallery-photo-return-v1')===null,null,{timeout:5000});
  await page.locator('#talera-flow-home').click({timeout:12000});
- await page.waitForURL(/\\/mijn-leven(?:$|\\?)/,{timeout:15000});
+ await page.waitForURL(url=>url.pathname==='/mijn-leven',{timeout:15000});
  assert.equal(await page.evaluate(()=>sessionStorage.getItem(
    'talera-f5-gallery-photo-return-v1')),null);
  console.log('TALERA_GALLERY_SWIPE_TO_OTHER_MEMORY_BACK_NORMAL_HOME_OK');

@@ -25,6 +25,20 @@ export {
 } from '../free-10m-social-do/social-objects.mjs';
 
 const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
+// The approved V25 menu has exactly three visible destinations; the fourth
+// "Gedeeld" destination was retired, but the original home grid stayed four
+// columns wide. Adjust ONLY the three-column CSS rule, never the nav nodes,
+// labels, URLs, visual theme, or the presentation/recording controls.
+const OLD_HOME_NAV_GRID='.flow-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important}';
+const THREE_HOME_NAV_GRID='.flow-nav{grid-template-columns:repeat(3,minmax(0,1fr))!important}';
+function evenlySpaceThreeHomeTabs(html){
+  if(typeof html!=='string'||html.split(OLD_HOME_NAV_GRID).length!==2||
+     !html.includes('id="navMine"')||!html.includes('id="navShared"')||
+     !html.includes('id="navNotifications"')||!html.includes('id="navMore"'))
+    throw Error('TALERA_HOME_NAV_SOURCE_DRIFT');
+  return html.replace(OLD_HOME_NAV_GRID,THREE_HOME_NAV_GRID);
+}
+
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
 // iOS fetches install icons independently of the browser login cookie.
 // These four static install resources are public. Account data remains private.
@@ -514,7 +528,8 @@ async function publicPage(request,env){
     // the record panel is visible. The original present/player video round
     // with sound after narration is untouched.
     const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;
-    const converted=await assetizeHtml(silenced,new Set(approvedAssets));
+    const threeTabHome=pathname==='/mijn-leven'?evenlySpaceThreeHomeTabs(silenced):silenced;
+    const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));
     return new Response(converted.html,{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
@@ -534,6 +549,10 @@ async function publicPage(request,env){
   headers.set('content-security-policy',F5_BROWSER_CSP);
   headers.set('x-content-type-options','nosniff');
   if(sessionToken&&!actor)headers.set('set-cookie',sessionCookie('',0));
+  if(pathname==='/mijn-leven'){
+    // Logged-out home displays the same three equal menu positions.
+    return new Response(evenlySpaceThreeHomeTabs(await r.text()),{status:200,headers});
+  }
   return new Response(r.body,{status:200,headers});
 }
 // Strictly session-bound, same-origin, NO personal-media network endpoint.

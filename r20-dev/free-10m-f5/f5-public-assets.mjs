@@ -132,6 +132,13 @@ function fixPhotoOnlyPresentation(original){
    "      // Resume ordinary circulation when this original video finishes.\n"+
    "      if(s===taleraInline&&s.phase==='ordinary'&&runtime.currentMemory()?.id===s.memory.id)\n"+
    "        window.__taleraV31SelectPhoto?.(s.memory.id,(s.memory._photoIndex+1)%s.frames.length,true);");
+ // A new unvoiced story first shows its OWN prepared cover; the previous
+ // story must not leave a visible overlay in front of the new one.
+ result=exact(result,
+   "if(changed&&memory&&Array.isArray(memory.photos)&&memory.photos.length){\n      memory._photoIndex=0;",
+   "if(changed&&memory&&Array.isArray(memory.photos)&&memory.photos.length){\n"+
+   "      if(memory._taleraLocal&&!memory._zeroItems?.some(x=>x.kind==='audio'))syncTaleraStoryFrame(null);\n"+
+   "      memory._photoIndex=0;");
  // One ordinary photo-stage request per memory + media URL. Repeated
  // timeline notifications must not cancel an iPhone image still decoding.
  result=exact(result,

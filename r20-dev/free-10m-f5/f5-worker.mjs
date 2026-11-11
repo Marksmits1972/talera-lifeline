@@ -127,17 +127,18 @@ function hideUnselectedEntryPhoto(html,requestUrl){
      const items=m._zeroItems||[];
      const isTextOnly=!!m._taleraLocal&&!items.some(x=>x.kind==='photo'||x.kind==='video');
      if(isTextOnly)return true;
-     const front=document.getElementById('memoryPhotoA');
-     if(!front||!m.image)return false;
-     if(front.getAttribute('src')!==m.image||!front.complete||front.naturalWidth<=0)return false;
      if(gallery){
-       // The selected original photo must actually decode, not just its cover.
+       // A gallery deep-link has its OWN selected decoded image. Never delay
+       // that image merely because the unrelated FIRST story cover is cold.
        const expected=m.photos?.[m._photoIndex||0];
        const sharp=document.querySelector('#photoStage .talera-story-synced-sharp');
-       if(!expected||!sharp||sharp.getAttribute('src')!==expected||
-          !sharp.complete||sharp.naturalWidth<=0)return false;
+       return !!expected&&!!sharp&&sharp.getAttribute('src')===expected&&
+         sharp.complete&&sharp.naturalWidth>0;
      }
-     return true;
+     // Preserve the approved ordinary deep-link guard byte-for-byte.
+     const front=document.getElementById('memoryPhotoA');
+     if(!front||!m.image)return false;
+     return front.getAttribute('src')===m.image&&front.complete&&front.naturalWidth>0;
    };
    const reveal=()=>{
      const m=window.__taleraTimelineRuntime?.currentMemory?.();

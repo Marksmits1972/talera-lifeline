@@ -121,6 +121,53 @@ try{
     },files);
     return row.id;
   },readFileSync(mp4).toString('base64'));
+  // The owner's bug occurs only AFTER a REAL story-to-story swipe.
+  // Preserve the same single /present page; do not navigate directly to
+  // memory 2. Its cover must be preloaded on the existing 11-photo wheel.
+  await load(page,plain,3);
+  const coverState=await page.evaluate(targetId=>{
+    const book=window.__taleraPhotoBook;
+    const row=book?.list?.().find(m=>m.storyId===targetId);
+    return {id:row?.id,preview:row?.previewImage,photo:row?.image,
+      hasMedia:!!row?._zeroItems?.length};
+  },mixed);
+  assert.ok(coverState.id&&coverState.preview&&coverState.hasMedia,
+    'Next story must have an existing attached real thumbnail');
+  const bounds=await page.locator('#memoryStoryScroll').boundingBox();
+  assert.ok(bounds?.width>100&&bounds?.height>100);
+  await page.mouse.move(bounds.x+bounds.width*.79,bounds.y+bounds.height*.48);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x+bounds.width*.18,bounds.y+bounds.height*.48,{steps:12});
+  await page.mouse.up();
+  await page.waitForFunction(id=>
+    window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+    mixed,{timeout:12000});
+  await page.waitForFunction(()=>!window.__taleraBandRolling,null,{timeout:12000});
+  await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length===3,
+    null,{timeout:11000});
+  const swipePhotoBefore=await page.locator('#photoStage').screenshot();
+  await waitIndex(page,1,11000);
+  const swipePhotoAfter=await page.locator('#photoStage').screenshot();
+  if(swipePhotoBefore.equals(swipePhotoAfter)){
+    const trace=await page.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      const stage=document.getElementById('photoStage');
+      const layers=[...stage.querySelectorAll('.example-photo,.talera-story-synced-sharp,.talera-wheel-strip,.talera-photo-strip-page')]
+        .map(e=>({className:e.className,id:e.id,src:e.currentSrc||e.src||'',
+          vis:getComputedStyle(e).visibility,display:getComputedStyle(e).display,
+          hidden:e.hidden,opacity:getComputedStyle(e).opacity,
+          z:getComputedStyle(e).zIndex,rect:e.getBoundingClientRect().toJSON()}));
+      return {story:m.storyId,index:m._photoIndex,
+        image:m.image,preview:m.previewImage,frames:m._zeroFrames,
+        rolling:window.__taleraBandRolling,layers};
+    });
+    throw Error('AFTER SWIPE DOTS MOVE BUT REAL PHOTO FROZEN: '+
+      JSON.stringify(trace).slice(0,9000));
+  }
+  await page.locator('#memoryStoryScroll').tap({timeout:12000});
+  await waitIndex(page,2,9000);
+  console.log('TALERA_REAL_STORY_SWIPE_AND_SECOND_MEMORY_PHOTO_ROLL_OK');
+  // Re-open the exact same local video as the existing dedicated test.
   await load(page,mixed,3);
   await waitIndex(page,1);
   await waitIndex(page,2);

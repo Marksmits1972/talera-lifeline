@@ -206,6 +206,57 @@ function fixFirstSwipePhotoLoad(html){
   'Must patch only the already existing 11-page wheel');
  return html;
 }
+// Original V13 wheel prefetch ran at document bootstrap and then only on
+// movement. Private IndexedDB memories are hydrated AFTER bootstrap: before
+// the first swipe those original photos were still cold, causing 2-3 blank
+// frames. Reuse the EXISTING preload cache immediately on runtime hydration;
+// keep identical 11-page wheel, timing, geometry, gesture and selected story.
+function warmUpFirstSwipePhotoStrip(html){
+ const replace=(oldValue,newValue,label)=>{
+   assert.equal(html.split(oldValue).length,2,'F5_COLD_SWIPE_SOURCE_DRIFT_'+label);
+   html=html.replace(oldValue,newValue);
+ };
+ const oldPrefetch="  function prefetch(){\n"+
+   "    const items=all(),c=Math.round(state.p),dir=Math.sign(state.v);\n"+
+   "    for(let off=(dir>=0?-3:-9);off<=(dir>=0?9:3);off++){\n"+
+   "      const mem=items[c+off];if(!mem||!mem.image||cache.has(mem.id))continue;\n"+
+   "      const img=new Image();img.decoding='async';img.src=mem.previewImage||mem.thumbnail||mem.image;\n"+
+   "      cache.set(mem.id,img);\n"+
+   "      if(cache.size>35)cache.delete(cache.keys().next().value);\n"+
+   "    }\n"+
+   "  }";
+ const warmPrefetch="  function prefetch(){\n"+
+   "    const items=all(),c=Math.round(state.p),dir=Math.sign(state.v);\n"+
+   "    for(let off=(dir>=0?-3:-9);off<=(dir>=0?9:3);off++){\n"+
+   "      const mem=items[c+off];if(!mem||!mem.image)continue;\n"+
+   "      const source=mem.previewImage||mem.thumbnail||mem.image;\n"+
+   "      if(cache.get(mem.id)?.src===source)continue;\n"+
+   "      const img=new Image();img.decoding='async';img.src=source;\n"+
+   "      cache.set(mem.id,img);\n"+
+   "      if(cache.size>35)cache.delete(cache.keys().next().value);\n"+
+   "    }\n"+
+   "  }";
+ replace(oldPrefetch,warmPrefetch,'PREFETCH');
+ const oldSub="  if(runtime?.subscribe)runtime.subscribe(()=>{if(state.visible||state.drag||window.__taleraBandRolling)return;state.p=book.state().index;state.center=-1;});";
+ const updatedSub="  if(runtime?.subscribe)runtime.subscribe(()=>{\n"+
+   "    if(state.visible||state.drag||window.__taleraBandRolling)return;\n"+
+   "    state.p=book.state().index;state.center=-1;\n"+
+   "    // The owner's local memories arrive after the first PWA render.\n"+
+   "    // Warm the SAME 13-photo budget before the first touch, not on swipe.\n"+
+   "    prefetch();\n"+
+   "  });";
+ replace(oldSub,updatedSub,'IDB_HYDRATION');
+ const oldFallback="    const fallback=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):null;";
+ const newFallback="    // A newly restored base image may be cold; retain any already decoded\n"+
+   "    // photo from this account's existing bounded wheel cache instead.\n"+
+   "    const readyNeighbour=[...cache.values()].find(img=>img.complete&&img.naturalWidth);\n"+
+   "    const fallback=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):\n"+
+   "      (readyNeighbour?.currentSrc||readyNeighbour?.src||null);";
+ replace(oldFallback,newFallback,'COLD_FALLBACK');
+ assert.ok(html.includes("const N=11,pages=[],cache=new Map()"),
+   'Only existing V13 photo wheel may change');
+ return html;
+}
 // Reuse the existing V61 local video poster generator and its IndexedDB
 // preview sidecar. On iPhone a hidden 2x2 autoplay video may never present a
 // frame; the visible native tile already has a load/seek/canvas fallback, but
@@ -265,6 +316,7 @@ for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);
+ if(route==='/present')html=warmUpFirstSwipePhotoStrip(html);
  if(route==='/tell')html=fixVideoFirstFramePreview(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

@@ -367,8 +367,8 @@ function fixVideoFirstFramePreview(html){
  // Safari can decode the first frame before a canvas thumbnail has finished.
  // Show that real muted video frame immediately while the original preview
  // worker finishes and refreshPreview swaps in the locally cached JPEG.
- replace("    for(const e of ['loadeddata','seeked','canplay','timeupdate'])\\n      v.addEventListener(e,()=>{if(v.readyState>=2)void capture()});",
-  "    for(const e of ['loadeddata','seeked','canplay','timeupdate'])\\n      v.addEventListener(e,()=>{if(v.readyState>=2){\\n        if(v.isConnected&&v.videoWidth&&v.videoHeight){v.pause();v.style.opacity='1';}\\n        void capture();\\n      }});",
+ replace("    for(const e of ['loadeddata','seeked','canplay','timeupdate'])\n      v.addEventListener(e,()=>{if(v.readyState>=2)void capture()});",
+  "    for(const e of ['loadeddata','seeked','canplay','timeupdate'])\n      v.addEventListener(e,()=>{if(v.readyState>=2){\n        if(v.isConnected&&v.videoWidth&&v.videoHeight){v.pause();v.style.opacity='1';}\n        void capture();\n      }});",
   'SAFARI_FIRST_DECODED_FRAME');
  assert.ok(html.includes("previewBlobs.set(id,image);refreshPreview(id);"),
   'Existing direct video poster selection must remain');

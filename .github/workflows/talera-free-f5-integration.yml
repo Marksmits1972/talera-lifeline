@@ -62,14 +62,20 @@ jobs:
           node --check r20-dev/free-10m-f5/f5-neighbor-preview.mjs
       - name: Verify Cloudflare compilation without deployment
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
-      - name: Execute synthetic auth + private DOB + social privacy and persistence
-        run: node r20-dev/free-10m-f5/f5-local-test.mjs
       - name: Install headless mobile browser and small synthetic video generator for the reported issue
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps chromium
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
+      - name: Browser verify existing real-account login, switching, privacy and original menu
+        run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
+      - name: Browser verify back-up panel, private session and two local browser contexts
+        run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
+      - name: Browser verify complete original-media export, checksum and nondestructive restore
+        run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
+      - name: Browser verify original ordinary presentation and video after adding only backup
+        run: node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Browser regression - five actual synthetic photos plus one MP4, mixed and separate video choices
         run: |
           node --check r20-dev/free-10m-f5/f5-video-browser-regression.mjs

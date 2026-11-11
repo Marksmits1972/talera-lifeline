@@ -57,9 +57,9 @@ const actualMenuResponse=await worker.fetch(new Request(origin+'/__clean/menu-in
 assert.equal(actualMenuResponse.status,200,'Original source-exact menu linking must succeed');
 const actualMenu=await actualMenuResponse.text();
 new Function(actualMenu);
-assert.equal(actualMenu.split('data-action=\\\"open-backup\\\"').length-1,1);
+assert.equal(actualMenu.split('data-action="open-backup"').length-1,1);
 assert.ok(actualMenu.includes("window.location.assign('/__f5/backup')"));
-assert.ok(actualMenu.includes('data-action=\\\"storage-refresh\\\"'));
+assert.ok(actualMenu.includes('data-action="storage-refresh"'));
 assert.ok(actualMenu.includes('birthDate:data.birthDate'));
 assert.ok(actualMenu.includes('Mijn abonnement'));
 assert.ok(actualMenu.includes('Bekijk opslag en back-up')===false);

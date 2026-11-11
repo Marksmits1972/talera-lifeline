@@ -141,10 +141,10 @@ function fixPhotoOnlyPresentation(original){
    "function hide(){requestNo++;owner='';shown='';if(host)host.hidden=true;}",
    "function hide(){requestNo++;owner='';shown='';pendingOwner='';pendingSrc='';if(host)host.hidden=true;}");
  result=exact(result,
-   "if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\\n      const seq=++requestNo,check=new Image();",
-   "if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\\n"+
-   "      if(pendingOwner===memory.id&&pendingSrc===src)return;\\n"+
-   "      pendingOwner=memory.id;pendingSrc=src;\\n"+
+   "if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\n      const seq=++requestNo,check=new Image();",
+   "if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\n"+
+   "      if(pendingOwner===memory.id&&pendingSrc===src)return;\n"+
+   "      pendingOwner=memory.id;pendingSrc=src;\n"+
    "      const seq=++requestNo,check=new Image();");
  result=exact(result,
    "owner=memory.id;shown=src;sharp.src=src;backdrop.src=src;host.hidden=false;",

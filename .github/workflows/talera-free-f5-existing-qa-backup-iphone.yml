@@ -937,7 +937,6 @@ jobs:
       - name: Dry-run only this original QA Worker package
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc --outdir .talera-f5-backup-iphone-dryrun
       - name: Deploy ONLY existing private QA Worker with no secret rotation or data migration
-        if: ${{ false }}
         id: deploy
         run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
       - name: Assert public sign-in app and private data boundaries on the SAME origin

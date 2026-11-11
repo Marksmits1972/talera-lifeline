@@ -191,6 +191,11 @@ try{
     window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
     mixed,{timeout:12000});
   await page.waitForFunction(()=>!window.__taleraBandRolling,null,{timeout:12000});
+  const wheelRest=await page.locator('#photoStage .talera-wheel-strip').evaluate(el=>({
+    display:getComputedStyle(el).display,active:el.classList.contains('is-visible')
+  }));
+  assert.equal(wheelRest.active,false,'The story swipe must have settled');
+  assert.equal(wheelRest.display,'none','Thumbnail wheel must hide ALL child pages at rest');
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length===3,
     null,{timeout:11000});
   const swipePhotoBefore=await centerPixel(page);

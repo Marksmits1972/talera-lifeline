@@ -94,8 +94,14 @@ function hideUnselectedEntryPhoto(html,requestUrl){
    let poll=0,settling=false;
    const selectGalleryPhoto=m=>{
      if(!gallery)return true;
-     if(m._photoLoading||!Array.isArray(m._zeroItems)||
-        !Array.isArray(m._zeroFrames)||!m._zeroFrames.length)return false;
+     if(m._photoLoading)return false;
+     if(!Array.isArray(m._zeroItems)||!Array.isArray(m._zeroFrames)||!m._zeroFrames.length){
+       if(Date.now()-started>20000){
+         try{sessionStorage.removeItem(galleryKey)}catch(e){}
+         gallery=null;return true;
+       }
+       return false;
+     }
      const frames=m._zeroItems.filter(x=>x&&(x.kind==='photo'||x.kind==='video'));
      const target=frames.findIndex(x=>x.key===gallery.media);
      if(target<0||target>=m._zeroFrames.length){
@@ -123,7 +129,15 @@ function hideUnselectedEntryPhoto(html,requestUrl){
      if(isTextOnly)return true;
      const front=document.getElementById('memoryPhotoA');
      if(!front||!m.image)return false;
-     return front.getAttribute('src')===m.image &&front.complete&&front.naturalWidth>0;
+     if(front.getAttribute('src')!==m.image||!front.complete||front.naturalWidth<=0)return false;
+     if(gallery){
+       // The selected original photo must actually decode, not just its cover.
+       const expected=m.photos?.[m._photoIndex||0];
+       const sharp=document.querySelector('#photoStage .talera-story-synced-sharp');
+       if(!expected||!sharp||sharp.getAttribute('src')!==expected||
+          !sharp.complete||sharp.naturalWidth<=0)return false;
+     }
+     return true;
    };
    const reveal=()=>{
      const m=window.__taleraTimelineRuntime?.currentMemory?.();

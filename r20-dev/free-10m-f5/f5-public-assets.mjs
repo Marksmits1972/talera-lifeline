@@ -288,7 +288,10 @@ function primeFirstOpenLocalStoryCovers(html){
   "   // Only a few adjacent covers, never all stories or original files.\n"+
   "   // First real cover and neighbours are ready before swipe can show them.\n"+
   "   const center=selected?.ms??runtime.currentMemory()?.ms??Date.now();\n"+
-  "   const near=memories.slice().sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,5);\n"+
+  "   const asked=new URLSearchParams(location.search).get('theme');\n"+
+  "   const norm=t=>String(t||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('nl');\n"+
+  "   const matching=asked?memories.filter(m=>(m.tags||[]).some(t=>norm(t)===norm(asked))):memories;\n"+
+  "   const near=matching.slice().sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,5);\n"+
   "   await Promise.all(near.map(warmFirstPhoto));\n"+
   "   runtime.registerMemories(memories);";
  exact(beforeRegistration,afterRegistration,'REGISTER_AFTER_REAL_COVERS');
@@ -414,6 +417,39 @@ function shapeOwnStoryTopics(html){
  assert.ok(html.includes('talera-tags-own-input'),'Editor input must remain within original work screen');
  return html;
 }
+// Reuse the ORIGINAL RH19 presentation and V3 swipe engine for topic routes.
+// Only current authenticated account's local stories may enter these selections.
+function filterOwnTopicPresentation(html){
+ const one=(before,after,label)=>{
+  assert.equal(html.split(before).length,2,'F5_OWNER_TOPIC_PRESENT_SOURCE_DRIFT_'+label);
+  html=html.replace(before,after);
+ };
+ const scope="const taleraMatchesScope = m => taleraMatchesTopic(m.tags) && taleraMatchesDecade(m);";
+ one(scope,"const taleraMatchesScope = m => taleraMatchesTopic(m.tags) && taleraMatchesDecade(m) && (!TALERA_ACTIVE_TOPIC || !!m._taleraLocal);",'ACCOUNT_ONLY');
+ const before="    const incoming=memories.filter(m=>m&&Number.isFinite(m.ms)&&taleraMatchesScope(m));";
+ const after=before+"\n"+
+  "    if(TALERA_ACTIVE_TOPIC){\n"+
+  "      // The original memories and examples are replaced atomically by\n"+
+  "      // the already-authenticated account's own stories with this tag.\n"+
+  "      if(!incoming.length){location.replace('/mijn-leven');return 0;}\n"+
+  "      MEMORIES.splice(0,MEMORIES.length);\n"+
+  "    }";
+ one(before,after,'NO_SAMPLES_ON_TOPIC');
+ const oldFinish="    MEMORIES.push(...incoming);\n    MEMORIES.sort((a,b)=>a.ms-b.ms);\n    taleraRebuildDensity();\n    return incoming.length;";
+ const newFinish="    MEMORIES.push(...incoming);\n    MEMORIES.sort((a,b)=>a.ms-b.ms);\n    taleraRebuildDensity();\n"+
+  "    if(TALERA_ACTIVE_TOPIC){\n"+
+  "      const selected=MEMORIES[MEMORIES.length-1];\n"+
+  "      centerMs=selected.ms;activeMemoryId=selected.id;keepCenterValid();\n"+
+  "      writeMemory(selected);draw();\n"+
+  "      document.documentElement.classList.remove('talera-topic-loading');\n"+
+  "    }\n"+
+  "    return incoming.length;";
+ one(oldFinish,newFinish,'EXISTING_PRESENTATION_ONLY');
+ assert.ok(html.includes('const TALERA_ACTIVE_TOPIC = new URLSearchParams(location.search).get("theme")||"";'),
+  'Original tag filter missing; refuse to alter presentation engine');
+ one('<head>','<head>'+"<script id=\"talera-topic-visibility-guard\">if(new URLSearchParams(location.search).has('theme'))document.documentElement.classList.add('talera-topic-loading');</script><style id=\"talera-topic-visibility-style\">html.talera-topic-loading #photoStage,html.talera-topic-loading #memoryCaption{visibility:hidden!important}</style>",'ONLY_TOPIC_LOADING_GUARD');
+ return html;
+}
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
@@ -421,6 +457,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);
  if(route==='/present')html=warmUpFirstSwipePhotoStrip(html);
  if(route==='/present')html=primeFirstOpenLocalStoryCovers(html);
+ if(route==='/present')html=filterOwnTopicPresentation(html);
  if(route==='/tell')html=fixVideoFirstFramePreview(html);
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/tell')html=shapeOwnStoryTopics(html);

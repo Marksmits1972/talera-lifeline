@@ -1,4 +1,4 @@
-name: TALERA Free F5 - exactly one Home example tile, never eight legacy sample cards
+name: TALERA Free F5 - no wrong first photo on direct story entry SAME candidate
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: d740d68b-5da1-46b2-816f-a9c19992045c
+      F5_PREVIOUS_VERSION: 471d0e4a-51da-48d8-9af4-20a2bbf95ccb
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Prove original Home no longer appends eight samples; one own example then real tags, no account changes
+      - name: Verify first-frame story selection and previous Home, photo, account regression without any accounts
         shell: bash
         run: |
           set -euo pipefail
@@ -415,6 +415,67 @@ jobs:
 
           const before=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-present.html','utf8');
           const present=readRef('/present');
+          // A direct Home story link used to paint the default reference
+          // memory 50 BEFORE R19 selected ?memory=3 / local IndexedDB.
+          const fromGuard=worker.indexOf('function hideUnselectedEntryPhoto(');
+          const toGuard=worker.indexOf('\nconst AUTH_PATHS=',fromGuard);
+          assert.ok(fromGuard>0&&toGuard>fromGuard,'Direct memory entry guard must be scoped');
+          const safeRoute=u=>u.pathname==='/present'&&u.searchParams.size===1&&
+            u.searchParams.has('memory');
+          const gate=new Function('LOCAL_STORY_ID','allowedLocalUiSearch',
+            worker.slice(fromGuard,toGuard)+';return hideUnselectedEntryPhoto;')(
+            /^local-[a-z0-9-]{8,90}$/i,safeRoute);
+          const rootUrl='https://talera.example/present';
+          assert.equal(gate(present,rootUrl),present,
+            'Ordinary presentation without a specific story must not change');
+          for(const suffix of ['?year=1985','?theme=Familie','?memory=1031'])
+            assert.equal(gate(present,rootUrl+suffix),present,
+              'Existing year/topic and unsupported legacy selectors remain unmodified');
+          const gated=gate(present,rootUrl+'?memory=3');
+          assert.ok(gated.includes('id="talera-direct-memory-entry-guard"'));
+          assert.ok(gated.includes('id="talera-direct-memory-entry-style"'));
+          assert.equal(gated.replace(/<script id="talera-direct-memory-entry-guard">[\s\S]*?<\/script><style id="talera-direct-memory-entry-style">[\s\S]*?<\/style>/,'')
+              ,present,'Only the immediate entry guard may change the approved presentation');
+          assert.ok(gated.indexOf('talera-direct-memory-entry-guard')<
+            gated.indexOf('id="memoryPhotoA"'),
+            'Wrong first photo must be hidden before it can paint');
+          const localGate=gate(present,rootUrl+'?memory=local-12345678');
+          assert.ok(localGate.includes('const requested="local-12345678";'));
+          assert.ok(worker.includes('const storyEntryHtml=hideUnselectedEntryPhoto(converted.html,request.url);'),
+            'Personal private account pages must receive first-frame protection');
+          assert.ok(worker.includes('hideUnselectedEntryPhoto(await r.text(),request.url)'),
+            'Anonymous Home example links must receive identical protection');
+          const innerScript=gated.match(/<script id="talera-direct-memory-entry-guard">([\s\S]*?)<\/script>/)?.[1];
+          assert.ok(innerScript,'Original same presentation must include entry guard');
+          const visibleClass=new Set();let frameCounter=0,intervalTick,cleaned=false;
+          const classList={add:k=>visibleClass.add(k),remove:k=>visibleClass.delete(k)};
+          let active={id:50,image:'wrong-reference-image',_photoLoading:false};
+          let foreground='wrong-reference-image',imageReady=true;
+          const dom={documentElement:{classList},getElementById:k=>k==='memoryPhotoA'?{
+            getAttribute:()=>foreground,complete:imageReady,naturalWidth:imageReady?800:0}:null};
+          const browser={__taleraTimelineRuntime:{currentMemory:()=>active},addEventListener:()=>{}};
+          new Function('window','document','setInterval','clearInterval','requestAnimationFrame',
+            innerScript)(browser,dom,fn=>(intervalTick=fn,1),()=>{cleaned=true},
+            fn=>{frameCounter++;fn()});
+          assert.ok(visibleClass.has('talera-direct-memory-entering'),
+            'The wrong reference image MUST be hidden before R19 selects the story');
+          assert.equal(typeof intervalTick,'function');
+          intervalTick();
+          assert.ok(visibleClass.has('talera-direct-memory-entering'),
+            'Default memory 50 may never be shown when opening memory 3');
+          active={id:3,image:'expected-owner-selection',_photoLoading:false};
+          intervalTick();
+          assert.ok(visibleClass.has('talera-direct-memory-entering'),
+            'After target selection, the wrong old bitmap may not be shown');
+          foreground='expected-owner-selection';imageReady=false;
+          intervalTick();
+          assert.ok(visibleClass.has('talera-direct-memory-entering'),
+            'Target not yet decoded cannot reveal presentation photo');
+          imageReady=true;intervalTick();
+          assert.ok(!visibleClass.has('talera-direct-memory-entering'),
+            'Reveal exactly the requested fully loaded photo after original writeMemory');
+          assert.ok(frameCounter>=2&&cleaned,'Guard must release only after two paint frames');
+          console.log('TALERA_DIRECT_STORY_ENTRY_NO_WRONG_REFERENCE_FRAME_R19_LOCAL');
           // Theme selection only affects the same RH19/V3 presentation engine.
           const topicScope=present.indexOf('const taleraMatchesScope = m =>');
           const scopeEnd=present.indexOf(';',topicScope);
@@ -830,6 +891,22 @@ jobs:
             code="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$path")"
             test "$code" = 404
           done
+          # Verify direct story open has the first-frame gate on the actual
+          # SAMEORIGIN Worker, never on normal presentation or year pages.
+          curl --max-time 20 -fsS "https://$F5_STAGE_HOST/present?memory=3" > /tmp/talera-direct-story-guard.html
+          curl --max-time 20 -fsS "https://$F5_STAGE_HOST/present" > /tmp/talera-normal-presentation.html
+          node <<'NODE'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          const story=fs.readFileSync('/tmp/talera-direct-story-guard.html','utf8');
+          const ordinary=fs.readFileSync('/tmp/talera-normal-presentation.html','utf8');
+          assert.ok(story.includes('id="talera-direct-memory-entry-guard"'));
+          assert.ok(story.includes('html.talera-direct-memory-entering #photoStage'));
+          assert.ok(story.indexOf('talera-direct-memory-entry-guard')<
+            story.indexOf('id="memoryPhotoA"'));
+          assert.ok(!ordinary.includes('talera-direct-memory-entry-guard'));
+          assert.ok(story.includes('talera-lifeline-r19-bridge'));
+          console.log('SAME_ORIGIN_DIRECT_MEMORY_ENTRY_NO_WRONG_FIRST_FRAME');
+          NODE
           # Same-origin menu and Home quick links, with no extra pages/accounts.
           for path in /meldingen '/present?year=1985' \
             '/present?memory=3' '/present?memory=1031'; do

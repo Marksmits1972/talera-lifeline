@@ -121,14 +121,17 @@ try{
    gap:parseFloat(styles.gap),rowMargin:parseFloat(
     getComputedStyle(track.closest('.talera-life-row')).marginBottom)};
  });
- assert.ok(compact.height>=140&&compact.height<=144,
-  'Apple-like smaller card height should be 142 CSS px: '+JSON.stringify(compact));
- assert.ok(compact.width<=170,
-  'Smaller card width should fit the current phone: '+JSON.stringify(compact));
- assert.ok(compact.available>=2*compact.width+compact.gap+8,
-  'At least two full photo cards and a visible hint of the next fit horizontally: '+
+ assert.ok(compact.width>=90&&compact.width<=112,
+  'Near-square Apple-style photo cards should be about 100 CSS px: '+JSON.stringify(compact));
+ assert.ok(Math.abs(compact.height-compact.width)<=2,
+  'Photographs should be square rather than wide landscape tiles: '+JSON.stringify(compact));
+ assert.ok(compact.available>=3*compact.width+2*compact.gap,
+  'At least three real photographs must fit next to one another on an iPhone: '+
    JSON.stringify(compact));
- assert.ok(compact.rowMargin<=14,'Compact rows make room for more gallery strips');
+ assert.ok(compact.rowMargin>=20&&compact.rowMargin<=25,
+  'Smaller cards should have more white breathing room between topic rows');
+ assert.equal(await page.locator('#talera-life-gallery-rows .talera-life-photo-placeholder').count(),0,
+  'Generated white hatch/raster must not overlay ANY real photograph');
  const years=await family.locator('.talera-life-card-caption small').allTextContents();
  assert.ok(new Set(years).size>=7,
   'The ten selected photos should be spread across the time period');
@@ -141,6 +144,8 @@ try{
   '#talera-life-gallery-rows a.talera-life-card img')].some(
   image=>image.currentSrc.startsWith('blob:')&&image.complete&&image.naturalWidth>0),
   null,{timeout:14000});
+ assert.equal(await page.locator('#talera-life-gallery-rows .talera-life-photo-placeholder').count(),0,
+  'Even loaded original photos must never have a generated raster on top');
  const firstLinks=await family.locator('a.talera-life-card').evaluateAll(a=>a.map(x=>x.href));
  await page.evaluate(()=>window.__taleraTopics.refresh());
  await page.waitForTimeout(350);
@@ -158,7 +163,7 @@ try{
  console.log('TALERA_FREE_LIFE_GALLERY_FIRST_OPEN_EXAMPLE_NO_FAKE_PHOTOS_OK');
  console.log('TALERA_FREE_LIFE_GALLERY_LOCAL_YEARS_AND_TAGS_TEN_SPREAD_OVER_LIFE_OK');
  console.log('TALERA_FREE_LIFE_GALLERY_BLOB_PHOTOS_SCROLL_AND_ORIGINAL_MEMORY_LINKS_OK');
- console.log('TALERA_FREE_LIFE_GALLERY_COMPACT_CARDS_TWO_FULL_PLUS_NEXT_PEEK_OK',JSON.stringify(compact));
+ console.log('TALERA_FREE_LIFE_GALLERY_SQUARE_THREE_ACROSS_NO_RASTER_OK',JSON.stringify(compact));
  console.log('TALERA_FREE_LIFE_GALLERY_ORIGINAL_TIMELINE_NAV_UNTOUCHED');
 }finally{
  await stop();

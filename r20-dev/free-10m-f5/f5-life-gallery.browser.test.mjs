@@ -211,6 +211,53 @@ try{
   false,'Gallery return history marker is one-shot, never persistent');
  console.log('TALERA_FREE_GALLERY_BACK_RETURNS_TO_EXACT_PHOTO_ROW_AND_SCROLL_OK');
 
+ // The gallery origin survives swiping to a DIFFERENT memory in the same
+ // presentation session. Only a new app opening forgets that origin.
+ const originalTile=family.locator('a.talera-life-card').filter({
+  has:page.locator('img')
+ }).nth(5);
+ await Promise.all([
+  page.waitForURL(url=>url.pathname==='/present',{timeout:22000}),
+  originalTile.click()
+ ]);
+ await page.waitForFunction(id=>
+   window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+   source.storyId,{timeout:22000});
+ await page.waitForFunction(()=>!window.__taleraBandRolling,null,{timeout:12000});
+ const stage=await page.locator('#memoryStoryScroll').boundingBox();
+ assert.ok(stage?.width>150&&stage?.height>120,
+   'Only the EXISTING actual memory filmstrip may process memory swipes');
+ await page.mouse.move(stage.x+stage.width*.79,stage.y+stage.height*.48);
+ await page.mouse.down();
+ await page.mouse.move(stage.x+stage.width*.17,stage.y+stage.height*.48,{steps:12});
+ await page.mouse.up();
+ await page.waitForFunction(id=>{
+  const m=window.__taleraTimelineRuntime?.currentMemory?.();
+  return m?._taleraLocal&&m.storyId!==id;
+ },source.storyId,{timeout:14000});
+ await Promise.all([
+  page.waitForURL(url=>url.pathname==='/mijn-leven',{timeout:22000}),
+  page.locator('#talera-flow-home').click()
+ ]);
+ await page.waitForFunction(()=>!!document.querySelector(
+  '#talera-life-gallery-rows a.talera-life-card[data-talera-gallery-photo]'),
+  null,{timeout:22000});
+ const afterSwipe=await page.evaluate(value=>{
+  const r=[...document.querySelectorAll('.talera-life-row')].find(
+   x=>x.dataset.taleraGalleryKey===value.group);
+  const t=r?.querySelector('.talera-life-track');
+  const a=[...(t?.querySelectorAll('a.talera-life-card')||[])].find(
+   c=>c.dataset.taleraGalleryMemory===value.storyId&&
+      c.dataset.taleraGalleryPhoto===value.photoId);
+  return {found:!!a,left:t?.scrollLeft,top:window.scrollY};
+ },source);
+ assert.ok(afterSwipe.found&&Math.abs(afterSwipe.left-source.left)<25&&
+    Math.abs(afterSwipe.top-source.top)<90,
+  'Even after a different memory, Back must return to original tapped gallery PHOTO: '+
+   JSON.stringify({source,afterSwipe}));
+ console.log('TALERA_FREE_GALLERY_RETURN_ORIGIN_SURVIVES_EXISTING_MEMORY_SWIPE_OK');
+
+
  // When the app is opened afresh, the transient gallery referral is gone.
  await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded',timeout:30000});
  await page.waitForFunction(()=>!!window.__taleraHomeGallery,null,{timeout:16000});

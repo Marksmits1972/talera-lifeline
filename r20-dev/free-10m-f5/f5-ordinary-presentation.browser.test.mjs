@@ -56,6 +56,7 @@ async function centerPixel(page){
       width:canvas.width,height:canvas.height};
   },shot.toString('base64'));
 }
+function nearColor(p,rgb){return p.upper.every((v,i)=>Math.abs(v-rgb[i])<42)}
 function dominant(p,channel){
   const rgb=p.upper;
   return rgb[channel] > rgb[(channel+1)%3]*1.55 &&
@@ -193,11 +194,11 @@ try{
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length===3,
     null,{timeout:11000});
   const swipePhotoBefore=await centerPixel(page);
-  assert.ok(dominant(swipePhotoBefore,0),
+  assert.ok(nearColor(swipePhotoBefore,[255,165,0]),
     'SWIPED THUMBNAIL NOT VISIBLE OR WRONG PHOTO: '+JSON.stringify(swipePhotoBefore));
   await waitIndex(page,1,11000);
   const swipePhotoAfter=await centerPixel(page);
-  if(!dominant(swipePhotoAfter,2)){
+  if(!nearColor(swipePhotoAfter,[0,217,242])){
     const trace=await page.evaluate(()=>{
       const m=window.__taleraTimelineRuntime.currentMemory();
       const stage=document.getElementById('photoStage');

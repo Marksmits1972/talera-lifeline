@@ -39,6 +39,75 @@ function evenlySpaceThreeHomeTabs(html){
   return html.replace(OLD_HOME_NAV_GRID,THREE_HOME_NAV_GRID);
 }
 
+// Direct memory deep-links originally painted the built-in reference frame
+// (memory 50) before R19 selected ?memory=3 or IndexedDB hydrated ?memory=local-*.
+// Avoid that unrelated first frame. Only a direct, valid ONE-story selection is
+// gated; all ordinary timelines, topic filters, voice, swipe and photos stay
+// exactly as before. No image/media copy, URL change or persistent state.
+function hideUnselectedEntryPhoto(html,requestUrl){
+ const url=new URL(requestUrl);
+ if(url.pathname!=='/present'||url.searchParams.size!==1||
+    !url.searchParams.has('memory')||!allowedLocalUiSearch(url))return html;
+ const id=url.searchParams.get('memory');
+ // R19 handles original IDs 1..50. Do not gate unsupported numeric navigation.
+ const covered=LOCAL_STORY_ID.test(id)||
+   (/^\d{1,2}$/.test(id)&&Number(id)>=1&&Number(id)<=50);
+ if(!covered)return html;
+ if(typeof html!=='string'||html.split('<head>').length!==2||
+    !html.includes('id="photoStage"')||
+    !html.includes('id="memoryPhotoA"')||
+    !html.includes('id="memoryCaption"')||
+    !html.includes('talera-lifeline-r19-bridge')||
+    !html.includes('talera-zero-memory-adapter'))
+   throw Error('TALERA_DIRECT_MEMORY_ENTRY_SOURCE_DRIFT');
+ const js=String.raw`(function(){
+   const requested=${JSON.stringify(id)};
+   const root=document.documentElement;
+   root.classList.add('talera-direct-memory-entering');
+   const isTarget=m=>m&&(
+     String(m.storyId||'')===requested ||
+     String(m.id)==='pwa:'+requested ||
+     String(m.id)===requested
+   );
+   let poll=0,settling=false;
+   const photoReady=m=>{
+     if(m._photoLoading)return false;
+     const items=m._zeroItems||[];
+     const isTextOnly=!!m._taleraLocal&&!items.some(x=>x.kind==='photo'||x.kind==='video');
+     if(isTextOnly)return true;
+     const front=document.getElementById('memoryPhotoA');
+     if(!front||!m.image)return false;
+     return front.getAttribute('src')===m.image &&front.complete&&front.naturalWidth>0;
+   };
+   const reveal=()=>{
+     const m=window.__taleraTimelineRuntime?.currentMemory?.();
+     if(!isTarget(m)||!photoReady(m))return;
+     root.classList.remove('talera-direct-memory-entering');
+     clearInterval(poll);
+   };
+   const tick=()=>{
+     const m=window.__taleraTimelineRuntime?.currentMemory?.();
+     if(!isTarget(m)||!photoReady(m)||settling)return;
+     settling=true;
+     // The normal photo layer and synced foreground have two frames to
+     // settle; do not display the earlier default during navigation.
+     requestAnimationFrame(()=>requestAnimationFrame(()=>{
+       settling=false;
+       reveal();
+     }));
+   };
+   poll=setInterval(tick,40);
+   tick();
+   window.addEventListener('pagehide',()=>clearInterval(poll),{once:true});
+ })();`;
+ const markup='<script id="talera-direct-memory-entry-guard">'+js+'</script>'+
+  '<style id="talera-direct-memory-entry-style">'+
+  'html.talera-direct-memory-entering #photoStage,'+
+  'html.talera-direct-memory-entering #memoryCaption{visibility:hidden!important}'+
+  '</style>';
+ return html.replace('<head>','<head>'+markup);
+}
+
 const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
 // iOS fetches install icons independently of the browser login cookie.
 // These four static install resources are public. Account data remains private.
@@ -543,7 +612,8 @@ async function publicPage(request,env){
     const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;
     const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(silenced):silenced;
     const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));
-    return new Response(converted.html,{
+    const storyEntryHtml=hideUnselectedEntryPhoto(converted.html,request.url);
+    return new Response(storyEntryHtml,{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
         'x-content-type-options':'nosniff','x-talera-free-f5':'personalized-durable-account',
@@ -566,6 +636,8 @@ async function publicPage(request,env){
     // Logged-out Home and its existing Notifications tab share the same bar.
     return new Response(evenlySpaceThreeHomeTabs(await r.text()),{status:200,headers});
   }
+  if(pathname==='/present')
+    return new Response(hideUnselectedEntryPhoto(await r.text(),request.url),{status:200,headers});
   return new Response(r.body,{status:200,headers});
 }
 // Strictly session-bound, same-origin, NO personal-media network endpoint.

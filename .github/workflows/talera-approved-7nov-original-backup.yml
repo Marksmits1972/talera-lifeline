@@ -72,7 +72,7 @@ jobs:
           import fs from 'node:fs';
           const config={
             name:'talera-account-birthdate-test-20261107',
-            main:'r20-dev/account-birthdate-test/account-birthdate-worker.mjs',
+            main:'account-birthdate-worker.mjs',
             compatibility_date:'2026-10-30',
             services:[{binding:'TALERA_BASE',service:'talera-closed-memory-diepblauw-test-20261107',environment:'production'}],
             d1_databases:[{binding:'BIRTH_DB',database_name:'talera-birthdate-account-test-20261107',database_id:'4d8aa183-3854-481c-97ab-e24eca7f484c'}]

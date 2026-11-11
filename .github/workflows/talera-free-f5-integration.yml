@@ -2,7 +2,7 @@ name: TALERA Free F5 - isolated single-origin integration tests
 
 on:
   push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108]
+    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-restored-integrated-backup-20261111]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
@@ -33,6 +33,10 @@ jobs:
         run: node r20-dev/free-10m-delivery/build.mjs
       - name: Package only public PWA references and stable external JavaScript
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify local backup menu is integrated with approved account UI
+        run: node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+      - name: Verify original photos, video, audio, IDs and archived versions round-trip losslessly
+        run: node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
       - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
       - name: Preserve saved narration media IDs and cue times when reopening an existing iPhone memory
@@ -66,6 +70,12 @@ jobs:
         run: |
           node --check r20-dev/free-10m-f5/f5-video-browser-regression.mjs
           node r20-dev/free-10m-f5/f5-video-browser-regression.mjs
+      - name: Browser verify private backup user interface, consent and two storage contexts
+        run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
+      - name: Browser verify source to destination local backup, integrity and non-destructive restore
+        run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
+      - name: Preserve original ordinary presentation and video after backup integration
+        run: node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Archive factual test result only
         if: success()
         uses: actions/upload-artifact@v4

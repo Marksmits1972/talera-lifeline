@@ -2,7 +2,7 @@ name: TALERA Free F5 - isolated single-origin integration tests
 
 on:
   push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108]
+    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-local-backup-ui-20261110]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
@@ -52,6 +52,8 @@ jobs:
           node --check r20-dev/free-10m-f5/f5-video-picker.mjs
           node --check r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
           node --check r20-dev/free-10m-f5/f5-neighbor-preview.mjs
+          node --check r20-dev/free-10m-f5/f5-life-gallery-home.mjs
+          node --check r20-dev/free-10m-f5/f5-life-gallery.browser.test.mjs
       - name: Verify Cloudflare compilation without deployment
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
       - name: Execute synthetic auth + private DOB + social privacy and persistence
@@ -66,6 +68,8 @@ jobs:
         run: |
           node --check r20-dev/free-10m-f5/f5-video-browser-regression.mjs
           node r20-dev/free-10m-f5/f5-video-browser-regression.mjs
+          node r20-dev/free-10m-f5/f5-life-gallery.browser.test.mjs
+          node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Archive factual test result only
         if: success()
         uses: actions/upload-artifact@v4

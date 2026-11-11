@@ -828,7 +828,9 @@ jobs:
           assert.ok(patchedAdapter>0&&patchedHydrate>patchedAdapter,
             'Original adapter must prime first local cover');
           const coverCode=present.slice(patchedAdapter,patchedHydrate);
-          assert.ok(coverCode.includes("memory.image=url;memory.previewImage=url;"));
+          assert.ok(coverCode.includes("memory.previewImage=url;")&&
+            coverCode.includes("if(memory._photoLoading&&!memory._zeroFrames?.length)memory.image=url;"),
+            'Cover must attach to the strip without resetting the active photo');
           assert.ok(coverCode.includes("memory._taleraFirstWarm={key:first.key,url};"));
           const patchedSelected=present.indexOf(
             "   const selected=isLocalId(wanted)?map.get('pwa:'+wanted):null;",patchedHydrate);

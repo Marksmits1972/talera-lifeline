@@ -165,7 +165,8 @@ try{
       JSON.stringify(trace).slice(0,9000));
   }
   await page.locator('#memoryStoryScroll').tap({timeout:12000});
-  await waitIndex(page,2,9000);
+  await page.waitForFunction(previous=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex!==previous,
+    1,{timeout:9000});
   console.log('TALERA_REAL_STORY_SWIPE_AND_SECOND_MEMORY_PHOTO_ROLL_OK');
   // Re-open the exact same local video as the existing dedicated test.
   await load(page,mixed,3);

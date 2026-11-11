@@ -1,4 +1,4 @@
-name: TALERA Free F5 - first saved photo as one illustrative topic tile on SAME candidate
+name: TALERA Free F5 - exactly one Home example tile, never eight legacy sample cards
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: 173dd790-9b13-4791-a6c2-69be4d042217
+      F5_PREVIOUS_VERSION: d740d68b-5da1-46b2-816f-a9c19992045c
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Verify personal photo example, automatic replacement by own tag, prior presentation and private data
+      - name: Prove original Home no longer appends eight samples; one own example then real tags, no account changes
         shell: bash
         run: |
           set -euo pipefail
@@ -212,7 +212,22 @@ jobs:
             'Original memory library must remain structurally present and data intact');
           assert.ok(originalHome.includes('<p class="hint">'),
             'Only the obsolete trial/example helper text is hidden');
-          const visibleHome=ownerHome.replace(legacyGalleryStyle,'');
+          // The user's screenshot showed our ONE correct Familie example PLUS
+          // eight older reference memory cards. V16 boot added them to the
+          // SAME #demoCards after the async owned-topic refresh completed.
+          const oldReferenceAppend="  examples.forEach(o=>mkCard(o,$('demoCards')));";
+          const removedReferenceAppend='  // Reference stories remain available in the existing hero/year timeline.';
+          assert.equal(originalHome.split(oldReferenceAppend).length,2,
+            'Exactly one original async eight-reference-card append must be identified');
+          assert.equal(ownerHome.split(removedReferenceAppend).length,2,
+            'Same Home must stop appending unrelated reference cards');
+          assert.ok(!ownerHome.includes(oldReferenceAppend),
+            'Legacy V16 boot cannot add 8 extra memory-card tiles after our refresh');
+          assert.ok(ownerHome.includes('const examples=demo.filter(')&&
+            ownerHome.includes('selectHero(show.find(x=>x.src)||examples[0]'),
+            'Original year/hero references remain intact; only Home card append removed');
+          const visibleHome=ownerHome.replace(legacyGalleryStyle,'')
+            .replace(removedReferenceAppend,oldReferenceAppend);
           const refreshMarker='async function refresh(){';
           const origRefresh=originalHome.indexOf(refreshMarker),ownerRefresh=visibleHome.indexOf(refreshMarker);
           const origTail=originalHome.indexOf('window.__taleraTopics={',origRefresh);
@@ -362,6 +377,7 @@ jobs:
           console.log('TALERA_NO_UNTAGGED_PHOTO_GALLERY_OR_DEMO_HELP_IN_HOME');
           console.log('TALERA_EMPTY_TOPIC_HEADING_AND_HELP_VISIBLE_NO_SAMPLE_TILES');
           console.log('TALERA_FIRST_OWN_PHOTO_EXAMPLE_REPLACED_BY_REAL_TAGGED_PHOTO');
+          console.log('TALERA_EXACTLY_ONE_FAMILIE_EXAMPLE_NO_EIGHT_EXTRA_LEGACY_CARDS');
           // The owner's screenshot shows the three live home buttons
           // occupying 3/4 of a legacy FOUR-column grid. Repair exactly ONE
           // CSS declaration for both logged-in and logged-out home, with no

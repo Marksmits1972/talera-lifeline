@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: 88e5947f-c2af-4a30-8d1b-e575c720eb07
+      F5_PREVIOUS_VERSION: d8ef7532-0007-44f6-a834-952f38d0c52f
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,6 +101,14 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify exact existing Storage menu wiring and preserved account transitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check r20-dev/free-10m-f5/f5-account-switch-guard.mjs
+          node --check r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
       - name: Verify separate ordinary photo carousel and untouched original narrated player
         shell: bash
         run: |
@@ -882,6 +890,13 @@ jobs:
           # Supply the transient CI binary, without modifying app code.
           export PATH="$PWD/node_modules/@ffmpeg-installer/linux-x64:$PATH"
           timeout 180s node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
+      - name: Verify existing local backup and restore with synthetic browser storage
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          timeout 180s node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
+          timeout 180s node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Build identical seven-DO deployment config without re-creating or changing secrets
         shell: bash
         run: |

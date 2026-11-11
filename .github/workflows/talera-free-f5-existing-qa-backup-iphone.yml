@@ -513,6 +513,13 @@ jobs:
           assert.ok(present.includes("const matching=asked?memories.filter("),
             'The initial topic photo must be primed using existing local media');
           console.log('TALERA_ORIGINAL_PRESENTATION_OWNER_TOPIC_FILTER_ONLY');
+          const originalControllerTag='<script id="talera-live-memory-integration-controller">';
+          const ctrlStart=present.indexOf(originalControllerTag);
+          const ctrlEnd=present.indexOf('</script>',ctrlStart);
+          assert.ok(ctrlStart>0&&ctrlEnd>ctrlStart,'Original presentation controller must exist');
+          assert.doesNotThrow(
+            ()=>new Function(present.slice(ctrlStart+originalControllerTag.length,ctrlEnd)),
+            'Generated ordinary presentation must contain parseable browser JavaScript');
           assert.ok(before.includes('    scheduleAuto(memory);\n  });'),'Original timer source missing');
           assert.ok(present.includes('  let pendingAutoPhoto=null,photoAutoSerial=0;'));
           assert.ok(present.includes('showPhoto(memory,next,true,true); // Commit only a decoded ordinary frame.'));

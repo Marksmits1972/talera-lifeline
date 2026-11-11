@@ -3,7 +3,7 @@
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions} from './f5-account-switch-guard.mjs';
-import {installLifeGalleries} from './f5-life-gallery-home.mjs';
+import {installLifeGalleries,installGalleryReturnToPresentation} from './f5-life-gallery-home.mjs';
 import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {mkdirSync,readFileSync,writeFileSync,copyFileSync} from 'node:fs';
 import path from 'node:path';
@@ -628,6 +628,7 @@ for(const [route,filename] of Object.entries(routes)){
  // apply later speculative iPhone video-poster modifications.
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/mijn-leven')html=installLifeGalleries(html);
+ if(route==='/present')html=installGalleryReturnToPresentation(html);
  if(route==='/tell')html=shapeOwnStoryTopics(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

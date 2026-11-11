@@ -317,7 +317,16 @@ function primeFirstOpenLocalStoryCovers(html){
    html=html.replace(before,after);
  };
  const hydrateAnchor=" async function hydrate(memory){";
- const prime=" // Keep up to five first-frame object URLs, scoped to this page and account.\n // The full existing hydrate() is still responsible for every other frame.\n async function warmFirstPhoto(memory){\n   if(!memory?._taleraLocal||memory._taleraFirstWarm)return;\n   const first=memory._zeroItems?.find(item=>item.kind==='photo'||item.kind==='video');\n   if(!first)return;\n   let url=null;\n   try{\n     if(first.kind==='photo'){\n       url=await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));\n     }else{\n       const still=await store.blob(first.key+':phone-v1');\n       if(still instanceof Blob&&still.size&&String(still.type).startsWith('image/'))\n         url=URL.createObjectURL(still);\n       else memory.image=videoPoster;\n     }\n   }catch(e){console.warn('TALERA eerste verhaalbeeld nog niet geladen',e)}\n   if(!url)return;\n   memory._taleraFirstWarm={key:first.key,url};\n   memory.image=url;memory.previewImage=url;\n }\n";
+ const prime=" // Keep up to five first-frame object URLs, scoped to this page and account.\n // The full existing hydrate() is still responsible for every other frame.\n async function warmFirstPhoto(memory){\n   if(!memory?._taleraLocal||memory._taleraFirstWarm)return;\n   const first=memory._zeroItems?.find(item=>item.kind==='photo'||item.kind==='video');\n   if(!first)return;\n   let url=null;\n   try{\n     if(first.kind==='photo'){\n       url=await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));\n     }else{\n       const still=await store.blob(first.key+':phone-v1');\n       if(still instanceof Blob&&still.size&&String(still.type).startsWith('image/'))\n         url=URL.createObjectURL(still);\n       else memory.image=videoPoster;\n     }\n   }catch(e){console.warn('TALERA eerste verhaalbeeld nog niet geladen',e)}\n   if(!url)return;\n   memory._taleraFirstWarm={key:first.key,url};\n   if(memory._photoLoading&&!memory._zeroFrames?.length)memory.image=url;\n"+
+  "   memory.previewImage=url;\n"+
+  " }\n"+
+  " // Reuse the SAME local record and wheel: bounded nearby cover prefetch.\n"+
+  " const warmCoverPending=new Set();\n"+
+  " if(typeof window!=='undefined')window.__taleraPrewarmLocalCover=memory=>{\n"+
+  "   if(!memory?._taleraLocal||memory._taleraFirstWarm||warmCoverPending.has(memory.id))return;\n"+
+  "   warmCoverPending.add(memory.id);\n"+
+  "   void warmFirstPhoto(memory).finally(()=>warmCoverPending.delete(memory.id));\n"+
+  " };\n";
  exact(hydrateAnchor,prime+hydrateAnchor,'WARM_BEFORE_HYDRATE');
  const beforePhoto="           try{url=await (store.displayUrl?store.displayUrl(item.key):store.mediaUrl(item.key))}catch(e){}";
  const afterPhoto="           try{url=memory._taleraFirstWarm?.key===item.key?memory._taleraFirstWarm.url:\n"+

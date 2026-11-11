@@ -498,7 +498,9 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=warmUpFirstSwipePhotoStrip(html);
  if(route==='/present')html=primeFirstOpenLocalStoryCovers(html);
  if(route==='/present')html=filterOwnTopicPresentation(html);
- if(route==='/tell')html=fixVideoFirstFramePreview(html);
+ // Use the ORIGINAL, already approved V61 video preview from the
+ // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
+ // apply later speculative iPhone video-poster modifications.
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/tell')html=shapeOwnStoryTopics(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);

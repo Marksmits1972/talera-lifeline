@@ -799,15 +799,40 @@ jobs:
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');
           console.log('TALERA_NORMAL_APP_ENTRY_OK; PRIVATE_DATA_STILL_AUTH_GATED; NO_ACCOUNTS_CREATED');
           NODE
-      - name: Verify stable first-photo position and new owner life galleries on same Free app
+      - name: Validate compact photos, no generated raster, and unchanged links
         shell: bash
         run: |
           set -euo pipefail
-          npm install --no-save --no-package-lock playwright@1.56.1
-          npx --no-install playwright install --with-deps chromium
-          sudo apt-get install -y -qq ffmpeg
-          node r20-dev/free-10m-f5/f5-life-gallery.browser.test.mjs
-          node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const source=readFileSync('r20-dev/free-10m-f5/f5-life-gallery-home.mjs','utf8');
+          assert.ok(source.includes('min(27vw,116px)'), 'Square photo cards must exist');
+          assert.ok(source.includes('margin:0 0 23px'), 'Restful white space between rows must exist');
+          assert.ok(!source.includes('talera-life-photo-placeholder'), 'Raster icons must not cover real photos');
+          assert.ok(source.includes("'/present?memory='"), 'Original memory presentation route is required');
+          console.log('TALERA_FREE_HOME_SQUARE_PHOTOS_RASTER_REMOVED_SOURCE_OK');
+          NODE
+      - name: Install Chromium and video test dependencies with bounded time
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          timeout 180s npm install --no-save --no-package-lock playwright@1.56.1
+          timeout 180s npx --no-install playwright install --with-deps chromium
+          timeout 90s sudo apt-get install -y -qq ffmpeg
+      - name: Verify actual iPhone-sized gallery with owned photos and no overlay
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          timeout 180s node r20-dev/free-10m-f5/f5-life-gallery.browser.test.mjs
+      - name: Recheck approved ordinary slideshow and video untouched
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          timeout 180s node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Build identical seven-DO deployment config without re-creating or changing secrets
         shell: bash
         run: |

@@ -114,6 +114,21 @@ try{
  });
  assert.equal(await family.locator('a.talera-life-card').count(),10,
   'Each horizontal topic row has at most ten actual photos');
+ const compact=await family.locator('.talera-life-track').evaluate(track=>{
+  const card=track.querySelector('.talera-life-card');
+  const box=card.getBoundingClientRect(),styles=getComputedStyle(track);
+  return {width:box.width,height:box.height,available:track.clientWidth,
+   gap:parseFloat(styles.gap),rowMargin:parseFloat(
+    getComputedStyle(track.closest('.talera-life-row')).marginBottom)};
+ });
+ assert.ok(compact.height>=140&&compact.height<=144,
+  'Apple-like smaller card height should be 142 CSS px: '+JSON.stringify(compact));
+ assert.ok(compact.width<=170,
+  'Smaller card width should fit the current phone: '+JSON.stringify(compact));
+ assert.ok(compact.available>=2*compact.width+compact.gap+8,
+  'At least two full photo cards and a visible hint of the next fit horizontally: '+
+   JSON.stringify(compact));
+ assert.ok(compact.rowMargin<=14,'Compact rows make room for more gallery strips');
  const years=await family.locator('.talera-life-card-caption small').allTextContents();
  assert.ok(new Set(years).size>=7,
   'The ten selected photos should be spread across the time period');
@@ -143,6 +158,7 @@ try{
  console.log('TALERA_FREE_LIFE_GALLERY_FIRST_OPEN_EXAMPLE_NO_FAKE_PHOTOS_OK');
  console.log('TALERA_FREE_LIFE_GALLERY_LOCAL_YEARS_AND_TAGS_TEN_SPREAD_OVER_LIFE_OK');
  console.log('TALERA_FREE_LIFE_GALLERY_BLOB_PHOTOS_SCROLL_AND_ORIGINAL_MEMORY_LINKS_OK');
+ console.log('TALERA_FREE_LIFE_GALLERY_COMPACT_CARDS_TWO_FULL_PLUS_NEXT_PEEK_OK',JSON.stringify(compact));
  console.log('TALERA_FREE_LIFE_GALLERY_ORIGINAL_TIMELINE_NAV_UNTOUCHED');
 }finally{
  await stop();

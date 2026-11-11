@@ -358,6 +358,62 @@ function fixVideoFirstFramePreview(html){
   'Published video poster must preserve original media ID');
  return html;
 }
+// Derive the original Home cards solely from owner-created story tags.
+// No test/sample topic categories, no duplicate stories, no cloud queries.
+function showOwnedStoriesOnly(html){
+ const start=html.indexOf('id="talera-v17-topics-script"');
+ const begin=html.indexOf('async function refresh(){',start);
+ const end=html.indexOf('window.__taleraTopics={',begin);
+ assert.ok(start>0&&begin>start&&end>begin, 'F5_TOPIC_HOME_SOURCE_MOVED');
+ const old=html.slice(begin,end);
+ for(const term of ['rows=(await store.list())','sampleRows(cat.name)','grid.replaceChildren()'])
+  assert.ok(old.includes(term),'F5_TOPIC_HOME_SOURCE_DRIFT_'+term);
+ const replacement="async function refresh(){\n rows=(await store.list()).filter(x=>x&&x.source==='pwa-local');\n const myCards=document.getElementById('myCards');\n const myHeading=document.getElementById('myCount')?.parentElement;\n if(myCards){myCards.style.display=rows.length?'':'none';if(myHeading)myHeading.style.display=rows.length?'':'none';}\n const normalized=s=>String(s||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('nl');\n const topics=new Map();\n for(const row of rows){\n   for(const raw of Array.isArray(row.tags)?row.tags:[]){\n     const name=String(raw||'').trim().replace(/\\s+/g,' ').slice(0,36);\n     const id=normalized(name);\n     if(!id)continue;\n     if(!topics.has(id))topics.set(id,{name,memories:[]});\n     if(!topics.get(id).memories.includes(row))topics.get(id).memories.push(row);\n   }\n }\n // Retain this presentation's approved two-column tile styling and cover logic.\n const available=[...topics.values()].sort((a,b)=>normalized(a.name).localeCompare(normalized(b.name),'nl'));\n const heading=grid.previousElementSibling,hasTopics=available.length>0;\n if(heading)heading.style.display=hasTopics?'':'none';\n grid.style.display=hasTopics?'':'none';\n note.style.display='none';\n grid.replaceChildren();escapeUrls();\n if(!hasTopics)return {records:rows.length,topics:0};\n // A page session survives navigation within the SAME TALERA app, while\n // opening a fresh app session advances a number (never any personal tags).\n const turnKey='talera-free-topic-open-v1',counterKey='talera-free-topic-turn-v1';\n if(window.__taleraTopicTurn==null){\n   let turn=0;\n   try{\n     const previous=sessionStorage.getItem(turnKey);\n     if(previous!==null)turn=Math.max(0,Number(previous)||0);\n     else{\n       turn=Math.max(0,Number(localStorage.getItem(counterKey))||0);\n       localStorage.setItem(counterKey,String((turn+1)%1000000));\n       sessionStorage.setItem(turnKey,String(turn));\n     }\n   }catch(e){}\n   window.__taleraTopicTurn=turn;\n }\n const start=available.length>8?(window.__taleraTopicTurn*8)%available.length:0;\n const visible=Array.from({length:Math.min(8,available.length)},\n   (_,i)=>available[(start+i)%available.length]);\n for(const entry of visible){\n   const cat=cats.find(x=>normalized(x.name)===normalized(entry.name))||\n     {icon:'✦',bg:'linear-gradient(145deg,#6b8194,#354966)'};\n   const tile=text('button','talera-topic-card');\n   tile.type='button';tile.style.background=cat.bg;\n   tile.setAttribute('aria-label',entry.name+' · '+countLabel(entry.memories.length));\n   const ownWithPhoto=entry.memories.filter(row=>(row.items||[]).some(item=>item.kind==='photo'));\n   const cover=pickCover(ownWithPhoto,entry.name,row=>row.id);\n   if(cover)imageFor(cover,tile);\n   tile.append(text('span','talera-topic-symbol',cat.icon));\n   const info=text('span','talera-topic-info');\n   info.append(text('strong','talera-topic-name',entry.name));\n   info.append(text('small','talera-topic-sub',countLabel(entry.memories.length)));\n   tile.append(info);\n   tile.onclick=()=>window.location.assign('/present?theme='+encodeURIComponent(entry.name));\n   grid.append(tile);\n }\n if(header)header.textContent='Mijn verhalen over…';\n if(small)small.textContent=available.length+' '+(available.length===1?'onderwerp':'onderwerpen');\n return {records:rows.length,topics:visible.length,available:available.length};\n}\n";
+ html=html.slice(0,begin)+replacement+html.slice(end);
+ assert.ok(html.includes('Mijn verhalen over…')&&html.includes('Math.min(8,available.length)'),
+  'Only eight owned topic tiles can be visible');
+ return html;
+}
+function shapeOwnStoryTopics(html){
+ const exact=(oldValue,newValue,label)=>{
+  assert.equal(html.split(oldValue).length,2,'F5_TOPIC_EDITOR_SOURCE_DRIFT_'+label);
+  html=html.replace(oldValue,newValue);
+ };
+ const start=html.indexOf('function setupV20Tags(g,details){');
+ const end=html.indexOf('}function setupV10(',start);
+ assert.ok(start>0&&end>start,'F5_TOPIC_EDITOR_SOURCE_MOVED');
+ let editor=html.slice(start,end+1);
+ const editExact=(before,after,label)=>{
+  assert.equal(editor.split(before).length,2,'F5_TOPIC_EDITOR_SOURCE_DRIFT_'+label);
+  editor=editor.replace(before,after);
+ };
+ const custom= " const customRow=document.createElement('div');customRow.className='talera-tags-own-input';\n const customName=document.createElement('input');customName.type='text';customName.maxLength=36;\n customName.placeholder='Familie, Sport, Werk…';\n customName.setAttribute('aria-label','Voeg je eigen onderwerp toe');\n const addCustom=document.createElement('button');addCustom.type='button';\n addCustom.textContent='Toevoegen';\n customRow.append(customName,addCustom);\n choices.insertAdjacentElement('afterend',customRow);\n const addOwnName=()=>{\n   const name=clean([customName.value])[0];\n   if(!name)return;\n   if(!openFavorites.some(x=>id(x)===id(name)))openFavorites.push(name);\n   pending.add(id(name));customName.value='';paintChoices();\n };\n addCustom.onclick=addOwnName;\n customName.addEventListener('keydown',e=>{\n   if(e.key==='Enter'){e.preventDefault();addOwnName()}\n });\n";
+ editExact(" let pending=new Set(),openFavorites=[];",
+  " let pending=new Set(),openFavorites=[];\n"+custom,'CUSTOM_TOPIC_ENTRY');
+ editExact("choices.setAttribute('aria-label',text('tag.selected','Mijn favoriete kenmerken'));",
+  "choices.setAttribute('aria-label','Mijn onderwerpen');",'HUMAN_CHOICES_LABEL');
+ const labelStart=editor.indexOf("  toggle.textContent=");
+ const labelEnd=editor.indexOf('\n',labelStart);
+ assert.ok(labelStart>0&&labelEnd>labelStart&&editor.slice(labelStart,labelEnd).includes('Kenmerk toevoegen'),
+  'F5_TOPIC_EDITOR_SOURCE_DRIFT_HUMAN_PROMPT');
+ const humanPrompt="  const lang=String(window.TaleraI18n?.language||'nl').slice(0,2);\n"+
+  "  const names={nl:'Waar gaat deze herinnering over?',en:'What is this memory about?',\n"+
+  "    de:'Worum geht es in dieser Erinnerung?',fr:'De quoi parle ce souvenir ?',\n"+
+  "    es:'¿De qué trata este recuerdo?'};\n"+
+  "  toggle.textContent='＋ '+(names[lang]||names.nl);";
+ editor=editor.slice(0,labelStart)+humanPrompt+editor.slice(labelEnd);
+ editExact('openFavorites=favorites();pending=new Set(',
+  'openFavorites=clean([...favorites(),...g.tags]);pending=new Set(','KEEP_EXISTING_TAGS');
+ html=html.slice(0,start)+editor+html.slice(end+1);
+ const style='<style id="talera-free-own-story-topics-style">'+
+  '.talera-tags-v20 .talera-tags-own-input{display:flex;gap:8px;padding:10px 0;align-items:stretch}'+
+  '.talera-tags-v20 .talera-tags-own-input input{min-width:0;flex:1;border:1px solid #d1dfe4;border-radius:12px;padding:10px;color:#173550;background:#fff;font-size:15px}'+
+  '.talera-tags-v20 .talera-tags-own-input button{border:1px solid #173550;border-radius:12px;padding:10px;color:white;background:#173550;font-size:14px;font-weight:700}'+
+  '</style>';
+ exact('</head>',style+'</head>','SAME_EDITOR_HEAD');
+ assert.ok(html.includes('talera-tags-own-input'),'Editor input must remain within original work screen');
+ return html;
+}
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
@@ -366,6 +422,8 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=warmUpFirstSwipePhotoStrip(html);
  if(route==='/present')html=primeFirstOpenLocalStoryCovers(html);
  if(route==='/tell')html=fixVideoFirstFramePreview(html);
+ if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
+ if(route==='/tell')html=shapeOwnStoryTopics(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  const hash=sha(html),file=hash+'.html';

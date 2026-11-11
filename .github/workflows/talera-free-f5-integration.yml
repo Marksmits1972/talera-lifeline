@@ -114,8 +114,11 @@ jobs:
           git diff --exit-code 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
           ! grep -q 'installLifeGalleries' r20-dev/free-10m-f5/f5-public-assets.mjs
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test "${#CLOUDFLARE_ACCOUNT_ID}" -eq 32
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo 'CLOUDFLARE_API_TOKEN not configured'; exit 1; fi
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          if [ "${#CLEAN_ID}" -ne 32 ]; then echo 'CLOUDFLARE_ACCOUNT_ID invalid after safe normalization'; exit 1; fi
+          echo "::add-mask::$CLEAN_ID"
+          echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN_ID" >> "$GITHUB_ENV"
       - name: Check live version and exact original account, storage and secret bindings
         shell: bash
         run: |

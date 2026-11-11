@@ -26,6 +26,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Normalize existing Cloudflare account env without changing credentials
+        shell: bash
+        run: |
+          ACCOUNT="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "${#ACCOUNT}" -eq 32
+          echo "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT" >> "$GITHUB_ENV"
       - name: Confirm unchanged official 7-Nov Worker and existing service/D1 bindings
         shell: bash
         run: |

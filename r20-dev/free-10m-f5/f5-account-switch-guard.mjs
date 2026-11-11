@@ -1,6 +1,7 @@
-// TALERA Free F5: protected account-scoped storage connections, no UI edit.
-// The original menu remains source-exact except three auth reloads and a
-// GET /api/memories bridge to the ALREADY existing local TaleraMemories.list().
+// TALERA Free F5: protected account-scoped storage connections.
+// Original auth transitions and account-local list remain source-exact.
+// The only additional UI change connects the EXISTING Storage and back-up
+// menu to the existing authenticated same-origin /__f5/backup page.
 // A Cloudflare response can never hold personal Free stories/media.
 const LOGIN_ANCHOR='setActiveAccount(result.account||null);state.history=[];';
 const LOGOUT_ANCHOR="document.documentElement.dataset.taleraAuth='signed-out';setActiveAccount(null);state.history=[];";
@@ -38,5 +39,38 @@ export function secureAccountMenuTransitions(source){
      .replace(LOCAL_API_PATCH,API_ENTRY)
      .replace(TITLES_PATCH,TITLES_ANCHOR)!==source)
    throw Error('ACCOUNT_STORAGE_CONNECTION_CHANGE_NOT_MINIMAL');
+ return changed;
+}
+
+// Link the EXISTING Storage and back-up screen to the already available,
+// authenticated local archive page. No account/data/player changes.
+const STORAGE_HINT="option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt')";
+const STORAGE_HINT_NEW="option('storage','▤','Opslag en back-up','Bekijk opslag en reservekopie')";
+const STORAGE_NOTICE="Reservekopie en herstel worden nog ontwikkeld. Lokale herinneringen staan in de opslag van deze browser en zijn niet automatisch geback-upt. Iedere TALERA-testlink heeft zijn eigen lokale opslag. Alleen na jouw expliciete toestemming mogen gegevens naar je account worden overgezet. Deze controle wijzigt of uploadt niets.";
+const STORAGE_NOTICE_NEW="Je herinneringen blijven lokaal. Via de knop hieronder kun je zelf een reservekopie maken of herstellen. Het bestand bevat originele media en is niet versleuteld: bewaar het privé. Er wordt niets automatisch geüpload.";
+const STORAGE_REFRESH="      '<button class=\"secondary\" type=\"button\" data-action=\"storage-refresh\">Opnieuw controleren</button>';";
+const STORAGE_ACTION="      (a?'<button class=\"primary\" type=\"button\" data-action=\"open-backup\">Back-up maken of herstellen</button>':'')+\n      '<button class=\"secondary\" type=\"button\" data-action=\"storage-refresh\">Opnieuw controleren</button>';";
+const MENU_CLICK=" if(button.dataset.view){go(button.dataset.view);return}";
+const MENU_CLICK_NEW=" if(button.dataset.view){go(button.dataset.view);return}\n if(button.dataset.action==='open-backup'&&state.view==='storage'&&state.account){window.location.assign('/__f5/backup');return;}";
+export function connectExistingStorageBackup(source){
+ if(typeof source!=='string')throw Error('ORIGINAL_STORAGE_BACKUP_MENU_SOURCE_DRIFT');
+ const edits=[
+  [STORAGE_HINT,STORAGE_HINT_NEW],
+  [STORAGE_NOTICE,STORAGE_NOTICE_NEW],
+  [STORAGE_REFRESH,STORAGE_ACTION],
+  [MENU_CLICK,MENU_CLICK_NEW]
+ ];
+ let changed=source;
+ for(const [before,after] of edits){
+  if(count(changed,before)!==1||changed.includes(after))
+   throw Error('ORIGINAL_STORAGE_BACKUP_MENU_SOURCE_DRIFT');
+  changed=changed.replace(before,after);
+ }
+ let original=changed;
+ for(const [before,after] of edits.slice().reverse()){
+  if(count(original,after)!==1)throw Error('STORAGE_BACKUP_MENU_PATCH_NOT_MINIMAL');
+  original=original.replace(after,before);
+ }
+ if(original!==source)throw Error('STORAGE_BACKUP_MENU_PATCH_NOT_MINIMAL');
  return changed;
 }

@@ -925,7 +925,7 @@ jobs:
       - name: Deploy ONLY existing private QA Worker with no secret rotation or data migration
         # One-shot scoped QA activation for this exact, tested commit message only.
         # Future commits remain blocked from automatic rollout.
-        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'qa-deploy-TALERA-gallery-first-image-priority-20261111' }}
+        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'qa-deploy-TALERA-existing-storage-backup-menu-20261111' }}
         id: deploy
         run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
       - name: Verify live existing Storage menu exposes exactly one account-gated backup action

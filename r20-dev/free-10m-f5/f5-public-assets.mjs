@@ -417,7 +417,22 @@ function primeFirstOpenLocalStoryCovers(html){
   "   const norm=t=>String(t||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('nl');\n"+
   "   const matching=asked?memories.filter(m=>(m.tags||[]).some(t=>norm(t)===norm(asked))):memories;\n"+
   "   const near=matching.slice().sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,5);\n"+
-  "   await Promise.all(near.map(warmFirstPhoto));\n"+
+  "   // A tapped gallery photo is the priority. Preserve bounded neighbour\n"+
+  "   // warm-up in the same app but never BLOCK on unrelated neighbours.\n"+
+  "   let galleryEntry=false;\n"+
+  "   if(selected){try{\n"+
+  "     const state=JSON.parse(sessionStorage.getItem('talera-f5-gallery-photo-return-v1')||'null');\n"+
+  "     galleryEntry=state?.v===1&&state.phase==='open'&&state.story===wanted&&\n"+
+  "       typeof state.media==='string'&&state.media.length>0;\n"+
+  "   }catch(e){}}\n"+
+  "   if(galleryEntry){\n"+
+  "     const priority=warmFirstPhoto(selected);\n"+
+  "     for(const other of near)if(other!==selected)void warmFirstPhoto(other);\n"+
+  "     await priority;\n"+
+  "   }else{\n"+
+  "     await Promise.all(near.map(warmFirstPhoto));\n"+
+  "   }\n"+
+
   "   runtime.registerMemories(memories);";
  exact(beforeRegistration,afterRegistration,'REGISTER_AFTER_REAL_COVERS');
  const beforeRevoke="   for(const urls of loaded.values())for(const url of urls)URL.revokeObjectURL(url);\n"+

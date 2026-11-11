@@ -1,4 +1,4 @@
-name: TALERA Free F5 - warm local memories before first swipe on SAME candidate
+name: TALERA Free F5 - real local covers before first-visible timeline on SAME candidate
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: 3132a940-e88f-4f71-b8f2-513c8ecbfdf2
+      F5_PREVIOUS_VERSION: 1ec48f79-8f33-4054-ae10-4ae69b2308a1
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Validate cold-start local-photo wheel prefetch, previous presentation repairs and private data
+      - name: Verify first-opening real local covers and protected presentation regression (no accounts)
         shell: bash
         run: |
           set -euo pipefail
@@ -411,6 +411,74 @@ jobs:
           assert.equal(coldTile.el.style.visibility,'visible',
             'Never expose white page when a previously decoded local photo exists');
           assert.equal(coldSharp.src,'blob:already-decoded-photo');
+          // Actual root cause: the V8 adapter used to PUBLISH local stories
+          // with a blank 32px placeholder, then hydrate only the selected
+          // memory. First swipe selected 2-3 still-blank real records.
+          const rawAdapter=before.indexOf(" const map=new Map(),loaded=new Map(),pending=new Map();");
+          const rawRegister=before.indexOf('   runtime.registerMemories(memories);',rawAdapter);
+          const oldHydrate=before.indexOf(' async function hydrate(memory){',rawAdapter);
+          assert.ok(rawAdapter>0&&rawRegister>oldHydrate);
+          const patchedAdapter=present.indexOf(' async function warmFirstPhoto(memory){');
+          const patchedHydrate=present.indexOf(' async function hydrate(memory){',patchedAdapter);
+          assert.ok(patchedAdapter>0&&patchedHydrate>patchedAdapter,
+            'Original adapter must prime first local cover');
+          const coverCode=present.slice(patchedAdapter,patchedHydrate);
+          assert.ok(coverCode.includes("memory.image=url;memory.previewImage=url;"));
+          assert.ok(coverCode.includes("memory._taleraFirstWarm={key:first.key,url};"));
+          const patchedSelected=present.indexOf(
+            "   const selected=isLocalId(wanted)?map.get('pwa:'+wanted):null;",patchedHydrate);
+          const primeAll=present.indexOf('   await Promise.all(near.map(warmFirstPhoto));',patchedSelected);
+          const publish=present.indexOf('   runtime.registerMemories(memories);',patchedSelected);
+          assert.ok(patchedSelected>0&&primeAll>patchedSelected&&publish>primeAll,
+            'Five nearby real images MUST be ready before records can be swiped');
+          assert.ok(present.includes('.slice(0,5);'),
+            'Preload must be strictly bounded on iPhone');
+          assert.ok(present.includes(
+            "url=memory._taleraFirstWarm?.key===item.key?memory._taleraFirstWarm.url:"),
+            'Original hydrate must reuse the same photo media URL');
+          assert.ok(present.includes('if(warm&&!loaded.has(m.id))URL.revokeObjectURL(warm);'),
+            'Warm images must be released when the app page closes');
+          const photoInMemory={id:'existing-photo',_taleraLocal:true,
+            _photoLoading:true,image:'32px-empty',
+            _zeroItems:[{key:'existing-photo-file',kind:'photo'}]};
+          const storedPhoto='blob:own-local-real-photo';
+          const accessed=[];
+          const photoWarm=new Function('store','URL','videoPoster','Blob','console',
+            coverCode+'; return warmFirstPhoto;')(
+              {displayUrl:async key=>{accessed.push(key);return storedPhoto}},
+              {createObjectURL:()=>{throw Error('No video should be duplicated')}},
+              'video-placeholder',Blob,console);
+          await photoWarm(photoInMemory);
+          assert.deepEqual(accessed,['existing-photo-file']);
+          assert.equal(photoInMemory.image,storedPhoto);
+          assert.equal(photoInMemory.previewImage,storedPhoto);
+          assert.equal(photoInMemory._taleraFirstWarm.key,'existing-photo-file');
+          await photoWarm(photoInMemory);
+          assert.equal(accessed.length,1,'The same media must not be reloaded');
+          const videoInMemory={id:'existing-video',_taleraLocal:true,
+            image:'empty',_zeroItems:[{kind:'video',key:'video-original-id'}]};
+          const poster=new Blob(['native frame'],{type:'image/jpeg'});
+          const videoWarm=new Function('store','URL','videoPoster','Blob','console',
+            coverCode+'; return warmFirstPhoto;')(
+              {blob:async key=>{
+                assert.equal(key,'video-original-id:phone-v1');return poster}},
+              {createObjectURL:b=>{assert.equal(b,poster);return 'blob:video-still-only'}},
+              'legacy-video-cover',Blob,console);
+          await videoWarm(videoInMemory);
+          assert.equal(videoInMemory.image,'blob:video-still-only');
+          assert.equal(videoInMemory._taleraFirstWarm.key,'video-original-id');
+          const missingStill={_taleraLocal:true,image:'empty',
+            _zeroItems:[{kind:'video',key:'no-still-yet'}]};
+          const noStill=new Function('store','URL','videoPoster','Blob','console',
+            coverCode+'; return warmFirstPhoto;')(
+              {blob:async()=>null},{createObjectURL:()=>null},
+              'original-video-cover',Blob,console);
+          await noStill(missingStill);
+          assert.equal(missingStill.image,'original-video-cover',
+            'Missing video thumbnail must not create a blank cover');
+          assert.equal(missingStill._taleraFirstWarm,undefined,
+            'No false poster is written or cached');
+          console.log('TALERA_FIRST_OPEN_REAL_PHOTO_AND_VIDEO_COVERS_BEFORE_REGISTRATION');
           console.log('TALERA_FIRST_OPEN_HYDRATION_PREFETCH_AND_SAFE_VISIBLE_FALLBACK');
           console.log('TALERA_FIRST_RETURN_SWIPE_NO_BLANK_UNTIL_IMAGE_LOADED');
           console.log('TALERA_PHOTO_ONLY_AUTOPLAY_LOADED_BEFORE_VISIBLE_COMMIT');

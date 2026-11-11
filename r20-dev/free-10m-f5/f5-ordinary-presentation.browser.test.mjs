@@ -1,0 +1,144 @@
+// Test the EXISTING TALERA Free /present route with disposable local-only media.
+// No test Worker, second app, production account, changes to /tell or personal data.
+import assert from 'node:assert/strict';
+import {spawn,execFileSync} from 'node:child_process';
+import {mkdirSync,readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import {chromium,devices} from 'playwright';
+
+const here=path.dirname(fileURLToPath(import.meta.url)),generated=path.join(here,'generated');
+mkdirSync(generated,{recursive:true});
+const origin='http://127.0.0.1:8837',gate='1'.repeat(64);
+let worker=null,browser=null,log='';
+async function stop(){
+  if(browser)await browser.close().catch(()=>{});
+  if(worker&&!worker.killed)worker.kill('SIGTERM');
+}
+async function start(){
+  worker=spawn(path.resolve('node_modules/.bin/wrangler'),[
+    'dev','--local','--ip','127.0.0.1','--port','8837',
+    '--config',path.join(here,'wrangler.jsonc'),
+    '--persist-to',path.join(generated,'ordinary-present-local'),
+    '--var','STAGING_F5_KEY:'+gate,
+    '--var','STAGING_ACCESS_KEY:'+'2'.repeat(64),
+    '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
+    '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_TEST_KEY',
+    '--var','DEMO_IDENTITY_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_SOCIAL_KEY',
+    '--log-level','error'
+  ],{env:{...process.env,CI:'true',BROWSER:'none'},stdio:['ignore','pipe','pipe']});
+  for(const stream of [worker.stdout,worker.stderr])
+    stream.on('data',x=>log=(log+x.toString()).slice(-6000));
+  for(let i=0;i<140;i++){
+    if(worker.exitCode!==null)throw Error('Local original Free worker stopped: '+log);
+    try{
+      if((await fetch(origin+'/__f5/health',{signal:AbortSignal.timeout(800)})).status===200)return;
+    }catch{}
+    await new Promise(r=>setTimeout(r,280));
+  }
+  throw Error('Original Free worker unavailable: '+log);
+}
+const waitIndex=(page,index,timeout=9500)=>page.waitForFunction(index=>
+  window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===index,
+  index,{timeout});
+async function load(page,id,count){
+  const res=await page.goto(origin+'/present?memory='+id,
+    {waitUntil:'domcontentloaded',timeout:25000});
+  assert.equal(res.status(),200);
+  await page.waitForFunction(([id,count])=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===count;
+  },[id,count],{timeout:20000});
+}
+try{
+  await start();
+  const suffix=Date.now().toString(36);
+  const signed=await fetch(origin+'/api/register',{method:'POST',headers:{
+    origin,'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.83',
+    'content-type':'application/json'
+  },body:JSON.stringify({
+    email:'photo-'+suffix+'@example.invalid',username:'phototest'+suffix.slice(-8),
+    displayName:'Synthetic photos only',password:'Synthetic_Free_Only_Roll_2026',
+    birthDate:'1974-04-02'
+  })});
+  assert.equal(signed.status,200,'No local account: '+(await signed.text()).slice(0,450));
+  const sid=/talera_sid=([a-f0-9]{64})/.exec(signed.headers.get('set-cookie')||'')?.[1];
+  assert.ok(sid,'Session cookie not returned');
+  browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
+  const ctx=await browser.newContext({
+    ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate}
+  });
+  await ctx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
+    path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+  const page=await ctx.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  const response=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+  assert.equal(response.status(),200);
+  await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:15000});
+
+  const plain=await page.evaluate(async()=>{
+    const files=await Promise.all(['#ef1523','#27d128','#233fff'].map(async(c,i)=>{
+      const canvas=document.createElement('canvas');canvas.width=140;canvas.height=140;
+      const paint=canvas.getContext('2d');paint.fillStyle=c;paint.fillRect(0,0,140,140);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+      return new File([blob],'original-'+i+'.png',{type:'image/png'});
+    }));
+    const row=await window.TaleraMemories.save({
+      title:'Original photo roll',date:'2026-11-11',time:'12:00:00',
+      text:'Synthetic unvoiced images without cues'
+    },files);
+    return row.id;
+  });
+  await load(page,plain,3);
+  assert.equal((await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex)),0);
+  const first=await page.locator('#photoStage').screenshot();
+  await waitIndex(page,1);
+  const second=await page.locator('#photoStage').screenshot();
+  assert.ok(!first.equals(second),'Automatic transition changed dots but not image');
+  await page.locator('#memoryStoryScroll').tap({timeout:12000});
+  await waitIndex(page,2,9000);
+  const third=await page.locator('#photoStage').screenshot();
+  assert.ok(!second.equals(third),'Manual tap changed dots but not image');
+  await waitIndex(page,0,9000);
+  assert.equal(await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory().storyId),plain);
+
+  const mp4=path.join(generated,'ordinary-original-video.mp4');
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
+    '-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',mp4],
+    {timeout:20000,stdio:'ignore'});
+  const mixed=await page.evaluate(async b64=>{
+    const files=await Promise.all(['#ef1523','#27d128'].map(async(c,i)=>{
+      const canvas=document.createElement('canvas');canvas.width=140;canvas.height=140;
+      const paint=canvas.getContext('2d');paint.fillStyle=c;paint.fillRect(0,0,140,140);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+      return new File([blob],'mixed-'+i+'.png',{type:'image/png'});
+    }));
+    files.push(new File([Uint8Array.from(atob(b64),c=>c.charCodeAt(0))],
+      'original.mp4',{type:'video/mp4'}));
+    const row=await window.TaleraMemories.save({
+      title:'Photos and original video',date:'2026-11-11',time:'12:01:00',
+      text:'Ordinary memory with original video but no narration'
+    },files);
+    return row.id;
+  },readFileSync(mp4).toString('base64'));
+  await load(page,mixed,3);
+  await waitIndex(page,1);
+  await waitIndex(page,2);
+  await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),
+    null,{timeout:9000});
+  await waitIndex(page,0,12000);
+  const state=await page.evaluate(()=>{
+    const m=window.__taleraTimelineRuntime.currentMemory();
+    return {id:m.storyId,video:document.body.classList.contains('talera-v61-narration-visual')};
+  });
+  assert.equal(state.id,mixed);
+  assert.equal(state.video,false,'Ordinary photo roll cannot enter narration mode');
+  assert.deepEqual(errors,[],'Original presentation script runtime errors');
+  console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
+    photoAutoVisible:true,tapVisible:true,loop:true,
+    originalVideoThenPhotos:true,narrationNeverActivated:true,
+    newApp:false,customerData:false,realIphoneAccepted:false
+  }));
+}finally{
+  await stop();
+}

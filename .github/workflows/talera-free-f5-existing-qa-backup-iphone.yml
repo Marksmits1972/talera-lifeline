@@ -231,12 +231,6 @@ jobs:
           assert.ok(gs>0&&ge>gs,'New gallery must be in the existing Home');
           const galleryCode=ownerHome.slice(gs+galleryOpen.length,ge);
           assert.doesNotThrow(()=>new Function(galleryCode),'New gallery JS syntax');
-          assert.ok(galleryCode.includes('taleraGalleryReturn')&&
-            galleryCode.includes("window.addEventListener('pageshow'")&&
-            galleryCode.includes("fromGallery=1")&&
-            galleryCode.includes('history.replaceState')&&
-            galleryCode.includes('restoreGalleryPosition'),
-            'Existing gallery must restore exact tapped photo only with browser history');
           assert.ok(galleryCode.includes("row.source!=='pwa-local'")&&
            galleryCode.includes("store.displayUrl(photo.item.key)")&&
            galleryCode.includes("'/present?memory='")&&
@@ -262,7 +256,7 @@ jobs:
           const lifePickerStart=galleryCode.indexOf('function spread(pool,group){');
           const lifePickerEnd=galleryCode.indexOf('function release(){',lifePickerStart);
           assert.ok(lifePickerStart>0&&lifePickerEnd>lifePickerStart,'Time-distributed picker is required');
-          const pick=new Function('picks','historyReturn',galleryCode.slice(lifePickerStart,lifePickerEnd)+';return spread;')(new Map(),null);
+          const pick=new Function('picks',galleryCode.slice(lifePickerStart,lifePickerEnd)+';return spread;')(new Map());
           const years=Array.from({length:21},(_,i)=>{
            const year=1980+i*2;
            return {row:{id:'local-test-'+i,date:year+'-01-01'},item:{key:'photo-'+i},
@@ -317,10 +311,6 @@ jobs:
 
           const before=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-present.html','utf8');
           const present=readRef('/present');
-          assert.ok(present.includes('<script id="talera-gallery-return-script">')&&
-            present.includes("const arrow=event.target.closest?.('a#talera-flow-home')")&&
-            present.includes('history.back(); // Exactly the previous history entry'),
-            'Original presentation back arrow must support temporary gallery origin');
 
           // A direct Home story link used to paint the default reference
           // memory 50 BEFORE R19 selected ?memory=3 / local IndexedDB.

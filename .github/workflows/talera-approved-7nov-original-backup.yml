@@ -30,11 +30,11 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=process.env.CLOUDFLARE_ACCOUNT_ID,n=process.env.APPROVED_NAME;
+          const id=(process.env.CLOUDFLARE_ACCOUNT_ID||'').trim(),n=process.env.APPROVED_NAME;
           assert.match(id||'',/^[a-f0-9]{32}$/i);
           assert.ok(process.env.CLOUDFLARE_API_TOKEN);
           const get=async path=>{
-            const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+id+'/workers/scripts/'+n+path,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN}});
+            const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+id+'/workers/scripts/'+n+path,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN.trim()}});
             assert.equal(r.status,200,'Existing Worker metadata unavailable');
             const j=await r.json();assert.equal(j.success,true);return j.result;
           };

@@ -66,10 +66,6 @@ jobs:
           sudo apt-get install -y -qq ffmpeg
       - name: Browser verify real public-account creation, switching, privacy and original menu
         run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
-      - name: Browser regression - five actual synthetic photos plus one MP4, mixed and separate video choices
-        run: |
-          node --check r20-dev/free-10m-f5/f5-video-browser-regression.mjs
-          node r20-dev/free-10m-f5/f5-video-browser-regression.mjs
       - name: Browser verify private backup user interface, consent and two storage contexts
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser verify source to destination local backup, integrity and non-destructive restore

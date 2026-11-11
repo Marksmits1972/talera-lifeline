@@ -493,7 +493,18 @@ try{
             index:m?._photoIndex,timestamp:Math.round(performance.now())});
         });
       });
-      const photoBefore=await page.locator('#photoStage').screenshot();
+      // Ordinary photo rotation is autonomous, without any voice/cue clock.
+      const firstImage=await page.locator('#photoStage').screenshot();
+      await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===1,
+        null,{timeout:8000}).catch(async e=>{
+        throw Error('Ordinary photo rotation did not move to photo 2: '+e.message);
+      });
+      const automatic=await visibleState();
+      assert.equal(automatic.storyId,target,'Photo rotation must not change the memory');
+      const autoImage=await page.locator('#photoStage').screenshot();
+      assert.ok(!firstImage.equals(autoImage),
+        'Ordinary cycle must change the visible photo, not only the dots');
+      const photoBefore=autoImage;
       // A forced tap on the hidden photo layer is NOT a user touch; it can
       // bypass the uppermost RH19 gesture surface and choose another memory.
       // Test the real visible story interaction surface at its hit-tested
@@ -514,7 +525,7 @@ try{
         throw Error('Real on-screen tap not hit-testable: '+
           JSON.stringify(touchContext)+'; '+error.message);
       });
-      await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===1,
+      await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===2,
         null,{timeout:9000}).catch(async error=>{
         const visibleAfterTap=await visibleState();
         const eventHit=await page.evaluate(()=>{

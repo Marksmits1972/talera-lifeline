@@ -10,16 +10,16 @@ assert.match(scriptPath||'',/^\/__talera_free\/f5scripts\/[a-f0-9]{64}\.mjs$/);
 const served=readFileSync(path.join('r20-dev/free-10m-delivery/public',scriptPath.slice(1)),'utf8');
 assert.equal(served,connectExistingStorageBackup(secureAccountMenuTransitions(source)),
  'Original account menu must remain unchanged except auth and Storage backup connection');
-assert.equal((served.match(/data-action=\\\"open-backup\\\"/g)||[]).length,1,
+assert.equal((served.match(/data-action="open-backup"/g)||[]).length,1,
  'Exactly one genuine local backup button, only inside existing Storage screen');
 assert.ok(served.includes("state.view==='storage'&&state.account")&&
   served.includes("window.location.assign('/__f5/backup')"),
  'Only an existing signed-in Storage menu can navigate to existing private backup');
-assert.ok(served.includes("data-action=\\\"storage-refresh\\\""),
+assert.ok(served.includes('data-action="storage-refresh"'),
  'Existing Storage status-refresh action must remain');
 assert.ok(!served.includes('Reservekopie en herstel worden nog ontwikkeld.'),
  'Do not falsely label an active local back-up function unfinished');
-assert.ok(!source.includes("data-action=\\\"open-backup\\\""),
+assert.ok(!source.includes('data-action="open-backup"'),
  'Never inject duplicate backup controls into the source menu');
 assert.throws(()=>connectExistingStorageBackup(source.replace(
  'Reservekopie en herstel worden nog ontwikkeld.',

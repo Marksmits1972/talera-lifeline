@@ -308,6 +308,13 @@ function fixFirstSwipePhotoLoad(html){
   "    else if(current)current.addEventListener('load',finish,{once:true});\n"+
   "    else requestAnimationFrame(finish);";
  replace(before,after,'COMMIT');
+ // A load event can fire while the 11-page strip is still landing.
+ // The original one-shot finish() then returned while state.snap was true,
+ // leaving the cover permanently in front of all rotating photos.
+ // Retry only closing the wheel once its real movement has ended.
+ replace("      if(state.drag||state.snap||Math.abs(state.v)>.01)return;",
+   "      if(state.drag||state.snap||Math.abs(state.v)>.01){requestAnimationFrame(finish);return;}",
+   'FINISH_AFTER_SWIPE_SETTLES');
  assert.ok(html.includes("const N=11,pages=[],cache=new Map()"),
   'Must patch only the already existing 11-page wheel');
  return html;

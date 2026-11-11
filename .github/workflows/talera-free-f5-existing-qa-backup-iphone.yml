@@ -548,10 +548,10 @@ jobs:
           const memory={id:'transient-local-photo',_taleraLocal:true,
             _photoIndex:0,image:'one',photos:['one','two'],
             _zeroItems:[],_zeroFrames:[]};
-          let active=memory;
+          let activePhotoMemory=memory;
           const func=new Function('runtime','settleVisiblePhoto','renderDots','scheduleAuto','Image','window',
             present.slice(photoStart,photoEnd)+';return showPhoto;');
-          const show=func({currentMemory:()=>active},
+          const show=func({currentMemory:()=>activePhotoMemory},
             m=>painted.push(m.image),m=>dots.push(m._photoIndex),
             ()=>{armed++},ManualImage,{__taleraLocalFrameChanged:()=>{}});
           show(memory,1,false);
@@ -575,7 +575,7 @@ jobs:
             photos:['one','two','video-still'],
             _zeroItems:[{kind:'photo'},{kind:'video'}],
             _zeroFrames:[{kind:'photo'},{kind:'photo'},{kind:'video'}]};
-          active=mixed;
+          activePhotoMemory=mixed;
           show(mixed,1,false);
           assert.equal(mixed._photoIndex,0,'Video albums must preload photos, too');
           images[2].finish();
@@ -585,7 +585,7 @@ jobs:
           images[3].finish();
           assert.equal(mixed._photoIndex,2);
           const narrated={...mixed,id:'narrated',_zeroItems:[{kind:'audio'}]};
-          active=narrated;
+          activePhotoMemory=narrated;
           const imageCount=images.length;
           show(narrated,1,false);
           assert.equal(images.length,imageCount,'Narrated photo timing is NEVER preloaded by ordinary mode');

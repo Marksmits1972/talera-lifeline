@@ -42,8 +42,10 @@ export function installLifeGalleries(html){
 
 const galleryBackScript="(function(){\n'use strict';\n// Same TALERA /present. A gallery-launched visit has one optional,\n// non-persistent navigation origin. Swipe and narration are untouched.\nconst url=new URL(location.href);\nif(url.searchParams.get('fromGallery')!=='1')return;\nurl.searchParams.delete('fromGallery');\nhistory.replaceState(history.state,'',url.pathname+url.search+url.hash);\nlet ref;\ntry{ref=new URL(document.referrer)}catch(e){return}\nif(ref.origin!==location.origin||ref.pathname!=='/mijn-leven'||history.length<2)return;\ndocument.addEventListener('click',function(event){\n const arrow=event.target.closest?.('a#talera-flow-home');\n if(!arrow)return;\n event.preventDefault();\n event.stopImmediatePropagation();\n history.back(); // Exactly the previous history entry with its original photo row.\n},true);\n})();";
 export function installGalleryReturnToPresentation(html){
- const back='<a href="/" id="talera-flow-home" aria-label="Back to My life">';
- assert.equal(html.split(back).length,2,'F5_GALLERY_RETURN_ORIGINAL_BACK_ARROW_DRIFT');
+ // The original V15 back arrow is attached at runtime by the APPROVED
+ // application bar. It must not be expected as literal static HTML.
+ assert.ok(html.includes('memoryStoryScroll')&&html.includes('photoStage'),
+  'F5_GALLERY_RETURN_ORIGINAL_PRESENTATION_DRIFT');
  assert.equal(html.split('</body>').length,2,'F5_GALLERY_RETURN_PRESENTATION_BODY_DRIFT');
  return html.replace('</body>','<script id="talera-gallery-return-script">'+galleryBackScript+'</script></body>');
 }

@@ -2,7 +2,7 @@ name: TALERA Free F5 - isolated single-origin integration tests
 
 on:
   push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108]
+    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
@@ -33,6 +33,12 @@ jobs:
         run: node r20-dev/free-10m-delivery/build.mjs
       - name: Package only public PWA references and stable external JavaScript
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify source-exact 11 November backup-only connection
+        run: |
+          git merge-base --is-ancestor 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD
+          git diff --exit-code 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
+          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
       - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
       - name: Preserve saved narration media IDs and cue times when reopening an existing iPhone memory

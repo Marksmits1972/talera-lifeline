@@ -24,7 +24,7 @@ export {
   FreeSocialMemory,FreeSocialSharePointer
 } from '../free-10m-social-do/social-objects.mjs';
 
-const PUBLIC_PAGES=new Set(['/mijn-leven','/present','/tell']);
+const PUBLIC_PAGES=new Set(['/mijn-leven','/meldingen','/present','/tell']);
 // The approved V25 menu has exactly three visible destinations; the fourth
 // "Gedeeld" destination was retired, but the original home grid stayed four
 // columns wide. Adjust ONLY the three-column CSS rule, never the nav nodes,
@@ -72,11 +72,16 @@ function allowedLocalUiSearch(url){
   // by F5's local-memory-only query filter (real iPhone 404). Permit only
   // the literal original hub entry, with no extra parameters or redirects.
   if(url.pathname==='/present'&&key==='talera_menu'&&id==='hub')return true;
-  // The approved TALERA UI opens a published local memory through
-  // /present?memory=<local-id>. Older F5 allowed only publishing and editing,
-  // causing a 404 when "Bekijk herinnering" was tapped despite a saved story.
-  // Permit exactly the original first-party local-memory navigation URLs;
-  // no broad query passthrough or production API fallback.
+  // The already-approved home has shortcut URLs for year browsing and its
+  // original sample memories. Do not invent a new timeline or open any API:
+  // validate ONLY those literal existing first-party presentation selectors.
+  if(url.pathname==='/present'&&key==='year')
+    return /^\d{4}$/.test(id)&&Number(id)>=1900&&Number(id)<=new Date().getFullYear();
+  if(url.pathname==='/present'&&key==='decade')
+    return /^\d{4}$/.test(id)&&Number(id)>=1900&&Number(id)<=new Date().getFullYear()&&Number(id)%10===0;
+  if(url.pathname==='/present'&&key==='memory'&&/^\d{1,6}$/.test(id))
+    return Number(id)>=1&&Number(id)<=100000;
+  // The original local memory and editing routes retain their strict IDs.
   return ((url.pathname==='/mijn-leven'&&key==='published')||
       (url.pathname==='/tell'&&key==='edit')||
       (url.pathname==='/present'&&key==='memory'))&&LOCAL_STORY_ID.test(id);
@@ -91,7 +96,7 @@ function canonicalReferralUiPath(url,method){
   const pairs=[...url.searchParams.entries()];
   if(!pairs.length||pairs.length>12)return null;
   let functional=null,passive=0;
-  const functionKeys=new Set(['talera_menu','published','edit','memory']);
+  const functionKeys=new Set(['talera_menu','published','edit','memory','year','decade']);
   const reserved=/^(?:account|user|db|database|scope|story|file|redirect|return|return_url|next|url|token|code|key|auth|session|password|email|birthDate|state|callback|target|share|origin|id|path)$/i;
   for(const [key,value] of pairs){
     if(key.length>64||value.length>256||/[\u0000-\u001f\u007f]/.test(key+value))
@@ -497,6 +502,10 @@ async function revokeAccountGrant(request,env,storyId,recipientId){
 }
 async function publicPage(request,env){
   const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
+  // Notifications is an existing tab in the approved Home markup/CSS.
+  // Reuse its EXACT Home shell; the original route-aware JS selects the tab.
+  const homeScreen=pathname==='/mijn-leven'||pathname==='/meldingen';
+  const sourcePath=pathname==='/meldingen'?'/mijn-leven':pathname;
   if(!env.ASSETS)return deny(503,'PWA-bestanden niet beschikbaar');
   const sessionToken=readSessionCookie(request);
   const actor=sessionToken?await sessionAccount(request,env):null;
@@ -504,17 +513,17 @@ async function publicPage(request,env){
     // Only a verified current account may load its private date and local
     // account-scoped storage. An expired cookie instead gets the sign-in UI.
     const date=await accountHome(env,actor.id).getBirthDate();
-    if((pathname==='/mijn-leven'||pathname==='/present')&&!date)
+    if((homeScreen||pathname==='/present')&&!date)
       return deny(503,'Geboortedatum ontbreekt; persoonlijke tijdlijn kan niet worden getoond');
-    const originalRef=referencePages[pathname];
+    const originalRef=referencePages[sourcePath];
     if(!originalRef)return deny(503,'Originele PWA-bron ontbreekt');
     const response=await env.ASSETS.fetch(new Request(new URL(originalRef,origin)));
     if(!response.ok)return deny(503,'PWA-bron niet bereikbaar');
     const original=await response.text();
-    const privateHtml=pathname==='/mijn-leven'?personalizeHome(original,date):
+    const privateHtml=homeScreen?personalizeHome(original,date):
       pathname==='/present'?personalizePresent(original,date):original;
     // Refuse to show a wrong or default timeline if source markers changed.
-    if((pathname==='/mijn-leven'||pathname==='/present')&&privateHtml===original)
+    if((homeScreen||pathname==='/present')&&privateHtml===original)
       return deny(503,'De persoonlijke tijdlijn kon niet veilig worden gemaakt');
     // Isolate *local* originals, audio, video, photo and cue records by
     // verified account, without changing recorder, swipe or presentation logic.
@@ -528,7 +537,7 @@ async function publicPage(request,env){
     // the record panel is visible. The original present/player video round
     // with sound after narration is untouched.
     const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;
-    const threeTabHome=pathname==='/mijn-leven'?evenlySpaceThreeHomeTabs(silenced):silenced;
+    const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(silenced):silenced;
     const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));
     return new Response(converted.html,{
       status:200,headers:{
@@ -538,7 +547,7 @@ async function publicPage(request,env){
       }
     });
   }
-  const asset=anonymousShells[pathname];
+  const asset=anonymousShells[sourcePath];
   if(!asset)return deny(503,'Anonieme PWA-shell ontbreekt');
   const r=await env.ASSETS.fetch(new Request(new URL(asset,origin)));
   if(!r.ok)return deny(503,'Anonieme PWA-shell is niet beschikbaar');
@@ -549,8 +558,8 @@ async function publicPage(request,env){
   headers.set('content-security-policy',F5_BROWSER_CSP);
   headers.set('x-content-type-options','nosniff');
   if(sessionToken&&!actor)headers.set('set-cookie',sessionCookie('',0));
-  if(pathname==='/mijn-leven'){
-    // Logged-out home displays the same three equal menu positions.
+  if(homeScreen){
+    // Logged-out Home and its existing Notifications tab share the same bar.
     return new Response(evenlySpaceThreeHomeTabs(await r.text()),{status:200,headers});
   }
   return new Response(r.body,{status:200,headers});
@@ -720,6 +729,9 @@ export default {
       const grantRevoke=/^\/api\/memories\/([A-Za-z0-9_-]{8,80})\/grants\/([0-9a-fA-F-]{36})\/revoke$/.exec(p);
       if(grantRevoke)return revokeAccountGrant(request,env,grantRevoke[1],grantRevoke[2]);
       if(p.startsWith('/__social/'))return socialApi(request,env);
+      // The V25 design retired Gedeeld in favor of the existing Meldingen tab.
+      if(p==='/gedeeld'&&m==='GET'&&!url.search)
+        return new Response(null,{status:302,headers:{location:'/meldingen','cache-control':'no-store'}});
       if(m==='GET'&&PUBLIC_PAGES.has(p))return publicPage(request,env);
       if(p.startsWith('/__clean/'))return publicScript(request,env);
       if(Object.hasOwn(verifiedPublicSupport,p))return publicPwaSupport(request,env);

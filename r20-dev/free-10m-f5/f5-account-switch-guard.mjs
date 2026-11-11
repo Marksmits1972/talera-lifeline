@@ -48,8 +48,8 @@ const STORAGE_HINT="option('storage','▤','Opslag en back-up','Bekijk opslag; b
 const STORAGE_HINT_NEW="option('storage','▤','Opslag en back-up','Bekijk opslag en reservekopie')";
 const STORAGE_NOTICE="Reservekopie en herstel worden nog ontwikkeld. Lokale herinneringen staan in de opslag van deze browser en zijn niet automatisch geback-upt. Iedere TALERA-testlink heeft zijn eigen lokale opslag. Alleen na jouw expliciete toestemming mogen gegevens naar je account worden overgezet. Deze controle wijzigt of uploadt niets.";
 const STORAGE_NOTICE_NEW="Je herinneringen blijven lokaal. Via de knop hieronder kun je zelf een reservekopie maken of herstellen. Het bestand bevat originele media en is niet versleuteld: bewaar het privé. Er wordt niets automatisch geüpload.";
-const STORAGE_REFRESH="      '<button class=\\\"secondary\\\" type=\\\"button\\\" data-action=\\\"storage-refresh\\\">Opnieuw controleren</button>';";
-const STORAGE_ACTION="      (a?'<button class=\\\"primary\\\" type=\\\"button\\\" data-action=\\\"open-backup\\\">Back-up maken of herstellen</button>':'')+\n      '<button class=\\\"secondary\\\" type=\\\"button\\\" data-action=\\\"storage-refresh\\\">Opnieuw controleren</button>';";
+const STORAGE_REFRESH="      '<button class=\"secondary\" type=\"button\" data-action=\"storage-refresh\">Opnieuw controleren</button>';";
+const STORAGE_ACTION="      (a?'<button class=\"primary\" type=\"button\" data-action=\"open-backup\">Back-up maken of herstellen</button>':'')+\n      '<button class=\"secondary\" type=\"button\" data-action=\"storage-refresh\">Opnieuw controleren</button>';";
 const MENU_CLICK=" if(button.dataset.view){go(button.dataset.view);return}";
 const MENU_CLICK_NEW=" if(button.dataset.view){go(button.dataset.view);return}\n if(button.dataset.action==='open-backup'&&state.view==='storage'&&state.account){window.location.assign('/__f5/backup');return;}";
 export function connectExistingStorageBackup(source){

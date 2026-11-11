@@ -256,7 +256,7 @@ jobs:
           const lifePickerStart=galleryCode.indexOf('function spread(pool,group){');
           const lifePickerEnd=galleryCode.indexOf('function release(){',lifePickerStart);
           assert.ok(lifePickerStart>0&&lifePickerEnd>lifePickerStart,'Time-distributed picker is required');
-          const pick=new Function('picks',galleryCode.slice(lifePickerStart,lifePickerEnd)+';return spread;')(new Map());
+          const pick=new Function('picks','returnView',galleryCode.slice(lifePickerStart,lifePickerEnd)+';return spread;')(new Map(),null);
           const years=Array.from({length:21},(_,i)=>{
            const year=1980+i*2;
            return {row:{id:'local-test-'+i,date:year+'-01-01'},item:{key:'photo-'+i},

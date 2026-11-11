@@ -2,7 +2,7 @@
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {secureAccountMenuTransitions} from './f5-account-switch-guard.mjs';
+import {secureAccountMenuTransitions,connectExistingStorageBackup} from './f5-account-switch-guard.mjs';
 import {installLifeGalleries} from './f5-life-gallery-home.mjs';
 import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {mkdirSync,readFileSync,writeFileSync,copyFileSync} from 'node:fs';
@@ -710,10 +710,11 @@ for(const name of paths){
  let shipped=first.body;
  // The original menu signs in/out IN PLACE, leaving the already loaded
  // account-scoped IndexedDB code bound to the PREVIOUS person. Reopen the
- // exact SAME URL only after a successful auth transition; no UI changes.
+ // exact SAME URL only after a successful auth transition; the existing
+ // Storage menu additionally links to the existing authenticated backup route.
  if(name==='/__clean/menu-integration.mjs'){
    writeFileSync(path.join(generated,'approved-menu-original.mjs'),first.body);
-   shipped=secureAccountMenuTransitions(first.body);
+   shipped=connectExistingStorageBackup(secureAccountMenuTransitions(first.body));
  }
  const filename=sha(shipped)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');

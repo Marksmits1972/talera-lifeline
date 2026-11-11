@@ -2,6 +2,7 @@
  * Service proxy preserves the entire approved TALERA implementation unchanged.
  * Sole persistent new data: private account_id -> ISO birth_date in dedicated D1.
  */
+import {localBackupPage,BACKUP_STATIC_MODULES} from './account-backup-bundle.mjs';
 const HOME_TAG = '<script id="talera-flow-v17-time">';
 const PRESENT_START = 'const LIFE_START = new Date(1976,8,6).getTime();';
 const JS_UI = String.raw`(()=>{
@@ -258,6 +259,51 @@ async function page(req,env){
  headers.set('x-talera-birthdate-test','isolated');
  return new Response(html,{status:upstream.status,statusText:upstream.statusText,headers});
 }
+// The single existing Storage and back-up panel gains one gated same-origin
+// archive action; all other menu contents and account handlers stay intact.
+const BACKUP_MENU_EDITS=Object.freeze([["option('storage','▤','Opslag en back-up','Bekijk opslag; back-up volgt')","option('storage','▤','Opslag en back-up','Lokale back-up en herstel')"],["Reservekopie en herstel worden nog ontwikkeld. Lokale herinneringen staan in de opslag van deze browser en zijn niet automatisch geback-upt. Iedere TALERA-testlink heeft zijn eigen lokale opslag. Alleen na jouw expliciete toestemming mogen gegevens naar je account worden overgezet. Deze controle wijzigt of uploadt niets.","Je herinneringen blijven lokaal in deze browser. Met de knop hieronder maak je zelf een reservekopie of herstel je een bestand. Het bestand bevat originele media, is niet versleuteld en wordt niet automatisch geüpload."],["      '<button class=\\\"secondary\\\" type=\\\"button\\\" data-action=\\\"storage-refresh\\\">Opnieuw controleren</button>';","      (a?'<button class=\\\"primary\\\" type=\\\"button\\\" data-action=\\\"open-backup\\\">Back-up maken of herstellen</button>':'')+\n      '<button class=\\\"secondary\\\" type=\\\"button\\\" data-action=\\\"storage-refresh\\\">Opnieuw controleren</button>';"],[" if(button.dataset.view){go(button.dataset.view);return}"," if(button.dataset.view){go(button.dataset.view);return}\n if(button.dataset.action==='open-backup'&&state.view==='storage'&&state.account){window.location.assign('/__f5/backup');return;}"]]);
+function connectBackupMenu(original){
+ let source=original;
+ for(const [from,to] of BACKUP_MENU_EDITS){
+  if(source.split(from).length!==2||source.includes(to))
+   throw Error('TALERA_BACKUP_ORIGINAL_STORAGE_MENU_DRIFT');
+  source=source.replace(from,to);
+ }
+ let verified=source;
+ for(const [from,to] of [...BACKUP_MENU_EDITS].reverse()){
+  if(verified.split(to).length!==2)throw Error('TALERA_BACKUP_STORAGE_MENU_NOT_MINIMAL');
+  verified=verified.replace(to,from);
+ }
+ if(verified!==original)throw Error('TALERA_BACKUP_STORAGE_MENU_NOT_MINIMAL');
+ return source;
+}
+const BACKUP_DB='talera-lifeline-dev-local-v1';
+const BACKUP_CSP="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
+async function backupRoute(request,env){
+ if(request.method!=='GET')return json({error:'Methode niet toegestaan'},405);
+ const url=new URL(request.url),path=url.pathname;
+ if(url.search.length>2048||[...url.searchParams.keys()].some(k=>/^(?:db|database|scope|account|user|target|story|file|redirect|url|token)$/i.test(k)))
+  return json({error:'Niet gevonden'},404);
+ const actor=await sessionAccount(request,env);
+ if(!actor)return json({error:'Aanmelden vereist'},401);
+ const commonHeaders={
+  'cache-control':'private, no-store',
+  'x-content-type-options':'nosniff',
+  'referrer-policy':'no-referrer',
+  'content-security-policy':BACKUP_CSP
+ };
+ if(path==='/__f5/backup'){
+  if(typeof actor.id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.id))
+   return json({error:'Accountcontrole niet beschikbaar'},503);
+  return new Response(localBackupPage(BACKUP_DB,actor.id),{status:200,headers:{
+   ...commonHeaders,'content-type':'text/html; charset=utf-8'
+  }});
+ }
+ if(url.search||!Object.hasOwn(BACKUP_STATIC_MODULES,path))return json({error:'Niet gevonden'},404);
+ return new Response(BACKUP_STATIC_MODULES[path],{status:200,headers:{
+  ...commonHeaders,'content-type':'text/javascript; charset=utf-8'
+ }});
+}
 // Preserve the original account UI and handlers, changing exactly one registration payload.
 async function patchedMenuIntegration(req,env){
  const upstream=await env.TALERA_BASE.fetch(req);
@@ -271,11 +317,12 @@ async function patchedMenuIntegration(req,env){
  const headers=new Headers(upstream.headers);
  for(const h of ['content-length','content-encoding','etag'])headers.delete(h);
  headers.set('cache-control','no-store');
- return new Response(original.replace(needle,patched),{status:upstream.status,statusText:upstream.statusText,headers});
+ return new Response(connectBackupMenu(original.replace(needle,patched)),{status:upstream.status,statusText:upstream.statusText,headers});
 }
 export default {
  async fetch(request,env){
   const url=new URL(request.url),path=url.pathname;
+  if(path==='/__f5/backup'||Object.hasOwn(BACKUP_STATIC_MODULES,path))return backupRoute(request,env);
   if(path==='/__clean/menu-integration.mjs'&&request.method==='GET')return patchedMenuIntegration(request,env);
   if(path==='/api/register'&&request.method==='POST')return register(request,env);
   if(path==='/api/me'&&request.method==='GET')return me(request,env);

@@ -216,6 +216,12 @@ try{
   return m?.storyId===id&&m._photoIndex===index&&!m._photoLoading&&
     !document.documentElement.classList.contains('talera-direct-memory-entering');
  },[target.story,target.index],{timeout:25000});
+ await page.waitForFunction(index=>{
+   const m=window.__taleraTimelineRuntime?.currentMemory?.();
+   const sharp=document.querySelector('#photoStage .talera-story-synced-sharp');
+   return m?._photoIndex===index&&sharp&&sharp.complete&&
+     sharp.naturalWidth>0&&sharp.currentSrc===m.photos?.[index];
+ },target.index,{timeout:15000});
  assert.equal(await page.locator('#talera-flow-home').count(),1,
   'The existing presentation back arrow remains present');
  await page.locator('#talera-flow-home').click({timeout:12000});
@@ -231,6 +237,30 @@ try{
  assert.ok(Math.abs(before.left-after.left)<=5&&Math.abs(before.y-after.y)<=18,
   'Back must preserve scroll positions: '+JSON.stringify({before,after}));
  console.log('TALERA_GALLERY_EXACT_MEDIA_ID_AND_SAME_CARD_BACK_OK');
+ // Story-to-story swipe must cancel special gallery return.
+ await route.locator('a.talera-life-card').nth(7).click();
+ await page.waitForURL(/\\/present\\?memory=local-/,{timeout:15000});
+ await page.waitForFunction(id=>
+   window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id&&
+   !document.documentElement.classList.contains('talera-direct-memory-entering'),
+   target.story,{timeout:25000});
+ const bounds=await page.locator('#memoryStoryScroll').boundingBox();
+ assert.ok(bounds?.width>100&&bounds?.height>100);
+ await page.mouse.move(bounds.x+bounds.width*.80,bounds.y+bounds.height*.50);
+ await page.mouse.down();
+ await page.mouse.move(bounds.x+bounds.width*.18,bounds.y+bounds.height*.50,{steps:14});
+ await page.mouse.up();
+ await page.waitForFunction(id=>
+   !!window.__taleraTimelineRuntime?.currentMemory?.()&&
+   window.__taleraTimelineRuntime.currentMemory().storyId!==id,
+   target.story,{timeout:15000});
+ await page.waitForFunction(()=>sessionStorage.getItem(
+   'talera-f5-gallery-photo-return-v1')===null,null,{timeout:5000});
+ await page.locator('#talera-flow-home').click({timeout:12000});
+ await page.waitForURL(/\\/mijn-leven(?:$|\\?)/,{timeout:15000});
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem(
+   'talera-f5-gallery-photo-return-v1')),null);
+ console.log('TALERA_GALLERY_SWIPE_TO_OTHER_MEMORY_BACK_NORMAL_HOME_OK');
  assert.deepEqual(errors,[],'Original Home and new gallery have no browser errors');
  console.log('TALERA_FREE_LIFE_GALLERY_FIRST_OPEN_EXAMPLE_NO_FAKE_PHOTOS_OK');
  console.log('TALERA_FREE_LIFE_GALLERY_LOCAL_YEARS_AND_TAGS_TEN_SPREAD_OVER_LIFE_OK');

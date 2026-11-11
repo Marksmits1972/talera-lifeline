@@ -50,9 +50,20 @@ function hideUnselectedEntryPhoto(html,requestUrl){
     !url.searchParams.has('memory')||!allowedLocalUiSearch(url))return html;
  const id=url.searchParams.get('memory');
  // R19 handles original IDs 1..50. Do not gate unsupported numeric navigation.
- const covered=LOCAL_STORY_ID.test(id)||
-   (/^\d{1,2}$/.test(id)&&Number(id)>=1&&Number(id)<=50);
+ const existingRef=/^\d+$/.test(id)&&((Number(id)>=1&&Number(id)<=50)||
+   (Number(id)>=1001&&Number(id)<=1450));
+ const covered=LOCAL_STORY_ID.test(id)||existingRef;
  if(!covered)return html;
+ // The APPROVED Home already links to numeric sample #1031, but its old
+ // R19 bridge rejected all IDs >50 and briefly displayed reference #50.
+ // Select only an actual existing 450-series reference; no new story or demo.
+ if(Number(id)>=1001&&Number(id)<=1450){
+   const oldBridge='if(!Number.isInteger(id)||id<1||id>50)return;';
+   const updatedBridge='if(!Number.isInteger(id)||!((id>=1&&id<=50)||(id>=1001&&id<=1450)))return;';
+   if(html.split(oldBridge).length!==2)
+     throw Error('TALERA_EXISTING_REFERENCE_DEEP_LINK_SOURCE_DRIFT');
+   html=html.replace(oldBridge,updatedBridge);
+ }
  if(typeof html!=='string'||html.split('<head>').length!==2||
     !html.includes('id="photoStage"')||
     !html.includes('id="memoryPhotoA"')||

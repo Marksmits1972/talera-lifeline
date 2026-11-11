@@ -74,11 +74,10 @@ function fixPhotoOnlyPresentation(original){
  };
  const show="  function showPhoto(memory,index,manual=false){\n";
  const guarded="  let pendingAutoPhoto=null,photoAutoSerial=0;\n"+
-   "  function showPhoto(memory,index,manual=false){\n"+
+   "  function showPhoto(memory,index,manual=false,decoded=false){\n"+
    "    if(manual){photoAutoSerial++;pendingAutoPhoto=null}\n"+
-   "    if(!manual&&memory?._taleraLocal&&Array.isArray(memory.photos)&&memory.photos.length>1&&\n"+
-   "       !memory._zeroItems?.some(x=>x.kind==='audio')&&\n"+
-   "       !memory._zeroFrames?.some(x=>x.kind==='video')){\n"+
+   "    if(!decoded&&memory?._taleraLocal&&Array.isArray(memory.photos)&&memory.photos.length>1&&\n"+
+   "       !memory._zeroItems?.some(x=>x.kind==='audio')){\n"+
    "      if(pendingAutoPhoto)return;\n"+
    "      const next=((index%memory.photos.length)+memory.photos.length)%memory.photos.length;\n"+
    "      const src=memory.photos[next],serial=++photoAutoSerial,preload=new Image();\n"+
@@ -88,7 +87,7 @@ function fixPhotoOnlyPresentation(original){
    "        if(pendingAutoPhoto!==pending||serial!==photoAutoSerial||!preload.naturalWidth||\n"+
    "           runtime.currentMemory()?.id!==memory.id)return;\n"+
    "        clearTimeout(pending.timer);pendingAutoPhoto=null;\n"+
-   "        showPhoto(memory,next,true); // The original WORKING tap path.\n"+
+   "        showPhoto(memory,next,true,true); // Commit only a decoded ordinary frame.\n"+
    "      };\n"+
    "      preload.onload=ready;preload.onerror=discard;\n"+
    "      pending.timer=setTimeout(discard,12000);\n"+
@@ -106,7 +105,33 @@ function fixPhotoOnlyPresentation(original){
    "    renderDots(memory);\n"+
    "    if(changed||(!autoStartTimer&&!autoInterval&&!pendingAutoPhoto))scheduleAuto(memory);\n"+
    "  });";
- const result=exact(exact(original,show,guarded),schedule,stable);
+ let result=exact(exact(original,show,guarded),schedule,stable);
+ // Only the ordinary photo roll owns the automatic timer. The recorded
+ // voice/cue engine keeps its exact original code and controls.
+ result=exact(result,
+   "memory._zeroItems?.some(x=>x.kind==='audio')||memory._zeroFrames?.some(x=>x.kind==='video')",
+   "memory._zeroItems?.some(x=>x.kind==='audio')");
+ // A native video may run to its natural end, then ordinary photos resume.
+ result=exact(result,"    clearAuto();\n    if(window.__taleraBandRolling)return;",
+   "    clearAuto();\n    if(window.__taleraBandRolling)return;\n"+
+   "    if(memory?._taleraLocal&&memory._zeroFrames?.[memory._photoIndex||0]?.kind==='video')return;");
+ // Register interval BEFORE the next frame request: immediate cached
+ // preloads can then safely cancel it instead of leaving a second timer.
+ result=exact(result,
+   "      showPhoto(memory,(memory._photoIndex||0)+1,false);\n      autoInterval=setInterval(",
+   "      autoInterval=setInterval(");
+ result=exact(result,
+   "      },memory?._taleraLocal?2500:AUTO_STEP_MS);\n    },memory?._taleraLocal?2500:AUTO_START_MS);",
+   "      },memory?._taleraLocal?2500:AUTO_STEP_MS);\n"+
+   "      showPhoto(memory,(memory._photoIndex||0)+1,false);\n"+
+   "    },memory?._taleraLocal?2500:AUTO_START_MS);");
+ // This is solely the already-existing ORDINARY video callback. All
+ // narrated video/cue/voice functions remain byte-for-byte unchanged.
+ result=exact(result,
+   "      // End of video does not advance the ordinary presentation; only tapping does.",
+   "      // Resume ordinary circulation when this original video finishes.\n"+
+   "      if(s===taleraInline&&s.phase==='ordinary'&&runtime.currentMemory()?.id===s.memory.id)\n"+
+   "        window.__taleraV31SelectPhoto?.(s.memory.id,(s.memory._photoIndex+1)%s.frames.length,true);");
  assert.ok(result.includes('window.__taleraV31SelectPhoto=')&&
    result.includes('function taleraInlineOrdinaryStep('),
    'Ordinary presentation manual photo source changed unexpectedly');

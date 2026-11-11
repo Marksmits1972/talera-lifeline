@@ -79,6 +79,10 @@ function allowedLocalUiSearch(url){
     return /^\d{4}$/.test(id)&&Number(id)>=1900&&Number(id)<=new Date().getFullYear();
   if(url.pathname==='/present'&&key==='decade')
     return /^\d{4}$/.test(id)&&Number(id)>=1900&&Number(id)<=new Date().getFullYear()&&Number(id)%10===0;
+  // Personal story topics are short user-entered labels, never code or an API route.
+  if(url.pathname==='/present'&&key==='theme')
+    return id.length>0&&id.length<=36&&id===id.trim()&&
+      !/[\u0000-\u001f\u007f<>\\]/.test(id);
   if(url.pathname==='/present'&&key==='memory'&&/^\d{1,6}$/.test(id))
     return Number(id)>=1&&Number(id)<=100000;
   // The original local memory and editing routes retain their strict IDs.
@@ -96,7 +100,7 @@ function canonicalReferralUiPath(url,method){
   const pairs=[...url.searchParams.entries()];
   if(!pairs.length||pairs.length>12)return null;
   let functional=null,passive=0;
-  const functionKeys=new Set(['talera_menu','published','edit','memory','year','decade']);
+  const functionKeys=new Set(['talera_menu','published','edit','memory','year','decade','theme']);
   const reserved=/^(?:account|user|db|database|scope|story|file|redirect|return|return_url|next|url|token|code|key|auth|session|password|email|birthDate|state|callback|target|share|origin|id|path)$/i;
   for(const [key,value] of pairs){
     if(key.length>64||value.length>256||/[\u0000-\u001f\u007f]/.test(key+value))

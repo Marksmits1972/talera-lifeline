@@ -274,6 +274,8 @@ function warmUpFirstSwipePhotoStrip(html){
    "    const items=all(),c=Math.round(state.p),dir=Math.sign(state.v);\n"+
    "    for(let off=(dir>=0?-3:-9);off<=(dir>=0?9:3);off++){\n"+
    "      const mem=items[c+off];if(!mem||!mem.image)continue;\n"+
+   "      // The existing strip warms ONLY approaching local thumbnails.\n"+
+   "      if(mem._taleraLocal&&mem._photoLoading)window.__taleraPrewarmLocalCover?.(mem);\n"+
    "      const source=mem.previewImage||mem.thumbnail||mem.image;\n"+
    "      if(cache.get(mem.id)?.src===source)continue;\n"+
    "      const img=new Image();img.decoding='async';img.src=source;\n"+

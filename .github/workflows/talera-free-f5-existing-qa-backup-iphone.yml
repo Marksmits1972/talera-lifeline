@@ -819,11 +819,12 @@ jobs:
         timeout-minutes: 8
         run: |
           set -euo pipefail
-          timeout 180s npm install --no-save --no-package-lock playwright@1.56.1
-          # GitHub Ubuntu runner has the browser system libraries; avoid the
-          # failing Azure Ubuntu apt mirror entirely during this UI-only test.
+          # Use an npm-provided FFmpeg only for the existing one-second
+          # synthetic regression video. Never change the app or user media.
+          timeout 180s npm install --no-save --no-package-lock playwright@1.56.1 @ffmpeg-installer/linux-x64@4.4.1
+          # The runner already has the Chromium shared libraries; no apt repo.
           timeout 180s npx --no-install playwright install chromium
-          command -v ffmpeg >/dev/null || { echo 'Existing runner ffmpeg unavailable'; exit 1; }
+          test -x node_modules/@ffmpeg-installer/linux-x64/ffmpeg
       - name: Verify actual iPhone-sized gallery with owned photos and no overlay
         shell: bash
         timeout-minutes: 5
@@ -835,6 +836,9 @@ jobs:
         timeout-minutes: 5
         run: |
           set -euo pipefail
+          # The old ordinary-memory browser test runs 'ffmpeg' by name.
+          # Supply the transient CI binary, without modifying app code.
+          export PATH="$PWD/node_modules/@ffmpeg-installer/linux-x64:$PATH"
           timeout 180s node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Build identical seven-DO deployment config without re-creating or changing secrets
         shell: bash

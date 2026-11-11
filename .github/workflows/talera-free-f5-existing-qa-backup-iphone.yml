@@ -792,7 +792,7 @@ jobs:
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');
           console.log('TALERA_NORMAL_APP_ENTRY_OK; PRIVATE_DATA_STILL_AUTH_GATED; NO_ACCOUNTS_CREATED');
           NODE
-      - name: Verify translated first-open gallery rows and same Free presentation unchanged
+      - name: Verify stable first-photo position and new owner life galleries on same Free app
         shell: bash
         run: |
           set -euo pipefail

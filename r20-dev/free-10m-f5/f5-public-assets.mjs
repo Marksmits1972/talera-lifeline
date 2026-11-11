@@ -159,6 +159,52 @@ function fixPhotoOnlyPresentation(original){
  result=exact(result,
    "check.onerror=()=>{if(seq===requestNo)console.warn('TALERA Story Player: geselecteerde foto kon niet laden',i)};",
    "check.onerror=()=>{if(seq===requestNo){pendingOwner='';pendingSrc='';console.warn('TALERA Story Player: geselecteerde foto kon niet laden',i)}};");
+ // On a plain tap, never open the photo strip's high-z thumbnail wheel.
+ // The wheel moves ONLY after a real horizontal swipe. Narrated stories
+ // use their exactly approved original gesture path, untouched.
+ result=exact(result,
+   "    window.__taleraBandRolling=true;\n"+
+   "    document.dispatchEvent(new CustomEvent('talera:wheel-motion',{detail:{active:true}}));\n"+
+   "    open();\n"+
+   "    state.drag={id:e.pointerId,",
+   "    const ordinaryTap=Boolean(window.__taleraTimelineRuntime?.currentMemory()?._taleraLocal&&\n"+
+   "      !window.__taleraTimelineRuntime.currentMemory()._zeroItems?.some(x=>x.kind==='audio'));\n"+
+   "    if(!ordinaryTap){\n"+
+   "      window.__taleraBandRolling=true;\n"+
+   "      document.dispatchEvent(new CustomEvent('talera:wheel-motion',{detail:{active:true}}));\n"+
+   "      open();\n"+
+   "    }\n"+
+   "    state.drag={id:e.pointerId,");
+ result=exact(result,
+   "lastMove:now,motion:0,old,started:false,usefulV:0,usefulAt:-1,",
+   "lastMove:now,motion:0,old,ordinaryTap,started:false,usefulV:0,usefulAt:-1,");
+ result=exact(result,
+   "    if(Math.abs(e.clientX-d.startX)>=13)d.started=true;\n"+
+   "    if(d.started&&d.samples.length>1){",
+   "    if(Math.abs(e.clientX-d.startX)>=13)d.started=true;\n"+
+   "    if(d.ordinaryTap&&d.started&&!d.wheelOpened){\n"+
+   "      d.wheelOpened=true;window.__taleraBandRolling=true;\n"+
+   "      document.dispatchEvent(new CustomEvent('talera:wheel-motion',{detail:{active:true}}));\n"+
+   "      open();\n"+
+   "    }\n"+
+   "    if(d.started&&d.samples.length>1){");
+ result=exact(result,
+   "    book.scrub(state.p);render(now);\n"+
+   "    if(e.cancelable)e.preventDefault();",
+   "    if(!d.ordinaryTap||d.started){book.scrub(state.p);render(now)}\n"+
+   "    if(e.cancelable&&(!d.ordinaryTap||d.started))e.preventDefault();");
+ result=exact(result,
+   "    state.drag=null;\n"+
+   "    beginLanding(direction,v,d.startIndex);\n"+
+   "    try{story.releasePointerCapture(e.pointerId)}catch(err){}",
+   "    state.drag=null;\n"+
+   "    if(d.ordinaryTap&&!d.started){\n"+
+   "      state.p=d.startIndex;\n"+
+   "      try{story.releasePointerCapture(e.pointerId)}catch(err){}\n"+
+   "      return; // Native click advances the ordinary photo; NEVER cover it with the strip.\n"+
+   "    }\n"+
+   "    beginLanding(direction,v,d.startIndex);\n"+
+   "    try{story.releasePointerCapture(e.pointerId)}catch(err){}");
  assert.ok(result.includes('window.__taleraV31SelectPhoto=')&&
    result.includes('function taleraInlineOrdinaryStep('),
    'Ordinary presentation manual photo source changed unexpectedly');

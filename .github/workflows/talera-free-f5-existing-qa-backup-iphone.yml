@@ -179,8 +179,9 @@ jobs:
             'Approved home must contain exactly one original four-slot menu');
           for(const id of ['navMine','navShared','navNotifications','navMore'])
             assert.ok(originalHome.includes('id="'+id+'"'),'Existing nav '+id+' missing');
-          assert.ok(/id="navShared"[^>]*style="display: none;"/.test(originalHome),
-            'Retired fourth menu item must remain hidden, not reintroduced');
+          assert.ok(originalHome.includes('.flow-nav a[href^="/gedeeld"]{display:none!important}')||
+            /id="navShared"[^>]*style="display:\\s*none;?"/.test(originalHome),
+            'The retired Gedeeld link must remain hidden by original CSS or inline style');
           const from=worker.indexOf('const OLD_HOME_NAV_GRID=');
           const until=worker.indexOf('const AUTH_PATHS=',from);
           assert.ok(from>0&&until>from,'Scoped three-tab nav helper missing');
@@ -568,7 +569,8 @@ jobs:
           assert.ok(!home.includes('.flow-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important}'));
           for(const id of ['navMine','navNotifications','navMore'])
             assert.ok(home.includes('id="'+id+'"'),'Missing original destination '+id);
-          assert.ok(/id="navShared"[^>]*style="display: none;"/.test(home));
+          assert.ok(home.includes('.flow-nav a[href^="/gedeeld"]{display:none!important}')||
+            /id="navShared"[^>]*style="display:\\s*none;?"/.test(home));
           console.log('SAME_ORIGIN_HOME_BOTTOM_NAV_3_SLOTS_PASS');
           NODE
           # User's in-app 404 is reproducible with appended link parameters.

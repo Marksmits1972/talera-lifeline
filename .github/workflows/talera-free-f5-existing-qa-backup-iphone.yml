@@ -388,11 +388,11 @@ jobs:
           console.log('TALERA_DIRECT_STORY_ENTRY_NO_WRONG_REFERENCE_FRAME_R19_LOCAL');
           // A GALLERY photo can reveal as soon as its own real pixels are ready.
           // The unrelated first cover deliberately stays cold in this regression.
-          const galleryOpen='<script id="talera-direct-memory-entry-guard">';
-          const galleryStart=localGate.indexOf(galleryOpen);
+          const directGalleryOpen='<script id="talera-direct-memory-entry-guard">';
+          const galleryStart=localGate.indexOf(directGalleryOpen);
           const galleryEnd=localGate.indexOf('</script>',galleryStart);
           const galleryJs=galleryStart>=0&&galleryEnd>galleryStart?
-            localGate.slice(galleryStart+galleryOpen.length,galleryEnd):'';
+            localGate.slice(galleryStart+directGalleryOpen.length,galleryEnd):'';
           assert.ok(galleryJs,'Existing gallery direct-photo guard must be present');
           const galleryVisible=new Set();
           let baseCoverReads=0,selectedPhotoChecks=0;

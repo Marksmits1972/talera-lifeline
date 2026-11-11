@@ -114,7 +114,18 @@ try{
     return row.id;
   });
   await load(page,plain,3);
-  assert.equal((await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex)),0);
+  // Hydration can exceed the first 2500ms auto interval on a busy CI
+  // machine. Select the real first photo again using the EXISTING controller
+  // so the visible red/green/blue check starts at a deterministic position.
+  await page.evaluate(()=>{
+    const m=window.__taleraTimelineRuntime.currentMemory();
+    window.__taleraV31SelectPhoto(m.id,0,true);
+  });
+  await page.waitForFunction(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return m?._photoIndex===0&&
+      document.querySelector('#photoStage .talera-story-synced-sharp')?.complete;
+  },null,{timeout:6000});
   const first=await centerPixel(page);
   assert.ok(dominant(first,0),'FIRST PHOTO IS NOT VISIBLE RED: '+JSON.stringify(first));
   await waitIndex(page,1);

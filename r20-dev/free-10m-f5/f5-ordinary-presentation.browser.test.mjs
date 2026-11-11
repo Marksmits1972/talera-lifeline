@@ -38,6 +38,29 @@ async function start(){
   }
   throw Error('Original Free worker unavailable: '+log);
 }
+// Read ONLY photographic pixels from the actual rendered stage screenshot.
+// Comparing whole screenshots allowed moving dots to masquerade as a new photo.
+async function centerPixel(page){
+  const shot=await page.locator('#photoStage').screenshot();
+  return page.evaluate(async data=>{
+    const img=new Image();
+    img.src='data:image/png;base64,'+data;
+    await img.decode();
+    const canvas=document.createElement('canvas');
+    canvas.width=img.width;canvas.height=img.height;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(img,0,0);
+    const sample=(x,y)=>Array.from(ctx.getImageData(
+      Math.floor(canvas.width*x),Math.floor(canvas.height*y),1,1).data).slice(0,3);
+    return {upper:sample(.5,.36),middle:sample(.5,.52),
+      width:canvas.width,height:canvas.height};
+  },shot.toString('base64'));
+}
+function dominant(p,channel){
+  const rgb=p.upper;
+  return rgb[channel] > rgb[(channel+1)%3]*1.55 &&
+    rgb[channel] > rgb[(channel+2)%3]*1.55;
+}
 const waitIndex=(page,index,timeout=9500)=>page.waitForFunction(index=>
   window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===index,
   index,{timeout});
@@ -91,14 +114,17 @@ try{
   });
   await load(page,plain,3);
   assert.equal((await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex)),0);
-  const first=await page.locator('#photoStage').screenshot();
+  const first=await centerPixel(page);
+  assert.ok(dominant(first,0),'FIRST PHOTO IS NOT VISIBLE RED: '+JSON.stringify(first));
   await waitIndex(page,1);
-  const second=await page.locator('#photoStage').screenshot();
-  assert.ok(!first.equals(second),'Automatic transition changed dots but not image');
+  const second=await centerPixel(page);
+  assert.ok(dominant(second,1),'SECOND PHOTO DOES NOT DISPLAY GREEN, DOTS ONLY: '+
+    JSON.stringify({first,second}));
   await page.locator('#memoryStoryScroll').tap({timeout:12000});
   await waitIndex(page,2,9000);
-  const third=await page.locator('#photoStage').screenshot();
-  assert.ok(!second.equals(third),'Manual tap changed dots but not image');
+  const third=await centerPixel(page);
+  assert.ok(dominant(third,2),'MANUAL TAP DID NOT DISPLAY BLUE: '+
+    JSON.stringify({second,third}));
   await waitIndex(page,0,9000);
   assert.equal(await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory().storyId),plain);
 
@@ -107,7 +133,7 @@ try{
     '-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',mp4],
     {timeout:20000,stdio:'ignore'});
   const mixed=await page.evaluate(async b64=>{
-    const files=await Promise.all(['#ef1523','#27d128'].map(async(c,i)=>{
+    const files=await Promise.all(['#ffa500','#00d9f2'].map(async(c,i)=>{
       const canvas=document.createElement('canvas');canvas.width=140;canvas.height=140;
       const paint=canvas.getContext('2d');paint.fillStyle=c;paint.fillRect(0,0,140,140);
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
@@ -145,10 +171,12 @@ try{
   await page.waitForFunction(()=>!window.__taleraBandRolling,null,{timeout:12000});
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length===3,
     null,{timeout:11000});
-  const swipePhotoBefore=await page.locator('#photoStage').screenshot();
+  const swipePhotoBefore=await centerPixel(page);
+  assert.ok(dominant(swipePhotoBefore,0),
+    'SWIPED THUMBNAIL NOT VISIBLE OR WRONG PHOTO: '+JSON.stringify(swipePhotoBefore));
   await waitIndex(page,1,11000);
-  const swipePhotoAfter=await page.locator('#photoStage').screenshot();
-  if(swipePhotoBefore.equals(swipePhotoAfter)){
+  const swipePhotoAfter=await centerPixel(page);
+  if(!dominant(swipePhotoAfter,2)){
     const trace=await page.evaluate(()=>{
       const m=window.__taleraTimelineRuntime.currentMemory();
       const stage=document.getElementById('photoStage');
@@ -162,7 +190,7 @@ try{
         rolling:window.__taleraBandRolling,layers};
     });
     throw Error('AFTER SWIPE DOTS MOVE BUT REAL PHOTO FROZEN: '+
-      JSON.stringify(trace).slice(0,9000));
+      JSON.stringify({swipePhotoBefore,swipePhotoAfter,trace}).slice(0,11000));
   }
   const secondTapBefore=await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex);
   await page.locator('#memoryStoryScroll').tap({timeout:12000});

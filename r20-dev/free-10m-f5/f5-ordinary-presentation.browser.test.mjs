@@ -222,14 +222,23 @@ try{
     throw Error('AFTER SWIPE DOTS MOVE BUT REAL PHOTO FROZEN: '+
       JSON.stringify({swipePhotoBefore,swipePhotoAfter,trace}).slice(0,11000));
   }
+  // The original short video can end before a later polling tick. Watch
+  // its actual DOM mount, then assert the regular-photo return separately.
+  await page.evaluate(()=>{
+    window.__taleraSawOrdinaryVideo=Boolean(document.querySelector('video.talera-v61-inline-video'));
+    const see=()=>{if(document.querySelector('video.talera-v61-inline-video'))
+      window.__taleraSawOrdinaryVideo=true;};
+    const watcher=new MutationObserver(see);
+    watcher.observe(document.body,{subtree:true,childList:true});
+  });
   const secondTapBefore=await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex);
   await page.locator('#memoryStoryScroll').tap({timeout:12000});
   await page.waitForFunction(previous=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex!==previous,
     secondTapBefore,{timeout:2200});
   console.log('TALERA_REAL_STORY_SWIPE_AND_SECOND_MEMORY_PHOTO_ROLL_OK');
   // Continue with the original video of the same swiped memory.
-  await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),
-    null,{timeout:9000});
+  await page.waitForFunction(()=>window.__taleraSawOrdinaryVideo===true,
+    null,{timeout:12000});
   await waitIndex(page,0,12000);
   const state=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();

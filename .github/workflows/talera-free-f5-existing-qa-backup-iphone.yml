@@ -528,6 +528,8 @@ jobs:
           assert.ok(present.includes('function taleraInlineOrdinaryStep('));
           assert.ok(present.includes('window.__taleraPrewarmLocalCover=memory=>'),
             'Existing strip must prewarm original attached photo cover when near');
+          assert.ok(present.includes('if(state.drag||state.snap||Math.abs(state.v)>.01){requestAnimationFrame(finish);return;}'),
+            'Wheel finish must retry after the original swipe inertia completes');
           assert.ok(present.includes('#photoStage .talera-wheel-strip:not(.is-visible){display:none!important}'),
             'Wheel thumbnail may never cover the ordinary photo when no swipe is active');
           assert.ok(present.includes('if(pendingOwner===memory.id&&pendingSrc===src)return;'),
@@ -901,7 +903,7 @@ jobs:
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');
           console.log('TALERA_NORMAL_APP_ENTRY_OK; PRIVATE_DATA_STILL_AUTH_GATED; NO_ACCOUNTS_CREATED');
           NODE
-      - name: Verify photo-stage pixels and thumbnail wheel hidden at rest, recorded narrator intact
+      - name: Prove swipe wheel closes after image load, photos change visibly and narration remains exact
         shell: bash
         run: |
           set -euo pipefail

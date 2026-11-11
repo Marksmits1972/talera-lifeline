@@ -98,7 +98,15 @@ jobs:
           set -euo pipefail
           HOST=https://talera-account-birthdate-test-20261107.mark-a39.workers.dev
           curl --fail --silent --show-error --max-time 25 "$HOST/mijn-leven" > /tmp/talera-original-home.html
-          curl --fail --silent --show-error --max-time 20 "$HOST/__clean/menu-integration.mjs" > /tmp/talera-original-menu.mjs
+          # Cloudflare propagation may briefly serve the prior immutable version.
+          # Require the actual new menu on the SAME existing origin before acceptance.
+          FOUND=0
+          for attempt in $(seq 1 20); do
+            curl --fail --silent --show-error --max-time 20 "$HOST/__clean/menu-integration.mjs" > /tmp/talera-original-menu.mjs
+            if grep -q 'open-backup' /tmp/talera-original-menu.mjs; then FOUND=1; break; fi
+            sleep 2
+          done
+          test "$FOUND" -eq 1
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import fs from 'node:fs';
@@ -107,8 +115,9 @@ jobs:
           assert.ok(home.includes('talera-flow-v17-time'));
           assert.ok(!home.includes('talera-life-gallery-rows'),'No Apple-style photo strips');
           assert.ok(home.includes('talera-memory-store-v1'),'Existing local originals preserved');
-          assert.equal(menu.split('data-action="open-backup"').length-1,1);
-          assert.ok(menu.includes('data-action="storage-refresh"'));
+          assert.equal((menu.match(/open-backup/g)||[]).length,2,'One Storage button and its one handler');
+          assert.ok(menu.includes("window.location.assign('/__f5/backup')"));
+          assert.ok(menu.includes('storage-refresh'));
           assert.ok(menu.includes('birthDate:data.birthDate'),'Approved date field preserved');
           assert.ok(!menu.includes('Reservekopie en herstel worden nog ontwikkeld.'));
           console.log('TALERA_ORIGINAL_7NOV_HOME_AND_BACKUP_MENU_POSTDEPLOY_PASS');

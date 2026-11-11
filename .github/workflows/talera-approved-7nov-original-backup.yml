@@ -1,4 +1,5 @@
 name: TALERA approved 7-Nov original layout - only local backup
+# One-shot: original Cloudflare Worker only, original version retained for rollback.
 on:
   push:
     branches: [feature/account-birthdate-timeline-20261107]

@@ -227,10 +227,7 @@ try{
   await page.waitForFunction(previous=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex!==previous,
     secondTapBefore,{timeout:2200});
   console.log('TALERA_REAL_STORY_SWIPE_AND_SECOND_MEMORY_PHOTO_ROLL_OK');
-  // Re-open the exact same local video as the existing dedicated test.
-  await load(page,mixed,3);
-  await waitIndex(page,1);
-  await waitIndex(page,2);
+  // Continue with the original video of the same swiped memory.
   await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),
     null,{timeout:9000});
   await waitIndex(page,0,12000);

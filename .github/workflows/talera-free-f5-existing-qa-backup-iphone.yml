@@ -1,4 +1,4 @@
-name: TALERA Free F5 - reconnect existing menu and Home shortcuts on SAME candidate
+name: TALERA Free F5 - Mijn verhalen over owner tags on SAME candidate
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: 6faab461-aac2-4128-8cb8-da2fcfc86aec
+      F5_PREVIOUS_VERSION: 74592d21-7050-45ad-b56c-5285ff916748
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Verify original Meldingen and quick links, previous photo/presentation and protected account boundaries
+      - name: Test owner's own-tag tiles and presentation scope, preserve previous media and private account boundaries
         shell: bash
         run: |
           set -euo pipefail
@@ -169,11 +169,15 @@ jobs:
           // The original Home shortcuts were previously rejected as 404.
           const accepts=u=>routeFns.allowedLocalUiSearch(
             new URL('https://talera.example'+u));
-          for(const url of ['/present?year=1985','/present?decade=1980',
+          for(const url of ['/present?theme=Familie','/present?theme=Sport',
+            '/present?theme=Werk%20%26%20passies',
+            '/present?year=1985','/present?decade=1980',
             '/present?memory=3','/present?memory=1031',
             '/present?memory=local-12345678','/present?talera_menu=hub'])
             assert.ok(accepts(url),'Original Home deep-link blocked: '+url);
-          for(const url of ['/present?year=12','/present?year=9999',
+          for(const url of ['/present?theme=',
+            '/present?theme=%3Cscript%3E','/present?theme=Familie&token=leak',
+            '/present?year=12','/present?year=9999',
             '/present?decade=1987','/present?memory=0',
             '/present?memory=../../api/me','/present?year=1985&token=hack',
             '/api/me?year=1985','/meldingen?token=hack'])
@@ -193,7 +197,75 @@ jobs:
           const {referencePages:refs}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
           const readRef=route=>fs.readFileSync(path.join(root,refs[route].replace(/^\//,'')),'utf8');
           const originalHome=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-mijn-leven.html','utf8');
-          assert.equal(readRef('/mijn-leven'),originalHome,'Home must stay byte-for-byte unchanged');
+          const ownerHome=readRef('/mijn-leven');
+          const refreshMarker='async function refresh(){';
+          const origRefresh=originalHome.indexOf(refreshMarker),ownerRefresh=ownerHome.indexOf(refreshMarker);
+          const origTail=originalHome.indexOf('window.__taleraTopics={',origRefresh);
+          const ownTail=ownerHome.indexOf('window.__taleraTopics={',ownerRefresh);
+          assert.ok(origRefresh>0&&origTail>origRefresh&&ownerRefresh>0&&ownTail>ownerRefresh,
+            'Exactly the existing home topic script must be revised');
+          assert.equal(ownerHome.slice(0,ownerRefresh),originalHome.slice(0,origRefresh),
+            'Home layout, original navigation, scripts and date controls must be untouched');
+          assert.equal(ownerHome.slice(ownTail),originalHome.slice(origTail),
+            'Only the existing topic refresh function may change on Home');
+          const ownTopicCode=ownerHome.slice(ownerRefresh,ownTail);
+          assert.ok(ownTopicCode.includes('Mijn verhalen over…'));
+          assert.ok(ownTopicCode.includes('Math.min(8,available.length)'));
+          assert.ok(ownTopicCode.includes("window.location.assign('/present?theme='"));
+          assert.ok(ownTopicCode.includes("source==='pwa-local'"));
+          assert.ok(!ownTopicCode.includes('sampleRows('),
+            'Never show hard-coded/example topics as owner's own topics');
+          assert.ok(ownTopicCode.includes('sessionStorage.getItem(turnKey)')&&
+            ownTopicCode.includes('localStorage.setItem(counterKey'),
+            'Tiles must stay stable within an open app session and rotate on new session');
+          // Exercise the EXACT bundled refresh with transient metadata ONLY.
+          // There is no account creation or IndexedDB/network write in this test.
+          const makeElement=(tag,cls,value)=>({tag,cls,textContent:value,style:{},children:[],
+            append(...nodes){this.children.push(...nodes)},setAttribute(key,value){this[key]=value}});
+          const fakeGrid={previousElementSibling:{style:{}},style:{},children:[],
+            replaceChildren(){this.children=[]},append(node){this.children.push(node)}};
+          const mkStorage=()=>{const m=new Map();return {getItem:k=>m.has(k)?m.get(k):null,
+            setItem:(k,v)=>m.set(k,String(v)),clear:()=>m.clear()}};
+          const localTurn=mkStorage(),tabTurn=mkStorage(),visits=[];
+          const browser={location:{assign:u=>visits.push(u)},__taleraTopicTurn:null};
+          const heading={textContent:''},minor={textContent:''},note={style:{}};
+          const myCards={style:{}},myHeading={style:{}};
+          const doc={getElementById:k=>k==='myCards'?myCards:k==='myCount'?{parentElement:myHeading}:null};
+          let ephemeral=[];
+          const createRefresh=new Function('store','document','grid','note','header','small','window',
+            'sessionStorage','localStorage','cats','text','countLabel','pickCover','imageFor','escapeUrls',
+            'let rows=[];'+ownTopicCode+';return refresh;');
+          const refreshHome=createRefresh({list:async()=>ephemeral},doc,fakeGrid,note,heading,minor,browser,
+            tabTurn,localTurn,[{name:'Familie',icon:'♡',bg:'old-blue'}],
+            makeElement,n=>String(n)+' herinneringen',arr=>arr[0],()=>{},()=>{});
+          await refreshHome();
+          assert.equal(fakeGrid.children.length,0,'No tags means NO selectable tile');
+          assert.equal(fakeGrid.style.display,'none');
+          ephemeral=[{id:'item1',source:'pwa-local',tags:['Familie','Sport'],items:[]},
+            {id:'item2',source:'pwa-local',tags:['Werk'],items:[]},
+            {id:'sample',source:'demo',tags:['Voorbeeld'],items:[]}];
+          await refreshHome();
+          assert.equal(fakeGrid.children.length,3,'Only three personally used tags');
+          assert.equal(heading.textContent,'Mijn verhalen over…');
+          assert.ok(!fakeGrid.children.some(x=>x.children.some(y=>y.textContent==='Voorbeeld')));
+          fakeGrid.children[0].onclick();
+          assert.ok(visits[0].startsWith('/present?theme='),'Topic must open original presentation');
+          ephemeral=Array.from({length:11},(_,i)=>({id:'item'+i,source:'pwa-local',
+            tags:['Onderwerp '+i],items:[]}));
+          await refreshHome();
+          const firstEight=fakeGrid.children.map(x=>x.children.find(y=>y.cls==='talera-topic-info')
+            .children[0].textContent);
+          assert.equal(firstEight.length,8,'The number of cards must never exceed eight');
+          await refreshHome();
+          assert.deepEqual(firstEight,fakeGrid.children.map(x=>x.children.find(y=>y.cls==='talera-topic-info')
+            .children[0].textContent),'No rotation while same app session stays open');
+          browser.__taleraTopicTurn=null;tabTurn.clear();await refreshHome();
+          const nextEight=fakeGrid.children.map(x=>x.children.find(y=>y.cls==='talera-topic-info')
+            .children[0].textContent);
+          assert.equal(nextEight.length,8);
+          assert.notDeepEqual(nextEight,firstEight,'New app session must rotate displayed topics');
+          assert.equal(ephemeral.length,11,'Original memory list must never be modified');
+          console.log('TALERA_MY_STORIES_ABOUT_0_TO_8_TILES_SESSION_ROTATION_OK');
           // The owner's screenshot shows the three live home buttons
           // occupying 3/4 of a legacy FOUR-column grid. Repair exactly ONE
           // CSS declaration for both logged-in and logged-out home, with no
@@ -231,6 +303,30 @@ jobs:
 
           const before=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-present.html','utf8');
           const present=readRef('/present');
+          // Theme selection only affects the same RH19/V3 presentation engine.
+          const topicScope=present.indexOf('const taleraMatchesScope = m =>');
+          const scopeEnd=present.indexOf(';',topicScope);
+          assert.ok(topicScope>0&&scopeEnd>topicScope);
+          const scopeCode=present.slice(topicScope,scopeEnd+1);
+          const scopeFor=active=>new Function('TALERA_ACTIVE_TOPIC','taleraMatchesTopic',
+            'taleraMatchesDecade',scopeCode+' return taleraMatchesScope;')(
+            active,tags=>Array.isArray(tags)&&tags.includes('Familie'),()=>true);
+          const ownerTag={_taleraLocal:true,tags:['Familie']};
+          assert.equal(scopeFor('Familie')(ownerTag),true);
+          assert.equal(scopeFor('Familie')({_taleraLocal:false,tags:['Familie']}),false,
+            'Demo and shared examples may never enter personal topic presentation');
+          assert.equal(scopeFor('Familie')({_taleraLocal:true,tags:['Werk']}),false);
+          assert.equal(scopeFor('')({_taleraLocal:false,tags:['Familie']}),true,
+            'Ordinary unfiltered presentation must be unchanged');
+          assert.ok(present.includes('if(!incoming.length){location.replace'),
+            'Empty topics must not reveal sample memories');
+          assert.ok(present.includes('MEMORIES.splice(0,MEMORIES.length);'),
+            'Original memory array must be filtered, never copied into a second player');
+          assert.ok(present.includes('talera-topic-loading')&&
+            present.includes("document.documentElement.classList.remove('talera-topic-loading')"));
+          assert.ok(present.includes("const matching=asked?memories.filter("),
+            'The initial topic photo must be primed using existing local media');
+          console.log('TALERA_ORIGINAL_PRESENTATION_OWNER_TOPIC_FILTER_ONLY');
           assert.ok(before.includes('    scheduleAuto(memory);\n  });'),'Original timer source missing');
           assert.ok(present.includes('  let pendingAutoPhoto=null,photoAutoSerial=0;'));
           assert.ok(present.includes('showPhoto(memory,next,true); // The original WORKING tap path.'));
@@ -329,6 +425,16 @@ jobs:
           // account remain untouched; exercise only the existing JS paths.
           const originalTell=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
           const tell=readRef('/tell');
+          assert.ok(tell.includes('Waar gaat deze herinnering over?'),
+            'User-approved human question must replace technical Kenmerk label');
+          assert.ok(tell.includes('talera-tags-own-input')&&
+            tell.includes('const addOwnName=()=>'),
+            'Work editor must accept user-created tags in original tag panel');
+          assert.ok(tell.includes('saveDraft();close();paintLabels();'),
+            'Existing draft persistence must stay unchanged');
+          assert.ok(tell.includes('const CANONICAL=['),
+            'Previously supported selected tag choices must stay available');
+          console.log('TALERA_EXISTING_WORK_EDITOR_HUMAN_TOPIC_AND_CUSTOM_ENTRY');
           assert.ok(originalTell.includes(
             "video.style.cssText='position:fixed;left:-10px;top:-10px;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1'"),
             'Existing iPhone poster capture source has moved');
@@ -601,6 +707,17 @@ jobs:
             /id="navShared"[^>]*style="display:\\s*none;?"/.test(home));
           console.log('SAME_ORIGIN_HOME_BOTTOM_NAV_3_SLOTS_PASS');
           NODE
+          # Topic links must remain on the same original presentation URL.
+          # All private APIs still require login, and untrusted selectors 404.
+          for path in '/present?theme=Familie' '/present?theme=Sport'; do
+            code="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$path")"
+            test "$code" = 200
+          done
+          for path in '/present?theme=%3Cscript%3E' \
+            '/present?theme=Familie&token=blocked'; do
+            code="$(curl --max-time 20 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$path")"
+            test "$code" = 404
+          done
           # Same-origin menu and Home quick links, with no extra pages/accounts.
           for path in /meldingen '/present?year=1985' \
             '/present?memory=3' '/present?memory=1031'; do

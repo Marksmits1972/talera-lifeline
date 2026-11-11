@@ -132,9 +132,15 @@ try{
   'Smaller cards should have more white breathing room between topic rows');
  assert.equal(await page.locator('#talera-life-gallery-rows .talera-life-photo-placeholder').count(),0,
   'Generated white hatch/raster must not overlay ANY real photograph');
- const years=await family.locator('.talera-life-card-caption small').allTextContents();
+ const years=await family.locator('a.talera-life-card').evaluateAll(links=>links.map(a=>a._taleraPhoto?.year));
  assert.ok(new Set(years).size>=7,
   'The ten selected photos should be spread across the time period');
+ assert.equal(await page.locator('.talera-life-card-caption').count(),0,
+  'Each photo itself is the card; no repeated topic and year labels');
+ assert.equal(await page.locator('#v18-phases .v18-eras-title').count(),0,
+  'Remove the duplicate Blader door je jaren header');
+ assert.equal(await page.locator('.talera-life-collection-head small').count(),0,
+  'Remove the redundant descriptions next to photo section headings');
  const links=await family.locator('a.talera-life-card').evaluateAll(links=>
   links.map(a=>a.getAttribute('href')));
  assert.ok(links.every(h=>/^\/present\?memory=local-/.test(h)),
@@ -159,6 +165,72 @@ try{
  });
  assert.ok(scroll.range>50&&scroll.after>scroll.before,
   'Photo strip must really scroll horizontally on a mobile display');
+
+ // Exact original photo ID and same-card return, not the story's first image.
+ const multi=await page.evaluate(async()=>{
+  const files=[];
+  for(let i=0;i<12;i++){
+   const canvas=document.createElement('canvas');
+   canvas.width=96;canvas.height=96;
+   const pen=canvas.getContext('2d');
+   pen.fillStyle='hsl('+((i*27)%360)+' 70% 50%)';
+   pen.fillRect(0,0,96,96);
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+   files.push(new File([blob],'photo-'+i+'.png',{type:'image/png'}));
+  }
+  const row=await window.TaleraMemories.save({
+   title:'Foto-ID rechtstreekse route',date:'2018-09-03',
+   time:'10:30:00',text:'Ephemeral exact original photo order'
+  },files);
+  await window.TaleraMemories.setTags(row.id,['FotoRoute']);
+  return row.id;
+ });
+ await page.reload({waitUntil:'domcontentloaded',timeout:30000});
+ await page.waitForFunction(()=>document.getElementById('v18-phases')?.dataset.photoCount==='24',
+  null,{timeout:20000});
+ const route=page.locator('.talera-life-row').filter({
+  has:page.getByRole('heading',{name:'FotoRoute'})
+ });
+ assert.equal(await route.locator('a.talera-life-card').count(),10,
+  'Ten real media IDs from the same original memory');
+ const chosen=route.locator('a.talera-life-card').nth(7);
+ await chosen.scrollIntoViewIfNeeded();
+ const target=await chosen.evaluate(a=>{
+  const selected=a._taleraPhoto;
+  const frames=selected.row.items.filter(x=>x.kind==='photo'||x.kind==='video');
+  return {key:selected.item.key,story:String(selected.row.id),
+   index:frames.findIndex(x=>x.key===selected.item.key)};
+ });
+ assert.equal(target.story,multi);
+ assert.ok(target.index>0,'Selected item must not be the first memory image');
+ const scrollState=()=>page.evaluate(()=>{
+  const row=[...document.querySelectorAll('.talera-life-row')].find(e=>
+   e.querySelector('h4')?.textContent==='FotoRoute');
+  return {y:window.scrollY,left:row?.querySelector('.talera-life-track')?.scrollLeft};
+ });
+ const before=await scrollState();
+ await chosen.click();
+ await page.waitForURL(/\/present\?memory=local-/,{timeout:30000});
+ await page.waitForFunction(([id,index])=>{
+  const m=window.__taleraTimelineRuntime?.currentMemory?.();
+  return m?.storyId===id&&m._photoIndex===index&&!m._photoLoading&&
+    !document.documentElement.classList.contains('talera-direct-memory-entering');
+ },[target.story,target.index],{timeout:25000});
+ assert.equal(await page.locator('#talera-flow-home').count(),1,
+  'The existing presentation back arrow remains present');
+ await page.locator('#talera-flow-home').click({timeout:12000});
+ await page.waitForURL(/\/mijn-leven(?:$|\?)/,{timeout:20000});
+ await page.waitForFunction(()=>document.getElementById('v18-phases')?.dataset.photoCount==='24'&&
+  sessionStorage.getItem('talera-f5-gallery-photo-return-v1')===null,
+  null,{timeout:20000});
+ const returned=await route.locator('a.talera-life-card').nth(7).evaluate(a=>
+  ({key:a._taleraPhoto?.item.key,story:String(a._taleraPhoto?.row.id)}));
+ assert.deepEqual(returned,{key:target.key,story:target.story},
+  'Back must restore exact media ID, exact card and its neighbors');
+ const after=await scrollState();
+ assert.ok(Math.abs(before.left-after.left)<=5&&Math.abs(before.y-after.y)<=18,
+  'Back must preserve scroll positions: '+JSON.stringify({before,after}));
+ console.log('TALERA_GALLERY_EXACT_MEDIA_ID_AND_SAME_CARD_BACK_OK');
  assert.deepEqual(errors,[],'Original Home and new gallery have no browser errors');
  console.log('TALERA_FREE_LIFE_GALLERY_FIRST_OPEN_EXAMPLE_NO_FAKE_PHOTOS_OK');
  console.log('TALERA_FREE_LIFE_GALLERY_LOCAL_YEARS_AND_TAGS_TEN_SPREAD_OVER_LIFE_OK');

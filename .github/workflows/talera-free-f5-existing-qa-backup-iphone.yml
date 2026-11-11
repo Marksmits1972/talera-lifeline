@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: talera-free-f5-storage-only-iphone-qa-20261109
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   protected_backup_qa:

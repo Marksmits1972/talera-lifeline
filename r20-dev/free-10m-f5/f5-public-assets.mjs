@@ -143,7 +143,7 @@ function fixPhotoOnlyPresentation(original){
  // timeline notifications must not cancel an iPhone image still decoding.
  result=exact(result,
    "let stage=null,host=null,sharp=null,backdrop=null,owner='',shown='',requestNo=0;",
-   "let stage=null,host=null,sharp=null,backdrop=null,owner='',shown='',requestNo=0,pendingOwner='',pendingSrc=';");
+   "let stage=null,host=null,sharp=null,backdrop=null,owner='',shown='',requestNo=0,pendingOwner='',pendingSrc='';");
  result=exact(result,
    "function hide(){requestNo++;owner='';shown='';if(host)host.hidden=true;}",
    "function hide(){requestNo++;owner='';shown='';pendingOwner='';pendingSrc='';if(host)host.hidden=true;}");

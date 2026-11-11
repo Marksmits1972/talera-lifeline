@@ -270,7 +270,41 @@ function primeFirstOpenLocalStoryCovers(html){
    html=html.replace(before,after);
  };
  const hydrateAnchor=" async function hydrate(memory){";
- const prime=String.raw// Reuse the existing V61 local video poster generator and its IndexedDB
+ const prime=" // Keep up to five first-frame object URLs, scoped to this page and account.\n // The full existing hydrate() is still responsible for every other frame.\n async function warmFirstPhoto(memory){\n   if(!memory?._taleraLocal||memory._taleraFirstWarm)return;\n   const first=memory._zeroItems?.find(item=>item.kind==='photo'||item.kind==='video');\n   if(!first)return;\n   let url=null;\n   try{\n     if(first.kind==='photo'){\n       url=await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));\n     }else{\n       const still=await store.blob(first.key+':phone-v1');\n       if(still instanceof Blob&&still.size&&String(still.type).startsWith('image/'))\n         url=URL.createObjectURL(still);\n       else memory.image=videoPoster;\n     }\n   }catch(e){console.warn('TALERA eerste verhaalbeeld nog niet geladen',e)}\n   if(!url)return;\n   memory._taleraFirstWarm={key:first.key,url};\n   memory.image=url;memory.previewImage=url;\n }\n";
+ exact(hydrateAnchor,prime+hydrateAnchor,'WARM_BEFORE_HYDRATE');
+ const beforePhoto="           try{url=await (store.displayUrl?store.displayUrl(item.key):store.mediaUrl(item.key))}catch(e){}";
+ const afterPhoto="           try{url=memory._taleraFirstWarm?.key===item.key?memory._taleraFirstWarm.url:\n"+
+  "             await (store.displayUrl?store.displayUrl(item.key):store.mediaUrl(item.key))}catch(e){}";
+ exact(beforePhoto,afterPhoto,'REUSE_SAME_LOCAL_COVER');
+ const beforeVideo="           try{const poster=await store.blob(item.key+':phone-v1');if(poster instanceof Blob&&poster.size&&String(poster.type).startsWith('image/'))url=URL.createObjectURL(poster)}catch(e){}";
+ const afterVideo="           try{if(memory._taleraFirstWarm?.key===item.key)url=memory._taleraFirstWarm.url;\n"+
+  "             else{const poster=await store.blob(item.key+':phone-v1');if(poster instanceof Blob&&poster.size&&String(poster.type).startsWith('image/'))url=URL.createObjectURL(poster)}}catch(e){}";
+ exact(beforeVideo,afterVideo,'REUSE_SAME_VIDEO_STILL');
+ const beforeRegistration="   for(const m of memories)map.set(m.id,m);\n"+
+  "   runtime.registerMemories(memories);\n"+
+  "   const selected=isLocalId(wanted)?map.get('pwa:'+wanted):null;";
+ const afterRegistration="   for(const m of memories)map.set(m.id,m);\n"+
+  "   const selected=isLocalId(wanted)?map.get('pwa:'+wanted):null;\n"+
+  "   // Only a few adjacent covers, never all stories or original files.\n"+
+  "   // First real cover and neighbours are ready before swipe can show them.\n"+
+  "   const center=selected?.ms??runtime.currentMemory()?.ms??Date.now();\n"+
+  "   const near=memories.slice().sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,5);\n"+
+  "   await Promise.all(near.map(warmFirstPhoto));\n"+
+  "   runtime.registerMemories(memories);";
+ exact(beforeRegistration,afterRegistration,'REGISTER_AFTER_REAL_COVERS');
+ const beforeRevoke="   for(const urls of loaded.values())for(const url of urls)URL.revokeObjectURL(url);\n"+
+  "   loaded.clear();";
+ const afterRevoke="   for(const urls of loaded.values())for(const url of urls)URL.revokeObjectURL(url);\n"+
+  "   for(const m of map.values()){\n"+
+  "     const warm=m._taleraFirstWarm?.url;\n"+
+  "     if(warm&&!loaded.has(m.id))URL.revokeObjectURL(warm);\n"+
+  "   }\n"+
+  "   loaded.clear();";
+ exact(beforeRevoke,afterRevoke,'RELEASE_WARM_COVERS');
+ assert.ok(html.includes('const selected=isLocalId(wanted)?map.get('),'Original ID selection preserved');
+ return html;
+}
+// Reuse the existing V61 local video poster generator and its IndexedDB
 // preview sidecar. On iPhone a hidden 2x2 autoplay video may never present a
 // frame; the visible native tile already has a load/seek/canvas fallback, but
 // that fallback requires successful autoplay. Keep the SAME original video,

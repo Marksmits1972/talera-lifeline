@@ -1,0 +1,113 @@
+name: TALERA approved 7-Nov original layout - only local backup
+on:
+  push:
+    branches: [feature/account-birthdate-timeline-20261107]
+    paths:
+      - 'r20-dev/account-birthdate-test/**'
+      - '.github/workflows/talera-approved-7nov-original-backup.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: approved-7nov-original-backup
+  cancel-in-progress: false
+jobs:
+  approved_original_backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APPROVED_NAME: talera-account-birthdate-test-20261107
+      APPROVED_VERSION: 01f11012-8624-4bff-941c-88730d76fa27
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Confirm unchanged official 7-Nov Worker and existing service/D1 bindings
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const id=process.env.CLOUDFLARE_ACCOUNT_ID,n=process.env.APPROVED_NAME;
+          assert.match(id||'',/^[a-f0-9]{32}$/i);
+          assert.ok(process.env.CLOUDFLARE_API_TOKEN);
+          const get=async path=>{
+            const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+id+'/workers/scripts/'+n+path,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN}});
+            assert.equal(r.status,200,'Existing Worker metadata unavailable');
+            const j=await r.json();assert.equal(j.success,true);return j.result;
+          };
+          const [s,d]=await Promise.all([get('/settings'),get('/deployments')]);
+          const bindings=s.bindings||[];
+          assert.equal(bindings.length,2,'Original Worker binding count changed');
+          const d1=bindings.find(x=>x.name==='BIRTH_DB');
+          const base=bindings.find(x=>x.name==='TALERA_BASE');
+          assert.equal(d1?.id,'4d8aa183-3854-481c-97ab-e24eca7f484c');
+          assert.equal(base?.service,'talera-closed-memory-diepblauw-test-20261107');
+          assert.equal(base?.environment,'production');
+          assert.equal(d.deployments?.[0]?.versions?.[0]?.version_id,process.env.APPROVED_VERSION,
+            'Original approved recovery version changed, refuse deployment');
+          console.log('TALERA_APPROVED_7NOV_ORIGINAL_2_BINDINGS_AND_VERSION_LOCK_PASS');
+          NODE
+      - name: Install pinned worker toolchain
+        run: npm ci
+      - name: Syntax check exact old app plus existing archive modules
+        run: |
+          node --check r20-dev/account-birthdate-test/account-birthdate-worker.mjs
+          node --check r20-dev/account-birthdate-test/account-backup-bundle.mjs
+          node --check r20-dev/account-birthdate-test/account-backup.contract.test.mjs
+          node --check r20-dev/account-birthdate-test/account-backup.browser.test.mjs
+      - name: Original Worker preserved and authenticated backup route works
+        run: node r20-dev/account-birthdate-test/account-backup.contract.test.mjs
+      - name: Browser engine for exact same in-app backup code
+        run: |
+          timeout 180s npm install --no-save --no-package-lock playwright@1.56.1
+          timeout 180s npx --no-install playwright install chromium
+      - name: Synthetic iPhone-sized lossless photo, video, audio, restore safety and account switching
+        run: node r20-dev/account-birthdate-test/account-backup.browser.test.mjs
+      - name: Build exact original 7-Nov Worker and unchanged D1/service dependencies
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const config={
+            name:'talera-account-birthdate-test-20261107',
+            main:'r20-dev/account-birthdate-test/account-birthdate-worker.mjs',
+            compatibility_date:'2026-10-30',
+            services:[{binding:'TALERA_BASE',service:'talera-closed-memory-diepblauw-test-20261107',environment:'production'}],
+            d1_databases:[{binding:'BIRTH_DB',database_name:'talera-birthdate-account-test-20261107',database_id:'4d8aa183-3854-481c-97ab-e24eca7f484c'}]
+          };
+          fs.writeFileSync('r20-dev/account-birthdate-test/wrangler.backup-original.generated.jsonc',JSON.stringify(config,null,2));
+          NODE
+          npx --no-install wrangler deploy --dry-run --config r20-dev/account-birthdate-test/wrangler.backup-original.generated.jsonc --outdir .talera-7nov-dryrun
+      - name: Deploy only the ALREADY existing 7-Nov Worker (no app migration)
+        id: deploy
+        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'qa-deploy-TALERA-approved-7Nov-original-backup-only-20261111' }}
+        run: npx --no-install wrangler deploy --keep-vars --config r20-dev/account-birthdate-test/wrangler.backup-original.generated.jsonc
+      - name: Validate live approved original Home and only one local backup menu
+        if: ${{ steps.deploy.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOST=https://talera-account-birthdate-test-20261107.mark-a39.workers.dev
+          curl --fail --silent --show-error --max-time 25 "$HOST/mijn-leven" > /tmp/talera-original-home.html
+          curl --fail --silent --show-error --max-time 20 "$HOST/__clean/menu-integration.mjs" > /tmp/talera-original-menu.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const home=fs.readFileSync('/tmp/talera-original-home.html','utf8');
+          const menu=fs.readFileSync('/tmp/talera-original-menu.mjs','utf8');
+          assert.ok(home.includes('talera-flow-v17-time'));
+          assert.ok(!home.includes('talera-life-gallery-rows'),'No Apple-style photo strips');
+          assert.ok(home.includes('talera-memory-store-v1'),'Existing local originals preserved');
+          assert.equal(menu.split('data-action=\\\"open-backup\\\"').length-1,1);
+          assert.ok(menu.includes('data-action=\\\"storage-refresh\\\"'));
+          assert.ok(menu.includes('birthDate:data.birthDate'),'Approved date field preserved');
+          assert.ok(!menu.includes('Reservekopie en herstel worden nog ontwikkeld.'));
+          console.log('TALERA_ORIGINAL_7NOV_HOME_AND_BACKUP_MENU_POSTDEPLOY_PASS');
+          NODE
+          test "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$HOST/__f5/backup")" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$HOST/__f5/backup?db=other")" = 404
+      - name: Restore existing proven 7-Nov Worker when deployment validation fails
+        if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
+        run: npx --no-install wrangler rollback --name "$APPROVED_NAME" --message 'Restore exact user-approved 7-Nov original prior to backup'

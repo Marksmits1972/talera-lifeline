@@ -1,4 +1,4 @@
-name: TALERA Free F5 - restore exact owner-approved original V61 video logic
+name: TALERA Free F5 - isolated ordinary photo carousel, original narration preserved
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Verify exact approved Nov 7 video logic and original media, preserve remaining Free regressions
+      - name: Verify separate ordinary photo carousel and untouched original narrated player
         shell: bash
         run: |
           set -euo pipefail
@@ -515,10 +515,26 @@ jobs:
           console.log('TALERA_ORIGINAL_PRESENTATION_OWNER_TOPIC_FILTER_ONLY');
           assert.ok(before.includes('    scheduleAuto(memory);\n  });'),'Original timer source missing');
           assert.ok(present.includes('  let pendingAutoPhoto=null,photoAutoSerial=0;'));
-          assert.ok(present.includes('showPhoto(memory,next,true); // The original WORKING tap path.'));
+          assert.ok(present.includes('showPhoto(memory,next,true,true); // Commit only a decoded ordinary frame.'));
           assert.ok(present.includes("if(changed||(!autoStartTimer&&!autoInterval&&!pendingAutoPhoto))scheduleAuto(memory);"));
           assert.ok(!before.includes('pendingAutoPhoto'),'Original template must be unmodified');
           assert.ok(present.includes('function taleraInlineOrdinaryStep('));
+          assert.ok(present.includes("if(memory?._taleraLocal&&memory._zeroFrames?.[memory._photoIndex||0]?.kind==='video')return;"),
+            'Original video must finish without a competing slideshow timer');
+          assert.ok(!present.includes("memory._zeroItems?.some(x=>x.kind==='audio')||memory._zeroFrames?.some(x=>x.kind==='video')"),
+            'Non-narrated mixed photo/video memories must also get ordinary rotation');
+          assert.ok(present.includes("window.__taleraV31SelectPhoto?.(s.memory.id,(s.memory._photoIndex+1)%s.frames.length,true)"),
+            'The ordinary video should return to the same photo-roll after its end');
+          for(const [first,last] of [
+            ['function taleraInlineSync(s){','async function taleraInlineLoadVideo('],
+            ['function taleraInlineDispose(){','function taleraInlineSync(s){']
+          ]){
+            const a=before.indexOf(first),b=before.indexOf(last,a);
+            const c=present.indexOf(first),d=present.indexOf(last,c);
+            assert.ok(a>0&&b>a&&c>0&&d>c,'Original narrated source boundary moved');
+            assert.equal(present.slice(c,d),before.slice(a,b),
+              'Recorded narration controller must remain byte-for-byte unchanged');
+          }
           const photoStart=present.indexOf('  let pendingAutoPhoto=null,photoAutoSerial=0;');
           const photoEnd=present.indexOf('  window.__taleraV31SelectPhoto=',photoStart);
           assert.ok(photoStart>0&&photoEnd>photoStart);
@@ -532,27 +548,48 @@ jobs:
           const memory={id:'transient-local-photo',_taleraLocal:true,
             _photoIndex:0,image:'one',photos:['one','two'],
             _zeroItems:[],_zeroFrames:[]};
+          let active=memory;
           const func=new Function('runtime','settleVisiblePhoto','renderDots','scheduleAuto','Image','window',
             present.slice(photoStart,photoEnd)+';return showPhoto;');
-          const show=func({currentMemory:()=>memory},
+          const show=func({currentMemory:()=>active},
             m=>painted.push(m.image),m=>dots.push(m._photoIndex),
             ()=>{armed++},ManualImage,{__taleraLocalFrameChanged:()=>{}});
           show(memory,1,false);
-          assert.equal(memory._photoIndex,0,'Never move dot before photo ready');
+          assert.equal(memory._photoIndex,0,'No dot advance until real image decoded');
           assert.equal(images.length,1);
           show(memory,1,false);
-          assert.equal(images.length,1,'Pending photo must not be loaded twice');
+          assert.equal(images.length,1,'No duplicate pending image');
           images[0].finish();
-          assert.equal(memory._photoIndex,1,'Loaded photo must use manual commit');
+          assert.equal(memory._photoIndex,1);
           assert.equal(memory.image,'two');
           assert.deepEqual(painted,['two']);
           assert.deepEqual(dots,[1]);
-          assert.equal(armed,1,'Reschedule original timer exactly once');
+          assert.equal(armed,1);
           show(memory,0,true);
-          assert.equal(memory._photoIndex,0,'Original tap behavior must remain');
-          const narrated={...memory,id:'narrated',_zeroItems:[{kind:'audio'}]};
+          assert.equal(memory._photoIndex,1,'Even a manual tap must wait until image loaded');
+          assert.equal(images.length,2);
+          images[1].finish();
+          assert.equal(memory._photoIndex,0,'Tap commits immediately after decode');
+          assert.deepEqual(dots,[1,0]);
+          const mixed={...memory,id:'transient-photo-and-video',image:'one',_photoIndex:0,
+            photos:['one','two','video-still'],
+            _zeroItems:[{kind:'photo'},{kind:'video'}],
+            _zeroFrames:[{kind:'photo'},{kind:'photo'},{kind:'video'}]};
+          active=mixed;
+          show(mixed,1,false);
+          assert.equal(mixed._photoIndex,0,'Video albums must preload photos, too');
+          images[2].finish();
+          assert.equal(mixed._photoIndex,1);
+          show(mixed,2,false);
+          assert.equal(mixed._photoIndex,1,'Video thumbnail must load before dot');
+          images[3].finish();
+          assert.equal(mixed._photoIndex,2);
+          const narrated={...mixed,id:'narrated',_zeroItems:[{kind:'audio'}]};
+          active=narrated;
+          const imageCount=images.length;
           show(narrated,1,false);
-          assert.equal(images.length,1,'Never change narrated photo timing');
+          assert.equal(images.length,imageCount,'Narrated photo timing is NEVER preloaded by ordinary mode');
+          console.log('TALERA_PLAIN_PHOTO_ROTATION_AND_TAP_LOAD_BEFORE_DOTS; NARRATION_UNMODIFIED');
           // Reproduce the very first return swipe with a photo not yet decoded.
           // This is in-memory JS only: no synthetic account and no stored memory.
           assert.ok(before.includes("tile.el.dataset.url=url;tile.el.style.visibility='hidden';"),
@@ -847,6 +884,14 @@ jobs:
           console.log('TALERA_REFERRAL_PARAMS_CANONICALIZED_ONLY_ON_SAFE_UI_PAGES');
           console.log('TALERA_NORMAL_APP_ENTRY_OK; PRIVATE_DATA_STILL_AUTH_GATED; NO_ACCOUNTS_CREATED');
           NODE
+      - name: Test visible ordinary photo auto-rotation, tap and original narration on same Free code
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+          sudo apt-get install -y -qq ffmpeg
+          node r20-dev/free-10m-f5/f5-video-browser-regression.mjs
       - name: Build identical seven-DO deployment config without re-creating or changing secrets
         shell: bash
         run: |

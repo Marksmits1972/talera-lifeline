@@ -519,6 +519,12 @@ jobs:
           assert.ok(present.includes("if(changed||(!autoStartTimer&&!autoInterval&&!pendingAutoPhoto))scheduleAuto(memory);"));
           assert.ok(!before.includes('pendingAutoPhoto'),'Original template must be unmodified');
           assert.ok(present.includes('function taleraInlineOrdinaryStep('));
+          assert.ok(present.includes('window.__taleraPrewarmLocalCover=memory=>'),
+            'Existing strip must prewarm original attached photo cover when near');
+          assert.ok(present.includes('if(pendingOwner===memory.id&&pendingSrc===src)return;'),
+            'Repeated story events may not cancel a photo still decoding');
+          assert.ok(present.includes("if(memory._taleraLocal&&!memory._zeroItems?.some(x=>x.kind==='audio'))syncTaleraStoryFrame(null);"),
+            'Only ordinary memories may reset the old visible photo on swipe');
           assert.ok(present.includes("if(memory?._taleraLocal&&memory._zeroFrames?.[memory._photoIndex||0]?.kind==='video')return;"),
             'Original video must finish without a competing slideshow timer');
           assert.ok(!present.includes("memory._zeroItems?.some(x=>x.kind==='audio')||memory._zeroFrames?.some(x=>x.kind==='video')"),

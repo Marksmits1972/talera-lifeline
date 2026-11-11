@@ -100,8 +100,8 @@ jobs:
           assert.ok(home.includes('talera-flow-v17-time'));
           assert.ok(!home.includes('talera-life-gallery-rows'),'No Apple-style photo strips');
           assert.ok(home.includes('talera-memory-store-v1'),'Existing local originals preserved');
-          assert.equal(menu.split('data-action=\\\"open-backup\\\"').length-1,1);
-          assert.ok(menu.includes('data-action=\\\"storage-refresh\\\"'));
+          assert.equal(menu.split('data-action="open-backup"').length-1,1);
+          assert.ok(menu.includes('data-action="storage-refresh"'));
           assert.ok(menu.includes('birthDate:data.birthDate'),'Approved date field preserved');
           assert.ok(!menu.includes('Reservekopie en herstel worden nog ontwikkeld.'));
           console.log('TALERA_ORIGINAL_7NOV_HOME_AND_BACKUP_MENU_POSTDEPLOY_PASS');

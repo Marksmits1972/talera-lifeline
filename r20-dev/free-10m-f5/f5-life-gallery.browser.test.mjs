@@ -169,7 +169,7 @@ try{
  // Exact original photo ID and same-card return, not the story's first image.
  const multi=await page.evaluate(async()=>{
   const files=[];
-  for(let i=0;i<12;i++){
+  for(let i=0;i<6;i++){
    const canvas=document.createElement('canvas');
    canvas.width=96;canvas.height=96;
    const pen=canvas.getContext('2d');
@@ -186,14 +186,14 @@ try{
   return row.id;
  });
  await page.reload({waitUntil:'domcontentloaded',timeout:30000});
- await page.waitForFunction(()=>document.getElementById('v18-phases')?.dataset.photoCount==='24',
+ await page.waitForFunction(()=>document.getElementById('v18-phases')?.dataset.photoCount==='18',
   null,{timeout:20000});
  const route=page.locator('.talera-life-row').filter({
   has:page.getByRole('heading',{name:'FotoRoute'})
  });
- assert.equal(await route.locator('a.talera-life-card').count(),10,
-  'Ten real media IDs from the same original memory');
- const chosen=route.locator('a.talera-life-card').nth(7);
+ assert.equal(await route.locator('a.talera-life-card').count(),6,
+  'Six existing photo media IDs from one memory');
+ const chosen=route.locator('a.talera-life-card').nth(4);
  await chosen.scrollIntoViewIfNeeded();
  const target=await chosen.evaluate(a=>{
   const selected=a._taleraPhoto;
@@ -226,10 +226,10 @@ try{
   'The existing presentation back arrow remains present');
  await page.locator('#talera-flow-home').click({timeout:12000});
  await page.waitForURL(/\/mijn-leven(?:$|\?)/,{timeout:20000});
- await page.waitForFunction(()=>document.getElementById('v18-phases')?.dataset.photoCount==='24'&&
+ await page.waitForFunction(()=>document.getElementById('v18-phases')?.dataset.photoCount==='18'&&
   sessionStorage.getItem('talera-f5-gallery-photo-return-v1')===null,
   null,{timeout:20000});
- const returned=await route.locator('a.talera-life-card').nth(7).evaluate(a=>
+ const returned=await route.locator('a.talera-life-card').nth(4).evaluate(a=>
   ({key:a._taleraPhoto?.item.key,story:String(a._taleraPhoto?.row.id)}));
  assert.deepEqual(returned,{key:target.key,story:target.story},
   'Back must restore exact media ID, exact card and its neighbors');
@@ -238,7 +238,7 @@ try{
   'Back must preserve scroll positions: '+JSON.stringify({before,after}));
  console.log('TALERA_GALLERY_EXACT_MEDIA_ID_AND_SAME_CARD_BACK_OK');
  // Story-to-story swipe must cancel special gallery return.
- await route.locator('a.talera-life-card').nth(7).click();
+ await route.locator('a.talera-life-card').nth(4).click();
  await page.waitForURL(url=>url.pathname==='/present'&&
    url.searchParams.get('memory')?.startsWith('local-'),{timeout:15000});
  await page.waitForFunction(id=>

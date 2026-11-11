@@ -353,6 +353,23 @@ function fixVideoFirstFramePreview(html){
  "      v.addEventListener(e,()=>{if(v.readyState>=2)void capture()});"
  ].join('\n');
  replace(oldMeta,newMeta,'SAFARI_AUTOPLAY_BLOCK');
+ // The compact iPhone workbench constructs the media tiles synchronously.
+ // Previously its video cover was attached only from tileHtml via a deferred
+ // animation frame, so the first editor paint could show the stock gray tile.
+ // Reuse that SAME native cover immediately once its real tile is in the DOM.
+ replace(" tiles.querySelectorAll('.tile').forEach(enableDrag);taleraV9EditorMediaControls(g);",
+  " tiles.querySelectorAll('.tile').forEach(enableDrag);taleraV9EditorMediaControls(g);taleraV61AttachNativeCovers();",
+  'WORK_TILE_FIRST_MOUNT');
+ // The original overview is the other existing location using the same tiles.
+ replace("main.querySelectorAll('.tile').forEach(enableDrag);$('addMore').onclick=",
+  "main.querySelectorAll('.tile').forEach(enableDrag);taleraV61AttachNativeCovers();$('addMore').onclick=",
+  'OVERVIEW_TILE_FIRST_MOUNT');
+ // Safari can decode the first frame before a canvas thumbnail has finished.
+ // Show that real muted video frame immediately while the original preview
+ // worker finishes and refreshPreview swaps in the locally cached JPEG.
+ replace("    for(const e of ['loadeddata','seeked','canplay','timeupdate'])\\n      v.addEventListener(e,()=>{if(v.readyState>=2)void capture()});",
+  "    for(const e of ['loadeddata','seeked','canplay','timeupdate'])\\n      v.addEventListener(e,()=>{if(v.readyState>=2){\\n        if(v.isConnected&&v.videoWidth&&v.videoHeight){v.pause();v.style.opacity='1';}\\n        void capture();\\n      }});",
+  'SAFARI_FIRST_DECODED_FRAME');
  assert.ok(html.includes("previewBlobs.set(id,image);refreshPreview(id);"),
   'Existing direct video poster selection must remain');
  assert.ok(html.includes("writeFiles([['preview:'+id,image]])"),

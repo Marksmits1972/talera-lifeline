@@ -123,8 +123,24 @@ try{
   await page.locator('#memoryStoryScroll').tap({timeout:12000});
   await waitIndex(page,2,9000);
   const third=await centerPixel(page);
-  assert.ok(dominant(third,2),'MANUAL TAP DID NOT DISPLAY BLUE: '+
-    JSON.stringify({second,third}));
+  if(!dominant(third,2)){
+    const diag=await page.evaluate(()=>{
+      const stage=document.getElementById('photoStage');
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      const l=[...stage.querySelectorAll('.photo-layer,.talera-story-synced-photo,.example-photo,.talera-story-synced-sharp')]
+        .map(e=>{const c=getComputedStyle(e);return {id:e.id,cls:e.className,
+          hidden:e.hidden,src:e.currentSrc||e.src||'',natural:e.naturalWidth||0,
+          display:c.display,visible:c.visibility,opacity:c.opacity,z:c.zIndex,
+          rect:JSON.stringify(e.getBoundingClientRect().toJSON()).slice(0,160)};});
+      const r=stage.getBoundingClientRect();
+      const el=document.elementFromPoint(r.left+r.width*.5,r.top+r.height*.36);
+      return {id:m.id,index:m._photoIndex,photo:m.photos[m._photoIndex],
+        image:m.image,owner:el?.className,layers:l,
+        narration:document.body.classList.contains('talera-v61-narration-visual')};
+    });
+    throw Error('MANUAL TAP INDEX CHANGED BUT PHOTO NOT BLUE: '+
+      JSON.stringify({second,third,diag}).slice(0,12000));
+  }
   await waitIndex(page,0,9000);
   assert.equal(await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory().storyId),plain);
 

@@ -190,7 +190,10 @@ try{
   await page.waitForFunction(id=>
     window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
     mixed,{timeout:12000});
-  await page.waitForFunction(()=>!window.__taleraBandRolling,null,{timeout:12000});
+  // It must become hidden after the original inertia completes AND the new
+  // selected base photo has decoded, not merely when a separate rolling flag flips.
+  await page.waitForFunction(()=>!document.querySelector('#photoStage .talera-wheel-strip')?.classList.contains('is-visible'),
+    null,{timeout:12000});
   const wheelRest=await page.locator('#photoStage .talera-wheel-strip').evaluate(el=>({
     display:getComputedStyle(el).display,active:el.classList.contains('is-visible')
   }));

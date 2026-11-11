@@ -829,7 +829,7 @@ jobs:
             'Original adapter must prime first local cover');
           const coverCode=present.slice(patchedAdapter,patchedHydrate);
           assert.ok(coverCode.includes("memory.previewImage=url;")&&
-            coverCode.includes("if(memory._photoLoading&&!memory._zeroFrames?.length)memory.image=url;"),
+            coverCode.includes("if(!Array.isArray(memory.photos)||!memory.photos.length)memory.image=url;"),
             'Cover must attach to the strip without resetting the active photo');
           assert.ok(coverCode.includes("memory._taleraFirstWarm={key:first.key,url};"));
           const patchedSelected=present.indexOf(

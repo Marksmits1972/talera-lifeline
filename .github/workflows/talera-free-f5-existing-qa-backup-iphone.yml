@@ -1,4 +1,4 @@
-name: TALERA Free F5 - empty personal topics section label and guidance on SAME candidate
+name: TALERA Free F5 - first saved photo as one illustrative topic tile on SAME candidate
 # Push only on this dedicated integration branch. No official PWA or customer media.
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
-      F5_PREVIOUS_VERSION: 46a2dcb6-769b-47d4-b71c-fdd79cf09620
+      F5_PREVIOUS_VERSION: 173dd790-9b13-4791-a6c2-69be4d042217
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         run: |
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Test empty Mijn herinneringen guidance, own-tag tiles, previous media and private account boundaries
+      - name: Verify personal photo example, automatic replacement by own tag, prior presentation and private data
         shell: bash
         run: |
           set -euo pipefail
@@ -249,13 +249,14 @@ jobs:
           const heading={textContent:''},minor={textContent:''},note={style:{}};
           const myCards={style:{}},myHeading={style:{}};
           const doc={getElementById:k=>k==='myCards'?myCards:k==='myCount'?{parentElement:myHeading}:null};
-          let ephemeral=[];
+          let ephemeral=[],loadedPhotos=[];
           const createRefresh=new Function('store','document','grid','note','header','small','window',
             'sessionStorage','localStorage','cats','text','countLabel','pickCover','imageFor','escapeUrls',
             'let rows=[];'+ownTopicCode+';return refresh;');
           const refreshHome=createRefresh({list:async()=>ephemeral},doc,fakeGrid,note,heading,minor,browser,
             tabTurn,localTurn,[{name:'Familie',icon:'♡',bg:'old-blue'}],
-            makeElement,n=>String(n)+' herinneringen',arr=>arr[0],()=>{},()=>{});
+            makeElement,n=>String(n)+' herinneringen',arr=>arr[0],
+            (row,tile)=>loadedPhotos.push({id:row.id,tag:tile.tag}),()=>{});
           await refreshHome();
           assert.equal(fakeGrid.children.length,0,'No tags means NO selectable tile');
           assert.equal(fakeGrid.style.display,'none');
@@ -268,18 +269,53 @@ jobs:
             'Empty-state hint must be below its heading in small lettering');
           assert.ok(tileClasses.has('talera-own-topics-ready'),
             'Example tiles must stay hidden during the original async fetch');
-          ephemeral=Array.from({length:3},(_,i)=>({id:'own-untagged-'+i,
-            source:'pwa-local',tags:[],items:[{kind:'photo'}]}));
+          // Text-only memories do not invent a stock/sample photo.
+          ephemeral=[{id:'text-only',source:'pwa-local',tags:[],items:[],
+            createdAt:'2026-11-10T07:00:00Z'}];
           await refreshHome();
           assert.equal(fakeGrid.children.length,0,
-            'Three locally stored but untagged photo stories must yield zero topic tiles');
+            'No owner photo: no example tile or fabricated image');
+          assert.equal(fakeGrid.style.display,'none');
+          // The user's first saved LOCAL photo supplies the illustration,
+          // regardless of the timeline dates or how store.list() sorted rows.
+          ephemeral=[
+            {id:'saved-later',source:'pwa-local',createdAt:'2026-11-10T12:00:00Z',
+              tags:[],items:[{key:'local-later:0',kind:'photo'}]},
+            {id:'saved-first',source:'pwa-local',createdAt:'2026-11-09T12:00:00Z',
+              tags:[],items:[{key:'local-first:0',kind:'photo'}]},
+            {id:'text-only',source:'pwa-local',createdAt:'2026-11-08T12:00:00Z',
+              tags:[],items:[]},
+            {id:'excluded-example',source:'demo',createdAt:'2020-01-01T12:00:00Z',
+              tags:[],items:[{key:'test-0',kind:'photo'}]}
+          ];
+          const untaggedBefore=JSON.stringify(ephemeral);
+          await refreshHome();
+          assert.equal(fakeGrid.children.length,1,
+            'All untagged real photos yield exactly ONE temporary visual tile');
+          const exampleTile=fakeGrid.children[0];
+          assert.equal(exampleTile.tag,'div','Temporary example must NOT be clickable');
+          assert.equal(exampleTile.onclick,undefined,'Example tile may not open a false topic filter');
+          assert.ok(exampleTile.cls.includes('talera-topic-example'));
+          assert.equal(exampleTile['aria-label'],'Familie — Voorbeeld van een onderwerptegel');
+          const exampleInfo=exampleTile.children.find(x=>x.cls==='talera-topic-info');
+          assert.equal(exampleInfo.children[0].textContent,'Familie');
+          assert.equal(exampleInfo.children[1].textContent,'Voorbeeld');
+          assert.equal(loadedPhotos.at(-1)?.id,'saved-first',
+            'The earliest SAVED own photograph must be the tile image');
+          assert.equal(loadedPhotos.at(-1)?.tag,'div');
+          assert.equal(JSON.stringify(ephemeral),untaggedBefore,
+            'No automatic tagging or mutation of personal records');
           assert.equal(heading.textContent,'Mijn herinneringen');
           assert.equal(minor.textContent,'Voeg een onderwerp toe aan een herinnering.');
+          assert.ok(fakeGrid.style.display!=='none','Show the one example in the existing tile grid');
           ephemeral=[{id:'item1',source:'pwa-local',tags:['Familie','Sport'],items:[]},
             {id:'item2',source:'pwa-local',tags:['Werk'],items:[]},
             {id:'sample',source:'demo',tags:['Voorbeeld'],items:[]}];
           await refreshHome();
           assert.equal(fakeGrid.children.length,3,'Only three personally used tags');
+          assert.ok(fakeGrid.children.every(card=>card.tag==='button'&&
+            !card.cls.includes('talera-topic-example')),
+            'As soon as a real topic exists, illustrative family tile disappears');
           assert.ok(ownerHome.includes(legacyGalleryStyle),
             'Even after local records load, CSS must keep legacy own-photo cards hidden');
           assert.equal(heading.textContent,'Mijn verhalen over…');
@@ -290,6 +326,23 @@ jobs:
           assert.ok(!fakeGrid.children.some(x=>x.children.some(y=>y.textContent==='Voorbeeld')));
           fakeGrid.children[0].onclick();
           assert.ok(visits[0].startsWith('/present?theme='),'Topic must open original presentation');
+          // When a tagged PHOTO is saved, the same stored photograph replaces
+          // the earlier illustrative photo: no extra memory, demo or new player.
+          ephemeral=[{id:'new-real-photo',source:'pwa-local',tags:['Vakantie'],
+            createdAt:'2026-11-11T07:00:00Z',
+            items:[{key:'original-own-photo:0',kind:'photo'}]}];
+          await refreshHome();
+          assert.equal(fakeGrid.children.length,1);
+          assert.equal(fakeGrid.children[0].tag,'button');
+          assert.ok(!fakeGrid.children[0].cls.includes('talera-topic-example'));
+          assert.equal(loadedPhotos.at(-1).id,'new-real-photo',
+            'The real personal tagged photo must replace the example cover');
+          const trueInfo=fakeGrid.children[0].children.find(x=>x.cls==='talera-topic-info');
+          assert.equal(trueInfo.children[0].textContent,'Vakantie');
+          assert.notEqual(trueInfo.children[1].textContent,'Voorbeeld');
+          fakeGrid.children[0].onclick();
+          assert.equal(visits.at(-1),'/present?theme=Vakantie',
+            'Real tile must use the already approved original presentation filter');
           ephemeral=Array.from({length:11},(_,i)=>({id:'item'+i,source:'pwa-local',
             tags:['Onderwerp '+i],items:[]}));
           await refreshHome();
@@ -308,6 +361,7 @@ jobs:
           console.log('TALERA_MY_STORIES_ABOUT_0_TO_8_TILES_SESSION_ROTATION_OK');
           console.log('TALERA_NO_UNTAGGED_PHOTO_GALLERY_OR_DEMO_HELP_IN_HOME');
           console.log('TALERA_EMPTY_TOPIC_HEADING_AND_HELP_VISIBLE_NO_SAMPLE_TILES');
+          console.log('TALERA_FIRST_OWN_PHOTO_EXAMPLE_REPLACED_BY_REAL_TAGGED_PHOTO');
           // The owner's screenshot shows the three live home buttons
           // occupying 3/4 of a legacy FOUR-column grid. Repair exactly ONE
           // CSS declaration for both logged-in and logged-out home, with no

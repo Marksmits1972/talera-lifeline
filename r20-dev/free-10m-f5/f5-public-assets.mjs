@@ -132,6 +132,26 @@ function fixPhotoOnlyPresentation(original){
    "      // Resume ordinary circulation when this original video finishes.\n"+
    "      if(s===taleraInline&&s.phase==='ordinary'&&runtime.currentMemory()?.id===s.memory.id)\n"+
    "        window.__taleraV31SelectPhoto?.(s.memory.id,(s.memory._photoIndex+1)%s.frames.length,true);");
+ // One ordinary photo-stage request per memory + media URL. Repeated
+ // timeline notifications must not cancel an iPhone image still decoding.
+ result=exact(result,
+   "let stage=null,host=null,sharp=null,backdrop=null,owner='',shown='',requestNo=0;",
+   "let stage=null,host=null,sharp=null,backdrop=null,owner='',shown='',requestNo=0,pendingOwner='',pendingSrc=';");
+ result=exact(result,
+   "function hide(){requestNo++;owner='';shown='';if(host)host.hidden=true;}",
+   "function hide(){requestNo++;owner='';shown='';pendingOwner='';pendingSrc='';if(host)host.hidden=true;}");
+ result=exact(result,
+   "if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\\n      const seq=++requestNo,check=new Image();",
+   "if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\\n"+
+   "      if(pendingOwner===memory.id&&pendingSrc===src)return;\\n"+
+   "      pendingOwner=memory.id;pendingSrc=src;\\n"+
+   "      const seq=++requestNo,check=new Image();");
+ result=exact(result,
+   "owner=memory.id;shown=src;sharp.src=src;backdrop.src=src;host.hidden=false;",
+   "owner=memory.id;shown=src;pendingOwner='';pendingSrc='';sharp.src=src;backdrop.src=src;host.hidden=false;");
+ result=exact(result,
+   "check.onerror=()=>{if(seq===requestNo)console.warn('TALERA Story Player: geselecteerde foto kon niet laden',i)};",
+   "check.onerror=()=>{if(seq===requestNo){pendingOwner='';pendingSrc='';console.warn('TALERA Story Player: geselecteerde foto kon niet laden',i)}};");
  assert.ok(result.includes('window.__taleraV31SelectPhoto=')&&
    result.includes('function taleraInlineOrdinaryStep('),
    'Ordinary presentation manual photo source changed unexpectedly');

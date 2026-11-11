@@ -453,9 +453,9 @@ jobs:
           let foreground='wrong-reference-image',imageReady=true;
           const dom={documentElement:{classList},getElementById:k=>k==='memoryPhotoA'?{
             getAttribute:()=>foreground,complete:imageReady,naturalWidth:imageReady?800:0}:null};
-          const browser={__taleraTimelineRuntime:{currentMemory:()=>active},addEventListener:()=>{}};
+          const entryBrowser={__taleraTimelineRuntime:{currentMemory:()=>active},addEventListener:()=>{}};
           new Function('window','document','setInterval','clearInterval','requestAnimationFrame',
-            innerScript)(browser,dom,fn=>(intervalTick=fn,1),()=>{cleaned=true},
+            innerScript)(entryBrowser,dom,fn=>(intervalTick=fn,1),()=>{cleaned=true},
             fn=>{frameCounter++;fn()});
           assert.ok(visibleClass.has('talera-direct-memory-entering'),
             'The wrong reference image MUST be hidden before R19 selects the story');

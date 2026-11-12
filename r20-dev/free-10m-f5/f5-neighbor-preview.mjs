@@ -22,19 +22,9 @@ export function eliminateFirstSwipeBlank(html){
   const count=html.split(text).length-1;
   if(count!==1)throw Error('TALERA_F5_PREVIEW_REFERENCE_CHANGED:'+count+':'+text);
  }
- // During an as-yet unread private memory, show a STILL-READY neighboring
- // image rather than fading in the blank default placeholder. Keep EXACT
- // original transforms and opacity curves, no new animation logic.
- const oldA=matches[1],oldB=matches[2];
- html=html.replace(oldA,
-  'setPhotoLayer(photoLayerA, memoryPhotoA, memoryBackdropA, '+
-  '(left._taleraLocal&&left._photoLoading?'+
-  '(runtime.currentMemory()?._photoLoading?right.image:runtime.currentMemory()?.image||right.image):left.image), 1-p, -7*p);');
- html=html.replace(oldB,
-  'setPhotoLayer(photoLayerB, memoryPhotoB, memoryBackdropB, '+
-  '(right._taleraLocal&&right._photoLoading?'+
-  '(runtime.currentMemory()?._photoLoading?left.image:runtime.currentMemory()?.image||left.image):right.image), p, 7*(1-p));');
-
+ // Keep the two original memory-ID-linked transition photos. Never show a
+ // neighbouring/previous memory image while an owned local cover loads.
+ // Prewarming below may accelerate loading, but never substitutes the source.
  const bootMarker=matches[3];
  const prewarm=`
  let f5ColdAdjacentStarted=false;

@@ -614,6 +614,36 @@ function filterOwnTopicPresentation(html){
  one('<head>','<head>'+"<script id=\"talera-topic-visibility-guard\">if(new URLSearchParams(location.search).has('theme'))document.documentElement.classList.add('talera-topic-loading');</script><style id=\"talera-topic-visibility-style\">html.talera-topic-loading #photoStage,html.talera-topic-loading #memoryCaption{visibility:hidden!important}</style>",'ONLY_TOPIC_LOADING_GUARD');
  return html;
 }
+// The approved standalone social toolbar and PHOTO view pencil are already
+// present. Only the two older controls inside the opened reading paper are
+// duplicates. Hide them solely while reading without removing their source
+// nodes or changing handlers, gestures, narration, media or storage.
+function hideDuplicateReadingSheetActions(html){
+ const necessary=[
+  'id="memoryCaption"',
+  'id="talera-v21-pencil"',
+  'id="talera-v18-story-actions"',
+  'talera-v5-editor-pencil',
+  'talera-v26-reading',
+  'talera-v18-reading',
+  'id="memoryStory"'
+ ];
+ for(const marker of necessary)
+  assert.ok(html.includes(marker),'APPROVED_READING_ACTION_MARKER_MISSING: '+marker);
+ const css='<style id="talera-free-reading-actions-only-dedup">'+
+  'body.talera-v18-reading #memoryCaption #talera-v18-story-actions,'+
+  '.memory-space.talera-v26-reading #memoryCaption #talera-v18-story-actions,'+
+  'body.talera-v18-reading #memoryCaption #talera-v21-pencil,'+
+  '.memory-space.talera-v26-reading #memoryCaption #talera-v21-pencil,'+
+  'body.talera-v18-reading #talera-v5-editor-pencil{'+
+  'display:none!important;visibility:hidden!important;pointer-events:none!important}'+
+  'body.talera-v18-reading .memory-space.talera-v26-reading #memoryCaption #memoryStory{'+
+  'padding-right:0!important}'+
+  '</style>';
+ assert.equal(html.split('</head>').length,2,'READING_HEAD_DRIFT');
+ assert.ok(!html.includes('talera-free-reading-actions-only-dedup'),'READING_PATCH_DUPLICATE');
+ return html.replace('</head>',css+'</head>');
+}
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
@@ -622,6 +652,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=warmUpFirstSwipePhotoStrip(html);
  if(route==='/present')html=primeFirstOpenLocalStoryCovers(html);
  if(route==='/present')html=filterOwnTopicPresentation(html);
+ if(route==='/present')html=hideDuplicateReadingSheetActions(html);
  // Use the ORIGINAL, already approved V61 video preview from the
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.

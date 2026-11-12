@@ -109,6 +109,15 @@ try{
   const response=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
   assert.equal(response.status(),200);
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:15000});
+  // With zero saved memories the original presentation must start empty:
+  // neither the 50 fixed examples nor the 450 generated examples can appear.
+  const initial=await page.evaluate(()=>({
+    memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,
+    demoImages:[...document.querySelectorAll('img')].map(img=>img.currentSrc||img.src||'')
+      .filter(src=>/talera-(?:v11-clean|500-fotoband)-/.test(src))
+  }));
+  assert.equal(initial.memory,null,'The account-free presentation must not select a built-in memory');
+  assert.deepEqual(initial.demoImages,[],'No built-in photo may be loaded into the presentation');
   const readingControls=await page.evaluate(()=>{
     const sheet=document.querySelector('.memory-space');
     const paper=document.getElementById('memoryCaption');

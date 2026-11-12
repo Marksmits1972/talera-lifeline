@@ -19,8 +19,11 @@ assert.ok(output.includes('const nearby=[sorted[i-1],sorted[i+1]].filter(Boolean
 assert.ok(output.includes("!first.startsWith('blob:')"));
 assert.ok(output.includes("await picture.decode()"));
 assert.ok(output.includes("if(f5ColdAdjacentStarted||!memory?._taleraLocal)return;"));
-assert.ok(output.includes('left._taleraLocal&&left._photoLoading'));
-assert.ok(output.includes('right._taleraLocal&&right._photoLoading'));
+assert.ok(output.includes('setPhotoLayer(photoLayerA, memoryPhotoA, memoryBackdropA, left.image, 1-p, -7*p);'));
+assert.ok(output.includes('setPhotoLayer(photoLayerB, memoryPhotoB, memoryBackdropB, right.image, p, 7*(1-p));'));
+assert.ok(!output.includes('runtime.currentMemory()?._photoLoading?right.image')&&
+  !output.includes('runtime.currentMemory()?._photoLoading?left.image'),
+  'Transitions must never borrow an image from a different memory ID');
 // Confirm the existing V61 recording presentation stays one-photo-at-rest,
 // but the SAME existing V3 swipe band is visible while .is-visible is set.
 assert.equal(output.split('id="talera-f5-narrated-swipe-band"').length-1,1);
@@ -54,32 +57,68 @@ for(let i=0;i<scriptBodies.length;i++){
  validated++;
 }
 assert.ok(validated>2);
-// These 450 historical examples are synthetic, not account-owned media.
-// Their preview is permitted only when the decoded image belongs to that
-// exact example, never a recycled neighboring wheel tile or another story.
+// The owner has ordered removal of all 500 built-in presentation memories.
+// The ORIGINAL anonymous baseline stays available solely for existing
+// animation/voice source comparison; shipped code must have no sample records.
 const {referencePages}=await import('./generated/public-template-map.mjs');
 const actualPresent=referencePages['/present'];
 assert.match(actualPresent||'',/^\/__talera_free\/f5references\/[a-f0-9]{64}\.html$/);
 const shipped=readFileSync('r20-dev/free-10m-delivery/public'+actualPresent,'utf8');
-assert.ok(shipped.includes('Array.from({length:450},(_,i)=>{')&&
-  shipped.includes("const seed='talera-500-fotoband-'+String(i+1).padStart(3,'0')"),
-  'Preserve the existing 450 unique source URLs, dates and sample IDs');
-const fallbackMarker='const fallback=mem._taleraLocal?(';
-const fallbackStart=shipped.indexOf(fallbackMarker);
-const fallbackEnd=shipped.indexOf('const cached=cache.get(mem.id);',fallbackStart);
-assert.ok(fallbackStart>0&&fallbackEnd>fallbackStart,
-  'Legacy first-swipe fallback may be used only by account-owned stories');
-const fallbackBlock=shipped.slice(fallbackStart,fallbackEnd);
-assert.ok(fallbackBlock.includes('readyNeighbour?.currentSrc||readyNeighbour?.src||null'),
-  'Protect original local photo loading behavior');
-assert.ok(fallbackBlock.includes("tile.el.style.visibility=mem._taleraLocal&&tile.sharp.complete&&tile.sharp.naturalWidth?'visible':'hidden';"),
-  'A demo memory must stay hidden until its own preview loads');
-assert.ok(!shipped.includes('const fallback=base?.complete&&base.naturalWidth?'),
-  'Never use a shared fallback for the 450 demo memories');
+assert.ok(shipped.includes('const MEMORIES = [];') &&
+  !shipped.includes('TALERA_STRESS_MEMORIES') &&
+  !shipped.includes('talera-500-fotoband-') &&
+  !shipped.includes('id:50, at:') &&
+  !shipped.includes('const MEMORIES = [\n'),
+  'All 50 original and 450 generated example memories must be absent from the shipped presentation');
+assert.ok(shipped.includes('runtime.registerMemories(memories)') &&
+  shipped.includes('const memories=rows.map(toMemory).filter(Boolean)'),
+  'Existing per-account IndexedDB memories must still populate the same presentation');
+assert.ok(shipped.includes('let ownSerial=0,ordinaryVideo=null') &&
+  shipped.includes('runtime.currentMemory()?.id!==memory.id') &&
+  shipped.includes('memory.photos[next]!==src') &&
+  shipped.includes('window.__taleraOrdinarySelectPhoto='),
+  'Single ordinary presentation controller must be bound to the selected memory ID');
+assert.ok(shipped.includes("memory.thumbnail=photos.find((_,i)=>frames[i]?.kind==='photo')"),
+  'One own thumbnail comes from this memory’s first photo, not a seventh media item');
+assert.ok(shipped.includes('tile.el.dataset.owner=owner') &&
+  shipped.includes("tile.el.style.visibility='hidden'"),
+  'Each recycled strip tile must be hidden until its own image is decoded');
+assert.ok(!shipped.includes('readyNeighbour?.currentSrc') &&
+  !shipped.includes('const fallback=mem._taleraLocal?(') &&
+  !shipped.includes('const fallback=base?.complete&&base.naturalWidth?'),
+  'No own or sample thumbnail may borrow a different memory image');
+assert.equal(shipped.split('function showPhoto(memory,index,manual=false').length-1,1,
+  'There must be only one ordinary photo selector');
+assert.ok(shipped.includes("if(!memory._zeroItems?.some(item=>item.kind==='audio')){") &&
+  shipped.includes('window.__taleraOrdinaryActivate?.(memory)'),
+  'Unvoiced memory must bypass original narrator before playing ordinary video');
+assert.ok(shipped.includes('function playOrdinaryVideo(memory,index)') &&
+  shipped.includes("window.TaleraMemories?.blob?.(key)"),
+  'Ordinary video must use the same original media store independently');
+const narratorMarkers=['function taleraInlineSync(s){','function taleraInlineVoiceEnded(s){',
+  'function taleraInlinePlayMedia(s,frame,muted,finished){'];
+for(const marker of narratorMarkers){
+  const i=raw.indexOf(marker);
+  assert.ok(i>=0,'Approved narrator marker missing');
+  assert.ok(shipped.includes(raw.slice(i,i+260)),
+    'Do not modify narrator functions during phase one: '+marker);
+}
+assert.ok(shipped.includes('function taleraInlineSync(')&&
+  shipped.includes('function taleraInlineVoiceEnded('),
+  'Original narrator and cue engine remain present and separate');
+const shippedScripts=[...shipped.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(x=>x[1]);
+let compiled=0;
+for(const content of shippedScripts){
+ const js=content.trim();
+ if(!js||js.startsWith('{"'))continue;
+ new vm.Script(js,{filename:'TALERA_SHIPPED_PRESENT.js'});
+ compiled++;
+}
+assert.ok(compiled>3,'Shipped presentation script must parse');
 console.log('TALERA_F5_FIRST_SWIPE_BOUNDED_PREWARM',JSON.stringify({
  success:true,syntheticOnly:true,accountPrivate:true,
  prewarmsMaxTwoNeighbors:true,noVideosOrFullAlbumsDecoded:true,
- firstTransitionAvoidsUnreadyLocalImage:true,
+ firstTransitionAvoidsUnreadyLocalImage:true,directIdOwnedPresentation:true,
  approvedTimelineAnimationUnchanged:true,narratedSwipeRestoresExistingV3Band:true,originalNarrationUntouched:true,
  scriptsParse:validated
 }));

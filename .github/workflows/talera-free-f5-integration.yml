@@ -207,7 +207,7 @@ jobs:
           }
           console.log('TALERA_SAME_ORIGIN_SETTINGS_CLEANUP_AND_BACKUP_VERIFIED');
           NODE
-      - name: Verify published example images never borrow an unrelated photo
+      - name: Verify private reference package and live anonymous shell without touching accounts
         shell: bash
         run: |
           set -euo pipefail
@@ -215,7 +215,16 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           import assert from 'node:assert/strict';
-          const html=fs.readFileSync('/tmp/talera-unique-example-covers.html','utf8');
+          // GET /present without login intentionally serves an ANONYMOUS
+          // shell. The 450 examples live only in the protected, packaged
+          // reference used after account authentication.
+          const {referencePages}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
+          const ref=referencePages['/present'];
+          assert.match(ref||'',/^\\/__talera_free\\/f5references\\/[a-f0-9]{64}\\.html$/);
+          const html=fs.readFileSync('r20-dev/free-10m-delivery/public'+ref,'utf8');
+          const anonymous=fs.readFileSync('/tmp/talera-unique-example-covers.html','utf8');
+          assert.ok(!anonymous.includes('const fallback=mem._taleraLocal?('),
+            'Anonymous visitors must not receive the account-private presentation');
           assert.ok(html.includes('const fallback=mem._taleraLocal?('),
             'A sample must not reuse a different memory image');
           assert.ok(html.includes("tile.el.style.visibility=mem._taleraLocal&&tile.sharp.complete&&tile.sharp.naturalWidth?'visible':'hidden';"),
@@ -224,7 +233,7 @@ jobs:
             'Never show a prior story photo as the next example');
           assert.ok(html.includes('Array.from({length:450},(_,i)=>{'));
           assert.ok(html.includes("const seed='talera-500-fotoband-'+String(i+1).padStart(3,'0')"));
-          console.log('TALERA_450_DISTINCT_EXAMPLES_NO_CROSS_MEMORY_COVER');
+          console.log('TALERA_450_DISTINCT_EXAMPLES_BUILT_NO_CROSS_MEMORY_COVER_AND_ANON_SHELL_PROTECTED');
           NODE
       - name: Verify restored ORIGINAL social import on existing Free presentation
         shell: bash

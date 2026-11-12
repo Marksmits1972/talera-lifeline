@@ -268,7 +268,8 @@ function fixFirstSwipePhotoLoad(html){
  "      if(tile.blur&&tile.blur.src!==fallback)tile.blur.src=fallback;",
  "      tile.el.style.visibility='visible';",
  "    }else{",
- "      tile.el.style.visibility=tile.sharp.complete&&tile.sharp.naturalWidth?'visible':'hidden';",
+ "      // A tile for a different record must not display an old decoded bitmap.",
+    "      tile.el.style.visibility='hidden';",
  "    }",
  "    const cached=cache.get(mem.id);",
  "    const img=cached?.src===url?cached:new Image();",
@@ -362,11 +363,13 @@ function warmUpFirstSwipePhotoStrip(html){
    "  });";
  replace(oldSub,updatedSub,'IDB_HYDRATION');
  const oldFallback="    const fallback=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):null;";
- const newFallback="    // A newly restored base image may be cold; retain any already decoded\n"+
-   "    // photo from this account's existing bounded wheel cache instead.\n"+
-   "    const readyNeighbour=[...cache.values()].find(img=>img.complete&&img.naturalWidth);\n"+
-   "    const fallback=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):\n"+
-   "      (readyNeighbour?.currentSrc||readyNeighbour?.src||null);";
+ const newFallback="    // A fallback is valid only for the SAME local memory and its OWN photo.\\n"+
+   "    // Never paint one sample/neighbor photo as a different memory.\\n"+
+   "    const active=runtime.currentMemory?.();\\n"+
+   "    const baseSrc=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):null;\\n"+
+   "    const sameLocalPhoto=!!(mem._taleraLocal&&active?.id===mem.id&&baseSrc&&\\n"+
+   "      (baseSrc===mem.image||(Array.isArray(mem.photos)&&mem.photos.includes(baseSrc))));\\n"+
+   "    const fallback=sameLocalPhoto?baseSrc:null;";
  replace(oldFallback,newFallback,'COLD_FALLBACK');
  assert.ok(html.includes("const N=11,pages=[],cache=new Map()"),
    'Only existing V13 photo wheel may change');

@@ -216,10 +216,12 @@ jobs:
           import fs from 'node:fs';
           import assert from 'node:assert/strict';
           const html=fs.readFileSync('/tmp/talera-unique-example-covers.html','utf8');
-          assert.ok(html.includes('const sameLocalPhoto=!!(mem._taleraLocal&&active?.id===mem.id&&baseSrc&&'));
-          assert.ok(html.includes('const fallback=sameLocalPhoto?baseSrc:null;'));
-          assert.ok(html.includes("tile.el.style.visibility='hidden';"));
-          assert.ok(!html.includes('readyNeighbour=[...cache.values()].find'));
+          assert.ok(html.includes('const fallback=mem._taleraLocal?('),
+            'A sample must not reuse a different memory image');
+          assert.ok(html.includes("tile.el.style.visibility=mem._taleraLocal&&tile.sharp.complete&&tile.sharp.naturalWidth?'visible':'hidden';"),
+            'Sample images must remain hidden until their own photos are loaded');
+          assert.ok(!html.includes('const fallback=base?.complete&&base.naturalWidth?'),
+            'Never show a prior story photo as the next example');
           assert.ok(html.includes('Array.from({length:450},(_,i)=>{'));
           assert.ok(html.includes("const seed='talera-500-fotoband-'+String(i+1).padStart(3,'0')"));
           console.log('TALERA_450_DISTINCT_EXAMPLES_NO_CROSS_MEMORY_COVER');

@@ -54,6 +54,29 @@ for(let i=0;i<scriptBodies.length;i++){
  validated++;
 }
 assert.ok(validated>2);
+// These 450 historical examples are synthetic, not account-owned media.
+// Their preview is permitted only when the decoded image belongs to that
+// exact example, never a recycled neighboring wheel tile or another story.
+const {referencePages}=await import('./generated/public-template-map.mjs');
+const actualPresent=referencePages['/present'];
+assert.match(actualPresent||'',/^\/__talera_free\/f5references\/[a-f0-9]{64}\.html$/);
+const shipped=readFileSync('r20-dev/free-10m-delivery/public'+actualPresent,'utf8');
+assert.ok(shipped.includes('Array.from({length:450},(_,i)=>{')&&
+  shipped.includes("const seed='talera-500-fotoband-'+String(i+1).padStart(3,'0')"),
+  'Preserve the existing 450 unique source URLs, dates and sample IDs');
+const fallbackMarker='const sameLocalPhoto=!!(mem._taleraLocal&&active?.id===mem.id&&baseSrc&&';
+const fallbackStart=shipped.indexOf(fallbackMarker);
+const fallbackEnd=shipped.indexOf('const cached=cache.get(mem.id);',fallbackStart);
+assert.ok(fallbackStart>0&&fallbackEnd>fallbackStart,
+  'Only exact local-memory photographs can appear during slow decoding');
+const fallbackBlock=shipped.slice(fallbackStart,fallbackEnd);
+assert.ok(fallbackBlock.includes('(baseSrc===mem.image||(Array.isArray(mem.photos)&&mem.photos.includes(baseSrc)))'));
+assert.ok(fallbackBlock.includes('const fallback=sameLocalPhoto?baseSrc:null;'));
+assert.ok(fallbackBlock.includes("tile.el.style.visibility='hidden';"),
+  'Unloaded demo photo must stay hidden, never display another memory');
+assert.ok(!shipped.includes('readyNeighbour=[...cache.values()].find'),
+  'Never use any unrelated cached image as a preview of this memory');
+
 console.log('TALERA_F5_FIRST_SWIPE_BOUNDED_PREWARM',JSON.stringify({
  success:true,syntheticOnly:true,accountPrivate:true,
  prewarmsMaxTwoNeighbors:true,noVideosOrFullAlbumsDecoded:true,

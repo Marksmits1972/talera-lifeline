@@ -16,7 +16,12 @@ const markers=[
  ['presentationDispose','function disposePresentation(',2200],
  ['narratedFrame','function taleraInlineSetFrame(',3700],
  ['voiceEnded','function taleraInlineVoiceEnded(',5900],
- ['mediaRead','async function hydrate(',1700]
+ ['mediaRead','async function hydrate(',1700],
+ ['soundControlInit','window.__taleraAudioControls',2100],
+ ['renderDots','function renderDots(',4600],
+ ['renderDotsAlternate','renderDots=(memory)',3600],
+ ['dotsMarkup','photoDots',1500],
+ ['orangeDotCss','dot-active',1200]
 ];
 for(const [name,marker,bytes] of markers){
  const at=page.indexOf(marker),sample=at>=0?page.slice(at,at+bytes):'';

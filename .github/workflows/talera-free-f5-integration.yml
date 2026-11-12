@@ -74,6 +74,8 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser verify complete original-media export, checksum and nondestructive restore
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
+      - name: Browser verify original ordinary video playback without narrated player
+        run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs
       - name: Browser verify original ordinary presentation and video after adding only backup
         run: node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Archive factual test result only

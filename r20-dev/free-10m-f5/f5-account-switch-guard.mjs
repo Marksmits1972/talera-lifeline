@@ -104,3 +104,27 @@ export function removeInactiveAccessibilityMenu(source){
    throw Error('ACCESSIBILITY_REMOVAL_SCOPE_DRIFT');
  return updated;
 }
+
+ 
+// Remove the formerly rejected, information-only Weergave screen. This
+// changes no actual accessibility, presentation, playback or stored data.
+export function removeInactiveDisplayMenu(source){
+ if(typeof source!=='string')throw Error('DISPLAY_MENU_SOURCE_DRIFT');
+ const edits=[
+  ["language:'Taal',display:'Weergave'","language:'Taal'"],
+  ["'Taal en weergave'","'Taal'"],
+  ["  option('display','◐','Weergave','Rust, beweging en visuele voorkeuren')+",""],
+  [" case 'display':\n  html=info('Presentatie en beweging','De huidige instellingen voor beeld, swipen en het verdwijnen van de sociale balk blijven behouden.')+\n   '<p class=\"meta\">Er is nog geen afzonderlijk profiel met weergavevoorkeuren actief.</p>';break;\n",""],
+  ["'language','display','storage'","'language','storage'"]
+ ];
+ let result=source;
+ for(const [before,after] of edits){
+  if(result.split(before).length!==2||(after&&result.includes(after)))
+   throw Error('DISPLAY_MENU_SOURCE_DRIFT');
+  result=result.replace(before,after);
+ }
+ if(result.includes("option('display'")||result.includes("case 'display':")||
+    !result.includes("option('language'")||!result.includes("option('storage'"))
+   throw Error('DISPLAY_REMOVAL_SCOPE_DRIFT');
+ return result;
+}

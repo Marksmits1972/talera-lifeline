@@ -19,8 +19,11 @@ assert.ok(output.includes('const nearby=[sorted[i-1],sorted[i+1]].filter(Boolean
 assert.ok(output.includes("!first.startsWith('blob:')"));
 assert.ok(output.includes("await picture.decode()"));
 assert.ok(output.includes("if(f5ColdAdjacentStarted||!memory?._taleraLocal)return;"));
-assert.ok(output.includes('left._taleraLocal&&left._photoLoading'));
-assert.ok(output.includes('right._taleraLocal&&right._photoLoading'));
+assert.ok(output.includes('setPhotoLayer(photoLayerA, memoryPhotoA, memoryBackdropA, left.image, 1-p, -7*p);'));
+assert.ok(output.includes('setPhotoLayer(photoLayerB, memoryPhotoB, memoryBackdropB, right.image, p, 7*(1-p));'));
+assert.ok(!output.includes('runtime.currentMemory()?._photoLoading?right.image')&&
+  !output.includes('runtime.currentMemory()?._photoLoading?left.image'),
+  'Transitions must never borrow an image from a different memory ID');
 // Confirm the existing V61 recording presentation stays one-photo-at-rest,
 // but the SAME existing V3 swipe band is visible while .is-visible is set.
 assert.equal(output.split('id="talera-f5-narrated-swipe-band"').length-1,1);

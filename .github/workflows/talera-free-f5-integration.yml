@@ -465,3 +465,5 @@ jobs:
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore prior TALERA QA on approved-backup deployment failure" --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
 
 # Narrator candidate includes current 500-example removal and ordinary engine; this deployment is acceptance only.
+
+# Owner-authorized final acceptance publish of narrator on actual 500-example-free baseline; same account/media/QA origin, no promotion.

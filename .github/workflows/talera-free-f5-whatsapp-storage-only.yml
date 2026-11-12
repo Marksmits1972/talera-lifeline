@@ -2,7 +2,7 @@ name: TALERA Free F5 - WhatsApp exact baseline storage-only integration
 
 on:
   push:
-    branches: [feature/free-f5-exact-whatsapp-storage-only-20261109, feature/free-f5-independent-narrator-20261112]
+    branches: [feature/free-f5-exact-whatsapp-storage-only-20261109]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - 'r20-dev/free-10m-delivery/**'

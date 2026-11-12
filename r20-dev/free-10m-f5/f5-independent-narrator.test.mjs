@@ -78,7 +78,7 @@ class FakeElement{
  appendChild(node){this.children.push(node);node.parentElement=this;return node}
  remove(){this.removed=true;if(this.parentElement)
   this.parentElement.children=this.parentElement.children.filter(x=>x!==this)}
- setAttribute(k,v){this[k]=v}
+ setAttribute(k,v){if(k!=='muted')this[k]=v}
  removeAttribute(k){if(k!=='muted')delete this[k]}
  load(){}
  pause(){this.paused=true;this.onpause?.()}

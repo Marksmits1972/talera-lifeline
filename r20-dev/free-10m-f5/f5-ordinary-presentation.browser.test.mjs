@@ -425,9 +425,29 @@ try{
   await load(page,plain,3);
   assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0,
     'Ordinary memory must not receive any narrator layer');
-  const backToOrdinary=await centerPixel(page);
-  assert.ok(dominant(backToOrdinary,0),
-    'Original ordinary memory stopped working after independent narration');
+  // Local iPhone-photo hydration and ordinary 2.5 s rotation may complete
+  // after the memory ID changes; inspect the actual native layer, not a stale
+  // first screenshot captured during the story-to-story handoff.
+  let backToOrdinary=null;
+  for(let tryNo=0;tryNo<12;tryNo++){
+    const state=await page.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const stage=document.getElementById('photoStage');
+      return {storyId:m?.storyId,index:m?._photoIndex,zeroCount:m?._zeroFrames?.length,
+        loaded:!m?._photoLoading,
+        current:stage?.querySelector('.photo-layer img.example-photo')?.currentSrc||'',
+        narrator:!!document.querySelector('.talera-independent-narrator-layer')};
+    });
+    if(state.storyId===plain&&state.index===0&&state.loaded&&!state.narrator){
+      const pixel=await centerPixel(page);
+      backToOrdinary={state,pixel};
+      if(dominant(pixel,0))break;
+    }
+    await page.waitForTimeout(220);
+  }
+  assert.ok(backToOrdinary&&dominant(backToOrdinary.pixel,0),
+    'Original ordinary memory stopped working after independent narration: '+
+    JSON.stringify(backToOrdinary));
   console.log('TALERA_INDEPENDENT_NARRATOR_REAL_BROWSER_PASS',JSON.stringify({
     originalMediaIds:narrated.keys,continuousVoiceMediaId:narrated.voiceId,
     cueTimes:narrated.cues.map(x=>x.t),

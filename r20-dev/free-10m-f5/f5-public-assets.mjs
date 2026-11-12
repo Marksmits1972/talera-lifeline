@@ -665,9 +665,56 @@ function rebuildDirectOrdinaryPresentation(html){
   if(html.includes('const fallback=mem._taleraLocal?('))throw Error('Old shared bitmap remains');
   return html;
 }
+
+// Remove exactly the original fifty reference memories and the four-hundred-
+// fifty synthetic photo-band records from the PRESENTATION SOURCE, not just
+// from the visible gallery. Personal memories are loaded later from the
+// original per-account IndexedDB bridge and remain completely untouched.
+// The existing presentation/wheel/narration engines are not replaced.
+function removeBuiltInPresentationExamples(original){
+ const start='const TALERA_STRESS_MEMORIES = Array.from({length:450},(_,i)=>{';
+ const last='const EVENT_OFFSETS = MEMORIES.map(';
+ const a=original.indexOf(start),b=original.indexOf(last,a+start.length);
+ assert.ok(a>0&&b>a,'F5_PRESENT_EXAMPLE_SOURCE_MOVED');
+ const old=original.slice(a,b);
+ assert.equal(original.split(start).length,2,'F5_PRESENT_EXAMPLE_SEED_DUPLICATED');
+ assert.equal(original.split('const MEMORIES = [').length,2,'F5_PRESENT_REFERENCE_ARRAY_DUPLICATED');
+ assert.equal(original.split('TALERA_STRESS_MEMORIES').length,3,
+  'F5_PRESENT_REFERENCE_GENERATOR_NEW_USAGE');
+ assert.ok(old.includes('const MEMORIES = [')&&
+  old.includes('].concat(TALERA_STRESS_MEMORIES).map(')&&
+  old.includes('id:1001+i')&&old.includes('id:50,'),
+  'F5_PRESENT_REFERENCE_SET_NOT_EXACT_50_PLUS_450');
+ let html=original.slice(0,a)+'const MEMORIES = [];\n\n'+original.slice(b);
+ const once=(from,to,label)=>{
+  assert.equal(html.split(from).length,2,'F5_EMPTY_PRESENT_'+label+'_SOURCE_DRIFT');
+  html=html.replace(from,to);
+ };
+ // The reference-only boot was allowed to assume an example always existed.
+ // Guard just these two empty-list paths until the SAME local-store hydration
+ // registers the owner's actual saved memories.
+ once('function surroundingMemories(ms) {\n  if (ms <= MEMORIES[0].ms)',
+  'function surroundingMemories(ms) {\n  if (!MEMORIES.length) return {left:null,right:null,progress:0};\n  if (ms <= MEMORIES[0].ms)',
+  'ROLLING_PREVIEW');
+ once('writeMemory(nearestMemory(centerMs));\nresize();',
+  'const firstOwnMemory=nearestMemory(centerMs);\nif(firstOwnMemory)writeMemory(firstOwnMemory);\nresize();',
+  'INITIAL_MEMORY');
+ assert.ok(html.includes('const MEMORIES = [];')&&
+  !html.includes('TALERA_STRESS_MEMORIES')&&
+  !html.includes('talera-500-fotoband-')&&
+  !html.includes('https://picsum.photos/seed/talera-v11-clean-001/800/1200'),
+  'F5_PRESENT_REFERENCE_PHOTO_STILL_BUNDLED');
+ // An old placeholder image in markup is not a real saved account photo.
+ // Clear just built-in sample src/srcset/poster attributes; the original
+ // photo stage later assigns each saved photo's real object URL as before.
+ html=html.replace(/(<img\b[^>]*?)\s(?:src|srcset|poster)=(["'])https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^"']*\2/gi,'$1');
+ return html;
+}
+
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
+ if(route==='/present')html=removeBuiltInPresentationExamples(html);
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);
  if(route==='/present')html=warmUpFirstSwipePhotoStrip(html);

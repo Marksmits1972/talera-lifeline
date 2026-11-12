@@ -467,3 +467,5 @@ jobs:
 # Narrator candidate includes current 500-example removal and ordinary engine; this deployment is acceptance only.
 
 # Owner-authorized final acceptance publish of narrator on actual 500-example-free baseline; same account/media/QA origin, no promotion.
+
+# Owner-requested correction for already-presented QA narration: audible voice and original video; cue-aligned orange dots. Same PWA, no merge, no official promotion.

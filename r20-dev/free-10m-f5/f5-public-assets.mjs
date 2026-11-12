@@ -2,7 +2,7 @@
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu} from './f5-account-switch-guard.mjs';
+import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu} from './f5-account-switch-guard.mjs';
 import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {mkdirSync,readFileSync,writeFileSync,copyFileSync} from 'node:fs';
 import path from 'node:path';
@@ -731,7 +731,7 @@ for(const name of paths){
  // Storage and back-up panel alone also links to the authenticated archive.
  if(name==='/__clean/menu-integration.mjs'){
    writeFileSync(path.join(generated,'approved-menu-original.mjs'),first.body);
-   shipped=removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body)));
+   shipped=removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body))));
  }
  const filename=sha(shipped)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');

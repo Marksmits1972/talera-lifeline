@@ -363,12 +363,12 @@ function warmUpFirstSwipePhotoStrip(html){
    "  });";
  replace(oldSub,updatedSub,'IDB_HYDRATION');
  const oldFallback="    const fallback=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):null;";
- const newFallback="    // A fallback is valid only for the SAME local memory and its OWN photo.\\n"+
-   "    // Never paint one sample/neighbor photo as a different memory.\\n"+
-   "    const active=runtime.currentMemory?.();\\n"+
-   "    const baseSrc=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):null;\\n"+
-   "    const sameLocalPhoto=!!(mem._taleraLocal&&active?.id===mem.id&&baseSrc&&\\n"+
-   "      (baseSrc===mem.image||(Array.isArray(mem.photos)&&mem.photos.includes(baseSrc))));\\n"+
+ const newFallback="    // A fallback is valid only for the SAME local memory and its OWN photo.\n"+
+   "    // Never paint one sample/neighbor photo as a different memory.\n"+
+   "    const active=runtime.currentMemory?.();\n"+
+   "    const baseSrc=base?.complete&&base.naturalWidth?(base.currentSrc||base.src):null;\n"+
+   "    const sameLocalPhoto=!!(mem._taleraLocal&&active?.id===mem.id&&baseSrc&&\n"+
+   "      (baseSrc===mem.image||(Array.isArray(mem.photos)&&mem.photos.includes(baseSrc))));\n"+
    "    const fallback=sameLocalPhoto?baseSrc:null;";
  replace(oldFallback,newFallback,'COLD_FALLBACK');
  assert.ok(html.includes("const N=11,pages=[],cache=new Map()"),

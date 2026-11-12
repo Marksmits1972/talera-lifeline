@@ -391,6 +391,18 @@ try{
     const audio=document.querySelector('.talera-independent-narrator-layer audio');
     return audio&&!audio.paused&&audio.currentTime>.06;
   },null,{timeout:14000});
+  const voiceSound=await page.evaluate(()=>{
+    const voice=document.querySelector('.talera-independent-narrator-layer audio');
+    return {settingsEnabled:window.__taleraAudioControls?.isEnabled?.(),
+      muted:voice?.muted,volume:voice?.volume,
+      dots:document.querySelectorAll('.talera-photo-dot').length};
+  });
+  assert.equal(voiceSound.settingsEnabled,true,
+    'Original TALERA listening preference should default to enabled');
+  assert.equal(voiceSound.muted,false,
+    'Recorded voice must not be silently muted in the real PWA');
+  assert.ok(voiceSound.volume>0,'Voice volume must be audible');
+  assert.equal(voiceSound.dots,4,'Existing orange photo dots must be present');
   const firstNarrated=await centerPixel(page);
   assert.ok(dominant(firstNarrated,0),
     'Independent narrator did not paint its OWN first original photo: '+JSON.stringify(firstNarrated));
@@ -403,6 +415,11 @@ try{
     const v=document.querySelector('video.talera-independent-narrator-video');
     return !!v&&v.muted===true;
   },null,{timeout:8000});
+  await page.waitForFunction(()=>{
+    const dots=[...document.querySelectorAll('.talera-photo-dot')];
+    return dots.length===4&&dots[3].classList.contains('active')&&
+      dots.filter(x=>x.classList.contains('active')).length===1;
+  },null,{timeout:5500});
   await page.evaluate(()=>{
     const audio=document.querySelector('.talera-independent-narrator-layer audio');
     audio.currentTime=1.8;
@@ -412,6 +429,11 @@ try{
     const img=document.querySelector('img.talera-independent-narrator-photo');
     return !!img&&!img.hidden&&img.complete&&img.naturalWidth>0;
   },null,{timeout:9000});
+  await page.waitForFunction(()=>{
+    const dots=[...document.querySelectorAll('.talera-photo-dot')];
+    return dots.length===4&&dots[1].classList.contains('active')&&
+      dots.filter(x=>x.classList.contains('active')).length===1;
+  },null,{timeout:5500});
   const secondNarrated=await centerPixel(page);
   assert.ok(dominant(secondNarrated,1),
     'Voice cue time did not display its own green media-ID: '+JSON.stringify(secondNarrated));
@@ -427,6 +449,8 @@ try{
       otherNarrators:document.querySelectorAll('.talera-independent-narrator-layer').length};
   });
   assert.equal(soundtrack.present,true,'The final original video was never played');
+  assert.equal(soundtrack.muted,false,
+    'Original video soundtrack must be audible with listening enabled');
   assert.equal(soundtrack.muted,soundtrack.expectedMuted,
     'The final original video did not respect the original sound setting');
   assert.equal(soundtrack.concurrentVoice,false,'Voice and original video must never overlap');
@@ -462,6 +486,7 @@ try{
     cueTimes:narrated.cues.map(x=>x.t),
     separateRenderer:true,silentNarrationVideo:true,
     remainingPhotoThenOriginalVideo:true,originalSoundtrackPresent:true,
+    voiceAudioUnmuted:true,orangeDotsFollowVoiceCues:true,
     ordinaryPresentationRestored:true,realIPhoneAccepted:false
   }));
 

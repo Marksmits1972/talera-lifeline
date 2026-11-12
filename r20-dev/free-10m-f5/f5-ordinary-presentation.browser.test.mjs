@@ -377,7 +377,7 @@ try{
   assert.equal(new Set(narrated.keys).size,4);
   await load(page,narrated.id,4);
   await page.locator('.talera-independent-narrator-layer audio')
-    .waitFor({timeout:15000});
+    .waitFor({state:'attached',timeout:15000});
   await page.waitForFunction(()=>{
     const audio=document.querySelector('.talera-independent-narrator-layer audio');
     return audio&&!audio.paused&&audio.currentTime>.06;

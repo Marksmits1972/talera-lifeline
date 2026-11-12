@@ -20,8 +20,8 @@ try{
     '--persist-to',path.join(generated,'ordinary-present-local'),
     '--var','STAGING_F5_KEY:'+gate,'--var','STAGING_ACCESS_KEY:'+'2'.repeat(64),
     '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
-    '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_ORDINARY_VIDEO_ACCOUNT',
-    '--var','DEMO_IDENTITY_KEY:SYNTHETIC_ORDINARY_VIDEO_SOCIAL',
+    '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_TEST_KEY',
+    '--var','DEMO_IDENTITY_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_SOCIAL_KEY',
     '--log-level','error'
   ],{env:{...process.env,CI:'true',BROWSER:'none'},stdio:['ignore','pipe','pipe']});
   for(const output of [worker.stdout,worker.stderr])output.on('data',d=>logs=(logs+d.toString()).slice(-2500));
@@ -39,7 +39,7 @@ try{
   },body:JSON.stringify({email:'video-'+tag+'@example.invalid',
     username:'video'+tag.slice(-9),displayName:'Local ordinary video regression',
     password:'Synthetic_TALERA_Ordinary_Test_2026',birthDate:'1974-04-02'})});
-  assert.equal(result.status,200,'Synthetic registration must succeed');
+  assert.equal(result.status,200,'Synthetic registration must succeed: '+(await result.text()).slice(0,400));
   const sid=/talera_sid=([a-f0-9]{64})/.exec(result.headers.get('set-cookie')||'')?.[1];
   assert.ok(sid,'Synthetic cookie missing');
   browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});

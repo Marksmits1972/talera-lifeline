@@ -309,6 +309,133 @@ try{
   });
   assert.equal(state.id,mixed);
   assert.equal(state.video,false,'Ordinary photo roll cannot enter narration mode');
+  // Playback integration in the SAME authenticated TALERA Free candidate.
+  // Synthetic voice and original soundtrack, no new app, no customer media.
+  const syntheticVoice=path.join(generated,'independent-narrator-voice.wav');
+  const syntheticOriginal=path.join(generated,'independent-narrator-original.mp4');
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','sine=frequency=330:duration=4.6',
+    '-c:a','pcm_s16le','-ar','22050',syntheticVoice],{timeout:25000,stdio:'ignore'});
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
+    '-f','lavfi','-i','sine=frequency=440:duration=1',
+    '-shortest','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac',
+    '-b:a','64k','-movflags','+faststart',syntheticOriginal],
+    {timeout:30000,stdio:'ignore'});
+  const narrated=await page.evaluate(async ({voice,video})=>{
+    const files=await Promise.all(['#f01426','#19d03a','#293af2'].map(async(c,i)=>{
+      const canvas=document.createElement('canvas');
+      canvas.width=140;canvas.height=140;
+      const p=canvas.getContext('2d');p.fillStyle=c;p.fillRect(0,0,140,140);
+      const blob=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
+      return new File([blob],'narration-original-'+i+'.png',{type:'image/png'});
+    }));
+    files.push(new File([Uint8Array.from(atob(video),x=>x.charCodeAt(0))],
+      'original-with-audio.mp4',{type:'video/mp4'}));
+    files.push(new File([Uint8Array.from(atob(voice),x=>x.charCodeAt(0))],
+      'one-continuous-voice.wav',{type:'audio/wav'}));
+    const saved=await window.TaleraMemories.save({
+      title:'Independent voice playback',date:'2026-11-12',time:'18:30:00',
+      text:'Synthetic one-story voice clock and original media',
+      narrationCues:[]
+    },files);
+    const row=await window.TaleraMemories.get(saved.id);
+    const imageKeys=row.items.filter(x=>x.kind==='photo'||x.kind==='video').map(x=>x.key);
+    const voiceItem=row.items.find(x=>x.kind==='audio');
+    if(imageKeys.length!==4||!voiceItem)throw Error('Original audio and 4 media IDs were not stored');
+    const cues=[
+      {t:0,index:0,mediaId:imageKeys[0]},
+      {t:600,index:3,mediaId:imageKeys[3],videoAtMs:0},
+      {t:1550,index:1,mediaId:imageKeys[1]},
+      {t:2800,index:3,mediaId:imageKeys[3],videoAtMs:250}
+    ];
+    // Test-only insertion of the exact published narrator cue schema into
+    // the SAME account-scoped IndexedDB. The real editor/writer is separately
+    // protected by the F5 recorder ID/readback tests.
+    const dbName=(await indexedDB.databases()).map(x=>x.name||'')
+      .find(x=>x.startsWith('talera-free-local-'));
+    if(!dbName)throw Error('Account-specific original media store missing');
+    const db=await new Promise((ok,bad)=>{
+      const req=indexedDB.open(dbName);
+      req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error);
+    });
+    await new Promise((ok,bad)=>{
+      const tx=db.transaction('stories','readwrite');
+      const store=tx.objectStore('stories');
+      const get=store.get(saved.id);
+      get.onsuccess=()=>{
+        const existing=get.result;
+        if(!existing){tx.abort();return}
+        store.put({...existing,narrationCues:cues,
+          narrationSchema:'media-id-v1',narrationDurationMs:4600});
+      };
+      tx.oncomplete=ok;tx.onerror=()=>bad(tx.error);tx.onabort=()=>bad(tx.error);
+    });
+    db.close();
+    return {id:saved.id,keys:imageKeys,voiceId:voiceItem.key,cues};
+  },{voice:readFileSync(syntheticVoice).toString('base64'),
+     video:readFileSync(syntheticOriginal).toString('base64')});
+  assert.equal(narrated.cues.length,4);
+  assert.equal(new Set(narrated.keys).size,4);
+  await load(page,narrated.id,4);
+  await page.locator('.talera-independent-narrator-layer audio')
+    .waitFor({timeout:15000});
+  await page.waitForFunction(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return audio&&!audio.paused&&audio.currentTime>.06;
+  },null,{timeout:14000});
+  const firstNarrated=await centerPixel(page);
+  assert.ok(dominant(firstNarrated,0),
+    'Independent narrator did not paint its OWN first original photo: '+JSON.stringify(firstNarrated));
+  await page.evaluate(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    audio.currentTime=.8;
+    audio.ontimeupdate?.();
+  });
+  await page.waitForFunction(()=>{
+    const v=document.querySelector('video.talera-independent-narrator-video');
+    return !!v&&v.muted===true;
+  },null,{timeout:8000});
+  await page.evaluate(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    audio.currentTime=1.8;
+    audio.ontimeupdate?.();
+  });
+  await page.waitForFunction(()=>{
+    const img=document.querySelector('img.talera-independent-narrator-photo');
+    return !!img&&!img.hidden&&img.complete&&img.naturalWidth>0;
+  },null,{timeout:9000});
+  const secondNarrated=await centerPixel(page);
+  assert.ok(dominant(secondNarrated,1),
+    'Voice cue time did not display its own green media-ID: '+JSON.stringify(secondNarrated));
+  await page.waitForFunction(()=>!!document.querySelector(
+    '.talera-independent-narrator-layer video.talera-independent-original-video'),
+    null,{timeout:15000});
+  const soundtrack=await page.evaluate(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const v=layer.querySelector('video.talera-independent-original-video');
+    return {present:!!v,originalMedia:v?.currentSrc||v?.src,
+      muted:v?.muted,expectedMuted:!window.__taleraAudioControls?.isEnabled?.(),
+      concurrentVoice:!!layer.querySelector('audio'),
+      otherNarrators:document.querySelectorAll('.talera-independent-narrator-layer').length};
+  });
+  assert.equal(soundtrack.present,true,'The final original video was never played');
+  assert.equal(soundtrack.muted,soundtrack.expectedMuted,
+    'The final original video did not respect the original sound setting');
+  assert.equal(soundtrack.concurrentVoice,false,'Voice and original video must never overlap');
+  assert.equal(soundtrack.otherNarrators,1,'Only one narrator may own an active memory');
+  await load(page,plain,3);
+  assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0,
+    'Ordinary memory must not receive any narrator layer');
+  const backToOrdinary=await centerPixel(page);
+  assert.ok(dominant(backToOrdinary,0),
+    'Original ordinary memory stopped working after independent narration');
+  console.log('TALERA_INDEPENDENT_NARRATOR_REAL_BROWSER_PASS',JSON.stringify({
+    originalMediaIds:narrated.keys,continuousVoiceMediaId:narrated.voiceId,
+    cueTimes:narrated.cues.map(x=>x.t),
+    separateRenderer:true,silentNarrationVideo:true,
+    remainingPhotoThenOriginalVideo:true,originalSoundtrackPresent:true,
+    ordinaryPresentationRestored:true,realIPhoneAccepted:false
+  }));
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

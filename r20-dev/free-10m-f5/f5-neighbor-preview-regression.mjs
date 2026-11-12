@@ -68,7 +68,7 @@ assert.ok(shipped.includes('const MEMORIES = [];') &&
   !shipped.includes('TALERA_STRESS_MEMORIES') &&
   !shipped.includes('talera-500-fotoband-') &&
   !shipped.includes('id:50, at:') &&
-  !shipped.includes('const MEMORIES = ['),
+  !shipped.includes('const MEMORIES = [\n'),
   'All 50 original and 450 generated example memories must be absent from the shipped presentation');
 assert.ok(shipped.includes('runtime.registerMemories(memories)') &&
   shipped.includes('const memories=rows.map(toMemory).filter(Boolean)'),

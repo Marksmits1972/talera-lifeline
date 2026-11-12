@@ -99,6 +99,42 @@ try{
   const response=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
   assert.equal(response.status(),200);
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:15000});
+  const readingControls=await page.evaluate(()=>{
+    const sheet=document.querySelector('.memory-space');
+    const paper=document.getElementById('memoryCaption');
+    const oldShare=document.getElementById('talera-v18-story-actions');
+    const oldPencil=document.getElementById('talera-v21-pencil');
+    const photoPencil=document.getElementById('talera-v5-editor-pencil');
+    const social=document.getElementById('talera-clean-social');
+    if(!sheet||!paper||!oldShare||!oldPencil||!photoPencil||!social)return null;
+    const originalHidden=oldPencil.hidden;
+    const photoBefore=getComputedStyle(photoPencil).display;
+    oldPencil.hidden=false;
+    sheet.classList.add('talera-v26-reading');
+    document.body.classList.add('talera-v18-reading');
+    const result={
+      share:getComputedStyle(oldShare).display,
+      sheetPencil:getComputedStyle(oldPencil).display,
+      photoPencil:getComputedStyle(photoPencil).display,
+      social:getComputedStyle(social).display,
+      storyPadding:getComputedStyle(document.getElementById('memoryStory')).paddingRight,
+      photoBefore
+    };
+    sheet.classList.remove('talera-v26-reading');
+    document.body.classList.remove('talera-v18-reading');
+    oldPencil.hidden=originalHidden;
+    result.photoAfter=getComputedStyle(photoPencil).display;
+    return result;
+  });
+  assert.ok(readingControls,'Original approved reading controls must exist');
+  assert.equal(readingControls.share,'none','Old sheet share remains hidden');
+  assert.equal(readingControls.sheetPencil,'none','Old sheet editor remains hidden');
+  assert.equal(readingControls.photoPencil,'none','Photo editor hidden while sheet raised only');
+  assert.equal(readingControls.storyPadding,'0px','No empty share-button text gutter');
+  assert.notEqual(readingControls.photoBefore,'none','Existing photo editor remains');
+  assert.notEqual(readingControls.photoAfter,'none','Existing photo editor returns');
+  assert.notEqual(readingControls.social,'none','Original social toolbar remains');
+
 
   const plain=await page.evaluate(async()=>{
     const files=await Promise.all(['#ef1523','#27d128','#233fff'].map(async(c,i)=>{

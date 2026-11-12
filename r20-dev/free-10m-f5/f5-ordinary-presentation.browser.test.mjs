@@ -41,7 +41,17 @@ async function start(){
 // Read ONLY photographic pixels from the actual rendered stage screenshot.
 // Comparing whole screenshots allowed moving dots to masquerade as a new photo.
 async function centerPixel(page){
-  const shot=await page.locator('#photoStage').screenshot();
+  const box=await page.locator('#photoStage').boundingBox();
+  assert.ok(box&&box.width>0&&box.height>0,'Visible photo stage required');
+  const session=await page.context().newCDPSession(page);
+  let shot;
+  try {
+    const result=await session.send('Page.captureScreenshot',{
+      format:'png',
+      clip:{x:box.x,y:box.y,width:box.width,height:box.height,scale:1}
+    });
+    shot=Buffer.from(result.data,'base64');
+  } finally {await session.detach();}
   return page.evaluate(async data=>{
     const img=new Image();
     img.src='data:image/png;base64,'+data;

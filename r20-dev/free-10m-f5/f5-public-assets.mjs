@@ -699,15 +699,14 @@ function removeBuiltInPresentationExamples(original){
  once('writeMemory(nearestMemory(centerMs));\nresize();',
   'const firstOwnMemory=nearestMemory(centerMs);\nif(firstOwnMemory)writeMemory(firstOwnMemory);\nresize();',
   'INITIAL_MEMORY');
+ // Remove the original static template image attributes as well as all
+ // generated memory records, before asserting that no sample source remains.
+ html=html.replace(/(<img\b[^>]*?)\s(?:src|srcset|poster)=(["'])https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^"']*\2/gi,'$1');
  assert.ok(html.includes('const MEMORIES = [];')&&
   !html.includes('TALERA_STRESS_MEMORIES')&&
   !html.includes('talera-500-fotoband-')&&
   !html.includes('https://picsum.photos/seed/talera-v11-clean-001/800/1200'),
   'F5_PRESENT_REFERENCE_PHOTO_STILL_BUNDLED');
- // An old placeholder image in markup is not a real saved account photo.
- // Clear just built-in sample src/srcset/poster attributes; the original
- // photo stage later assigns each saved photo's real object URL as before.
- html=html.replace(/(<img\b[^>]*?)\s(?:src|srcset|poster)=(["'])https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^"']*\2/gi,'$1');
  return html;
 }
 

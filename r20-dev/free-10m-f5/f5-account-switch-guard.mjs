@@ -119,7 +119,7 @@ export function removeInactiveDisplayMenu(source){
  ];
  let result=source;
  for(const [before,after] of edits){
-  if(result.split(before).length!==2||(after&&result.includes(after)))
+  if(result.split(before).length!==2)
    throw Error('DISPLAY_MENU_SOURCE_DRIFT');
   result=result.replace(before,after);
  }

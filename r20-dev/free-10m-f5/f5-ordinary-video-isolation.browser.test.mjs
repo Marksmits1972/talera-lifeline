@@ -74,8 +74,21 @@ try{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3;
   },id,{timeout:18000});
+  await page.evaluate(()=>{
+    window.__taleraOrdinaryVideoObserved=false;
+    const observer=new MutationObserver(records=>{
+      for(const record of records)for(const node of record.addedNodes){
+        if(node.nodeType===1&&(node.matches?.('video.talera-v61-inline-video')||
+          node.querySelector?.('video.talera-v61-inline-video')))
+          window.__taleraOrdinaryVideoObserved=true;
+      }
+    });
+    observer.observe(document.documentElement,{childList:true,subtree:true});
+    window.__taleraOrdinaryVideoObserver=observer;
+  });
   await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.('pwa:'+id,2,true),id);
-  await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),null,{timeout:11000});
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:11000});
+  await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
   const info=()=>page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     const v=document.querySelector('video.talera-v61-inline-video');

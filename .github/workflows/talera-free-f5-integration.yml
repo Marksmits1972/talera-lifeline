@@ -77,14 +77,14 @@ jobs:
           npx --no-install playwright install --with-deps chromium
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
+      - name: Browser verify independent narrator, cue clock, own video and original ordinary presentation
+        run: node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Browser verify existing real-account login, switching, privacy and original menu
         run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
       - name: Browser verify back-up panel, private session and two local browser contexts
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser verify complete original-media export, checksum and nondestructive restore
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
-      - name: Browser verify original ordinary presentation and video after adding only backup
-        run: node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Archive factual test result only
         if: success()
         uses: actions/upload-artifact@v4

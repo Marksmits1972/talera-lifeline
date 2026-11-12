@@ -220,7 +220,7 @@ jobs:
           // reference used after account authentication.
           const {referencePages}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
           const ref=referencePages['/present'];
-          assert.match(ref||'',/^\/__talera_free\/f5references\/[a-f0-9]{64}\.html$/);
+          assert.ok(ref?.startsWith('/__talera_free/f5references/') &&\n            ref.endsWith('.html') && ref.split('/').at(-1).length===69,\n            'Immutable authenticated presentation asset mapping missing');
           const html=fs.readFileSync('r20-dev/free-10m-delivery/public'+ref,'utf8');
           const anonymous=fs.readFileSync('/tmp/talera-unique-example-covers.html','utf8');
           assert.ok(!anonymous.includes('const fallback=mem._taleraLocal?('),

@@ -151,7 +151,7 @@ jobs:
           assert.equal(observed.find(b=>b.name==='AUTH_STORAGE_JURISDICTION')?.text,'eu');
           console.log('EXACT_EXISTING_QA_WORKER_AND_APPROVED_BINDINGS_VERIFIED');
           NODE
-      - name: Assemble unchanged approved Worker assets and the added original Storage menu link
+      - name: Package existing Worker assets and unchanged approved Storage menu link
         run: |
           npm ci
           node r20-dev/free-10m-delivery/build.mjs

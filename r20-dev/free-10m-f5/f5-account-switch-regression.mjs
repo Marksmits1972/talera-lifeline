@@ -2,14 +2,18 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
-import {secureAccountMenuTransitions,connectExistingStorageBackup} from './f5-account-switch-guard.mjs';
+import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu} from './f5-account-switch-guard.mjs';
 const source=readFileSync('r20-dev/free-10m-f5/generated/approved-menu-original.mjs','utf8');
 const {verifiedPublicScripts}=await import('./generated/public-template-map.mjs');
 const scriptPath=verifiedPublicScripts['/__clean/menu-integration.mjs'];
 assert.match(scriptPath||'',/^\/__talera_free\/f5scripts\/[a-f0-9]{64}\.mjs$/);
 const served=readFileSync(path.join('r20-dev/free-10m-delivery/public',scriptPath.slice(1)),'utf8');
-assert.equal(served,connectExistingStorageBackup(secureAccountMenuTransitions(source)),
- 'Original account menu must remain unchanged except auth and Storage backup connection');
+assert.equal(served,removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(source))),
+ 'Original account menu must remain unchanged except auth, backup and removed Accessibility placeholder');
+assert.ok(source.includes("option('accessibility'")&&source.includes("case 'accessibility':"),'Original menu source still has placeholder; verify minimal change');
+assert.ok(!served.includes("option('accessibility'")&&!served.includes("case 'accessibility':")&&!served.includes("accessibility:'Toegankelijkheid'")&&!served.includes("'accessibility','display'"),'No Accessibility menu, screen, heading or deep-link remains');
+assert.ok(served.includes("option('display'")&&served.includes("option('language'")&&served.includes("option('storage'"),'Every other settings item must remain present');
+assert.throws(()=>removeInactiveAccessibilityMenu(source.replace("case 'accessibility':","case 'accessibility-changed':")),/ACCESSIBILITY_MENU_SOURCE_DRIFT/,'Refuse removal against drifted source');
 assert.equal((served.match(/data-action="open-backup"/g)||[]).length,1,
  'Exactly one genuine local backup button, only inside existing Storage screen');
 assert.ok(served.includes("state.view==='storage'&&state.account")&&

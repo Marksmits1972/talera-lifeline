@@ -133,7 +133,7 @@ audio.currentTime=35.1;audio.ontimeupdate();
 await Promise.resolve();await Promise.resolve();
 audio.onended();
 await Promise.resolve();await Promise.resolve();
-assert.ok(timeouts.some(x=>x.ms===2500),
+assert.ok(timeouts.some(x=>x.ms===4000),
   'Only AFTER voice ends may unused photos use the post-voice clock');
 const s1=timeouts.at(-1);s1.fn(); // Skip synthetic unused photo.
 await Promise.resolve();await Promise.resolve();

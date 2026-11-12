@@ -23,7 +23,7 @@ assert.ok(page.includes('return; // No ordinary presentation functions for voice
 assert.ok(page.includes('function taleraInlineOrdinaryStep(s,index)'),
   'Existing ordinary presentation must remain unchanged');
 assert.ok(!/taleraInline|__taleraV31SelectPhoto|scheduleAuto|showPhoto\(/.test(source),
-  'Narrator must not execute presentation's timers, event hooks or controls');
+  'Narrator must not execute ordinary presentation timers, event hooks or controls');
 assert.ok(source.includes('mediaId:frames[index].key'),'Narrator cues must use original media IDs');
 const sandbox={};
 vm.runInNewContext(source+

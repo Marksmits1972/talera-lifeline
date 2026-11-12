@@ -309,6 +309,90 @@ try{
   });
   assert.equal(state.id,mixed);
   assert.equal(state.video,false,'Ordinary photo roll cannot enter narration mode');
+
+  // Real local recording and saved cue IDs on the SAME current /present page.
+  // Seek one original WAV audio element to recorded cue times; no mocked engine,
+  // no second app, and no invocation of the ordinary-photo controller.
+  const narrated=await page.evaluate(async()=>{
+    const pictures=await Promise.all(['#f22437','#26d12a','#284aff'].map(async(c,i)=>{
+      const canvas=document.createElement('canvas');canvas.width=140;canvas.height=140;
+      const g=canvas.getContext('2d');g.fillStyle=c;g.fillRect(0,0,140,140);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+      return new File([blob],'voice-photo-'+i+'.png',{type:'image/png'});
+    }));
+    const rate=8000,seconds=5,samples=rate*seconds;
+    const buffer=new ArrayBuffer(44+samples*2),view=new DataView(buffer);
+    const str=(offset,value)=>{for(let i=0;i<value.length;i++)view.setUint8(offset+i,value.charCodeAt(i))};
+    str(0,'RIFF');view.setUint32(4,36+samples*2,true);
+    str(8,'WAVE');str(12,'fmt ');view.setUint32(16,16,true);
+    view.setUint16(20,1,true);view.setUint16(22,1,true);
+    view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);
+    view.setUint16(32,2,true);view.setUint16(34,16,true);
+    str(36,'data');view.setUint32(40,samples*2,true);
+    pictures.push(new File([buffer],'recorded-voice.wav',{type:'audio/wav'}));
+    const row=await window.TaleraMemories.save({
+      title:'Recorded cue isolation',date:'2026-11-10',time:'12:02:00',
+      text:'Separate text without cue playback control',
+      narrationDurationMs:5000,
+      narrationCues:[{t:0,index:0},{t:1000,index:1},
+        {t:2000,index:2},{t:3000,index:1}]
+    },pictures);
+    const read=await window.TaleraMemories.get(row.id);
+    if(read.items?.length!==4||read.narrationCues?.length!==4)
+      throw Error('Narrated media or saved cue IDs missing');
+    return row.id;
+  });
+  await load(page,narrated,3);
+  await page.waitForFunction(()=>{
+    const audio=document.querySelector('#photoStage audio');
+    return !!audio&&Number.isFinite(audio.duration)&&audio.duration>=4.8;
+  },null,{timeout:15000});
+  await page.evaluate(()=>{
+    const original=window.__taleraV31SelectPhoto;
+    if(typeof original!=='function'||typeof window.__taleraPaintNarratedFrame!=='function')
+      throw Error('Separate narrated screen bridge missing');
+    window.__taleraOrdinaryCalledByNarrator=0;
+    window.__taleraV31SelectPhoto=(...args)=>{
+      window.__taleraOrdinaryCalledByNarrator++;
+      return original(...args);
+    };
+  });
+  for(const [second,index,rgb] of [
+    [0.2,0,[242,36,55]],[1.2,1,[38,209,42]],
+    [2.2,2,[40,74,255]],[3.2,1,[38,209,42]]
+  ]){
+    await page.evaluate(t=>{
+      const audio=document.querySelector('#photoStage audio');
+      audio.pause();
+      audio.currentTime=t;
+      audio.dispatchEvent(new Event('timeupdate'));
+    },second);
+    await waitIndex(page,index,4500);
+    const pixel=await centerPixel(page);
+    assert.ok(nearColor(pixel,rgb),
+      'Narrated audio cue does not paint the saved own media ID: '+
+      JSON.stringify({second,index,pixel}));
+  }
+  const voiceIsolation=await page.evaluate(()=>{
+    const m=window.__taleraTimelineRuntime.currentMemory();
+    const audio=document.querySelector('#photoStage audio');
+    return {id:m.storyId,called:window.__taleraOrdinaryCalledByNarrator,
+      audio:!!audio,paused:audio?.paused,cues:m._taleraNarrationCues?.length,
+      media:m._zeroFrames?.map(f=>f.key)};
+  });
+  assert.equal(voiceIsolation.id,narrated);
+  assert.equal(voiceIsolation.called,0,
+    'Recorded cue engine must never invoke the ordinary photo controller');
+  assert.ok(voiceIsolation.audio&&voiceIsolation.paused);
+  assert.equal(voiceIsolation.cues,4);
+  assert.equal(voiceIsolation.media.length,3);
+  console.log('TALERA_RECORDED_CUE_ID_INDEPENDENCE_OK',JSON.stringify({
+    voiceAudioOnlyClock:true,seekSequence:[0,1,2,1],
+    ordinaryControllerCalls:voiceIsolation.called,
+    localStorageUnchanged:true,recordedMediaIds:voiceIsolation.media.length,
+    onIphoneAccepted:false
+  }));
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

@@ -64,19 +64,18 @@ const shipped=readFileSync('r20-dev/free-10m-delivery/public'+actualPresent,'utf
 assert.ok(shipped.includes('Array.from({length:450},(_,i)=>{')&&
   shipped.includes("const seed='talera-500-fotoband-'+String(i+1).padStart(3,'0')"),
   'Preserve the existing 450 unique source URLs, dates and sample IDs');
-const fallbackMarker='const sameLocalPhoto=!!(mem._taleraLocal&&active?.id===mem.id&&baseSrc&&';
+const fallbackMarker='const fallback=mem._taleraLocal?(';
 const fallbackStart=shipped.indexOf(fallbackMarker);
 const fallbackEnd=shipped.indexOf('const cached=cache.get(mem.id);',fallbackStart);
 assert.ok(fallbackStart>0&&fallbackEnd>fallbackStart,
-  'Only exact local-memory photographs can appear during slow decoding');
+  'Legacy first-swipe fallback may be used only by account-owned stories');
 const fallbackBlock=shipped.slice(fallbackStart,fallbackEnd);
-assert.ok(fallbackBlock.includes('(baseSrc===mem.image||(Array.isArray(mem.photos)&&mem.photos.includes(baseSrc)))'));
-assert.ok(fallbackBlock.includes('const fallback=sameLocalPhoto?baseSrc:null;'));
-assert.ok(fallbackBlock.includes("tile.el.style.visibility='hidden';"),
-  'Unloaded demo photo must stay hidden, never display another memory');
-assert.ok(!shipped.includes('readyNeighbour=[...cache.values()].find'),
-  'Never use any unrelated cached image as a preview of this memory');
-
+assert.ok(fallbackBlock.includes('readyNeighbour?.currentSrc||readyNeighbour?.src||null'),
+  'Protect original local photo loading behavior');
+assert.ok(fallbackBlock.includes("tile.el.style.visibility=mem._taleraLocal&&tile.sharp.complete&&tile.sharp.naturalWidth?'visible':'hidden';"),
+  'A demo memory must stay hidden until its own preview loads');
+assert.ok(!shipped.includes('const fallback=base?.complete&&base.naturalWidth?'),
+  'Never use a shared fallback for the 450 demo memories');
 console.log('TALERA_F5_FIRST_SWIPE_BOUNDED_PREWARM',JSON.stringify({
  success:true,syntheticOnly:true,accountPrivate:true,
  prewarmsMaxTwoNeighbors:true,noVideosOrFullAlbumsDecoded:true,

@@ -82,7 +82,7 @@ assert.equal(shipped.split('function showPhoto(memory,index,manual=false').lengt
 assert.ok(shipped.includes('function taleraInlineSync(')&&
   shipped.includes('function taleraInlineVoiceEnded('),
   'Original narrator and cue engine remain present and separate');
-const shippedScripts=[...shipped.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(x=>x[1]);
+const shippedScripts=[...shipped.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(x=>x[1]);
 let compiled=0;
 for(const content of shippedScripts){
  const js=content.trim();

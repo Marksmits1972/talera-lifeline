@@ -1,0 +1,54 @@
+name: TALERA clean one-memory test deployment through GitHub
+on:
+  push:
+    branches: [feature/clean-one-memory-flow-20261105]
+    paths:
+      - r20-dev/one-flow/one-flow.worker.mjs
+      - r20-dev/one-flow/one-flow.worker.test.mjs
+      - r20-dev/one-flow/browser-smoke.mjs
+      - r20-dev/one-flow/check-v9.mjs
+      - r20-dev/one-flow/wrangler.jsonc
+      - .github/workflows/talera-clean-flow-staging.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Wrangler
+        run: npm ci
+      - name: Single-memory timing regressions
+        run: node --test test/one-memory-flow.test.mjs
+      - name: Native V9 tail adapter regressions
+        run: node --test r20-dev/one-flow/one-flow.worker.test.mjs
+      - name: Validate actual approved V9 source, no changes to recorder
+        run: node r20-dev/one-flow/check-v9.mjs
+      - name: Require existing GitHub deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'No GitHub secret: deployment skipped'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'No GitHub account ID: deployment skipped'; exit 1; }
+      - name: Deploy NEW staging worker only, never V9
+        run: |
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd '[:alnum:]_-')"
+          npx wrangler deploy --config r20-dev/one-flow/wrangler.jsonc
+      - name: Verify live staging routes after propagation
+        run: node r20-dev/one-flow/verify-stage.mjs
+      - name: Real mobile-sized browser playback with synthetic voice, photos and video
+        run: |
+          BROWSER=$(command -v google-chrome-stable || command -v google-chrome || command -v chromium)
+          CDP_DIR="$RUNNER_TEMP/talera-clean-flow-$GITHUB_RUN_ATTEMPT-$$"
+          mkdir -p "$CDP_DIR"
+          "$BROWSER" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --autoplay-policy=user-gesture-required --remote-allow-origins='*' --remote-debugging-port=0 --user-data-dir="$CDP_DIR" about:blank >/tmp/talera-clean-flow-browser.log 2>&1 &
+          CHROME_PID=$!
+          trap 'kill "$CHROME_PID" 2>/dev/null || true' EXIT
+          TALERA_CDP_DIR="$CDP_DIR" node r20-dev/one-flow/browser-smoke.mjs || { tail -n 60 /tmp/talera-clean-flow-browser.log; exit 1; }

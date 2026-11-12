@@ -1,0 +1,9 @@
+{
+  "name": "talera-one-memory-clean-test-20261105",
+  "main": "./one-flow.worker.mjs",
+  "compatibility_date": "2026-11-05",
+  "workers_dev": true,
+  "services": [
+    {"binding":"STYLE_BASE","service":"talera-v9-stille-luxe-stijlstaging-20261104"}
+  ]
+}

@@ -1,0 +1,33 @@
+name: TALERA clean-flow protected V9 read-only probe
+on:
+  push:
+    branches: [feature/clean-one-memory-flow-20261105]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: New pure logic regression tests
+        run: node --test test/one-memory-flow.test.mjs
+      - name: Test native V9 adapter without replacing the recorder
+        run: node --test r20-dev/one-flow/one-flow.worker.test.mjs
+      - name: Compile patch on actual approved V9 code and prove other pages byte-identical
+        run: node r20-dev/one-flow/check-v9.mjs
+      - name: Inspect native V9 video startup and listening callbacks
+        run: node r20-dev/one-flow/inspect-playback-v9.mjs
+      - name: Read-only inspect swipe performance and narration event handlers
+        run: node r20-dev/one-flow/inspect-swipe-v9.mjs
+      - name: Check deployment readiness through GitHub (never print tokens)
+        env:
+          DEPLOY_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DEPLOY_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$DEPLOY_API_TOKEN" ] && [ -n "$DEPLOY_ACCOUNT_ID" ]; then
+            echo 'GITHUB_DEPLOYMENT_SECRETS=available'
+          else
+            echo 'GITHUB_DEPLOYMENT_SECRETS=unavailable'
+          fi

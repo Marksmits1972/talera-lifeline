@@ -621,8 +621,8 @@ function filterOwnTopicPresentation(html){
 function hideDuplicateReadingSheetActions(html){
  const necessary=[
   'id="memoryCaption"',
-  'id="talera-v21-pencil"',
-  'id="talera-v18-story-actions"',
+  'talera-v21-pencil',
+  'talera-v18-story-actions',
   'talera-v5-editor-pencil',
   'talera-v26-reading',
   'talera-v18-reading',

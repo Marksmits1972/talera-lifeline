@@ -147,7 +147,7 @@ assert.ok(timeouts.some(x=>x.ms===4000),
   'Only AFTER voice ends may unused photos use the post-voice clock');
 assert.equal(fakeDots[3].classList.active,true,'Unshown-photo phase moves orange dot');
 const s1=timeouts.at(-1);s1.fn(); // Skip synthetic unused photo.
-await Promise.resolve();await Promise.resolve();
+await new Promise(resolve=>setImmediate(resolve)); // Let original ID Blob resolve.
 const videos=made.filter(x=>x.tag==='video');
 assert.ok(videos.length>=2,'Original soundtrack round must use a new video element');
 assert.equal(videos.at(-1).muted,false,
@@ -176,7 +176,7 @@ assert.ok(permission.removed,'Permission prompt should disappear after the gestu
 offAudio.onended();
 await Promise.resolve();await Promise.resolve();
 const photoTimer=timeouts.at(-1);photoTimer.fn();
-await Promise.resolve();await Promise.resolve();
+await new Promise(resolve=>setImmediate(resolve)); // Let original ID Blob resolve.
 assert.equal(made.filter(x=>x.tag==='video').at(-1).muted,false,
   'After a Listen gesture, original video must also become audible');
 motor.stop();

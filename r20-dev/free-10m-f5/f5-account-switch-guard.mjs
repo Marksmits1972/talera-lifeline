@@ -74,3 +74,33 @@ export function connectExistingStorageBackup(source){
  if(original!==source)throw Error('STORAGE_BACKUP_MENU_PATCH_NOT_MINIMAL');
  return changed;
 }
+
+
+// Remove only the unconfigured Accessibility information entry and its dead
+// route. Actual iPhone/OS accessibility support, CSS, media and input handling
+// are left untouched. Fail closed if the approved public menu source drifts.
+export function removeInactiveAccessibilityMenu(source){
+ if(typeof source!=='string'||source.split('accessibility').length-1!==4)
+   throw Error('ACCESSIBILITY_MENU_SOURCE_DRIFT');
+ const edits=[
+  ["language:'Taal',accessibility:'Toegankelijkheid',display:'Weergave'",
+   "language:'Taal',display:'Weergave'"],
+  ["'Taal, toegankelijkheid en weergave'","'Taal en weergave'"],
+  ["  option('accessibility','Aa','Toegankelijkheid','Tekstgrootte, contrast en bediening')+\n",""],
+  [" case 'accessibility':\n  html=info('Leesbaarheid en bediening','TALERA volgt op dit moment de toegankelijkheidsvoorkeuren van je apparaat waar dat mogelijk is.')+\n   '<p class=\"meta\">Er worden hier nog geen aparte instellingen bewaard.</p>';break;\n",""],
+  ["'language','accessibility','display','storage'",
+   "'language','display','storage'"]
+ ];
+ let updated=source;
+ for(const [before,after] of edits){
+   if(updated.split(before).length!==2||
+      (after&&updated.includes(after)))
+     throw Error('ACCESSIBILITY_MENU_SOURCE_DRIFT');
+   updated=updated.replace(before,after);
+ }
+ if(updated.includes('accessibility')||updated.includes("case 'accessibility':")||
+    !updated.includes("option('display'")||
+    !updated.includes("option('storage'"))
+   throw Error('ACCESSIBILITY_REMOVAL_SCOPE_DRIFT');
+ return updated;
+}

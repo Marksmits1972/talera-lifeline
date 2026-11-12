@@ -632,7 +632,7 @@ function hideDuplicateReadingSheetActions(html){
   assert.ok(html.includes(marker),'APPROVED_READING_ACTION_MARKER_MISSING: '+marker);
  const css='<style id="talera-free-reading-actions-only-dedup">'+
   'body.talera-v18-reading #memoryCaption #talera-v18-story-actions,'+
-  '.memory-space.talera-v26-reading #memoryCaption #talera-v18-story-actions,'+
+  'body:not(.talera-recipient-presentation) .memory-space.talera-v26-reading #memoryCaption #talera-v18-story-actions,'+
   'body.talera-v18-reading #memoryCaption #talera-v21-pencil,'+
   '.memory-space.talera-v26-reading #memoryCaption #talera-v21-pencil,'+
   'body.talera-v18-reading #talera-v5-editor-pencil{'+

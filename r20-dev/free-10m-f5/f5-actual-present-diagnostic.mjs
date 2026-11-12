@@ -19,3 +19,14 @@ for(const [name,marker,bytes] of markers){
   name,found:at>=0,offset:at,length:page.length,sample
  }));
 }
+
+// Read-only source audit of built-in demonstration memories. This diagnostic
+// prints only anonymous, build-time reference HTML, never personal IDB content.
+for (const marker of ['const MEMORIES','let MEMORIES','MEMORIES.push','1001','1450',
+ 'sampleRows(','generate','demo','examples','500']){
+ const at=page.indexOf(marker),hits=page.split(marker).length-1;
+ console.log('TALERA_REFERENCE_GENERATOR_SCAN',JSON.stringify({
+  marker,hits,offset:at,
+  source:at<0?'':page.slice(Math.max(0,at-300),at+1900)
+ }));
+}

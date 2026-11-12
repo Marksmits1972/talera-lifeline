@@ -36,7 +36,24 @@ function taleraIndependentNarrationPlan(memory){
 }
 function taleraCreateIndependentNarrator({stage,store,runtime}){
   let active=null,generation=0;
-  const hasSound=()=>Boolean(window.__taleraAudioControls?.isEnabled?.());
+  // Presentation owns none of our audio state. The app-wide listening setting
+  // may be absent during an iPhone cold start; absence is NOT 'muted'.
+  // Explicit user OFF is respected until they tap the existing Listen button.
+  const hasSound=s=>s?.soundOverride===true||
+    window.__taleraAudioControls?.isEnabled?.()!==false;
+  function setAudible(media,enabled){
+    media.muted=!enabled;media.defaultMuted=!enabled;media.volume=1;
+    if(enabled)media.removeAttribute('muted');
+    else media.setAttribute('muted','');
+  }
+  function highlightNarratorDot(s,index){
+    if(!isCurrent(s)||!Number.isInteger(index)||index<0)return;
+    // Only the existing dots DOM is reused; no ordinary motor method,
+    // timer, callback or presentation state is invoked.
+    const dots=document.querySelectorAll?.('.talera-photo-dot')||[];
+    if(dots.length!==s.plan.frames.length)return;
+    dots.forEach((dot,i)=>dot.classList.toggle('active',i===index));
+  }
   const isCurrent=s=>active===s&&s.generation===generation&&
     runtime.currentMemory()?.id===s.id;
   function clearButton(s){
@@ -47,20 +64,32 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     const button=document.createElement('button');
     button.type='button';button.textContent='▶ Beluister';
     button.className='talera-v61-audio-permission-hint';
-    button.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:25;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:auto;cursor:pointer';
+    button.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:65;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:auto;cursor:pointer';
     button.onclick=event=>{
       event.preventDefault();event.stopPropagation();
       if(!isCurrent(s))return;
-      media.muted=!hasSound();
-      Promise.resolve(media.play()).then(()=>clearButton(s)).catch(()=>{});
+      s.soundOverride=true;
+      setAudible(media,true);
+      // A currently playing, muted track needs unmuting, not restarting.
+      if(!media.paused){clearButton(s);return}
+      Promise.resolve(media.play()).then(()=>clearButton(s))
+        .catch(error=>{if(error?.name!=='NotAllowedError')
+          console.warn('TALERA vertelgeluid kan niet starten',error)});
     };
-    s.layer.appendChild(button);s.button=button;
+    s.host.appendChild(button);s.button=button;
   }
   function attemptPlay(s,media){
     if(!isCurrent(s)||!media)return;
-    media.muted=!hasSound();
-    try{Promise.resolve(media.play()).then(()=>clearButton(s))
-      .catch(error=>{if(error?.name==='NotAllowedError')offerPlay(s,media)})}
+    const enabled=hasSound(s);
+    setAudible(media,enabled);
+    if(!enabled)offerPlay(s,media);
+    try{Promise.resolve(media.play()).then(()=>{
+      if(enabled)clearButton(s);
+    }).catch(error=>{
+      if(error?.name==='NotAllowedError')offerPlay(s,media);
+      else if(error?.name!=='AbortError')
+        console.warn('TALERA vertelgeluid niet gestart',error);
+    })}
     catch(error){if(error?.name==='NotAllowedError')offerPlay(s,media)}
   }
   function removeVideo(s){
@@ -166,6 +195,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     if(!frame)return;
     if(s.currentId!==frame.key){
       s.currentId=frame.key;
+      highlightNarratorDot(s,cue.index);
       if(frame.kind==='photo')displayPhoto(s,frame);
       else if(frame.kind==='video')syncSilentVideo(s,cue,frame,audioMs);
     }else if(frame.kind==='video')syncSilentVideo(s,cue,frame,audioMs);
@@ -181,6 +211,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
   async function playOriginalVideo(s,frame,done){
     if(!isCurrent(s))return;
     removeVideo(s);clearButton(s);
+    highlightNarratorDot(s,s.plan.frames.findIndex(x=>x.key===frame.key));
     s.photo.hidden=true;
     const video=document.createElement('video');
     video.className='talera-v61-inline-video talera-independent-original-video';
@@ -208,6 +239,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       if(!isCurrent(s))return;
       if(s.postIndex<s.plan.remainingPhotos.length){
         const frame=s.plan.remainingPhotos[s.postIndex++];
+        highlightNarratorDot(s,s.plan.frames.findIndex(x=>x.key===frame.key));
         displayPhoto(s,frame);
         s.postTimer=setTimeout(next,4000);
         return;
@@ -244,6 +276,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     const s={id,generation:run,plan,layer,photo,host,
       hostPosition:oldPosition,hostPositionChanged:changePosition,
       phase:'loading',audio:null,voiceUrl:null,video:null,videoId:'',videoUrl:null,
+      soundOverride:false,
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
       visibilityChange:null};
@@ -264,7 +297,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     audio.preload='auto';audio.playsInline=true;audio.style.display='none';
     layer.appendChild(audio);s.audio=audio;
     s.voiceUrl=URL.createObjectURL(blob);audio.src=s.voiceUrl;
-    audio.muted=!hasSound();audio.volume=1;
+    setAudible(audio,hasSound(s));
     s.phase='voice';
     audio.onplay=()=>{if(!isCurrent(s)||s.phase!=='voice')return;
       if(s.timer)clearInterval(s.timer);

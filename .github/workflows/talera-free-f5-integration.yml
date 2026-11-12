@@ -437,3 +437,5 @@ jobs:
       - name: Restore previous QA Worker if publish or postpublish verification fails
         if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous approved TALERA QA after narrator rollout failure" --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
+
+# Product-owner instruction 2026-11-12: integrate into this SAME F5 acceptance PWA; do not merge or register as official successor.

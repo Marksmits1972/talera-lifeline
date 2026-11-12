@@ -57,16 +57,22 @@ for(let i=0;i<scriptBodies.length;i++){
  validated++;
 }
 assert.ok(validated>2);
-// These 450 historical examples are synthetic, not account-owned media.
-// Their preview is permitted only when the decoded image belongs to that
-// exact example, never a recycled neighboring wheel tile or another story.
+// The owner has ordered removal of all 500 built-in presentation memories.
+// The ORIGINAL anonymous baseline stays available solely for existing
+// animation/voice source comparison; shipped code must have no sample records.
 const {referencePages}=await import('./generated/public-template-map.mjs');
 const actualPresent=referencePages['/present'];
 assert.match(actualPresent||'',/^\/__talera_free\/f5references\/[a-f0-9]{64}\.html$/);
 const shipped=readFileSync('r20-dev/free-10m-delivery/public'+actualPresent,'utf8');
-assert.ok(shipped.includes('Array.from({length:450},(_,i)=>{')&&
-  shipped.includes("const seed='talera-500-fotoband-'+String(i+1).padStart(3,'0')"),
-  'Preserve the existing 450 unique source URLs, dates and sample IDs');
+assert.ok(shipped.includes('const MEMORIES = [];') &&
+  !shipped.includes('TALERA_STRESS_MEMORIES') &&
+  !shipped.includes('talera-500-fotoband-') &&
+  !shipped.includes('id:50, at:') &&
+  !shipped.includes('const MEMORIES = ['),
+  'All 50 original and 450 generated example memories must be absent from the shipped presentation');
+assert.ok(shipped.includes('runtime.registerMemories(memories)') &&
+  shipped.includes('const memories=rows.map(toMemory).filter(Boolean)'),
+  'Existing per-account IndexedDB memories must still populate the same presentation');
 assert.ok(shipped.includes('let ownSerial=0,ordinaryVideo=null') &&
   shipped.includes('runtime.currentMemory()?.id!==memory.id') &&
   shipped.includes('memory.photos[next]!==src') &&

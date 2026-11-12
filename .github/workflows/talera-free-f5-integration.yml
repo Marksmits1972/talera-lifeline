@@ -2,7 +2,7 @@ name: TALERA Free F5 - isolated single-origin integration tests
 
 on:
   push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only]
+    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
@@ -35,10 +35,17 @@ jobs:
         run: node r20-dev/free-10m-delivery/build.mjs
       - name: Package only public PWA references and stable external JavaScript
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify independent voice timeline, original media IDs, separate player sources and post-video soundtrack
+        run: node r20-dev/free-10m-f5/f5-independent-narrator.test.mjs
       - name: Verify source-exact 11 November backup-only connection
         run: |
           git merge-base --is-ancestor 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD
+          if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ]; then
+            # Only this feature changes f5-worker's embedded-player routing.
+            git diff --exit-code 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD -- r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
+          else
           git diff --exit-code 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
+          fi
           node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
           node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
       - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
@@ -54,6 +61,8 @@ jobs:
         # Exact video-picker source inspected once before the narrow F5 hotfix
       - name: Verify F5 Worker and tests parse
         run: |
+          node --check r20-dev/free-10m-f5/f5-independent-narrator.browser.js
+          node --check r20-dev/free-10m-f5/f5-independent-narrator.test.mjs
           node --check r20-dev/free-10m-f5/f5-worker.mjs
           node --check r20-dev/free-10m-f5/f5-local-test.mjs
           node --check r20-dev/free-10m-f5/f5-public-assets.mjs
@@ -87,7 +96,7 @@ jobs:
   deploy_approved_backup:
     name: Publish checked example-photo fix to the SAME TALERA QA origin
     needs: f5_isolated_local
-    if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'qa-deploy-TALERA-free-photo-fallback-20261112' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-approved-20261111-backup-only' && github.event.head_commit.message == 'qa-deploy-TALERA-free-photo-fallback-20261112' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     env:

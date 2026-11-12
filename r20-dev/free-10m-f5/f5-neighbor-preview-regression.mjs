@@ -67,9 +67,10 @@ const shipped=readFileSync('r20-dev/free-10m-delivery/public'+actualPresent,'utf
 assert.ok(shipped.includes('Array.from({length:450},(_,i)=>{')&&
   shipped.includes("const seed='talera-500-fotoband-'+String(i+1).padStart(3,'0')"),
   'Preserve the existing 450 unique source URLs, dates and sample IDs');
-assert.ok(shipped.includes('let ownSerial=0;') &&
+assert.ok(shipped.includes('let ownSerial=0,ordinaryVideo=null') &&
   shipped.includes('runtime.currentMemory()?.id!==memory.id') &&
-  shipped.includes('memory.photos[next]!==src'),
+  shipped.includes('memory.photos[next]!==src') &&
+  shipped.includes('window.__taleraOrdinarySelectPhoto='),
   'Single ordinary presentation controller must be bound to the selected memory ID');
 assert.ok(shipped.includes("memory.thumbnail=photos.find((_,i)=>frames[i]?.kind==='photo')"),
   'One own thumbnail comes from this memory’s first photo, not a seventh media item');
@@ -82,6 +83,20 @@ assert.ok(!shipped.includes('readyNeighbour?.currentSrc') &&
   'No own or sample thumbnail may borrow a different memory image');
 assert.equal(shipped.split('function showPhoto(memory,index,manual=false').length-1,1,
   'There must be only one ordinary photo selector');
+assert.ok(shipped.includes("if(!memory._zeroItems?.some(item=>item.kind==='audio')){") &&
+  shipped.includes('window.__taleraOrdinaryActivate?.(memory)'),
+  'Unvoiced memory must bypass original narrator before playing ordinary video');
+assert.ok(shipped.includes('function playOrdinaryVideo(memory,index)') &&
+  shipped.includes("window.TaleraMemories?.blob?.(key)"),
+  'Ordinary video must use the same original media store independently');
+const narratorMarkers=['function taleraInlineSync(s){','function taleraInlineVoiceEnded(s){',
+  'function taleraInlinePlayMedia(s,frame,muted,finished){'];
+for(const marker of narratorMarkers){
+  const i=raw.indexOf(marker);
+  assert.ok(i>=0,'Approved narrator marker missing');
+  assert.ok(shipped.includes(raw.slice(i,i+260)),
+    'Do not modify narrator functions during phase one: '+marker);
+}
 assert.ok(shipped.includes('function taleraInlineSync(')&&
   shipped.includes('function taleraInlineVoiceEnded('),
   'Original narrator and cue engine remain present and separate');

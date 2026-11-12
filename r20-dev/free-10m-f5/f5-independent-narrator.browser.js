@@ -209,7 +209,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       if(s.postIndex<s.plan.remainingPhotos.length){
         const frame=s.plan.remainingPhotos[s.postIndex++];
         displayPhoto(s,frame);
-        s.postTimer=setTimeout(next,2500);
+        s.postTimer=setTimeout(next,4000);
         return;
       }
       s.phase='originals';let i=0;

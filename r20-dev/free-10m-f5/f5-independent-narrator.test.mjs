@@ -79,7 +79,7 @@ class FakeElement{
  remove(){this.removed=true;if(this.parentElement)
   this.parentElement.children=this.parentElement.children.filter(x=>x!==this)}
  setAttribute(k,v){this[k]=v}
- removeAttribute(k){delete this[k]}
+ removeAttribute(k){if(k!=='muted')delete this[k]}
  load(){}
  pause(){this.paused=true;this.onpause?.()}
  play(){this.paused=false;this.onplay?.();return Promise.resolve()}
@@ -88,9 +88,13 @@ const host=new FakeElement('host');const stage=new FakeElement('stage');
 stage.parentElement=host;
 let current=memory.id;
 const bodyClasses=new Set();
+const fakeDots=Array.from({length:memory._zeroFrames.length},()=>({
+  active:false,classList:{toggle(name,on){assert.equal(name,'active');this.active=on}}
+}));
 const ctx={
  window:{__taleraAudioControls:{isEnabled:()=>true}},
  document:{createElement(tag){const el=new FakeElement(tag);made.push(el);return el},
+  querySelectorAll(selector){assert.equal(selector,'.talera-photo-dot');return fakeDots},
   body:{classList:{add(x){bodyClasses.add(x)},remove(x){bodyClasses.delete(x)}}},
   addEventListener(){},removeEventListener(){}},
  Blob:FakeBlob,console,
@@ -117,6 +121,8 @@ await Promise.resolve();await Promise.resolve();
 const audio=made.find(x=>x.tag==='audio');
 assert.ok(audio&&audio.src==='blob:independent-voice',
   'One original voice Blob must own the narrator clock');
+assert.equal(audio.muted,false,'Recorded voice MUST be audible when listening is on');
+assert.equal(fakeDots[0].classList.active,true,'First orange dot must be active at t=0');
 assert.ok(bodyClasses.has('talera-v61-narration-visual'));
 assert.ok(made.some(x=>x.tag==='img'&&x.src==='blob:photo-A'),
   'Narration must render media-ID A at t=0 without the presenter');
@@ -126,30 +132,70 @@ const silentVideo=made.find(x=>x.tag==='video');
 assert.ok(silentVideo&&silentVideo.muted&&silentVideo.controls===false,
   'Narrated preview must be silent');
 assert.ok(fetchedMedia.includes('video-C'));
+assert.equal(fakeDots[2].classList.active,true,'Orange video dot must follow voice cue');
+assert.equal(fakeDots[0].classList.active,false);
 audio.currentTime=21.1;audio.ontimeupdate();
 await Promise.resolve();await Promise.resolve();
 assert.ok(made.some(x=>x.tag==='img'&&x.src==='blob:photo-B'));
+assert.equal(fakeDots[1].classList.active,true,'Orange photo dot must follow voice cue');
 audio.currentTime=35.1;audio.ontimeupdate();
 await Promise.resolve();await Promise.resolve();
+assert.equal(fakeDots[2].classList.active,true,'Repeated video cue must update orange dot');
 audio.onended();
 await Promise.resolve();await Promise.resolve();
 assert.ok(timeouts.some(x=>x.ms===4000),
   'Only AFTER voice ends may unused photos use the post-voice clock');
+assert.equal(fakeDots[3].classList.active,true,'Unshown-photo phase moves orange dot');
 const s1=timeouts.at(-1);s1.fn(); // Skip synthetic unused photo.
 await Promise.resolve();await Promise.resolve();
 const videos=made.filter(x=>x.tag==='video');
 assert.ok(videos.length>=2,'Original soundtrack round must use a new video element');
-assert.ok(videos.at(-1).muted!==true,
+assert.equal(videos.at(-1).muted,false,
   'Original soundtrack must not inherit narrated preview mute');
+assert.equal(fakeDots[2].classList.active,true,'Original-video round selects correct dot');
 current='pwa:another-memory';motor.stop();
 assert.equal(bodyClasses.has('talera-v61-narration-visual'),false);
 assert.ok(host.children.every(x=>x.removed||!x.className?.includes('talera-independent-narrator-layer')));
 assert.ok(revoked.includes('blob:independent-voice'));
+
+// A persistent explicit listening OFF must not silently hide the remedy.
+// Existing '▶ Beluister' is a real native iPhone gesture and enables both
+// the voice AND the subsequent original video in this ONE narrated playback.
+current=memory.id;
+ctx.window.__taleraAudioControls.isEnabled=()=>false;
+await motor.open(memory);
+await Promise.resolve();await Promise.resolve();
+const offAudio=made.filter(x=>x.tag==='audio').at(-1);
+assert.equal(offAudio.muted,true,'Explicit user OFF remains respected');
+const permission=host.children.find(x=>x.textContent==='▶ Beluister'&&!x.removed);
+assert.ok(permission,'A muted narration must expose the existing Listen action');
+permission.onclick({preventDefault(){},stopPropagation(){}});
+await Promise.resolve();await Promise.resolve();
+assert.equal(offAudio.muted,false,'Listen tap must actually unmute the recording');
+assert.ok(permission.removed,'Permission prompt should disappear after the gesture');
+offAudio.onended();
+await Promise.resolve();await Promise.resolve();
+const photoTimer=timeouts.at(-1);photoTimer.fn();
+await Promise.resolve();await Promise.resolve();
+assert.equal(made.filter(x=>x.tag==='video').at(-1).muted,false,
+  'After a Listen gesture, original video must also become audible');
+motor.stop();
+
+// Missing UI control during iOS cold start must never silently mute voice.
+ctx.window.__taleraAudioControls=undefined;
+await motor.open(memory);
+await Promise.resolve();await Promise.resolve();
+const coldAudio=made.filter(x=>x.tag==='audio').at(-1);
+assert.equal(coldAudio.muted,false,
+  'Absent sound controller must mean audible, not silent default playback');
+motor.stop();
 console.log('TALERA_INDEPENDENT_NARRATOR_TEST_PASS',JSON.stringify({
  originalIdsUnchanged:true,repeatSwipesRetained:true,
  recorderAndPresentationSourcesDistinct:true,
  narrationNoPresentationFunctions:true,voiceClockDrivesCues:true,
  videoSilentDuringVoice:true,remainingPhotosAfterVoice:true,
- originalVideoAudioAfterVoice:true,isolatedCleanup:true,
+ originalVideoAudioAfterVoice:true,orangeDotsFollowAllCues:true,
+ explicitOffHasAudibleGesture:true,missingAudioControllerAudible:true,
+ isolatedCleanup:true,
  actualIphoneAccepted:false,productionChanged:false
 }));

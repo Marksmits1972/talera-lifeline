@@ -85,7 +85,7 @@ jobs:
           retention-days: 14
 
   deploy_approved_backup:
-    name: Publish only the approved settings cleanup to the SAME TALERA QA origin
+    name: Publish checked example-photo fix to the SAME TALERA QA origin
     needs: f5_isolated_local
     if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'qa-deploy-TALERA-free-photo-fallback-20261112' }}
     runs-on: ubuntu-24.04

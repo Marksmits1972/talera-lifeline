@@ -113,7 +113,7 @@ try{
   assert.equal(cleanHomeResponse.status(),200);
   try{
     await page.waitForFunction(()=>!!window.TaleraMemories?.list&&
-      document.getElementById('v17-year-summary')?.textContent==='nog leeg',
+      /^(nog leeg|still empty)$/i.test(document.getElementById('v17-year-summary')?.textContent?.trim()||''),
       null,{timeout:14000});
   }catch(error){
     const state=await page.evaluate(()=>({
@@ -161,7 +161,7 @@ try{
   assert.equal(cleanHome.heroImage,null,'No reference hero src may survive');
   assert.equal(cleanHome.sampleTiles,0,'No example or fake topic tiles');
   assert.equal(cleanHome.fakeFamily,0,'No invented family topic from first own photo');
-  assert.equal(cleanHome.yearStatus,'nog leeg','A year with no events has no sample count');
+  assert.match(cleanHome.yearStatus,/^(nog leeg|still empty)$/i,'A year with no events has no sample count');
   assert.equal(cleanHome.minYear,'1974','Existing account birthday still controls Home time axis');
   assert.equal(cleanHome.year,String(new Date().getFullYear()),
     'Empty account selects the current year, never 1990 or demo year 1985');

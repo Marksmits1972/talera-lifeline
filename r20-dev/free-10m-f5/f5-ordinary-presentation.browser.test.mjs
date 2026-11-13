@@ -242,6 +242,42 @@ try{
     },files);
     return row.id;
   });
+  // The exact SAME Home must refill from a real account-local saved memory:
+  // a clean default cannot hide people's real titles, years or media.
+  const realHomeResponse=await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+  assert.equal(realHomeResponse.status(),200);
+  await page.waitForFunction(()=>document.getElementById('heroTitle')?.textContent.trim()
+    ==='Original photo roll',null,{timeout:18000});
+  const filledHome=await page.evaluate(async id=>{
+    const local=await window.TaleraMemories.list();
+    const hero=document.getElementById('heroCaption');
+    const picture=document.getElementById('heroImage');
+    return {
+      saved:local.map(x=>x.id),
+      heroTitle:document.getElementById('heroTitle')?.textContent.trim(),
+      heroVisible:getComputedStyle(hero).display!=='none',
+      heroUrl:hero.dataset.presentHref,
+      heroPictureReady:picture.classList.contains('ready'),
+      selectedYear:document.getElementById('v17-selected-year')?.textContent.trim(),
+      yearStatus:document.getElementById('v17-year-summary')?.textContent.trim(),
+      preview:document.getElementById('v17-year-preview')?.textContent.trim(),
+      demos:window.__taleraReferenceMemories?.length,
+      fakeTiles:document.querySelectorAll('.talera-topic-example').length
+    };
+  },plain);
+  assert.ok(filledHome.saved.includes(plain),'Original owner memory survived Home cleanup');
+  assert.equal(filledHome.heroTitle,'Original photo roll');
+  assert.equal(filledHome.heroVisible,true);
+  assert.ok(filledHome.heroUrl.includes(plain),'Hero must open the SAME owner memory');
+  assert.equal(filledHome.heroPictureReady,true,'Original photo must still load on Home');
+  assert.equal(filledHome.selectedYear,'2026');
+  assert.match(filledHome.yearStatus,/1/,'One real memory is counted on year slider');
+  assert.match(filledHome.preview,/Original photo roll/,'Real title appears on its original year');
+  assert.equal(filledHome.demos,0);
+  assert.equal(filledHome.fakeTiles,0);
+  console.log('TALERA_F5_HOME_OWNER_RECORDS_STILL_WORK_PASS',
+    JSON.stringify({saved:1,ownHero:true,ownPhoto:true,ownerYear:true,
+      exampleCount:0,originalPwa:true,iphoneAccepted:false}));
   await load(page,plain,3);
   // Native timeline regression: with only ONE real local memory near today,
   // releasing a finger drag must preserve the finger-selected historical year.

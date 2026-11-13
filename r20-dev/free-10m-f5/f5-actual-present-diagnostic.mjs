@@ -29,3 +29,20 @@ for(const [name,marker,bytes] of markers){
   name,found:at>=0,offset:at,length:page.length,sample
  }));
 }
+
+const wheelMarkers=[
+ ['wheelController','const N=11,pages=[],cache=new Map()',20500],
+ ['wheelPointerDown',"story.addEventListener('pointerdown'",10200],
+ ['wheelPointerMove',"story.addEventListener('pointermove'",7200],
+ ['wheelPointerUp',"story.addEventListener('pointerup'",5900],
+ ['wheelGestureBlock',"talera-v61-narration-visual",1600],
+ ['wheelRender',"function beginLanding(",2500],
+ ['wheelTarget',"id=\"memoryStoryScroll\"",1600],
+ ['wheelSource',"function activate(memory)",3200]
+];
+for(const [name,needle,bytes] of wheelMarkers){
+ const at=page.indexOf(needle);
+ console.log('TALERA_WHEEL_GESTURE_SOURCE',JSON.stringify({
+   name,found:at>=0,offset:at,sample:at<0?'':page.slice(at,at+bytes)
+ }));
+}

@@ -795,6 +795,17 @@ try{
   assert.deepEqual([firstMediaCover.firstKind,firstMediaCover.secondKind],
     ['video','photo']);
   assert.ok(firstMediaCover.sameFirst&&firstMediaCover.distinctSecond);
+  const persistedVideoPoster=await page.evaluate(async id=>{
+    const m=window.__taleraTimelineRuntime.currentMemory();
+    const first=m._zeroItems.find(it=>it.kind==='video');
+    const blob=await window.TaleraMemories.blob(first.key+':phone-v1');
+    return {type:blob?.type||null,bytes:blob?.size||0};
+  },videoFirst.id);
+  assert.ok(persistedVideoPoster.bytes>100&&
+    String(persistedVideoPoster.type).startsWith('image/'),
+    'First video sidecar must already exist in original account-scoped IDB: '+
+      JSON.stringify(persistedVideoPoster));
+
   assert.ok(firstMediaCover.pixel[2]>firstMediaCover.pixel[0]*1.4&&
     firstMediaCover.pixel[2]>firstMediaCover.pixel[1]*1.4,
     'First-media VIDEO cover is not its BLUE first frame: '+
@@ -808,14 +819,34 @@ try{
   await page.mouse.move(stripBox.x+stripBox.width*.18,stripY);
   await page.mouse.down();
   await page.mouse.move(stripBox.x+stripBox.width*.62,stripY,{steps:10});
-  await page.waitForFunction(id=>{
-    const owner='pwa:'+id;
-    const mem=window.__taleraPhotoBook?.list()?.find(m=>m.storyId===id);
-    const tile=[...document.querySelectorAll('#photoStage .talera-wheel-page')]
-      .find(el=>el.dataset.owner===owner);
-    return !!tile&&tile.dataset.url===mem?.thumbnail&&
-      !!tile.querySelector('img.example-photo')?.naturalWidth;
-  },videoFirst.id,{timeout:12000});
+  try{
+    await page.waitForFunction(id=>{
+      const owner='pwa:'+id;
+      const mem=window.__taleraPhotoBook?.list()?.find(m=>m.storyId===id);
+      const tile=[...document.querySelectorAll('#photoStage .talera-wheel-page')]
+        .find(el=>el.dataset.owner===owner);
+      return !!tile&&tile.dataset.url===mem?.thumbnail&&
+        !!tile.querySelector('img.example-photo')?.naturalWidth;
+    },videoFirst.id,{timeout:12000});
+  }catch(error){
+    const diag=await page.evaluate(id=>{
+      const list=window.__taleraPhotoBook?.list()||[];
+      const target=list.find(m=>m.storyId===id);
+      return {selected:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+        band:window.__taleraIntegratedBand?.getState?.(),
+        target:target?{id:target.id,thumbnail:target.thumbnail,
+          previewImage:target.previewImage,photos:target.photos,
+          loading:target._photoLoading}:null,
+        wheels:[...document.querySelectorAll('#photoStage .talera-wheel-page')]
+          .map(el=>({owner:el.dataset.owner,url:el.dataset.url,
+            image:el.querySelector('img.example-photo')?.src,
+            natural:el.querySelector('img.example-photo')?.naturalWidth,
+            visible:getComputedStyle(el).visibility}))
+          .filter(x=>x.owner||x.url).slice(0,12)};
+    },videoFirst.id);
+    await page.mouse.up();
+    throw Error('FIRST_VIDEO_WHEEL_NOT_READY '+JSON.stringify(diag)+' '+error);
+  }
   const duringVideoFirstSwipe=await page.evaluate(id=>{
     const book=window.__taleraPhotoBook;
     const mem=book.list().find(m=>m.storyId===id);

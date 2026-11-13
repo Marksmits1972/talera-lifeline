@@ -490,3 +490,4 @@ jobs:
 # Same existing TALERA QA PWA: restore native finger-release date; keep exact age-54 scale.
 # Same original F5 acceptance origin: event IDs and timestamps, no new stores or players.
 # Existing F5 acceptance origin: real timeline motion stops old player and synchronizes the original photo wheel.
+# Same original TALERA Free origin: remove bundled example catalog and static pretend stories, preserve all private stores.

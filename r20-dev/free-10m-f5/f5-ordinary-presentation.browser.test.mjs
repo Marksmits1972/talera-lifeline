@@ -997,6 +997,94 @@ try{
     JSON.stringify({sameDayDistinctHours:true,noInterpolatedMemories:true,
       independentNativeRuler:true,noNewMediaOrDatabase:true,iphoneAccepted:false}));
 
+  // Timeline is the SAME controller as the photo book. Moving it while an
+  // original narrated story plays must immediately stop the voice/video and
+  // expose the original wheel at the nearest stored date. No separate app.
+  await load(page,narrated.id,4);
+  await page.waitForFunction(()=>{
+    const voice=document.querySelector('.talera-independent-narrator-layer audio');
+    return !!voice&&!voice.paused&&voice.currentTime>.05;
+  },null,{timeout:15000});
+  const activeNarratedId=await page.evaluate(()=>
+    window.__taleraTimelineRuntime.currentMemory()?.storyId);
+  assert.equal(activeNarratedId,narrated.id);
+  const liveSurface=await page.locator('#surface').boundingBox();
+  assert.ok(liveSurface?.width>150);
+  const touchY=liveSurface.y+liveSurface.height*.38;
+  const timeBefore=await page.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
+  await page.mouse.move(liveSurface.x+liveSurface.width*.17,touchY);
+  await page.mouse.down();
+  const stillOnTouch=await page.evaluate(()=>({
+    voice:!!document.querySelector('.talera-independent-narrator-layer audio'),
+    showing:!!document.querySelector('.talera-independent-narrator-layer')
+  }));
+  assert.equal(stillOnTouch.voice,true,'Touch alone must not stop existing narration');
+  await page.mouse.move(liveSurface.x+liveSurface.width*.83,touchY,{steps:18});
+  const navigation=await page.evaluate(()=>{
+    const runtime=window.__taleraTimelineRuntime;
+    const band=window.__taleraIntegratedBand.getState();
+    const wheel=document.querySelector('#photoStage .talera-wheel-strip');
+    return {
+      center:runtime.centerMs(),tracking:band.timelineTracking,
+      photoIndex:band.p,photos:window.__taleraPhotoBook.list().length,
+      wheelVisible:wheel?.classList.contains('is-visible'),
+      layer:!!document.querySelector('.talera-independent-narrator-layer'),
+      voice:!!document.querySelector('.talera-independent-narrator-layer audio'),
+      originalVideo:!!document.querySelector('.talera-independent-narrator-video'),
+      focusedDate:document.getElementById('focusText')?.textContent
+    };
+  });
+  assert.ok(navigation.center<timeBefore-4*365*86400000,
+    'Timeline must keep original decade-swipe navigation');
+  assert.equal(navigation.tracking,true);
+  assert.equal(navigation.wheelVisible,true,
+    'Existing eleven-image strip must follow a time swipe while held');
+  assert.equal(navigation.layer,false,
+    'Timeline movement MUST stop and remove the playing narrator immediately: '+
+      JSON.stringify(navigation));
+  assert.ok(Number.isInteger(navigation.photoIndex),
+    'Timeline must select the nearest REAL memory, not intermediate photo');
+  await page.mouse.up();
+  await page.waitForFunction(id=>window.__taleraTimelineRuntime.currentMemory()?.storyId===id,
+    exactStories[1],{timeout:12000});
+  const settled=await page.evaluate(()=>{
+    const m=window.__taleraTimelineRuntime.currentMemory();
+    return {story:m?.storyId,date:m?.ms,
+      narrator:!!document.querySelector('.talera-independent-narrator-layer'),
+      currentAxis:window.__taleraTimelineRuntime.centerMs(),
+      originalVideo:!!document.querySelector('.talera-independent-narrator-video')};
+  });
+  assert.equal(settled.narrator,false);
+  assert.equal(settled.story,exactStories[1]);
+  assert.ok(settled.currentAxis<timeBefore-4*365*86400000,
+    'Photo selection must not rewrite finger-selected timeline date');
+  console.log('TALERA_TIMELINE_NAVIGATION_DISMISSES_NARRATOR_AND_FOLLOWS_REAL_PHOTOS_PASS',
+    JSON.stringify({existingPhotoWheel:true,narrationStopped:true,
+      eventDateKept:true,speedScaleIntact:true,iphoneAccepted:false}));
+
+  // A non-narrated ORIGINAL video has the same ownership rule: movement of
+  // the time axis stops the video instead of leaving a competing presentation.
+  await load(page,mixed,3);
+  await page.evaluate(()=>window.__taleraV31SelectPhoto?.(
+    window.__taleraTimelineRuntime.currentMemory().id,2,true));
+  await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),
+    null,{timeout:12000});
+  const videoSurface=await page.locator('#surface').boundingBox();
+  const videoY=videoSurface.y+videoSurface.height*.38;
+  await page.mouse.move(videoSurface.x+videoSurface.width*.2,videoY);
+  await page.mouse.down();
+  await page.mouse.move(videoSurface.x+videoSurface.width*.8,videoY,{steps:12});
+  const ordinaryWhileMoving=await page.evaluate(()=>({
+    originalVideo:!!document.querySelector('video.talera-v61-inline-video'),
+    wheel:document.querySelector('#photoStage .talera-wheel-strip')?.classList.contains('is-visible')
+  }));
+  await page.mouse.up();
+  assert.equal(ordinaryWhileMoving.originalVideo,false,
+    'Timeline movement must stop the original ordinary video player');
+  assert.equal(ordinaryWhileMoving.wheel,true);
+  console.log('TALERA_TIMELINE_NAVIGATION_STOPS_ORDINARY_VIDEO_PASS',
+    JSON.stringify({originalVideoStopped:true,noNewPlayer:true,iphoneAccepted:false}));
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

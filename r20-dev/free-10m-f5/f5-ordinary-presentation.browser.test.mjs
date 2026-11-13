@@ -524,16 +524,26 @@ try{
   await page.waitForFunction(()=>!!document.querySelector(
     '.talera-independent-narrator-layer video.talera-independent-original-video'),
     null,{timeout:16000});
+
+  await page.waitForFunction(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer?.querySelector('video.talera-independent-original-video');
+    const sound=layer?.querySelector('audio');
+    return video&&sound&&sound.currentSrc===video.currentSrc&&
+      !sound.paused&&!sound.muted&&sound.currentTime>.02;
+  },null,{timeout:12000});
   const independentVideo=await page.evaluate(()=>{
-    const video=document.querySelector(
-      '.talera-independent-narrator-layer video.talera-independent-original-video');
-    return {muted:video?.muted,defaultMuted:video?.defaultMuted,
-      volume:video?.volume,hasSource:Boolean(video?.currentSrc||video?.src)};
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer.querySelector('video.talera-independent-original-video');
+    const sound=layer.querySelector('audio');
+    return {pictureMuted:video?.muted,soundMuted:sound?.muted,
+      soundPlaying:!!sound&&!sound.paused&&sound.currentTime>0,
+      volume:sound?.volume,sameSource:sound?.currentSrc===video?.currentSrc};
   });
-  assert.equal(independentVideo.muted,false,
-    'Final original video audio must be owned by narration, not presenter settings');
-  assert.equal(independentVideo.defaultMuted,false);
-  assert.ok(independentVideo.volume>0&&independentVideo.hasSource);
+  assert.equal(independentVideo.pictureMuted,true);
+  assert.equal(independentVideo.soundMuted,false);
+  assert.equal(independentVideo.soundPlaying,true);
+  assert.ok(independentVideo.volume>0&&independentVideo.sameSource);
   await page.evaluate(()=>localStorage.setItem('talera-v61-listening-intent-r8','on'));
   await load(page,plain,3);
   assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0);

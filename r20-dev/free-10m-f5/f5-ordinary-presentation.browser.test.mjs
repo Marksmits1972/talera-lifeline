@@ -561,10 +561,19 @@ try{
     const audio=document.querySelector('.talera-independent-narrator-layer audio');
     return audio&&!audio.paused&&audio.currentTime>.06;
   },null,{timeout:13000});
+  // Seek into the already-known video cue: the precise reported slowdown
+  // happens while the narrator's video is actively decoding.
   await page.evaluate(()=>{
-    window.__taleraSwipeVoiceToStop=
-      document.querySelector('.talera-independent-narrator-layer audio');
+    const voice=document.querySelector('.talera-independent-narrator-layer audio');
+    window.__taleraSwipeVoiceToStop=voice;
+    voice.currentTime=1.85;voice.dispatchEvent(new Event('timeupdate'));
   });
+  await page.waitForFunction(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer?.querySelector('video.talera-independent-narrator-video');
+    const audio=layer?.querySelector('audio');
+    return !!video?.currentSrc&&!video.paused&&!audio.paused;
+  },null,{timeout:9000});
   const narratedWheelAtRest=await page.locator('#photoStage .talera-wheel-strip')
     .evaluate(el=>({active:el.classList.contains('is-visible'),
       display:getComputedStyle(el).display}));
@@ -576,6 +585,17 @@ try{
   const narratorY=narratedBounds.y+narratedBounds.height*.48;
   await page.mouse.move(narratedBounds.x+narratedBounds.width*.2,narratorY);
   await page.mouse.down();
+  const videoStillRunningOnTouch=await page.evaluate(()=>{
+    const l=document.querySelector('.talera-independent-narrator-layer');
+    return {audioPaused:l.querySelector('audio')?.paused,
+      videoPaused:l.querySelector('video.talera-independent-narrator-video')?.paused,
+      hidden:l.style.visibility==='hidden'};
+  });
+  assert.equal(videoStillRunningOnTouch.audioPaused,false,
+    'A touch WITHOUT horizontal movement must not pause speech');
+  assert.equal(videoStillRunningOnTouch.videoPaused,false,
+    'A touch WITHOUT horizontal movement must not pause the video');
+  assert.equal(videoStillRunningOnTouch.hidden,false);
   assert.equal(await page.locator('#photoStage .talera-wheel-strip')
     .evaluate(el=>el.classList.contains('is-visible')),false,
     'Touching without swiping should not reveal thumbnail wheel');
@@ -588,7 +608,10 @@ try{
       narrationActive:!!document.querySelector('.talera-independent-narrator-layer'),
       active:wheel?.classList.contains('is-visible'),
       display:style?.display,visibility:style?.visibility,opacity:style?.opacity,
-      drag:window.__taleraIntegratedBand?.getState?.().drag
+      drag:window.__taleraIntegratedBand?.getState?.().drag,
+      narratorHidden:document.querySelector('.talera-independent-narrator-layer')?.style.visibility==='hidden',
+      voicePaused:document.querySelector('.talera-independent-narrator-layer audio')?.paused,
+      videoPaused:document.querySelector('.talera-independent-narrator-video')?.paused
     };
   });
   assert.equal(narratedDuringSwipe.selected,narrated.id);
@@ -601,6 +624,12 @@ try{
   assert.notEqual(narratedDuringSwipe.visibility,'hidden',
     'Narrated swipe strip cannot stay invisible once active');
   assert.ok(Number(narratedDuringSwipe.opacity)>0.9);
+  assert.equal(narratedDuringSwipe.narratorHidden,true,
+    'The narrator video must be visually removed during active photo-strip swipe');
+  assert.equal(narratedDuringSwipe.voicePaused,true,
+    'The narrator voice timer must stop while swiping away');
+  assert.equal(narratedDuringSwipe.videoPaused,true,
+    'The current iPhone video decoder must stop at swipe recognition');
   await page.mouse.move(narratedBounds.x+narratedBounds.width*.84,narratorY,{steps:10});
   await page.mouse.up();
   await page.waitForFunction(id=>
@@ -634,7 +663,9 @@ try{
     .waitFor({state:'attached',timeout:13000});
   assert.equal(await page.locator('.talera-independent-narrator-layer').count(),1);
   console.log('TALERA_NARRATOR_EXISTING_WHEEL_SWIPE_BOTH_DIRECTIONS_PASS',
-    JSON.stringify({wheelVisibleOnMovement:true,previousMemory:mixed,
+    JSON.stringify({wheelVisibleOnMovement:true,
+      videoSuspendedOnHorizontalGesture:true,videoUnchangedAtTouch:true,
+      previousMemory:mixed,
       returnedNarratedMemory:narrated.id,oldVoiceStopped:true,
       ordinaryEngineUntouched:true,iphoneAccepted:false}));
   await load(page,plain,3);

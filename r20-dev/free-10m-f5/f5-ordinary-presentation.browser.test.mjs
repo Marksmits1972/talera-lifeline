@@ -729,6 +729,105 @@ try{
   await load(page,plain,3);
 
 
+
+  // OWNER'S LAST FIRST-MEDIA BUG: a video at index 0 must show its own
+  // first frame in the EXISTING swipe strip, never photo from index 1.
+  // Actual local F5 IndexedDB row, real original video Blob, no mock covers.
+  const videoFirst=await page.evaluate(async b64=>{
+    const original=new File(
+      [Uint8Array.from(atob(b64),c=>c.charCodeAt(0))],
+      'video-first-blue.mp4',{type:'video/mp4'});
+    const canvas=document.createElement('canvas');
+    canvas.width=140;canvas.height=140;
+    const ctx=canvas.getContext('2d');ctx.fillStyle='#ffa500';
+    ctx.fillRect(0,0,140,140);
+    const photoBlob=await new Promise(done=>canvas.toBlob(done,'image/png'));
+    const second=new File([photoBlob],'second-photo-orange.png',{type:'image/png'});
+    const row=await window.TaleraMemories.save({
+      title:'Original blue video FIRST, orange photo SECOND',
+      date:'2026-11-11',time:'11:59:00',text:'First media must own strip cover'
+    },[original,second]);
+    return {id:row.id,kinds:row.items.filter(x=>
+      x.kind==='video'||x.kind==='photo').map(x=>x.kind)};
+  },readFileSync(mp4).toString('base64'));
+  assert.deepEqual(videoFirst.kinds,['video','photo'],
+    'Test needs genuinely ordered video first, photo second in the same memory');
+  await load(page,videoFirst.id,2);
+  await page.waitForFunction(id=>{
+    const mem=window.__taleraTimelineRuntime?.currentMemory?.();
+    return mem?.storyId===id && !mem._photoLoading &&
+      mem.thumbnail?.startsWith('blob:')&&mem.thumbnail===mem.photos[0] &&
+      mem.thumbnail!==mem.photos[1];
+  },videoFirst.id,{timeout:16000});
+  const firstMediaCover=await page.evaluate(async id=>{
+    const book=window.__taleraPhotoBook;
+    const mem=book.list().find(x=>x.storyId===id);
+    const image=new Image();image.src=mem.thumbnail;
+    await image.decode();
+    const canvas=document.createElement('canvas');
+    canvas.width=32;canvas.height=32;
+    const context=canvas.getContext('2d',{willReadFrequently:true});
+    context.drawImage(image,0,0,32,32);
+    return {
+      firstKind:mem._zeroFrames?.[0]?.kind,
+      secondKind:mem._zeroFrames?.[1]?.kind,
+      sameFirst:mem.thumbnail===mem.photos[0],
+      distinctSecond:mem.thumbnail!==mem.photos[1],
+      pixel:Array.from(context.getImageData(16,16,1,1).data).slice(0,3)
+    };
+  },videoFirst.id);
+  assert.deepEqual([firstMediaCover.firstKind,firstMediaCover.secondKind],
+    ['video','photo']);
+  assert.ok(firstMediaCover.sameFirst&&firstMediaCover.distinctSecond);
+  assert.ok(firstMediaCover.pixel[2]>firstMediaCover.pixel[0]*1.4&&
+    firstMediaCover.pixel[2]>firstMediaCover.pixel[1]*1.4,
+    'First-media VIDEO cover is not its BLUE first frame: '+
+      JSON.stringify(firstMediaCover));
+
+  // Swipe FROM another photo memory. During the movement, the native RH19
+  // strip must show that same first video still; after landing its video plays.
+  await load(page,plain,3);
+  const stripBox=await page.locator('#memoryStoryScroll').boundingBox();
+  const stripY=stripBox.y+stripBox.height*.48;
+  await page.mouse.move(stripBox.x+stripBox.width*.18,stripY);
+  await page.mouse.down();
+  await page.mouse.move(stripBox.x+stripBox.width*.62,stripY,{steps:10});
+  await page.waitForFunction(id=>{
+    const owner='pwa:'+id;
+    const mem=window.__taleraPhotoBook?.list()?.find(m=>m.storyId===id);
+    const tile=[...document.querySelectorAll('#photoStage .talera-wheel-page')]
+      .find(el=>el.dataset.owner===owner);
+    return !!tile&&tile.dataset.url===mem?.thumbnail&&
+      !!tile.querySelector('img.example-photo')?.naturalWidth;
+  },videoFirst.id,{timeout:12000});
+  const duringVideoFirstSwipe=await page.evaluate(id=>{
+    const book=window.__taleraPhotoBook;
+    const mem=book.list().find(m=>m.storyId===id);
+    const tile=[...document.querySelectorAll('#photoStage .talera-wheel-page')]
+      .find(x=>x.dataset.owner==='pwa:'+id);
+    return {tileMatchesVideoFirst:tile?.dataset.url===mem.thumbnail,
+      firstKind:mem._zeroFrames[0].kind,
+      stripVisible:document.querySelector('#photoStage .talera-wheel-strip')
+        ?.classList.contains('is-visible')};
+  },videoFirst.id);
+  assert.equal(duringVideoFirstSwipe.tileMatchesVideoFirst,true);
+  assert.equal(duringVideoFirstSwipe.stripVisible,true);
+  await page.mouse.move(stripBox.x+stripBox.width*.85,stripY,{steps:6});
+  await page.mouse.up();
+  await page.waitForFunction(id=>
+    window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+    videoFirst.id,{timeout:13000});
+  await page.waitForFunction(()=>{
+    const mem=window.__taleraTimelineRuntime?.currentMemory?.();
+    return mem?._photoIndex===0&&
+      !!document.querySelector('video.talera-v61-inline-video');
+  },null,{timeout:10000});
+  console.log('TALERA_FIRST_MEDIA_VIDEO_BLUE_FRAME_SWIPE_COVER_PASS',
+    JSON.stringify({first:videoFirst.id,
+      videoFrameNotLaterPhoto:true,originalVideoIdUnchanged:true,
+      firstVideoFrameInStrip:true,noNewVideoCopy:true,iPhoneAccepted:false}));
+  await load(page,plain,3);
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

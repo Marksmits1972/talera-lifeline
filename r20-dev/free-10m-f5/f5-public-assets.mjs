@@ -843,6 +843,40 @@ function capVisibleTimelineAtToday(html){
  return html;
 }
 
+// Restore the original native timeline's drag position after choosing a
+// photo-book frame. The V3 book landing previously rewrote centerMs to its
+// nearest memory on pointer-up (with one local memory, often today's date).
+// Only the timeline release is affected: ordinary photo swipes, zoom gears,
+// speed-adaptive scale, player and every media ID use their original code.
+function keepNativeTimelineDateAfterPhotoLanding(html){
+ const one=(before,after,label)=>{
+  assert.equal(html.split(before).length,2,'F5_NATIVE_TIMELINE_'+label+'_SOURCE_DRIFT');
+  html=html.replace(before,after);
+ };
+ one(
+   '    centerMs=l.ms+(r.ms-l.ms)*clamp(position-ix,0,1);\n    keepCenterValid();draw();',
+   '    const held=window.__taleraNativeTimelineReleaseMs;\n'+
+   '    centerMs=Number.isFinite(held)?held:l.ms+(r.ms-l.ms)*clamp(position-ix,0,1);\n'+
+   '    keepCenterValid();draw();',
+   'SCRUB_ONLY_DURING_TIMELINE_RELEASE');
+ one(
+   '    centerMs=item.ms;keepCenterValid();\n    if(item.id!==activeMemoryId)',
+   '    const held=window.__taleraNativeTimelineReleaseMs;\n'+
+   '    window.__taleraNativeTimelineReleaseMs=null;\n'+
+   '    centerMs=Number.isFinite(held)?held:item.ms;keepCenterValid();\n'+
+   '    if(item.id!==activeMemoryId)',
+   'CHOOSE_PRESERVES_FINGER_DATE');
+ one(
+   '    beginLanding(0,0,Math.round(state.p));\n'+
+   '    // Timeline selection also uses the single landing curve.',
+   '    // Keep the actual finger-chosen date while the original book settles.\n'+
+   '    window.__taleraNativeTimelineReleaseMs=runtime.centerMs();\n'+
+   '    beginLanding(0,0,Math.round(state.p));\n'+
+   '    // Timeline selection also uses the single landing curve.',
+   'END_TIMELINE_DATE');
+ return html;
+}
+
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
@@ -857,6 +891,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=isolateNarratedMemories(html);
  if(route==='/present')html=showExistingNarratedSwipeBand(html);
  if(route==='/present')html=capVisibleTimelineAtToday(html);
+ if(route==='/present')html=keepNativeTimelineDateAfterPhotoLanding(html);
  // Use the ORIGINAL, already approved V61 video preview from the
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.

@@ -789,6 +789,39 @@ function isolateNarratedMemories(html){
  return html;
 }
 
+// Only the visible historical ruler ends at today. The existing timeline
+// navigation, zoom, clock, personal birth date, media and photos remain intact.
+// In the approved presenter the center is already clamped to LIFE_END, but
+// the canvas still drew future years and an endless horizontal axis.
+function capVisibleTimelineAtToday(html){
+ const one=(before,after,label)=>{
+  assert.equal(html.split(before).length,2,'F5_PRESENT_TODAY_'+label+'_SOURCE_DRIFT');
+  html=html.replace(before,after);
+ };
+ one('function tick(x,axisY,major,label="",sub="",strongSub=false) {\n  if(x<-55 || x>canvas.clientWidth+55) return;',
+     'function tick(x,axisY,major,label="",sub="",strongSub=false) {\n'+
+     '  const [viewStart,viewEnd]=bounds();\n'+
+     '  const endX=((LIFE_END-viewStart)/(viewEnd-viewStart))*canvas.clientWidth;\n'+
+     '  if(x<-55 || x>canvas.clientWidth+55 || x>endX) return;\n'+
+     '  // Avoid drawing half a future-facing label at the end of the life line.\n'+
+     '  if(major&&label&&x+Math.max(18,String(label).length*4)>endX){label="";sub="";}',
+     'SCALE_TICKS');
+ one('  drawDensity(level,startMs,endMs,w,axisY);\n'+
+     '  drawMemoryBeacons(level,startMs,endMs,w,axisY);\n'+
+     '  drawScale(level,startMs,endMs,w,axisY);',
+     '  // The selected date and center needle still use the original scale.\n'+
+     '  // Only the paintable future part of its canvas is cut off.\n'+
+     '  const endX=Math.max(0,Math.min(w,((LIFE_END-startMs)/(endMs-startMs))*w));\n'+
+     '  ctx.save();ctx.beginPath();ctx.rect(0,0,endX,h);ctx.clip();\n'+
+     '  drawDensity(level,startMs,endMs,w,axisY);\n'+
+     '  drawMemoryBeacons(level,startMs,endMs,w,axisY);\n'+
+     '  drawScale(level,startMs,endMs,w,axisY);\n'+
+     '  ctx.restore();',
+     'CANVAS_LIMIT');
+ assert.ok(html.includes('const endX=Math.max(0,Math.min(w,((LIFE_END-startMs)/(endMs-startMs))*w));'));
+ return html;
+}
+
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
@@ -802,6 +835,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=hideDuplicateReadingSheetActions(html);
  if(route==='/present')html=isolateNarratedMemories(html);
  if(route==='/present')html=showExistingNarratedSwipeBand(html);
+ if(route==='/present')html=capVisibleTimelineAtToday(html);
  // Use the ORIGINAL, already approved V61 video preview from the
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.

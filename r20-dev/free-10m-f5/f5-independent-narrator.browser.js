@@ -36,15 +36,38 @@ function taleraIndependentNarrationPlan(memory){
 }
 function taleraCreateIndependentNarrator({stage,store,runtime}){
   let active=null,generation=0;
-  // Presentation owns none of our audio state. The app-wide listening setting
-  // may be absent during an iPhone cold start; absence is NOT 'muted'.
-  // Explicit user OFF is respected until they tap the existing Listen button.
-  const hasSound=s=>s?.soundOverride===true||
-    window.__taleraAudioControls?.isEnabled?.()!==false;
-  function setAudible(media,enabled){
-    media.muted=!enabled;media.defaultMuted=!enabled;media.volume=1;
-    if(enabled)media.removeAttribute('muted');
-    else media.setAttribute('muted','');
+  // TALERA narrator has its OWN audible playback policy. Reading the
+  // presenter's global listening switch can silently mute BOTH the original
+  // voice and the original video, and violates the 100%-independent motor.
+  // Only video previews DURING the voice are intentionally muted.
+  function setAudible(media){
+    media.muted=false;media.defaultMuted=false;media.volume=1;
+    media.removeAttribute('muted');
+  }
+  function prepareNativePlayback(s){
+    // On iOS standalone PWAs the default audio-session category may obey the
+    // silent switch, even when HTMLMediaElement.muted === false. Only while
+    // this narration owns the screen, request the native playback category.
+    try{
+      const native=typeof navigator==='undefined'?null:navigator.audioSession;
+      if(!native||typeof native.type!=='string')return;
+      if(!s.nativeAudioSession&&native.type!=='playback')
+        s.nativeAudioSession={native,previous:native.type};
+      if(native.type!=='playback')native.type='playback';
+    }catch(error){
+      console.warn('TALERA iPhone narrator audio session unavailable',error);
+    }
+  }
+  function restoreNativePlayback(s){
+    const prior=s.nativeAudioSession;
+    if(!prior)return;
+    try{
+      if(prior.native.type==='playback')
+        prior.native.type=prior.previous;
+    }catch(error){
+      console.warn('TALERA iPhone narrator audio session restore unavailable',error);
+    }
+    s.nativeAudioSession=null;
   }
   function highlightNarratorDot(s,index){
     if(!isCurrent(s)||!Number.isInteger(index)||index<0)return;
@@ -68,9 +91,9 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     button.onclick=event=>{
       event.preventDefault();event.stopPropagation();
       if(!isCurrent(s))return;
-      s.soundOverride=true;
-      setAudible(media,true);
-      // A currently playing, muted track needs unmuting, not restarting.
+      prepareNativePlayback(s);
+      setAudible(media);
+      // A currently playing, silent track needs a real iPhone audio gesture.
       if(!media.paused){clearButton(s);return}
       Promise.resolve(media.play()).then(()=>clearButton(s))
         .catch(error=>{if(error?.name!=='NotAllowedError')
@@ -80,11 +103,10 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
   }
   function attemptPlay(s,media){
     if(!isCurrent(s)||!media)return;
-    const enabled=hasSound(s);
-    setAudible(media,enabled);
-    if(!enabled)offerPlay(s,media);
+    prepareNativePlayback(s);
+    setAudible(media);
     try{Promise.resolve(media.play()).then(()=>{
-      if(enabled)clearButton(s);
+      clearButton(s);
     }).catch(error=>{
       if(error?.name==='NotAllowedError')offerPlay(s,media);
       else if(error?.name!=='AbortError')
@@ -115,6 +137,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     if(s.voiceUrl)URL.revokeObjectURL(s.voiceUrl);
     removeVideo(s);clearButton(s);
     for(const url of s.createdUrls)URL.revokeObjectURL(url);
+    restoreNativePlayback(s);
     s.layer.remove();
     if(s.hostPositionChanged&&s.host.style.position==='relative')
       s.host.style.position=s.hostPosition;
@@ -276,7 +299,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     const s={id,generation:run,plan,layer,photo,host,
       hostPosition:oldPosition,hostPositionChanged:changePosition,
       phase:'loading',audio:null,voiceUrl:null,video:null,videoId:'',videoUrl:null,
-      soundOverride:false,
+      nativeAudioSession:null,
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
       visibilityChange:null};
@@ -297,7 +320,8 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     audio.preload='auto';audio.playsInline=true;audio.style.display='none';
     layer.appendChild(audio);s.audio=audio;
     s.voiceUrl=URL.createObjectURL(blob);audio.src=s.voiceUrl;
-    setAudible(audio,hasSound(s));
+    prepareNativePlayback(s);
+    setAudible(audio);
     s.phase='voice';
     audio.onplay=()=>{if(!isCurrent(s)||s.phase!=='voice')return;
       if(s.timer)clearInterval(s.timer);

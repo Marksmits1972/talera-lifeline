@@ -532,6 +532,49 @@ try{
     JSON.stringify({presenterSoundOff:true,ownVoiceAudibleFlag:true,
       ownVideoAudibleFlag:true,physicalIphoneSoundNotMeasurableInCI:true}));
 
+
+  // iPhone-style autoplay rejection in the REAL F5 PWA DOM. Previous tests
+  // enabled a Chromium flag allowing audio autoplay, masking this case.
+  // Reject exactly the FIRST voice play and the FIRST original-video play,
+  // so the native user gesture must recover BOTH independently.
+  await page.addInitScript(()=>{
+    const originalPlay=HTMLMediaElement.prototype.play;
+    let refusedVoice=false,refusedVideo=false;
+    HTMLMediaElement.prototype.play=function(...args){
+      if(this.closest('.talera-independent-narrator-layer')){
+        if(this.tagName==='AUDIO'&&!refusedVoice){
+          refusedVoice=true;
+          return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
+        }
+        if(this.tagName==='VIDEO'&&this.classList.contains('talera-independent-original-video')&&!refusedVideo){
+          refusedVideo=true;
+          return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
+        }
+      }
+      return originalPlay.apply(this,args);
+    };
+  });
+  await load(page,narrated.id,4);
+  const voiceButton=page.locator('button.talera-v61-audio-permission-hint')
+    .filter({hasText:'Beluister'});
+  await voiceButton.waitFor({state:'visible',timeout:10000});
+  await voiceButton.click({timeout:6000});
+  await page.waitForFunction(()=>{
+    const a=document.querySelector('.talera-independent-narrator-layer audio');
+    return a&&!a.paused&&!a.muted&&a.currentTime>.15;
+  },null,{timeout:12000});
+  await page.locator('.talera-independent-narrator-layer .talera-independent-original-video')
+    .waitFor({state:'attached',timeout:18000});
+  await voiceButton.waitFor({state:'visible',timeout:9000});
+  await voiceButton.click({timeout:6000});
+  await page.waitForFunction(()=>{
+    const v=document.querySelector(
+      '.talera-independent-narrator-layer video.talera-independent-original-video');
+    return v&&!v.paused&&!v.muted&&v.currentTime>.08;
+  },null,{timeout:10000});
+  console.log('TALERA_IOS_GESTURE_NARRATOR_AUDIO_AND_VIDEO_PLAYBACK_PASS');
+  await load(page,plain,3);
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

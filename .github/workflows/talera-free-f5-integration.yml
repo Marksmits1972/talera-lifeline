@@ -2,7 +2,7 @@ name: TALERA Free F5 - isolated single-origin integration tests
 
 on:
   push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112]
+    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112, feature/free-f5-narrator-story-swipe-20261113]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
@@ -39,7 +39,7 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-independent-narrator.test.mjs
       - name: Verify source-exact 11 November backup-only connection
         run: |
-          if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ]; then
+          if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
           else

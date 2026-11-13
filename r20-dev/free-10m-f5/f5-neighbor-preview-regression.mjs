@@ -78,8 +78,11 @@ assert.ok(shipped.includes('let ownSerial=0,ordinaryVideo=null') &&
   shipped.includes('memory.photos[next]!==src') &&
   shipped.includes('window.__taleraOrdinarySelectPhoto='),
   'Single ordinary presentation controller must be bound to the selected memory ID');
-assert.ok(shipped.includes("memory.thumbnail=photos.find((_,i)=>frames[i]?.kind==='photo')"),
-  'One own thumbnail comes from this memory’s first photo, not a seventh media item');
+assert.ok(shipped.includes("memory.thumbnail=photos[0]||placeholder;"),
+  'One own thumbnail comes from this memory’s FIRST media item, photo or video');
+assert.ok(shipped.includes('if(index===0)memory.thumbnail=cover;')&&
+  shipped.includes("if(frames[0]?.kind==='video'&&!frames[0].url)"),
+  'When a video starts a memory without stored still, derive its OWN first frame only');
 assert.ok(shipped.includes('tile.el.dataset.owner=owner') &&
   shipped.includes("tile.el.style.visibility='hidden'"),
   'Each recycled strip tile must be hidden until its own image is decoded');

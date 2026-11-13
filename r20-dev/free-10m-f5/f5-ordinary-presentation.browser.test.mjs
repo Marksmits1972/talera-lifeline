@@ -318,6 +318,298 @@ try{
   });
   assert.equal(state.id,mixed);
   assert.equal(state.video,false,'Ordinary photo roll cannot enter narration mode');
+  // Playback integration in the SAME authenticated TALERA Free candidate.
+  // Synthetic voice and original soundtrack, no new app, no customer media.
+  const syntheticVoice=path.join(generated,'independent-narrator-voice.wav');
+  const syntheticOriginal=path.join(generated,'independent-narrator-original.webm');
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','sine=frequency=330:duration=4.6',
+    '-c:a','pcm_s16le','-ar','22050',syntheticVoice],{timeout:25000,stdio:'ignore'});
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=2',
+    '-f','lavfi','-i','sine=frequency=440:duration=2',
+    '-shortest','-c:v','libvpx','-b:v','160k','-c:a','libopus',
+    '-b:a','64k',syntheticOriginal],
+    {timeout:30000,stdio:'ignore'});
+  const narrated=await page.evaluate(async ({voice,video})=>{
+    const files=await Promise.all(['#f01426','#19d03a','#293af2'].map(async(c,i)=>{
+      const canvas=document.createElement('canvas');
+      canvas.width=140;canvas.height=140;
+      const p=canvas.getContext('2d');p.fillStyle=c;p.fillRect(0,0,140,140);
+      const blob=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
+      return new File([blob],'narration-original-'+i+'.png',{type:'image/png'});
+    }));
+    files.push(new File([Uint8Array.from(atob(video),x=>x.charCodeAt(0))],
+      'original-with-audio.webm',{type:'video/webm'}));
+    files.push(new File([Uint8Array.from(atob(voice),x=>x.charCodeAt(0))],
+      'one-continuous-voice.wav',{type:'audio/wav'}));
+    const saved=await window.TaleraMemories.save({
+      title:'Independent voice playback',date:'2026-11-12',time:'18:30:00',
+      text:'Synthetic one-story voice clock and original media',
+      narrationCues:[]
+    },files);
+    const row=await window.TaleraMemories.get(saved.id);
+    const imageKeys=row.items.filter(x=>x.kind==='photo'||x.kind==='video').map(x=>x.key);
+    const voiceItem=row.items.find(x=>x.kind==='audio');
+    if(imageKeys.length!==4||!voiceItem)throw Error('Original audio and 4 media IDs were not stored');
+    const cues=[
+      {t:0,index:0,mediaId:imageKeys[0]},
+      {t:600,index:3,mediaId:imageKeys[3],videoAtMs:0},
+      {t:1550,index:1,mediaId:imageKeys[1]},
+      {t:2800,index:3,mediaId:imageKeys[3],videoAtMs:250}
+    ];
+    // Test-only insertion of the exact published narrator cue schema into
+    // the SAME account-scoped IndexedDB. The real editor/writer is separately
+    // protected by the F5 recorder ID/readback tests.
+    const dbName=(await indexedDB.databases()).map(x=>x.name||'')
+      .find(x=>x.startsWith('talera-free-local-'));
+    if(!dbName)throw Error('Account-specific original media store missing');
+    const db=await new Promise((ok,bad)=>{
+      const req=indexedDB.open(dbName);
+      req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error);
+    });
+    await new Promise((ok,bad)=>{
+      const tx=db.transaction('stories','readwrite');
+      const store=tx.objectStore('stories');
+      const get=store.get(saved.id);
+      get.onsuccess=()=>{
+        const existing=get.result;
+        if(!existing){tx.abort();return}
+        store.put({...existing,narrationCues:cues,
+          narrationSchema:'media-id-v1',narrationDurationMs:4600});
+      };
+      tx.oncomplete=ok;tx.onerror=()=>bad(tx.error);tx.onabort=()=>bad(tx.error);
+    });
+    db.close();
+    return {id:saved.id,keys:imageKeys,voiceId:voiceItem.key,cues};
+  },{voice:readFileSync(syntheticVoice).toString('base64'),
+     video:readFileSync(syntheticOriginal).toString('base64')});
+  assert.equal(narrated.cues.length,4);
+  assert.equal(new Set(narrated.keys).size,4);
+  await load(page,narrated.id,4);
+  await page.locator('.talera-independent-narrator-layer audio')
+    .waitFor({state:'attached',timeout:15000});
+  await page.waitForFunction(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return audio&&!audio.paused&&audio.currentTime>.06;
+  },null,{timeout:14000});
+  const voiceSound=await page.evaluate(()=>{
+    const voice=document.querySelector('.talera-independent-narrator-layer audio');
+    return {settingsEnabled:window.__taleraAudioControls?.isEnabled?.(),
+      muted:voice?.muted,volume:voice?.volume,
+      dots:document.querySelectorAll('.talera-photo-dot').length};
+  });
+  assert.equal(voiceSound.settingsEnabled,true,
+    'Original TALERA listening preference should default to enabled');
+  assert.equal(voiceSound.muted,false,
+    'Recorded voice must not be silently muted in the real PWA');
+  assert.ok(voiceSound.volume>0,'Voice volume must be audible');
+  assert.equal(voiceSound.dots,4,'Existing orange photo dots must be present');
+  const firstNarrated=await centerPixel(page);
+  assert.ok(dominant(firstNarrated,0),
+    'Independent narrator did not paint its OWN first original photo: '+JSON.stringify(firstNarrated));
+  await page.evaluate(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    audio.currentTime=.8;
+    audio.ontimeupdate?.();
+  });
+  await page.waitForFunction(()=>{
+    const v=document.querySelector('video.talera-independent-narrator-video');
+    return !!v&&v.muted===true;
+  },null,{timeout:8000});
+  await page.waitForFunction(()=>{
+    const dots=[...document.querySelectorAll('.talera-photo-dot')];
+    return dots.length===4&&dots[3].classList.contains('active')&&
+      dots.filter(x=>x.classList.contains('active')).length===1;
+  },null,{timeout:5500});
+  await page.evaluate(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    audio.currentTime=1.8;
+    audio.ontimeupdate?.();
+  });
+  await page.waitForFunction(()=>{
+    const img=document.querySelector('img.talera-independent-narrator-photo');
+    return !!img&&!img.hidden&&img.complete&&img.naturalWidth>0;
+  },null,{timeout:9000});
+  await page.waitForFunction(()=>{
+    const dots=[...document.querySelectorAll('.talera-photo-dot')];
+    return dots.length===4&&dots[1].classList.contains('active')&&
+      dots.filter(x=>x.classList.contains('active')).length===1;
+  },null,{timeout:5500});
+  const secondNarrated=await centerPixel(page);
+  assert.ok(dominant(secondNarrated,1),
+    'Voice cue time did not display its own green media-ID: '+JSON.stringify(secondNarrated));
+  await page.waitForFunction(()=>!!document.querySelector(
+    '.talera-independent-narrator-layer video.talera-independent-original-video'),
+    null,{timeout:15000});
+
+  await page.waitForFunction(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer?.querySelector('video.talera-independent-original-video');
+    const sound=layer?.querySelector('audio');
+    return video&&sound&&sound.currentSrc===video.currentSrc&&
+      !sound.paused&&!sound.muted&&sound.currentTime>.02;
+  },null,{timeout:12000});
+  const soundtrack=await page.evaluate(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer.querySelector('video.talera-independent-original-video');
+    const sound=layer.querySelector('audio');
+    return {pictureMuted:video?.muted,audioMuted:sound?.muted,
+      audioPlaying:!sound.paused&&sound.currentTime>0,
+      sameOriginalSource:sound.currentSrc===video.currentSrc,
+      secondListen:!!document.querySelector('button.talera-v61-audio-permission-hint'),
+      narratorCount:document.querySelectorAll('.talera-independent-narrator-layer').length};
+  });
+  assert.equal(soundtrack.pictureMuted,true);
+  assert.equal(soundtrack.audioMuted,false);
+  assert.equal(soundtrack.audioPlaying,true);
+  assert.equal(soundtrack.sameOriginalSource,true);
+  assert.equal(soundtrack.secondListen,false);
+  assert.equal(soundtrack.narratorCount,1);
+  await load(page,plain,3);
+  assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0,
+    'Ordinary memory must not receive any narrator layer');
+  // Local iPhone-photo hydration and ordinary 2.5 s rotation may complete
+  // after the memory ID changes; inspect the actual native layer, not a stale
+  // first screenshot captured during the story-to-story handoff.
+  let backToOrdinary=null;
+  for(let tryNo=0;tryNo<12;tryNo++){
+    const state=await page.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const stage=document.getElementById('photoStage');
+      return {storyId:m?.storyId,index:m?._photoIndex,zeroCount:m?._zeroFrames?.length,
+        loaded:!m?._photoLoading,
+        current:stage?.querySelector('.photo-layer img.example-photo')?.currentSrc||'',
+        narrator:!!document.querySelector('.talera-independent-narrator-layer')};
+    });
+    if(state.storyId===plain&&state.index===0&&state.loaded&&!state.narrator){
+      const pixel=await centerPixel(page);
+      backToOrdinary={state,pixel};
+      if(dominant(pixel,0))break;
+    }
+    await page.waitForTimeout(220);
+  }
+  assert.ok(backToOrdinary&&dominant(backToOrdinary.pixel,0),
+    'Original ordinary memory stopped working after independent narration: '+
+    JSON.stringify(backToOrdinary));
+  console.log('TALERA_INDEPENDENT_NARRATOR_REAL_BROWSER_PASS',JSON.stringify({
+    originalMediaIds:narrated.keys,continuousVoiceMediaId:narrated.voiceId,
+    cueTimes:narrated.cues.map(x=>x.t),
+    separateRenderer:true,silentNarrationVideo:true,
+    remainingPhotoThenOriginalVideo:true,originalSoundtrackPresent:true,
+    voiceAudioUnmuted:true,orangeDotsFollowVoiceCues:true,
+    ordinaryPresentationRestored:true,realIPhoneAccepted:false
+  }));
+
+
+  // Regression for a genuine iPhone profile with historic listening=OFF.
+  // The audio policy of the ORDINARY presentation must never silently mute
+  // the independent voice track or the later original video soundtrack.
+  await page.evaluate(()=>localStorage.setItem('talera-v61-listening-intent-r8','off'));
+  await load(page,narrated.id,4);
+  await page.waitForFunction(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return audio&&!audio.paused&&audio.currentTime>.06;
+  },null,{timeout:15000});
+  const independentSound=await page.evaluate(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return {presenterListening:window.__taleraAudioControls?.isEnabled?.(),
+      voicedAudioMuted:audio?.muted,voicedAudioDefaultMuted:audio?.defaultMuted,
+      voicedAudioVolume:audio?.volume,voicedAudioTime:audio?.currentTime};
+  });
+  assert.equal(independentSound.presenterListening,false,
+    'Historical ordinary-presenter silent setting not reproduced');
+  assert.equal(independentSound.voicedAudioMuted,false,
+    'A stored presenter OFF preference must NOT mute the separately owned voice');
+  assert.equal(independentSound.voicedAudioDefaultMuted,false);
+  assert.equal(independentSound.voicedAudioVolume,1);
+  await page.waitForFunction(()=>!!document.querySelector(
+    '.talera-independent-narrator-layer video.talera-independent-original-video'),
+    null,{timeout:16000});
+
+  await page.waitForFunction(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer?.querySelector('video.talera-independent-original-video');
+    const sound=layer?.querySelector('audio');
+    return video&&sound&&sound.currentSrc===video.currentSrc&&
+      !sound.paused&&!sound.muted&&sound.currentTime>.02;
+  },null,{timeout:12000});
+  const independentVideo=await page.evaluate(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer.querySelector('video.talera-independent-original-video');
+    const sound=layer.querySelector('audio');
+    return {pictureMuted:video?.muted,soundMuted:sound?.muted,
+      soundPlaying:!!sound&&!sound.paused&&sound.currentTime>0,
+      volume:sound?.volume,sameSource:sound?.currentSrc===video?.currentSrc};
+  });
+  assert.equal(independentVideo.pictureMuted,true);
+  assert.equal(independentVideo.soundMuted,false);
+  assert.equal(independentVideo.soundPlaying,true);
+  assert.ok(independentVideo.volume>0&&independentVideo.sameSource);
+  await page.evaluate(()=>localStorage.setItem('talera-v61-listening-intent-r8','on'));
+  await load(page,plain,3);
+  assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0);
+  console.log('TALERA_NARRATOR_AUDIO_NOT_CONNECTED_TO_PRESENTER_MUTE',
+    JSON.stringify({presenterSoundOff:true,ownVoiceAudibleFlag:true,
+      ownVideoAudibleFlag:true,physicalIphoneSoundNotMeasurableInCI:true}));
+
+
+  // iPhone-style autoplay rejection in the REAL F5 PWA DOM. Previous tests
+  // enabled a Chromium flag allowing audio autoplay, masking this case.
+  // Reject the first voice play and all newly-created audible video plays.
+  // The narrator must reuse its unlocked voice audio element instead.
+  await page.addInitScript(()=>{
+    const originalPlay=HTMLMediaElement.prototype.play;
+    let refusedVoice=false,refusedVideo=false;
+    HTMLMediaElement.prototype.play=function(...args){
+      if(this.closest('.talera-independent-narrator-layer')){
+        if(this.tagName==='AUDIO'&&!refusedVoice){
+          refusedVoice=true;
+          return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
+        }
+        if(this.tagName==='VIDEO'&&!this.muted&&this.classList.contains('talera-independent-original-video')&&!refusedVideo){
+          refusedVideo=true;
+          return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
+        }
+      }
+      return originalPlay.apply(this,args);
+    };
+  });
+  await load(page,narrated.id,4);
+  const voiceButton=page.locator('button.talera-v61-audio-permission-hint')
+    .filter({hasText:'Beluister'});
+  await voiceButton.waitFor({state:'visible',timeout:10000});
+  await voiceButton.click({timeout:6000});
+  await page.waitForFunction(()=>{
+    const a=document.querySelector('.talera-independent-narrator-layer audio');
+    return a&&!a.paused&&!a.muted&&a.currentTime>.15;
+  },null,{timeout:12000});
+  await page.locator('.talera-independent-narrator-layer .talera-independent-original-video')
+    .waitFor({state:'attached',timeout:18000});
+
+  // The first voice gesture unlocks the audio element; the video soundtrack
+  // reuses that SAME element without another user interaction.
+  await page.waitForFunction(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const v=layer?.querySelector('video.talera-independent-original-video');
+    const a=layer?.querySelector('audio');
+    return v&&a&&v.currentSrc===a.currentSrc&&!a.muted&&
+      !a.paused&&a.currentTime>.04;
+  },null,{timeout:12000});
+  assert.equal(await voiceButton.count(),0,
+    'The original video soundtrack must not request a second Listen tap');
+  const finalSound=await page.evaluate(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const v=layer.querySelector('video.talera-independent-original-video');
+    const a=layer.querySelector('audio');
+    return {pictureMuted:v.muted,soundMuted:a.muted,
+      soundPlaying:!a.paused&&a.currentTime>.04,
+      sameMedia:a.currentSrc===v.currentSrc};
+  });
+  assert.equal(finalSound.pictureMuted,true);
+  assert.equal(finalSound.soundMuted,false);
+  assert.ok(finalSound.soundPlaying&&finalSound.sameMedia);
+  console.log('TALERA_IOS_GESTURE_NARRATOR_AUDIO_AND_VIDEO_PLAYBACK_PASS');
+  await load(page,plain,3);
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

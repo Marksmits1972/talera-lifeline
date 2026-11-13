@@ -690,7 +690,8 @@ async function privateEmbeddedPlayer(request,env){
     return deny(404,'Ongeldige afspeelroute');
   const actor=await sessionAccount(request,env);
   if(!actor)return deny(401,'Sessie verlopen; meld je opnieuw aan');
-  const reference=referencePages['/vertelmodus-embed'];
+  const reference=referencePages[params[0][1]==='record'?
+    '/vertelmodus-embed-record':'/vertelmodus-embed'];
   if(!reference||!env.ASSETS)return deny(503,'Originele afspeelfunctie ontbreekt');
   const r=await env.ASSETS.fetch(new Request(new URL(reference,url.origin)));
   if(!r.ok)return deny(503,'Originele afspeelfunctie niet bereikbaar');

@@ -710,6 +710,40 @@ function removeBuiltInPresentationExamples(original){
  return html;
 }
 
+// Each recorded memory is controlled by an entirely separate motor.
+// The existing taleraInline ordinary presenter is unchanged and never starts
+// for a recorded memory. Only store (original media-ID library), stage (the
+// existing visible surface) and runtime.currentMemory (router) cross this edge.
+function isolateNarratedMemories(html){
+ const own=readFileSync(path.join(here,'f5-independent-narrator.browser.js'),'utf8');
+ assert.ok(own.includes('function taleraCreateIndependentNarrator(')&&
+   !own.includes('__taleraV31SelectPhoto')&&!own.includes('taleraInline'),
+   'NARRATOR_MUST_NOT_IMPORT_PRESENTATION_MOTOR');
+ const oldStart="async function present(memory){\n  if(!stage||!memory)return;";
+ const newStart=own+"\nconst taleraIndependentNarrator="+
+   "taleraCreateIndependentNarrator({stage,store,runtime});\n"+
+   "async function present(memory){\n  if(!stage||!memory)return;\n"+
+   "  if(memory._zeroItems?.some(item=>item.kind==='audio')){\n"+
+   "    if(taleraInline)disposePresentation();\n"+
+   "    await taleraIndependentNarrator.open(memory);\n"+
+   "    return; // No ordinary presentation functions for voice memories.\n"+
+   "  }\n"+
+   "  taleraIndependentNarrator.stop();";
+ const exact=(before,after,label)=>{
+   assert.equal(html.split(before).length,2,'F5_NARRATOR_ROUTER_SOURCE_DRIFT_'+label);
+   html=html.replace(before,after);
+ };
+ exact(oldStart,newStart,'TYPE_ROUTER');
+ exact("if(!memory||!memory._taleraLocal){disposePresentation();return}",
+  "if(!memory||!memory._taleraLocal){taleraIndependentNarrator.stop();disposePresentation();return}",
+  'DEACTIVATION');
+ exact("window.addEventListener('pagehide',()=>{\n   disposePresentation();",
+  "window.addEventListener('pagehide',()=>{\n   taleraIndependentNarrator.stop();\n   disposePresentation();",
+  'PAGEHIDE');
+ assert.ok(html.includes('return; // No ordinary presentation functions for voice memories.'));
+ return html;
+}
+
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
@@ -721,6 +755,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=rebuildDirectOrdinaryPresentation(html);
  if(route==='/present')html=filterOwnTopicPresentation(html);
  if(route==='/present')html=hideDuplicateReadingSheetActions(html);
+ if(route==='/present')html=isolateNarratedMemories(html);
  // Use the ORIGINAL, already approved V61 video preview from the
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.
@@ -755,12 +790,21 @@ async function fetchApprovedPlayer(mode){
 }
 const approvedPlayerA=await fetchApprovedPlayer('present');
 const approvedPlayerB=await fetchApprovedPlayer('record');
-assert.equal(approvedPlayerA,approvedPlayerB,
-  'Approved recording and presentation must use IDENTICAL embedded player');
-const approvedPlayerFile=sha(approvedPlayerA)+'.html';
-writeFileSync(path.join(publicDir,'__talera_free','f5references',approvedPlayerFile),
+// Two separately packaged source copies: changes in recording cannot mutate
+// the approved original presentation player, even when both started with
+// identical code. Neither copy imports or references the other.
+const originalPresentationFile=sha(approvedPlayerA)+'.html';
+const independentRecordSource=approvedPlayerB+
+  '\n<!-- TALERA_RECORD_ENGINE_ONLY independent source copy -->\n';
+const independentRecordFile=sha(independentRecordSource)+'.html';
+assert.notEqual(originalPresentationFile,independentRecordFile,
+  'Recording and presentation must not use the same bundled asset');
+writeFileSync(path.join(publicDir,'__talera_free','f5references',originalPresentationFile),
   approvedPlayerA,'utf8');
-refs['/vertelmodus-embed']='/__talera_free/f5references/'+approvedPlayerFile;
+writeFileSync(path.join(publicDir,'__talera_free','f5references',independentRecordFile),
+  independentRecordSource,'utf8');
+refs['/vertelmodus-embed']='/__talera_free/f5references/'+originalPresentationFile;
+refs['/vertelmodus-embed-record']='/__talera_free/f5references/'+independentRecordFile;
 const scripts={};
 const paths=[
  '/__clean/menu-integration.mjs',

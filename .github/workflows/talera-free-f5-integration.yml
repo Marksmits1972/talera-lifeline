@@ -487,3 +487,4 @@ jobs:
       - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
       - run: node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs
 # Existing same-origin F5 QA: verified birth-year to current-year visual ruler only.
+# Same existing TALERA QA PWA: restore native finger-release date; keep exact age-54 scale.

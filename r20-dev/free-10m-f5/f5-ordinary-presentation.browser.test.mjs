@@ -169,6 +169,32 @@ try{
     return row.id;
   });
   await load(page,plain,3);
+  // Native timeline regression: with only ONE real local memory near today,
+  // releasing a finger drag must preserve the finger-selected historical year.
+  // The existing photo-book landing may choose that memory but must NOT
+  // reposition the independent timeline back to its event date.
+  const timelineBox=await page.locator('#surface').boundingBox();
+  assert.ok(timelineBox?.width>180&&timelineBox?.height>90,
+    'Original native timeline touch surface required');
+  const firstCenter=await page.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
+  const timelineY=timelineBox.y+timelineBox.height*.38;
+  await page.mouse.move(timelineBox.x+timelineBox.width*.22,timelineY);
+  await page.mouse.down();
+  await page.mouse.move(timelineBox.x+timelineBox.width*.82,timelineY,{steps:18});
+  const heldCenter=await page.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
+  assert.ok(heldCenter<firstCenter-4*365*86400000,
+    'Timeline must follow finger back at least four years while held');
+  await page.mouse.up();
+  await page.waitForTimeout(1150);
+  const releasedCenter=await page.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
+  assert.ok(Math.abs(releasedCenter-heldCenter)<.35*365.25*86400000,
+    'Timeline returned to latest memory/today after finger release: '+
+      JSON.stringify({held:new Date(heldCenter).toISOString(),
+        released:new Date(releasedCenter).toISOString()}));
+  console.log('TALERA_NATIVE_TIMELINE_RELEASE_STAYS_IN_PAST_PASS',
+    JSON.stringify({previousNavigationIntact:true,fastSlowScaleUntouched:true,
+      mediaNotMoved:true,iphoneAccepted:false}));
+  await load(page,plain,3);
   assert.equal((await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex)),0);
   const first=await centerPixel(page);
   assert.ok(dominant(first,0),'FIRST PHOTO IS NOT VISIBLE RED: '+JSON.stringify(first));

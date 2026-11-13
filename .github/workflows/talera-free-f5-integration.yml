@@ -429,8 +429,8 @@ jobs:
             html.includes('window.__taleraOrdinaryActivate=') &&
             html.includes('tile.el.dataset.owner=owner'),
             'One ordinary image owner and own thumbnail required');
-          assert.ok(html.includes("memory.thumbnail=photos.find((_,i)=>frames[i]?.kind==='photo')"),
-            'A memory uses its own first photo as thumbnail');
+          assert.ok(html.includes("memory.thumbnail=photos[0]||placeholder;"),
+            'Each memory uses the first ordered media item (photo/video still) as its thumbnail');
           assert.ok(!html.includes('const fallback=mem._taleraLocal?(') &&
             !html.includes('readyNeighbour?.currentSrc') &&
             !html.includes('const fallback=base?.complete&&base.naturalWidth?'),

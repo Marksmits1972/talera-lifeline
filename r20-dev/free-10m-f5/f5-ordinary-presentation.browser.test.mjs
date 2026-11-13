@@ -552,6 +552,93 @@ try{
       ownVideoAudibleFlag:true,physicalIphoneSoundNotMeasurableInCI:true}));
 
 
+
+  // A real LEFT/RIGHT gesture from a playing voice memory must immediately
+  // reveal the EXISTING 11-photo wheel and select another saved memory.
+  // No new viewer, test app, audio ID or narrator-specific swipe engine.
+  await load(page,narrated.id,4);
+  await page.waitForFunction(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return audio&&!audio.paused&&audio.currentTime>.06;
+  },null,{timeout:13000});
+  await page.evaluate(()=>{
+    window.__taleraSwipeVoiceToStop=
+      document.querySelector('.talera-independent-narrator-layer audio');
+  });
+  const narratedWheelAtRest=await page.locator('#photoStage .talera-wheel-strip')
+    .evaluate(el=>({active:el.classList.contains('is-visible'),
+      display:getComputedStyle(el).display}));
+  assert.equal(narratedWheelAtRest.active,false);
+  assert.equal(narratedWheelAtRest.display,'none',
+    'Narrated wheel must not cover original image at rest');
+  const narratedBounds=await page.locator('#memoryStoryScroll').boundingBox();
+  assert.ok(narratedBounds?.width>100&&narratedBounds?.height>100);
+  const narratorY=narratedBounds.y+narratedBounds.height*.48;
+  await page.mouse.move(narratedBounds.x+narratedBounds.width*.2,narratorY);
+  await page.mouse.down();
+  assert.equal(await page.locator('#photoStage .talera-wheel-strip')
+    .evaluate(el=>el.classList.contains('is-visible')),false,
+    'Touching without swiping should not reveal thumbnail wheel');
+  await page.mouse.move(narratedBounds.x+narratedBounds.width*.35,narratorY,{steps:4});
+  const narratedDuringSwipe=await page.evaluate(()=>{
+    const wheel=document.querySelector('#photoStage .talera-wheel-strip');
+    const style=wheel&&getComputedStyle(wheel);
+    return {
+      selected:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+      narrationActive:!!document.querySelector('.talera-independent-narrator-layer'),
+      active:wheel?.classList.contains('is-visible'),
+      display:style?.display,visibility:style?.visibility,opacity:style?.opacity,
+      drag:window.__taleraIntegratedBand?.getState?.().drag
+    };
+  });
+  assert.equal(narratedDuringSwipe.selected,narrated.id);
+  assert.equal(narratedDuringSwipe.narrationActive,true);
+  assert.equal(narratedDuringSwipe.drag,true,'Original gesture did not register finger move');
+  assert.equal(narratedDuringSwipe.active,true,
+    'Narrated swipe must activate original photo strip on the FIRST movement');
+  assert.notEqual(narratedDuringSwipe.display,'none',
+    'Narrated CSS still hides the original photo strip during swipe');
+  assert.notEqual(narratedDuringSwipe.visibility,'hidden',
+    'Narrated swipe strip cannot stay invisible once active');
+  assert.ok(Number(narratedDuringSwipe.opacity)>0.9);
+  await page.mouse.move(narratedBounds.x+narratedBounds.width*.84,narratorY,{steps:10});
+  await page.mouse.up();
+  await page.waitForFunction(id=>
+    window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+    mixed,{timeout:13000});
+  await page.waitForFunction(()=>!document.querySelector(
+    '.talera-independent-narrator-layer'),null,{timeout:6000});
+  const afterNarratedSwipe=await page.evaluate(()=>({
+    leftVoicePaused:window.__taleraSwipeVoiceToStop?.paused,
+    leftVoiceSrc:window.__taleraSwipeVoiceToStop?.src,
+    hasNarratorClass:document.body.classList.contains('talera-v61-narration-visual'),
+    newMemory:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId
+  }));
+  assert.equal(afterNarratedSwipe.leftVoicePaused,true,
+    'Old voice keeps playing after navigating to another memory');
+  assert.equal(afterNarratedSwipe.hasNarratorClass,false);
+  assert.equal(afterNarratedSwipe.newMemory,mixed);
+  // The opposite swipe returns to the narrated memory on the same timeline,
+  // still using the original wheel rather than a separate gesture controller.
+  await page.waitForFunction(()=>!document.querySelector(
+    '#photoStage .talera-wheel-strip')?.classList.contains('is-visible'),
+    null,{timeout:13000});
+  await page.mouse.move(narratedBounds.x+narratedBounds.width*.8,narratorY);
+  await page.mouse.down();
+  await page.mouse.move(narratedBounds.x+narratedBounds.width*.18,narratorY,{steps:13});
+  await page.mouse.up();
+  await page.waitForFunction(id=>
+    window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+    narrated.id,{timeout:13000});
+  await page.locator('.talera-independent-narrator-layer audio')
+    .waitFor({state:'attached',timeout:13000});
+  assert.equal(await page.locator('.talera-independent-narrator-layer').count(),1);
+  console.log('TALERA_NARRATOR_EXISTING_WHEEL_SWIPE_BOTH_DIRECTIONS_PASS',
+    JSON.stringify({wheelVisibleOnMovement:true,previousMemory:mixed,
+      returnedNarratedMemory:narrated.id,oldVoiceStopped:true,
+      ordinaryEngineUntouched:true,iphoneAccepted:false}));
+  await load(page,plain,3);
+
   // iPhone-style autoplay rejection in the REAL F5 PWA DOM. Previous tests
   // enabled a Chromium flag allowing audio autoplay, masking this case.
   // Reject the first voice play and all newly-created audible video plays.

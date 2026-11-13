@@ -914,6 +914,83 @@ try{
       firstVideoFrameInStrip:true,noNewVideoCopy:true,iPhoneAccepted:false}));
   await load(page,plain,3);
 
+  // A real event occupies its own saved date AND clock time. The original
+  // timestamp must never be stretched into blended/artificial memories
+  // across all intervening hours and years on the native timeline.
+  const exactStories=await page.evaluate(async()=>{
+    const save=async(title,date,time,color)=>{
+      const c=document.createElement('canvas');c.width=c.height=30;
+      const x=c.getContext('2d');x.fillStyle=color;x.fillRect(0,0,30,30);
+      const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));
+      return (await window.TaleraMemories.save({
+        title,date,time,text:'Original event with exact persisted clock time'
+      },[new File([blob],title+'.png',{type:'image/png'})])).id;
+    };
+    return [
+      await save('Morning event','2017-09-09','08:15:00','#e35723'),
+      await save('Evening event','2017-09-09','22:45:00','#552bad')
+    ];
+  });
+  await load(page,exactStories[0],1);
+  await page.waitForFunction(ids=>ids.every(id=>
+    window.__taleraPhotoBook?.list()?.some(m=>m.storyId===id)),
+    exactStories,{timeout:15000});
+  const eventBridge=await page.evaluate(async ids=>{
+    const book=window.__taleraPhotoBook;
+    const axis=window.__taleraTimelineRuntime;
+    const band=window.__taleraIntegratedBand;
+    const all=book.list(),morning=all.find(m=>m.storyId===ids[0]);
+    const evening=all.find(m=>m.storyId===ids[1]);
+    const morningIndex=all.indexOf(morning),eveningIndex=all.indexOf(evening);
+    // Separate original saved times, on exactly the same calendar date.
+    const morningTime=morning?.ms,eveningTime=evening?.ms;
+    band.beginTimeline();
+    const targetMorning=morningTime+90*60000;
+    axis.setCenter(targetMorning);axis.draw();band.followTimeline(targetMorning);
+    const nearMorning=band.getState().p;
+    const targetEvening=eveningTime-70*60000;
+    axis.setCenter(targetEvening);axis.draw();band.followTimeline(targetEvening);
+    const nearEvening=band.getState().p;
+    const noEventDate=new Date(2019,0,11,12,0,0).getTime();
+    axis.setCenter(noEventDate);axis.draw();band.followTimeline(noEventDate);
+    const inGap=band.getState().p;
+    const centerBeforeRelease=axis.centerMs();
+    band.endTimeline();
+    await new Promise(resolve=>setTimeout(resolve,720));
+    return {
+      morningTime,eveningTime,morningIndex,eveningIndex,
+      nearMorning,nearEvening,inGap,
+      centerBeforeRelease,centerAfterRelease:axis.centerMs(),
+      title:document.getElementById('memoryStory')?.textContent,
+      focusedDate:document.getElementById('focusText')?.textContent,
+      eventDate:document.getElementById('memoryDate')?.textContent,
+      selected:axis.currentMemory()?.id,
+      selectedDate:axis.currentMemory()?.ms
+    };
+  },exactStories);
+  assert.ok(Number.isFinite(eventBridge.morningTime)&&
+    Number.isFinite(eventBridge.eveningTime)&&
+    eventBridge.eveningTime-eventBridge.morningTime===14.5*3600000,
+    'Original distinct morning and evening timestamps must remain exact: '+
+      JSON.stringify(eventBridge));
+  assert.equal(eventBridge.nearMorning,eventBridge.morningIndex,
+    'Morning photo must be anchored only to its exact record (no fractional overlap)');
+  assert.equal(eventBridge.nearEvening,eventBridge.eveningIndex,
+    'Evening photo must be anchored only to its exact record (no fractional overlap)');
+  assert.equal(eventBridge.inGap,Math.round(eventBridge.inGap),
+    'No interpolated photographic memory should appear on unrelated 2019 dates');
+  assert.ok(Math.abs(eventBridge.centerAfterRelease-
+    eventBridge.centerBeforeRelease)<60000,
+    'Unrelated memory must not replace finger-selected 2019 date');
+  assert.ok(String(eventBridge.focusedDate).includes('2019'),
+    'Timeline clock must show actual selected 2019 date, not adjacent memory date: '+
+      JSON.stringify(eventBridge));
+  assert.ok(Number.isFinite(eventBridge.selectedDate),
+    'Timeline selection must reference one original real memory ID');
+  console.log('TALERA_EXACT_EVENT_DATE_TIME_SINGLE_OWNER_PASS',
+    JSON.stringify({sameDayDistinctHours:true,noInterpolatedMemories:true,
+      independentNativeRuler:true,noNewMediaOrDatabase:true,iphoneAccepted:false}));
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

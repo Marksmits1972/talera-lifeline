@@ -806,6 +806,13 @@ function capVisibleTimelineAtToday(html){
      '  // Avoid drawing half a future-facing label at the end of the life line.\n'+
      '  if(major&&label&&x+Math.max(18,String(label).length*4)>endX){label="";sub="";}',
      'SCALE_TICKS');
+ // Preserve all existing age/year spacing except the final partial period.
+ // The last complete calendar-year difference is drawn at today's position.
+ // No time-position, navigation, swipe, zoom or memory data is changed.
+ one('    if(age<0 || age>60) continue;',
+     '    const calendarAge=new Date(LIFE_END).getFullYear()-new Date(LIFE_START).getFullYear();\\n'+
+     '    if(age<0 || age>=calendarAge) continue;',
+     'LAST_WHOLE_YEAR');
  one('  drawDensity(level,startMs,endMs,w,axisY);\n'+
      '  drawMemoryBeacons(level,startMs,endMs,w,axisY);\n'+
      '  drawScale(level,startMs,endMs,w,axisY);',
@@ -816,7 +823,21 @@ function capVisibleTimelineAtToday(html){
      '  drawDensity(level,startMs,endMs,w,axisY);\n'+
      '  drawMemoryBeacons(level,startMs,endMs,w,axisY);\n'+
      '  drawScale(level,startMs,endMs,w,axisY);\n'+
-     '  ctx.restore();',
+     '  ctx.restore();\\n'+
+     '  if(level===0 && LIFE_END>=startMs && LIFE_END<=endMs){\\n'+
+     '    const lastYear=new Date(LIFE_END).getFullYear();\\n'+
+     '    const birthYear=new Date(LIFE_START).getFullYear();\\n'+
+     '    const calendarAge=Math.max(0,lastYear-birthYear);\\n'+
+     '    const x=((LIFE_END-startMs)/(endMs-startMs))*w;\\n'+
+     '    ctx.strokeStyle="rgba(15,39,71,.66)";ctx.lineWidth=1.5;\\n'+
+     '    ctx.beginPath();ctx.moveTo(x,axisY-11);ctx.lineTo(x,axisY+10);ctx.stroke();\\n'+
+     '    ctx.textAlign="center";ctx.fillStyle="rgba(15,39,71,.90)";\\n'+
+     '    ctx.font="700 13px Inter,-apple-system,sans-serif";\\n'+
+     '    ctx.fillText(calendarAge+" "+(window.TaleraI18n?.t("present.ageUnit")||"jaar"),x,axisY+22);\\n'+
+     '    ctx.fillStyle="rgba(62,74,89,.58)";\\n'+
+     '    ctx.font="11px Inter,-apple-system,sans-serif";\\n'+
+     '    ctx.fillText(String(lastYear),x,axisY+34);\\n'+
+     '  }',
      'CANVAS_LIMIT');
  assert.ok(html.includes('const endX=Math.max(0,Math.min(w,((LIFE_END-startMs)/(endMs-startMs))*w));'));
  return html;

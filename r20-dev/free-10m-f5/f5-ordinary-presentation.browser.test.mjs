@@ -111,9 +111,26 @@ try{
   // 1990/year counter. Genuine owner records are never removed by this test.
   const cleanHomeResponse=await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
   assert.equal(cleanHomeResponse.status(),200);
-  await page.waitForFunction(()=>!!window.TaleraMemories?.list&&
-    document.getElementById('v17-year-summary')?.textContent==='nog leeg',
-    null,{timeout:18000});
+  try{
+    await page.waitForFunction(()=>!!window.TaleraMemories?.list&&
+      document.getElementById('v17-year-summary')?.textContent==='nog leeg',
+      null,{timeout:14000});
+  }catch(error){
+    const state=await page.evaluate(()=>({
+      href:location.href,
+      taleraMemories:typeof window.TaleraMemories?.list,
+      demo:window.__taleraReferenceMemories?.length,
+      yearStatus:document.getElementById('v17-year-summary')?.textContent,
+      year:document.getElementById('v17-selected-year')?.textContent,
+      minYear:document.getElementById('v17-min-year')?.textContent,
+      heroTitle:document.getElementById('heroTitle')?.textContent,
+      heroVisible:getComputedStyle(document.getElementById('heroCaption')).display,
+      topicsScript:document.getElementById('talera-v17-topics-script')?.textContent.length,
+      timelineScript:document.getElementById('talera-flow-v17-time')?.textContent.length
+    }));
+    throw Error('CLEAN_HOME_INIT_DIAGNOSTIC '+JSON.stringify(state)+
+      ' pageerrors='+JSON.stringify(errors.slice(0,12))+' cause='+String(error));
+  }
   const cleanHome=await page.evaluate(async()=>{
     const saved=await window.TaleraMemories.list();
     const hero=document.getElementById('heroCaption');

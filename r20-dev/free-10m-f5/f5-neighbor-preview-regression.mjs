@@ -83,6 +83,13 @@ assert.ok(shipped.includes("memory.thumbnail=photos[0]||placeholder;"),
 assert.ok(shipped.includes('if(index===0)memory.thumbnail=cover;')&&
   shipped.includes("if(frames[0]?.kind==='video'&&!frames[0].url)"),
   'When a video starts a memory without stored still, derive its OWN first frame only');
+assert.ok(shipped.includes('async function cacheVideoPoster(mediaKey,still)')&&
+  shipped.includes("item=>item.kind==='video'&&item.key===key")&&
+  shipped.includes("tx.objectStore('files').put({key:posterKey,blob:still})")&&
+  shipped.includes("await taleraClosedMakeCover(memory,{key:first.key,kind:'video',url:null},0,[],true)")&&
+  shipped.includes('await store.cacheVideoPoster?.(frame.key,blob)'),
+  'Only the own VIDEO first-frame JPEG may be prewarmed/persisted in existing scoped IDB');
+
 assert.ok(shipped.includes('tile.el.dataset.owner=owner') &&
   shipped.includes("tile.el.style.visibility='hidden'"),
   'Each recycled strip tile must be hidden until its own image is decoded');

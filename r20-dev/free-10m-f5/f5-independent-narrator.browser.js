@@ -83,7 +83,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     if(s.button){s.button.remove();s.button=null}
   }
   function offerPlay(s,media){
-    if(!isCurrent(s)||s.button)return;
+    if(!isCurrent(s)||s.swipeSuspended||s.button)return;
     const button=document.createElement('button');
     button.type='button';button.textContent='▶ Beluister';
     button.className='talera-v61-audio-permission-hint';
@@ -172,7 +172,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       ['pointerdown',s.onSwipePointerDown],['pointermove',s.onSwipePointerMove],
       ['pointerup',s.onSwipePointerEnd],['pointercancel',s.onSwipePointerEnd],
       ['talera:wheel-motion',s.onSwipeWheelMotion]
-    ])if(handler)document.removeEventListener(event,handler,true);
+    ])if(handler)document.removeEventListener(event,handler,event!=='talera:wheel-motion');
     if(s.timer)clearInterval(s.timer);
     if(s.postTimer)clearTimeout(s.postTimer);
     if(s.audio){

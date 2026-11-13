@@ -896,6 +896,30 @@ function keepNativeTimelineDateAfterPhotoLanding(html){
    '      state.dateIndex=i;\n'+
    '    }',
    'KEEP_REAL_TIME_RULER_DATE');
+ // The original wheel keeps rendering for several frames after the
+ // timeline finger is released. It must not re-impose its photo date over
+ // the real ruler date while the wheel finishes the original landing.
+ one(
+   '    if(focus&&!state.timelineTracking)focus.textContent=formatter.format(items[state.dateIndex>=0?state.dateIndex:c].ms);',
+   '    if(focus&&!state.timelineTracking&&!state.timelineFocusReleased)focus.textContent=formatter.format(items[state.dateIndex>=0?state.dateIndex:c].ms);',
+   'FOCUS_NOT_OVERWRITTEN_BY_WHEEL_FRAME');
+ one(
+   '    // Keep the actual finger-chosen date while the original book settles.\n'+
+   '    window.__taleraNativeTimelineReleaseMs=runtime.centerMs();',
+   '    // Keep the actual finger-chosen date while the original book settles.\n'+
+   '    state.timelineFocusReleased=true;\n'+
+   '    window.__taleraNativeTimelineReleaseMs=runtime.centerMs();',
+   'RELEASE_FOCUS_DURING_LANDING');
+ one(
+   '    state.v=0;state.snap=false;state.landing=null;state.minimumIntentIndex=null;state.intentDirection=0;',
+   '    state.timelineFocusReleased=false;\n'+
+   '    state.v=0;state.snap=false;state.landing=null;state.minimumIntentIndex=null;state.intentDirection=0;',
+   'PHOTO_SWIPE_RETURNS_ORIGINAL_FOCUS');
+ one(
+   '      belt.classList.remove(\'is-visible\');state.visible=false;window.__taleraBandRolling=false;',
+   '      belt.classList.remove(\'is-visible\');state.visible=false;window.__taleraBandRolling=false;\n'+
+   '      state.timelineFocusReleased=false;',
+   'SETTLED_WHEEL_RELEASES_DATE_GUARD');
  return html;
 }
 

@@ -1001,10 +1001,31 @@ try{
   // original narrated story plays must immediately stop the voice/video and
   // expose the original wheel at the nearest stored date. No separate app.
   await load(page,narrated.id,4);
-  await page.waitForFunction(()=>{
-    const voice=document.querySelector('.talera-independent-narrator-layer audio');
-    return !!voice&&!voice.paused&&voice.currentTime>.05;
-  },null,{timeout:15000});
+  try{
+    await page.waitForFunction(()=>!!document.querySelector(
+      '.talera-independent-narrator-layer audio'),null,{timeout:12000});
+    await page.evaluate(async()=>{
+      const audio=document.querySelector('.talera-independent-narrator-layer audio');
+      if(audio.ended)audio.currentTime=0;
+      if(audio.paused)await audio.play();
+    });
+    await page.waitForFunction(()=>{
+      const voice=document.querySelector('.talera-independent-narrator-layer audio');
+      return !!voice&&!voice.paused&&voice.currentTime>.05;
+    },null,{timeout:7000});
+  }catch(error){
+    const diagnostic=await page.evaluate(()=>({
+      active:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+      narrator:!!document.querySelector('.talera-independent-narrator-layer'),
+      audio:[...document.querySelectorAll('.talera-independent-narrator-layer audio')]
+        .map(x=>({paused:x.paused,time:x.currentTime,ended:x.ended,src:!!x.currentSrc,
+          ready:x.readyState,network:x.networkState,error:x.error?.message})),
+      runtime:window.__taleraIntegratedBand?.getState?.(),
+      location:location.pathname+location.search
+    }));
+    throw Error('TIMELINE_GESTURE_NARRATOR_START_DIAGNOSTIC '+JSON.stringify(diagnostic)+
+      ' original='+String(error));
+  }
   const activeNarratedId=await page.evaluate(()=>
     window.__taleraTimelineRuntime.currentMemory()?.storyId);
   assert.equal(activeNarratedId,narrated.id);

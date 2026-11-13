@@ -321,13 +321,13 @@ try{
   // Playback integration in the SAME authenticated TALERA Free candidate.
   // Synthetic voice and original soundtrack, no new app, no customer media.
   const syntheticVoice=path.join(generated,'independent-narrator-voice.wav');
-  const syntheticOriginal=path.join(generated,'independent-narrator-original.mp4');
+  const syntheticOriginal=path.join(generated,'independent-narrator-original.webm');
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','sine=frequency=330:duration=4.6',
     '-c:a','pcm_s16le','-ar','22050',syntheticVoice],{timeout:25000,stdio:'ignore'});
-  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
-    '-f','lavfi','-i','sine=frequency=440:duration=1',
-    '-shortest','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac',
-    '-b:a','64k','-movflags','+faststart',syntheticOriginal],
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=2',
+    '-f','lavfi','-i','sine=frequency=440:duration=2',
+    '-shortest','-c:v','libvpx','-b:v','160k','-c:a','libopus',
+    '-b:a','64k',syntheticOriginal],
     {timeout:30000,stdio:'ignore'});
   const narrated=await page.evaluate(async ({voice,video})=>{
     const files=await Promise.all(['#f01426','#19d03a','#293af2'].map(async(c,i)=>{
@@ -338,7 +338,7 @@ try{
       return new File([blob],'narration-original-'+i+'.png',{type:'image/png'});
     }));
     files.push(new File([Uint8Array.from(atob(video),x=>x.charCodeAt(0))],
-      'original-with-audio.mp4',{type:'video/mp4'}));
+      'original-with-audio.webm',{type:'video/webm'}));
     files.push(new File([Uint8Array.from(atob(voice),x=>x.charCodeAt(0))],
       'one-continuous-voice.wav',{type:'audio/wav'}));
     const saved=await window.TaleraMemories.save({

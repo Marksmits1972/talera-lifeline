@@ -758,6 +758,14 @@ function isolateNarratedMemories(html){
  exact("if(!memory||!memory._taleraLocal){disposePresentation();return}",
   "if(!memory||!memory._taleraLocal){taleraIndependentNarrator.stop();disposePresentation();return}",
   'DEACTIVATION');
+
+ // On a swipe into a memory whose original media are not yet hydrated,
+ // stop the previous narrator BEFORE waiting for IndexedDB/media decode.
+ // Otherwise the previous voice layer keeps playing over the next photo
+ // until async hydrate() completes (or remains stuck after a failed read).
+ exact("if(memory._photoLoading){void hydrate(memory).then(",
+  "if(memory._photoLoading){taleraIndependentNarrator.stop();void hydrate(memory).then(",
+  'STOP_BEFORE_NEXT_MEMORY_HYDRATION');
  exact("window.addEventListener('pagehide',()=>{\n   disposePresentation();",
   "window.addEventListener('pagehide',()=>{\n   taleraIndependentNarrator.stop();\n   disposePresentation();",
   'PAGEHIDE');

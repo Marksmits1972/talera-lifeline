@@ -471,3 +471,18 @@ jobs:
 # Owner-requested correction for already-presented QA narration: audible voice and original video; cue-aligned orange dots. Same PWA, no merge, no official promotion.
 
 # Product owner requested restoring spoken and original-video sound in the same Free PWA; this is an acceptance update only, not a new approved fallback.
+
+  f5_story_swipe_source_inspection:
+    name: Inspect original narration swipe wheel on SAME existing PWA source
+    if: ${{ github.ref_name == 'feature/free-f5-narrator-story-swipe-20261113' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node r20-dev/free-10m-delivery/build.mjs
+      - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - run: node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs

@@ -825,8 +825,9 @@ try{
       const mem=window.__taleraPhotoBook?.list()?.find(m=>m.storyId===id);
       const tile=[...document.querySelectorAll('#photoStage .talera-wheel-page')]
         .find(el=>el.dataset.owner===owner);
-      return !!tile&&tile.dataset.url===mem?.thumbnail&&
-        !!tile.querySelector('img.example-photo')?.naturalWidth;
+      const cover=mem?.thumbnail||mem?.previewImage||mem?.photos?.[0]||mem?.image;
+    return !!tile&&tile.dataset.url===cover&&
+      !!tile.querySelector('img.example-photo')?.naturalWidth;
     },videoFirst.id,{timeout:12000});
   }catch(error){
     const diag=await page.evaluate(id=>{
@@ -852,13 +853,25 @@ try{
     const mem=book.list().find(m=>m.storyId===id);
     const tile=[...document.querySelectorAll('#photoStage .talera-wheel-page')]
       .find(x=>x.dataset.owner==='pwa:'+id);
-    return {tileMatchesVideoFirst:tile?.dataset.url===mem.thumbnail,
-      firstKind:mem._zeroFrames[0].kind,
+    const cover=mem.thumbnail||mem.previewImage||mem.photos?.[0]||mem.image;
+    const img=tile?.querySelector('img.example-photo');
+    const canvas=document.createElement('canvas');
+    canvas.width=canvas.height=1;
+    const context=canvas.getContext('2d',{willReadFrequently:true});
+    if(img?.naturalWidth)context.drawImage(img,0,0,1,1);
+    const pixel=Array.from(context.getImageData(0,0,1,1).data).slice(0,3);
+    return {tileMatchesVideoFirst:tile?.dataset.url===cover,
+      firstKind:mem._zeroItems?.find(it=>it.kind==='photo'||it.kind==='video')?.kind,
       stripVisible:document.querySelector('#photoStage .talera-wheel-strip')
-        ?.classList.contains('is-visible')};
+        ?.classList.contains('is-visible'),pixel};
   },videoFirst.id);
   assert.equal(duringVideoFirstSwipe.tileMatchesVideoFirst,true);
+  assert.equal(duringVideoFirstSwipe.firstKind,'video');
   assert.equal(duringVideoFirstSwipe.stripVisible,true);
+  assert.ok(duringVideoFirstSwipe.pixel[2]>duringVideoFirstSwipe.pixel[0]*1.4&&
+    duringVideoFirstSwipe.pixel[2]>duringVideoFirstSwipe.pixel[1]*1.4,
+    'SWIPE showed other photo instead of first blue VIDEO frame: '+
+      JSON.stringify(duringVideoFirstSwipe));
   await page.mouse.move(stripBox.x+stripBox.width*.85,stripY,{steps:6});
   await page.mouse.up();
   await page.waitForFunction(id=>

@@ -278,7 +278,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       try{soundtrack.pause()}catch(error){}
       done();
     }
-    soundtrack.onplay=null;
+    soundtrack.onplay=syncPicture;
     soundtrack.onpause=null;
     soundtrack.ontimeupdate=syncPicture;
     soundtrack.onplaying=syncPicture;

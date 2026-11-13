@@ -489,3 +489,4 @@ jobs:
 # Existing same-origin F5 QA: verified birth-year to current-year visual ruler only.
 # Same existing TALERA QA PWA: restore native finger-release date; keep exact age-54 scale.
 # Same original F5 acceptance origin: event IDs and timestamps, no new stores or players.
+# Existing F5 acceptance origin: real timeline motion stops old player and synchronizes the original photo wheel.

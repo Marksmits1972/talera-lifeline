@@ -554,8 +554,8 @@ try{
 
   // iPhone-style autoplay rejection in the REAL F5 PWA DOM. Previous tests
   // enabled a Chromium flag allowing audio autoplay, masking this case.
-  // Reject exactly the FIRST voice play and the FIRST original-video play,
-  // so the native user gesture must recover BOTH independently.
+  // Reject the first voice play and all newly-created audible video plays.
+  // The narrator must reuse its unlocked voice audio element instead.
   await page.addInitScript(()=>{
     const originalPlay=HTMLMediaElement.prototype.play;
     let refusedVoice=false,refusedVideo=false;
@@ -565,7 +565,7 @@ try{
           refusedVoice=true;
           return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
         }
-        if(this.tagName==='VIDEO'&&this.classList.contains('talera-independent-original-video')&&!refusedVideo){
+        if(this.tagName==='VIDEO'&&!this.muted&&this.classList.contains('talera-independent-original-video')&&!refusedVideo){
           refusedVideo=true;
           return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
         }
@@ -584,39 +584,29 @@ try{
   },null,{timeout:12000});
   await page.locator('.talera-independent-narrator-layer .talera-independent-original-video')
     .waitFor({state:'attached',timeout:18000});
-  await voiceButton.waitFor({state:'visible',timeout:9000});
-  await page.evaluate(()=>{
-    const v=document.querySelector(
-      '.talera-independent-narrator-layer video.talera-independent-original-video');
-    window.__taleraOriginalAudioQA={started:false,timeSeen:0,ended:false};
-    const qa=window.__taleraOriginalAudioQA;
-    v.addEventListener('playing',()=>qa.started=true);
-    v.addEventListener('timeupdate',()=>qa.timeSeen=Math.max(qa.timeSeen,v.currentTime||0));
-    v.addEventListener('ended',()=>{qa.ended=true;qa.timeSeen=Math.max(qa.timeSeen,v.currentTime||0)});
-  });
-  await voiceButton.click({timeout:6000});
-  try{
-    await page.waitForFunction(()=>{
-      const qa=window.__taleraOriginalAudioQA;
-      return qa&&(qa.timeSeen>.04||qa.ended);
-    },null,{timeout:12000});
-  }catch(error){
-    const state=await page.evaluate(()=>{
-      const v=document.querySelector('.talera-independent-original-video');
-      return {qa:window.__taleraOriginalAudioQA,
-        video:v?{paused:v.paused,ended:v.ended,time:v.currentTime,
-          readyState:v.readyState,muted:v.muted,error:v.error?.message}:null,
-        buttonVisible:!!document.querySelector('button.talera-v61-audio-permission-hint')};
-    });
-    throw Error('Original video did not advance after native Listen click: '+
-      JSON.stringify(state)+'; '+error);
-  }
+
+  // The first voice gesture unlocks the audio element; the video soundtrack
+  // reuses that SAME element without another user interaction.
+  await page.waitForFunction(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const v=layer?.querySelector('video.talera-independent-original-video');
+    const a=layer?.querySelector('audio');
+    return v&&a&&v.currentSrc===a.currentSrc&&!a.muted&&
+      !a.paused&&a.currentTime>.04;
+  },null,{timeout:12000});
+  assert.equal(await voiceButton.count(),0,
+    'The original video soundtrack must not request a second Listen tap');
   const finalSound=await page.evaluate(()=>{
-    const v=document.querySelector('.talera-independent-original-video');
-    return {muted:v?.muted,volume:v?.volume,events:window.__taleraOriginalAudioQA};
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const v=layer.querySelector('video.talera-independent-original-video');
+    const a=layer.querySelector('audio');
+    return {pictureMuted:v.muted,soundMuted:a.muted,
+      soundPlaying:!a.paused&&a.currentTime>.04,
+      sameMedia:a.currentSrc===v.currentSrc};
   });
-  assert.equal(finalSound.muted,false,'Original video must remain unmuted after Listen gesture');
-  assert.ok(finalSound.events.started||finalSound.events.ended,'Native original video play never started');
+  assert.equal(finalSound.pictureMuted,true);
+  assert.equal(finalSound.soundMuted,false);
+  assert.ok(finalSound.soundPlaying&&finalSound.sameMedia);
   console.log('TALERA_IOS_GESTURE_NARRATOR_AUDIO_AND_VIDEO_PLAYBACK_PASS');
   await load(page,plain,3);
 

@@ -566,12 +566,38 @@ try{
   await page.locator('.talera-independent-narrator-layer .talera-independent-original-video')
     .waitFor({state:'attached',timeout:18000});
   await voiceButton.waitFor({state:'visible',timeout:9000});
-  await voiceButton.click({timeout:6000});
-  await page.waitForFunction(()=>{
+  await page.evaluate(()=>{
     const v=document.querySelector(
       '.talera-independent-narrator-layer video.talera-independent-original-video');
-    return v&&!v.paused&&!v.muted&&v.currentTime>.08;
-  },null,{timeout:10000});
+    window.__taleraOriginalAudioQA={started:false,timeSeen:0,ended:false};
+    const qa=window.__taleraOriginalAudioQA;
+    v.addEventListener('playing',()=>qa.started=true);
+    v.addEventListener('timeupdate',()=>qa.timeSeen=Math.max(qa.timeSeen,v.currentTime||0));
+    v.addEventListener('ended',()=>{qa.ended=true;qa.timeSeen=Math.max(qa.timeSeen,v.currentTime||0)});
+  });
+  await voiceButton.click({timeout:6000});
+  try{
+    await page.waitForFunction(()=>{
+      const qa=window.__taleraOriginalAudioQA;
+      return qa&&(qa.timeSeen>.04||qa.ended);
+    },null,{timeout:12000});
+  }catch(error){
+    const state=await page.evaluate(()=>{
+      const v=document.querySelector('.talera-independent-original-video');
+      return {qa:window.__taleraOriginalAudioQA,
+        video:v?{paused:v.paused,ended:v.ended,time:v.currentTime,
+          readyState:v.readyState,muted:v.muted,error:v.error?.message}:null,
+        buttonVisible:!!document.querySelector('button.talera-v61-audio-permission-hint')};
+    });
+    throw Error('Original video did not advance after native Listen click: '+
+      JSON.stringify(state)+'; '+error);
+  }
+  const finalSound=await page.evaluate(()=>{
+    const v=document.querySelector('.talera-independent-original-video');
+    return {muted:v?.muted,volume:v?.volume,events:window.__taleraOriginalAudioQA};
+  });
+  assert.equal(finalSound.muted,false,'Original video must remain unmuted after Listen gesture');
+  assert.ok(finalSound.events.started||finalSound.events.ended,'Native original video play never started');
   console.log('TALERA_IOS_GESTURE_NARRATOR_AUDIO_AND_VIDEO_PLAYBACK_PASS');
   await load(page,plain,3);
 

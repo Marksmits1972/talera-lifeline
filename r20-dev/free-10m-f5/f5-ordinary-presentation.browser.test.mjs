@@ -106,8 +106,30 @@ try{
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
+  // Inspect the REAL existing canvas while Chromium renders its original
+  // account-birthdate ruler. The life line must not paint future-year labels.
+  await page.addInitScript(()=>{
+    window.__taleraDrawnYears=[];
+    const original=CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText=function(text,x,y,...rest){
+      if(this.canvas?.id==='timelineCanvas')
+        window.__taleraDrawnYears.push(String(text));
+      return original.call(this,text,x,y,...rest);
+    };
+  });
   const response=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
   assert.equal(response.status(),200);
+  await page.waitForFunction(()=>window.__taleraDrawnYears?.includes('50 jaar'),
+    null,{timeout:10000});
+  const renderedYearLabels=await page.evaluate(()=>[...window.__taleraDrawnYears]);
+  assert.ok(renderedYearLabels.includes('50 jaar')&&renderedYearLabels.includes('2024'),
+    'Historical 50-year tick must remain visible on approved canvas');
+  assert.deepEqual(renderedYearLabels.filter(x=>/^20(?:2[7-9]|[3-9][0-9])$/.test(x)),[],
+    'Original 15-year timeline painted future years after today');
+  console.log('TALERA_PRESENT_TODAY_ONLY_REAL_CANVAS_PASS',
+    JSON.stringify({birthYear:1974,lastAllowed:2026,visiblePast:true,
+      paintedFuture:false,originalPlayerUnchanged:true,realIphoneAccepted:false}));
+
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:15000});
   // With zero saved memories the original presentation must start empty:
   // neither the 50 fixed examples nor the 450 generated examples can appear.

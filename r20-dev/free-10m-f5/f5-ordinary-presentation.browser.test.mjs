@@ -736,7 +736,7 @@ try{
   const videoFirst=await page.evaluate(async b64=>{
     const original=new File(
       [Uint8Array.from(atob(b64),c=>c.charCodeAt(0))],
-      'video-first-blue.mp4',{type:'video/mp4'});
+      'video-first-blue.webm',{type:'video/webm'});
     const canvas=document.createElement('canvas');
     canvas.width=140;canvas.height=140;
     const ctx=canvas.getContext('2d');ctx.fillStyle='#ffa500';
@@ -749,7 +749,7 @@ try{
     },[original,second]);
     return {id:row.id,kinds:row.items.filter(x=>
       x.kind==='video'||x.kind==='photo').map(x=>x.kind)};
-  },readFileSync(mp4).toString('base64'));
+  },readFileSync(syntheticOriginal).toString('base64'));
   assert.deepEqual(videoFirst.kinds,['video','photo'],
     'Test needs genuinely ordered video first, photo second in the same memory');
   await load(page,videoFirst.id,2);

@@ -923,6 +923,46 @@ function keepNativeTimelineDateAfterPhotoLanding(html){
  return html;
 }
 
+/* A genuine movement of the existing time ruler owns the existing RH19
+   photo strip. Stop the old ordinary/narrated playback on the FIRST movement,
+   not on a stationary touch. The original engines, saved cues, photos,
+   speed-sensitive scale and book landing remain unchanged. */
+function stopOldPresentationWhenTimelineMoves(html){
+ const one=(before,after,label)=>{
+  assert.equal(html.split(before).length,2,'F5_TIMELINE_PRESENTATION_'+label+'_DRIFT');
+  html=html.replace(before,after);
+ };
+ one(
+   '    state.timelineTracking=true;state.timelineLastAt=now;',
+   '    state.timelineTracking=true;state.timelineMoved=false;state.timelineLastAt=now;',
+   'TRACK_ACTUAL_MOTION');
+ one(
+   '    const now=performance.now(),pos=positionForTimestamp(ms);',
+   '    if(!state.timelineMoved){\n'+
+   '      state.timelineMoved=true;\n'+
+   '      document.dispatchEvent(new Event("talera:timeline-user-motion"));\n'+
+   '    }\n'+
+   '    const now=performance.now(),pos=positionForTimestamp(ms);',
+   'STOP_ON_FIRST_REAL_MOVEMENT');
+ one(
+   'const taleraIndependentNarrator=taleraCreateIndependentNarrator({stage,store,runtime});',
+   'const taleraIndependentNarrator=taleraCreateIndependentNarrator({stage,store,runtime});\n'+
+   '// Do not let a recorded voice/video continue behind a moving photo strip.\n'+
+   'document.addEventListener("talera:timeline-user-motion",()=>{\n'+
+   '  taleraIndependentNarrator.stop();\n'+
+   '  if(taleraInline)disposePresentation();\n'+
+   '});',
+   'STOP_VOICE_AND_ORIGINAL_SOUND');
+ one(
+   "  window.addEventListener('pagehide',closeOrdinaryVideo,{once:true});",
+   '  document.addEventListener("talera:timeline-user-motion",()=>{\n'+
+   '    ownSerial++;clearAuto();closeOrdinaryVideo();\n'+
+   '  });\n'+
+   "  window.addEventListener('pagehide',closeOrdinaryVideo,{once:true});",
+   'STOP_ORDINARY_PLAYER');
+ return html;
+}
+
 const refs={};
 for(const [route,filename] of Object.entries(routes)){
  let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
@@ -938,6 +978,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=showExistingNarratedSwipeBand(html);
  if(route==='/present')html=capVisibleTimelineAtToday(html);
  if(route==='/present')html=keepNativeTimelineDateAfterPhotoLanding(html);
+ if(route==='/present')html=stopOldPresentationWhenTimelineMoves(html);
  // Use the ORIGINAL, already approved V61 video preview from the
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.

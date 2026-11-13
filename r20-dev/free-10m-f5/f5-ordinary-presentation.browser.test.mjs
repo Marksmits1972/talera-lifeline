@@ -106,6 +106,56 @@ try{
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
+  // The VERY SAME authenticated Free PWA must begin with ZERO bundled
+  // memories on Home, not merely an image-less Test 081 hero or a synthetic
+  // 1990/year counter. Genuine owner records are never removed by this test.
+  const cleanHomeResponse=await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+  assert.equal(cleanHomeResponse.status(),200);
+  await page.waitForFunction(()=>!!window.TaleraMemories?.list&&
+    document.getElementById('v17-year-summary')?.textContent==='nog leeg',
+    null,{timeout:18000});
+  const cleanHome=await page.evaluate(async()=>{
+    const saved=await window.TaleraMemories.list();
+    const hero=document.getElementById('heroCaption');
+    return {
+      saved:saved.length,
+      examples:window.__taleraReferenceMemories?.length,
+      heroTitle:document.getElementById('heroTitle')?.textContent.trim(),
+      heroDate:document.getElementById('heroKind')?.textContent.trim(),
+      heroVisible:!!hero&&getComputedStyle(hero).display!=='none',
+      heroImage:document.getElementById('heroImage')?.getAttribute('src'),
+      year:document.getElementById('v17-selected-year')?.textContent.trim(),
+      minYear:document.getElementById('v17-min-year')?.textContent.trim(),
+      yearStatus:document.getElementById('v17-year-summary')?.textContent.trim(),
+      sampleTiles:document.getElementById('demoCards')?.children.length,
+      yearPreview:document.getElementById('v17-year-preview')?.textContent.trim(),
+      yearSampleTips:[...document.querySelectorAll('#v17-ruler .v17-mark')]
+        .filter(x=>/voorbeeld/i.test(x.title)).length,
+      fakeFamily:[...document.querySelectorAll('.talera-topic-example')].length,
+      bundledTest81:document.documentElement.outerHTML.includes('Test 081'),
+      bundledPhoto081:document.documentElement.outerHTML.includes('talera-500-fotoband-081')
+    };
+  });
+  assert.equal(cleanHome.saved,0,'Brand-new local account must start with zero own records');
+  assert.equal(cleanHome.examples,0,'ALL 500 Home demo records must be removed');
+  assert.deepEqual([cleanHome.heroTitle,cleanHome.heroDate],['',''],
+    'Home must not show a remembered demo title/date on an empty account');
+  assert.equal(cleanHome.heroVisible,false,'No pretend hero memory should remain');
+  assert.equal(cleanHome.heroImage,null,'No reference hero src may survive');
+  assert.equal(cleanHome.sampleTiles,0,'No example or fake topic tiles');
+  assert.equal(cleanHome.fakeFamily,0,'No invented family topic from first own photo');
+  assert.equal(cleanHome.yearStatus,'nog leeg','A year with no events has no sample count');
+  assert.equal(cleanHome.minYear,'1974','Existing account birthday still controls Home time axis');
+  assert.equal(cleanHome.year,String(new Date().getFullYear()),
+    'Empty account selects the current year, never 1990 or demo year 1985');
+  assert.equal(cleanHome.yearSampleTips,0,'Ruler must not expose demo memory tooltips');
+  assert.equal(cleanHome.bundledTest81,false);
+  assert.equal(cleanHome.bundledPhoto081,false);
+  console.log('TALERA_F5_HOME_ZERO_BUNDLED_MEMORIES_PASS',JSON.stringify({
+    sampleCount:0,heroEmpty:true,yearEmpty:true,accountBirthYearPreserved:true,
+    ownerIndexedDbUntouched:true,realIphoneAccepted:false
+  }));
+
   const response=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
   assert.equal(response.status(),200);
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:15000});
@@ -118,6 +168,13 @@ try{
   }));
   assert.equal(initial.memory,null,'The account-free presentation must not select a built-in memory');
   assert.deepEqual(initial.demoImages,[],'No built-in photo may be loaded into the presentation');
+  const emptyPresentation=await page.evaluate(()=>({
+    date:document.getElementById('memoryDate')?.textContent.trim(),
+    story:document.getElementById('memoryStory')?.textContent.trim()
+  }));
+  assert.deepEqual(emptyPresentation,{date:'',story:''},
+    'Presentation with zero own events must not render a fake September 2026 memory');
+
   const readingControls=await page.evaluate(()=>{
     const sheet=document.querySelector('.memory-space');
     const paper=document.getElementById('memoryCaption');

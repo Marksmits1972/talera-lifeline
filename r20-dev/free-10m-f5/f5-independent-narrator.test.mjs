@@ -72,9 +72,12 @@ assert.equal(sandbox.plan(noCues).cues[0].mediaId,'photo-A');
 // the original Talera presentation controller as a mocked dependency.
 const made=[],revoked=[],intervals=[],timeouts=[];
 class FakeBlob{constructor(size=17){this.size=size}}
+let blockNextVoice=false;
 class FakeElement{
  constructor(tag){this.tag=tag;this.style={position:'relative'};this.children=[];
-  this.hidden=false;this.paused=true;this.currentTime=0;this.readyState=4;this.duration=90}
+  this.hidden=false;this.paused=true;this.currentTime=0;this.readyState=4;this.duration=90;
+  this.blockOnce=tag==='audio'&&blockNextVoice;
+  if(this.blockOnce)blockNextVoice=false}
  appendChild(node){this.children.push(node);node.parentElement=this;return node}
  remove(){this.removed=true;if(this.parentElement)
   this.parentElement.children=this.parentElement.children.filter(x=>x!==this)}
@@ -82,7 +85,12 @@ class FakeElement{
  removeAttribute(k){if(k!=='muted')delete this[k]}
  load(){}
  pause(){this.paused=true;this.onpause?.()}
- play(){this.paused=false;this.onplay?.();return Promise.resolve()}
+ play(){
+  if(this.blockOnce){
+    this.blockOnce=false;
+    return Promise.reject(Object.assign(new Error('iOS gesture required'),{name:'NotAllowedError'}));
+  }
+  this.paused=false;this.onplay?.();return Promise.resolve()}
 }
 const host=new FakeElement('host');const stage=new FakeElement('stage');
 stage.parentElement=host;
@@ -92,7 +100,8 @@ const fakeDots=Array.from({length:memory._zeroFrames.length},()=>({
   active:false,classList:{toggle(name,on){assert.equal(name,'active');this.active=on}}
 }));
 const ctx={
- window:{__taleraAudioControls:{isEnabled:()=>true}},
+ window:{__taleraAudioControls:{isEnabled:()=>false}}, // Presenter is OFF; narrator must not import it.
+ navigator:{audioSession:{type:'ambient'}},
  document:{createElement(tag){const el=new FakeElement(tag);made.push(el);return el},
   querySelectorAll(selector){assert.equal(selector,'.talera-photo-dot');return fakeDots},
   body:{classList:{add(x){bodyClasses.add(x)},remove(x){bodyClasses.delete(x)}}},
@@ -121,7 +130,10 @@ await Promise.resolve();await Promise.resolve();
 const audio=made.find(x=>x.tag==='audio');
 assert.ok(audio&&audio.src==='blob:independent-voice',
   'One original voice Blob must own the narrator clock');
-assert.equal(audio.muted,false,'Recorded voice MUST be audible when listening is on');
+assert.equal(audio.muted,false,
+  'Narrator voice must be unmuted even if presenter audio preference is OFF');
+assert.equal(ctx.navigator.audioSession.type,'playback',
+  'iPhone PWA narration must request audio-session playback, not ambient');
 assert.equal(fakeDots[0].classList.active,true,'First orange dot must be active at t=0');
 assert.ok(bodyClasses.has('talera-v61-narration-visual'));
 assert.ok(made.some(x=>x.tag==='img'&&x.src==='blob:photo-A'),
@@ -155,47 +167,54 @@ assert.equal(videos.at(-1).muted,false,
 assert.equal(fakeDots[2].classList.active,true,'Original-video round selects correct dot');
 current='pwa:another-memory';motor.stop();
 assert.equal(bodyClasses.has('talera-v61-narration-visual'),false);
+assert.equal(ctx.navigator.audioSession.type,'ambient',
+  'Narrator must restore original native audio session when switching motors');
 assert.ok(host.children.every(x=>x.removed||!x.className?.includes('talera-independent-narrator-layer')));
 assert.ok(revoked.includes('blob:independent-voice'));
 
-// A persistent explicit listening OFF must not silently hide the remedy.
-// Existing '▶ Beluister' is a real native iPhone gesture and enables both
-// the voice AND the subsequent original video in this ONE narrated playback.
+// A persistent global presenter OFF must not silence the separated narrator.
 current=memory.id;
 ctx.window.__taleraAudioControls.isEnabled=()=>false;
 await motor.open(memory);
 await Promise.resolve();await Promise.resolve();
-const offAudio=made.filter(x=>x.tag==='audio').at(-1);
-assert.equal(offAudio.muted,true,'Explicit user OFF remains respected');
-const permission=host.children.find(x=>x.textContent==='▶ Beluister'&&!x.removed);
-assert.ok(permission,'A muted narration must expose the existing Listen action');
-permission.onclick({preventDefault(){},stopPropagation(){}});
-await Promise.resolve();await Promise.resolve();
-assert.equal(offAudio.muted,false,'Listen tap must actually unmute the recording');
-assert.ok(permission.removed,'Permission prompt should disappear after the gesture');
-offAudio.onended();
-await Promise.resolve();await Promise.resolve();
+const independentAudio=made.filter(x=>x.tag==='audio').at(-1);
+assert.equal(independentAudio.muted,false);
+assert.equal(ctx.navigator.audioSession.type,'playback');
+independentAudio.onended();
+await new Promise(resolve=>setImmediate(resolve));
 const photoTimer=timeouts.at(-1);photoTimer.fn();
-await new Promise(resolve=>setImmediate(resolve)); // Let original ID Blob resolve.
+await new Promise(resolve=>setImmediate(resolve));
 assert.equal(made.filter(x=>x.tag==='video').at(-1).muted,false,
-  'After a Listen gesture, original video must also become audible');
+  'Original video must be audible independent of presenter OFF state');
 motor.stop();
+assert.equal(ctx.navigator.audioSession.type,'ambient');
 
-// Missing UI control during iOS cold start must never silently mute voice.
-ctx.window.__taleraAudioControls=undefined;
+// Simulate genuine iOS sound autoplay failure. Must expose an accessible
+// native-gesture Listen button; button handler directly calls media.play().
+blockNextVoice=true;
 await motor.open(memory);
-await Promise.resolve();await Promise.resolve();
-const coldAudio=made.filter(x=>x.tag==='audio').at(-1);
-assert.equal(coldAudio.muted,false,
-  'Absent sound controller must mean audible, not silent default playback');
+await new Promise(resolve=>setImmediate(resolve));
+const blockedAudio=made.filter(x=>x.tag==='audio').at(-1);
+const permission=host.children.find(x=>x.tag==='button'&&
+  x.textContent==='▶ Beluister'&&!x.removed);
+assert.ok(permission,'Voice autoplay blocked by iOS must show an actual Listen button');
+assert.equal(blockedAudio.paused,true,'iOS blocked autoplay must not be mistaken for playback');
+permission.onclick({preventDefault(){},stopPropagation(){}});
+await new Promise(resolve=>setImmediate(resolve));
+assert.equal(blockedAudio.paused,false,'iPhone Listen gesture must start original voice');
+assert.equal(blockedAudio.muted,false);
+assert.equal(permission.removed,true);
 motor.stop();
+assert.equal(ctx.navigator.audioSession.type,'ambient');
+
 console.log('TALERA_INDEPENDENT_NARRATOR_TEST_PASS',JSON.stringify({
  originalIdsUnchanged:true,repeatSwipesRetained:true,
  recorderAndPresentationSourcesDistinct:true,
  narrationNoPresentationFunctions:true,voiceClockDrivesCues:true,
  videoSilentDuringVoice:true,remainingPhotosAfterVoice:true,
  originalVideoAudioAfterVoice:true,orangeDotsFollowAllCues:true,
- explicitOffHasAudibleGesture:true,missingAudioControllerAudible:true,
+ nativeAudioSessionPlayback:true,nativeSessionRestored:true,
+ originalAudioIndependentOfPresenter:true,iOSListenGestureRecoverable:true,
  isolatedCleanup:true,
  actualIphoneAccepted:false,productionChanged:false
 }));

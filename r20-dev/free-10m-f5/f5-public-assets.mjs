@@ -874,6 +874,28 @@ function keepNativeTimelineDateAfterPhotoLanding(html){
    '    beginLanding(0,0,Math.round(state.p));\n'+
    '    // Timeline selection also uses the single landing curve.',
    'END_TIMELINE_DATE');
+
+ // The original photo book has a fractional position for photo-to-photo
+ // gestures. It is NOT a real timestamp: interpolating this position during
+ // native TIME browsing blends two unrelated memories over the years/hours
+ // between their original saved event dates. Time browsing must resolve
+ // exactly one unchanged memory ID from the sorted original timestamps.
+ one(
+   '    return clip(lo+clip((ms-items[lo].ms)/Math.max(1,items[hi].ms-items[lo].ms),0,1),0,n-1);',
+   '    return ms-items[lo].ms<=items[hi].ms-ms?lo:hi;',
+   'EVENT_TIMESTAMP_NOT_INTERPOLATED');
+ // The native ruler already paints the finger-selected date in draw().
+ // The photo book must not replace it with a different memory's date upon
+ // committing that memory after a native timeline swipe.
+ one(
+   '    book.choose(i);\n    if(focus){focus.textContent=formatter.format(items[i].ms);state.dateIndex=i;}',
+   '    const fromNativeTimeline=Number.isFinite(window.__taleraNativeTimelineReleaseMs);\n'+
+   '    book.choose(i);\n'+
+   '    if(focus){\n'+
+   '      if(!fromNativeTimeline)focus.textContent=formatter.format(items[i].ms);\n'+
+   '      state.dateIndex=i;\n'+
+   '    }',
+   'KEEP_REAL_TIME_RULER_DATE');
  return html;
 }
 

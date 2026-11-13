@@ -440,21 +440,30 @@ try{
   await page.waitForFunction(()=>!!document.querySelector(
     '.talera-independent-narrator-layer video.talera-independent-original-video'),
     null,{timeout:15000});
+
+  await page.waitForFunction(()=>{
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const video=layer?.querySelector('video.talera-independent-original-video');
+    const sound=layer?.querySelector('audio');
+    return video&&sound&&sound.currentSrc===video.currentSrc&&
+      !sound.paused&&!sound.muted&&sound.currentTime>.02;
+  },null,{timeout:12000});
   const soundtrack=await page.evaluate(()=>{
     const layer=document.querySelector('.talera-independent-narrator-layer');
-    const v=layer.querySelector('video.talera-independent-original-video');
-    return {present:!!v,originalMedia:v?.currentSrc||v?.src,
-      muted:v?.muted,expectedMuted:!window.__taleraAudioControls?.isEnabled?.(),
-      concurrentVoice:!!layer.querySelector('audio'),
-      otherNarrators:document.querySelectorAll('.talera-independent-narrator-layer').length};
+    const video=layer.querySelector('video.talera-independent-original-video');
+    const sound=layer.querySelector('audio');
+    return {pictureMuted:video?.muted,audioMuted:sound?.muted,
+      audioPlaying:!sound.paused&&sound.currentTime>0,
+      sameOriginalSource:sound.currentSrc===video.currentSrc,
+      secondListen:!!document.querySelector('button.talera-v61-audio-permission-hint'),
+      narratorCount:document.querySelectorAll('.talera-independent-narrator-layer').length};
   });
-  assert.equal(soundtrack.present,true,'The final original video was never played');
-  assert.equal(soundtrack.muted,false,
-    'Original video soundtrack must be audible with listening enabled');
-  assert.equal(soundtrack.muted,soundtrack.expectedMuted,
-    'The final original video did not respect the original sound setting');
-  assert.equal(soundtrack.concurrentVoice,false,'Voice and original video must never overlap');
-  assert.equal(soundtrack.otherNarrators,1,'Only one narrator may own an active memory');
+  assert.equal(soundtrack.pictureMuted,true);
+  assert.equal(soundtrack.audioMuted,false);
+  assert.equal(soundtrack.audioPlaying,true);
+  assert.equal(soundtrack.sameOriginalSource,true);
+  assert.equal(soundtrack.secondListen,false);
+  assert.equal(soundtrack.narratorCount,1);
   await load(page,plain,3);
   assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0,
     'Ordinary memory must not receive any narrator layer');

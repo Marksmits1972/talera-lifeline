@@ -82,6 +82,10 @@ assert.equal(sandbox.plan(noCues).cues[0].mediaId,'photo-A');
 // Test actual lifecycle with synthetic Blob/File references; never use
 // the original Talera presentation controller as a mocked dependency.
 const made=[],revoked=[],intervals=[],timeouts=[];
+const documentListeners=new Map();
+const dispatch=(type,event={})=>{
+  for(const handler of [...(documentListeners.get(type)||[])])handler(event);
+};
 class FakeBlob{constructor(size=17){this.size=size}}
 let blockNextVoice=false;
 class FakeElement{
@@ -116,7 +120,11 @@ const ctx={
  document:{createElement(tag){const el=new FakeElement(tag);made.push(el);return el},
   querySelectorAll(selector){assert.equal(selector,'.talera-photo-dot');return fakeDots},
   body:{classList:{add(x){bodyClasses.add(x)},remove(x){bodyClasses.delete(x)}}},
-  addEventListener(){},removeEventListener(){}},
+  addEventListener(name,fn){
+    if(!documentListeners.has(name))documentListeners.set(name,new Set());
+    documentListeners.get(name).add(fn);
+  },
+  removeEventListener(name,fn){documentListeners.get(name)?.delete(fn)}},
  Blob:FakeBlob,console,
  URL:{createObjectURL:()=>{const x='blob:independent-voice';return x},
   revokeObjectURL(x){revoked.push(x)}},
@@ -156,6 +164,33 @@ assert.ok(silentVideo&&silentVideo.muted&&silentVideo.controls===false,
   'Narrated preview must be silent');
 assert.ok(fetchedMedia.includes('video-C'));
 assert.equal(fakeDots[2].classList.active,true,'Orange video dot must follow voice cue');
+// Narrator video compositor must stop immediately at horizontal swipe intent,
+// independently of the existing photo-wheel gesture implementation.
+const voiceLayer=host.children.find(x=>x.className==='talera-independent-narrator-layer'&&!x.removed);
+const validPhotoTarget={
+ closest(selector){return selector==='#memoryStoryScroll'?{}:null}
+};
+await silentVideo.play(); // Simulate active video decode on a real iPhone.
+assert.equal(silentVideo.paused,false);
+dispatch('pointerdown',{pointerId:9,pointerType:'touch',isPrimary:true,
+  clientX:180,clientY:200,target:validPhotoTarget});
+assert.equal(audio.paused,false,'A tap without horizontal movement must keep voice playing');
+dispatch('pointermove',{pointerId:9,clientX:177,clientY:239});
+assert.equal(audio.paused,false,'Vertical scrolling must not pause narrator voice');
+assert.equal(silentVideo.paused,false,'Vertical scrolling must not pause video');
+dispatch('pointermove',{pointerId:9,clientX:132,clientY:204});
+assert.equal(audio.paused,true,'Horizontal swipe must pause the voice timer immediately');
+assert.equal(silentVideo.paused,true,'Horizontal swipe must stop iOS video decoding immediately');
+assert.equal(voiceLayer.style.visibility,'hidden',
+  'Narrator video compositor must be hidden behind the existing wheel');
+dispatch('pointerup',{pointerId:9});
+dispatch('talera:wheel-motion',{detail:{active:false}});
+await Promise.resolve();
+assert.equal(voiceLayer.style.visibility,'','Canceled swipe must restore narrator layer');
+assert.equal(audio.paused,false,'Canceled swipe must restore audible narration');
+assert.equal(silentVideo.paused,false,'Canceled swipe must restore silent video preview');
+assert.equal(ctx.navigator.audioSession.type,'playback');
+
 assert.equal(fakeDots[0].classList.active,false);
 audio.currentTime=21.1;audio.ontimeupdate();
 await Promise.resolve();await Promise.resolve();
@@ -184,10 +219,23 @@ assert.equal(audio.paused,false,'Original sound must start automatically, no new
 assert.equal(host.children.some(x=>x.tag==='button'&&!x.removed),false,
   'The original-video round must NOT require a separate Listen button');
 assert.equal(fakeDots[2].classList.active,true,'Original-video round selects correct dot');
+const finalPicture=made.filter(x=>x.tag==='video').at(-1);
+await finalPicture.play();
+dispatch('pointerdown',{pointerId:14,pointerType:'touch',isPrimary:true,
+  clientX:202,clientY:210,target:validPhotoTarget});
+dispatch('pointermove',{pointerId:14,clientX:166,clientY:212});
+assert.equal(finalPicture.paused,true,'Original final video must also freeze during swipe');
+assert.equal(audio.paused,true,'Original soundtrack must also freeze during swipe');
+assert.equal(voiceLayer.style.visibility,'hidden');
+
 current='pwa:another-memory';motor.stop();
 assert.equal(bodyClasses.has('talera-v61-narration-visual'),false);
 assert.equal(ctx.navigator.audioSession.type,'ambient',
   'Narrator must restore original native audio session when switching motors');
+assert.equal(documentListeners.get('pointerdown')?.size||0,0,
+  'Narrator pointer listeners must be removed after story change');
+assert.equal(documentListeners.get('talera:wheel-motion')?.size||0,0,
+  'Narrator wheel-finish listener must never leak into ordinary presentation');
 assert.ok(host.children.every(x=>x.removed||!x.className?.includes('talera-independent-narrator-layer')));
 assert.ok(revoked.includes('blob:independent-voice'));
 
@@ -235,7 +283,9 @@ console.log('TALERA_INDEPENDENT_NARRATOR_TEST_PASS',JSON.stringify({
  narrationNoPresentationFunctions:true,voiceClockDrivesCues:true,
  videoSilentDuringVoice:true,remainingPhotosAfterVoice:true,
  originalVideoAudioAfterVoice:true,originalSoundUsesUnlockedVoicePlayer:true,
- noSecondListenButton:true,orangeDotsFollowAllCues:true,
+ noSecondListenButton:true,videoCompositorStopsOnSwipe:true,
+ tapOrVerticalMoveKeepsPlayback:true,abortedSwipeResumes:true,
+ orangeDotsFollowAllCues:true,
  nativeAudioSessionPlayback:true,nativeSessionRestored:true,
  originalAudioIndependentOfPresenter:true,iOSListenGestureRecoverable:true,
  isolatedCleanup:true,

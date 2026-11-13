@@ -502,6 +502,95 @@ function fixVideoFirstFramePreview(html){
   'Published video poster must preserve original media ID');
  return html;
 }
+// The original Home shipped 500 demo records EVEN AFTER their photos were
+// removed from /present. Its hero and year slider still surfaced synthetic
+// titles, years, counts and even a fake "Familie" topic tile. This is
+// ONE app with ZERO bundled memories; owner-local records remain untouched.
+function removeAllBuiltInHomeExamples(html){
+ const start='<script id="talera-reference-catalog">';
+ const pos=html.indexOf(start),end=html.indexOf('</script>',pos+start.length);
+ assert.ok(pos>0&&end>pos&&html.indexOf(start,pos+1)===-1,
+  'F5_HOME_REFERENCE_CATALOG_MARKER_DRIFT');
+ const old=html.slice(pos,end);
+ assert.ok(old.length>80000&&old.includes('Test 081')&&
+  old.includes('isDemo')&&old.includes('talera-500-fotoband-'),
+  'F5_HOME_500_BUNDLED_STORIES_SOURCE_DRIFT');
+ // Keep the original reference variable for older event handlers. It is
+ // deliberately EMPTY; do not seed data or modify account IndexedDB.
+ html=html.slice(0,pos)+start+'window.__taleraReferenceMemories=[];'+html.slice(end);
+ const one=(before,after,label)=>{
+  assert.equal(html.split(before).length,2,'F5_HOME_EMPTY_'+label+'_DRIFT');
+  html=html.replace(before,after);
+ };
+ // Never paint a story title/hero from a template on a newly empty account.
+ one('id="heroKind">Jouw herinneringen</small><h1 id="heroTitle">Een leven vol verhalen</h1>',
+     'id="heroKind"></small><h1 id="heroTitle"></h1>',
+     'STATIC_HERO_TITLE');
+ one(" const selectHero=(o)=>{\n   $('heroTitle').textContent=o.title||'';",
+     " const selectHero=(o)=>{\n   $('heroCaption').style.display='';\n   $('heroTitle').textContent=o.title||'';",
+     'REAL_HERO_VISIBLE');
+ one("  selectHero(show.find(x=>x.src)||examples[0]||{title:'Jouw leven',link:'/tell'});",
+     "  const ownHero=show.find(x=>x.src)||show[0];\n"+
+     "  if(ownHero)selectHero(ownHero);\n"+
+     "  else {\n"+
+     "    $('heroCaption').style.display='none';\n"+
+     "    $('heroImage').removeAttribute('src');\n"+
+     "    $('heroImage').classList.remove('ready');\n"+
+     "    $('heroNote').textContent='';\n"+
+     "  }",
+     'NO_FAKE_HERO_FALLBACK');
+ one("n.append(bold,document.createTextNode('Voeg je eerste herinnering toe. Tot die tijd kun je de voorbeelden hieronder bekijken.'));",
+     "n.append(bold,document.createTextNode('Voeg je eerste herinnering toe.'));",
+     'NO_EXAMPLES_EMPTY_TEXT');
+ // The native year slider keeps its precise profile-birthdate
+ // personalization. Its existing per-year rendering reads ZERO examples.
+ one(" image.src=m.src;image.classList.add('ready');title.textContent=m.title;kind.textContent=m.demo?",
+     " caption.style.display='';image.src=m.src;image.classList.add('ready');title.textContent=m.title;kind.textContent=m.demo?",
+     'PERSONAL_HERO_RESUMES');
+ one(" const showingExamples=ownCounts.size===0;\n const densityCounts=showingExamples?referenceCounts:ownCounts;",
+     " const showingExamples=false;\n const densityCounts=ownCounts;",
+     'NO_SAMPLE_RULER_DENSITY');
+ one("tick.title=tick.dataset.years+': '+count+' '+(showingExamples?'voorbeeld':'eigen ')+(count===1?'herinnering':'herinneringen');",
+     "tick.title=tick.dataset.years+': '+count+' '+(count===1?'herinnering':'herinneringen');",
+     'NO_SAMPLE_RULER_TOOLTIP');
+ // The legacy topic refresh also rendered a fake "Familie / Voorbeeld"
+ // card using an owner's photo when no real tags existed. Remove only
+ // that teaser, preserving topic cards built from actual saved tags.
+ const beforePhoto=" const firstOwnPhoto=!hasTopics?rows.filter(row=>";
+ const afterPhoto=" if(heading){";
+ const a=html.indexOf(beforePhoto),b=html.indexOf(afterPhoto,a);
+ assert.ok(a>0&&b>a&&b-a<1100,'F5_HOME_FAKE_FAMILY_SOURCE_DRIFT');
+ html=html.slice(0,a)+html.slice(b);
+ one("   heading.style.display='';",
+     "   heading.style.display=hasTopics?'':'none';",
+     'HIDE_EMPTY_TOPIC_HEADING');
+ one(" grid.style.display=(hasTopics||firstOwnPhoto)?'':'none';",
+     " grid.style.display=hasTopics?'':'none';",
+     'ONLY_REAL_TOPIC_TILES');
+ const teaserStart=" if(!hasTopics){\n   if(firstOwnPhoto){";
+ const teaserStop=" // A page session survives navigation within the SAME TALERA app";
+ const i=html.indexOf(teaserStart),j=html.indexOf(teaserStop,i);
+ assert.ok(i>0&&j>i&&j-i<2100,'F5_HOME_FAKE_TEASER_SOURCE_DRIFT');
+ html=html.slice(0,i)+" if(!hasTopics)return {records:rows.length,topics:0};\n"+html.slice(j);
+ // Remove the last static reference labels from pre-hydration HTML.
+ one('<small>Voorbeelden</small></div>\n    <div id="demoCards"',
+     '<small></small></div>\n    <div id="demoCards"',
+     'STATIC_EXAMPLE_COUNT');
+ one('<p class="hint">Voorbeelden zijn apart herkenbaar. Je eigen herinneringen worden in deze proefversie op dit toestel bewaard.</p>',
+     '<p class="hint"></p>',
+     'STATIC_TRIAL_NOTE');
+ const css='<style id="talera-f5-true-empty-home">'+
+   '.section-head:has(+ #demoCards:not(.talera-own-topics-ready)){display:none!important}'+
+   '</style>';
+ one('</head>',css+'</head>','NO_PENDING_EXAMPLE_TITLE');
+ assert.ok(!html.includes('Test 081')&&!html.includes('talera-500-fotoband-081')&&
+   html.includes('window.__taleraReferenceMemories=[];')&&
+   html.includes('TaleraMemories.list()')&&
+   html.includes("const min=Math.min(...(years.length?years:[1985])),max=Math.max(now,...years);"),
+   'F5_HOME_EMPTY_STORY_OR_BIRTHDATE_SOURCE_DRIFT');
+ return html;
+}
+
 // Derive the original Home cards solely from owner-created story tags.
 // No test/sample topic categories, no duplicate stories, no cloud queries.
 function showOwnedStoriesOnly(html){
@@ -714,6 +803,10 @@ function removeBuiltInPresentationExamples(original){
  once('writeMemory(nearestMemory(centerMs));\nresize();',
   'const firstOwnMemory=nearestMemory(centerMs);\nif(firstOwnMemory)writeMemory(firstOwnMemory);\nresize();',
   'INITIAL_MEMORY');
+ once('id="memoryDate">6 september 2026</div>',
+      'id="memoryDate"></div>','STATIC_FAKE_EVENT_DATE');
+ once('id="memoryStory">Terugkijken op al die losse momenten die samen langzaam een leven beginnen te vormen.</div>',
+      'id="memoryStory"></div>','STATIC_FAKE_EVENT_STORY');
  // Remove the original static template image attributes as well as all
  // generated memory records, before asserting that no sample source remains.
  html=html.replace(/(<img\b[^>]*?)\s(?:src|srcset|poster)=(["'])https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^"']*\2/gi,'$1');
@@ -983,6 +1076,7 @@ for(const [route,filename] of Object.entries(routes)){
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
+ if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
  if(route==='/tell')html=shapeOwnStoryTopics(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

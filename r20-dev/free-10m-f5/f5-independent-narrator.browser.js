@@ -102,7 +102,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     s.host.appendChild(button);s.button=button;
   }
   function attemptPlay(s,media){
-    if(!isCurrent(s)||!media)return;
+    if(!isCurrent(s)||!media||s.swipeSuspended)return;
     prepareNativePlayback(s);
     setAudible(media);
     try{Promise.resolve(media.play()).then(()=>{
@@ -122,10 +122,57 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     v.remove();
     if(s.videoUrl){URL.revokeObjectURL(s.videoUrl);s.videoUrl=null}
   }
+  // Pause ONLY the independent narrator's active video as soon as an actual
+  // horizontal swipe is recognized. The established RH19 strip still owns
+  // all gesture movement and memory selection; the video is not dragged.
+  function bindSwipeSuspension(s){
+    const eligible=e=>e.isPrimary!==false&&
+      (e.pointerType!=='mouse'||e.button===0)&&
+      !!e.target?.closest?.('#memoryStoryScroll')&&
+      !e.target?.closest?.('a,button,input,textarea,select,nav,[role="button"],.talera-memory-audio');
+    s.onSwipePointerDown=e=>{
+      if(!isCurrent(s)||!eligible(e))return;
+      s.swipePointer={id:e.pointerId,x:e.clientX,y:e.clientY};
+    };
+    s.onSwipePointerMove=e=>{
+      const p=s.swipePointer;
+      if(!p||p.id!==e.pointerId||!isCurrent(s))return;
+      const dx=e.clientX-p.x,dy=e.clientY-p.y;
+      if(Math.abs(dx)<13||Math.abs(dx)<Math.abs(dy)*1.2)return;
+      s.swipePointer=null;
+      if(!s.video||s.swipeSuspended)return;
+      s.swipeSuspended=true;
+      s.swipeWasPlaying=!!s.audio&&!s.audio.paused&&!s.audio.ended;
+      if(s.audio&&!s.audio.paused)s.audio.pause();
+      if(s.video&&!s.video.paused)s.video.pause();
+      s.layer.style.visibility='hidden';
+    };
+    s.onSwipePointerEnd=e=>{
+      if(s.swipePointer?.id===e.pointerId)s.swipePointer=null;
+    };
+    s.onSwipeWheelMotion=e=>{
+      if(e.detail?.active!==false||!s.swipeSuspended)return;
+      s.swipeSuspended=false;
+      if(!isCurrent(s))return;
+      s.layer.style.visibility='';
+      if(s.swipeWasPlaying)attemptPlay(s,s.audio);
+      s.swipeWasPlaying=false;
+    };
+    document.addEventListener('pointerdown',s.onSwipePointerDown,{capture:true,passive:true});
+    document.addEventListener('pointermove',s.onSwipePointerMove,{capture:true,passive:true});
+    document.addEventListener('pointerup',s.onSwipePointerEnd,{capture:true,passive:true});
+    document.addEventListener('pointercancel',s.onSwipePointerEnd,{capture:true,passive:true});
+    document.addEventListener('talera:wheel-motion',s.onSwipeWheelMotion);
+  }
   function stop(){
     generation++;
     const s=active;active=null;
     if(!s)return;
+    for(const [event,handler] of [
+      ['pointerdown',s.onSwipePointerDown],['pointermove',s.onSwipePointerMove],
+      ['pointerup',s.onSwipePointerEnd],['pointercancel',s.onSwipePointerEnd],
+      ['talera:wheel-motion',s.onSwipeWheelMotion]
+    ])if(handler)document.removeEventListener(event,handler,true);
     if(s.timer)clearInterval(s.timer);
     if(s.postTimer)clearTimeout(s.postTimer);
     if(s.audio){
@@ -350,11 +397,13 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       nativeAudioSession:null,
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
+      swipePointer:null,swipeSuspended:false,swipeWasPlaying:false,
       visibilityChange:null};
     s.visibilityChange=()=>{if(!isCurrent(s))return;
       if(document.hidden){s.audio?.pause();s.video?.pause()}};
     document.addEventListener('visibilitychange',s.visibilityChange);
     active=s;
+    bindSwipeSuspension(s);
     document.body.classList.add('talera-v61-narration-visual');
     const blob=await store.blob(voice.key);
     if(!isCurrent(s))return;

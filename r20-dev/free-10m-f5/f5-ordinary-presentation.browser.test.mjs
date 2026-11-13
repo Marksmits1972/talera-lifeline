@@ -985,6 +985,12 @@ try{
   assert.ok(String(eventBridge.focusedDate).includes('2019'),
     'Timeline clock must show actual selected 2019 date, not adjacent memory date: '+
       JSON.stringify(eventBridge));
+  assert.equal(eventBridge.selectedDate,eventBridge.eveningTime,
+    'Selected original memory must retain its EXACT stored hour when timeline stops in 2019');
+  assert.equal(eventBridge.title,'Evening event',
+    'The displayed title must belong to the same selected memory ID');
+  assert.ok(String(eventBridge.eventDate).includes('2017'),
+    'Original memory date must not be presented as the 2019 ruler date');
   assert.ok(Number.isFinite(eventBridge.selectedDate),
     'Timeline selection must reference one original real memory ID');
   console.log('TALERA_EXACT_EVENT_DATE_TIME_SINGLE_OWNER_PASS',

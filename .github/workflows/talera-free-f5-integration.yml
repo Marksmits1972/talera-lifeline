@@ -279,9 +279,9 @@ jobs:
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore prior TALERA QA on approved-backup deployment failure" --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
 
   deploy_independent_narrator:
-    name: Publish timeline-gesture presentation stop to SAME existing TALERA F5 PWA
+    name: Publish ZERO bundled memories on SAME existing TALERA F5 PWA
     needs: f5_isolated_local
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-narrator-story-swipe-20261113' && github.event.head_commit.message == 'qa-deploy-TALERA-free-timeline-gesture-stops-player-20261113' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-narrator-story-swipe-20261113' && github.event.head_commit.message == 'qa-deploy-TALERA-free-no-bundled-example-stories-20261113' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     env:
@@ -289,7 +289,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_PREVIOUS_VERSION: d919b67d-9bc9-4895-941b-8a3eb73f7ed2
+      F5_PREVIOUS_VERSION: f33b71bc-031a-4c03-9798-a0d5f3c79f49
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
     steps:
@@ -375,7 +375,7 @@ jobs:
           NODE
       - name: Cloudflare immutable package dry-run, no resource write
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc --outdir .talera-approved-backup-dryrun
-      - name: Deploy only tested native timeline-gesture stop to existing F5 QA origin
+      - name: Deploy only tested example-free Home and presentation to existing F5 QA origin
         id: deploy
         run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
       - name: Verify real served menu is ORIGINAL design plus exactly one backup action

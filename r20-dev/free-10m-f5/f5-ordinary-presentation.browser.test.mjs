@@ -490,6 +490,48 @@ try{
     ordinaryPresentationRestored:true,realIPhoneAccepted:false
   }));
 
+
+  // Regression for a genuine iPhone profile with historic listening=OFF.
+  // The audio policy of the ORDINARY presentation must never silently mute
+  // the independent voice track or the later original video soundtrack.
+  await page.evaluate(()=>localStorage.setItem('talera-v61-listening-intent-r8','off'));
+  await load(page,narrated.id,4);
+  await page.waitForFunction(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return audio&&!audio.paused&&audio.currentTime>.06;
+  },null,{timeout:15000});
+  const independentSound=await page.evaluate(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return {presenterListening:window.__taleraAudioControls?.isEnabled?.(),
+      voicedAudioMuted:audio?.muted,voicedAudioDefaultMuted:audio?.defaultMuted,
+      voicedAudioVolume:audio?.volume,voicedAudioTime:audio?.currentTime};
+  });
+  assert.equal(independentSound.presenterListening,false,
+    'Historical ordinary-presenter silent setting not reproduced');
+  assert.equal(independentSound.voicedAudioMuted,false,
+    'A stored presenter OFF preference must NOT mute the separately owned voice');
+  assert.equal(independentSound.voicedAudioDefaultMuted,false);
+  assert.equal(independentSound.voicedAudioVolume,1);
+  await page.waitForFunction(()=>!!document.querySelector(
+    '.talera-independent-narrator-layer video.talera-independent-original-video'),
+    null,{timeout:16000});
+  const independentVideo=await page.evaluate(()=>{
+    const video=document.querySelector(
+      '.talera-independent-narrator-layer video.talera-independent-original-video');
+    return {muted:video?.muted,defaultMuted:video?.defaultMuted,
+      volume:video?.volume,hasSource:Boolean(video?.currentSrc||video?.src)};
+  });
+  assert.equal(independentVideo.muted,false,
+    'Final original video audio must be owned by narration, not presenter settings');
+  assert.equal(independentVideo.defaultMuted,false);
+  assert.ok(independentVideo.volume>0&&independentVideo.hasSource);
+  await page.evaluate(()=>localStorage.setItem('talera-v61-listening-intent-r8','on'));
+  await load(page,plain,3);
+  assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0);
+  console.log('TALERA_NARRATOR_AUDIO_NOT_CONNECTED_TO_PRESENTER_MUTE',
+    JSON.stringify({presenterSoundOff:true,ownVoiceAudibleFlag:true,
+      ownVideoAudibleFlag:true,physicalIphoneSoundNotMeasurableInCI:true}));
+
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

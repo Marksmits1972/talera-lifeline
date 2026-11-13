@@ -661,10 +661,10 @@ function rebuildDirectOrdinaryPresentation(html){
   // from the untouched original video when its :phone-v1 sidecar is absent.
   // A later cue may choose another image; the wheel cover stays media[0].
   once("    urls.push(cover);memory.previewImage=cover;memory.photos[index]=cover;",
-    "    urls.push(cover);memory.previewImage=cover;memory.photos[index]=cover;\\n    if(index===0)memory.thumbnail=cover;",
+    "    urls.push(cover);memory.previewImage=cover;memory.photos[index]=cover;\n    if(index===0)memory.thumbnail=cover;",
     'VIDEO_FIRST_FRAME_THUMBNAIL');
-  once("       if(frames[coverIndex]?.kind==='video'&&!frames[coverIndex].url)\\n         void taleraClosedMakeCover(memory,frames[coverIndex],coverIndex,urls);",
-    "       if(frames[0]?.kind==='video'&&!frames[0].url)\\n         void taleraClosedMakeCover(memory,frames[0],0,urls);\\n       if(coverIndex!==0&&frames[coverIndex]?.kind==='video'&&!frames[coverIndex].url)\\n         void taleraClosedMakeCover(memory,frames[coverIndex],coverIndex,urls);",
+  once("       if(frames[coverIndex]?.kind==='video'&&!frames[coverIndex].url)\n         void taleraClosedMakeCover(memory,frames[coverIndex],coverIndex,urls);",
+    "       if(frames[0]?.kind==='video'&&!frames[0].url)\n         void taleraClosedMakeCover(memory,frames[0],0,urls);\n       if(coverIndex!==0&&frames[coverIndex]?.kind==='video'&&!frames[coverIndex].url)\n         void taleraClosedMakeCover(memory,frames[coverIndex],coverIndex,urls);",
     'FIRST_VIDEO_COVER_FALLBACK');
   once("if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\n      if(pendingOwner===memory.id&&pendingSrc===src)return;","if(owner===memory.id&&shown===src&&!host.hidden){layout();return}\n      if(owner!==memory.id&&host)host.hidden=true;\n      if(pendingOwner===memory.id&&pendingSrc===src)return;",'REMOVE_OLD_OVERLAY');
   once("const source=mem.previewImage||mem.thumbnail||mem.image;","const source=mem.thumbnail||mem.previewImage||mem.image;",'PREFETCH_COVER');

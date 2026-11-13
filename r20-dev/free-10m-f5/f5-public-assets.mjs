@@ -159,16 +159,15 @@ function fixPhotoOnlyPresentation(original){
  result=exact(result,
    "check.onerror=()=>{if(seq===requestNo)console.warn('TALERA Story Player: geselecteerde foto kon niet laden',i)};",
    "check.onerror=()=>{if(seq===requestNo){pendingOwner='';pendingSrc='';console.warn('TALERA Story Player: geselecteerde foto kon niet laden',i)}};");
- // On a plain tap, never open the photo strip's high-z thumbnail wheel.
- // The wheel moves ONLY after a real horizontal swipe. Narrated stories
- // use their exactly approved original gesture path, untouched.
+ // A plain tap (ordinary OR narrated) must not reveal the 11-page wheel.
+ // Once a real horizontal swipe starts, both memory types use the SAME
+ // existing strip/landing animation; never change narrator timing or media.
  result=exact(result,
    "    window.__taleraBandRolling=true;\n"+
    "    document.dispatchEvent(new CustomEvent('talera:wheel-motion',{detail:{active:true}}));\n"+
    "    open();\n"+
    "    state.drag={id:e.pointerId,",
-   "    const ordinaryTap=Boolean(window.__taleraTimelineRuntime?.currentMemory()?._taleraLocal&&\n"+
-   "      !window.__taleraTimelineRuntime.currentMemory()._zeroItems?.some(x=>x.kind==='audio'));\n"+
+   "    const ordinaryTap=Boolean(window.__taleraTimelineRuntime?.currentMemory()?._taleraLocal);\n"+
    "    if(!ordinaryTap){\n"+
    "      window.__taleraBandRolling=true;\n"+
    "      document.dispatchEvent(new CustomEvent('talera:wheel-motion',{detail:{active:true}}));\n"+
@@ -710,6 +709,28 @@ function removeBuiltInPresentationExamples(original){
  return html;
 }
 
+// F5 narration swipe repair: the ORIGINAL V61 resting-mode photo CSS hides
+// all photo-strip pages while narration is visible. That is correct at rest,
+// but suppresses the ALREADY EXISTING RH19/V13 swipe belt even after the
+// original gesture listener activates it. Make ONLY its .is-visible state
+// visible, without changing wheel timings, memory selection or player code.
+function showExistingNarratedSwipeBand(html){
+ const checks=[
+   'talera-v61-narration-visual #photoStage .talera-photo-strip',
+   "belt.classList.add('is-visible')",
+   "belt.classList.remove('is-visible')",
+   'id="memoryStoryScroll"'
+ ];
+ for(const part of checks)
+   assert.ok(html.includes(part),'NARRATOR_SWIPE_EXISTING_WHEEL_MISSING: '+part);
+ const mark='id="talera-f5-narrated-swipe-band"';
+ assert.ok(!html.includes(mark),'NARRATOR_SWIPE_CSS_DUPLICATED');
+ const css='<style '+mark+'>'+
+   'body.talera-v61-narration-visual #photoStage .talera-photo-strip.talera-wheel-strip.is-visible'+
+   '{display:block!important;visibility:visible!important;opacity:1!important}'+
+   '</style>';
+ return html.replace('</head>',css+'</head>');
+}
 // Each recorded memory is controlled by an entirely separate motor.
 // The existing taleraInline ordinary presenter is unchanged and never starts
 // for a recorded memory. Only store (original media-ID library), stage (the
@@ -756,6 +777,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=filterOwnTopicPresentation(html);
  if(route==='/present')html=hideDuplicateReadingSheetActions(html);
  if(route==='/present')html=isolateNarratedMemories(html);
+ if(route==='/present')html=showExistingNarratedSwipeBand(html);
  // Use the ORIGINAL, already approved V61 video preview from the
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.

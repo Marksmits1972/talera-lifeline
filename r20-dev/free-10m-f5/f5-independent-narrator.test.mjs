@@ -162,8 +162,16 @@ const s1=timeouts.at(-1);s1.fn(); // Skip synthetic unused photo.
 await new Promise(resolve=>setImmediate(resolve)); // Let original ID Blob resolve.
 const videos=made.filter(x=>x.tag==='video');
 assert.ok(videos.length>=2,'Original soundtrack round must use a new video element');
-assert.equal(videos.at(-1).muted,false,
-  'Original soundtrack must not inherit narrated preview mute');
+assert.equal(videos.at(-1).muted,true,
+  'Original video image must stay muted: sound is played by the existing voice element');
+assert.strictEqual(made.filter(x=>x.tag==='audio').at(-1),audio,
+  'The SAME audio element that spoke the voice must reproduce original soundtrack');
+assert.equal(audio.src,'blob:synthetic-video-C',
+  'The unlocked voice element must play the unmodified original video bytes');
+assert.equal(audio.muted,false,'Replayed original audio must be audible');
+assert.equal(audio.paused,false,'Original sound must start automatically, no new button tap');
+assert.equal(host.children.some(x=>x.tag==='button'&&!x.removed),false,
+  'The original-video round must NOT require a separate Listen button');
 assert.equal(fakeDots[2].classList.active,true,'Original-video round selects correct dot');
 current='pwa:another-memory';motor.stop();
 assert.equal(bodyClasses.has('talera-v61-narration-visual'),false);
@@ -184,8 +192,11 @@ independentAudio.onended();
 await new Promise(resolve=>setImmediate(resolve));
 const photoTimer=timeouts.at(-1);photoTimer.fn();
 await new Promise(resolve=>setImmediate(resolve));
-assert.equal(made.filter(x=>x.tag==='video').at(-1).muted,false,
-  'Original video must be audible independent of presenter OFF state');
+assert.equal(made.filter(x=>x.tag==='video').at(-1).muted,true,
+  'Original video must be visually muted while audio comes from voice element');
+assert.equal(independentAudio.muted,false,
+  'Original video soundtrack must be audible independently of presenter');
+assert.equal(independentAudio.src,'blob:synthetic-video-C');
 motor.stop();
 assert.equal(ctx.navigator.audioSession.type,'ambient');
 
@@ -212,7 +223,8 @@ console.log('TALERA_INDEPENDENT_NARRATOR_TEST_PASS',JSON.stringify({
  recorderAndPresentationSourcesDistinct:true,
  narrationNoPresentationFunctions:true,voiceClockDrivesCues:true,
  videoSilentDuringVoice:true,remainingPhotosAfterVoice:true,
- originalVideoAudioAfterVoice:true,orangeDotsFollowAllCues:true,
+ originalVideoAudioAfterVoice:true,originalSoundUsesUnlockedVoicePlayer:true,
+ noSecondListenButton:true,orangeDotsFollowAllCues:true,
  nativeAudioSessionPlayback:true,nativeSessionRestored:true,
  originalAudioIndependentOfPresenter:true,iOSListenGestureRecoverable:true,
  isolatedCleanup:true,

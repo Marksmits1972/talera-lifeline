@@ -17,6 +17,17 @@ assert.match(record,/TALERA_RECORD_ENGINE_ONLY independent source copy/);
 assert.ok(!original.includes('TALERA_RECORD_ENGINE_ONLY'),'Original presentation code changed');
 assert.ok(worker.includes("'/vertelmodus-embed-record':'/vertelmodus-embed'"),
   'Worker still sends recording through presentation asset');
+
+assert.ok(page.includes('id="talera-f5-narrated-swipe-band"'),
+  'Narrated memories must expose the existing photo strip during horizontal swipe');
+assert.ok(page.includes(
+  'body.talera-v61-narration-visual #photoStage .talera-photo-strip.talera-wheel-strip.is-visible'),
+  'Original 11-page wheel must be visible ONLY while actually active in narration');
+assert.ok(page.includes(
+  'const ordinaryTap=Boolean(window.__taleraTimelineRuntime?.currentMemory()?._taleraLocal);'),
+  'Narrated and ordinary local memories must use the same real-swipe entry condition');
+assert.ok(page.includes('if(d.ordinaryTap&&d.started&&!d.wheelOpened)'),
+  'A tap may not reveal the wheel; a horizontal swipe must open it at the first threshold');
 assert.ok(page.includes('const taleraIndependentNarrator=taleraCreateIndependentNarrator'));
 assert.ok(page.includes("if(memory._zeroItems?.some(item=>item.kind==='audio'))"));
 assert.ok(page.includes('return; // No ordinary presentation functions for voice memories.'));

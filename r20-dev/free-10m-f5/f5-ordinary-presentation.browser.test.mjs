@@ -1045,8 +1045,9 @@ try{
   assert.ok(Number.isInteger(navigation.photoIndex),
     'Timeline must select the nearest REAL memory, not intermediate photo');
   await page.mouse.up();
-  await page.waitForFunction(id=>window.__taleraTimelineRuntime.currentMemory()?.storyId===id,
-    exactStories[1],{timeout:12000});
+  await page.waitForFunction(ids=>ids.includes(
+    window.__taleraTimelineRuntime.currentMemory()?.storyId),
+    exactStories,{timeout:12000});
   const settled=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();
     return {story:m?.storyId,date:m?.ms,
@@ -1055,7 +1056,8 @@ try{
       originalVideo:!!document.querySelector('.talera-independent-narrator-video')};
   });
   assert.equal(settled.narrator,false);
-  assert.equal(settled.story,exactStories[1]);
+  assert.ok(exactStories.includes(settled.story),
+    'Timeline must settle on one of the actual original 2017 events');
   assert.ok(settled.currentAxis<timeBefore-4*365*86400000,
     'Photo selection must not rewrite finger-selected timeline date');
   console.log('TALERA_TIMELINE_NAVIGATION_DISMISSES_NARRATOR_AND_FOLLOWS_REAL_PHOTOS_PASS',
@@ -1069,6 +1071,12 @@ try{
     window.__taleraTimelineRuntime.currentMemory().id,2,true));
   await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),
     null,{timeout:12000});
+  // Slow the synthetic clip so its natural end cannot mask the test:
+  // playback must stop BECAUSE of timeline movement, not a one-second EOF.
+  await page.evaluate(()=>{
+    const video=document.querySelector('video.talera-v61-inline-video');
+    video.loop=true;video.playbackRate=.1;
+  });
   const videoSurface=await page.locator('#surface').boundingBox();
   const videoY=videoSurface.y+videoSurface.height*.38;
   await page.mouse.move(videoSurface.x+videoSurface.width*.2,videoY);

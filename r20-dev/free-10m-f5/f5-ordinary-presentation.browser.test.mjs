@@ -753,12 +753,28 @@ try{
   assert.deepEqual(videoFirst.kinds,['video','photo'],
     'Test needs genuinely ordered video first, photo second in the same memory');
   await load(page,videoFirst.id,2);
-  await page.waitForFunction(id=>{
-    const mem=window.__taleraTimelineRuntime?.currentMemory?.();
-    return mem?.storyId===id && !mem._photoLoading &&
-      mem.thumbnail?.startsWith('blob:')&&mem.thumbnail===mem.photos[0] &&
-      mem.thumbnail!==mem.photos[1];
-  },videoFirst.id,{timeout:16000});
+  try{
+    await page.waitForFunction(id=>{
+        const mem=window.__taleraTimelineRuntime?.currentMemory?.();
+        return mem?.storyId===id && !mem._photoLoading &&
+          mem.thumbnail?.startsWith('blob:')&&mem.thumbnail===mem.photos[0] &&
+          mem.thumbnail!==mem.photos[1];
+      },videoFirst.id,{timeout:16000});
+  }catch(error){
+    const details=await page.evaluate(async id=>{
+      const mem=window.__taleraTimelineRuntime?.currentMemory?.();
+      const row=await window.TaleraMemories.get(id);
+      const video=row.items.find(item=>item.kind==='video');
+      let poster=null;
+      try{const b=await window.TaleraMemories.blob(video.key+':phone-v1');
+        poster=b?{type:b.type,size:b.size}:null}catch(e){poster={error:String(e)}}
+      return {kindOrder:row.items.map(it=>it.kind),thumbnail:mem?.thumbnail,
+        image:mem?.image,preview:mem?.previewImage,photos:mem?.photos,
+        frames:mem?._zeroFrames,loading:mem?._photoLoading,
+        poster,videoKey:video.key};
+    },videoFirst.id);
+    throw Error('FIRST_VIDEO_STILL_NOT_READY '+JSON.stringify(details)+' '+error);
+  }
   const firstMediaCover=await page.evaluate(async id=>{
     const book=window.__taleraPhotoBook;
     const mem=book.list().find(x=>x.storyId===id);

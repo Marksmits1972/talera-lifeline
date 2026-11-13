@@ -131,6 +131,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     if(s.audio){
       s.audio.onplay=s.audio.onpause=s.audio.onended=null;
       s.audio.ontimeupdate=s.audio.onseeking=s.audio.onseeked=null;
+      s.audio.onplaying=null;
       try{s.audio.pause();s.audio.removeAttribute('src');s.audio.load()}catch(error){}
       s.audio.remove();
     }
@@ -231,6 +232,8 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       if(s.audio.paused){if(!s.video.paused)s.video.pause()}
     }
   }
+  // Original soundtrack uses the SAME already-authorized audio element as the
+  // voice. iOS may refuse a new unmuted video element without another gesture.
   async function playOriginalVideo(s,frame,done){
     if(!isCurrent(s))return;
     removeVideo(s);clearButton(s);
@@ -241,21 +244,66 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     video.setAttribute('playsinline','');
     video.setAttribute('webkit-playsinline','');
     video.playsInline=true;video.preload='auto';video.controls=false;
+    video.muted=true;video.defaultMuted=true;
     video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none';
     s.layer.appendChild(video);
     s.video=video;s.videoId=frame.key;
     const serial=++s.videoSerial;
-    video.onended=()=>{if(isCurrent(s)&&s.video===video&&s.videoSerial===serial)done()};
+    const soundtrack=s.audio; // The original voice player, not a new element.
+    if(!soundtrack){
+      console.warn('TALERA oorspronkelijke vertel-audiospeler ontbreekt');
+      return;
+    }
+    const current=()=>isCurrent(s)&&s.phase==='originals'&&
+      s.video===video&&s.videoSerial===serial&&s.audio===soundtrack;
+    function syncPicture(){
+      if(!current()||video.readyState<1)return;
+      const seconds=Math.max(0,Number(soundtrack.currentTime)||0);
+      if(!video.seeking&&Math.abs((Number(video.currentTime)||0)-seconds)>0.3)
+        try{video.currentTime=Math.min(seconds,
+          Number.isFinite(video.duration)&&video.duration>0?
+          Math.max(0,video.duration-0.04):seconds)}catch(error){}
+      if(soundtrack.paused||soundtrack.ended){
+        if(!video.paused)video.pause();
+      }else if(video.paused&&!video.ended){
+        Promise.resolve(video.play()).catch(error=>{
+          if(current()&&error?.name!=='AbortError')
+            console.warn('TALERA gedempt videobeeld kon niet starten',error);
+        });
+      }
+    }
+    function finished(){
+      if(!current())return;
+      soundtrack.onended=soundtrack.ontimeupdate=soundtrack.onplaying=null;
+      try{soundtrack.pause()}catch(error){}
+      done();
+    }
+    soundtrack.onplay=null;
+    soundtrack.onpause=null;
+    soundtrack.ontimeupdate=syncPicture;
+    soundtrack.onplaying=syncPicture;
+    soundtrack.onended=finished;
+    video.onloadedmetadata=video.oncanplay=syncPicture;
+    video.onended=()=>{if(current()&&soundtrack.ended)finished()};
     const url=await urlFor(s,frame,true);
-    if(!isCurrent(s)||s.video!==video||!url)return;
+    if(!current()||!url)return;
     s.videoUrl=url;video.src=url;video.load();
-    attemptPlay(s,video);
+    // Sound is decoded directly from the untouched ORIGINAL video media file.
+    soundtrack.src=url;setAudible(soundtrack);soundtrack.load();
+    // On supported iOS versions this continues automatically after voice.
+    // Preserve the fallback if an iOS version still demands another gesture.
+    attemptPlay(s,soundtrack);
   }
   function nextAfterVoice(s){
     if(!isCurrent(s))return;
     clearButton(s);
     if(s.timer){clearInterval(s.timer);s.timer=null}
-    if(s.audio){s.audio.pause();s.audio.remove();s.audio=null}
+    if(s.audio){
+      s.audio.onplay=s.audio.onpause=s.audio.onended=null;
+      s.audio.ontimeupdate=s.audio.onseeking=s.audio.onseeked=null;
+      s.audio.onplaying=null;
+      // Reuse the already-audible player for the later original videos.
+    }
     removeVideo(s);
     s.phase='remaining';s.postIndex=0;
     function next(){

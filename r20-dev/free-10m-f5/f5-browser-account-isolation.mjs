@@ -493,6 +493,60 @@ try{
    secondOwnerNewPrivateDatabases:newlyOpenedB.length,
    noOriginalDatabaseDeleted:true
  }));
+ // Owner-approved 14-Nov menu cleanup on the SAME real mobile browser page.
+ // Only functioning Free controls are visible. The account, private storage,
+ // narration player and timeline are unchanged and explicitly not re-created.
+ await menu(page);
+ const cleanHub=await page.evaluate(()=>{
+   const panel=document.getElementById('talera-more-menu');
+   return {
+     listed:[...panel.querySelectorAll('button[data-view]')].map(x=>x.dataset.view),
+     hrefs:[...panel.querySelectorAll('a[href]')].map(x=>x.href)
+   };
+ });
+ for(const active of ['account','mine','privacy','settings','help'])
+   assert.ok(cleanHub.listed.includes(active),'Working More destination removed: '+active);
+ for(const unavailable of ['people','shared','subscription','forgot'])
+   assert.ok(!cleanHub.listed.includes(unavailable),
+     'Unavailable Free option must not pretend to be working: '+unavailable);
+ assert.equal(cleanHub.listed.filter(v=>v==='privacy').length,1,
+   'Exactly one visible privacy option on the main More page');
+
+ await view(page,'help');
+ const helpLink=page.locator('#talera-more-menu a[href="https://talera-website.pages.dev/welkom/"]');
+ assert.equal(await helpLink.count(),1,'Keep the existing TALERA help web link');
+ assert.equal(await helpLink.getAttribute('target'),'_blank');
+ assert.equal(await page.locator('#talera-more-menu [data-view="privacy"]').count(),0,
+   'Help should not repeat a second privacy shortcut');
+ await page.locator('#talera-more-menu [data-action="back"]').first().click();
+ await view(page,'privacy');
+ assert.equal(await page.locator('#talera-more-menu form[data-form="privacy"]').count(),0,
+   'Disabled discoverability must never have a misleading save control');
+ assert.equal(await page.locator('#talera-more-menu [data-view="mine"]').count(),1,
+   'Private account must still be able to revoke already issued share links');
+ assert.match(await page.locator('#talera-more-menu').innerText(),/niet vindbaar/i);
+ await page.locator('#talera-more-menu [data-action="back"]').first().click();
+ await view(page,'settings');
+ for(const saved of ['account','language','storage'])
+   assert.equal(await page.locator('#talera-more-menu [data-view="'+saved+'"]').count(),1,
+     'Original functional setting missing: '+saved);
+ assert.equal(await page.locator('#talera-more-menu [data-view="privacy"]').count(),0,
+   'Settings must not duplicate the top-level privacy route');
+ assert.equal(await page.locator('#talera-more-menu [data-action="enable-listening"],#talera-more-menu [data-action="disable-listening"]').count(),1,
+   'Existing voice on/off control remains usable');
+ await page.locator('#talera-more-menu [data-action="back"]').first().click();
+ await view(page,'account');
+ assert.equal(await page.locator('#talera-more-menu [data-view="forgot"]').count(),0,
+   'Unimplemented email password recovery must not be offered as working');
+ assert.equal(await page.locator('#talera-more-menu [data-action="logout"]').count(),1,
+   'Real sign-out button remains available');
+ await page.locator('#talera-more-menu [data-action="back"]').first().click();
+ console.log('TALERA_FREE_MENU_WORKING_ONLY_AND_HELP_WEBSITE_PASS',JSON.stringify({
+   helpLinkUnchanged:true,privacyOneEntry:true,privacySaveHidden:true,
+   localBackupsPreserved:true,languagePreserved:true,audioTogglePreserved:true,
+   socialRevokePreserved:true,missingRoutesHidden:true,iphoneAccepted:false
+ }));
+
  // This complements the STATIC source-route inventory with REAL requests
  // made by existing menu controls, without activating any privacy toggle,
  // publishing, sharing, or unported media/upload path.

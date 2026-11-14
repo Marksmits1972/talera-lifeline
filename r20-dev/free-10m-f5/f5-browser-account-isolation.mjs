@@ -534,6 +534,42 @@ try{
    'Settings must not duplicate the top-level privacy route');
  assert.equal(await page.locator('#talera-more-menu [data-action="enable-listening"],#talera-more-menu [data-action="disable-listening"]').count(),1,
    'Existing voice on/off control remains usable');
+ const beforeStorageReads=apiTrace.length;
+ await view(page,'storage');
+ await page.waitForFunction(()=>{
+   const menu=document.getElementById('talera-more-menu');
+   const text=menu?.innerText||'';
+   return text.includes('In deze app')&&/\\d+ herinnering/.test(text)&&
+     !text.includes('Controleren…');
+ },null,{timeout:16000});
+ const storageOverview=await page.evaluate(async()=>{
+   const menu=document.getElementById('talera-more-menu');
+   const own=await window.TaleraMemories.list();
+   const text=menu.innerText;
+   return {
+     saved:own.length,
+     text,
+     backupButtons:menu.querySelectorAll('[data-action="open-backup"]').length,
+     refreshButtons:menu.querySelectorAll('[data-action="storage-refresh"]').length,
+     count:text.includes(own.length+' herinnering'+(own.length===1?'':'en'))
+   };
+ });
+ assert.equal(storageOverview.backupButtons,1,
+   'One and only one real backup route is visible on the storage screen');
+ assert.equal(storageOverview.refreshButtons,0,
+   'No unnecessary retry action is shown while the local count succeeds');
+ assert.equal(storageOverview.count,true,
+   'The only visible count must match real locally stored memories');
+ for(const gone of ['account-herinneringen','Met mij gedeeld','Controle niet volledig',
+    'Ontvangen herinneringen niet beschikbaar','Let op']){
+   assert.ok(!storageOverview.text.includes(gone),
+     'Storage overview contains a duplicate or irrelevant item: '+gone);
+ }
+ assert.ok(storageOverview.text.includes('Back-up maken of terugzetten'));
+ const newStorageRequests=apiTrace.slice(beforeStorageReads);
+ assert.ok(!newStorageRequests.some(x=>x.path==='/api/shared-with-me'||x.path==='/api/memories'),
+   'Local storage must not call the unfinished social endpoint or duplicate account count');
+ await page.locator('#talera-more-menu [data-action="back"]').first().click();
  await page.locator('#talera-more-menu [data-action="back"]').first().click();
  await view(page,'account');
  assert.equal(await page.locator('#talera-more-menu [data-view="forgot"]').count(),0,

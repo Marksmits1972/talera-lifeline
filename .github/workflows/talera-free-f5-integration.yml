@@ -401,10 +401,21 @@ jobs:
           import assert from 'node:assert/strict';
           import fs from 'node:fs';
           const menu=fs.readFileSync('/tmp/talera-just-backup-menu.mjs','utf8');
-          assert.equal(menu.split('data-action="open-backup"').length,2);
+          assert.equal(menu.split('data-action="open-backup"').length,3);
           assert.ok(menu.includes("state.view==='storage'&&state.account"));
           assert.ok(menu.includes("window.location.assign('/__f5/backup')"));
           assert.ok(menu.includes('data-action="storage-refresh"'));
+          assert.ok(menu.includes("info('In deze app',amount)")&&
+            menu.includes('Back-up maken of terugzetten'),
+            'Published local backup overview must show one local count and clear action');
+          const storageStart=menu.indexOf("   if(view==='storage'){");
+          const storageEnd=menu.indexOf("  if(view==='shared')",storageStart);
+          assert.ok(storageStart>=0&&storageEnd>storageStart,'Local storage loader is missing');
+          const storage=menu.slice(storageStart,storageEnd);
+          assert.ok(storage.includes('window.TaleraMemories?.list?.()')&&
+            !storage.includes("api('/api/memories')")&&
+            !storage.includes("api('/api/shared-with-me')"),
+            'The backup overview must not duplicate records or query unfinished social routes');
           assert.ok(!menu.includes('Reservekopie en herstel worden nog ontwikkeld.'));
           for (const missing of ["option('accessibility'","case 'accessibility':","option('display'","case 'display':"]) {
             assert.ok(!menu.includes(missing), 'Unused setting still visible: '+missing);

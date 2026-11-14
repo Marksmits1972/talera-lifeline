@@ -13,7 +13,20 @@ const chooser=el('restore-file'),cross=el('other-origin'),preview=el('preview-re
 const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore-status');
 let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
 const message=(element,text)=>{element.textContent=text;};
-const failText=e=>e instanceof Error?e.message:String(e);
+const failText=e=>{
+ const raw=e instanceof Error?e.message:String(e);
+ if(/ACCOUNT_CHANGED|SESSION_EXPIRED|SESSION_UNVERIFIED/.test(raw))
+  return 'Je account is gewijzigd. Open Back-ups opnieuw.';
+ if(/EXPLICIT_CONSENT|DIFFERENT_ORIGIN/.test(raw))
+  return 'Vink eerst aan dat de back-up uit een andere TALERA-versie mag komen.';
+ if(/CHECKSUM|INVALID_MANIFEST|INVALID_ORIGIN|ARCHIVE_/.test(raw))
+  return 'Bestand beschadigd of ongeldig. Kies een ander back-upbestand.';
+ if(/DATABASE_NOT_FOUND|NO_INDEXEDDB|NO_STORIES_FOUND/.test(raw))
+  return 'Geen lokale herinneringen gevonden. Open eerst Mijn leven.';
+ if(/EXISTING_CONTENT|DUPLICATE/.test(raw))
+  return 'Deze herinneringen staan al in de app. Er is niets veranderd.';
+ return 'Controleer het bestand en probeer opnieuw.';
+};
 // The backup page may stay open while the user switches accounts in another tab.
 // Revalidate the currently signed-in server identity before any local file read
 // or write. Only an account ID is fetched: original media never leaves IndexedDB.
@@ -34,7 +47,7 @@ async function assertCurrentAccount(){
 
 function invalidate(){
  review=null;reviewFile=null;reviewCross=null;restore.disabled=true;
- message(status,'Het herstelbestand moet eerst opnieuw gecontroleerd worden.');
+ message(status,'Bestand gewijzigd. Controleer het opnieuw.');
 }
 chooser.addEventListener('change',invalidate);
 cross.addEventListener('change',invalidate);
@@ -45,34 +58,33 @@ make.addEventListener('click',async()=>{
  make.disabled=true;
  if(downloadUrl){URL.revokeObjectURL(downloadUrl);downloadUrl=null}
  save.hidden=true;save.removeAttribute('href');
- message(exportStatus,'De lokale herinneringen worden gecontroleerd. Er wordt niets verzonden.');
+ message(exportStatus,'Back-up maken…');
  try{
   await assertCurrentAccount();
   const archive=await exportExistingFreeLibrary(db);
   downloadUrl=URL.createObjectURL(archive);
   save.href=downloadUrl;
-  save.download='talera-free-'+new Date().toISOString().slice(0,10)+'.talera';
+  save.download='talera-free-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.talera';
   save.hidden=false;
-  message(exportStatus,'Back-up lokaal gemaakt ('+(archive.size/1048576).toFixed(1)+
-   ' MiB). Tik nu op "Bewaar back-upbestand" en controleer zelf in Bestanden dat de download echt is opgeslagen. Dit bestand is niet versleuteld.');
+  message(exportStatus,'Back-up klaar ('+(archive.size/1048576).toFixed(1)+
+   ' MB). Tik op "Bewaar bestand" en controleer de download in Bestanden.');
  }catch(e){message(exportStatus,'Back-up niet gemaakt: '+failText(e))}
  finally{make.disabled=false}
 });
 preview.addEventListener('click',async()=>{
  invalidate();confirm.checked=false;
  const file=chooser.files?.[0];
- if(!file){message(status,'Kies eerst een .talera-bestand.');return}
+ if(!file){message(status,'Kies een back-upbestand.');return}
  preview.disabled=true;
- message(status,'Bestand en originele mediabytes worden gecontroleerd. Er wordt niets geïmporteerd.');
+ message(status,'Bestand controleren…');
  try{
   await assertCurrentAccount();
   const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:cross.checked});
   review=result;reviewFile=file;reviewCross=cross.checked;
-  message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en), '+
-   result.mediaStoreEntries+' media-/werkrecords. '+
-   (result.crossOrigin?'Archief van andere of niet aantoonbare herkomst. ':'')+
-   (result.safeToRestore?'Geen dubbele ID’s aangetroffen. Je kunt expliciet bevestigen.':
-    'Conflict met bestaande herinneringen of media: herstel geblokkeerd.'));
+  message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en). '+
+   (result.crossOrigin?'Back-up uit een andere TALERA-versie. ':'')+
+   (result.safeToRestore?'Geen dubbele gegevens. Vink de bevestiging aan om terug te zetten.':
+    'Conflict met bestaande gegevens: terugzetten niet mogelijk.'));
  }catch(e){message(status,'Controle gestopt (niets gewijzigd): '+failText(e))}
  finally{preview.disabled=false}
 });
@@ -81,15 +93,14 @@ restore.addEventListener('click',async()=>{
  if(!review?.safeToRestore||!confirm.checked||file!==reviewFile||cross.checked!==reviewCross)
   return invalidate();
  restore.disabled=true;confirm.disabled=true;preview.disabled=true;
- message(status,'Herstel loopt. Sluit deze pagina niet voordat het is afgerond.');
+ message(status,'Herinneringen worden teruggezet. Wacht tot dit klaar is.');
  try{
   await assertCurrentAccount();
   const result=await restoreFreeLibrary(file,db,{allowOtherOrigin:cross.checked,confirmed:true});
-  message(status,'Herstel voltooid: '+result.restoredStories+' herinnering(en), '+
-   result.restoredMediaEntries+' records toegevoegd. Controleer nu zelf je herinneringen op Mijn leven. De originele bron is niet verwijderd.');
+  message(status,'Herstel voltooid: '+result.restoredStories+' herinnering(en) toegevoegd. Controleer ze bij Mijn leven.');
   review=null;
  }catch(e){
-  message(status,'Herstel gestopt; bestaande inhoud wordt niet overschreven: '+failText(e));
+  message(status,'Terugzetten gestopt. Bestaande herinneringen blijven staan. '+failText(e));
   review=null;
  }finally{confirm.disabled=false;preview.disabled=false}
 });

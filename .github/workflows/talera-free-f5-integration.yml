@@ -402,11 +402,11 @@ jobs:
           for (const keep of ["option('language'","option('privacy'","option('storage'","option('account'"]) {
             assert.ok(menu.includes(keep), 'Existing setting lost: '+keep);
           }
-          assert.equal((menu.match(/function taleraCleanFreeMenu\\(\\)/g)||[]).length,1,
+          assert.equal((menu.match(/function taleraCleanFreeMenu\(\)/g)||[]).length,1,
             'New Free menu cleanups must be present exactly once');
           for(const x of ["prune('people')","prune('shared')","prune('subscription')",
             "prune('privacy')","prune('forgot')",
-            "form[data-form=\\\"privacy\\\"]"]) {
+            "body.querySelector('form[data-form"]) {
             assert.ok(menu.includes(x),'Menu still exposes an unimplemented or duplicated function: '+x);
           }
           assert.ok(menu.includes('https://talera-website.pages.dev/welkom/'),

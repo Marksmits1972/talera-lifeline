@@ -41,7 +41,14 @@ jobs:
         run: |
           if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
-            git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+            git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+            # The approved backup UI wording is immutable; media/storage codecs remain source-exact.
+            if [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "e01dc1b7bab00fc38125fc525f65a357a931c061"
+            else
+              git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
+            fi
           else
           git merge-base --is-ancestor 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD
           git diff --exit-code 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
@@ -305,7 +312,10 @@ jobs:
         run: |
           set -euo pipefail
           git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
-          git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+          git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+          # Lock exact approved backup UI copies; no unreviewed changes to archive/read/write.
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "e01dc1b7bab00fc38125fc525f65a357a931c061"
           ! grep -q 'installLifeGalleries' r20-dev/free-10m-f5/f5-public-assets.mjs
           test "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109

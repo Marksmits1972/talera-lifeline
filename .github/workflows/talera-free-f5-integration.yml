@@ -526,3 +526,4 @@ jobs:
 # Same original F5 acceptance origin: event IDs and timestamps, no new stores or players.
 # Existing F5 acceptance origin: real timeline motion stops old player and synchronizes the original photo wheel.
 # Same original TALERA Free origin: remove bundled example catalog and static pretend stories, preserve all private stores.
+# 14 Nov 2026: product-owner-authorized TALERA Free same-origin menu and backup UX acceptance publication; retain prior Worker version.

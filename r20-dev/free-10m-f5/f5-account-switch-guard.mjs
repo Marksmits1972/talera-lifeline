@@ -184,6 +184,23 @@ function taleraCleanFreeMenu(){
     // Remove only the duplicate Privacy-link. The working introduction
     // website must remain the same original href, DOM element and target.
     prune('privacy');
+  }else if(active==='storage'){
+    // Only this account's actual LOCAL library is counted; /api/memories is
+    // the same browser list, not an extra cloud copy. Incoming social routes
+    // are unfinished and do not belong on a local backup status screen.
+    const n=storageState.local;
+    const amount=n===null?(storageState.error?'Niet beschikbaar':'Controleren…'):
+      n+' herinnering'+(n===1?'':'en');
+    body.innerHTML=
+      info('In deze app',amount)+
+      '<p class="meta">Er wordt niet automatisch een back-up gemaakt.</p>'+
+      (state.account?
+        '<button class="primary" type="button" data-action="open-backup">Back-up maken of terugzetten</button>':
+        '<button class="primary" type="button" data-view="login">Aanmelden voor back-up</button>')+
+      (storageState.error?
+        info('Opslag niet leesbaar',storageState.error)+
+        '<button class="secondary" type="button" data-action="storage-refresh">Opnieuw controleren</button>':'')+
+      notice();
   }else if(active==='privacy'&&state.account){
     // /api/discovery intentionally rejects writes. Never show a functional
     // save control until account discovery and permission checks exist.
@@ -218,12 +235,39 @@ function taleraCleanFreeMenu(){
  // no new menu controller or alternate screen is introduced.
  const render="function render(){";
  if(count(altered,render)!==1)throw Error('FREE_MENU_RENDER_ENTRY_DRIFT');
- const result=altered.replace(render,compiled+"\n"+render);
+ let result=altered.replace(render,compiled+"\n"+render);
+ // Avoid duplicate remote/local counts and a known unavailable incoming-share
+ // API. The original auth and local IndexedDB checks stay unchanged.
+ const loaderStart="   if(view==='storage'){";
+ const loaderEnd="\n  if(view==='shared')";
+ const i=result.indexOf(loaderStart),j=result.indexOf(loaderEnd,i+loaderStart.length);
+ if(i<0||j<=i||result.indexOf(loaderStart,i+1)!==-1)
+   throw Error('FREE_STORAGE_ORIGINAL_LOADER_DRIFT');
+ const previous=result.slice(i,j);
+ if(!previous.includes("api('/api/memories')")||
+    !previous.includes("api('/api/shared-with-me')")||
+    !previous.includes('window.TaleraMemories?.list?.()'))
+   throw Error('FREE_STORAGE_BACKUP_LOCAL_DATA_DRIFT');
+ const localOnly=`   if(view==='storage'){
+     storageState.local=null;storageState.owned=null;storageState.received=null;
+     storageState.error='';
+     if(state.open&&state.view===view)render();
+     try{
+       const rows=await window.TaleraMemories?.list?.();
+       if(!Array.isArray(rows))throw Error('LOCAL_STORAGE_UNAVAILABLE');
+       storageState.local=rows.length;
+     }catch(e){storageState.error='Probeer het opnieuw.';}
+   }
+`;
+ result=result.slice(0,i)+localOnly+result.slice(j);
  if(!result.includes('https://talera-website.pages.dev/welkom/')||
     !result.includes("option('mine','▣','Door mij gedeeld'")||
     !result.includes("option('storage','▤','Opslag en back-up'")||
     !result.includes("option('language','NL','Taal'")||
-    count(result,"function taleraCleanFreeMenu()")!==1)
+    count(result,"function taleraCleanFreeMenu()")!==1||
+    !result.includes("Back-up maken of terugzetten")||
+    !result.includes("if(view==='storage')")||
+    !result.includes("const rows=await window.TaleraMemories?.list?.()"))
    throw Error('FREE_MENU_FUNCTIONS_PRESERVATION_FAILED');
  return result;
 }

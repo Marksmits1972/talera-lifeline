@@ -128,3 +128,103 @@ export function removeInactiveDisplayMenu(source){
    throw Error('DISPLAY_REMOVAL_SCOPE_DRIFT');
  return result;
 }
+
+
+// Owner-approved Free-menu cleanup (14 Nov 2026):
+// Keep the ONE working Hulp / Ontdek TALERA website link unchanged.
+// Hide unavailable social discovery, incoming shares, subscriptions and
+// password recovery; remove duplicated privacy routes. Do not change the
+// original account auth, sharing/revocation, backups, language, audio, UI
+// gesture handlers, personal IndexedDB or any server permission.
+export function keepOnlyFunctionalFreeMenu(source){
+ if(typeof source!=='string')throw Error('FREE_MENU_SOURCE_MISSING');
+ const required=[
+  "option('people','○','Mijn mensen'",
+  "option('shared','⌁','Met mij gedeeld'",
+  "option('mine','▣','Door mij gedeeld'",
+  "option('subscription','◇','Mijn abonnement'",
+  "option('privacy','♢','Privacy en beveiliging'",
+  "option('help','?','Hulp en over TALERA'",
+  "option('storage','▤','Opslag en back-up'",
+  "option('language','NL','Taal'",
+  "data-action=\"logout\"",
+  "data-form=\"privacy\"",
+  "data-form=\"forgot\"",
+  "option('forgot','◈','Wachtwoord herstellen'",
+  "case 'help':",
+  "case 'privacy':",
+  "body.innerHTML=html+notice();body.scrollTop=0;",
+  "https://talera-website.pages.dev/welkom/",
+  "function setActiveAccount(account)"
+ ];
+ for(const fragment of required)if(!source.includes(fragment))
+   throw Error('FREE_MENU_APPROVED_SOURCE_DRIFT:'+fragment.slice(0,43));
+ const anchor="body.innerHTML=html+notice();body.scrollTop=0;";
+ if(count(source,anchor)!==1)throw Error('FREE_MENU_RENDER_DRIFT');
+ // Prune only the original currently visible options AFTER the original
+ // renderer. This preserves every existing menu action, loader and history.
+ // Disabled UI is not mislabeled as working; no 'success' from a fake save.
+ const clean=String.raw`
+function taleraCleanFreeMenu(){
+  const active=state.view;
+  const prune=view=>{
+    for(const node of body.querySelectorAll('[data-view="'+view+'"]'))node.remove();
+  };
+  if(active==='hub'){
+    prune('people');prune('shared');prune('subscription');
+    for(const label of body.querySelectorAll('.section-label')){
+      if(label.textContent.trim()==='Contacten en delen')label.textContent='Delen';
+    }
+  }else if(active==='account'){
+    prune('privacy');prune('forgot');
+  }else if(active==='login'){
+    prune('forgot');
+  }else if(active==='settings'){
+    prune('privacy');
+  }else if(active==='help'){
+    // Remove only the duplicate Privacy-link. The working introduction
+    // website must remain the same original href, DOM element and target.
+    prune('privacy');
+  }else if(active==='privacy'&&state.account){
+    // /api/discovery intentionally rejects writes. Never show a functional
+    // save control until account discovery and permission checks exist.
+    body.querySelector('form[data-form="privacy"]')?.remove();
+    const first=body.querySelector('.info');
+    if(first){
+      const heading=first.querySelector('strong'),description=first.querySelector('p');
+      if(heading)heading.textContent='Privacy in TALERA Free';
+      if(description)description.textContent='Je account is niet vindbaar via TALERA-zoeken. Bestaande toegang tot gedeelde herinneringen kun je hieronder bekijken en intrekken.';
+    }
+    for(const label of body.querySelectorAll('.section-label')){
+      if(label.textContent.trim()==='Tijdelijke toegang')
+        label.textContent='Bestaande gedeelde toegang';
+    }
+  }
+  // The original section helper would otherwise leave empty card outlines
+  // and orphan headings (e.g. "Account en privacy" without real choices).
+  for(const options of body.querySelectorAll('.options')){
+    if(options.querySelector('button,a,input,textarea'))continue;
+    const heading=options.previousElementSibling;
+    if(heading?.classList.contains('section-label'))heading.remove();
+    options.remove();
+  }
+}
+`;
+ const compiled=clean;
+ const altered=source.replace(
+   anchor,
+   "body.innerHTML=html+notice();taleraCleanFreeMenu();body.scrollTop=0;"
+ );
+ // Insert the small view-specific hook next to the original render function;
+ // no new menu controller or alternate screen is introduced.
+ const render="function render(){";
+ if(count(altered,render)!==1)throw Error('FREE_MENU_RENDER_ENTRY_DRIFT');
+ const result=altered.replace(render,compiled+"\n"+render);
+ if(!result.includes('https://talera-website.pages.dev/welkom/')||
+    !result.includes("option('mine','▣','Door mij gedeeld'")||
+    !result.includes("option('storage','▤','Opslag en back-up'")||
+    !result.includes("option('language','NL','Taal'")||
+    count(result,"function taleraCleanFreeMenu()")!==1)
+   throw Error('FREE_MENU_FUNCTIONS_PRESERVATION_FAILED');
+ return result;
+}

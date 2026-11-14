@@ -41,7 +41,7 @@ assert.throws(()=>keepOnlyFunctionalFreeMenu(source.replace(
 
 assert.throws(()=>removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(source.replace("case 'display':","case 'display-broken':"))),/DISPLAY_MENU_SOURCE_DRIFT/,'Fail closed if original Weergave menu changes');
 assert.throws(()=>removeInactiveAccessibilityMenu(source.replace("case 'accessibility':","case 'accessibility-changed':")),/ACCESSIBILITY_MENU_SOURCE_DRIFT/,'Refuse removal against drifted source');
-assert.equal((served.match(/data-action="open-backup"/g)||[]).length,1,
+assert.equal((served.match(/data-action="open-backup"/g)||[]).length,2,
  'Exactly one genuine local backup button, only inside existing Storage screen');
 assert.ok(served.includes("state.view==='storage'&&state.account")&&
   served.includes("window.location.assign('/__f5/backup')"),

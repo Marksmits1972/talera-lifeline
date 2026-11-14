@@ -539,7 +539,7 @@ try{
  await page.waitForFunction(()=>{
    const menu=document.getElementById('talera-more-menu');
    const text=menu?.innerText||'';
-   return text.includes('In deze app')&&/\\d+ herinnering/.test(text)&&
+   return text.includes('In deze app')&&/\d+ herinnering/.test(text)&&
      !text.includes('Controleren…');
  },null,{timeout:16000});
  const storageOverview=await page.evaluate(async()=>{

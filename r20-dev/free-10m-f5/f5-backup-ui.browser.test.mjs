@@ -77,9 +77,23 @@ try{
  await b.goto(originB+'/__f5/backup');
  await seed(a,dbA,'old');await seed(b,dbB,'new');
  assert.equal(await a.locator('#talera-free-backup').getAttribute('data-database'),dbA);
- await a.getByRole('button',{name:'Maak back-up'}).click();
+ assert.equal(await a.getByRole('heading',{name:'Back-ups'}).count(),1);
+ assert.equal(await a.getByRole('heading',{name:'Back-up maken'}).count(),1);
+ assert.equal(await a.getByRole('heading',{name:'Back-up terugzetten'}).count(),1);
+ assert.equal(await a.locator('#export-status').textContent(),'',
+  'A second or tenth back-up must not falsely claim this is the first');
+ assert.equal(await a.locator('#restore-status').textContent(),'');
+ assert.equal(await a.getByRole('button',{name:'Back-up maken'}).count(),1);
+ await a.getByRole('button',{name:'Back-up maken'}).click();
  await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('Bestanden'));
  await a.locator('#save-backup').waitFor({state:'visible'});
+ assert.equal(await a.locator('#save-backup').textContent(),'Bewaar bestand');
+ assert.equal(await a.getByRole('button',{name:'Back-up maken'}).isEnabled(),true);
+ // A subsequent back-up uses EXACTLY the same labels and original local
+ // workflow, without a first-run or expired-success label.
+ await a.getByRole('button',{name:'Back-up maken'}).click();
+ await a.waitForFunction(()=>document.getElementById('export-status')?.textContent.includes('Back-up klaar'));
+ assert.equal(await a.locator('#save-backup').textContent(),'Bewaar bestand');
  assert.match(await a.locator('#export-status').textContent(),/Bestanden/);
  const downloadPromise=a.waitForEvent('download');
  await a.locator('#save-backup').click();
@@ -90,7 +104,7 @@ try{
  await b.locator('#restore-file').setInputFiles({name:'mijn-talera.talera',
   mimeType:'application/octet-stream',buffer:fileBytes});
  await b.locator('#preview-restore').click();
- await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('EXPLICIT_CONSENT'));
+ await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Vink eerst aan'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  await b.locator('#other-origin').check();
  await b.locator('#preview-restore').click();
@@ -123,7 +137,7 @@ try{
  await b.locator('#restore-file').setInputFiles({name:'beschadigd.talera',
   mimeType:'application/octet-stream',buffer:corrupt});
  await b.locator('#preview-restore').click();
- await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('MEDIA_CHECKSUM'));
+ await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Bestand beschadigd'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  // Simulate a different account logging in while this old page stays open.
  // The UI must fail closed rather than export the previous account's library.
@@ -131,9 +145,16 @@ try{
  await b.locator('#restore-file').setInputFiles({name:'opnieuw.talera',
   mimeType:'application/octet-stream',buffer:fileBytes});
  await b.locator('#preview-restore').click();
- await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('ACCOUNT_CHANGED'));
+ await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('account is gewijzigd'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  assert.ok(accountReads>=4,'Every archive action must check current account session');
+ assert.equal(await b.getByRole('button',{name:'Bestand controleren'}).count(),1,
+  'Restore inspection must always be named exactly the same');
+ assert.equal(await b.getByRole('button',{name:'Herinneringen terugzetten'}).count(),1,
+  'Restore label must not change after success or repeated restore');
+ assert.match(await a.locator('main').innerText(),/niet versleuteld/i);
+ assert.ok(!(await a.locator('main').innerText()).includes('besloten proef'),
+  'Existing real Free backup must not be falsely marked as a demo');
  assert.equal(posts,0,'No archive or media sent to any server POST');
  assert.deepEqual(errors,[],'No browser errors allowed');
  console.log('TALERA_FREE_F5_BACKUP_UI_TWO_ORIGINS_PASS',JSON.stringify({

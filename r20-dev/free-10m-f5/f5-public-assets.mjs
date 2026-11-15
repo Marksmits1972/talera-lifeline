@@ -1049,7 +1049,7 @@ function stopOldPresentationWhenTimelineMoves(html){
  one(
    "  window.addEventListener('pagehide',closeOrdinaryVideo,{once:true});",
    '  document.addEventListener("talera:timeline-user-motion",()=>{\n'+
-   '    ownSerial++;clearAuto();closeOrdinaryVideo();\n'+
+   '    ownSerial++;clearAuto();closeOrdinaryVideo(true);\n'+
    '  });\n'+
    "  window.addEventListener('pagehide',closeOrdinaryVideo,{once:true});",
    'STOP_ORDINARY_PLAYER');

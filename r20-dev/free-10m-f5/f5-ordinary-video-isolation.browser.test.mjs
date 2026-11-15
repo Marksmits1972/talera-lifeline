@@ -89,12 +89,20 @@ try{
     if(listening.isEnabled()!==false)throw Error('Could not simulate listening preference OFF');
     window.__taleraOrdinaryVideoSnapshots=[];
     window.__taleraOrdinaryVideoObserved=false;
+    const observedSources=new Set();
     const observer=new MutationObserver(records=>{
-      for(const record of records)for(const node of record.addedNodes){
-        if(node.nodeType!==1)continue;
-        const video=node.matches?.('video.talera-v61-inline-video')?node:
-          node.querySelector?.('video.talera-v61-inline-video');
-        if(video){
+      for(const record of records){
+        const candidates=record.type==='attributes'?[record.target]:
+          [...record.addedNodes].filter(x=>x.nodeType===1).flatMap(node=>{
+            const found=node.matches?.('video.talera-v61-inline-video')?node:
+              node.querySelector?.('video.talera-v61-inline-video');
+            return found?[found]:[];
+          });
+        for(const video of candidates){
+          if(!video.matches?.('video.talera-v61-inline-video'))continue;
+          const source=video.getAttribute('src');
+          if(!source?.startsWith('blob:')||observedSources.has(source))continue;
+          observedSources.add(source);
           window.__taleraOrdinaryVideoObserved=true;
           const snapshot={muted:video.muted,
             defaultMuted:video.defaultMuted,volume:video.volume,played:false,
@@ -112,7 +120,8 @@ try{
         }
       }
     });
-    observer.observe(document.documentElement,{childList:true,subtree:true});
+    observer.observe(document.documentElement,{
+      childList:true,subtree:true,attributes:true,attributeFilter:['src']});
     window.__taleraOrdinaryVideoObserver=observer;
   });
   // No manual selection: wait for the normal photo timer to bring the video into view.

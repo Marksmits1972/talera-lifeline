@@ -178,17 +178,23 @@ try{
   assert.equal(after.voiceAudio,false,'Ordinary player must not instantiate narrated audio');
   assert.equal(after.id,id,'Correct memory must stay selected');
   assert.equal(after.idx,0,'Original ordinary video must return to first photo after ending');
-  // Simulate Safari denying ONLY the first audible play(). The ordinary
-  // presenter may then use ONE existing real touch, but never a per-video button.
+  // No hidden audio-authorization listener on Back or the entire document.
+  // The Settings flag is read again for EVERY video, even if Safari denied
+  // the preceding video's sound and it continued muted.
   await page.evaluate(id=>{
     const originalPlay=HTMLMediaElement.prototype.play;
-    window.__taleraTestDeniedOnce=false;
+    window.__taleraAutoPlayAttempts=[];
+    window.__taleraDenyNextAudible=true;
     HTMLMediaElement.prototype.play=function(...args){
-      if(this.classList?.contains('talera-v61-inline-video')&&!this.muted&&
-         !window.__taleraTestDeniedOnce){
-        window.__taleraTestDeniedOnce=true;
-        this.playbackRate=.12;
-        return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
+      if(this.classList?.contains('talera-v61-inline-video')){
+        window.__taleraAutoPlayAttempts.push({
+          muted:this.muted,source:this.getAttribute('src'),
+          frame:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex
+        });
+        if(!this.muted&&window.__taleraDenyNextAudible){
+          window.__taleraDenyNextAudible=false;
+          return Promise.reject(new DOMException('Safari requires gesture','NotAllowedError'));
+        }
       }
       return originalPlay.apply(this,args);
     };
@@ -196,58 +202,66 @@ try{
   },id);
   await page.waitForFunction(()=>{
     const v=document.querySelector('video.talera-v61-inline-video');
-    return window.__taleraTestDeniedOnce&&v?.muted===true&&!v.paused&&
-      v.currentTime>=.02;
+    return v?.muted===true&&!v.paused&&v.currentTime>.025&&
+      window.__taleraAutoPlayAttempts?.some(x=>!x.muted)&&
+      window.__taleraAutoPlayAttempts?.some(x=>x.muted);
   },null,{timeout:9000});
-  // A real tap on the existing photograph (not a new Listen button).
-  // Its normal photo-tap handler may already advance the photo.
-  await page.touchscreen.tap(195,420);
-  await page.waitForFunction(()=>{
-    const v=window.__taleraFirstOrdinaryVideo;
-    return v?.muted===false&&v.defaultMuted===false;
-  },null,{timeout:3500});
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
-    'A real presentation gesture must unlock ordinary sound WITHOUT a Listen button');
-  await page.evaluate(()=>{
-    // Restore normal speed after the synthetic Safari denial; the ORIGINAL
-    // video ending must itself return to the first photo before auto rotation.
-    if(window.__taleraFirstOrdinaryVideo)window.__taleraFirstOrdinaryVideo.playbackRate=1;
-  });
+    'Ordinary presentation must not add a per-video Listen button');
+  // That blocked video ends; the SAME automatic photo cycle eventually
+  // brings it back. Settings ON must cause a FRESH unmuted play() attempt.
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
     null,{timeout:7000});
-  try{
-    await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
-      null,{timeout:18000});
-  }catch(error){
-    const state=await page.evaluate(()=>({
-      frameIndex:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
-      moving:window.__taleraTimelineRuntime?.isMoving?.(),
-      bandRolling:window.__taleraBandRolling,
-      source:window.__taleraFirstOrdinaryVideo?.getAttribute('src'),
-      paused:window.__taleraFirstOrdinaryVideo?.paused,
-      current:window.__taleraFirstOrdinaryVideo?.currentTime,
-      duration:window.__taleraFirstOrdinaryVideo?.duration,
-      loop:window.__taleraFirstOrdinaryVideo?.loop,
-      playbackRate:window.__taleraFirstOrdinaryVideo?.playbackRate,
-      currentMemoryId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
-      snapshots:window.__taleraOrdinaryVideoSnapshots,
-      button:!!document.querySelector('.talera-v61-audio-permission-hint')
-    }));
-    throw Error('Ordinary video after single audio gesture did not rotate: '+JSON.stringify(state));
-  }
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
+    null,{timeout:16000});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[3]?.played,
-    null,{timeout:6000});
-  const afterUnlock=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[3]);
-  assert.equal(afterUnlock.samePlayer,true,'Next ordinary video must reuse the once-unlocked element');
-  assert.equal(afterUnlock.listeningEnabled,true,'Existing Settings must still say sound ON');
-  assert.equal(afterUnlock.muted,false,'Later automatic video must start with original sound requested');
-  console.log('TALERA_ORDINARY_IOS_AUDIO_PERMISSION_RECOVERY_PASS',
-    JSON.stringify({firstAudiblePlayDenied:true,onePresentationTouch:true,
-      noListenButton:true,nextAutomaticVideoAudible:true,
-      reusablePlayer:afterUnlock.samePlayer}));
-  await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
+    null,{timeout:7000});
+  const consecutive=await page.evaluate(()=>({
+    next:window.__taleraOrdinaryVideoSnapshots[3],
+    attempts:window.__taleraAutoPlayAttempts
+  }));
+  assert.equal(consecutive.next.samePlayer,true,'Retain the original single ordinary player');
+  assert.equal(consecutive.next.listeningEnabled,true,'Settings ON remains the only sound preference');
+  assert.equal(consecutive.next.muted,false,
+    'The NEXT automatic video must freshly request sound after a denied previous clip');
+  assert.ok(consecutive.attempts.filter(x=>x.muted===false).length>=2,
+    'The Settings ON preference must trigger a new audible play() attempt on EACH video');
+  console.log('TALERA_ORDINARY_SETTINGS_EACH_VIDEO_AUTOPLAY_PASS',JSON.stringify({
+    firstAudibleDenied:true,silentFallback:true,
+    nextVideoAutomaticallyAudible:true,
+    audibleAttempts:consecutive.attempts.filter(x=>!x.muted).length,
+    onePlayer:true,noListenButton:true
+  }));
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
     null,{timeout:7000});
+  // Before tapping Back, simulate the exact reported state:
+  // Safari has rejected audible autoplay, the clip is playing silently.
+  await page.evaluate(id=>{
+    window.__taleraDenyNextAudible=true;
+    window.__taleraOrdinarySelectPhoto?.(id,2,true);
+    const back=document.getElementById('talera-flow-home');
+    if(!back)throw Error('Original Back control missing');
+    back.addEventListener('click',()=>{
+      const video=document.querySelector('video.talera-v61-inline-video');
+      console.log('TALERA_BACK_CLICK_NO_SOUND_PROBE '+JSON.stringify({
+        videoMuted:video?.muted,videoPlaying:video&&!video.paused,
+        attemptCount:window.__taleraAutoPlayAttempts?.length,
+        settings:window.__taleraAudioControls?.isEnabled?.(),
+        target:back.getAttribute('href')
+      }));
+    },{capture:true,once:true});
+  },id);
+  await page.waitForFunction(()=>{
+    const v=document.querySelector('video.talera-v61-inline-video');
+    return v?.muted===true&&!v.paused&&v.currentTime>.02&&
+      window.__taleraDenyNextAudible===false;
+  },null,{timeout:8000});
+  let backProbe=null;
+  page.on('console',message=>{
+    const label='TALERA_BACK_CLICK_NO_SOUND_PROBE ';
+    if(message.text().startsWith(label))backProbe=JSON.parse(message.text().slice(label.length));
+  });
+  await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
 
   // Diagnose the reported top-left return control on the SAME ordinary player.
   await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.(id,2,true),id);
@@ -281,6 +295,7 @@ try{
   assert.ok(back,'The ORIGINAL return control must exist while video is shown');
   assert.equal(back.href,'/mijn-leven','Back must directly open the real Home path, not rely on Safari following a redirect');
   assert.equal(back.itselfAtCenter,true,'Nothing may cover the back button hit target');
+  const playCountBeforeBack=await page.evaluate(()=>window.__taleraAutoPlayAttempts?.length);
   await page.touchscreen.tap(back.rect[0]+back.rect[2]/2,back.rect[1]+back.rect[3]/2);
   try{
     await page.waitForURL(url=>url.pathname==='/mijn-leven',{timeout:8000});
@@ -291,6 +306,13 @@ try{
       anchorCount:document.querySelectorAll('#talera-flow-home').length}));
     throw Error('Real mobile tap on original back did not reach home: '+JSON.stringify(trace));
   }
+  assert.ok(backProbe,'Back tap must be observed without any audio side effect');
+  assert.equal(backProbe.settings,true,'Settings ON stays enabled even when navigating Back');
+  assert.equal(backProbe.videoMuted,true,'Back must not unmute the blocked video');
+  assert.equal(backProbe.target,'/mijn-leven','Back must navigate directly to My life');
+  assert.equal(backProbe.attemptCount,playCountBeforeBack,
+    'Back must NEVER call video.play() or try to unlock audio');
+  console.log('TALERA_ORDINARY_BACK_NAV_ONLY_NO_AUDIO_PASS',JSON.stringify(backProbe));
   console.log('TALERA_ORDINARY_RETURN_TO_HOME_WITH_ACTIVE_VIDEO_PASS',
     JSON.stringify({url:page.url(),noExtraBackControls:true}));
 

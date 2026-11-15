@@ -50,12 +50,13 @@ try{
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(origin+'/present',{waitUntil:'domcontentloaded',timeout:25000});
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:18000});
-  const clip=path.join(generated,'ordinary-original-video.mp4');
+  const clip=path.join(generated,'ordinary-original-video.webm');
+  // Browser-playable synthetic audio + video. iPhone MOV/HEVC still needs device acceptance.
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
-    '-f','lavfi','-i','sine=frequency=440:duration=1:sample_rate=44100',
-    '-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-shortest',
-    '-movflags','+faststart',clip],
-    {timeout:20000,stdio:'ignore'});
+    '-f','lavfi','-i','sine=frequency=440:duration=1',
+    '-shortest','-c:v','libvpx','-b:v','160k','-c:a','libopus',
+    '-b:a','64k',clip],
+    {timeout:30000,stdio:'ignore'});
   const codec=execFileSync('ffprobe',['-v','error','-show_entries',
     'stream=codec_type','-of','default=noprint_wrappers=1:nokey=1',clip],
     {encoding:'utf8'});
@@ -68,7 +69,7 @@ try{
       return new File([blob],'test-'+i+'.png',{type:'image/png'});
     }));
     files.push(new File([Uint8Array.from(atob(b64),ch=>ch.charCodeAt(0))],
-      'source.mp4',{type:'video/mp4'}));
+      'source.webm',{type:'video/webm'}));
     const row=await window.TaleraMemories.save({
       title:'Ordinary only',date:'2026-11-11',text:'Non-narrated media',
       narrationCues:[],narrationDurationMs:0

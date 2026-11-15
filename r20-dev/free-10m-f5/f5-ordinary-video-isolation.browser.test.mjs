@@ -197,6 +197,8 @@ try{
   assert.equal(silent.listeningEnabled,false,'Test must simulate the real menu setting OFF');
   assert.equal(silent.muted,true,'Setting OFF must mute the original video soundtrack');
   assert.equal(silent.defaultMuted,true,'Setting OFF must set muted as the video default');
+  assert.equal(await page.locator('#talera-f5-ordinary-sound-hint').count(),0,
+    'Disabled sound setting must not show a Safari permission hint');
   assert.equal(silent.volume,1,'Setting OFF must not modify the original stored file or volume');
   assert.equal(silentAfter.idx,0,'Silent video must return to ordinary photo rotation after ending');
   // Switch the same existing Settings contract ON before the next automatic cycle.
@@ -255,6 +257,14 @@ try{
   },null,{timeout:9000});
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
     'Ordinary presentation must not add a per-video Listen button');
+  const hint=page.locator('#talera-f5-ordinary-sound-hint');
+  await hint.waitFor({state:'visible',timeout:4500});
+  assert.equal(await hint.textContent(),'Tik één keer voor geluid',
+    'Only a denied Safari audible start may show the agreed temporary hint');
+  assert.equal(await hint.evaluate(el=>getComputedStyle(el).pointerEvents),'none',
+    'The sound hint must never intercept the actual presentation gesture');
+  assert.equal(await hint.getAttribute('role'),'status',
+    'The hint must remain accessible without becoming a control');
   const deniedCalls=await page.evaluate(()=>window.__taleraAutoPlayAttempts
     .filter(x=>!x.muted).length);
   assert.equal(deniedCalls,1,
@@ -274,17 +284,22 @@ try{
   });
   assert.deepEqual(selectedAfterUnlock,selectedBeforeUnlock,
     'First Safari audio-unlock tap MUST NOT advance the memory or photo');
+  await page.waitForFunction(()=>!document.querySelector('#talera-f5-ordinary-sound-hint'),
+    null,{timeout:4500});
   await page.waitForFunction(before=>window.__taleraAutoPlayAttempts
     ?.filter(x=>!x.muted).length>before,deniedCalls,{timeout:4500});
   const gestureRecovery=await page.evaluate(()=>({
     attempts:window.__taleraAutoPlayAttempts,
     narratorActive:!!document.querySelector('.talera-independent-narrator-layer'),
-    listenButtons:document.querySelectorAll('button.talera-v61-audio-permission-hint').length
+    listenButtons:document.querySelectorAll('button.talera-v61-audio-permission-hint').length,
+    soundHint:!!document.getElementById('talera-f5-ordinary-sound-hint')
   }));
   assert.equal(gestureRecovery.narratorActive,false,
     'Ordinary tap recovery must not activate narrator');
   assert.equal(gestureRecovery.listenButtons,0,
     'Ordinary tap recovery must never add a Beluister button');
+  assert.equal(gestureRecovery.soundHint,false,
+    'The hint must disappear on the first real audio-unlock tap');
   // A normal second tap must retain the approved photo navigation.
   await page.locator('#memoryStoryScroll').tap({timeout:4500});
   await page.waitForFunction(before=>

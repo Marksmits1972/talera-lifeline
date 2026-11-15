@@ -261,7 +261,19 @@ try{
     'Safari metadata load must not trigger TWO overlapping audible play() attempts');
   // The user's real tap on the EXISTING story surface is the only recovery
   // gesture. No hidden button, document-wide touch listener or Back binding.
+  const selectedBeforeUnlock=await page.evaluate(()=>{
+    const video=document.querySelector('video.talera-v61-inline-video');
+    video.loop=true; // Keep this short synthetic clip onscreen for the gesture check.
+    const memory=window.__taleraTimelineRuntime.currentMemory();
+    return {id:memory.id,photoIndex:memory._photoIndex};
+  });
   await page.locator('#memoryStoryScroll').tap({timeout:4500});
+  const selectedAfterUnlock=await page.evaluate(()=>{
+    const memory=window.__taleraTimelineRuntime.currentMemory();
+    return {id:memory.id,photoIndex:memory._photoIndex};
+  });
+  assert.deepEqual(selectedAfterUnlock,selectedBeforeUnlock,
+    'First Safari audio-unlock tap MUST NOT advance the memory or photo');
   await page.waitForFunction(before=>window.__taleraAutoPlayAttempts
     ?.filter(x=>!x.muted).length>before,deniedCalls,{timeout:4500});
   const gestureRecovery=await page.evaluate(()=>({
@@ -273,6 +285,11 @@ try{
     'Ordinary tap recovery must not activate narrator');
   assert.equal(gestureRecovery.listenButtons,0,
     'Ordinary tap recovery must never add a Beluister button');
+  // A normal second tap must retain the approved photo navigation.
+  await page.locator('#memoryStoryScroll').tap({timeout:4500});
+  await page.waitForFunction(before=>
+    window.__taleraTimelineRuntime.currentMemory()?._photoIndex!==before,
+    selectedBeforeUnlock.photoIndex,{timeout:4500});
   console.log('TALERA_ORDINARY_NATIVE_STAGE_TAP_AUDIO_RECOVERY_PASS',JSON.stringify({
     firstAudibleAttempts:deniedCalls,
     audibleRetries:gestureRecovery.attempts.filter(x=>!x.muted).length,

@@ -454,6 +454,63 @@ try{
   });
   assert.equal(state.id,mixed);
   assert.equal(state.video,false,'Ordinary photo roll cannot enter narration mode');
+  // The SAME ordinary native video node must survive story-to-story swipes,
+  // not merely photo/video rotations within one story. On iOS that element
+  // may retain the sound authorization a prior genuine gesture established.
+  await page.evaluate(()=>{
+    window.__taleraOrdinaryPlayerBeforeStorySwipe=
+      document.querySelector('video.talera-v61-inline-video');
+    if(!window.__taleraOrdinaryPlayerBeforeStorySwipe)
+      throw Error('Original video element missing before ordinary story swipe');
+  });
+  const ordinarySwipeBox=await page.locator('#memoryStoryScroll').boundingBox();
+  const ordinarySwipeY=ordinarySwipeBox.y+ordinarySwipeBox.height*.48;
+  const swipeMemory=async(from,to)=>{
+    await page.mouse.move(ordinarySwipeBox.x+ordinarySwipeBox.width*from,ordinarySwipeY);
+    await page.mouse.down();
+    await page.mouse.move(ordinarySwipeBox.x+ordinarySwipeBox.width*to,ordinarySwipeY,
+      {steps:13});
+    await page.mouse.up();
+  };
+  await swipeMemory(.18,.82);
+  await page.waitForFunction(id=>
+    window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+    plain,{timeout:13000});
+  await page.waitForFunction(()=>!document.querySelector(
+    '#photoStage .talera-wheel-strip')?.classList.contains('is-visible'),
+    null,{timeout:13000});
+  const stillSameOnPlain=await page.evaluate(()=>
+    document.querySelector('video.talera-v61-inline-video')===
+    window.__taleraOrdinaryPlayerBeforeStorySwipe);
+  assert.equal(stillSameOnPlain,true,
+    'Changing ordinary memory must not destroy the authorized video DOM node');
+  await swipeMemory(.82,.18);
+  await page.waitForFunction(id=>
+    window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+    mixed,{timeout:13000});
+  await page.waitForFunction(()=>!document.querySelector(
+    '#photoStage .talera-wheel-strip')?.classList.contains('is-visible'),
+    null,{timeout:13000});
+  await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.(
+    window.__taleraTimelineRuntime.currentMemory().id,2,true),mixed);
+  await page.waitForFunction(()=>{
+    const v=document.querySelector('video.talera-v61-inline-video');
+    return v?.currentSrc?.startsWith('blob:')&&!v.paused&&
+      v===window.__taleraOrdinaryPlayerBeforeStorySwipe;
+  },null,{timeout:11000});
+  const retainedPlayer=await page.evaluate(()=>({
+    sameNode:document.querySelector('video.talera-v61-inline-video')===
+      window.__taleraOrdinaryPlayerBeforeStorySwipe,
+    memoryId:window.__taleraTimelineRuntime?.currentMemory()?.storyId,
+    narratedLayerCount:document.querySelectorAll('.talera-independent-narrator-layer').length,
+    listenButtonCount:document.querySelectorAll('button.talera-v61-audio-permission-hint').length
+  }));
+  assert.equal(retainedPlayer.sameNode,true);
+  assert.equal(retainedPlayer.narratedLayerCount,0);
+  assert.equal(retainedPlayer.listenButtonCount,0);
+  console.log('TALERA_ORDINARY_PLAYER_REUSED_ACROSS_REAL_STORY_SWIPES_PASS',
+    JSON.stringify({sameNode:retainedPlayer.sameNode,
+      ordinaryToOrdinary:true,noNarratorLeak:true,realIphoneAccepted:false}));
   // Playback integration in the SAME authenticated TALERA Free candidate.
   // Synthetic voice and original soundtrack, no new app, no customer media.
   const syntheticVoice=path.join(generated,'independent-narrator-voice.wav');

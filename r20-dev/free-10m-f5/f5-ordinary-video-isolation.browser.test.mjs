@@ -165,6 +165,35 @@ try{
   assert.equal(after.voiceAudio,false,'Ordinary player must not instantiate narrated audio');
   assert.equal(after.id,id,'Correct memory must stay selected');
   assert.equal(after.idx,0,'Original ordinary video must return to first photo after ending');
+  // Diagnose the reported top-left return control on the SAME ordinary player.
+  await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.(id,2,true),id);
+  await page.waitForSelector('video.talera-v61-inline-video',{timeout:8000});
+  const navigation=await page.evaluate(()=>{
+    const nodes=[...document.querySelectorAll('button,a,[role="button"]')];
+    const controls=nodes.map(el=>{
+      const r=el.getBoundingClientRect(),cs=getComputedStyle(el);
+      const centerX=r.x+r.width/2,centerY=r.y+r.height/2;
+      const top=document.elementFromPoint(centerX,centerY);
+      return {tag:el.tagName,id:el.id,className:String(el.className).slice(0,120),
+        text:el.textContent?.trim().slice(0,65),aria:el.getAttribute('aria-label'),
+        title:el.getAttribute('title'),href:el.getAttribute('href'),
+        outer:el.outerHTML.slice(0,360),
+        rect:[Math.round(r.x),Math.round(r.y),Math.round(r.width),Math.round(r.height)],
+        visible:cs.visibility!=='hidden'&&cs.display!=='none',
+        pointerEvents:cs.pointerEvents,zIndex:cs.zIndex,
+        atCenter:top?.id||top?.className||top?.tagName,
+        itselfAtCenter:top===el||el.contains(top)};
+    }).filter(x=>x.rect[0]<195&&x.rect[1]<240&&x.rect[2]>10&&x.rect[3]>10);
+    return {url:location.href,controls,
+      elementsAtTopLeft:document.elementsFromPoint(34,145).slice(0,8)
+        .map(el=>({tag:el.tagName,id:el.id,className:String(el.className).slice(0,100),
+          pointerEvents:getComputedStyle(el).pointerEvents})),
+      historyLength:history.length,
+      audioSetting:window.__taleraAudioControls?.isEnabled?.(),
+      currentVideo:document.querySelector('video.talera-v61-inline-video')?.outerHTML.slice(0,370)};
+  });
+  console.log('TALERA_ORDINARY_RETURN_BUTTON_DIAGNOSTIC',JSON.stringify(navigation));
+
   assert.deepEqual(errors,[],'No presentation JS errors');
 }finally{
   if(browser)await browser.close().catch(()=>{});

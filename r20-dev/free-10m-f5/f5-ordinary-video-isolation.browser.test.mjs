@@ -170,7 +170,7 @@ try{
   assert.equal(audible.samePlayer,true,'Same ordinary media element must be retained across video rotations');
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
     'Ordinary video must never show its own duplicate Listen button');
-  await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
+  // Keep the same observer active for the simulated Safari denial and later video.
   await wait(2200);
   const after=await info();
   console.log('TALERA_ORDINARY_VIDEO_SETTINGS_DIAGNOSTIC',

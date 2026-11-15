@@ -208,12 +208,13 @@ try{
   },null,{timeout:3500});
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
     'A real presentation gesture must unlock ordinary sound WITHOUT a Listen button');
-  await page.evaluate(id=>{
-    // Resume ordinary automatic rotation after the intentionally simulated
-    // iOS permission gesture; preserve the SAME video DOM element.
-    window.__taleraOrdinarySelectPhoto?.(id,0,true);
-    if(window.__taleraFirstOrdinaryVideo)window.__taleraFirstOrdinaryVideo.playbackRate=4;
-  },id);
+  await page.evaluate(()=>{
+    // Restore normal speed after the synthetic Safari denial; the ORIGINAL
+    // video ending must itself return to the first photo before auto rotation.
+    if(window.__taleraFirstOrdinaryVideo)window.__taleraFirstOrdinaryVideo.playbackRate=1;
+  });
+  await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
+    null,{timeout:7000});
   try{
     await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
       null,{timeout:18000});
@@ -225,6 +226,10 @@ try{
       source:window.__taleraFirstOrdinaryVideo?.getAttribute('src'),
       paused:window.__taleraFirstOrdinaryVideo?.paused,
       current:window.__taleraFirstOrdinaryVideo?.currentTime,
+      duration:window.__taleraFirstOrdinaryVideo?.duration,
+      loop:window.__taleraFirstOrdinaryVideo?.loop,
+      playbackRate:window.__taleraFirstOrdinaryVideo?.playbackRate,
+      currentMemoryId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
       snapshots:window.__taleraOrdinaryVideoSnapshots,
       button:!!document.querySelector('.talera-v61-audio-permission-hint')
     }));

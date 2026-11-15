@@ -52,8 +52,14 @@ try{
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:18000});
   const clip=path.join(generated,'ordinary-original-video.mp4');
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
-    '-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',clip],
+    '-f','lavfi','-i','sine=frequency=440:duration=1:sample_rate=44100',
+    '-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-shortest',
+    '-movflags','+faststart',clip],
     {timeout:20000,stdio:'ignore'});
+  const codec=execFileSync('ffprobe',['-v','error','-show_entries',
+    'stream=codec_type','-of','default=noprint_wrappers=1:nokey=1',clip],
+    {encoding:'utf8'});
+  assert.ok(codec.split(/\s+/).includes('audio'),'Synthetic original video must contain actual soundtrack');
   const id=await page.evaluate(async b64=>{
     const files=await Promise.all(['#ef1523','#27d128'].map(async(c,i)=>{
       const el=document.createElement('canvas');el.width=140;el.height=140;
@@ -75,19 +81,31 @@ try{
     return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3;
   },id,{timeout:18000});
   await page.evaluate(()=>{
+    // Synthetic disabled legacy preference: normal original video still needs sound.
+    const listening=window.__taleraAudioControls;
+    if(!listening||typeof listening.isEnabled!=='function')throw Error('Audio preference contract missing');
+    listening.isEnabled=()=>false;
+    if(listening.isEnabled()!==false)throw Error('Could not simulate listening preference OFF');
+    window.__taleraOrdinaryVideoSnapshot=null;
     window.__taleraOrdinaryVideoObserved=false;
     const observer=new MutationObserver(records=>{
       for(const record of records)for(const node of record.addedNodes){
-        if(node.nodeType===1&&(node.matches?.('video.talera-v61-inline-video')||
-          node.querySelector?.('video.talera-v61-inline-video')))
+        if(node.nodeType!==1)continue;
+        const video=node.matches?.('video.talera-v61-inline-video')?node:
+          node.querySelector?.('video.talera-v61-inline-video');
+        if(video){
           window.__taleraOrdinaryVideoObserved=true;
+          window.__taleraOrdinaryVideoSnapshot={muted:video.muted,
+            defaultMuted:video.defaultMuted,volume:video.volume,
+            legacyListeningEnabled:window.__taleraAudioControls?.isEnabled?.()};
+        }
       }
     });
     observer.observe(document.documentElement,{childList:true,subtree:true});
     window.__taleraOrdinaryVideoObserver=observer;
   });
-  await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.('pwa:'+id,2,true),id);
-  await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:11000});
+  // No manual selection: wait for the normal photo timer to bring the video into view.
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:18000});
   await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
   const info=()=>page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
@@ -99,7 +117,12 @@ try{
       voiceAudio:!!window.__taleraInlineSharedAudio};
   });
   const immediate=await info();await wait(2200);const after=await info();
-  console.log('TALERA_ORDINARY_VIDEO_ISOLATION_DIAGNOSTIC',JSON.stringify({immediate,after,errors}));
+  const snap=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshot);
+  console.log('TALERA_ORDINARY_VIDEO_ISOLATION_DIAGNOSTIC',JSON.stringify({immediate,after,snap,errors}));
+  assert.equal(snap.legacyListeningEnabled,false,'Legacy listening preference must be OFF in this test');
+  assert.equal(snap.muted,false,'Automatic ordinary video must retain original audible track');
+  assert.equal(snap.defaultMuted,false,'Ordinary video must not set the HTML muted default');
+  assert.equal(snap.volume,1,'Ordinary video playback must request full natural audio volume');
   assert.equal(after.voiceAudio,false,'Ordinary player must not instantiate narrated audio');
   assert.equal(after.id,id,'Correct memory must stay selected');
   assert.equal(after.idx,0,'Original ordinary video must return to first photo after ending');

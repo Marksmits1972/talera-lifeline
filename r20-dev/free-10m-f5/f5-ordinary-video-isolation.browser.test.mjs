@@ -193,6 +193,22 @@ try{
       currentVideo:document.querySelector('video.talera-v61-inline-video')?.outerHTML.slice(0,370)};
   });
   console.log('TALERA_ORDINARY_RETURN_BUTTON_DIAGNOSTIC',JSON.stringify(navigation));
+  const back=navigation.controls.find(x=>x.id==='talera-flow-home');
+  assert.ok(back,'The ORIGINAL return control must exist while video is shown');
+  assert.equal(back.href,'/','The original return destination must remain home');
+  assert.equal(back.itselfAtCenter,true,'Nothing may cover the back button hit target');
+  await page.touchscreen.tap(back.rect[0]+back.rect[2]/2,back.rect[1]+back.rect[3]/2);
+  try{
+    await page.waitForURL(url=>url.pathname==='/mijn-leven',{timeout:8000});
+  }catch(error){
+    const trace=await page.evaluate(()=>({href:location.href,historyLength:history.length,
+      homeLink:document.getElementById('talera-flow-home')?.outerHTML,
+      pageshow:document.readyState,
+      anchorCount:document.querySelectorAll('#talera-flow-home').length}));
+    throw Error('Real mobile tap on original back did not reach home: '+JSON.stringify(trace));
+  }
+  console.log('TALERA_ORDINARY_RETURN_TO_HOME_WITH_ACTIVE_VIDEO_PASS',
+    JSON.stringify({url:page.url(),noExtraBackControls:true}));
 
   assert.deepEqual(errors,[],'No presentation JS errors');
 }finally{

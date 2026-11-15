@@ -236,7 +236,11 @@ try{
         });
         if(!this.muted&&window.__taleraDenyNextAudible){
           window.__taleraDenyNextAudible=false;
-          return Promise.reject(new DOMException('Safari requires gesture','NotAllowedError'));
+          // Native metadata can complete while the first audible play promise
+          // is still pending. Do NOT issue a second, overlapping audible play.
+          setTimeout(()=>this.dispatchEvent(new Event('loadedmetadata')),12);
+          return new Promise((_,reject)=>setTimeout(()=>reject(
+            new DOMException('Safari requires gesture','NotAllowedError')),80));
         }
       }
       return originalPlay.apply(this,args);
@@ -251,6 +255,29 @@ try{
   },null,{timeout:9000});
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
     'Ordinary presentation must not add a per-video Listen button');
+  const deniedCalls=await page.evaluate(()=>window.__taleraAutoPlayAttempts
+    .filter(x=>!x.muted).length);
+  assert.equal(deniedCalls,1,
+    'Safari metadata load must not trigger TWO overlapping audible play() attempts');
+  // The user's real tap on the EXISTING story surface is the only recovery
+  // gesture. No hidden button, document-wide touch listener or Back binding.
+  await page.locator('#memoryStoryScroll').tap({timeout:4500});
+  await page.waitForFunction(before=>window.__taleraAutoPlayAttempts
+    ?.filter(x=>!x.muted).length>before,deniedCalls,{timeout:4500});
+  const gestureRecovery=await page.evaluate(()=>({
+    attempts:window.__taleraAutoPlayAttempts,
+    narratorActive:!!document.querySelector('.talera-independent-narrator-layer'),
+    listenButtons:document.querySelectorAll('button.talera-v61-audio-permission-hint').length
+  }));
+  assert.equal(gestureRecovery.narratorActive,false,
+    'Ordinary tap recovery must not activate narrator');
+  assert.equal(gestureRecovery.listenButtons,0,
+    'Ordinary tap recovery must never add a Beluister button');
+  console.log('TALERA_ORDINARY_NATIVE_STAGE_TAP_AUDIO_RECOVERY_PASS',JSON.stringify({
+    firstAudibleAttempts:deniedCalls,
+    audibleRetries:gestureRecovery.attempts.filter(x=>!x.muted).length,
+    noExtraControl:true,ordinaryEngineOnly:true,realIphoneAccepted:false
+  }));
   // That blocked video ends; the SAME automatic photo cycle eventually
   // brings it back. Settings ON must cause a FRESH unmuted play() attempt.
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,

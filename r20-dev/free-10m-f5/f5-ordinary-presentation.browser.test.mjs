@@ -777,8 +777,20 @@ try{
     leftVoicePaused:window.__taleraSwipeVoiceToStop?.paused,
     leftVoiceSrc:window.__taleraSwipeVoiceToStop?.src,
     hasNarratorClass:document.body.classList.contains('talera-v61-narration-visual'),
-    newMemory:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId
+    newMemory:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+    memoryHasVoice:!!window.__taleraTimelineRuntime?.currentMemory?.()
+      ?._zeroItems?.some(x=>x.kind==='audio'),
+    narratorLayers:document.querySelectorAll('.talera-independent-narrator-layer').length,
+    danglingListen:document.querySelectorAll('button.talera-v61-audio-permission-hint').length,
+    settingsEnabled:window.__taleraAudioControls?.isEnabled?.()
   }));
+  assert.equal(afterNarratedSwipe.memoryHasVoice,false,
+    'Ordinary memory must select ordinary motor after swipe');
+  assert.equal(afterNarratedSwipe.narratorLayers,0,
+    'Recorded-voice motor must be entirely stopped on ordinary-memory transition');
+  assert.equal(afterNarratedSwipe.danglingListen,0,
+    'A narrator Listen button must never remain on an ordinary memory');
+  console.log('TALERA_SWIPE_ENGINE_AUDIO_ISOLATION_PASS',JSON.stringify(afterNarratedSwipe));
   assert.equal(afterNarratedSwipe.leftVoicePaused,true,
     'Old voice keeps playing after navigating to another memory');
   assert.equal(afterNarratedSwipe.hasNarratorClass,false);

@@ -199,21 +199,37 @@ try{
     return window.__taleraTestDeniedOnce&&v?.muted===true&&!v.paused&&
       v.currentTime>=.02;
   },null,{timeout:9000});
-  await page.touchscreen.tap(110,45);
+  // A real tap on the existing photograph (not a new Listen button).
+  // Its normal photo-tap handler may already advance the photo.
+  await page.touchscreen.tap(195,420);
   await page.waitForFunction(()=>{
-    const v=document.querySelector('video.talera-v61-inline-video');
-    return v?.muted===false&&v.defaultMuted===false&&!v.paused;
+    const v=window.__taleraFirstOrdinaryVideo;
+    return v?.muted===false&&v.defaultMuted===false;
   },null,{timeout:3500});
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
     'A real presentation gesture must unlock ordinary sound WITHOUT a Listen button');
-  await page.evaluate(()=>{
-    const v=document.querySelector('video.talera-v61-inline-video');
-    if(v)v.playbackRate=8;
-  });
-  await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
-    null,{timeout:6000});
-  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
-    null,{timeout:16000});
+  await page.evaluate(id=>{
+    // Resume ordinary automatic rotation after the intentionally simulated
+    // iOS permission gesture; preserve the SAME video DOM element.
+    window.__taleraOrdinarySelectPhoto?.(id,0,true);
+    if(window.__taleraFirstOrdinaryVideo)window.__taleraFirstOrdinaryVideo.playbackRate=4;
+  },id);
+  try{
+    await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
+      null,{timeout:18000});
+  }catch(error){
+    const state=await page.evaluate(()=>({
+      frameIndex:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
+      moving:window.__taleraTimelineRuntime?.isMoving?.(),
+      bandRolling:window.__taleraBandRolling,
+      source:window.__taleraFirstOrdinaryVideo?.getAttribute('src'),
+      paused:window.__taleraFirstOrdinaryVideo?.paused,
+      current:window.__taleraFirstOrdinaryVideo?.currentTime,
+      snapshots:window.__taleraOrdinaryVideoSnapshots,
+      button:!!document.querySelector('.talera-v61-audio-permission-hint')
+    }));
+    throw Error('Ordinary video after single audio gesture did not rotate: '+JSON.stringify(state));
+  }
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[3]?.played,
     null,{timeout:6000});
   const afterUnlock=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[3]);

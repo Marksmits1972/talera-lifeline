@@ -81,12 +81,12 @@ try{
     return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3;
   },id,{timeout:18000});
   await page.evaluate(()=>{
-    // Synthetic disabled legacy preference: normal original video still needs sound.
+    // Setting OFF: keep the original video moving with its soundtrack muted.
     const listening=window.__taleraAudioControls;
     if(!listening||typeof listening.isEnabled!=='function')throw Error('Audio preference contract missing');
     listening.isEnabled=()=>false;
     if(listening.isEnabled()!==false)throw Error('Could not simulate listening preference OFF');
-    window.__taleraOrdinaryVideoSnapshot=null;
+    window.__taleraOrdinaryVideoSnapshots=[];
     window.__taleraOrdinaryVideoObserved=false;
     const observer=new MutationObserver(records=>{
       for(const record of records)for(const node of record.addedNodes){
@@ -95,9 +95,11 @@ try{
           node.querySelector?.('video.talera-v61-inline-video');
         if(video){
           window.__taleraOrdinaryVideoObserved=true;
-          window.__taleraOrdinaryVideoSnapshot={muted:video.muted,
-            defaultMuted:video.defaultMuted,volume:video.volume,
-            legacyListeningEnabled:window.__taleraAudioControls?.isEnabled?.()};
+          const snapshot={muted:video.muted,
+            defaultMuted:video.defaultMuted,volume:video.volume,played:false,
+            listeningEnabled:window.__taleraAudioControls?.isEnabled?.()};
+          window.__taleraOrdinaryVideoSnapshots.push(snapshot);
+          video.addEventListener('playing',()=>{snapshot.played=true},{once:true});
         }
       }
     });
@@ -106,7 +108,6 @@ try{
   });
   // No manual selection: wait for the normal photo timer to bring the video into view.
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:18000});
-  await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
   const info=()=>page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     const v=document.querySelector('video.talera-v61-inline-video');
@@ -116,13 +117,35 @@ try{
       error:v?.error?.code,muted:v?.muted,src:v?.currentSrc?.startsWith('blob:'),
       voiceAudio:!!window.__taleraInlineSharedAudio};
   });
-  const immediate=await info();await wait(2200);const after=await info();
-  const snap=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshot);
-  console.log('TALERA_ORDINARY_VIDEO_ISOLATION_DIAGNOSTIC',JSON.stringify({immediate,after,snap,errors}));
-  assert.equal(snap.legacyListeningEnabled,false,'Legacy listening preference must be OFF in this test');
-  assert.equal(snap.muted,false,'Automatic ordinary video must retain original audible track');
-  assert.equal(snap.defaultMuted,false,'Ordinary video must not set the HTML muted default');
-  assert.equal(snap.volume,1,'Ordinary video playback must request full natural audio volume');
+  const immediate=await info();
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[0]?.played,
+    null,{timeout:10000});
+  await wait(2200);
+  const silentAfter=await info();
+  const silent=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[0]);
+  assert.equal(silent.listeningEnabled,false,'Test must simulate the real menu setting OFF');
+  assert.equal(silent.muted,true,'Setting OFF must mute the original video soundtrack');
+  assert.equal(silent.defaultMuted,true,'Setting OFF must set muted as the video default');
+  assert.equal(silent.volume,1,'Setting OFF must not modify the original stored file or volume');
+  assert.equal(silentAfter.idx,0,'Silent video must return to ordinary photo rotation after ending');
+  // Switch the same existing Settings contract ON before the next automatic cycle.
+  await page.evaluate(()=>{window.__taleraAudioControls.isEnabled=()=>true});
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=2,
+    null,{timeout:18000});
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[1]?.played,
+    null,{timeout:10000});
+  const audible=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[1]);
+  assert.equal(audible.listeningEnabled,true,'Test must simulate the real menu setting ON');
+  assert.equal(audible.muted,false,'Setting ON must request the original audible soundtrack');
+  assert.equal(audible.defaultMuted,false,'Setting ON must clear default mute');
+  assert.equal(audible.volume,1,'Original video soundtrack must retain its full playback volume');
+  assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
+    'Ordinary video must never show its own duplicate Listen button');
+  await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
+  await wait(2200);
+  const after=await info();
+  console.log('TALERA_ORDINARY_VIDEO_SETTINGS_DIAGNOSTIC',
+    JSON.stringify({immediate,silentAfter,after,silent,audible,errors}));
   assert.equal(after.voiceAudio,false,'Ordinary player must not instantiate narrated audio');
   assert.equal(after.id,id,'Correct memory must stay selected');
   assert.equal(after.idx,0,'Original ordinary video must return to first photo after ending');

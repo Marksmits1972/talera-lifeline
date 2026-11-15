@@ -286,9 +286,9 @@ jobs:
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore prior TALERA QA on approved-backup deployment failure" --config r20-dev/free-10m-f5/wrangler.backup-iphone.generated.jsonc
 
   deploy_independent_narrator:
-    name: Publish tested ordinary video element reuse to SAME TALERA Free PWA
+    name: Publish Safari denied-audio hint to SAME TALERA Free PWA
     needs: f5_isolated_local
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-narrator-story-swipe-20261113' && github.event.head_commit.message == 'qa-deploy-TALERA-free-native-video-sound-swipe-recovery-20261115' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-narrator-story-swipe-20261113' && github.event.head_commit.message == 'qa-deploy-TALERA-free-safari-sound-hint-20261115' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     env:
@@ -296,7 +296,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_PREVIOUS_VERSION: 8ddf3dcc-c977-4556-8536-10d8f714d509
+      F5_PREVIOUS_VERSION: 2c4d65d4-96ba-4bea-831a-63cb421f955a
       F5_INVITE_HASH: d85c9339c034b39bd31a94c94bb92d4970dbe50685f74eb49952b19c79e880a2
       F5_INVITE_EXPIRES: '1794942000000'
     steps:
@@ -470,6 +470,8 @@ jobs:
             ordinary.includes('const video=ordinaryVideo||document.createElement(\'video\');') &&
             ordinary.includes('playPending=true;') &&
             ordinary.includes('ordinaryRecoverSound=recoverAudible;') &&
+            ordinary.includes('ordinarySoundHint(true);') &&
+            html.includes("hint.textContent='Tik één keer voor geluid';") &&
             html.includes("closeOrdinaryVideo(!!memory&&!memory._zeroItems?.some(x=>x.kind==='audio'))") &&
             html.includes("document.getElementById('memoryStoryScroll')?.addEventListener('click'") &&
             html.includes('closeOrdinaryVideo(true);') &&
@@ -478,7 +480,7 @@ jobs:
             html.includes("back.setAttribute('href','/mijn-leven');") &&
             !ordinary.includes("hint.textContent='▶ Beluister'") &&
             !ordinary.includes('ordinaryHint'),
-            'Every ordinary video re-applies existing Settings; Back cannot trigger audio and no Listen prompt exists');
+            'Every ordinary video respects Settings; only a refused audible start shows its non-interactive hint; no Listen button');
           assert.ok(html.includes('let ownSerial=0,ordinaryVideo=null') &&
             html.includes('window.__taleraOrdinarySelectPhoto=') &&
             html.includes('window.__taleraOrdinaryActivate=') &&

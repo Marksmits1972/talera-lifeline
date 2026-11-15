@@ -81,6 +81,49 @@ try{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3;
   },id,{timeout:18000});
+  // Read the REAL persisted Settings contract before any test simulates it.
+  // This checks that the on/off preference survives navigation/reload, unlike
+  // the later controlled Safari-denial experiment that replaces isEnabled().
+  const settingsKey='talera-v61-listening-intent-r8';
+  const previousIntent=await page.evaluate(key=>localStorage.getItem(key),settingsKey);
+  const realPreferenceChecks=[];
+  for(const [stored,expected] of [['off',false],['on',true]]){
+    await page.evaluate(({key,stored})=>localStorage.setItem(key,stored),
+      {key:settingsKey,stored});
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return typeof window.__taleraAudioControls?.isEnabled==='function'&&
+        m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3;
+    },id,{timeout:18000});
+    const actual=await page.evaluate(key=>({
+      stored:localStorage.getItem(key),
+      actualEnabled:window.__taleraAudioControls.isEnabled(),
+      narratorPresent:!!document.querySelector('.talera-independent-narrator-layer'),
+      voiceItem:!!window.__taleraTimelineRuntime.currentMemory()?._zeroItems?.some(x=>x.kind==='audio')
+    }),settingsKey);
+    assert.equal(actual.stored,stored,'Existing Settings intent must persist through reload');
+    assert.equal(actual.actualEnabled,expected,
+      'REAL Settings on/off must reach the ordinary-video audio contract');
+    assert.equal(actual.narratorPresent,false,
+      'An ordinary memory must never initialize the voice engine');
+    assert.equal(actual.voiceItem,false,'Sound preference test must use ordinary memory');
+    realPreferenceChecks.push(actual);
+  }
+  await page.evaluate(({key,value})=>{
+    if(value===null)localStorage.removeItem(key);
+    else localStorage.setItem(key,value);
+  },{key:settingsKey,value:previousIntent});
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(id=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return typeof window.__taleraAudioControls?.isEnabled==='function'&&
+      m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3;
+  },id,{timeout:18000});
+  console.log('TALERA_REAL_PERSISTED_AUDIO_SETTINGS_PASS',
+    JSON.stringify({checks:realPreferenceChecks,originalPreferenceRestored:true,
+      testAppOnly:true,realIPhoneAccepted:false}));
+
   await page.evaluate(()=>{
     // Setting OFF: keep the original video moving with its soundtrack muted.
     const listening=window.__taleraAudioControls;

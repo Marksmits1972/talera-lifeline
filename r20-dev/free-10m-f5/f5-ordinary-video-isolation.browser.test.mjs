@@ -169,6 +169,56 @@ try{
   assert.equal(after.voiceAudio,false,'Ordinary player must not instantiate narrated audio');
   assert.equal(after.id,id,'Correct memory must stay selected');
   assert.equal(after.idx,0,'Original ordinary video must return to first photo after ending');
+  // Simulate Safari denying ONLY the first audible play(). The ordinary
+  // presenter may then use ONE existing real touch, but never a per-video button.
+  await page.evaluate(id=>{
+    const originalPlay=HTMLMediaElement.prototype.play;
+    window.__taleraTestDeniedOnce=false;
+    HTMLMediaElement.prototype.play=function(...args){
+      if(this.classList?.contains('talera-v61-inline-video')&&!this.muted&&
+         !window.__taleraTestDeniedOnce){
+        window.__taleraTestDeniedOnce=true;
+        this.playbackRate=.12;
+        return Promise.reject(new DOMException('User gesture required','NotAllowedError'));
+      }
+      return originalPlay.apply(this,args);
+    };
+    window.__taleraOrdinarySelectPhoto?.(id,2,true);
+  },id);
+  await page.waitForFunction(()=>{
+    const v=document.querySelector('video.talera-v61-inline-video');
+    return window.__taleraTestDeniedOnce&&v?.muted===true&&!v.paused&&
+      v.currentTime>=.02;
+  },null,{timeout:9000});
+  await page.touchscreen.tap(110,45);
+  await page.waitForFunction(()=>{
+    const v=document.querySelector('video.talera-v61-inline-video');
+    return v?.muted===false&&v.defaultMuted===false&&!v.paused;
+  },null,{timeout:3500});
+  assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
+    'A real presentation gesture must unlock ordinary sound WITHOUT a Listen button');
+  await page.evaluate(()=>{
+    const v=document.querySelector('video.talera-v61-inline-video');
+    if(v)v.playbackRate=8;
+  });
+  await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
+    null,{timeout:6000});
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
+    null,{timeout:16000});
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[3]?.played,
+    null,{timeout:6000});
+  const afterUnlock=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[3]);
+  assert.equal(afterUnlock.samePlayer,true,'Next ordinary video must reuse the once-unlocked element');
+  assert.equal(afterUnlock.listeningEnabled,true,'Existing Settings must still say sound ON');
+  assert.equal(afterUnlock.muted,false,'Later automatic video must start with original sound requested');
+  console.log('TALERA_ORDINARY_IOS_AUDIO_PERMISSION_RECOVERY_PASS',
+    JSON.stringify({firstAudiblePlayDenied:true,onePresentationTouch:true,
+      noListenButton:true,nextAutomaticVideoAudible:true,
+      reusablePlayer:afterUnlock.samePlayer}));
+  await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
+  await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
+    null,{timeout:7000});
+
   // Diagnose the reported top-left return control on the SAME ordinary player.
   await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.(id,2,true),id);
   await page.waitForSelector('video.talera-v61-inline-video',{timeout:8000});

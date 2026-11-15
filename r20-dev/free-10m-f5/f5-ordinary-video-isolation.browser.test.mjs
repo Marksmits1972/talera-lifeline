@@ -97,9 +97,14 @@ try{
           window.__taleraOrdinaryVideoObserved=true;
           const snapshot={muted:video.muted,
             defaultMuted:video.defaultMuted,volume:video.volume,played:false,
-            listeningEnabled:window.__taleraAudioControls?.isEnabled?.()};
+            listeningEnabled:window.__taleraAudioControls?.isEnabled?.(),events:[]};
           window.__taleraOrdinaryVideoSnapshots.push(snapshot);
-          video.addEventListener('playing',()=>{snapshot.played=true},{once:true});
+          for(const kind of ['loadstart','loadedmetadata','play','playing','timeupdate','pause','ended','error']){
+            video.addEventListener(kind,()=>{
+              if(snapshot.events.length<25)snapshot.events.push(kind+':'+video.currentTime.toFixed(2));
+              if(kind==='playing'||kind==='timeupdate'&&video.currentTime>.04)snapshot.played=true;
+            });
+          }
         }
       }
     });
@@ -118,8 +123,18 @@ try{
       voiceAudio:!!window.__taleraInlineSharedAudio};
   });
   const immediate=await info();
-  await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[0]?.played,
-    null,{timeout:10000});
+  try{
+    await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[0]?.played,
+      null,{timeout:4500});
+  }catch(error){
+    const diag=await page.evaluate(()=>({
+      samples:window.__taleraOrdinaryVideoSnapshots,
+      active:document.querySelector('video.talera-v61-inline-video')?.outerHTML,
+      memory:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex,
+      hintCount:document.querySelectorAll('button.talera-v61-audio-permission-hint').length
+    }));
+    throw Error('Automatic ordinary muted playback did not report playing: '+JSON.stringify(diag));
+  }
   await wait(2200);
   const silentAfter=await info();
   const silent=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[0]);

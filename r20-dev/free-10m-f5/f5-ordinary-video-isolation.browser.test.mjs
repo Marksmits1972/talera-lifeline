@@ -98,7 +98,10 @@ try{
           window.__taleraOrdinaryVideoObserved=true;
           const snapshot={muted:video.muted,
             defaultMuted:video.defaultMuted,volume:video.volume,played:false,
-            listeningEnabled:window.__taleraAudioControls?.isEnabled?.(),events:[]};
+            listeningEnabled:window.__taleraAudioControls?.isEnabled?.(),events:[],
+            samePlayer:window.__taleraOrdinaryVideoSnapshots.length===0||
+              video===window.__taleraFirstOrdinaryVideo};
+          if(!window.__taleraFirstOrdinaryVideo)window.__taleraFirstOrdinaryVideo=video;
           window.__taleraOrdinaryVideoSnapshots.push(snapshot);
           for(const kind of ['loadstart','loadedmetadata','play','playing','timeupdate','pause','ended','error']){
             video.addEventListener(kind,()=>{
@@ -155,6 +158,7 @@ try{
   assert.equal(audible.muted,false,'Setting ON must request the original audible soundtrack');
   assert.equal(audible.defaultMuted,false,'Setting ON must clear default mute');
   assert.equal(audible.volume,1,'Original video soundtrack must retain its full playback volume');
+  assert.equal(audible.samePlayer,true,'Same ordinary media element must be retained across video rotations');
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
     'Ordinary video must never show its own duplicate Listen button');
   await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
@@ -195,7 +199,7 @@ try{
   console.log('TALERA_ORDINARY_RETURN_BUTTON_DIAGNOSTIC',JSON.stringify(navigation));
   const back=navigation.controls.find(x=>x.id==='talera-flow-home');
   assert.ok(back,'The ORIGINAL return control must exist while video is shown');
-  assert.equal(back.href,'/','The original return destination must remain home');
+  assert.equal(back.href,'/mijn-leven','Back must directly open the real Home path, not rely on Safari following a redirect');
   assert.equal(back.itselfAtCenter,true,'Nothing may cover the back button hit target');
   await page.touchscreen.tap(back.rect[0]+back.rect[2]/2,back.rect[1]+back.rect[3]/2);
   try{

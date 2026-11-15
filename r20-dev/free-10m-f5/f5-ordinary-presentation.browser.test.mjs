@@ -1282,16 +1282,23 @@ try{
   await page.mouse.move(videoSurface.x+videoSurface.width*.2,videoY);
   await page.mouse.down();
   await page.mouse.move(videoSurface.x+videoSurface.width*.8,videoY,{steps:12});
-  const ordinaryWhileMoving=await page.evaluate(()=>({
-    originalVideo:!!document.querySelector('video.talera-v61-inline-video'),
-    wheel:document.querySelector('#photoStage .talera-wheel-strip')?.classList.contains('is-visible')
-  }));
+  const ordinaryWhileMoving=await page.evaluate(()=>{
+    const video=document.querySelector('video.talera-v61-inline-video');
+    return {retainedPlayer:!!video,paused:video?.paused,
+      hidden:video?.style.display==='none',
+      wheel:document.querySelector('#photoStage .talera-wheel-strip')?.classList.contains('is-visible')};
+  });
   await page.mouse.up();
-  assert.equal(ordinaryWhileMoving.originalVideo,false,
-    'Timeline movement must stop the original ordinary video player');
+  assert.equal(ordinaryWhileMoving.retainedPlayer,true,
+    'A real timeline swipe must retain the SAME ordinary video node for iOS sound reuse');
+  assert.equal(ordinaryWhileMoving.paused,true,
+    'Timeline movement must immediately stop the old ordinary video soundtrack');
+  assert.equal(ordinaryWhileMoving.hidden,true,
+    'The old ordinary video must disappear while the native timeline strip moves');
   assert.equal(ordinaryWhileMoving.wheel,true);
   console.log('TALERA_TIMELINE_NAVIGATION_STOPS_ORDINARY_VIDEO_PASS',
-    JSON.stringify({originalVideoStopped:true,noNewPlayer:true,iphoneAccepted:false}));
+    JSON.stringify({originalVideoStopped:true,originalVideoHidden:true,
+      nativeNodeRetained:true,noNewPlayer:true,iphoneAccepted:false}));
 
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({

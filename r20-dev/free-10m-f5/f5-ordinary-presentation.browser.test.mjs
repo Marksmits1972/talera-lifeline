@@ -1200,14 +1200,14 @@ try{
   await load(page,mixed,3);
   await page.evaluate(()=>window.__taleraV31SelectPhoto?.(
     window.__taleraTimelineRuntime.currentMemory().id,2,true));
-  await page.waitForFunction(()=>!!document.querySelector('video.talera-v61-inline-video'),
-    null,{timeout:12000});
-  // Slow the synthetic clip so its natural end cannot mask the test:
-  // playback must stop BECAUSE of timeline movement, not a one-second EOF.
-  await page.evaluate(()=>{
+  // Set test playback speed immediately when the short-lived video appears.
+  // Do not poll existence then race its natural EOF in a second browser call.
+  await page.waitForFunction(()=>{
     const video=document.querySelector('video.talera-v61-inline-video');
+    if(!video)return false;
     video.loop=true;video.playbackRate=.1;
-  });
+    return true;
+  },null,{timeout:12000});
   const videoSurface=await page.locator('#surface').boundingBox();
   const videoY=videoSurface.y+videoSurface.height*.38;
   await page.mouse.move(videoSurface.x+videoSurface.width*.2,videoY);

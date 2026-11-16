@@ -41,13 +41,16 @@ jobs:
         run: |
           if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
-            git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
-            # The approved backup UI wording is immutable; media/storage codecs remain source-exact.
+            git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+            # Owner-requested phase-1 lossless backup audit: exactly four scoped
+            # source changes. Keep all protected presentation/storage sources pinned.
             if [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "e01dc1b7bab00fc38125fc525f65a357a931c061"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-archive.mjs)" = "2d9f6071e64adf2cfee7565b3712aadb6d2004e0"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-idb.mjs)" = "c3299aac47b73c5cc9d0d66a700e28dab8ecd617"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "921d3a43b7a60208ec563823bfcb42ac1c6c01cd"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "0f813b3289855c2f59860a9825263c579863b06f"
             else
-              git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
+              git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
             fi
           else
           git merge-base --is-ancestor 985dd1be2886db12fc7164e1e3ab52977cd7ba5d HEAD

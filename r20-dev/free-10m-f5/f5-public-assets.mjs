@@ -506,6 +506,28 @@ function fixVideoFirstFramePreview(html){
   'Published video poster must preserve original media ID');
  return html;
 }
+// Safari can restore Home from BFCache with its original local Blob URLs.
+// The upstream page revoked these on every pagehide, including a suspended
+// (persisted) document. This leaves pictures broken after Back even though
+// original customer photos remain safe in the existing IndexedDB account.
+// Skip revocation ONLY during BFCache suspension. Browser reclaims URLs if
+// it later evicts the page. No new store, copy, or data mutation.
+function keepHomeCoversValidAcrossBFCache(html){
+ const exact=(before,after,label)=>{
+  assert.equal(html.split(before).length,2,'F5_HOME_BFCACHE_'+label+'_SOURCE_DRIFT');
+  html=html.replace(before,after);
+ };
+ exact("window.addEventListener('pagehide',clean,{once:true});",
+   "window.addEventListener('pagehide',event=>{if(!event.persisted)clean()});",
+   'HERO_AND_CARDS');
+ exact("window.addEventListener('pagehide',()=>nodes.forEach(u=>URL.revokeObjectURL(u)),{once:true});",
+   "window.addEventListener('pagehide',event=>{if(!event.persisted)nodes.forEach(u=>URL.revokeObjectURL(u))});",
+   'YEAR_PREVIEWS');
+ exact("if(image)window.addEventListener('pagehide',()=>URL.revokeObjectURL(image),{once:true})",
+   "if(image)window.addEventListener('pagehide',event=>{if(!event.persisted)URL.revokeObjectURL(image)})",
+   'DECADE_PREVIEWS');
+ return html;
+}
 // The original Home shipped 500 demo records EVEN AFTER their photos were
 // removed from /present. Its hero and year slider still surfaced synthetic
 // titles, years, counts and even a fake "Familie" topic tile. This is
@@ -1081,6 +1103,7 @@ for(const [route,filename] of Object.entries(routes)){
  // apply later speculative iPhone video-poster modifications.
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
+ if(route==='/mijn-leven')html=keepHomeCoversValidAcrossBFCache(html);
  if(route==='/tell')html=shapeOwnStoryTopics(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

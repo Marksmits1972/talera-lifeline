@@ -1290,7 +1290,8 @@ try{
       'Restored original Home must have an actual tappable hero photo: '+
       JSON.stringify(homeBeforeOpen));
     await importedPage.locator('.hero').click({timeout:12000});
-    await importedPage.waitForURL(/\\/present\\?memory=/,{timeout:18000});
+    await importedPage.waitForURL(url=>url.pathname==='/present'&&
+      url.searchParams.get('memory')===homeBeforeOpen.storyId,{timeout:18000});
     await importedPage.waitForFunction(id=>{
       const m=window.__taleraTimelineRuntime?.currentMemory?.();
       return m?.storyId===id&&!m._photoLoading&&
@@ -1321,7 +1322,8 @@ try{
     assert.ok(originalPresent.originalBytes>120,
       'Original media ID must remain readable during actual Home to Present navigation');
     await importedPage.goBack({waitUntil:'domcontentloaded',timeout:20000});
-    await importedPage.waitForURL(/\\/mijn-leven(?:\\?|$)/,{timeout:12000});
+    await importedPage.waitForURL(url=>url.pathname==='/mijn-leven',
+      {timeout:12000});
     await importedPage.waitForFunction(()=>document.getElementById('heroImage')?.naturalWidth>0,
       null,{timeout:18000});
     const back=await importedPage.evaluate(async()=>{

@@ -195,6 +195,8 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     if(s.voiceUrl)URL.revokeObjectURL(s.voiceUrl);
     removeVideo(s);clearButton(s);
     if(s.tapTarget&&s.onSoundTap)s.tapTarget.removeEventListener('click',s.onSoundTap,true);
+    if(s.tapTarget&&s.onSoundTouchStart)s.tapTarget.removeEventListener('touchstart',s.onSoundTouchStart,true);
+    if(s.tapTarget&&s.onSoundTouchEnd)s.tapTarget.removeEventListener('touchend',s.onSoundTouchEnd,true);
     for(const url of s.createdUrls)URL.revokeObjectURL(url);
     restoreNativePlayback(s);
     s.layer.remove();
@@ -415,7 +417,8 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
       swipePointer:null,swipeSuspended:false,swipeWasPlaying:false,
-      visibilityChange:null,tapTarget:null,onSoundTap:null,retry:null};
+      visibilityChange:null,tapTarget:null,onSoundTap:null,
+      onSoundTouchStart:null,onSoundTouchEnd:null,soundTouch:null,retry:null};
     s.visibilityChange=()=>{if(!isCurrent(s))return;
       if(document.hidden){s.audio?.pause();s.video?.pause()}};
     document.addEventListener('visibilitychange',s.visibilityChange);
@@ -429,6 +432,27 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       s.retry();
     };
     s.tapTarget?.addEventListener('click',s.onSoundTap,{capture:true});
+    // iOS narrated gesture surfaces may cancel synthetic click events even
+    // after an actual tap. touchend is a genuine Safari user activation.
+    // Only a short, single-finger TAP may unlock; horizontal/vertical
+    // swipes remain owned by the existing RH19 timeline and photo strip.
+    s.onSoundTouchStart=e=>{
+      if(!isCurrent(s)||!s.retry||e.touches?.length!==1)return;
+      const t=e.touches[0];
+      s.soundTouch={id:t.identifier,x:t.clientX,y:t.clientY};
+    };
+    s.onSoundTouchEnd=e=>{
+      const start=s.soundTouch;s.soundTouch=null;
+      if(!start||!isCurrent(s)||!s.retry||s.swipeSuspended||
+         e.target?.closest?.('a,button,[role=button],input,select,textarea'))return;
+      const t=Array.from(e.changedTouches||[]).find(t=>t.identifier===start.id);
+      if(!t||Math.hypot(t.clientX-start.x,t.clientY-start.y)>12)return;
+      if(e.cancelable)e.preventDefault();
+      e.stopImmediatePropagation();
+      s.retry(); // Same synchronous trusted Safari gesture.
+    };
+    s.tapTarget?.addEventListener('touchstart',s.onSoundTouchStart,{capture:true,passive:true});
+    s.tapTarget?.addEventListener('touchend',s.onSoundTouchEnd,{capture:true,passive:false});
     document.body.classList.add('talera-v61-narration-visual');
     const blob=await store.blob(voice.key);
     if(!isCurrent(s))return;

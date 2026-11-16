@@ -108,6 +108,34 @@ class FakeElement{
   this.paused=false;this.onplay?.();return Promise.resolve()}
 }
 const host=new FakeElement('host');const stage=new FakeElement('stage');
+const permanentAudio=new FakeElement('audio');
+made.push(permanentAudio);
+let sharedOwner=null;
+const sharedAudible={
+ claim(owner,src){
+   permanentAudio.onplay=permanentAudio.onpause=permanentAudio.onended=null;
+   permanentAudio.ontimeupdate=permanentAudio.onplaying=permanentAudio.onloadedmetadata=null;
+   permanentAudio.pause();permanentAudio.paused=true;permanentAudio.currentTime=0;
+   permanentAudio.src=src;permanentAudio.muted=false;permanentAudio.defaultMuted=false;
+   if(blockNextVoice){permanentAudio.blockOnce=true;blockNextVoice=false}
+   sharedOwner=owner;return permanentAudio;
+ },
+ release(owner){
+   if(owner!==sharedOwner)return;
+   permanentAudio.onplay=permanentAudio.onpause=permanentAudio.onended=null;
+   permanentAudio.ontimeupdate=permanentAudio.onplaying=null;
+   permanentAudio.pause();permanentAudio.src='';sharedOwner=null;
+ },
+ isOwner(owner){return owner===sharedOwner},get(){return permanentAudio}
+};
+const tapHandlers=new Set();
+const tapSurface={
+ addEventListener(type,fn){assert.equal(type,'click');tapHandlers.add(fn)},
+ removeEventListener(type,fn){assert.equal(type,'click');tapHandlers.delete(fn)},
+ tap(){for(const fn of [...tapHandlers])fn({
+   target:{closest(){return null}},preventDefault(){},stopImmediatePropagation(){}
+ })}
+};
 stage.parentElement=host;
 let current=memory.id;
 const bodyClasses=new Set();
@@ -115,11 +143,13 @@ const fakeDots=Array.from({length:memory._zeroFrames.length},()=>({
   active:false,classList:{toggle(name,on){assert.equal(name,'active');this.active=on}}
 }));
 const ctx={
- window:{__taleraAudioControls:{isEnabled:()=>false}}, // Presenter is OFF; narrator must not import it.
+ window:{__taleraAudioControls:{isEnabled:()=>false},__taleraF5SharedAudible:sharedAudible}, // Audio element shared, motor still independent.
  navigator:{audioSession:{type:'ambient'}},
  document:{createElement(tag){const el=new FakeElement(tag);made.push(el);return el},
+  getElementById(id){return id==='memoryStoryScroll'?tapSurface:null},
   querySelectorAll(selector){assert.equal(selector,'.talera-photo-dot');return fakeDots},
-  body:{classList:{add(x){bodyClasses.add(x)},remove(x){bodyClasses.delete(x)}}},
+  body:{children:[],appendChild(node){this.children.push(node);node.parentElement=this;return node},
+    classList:{add(x){bodyClasses.add(x)},remove(x){bodyClasses.delete(x)}}},
   addEventListener(name,fn){
     if(!documentListeners.has(name))documentListeners.set(name,new Set());
     documentListeners.get(name).add(fn);
@@ -259,23 +289,28 @@ assert.equal(independentAudio.src,'blob:synthetic-video-C');
 motor.stop();
 assert.equal(ctx.navigator.audioSession.type,'ambient');
 
-// Simulate genuine iOS sound autoplay failure. Must expose an accessible
-// native-gesture Listen button; button handler directly calls media.play().
+// Simulate genuine iOS autoplay failure. An ordinary-video gesture may
+// already have authorized this single node. If Safari still rejects an
+// audible play, the EXISTING presentation surface is the only recovery tap.
 blockNextVoice=true;
 await motor.open(memory);
 await new Promise(resolve=>setImmediate(resolve));
 const blockedAudio=made.filter(x=>x.tag==='audio').at(-1);
-const permission=host.children.find(x=>x.tag==='button'&&
-  x.textContent==='▶ Beluister'&&!x.removed);
-assert.ok(permission,'Voice autoplay blocked by iOS must show an actual Listen button');
-assert.equal(blockedAudio.paused,true,'iOS blocked autoplay must not be mistaken for playback');
-permission.onclick({preventDefault(){},stopPropagation(){}});
+const permission=ctx.document.body.children.find(x=>x.tag==='div'&&
+  x.id==='talera-f5-narrator-sound-hint'&&!x.removed);
+assert.ok(permission,'Safari rejected voice sound must show a temporary non-interactive hint');
+assert.equal(permission.textContent,'Tik één keer voor geluid');
+assert.equal(blockedAudio.paused,true,'iOS denied autoplay must not be mistaken for playback');
+tapSurface.tap();
 await new Promise(resolve=>setImmediate(resolve));
-assert.equal(blockedAudio.paused,false,'iPhone Listen gesture must start original voice');
+assert.equal(blockedAudio.paused,false,'Genuine presentation tap must start original voice');
 assert.equal(blockedAudio.muted,false);
 assert.equal(permission.removed,true);
 motor.stop();
 assert.equal(ctx.navigator.audioSession.type,'ambient');
+assert.equal(tapHandlers.size,0,'Narrator sound tap handler must not leak into ordinary presentation');
+assert.equal(made.filter(x=>x.tag==='audio').length,1,
+  'One persistent audio node must survive all voice/video transitions');
 
 console.log('TALERA_INDEPENDENT_NARRATOR_TEST_PASS',JSON.stringify({
  originalIdsUnchanged:true,repeatSwipesRetained:true,
@@ -288,6 +323,7 @@ console.log('TALERA_INDEPENDENT_NARRATOR_TEST_PASS',JSON.stringify({
  orangeDotsFollowAllCues:true,
  nativeAudioSessionPlayback:true,nativeSessionRestored:true,
  originalAudioIndependentOfPresenter:true,iOSListenGestureRecoverable:true,
+ sharedAudioNodeSingle:true,temporarySoundHintNoButton:true,
  isolatedCleanup:true,
  actualIphoneAccepted:false,productionChanged:false
 }));

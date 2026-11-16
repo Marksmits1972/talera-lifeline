@@ -416,8 +416,21 @@ function primeFirstOpenLocalStoryCovers(html){
   "   const norm=t=>String(t||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('nl');\n"+
   "   const matching=asked?memories.filter(m=>(m.tags||[]).some(t=>norm(t)===norm(asked))):memories;\n"+
   "   const near=matching.slice().sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,5);\n"+
-  "   await Promise.all(near.map(warmFirstPhoto));\n"+
-  "   runtime.registerMemories(memories);";
+  "   // Video poster decoding can stall on a first iOS launch. A slow preview\n"+
+  "   // in another story must never prevent the selected story from opening.\n"+
+  "   const primary=selected||near[0]||null;\n"+
+  "   const primaryFirst=primary?._zeroItems?.find(x=>x.kind==='photo'||x.kind==='video');\n"+
+  "   // Protect the selected real PHOTO's approved first-frame display.\n"+
+  "   if(primaryFirst?.kind==='photo')await warmFirstPhoto(primary);\n"+
+  "   runtime.registerMemories(memories);\n"+
+  "   // The selected VIDEO is hydrated by its own original motor after\n"+
+  "   // registration. Never run two concurrent video-poster decoders.\n"+
+  "   // Only neighbouring PHOTOS are prepared in the background.\n"+
+  "   for(const m of near){\n"+
+  "     if(m===primary)continue;\n"+
+  "     if(m._zeroItems?.find(x=>x.kind==='photo'||x.kind==='video')?.kind==='photo')\n"+
+  "       void warmFirstPhoto(m);\n"+
+  "   }";
  exact(beforeRegistration,afterRegistration,'REGISTER_AFTER_REAL_COVERS');
  const beforeRevoke="   for(const urls of loaded.values())for(const url of urls)URL.revokeObjectURL(url);\n"+
   "   loaded.clear();";

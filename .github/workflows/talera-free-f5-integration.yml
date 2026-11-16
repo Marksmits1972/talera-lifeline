@@ -45,6 +45,13 @@ jobs:
           const base='r20-dev/free-10m-delivery/public';
           const home=readFileSync(base+referencePages['/mijn-leven'],'utf8');
           const present=readFileSync(base+referencePages['/present'],'utf8');
+          // A new browser is signed OUT. It must never show old demos either.
+          const {anonymousShells}=await import('./r20-dev/free-10m-delivery/generated/approved-assets.mjs');
+          for(const route of ['/mijn-leven','/present']){
+            const anonymous=readFileSync(base+anonymousShells[route],'utf8');
+            assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES|id="demoCards"/.test(anonymous),
+             'UNAPPROVED_ANONYMOUS_EXAMPLES_PRESENT '+route);
+          }
           assert.ok(home.includes('window.__taleraReferenceMemories=[];'));
           assert.ok(!home.includes('Test 081')&&!home.includes('talera-500-fotoband-'));
           assert.ok(present.includes('const MEMORIES = [];'));

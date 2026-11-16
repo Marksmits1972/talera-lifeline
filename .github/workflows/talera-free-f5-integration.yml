@@ -465,7 +465,11 @@ jobs:
             'Must find ONLY the ordinary presentation video motor');
           const ordinary=html.slice(ordinaryStart,ordinaryEnd);
           assert.ok(ordinary.includes('const soundEnabled=Boolean(window.__taleraAudioControls?.isEnabled?.());') &&
-            ordinary.includes('video.muted=!soundEnabled;video.defaultMuted=!soundEnabled;video.volume=1;') &&
+            ordinary.includes('video.muted=true;video.defaultMuted=true;video.volume=1;') &&
+            ordinary.includes('taleraSharedAudible.claim(owner,url)') &&
+            html.includes("window.__taleraF5SharedAudible=taleraSharedAudible;") &&
+            html.includes('sharedAudible.claim(s,s.voiceUrl)') &&
+            html.includes('sharedAudible.claim(s,url)') &&
             ordinary.includes('Promise.resolve(video.play())') &&
             ordinary.includes('const video=ordinaryVideo||document.createElement(\'video\');') &&
             ordinary.includes('playPending=true;') &&

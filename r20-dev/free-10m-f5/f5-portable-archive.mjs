@@ -308,7 +308,8 @@ export async function verifyFreeArchiveSnapshot(archive,stories,files){
    selectedMedia++;
   }
  }
- return {storyCount:stories.length,mediaStoreEntries:files.length,
+ return {sourceScope:restored.sourceScope,sourceOrigin:restored.sourceOrigin,
+   storyCount:stories.length,mediaStoreEntries:files.length,
    selectedMediaReferences:selectedMedia,verifiedBinaryCount:
    (await inspectFreeArchive(archive)).binaries,
    originalBytesVerified:true,allOriginalIdsVerified:true};

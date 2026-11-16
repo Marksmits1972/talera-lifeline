@@ -6,12 +6,13 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {webkit,devices} from 'playwright';
+import {chromium,webkit,devices} from 'playwright';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const origin='http://127.0.0.1:8837',gate='1'.repeat(64);
-let worker=null,browser=null,log='';
+let worker=null,browser=null,sourceBrowser=null,log='';
 async function stop(){
   if(browser)await browser.close().catch(()=>{});
+  if(sourceBrowser)await sourceBrowser.close().catch(()=>{});
   if(worker&&!worker.killed)worker.kill('SIGTERM');
 }
 async function boot(){
@@ -49,15 +50,19 @@ try{
   assert.equal(response.status,200,'Synthetic account register '+(await response.text()).slice(0,200));
   const sid=/talera_sid=([a-f0-9]{64})/.exec(response.headers.get('set-cookie')||'')?.[1];
   assert.ok(sid);
+  // Source is a disposable existing Free PWA Chrome instance, just as the
+  // user's OLDER install produced the backup. Only the TARGET WebKit engine
+  // needs to consume it; WebKit/Linux may lack camera-File IDB writes.
+  sourceBrowser=await chromium.launch({headless:true});
   browser=await webkit.launch({headless:true});
-  const mkContext=async()=>{
-    const ctx=await browser.newContext({...devices['iPhone 13'],
+  const mkContext=async(engine)=>{
+    const ctx=await engine.newContext({...devices['iPhone 13'],
       extraHTTPHeaders:{'x-talera-f5-key':gate}});
     await ctx.addCookies([{name:'talera_sid',value:sid,
       domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
     return ctx;
   };
-  const source=await mkContext(),target=await mkContext();
+  const source=await mkContext(sourceBrowser),target=await mkContext(browser);
   const a=await source.newPage(),b=await target.newPage();
   assert.equal((await a.goto(origin+'/mijn-leven')).status(),200);
   await a.waitForFunction(()=>typeof window.TaleraMemories?.save==='function',
@@ -68,34 +73,10 @@ try{
     const cx=canvas.getContext('2d');
     cx.fillStyle='#db1937';cx.fillRect(0,0,160,160);
     const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
-    const file=new File([blob],'webkit-original.png',{type:'image/png'});
-    const requestErrors=[];
-    const put=IDBObjectStore.prototype.put;
-    IDBObjectStore.prototype.put=function(...args){
-      let request;
-      try{request=put.apply(this,args)}catch(err){
-        requestErrors.push({phase:'put',store:this.name,
-          error:err.name,message:err.message});throw err;
-      }
-      request.addEventListener('error',()=>requestErrors.push({
-        phase:'request',store:this.name,
-        error:request.error?.name||'',message:request.error?.message||''
-      }));
-      return request;
-    };
-    try{
-      const row=await window.TaleraMemories.save({title:'WebKit restored original',
-        date:'2026-11-11',time:'11:11:11',text:'Restored original image'},[file]);
-      return {id:row.id,bytes:blob.size};
-    }catch(err){
-      const audit=await window.TaleraMemories.audit().catch(x=>({error:String(x)}));
-      throw Error('WEBKIT_F5_SAVE_DIAG '+JSON.stringify({
-        name:err.name,message:err.message,requestErrors,
-        sourceType:file.type,size:file.size,
-        audit:{stories:audit?.stories,consistent:audit?.consistent,
-          missing:audit?.missing?.length},secure:isSecureContext
-      }));
-    }finally{IDBObjectStore.prototype.put=put}
+    const row=await window.TaleraMemories.save({title:'WebKit restored original',
+      date:'2026-11-11',time:'11:11:11',text:'Restored original image'},
+      [new File([blob],'webkit-original.png',{type:'image/png'})]);
+    return {id:row.id,bytes:blob.size};
   });
   assert.ok(story.bytes>150);
   await a.goto(origin+'/__f5/backup');

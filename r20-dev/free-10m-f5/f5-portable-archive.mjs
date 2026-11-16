@@ -234,3 +234,82 @@ export async function decodeFreeArchive(archive){
  return {sourceScope:p.sourceScope,sourceOrigin:p.sourceOrigin??null,createdAt:p.createdAt,stories,files,
   verifiedBinaryCount:p.binaries.length};
 }
+
+// Verify a COMPLETE captured IndexedDB snapshot against the actual archive.
+// This is read-only: no media conversion, new IDs, cloud calls or restore.
+// Fail closed on even one missing byte, field, preview, metadata record or ID.
+export async function verifyFreeArchiveSnapshot(archive,stories,files){
+ ensure(Array.isArray(stories)&&Array.isArray(files),'SOURCE_STORES_INVALID');
+ const restored=await decodeFreeArchive(archive); // manifest AND every binary checksum
+ ensure(stories.length===restored.stories.length&&files.length===restored.files.length,
+   'SOURCE_RECORD_COUNT_CHANGED');
+ const same=async(a,b,depth)=>{
+  ensure(depth<MAX_DEPTH,'SOURCE_DEPTH_MISMATCH');
+  if(a instanceof Blob){
+   ensure(b instanceof Blob&&a.size===b.size&&a.type===b.type,
+     'SOURCE_BINARY_METADATA_MISMATCH');
+   const aFile=typeof File!=='undefined'&&a instanceof File;
+   const bFile=typeof File!=='undefined'&&b instanceof File;
+   ensure(aFile===bFile,'SOURCE_BINARY_KIND_MISMATCH');
+   if(aFile)ensure(a.name===b.name&&a.lastModified===b.lastModified,
+     'SOURCE_FILE_METADATA_MISMATCH');
+   const [left,right]=[await chunkHashes(a),await chunkHashes(b)];
+   ensure(left.length===right.length&&left.every((hash,i)=>hash===right[i]),
+     'SOURCE_BINARY_BYTES_MISMATCH');
+   return;
+  }
+  if(a instanceof ArrayBuffer){
+   ensure(b instanceof ArrayBuffer&&a.byteLength===b.byteLength,
+     'SOURCE_ARRAYBUFFER_METADATA_MISMATCH');
+   const [left,right]=[await chunkHashes(new Blob([a])),
+     await chunkHashes(new Blob([b]))];
+   ensure(left.length===right.length&&left.every((hash,i)=>hash===right[i]),
+     'SOURCE_ARRAYBUFFER_BYTES_MISMATCH');
+   return;
+  }
+  if(a instanceof Date){
+   ensure(b instanceof Date&&a.getTime()===b.getTime(),'SOURCE_DATE_MISMATCH');
+   return;
+  }
+  if(Array.isArray(a)){
+   ensure(Array.isArray(b)&&a.length===b.length,'SOURCE_ARRAY_MISMATCH');
+   // Sparse arrays and extra enumerable properties cannot be silently lost.
+   const ka=Reflect.ownKeys(a),kb=Reflect.ownKeys(b);
+   ensure(ka.length===kb.length&&ka.every((k,i)=>k===kb[i]),
+     'SOURCE_ARRAY_PROPERTIES_MISMATCH');
+   for(let i=0;i<a.length;i++)await same(a[i],b[i],depth+1);
+   return;
+  }
+  if(isPlain(a)){
+   ensure(isPlain(b),'SOURCE_OBJECT_MISMATCH');
+   const ka=Reflect.ownKeys(a),kb=Reflect.ownKeys(b);
+   ensure(ka.length===kb.length&&ka.every((k,i)=>k===kb[i])&&
+     ka.every(k=>typeof k==='string'&&
+       Object.getOwnPropertyDescriptor(a,k)?.enumerable===true),
+     'SOURCE_OBJECT_PROPERTIES_MISMATCH');
+   for(const k of ka)await same(a[k],b[k],depth+1);
+   return;
+  }
+  ensure(Object.is(a,b),'SOURCE_VALUE_MISMATCH');
+ };
+ for(let i=0;i<stories.length;i++)await same(stories[i],restored.stories[i],0);
+ for(let i=0;i<files.length;i++)await same(files[i],restored.files[i],0);
+ // All media selected in a story must have their ORIGINAL binary, not just
+ // a filename, empty placeholder, cached poster or an existing reference ID.
+ const fileMap=new Map(files.map(row=>[row.key,row]));
+ let selectedMedia=0;
+ for(const story of stories){
+  ensure(Array.isArray(story.items||[]),'SOURCE_ITEMS_INVALID');
+  for(const item of story.items||[]){
+   ensure(item&&typeof item.key==='string','SOURCE_MEDIA_ID_INVALID');
+   const row=fileMap.get(item.key);
+   ensure(row,'MISSING_STORY_MEDIA');
+   ensure(row.blob instanceof Blob&&row.blob.size>0,'EMPTY_STORY_MEDIA');
+   selectedMedia++;
+  }
+ }
+ return {storyCount:stories.length,mediaStoreEntries:files.length,
+   selectedMediaReferences:selectedMedia,verifiedBinaryCount:
+   (await inspectFreeArchive(archive)).binaries,
+   originalBytesVerified:true,allOriginalIdsVerified:true};
+}

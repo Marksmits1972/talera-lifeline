@@ -1289,7 +1289,23 @@ try{
       homeBeforeOpen.photo?.startsWith('blob:'),
       'Restored original Home must have an actual tappable hero photo: '+
       JSON.stringify(homeBeforeOpen));
-    await importedPage.locator('.hero').click({timeout:12000});
+    // Home's approved bottom sheet deliberately overlaps the lower hero.
+    // Tap an actually exposed image pixel, not Playwright's obscured center.
+    const heroTap=await importedPage.evaluate(()=>{
+      const hero=document.querySelector('.hero'),r=hero?.getBoundingClientRect();
+      if(!r||!r.width||!r.height)return null;
+      for(const fy of [.1,.2,.3,.4,.5,.6,.7,.8,.9]){
+        for(const fx of [.5,.25,.75]){
+          const x=r.left+r.width*fx,y=r.top+r.height*fy;
+          const hit=document.elementFromPoint(x,y);
+          if(hit===hero||hit?.closest?.('.hero')===hero)
+            return {x,y,visible:true};
+        }
+      }
+      return null;
+    });
+    assert.ok(heroTap?.visible,'No user-tappable portion of restored Home hero is exposed');
+    await importedPage.touchscreen.tap(heroTap.x,heroTap.y);
     await importedPage.waitForURL(url=>url.pathname==='/present'&&
       url.searchParams.get('memory')===homeBeforeOpen.storyId,{timeout:18000});
     await importedPage.waitForFunction(id=>{

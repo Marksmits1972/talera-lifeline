@@ -1089,6 +1089,15 @@ try{
         [...document.querySelectorAll('#photoStage img')].some(x=>
           x.complete&&x.naturalWidth>0&&(x.currentSrc===photo||x.src===photo));
     },plain,{timeout:20000});
+    // A decoded image in the DOM may be hidden behind a blank stage. Match
+    // the OWNER'S actual complaint by sampling the rendered photographic
+    // pixels after restoring the photo, not merely checking naturalWidth.
+    const restoredPhotoPixels=await centerPixel(importedPage);
+    assert.ok(dominant(restoredPhotoPixels,0),
+      'Restored first PHOTO is loaded but INVISIBLE in real presentation stage: '+
+      JSON.stringify(restoredPhotoPixels));
+    console.log('TALERA_FRESH_PWA_IMPORT_VISIBLE_PHOTO_PIXELS_PASS',
+      JSON.stringify({renderedRed:true,ownerOriginalMedia:true,realIphoneAccepted:false}));
     await importedPage.goto(origin+'/present?memory='+narrated.id,
       {waitUntil:'domcontentloaded',timeout:25000});
     await importedPage.waitForFunction(id=>{

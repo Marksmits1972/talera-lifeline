@@ -1084,6 +1084,31 @@ for(const [route,filename] of Object.entries(routes)){
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;
 }
+// Reuse the EXACT owner-approved, fully built Free pages at signed-out first
+// launch. The old separate anonymous template is pre-audio and can show the
+// obsolete 'Beluister' control even though the approved presenter never does.
+// These are the same public source pages, not a second presentation engine.
+const cleanAnonymousShells={};
+mkdirSync(path.join(publicDir,'__talera_free','f5anonymous'),{recursive:true});
+for(const route of ['/mijn-leven','/present']){
+ const approvedReference=refs[route];
+ assert.ok(approvedReference,'F5_MISSING_APPROVED_REFERENCE '+route);
+ const clean=readFileSync(path.join(publicDir,approvedReference.slice(1)),'utf8');
+ if(route==='/present')
+  assert.ok(clean.includes('talera-f5-shared-audio')&&
+   clean.includes('taleraCreateIndependentNarrator')&&
+   clean.includes('Tik één keer voor geluid'),
+   'F5_ANONYMOUS_PRESENT_MUST_REUSE_APPROVED_SHARED_AUDIO_ENGINE');
+ assert.ok(clean.includes(route==='/mijn-leven'
+   ?'window.__taleraReferenceMemories=[];':'const MEMORIES = [];'),
+   'F5_CLEAN_ANONYMOUS_EMPTY_LIST_MISSING '+route);
+ assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/.test(clean),
+   'F5_CLEAN_ANONYMOUS_SAMPLE_CONTENT '+route);
+ const optimized=await assetizeHtml(clean,new Set(approvedAssets));
+ const file=sha(optimized.html)+'.html';
+ writeFileSync(path.join(publicDir,'__talera_free','f5anonymous',file),optimized.html,'utf8');
+ cleanAnonymousShells[route]='/__talera_free/f5anonymous/'+file;
+}
 // The approved /present page creates a SAME-ORIGIN iframe at
 // /vertelmodus-embed?mode=present. Its unchanged zero-based video/audio
 // player MUST be present or the RH19 dots advance over a frozen base image.
@@ -1212,6 +1237,7 @@ for(const mandatory of ['/sw.js','/manifest.webmanifest'])
 writeFileSync(path.join(generated,'public-template-map.mjs'),
   '// Generated only from current approved anonymous public TALERA source.\n'+
   'export const referencePages = Object.freeze('+JSON.stringify(refs,null,2)+');\n'+
+  'export const cleanAnonymousShells = Object.freeze('+JSON.stringify(cleanAnonymousShells,null,2)+');\n'+
   'export const verifiedPublicScripts = Object.freeze('+JSON.stringify(scripts,null,2)+');\n'+
   'export const verifiedPublicSupport = Object.freeze('+JSON.stringify(support,null,2)+');\n');
 const report={result:'BUILT (not browser-certified)',source:origin,

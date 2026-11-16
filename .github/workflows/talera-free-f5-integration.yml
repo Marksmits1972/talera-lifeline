@@ -53,6 +53,20 @@ jobs:
           assert.ok(present.includes("hint.textContent='Tik één keer voor geluid'"));
           // Historical unused text is retained byte-for-byte in the approved engine;
           // assert the actual approved fallback without rewriting that engine.
+          const {cleanAnonymousShells}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
+          for(const route of ['/mijn-leven','/present']){
+            const file=cleanAnonymousShells[route];
+            assert.match(file||'',/^\/__talera_free\/f5anonymous\/[a-f0-9]{64}\.html$/);
+            const html=readFileSync(p+file,'utf8');
+            assert.ok(html.includes(route==='/mijn-leven'
+              ?'window.__taleraReferenceMemories=[];':'const MEMORIES = [];'));
+            assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/.test(html));
+            if(route==='/present'){
+              assert.ok(html.includes('talera-f5-shared-audio'));
+              assert.ok(html.includes('taleraCreateIndependentNarrator'));
+              assert.ok(html.includes('Tik één keer voor geluid'));
+            }
+          }
           console.log('TALERA_APPROVED_SIGNED_IN_EMPTY_PRESENTATION_AND_SHARED_AUDIO_INTACT');
           NODE
       - name: Verify independent narration media IDs, timing and no shared presentation controls
@@ -65,13 +79,16 @@ jobs:
             git merge-base --is-ancestor "$BASE" HEAD
             while IFS= read -r file; do
               case "$file" in
-                .github/workflows/talera-free-f5-integration.yml|r20-dev/free-10m-f5/f5-portable-archive.mjs|r20-dev/free-10m-f5/f5-portable-idb.mjs|r20-dev/free-10m-f5/f5-backup-controller.mjs|r20-dev/free-10m-f5/f5-local-backup-page.mjs|r20-dev/free-10m-f5/f5-portable-archive.test.mjs|r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs) ;;
+                .github/workflows/talera-free-f5-integration.yml|r20-dev/free-10m-f5/f5-worker.mjs|r20-dev/free-10m-f5/f5-public-assets.mjs|r20-dev/free-10m-f5/f5-portable-archive.mjs|r20-dev/free-10m-f5/f5-portable-idb.mjs|r20-dev/free-10m-f5/f5-backup-controller.mjs|r20-dev/free-10m-f5/f5-local-backup-page.mjs|r20-dev/free-10m-f5/f5-portable-archive.test.mjs|r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs) ;;
                 *) echo "TALERA_APPROVED_NON_BACKUP_FILE_CHANGED: $file"; exit 1 ;;
               esac
             done < <(git diff --name-only "$BASE" HEAD)
             # Every byte of owner-approved presentation, narrator, timeline,
             # login, media publishing, routing and anonymous first-open stays.
-            git diff --exit-code "$BASE" HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-auth-pilot/ r20-dev/free-10m-social-do/ r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-independent-narrator.browser.js r20-dev/free-10m-f5/f5-local-scope.mjs
+            git diff --exit-code "$BASE" HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-auth-pilot/ r20-dev/free-10m-social-do/ r20-dev/free-10m-f5/f5-independent-narrator.browser.js r20-dev/free-10m-f5/f5-local-scope.mjs
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-independent-narrator.browser.js)" = "$(git rev-parse "$BASE":r20-dev/free-10m-f5/f5-independent-narrator.browser.js)"
+            grep -Fq 'const asset=cleanAnonymousShells[sourcePath]||anonymousShells[sourcePath];' r20-dev/free-10m-f5/f5-worker.mjs
+            grep -Fq 'F5_ANONYMOUS_PRESENT_MUST_REUSE_APPROVED_SHARED_AUDIO_ENGINE' r20-dev/free-10m-f5/f5-public-assets.mjs
             echo TALERA_APPROVED_MORNING_APPLICATION_EXACT_EXCEPT_BACKUP
           elif [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD

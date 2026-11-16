@@ -393,8 +393,30 @@ try{
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length===3,
     null,{timeout:11000});
   const swipePhotoBefore=await centerPixel(page);
-  assert.ok(nearColor(swipePhotoBefore,[255,165,0]),
-    'SWIPED THUMBNAIL NOT VISIBLE OR WRONG PHOTO: '+JSON.stringify(swipePhotoBefore));
+  if(!nearColor(swipePhotoBefore,[255,165,0])){
+    // Diagnose whether the genuine second image is already showing because
+    // the original autoplay clock advanced, or whether pixels are missing.
+    // No production behavior, timing, or assertion is changed here.
+    const diagnostic=await page.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const stage=document.getElementById('photoStage');
+      return {
+        storyId:m?.storyId,photoIndex:m?._photoIndex,
+        photoLoading:m?._photoLoading,
+        mediaIds:(m?._zeroFrames||[]).map(x=>({key:x.key,kind:x.kind})),
+        activePhoto:m?.photos?.[m?._photoIndex]||null,
+        images:[...stage.querySelectorAll('img')].slice(0,12).map(x=>({
+          className:x.className,srcMatchesActive:x.src===m?.photos?.[m?._photoIndex],
+          loaded:x.complete&&x.naturalWidth>0,
+          display:getComputedStyle(x).display,
+          visibility:getComputedStyle(x).visibility,
+          opacity:getComputedStyle(x).opacity
+        }))
+      };
+    });
+    throw Error('SWIPED THUMBNAIL NOT VISIBLE OR WRONG PHOTO: '+
+      JSON.stringify({pixels:swipePhotoBefore,diagnostic}).slice(0,9500));
+  }
   await waitIndex(page,1,11000);
   const swipePhotoAfter=await centerPixel(page);
   if(!nearColor(swipePhotoAfter,[0,217,242])){

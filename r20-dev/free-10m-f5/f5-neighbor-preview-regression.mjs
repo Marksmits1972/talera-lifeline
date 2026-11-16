@@ -125,6 +125,50 @@ for(const content of shippedScripts){
  compiled++;
 }
 assert.ok(compiled>3,'Shipped presentation script must parse');
+// Execute the REAL shipped boot fragment, not an invented presentation.
+// The first session must register immediately even if a newly added video's
+// thumbnail extraction never finishes; a restart must NOT be the workaround.
+const firstBootAnchor='   const center=selected?.ms??runtime.currentMemory()?.ms??Date.now();';
+const firstBootStart=shipped.indexOf(firstBootAnchor);
+const firstBootEndMarker='   for(const m of near){';
+const firstBootLoop=shipped.indexOf(firstBootEndMarker,firstBootStart);
+const firstBootEnd=shipped.indexOf('   }\n',firstBootLoop);
+assert.ok(firstBootStart>0&&firstBootLoop>firstBootStart&&
+  firstBootEnd>firstBootLoop,'Actual initial PWA memory boot fragment unavailable');
+const firstBootCode=shipped.slice(firstBootStart,firstBootEnd+5);
+const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+const runFirstBoot=new AsyncFunction('selected','runtime','memories','warmFirstPhoto',
+  'location','URLSearchParams',firstBootCode);
+async function verifyFirstOpen(primaryKind){
+  const primary={id:'pwa:new-selected-'+primaryKind,ms:Date.now(),
+    _zeroItems:[{kind:primaryKind,key:'original-selected'}],tags:[]};
+  const video={id:'pwa:other-new-video',ms:Date.now()-250,
+    _zeroItems:[{kind:'video',key:'original-other'}],tags:[]};
+  let registered=0,unrelatedVideoDecoded=0;
+  const runtime={currentMemory:()=>null,
+    registerMemories:memories=>{
+      assert.deepEqual(memories,[primary,video]);registered++;
+    }};
+  const warm=m=>{
+    if(m===video){unrelatedVideoDecoded++;return new Promise(()=>{});}
+    if(m===primary&&primaryKind==='video')return new Promise(()=>{});
+    return Promise.resolve();
+  };
+  await Promise.race([
+    runFirstBoot(primary,runtime,[primary,video],warm,{search:''},URLSearchParams),
+    new Promise((_,reject)=>setTimeout(()=>reject(Error(
+      'FIRST_PWA_BOOT_STALLED_WAITING_FOR_VIDEO_THUMBNAIL:'+primaryKind)),650))
+  ]);
+  assert.equal(registered,1,'Initial memory timeline must register exactly once');
+  assert.equal(unrelatedVideoDecoded,0,
+    'Cold launch must not start competing unnecessary video poster decoders');
+}
+await verifyFirstOpen('photo');
+await verifyFirstOpen('video');
+console.log('TALERA_FIRST_PWA_BOOT_NOT_BLOCKED_BY_NEW_VIDEO_PREVIEW_PASS',
+  JSON.stringify({firstPhotoReady:true,firstVideoDoesNotBlock:true,
+    noParallelPosterDecoders:true,noReloadRequired:true,
+    realIphoneAcceptancePending:true}));
 console.log('TALERA_F5_FIRST_SWIPE_BOUNDED_PREWARM',JSON.stringify({
  success:true,syntheticOnly:true,accountPrivate:true,
  prewarmsMaxTwoNeighbors:true,noVideosOrFullAlbumsDecoded:true,

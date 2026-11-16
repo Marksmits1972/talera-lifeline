@@ -603,3 +603,144 @@ jobs:
 # Existing F5 acceptance origin: real timeline motion stops old player and synchronizes the original photo wheel.
 # Same original TALERA Free origin: remove bundled example catalog and static pretend stories, preserve all private stores.
 # 14 Nov 2026: product-owner-authorized TALERA Free same-origin menu and backup UX acceptance publication; retain prior Worker version.
+
+  publish_isolated_backup_preview:
+    name: Fresh empty-library TALERA Free Preview of SAME Worker, owner approved unchanged
+    needs: f5_isolated_local
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-backup-fresh-approved-20261116' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
+      F5_PREVIEW_NAME: backup-fresh-f5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Lock approved morning commit and target original Worker Preview only
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
+          test "$GITHUB_REF_NAME" = feature/free-f5-backup-fresh-approved-20261116
+          test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
+          test -n "$CLOUDFLARE_API_TOKEN"
+          CLEAN_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -cd 'a-fA-F0-9')"
+          test "$(printf '%s' "$CLEAN_ID" | wc -c)" -eq 32
+          echo "::add-mask::$CLEAN_ID"
+          echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN_ID" >> "$GITHUB_ENV"
+      - name: Assert owner's protected 16-Nov Free deployment is unchanged
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const id=process.env.CLOUDFLARE_ACCOUNT_ID;
+          const host='https://api.cloudflare.com/client/v4/accounts/'+id+'/workers/scripts/'+process.env.F5_STAGE_NAME+'/deployments';
+          const r=await fetch(host,{headers:{authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},signal:AbortSignal.timeout(15000)});
+          assert.equal(r.status,200,'Production lock cannot be read');
+          const data=await r.json();
+          assert.ok(data.success,'Production version unavailable');
+          assert.deepEqual((data.result.deployments||[])[0]?.versions?.map(v=>[v.version_id,v.percentage]),
+            [['c085893a-af9c-4d8d-ae6a-2ef81bcfb324',100]],
+            'Approved morning Worker is no longer the untouched 100% deployment');
+          console.log('TALERA_OFFICIAL_APPROVED_DEPLOYMENT_UNCHANGED');
+          NODE
+      - name: Build full approved TALERA candidate with clean signed-out pages and checked export
+        run: |
+          npm ci
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+      - name: Install Wrangler Preview CLI only in disposable GitHub runner
+        run: npm install --no-save --no-package-lock wrangler@4.135.0
+      - name: Generate Preview-only configuration and private authentication secrets
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync,writeFileSync,chmodSync} from 'node:fs';
+          import {createHmac} from 'node:crypto';
+          const c=JSON.parse(readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          const classes=['FreeAuthAccount','FreeAuthEmail','FreeAuthHandle','FreeAuthSession','FreeAuthRate','FreeSocialMemory','FreeSocialSharePointer'];
+          assert.equal(c.name,'talera-free-f5-combined-stage-20261108');
+          assert.deepEqual(c.durable_objects.bindings.map(b=>b.class_name),classes);
+          assert.equal(c.d1_databases?.length||0,0);
+          assert.equal(c.r2_buckets?.length||0,0);
+          assert.equal(c.services?.length||0,0);
+          c.name=process.env.F5_STAGE_NAME;
+          c.previews={vars:{AUTH_STORAGE_JURISDICTION:'eu',SOCIAL_STORAGE_JURISDICTION:'eu'},
+            durable_objects:{bindings:c.durable_objects.bindings}};
+          writeFileSync('r20-dev/free-10m-f5/wrangler.backup-preview.generated.jsonc',
+            JSON.stringify(c,null,2)+'\n');
+          const token=process.env.CLOUDFLARE_API_TOKEN;
+          assert.ok(token&&token.length>30);
+          const names=['STAGING_F5_KEY','STAGING_ACCESS_KEY','STAGING_SOCIAL_KEY',
+            'AUTH_NAMESPACE_KEY','DEMO_IDENTITY_KEY'];
+          const values=Object.fromEntries(names.map(name=>[name,
+            createHmac('sha256',token).update('TALERA_F5_ISOLATED_BACKUP_20261116:'+
+              process.env.F5_PREVIEW_NAME+':'+name).digest('hex')]));
+          const secretFile=process.env.RUNNER_TEMP+'/talera-preview-secrets.json';
+          writeFileSync(secretFile,JSON.stringify(values),{mode:0o600});
+          chmodSync(secretFile,0o600);
+          console.log('ISOLATED_PREVIEW_CONFIG_READY');
+          NODE
+      - name: Compile without publishing to approved address
+        run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.backup-preview.generated.jsonc --outdir .talera-backup-preview-dryrun
+      - name: Publish Preview of existing Worker, never run wrangler deploy
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler preview --ignore-base-config \
+            --name "$F5_PREVIEW_NAME" \
+            --config r20-dev/free-10m-f5/wrangler.backup-preview.generated.jsonc \
+            --json > "$RUNNER_TEMP/talera-preview-output.json"
+          echo "ISOLATED_PREVIEW_DEPLOYED_NOT_PRODUCTION"
+      - name: Store authentication secrets in the Preview only
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler preview secret bulk \
+            "$RUNNER_TEMP/talera-preview-secrets.json" \
+            --name "$F5_PREVIEW_NAME" \
+            --worker-name "$F5_STAGE_NAME" \
+            --config r20-dev/free-10m-f5/wrangler.backup-preview.generated.jsonc
+          rm -f "$RUNNER_TEMP/talera-preview-secrets.json"
+      - name: Verify observed Preview URL serves full Free app, denies anonymous backup
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync,appendFileSync} from 'node:fs';
+          const raw=readFileSync(process.env.RUNNER_TEMP+'/talera-preview-output.json','utf8');
+          const expectedHost=process.env.F5_PREVIEW_NAME+'-'+process.env.F5_STAGE_NAME+'.mark-a39.workers.dev';
+          const urls=[...raw.matchAll(/https:\/\/[a-z0-9.-]+\.workers\.dev\/?/g)]
+            .map(x=>new URL(x[0]));
+          const found=urls.find(x=>x.hostname===expectedHost);
+          assert.ok(found,'Wrangler did not return matching Preview URL');
+          const origin=found.origin;
+          for(const [path,code] of [['/mijn-leven',200],['/present',200],
+            ['/tell',200],['/__f5/backup',401]]){
+            let result;
+            for(let attempt=0;attempt<5;attempt++){
+              result=await fetch(origin+path,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+              if(result.status===code)break;
+              await new Promise(ok=>setTimeout(ok,1000));
+            }
+            assert.equal(result.status,code,'Preview route failed '+path);
+          }
+          for(const [path,emptyMarker] of [['/mijn-leven','window.__taleraReferenceMemories=[];'],
+            ['/present','const MEMORIES = [];']]){
+            const response=await fetch(origin+path,{redirect:'error',signal:AbortSignal.timeout(15000)});
+            assert.equal(response.status,200,'Clean TALERA page unavailable '+path);
+            const html=await response.text();
+            assert.ok(html.includes(emptyMarker),'Clean original-memory array missing '+path);
+            assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/.test(html),
+              'Old example memories still published at '+path);
+          }
+          const official='https://talera-free-f5-storage-qa-20261109.mark-a39.workers.dev/mijn-leven';
+          const protectedResponse=await fetch(official,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+          assert.equal(protectedResponse.status,200,'Approved TALERA Free main route changed');
+          console.log('TALERA_FRESH_CLEAN_BACKUP_PREVIEW_VERIFIED '+origin+'/mijn-leven');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            '\nVerified isolated Preview: '+origin+'/mijn-leven\n');
+          NODE

@@ -1,7 +1,7 @@
 // TALERA Free F5: origin-scoped, fail-closed backup/restore adapter.
 // NOT injected into approved /tell, /present or home. No network and no media cloud.
 // A later explicit user-triggered UI is required before any production restore.
-import {createFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
+import {createFreeArchive,decodeFreeArchive,verifyCompleteFreeExport} from './f5-portable-archive.mjs';
 const SOURCE_LEGACY='talera-lifeline-dev-local-v1';
 const PRIVATE=/^talera-free-local-[a-f0-9]{32}-v1$/;
 const requireName=(name,restoring)=>{
@@ -52,11 +52,30 @@ export async function exportExistingFreeLibrary(databaseName){
  try{
   const {stories,files}=await readAll(db);
   if(!stories.length)throw Error('TALERA_RESTORE_NO_STORIES_FOUND');
-  return await createFreeArchive({stories,files,sourceScope:databaseName,
+  const archive=await createFreeArchive({stories,files,sourceScope:databaseName,
    sourceOrigin:typeof location==='object'?location.origin:null,
    createdAt:new Date().toISOString()});
+  // Fail closed: download only after original IDs, full records and all
+  // media bytes have been independently verified against this exact snapshot.
+  await verifyCompleteFreeExport(archive,stories,files);
+  return archive;
  }finally{db.close()}
 }
+// Read-only comparison of the actual file selected from iPhone Bestanden.
+// A new account, different origin, changed story or changed binary fails.
+export async function verifyStoredFreeExport(file,databaseName){
+ const db=await openExisting(databaseName,false);
+ try{
+  const {stories,files}=await readAll(db);
+  if(!stories.length)throw Error('TALERA_RESTORE_NO_STORIES_FOUND');
+  const verified=await verifyCompleteFreeExport(file,stories,files);
+  if(verified.sourceScope!==databaseName||
+     verified.sourceOrigin!==(typeof location==='object'?location.origin:null))
+    throw Error('TALERA_ARCHIVE_EXPORT_ORIGIN_MISMATCH');
+  return verified;
+ }finally{db.close()}
+}
+
 async function preview(decoded,name,allowOtherOrigin){
  const sourceMatches=decoded.sourceScope===name &&
    decoded.sourceOrigin===location.origin;

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createFreeArchive,inspectFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
+import {createFreeArchive,inspectFreeArchive,decodeFreeArchive,verifyCompleteFreeExport} from './f5-portable-archive.mjs';
 const scope='f5-browser-account-verified-7f8acd68b2';
 const audio=new File([Uint8Array.from([0,1,2,3,4,5,6,7,8,9])],'originele-stem.wav',
  {type:'audio/wav',lastModified:1690900000000});
@@ -7,13 +7,19 @@ const movie=new File([Uint8Array.from([9,8,7,6,5,4,3,2,1,0])],'originale-video.m
  {type:'video/quicktime',lastModified:1700000000000});
 const image=new File([Uint8Array.from([1,2,3,1,2,3,0])],'originele-foto.heic',
  {type:'image/heic',lastModified:1700010000000});
+const secondPhoto=new File([Uint8Array.from([12,18,27,52,68])],
+ 'eigen-test-foto.jpg',{type:'image/jpeg',lastModified:1700010001000});
+const thirdPhoto=new File([Uint8Array.from([1,33,77,99,8,7,6])],
+ 'derde-test-foto.png',{type:'image/png',lastModified:1700010002000});
 const story={
  id:'local-9e31287c-8475-482a-a8c7-3b2a610c2d1f',source:'pwa-local',
  title:'Fictief testverhaal',date:'2000-01-05',text:'Geen persoonsgegevens',
  items:[
   {key:'local-test:0',kind:'photo',mime:'image/heic',name:'originele-foto.heic',size:image.size},
   {key:'local-test:1',kind:'video',mime:'video/quicktime',name:'originale-video.mov',size:movie.size},
-  {key:'local-test:2',kind:'audio',mime:'audio/wav',name:'originele-stem.wav',size:audio.size}
+  {key:'local-test:2',kind:'audio',mime:'audio/wav',name:'originele-stem.wav',size:audio.size},
+  {key:'local-test:3',kind:'photo',mime:'image/jpeg',name:secondPhoto.name,size:secondPhoto.size},
+  {key:'local-test:4',kind:'photo',mime:'image/png',name:thirdPhoto.name,size:thirdPhoto.size}
  ],
  narrationDurationMs:17000,
  narrationCues:[{t:0,index:0},{t:6000,index:1,videoAtMs:700},{t:12000,index:0}],
@@ -26,6 +32,8 @@ const files=[
  {key:'local-test:0',blob:image},
  {key:'local-test:1',blob:movie},
  {key:'local-test:2',blob:audio},
+ {key:'local-test:3',blob:secondPhoto},
+ {key:'local-test:4',blob:thirdPhoto},
  {key:'local-test:0:phone-v1',blob:new Blob(['small-preview'],{type:'image/jpeg'})},
  {key:'talera-v4-work:manifest',blob:[{media:['local-test:0'],voice:'local-test:2'}]},
  {key:'talera-v4-work:preview:local-test:1',blob:new Blob(['preview'],{type:'image/jpeg'})}
@@ -33,8 +41,13 @@ const files=[
 const archive=await createFreeArchive({stories,files,sourceScope:scope});
 const inspected=await inspectFreeArchive(archive);
 assert.equal(inspected.stories,1);
-assert.equal(inspected.files,6);
-assert.equal(inspected.binaries,5);
+assert.equal(inspected.files,8);
+assert.equal(inspected.binaries,7);
+const checked=await verifyCompleteFreeExport(archive,stories,files);
+assert.equal(checked.stories,1);
+assert.equal(checked.records,8);
+assert.equal(checked.referencedMedia,5);
+assert.equal(checked.binaries,7);
 const decoded=await decodeFreeArchive(archive);
 assert.equal(decoded.sourceScope,scope);
 assert.deepEqual(JSON.parse(JSON.stringify(decoded.stories[0])),story);
@@ -49,6 +62,23 @@ for(let i=0;i<files.length;i++){
   if(want instanceof File)assert.equal(got.name,want.name);
  }else assert.deepEqual(JSON.parse(JSON.stringify(got)),want);
 }
+// The archive must fail against any source mismatch, even at equal byte size.
+const altered=files.map(r=>r.key==='local-test:3'?
+ {...r,blob:new File([Uint8Array.from([12,18,27,52,69])],
+  secondPhoto.name,{type:secondPhoto.type,lastModified:secondPhoto.lastModified})}:r);
+await assert.rejects(()=>verifyCompleteFreeExport(archive,stories,altered),/EXPORT_BINARY_BYTES_MISMATCH/);
+await assert.rejects(()=>verifyCompleteFreeExport(archive,
+ [{...story,title:'Bewerkte titel'}],files),/EXPORT_FIELD_VALUE_MISMATCH/);
+await assert.rejects(()=>verifyCompleteFreeExport(archive,stories,
+ files.filter(r=>r.key!=='local-test:4')),/MISSING_STORY_MEDIA|EXPORT_RECORD_COUNT_MISMATCH/);
+const noPhoto=files.map(r=>r.key==='local-test:4'?
+ {...r,blob:new Blob([],{type:'image/png'})}:r);
+const incomplete=await createFreeArchive({stories,files:noPhoto,sourceScope:scope});
+await assert.rejects(()=>verifyCompleteFreeExport(incomplete,stories,noPhoto),/EXPORT_ORIGINAL_EMPTY/);
+const changedPreview=files.map(r=>r.key==='local-test:0:phone-v1'?
+ {...r,blob:new Blob(['other-preview'],{type:'image/jpeg'})}:r);
+await assert.rejects(()=>verifyCompleteFreeExport(archive,stories,changedPreview),
+ /EXPORT_BINARY_BYTES_MISMATCH/);
 assert.ok(archive instanceof Blob);
 assert.equal(typeof fetch,'function');
 const bytes=new Uint8Array(await archive.arrayBuffer());

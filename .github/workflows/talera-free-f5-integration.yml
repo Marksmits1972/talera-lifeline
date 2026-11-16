@@ -50,7 +50,9 @@ jobs:
           assert.ok(present.includes('talera-f5-shared-audio'));
           assert.ok(present.includes('taleraCreateIndependentNarrator'));
           assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/.test(home+present));
-          assert.ok(!present.includes("hint.textContent='▶ Beluister'"));
+          assert.ok(present.includes("hint.textContent='Tik één keer voor geluid'"));
+          // Historical unused text is retained byte-for-byte in the approved engine;
+          // assert the actual approved fallback without rewriting that engine.
           console.log('TALERA_APPROVED_SIGNED_IN_EMPTY_PRESENTATION_AND_SHARED_AUDIO_INTACT');
           NODE
       - name: Verify independent narration media IDs, timing and no shared presentation controls

@@ -1110,9 +1110,37 @@ try{
       'Restored recorded narration must load with original media-ID cues');
     console.log('TALERA_FRESH_PWA_IMPORT_PHOTO_AND_NARRATION_RENDER_PASS',
       JSON.stringify({voice:restoredNarration,realIphoneAccepted:false}));
-    // Simulate iOS rejecting muted video autoplay: the first restored video
-    // cover must still decode before any sound activation tap.
+    // iOS standalone can fail in two independent ways: the offscreen
+    // thumbnail decoder/canvas can fail AND muted autoplay can be denied.
+    // Simulate both on the real restored video-first story in the same app.
+    // Removing only a synthetic DERIVED JPEG forces the raw original to be
+    // the sole first-frame source; original test media remain unchanged.
+    const deletedSyntheticStill=await importedPage.evaluate(async id=>{
+      const row=await window.TaleraMemories.get(id);
+      const key=row.items.find(item=>item.kind==='video').key;
+      const scope=(await indexedDB.databases()).map(x=>x.name||'')
+        .find(x=>x.startsWith('talera-free-local-'));
+      const db=await new Promise((ok,no)=>{
+        const req=indexedDB.open(scope,1);
+        req.onsuccess=()=>ok(req.result);req.onerror=()=>no(req.error);
+      });
+      await new Promise((ok,no)=>{
+        const tx=db.transaction('files','readwrite');
+        tx.objectStore('files').delete(key+':phone-v1');
+        tx.oncomplete=ok;tx.onabort=()=>no(tx.error);
+      });
+      db.close();
+      return {originalBytes:(await window.TaleraMemories.blob(key))?.size||0,
+        still:(await window.TaleraMemories.blob(key+':phone-v1'))?.size||0};
+    },videoFirst.id);
+    assert.ok(deletedSyntheticStill.originalBytes>1000&&!deletedSyntheticStill.still);
     await importedPage.addInitScript(()=>{
+      const draw=CanvasRenderingContext2D.prototype.drawImage;
+      CanvasRenderingContext2D.prototype.drawImage=function(source,...args){
+        if(source instanceof HTMLVideoElement&&!source.isConnected)
+          throw Error('Synthetic iOS offscreen video capture unavailable');
+        return draw.call(this,source,...args);
+      };
       const originalPlay=HTMLMediaElement.prototype.play;
       HTMLMediaElement.prototype.play=function(...args){
         if(this.tagName==='VIDEO'&&this.classList.contains('talera-v61-inline-video'))

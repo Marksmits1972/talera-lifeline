@@ -1077,6 +1077,70 @@ try{
       JSON.stringify(initialVideo));
     console.log('TALERA_FRESH_PWA_IMPORT_VIDEO_FIRST_RENDER_PASS',
       JSON.stringify({restore:imported,video:initialVideo,realIphoneAccepted:false}));
+    // Restore also contains real original PHOTO and voice+cues. Reopen both
+    // directly from the imported account-private database.
+    await importedPage.goto(origin+'/present?memory='+plain,
+      {waitUntil:'domcontentloaded',timeout:25000});
+    await importedPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const photo=m?.photos?.[0];
+      return m?.storyId===id&&!m._photoLoading&&
+        photo?.startsWith('blob:')&&
+        [...document.querySelectorAll('#photoStage img')].some(x=>
+          x.complete&&x.naturalWidth>0&&(x.currentSrc===photo||x.src===photo));
+    },plain,{timeout:20000});
+    await importedPage.goto(origin+'/present?memory='+narrated.id,
+      {waitUntil:'domcontentloaded',timeout:25000});
+    await importedPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const a=document.querySelector('.talera-independent-narrator-layer audio');
+      return m?.storyId===id&&a?.currentSrc?.startsWith('blob:')&&
+        m._zeroFrames?.length===4;
+    },narrated.id,{timeout:20000});
+    const restoredNarration=await importedPage.evaluate(async id=>{
+      const row=await window.TaleraMemories.get(id);
+      const item=row.items.find(x=>x.kind==='audio');
+      const original=await window.TaleraMemories.blob(item.key);
+      const a=document.querySelector('.talera-independent-narrator-layer audio');
+      return {voiceBytes:original?.size||0,voiceSrc:a?.currentSrc?.startsWith('blob:')||false,
+        cues:row.narrationCues?.length||0};
+    },narrated.id);
+    assert.ok(restoredNarration.voiceBytes>1000&&restoredNarration.voiceSrc&&
+      restoredNarration.cues===4,
+      'Restored recorded narration must load with original media-ID cues');
+    console.log('TALERA_FRESH_PWA_IMPORT_PHOTO_AND_NARRATION_RENDER_PASS',
+      JSON.stringify({voice:restoredNarration,realIphoneAccepted:false}));
+    // Simulate iOS rejecting muted video autoplay: the first restored video
+    // cover must still decode before any sound activation tap.
+    await importedPage.addInitScript(()=>{
+      const originalPlay=HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play=function(...args){
+        if(this.tagName==='VIDEO'&&this.classList.contains('talera-v61-inline-video'))
+          return Promise.reject(new DOMException('iOS autoplay denied','NotAllowedError'));
+        return originalPlay.apply(this,args);
+      };
+    });
+    await importedPage.goto(origin+'/present?memory='+videoFirst.id,
+      {waitUntil:'domcontentloaded',timeout:25000});
+    await importedPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return m?.storyId===id&&!m._photoLoading&&
+        m.thumbnail?.startsWith('blob:')&&m.thumbnail===m.photos?.[0];
+    },videoFirst.id,{timeout:20000});
+    const firstCoverWithoutAutoplay=await importedPage.evaluate(async id=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      const img=new Image();img.src=m.thumbnail;await img.decode();
+      const row=await window.TaleraMemories.get(id);
+      const key=row.items.find(x=>x.kind==='video').key;
+      const original=await window.TaleraMemories.blob(key);
+      return {coverWidth:img.naturalWidth,coverHeight:img.naturalHeight,
+        originalBytes:original?.size||0,frameCount:m._zeroFrames.length};
+    },videoFirst.id);
+    assert.ok(firstCoverWithoutAutoplay.coverWidth>0&&
+      firstCoverWithoutAutoplay.originalBytes>1000,
+      'Restored video needs a genuine frame even when native autoplay is denied');
+    console.log('TALERA_FRESH_PWA_RESTORED_VIDEO_COVER_WITHOUT_AUTOPLAY_PASS',
+      JSON.stringify({firstCoverWithoutAutoplay,realIphoneAccepted:false}));
   }finally{await restoredContext.close()}
   await load(page,videoFirst.id,2);
   try{

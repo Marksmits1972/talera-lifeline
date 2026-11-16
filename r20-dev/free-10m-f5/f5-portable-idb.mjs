@@ -1,7 +1,7 @@
 // TALERA Free F5: origin-scoped, fail-closed backup/restore adapter.
 // NOT injected into approved /tell, /present or home. No network and no media cloud.
 // A later explicit user-triggered UI is required before any production restore.
-import {createFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
+import {createFreeArchive,decodeFreeArchive,verifyFreeArchiveSnapshot} from './f5-portable-archive.mjs';
 const SOURCE_LEGACY='talera-lifeline-dev-local-v1';
 const PRIVATE=/^talera-free-local-[a-f0-9]{32}-v1$/;
 const requireName=(name,restoring)=>{
@@ -52,11 +52,30 @@ export async function exportExistingFreeLibrary(databaseName){
  try{
   const {stories,files}=await readAll(db);
   if(!stories.length)throw Error('TALERA_RESTORE_NO_STORIES_FOUND');
-  return await createFreeArchive({stories,files,sourceScope:databaseName,
+  const archive=await createFreeArchive({stories,files,sourceScope:databaseName,
    sourceOrigin:typeof location==='object'?location.origin:null,
    createdAt:new Date().toISOString()});
+  // Do not enable "Bewaar bestand" for an incomplete or altered library copy.
+  await verifyFreeArchiveSnapshot(archive,stories,files);
+  return archive;
  }finally{db.close()}
 }
+// Phase 1 only: compare a user-selected *saved* .talera file with the same
+// current private library, without touching restore or modifying any records.
+export async function verifySavedFreeLibraryArchive(archive,databaseName){
+ const db=await openExisting(databaseName,false);
+ try{
+  const {stories,files}=await readAll(db);
+  if(!stories.length)throw Error('TALERA_RESTORE_NO_STORIES_FOUND');
+  const result=await verifyFreeArchiveSnapshot(archive,stories,files);
+  if(result.sourceScope!==databaseName||
+     result.sourceOrigin!==(typeof location==='object'?location.origin:null))
+   throw Error('TALERA_ARCHIVE_SAVED_COPY_SCOPE_MISMATCH');
+  return {...result,savedCopyMatchesCurrentLibrary:true,
+   fileVerifiedWithoutRestore:true};
+ }finally{db.close()}
+}
+
 async function preview(decoded,name,allowOtherOrigin){
  const sourceMatches=decoded.sourceScope===name &&
    decoded.sourceOrigin===location.origin;

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createFreeArchive,inspectFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
+import {createFreeArchive,inspectFreeArchive,decodeFreeArchive,verifyFreeArchiveSnapshot} from './f5-portable-archive.mjs';
 const scope='f5-browser-account-verified-7f8acd68b2';
 const audio=new File([Uint8Array.from([0,1,2,3,4,5,6,7,8,9])],'originele-stem.wav',
  {type:'audio/wav',lastModified:1690900000000});
@@ -7,13 +7,19 @@ const movie=new File([Uint8Array.from([9,8,7,6,5,4,3,2,1,0])],'originale-video.m
  {type:'video/quicktime',lastModified:1700000000000});
 const image=new File([Uint8Array.from([1,2,3,1,2,3,0])],'originele-foto.heic',
  {type:'image/heic',lastModified:1700010000000});
+const photoJpeg=new File([Uint8Array.from([0xff,0xd8,0xff,0xd9])],
+ 'originele-tweede-foto.jpg',{type:'image/jpeg',lastModified:1700010001000});
+const photoPng=new File([Uint8Array.from([0x89,0x50,0x4e,0x47,1,2,3])],
+ 'originele-derde-foto.png',{type:'image/png',lastModified:1700010002000});
 const story={
  id:'local-9e31287c-8475-482a-a8c7-3b2a610c2d1f',source:'pwa-local',
  title:'Fictief testverhaal',date:'2000-01-05',text:'Geen persoonsgegevens',
  items:[
   {key:'local-test:0',kind:'photo',mime:'image/heic',name:'originele-foto.heic',size:image.size},
   {key:'local-test:1',kind:'video',mime:'video/quicktime',name:'originale-video.mov',size:movie.size},
-  {key:'local-test:2',kind:'audio',mime:'audio/wav',name:'originele-stem.wav',size:audio.size}
+  {key:'local-test:2',kind:'audio',mime:'audio/wav',name:'originele-stem.wav',size:audio.size},
+  {key:'local-test:3',kind:'photo',mime:'image/jpeg',name:photoJpeg.name,size:photoJpeg.size},
+  {key:'local-test:4',kind:'photo',mime:'image/png',name:photoPng.name,size:photoPng.size}
  ],
  narrationDurationMs:17000,
  narrationCues:[{t:0,index:0},{t:6000,index:1,videoAtMs:700},{t:12000,index:0}],
@@ -26,6 +32,8 @@ const files=[
  {key:'local-test:0',blob:image},
  {key:'local-test:1',blob:movie},
  {key:'local-test:2',blob:audio},
+ {key:'local-test:3',blob:photoJpeg},
+ {key:'local-test:4',blob:photoPng},
  {key:'local-test:0:phone-v1',blob:new Blob(['small-preview'],{type:'image/jpeg'})},
  {key:'talera-v4-work:manifest',blob:[{media:['local-test:0'],voice:'local-test:2'}]},
  {key:'talera-v4-work:preview:local-test:1',blob:new Blob(['preview'],{type:'image/jpeg'})}
@@ -33,8 +41,14 @@ const files=[
 const archive=await createFreeArchive({stories,files,sourceScope:scope});
 const inspected=await inspectFreeArchive(archive);
 assert.equal(inspected.stories,1);
-assert.equal(inspected.files,6);
-assert.equal(inspected.binaries,5);
+assert.equal(inspected.files,8);
+assert.equal(inspected.binaries,7);
+const complete=await verifyFreeArchiveSnapshot(archive,stories,files);
+assert.equal(complete.storyCount,1);
+assert.equal(complete.mediaStoreEntries,8);
+assert.equal(complete.selectedMediaReferences,5);
+assert.equal(complete.verifiedBinaryCount,7);
+assert.equal(complete.originalBytesVerified,true);
 const decoded=await decodeFreeArchive(archive);
 assert.equal(decoded.sourceScope,scope);
 assert.deepEqual(JSON.parse(JSON.stringify(decoded.stories[0])),story);
@@ -49,6 +63,27 @@ for(let i=0;i<files.length;i++){
   if(want instanceof File)assert.equal(got.name,want.name);
  }else assert.deepEqual(JSON.parse(JSON.stringify(got)),want);
 }
+// Exact source comparison must detect missing originals, empty placeholders,
+// altered media, changed narration metadata and even unreferenced cached files.
+const badRows=files.map(row=>row.key==='local-test:3'?
+ {...row,blob:new Blob([], {type:'image/jpeg'})}:row);
+const emptyBackup=await createFreeArchive({stories,files:badRows,sourceScope:scope});
+await assert.rejects(()=>verifyFreeArchiveSnapshot(emptyBackup,stories,badRows),
+ /EMPTY_STORY_MEDIA/);
+await assert.rejects(()=>verifyFreeArchiveSnapshot(archive,
+ [{...story,title:'Changed without updating saved file'}],files),
+ /SOURCE_VALUE_MISMATCH/);
+await assert.rejects(()=>verifyFreeArchiveSnapshot(archive,stories,
+ files.map(row=>row.key==='local-test:1'?
+  {...row,blob:new File([Uint8Array.of(9,8,7,6,5,4,3,2,1,1)],
+   'originale-video.mov',{type:'video/quicktime',lastModified:1700000000000})}:row)),
+ /SOURCE_BINARY_BYTES_MISMATCH/);
+await assert.rejects(()=>verifyFreeArchiveSnapshot(archive,stories,
+ files.map(row=>row.key==='local-test:0:phone-v1'?
+  {...row,blob:new Blob(['other-preview'],{type:'image/jpeg'})}:row)),
+ /SOURCE_BINARY_BYTES_MISMATCH/);
+await assert.rejects(()=>verifyFreeArchiveSnapshot(archive,stories,
+ files.filter(row=>row.key!=='local-test:4')),/SOURCE_RECORD_COUNT_CHANGED/);
 assert.ok(archive instanceof Blob);
 assert.equal(typeof fetch,'function');
 const bytes=new Uint8Array(await archive.arrayBuffer());
@@ -113,6 +148,9 @@ assert.deepEqual(
 console.log('TALERA_F5_PORTABLE_ARCHIVE_CODEC_PASS',JSON.stringify({
  completeStory:true,originalVideoBytes:true,originalImageBytes:true,originalVoiceBytes:true,
  originalIDs:true,orderedMedia:true,cueTiming:true,phonePreview:true,
+ threeDifferentPhotoFormats:true,exportSnapshotVerified:true,
+ emptyMediaRejected:true,changedMetadataRejected:true,changedOriginalRejected:true,
+ changedPreviewRejected:true,missingFileRecordRejected:true,
  editorDraftManifest:true,checksumTamperingRejected:true,partialBackupRejected:true,
  duplicateIDsRejected:true,originalSourceNotModified:true,
  metadataNeverUploaded:true,physicalIPhoneRestoreCertified:false,

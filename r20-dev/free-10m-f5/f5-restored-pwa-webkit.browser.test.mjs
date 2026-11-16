@@ -102,6 +102,56 @@ try{
   // directly using the lossless archive created in the same app by Chromium.
   // The original local media IDs, rendering and Back assertions remain below.
   await b.goto(origin+'/__f5/backup');
+  // Diagnostic only: prove whether Playwright's Linux WebKit can write even
+  // one native File to the EXISTING synthetic account's IndexedDB.
+  // These one-off records are not owner memories or a separate test app.
+  console.log('TALERA_WEBKIT_STAGE_NATIVE_INDEXEDDB_FILE_CANARY');
+  const nativeCanary=await bounded('native-file-canary',b.evaluate(async()=>{
+    const name=document.getElementById('talera-free-backup')?.dataset.database;
+    const opened=indexedDB.open(name,1);
+    const db=await new Promise((ok,no)=>{
+      opened.onsuccess=()=>ok(opened.result);
+      opened.onerror=()=>no(opened.error);
+    });
+    const probe=async(type)=>{
+      const key='__talera_webkit_native_file_test_'+type;
+      const payload=type==='blob'?
+        new Blob([new Uint8Array([1,2,3,4,5,6,7])],{type:'image/png'}):
+        new File([new Uint8Array([1,2,3,4,5,6,7])],
+          'test-only.png',{type:'image/png'});
+      console.log('WEBKIT_RESTORE_CANARY_BEGIN',type,payload.constructor.name);
+      const result=await new Promise(resolve=>{
+        const tx=db.transaction('files','readwrite');
+        let ended=false;
+        const finish=(state)=>{
+          if(ended)return;ended=true;clearTimeout(timer);resolve(state);
+        };
+        const timer=setTimeout(()=>{
+          console.log('WEBKIT_RESTORE_CANARY_NATIVE_TIMEOUT',type);
+          try{tx.abort()}catch{}
+          finish('timeout');
+        },6000);
+        tx.oncomplete=()=>finish('complete');
+        tx.onabort=()=>finish('abort:'+String(tx.error));
+        tx.onerror=()=>console.log('WEBKIT_RESTORE_CANARY_TX_ERROR',type);
+        const req=tx.objectStore('files').add({key,blob:payload});
+        req.onsuccess=()=>console.log('WEBKIT_RESTORE_CANARY_REQUEST_SUCCESS',type);
+        req.onerror=()=>console.log('WEBKIT_RESTORE_CANARY_REQUEST_ERROR',type,String(req.error));
+      });
+      console.log('WEBKIT_RESTORE_CANARY_RESULT',type,result);
+      return result;
+    };
+    try{
+      const blob=await probe('blob');
+      if(blob!=='complete')return {blob,file:'not-run'};
+      const file=await probe('file');
+      return {blob,file};
+    }finally{db.close()}
+  }),16500);
+  console.log('TALERA_WEBKIT_NATIVE_FILE_CANARY_RESULT',JSON.stringify(nativeCanary));
+  assert.deepEqual(nativeCanary,{blob:'complete',file:'complete'},
+    'Linux WebKit cannot persist a native File/Blob to the same account-private IndexedDB: '+
+    JSON.stringify(nativeCanary));
   console.log('TALERA_WEBKIT_STAGE_TARGET_RESTORE');
   const imported=await bounded('target-restore',b.evaluate(async bytes=>{
     const db=document.getElementById('talera-free-backup')?.dataset.database;

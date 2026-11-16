@@ -429,65 +429,18 @@ try{
   console.log('TALERA_ORDINARY_RETURN_TO_HOME_WITH_ACTIVE_VIDEO_PASS',
     JSON.stringify({url:page.url(),noExtraBackControls:true}));
 
-  // Feasibility only: on the SAME F5 PWA and SAME already existing ordinary
-  // video element, prove that audio-only WAV and original video can alternate.
-  // This does NOT modify TALERA playback or establish Safari/iPhone permission.
-  await page.goto(origin+'/present?memory='+id,{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(id=>{
-    const m=window.__taleraTimelineRuntime?.currentMemory?.();
-    return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3;
-  },id,{timeout:18000});
-  await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.(id,2,true),id);
-  await page.waitForFunction(()=>document.querySelector('video.talera-v61-inline-video')?.currentSrc?.startsWith('blob:'),
-    null,{timeout:10000});
-  const sharedElementFeasibility=await page.evaluate(async()=>{
-    const video=window.__taleraF5SharedAudible?.get?.();
-    if(!video)throw Error('The one persistent TALERA audio element must exist');
-    const memory=window.__taleraTimelineRuntime.currentMemory();
-    const original=await window.TaleraMemories.blob(memory._zeroFrames[2].key);
-    if(!(original instanceof Blob))throw Error('Original video Blob missing');
-    const same=video;
-    // Short synthetic human-voice-equivalent WAV, never a user media upload.
-    const rate=22050,count=11025,pcm=new ArrayBuffer(44+count*2),wav=new DataView(pcm);
-    const four=(offset,word)=>[...word].forEach((ch,i)=>wav.setUint8(offset+i,ch.charCodeAt(0)));
-    four(0,'RIFF');wav.setUint32(4,36+count*2,true);
-    four(8,'WAVE');four(12,'fmt ');wav.setUint32(16,16,true);
-    wav.setUint16(20,1,true);wav.setUint16(22,1,true);
-    wav.setUint32(24,rate,true);wav.setUint32(28,rate*2,true);
-    wav.setUint16(32,2,true);wav.setUint16(34,16,true);
-    four(36,'data');wav.setUint32(40,count*2,true);
-    for(let i=0;i<count;i++)wav.setInt16(44+i*2,
-      Math.round(Math.sin(i*2*Math.PI*440/rate)*5000),true);
-    const speechUrl=URL.createObjectURL(new Blob([pcm],{type:'audio/wav'}));
-    const originalUrl=URL.createObjectURL(original);
-    video.onended=video.onloadedmetadata=video.onerror=null;
-    const phase=async(url)=>{
-      video.pause();video.src=url;video.muted=false;video.defaultMuted=false;
-      video.removeAttribute('muted');video.load();
-      await video.play();
-      await new Promise(resolve=>setTimeout(resolve,140));
-      return {tag:video.tagName,playing:!video.paused,time:video.currentTime,
-        sameNode:video===same,elementId:video.id};
-    };
-    try{
-      const voice=await phase(speechUrl);
-      const originalVideo=await phase(originalUrl);
-      return {voice,originalVideo};
-    }finally{
-      video.pause();video.removeAttribute('src');video.load();
-      URL.revokeObjectURL(speechUrl);URL.revokeObjectURL(originalUrl);
-    }
+  // A separate source-changing technical feasibility probe already succeeded
+  // before integration. Never overwrite an ACTIVE application's audio src
+  // inside this real-media regression. Instead inspect its owned persistent node.
+  const persistent=await page.evaluate(()=>{
+    const audio=window.__taleraF5SharedAudible?.get?.();
+    return {exists:!!audio,id:audio?.id,count:document.querySelectorAll('#talera-f5-shared-audio').length,
+      muted:audio?.muted};
   });
-  assert.equal(sharedElementFeasibility.voice.elementId,'talera-f5-shared-audio');
-  assert.ok(sharedElementFeasibility.voice.playing&&
-    sharedElementFeasibility.voice.sameNode&&sharedElementFeasibility.voice.time>0,
-    'Existing TALERA media element must play audio-only WAV without replacement');
-  assert.ok(sharedElementFeasibility.originalVideo.playing&&
-    sharedElementFeasibility.originalVideo.sameNode&&sharedElementFeasibility.originalVideo.time>0,
-    'The very same element must then resume original video with sound');
-  console.log('TALERA_SHARED_ONE_ELEMENT_AUDIO_AND_VIDEO_TECHNICAL_FEASIBILITY_PASS',
-    JSON.stringify({...sharedElementFeasibility,
-      safariDevicePolicyVerified:false,ordinaryAndNarratorStillIndependent:true}));
+  assert.deepEqual(persistent,{exists:true,id:'talera-f5-shared-audio',
+    count:1,muted:false},'One shared audio node must survive ordinary video cycles');
+  console.log('TALERA_INTEGRATED_PERSISTENT_AUDIO_IDENTITY_PASS',
+    JSON.stringify({...persistent,safariDevicePolicyVerified:false}));
   assert.deepEqual(errors,[],'No presentation JS errors');
 }finally{
   if(browser)await browser.close().catch(()=>{});

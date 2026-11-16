@@ -923,7 +923,23 @@ try{
   await voiceHint.waitFor({state:'visible',timeout:10000});
   assert.equal(await voiceHint.textContent(),'Tik één keer voor geluid');
   assert.equal(await voiceHint.evaluate(e=>getComputedStyle(e).pointerEvents),'none');
+  await page.evaluate(()=>{
+    window.__taleraNarratorTapDiagnostics=[];
+    document.addEventListener('click',e=>window.__taleraNarratorTapDiagnostics.push({
+      target:e.target?.id||e.target?.className||e.target?.tagName,
+      inside:!!e.target?.closest?.('#memoryStoryScroll'),
+      blocked:!!e.target?.closest?.('a,button,[role=button],input,select,textarea')
+    }),{capture:true,once:true});
+  });
   await page.locator('#memoryStoryScroll').tap({timeout:6000});
+  await page.waitForTimeout(500);
+  const tapReport=await page.evaluate(()=>({events:window.__taleraNarratorTapDiagnostics,
+    hint:!!document.getElementById('talera-f5-narrator-sound-hint'),
+    memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
+    audio:((a)=>({exists:!!a,paused:a?.paused,muted:a?.muted,
+      time:a?.currentTime,source:a?.currentSrc?.slice(0,45)}))
+        (document.querySelector('.talera-independent-narrator-layer audio'))}));
+  console.log('TALERA_NARRATOR_SHARED_TAP_DIAGNOSTIC',JSON.stringify(tapReport));
   await page.waitForFunction(()=>{
     const a=document.querySelector('.talera-independent-narrator-layer audio');
     return a&&!a.paused&&!a.muted&&a.currentTime>.15;

@@ -11,7 +11,7 @@ import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 import {approvedAssets,anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {assetizeHtml} from '../free-10m-delivery/rewrite.mjs';
 import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birthdate-worker.mjs';
-import {referencePages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
+import {referencePages,verifiedPublicScripts,verifiedPublicSupport,cleanAnonymousShells} from './generated/public-template-map.mjs';
 import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
@@ -632,7 +632,7 @@ async function publicPage(request,env){
       }
     });
   }
-  const asset=anonymousShells[sourcePath];
+  const asset=cleanAnonymousShells[sourcePath]||anonymousShells[sourcePath];
   if(!asset)return deny(503,'Anonieme PWA-shell ontbreekt');
   const r=await env.ASSETS.fetch(new Request(new URL(asset,origin)));
   if(!r.ok)return deny(503,'Anonieme PWA-shell is niet beschikbaar');

@@ -756,6 +756,12 @@ try{
   // reveal the EXISTING 11-photo wheel and select another saved memory.
   // No new viewer, test app, audio ID or narrator-specific swipe engine.
   await load(page,narrated.id,4);
+  // load() is a FULL page navigation; compare DOM identity only within this
+  // document, across actual touch swipes (not across reloads).
+  await page.evaluate(()=>{
+    window.__taleraAudioNodeBeforeNarrationSwipe=
+      window.__taleraF5SharedAudible.get();
+  });
   await page.waitForFunction(()=>{
     const audio=document.querySelector('.talera-independent-narrator-layer audio');
     return audio&&!audio.paused&&audio.currentTime>.06;

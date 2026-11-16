@@ -278,6 +278,51 @@ try{
   console.log('TALERA_F5_HOME_OWNER_RECORDS_STILL_WORK_PASS',
     JSON.stringify({saved:1,ownHero:true,ownPhoto:true,ownerYear:true,
       exampleCount:0,originalPwa:true,iphoneAccepted:false}));
+  // Real original /present with a deliberately slow IndexedDB media read.
+  // The first existing cover is fast, but later original photos arrive after
+  // registration. This must still paint the selected original first photo,
+  // never a placeholder or a stale previous memory. No fake product screen.
+  const slowPage=await ctx.newPage();
+  await slowPage.addInitScript(()=>{
+    let scoped;
+    Object.defineProperty(window,'TaleraMemories',{
+      configurable:true,enumerable:true,
+      get(){return scoped},
+      set(api){
+        scoped=api;
+        if(!api||typeof api.displayUrl!=='function')return;
+        const original=api.displayUrl.bind(api);
+        api.displayUrl=async key=>{
+          if(/:[12]$/.test(String(key))){
+            window.__taleraDelayedReadCount=(window.__taleraDelayedReadCount||0)+1;
+            await new Promise(done=>setTimeout(done,1500));
+          }
+          return original(key);
+        };
+      }
+    });
+  });
+  await load(slowPage,plain,3);
+  const deferredState=await slowPage.evaluate(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return {storyId:m?.storyId,index:m?._photoIndex,
+      delayed:window.__taleraDelayedReadCount||0,
+      firstImage:m?.photos?.[0]?.startsWith('blob:')||false,
+      loading:m?._photoLoading};
+  });
+  assert.ok(deferredState.delayed>=2,
+    'The selected original media did not actually exercise delayed hydration: '+
+    JSON.stringify(deferredState));
+  assert.equal(deferredState.index,0,
+    'The first photo must remain selected immediately after slow hydration');
+  const deferredPixels=await centerPixel(slowPage);
+  assert.ok(dominant(deferredPixels,0),
+    'RESTORED FIRST PHOTO NOT VISIBLE AFTER DELAYED HYDRATION: '+
+    JSON.stringify({deferredState,deferredPixels}));
+  console.log('TALERA_DELAYED_HYDRATION_FIRST_MEDIA_VISIBLE_PASS',
+    JSON.stringify({delayedOriginalReads:deferredState.delayed,
+      localMediaUsed:true,firstPhotoVisible:true,realIphoneAccepted:false}));
+  await slowPage.close();
   await load(page,plain,3);
   // Native timeline regression: with only ONE real local memory near today,
   // releasing a finger drag must preserve the finger-selected historical year.

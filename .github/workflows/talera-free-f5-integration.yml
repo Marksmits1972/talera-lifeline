@@ -605,7 +605,7 @@ jobs:
 # Same original TALERA Free origin: remove bundled example catalog and static pretend stories, preserve all private stores.
 # 14 Nov 2026: product-owner-authorized TALERA Free same-origin menu and backup UX acceptance publication; retain prior Worker version.
 
-publish_isolated_backup_preview:
+  publish_isolated_backup_preview:
     name: Backup-only owner-approved F5 source Preview (same existing TALERA Worker)
     needs: f5_isolated_local
     if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-approved-morning-backup-only-20261116' }}

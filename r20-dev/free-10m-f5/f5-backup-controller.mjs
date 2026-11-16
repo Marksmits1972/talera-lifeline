@@ -90,7 +90,7 @@ make.addEventListener('click',async()=>{
   save.hidden=false;
   message(exportStatus,'Back-up klaar, intern volledig gecontroleerd ('+
    (archive.size/1048576).toFixed(1)+
-   ' MB). Tik op "Bewaar bestand", kies daarna de opgeslagen kopie hierboven en controleer deze.');
+   ' MB). Tik op "Bewaar bestand", sla op in Bestanden en controleer daarna de gekozen kopie hierboven.');
  }catch(e){message(exportStatus,'Back-up niet gemaakt: '+failText(e))}
  finally{make.disabled=false}
 });

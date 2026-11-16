@@ -996,6 +996,88 @@ try{
   },readFileSync(syntheticOriginal).toString('base64'));
   assert.deepEqual(videoFirst.kinds,['video','photo'],
     'Test needs genuinely ordered video first, photo second in the same memory');
+  // A real backup success is NOT proof that restored media renders.
+  // Reproduce exactly the owner's transfer: source PWA has newly saved
+  // VIDEO-first + narrated stories, target is a separate first-launch
+  // browser storage context at the SAME TALERA Free origin.
+  // Do not use external apps, other Workers or any personal content.
+  const exported=await page.evaluate(async ()=>{
+    const db=(await indexedDB.databases()).map(x=>x.name||'')
+      .find(x=>x.startsWith('talera-free-local-'));
+    const {exportExistingFreeLibrary}=await import('/__f5/f5-portable-idb.mjs');
+    const archive=await exportExistingFreeLibrary(db);
+    const bytes=new Uint8Array(await archive.arrayBuffer());
+    let str='';
+    for(let offset=0;offset<bytes.length;offset+=32768)
+      str+=String.fromCharCode(...bytes.subarray(offset,offset+32768));
+    return {base64:btoa(str),byteCount:bytes.length};
+  });
+  assert.ok(exported.byteCount>500,'Real synthetic photo/video/voice backup required');
+  const restoredContext=await browser.newContext({
+    ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate}
+  });
+  try{
+    await restoredContext.addCookies([{name:'talera_sid',value:sid,
+      domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+    const importedPage=await restoredContext.newPage();
+    const home=await importedPage.goto(origin+'/mijn-leven',
+      {waitUntil:'domcontentloaded',timeout:25000});
+    assert.equal(home.status(),200);
+    await importedPage.waitForFunction(()=>!!window.TaleraMemories?.list,
+      null,{timeout:16000});
+    const imported=await importedPage.evaluate(async base64=>{
+      const db=(await indexedDB.databases()).map(x=>x.name||'')
+        .find(x=>x.startsWith('talera-free-local-'));
+      const {previewFreeLibraryRestore,restoreFreeLibrary}=
+        await import('/__f5/f5-portable-idb.mjs');
+      const bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));
+      const archive=new Blob([bytes],{type:'application/octet-stream'});
+      const review=await previewFreeLibraryRestore(archive,db,
+        {allowOtherOrigin:true});
+      if(!review.safeToRestore)throw Error('Fresh target must accept first import');
+      const done=await restoreFreeLibrary(archive,db,
+        {allowOtherOrigin:true,confirmed:true});
+      const rows=await window.TaleraMemories.list();
+      return {stories:done.restoredStories,files:done.restoredMediaEntries,
+        readable:rows.length,verified:done.readbackPassed};
+    },exported.base64);
+    assert.ok(imported.stories>=4&&imported.files>=7&&
+      imported.verified&&imported.readable>=4,
+      'Real newly saved photo/video/voice files must restore transactionally');
+    const first=await importedPage.goto(origin+'/present?memory='+videoFirst.id,
+      {waitUntil:'domcontentloaded',timeout:25000});
+    assert.equal(first.status(),200);
+    await importedPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return m?.storyId===id&&!m._photoLoading&&
+        m._zeroFrames?.length===2;
+    },videoFirst.id,{timeout:20000});
+    await importedPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const video=document.querySelector('video.talera-v61-inline-video');
+      return m?.storyId===id&&
+        (m.thumbnail?.startsWith('blob:')||m.photos?.[0]?.startsWith('blob:'))&&
+        video?.currentSrc?.startsWith('blob:')&&video.readyState>=2;
+    },videoFirst.id,{timeout:18000});
+    const initialVideo=await importedPage.evaluate(async id=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      const row=await window.TaleraMemories.get(id);
+      const key=row.items.find(x=>x.kind==='video').key;
+      const original=await window.TaleraMemories.blob(key);
+      const video=document.querySelector('video.talera-v61-inline-video');
+      const still=await window.TaleraMemories.blob(key+':phone-v1');
+      return {storyId:m.storyId,videoBytes:original?.size||0,
+        videoReady:video?.readyState||0,videoW:video?.videoWidth||0,
+        previewReady:!!still?.size,
+        firstPhoto:m.photos?.[0]?.startsWith('blob:')};
+    },videoFirst.id);
+    assert.ok(initialVideo.videoBytes>1000&&initialVideo.videoReady>=2&&
+      initialVideo.videoW>0&&initialVideo.firstPhoto,
+      'Imported first-video original or first-frame preview is NOT playable: '+
+      JSON.stringify(initialVideo));
+    console.log('TALERA_FRESH_PWA_IMPORT_VIDEO_FIRST_RENDER_PASS',
+      JSON.stringify({restore:imported,video:initialVideo,realIphoneAccepted:false}));
+  }finally{await restoredContext.close()}
   await load(page,videoFirst.id,2);
   try{
     await page.waitForFunction(id=>{

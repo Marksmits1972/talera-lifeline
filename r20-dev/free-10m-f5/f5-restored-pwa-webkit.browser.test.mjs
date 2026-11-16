@@ -66,6 +66,8 @@ try{
   };
   const source=await mkContext(sourceBrowser),target=await mkContext(browser);
   const a=await source.newPage(),b=await target.newPage();
+  b.on('console',msg=>{if(msg.text().startsWith('WEBKIT_RESTORE_'))console.log('TALERA_WEBKIT_DETAIL',msg.text())});
+  b.on('pageerror',err=>console.log('TALERA_WEBKIT_PAGEERROR',err.message));
   assert.equal((await a.goto(origin+'/mijn-leven')).status(),200);
   await a.waitForFunction(()=>typeof window.TaleraMemories?.save==='function',
     null,{timeout:18000});
@@ -99,12 +101,18 @@ try{
   console.log('TALERA_WEBKIT_STAGE_TARGET_RESTORE');
   const imported=await bounded('target-restore',b.evaluate(async bytes=>{
     const db=document.getElementById('talera-free-backup')?.dataset.database;
+    console.log('WEBKIT_RESTORE_DATABASE_SELECTED',String(db||'').length);
     const {previewFreeLibraryRestore,restoreFreeLibrary}=
       await import('/__f5/f5-portable-idb.mjs');
+    console.log('WEBKIT_RESTORE_MODULE_LOADED');
     const blob=new Blob([new Uint8Array(bytes)],{type:'application/octet-stream'});
+    console.log('WEBKIT_RESTORE_ARCHIVE_BYTES',blob.size);
     const preview=await previewFreeLibraryRestore(blob,db,{allowOtherOrigin:true});
+    console.log('WEBKIT_RESTORE_PREVIEW_COMPLETE',preview.storyCount,preview.mediaStoreEntries);
     if(!preview.safeToRestore)throw Error('Fresh WebKit restore denied');
-    return restoreFreeLibrary(blob,db,{allowOtherOrigin:true,confirmed:true});
+    const done=await restoreFreeLibrary(blob,db,{allowOtherOrigin:true,confirmed:true});
+    console.log('WEBKIT_RESTORE_COMMIT_COMPLETE',done.restoredStories,done.readbackPassed);
+    return done;
   },archived),22000);
   assert.equal(imported.restoredStories,1);
   assert.equal(imported.readbackPassed,true);

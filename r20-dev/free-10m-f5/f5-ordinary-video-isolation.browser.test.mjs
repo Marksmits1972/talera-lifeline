@@ -209,8 +209,17 @@ try{
     null,{timeout:10000});
   const audible=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[1]);
   assert.equal(audible.listeningEnabled,true,'Test must simulate the real menu setting ON');
-  assert.equal(audible.muted,false,'Setting ON must request the original audible soundtrack');
-  assert.equal(audible.defaultMuted,false,'Setting ON must clear default mute');
+  assert.equal(audible.muted,true,'Original picture must remain muted with shared sound enabled');
+  assert.equal(audible.defaultMuted,true,'Original picture must keep default mute');
+  const sharedStatus=await page.evaluate(()=>{
+    const a=window.__taleraF5SharedAudible?.get?.();
+    return {muted:a?.muted,playing:!!a&&!a.paused,
+      src:a?.currentSrc?.startsWith('blob:'),id:a?.id};
+  });
+  assert.equal(sharedStatus.id,'talera-f5-shared-audio');
+  assert.equal(sharedStatus.muted,false,'The persistent sound element must remain audible');
+  assert.equal(sharedStatus.playing,true,'Settings ON must play the source audio separately');
+  assert.equal(sharedStatus.src,true,'Shared audio must load original media bytes');
   assert.equal(audible.volume,1,'Original video soundtrack must retain its full playback volume');
   assert.equal(audible.samePlayer,true,'Same ordinary media element must be retained across video rotations');
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
@@ -231,12 +240,14 @@ try{
     window.__taleraAutoPlayAttempts=[];
     window.__taleraDenyNextAudible=true;
     HTMLMediaElement.prototype.play=function(...args){
-      if(this.classList?.contains('talera-v61-inline-video')){
+      if(this.classList?.contains('talera-v61-inline-video') ||
+         this.id==='talera-f5-shared-audio'){
+        const sound=this.id==='talera-f5-shared-audio';
         window.__taleraAutoPlayAttempts.push({
-          muted:this.muted,source:this.getAttribute('src'),
+          kind:sound?'audio':'picture',muted:this.muted,source:this.getAttribute('src'),
           frame:window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex
         });
-        if(!this.muted&&window.__taleraDenyNextAudible){
+        if(sound&&window.__taleraDenyNextAudible){
           window.__taleraDenyNextAudible=false;
           // Native metadata can complete while the first audible play promise
           // is still pending. Do NOT issue a second, overlapping audible play.
@@ -252,8 +263,8 @@ try{
   await page.waitForFunction(()=>{
     const v=document.querySelector('video.talera-v61-inline-video');
     return v?.muted===true&&!v.paused&&v.currentTime>.025&&
-      window.__taleraAutoPlayAttempts?.some(x=>!x.muted)&&
-      window.__taleraAutoPlayAttempts?.some(x=>x.muted);
+      window.__taleraAutoPlayAttempts?.some(x=>x.kind==='audio')&&
+      window.__taleraAutoPlayAttempts?.some(x=>x.kind==='picture');
   },null,{timeout:9000});
   assert.equal(await page.locator('button.talera-v61-audio-permission-hint').count(),0,
     'Ordinary presentation must not add a per-video Listen button');
@@ -266,7 +277,7 @@ try{
   assert.equal(await hint.getAttribute('role'),'status',
     'The hint must remain accessible without becoming a control');
   const deniedCalls=await page.evaluate(()=>window.__taleraAutoPlayAttempts
-    .filter(x=>!x.muted).length);
+    .filter(x=>x.kind==='audio').length);
   assert.equal(deniedCalls,1,
     'Safari metadata load must not trigger TWO overlapping audible play() attempts');
   // The user's real tap on the EXISTING story surface is the only recovery
@@ -287,7 +298,7 @@ try{
   await page.waitForFunction(()=>!document.querySelector('#talera-f5-ordinary-sound-hint'),
     null,{timeout:4500});
   await page.waitForFunction(before=>window.__taleraAutoPlayAttempts
-    ?.filter(x=>!x.muted).length>before,deniedCalls,{timeout:4500});
+    ?.filter(x=>x.kind==='audio').length>before,deniedCalls,{timeout:4500});
   const gestureRecovery=await page.evaluate(()=>({
     attempts:window.__taleraAutoPlayAttempts,
     narratorActive:!!document.querySelector('.talera-independent-narrator-layer'),
@@ -307,7 +318,7 @@ try{
     selectedBeforeUnlock.photoIndex,{timeout:4500});
   console.log('TALERA_ORDINARY_NATIVE_STAGE_TAP_AUDIO_RECOVERY_PASS',JSON.stringify({
     firstAudibleAttempts:deniedCalls,
-    audibleRetries:gestureRecovery.attempts.filter(x=>!x.muted).length,
+    audibleRetries:gestureRecovery.attempts.filter(x=>x.kind==='audio').length,
     noExtraControl:true,ordinaryEngineOnly:true,realIphoneAccepted:false
   }));
   // That blocked video ends; the SAME automatic photo cycle eventually
@@ -324,14 +335,14 @@ try{
   }));
   assert.equal(consecutive.next.samePlayer,true,'Retain the original single ordinary player');
   assert.equal(consecutive.next.listeningEnabled,true,'Settings ON remains the only sound preference');
-  assert.equal(consecutive.next.muted,false,
-    'The NEXT automatic video must freshly request sound after a denied previous clip');
-  assert.ok(consecutive.attempts.filter(x=>x.muted===false).length>=2,
+  assert.equal(consecutive.next.muted,true,
+    'The NEXT original video picture must remain muted while separate sound plays');
+  assert.ok(consecutive.attempts.filter(x=>x.kind==='audio').length>=2,
     'The Settings ON preference must trigger a new audible play() attempt on EACH video');
   console.log('TALERA_ORDINARY_SETTINGS_EACH_VIDEO_AUTOPLAY_PASS',JSON.stringify({
     firstAudibleDenied:true,silentFallback:true,
     nextVideoAutomaticallyAudible:true,
-    audibleAttempts:consecutive.attempts.filter(x=>!x.muted).length,
+    audibleAttempts:consecutive.attempts.filter(x=>x.kind==='audio').length,
     onePlayer:true,noListenButton:true
   }));
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
@@ -430,8 +441,8 @@ try{
   await page.waitForFunction(()=>document.querySelector('video.talera-v61-inline-video')?.currentSrc?.startsWith('blob:'),
     null,{timeout:10000});
   const sharedElementFeasibility=await page.evaluate(async()=>{
-    const video=document.querySelector('video.talera-v61-inline-video');
-    if(!video)throw Error('The original TALERA video element must exist');
+    const video=window.__taleraF5SharedAudible?.get?.();
+    if(!video)throw Error('The one persistent TALERA audio element must exist');
     const memory=window.__taleraTimelineRuntime.currentMemory();
     const original=await window.TaleraMemories.blob(memory._zeroFrames[2].key);
     if(!(original instanceof Blob))throw Error('Original video Blob missing');
@@ -456,7 +467,7 @@ try{
       await video.play();
       await new Promise(resolve=>setTimeout(resolve,140));
       return {tag:video.tagName,playing:!video.paused,time:video.currentTime,
-        sameNode:video===same,videoWidth:video.videoWidth};
+        sameNode:video===same,elementId:video.id};
     };
     try{
       const voice=await phase(speechUrl);
@@ -467,6 +478,7 @@ try{
       URL.revokeObjectURL(speechUrl);URL.revokeObjectURL(originalUrl);
     }
   });
+  assert.equal(sharedElementFeasibility.voice.elementId,'talera-f5-shared-audio');
   assert.ok(sharedElementFeasibility.voice.playing&&
     sharedElementFeasibility.voice.sameNode&&sharedElementFeasibility.voice.time>0,
     'Existing TALERA media element must play audio-only WAV without replacement');

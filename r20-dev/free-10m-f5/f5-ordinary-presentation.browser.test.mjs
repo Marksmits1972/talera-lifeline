@@ -1276,6 +1276,67 @@ try{
         JSON.stringify(bfCachePhoto));
     console.log('TALERA_FRESH_PWA_RESTORED_HOME_PHOTO_SURVIVES_BFCACHE_PASS',
       JSON.stringify({...bfCachePhoto,realIphoneAccepted:false}));
+    // Complete the owner's ACTUAL path after backup: tap the existing Home hero,
+    // open the real /present screen, then browser Back to the SAME Home.
+    // A decoded image or synthetic pageshow alone did not prove this transition.
+    const homeBeforeOpen=await importedPage.evaluate(()=>{
+      const hero=document.getElementById('heroImage');
+      const href=document.getElementById('heroCaption')?.dataset.presentHref;
+      return {href,storyId:href?new URL(href,location.href).searchParams.get('memory'):null,
+        photo:hero?.src,visible:!!hero?.naturalWidth};
+    });
+    assert.ok(homeBeforeOpen.storyId&&homeBeforeOpen.visible&&
+      homeBeforeOpen.photo?.startsWith('blob:'),
+      'Restored original Home must have an actual tappable hero photo: '+
+      JSON.stringify(homeBeforeOpen));
+    await importedPage.locator('.hero').click({timeout:12000});
+    await importedPage.waitForURL(/\\/present\\?memory=/,{timeout:18000});
+    await importedPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return m?.storyId===id&&!m._photoLoading&&
+        m.photos?.[0]?.startsWith('blob:')&&
+        [...document.querySelectorAll('#photoStage img')].some(img=>
+          img.src===m.photos[0]&&img.complete&&img.naturalWidth>0&&
+          getComputedStyle(img).visibility!=='hidden'&&
+          getComputedStyle(img).display!=='none');
+    },homeBeforeOpen.storyId,{timeout:25000});
+    const expected=await importedPage.evaluate(async()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      const source=new Image();source.src=m.photos[0];await source.decode();
+      const canvas=document.createElement('canvas');canvas.width=40;canvas.height=40;
+      const cx=canvas.getContext('2d',{willReadFrequently:true});
+      cx.drawImage(source,0,0,40,40);
+      return [...cx.getImageData(20,14,1,1).data].slice(0,3);
+    });
+    const pixels=await centerPixel(importedPage);
+    assert.ok(nearColor(pixels,expected),
+      'Real Home tap opened BLANK/WRONG photo, despite available original media: '+
+      JSON.stringify({homeBeforeOpen,expected,pixels}));
+    const originalPresent=await importedPage.evaluate(async id=>{
+      const row=await window.TaleraMemories.get(id);
+      const first=(row?.items||[]).find(item=>item.kind==='photo'||item.kind==='video');
+      return {id:row?.id,firstKey:first?.key,
+        originalBytes:first?((await window.TaleraMemories.blob(first.key))?.size||0):0};
+    },homeBeforeOpen.storyId);
+    assert.ok(originalPresent.originalBytes>120,
+      'Original media ID must remain readable during actual Home to Present navigation');
+    await importedPage.goBack({waitUntil:'domcontentloaded',timeout:20000});
+    await importedPage.waitForURL(/\\/mijn-leven(?:\\?|$)/,{timeout:12000});
+    await importedPage.waitForFunction(()=>document.getElementById('heroImage')?.naturalWidth>0,
+      null,{timeout:18000});
+    const back=await importedPage.evaluate(async()=>{
+      const img=document.getElementById('heroImage');
+      return {urlIsBlob:img.src.startsWith('blob:'),
+        imageWidth:img.naturalWidth,
+        urlAlive:await fetch(img.src).then(res=>res.ok).catch(()=>false)};
+    });
+    assert.ok(back.urlIsBlob&&back.urlAlive&&back.imageWidth>0,
+      'Real Back from presentation erased restored Home photo: '+JSON.stringify(back));
+    console.log('TALERA_REAL_RESTORED_HOME_TAP_PRESENT_BACK_PIXELS_PASS',
+      JSON.stringify({idMatched:true,realHomeClick:true,
+        firstOriginalBytes:originalPresent.originalBytes,
+        presentedPixelMatch:true,backImageWidth:back.imageWidth,
+        originalMediaUnchanged:true,realIphoneAccepted:false}));
   }finally{await restoredContext.close()}
   await load(page,videoFirst.id,2);
   try{

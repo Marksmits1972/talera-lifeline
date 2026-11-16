@@ -109,7 +109,7 @@ try{
  await a.waitForFunction(()=>document.getElementById('saved-check-status')
    .textContent.includes('exact gelijk'));
  assert.match(await a.locator('#saved-check-status').innerText(),
-   /3 verwijzingen en 3 binaire bestanden/);
+   /3 verwijzingen en 4 binaire bestanden/);
  // One changed byte must NEVER receive the "exact gelijk" confirmation.
  const damagedCopy=Buffer.from(fileBytes);
  damagedCopy[damagedCopy.length-1]^=255;
@@ -122,6 +122,28 @@ try{
  assert.doesNotMatch(await a.locator('#saved-check-status').innerText(),/exact gelijk/);
  // A legitimate original must still be available after a rejected copy.
  assert.equal(await a.getByRole('button',{name:'Back-up maken'}).isEnabled(),true);
+ // Fail-closed: never offer a 'successful' backup from a library whose
+ // story references a photo ID whose original binary is actually missing.
+ await a.evaluate(async db=>{
+  const req=indexedDB.open(db,1);
+  const conn=await new Promise((ok,bad)=>{
+   req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error);
+  });
+  const tx=conn.transaction('stories','readwrite');
+  const store=tx.objectStore('stories');
+  const get=store.get('local-old-1950-01-01-synthetic-record');
+  const story=await new Promise((ok,bad)=>{get.onsuccess=()=>ok(get.result);get.onerror=()=>bad(get.error)});
+  story.items.push({key:'local-missing-photo-synthetic-id',kind:'photo'});
+  store.put(story);
+  await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
+  conn.close();
+ },dbA);
+ await a.getByRole('button',{name:'Back-up maken'}).click();
+ await a.waitForFunction(()=>document.getElementById('export-status')
+  .textContent.includes('Back-up niet gemaakt'));
+ assert.equal(await a.locator('#save-backup').isHidden(),true,
+  'Incomplete media-ID library must never expose a download');
+ assert.match(await a.locator('#export-status').innerText(),/media-ID/);
  await b.locator('#restore-file').setInputFiles({name:'mijn-talera.talera',
   mimeType:'application/octet-stream',buffer:fileBytes});
  await b.locator('#preview-restore').click();
@@ -180,7 +202,8 @@ try{
  assert.deepEqual(errors,[],'No browser errors allowed');
  console.log('TALERA_FREE_F5_BACKUP_UI_TWO_ORIGINS_PASS',JSON.stringify({
   voluntarySaveDownload:true,savedFileOriginalByteVerification:true,
-  corruptedSavedFileRejected:true,twoIsolatedBrowserOrigins:true,permissionRequired:true,
+  corruptedSavedFileRejected:true,missingSourceMediaBlocksDownload:true,
+  twoIsolatedBrowserOrigins:true,permissionRequired:true,
   consentRequiredBeforeWrite:true,recordIdsIntact:true,voiceCuesIntact:true,
   originalMovBytesIntact:true,preexistingStoriesPreserved:true,duplicateRestoresRejected:true,
   corruptedArchiveRejected:true,networkUploads:posts,realIPhoneValidated:false,

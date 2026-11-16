@@ -2,7 +2,7 @@ name: TALERA Free F5 - isolated single-origin integration tests
 
 on:
   push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112, feature/free-f5-narrator-story-swipe-20261113]
+    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112, feature/free-f5-narrator-story-swipe-20261113, feature/free-f5-backup-export-isolated-20261116]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
@@ -39,7 +39,24 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-independent-narrator.test.mjs
       - name: Verify source-exact 11 November backup-only connection
         run: |
-          if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
+          if [ "$GITHUB_REF_NAME" = feature/free-f5-backup-export-isolated-20261116 ]; then
+            # Candidate must be precisely the owner's approved 16-Nov code,
+            # plus exactly the six exported-backup and verification files.
+            BASE=10021f4e5dda4d11256b7e991f3f1bd01e9baf30
+            git merge-base --is-ancestor "$BASE" HEAD
+            git diff --name-only "$BASE" HEAD | while IFS= read -r file; do
+              case "$file" in
+                .github/workflows/talera-free-f5-integration.yml|r20-dev/free-10m-f5/f5-portable-archive.mjs|r20-dev/free-10m-f5/f5-portable-idb.mjs|r20-dev/free-10m-f5/f5-backup-controller.mjs|r20-dev/free-10m-f5/f5-local-backup-page.mjs|r20-dev/free-10m-f5/f5-portable-archive.test.mjs|r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs) ;;
+                *) echo "PROTECTED_APPROVED_SOURCE_CHANGED: $file"; exit 1 ;;
+              esac
+            done
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-archive.mjs)" = "2d9f6071e64adf2cfee7565b3712aadb6d2004e0"
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-idb.mjs)" = "c3299aac47b73c5cc9d0d66a700e28dab8ecd617"
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "921d3a43b7a60208ec563823bfcb42ac1c6c01cd"
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "638a88f76f06ee270a0f1a66d6ab93a465dfeb4e"
+            node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+            node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+          elif [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
             # The approved backup UI wording is immutable; media/storage codecs remain source-exact.

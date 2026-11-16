@@ -36,6 +36,9 @@ function taleraIndependentNarrationPlan(memory){
 }
 function taleraCreateIndependentNarrator({stage,store,runtime}){
   let active=null,generation=0;
+  // The sole audible output is shared with ordinary videos, NEVER the motors.
+  const sharedAudible=window.__taleraF5SharedAudible;
+  if(!sharedAudible)throw Error('TALERA enkele geluidsvoorziening ontbreekt');
   // TALERA narrator has its OWN audible playback policy. Reading the
   // presenter's global listening switch can silently mute BOTH the original
   // voice and the original video, and violates the 100%-independent motor.
@@ -81,25 +84,31 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     runtime.currentMemory()?.id===s.id;
   function clearButton(s){
     if(s.button){s.button.remove();s.button=null}
+    s.retry=null;
   }
   function offerPlay(s,media){
-    if(!isCurrent(s)||s.swipeSuspended||s.button)return;
-    const button=document.createElement('button');
-    button.type='button';button.textContent='▶ Beluister';
-    button.className='talera-v61-audio-permission-hint';
-    button.style.cssText='position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:65;padding:9px 15px;border-radius:15px;background:rgba(250,250,247,.94);color:#173d52;font:650 13px system-ui;pointer-events:auto;cursor:pointer';
-    button.onclick=event=>{
-      event.preventDefault();event.stopPropagation();
-      if(!isCurrent(s))return;
-      prepareNativePlayback(s);
-      setAudible(media);
-      // A currently playing, silent track needs a real iPhone audio gesture.
-      if(!media.paused){clearButton(s);return}
-      Promise.resolve(media.play()).then(()=>clearButton(s))
-        .catch(error=>{if(error?.name!=='NotAllowedError')
-          console.warn('TALERA vertelgeluid kan niet starten',error)});
+    if(!isCurrent(s)||s.swipeSuspended)return;
+    // Only a REAL iOS NotAllowedError shows this non-interactive reminder.
+    // The real tap is captured on the EXISTING presentation surface below.
+    if(!s.button){
+      const hint=document.createElement('div');
+      hint.id='talera-f5-narrator-sound-hint';
+      hint.textContent='Tik één keer voor geluid';
+      hint.setAttribute('role','status');
+      hint.style.cssText='position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);transform:translateX(-50%);z-index:40;padding:9px 15px;border-radius:20px;background:rgba(7,26,61,.80);color:white;font:500 14px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;max-width:calc(100vw - 32px);pointer-events:none;-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)';
+      document.body.appendChild(hint);s.button=hint;
+    }
+    s.retry=()=>{
+      if(!isCurrent(s)||s.swipeSuspended||!sharedAudible.isOwner(s))return;
+      prepareNativePlayback(s);setAudible(media);
+      // A user gesture must invoke play() right here: no awaits or timers.
+      Promise.resolve(media.play()).then(()=>clearButton(s)).catch(error=>{
+        if(!isCurrent(s))return;
+        if(error?.name==='NotAllowedError')offerPlay(s,media);
+        else if(error?.name!=='AbortError')
+          console.warn('TALERA vertelgeluid kan niet starten',error);
+      });
     };
-    s.host.appendChild(button);s.button=button;
   }
   function attemptPlay(s,media){
     if(!isCurrent(s)||!media||s.swipeSuspended)return;
@@ -179,11 +188,13 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       s.audio.onplay=s.audio.onpause=s.audio.onended=null;
       s.audio.ontimeupdate=s.audio.onseeking=s.audio.onseeked=null;
       s.audio.onplaying=null;
-      try{s.audio.pause();s.audio.removeAttribute('src');s.audio.load()}catch(error){}
-      s.audio.remove();
+      sharedAudible.release(s);
+      // Reparent the SAME existing node, never detach/destroy it.
+      if(s.audio.parentElement!==document.body)document.body.appendChild(s.audio);
     }
     if(s.voiceUrl)URL.revokeObjectURL(s.voiceUrl);
     removeVideo(s);clearButton(s);
+    if(s.tapTarget&&s.onSoundTap)s.tapTarget.removeEventListener('click',s.onSoundTap,true);
     for(const url of s.createdUrls)URL.revokeObjectURL(url);
     restoreNativePlayback(s);
     s.layer.remove();
@@ -335,8 +346,14 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     const url=await urlFor(s,frame,true);
     if(!current()||!url)return;
     s.videoUrl=url;video.src=url;video.load();
-    // Sound is decoded directly from the untouched ORIGINAL video media file.
-    soundtrack.src=url;setAudible(soundtrack);soundtrack.load();
+    // The SAME shared sound node plays original video soundtrack after voice.
+    sharedAudible.claim(s,url);setAudible(soundtrack);
+    // claim() resets old event handlers, so install original-video handlers after it.
+    soundtrack.onplay=syncPicture;
+    soundtrack.onpause=null;
+    soundtrack.ontimeupdate=syncPicture;
+    soundtrack.onplaying=syncPicture;
+    soundtrack.onended=finished;
     // On supported iOS versions this continues automatically after voice.
     // Preserve the fallback if an iOS version still demands another gesture.
     attemptPlay(s,soundtrack);
@@ -398,12 +415,20 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
       swipePointer:null,swipeSuspended:false,swipeWasPlaying:false,
-      visibilityChange:null};
+      visibilityChange:null,tapTarget:null,onSoundTap:null,retry:null};
     s.visibilityChange=()=>{if(!isCurrent(s))return;
       if(document.hidden){s.audio?.pause();s.video?.pause()}};
     document.addEventListener('visibilitychange',s.visibilityChange);
     active=s;
     bindSwipeSuspension(s);
+    s.tapTarget=document.getElementById('memoryStoryScroll');
+    s.onSoundTap=event=>{
+      if(!isCurrent(s)||!s.retry||s.swipeSuspended||
+         event.target?.closest?.('a,button,[role=button],input,select,textarea'))return;
+      event.preventDefault();event.stopImmediatePropagation();
+      s.retry();
+    };
+    s.tapTarget?.addEventListener('click',s.onSoundTap,{capture:true});
     document.body.classList.add('talera-v61-narration-visual');
     const blob=await store.blob(voice.key);
     if(!isCurrent(s))return;
@@ -413,10 +438,9 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       if(plan.frames.length)displayPhoto(s,plan.frames[0]);
       return;
     }
-    const audio=document.createElement('audio');
-    audio.preload='auto';audio.playsInline=true;audio.style.display='none';
+    s.voiceUrl=URL.createObjectURL(blob);
+    const audio=sharedAudible.claim(s,s.voiceUrl);
     layer.appendChild(audio);s.audio=audio;
-    s.voiceUrl=URL.createObjectURL(blob);audio.src=s.voiceUrl;
     prepareNativePlayback(s);
     setAudible(audio);
     s.phase='voice';

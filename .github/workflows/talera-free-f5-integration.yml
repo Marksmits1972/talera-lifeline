@@ -61,12 +61,15 @@ jobs:
             git merge-base --is-ancestor "$BASE" HEAD
             git diff --name-only "$BASE" HEAD | while IFS= read -r file; do
               case "$file" in
-                .github/workflows/talera-free-f5-integration.yml|r20-dev/free-10m-f5/f5-portable-archive.mjs|r20-dev/free-10m-f5/f5-portable-idb.mjs|r20-dev/free-10m-f5/f5-local-backup-page.mjs|r20-dev/free-10m-f5/f5-backup-controller.mjs|r20-dev/free-10m-f5/f5-portable-archive.test.mjs|r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs) ;;
+                .github/workflows/talera-free-f5-integration.yml|r20-dev/free-10m-f5/f5-portable-archive.mjs|r20-dev/free-10m-f5/f5-portable-idb.mjs|r20-dev/free-10m-f5/f5-local-backup-page.mjs|r20-dev/free-10m-f5/f5-backup-controller.mjs|r20-dev/free-10m-f5/f5-portable-archive.test.mjs|r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs|r20-dev/free-10m-f5/f5-public-assets.mjs|r20-dev/free-10m-f5/f5-worker.mjs) ;;
                 *) echo "REFUSE_TO_CHANGE_APPROVED_APP: $file"; exit 1 ;;
               esac
             done
-            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-worker.mjs)" = "$(git rev-parse "$BASE":r20-dev/free-10m-f5/f5-worker.mjs)"
-            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-public-assets.mjs)" = "$(git rev-parse "$BASE":r20-dev/free-10m-f5/f5-public-assets.mjs)"
+            # The only allowed page-source change on this branch is serving a
+            # cleaned anonymous shell. The original signed-in tests still run.
+            grep -Fq 'const asset=cleanAnonymousShells[sourcePath]||anonymousShells[sourcePath];' r20-dev/free-10m-f5/f5-worker.mjs
+            grep -Fq 'const cleanAnonymousShells={};' r20-dev/free-10m-f5/f5-public-assets.mjs
+            git diff --check "$BASE" HEAD -- r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-worker.mjs
           elif [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs

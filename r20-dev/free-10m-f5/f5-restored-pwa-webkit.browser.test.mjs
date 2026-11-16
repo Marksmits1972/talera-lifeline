@@ -9,6 +9,8 @@ import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const origin='http://127.0.0.1:8837',gate='1'.repeat(64);
+const bounded=(name,op,ms=18000)=>Promise.race([op,
+  new Promise((_,reject)=>setTimeout(()=>reject(Error('WEBKIT_STAGE_TIMEOUT_'+name)),ms))]);
 let worker=null,browser=null,sourceBrowser=null,log='';
 async function stop(){
   if(browser)await browser.close().catch(()=>{});
@@ -67,7 +69,8 @@ try{
   assert.equal((await a.goto(origin+'/mijn-leven')).status(),200);
   await a.waitForFunction(()=>typeof window.TaleraMemories?.save==='function',
     null,{timeout:18000});
-  const story=await a.evaluate(async()=>{
+  console.log('TALERA_WEBKIT_STAGE_SOURCE_SAVE');
+  const story=await bounded('source-save',a.evaluate(async()=>{
     const canvas=document.createElement('canvas');
     canvas.width=canvas.height=160;
     const cx=canvas.getContext('2d');
@@ -77,22 +80,24 @@ try{
       date:'2026-11-11',time:'11:11:11',text:'Restored original image'},
       [new File([blob],'webkit-original.png',{type:'image/png'})]);
     return {id:row.id,bytes:blob.size};
-  });
+  }),18000);
   assert.ok(story.bytes>150);
   await a.goto(origin+'/__f5/backup');
-  const archived=await a.evaluate(async()=>{
+  console.log('TALERA_WEBKIT_STAGE_SOURCE_ARCHIVE');
+  const archived=await bounded('source-archive',a.evaluate(async()=>{
     const db=document.getElementById('talera-free-backup')?.dataset.database;
     const {exportExistingFreeLibrary}=await import('/__f5/f5-portable-idb.mjs');
     const file=await exportExistingFreeLibrary(db);
     const bytes=new Uint8Array(await file.arrayBuffer());
     return Array.from(bytes);
-  });
+  }),18000);
   assert.ok(archived.length>600);
   await b.goto(origin+'/mijn-leven');
   await b.waitForFunction(()=>!!window.TaleraMemories?.list,
     null,{timeout:18000});
   await b.goto(origin+'/__f5/backup');
-  const imported=await b.evaluate(async bytes=>{
+  console.log('TALERA_WEBKIT_STAGE_TARGET_RESTORE');
+  const imported=await bounded('target-restore',b.evaluate(async bytes=>{
     const db=document.getElementById('talera-free-backup')?.dataset.database;
     const {previewFreeLibraryRestore,restoreFreeLibrary}=
       await import('/__f5/f5-portable-idb.mjs');
@@ -100,9 +105,10 @@ try{
     const preview=await previewFreeLibraryRestore(blob,db,{allowOtherOrigin:true});
     if(!preview.safeToRestore)throw Error('Fresh WebKit restore denied');
     return restoreFreeLibrary(blob,db,{allowOtherOrigin:true,confirmed:true});
-  },archived);
+  },archived),22000);
   assert.equal(imported.restoredStories,1);
   assert.equal(imported.readbackPassed,true);
+  console.log('TALERA_WEBKIT_STAGE_HOME_RENDER');
   await b.goto(origin+'/mijn-leven');
   await b.waitForFunction(()=>document.getElementById('heroImage')?.src.startsWith('blob:')&&
     document.getElementById('heroImage').naturalWidth>0,
@@ -113,6 +119,7 @@ try{
       document.getElementById('heroCaption')?.dataset.presentHref||null};
   });
   assert.ok(home.href?.includes(story.id),'Owner hero must link to restored record: '+JSON.stringify(home));
+  console.log('TALERA_WEBKIT_STAGE_PRESENT_CLICK');
   await b.locator('.hero').click();
   await b.waitForURL(/\/present/,{timeout:18000});
   await b.waitForFunction(id=>{

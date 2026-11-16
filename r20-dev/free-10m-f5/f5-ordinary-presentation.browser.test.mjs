@@ -578,6 +578,12 @@ try{
   assert.equal(narrated.cues.length,4);
   assert.equal(new Set(narrated.keys).size,4);
   await load(page,narrated.id,4);
+  await page.evaluate(()=>{
+    const shared=window.__taleraF5SharedAudible?.get?.();
+    if(!shared||shared.id!=='talera-f5-shared-audio')
+      throw Error('Shared audio element missing for narrated memory');
+    window.__taleraAudioNodeBeforeNarrationSwipe=shared;
+  });
   await page.locator('.talera-independent-narrator-layer audio')
     .waitFor({state:'attached',timeout:15000});
   await page.waitForFunction(()=>{
@@ -839,12 +845,19 @@ try{
       ?._zeroItems?.some(x=>x.kind==='audio'),
     narratorLayers:document.querySelectorAll('.talera-independent-narrator-layer').length,
     danglingListen:document.querySelectorAll('button.talera-v61-audio-permission-hint').length,
-    settingsEnabled:window.__taleraAudioControls?.isEnabled?.()
+    settingsEnabled:window.__taleraAudioControls?.isEnabled?.(),
+    audioPreserved:window.__taleraF5SharedAudible.get()===
+      window.__taleraAudioNodeBeforeNarrationSwipe,
+    soundNodeCount:document.querySelectorAll('#talera-f5-shared-audio').length
   }));
   assert.equal(afterNarratedSwipe.memoryHasVoice,false,
     'Ordinary memory must select ordinary motor after swipe');
   assert.equal(afterNarratedSwipe.narratorLayers,0,
     'Recorded-voice motor must be entirely stopped on ordinary-memory transition');
+  assert.equal(afterNarratedSwipe.audioPreserved,true,
+    'Narrator-to-ordinary swipe must keep the SAME audio element');
+  assert.equal(afterNarratedSwipe.soundNodeCount,1,
+    'There must be exactly one persistent sound element on the presentation page');
   assert.equal(afterNarratedSwipe.danglingListen,0,
     'A narrator Listen button must never remain on an ordinary memory');
   console.log('TALERA_SWIPE_ENGINE_AUDIO_ISOLATION_PASS',JSON.stringify(afterNarratedSwipe));
@@ -867,6 +880,9 @@ try{
   await page.locator('.talera-independent-narrator-layer audio')
     .waitFor({state:'attached',timeout:13000});
   assert.equal(await page.locator('.talera-independent-narrator-layer').count(),1);
+  assert.equal(await page.evaluate(()=>window.__taleraF5SharedAudible.get()===
+    window.__taleraAudioNodeBeforeNarrationSwipe),true,
+    'Ordinary-to-narrator swipe must reuse the SAME audio element');
   console.log('TALERA_NARRATOR_EXISTING_WHEEL_SWIPE_BOTH_DIRECTIONS_PASS',
     JSON.stringify({wheelVisibleOnMovement:true,
       videoSuspendedOnHorizontalGesture:true,videoUnchangedAtTouch:true,
@@ -897,10 +913,11 @@ try{
     };
   });
   await load(page,narrated.id,4);
-  const voiceButton=page.locator('button.talera-v61-audio-permission-hint')
-    .filter({hasText:'Beluister'});
-  await voiceButton.waitFor({state:'visible',timeout:10000});
-  await voiceButton.click({timeout:6000});
+  const voiceHint=page.locator('#talera-f5-narrator-sound-hint');
+  await voiceHint.waitFor({state:'visible',timeout:10000});
+  assert.equal(await voiceHint.textContent(),'Tik één keer voor geluid');
+  assert.equal(await voiceHint.evaluate(e=>getComputedStyle(e).pointerEvents),'none');
+  await page.locator('#memoryStoryScroll').tap({timeout:6000});
   await page.waitForFunction(()=>{
     const a=document.querySelector('.talera-independent-narrator-layer audio');
     return a&&!a.paused&&!a.muted&&a.currentTime>.15;
@@ -917,8 +934,8 @@ try{
     return v&&a&&v.currentSrc===a.currentSrc&&!a.muted&&
       !a.paused&&a.currentTime>.04;
   },null,{timeout:12000});
-  assert.equal(await voiceButton.count(),0,
-    'The original video soundtrack must not request a second Listen tap');
+  assert.equal(await voiceHint.count(),0,
+    'The original video soundtrack must not request a second sound-activation hint');
   const finalSound=await page.evaluate(()=>{
     const layer=document.querySelector('.talera-independent-narrator-layer');
     const v=layer.querySelector('video.talera-independent-original-video');

@@ -2,13 +2,16 @@
 // archives and original media never leave local IndexedDB or reach a server.
 // This module runs only on the separately authenticated /__f5/backup route.
 import {
- exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary
+ exportExistingFreeLibrary,verifySavedFreeLibraryArchive,
+ previewFreeLibraryRestore,restoreFreeLibrary
 } from '/__f5/f5-portable-idb.mjs';
 const el=id=>document.getElementById(id);
 const root=el('talera-free-backup'),db=root?.dataset.database;
 if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(db||''))
  throw Error('TALERA_BACKUP_MISSING_VERIFIED_SCOPE');
 const make=el('make-backup'),save=el('save-backup'),exportStatus=el('export-status');
+const savedChooser=el('verify-saved-file'),checkSaved=el('verify-saved-backup'),
+ savedStatus=el('saved-check-status');
 const chooser=el('restore-file'),cross=el('other-origin'),preview=el('preview-restore');
 const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore-status');
 let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
@@ -19,8 +22,10 @@ const failText=e=>{
   return 'Je account is gewijzigd. Open Back-ups opnieuw.';
  if(/EXPLICIT_CONSENT|DIFFERENT_ORIGIN/.test(raw))
   return 'Vink eerst aan dat de back-up uit een andere TALERA-versie mag komen.';
+ if(/MISSING_STORY_MEDIA|EMPTY_STORY_MEDIA|SOURCE_|SAVED_COPY_SCOPE/.test(raw))
+  return 'Back-upcontrole mislukt: gegevens, media-ID’s of originele bestanden komen niet exact overeen.';
  if(/CHECKSUM|INVALID_MANIFEST|INVALID_ORIGIN|ARCHIVE_/.test(raw))
-  return 'Bestand beschadigd of ongeldig. Kies een ander back-upbestand.';
+  return 'Bestand beschadigd, onvolledig of ongeldig. Kies een ander back-upbestand.';
  if(/DATABASE_NOT_FOUND|NO_INDEXEDDB|NO_STORIES_FOUND/.test(raw))
   return 'Geen lokale herinneringen gevonden. Open eerst Mijn leven.';
  if(/EXISTING_CONTENT|DUPLICATE/.test(raw))
@@ -54,6 +59,23 @@ cross.addEventListener('change',invalidate);
 confirm.addEventListener('change',()=>{
  restore.disabled=!(review?.safeToRestore&&confirm.checked&&reviewFile===chooser.files?.[0]&&reviewCross===cross.checked);
 });
+savedChooser.addEventListener('change',()=>message(savedStatus,''));
+checkSaved.addEventListener('click',async()=>{
+ const file=savedChooser.files?.[0];
+ if(!file){message(savedStatus,'Kies eerst het bewaarde back-upbestand.');return}
+ checkSaved.disabled=true;
+ message(savedStatus,'Bewaard bestand wordt vergeleken met de lokale bibliotheek…');
+ try{
+  await assertCurrentAccount();
+  const result=await verifySavedFreeLibraryArchive(file,db);
+  message(savedStatus,'Bewaard bestand volledig gecontroleerd: '+
+   result.storyCount+' herinnering(en), '+
+   result.mediaStoreEntries+' media-/opslagrecords, '+
+   result.selectedMediaReferences+' verwijzingen en '+
+   result.verifiedBinaryCount+' binaire bestanden. Alle gegevens en originele bytes zijn exact gelijk.');
+ }catch(e){message(savedStatus,'Bewaard bestand NIET goedgekeurd: '+failText(e))}
+ finally{checkSaved.disabled=false}
+});
 make.addEventListener('click',async()=>{
  make.disabled=true;
  if(downloadUrl){URL.revokeObjectURL(downloadUrl);downloadUrl=null}
@@ -66,8 +88,9 @@ make.addEventListener('click',async()=>{
   save.href=downloadUrl;
   save.download='talera-free-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.talera';
   save.hidden=false;
-  message(exportStatus,'Back-up klaar ('+(archive.size/1048576).toFixed(1)+
-   ' MB). Tik op "Bewaar bestand" en controleer de download in Bestanden.');
+  message(exportStatus,'Back-up klaar, intern volledig gecontroleerd ('+
+   (archive.size/1048576).toFixed(1)+
+   ' MB). Tik op "Bewaar bestand", kies daarna de opgeslagen kopie hierboven en controleer deze.');
  }catch(e){message(exportStatus,'Back-up niet gemaakt: '+failText(e))}
  finally{make.disabled=false}
 });
@@ -106,5 +129,6 @@ restore.addEventListener('click',async()=>{
 });
 window.addEventListener('pagehide',()=>{if(downloadUrl)URL.revokeObjectURL(downloadUrl)});
 make.disabled=false;
+checkSaved.disabled=false;
 preview.disabled=false;
 root.dataset.ready='yes';

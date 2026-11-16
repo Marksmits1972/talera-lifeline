@@ -1085,16 +1085,22 @@ for(const [route,filename] of Object.entries(routes)){
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;
 }
-// Only the signed-out shell still contained the original public demonstration
-// records. Apply the ALREADY-APPROVED example removal to that same source,
-// without modifying signed-in pages, session storage, IDs, or any media.
+// The guest first-open view MUST reuse the exact existing approved,
+// already fully transformed Free view. Previously the guest route rebuilt
+// only the zero-example change from the OLD pre-audio public sample: it
+// unintentionally restored legacy narration UI such as "Beluister".
+// Use the same source for both routes; NEVER rebuild a second presentation.
 const cleanAnonymousShells={};
 mkdirSync(path.join(publicDir,'__talera_free','f5anonymous'),{recursive:true});
 for(const route of ['/mijn-leven','/present']){
- const original=readFileSync(path.join(delivery,'generated','reference-'+routes[route]+'.html'),'utf8');
- const clean=route==='/mijn-leven'
-   ?removeAllBuiltInHomeExamples(showOwnedStoriesOnly(original))
-   :removeBuiltInPresentationExamples(original);
+ const approvedReference=refs[route];
+ assert.ok(approvedReference,'F5_MISSING_APPROVED_REFERENCE '+route);
+ const clean=readFileSync(path.join(publicDir,approvedReference.slice(1)),'utf8');
+ if(route==='/present'){
+   assert.ok(clean.includes("talera-f5-shared-audio")&&
+     clean.includes('taleraCreateIndependentNarrator'),
+     'F5_ANONYMOUS_PRESENT_MUST_REUSE_APPROVED_SHARED_AUDIO_ENGINE');
+ }
  assert.ok(clean.includes(route==='/mijn-leven'
      ?'window.__taleraReferenceMemories=[];':'const MEMORIES = [];'),
    'F5_CLEAN_ANONYMOUS_EMPTY_LIST_MISSING '+route);

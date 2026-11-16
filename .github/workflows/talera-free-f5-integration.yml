@@ -141,6 +141,11 @@ jobs:
             assert.ok(html.includes(route==='/mijn-leven'
               ?'window.__taleraReferenceMemories=[];':'const MEMORIES = [];'),
               'UNAPPROVED_ANONYMOUS_EXAMPLE_ARRAY_PRESENT '+route);
+            if(route==='/present'){
+              assert.ok(html.includes('talera-f5-shared-audio')&&
+                html.includes('taleraCreateIndependentNarrator'),
+                'UNAPPROVED_OLD_AUDIO_PRESENTATION_WAS_REUSED_IN_GUEST_VIEW');
+            }
           }
           console.log('TALERA_CLEAN_ANONYMOUS_FIRST_OPEN_CONFIRMED');
           NODE
@@ -739,6 +744,10 @@ jobs:
             assert.ok(html.includes(emptyMarker),'Clean original-memory array missing '+path);
             assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/.test(html),
               'Old example memories still published at '+path);
+            if(path==='/present')
+              assert.ok(html.includes('talera-f5-shared-audio')&&
+                html.includes('taleraCreateIndependentNarrator'),
+                'Deployed guest view lacks owner-approved continuous audio engine');
           }
           const official='https://talera-free-f5-storage-qa-20261109.mark-a39.workers.dev/mijn-leven';
           const protectedResponse=await fetch(official,{redirect:'manual',signal:AbortSignal.timeout(15000)});

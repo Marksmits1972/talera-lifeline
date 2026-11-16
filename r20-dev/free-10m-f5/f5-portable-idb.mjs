@@ -68,6 +68,9 @@ export async function verifySavedFreeLibraryArchive(archive,databaseName){
   const {stories,files}=await readAll(db);
   if(!stories.length)throw Error('TALERA_RESTORE_NO_STORIES_FOUND');
   const result=await verifyFreeArchiveSnapshot(archive,stories,files);
+  if(result.sourceScope!==databaseName||
+     result.sourceOrigin!==(typeof location==='object'?location.origin:null))
+   throw Error('TALERA_ARCHIVE_SAVED_COPY_SCOPE_MISMATCH');
   return {...result,savedCopyMatchesCurrentLibrary:true,
    fileVerifiedWithoutRestore:true};
  }finally{db.close()}

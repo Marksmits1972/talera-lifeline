@@ -128,13 +128,21 @@ const sharedAudible={
  },
  isOwner(owner){return owner===sharedOwner},get(){return permanentAudio}
 };
-const tapHandlers=new Set();
+const tapHandlers=new Map([['click',new Set()],['touchstart',new Set()],['touchend',new Set()]]);
 const tapSurface={
- addEventListener(type,fn){assert.equal(type,'click');tapHandlers.add(fn)},
- removeEventListener(type,fn){assert.equal(type,'click');tapHandlers.delete(fn)},
- tap(){for(const fn of [...tapHandlers])fn({
-   target:{closest(){return null}},preventDefault(){},stopImmediatePropagation(){}
- })}
+ addEventListener(type,fn){assert.ok(tapHandlers.has(type));tapHandlers.get(type).add(fn)},
+ removeEventListener(type,fn){tapHandlers.get(type)?.delete(fn)},
+ tap(){
+   const target={closest(){return null}};
+   const finger={identifier:7,clientX:140,clientY:210};
+   for(const fn of [...tapHandlers.get('touchstart')])fn({
+     target,touches:[finger],changedTouches:[finger]
+   });
+   for(const fn of [...tapHandlers.get('touchend')])fn({
+     target,touches:[],changedTouches:[finger],cancelable:true,
+     preventDefault(){},stopImmediatePropagation(){}
+   });
+ }
 };
 stage.parentElement=host;
 let current=memory.id;
@@ -308,7 +316,8 @@ assert.equal(blockedAudio.muted,false);
 assert.equal(permission.removed,true);
 motor.stop();
 assert.equal(ctx.navigator.audioSession.type,'ambient');
-assert.equal(tapHandlers.size,0,'Narrator sound tap handler must not leak into ordinary presentation');
+assert.equal([...tapHandlers.values()].every(set=>set.size===0),true,
+  'Narrator touch/click handlers must not leak into ordinary presentation');
 assert.equal(made.filter(x=>x.tag==='audio').length,1,
   'One persistent audio node must survive all voice/video transitions');
 

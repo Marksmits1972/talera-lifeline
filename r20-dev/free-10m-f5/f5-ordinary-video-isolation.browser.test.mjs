@@ -429,18 +429,10 @@ try{
   console.log('TALERA_ORDINARY_RETURN_TO_HOME_WITH_ACTIVE_VIDEO_PASS',
     JSON.stringify({url:page.url(),noExtraBackControls:true}));
 
-  // A separate source-changing technical feasibility probe already succeeded
-  // before integration. Never overwrite an ACTIVE application's audio src
-  // inside this real-media regression. Instead inspect its owned persistent node.
-  const persistent=await page.evaluate(()=>{
-    const audio=window.__taleraF5SharedAudible?.get?.();
-    return {exists:!!audio,id:audio?.id,count:document.querySelectorAll('#talera-f5-shared-audio').length,
-      muted:audio?.muted};
-  });
-  assert.deepEqual(persistent,{exists:true,id:'talera-f5-shared-audio',
-    count:1,muted:false},'One shared audio node must survive ordinary video cycles');
-  console.log('TALERA_INTEGRATED_PERSISTENT_AUDIO_IDENTITY_PASS',
-    JSON.stringify({...persistent,safariDevicePolicyVerified:false}));
+  // The previous Back test deliberately navigates to /mijn-leven.
+  // Audio exists only in /present; it MUST NOT linger on the Home page.
+  assert.equal(await page.locator('#talera-f5-shared-audio').count(),0,
+    'No presentation audio player may leak into the main My Life page');
   assert.deepEqual(errors,[],'No presentation JS errors');
 }finally{
   if(browser)await browser.close().catch(()=>{});

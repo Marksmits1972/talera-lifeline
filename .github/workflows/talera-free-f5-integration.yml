@@ -2,7 +2,7 @@ name: TALERA Free F5 - isolated single-origin integration tests
 
 on:
   push:
-    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112, feature/free-f5-narrator-story-swipe-20261113]
+    branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112, feature/free-f5-narrator-story-swipe-20261113, feature/free-f5-backup-fresh-approved-20261116]
     paths:
       - 'r20-dev/free-10m-f5/**'
       - '.github/workflows/talera-free-f5-integration.yml'
@@ -35,11 +35,39 @@ jobs:
         run: node r20-dev/free-10m-delivery/build.mjs
       - name: Package only public PWA references and stable external JavaScript
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Verify unchanged owner's zero-example signed-in TALERA pages
+        if: github.ref_name == 'feature/free-f5-backup-fresh-approved-20261116'
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {referencePages} from './r20-dev/free-10m-f5/generated/public-template-map.mjs';
+          const base='r20-dev/free-10m-delivery/public';
+          const home=readFileSync(base+referencePages['/mijn-leven'],'utf8');
+          const present=readFileSync(base+referencePages['/present'],'utf8');
+          assert.ok(home.includes('window.__taleraReferenceMemories=[];'));
+          assert.ok(!home.includes('Test 081')&&!home.includes('talera-500-fotoband-'));
+          assert.ok(present.includes('const MEMORIES = [];'));
+          assert.ok(!present.includes('TALERA_STRESS_MEMORIES'));
+          assert.ok(!present.includes('talera-500-fotoband-'));
+          console.log('TALERA_APPROVED_SIGNED_IN_ZERO_EXAMPLES_CONFIRMED');
+          NODE
       - name: Verify independent narration media IDs, timing and no shared presentation controls
         run: node r20-dev/free-10m-f5/f5-independent-narrator.test.mjs
       - name: Verify source-exact 11 November backup-only connection
         run: |
-          if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
+          if [ "$GITHUB_REF_NAME" = feature/free-f5-backup-fresh-approved-20261116 ]; then
+            BASE=10021f4e5dda4d11256b7e991f3f1bd01e9baf30
+            git merge-base --is-ancestor "$BASE" HEAD
+            git diff --name-only "$BASE" HEAD | while IFS= read -r file; do
+              case "$file" in
+                .github/workflows/talera-free-f5-integration.yml|r20-dev/free-10m-f5/f5-portable-archive.mjs|r20-dev/free-10m-f5/f5-portable-idb.mjs|r20-dev/free-10m-f5/f5-local-backup-page.mjs|r20-dev/free-10m-f5/f5-backup-controller.mjs|r20-dev/free-10m-f5/f5-portable-archive.test.mjs|r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs) ;;
+                *) echo "REFUSE_TO_CHANGE_APPROVED_APP: $file"; exit 1 ;;
+              esac
+            done
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-worker.mjs)" = "$(git rev-parse "$BASE":r20-dev/free-10m-f5/f5-worker.mjs)"
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-public-assets.mjs)" = "$(git rev-parse "$BASE":r20-dev/free-10m-f5/f5-public-assets.mjs)"
+          elif [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
             # The approved backup UI wording is immutable; media/storage codecs remain source-exact.

@@ -234,3 +234,80 @@ export async function decodeFreeArchive(archive){
  return {sourceScope:p.sourceScope,sourceOrigin:p.sourceOrigin??null,createdAt:p.createdAt,stories,files,
   verifiedBinaryCount:p.binaries.length};
 }
+
+// Phase one of TALERA backup: independently decode the finished archive and
+// compare ALL source-store records, original media IDs, file metadata and bytes.
+// This never changes the local library, invokes restore, or uploads anything.
+export async function verifyCompleteFreeExport(archive,stories,files){
+ ensure(Array.isArray(stories)&&Array.isArray(files),'SOURCE_STORES_INVALID');
+ const decoded=await decodeFreeArchive(archive); // also verifies every SHA-256 chunk
+ ensure(decoded.stories.length===stories.length&&decoded.files.length===files.length,
+  'EXPORT_RECORD_COUNT_MISMATCH');
+ const compare=async(a,b,depth=0)=>{
+  ensure(depth<MAX_DEPTH,'EXPORT_DEPTH_MISMATCH');
+  if(a instanceof Blob){
+   ensure(b instanceof Blob&&a.size===b.size&&a.type===b.type,
+    'EXPORT_BINARY_METADATA_MISMATCH');
+   const hasFile=typeof File!=='undefined'&&a instanceof File;
+   const gotFile=typeof File!=='undefined'&&b instanceof File;
+   ensure(hasFile===gotFile,'EXPORT_FILE_KIND_MISMATCH');
+   if(hasFile)ensure(a.name===b.name&&a.lastModified===b.lastModified,
+    'EXPORT_FILE_METADATA_MISMATCH');
+   const left=await chunkHashes(a),right=await chunkHashes(b);
+   ensure(left.length===right.length&&left.every((v,i)=>v===right[i]),
+    'EXPORT_BINARY_BYTES_MISMATCH');
+   return;
+  }
+  if(a instanceof ArrayBuffer){
+   ensure(b instanceof ArrayBuffer&&a.byteLength===b.byteLength,
+    'EXPORT_ARRAYBUFFER_SIZE_MISMATCH');
+   const left=await chunkHashes(new Blob([a]));
+   const right=await chunkHashes(new Blob([b]));
+   ensure(left.length===right.length&&left.every((v,i)=>v===right[i]),
+    'EXPORT_ARRAYBUFFER_BYTES_MISMATCH');
+   return;
+  }
+  if(a instanceof Date){
+   ensure(b instanceof Date&&a.getTime()===b.getTime(),'EXPORT_DATE_MISMATCH');
+   return;
+  }
+  if(Array.isArray(a)){
+   ensure(Array.isArray(b)&&a.length===b.length,'EXPORT_ARRAY_LENGTH_MISMATCH');
+   const ka=Reflect.ownKeys(a),kb=Reflect.ownKeys(b);
+   ensure(ka.length===kb.length&&ka.every((v,i)=>v===kb[i]),
+    'EXPORT_ARRAY_KEYS_MISMATCH');
+   for(let i=0;i<a.length;i++)await compare(a[i],b[i],depth+1);
+   return;
+  }
+  if(isPlain(a)){
+   ensure(isPlain(b),'EXPORT_OBJECT_KIND_MISMATCH');
+   const ka=Object.keys(a).sort(),kb=Object.keys(b).sort();
+   ensure(ka.length===kb.length&&ka.every((v,i)=>v===kb[i]),
+    'EXPORT_RECORD_FIELDS_MISMATCH');
+   ensure(Reflect.ownKeys(a).length===ka.length&&Reflect.ownKeys(b).length===kb.length,
+    'EXPORT_HIDDEN_FIELDS_MISMATCH');
+   for(const key of ka)await compare(a[key],b[key],depth+1);
+   return;
+  }
+  ensure(Object.is(a,b),'EXPORT_FIELD_VALUE_MISMATCH');
+ };
+ for(let i=0;i<stories.length;i++)await compare(stories[i],decoded.stories[i]);
+ for(let i=0;i<files.length;i++)await compare(files[i],decoded.files[i]);
+ const mediaById=new Map(files.map(x=>[x.key,x]));
+ let referencedMedia=0;
+ for(const story of stories){
+  ensure(Array.isArray(story.items||[]),'EXPORT_STORY_ITEMS_INVALID');
+  for(const item of story.items||[]){
+   ensure(item&&typeof item.key==='string','EXPORT_MEDIA_ID_INVALID');
+   const record=mediaById.get(item.key);
+   ensure(record,'EXPORT_ORIGINAL_MISSING');
+   ensure(record.blob instanceof Blob&&record.blob.size>0,
+    'EXPORT_ORIGINAL_EMPTY');
+   referencedMedia++;
+  }
+ }
+ return {stories:stories.length,records:files.length,
+   referencedMedia,binaries:decoded.verifiedBinaryCount,
+   sourceScope:decoded.sourceScope,sourceOrigin:decoded.sourceOrigin,
+   exactSourceComparisonPassed:true};
+}

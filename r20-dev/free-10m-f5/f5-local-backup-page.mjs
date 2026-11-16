@@ -27,6 +27,10 @@ label{display:block;margin:12px 0}.note{font-size:.93rem}output{display:block;wh
 <button type="button" id="make-backup" disabled>Back-up maken</button>
 <a id="save-backup" class="save" download hidden>Bewaar bestand</a>
 <output id="export-status" role="status"></output>
+<p class="note">Nadat je het bestand in Bestanden hebt opgeslagen: kies de bewaarde kopie en controleer die zonder iets terug te zetten.</p>
+<label>Kies bewaarde back-up <input type="file" id="verify-export-file" accept=".talera,application/octet-stream"></label>
+<button type="button" id="verify-export" disabled>Controleer bewaarde back-up</button>
+<output id="verify-export-status" role="status"></output>
 </section>
 <section><h2>Back-up terugzetten</h2>
 <p>Kies een bewaard back-upbestand en controleer het voordat je het terugzet.</p>

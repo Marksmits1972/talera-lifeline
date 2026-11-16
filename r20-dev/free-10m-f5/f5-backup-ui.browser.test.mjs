@@ -51,7 +51,8 @@ const seed=async(page,db,present)=>{
    const id='local-old-1950-01-01-synthetic-record';
    stories.add({id,title:'Oud origineel fictief verhaal',source:'pwa-local',
     items:[{key:id+':0',kind:'photo'},{key:id+':1',kind:'video'},
-     {key:id+':2',kind:'audio'}],
+     {key:id+':2',kind:'audio'},
+     {key:id+':3',kind:'photo'},{key:id+':4',kind:'photo'}],
     narrationCues:[{t:0,index:0},{t:4000,index:1,videoAtMs:300},{t:7000,index:0}]});
    files.add({key:id+':0',blob:new File([Uint8Array.from([2,4,6,8])],
     'origineel.heic',{type:'image/heic'})});
@@ -59,6 +60,10 @@ const seed=async(page,db,present)=>{
     'origineel.mov',{type:'video/quicktime'})});
    files.add({key:id+':2',blob:new File([Uint8Array.from([7,6,5,4])],
     'stem.wav',{type:'audio/wav'})});
+   files.add({key:id+':3',blob:new File([Uint8Array.from([0xff,0xd8,2,3])],
+    'foto-twee.jpg',{type:'image/jpeg'})});
+   files.add({key:id+':4',blob:new File([Uint8Array.from([0x89,0x50,1,2])],
+    'foto-drie.png',{type:'image/png'})});
    files.add({key:'talera-v4-work:preview:synthetic',blob:new Blob(['preview'],{type:'image/jpeg'})});
   }else{
    stories.add({id:'local-existing-1980-synthetic',title:'Bestaande herinnering',items:[]});
@@ -101,6 +106,22 @@ try{
  assert.match(download.suggestedFilename(),/\.talera$/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
+ // Verify the ACTUAL downloaded bytes against the unchanged source IndexedDB.
+ await a.locator('#verify-export-file').setInputFiles({
+  name:'uit-bestanden.talera',mimeType:'application/octet-stream',buffer:fileBytes});
+ await a.getByRole('button',{name:'Controleer bewaarde back-up'}).click();
+ await a.waitForFunction(()=>document.getElementById('verify-export-status')
+  .textContent.includes('exact gelijk'));
+ assert.match(await a.locator('#verify-export-status').innerText(),
+  /5 verwijzingen en 6 binaire bestanden/);
+ const broken=Buffer.from(fileBytes);broken[broken.length-1]^=1;
+ await a.locator('#verify-export-file').setInputFiles({
+  name:'afwijkende-kopie.talera',mimeType:'application/octet-stream',buffer:broken});
+ await a.getByRole('button',{name:'Controleer bewaarde back-up'}).click();
+ await a.waitForFunction(()=>document.getElementById('verify-export-status')
+  .textContent.includes('NIET goedgekeurd'));
+ // No restoration on this first-phase verification page.
+ assert.equal(await a.getByRole('button',{name:'Back-up maken'}).isEnabled(),true);
  await b.locator('#restore-file').setInputFiles({name:'mijn-talera.talera',
   mimeType:'application/octet-stream',buffer:fileBytes});
  await b.locator('#preview-restore').click();

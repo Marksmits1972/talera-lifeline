@@ -2,13 +2,14 @@
 // archives and original media never leave local IndexedDB or reach a server.
 // This module runs only on the separately authenticated /__f5/backup route.
 import {
- exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary
+ exportExistingFreeLibrary,verifyStoredFreeExport,previewFreeLibraryRestore,restoreFreeLibrary
 } from '/__f5/f5-portable-idb.mjs';
 const el=id=>document.getElementById(id);
 const root=el('talera-free-backup'),db=root?.dataset.database;
 if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(db||''))
  throw Error('TALERA_BACKUP_MISSING_VERIFIED_SCOPE');
 const make=el('make-backup'),save=el('save-backup'),exportStatus=el('export-status');
+const verifyFile=el('verify-export-file'),verifyExport=el('verify-export'),verifyStatus=el('verify-export-status');
 const chooser=el('restore-file'),cross=el('other-origin'),preview=el('preview-restore');
 const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore-status');
 let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
@@ -19,6 +20,8 @@ const failText=e=>{
   return 'Je account is gewijzigd. Open Back-ups opnieuw.';
  if(/EXPLICIT_CONSENT|DIFFERENT_ORIGIN/.test(raw))
   return 'Vink eerst aan dat de back-up uit een andere TALERA-versie mag komen.';
+ if(/EXPORT_|SOURCE_/.test(raw))
+  return 'De back-up bevat ontbrekende of afwijkende ID’s, gegevens of originele mediabestanden.';
  if(/CHECKSUM|INVALID_MANIFEST|INVALID_ORIGIN|ARCHIVE_/.test(raw))
   return 'Bestand beschadigd of ongeldig. Kies een ander back-upbestand.';
  if(/DATABASE_NOT_FOUND|NO_INDEXEDDB|NO_STORIES_FOUND/.test(raw))
@@ -54,6 +57,22 @@ cross.addEventListener('change',invalidate);
 confirm.addEventListener('change',()=>{
  restore.disabled=!(review?.safeToRestore&&confirm.checked&&reviewFile===chooser.files?.[0]&&reviewCross===cross.checked);
 });
+verifyFile.addEventListener('change',()=>message(verifyStatus,''));
+verifyExport.addEventListener('click',async()=>{
+ const selected=verifyFile.files?.[0];
+ if(!selected){message(verifyStatus,'Kies het bewaarde back-upbestand.');return}
+ verifyExport.disabled=true;
+ message(verifyStatus,'Bewaarde kopie vergelijken met de volledige bibliotheek…');
+ try{
+  await assertCurrentAccount();
+  const match=await verifyStoredFreeExport(selected,db);
+  message(verifyStatus,'Bewaarde back-up exact gelijk: '+
+   match.stories+' herinnering(en), '+match.records+
+   ' bibliotheekrecords, '+match.referencedMedia+
+   ' verwijzingen en '+match.binaries+' binaire bestanden gecontroleerd.');
+ }catch(e){message(verifyStatus,'Bewaarde kopie NIET goedgekeurd: '+failText(e))}
+ finally{verifyExport.disabled=false}
+});
 make.addEventListener('click',async()=>{
  make.disabled=true;
  if(downloadUrl){URL.revokeObjectURL(downloadUrl);downloadUrl=null}
@@ -66,8 +85,9 @@ make.addEventListener('click',async()=>{
   save.href=downloadUrl;
   save.download='talera-free-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.talera';
   save.hidden=false;
-  message(exportStatus,'Back-up klaar ('+(archive.size/1048576).toFixed(1)+
-   ' MB). Tik op "Bewaar bestand" en controleer de download in Bestanden.');
+  message(exportStatus,'Back-up klaar, inhoud volledig gecontroleerd ('+
+   (archive.size/1048576).toFixed(1)+
+   ' MB). Tik op "Bewaar bestand", sla op in Bestanden en controleer die kopie.');
  }catch(e){message(exportStatus,'Back-up niet gemaakt: '+failText(e))}
  finally{make.disabled=false}
 });
@@ -106,5 +126,6 @@ restore.addEventListener('click',async()=>{
 });
 window.addEventListener('pagehide',()=>{if(downloadUrl)URL.revokeObjectURL(downloadUrl)});
 make.disabled=false;
+verifyExport.disabled=false;
 preview.disabled=false;
 root.dataset.ready='yes';

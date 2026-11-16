@@ -1169,6 +1169,37 @@ try{
       'Restored video needs a genuine frame even when native autoplay is denied');
     console.log('TALERA_FRESH_PWA_RESTORED_VIDEO_COVER_WITHOUT_AUTOPLAY_PASS',
       JSON.stringify({firstCoverWithoutAutoplay,realIphoneAccepted:false}));
+    // The owner's iPhone saw a real restored photo on Home once, then
+    // it vanished after opening a memory and returning to the same PWA.
+    // iOS may restore that Home document from its Back/Forward cache.
+    // Simulate pagehide.persisted on the actual account-private home image,
+    // and verify the SAME Blob URL still loads without re-import or reload.
+    await importedPage.goto(origin+'/mijn-leven',
+      {waitUntil:'domcontentloaded',timeout:25000});
+    await importedPage.waitForFunction(()=>[...document.querySelectorAll('img')].some(img=>
+      img.src.startsWith('blob:')&&img.complete&&img.naturalWidth>0),
+      null,{timeout:20000});
+    const bfCachePhoto=await importedPage.evaluate(async()=>{
+      const image=[...document.querySelectorAll('img')].find(img=>
+        img.src.startsWith('blob:')&&img.complete&&img.naturalWidth>0);
+      if(!image)throw Error('No restored photo shown on Home');
+      const uri=image.src;
+      const before=await fetch(uri).then(r=>r.ok).catch(()=>false);
+      window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
+      window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));
+      const after=await fetch(uri).then(r=>r.ok).catch(()=>false);
+      const probe=new Image();probe.src=uri;
+      let decoded=false;
+      try{await probe.decode();decoded=probe.naturalWidth>0}catch{}
+      return {before,after,decoded,photoBytes:(await fetch(uri)).headers.get('content-length'),
+        urlUnchanged:image.src===uri};
+    });
+    assert.ok(bfCachePhoto.before&&bfCachePhoto.after&&
+      bfCachePhoto.decoded&&bfCachePhoto.urlUnchanged,
+      'Restored Home photos MUST survive Safari BFCache navigation: '+
+        JSON.stringify(bfCachePhoto));
+    console.log('TALERA_FRESH_PWA_RESTORED_HOME_PHOTO_SURVIVES_BFCACHE_PASS',
+      JSON.stringify({...bfCachePhoto,realIphoneAccepted:false}));
   }finally{await restoredContext.close()}
   await load(page,videoFirst.id,2);
   try{

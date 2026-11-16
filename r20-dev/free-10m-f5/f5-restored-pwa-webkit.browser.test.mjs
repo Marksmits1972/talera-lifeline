@@ -22,8 +22,8 @@ async function boot(){
     '--var','STAGING_F5_KEY:'+gate,
     '--var','STAGING_ACCESS_KEY:'+'2'.repeat(64),
     '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
-    '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_WEBKIT_F5_ONLY_KEY',
-    '--var','DEMO_IDENTITY_KEY:SYNTHETIC_WEBKIT_F5_ONLY_SOCIAL',
+    '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_TEST_KEY',
+    '--var','DEMO_IDENTITY_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_SOCIAL_KEY',
     '--log-level','error'
   ],{env:{...process.env,CI:'true',BROWSER:'none'},stdio:['ignore','pipe','pipe']});
   for(const stream of [worker.stdout,worker.stderr])

@@ -385,7 +385,7 @@ function primeFirstOpenLocalStoryCovers(html){
    html=html.replace(before,after);
  };
  const hydrateAnchor=" async function hydrate(memory){";
- const prime=" // Keep up to five first-frame object URLs, scoped to this page and account.\n // The full existing hydrate() is still responsible for every other frame.\n async function warmFirstPhoto(memory){\n   if(!memory?._taleraLocal||memory._taleraFirstWarm)return;\n   const first=memory._zeroItems?.find(item=>item.kind==='photo'||item.kind==='video');\n   if(!first)return;\n   let url=null;\n   try{\n     if(first.kind==='photo'){\n       url=await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));\n     }else{\n       const still=await store.blob(first.key+':phone-v1');\n       if(still instanceof Blob&&still.size&&String(still.type).startsWith('image/'))\n         url=URL.createObjectURL(still);\n       else{\n         url=await taleraClosedMakeCover(memory,{key:first.key,kind:'video',url:null},0,[],true);\n         if(!url)memory.image=videoPoster;\n       }\n     }\n   }catch(e){console.warn('TALERA eerste verhaalbeeld nog niet geladen',e)}\n   if(!url)return;\n   memory._taleraFirstWarm={key:first.key,url};\n   if(!Array.isArray(memory.photos)||!memory.photos.length)memory.image=url;\n"+
+ const prime=" // Keep up to five first-frame object URLs, scoped to this page and account.\n // The full existing hydrate() is still responsible for every other frame.\n async function warmFirstPhoto(memory,decodeMissingVideo=true){\n   if(!memory?._taleraLocal||memory._taleraFirstWarm)return;\n   const first=memory._zeroItems?.find(item=>item.kind==='photo'||item.kind==='video');\n   if(!first)return;\n   let url=null;\n   try{\n     if(first.kind==='photo'){\n       url=await (store.displayUrl?store.displayUrl(first.key):store.mediaUrl(first.key));\n     }else{\n       const still=await store.blob(first.key+':phone-v1');\n       if(still instanceof Blob&&still.size&&String(still.type).startsWith('image/'))\n         url=URL.createObjectURL(still);\n       else if(decodeMissingVideo){\n         url=await taleraClosedMakeCover(memory,{key:first.key,kind:'video',url:null},0,[],true);\n         if(!url)memory.image=videoPoster;\n       }\n     }\n   }catch(e){console.warn('TALERA eerste verhaalbeeld nog niet geladen',e)}\n   if(!url)return;\n   memory._taleraFirstWarm={key:first.key,url};\n   if(!Array.isArray(memory.photos)||!memory.photos.length)memory.image=url;\n"+
   "   memory.previewImage=url;\n"+
   " }\n"+
   " // Reuse the SAME local record and wheel: bounded nearby cover prefetch.\n"+
@@ -416,21 +416,12 @@ function primeFirstOpenLocalStoryCovers(html){
   "   const norm=t=>String(t||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('nl');\n"+
   "   const matching=asked?memories.filter(m=>(m.tags||[]).some(t=>norm(t)===norm(asked))):memories;\n"+
   "   const near=matching.slice().sort((a,b)=>Math.abs(a.ms-center)-Math.abs(b.ms-center)).slice(0,5);\n"+
-  "   // Video poster decoding can stall on a first iOS launch. A slow preview\n"+
-  "   // in another story must never prevent the selected story from opening.\n"+
-  "   const primary=selected||near[0]||null;\n"+
-  "   const primaryFirst=primary?._zeroItems?.find(x=>x.kind==='photo'||x.kind==='video');\n"+
-  "   // Protect the selected real PHOTO's approved first-frame display.\n"+
-  "   if(primaryFirst?.kind==='photo')await warmFirstPhoto(primary);\n"+
-  "   runtime.registerMemories(memories);\n"+
-  "   // The selected VIDEO is hydrated by its own original motor after\n"+
-  "   // registration. Never run two concurrent video-poster decoders.\n"+
-  "   // Only neighbouring PHOTOS are prepared in the background.\n"+
-  "   for(const m of near){\n"+
-  "     if(m===primary)continue;\n"+
-  "     if(m._zeroItems?.find(x=>x.kind==='photo'||x.kind==='video')?.kind==='photo')\n"+
-  "       void warmFirstPhoto(m);\n"+
-  "   }";
+  "   // Prepare all five REAL nearby photos and already-cached video stills.\n"+
+  "   // A newly uploaded video without a stored still must NOT be decoded\n"+
+  "   // before registration: its original video motor handles the first frame.\n"+
+  "   // This avoids one slow poster blocking every other story on first launch.\n"+
+  "   await Promise.all(near.map(m=>warmFirstPhoto(m,false)));\n"+
+  "   runtime.registerMemories(memories);";
  exact(beforeRegistration,afterRegistration,'REGISTER_AFTER_REAL_COVERS');
  const beforeRevoke="   for(const urls of loaded.values())for(const url of urls)URL.revokeObjectURL(url);\n"+
   "   loaded.clear();";

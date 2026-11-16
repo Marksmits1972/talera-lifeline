@@ -48,7 +48,7 @@ jobs:
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-archive.mjs)" = "2d9f6071e64adf2cfee7565b3712aadb6d2004e0"
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-idb.mjs)" = "c3299aac47b73c5cc9d0d66a700e28dab8ecd617"
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "921d3a43b7a60208ec563823bfcb42ac1c6c01cd"
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "0f813b3289855c2f59860a9825263c579863b06f"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "638a88f76f06ee270a0f1a66d6ab93a465dfeb4e"
             else
               git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs
             fi

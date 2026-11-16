@@ -634,7 +634,7 @@ jobs:
           test "$(printf '%s' "$CLEAN_ID" | wc -c)" -eq 32
           echo "::add-mask::$CLEAN_ID"
           echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN_ID" >> "$GITHUB_ENV"
-      - name: Assert owner's protected 16-Nov Free deployment is unchanged
+      - name: Guard observed official deployment without altering it; retain approved morning rollback
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
@@ -645,9 +645,12 @@ jobs:
           const data=await r.json();
           assert.ok(data.success,'Production version unavailable');
           assert.deepEqual((data.result.deployments||[])[0]?.versions?.map(v=>[v.version_id,v.percentage]),
-            [['c085893a-af9c-4d8d-ae6a-2ef81bcfb324',100]],
-            'Approved morning Worker is no longer the untouched 100% deployment');
-          console.log('TALERA_OFFICIAL_APPROVED_DEPLOYMENT_UNCHANGED');
+            [['0b7a9345-8556-481f-8aad-975bb9c1d6d1',100]],
+            'Official Worker changed since the 16-Nov 11:46 UTC recorded deployment');
+          const preserved=await fetch(host.replace(/\/deployments$/,'/versions/c085893a-af9c-4d8d-ae6a-2ef81bcfb324'),
+            {headers:{authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},signal:AbortSignal.timeout(15000)});
+          assert.equal(preserved.status,200,'Owner-approved morning rollback version is no longer available');
+          console.log('TALERA_OFFICIAL_DEPLOYMENT_LOCKED_AND_APPROVED_ROLLBACK_RETAINED');
           NODE
       - name: Build full approved TALERA candidate with clean signed-out pages and checked export
         run: |

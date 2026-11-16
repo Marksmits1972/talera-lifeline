@@ -80,7 +80,7 @@ await assert.rejects(()=>verifyFreeArchiveSnapshot(archive,stories,
  /SOURCE_BINARY_BYTES_MISMATCH/);
 await assert.rejects(()=>verifyFreeArchiveSnapshot(archive,stories,
  files.map(row=>row.key==='local-test:0:phone-v1'?
-  {...row,blob:new Blob(['changed-preview'],{type:'image/jpeg'})}:row)),
+  {...row,blob:new Blob(['other-preview'],{type:'image/jpeg'})}:row)),
  /SOURCE_BINARY_BYTES_MISMATCH/);
 await assert.rejects(()=>verifyFreeArchiveSnapshot(archive,stories,
  files.filter(row=>row.key!=='local-test:4')),/SOURCE_RECORD_COUNT_CHANGED/);

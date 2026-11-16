@@ -20,7 +20,7 @@ const failText=e=>{
   return 'Je account is gewijzigd. Open Back-ups opnieuw.';
  if(/EXPLICIT_CONSENT|DIFFERENT_ORIGIN/.test(raw))
   return 'Vink eerst aan dat de back-up uit een andere TALERA-versie mag komen.';
- if(/EXPORT_|SOURCE_|MEDIA_CHECKSUM/.test(raw))
+ if(/EXPORT_|SOURCE_/.test(raw))
   return 'De back-up bevat ontbrekende of afwijkende ID’s, gegevens of originele mediabestanden.';
  if(/CHECKSUM|INVALID_MANIFEST|INVALID_ORIGIN|ARCHIVE_/.test(raw))
   return 'Bestand beschadigd of ongeldig. Kies een ander back-upbestand.';

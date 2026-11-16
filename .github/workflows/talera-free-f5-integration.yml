@@ -45,13 +45,6 @@ jobs:
           const base='r20-dev/free-10m-delivery/public';
           const home=readFileSync(base+referencePages['/mijn-leven'],'utf8');
           const present=readFileSync(base+referencePages['/present'],'utf8');
-          // A new browser is signed OUT. It must never show old demos either.
-          const {anonymousShells}=await import('./r20-dev/free-10m-delivery/generated/approved-assets.mjs');
-          for(const route of ['/mijn-leven','/present']){
-            const anonymous=readFileSync(base+anonymousShells[route],'utf8');
-            assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES|id="demoCards"/.test(anonymous),
-             'UNAPPROVED_ANONYMOUS_EXAMPLES_PRESENT '+route);
-          }
           assert.ok(home.includes('window.__taleraReferenceMemories=[];'));
           assert.ok(!home.includes('Test 081')&&!home.includes('talera-500-fotoband-'));
           assert.ok(present.includes('const MEMORIES = [];'));
@@ -129,6 +122,20 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser verify complete original-media export, checksum and nondestructive restore
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
+      - name: Protect the owner's clean first launch (must contain no anonymous examples)
+        if: github.ref_name == 'feature/free-f5-backup-fresh-approved-20261116'
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {anonymousShells} from './r20-dev/free-10m-delivery/generated/approved-assets.mjs';
+          for(const route of ['/mijn-leven','/present']){
+            const html=readFileSync('r20-dev/free-10m-delivery/public'+anonymousShells[route],'utf8');
+            assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES|id="demoCards"/.test(html),
+              'UNAPPROVED_ANONYMOUS_EXAMPLES_PRESENT '+route);
+          }
+          console.log('TALERA_CLEAN_ANONYMOUS_FIRST_OPEN_CONFIRMED');
+          NODE
       - name: Archive factual test result only
         if: success()
         uses: actions/upload-artifact@v4

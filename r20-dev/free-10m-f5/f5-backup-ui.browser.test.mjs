@@ -101,6 +101,27 @@ try{
  assert.match(download.suggestedFilename(),/\.talera$/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
+ // Phase 1: verify the actually downloaded file against unchanged local IDB.
+ await a.locator('#verify-saved-file').setInputFiles({
+  name:'daadwerkelijk-bewaarde-kopie.talera',mimeType:'application/octet-stream',
+  buffer:fileBytes});
+ await a.getByRole('button',{name:'Controleer bewaarde back-up'}).click();
+ await a.waitForFunction(()=>document.getElementById('saved-check-status')
+   .textContent.includes('exact gelijk'));
+ assert.match(await a.locator('#saved-check-status').innerText(),
+   /3 verwijzingen en 3 binaire bestanden/);
+ // One changed byte must NEVER receive the "exact gelijk" confirmation.
+ const damagedCopy=Buffer.from(fileBytes);
+ damagedCopy[damagedCopy.length-1]^=255;
+ await a.locator('#verify-saved-file').setInputFiles({
+  name:'beschadigde-kopie.talera',mimeType:'application/octet-stream',
+  buffer:damagedCopy});
+ await a.getByRole('button',{name:'Controleer bewaarde back-up'}).click();
+ await a.waitForFunction(()=>document.getElementById('saved-check-status')
+  .textContent.includes('NIET goedgekeurd'));
+ assert.doesNotMatch(await a.locator('#saved-check-status').innerText(),/exact gelijk/);
+ // A legitimate original must still be available after a rejected copy.
+ assert.equal(await a.getByRole('button',{name:'Back-up maken'}).isEnabled(),true);
  await b.locator('#restore-file').setInputFiles({name:'mijn-talera.talera',
   mimeType:'application/octet-stream',buffer:fileBytes});
  await b.locator('#preview-restore').click();
@@ -158,7 +179,8 @@ try{
  assert.equal(posts,0,'No archive or media sent to any server POST');
  assert.deepEqual(errors,[],'No browser errors allowed');
  console.log('TALERA_FREE_F5_BACKUP_UI_TWO_ORIGINS_PASS',JSON.stringify({
-  voluntarySaveDownload:true,twoIsolatedBrowserOrigins:true,permissionRequired:true,
+  voluntarySaveDownload:true,savedFileOriginalByteVerification:true,
+  corruptedSavedFileRejected:true,twoIsolatedBrowserOrigins:true,permissionRequired:true,
   consentRequiredBeforeWrite:true,recordIdsIntact:true,voiceCuesIntact:true,
   originalMovBytesIntact:true,preexistingStoriesPreserved:true,duplicateRestoresRejected:true,
   corruptedArchiveRejected:true,networkUploads:posts,realIPhoneValidated:false,

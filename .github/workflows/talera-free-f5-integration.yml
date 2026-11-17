@@ -597,7 +597,7 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
           test "$(git rev-parse HEAD^)" = a8a4a915d24ac3e5f73c6089a68d841fb1e43c6e
-          test "$(git diff --name-only 3d12087716550665bc68c4b71977dddd99243b1e HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          test "$(git diff --name-only a8a4a915d24ac3e5f73c6089a68d841fb1e43c6e HEAD)" = .github/workflows/talera-free-f5-integration.yml
           EXPECTED=$(printf "%s\n" .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
           test "$(git diff --name-only 7c91555e88c636cb8974c8d0ca64c0f77d3a6373 HEAD)" = "$EXPECTED"
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD

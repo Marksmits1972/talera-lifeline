@@ -92,6 +92,19 @@ try{
   if(!rejected)throw Error('Duplicate canonical reference accepted');
   const after=JSON.stringify((await mem.get(story.id)).items);
   if(after!==before)throw Error('Rejected edit changed original story');
+  // A missing original-ID mapping MUST fail before any destructive replacement.
+  let unmappedRejected=false;
+  try{
+   await mem.save({title:'Bewerking zonder ID-koppeling',date:'1990-01-01',
+    text:'niet opslaan'},[first,second],story.id);
+  }catch(error){
+   unmappedRejected=String(error.message).includes('media-ID-koppeling ontbreekt');
+  }
+  if(!unmappedRejected)throw Error('Editor accepted an edit without original media ID mapping');
+  if(JSON.stringify((await mem.get(story.id)).items)!==before||
+     JSON.stringify(await bytes(keys[0]))!==JSON.stringify(oldA)||
+     JSON.stringify(await bytes(keys[1]))!==JSON.stringify(oldB))
+   throw Error('Unmapped edit modified an original story or original bytes');
   const audit=await mem.audit();
   if(!audit.consistent)throw Error('Incomplete library after edit');
   // The SAME published library must survive complete lossless export and

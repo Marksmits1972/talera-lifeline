@@ -31,54 +31,6 @@ for(const page of ['mijn-leven','present','tell']){
    a.includes('async function taleraV61PersistMediaIds(')
   ];
   assert.ok(components.every(Boolean),'Legacy deletion, private story store and cue writer must remain intact');
-  // Inspect approved edit rehydration and association between draft IDs and canonical IDs.
-  for(const key of [
-    'async function boot(', 'function boot(', '?edit=', 'g.existing=',
-    'g.media.push(', 'g.media=', 'assets.set(', 'row.items||[]',
-    'const row=await mem.get(', 'const row=await mem.save('
-  ]){
-    const positions=[];let idx=-1;
-    while((idx=a.indexOf(key,idx+1))>=0)positions.push(idx);
-    const views=positions.slice(0,4).map(pos=>a.slice(Math.max(0,pos-650),pos+2300)
-      .replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE'));
-    console.log('TALERA_LIBRARY_EDIT_ID_ROUTE',JSON.stringify({key,count:positions.length,views}));
-  }
-  // Read-only structural diagnostics from the same anonymous editor snapshot.
-  // Never inspect account records, personal media, cookies or sessions.
-  const patterns=[
-   'async function taleraV61PersistMediaIds(',
-   'async function dbOpen(',
-   'async function writeFiles(',
-   'async function readFiles(',
-   'async function save(',
-   'function fileStore(',
-   'function taleraV61PersistMediaIds(',
-   'indexedDB.open('
-  ];
-  for(const [token,limit] of [
-   ['async function save(',8500],
-   ['async function taleraV61PersistMediaIds(',4100],
-   ['async function writeFiles(',4100],
-   ['async function readDraft(',4300],
-   ['async function dbOpen()',2800],
-   ['function dbOpen()',2800]
-  ]){
-   const at=a.indexOf(token);
-   if(at>=0)console.log('TALERA_LIBRARY_EDITOR_DEEP_SOURCE',JSON.stringify({
-    token,excerpt:a.slice(at,at+limit).replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE')
-   }));
-  }
-  for(const token of patterns){
-   const at=a.indexOf(token);
-   const positions=[];let i=-1;
-   while((i=a.indexOf(token,i+1))>=0)positions.push(i);
-   const excerpt=at<0?'':a.slice(at,at+1500)
-     .replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE');
-   console.log('TALERA_LIBRARY_EDITOR_SOURCE_AUDIT',JSON.stringify({
-    token,hits:positions.length,excerpt
-   }));
-  }
-
  }
  console.log('TALERA_FREE_SCOPED_DB_ALIGNMENT',JSON.stringify({
    page,approvedDbReferences:original,allReferencesPrivate:true,

@@ -769,6 +769,59 @@ function rebuildDirectOrdinaryPresentation(html){
   once("const source=mem.previewImage||mem.thumbnail||mem.image;","const source=mem.thumbnail||mem.previewImage||mem.image;",'PREFETCH_COVER');
   once("window.__taleraV31SelectPhoto?.(memoryId,index,true);","window.__taleraOrdinarySelectPhoto?.(memoryId,index,true);",'ORDINARY_TAP_ENTRY_ONLY');
   once(" function activate(memory){\n   if(!memory||!memory._taleraLocal){disposePresentation();return}\n   if(memory._photoLoading){void hydrate(memory).then(()=>{if(runtime.currentMemory()?.id===memory.id)activate(memory)});return}\n   void present(memory);\n }"," function activate(memory){\n   if(!memory||!memory._taleraLocal){disposePresentation();return}\n   if(memory._photoLoading){void hydrate(memory).then(()=>{if(runtime.currentMemory()?.id===memory.id)activate(memory)});return}\n   // Routing only: the original recorded-voice functions remain untouched.\n   if(!memory._zeroItems?.some(item=>item.kind==='audio')){\n     if(activeId!==null)disposePresentation();\n     window.__taleraOrdinaryActivate?.(memory);\n     return;\n   }\n   void present(memory);\n }",'ONE_ENGINE_ROUTER');
+
+  // FIRST_COLD_VIDEO_NO_STILL: thumbnail is exclusively a wheel/cover asset.
+  // It is never the large ordinary-video frame. No alteration to narrator.
+  const ordinaryMask=String.raw\`  function taleraOrdinaryVideoMask(active){
+    const stage=document.getElementById('photoStage');
+    const host=stage?.parentElement||stage;
+    const existing=document.getElementById('talera-f5-ordinary-video-mask');
+    if(!active){existing?.remove();return}
+    if(!host||existing)return;
+    const mask=document.createElement('div');
+    mask.id='talera-f5-ordinary-video-mask';
+    mask.style.cssText='position:absolute;inset:0;background:#071a3d;z-index:11;pointer-events:none';
+    host.appendChild(mask);
+  }
+\`;
+  once("  function playOrdinaryVideo(memory,index){",ordinaryMask+"  function playOrdinaryVideo(memory,index){",'ORDINARY_THUMB_STRIP_ONLY');
+  // Remove the previous mask as the video leaves, never when the thumbnail
+  // wheel is merely rendered. Keep all original image bytes unchanged.
+  once("    ordinaryVideoToken++;ordinaryRecoverSound=null;ordinarySoundHint(false);",
+    "    ordinaryVideoToken++;ordinaryRecoverSound=null;ordinarySoundHint(false);\\n    taleraOrdinaryVideoMask(false);",
+    'ORDINARY_MASK_CLEANUP');
+  once("    closeOrdinaryVideo(true);\\n    const id=memory.id,key=frame.key,token=ordinaryVideoToken;",
+    "    closeOrdinaryVideo(true);\\n    taleraOrdinaryVideoMask(true);\\n    const id=memory.id,key=frame.key,token=ordinaryVideoToken;",
+    'MASK_BEFORE_ORIGINAL_VIDEO_READ');
+  once("      memory._photoIndex=next;memory.image=src;\\n      settleVisiblePhoto(memory);renderDots(memory);",
+    "      memory._photoIndex=next;memory.image=src;\\n      taleraOrdinaryVideoMask(frame?.kind==='video');\\n      settleVisiblePhoto(memory);renderDots(memory);",
+    'NO_VIDEO_POSTER_AS_MAIN_STAGE');
+  once("    if(changed&&memory&&!memory._photoLoading&&Array.isArray(memory.photos)&&memory.photos.length){\\n      memory._photoIndex=0;",
+    "    if(changed&&memory&&!memory._photoLoading&&Array.isArray(memory.photos)&&memory.photos.length){\\n      taleraOrdinaryVideoMask(memory._taleraLocal&&!memory._zeroItems?.some(x=>x.kind==='audio')&&\\n        memory._zeroFrames?.[0]?.kind==='video');\\n      memory._photoIndex=0;",
+    'MASK_INITIAL_VIDEO_BEFORE_STILL');
+  // First decoded motion frame becomes visible atomically, not the JPEG
+  // :phone-v1 which remains only in the existing timeline strip.
+  once("video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';",
+    "video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none;opacity:0';",
+    'FIRST_MOTION_FRAME_HIDDEN_UNTIL_READY');
+  once("        video.onplaying=syncSound;\\n        video.ontimeupdate=syncSound;",
+    "        const showDecodedVideo=()=>{\\n          if(!valid()||video.paused)return;\\n          const reveal=()=>{if(valid()&&!video.paused&&video.readyState>=2)video.style.opacity='1'};\\n          if(typeof video.requestVideoFrameCallback==='function')video.requestVideoFrameCallback(reveal);\\n          else requestAnimationFrame(reveal);\\n        };\\n        video.onplaying=()=>{showDecodedVideo();syncSound()};\\n        video.ontimeupdate=syncSound;",
+    'FIRST_MOTION_FRAME_ATOMIC_REVEAL');
+  // First iPhone start: repeated 0.4 s hard seeks made cold audio stutter.
+  // Retain the approved shared audio element and a last-resort drift check,
+  // never chase each early timeupdate while both decoders are warming.
+  once("        let startedSound=false;\\n        const syncSound=()=>{",
+    "        let startedSound=false,lastSoundSeekAt=Date.now();\\n        const syncSound=()=>{",
+    'PERSISTENT_AUDIO_COOLDOWN_CLOCK');
+  once("          if(video.readyState>=2&&audio.readyState>=1&&\\n              Math.abs(audio.currentTime-video.currentTime)>0.40)\\n            try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
+    "          const now=Date.now();\\n          if(now-lastSoundSeekAt<5000||video.readyState<3||audio.readyState<3)return;\\n          if(Math.abs(audio.currentTime-video.currentTime)>1.5){\\n            lastSoundSeekAt=now;\\n            try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}\\n          }",
+    'COLD_FIRST_AUDIO_NO_REPEAT_SEEKS');
+  once("          try{if(audio.readyState>=1)audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
+    "          // A cold metadata-only audio decoder must not be forced to seek.\\n          try{if(video.currentTime>2&&audio.readyState>=3)audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
+    'NO_COLD_RECOVERY_SEEK');
+  once("            if(valid()&&taleraSharedAudible.isOwner(owner))\\n              try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
+    "            if(valid()&&taleraSharedAudible.isOwner(owner)&&video.currentTime>2&&audio.readyState>=3)\\n              try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
+    'NO_COLD_METADATA_SEEK');
   if(html.includes('readyNeighbour?.currentSrc'))throw Error('Old neighbor bitmap remains');
   if(html.includes('const fallback=mem._taleraLocal?('))throw Error('Old shared bitmap remains');
   return html;

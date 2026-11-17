@@ -1318,12 +1318,22 @@ try{
     return true;
   },null,{timeout:12000});
   const ordinarySource=await page.content();
-  assert.ok(!ordinarySource.includes('taleraOrdinaryVideoMask')&&
-    !ordinarySource.includes('talera-f5-ordinary-video-mask')&&
-    ordinarySource.includes('video.onloadedmetadata=start')&&
-    ordinarySource.includes('video.src=url;start()')&&
-    !ordinarySource.includes('video.src=url;video.load()'),
-    'No blue overlay between memories; original video first frame must decode before play');
+  const ordinaryMotorStart=ordinarySource.indexOf('  function playOrdinaryVideo(memory,index){');
+  const ordinaryMotorEnd=ordinarySource.indexOf('  function showPhoto(memory,index,manual=false){',
+    ordinaryMotorStart);
+  assert.ok(ordinaryMotorStart>=0&&ordinaryMotorEnd>ordinaryMotorStart,
+    'Only the existing ordinary video player may be inspected');
+  const ordinaryMotor=ordinarySource.slice(ordinaryMotorStart,ordinaryMotorEnd);
+  const ordinarySafety={
+    noBlueMask:!ordinarySource.includes('taleraOrdinaryVideoMask')&&
+      !ordinarySource.includes('talera-f5-ordinary-video-mask'),
+    originalFirstPlay:ordinaryMotor.includes('video.onloadedmetadata=start')&&
+      ordinaryMotor.includes('video.src=url;start()'),
+    noDoubleLoad:!ordinaryMotor.includes('video.src=url;video.load()')
+  };
+  assert.ok(Object.values(ordinarySafety).every(Boolean),
+    'Ordinary video is unchanged and no blue interstitial is installed: '+
+      JSON.stringify(ordinarySafety));
   assert.ok(ordinarySource.includes('const adjacentOriginals=new Map()')&&
     ordinarySource.includes('for(const offset of [-1,1])')&&
     ordinarySource.includes("m._zeroFrames?.[0]?.kind!=='photo'"),

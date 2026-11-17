@@ -23,22 +23,22 @@ export function preserveOriginalMediaIdsOnEdit(html){
  // Editor concept writes are now owned by the SAME account-local library.
  // Existing keys, stored Blob values and transaction semantics stay identical.
  exact("window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,",
-   "async function writeDraftRows(rows){\\n"+
-   " if(!Array.isArray(rows)||rows.some(x=>!Array.isArray(x)||x.length!==2||typeof x[0]!=='string'||!x[0]))\\n"+
-   "  throw Error('Ongeldige conceptbestanden voor de bibliotheek.');\\n"+
-   " if(!rows.length)return;\\n"+
-   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\\n"+
-   " for(const [key,value] of rows)tx.objectStore('files').put({key,blob:value});\\n"+
-   " await finished;\\n"+
-   "}\\n"+
-   "async function deleteDraftKeys(keys){\\n"+
-   " if(!Array.isArray(keys)||keys.some(key=>typeof key!=='string'||!key))\\n"+
-   "  throw Error('Ongeldige conceptsleutels voor de bibliotheek.');\\n"+
-   " if(!keys.length)return;\\n"+
-   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\\n"+
-   " for(const key of keys)tx.objectStore('files').delete(key);\\n"+
-   " await finished;\\n"+
-   "}\\n"+
+   "async function writeDraftRows(rows){\n"+
+   " if(!Array.isArray(rows)||rows.some(x=>!Array.isArray(x)||x.length!==2||typeof x[0]!=='string'||!x[0]))\n"+
+   "  throw Error('Ongeldige conceptbestanden voor de bibliotheek.');\n"+
+   " if(!rows.length)return;\n"+
+   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\n"+
+   " for(const [key,value] of rows)tx.objectStore('files').put({key,blob:value});\n"+
+   " await finished;\n"+
+   "}\n"+
+   "async function deleteDraftKeys(keys){\n"+
+   " if(!Array.isArray(keys)||keys.some(key=>typeof key!=='string'||!key))\n"+
+   "  throw Error('Ongeldige conceptsleutels voor de bibliotheek.');\n"+
+   " if(!keys.length)return;\n"+
+   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\n"+
+   " for(const key of keys)tx.objectStore('files').delete(key);\n"+
+   " await finished;\n"+
+   "}\n"+
    "window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,"+
    "draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,",
    "DRAFT_LIBRARY_OWNER");

@@ -14,6 +14,7 @@ import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birt
 import {referencePages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
 import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
+import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
 import {localBackupPage} from './f5-local-backup-page.mjs';
 
@@ -617,7 +618,7 @@ async function publicPage(request,env){
     // Locked WhatsApp design-cleanup baseline: no visible UI or presentation
     // amendments. Only server-verified private local storage and saved cue
     // media-ID reconciliation may rewrite the original approved markup.
-    const stableEditedCues=pathname==='/tell'?alignEditedNarrationCueRefs(scoped):scoped;
+    const stableEditedCues=pathname==='/tell'?retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped)):scoped;
     // Keep the editor's preview silent from the FIRST frame, even before
     // the record panel is visible. The original present/player video round
     // with sound after narration is untouched.

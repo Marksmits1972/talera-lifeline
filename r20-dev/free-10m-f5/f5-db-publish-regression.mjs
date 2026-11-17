@@ -43,6 +43,19 @@ for(const page of ['mijn-leven','present','tell']){
    'function taleraV61PersistMediaIds(',
    'indexedDB.open('
   ];
+  for(const [token,limit] of [
+   ['async function save(',8500],
+   ['async function taleraV61PersistMediaIds(',4100],
+   ['async function writeFiles(',4100],
+   ['async function readDraft(',4300],
+   ['async function dbOpen()',2800],
+   ['function dbOpen()',2800]
+  ]){
+   const at=a.indexOf(token);
+   if(at>=0)console.log('TALERA_LIBRARY_EDITOR_DEEP_SOURCE',JSON.stringify({
+    token,excerpt:a.slice(at,at+limit).replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE')
+   }));
+  }
   for(const token of patterns){
    const at=a.indexOf(token);
    const positions=[];let i=-1;

@@ -74,7 +74,7 @@ const invalidDraft={existing:'local-stable'};
 assert.throws(()=>vm.runInNewContext(mapScript,{
  g:invalidDraft,row:{items:[{key:'old:0'}]},entries:pairs
 }),/oorspronkelijke mediaverwijzingen zijn onvolledig/);
-const editorCode=[...wired.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/g)]
+const editorCode=[...wired.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
  .map(x=>x[1]).find(x=>x.includes('g.canonicalByDraft=Object.fromEntries('));
 assert.ok(editorCode);
 new vm.Script(editorCode,{filename:'f5-editor-canonical-media-refs.js'});

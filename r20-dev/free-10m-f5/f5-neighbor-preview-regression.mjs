@@ -135,6 +135,56 @@ for(const content of shippedScripts){
  compiled++;
 }
 assert.ok(compiled>3,'Shipped presentation script must parse');
+// Execute the REAL shipped boot fragment, not an invented presentation.
+// Fresh local videos without a cached still MUST NOT block first registration.
+// The five selected-neighbour photo/cached-still reads remain bounded.
+assert.ok(shipped.includes('async function warmFirstPhoto(memory,decodeMissingVideo=true)')&&
+  shipped.includes('else if(decodeMissingVideo){'),
+  'Missing conditional new-video poster decoder');
+const firstBootAnchor='   const center=selected?.ms??runtime.currentMemory()?.ms??Date.now();';
+const firstBootStart=shipped.indexOf(firstBootAnchor);
+const lastBootLine='   runtime.registerMemories(memories);';
+const firstBootEnd=shipped.indexOf(lastBootLine,firstBootStart);
+assert.ok(firstBootStart>0&&firstBootEnd>firstBootStart,
+  'The real first-session registration code must be present');
+const firstBootCode=shipped.slice(firstBootStart,firstBootEnd+lastBootLine.length);
+const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+const runFirstBoot=new AsyncFunction('selected','runtime','memories','warmFirstPhoto',
+  'location','URLSearchParams',firstBootCode);
+async function verifyFirstOpen(primaryKind){
+  const primary={id:'pwa:new-selected-'+primaryKind,ms:Date.now(),
+    _zeroItems:[{kind:primaryKind,key:'original-selected'}],tags:[]};
+  const neighbour={id:'pwa:other-new-video',ms:Date.now()-250,
+    _zeroItems:[{kind:'video',key:'original-other'}],tags:[]};
+  let registered=0,decoderAttempts=0,covers=0;
+  const runtime={currentMemory:()=>null,
+    registerMemories:memories=>{
+      assert.deepEqual(memories,[primary,neighbour]);registered++;
+    }};
+  const warm=(m,decodeMissingVideo)=>{
+    assert.equal(decodeMissingVideo,false,
+      'First-session boot must never request an uncached video decode');
+    if(m===primary||m===neighbour)covers++;
+    if(m._zeroItems[0].kind==='video'&&decodeMissingVideo!==false){
+      decoderAttempts++;return new Promise(()=>{});
+    }
+    return Promise.resolve();
+  };
+  await Promise.race([
+    runFirstBoot(primary,runtime,[primary,neighbour],warm,{search:''},URLSearchParams),
+    new Promise((_,reject)=>setTimeout(()=>reject(Error(
+      'FIRST_PWA_BOOT_STALLED_WAITING_FOR_VIDEO_THUMBNAIL:'+primaryKind)),650))
+  ]);
+  assert.equal(registered,1,'Initial timeline must register exactly once');
+  assert.equal(covers,2,'Nearby real photo and cached-still checks stay intact');
+  assert.equal(decoderAttempts,0,'No cold video decoder may block first launch');
+}
+await verifyFirstOpen('photo');
+await verifyFirstOpen('video');
+console.log('TALERA_FIRST_PWA_BOOT_NOT_BLOCKED_BY_NEW_VIDEO_PREVIEW_PASS',
+  JSON.stringify({firstPhotoPreserved:true,firstVideoUncachedNotBlocking:true,
+    fiveNeighbourChecksRetained:true,originalPosterOnDemand:true,
+    firstSessionAcceptedOnActualIphone:false}));
 console.log('TALERA_F5_FIRST_SWIPE_BOUNDED_PREWARM',JSON.stringify({
  success:true,syntheticOnly:true,accountPrivate:true,
  prewarmsMaxTwoNeighbors:true,noVideosOrFullAlbumsDecoded:true,

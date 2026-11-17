@@ -581,7 +581,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_ACTIVE_VERSION: b160ccee-5c19-46f5-a3f4-8809a0eba199
+      F5_ACTIVE_VERSION: 5035abc2-d4c7-41ad-a9dc-70ef5e92c3da
       F5_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -596,10 +596,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = f48a72b5dac59c01efbc5dc497943d5eb2d24886
-          test "$(git diff --name-only f48a72b5dac59c01efbc5dc497943d5eb2d24886 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          EXPECTED=$(printf "%s\n" .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
-          test "$(git diff --name-only 7c91555e88c636cb8974c8d0ca64c0f77d3a6373 HEAD)" = "$EXPECTED"
+          # The last video-readiness code is EXACTLY the 28/28-green commit.
+          # Publication may change THIS workflow only, not presentation or user media code.
+          test "$(git rev-parse HEAD^)" = 31b447750b5e856f5ac65d50351a23c4670d3875
+          test "$(git diff --name-only 31b447750b5e856f5ac65d50351a23c4670d3875 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
+          test "$(git diff --name-only ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD^)" = "$EXPECTED"
+          git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -645,7 +648,7 @@ jobs:
           assert.equal(before.find(b=>b.name==='AUTH_STORAGE_JURISDICTION')?.text,'eu');
           assert.equal(before.find(b=>b.name==='SOCIAL_STORAGE_JURISDICTION')?.text,'eu');
           fs.writeFileSync('/tmp/talera-library-preflight.json',JSON.stringify({version:process.env.F5_ACTIVE_VERSION,restoreVersion:process.env.F5_RESTORE_VERSION,bindings:before}));
-          console.log('CURRENT_16_NOV_LIVE_AND_APPROVED_RESTORE_VERSION_AND_17_BINDINGS_VERIFIED');
+          console.log('CURRENT_17_NOV_LIVE_AND_APPROVED_16_NOV_RESTORE_AND_17_BINDINGS_VERIFIED');
           NODE
       - name: Build the exact tested integrated library without changing personal data
         run: |
@@ -727,6 +730,6 @@ jobs:
           assert.notEqual(versions?.[0]?.version_id,process.env.F5_ACTIVE_VERSION);
           console.log('SAME_TALERA_ORIGIN_LIBRARY_ACCEPTANCE_PUBLISHED; IPHONE_TEST_STILL_OPEN');
           NODE
-      - name: Restore preceding 16-Nov live Worker on post-deploy failure
+      - name: Restore preceding 17-Nov QA Worker on post-deploy failure
         if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
-        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore 16 November TALERA approval after library QA failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore preceding 17 November TALERA QA after prewarm publication failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc

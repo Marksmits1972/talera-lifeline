@@ -20,5 +20,33 @@ export function preserveOriginalMediaIdsOnEdit(html){
  exact("},uploads,g.existing||undefined);const persisted=await mem.get(row.id);","},uploads,g.existing||undefined,canonicalIds);const persisted=await mem.get(row.id);","EDITOR_SAVE_FOURTH_ARG");
  exact("window.TaleraMemories={save:save,","async function setNarrationCuesForStory(storyId,cues){\n const story=await get(storyId);\n if(!story||story.source!=='pwa-local'||!Array.isArray(cues))\n  throw Error('Het vertelplan kan niet veilig aan deze herinnering worden gekoppeld.');\n const updated={...story,narrationCues:cues,narrationSchema:'media-id-v1'};\n const db=await open(),tx=db.transaction('stories','readwrite'),finished=done(tx);\n tx.objectStore('stories').put(updated);\n await finished;\n return updated;\n}\nwindow.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,","CUE_WRITER_LIBRARY_OWNER");
  exact("const updated={...persisted,narrationCues:mapped,narrationSchema:'media-id-v1'};\n  const db=await dbOpen();\n  try{\n    const tx=db.transaction('stories','readwrite'),complete=done(tx);\n    tx.objectStore('stories').put(updated);\n    await complete;\n  }finally{db.close()}","await mem.updateCues(persisted.id,mapped);","CUE_EDITOR_WRITES_THROUGH_LIBRARY");
+ // Editor concept writes are now owned by the SAME account-local library.
+ // Existing keys, stored Blob values and transaction semantics stay identical.
+ exact("window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,",
+   "async function writeDraftRows(rows){\\n"+
+   " if(!Array.isArray(rows)||rows.some(x=>!Array.isArray(x)||x.length!==2||typeof x[0]!=='string'||!x[0]))\\n"+
+   "  throw Error('Ongeldige conceptbestanden voor de bibliotheek.');\\n"+
+   " if(!rows.length)return;\\n"+
+   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\\n"+
+   " for(const [key,value] of rows)tx.objectStore('files').put({key,blob:value});\\n"+
+   " await finished;\\n"+
+   "}\\n"+
+   "async function deleteDraftKeys(keys){\\n"+
+   " if(!Array.isArray(keys)||keys.some(key=>typeof key!=='string'||!key))\\n"+
+   "  throw Error('Ongeldige conceptsleutels voor de bibliotheek.');\\n"+
+   " if(!keys.length)return;\\n"+
+   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\\n"+
+   " for(const key of keys)tx.objectStore('files').delete(key);\\n"+
+   " await finished;\\n"+
+   "}\\n"+
+   "window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,"+
+   "draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,",
+   "DRAFT_LIBRARY_OWNER");
+ exact("async function writeFiles(entries){const db=await dbOpen();try{const t=db.transaction('files','readwrite'),d=done(t);for(const [id,file] of entries)t.objectStore('files').put({key:PREFIX+id,blob:file});await d}finally{db.close()}}",
+   "async function writeFiles(entries){return mem.draftWriteRows(entries.map(([id,file])=>[PREFIX+id,file]))}",
+   "DRAFT_WRITE_GATEWAY");
+ exact("async function deleteFiles(ids){if(!ids.length)return;const db=await dbOpen();try{const t=db.transaction('files','readwrite'),d=done(t);ids.forEach(id=>t.objectStore('files').delete(PREFIX+id));await d}finally{db.close()}}",
+   "async function deleteFiles(ids){return mem.draftDeleteKeys(ids.map(id=>PREFIX+id))}",
+   "DRAFT_DELETE_GATEWAY");
  return html;
 }

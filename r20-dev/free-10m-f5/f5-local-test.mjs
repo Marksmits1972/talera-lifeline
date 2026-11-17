@@ -443,7 +443,8 @@ async function run(){
     'async function writeFiles(entries){return mem.draftWriteRows(',
     'async function deleteFiles(ids){return mem.draftDeleteKeys(',
     'draftReadPayload:readDraftPayload,',
-    'const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);'
+    'const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);',
+    "const cached=await mem.blob(PREFIX+'duplicate-index-v7');"
   ]){
     assert.ok(String(storyEditor.data).includes(marker),
       'Signed-in editor lost permanent-ID library contract: '+marker);

@@ -853,7 +853,13 @@ function installReadOnlyLibraryGateway(html){
  const m=matches[0],at=m.index+m[0].length;
  const install='\n'+raw+'\n'+
   'window.TaleraLibrary=window.TaleraLibraryFactory.create(window.TaleraMemories);\n';
- return html.slice(0,at)+install+html.slice(at);
+ const mounted=html.slice(0,at)+install+html.slice(at);
+ // Only AFTER ALL previously approved source-exact presentation repairs,
+ // switch the narrator's read dependency to the library gateway.
+ const old='const taleraIndependentNarrator=taleraCreateIndependentNarrator({stage,store,runtime});';
+ assert.equal(mounted.split(old).length,2,'LIBRARY_NARRATOR_ROUTER_MARKER_CHANGED');
+ return mounted.replace(old,
+  'const taleraIndependentNarrator=taleraCreateIndependentNarrator({stage,store:window.TaleraLibrary,runtime});');
 }
 
 // Each recorded memory is controlled by an entirely separate motor.
@@ -867,7 +873,7 @@ function isolateNarratedMemories(html){
    'NARRATOR_MUST_NOT_IMPORT_PRESENTATION_MOTOR');
  const oldStart="async function present(memory){\n  if(!stage||!memory)return;";
  const newStart=own+"\nconst taleraIndependentNarrator="+
-   "taleraCreateIndependentNarrator({stage,store:window.TaleraLibrary,runtime});\n"+
+   "taleraCreateIndependentNarrator({stage,store,runtime});\n"+
    "async function present(memory){\n  if(!stage||!memory)return;\n"+
    "  if(memory._zeroItems?.some(item=>item.kind==='audio')){\n"+
    "    if(taleraInline)disposePresentation();\n"+

@@ -581,7 +581,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_ACTIVE_VERSION: b703e96c-ea2d-4770-8d01-53f9c5535969
+      F5_ACTIVE_VERSION: 590ac3bf-e7bf-47d2-88d1-7e3abf954ec2
       F5_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -596,8 +596,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 4346b9f63e38b81890c3c60775d37d642223870a
-          test "$(git diff --name-only 4346b9f63e38b81890c3c60775d37d642223870a HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          test "$(git rev-parse HEAD^)" = b5d95355bf1f281feb9bfc3773b09728a3e711f9
+          test "$(git diff --name-only b5d95355bf1f281feb9bfc3773b09728a3e711f9 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           EXPECTED=$(printf "%s\n" .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
           test "$(git diff --name-only 7c91555e88c636cb8974c8d0ca64c0f77d3a6373 HEAD)" = "$EXPECTED"
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD

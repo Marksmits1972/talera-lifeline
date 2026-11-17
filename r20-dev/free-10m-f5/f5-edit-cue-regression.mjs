@@ -87,6 +87,14 @@ assert.ok(stable.includes("if(existing&&canonicalIds!==undefined&&canonicalIds[j
 assert.ok(stable.includes("tx.objectStore('files').add(row)"));
 assert.ok(stable.includes('canonicalIds);const persisted=await mem.get(row.id);'));
 assert.ok(stable.includes('g.canonicalByDraft[id]||null'));
+assert.ok(stable.includes('window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,'));
+assert.ok(stable.includes('await mem.updateCues(persisted.id,mapped);'));
+const patchedCueAt=stable.indexOf('async function taleraV61PersistMediaIds(');
+const patchedCueEnd=stable.indexOf('async function publish(',patchedCueAt);
+assert.ok(patchedCueAt>0&&patchedCueEnd>patchedCueAt);
+assert.ok(!stable.slice(patchedCueAt,patchedCueEnd).includes("db.transaction('stories'"),
+ 'Editor must not own permanent narration-cue writes');
+
 assert.ok(stable.includes("birthYear:Number(input.birthYear)||(existing?.birthYear||null)"));
 assert.ok(stable.includes("const row=await mem.save({title,date:g.date"));
 const stableScripts=[...stable.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]

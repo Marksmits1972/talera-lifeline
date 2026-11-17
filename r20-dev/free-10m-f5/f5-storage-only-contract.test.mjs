@@ -21,7 +21,7 @@ for(const forbidden of [
 ])assert.ok(!gateway.includes(forbidden),'Storage-only app contains UI patch '+forbidden);
 assert.ok(gateway.includes('scopeLocalMemories(privateHtml,await privateAccountScope(actor.id))'),
   'Private local media must be bound to verified session identity');
-assert.ok(gateway.includes("pathname==='/tell'?alignEditedNarrationCueRefs(scoped):scoped"),
+assert.ok(gateway.includes("pathname==='/tell'?retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped)):scoped"),
   'Only recording media-ID integrity is allowed as an editor storage correction');
 assert.ok(gateway.includes("const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;")&&
   gateway.includes('assetizeHtml(silenced,new Set(approvedAssets))'),

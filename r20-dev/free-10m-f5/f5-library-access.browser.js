@@ -69,6 +69,8 @@
   };
   const api={
    listStories,readStory,orderedMedia,originalBlob,mediaUrl,displayUrl,playback,
+   // Compatibility names used by the two approved playback engines.
+   list:listStories,get:readStory,blob:originalBlob,
    // Writing stays controlled by the existing editor/storage implementation;
    // neither player receives a second database handle or a write method.
    localOnly:true

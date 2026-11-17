@@ -32,16 +32,13 @@
   };
   const mediaUrl=async id=>{
    requireId(id,'MEDIA_ID');
-   const url=await store.mediaUrl(id);
-   if(typeof url!=='string'||!url)throw Error('TALERA_LIBRARY_MEDIA_URL_MISSING');
-   // Temporary URLs are owned and ultimately revoked by the caller/player.
-   return url;
+   // Same missing-file behavior as the approved motor. The motor decides
+   // whether a missing optional cover or original media ends the phase.
+   return store.mediaUrl(id);
   };
   const displayUrl=async id=>{
    requireId(id,'MEDIA_ID');
-   const url=await (typeof store.displayUrl==='function'?store.displayUrl(id):store.mediaUrl(id));
-   if(typeof url!=='string'||!url)throw Error('TALERA_LIBRARY_DISPLAY_URL_MISSING');
-   return url;
+   return typeof store.displayUrl==='function'?store.displayUrl(id):store.mediaUrl(id);
   };
   // Returns permanent catalog references; does not create or move original files.
   const orderedMedia=async id=>{
@@ -70,7 +67,10 @@
   const api={
    listStories,readStory,orderedMedia,originalBlob,mediaUrl,displayUrl,playback,
    // Compatibility names used by the two approved playback engines.
-   list:listStories,get:readStory,blob:originalBlob,
+   // Original read-signatures remain compatible, including null on a miss.
+   list:(...args)=>store.list(...args),
+   get:(...args)=>store.get(...args),
+   blob:id=>{requireId(id,'MEDIA_ID');return store.blob(id)},
    // Writing stays controlled by the existing editor/storage implementation;
    // neither player receives a second database handle or a write method.
    localOnly:true

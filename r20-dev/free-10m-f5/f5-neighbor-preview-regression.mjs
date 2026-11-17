@@ -107,6 +107,14 @@ assert.ok(shipped.includes('function playOrdinaryVideo(memory,index)') &&
   shipped.includes('window.TaleraLibrary=window.TaleraLibraryFactory.create(window.TaleraMemories)') &&
   !shipped.includes("window.TaleraMemories?.blob?.(key)"),
   'Ordinary video must read original media through the single account-local library');
+const libraryFactory=readFileSync('r20-dev/free-10m-f5/f5-library-access.browser.js','utf8');
+assert.ok(shipped.includes(libraryFactory),'Shipped page must include the exact library gateway');
+const playerWithoutLibrarySource=shipped.replace(libraryFactory,'');
+for(const name of ['list','get','blob','mediaUrl','displayUrl']){
+ assert.ok(!playerWithoutLibrarySource.includes('store.'+name+'('),
+  'The presentation may not bypass the library for '+name);
+}
+
 const narratorMarkers=['function taleraInlineSync(s){','function taleraInlineVoiceEnded(s){',
   'function taleraInlinePlayMedia(s,frame,muted,finished){'];
 for(const marker of narratorMarkers){

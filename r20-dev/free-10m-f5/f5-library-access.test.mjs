@@ -65,11 +65,13 @@ assert.strictEqual(p.cues,playback._taleraNarrationCues,'Do not alter cue times'
 assert.ok(Object.isFrozen(p));
 assert.equal(library.playback({id:'pwa:local-memory-2',items:[]}).hasVoice,false);
 await assert.rejects(()=>library.originalBlob('missing'),/TALERA_LIBRARY_ORIGINAL_MEDIA_NOT_FOUND/);
-await assert.rejects(()=>library.mediaUrl('missing'),/TALERA_LIBRARY_MEDIA_URL_MISSING/);
+assert.equal(await library.mediaUrl('missing'),null);
+assert.equal(await library.blob('missing'),null);
+assert.equal(await library.get('missing'),null);
 await assert.rejects(()=>library.readStory('missing'),/TALERA_LIBRARY_STORY_NOT_FOUND/);
 await assert.rejects(()=>library.readStory(''),/TALERA_LIBRARY_INVALID_STORY_ID/);
 await assert.rejects(()=>library.orderedMedia('missing'),/TALERA_LIBRARY_STORY_NOT_FOUND/);
-assert.ok(gets>0&&blobs===4&&lists===1&&urls===2);
+assert.ok(gets>0&&blobs===5&&lists===1&&urls===2);
 assert.deepEqual(stories[0].items.map(x=>x.key),['media-photo-1','media-video-1','media-voice-1']);
 assert.equal(files.get('media-photo-1'),photo);
 console.log('TALERA_LIBRARY_READONLY_GATEWAY_CONTRACT_PASS',JSON.stringify({

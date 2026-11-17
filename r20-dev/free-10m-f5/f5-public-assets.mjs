@@ -846,14 +846,24 @@ function installReadOnlyLibraryGateway(html){
  const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
  assert.ok(raw.includes('TaleraLibraryFactory')&&!raw.includes('</script'),
    'LIBRARY_GATEWAY_SOURCE_INVALID');
+ // Re-route only existing read calls, AFTER every approved source-exact
+ // presentation patch. Do this BEFORE injecting the factory itself, so
+ // its own calls to the unchanged IndexedDB owner are never rewritten.
+ let routed=html;
+ for(const name of ['list','get','blob','mediaUrl','displayUrl']){
+  const before='store.'+name+'(';
+  const hits=routed.split(before).length-1;
+  assert.ok(hits<60,'LIBRARY_UNEXPECTED_READ_CALL_COUNT_'+name);
+  if(hits)routed=routed.replaceAll(before,'window.TaleraLibrary.'+name+'(');
+ }
  const re=/window\.TaleraMemories=\{[^\n;]*localOnly:true\};/g;
- const matches=[...html.matchAll(re)];
+ const matches=[...routed.matchAll(re)];
  assert.equal(matches.length,1,'LIBRARY_ORIGINAL_STORE_MARKER_CHANGED');
- assert.ok(!html.includes('window.TaleraLibrary='),'LIBRARY_GATEWAY_DUPLICATED');
+ assert.ok(!routed.includes('window.TaleraLibrary='),'LIBRARY_GATEWAY_DUPLICATED');
  const m=matches[0],at=m.index+m[0].length;
  const install='\n'+raw+'\n'+
   'window.TaleraLibrary=window.TaleraLibraryFactory.create(window.TaleraMemories);\n';
- const mounted=html.slice(0,at)+install+html.slice(at);
+ const mounted=routed.slice(0,at)+install+routed.slice(at);
  // Only AFTER ALL previously approved source-exact presentation repairs,
  // switch the narrator's read dependency to the library gateway.
  const old='const taleraIndependentNarrator=taleraCreateIndependentNarrator({stage,store,runtime});';

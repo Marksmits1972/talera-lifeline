@@ -1056,8 +1056,9 @@ try{
       JSON.stringify(firstMediaCover));
 
   // Real-IndexedDB original video: on returning from its second photo to
-  // its own first media, a single saved .15s wheel still must remain above
-  // the SAME native video until the matching moving frame is composed.
+  // its own first media, reuse the same saved 0.15s still. Begin a guarded
+  // 50ms visual blend once the actual video passes the 0.10s mark; retain
+  // the original video and stored thumbnail without seeking or copying.
   // Prove attachment, removal before video end and media-ID ownership.
   await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();
@@ -1069,10 +1070,16 @@ try{
     const host=document.getElementById('photoStage')?.parentElement;
     if(!host)throw Error('Original ordinary presentation host not found');
     const trace={added:0,removed:0,src:'',timeAtRemoval:null,
-      endedAtRemoval:null,hasOneSoundNode:null};
+      fadeAt:null,fadeDuration:null,endedAtRemoval:null,hasOneSoundNode:null};
     window.__taleraFirstFrameHandoffTrace=trace;
     window.__taleraFirstFrameHandoffObserver=new MutationObserver(records=>{
       for(const record of records){
+        if(record.type==='attributes'&&record.target.classList?.contains('talera-v61-first-frame-bridge')&&
+           record.target.style.opacity==='0'&&trace.fadeAt===null){
+          const video=document.querySelector('video.talera-v61-inline-video');
+          trace.fadeAt=video?.currentTime??null;
+          trace.fadeDuration=record.target.style.transition;
+        }
         for(const node of record.addedNodes){
           if(node.nodeType===1&&node.classList?.contains('talera-v61-first-frame-bridge')){
             trace.added++;trace.src=node.src;
@@ -1088,7 +1095,8 @@ try{
         }
       }
     });
-    window.__taleraFirstFrameHandoffObserver.observe(host,{childList:true});
+    window.__taleraFirstFrameHandoffObserver.observe(host,{
+      childList:true,subtree:true,attributes:true,attributeFilter:['style']});
     const m=window.__taleraTimelineRuntime.currentMemory();
     window.__taleraOrdinarySelectPhoto?.(m.id,0,true);
   });
@@ -1110,8 +1118,15 @@ try{
   assert.equal(exactHandoff.removed,1);
   assert.equal(exactHandoff.exactSameStill,true,
     'Handoff must reuse the SAME video still as the existing timeline wheel');
+  assert.ok(exactHandoff.fadeAt>=.095,
+    'Do not fade a 0.15s thumbnail until the native video has a decoded 0.10s frame: '+
+      JSON.stringify(exactHandoff));
+  assert.ok(exactHandoff.fadeAt<.27,
+    'Do not hold a still until long after playback starts: '+JSON.stringify(exactHandoff));
+  assert.equal(exactHandoff.fadeDuration,'opacity 50ms linear',
+    'Only a short 50ms blend is permitted in the existing video stage');
   assert.ok(exactHandoff.timeAtRemoval>=.14,
-    'Never jump backwards from the 0.15s saved first-video still');
+    'Remove the old 0.15s still only after the matching video time and fade');
   assert.equal(exactHandoff.endedAtRemoval,false,
     'The visual transition must settle WHILE the original video plays');
   assert.equal(exactHandoff.bridgeLeft,false);

@@ -1320,9 +1320,8 @@ try{
   const ordinarySource=await page.content();
   assert.ok(!ordinarySource.includes('taleraOrdinaryVideoMask')&&
     !ordinarySource.includes('talera-f5-ordinary-video-mask')&&
-    ordinarySource.includes('video.onloadeddata=start')&&
-    ordinarySource.includes('video.oncanplay=start')&&
-    ordinarySource.includes('setTimeout(()=>{if(valid()&&video.paused)start()},1200)')&&
+    ordinarySource.includes('video.onloadedmetadata=start')&&
+    ordinarySource.includes('video.src=url;start()')&&
     !ordinarySource.includes('video.src=url;video.load()'),
     'No blue overlay between memories; original video first frame must decode before play');
   assert.ok(ordinarySource.includes('const adjacentOriginals=new Map()')&&

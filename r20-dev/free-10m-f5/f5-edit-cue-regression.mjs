@@ -88,7 +88,7 @@ assert.ok(stable.includes("tx.objectStore('files').add(row)"));
 assert.ok(stable.includes('canonicalIds);const persisted=await mem.get(row.id);'));
 assert.ok(stable.includes('g.canonicalByDraft[id]||null'));
 assert.ok(stable.includes("birthYear:Number(input.birthYear)||(existing?.birthYear||null)"));
-assert.ok(!stable.includes("const row=await mem.save({title,date:g.date"));
+assert.ok(stable.includes("const row=await mem.save({title,date:g.date"));
 const stableScripts=[...stable.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
  .map(m=>m[1]);
 const storeScript=stableScripts.find(src=>src.includes('async function save(input,uploads,editId,canonicalIds)'));

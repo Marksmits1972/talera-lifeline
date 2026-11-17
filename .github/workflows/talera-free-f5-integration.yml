@@ -596,7 +596,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 08600e85d6bfb9fa994b7ddb2866995c48b5398e
+          test "$(git rev-parse HEAD^)" = 74e1fa276ae328a84b66d767714fba1284b63beb
           test "$(git diff --name-only 3d12087716550665bc68c4b71977dddd99243b1e HEAD)" = .github/workflows/talera-free-f5-integration.yml
           EXPECTED=$(printf "%s\n" .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
           test "$(git diff --name-only 7c91555e88c636cb8974c8d0ca64c0f77d3a6373 HEAD)" = "$EXPECTED"

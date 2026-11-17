@@ -846,13 +846,13 @@ function installReadOnlyLibraryGateway(html){
  const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
  assert.ok(raw.includes('TaleraLibraryFactory')&&!raw.includes('</script'),
    'LIBRARY_GATEWAY_SOURCE_INVALID');
- const re=/window\\.TaleraMemories=\\{[^\\n;]*localOnly:true\\};/g;
+ const re=/window\.TaleraMemories=\{[^\n;]*localOnly:true\};/g;
  const matches=[...html.matchAll(re)];
  assert.equal(matches.length,1,'LIBRARY_ORIGINAL_STORE_MARKER_CHANGED');
  assert.ok(!html.includes('window.TaleraLibrary='),'LIBRARY_GATEWAY_DUPLICATED');
  const m=matches[0],at=m.index+m[0].length;
- const install='\\n'+raw+'\\n'+
-  'window.TaleraLibrary=window.TaleraLibraryFactory.create(window.TaleraMemories);\\n';
+ const install='\n'+raw+'\n'+
+  'window.TaleraLibrary=window.TaleraLibraryFactory.create(window.TaleraMemories);\n';
  return html.slice(0,at)+install+html.slice(at);
 }
 

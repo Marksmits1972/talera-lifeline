@@ -1,0 +1,22 @@
+// TALERA Free: permanent published media IDs, independent of visual order.
+// Patch only the ORIGINAL private-account TaleraMemories save and editor call.
+// No migration, secondary database, Worker, UI change or media deletion.
+export function preserveOriginalMediaIdsOnEdit(html){
+ if(typeof html!=='string'||!html.includes('talera-memory-store-v1'))
+  throw Error('TALERA_LIBRARY_EDITOR_SAVE_SOURCE_MISSING');
+ const exact=(a,b,label)=>{
+  const n=html.split(a).length-1;
+  if(n!==1)throw Error('TALERA_LIBRARY_EDITOR_SAVE_DRIFT_'+label+':'+n);
+  html=html.replace(a,b);
+ };
+ exact("async function save(input,uploads,editId){","async function save(input,uploads,editId,canonicalIds){","SAVE_ARG");
+ exact("if(editId&&(!existing||existing.source!=='pwa-local'))throw Error('Deze herinnering kan niet worden bewerkt.');","if(editId&&(!existing||existing.source!=='pwa-local'))throw Error('Deze herinnering kan niet worden bewerkt.');\n if(existing&&canonicalIds!==undefined){\n  if(!Array.isArray(canonicalIds)||canonicalIds.length!==uploads.length)\n   throw Error('Het oorspronkelijke media-overzicht is onvolledig.');\n  const originals=new Map((existing.items||[]).map(item=>[item.key,item]));\n  const used=new Set();\n  for(let n=0;n<uploads.length;n++){\n   const key=canonicalIds[n];\n   if(key===null||key===undefined)continue;\n   if(typeof key!=='string'||!originals.has(key)||used.has(key))\n    throw Error('Een oorspronkelijk media-ID kan niet veilig worden teruggevonden.');\n   const item=originals.get(key),original=await blob(key);\n   if(item.kind!==typeOf(uploads[n])||item.size!==uploads[n].size||\n      !(original instanceof Blob)||!original.size)\n    throw Error('Het oorspronkelijke mediabestand is niet meer hetzelfde. De herinnering blijft behouden.');\n   used.add(key);\n  }\n }\n","PREFLIGHT_ORIGINAL");
+ exact("files.push({key:id+':'+i,kind:kind,name:safeName(f.name||kind),mime:f.type||'',size:f.size});","const mediaKey=existing&&canonicalIds!==undefined?\n   (canonicalIds[i]||id+':new-'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2))):\n   id+':'+i;\n  files.push({key:mediaKey,kind:kind,name:safeName(f.name||kind),mime:f.type||'',size:f.size});","STABLE_KEYS");
+ exact("birthYear:Number(input.birthYear)||null,source:'pwa-local'};","birthYear:Number(input.birthYear)||(existing?.birthYear||null),source:'pwa-local'};","PRESERVE_YEAR");
+ exact("phoneCopies.push(typeOf(uploads[p])==='photo'?await phoneRendition(uploads[p]):null);","phoneCopies.push(!(existing&&canonicalIds!==undefined&&canonicalIds[p])&&typeOf(uploads[p])==='photo'?await phoneRendition(uploads[p]):null);","NO_COPY_REUSED");
+ exact("if(existing)for(var k=0;k<(existing.items||[]).length;k++){","if(existing&&canonicalIds===undefined)for(var k=0;k<(existing.items||[]).length;k++){","KEEP_ORIGINALS");
+ exact("for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:uploads[j]});","for(var j=0;j<files.length;j++){\n   if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;\n   const row={key:files[j].key,blob:uploads[j]};\n   if(existing&&canonicalIds!==undefined)tx.objectStore('files').add(row);\n   else tx.objectStore('files').put(row);\n  }","ADD_ONLY_NEW");
+ exact("const title=g.title.trim();const row=await mem.save(","const title=g.title.trim();\n const canonicalIds=g.existing?(()=>{\n  if(!g.canonicalByDraft||typeof g.canonicalByDraft!=='object')\n   throw Error('Deze oudere conceptbewerking bevat geen veilige media-ID-koppelingen. De bestaande herinnering blijft intact.');\n  return [...g.media,...(g.voice?[g.voice]:[])].map(id=>g.canonicalByDraft[id]||null);\n })():undefined;\n const row=await mem.save(","EDITOR_IDS");
+ exact("},uploads,g.existing||undefined);const persisted=await mem.get(row.id);","},uploads,g.existing||undefined,canonicalIds);const persisted=await mem.get(row.id);","EDITOR_SAVE_FOURTH_ARG");
+ return html;
+}

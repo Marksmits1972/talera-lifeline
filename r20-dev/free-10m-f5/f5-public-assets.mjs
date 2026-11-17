@@ -785,23 +785,8 @@ function rebuildDirectOrdinaryPresentation(html){
   once("window.__taleraV31SelectPhoto?.(memoryId,index,true);","window.__taleraOrdinarySelectPhoto?.(memoryId,index,true);",'ORDINARY_TAP_ENTRY_ONLY');
   once(" function activate(memory){\n   if(!memory||!memory._taleraLocal){disposePresentation();return}\n   if(memory._photoLoading){void hydrate(memory).then(()=>{if(runtime.currentMemory()?.id===memory.id)activate(memory)});return}\n   void present(memory);\n }"," function activate(memory){\n   if(!memory||!memory._taleraLocal){disposePresentation();return}\n   if(memory._photoLoading){void hydrate(memory).then(()=>{if(runtime.currentMemory()?.id===memory.id)activate(memory)});return}\n   // Routing only: the original recorded-voice functions remain untouched.\n   if(!memory._zeroItems?.some(item=>item.kind==='audio')){\n     if(activeId!==null)disposePresentation();\n     window.__taleraOrdinaryActivate?.(memory);\n     return;\n   }\n   void present(memory);\n }",'ONE_ENGINE_ROUTER');
 
-  // Restrict source-exact edits to the ORDINARY video function; the narrator
-  // also uses some of the same HTMLMediaElement styles and must not be edited.
-  const ordinaryOnce=(a,b,k)=>{
-    const first=html.indexOf('  function playOrdinaryVideo(memory,index){');
-    const last=html.indexOf('  function showPhoto(memory,index,manual=false){',first);
-    assert.ok(first>=0&&last>first,'DIRECT_ORDINARY_SCOPE_'+k);
-    const part=html.slice(first,last);
-    assert.equal(part.split(a).length,2,'DIRECT_ORDINARY_'+k);
-    html=html.slice(0,first)+part.replace(a,b)+html.slice(last);
-  };
-  // Never add a blue frame between stories. The original 11-cell wheel
-  // already previews the next video while the same native player warms up.
-  // On a cold video open, wait for the ORIGINAL video frame to decode before
-  // requesting playback. Preserve the exact existing shared audio node.
-  ordinaryOnce("        video.onloadedmetadata=start;","        video.onloadedmetadata=()=>{if(video.readyState>=2)start()};\n        video.onloadeddata=start;\n        video.oncanplay=start;",'FIRST_REAL_VIDEO_FRAME_BEFORE_PLAY');
-  ordinaryOnce("        video.src=url;start();","        video.src=url;\n        // Setting src already starts loading. Do not reset iPhone decoding with load().\n        // If iOS ignores preload, use the original play route only as a fallback.\n        setTimeout(()=>{if(valid()&&video.paused)start()},1200);",'NO_DOUBLE_LOAD_COLD_VIDEO_START');
-  once("        ordinaryVideo.onplaying=ordinaryVideo.ontimeupdate=null;","        ordinaryVideo.onplaying=ordinaryVideo.ontimeupdate=ordinaryVideo.onloadeddata=ordinaryVideo.oncanplay=null;",'CLEANUP_FIRST_FRAME_HANDLERS');
+  // Keep the proven ordinary video start exactly as tested; no injected
+  // blue mask or second decoder load between adjacent memories.
   // First iPhone start: repeated 0.4 s hard seeks made cold audio stutter.
   // Retain the approved shared audio element and a last-resort drift check,
   // never chase each early timeupdate while both decoders are warming.

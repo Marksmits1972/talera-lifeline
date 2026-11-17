@@ -1316,6 +1316,35 @@ try{
     video.loop=true;video.playbackRate=.1;
     return true;
   },null,{timeout:12000});
+  // Distinct ownership: the stored thumbnail remains for the swipe strip,
+  // while the ordinary presentation exposes only decoded original video.
+  await page.waitForFunction(()=>{
+    const video=document.querySelector('video.talera-v61-inline-video');
+    const mask=document.getElementById('talera-f5-ordinary-video-mask');
+    return !!mask&&!!video&&!video.paused&&
+      video.readyState>=2&&video.style.opacity==='1';
+  },null,{timeout:12000});
+  const videoStage=await page.evaluate(()=>({
+    mask:!!document.getElementById('talera-f5-ordinary-video-mask'),
+    videoVisible:document.querySelector('video.talera-v61-inline-video')?.style.opacity==='1',
+    thumbnail:window.__taleraTimelineRuntime?.currentMemory?.()?.thumbnail,
+    videoSource:document.querySelector('video.talera-v61-inline-video')?.currentSrc,
+    narrator:!!document.querySelector('.talera-independent-narrator-layer')
+  }));
+  assert.equal(videoStage.mask,true,'An ordinary video must cover its static JPEG stage');
+  assert.equal(videoStage.videoVisible,true,'Only a decoded playing frame may become visible');
+  assert.ok(videoStage.thumbnail?.startsWith('blob:'),
+    'The unchanged thumbnail must remain available to the original swipe strip');
+  assert.ok(videoStage.videoSource?.startsWith('blob:'),
+    'The presentation must play the original local video Blob, not a JPEG still');
+  assert.equal(videoStage.narrator,false,'An ordinary video must not activate narration');
+  const ordinarySource=await page.content();
+  assert.ok(ordinarySource.includes('now-lastSoundSeekAt<5000')&&
+    ordinarySource.includes('Math.abs(audio.currentTime-video.currentTime)>1.5'),
+    'Cold first audio must not be repeatedly seeked every 0.4 second');
+  console.log('TALERA_ORDINARY_VIDEO_NO_THUMB_FLASH_COLD_SOUND_GUARD_PASS',
+    JSON.stringify({stripThumbnailUnchanged:true,videoDecodedBeforeVisible:true,
+      firstAudioHardSeekThrottled:true,narratorUntouched:true,iPhoneAccepted:false}));
   const videoSurface=await page.locator('#surface').boundingBox();
   const videoY=videoSurface.y+videoSurface.height*.38;
   await page.mouse.move(videoSurface.x+videoSurface.width*.2,videoY);

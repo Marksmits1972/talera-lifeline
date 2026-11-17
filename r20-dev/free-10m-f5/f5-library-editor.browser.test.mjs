@@ -17,6 +17,13 @@ const mapped=retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped));
 const edited=preserveOriginalMediaIdsOnEdit(mapped);
 const scripts=[...edited.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
 const storage=scripts.find(m=>m[1].includes('talera-memory-store-v1'))?.[2];
+const deletion=scripts.find(m=>m[1].includes('talera-v9-complete-delete'))?.[2];
+assert.ok(deletion&&deletion.includes('window.TaleraMemories.removePublishedStory(key)'));
+assert.ok(!deletion.includes('indexedDB.open('),'UI deletion must not know physical storage');
+assert.ok(storage.includes('removePublishedStory:taleraLibraryRemoval.removePublishedStory,'));
+assert.ok(storage.includes('repairOrphanDrafts:taleraLibraryRemoval.repairOrphans,'));
+assert.ok(storage.includes("db.transaction(['stories','files'],'readwrite')"),
+ 'Original atomic deletion must live in the one library owner');
 assert.ok(storage&&storage.includes('async function save(input,uploads,editId,canonicalIds){'));
 assert.ok(storage.includes('if(existing&&canonicalIds===undefined)for('));
 assert.ok(storage.includes("tx.objectStore('files').add(row)"));
@@ -33,6 +40,7 @@ assert.ok(!edited.includes("const req=db.transaction('files','readonly').objectS
 
 
 const html='<!doctype html><html lang="nl"><head><meta charset="utf-8"></head><body>'+
+ '<script id="talera-v9-complete-delete">'+deletion+'</'+'script>'+
  '<script id="talera-memory-store-v1">'+storage+'</'+'script></body></html>';
 let page,browser,server,otherRequests=0;
 const port=8963;
@@ -221,6 +229,59 @@ try{
        JSON.stringify([...new Uint8Array(await src.arrayBuffer())]))
     throw Error('Restored original media bytes are not identical');
   }
+  // Existing complete-delete button MUST use the original bookcase and
+  // preserve media shared with another memory in one atomic transaction.
+  const deleteMe=await mem.save({title:'Weg te halen testherinnering',
+   date:'1990-01-01',text:'synthetisch'},[first,second]);
+  const [sharedKey,uniqueKey]=deleteMe.items.map(item=>item.key);
+  const privateDb='talera-free-local-'+('b'.repeat(32))+'-v1';
+  const shareId='local-shared-synthetic-media';
+  const req=indexedDB.open(privateDb,1);
+  const db=await new Promise((ok,bad)=>{
+   req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error);
+  });
+  const tx=db.transaction('stories','readwrite');
+  tx.objectStore('stories').add({id:shareId,source:'pwa-local',
+   title:'Gedeeld origineel',items:[{key:sharedKey,kind:'photo'}]});
+  await new Promise((ok,bad)=>{
+   tx.oncomplete=ok;tx.onabort=()=>bad(tx.error);
+  });
+  db.close();
+  if(typeof window.__taleraV9FullDelete!=='function'||
+     typeof mem.removePublishedStory!=='function'||
+     typeof mem.repairOrphanDrafts!=='function')
+   throw Error('Original deletion UI is not linked to the library');
+  let invalidDeleteRejected=false;
+  try{await window.__taleraV9FullDelete('invalid-id')}
+  catch(e){invalidDeleteRejected=String(e.message).includes('Ongeldig herinnerings-ID')}
+  if(!invalidDeleteRejected)throw Error('Invalid deletion ID was accepted');
+  const removal=await window.__taleraV9FullDelete(deleteMe.id);
+  if(!removal||removal.removedMedia!==1||await mem.get(deleteMe.id)||
+     !(await mem.blob(sharedKey))||(await mem.blob(uniqueKey)))
+   throw Error('Deletion lost shared original or retained deleted record');
+  if(!(await mem.get(shareId)))
+   throw Error('Unrelated story was deleted');
+  // Orphan cleanup removes only edits for missing published stories.
+  const draftPrefix='talera-v4-work:',draftManifest=draftPrefix+'manifest';
+  const goneDraft='orphan-synthetic-photo',keepDraft='new-independent-photo';
+  await mem.draftWriteRows([
+   [draftManifest,[
+    {id:'orphan-synthetic',existing:'local-already-gone',
+     media:[goneDraft],voice:''},
+    {id:'new-synthetic',existing:'',media:[keepDraft],voice:''}
+   ]],
+   [draftPrefix+goneDraft,first],
+   [draftPrefix+keepDraft,second]
+  ]);
+  const repaired=await window.__taleraV9RepairOrphans();
+  const survivors=await mem.blob(draftManifest);
+  if(repaired!==1||!Array.isArray(survivors)||survivors.length!==1||
+     survivors[0].id!=='new-synthetic'||await mem.blob(draftPrefix+goneDraft)||
+     !(await mem.blob(draftPrefix+keepDraft)))
+   throw Error('Orphan cleanup deleted independent draft or retained orphan');
+  // Synthetic cleanup is explicit and never touches owner/device data.
+  await window.__taleraV9FullDelete(shareId);
+  await mem.draftDeleteKeys([draftManifest,draftPrefix+keepDraft]);
   return {storyUnchangedId:grown.id===story.id,
    reorderedExistingKeys:order.join(',')===keys.slice().reverse().join(','),
    existingOriginalBytesIdentical:true,newFileHasNewId:true,

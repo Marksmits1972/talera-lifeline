@@ -581,7 +581,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_APPROVED_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
+      F5_ACTIVE_VERSION: 0b7a9345-8556-481f-8aad-975bb9c1d6d1
+      F5_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
         with:
@@ -595,8 +596,10 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 7c91555e88c636cb8974c8d0ca64c0f77d3a6373
-          test "$(git diff --name-only 7c91555e88c636cb8974c8d0ca64c0f77d3a6373 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          test "$(git rev-parse HEAD^)" = 3d12087716550665bc68c4b71977dddd99243b1e
+          test "$(git diff --name-only 3d12087716550665bc68c4b71977dddd99243b1e HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          EXPECTED=$(printf "%s\n" .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-neighbor-preview-regression.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
+          test "$(git diff --name-only 7c91555e88c636cb8974c8d0ca64c0f77d3a6373 HEAD)" = "$EXPECTED"
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -615,11 +618,12 @@ jobs:
             assert.equal(r.status,200,'Protected existing Worker preflight '+path);
             const j=await r.json();assert.equal(j.success,true);return j.result;
           }
-          const [deploy,settings,approved]=await Promise.all([
-            get('/deployments'),get('/settings'),get('/versions/'+process.env.F5_APPROVED_VERSION)
+          const [deploy,settings,approved,active]=await Promise.all([
+            get('/deployments'),get('/settings'),get('/versions/'+process.env.F5_RESTORE_VERSION),
+            get('/versions/'+process.env.F5_ACTIVE_VERSION)
           ]);
           assert.deepEqual(deploy.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),
-            [[process.env.F5_APPROVED_VERSION,100]],
+            [[process.env.F5_ACTIVE_VERSION,100]],
             'Do not overwrite any newer or unexpected QA deployment');
           const normalize=b=>({
             name:b.name,type:b.type,
@@ -628,7 +632,9 @@ jobs:
           });
           const sorted=a=>a.map(normalize).sort((a,b)=>a.name.localeCompare(b.name));
           const before=sorted(settings.bindings||[]),official=sorted(approved.resources?.bindings||[]);
-          assert.deepEqual(before,official,'Original accepted version settings must match');
+          const deployed=sorted(active.resources?.bindings||[]);
+          assert.deepEqual(before,deployed,'Current live version bindings must match');
+          assert.deepEqual(before,official,'Current live settings must preserve approved 16-Nov account and storage bindings');
           assert.equal(before.length,17);
           const types=t=>before.filter(b=>b.type===t);
           assert.equal(types('durable_object_namespace').length,7);
@@ -638,8 +644,8 @@ jobs:
           for(const k of vars)assert.ok(before.find(b=>b.name===k&&b.type==='plain_text')?.text,'Missing existing '+k);
           assert.equal(before.find(b=>b.name==='AUTH_STORAGE_JURISDICTION')?.text,'eu');
           assert.equal(before.find(b=>b.name==='SOCIAL_STORAGE_JURISDICTION')?.text,'eu');
-          fs.writeFileSync('/tmp/talera-library-preflight.json',JSON.stringify({version:process.env.F5_APPROVED_VERSION,bindings:before}));
-          console.log('EXISTING_APPROVED_16_NOV_VERSION_AND_17_BINDINGS_VERIFIED');
+          fs.writeFileSync('/tmp/talera-library-preflight.json',JSON.stringify({version:process.env.F5_ACTIVE_VERSION,restoreVersion:process.env.F5_RESTORE_VERSION,bindings:before}));
+          console.log('CURRENT_16_NOV_LIVE_AND_APPROVED_RESTORE_VERSION_AND_17_BINDINGS_VERIFIED');
           NODE
       - name: Build the exact tested integrated library without changing personal data
         run: |
@@ -685,7 +691,7 @@ jobs:
           const r=await fetch(u,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},signal:AbortSignal.timeout(20000)});
           assert.equal(r.status,200);
           const j=await r.json();assert.equal(j.success,true);
-          assert.deepEqual(j.result.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),[[process.env.F5_APPROVED_VERSION,100]]);
+          assert.deepEqual(j.result.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),[[process.env.F5_ACTIVE_VERSION,100]]);
           NODE
       - name: Publish this exact library candidate to the ALREADY EXISTING TALERA acceptance origin
         id: deploy
@@ -718,9 +724,9 @@ jobs:
           const versions=d.deployments?.[0]?.versions;
           assert.equal(versions?.length,1);
           assert.equal(versions?.[0]?.percentage,100);
-          assert.notEqual(versions?.[0]?.version_id,process.env.F5_APPROVED_VERSION);
+          assert.notEqual(versions?.[0]?.version_id,process.env.F5_ACTIVE_VERSION);
           console.log('SAME_TALERA_ORIGIN_LIBRARY_ACCEPTANCE_PUBLISHED; IPHONE_TEST_STILL_OPEN');
           NODE
-      - name: Restore approved 16-Nov Worker on post-deploy failure
+      - name: Restore preceding 16-Nov live Worker on post-deploy failure
         if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore 16 November TALERA approval after library QA failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc

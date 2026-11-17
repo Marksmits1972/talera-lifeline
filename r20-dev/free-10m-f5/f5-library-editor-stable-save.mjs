@@ -39,8 +39,39 @@ export function preserveOriginalMediaIdsOnEdit(html){
    " for(const key of keys)tx.objectStore('files').delete(key);\n"+
    " await finished;\n"+
    "}\n"+
+   "async function readDraftPayload(manifestKey,prefix){\n"+
+   " if(typeof manifestKey!=='string'||!manifestKey||\n"+
+   "    typeof prefix!=='string'||!prefix)\n"+
+   "  throw Error('Ongeldige conceptverwijzing voor de bibliotheek.');\n"+
+   " const db=await open();\n"+
+   " try{\n"+
+   "  const store=db.transaction('files','readonly').objectStore('files');\n"+
+   "  const manifest=await new Promise(resolve=>{\n"+
+   "   const q=store.get(manifestKey);\n"+
+   "   q.onsuccess=()=>resolve(q.result);\n"+
+   "   q.onerror=()=>resolve(null);\n"+
+   "  });\n"+
+   "  const catalog=Array.isArray(manifest&&manifest.blob)?manifest.blob:[];\n"+
+   "  const ids=[...new Set(catalog.flatMap(g=>[\n"+
+   "   ...(g.media||[]),...(g.voice?[g.voice]:[])\n"+
+   "  ]))];\n"+
+   "  const fetchRows=async preview=>{\n"+
+   "   if(!ids.length)return[];\n"+
+   "   const objectStore=db.transaction('files','readonly').objectStore('files');\n"+
+   "   return Promise.all(ids.map(id=>new Promise(resolve=>{\n"+
+   "    const key=prefix+(preview?'preview:':'')+id;\n"+
+   "    const q=objectStore.get(key);\n"+
+   "    q.onsuccess=()=>resolve([id,q.result&&q.result.blob]);\n"+
+   "    q.onerror=()=>resolve([id,null]);\n"+
+   "   })));\n"+
+   "  };\n"+
+   "  const originals=await fetchRows(false);\n"+
+   "  const previews=await fetchRows(true);\n"+
+   "  return {catalog,originals,previews};\n"+
+   " }finally{db.close()}\n"+
+   "}\n"+
    "window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,"+
-   "draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,",
+   "draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,draftReadPayload:readDraftPayload,",
    "DRAFT_LIBRARY_OWNER");
  exact("async function writeFiles(entries){const db=await dbOpen();try{const t=db.transaction('files','readwrite'),d=done(t);for(const [id,file] of entries)t.objectStore('files').put({key:PREFIX+id,blob:file});await d}finally{db.close()}}",
    "async function writeFiles(entries){return mem.draftWriteRows(entries.map(([id,file])=>[PREFIX+id,file]))}",
@@ -48,5 +79,6 @@ export function preserveOriginalMediaIdsOnEdit(html){
  exact("async function deleteFiles(ids){if(!ids.length)return;const db=await dbOpen();try{const t=db.transaction('files','readwrite'),d=done(t);ids.forEach(id=>t.objectStore('files').delete(PREFIX+id));await d}finally{db.close()}}",
    "async function deleteFiles(ids){return mem.draftDeleteKeys(ids.map(id=>PREFIX+id))}",
    "DRAFT_DELETE_GATEWAY");
+ exact("async function readDraft(){const db=await dbOpen();try{const t=db.transaction('files','readonly'),s=t.objectStore('files');const m=await new Promise(res=>{const r=s.get(MANIFEST);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)});const a=Array.isArray(m&&m.blob)?m.blob:[];const ids=[...new Set(a.flatMap(g=>[...(g.media||[]),...(g.voice?[g.voice]:[])]))];const t2=db.transaction('files','readonly'),s2=t2.objectStore('files');const r=await Promise.all(ids.map(id=>new Promise(res=>{const q=s2.get(PREFIX+id);q.onsuccess=()=>res([id,q.result&&q.result.blob]);q.onerror=()=>res([id,null])})));r.forEach(([id,f])=>{if(f)assets.set(id,f)});const thumbTx=db.transaction('files','readonly'),thumbStore=thumbTx.objectStore('files');const found=await Promise.all(ids.map(id=>new Promise(res=>{const r=thumbStore.get(PREFIX+'preview:'+id);r.onsuccess=()=>res([id,r.result?.blob]);r.onerror=()=>res([id,null])})));found.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});groups=a.map(g=>({...g,media:(g.media||[]).filter(id=>assets.has(id)),voice:assets.has(g.voice)?g.voice:''})).filter(g=>g&&g.id)}finally{db.close()}}","async function readDraft(){\n const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);\n originals.forEach(([id,f])=>{if(f)assets.set(id,f)});\n previews.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});\n groups=catalog.map(g=>({...g,\n  media:(g.media||[]).filter(id=>assets.has(id)),\n  voice:assets.has(g.voice)?g.voice:''\n })).filter(g=>g&&g.id);\n}","DRAFT_READ_GATEWAY");
  return html;
 }

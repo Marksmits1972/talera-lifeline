@@ -24,6 +24,10 @@ assert.ok(edited.includes("draftWriteRows:writeDraftRows,draftDeleteKeys:deleteD
 assert.ok(edited.includes("async function writeFiles(entries){return mem.draftWriteRows("));
 assert.ok(edited.includes("async function deleteFiles(ids){return mem.draftDeleteKeys("));
 assert.ok(!edited.includes("async function writeFiles(entries){const db=await dbOpen()"));
+assert.ok(edited.includes("draftReadPayload:readDraftPayload,"));
+assert.ok(edited.includes("const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);"));
+assert.ok(!edited.includes("async function readDraft(){const db=await dbOpen()"));
+
 
 const html='<!doctype html><html lang="nl"><head><meta charset="utf-8"></head><body>'+
  '<script id="talera-memory-store-v1">'+storage+'</'+'script></body></html>';
@@ -63,6 +67,26 @@ try{
   const first=await originalPhoto('#cc1122','fictief-a.png');
   const second=await originalPhoto('#22cc11','fictief-b.png');
   const third=await originalPhoto('#1122cc','fictief-c.png');
+  const namespace='talera-f5-local-draft-test:';
+  const conceptId='test-concept-photo';
+  const manifestKey=namespace+'manifest';
+  const draftRows=[
+   [manifestKey,[{id:'synthetic-concept-01',media:[conceptId],voice:''}]],
+   [namespace+conceptId,first],
+   [namespace+'preview:'+conceptId,second]
+  ];
+  await mem.draftWriteRows(draftRows);
+  const recovered=await mem.draftReadPayload(manifestKey,namespace);
+  if(recovered.catalog.length!==1||
+     recovered.catalog[0].media[0]!==conceptId||
+     recovered.originals.length!==1||recovered.originals[0][0]!==conceptId||
+     recovered.originals[0][1]?.size!==first.size||
+     recovered.previews.length!==1||recovered.previews[0][1]?.size!==second.size)
+   throw Error('Editor draft library did not read original, manifest and preview intact');
+  await mem.draftDeleteKeys(draftRows.map(row=>row[0]));
+  if(await mem.blob(manifestKey)||await mem.blob(namespace+conceptId)||
+     await mem.blob(namespace+'preview:'+conceptId))
+   throw Error('Test draft cleanup failed');
   const story=await mem.save({title:'Fictieve test',date:'1990-01-01',
    text:'geen persoonsgegevens'},[first,second]);
   // Temporary draft writes/deletes use the SAME account-local owner.

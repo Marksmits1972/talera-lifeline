@@ -2,12 +2,13 @@
 // NOT injected into approved /tell, /present or home. No network and no media cloud.
 // A later explicit user-triggered UI is required before any production restore.
 import {createFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
-import {requireName,openExisting,readAll,restoreRowsAtomic} from './f5-library-persistence.mjs';
+import {requireName,openExisting,readAll,restoreRowsAtomic,verifyLibraryMediaIntegrity} from './f5-library-persistence.mjs';
 export async function exportExistingFreeLibrary(databaseName){
  const db=await openExisting(databaseName,false);
  try{
   const {stories,files}=await readAll(db);
   if(!stories.length)throw Error('TALERA_RESTORE_NO_STORIES_FOUND');
+  verifyLibraryMediaIntegrity({stories,files});
   return await createFreeArchive({stories,files,sourceScope:databaseName,
    sourceOrigin:typeof location==='object'?location.origin:null,
    createdAt:new Date().toISOString()});
@@ -41,6 +42,7 @@ export async function previewFreeLibraryRestore(archive,databaseName,{allowOther
  requireName(databaseName,true);
  // Verify checksum & every media reference BEFORE even inspecting target state.
  const decoded=await decodeFreeArchive(archive);
+ verifyLibraryMediaIntegrity(decoded);
  return preview(decoded,databaseName,allowOtherOrigin===true);
 }
 export async function restoreFreeLibrary(archive,databaseName,
@@ -48,6 +50,7 @@ export async function restoreFreeLibrary(archive,databaseName,
  if(confirmed!==true)throw Error('TALERA_RESTORE_EXPLICIT_CONFIRMATION_REQUIRED');
  requireName(databaseName,true);
  const decoded=await decodeFreeArchive(archive);
+ verifyLibraryMediaIntegrity(decoded);
  const review=await preview(decoded,databaseName,allowOtherOrigin===true);
  if(!review.safeToRestore)throw Error('TALERA_RESTORE_EXISTING_CONTENT_MUST_NOT_BE_OVERWRITTEN');
  const db=await openExisting(databaseName,true);

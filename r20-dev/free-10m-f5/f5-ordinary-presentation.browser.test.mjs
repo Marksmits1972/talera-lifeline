@@ -1143,55 +1143,73 @@ try{
     const mem=window.__taleraTimelineRuntime?.currentMemory?.();
     const key=mem?._zeroFrames?.[0]?.key;
     if(!mem||!key)throw Error('No original video selected for startup timing');
-    window.__taleraOrdinarySelectPhoto?.(mem.id,1,true);
-    await new Promise((resolve,reject)=>{
-      const until=performance.now()+5000;
-      const tick=()=>{
-        if(window.__taleraTimelineRuntime.currentMemory()?._photoIndex===1)resolve();
-        else if(performance.now()>until)reject(Error('Photo selection did not settle'));
-        else requestAnimationFrame(tick);
-      };tick();
-    });
-    const video=document.querySelector('video.talera-v61-inline-video');
-    if(!video)throw Error('Original native video element missing');
     const store=window.TaleraMemories,originalBlob=store.blob;
     let selectedAt=0,loadedAt=null,playingAt=null,movingAt=null;
+    let preparedBeforeSelection=false,preparedMetadata=false;
     const reads=[];
-    try{
-      store.blob=function(id,...args){
-        const started=performance.now();
-        return Promise.resolve(originalBlob.call(this,id,...args)).then(blob=>{
-          if(id===key&&selectedAt>0)reads.push({
-            startMs:Math.round(started-selectedAt),
-            durationMs:Math.round((performance.now()-started)*1000)/1000,
-            bytes:blob?.size||0
-          });
-          return blob;
+    // Observe the ORIGINAL library during both phases. A successful prime
+    // intentionally moves its Blob read to BEFORE video selection.
+    store.blob=function(id,...args){
+      const started=performance.now();
+      return Promise.resolve(originalBlob.call(this,id,...args)).then(blob=>{
+        if(id===key)reads.push({
+          phase:selectedAt>0?'selection':'preparation',
+          durationMs:Math.round((performance.now()-started)*1000)/1000,
+          bytes:blob?.size||0
         });
-      };
-      const markLoaded=()=>{if(loadedAt===null)loadedAt=performance.now()};
-      const markPlaying=()=>{if(playingAt===null)playingAt=performance.now()};
+        return blob;
+      });
+    };
+    let video=null,markLoaded=null,markPlaying=null;
+    try{
+      window.__taleraOrdinarySelectPhoto?.(mem.id,1,true);
+      await new Promise((resolve,reject)=>{
+        const until=performance.now()+5000;
+        const tick=()=>{
+          if(window.__taleraTimelineRuntime.currentMemory()?._photoIndex===1)resolve();
+          else if(performance.now()>until)reject(Error('Photo selection did not settle'));
+          else requestAnimationFrame(tick);
+        };tick();
+      });
+      // The same native element may already contain the next source.
+      // Readiness is permitted to occur before selection, not fabricated.
+      await new Promise((resolve,reject)=>{
+        const until=performance.now()+5000;
+        const tick=()=>{
+          const v=document.querySelector('video.talera-v61-inline-video');
+          if(v?.getAttribute('src')?.startsWith('blob:')&&v.paused)resolve();
+          else if(performance.now()>until)reject(Error('Next native video not prepared'));
+          else requestAnimationFrame(tick);
+        };tick();
+      });
+      video=document.querySelector('video.talera-v61-inline-video');
+      preparedBeforeSelection=!!video&&video.paused&&
+        video.getAttribute('src')?.startsWith('blob:');
+      preparedMetadata=video.readyState>=1;
+      markLoaded=()=>{if(loadedAt===null)loadedAt=performance.now()};
+      markPlaying=()=>{if(playingAt===null)playingAt=performance.now()};
       video.addEventListener('loadedmetadata',markLoaded);
       video.addEventListener('playing',markPlaying);
-      try{
-        selectedAt=performance.now();
-        window.__taleraOrdinarySelectPhoto?.(mem.id,0,true);
-        await new Promise((resolve,reject)=>{
-          const until=performance.now()+10000;
-          const tick=()=>{
-            if(video.currentTime>=.10&&!video.paused&&video.readyState>=2){
-              movingAt=performance.now();resolve();
-            }else if(performance.now()>until)reject(Error('No original moving video frame'));
-            else requestAnimationFrame(tick);
-          };tick();
-        });
-      }finally{
-        video.removeEventListener('loadedmetadata',markLoaded);
-        video.removeEventListener('playing',markPlaying);
-      }
-    }finally{store.blob=originalBlob}
+      selectedAt=performance.now();
+      if(preparedMetadata)loadedAt=selectedAt;
+      window.__taleraOrdinarySelectPhoto?.(mem.id,0,true);
+      await new Promise((resolve,reject)=>{
+        const until=performance.now()+10000;
+        const tick=()=>{
+          if(video.currentTime>=.10&&!video.paused&&video.readyState>=2){
+            movingAt=performance.now();resolve();
+          }else if(performance.now()>until)reject(Error('No original moving video frame'));
+          else requestAnimationFrame(tick);
+        };tick();
+      });
+    }finally{
+      store.blob=originalBlob;
+      if(video&&markLoaded)video.removeEventListener('loadedmetadata',markLoaded);
+      if(video&&markPlaying)video.removeEventListener('playing',markPlaying);
+    }
     return {
       mediaKeyPreserved:window.__taleraTimelineRuntime.currentMemory()?._zeroFrames?.[0]?.key===key,
+      preparedBeforeSelection,preparedMetadata,
       libraryReads:reads,
       selectToMetadataMs:loadedAt===null?null:Math.round((loadedAt-selectedAt)*1000)/1000,
       selectToPlayingMs:playingAt===null?null:Math.round((playingAt-selectedAt)*1000)/1000,
@@ -1203,8 +1221,10 @@ try{
   assert.equal(startupDiagnostic.mediaKeyPreserved,true);
   assert.equal(startupDiagnostic.hasSingleVideo,true);
   assert.equal(startupDiagnostic.hasSingleSharedAudio,true);
-  assert.ok(startupDiagnostic.libraryReads.some(r=>r.bytes>0),
-    'Original video must be read from the same account-local library on selection');
+  assert.equal(startupDiagnostic.preparedBeforeSelection,true,
+    'Existing video element must be silently primed before ordinary selection');
+  assert.ok(startupDiagnostic.libraryReads.some(r=>r.bytes>0&&r.phase==='preparation'),
+    'Original video must be read from the SAME local library during preparation');
   assert.ok(startupDiagnostic.selectToMovingMs>0&&
     startupDiagnostic.selectToMovingMs<10000,'Native video must advance while measuring');
   console.log('TALERA_ORIGINAL_VIDEO_STARTUP_LATENCY_BASELINE_BROWSER_ONLY',

@@ -430,6 +430,22 @@ async function run(){
     'Editor must not write its media-ID timeline to the old global database');
   assert.equal(String(storyEditor.data).split(scopedName).length-1,3,
     'Editor, story store and deletion tool must all use the same private DB');
+  // Validate the ACTUAL signed-in editor response, not just isolated
+  // patch-function tests. Original files stay in the one private library.
+  for(const marker of [
+    'async function save(input,uploads,editId,canonicalIds){',
+    'g.canonicalByDraft=Object.fromEntries(',
+    'canonicalByDraft:g.canonicalByDraft?{...g.canonicalByDraft}:null',
+    'if(existing&&canonicalIds===undefined)for(',
+    "tx.objectStore('files').add(row)",
+    'await mem.updateCues(persisted.id,mapped);'
+  ]){
+    assert.ok(String(storyEditor.data).includes(marker),
+      'Signed-in editor lost permanent-ID library contract: '+marker);
+  }
+  assert.ok(!String(signedPresent.data).includes('g.canonicalByDraft=Object.fromEntries('),
+    'Do not inject editor writes into the approved presentation motor');
+
 
   assert.match(String(signedHome.data),/let current=1974;/,
     'Birth-year must come from the individual account DO, not the demo shell');

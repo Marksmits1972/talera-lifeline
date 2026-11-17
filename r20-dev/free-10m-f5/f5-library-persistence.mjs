@@ -47,6 +47,52 @@ export async function readAll(db){
  return {stories:await stories,files:await files};
 }
 
+// Fail-closed relationship check for the ORIGINAL media within the single
+// account-local library. Cache/manifest records need not be Blob originals.
+// Existing legacy index-only voice cues are still supported without migration.
+export function verifyLibraryMediaIntegrity({stories,files}={}){
+ if(!Array.isArray(stories)||!Array.isArray(files))
+  throw Error('TALERA_LIBRARY_INVALID_SNAPSHOT');
+ const filesByKey=new Map();
+ for(const row of files){
+  if(typeof row?.key!=='string'||!row.key||filesByKey.has(row.key))
+   throw Error('TALERA_LIBRARY_INVALID_OR_DUPLICATE_FILE_ID');
+  filesByKey.set(row.key,row);
+ }
+ const seenStories=new Set();
+ let originalsChecked=0,explicitCuesChecked=0;
+ for(const story of stories){
+  if(typeof story?.id!=='string'||!story.id||seenStories.has(story.id))
+   throw Error('TALERA_LIBRARY_INVALID_OR_DUPLICATE_STORY_ID');
+  seenStories.add(story.id);
+  const items=story.items??[];
+  if(!Array.isArray(items))throw Error('TALERA_LIBRARY_INVALID_STORY_MEDIA');
+  const visuals=new Set();
+  for(const item of items){
+   const key=item?.key;
+   if(typeof key!=='string'||!key||!filesByKey.has(key))
+    throw Error('TALERA_LIBRARY_MISSING_ORIGINAL_MEDIA_ID');
+   const original=filesByKey.get(key)?.blob;
+   if(!(original instanceof Blob)||!Number.isSafeInteger(original.size)||original.size<=0)
+    throw Error('TALERA_LIBRARY_MISSING_OR_EMPTY_ORIGINAL_MEDIA');
+   originalsChecked++;
+   if(item.kind==='photo'||item.kind==='video')visuals.add(key);
+  }
+  const cues=story.narrationCues??[];
+  if(!Array.isArray(cues))throw Error('TALERA_LIBRARY_INVALID_VOICE_CUES');
+  for(const cue of cues){
+   // Older accepted recordings contain index-only cues; no new ID is invented.
+   const ref=cue?.mediaId;
+   if(ref===undefined||ref===null||ref==='')continue;
+   if(typeof ref!=='string'||!visuals.has(ref))
+    throw Error('TALERA_LIBRARY_INVALID_VOICE_MEDIA_ID');
+   explicitCuesChecked++;
+  }
+ }
+ return Object.freeze({stories:stories.length,originalsChecked,
+  explicitCuesChecked});
+}
+
 export async function restoreRowsAtomic(db,decoded){
   // One atomic IndexedDB transaction for both stores: fail/QuotaExceeded
   // aborts the WHOLE import, never deletes or replaces existing media/stories.

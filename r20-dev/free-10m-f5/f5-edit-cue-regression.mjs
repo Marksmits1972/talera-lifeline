@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
+import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 
 const html=readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
 const account='a'.repeat(64);
@@ -50,6 +51,33 @@ const editor=[...patched.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
  .map(x=>x[1]).find(x=>x.includes('if(entries.length)await writeFiles(entries)'));
 assert.ok(editor,'The original edit boot script must contain the guarded patch');
 new vm.Script(editor,{filename:'f5-original-editor-verified.js'});
+// The original-to-draft association survives the SAME local draft manifest.
+const wired=retainEditorCanonicalMediaIds(patched);
+assert.ok(wired.includes('canonicalByDraft:g.canonicalByDraft?{...g.canonicalByDraft}:null'));
+assert.equal(wired.split('g.canonicalByDraft=Object.fromEntries(').length-1,1);
+const startMap=wired.indexOf('if(g.existing){',changedStart);
+const endMap=wired.indexOf(suffix,startMap);
+assert.ok(startMap>changedStart&&endMap>startMap);
+const mapScript=wired.slice(startMap,endMap);
+const oldIds=['local-stable:0','local-stable:1','local-stable:2'];
+const existingDraft={existing:'local-stable',media:['draft-0','draft-1'],voice:'draft-2'};
+const initialRow={items:oldIds.map(key=>({key}))};
+const pairs=[['draft-0',new Blob(['photo'])],['draft-1',new Blob(['video'])],['draft-2',new Blob(['audio'])]];
+vm.runInNewContext(mapScript,{g:existingDraft,row:initialRow,entries:pairs});
+assert.deepEqual({...existingDraft.canonicalByDraft},{
+ 'draft-0':'local-stable:0','draft-1':'local-stable:1','draft-2':'local-stable:2'
+});
+existingDraft.media.reverse();
+assert.deepEqual(existingDraft.media.map(key=>existingDraft.canonicalByDraft[key]),['local-stable:1','local-stable:0'],
+ 'Reordering must not change the identity of the two original photos');
+const invalidDraft={existing:'local-stable'};
+assert.throws(()=>vm.runInNewContext(mapScript,{
+ g:invalidDraft,row:{items:[{key:'old:0'}]},entries:pairs
+}),/oorspronkelijke mediaverwijzingen zijn onvolledig/);
+const editorCode=[...wired.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/g)]
+ .map(x=>x[1]).find(x=>x.includes('g.canonicalByDraft=Object.fromEntries('));
+assert.ok(editorCode);
+new vm.Script(editorCode,{filename:'f5-editor-canonical-media-refs.js'});
 console.log('TALERA_F5_EDITED_NARRATION_ID_REBIND',JSON.stringify({
  passed:true,syntheticOnly:true,keptOriginalBlobs:true,
  cuesPreserveTimeAndOrder:true,noInvalidCrossAccountIds:true,

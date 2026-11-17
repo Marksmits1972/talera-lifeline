@@ -1318,12 +1318,28 @@ try{
   },null,{timeout:12000});
   // Distinct ownership: the stored thumbnail remains for the swipe strip,
   // while the ordinary presentation exposes only decoded original video.
-  await page.waitForFunction(()=>{
-    const video=document.querySelector('video.talera-v61-inline-video');
-    const mask=document.getElementById('talera-f5-ordinary-video-mask');
-    return !!mask&&!!video&&!video.paused&&
-      video.readyState>=2&&video.style.opacity==='1';
-  },null,{timeout:12000});
+  try{
+    await page.waitForFunction(()=>{
+      const video=document.querySelector('video.talera-v61-inline-video');
+      const mask=document.getElementById('talera-f5-ordinary-video-mask');
+      return !!mask&&!!video&&!video.paused&&
+        video.readyState>=2&&video.style.opacity==='1';
+    },null,{timeout:12000});
+  }catch(error){
+    const diag=await page.evaluate(()=>{
+      const v=document.querySelector('video.talera-v61-inline-video');
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      const shield=document.getElementById('talera-f5-ordinary-video-mask');
+      return {memory:m?.id,index:m?._photoIndex,kind:m?._zeroFrames?.[m._photoIndex]?.kind,
+        mask:!!shield,maskHost:shield?.parentElement?.id,maskZ:shield&&getComputedStyle(shield).zIndex,
+        video:!!v,display:v?.style.display,opacity:v?.style.opacity,paused:v?.paused,
+        ended:v?.ended,time:v?.currentTime,ready:v?.readyState,network:v?.networkState,
+        speed:v?.playbackRate,source:v?.currentSrc?.slice(0,55),picture:v?.videoWidth,
+        audio:!!document.getElementById('talera-f5-shared-audio'),
+        wheel:document.querySelector('#photoStage .talera-wheel-strip')?.classList.contains('is-visible')};
+    });
+    throw Error('FIRST_ORDINARY_VIDEO_FRAME_DIAGNOSTIC '+JSON.stringify(diag)+' '+String(error));
+  }
   const videoStage=await page.evaluate(()=>({
     mask:!!document.getElementById('talera-f5-ordinary-video-mask'),
     videoVisible:document.querySelector('video.talera-v61-inline-video')?.style.opacity==='1',

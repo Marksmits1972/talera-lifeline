@@ -31,6 +31,21 @@ for(const page of ['mijn-leven','present','tell']){
    a.includes('async function taleraV61PersistMediaIds(')
   ];
   assert.ok(components.every(Boolean),'Legacy deletion, private story store and cue writer must remain intact');
+  // Read-only audit of already embedded delete/recording/editor storage paths.
+  // Only source code is inspected; no cookies or real account records are read.
+  const idx=[...a.matchAll(/indexedDB\\.open\\(/g)].map(m=>m.index);
+  const deleteMarker=a.indexOf('talera-v9-complete-delete');
+  const deleteClose=deleteMarker>=0?a.indexOf('</script>',deleteMarker):-1;
+  console.log('TALERA_SINGLE_LIBRARY_DELETE_AUDIT',JSON.stringify({
+   indexedDbOpenSites:idx.map(pos=>({
+    at:pos,source:a.slice(Math.max(0,pos-550),Math.min(a.length,pos+2300))
+      .replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE')
+   })),
+   deleteScript:deleteMarker>=0&&deleteClose>deleteMarker?
+    a.slice(deleteMarker,Math.min(deleteClose,deleteMarker+4800))
+      .replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE'):null
+  }));
+
  }
  console.log('TALERA_FREE_SCOPED_DB_ALIGNMENT',JSON.stringify({
    page,approvedDbReferences:original,allReferencesPrivate:true,

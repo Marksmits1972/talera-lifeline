@@ -1312,7 +1312,12 @@ try{
   // Do not poll existence then race its natural EOF in a second browser call.
   await page.waitForFunction(()=>{
     const video=document.querySelector('video.talera-v61-inline-video');
-    if(!video)return false;
+    const current=window.__taleraTimelineRuntime?.currentMemory?.();
+    // The same native player is intentionally reused and may still exist
+    // hidden with an old src while the new local video Blob is fetched.
+    // Do not slow down that stale node before the CURRENT clip is playing.
+    if(current?._photoIndex!==2||!video||video.paused||
+       video.readyState<2||!video.currentSrc?.startsWith('blob:'))return false;
     video.loop=true;video.playbackRate=.1;
     return true;
   },null,{timeout:12000});

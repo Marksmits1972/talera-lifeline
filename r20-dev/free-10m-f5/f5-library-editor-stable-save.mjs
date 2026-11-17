@@ -27,31 +27,24 @@ export function preserveOriginalMediaIdsOnEdit(html){
    " if(!Array.isArray(rows)||rows.some(x=>!Array.isArray(x)||x.length!==2||typeof x[0]!=='string'||!x[0]))\n"+
    "  throw Error('Ongeldige conceptbestanden voor de bibliotheek.');\n"+
    " if(!rows.length)return;\n"+
-   " const db=await open();\n"+
-   " try{\n"+
-   "  const tx=db.transaction('files','readwrite'),finished=done(tx);\n"+
-   "  for(const [key,value] of rows)tx.objectStore('files').put({key,blob:value});\n"+
-   "  await finished;\n"+
-   " }finally{db.close()}\n"+
+   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\n"+
+   " for(const [key,value] of rows)tx.objectStore('files').put({key,blob:value});\n"+
+   " await finished;\n"+
    "}\n"+
    "async function deleteDraftKeys(keys){\n"+
    " if(!Array.isArray(keys)||keys.some(key=>typeof key!=='string'||!key))\n"+
    "  throw Error('Ongeldige conceptsleutels voor de bibliotheek.');\n"+
    " if(!keys.length)return;\n"+
-   " const db=await open();\n"+
-   " try{\n"+
-   "  const tx=db.transaction('files','readwrite'),finished=done(tx);\n"+
-   "  for(const key of keys)tx.objectStore('files').delete(key);\n"+
-   "  await finished;\n"+
-   " }finally{db.close()}\n"+
+   " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\n"+
+   " for(const key of keys)tx.objectStore('files').delete(key);\n"+
+   " await finished;\n"+
    "}\n"+
    "async function readDraftPayload(manifestKey,prefix){\n"+
    " if(typeof manifestKey!=='string'||!manifestKey||\n"+
    "    typeof prefix!=='string'||!prefix)\n"+
    "  throw Error('Ongeldige conceptverwijzing voor de bibliotheek.');\n"+
    " const db=await open();\n"+
-   " try{\n"+
-   "  const store=db.transaction('files','readonly').objectStore('files');\n"+
+   " const store=db.transaction('files','readonly').objectStore('files');\n"+
    "  const manifest=await new Promise(resolve=>{\n"+
    "   const q=store.get(manifestKey);\n"+
    "   q.onsuccess=()=>resolve(q.result);\n"+
@@ -74,7 +67,6 @@ export function preserveOriginalMediaIdsOnEdit(html){
    "  const originals=await fetchRows(false);\n"+
    "  const previews=await fetchRows(true);\n"+
    "  return {catalog,originals,previews};\n"+
-   " }finally{db.close()}\n"+
    "}\n"+
    "window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,"+
    "draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,draftReadPayload:readDraftPayload,",

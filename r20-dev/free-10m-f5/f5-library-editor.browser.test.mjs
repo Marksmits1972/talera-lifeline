@@ -69,6 +69,13 @@ try{
   const thirdKey=grown.items[2]?.key;
   if(!thirdKey||keys.includes(thirdKey))throw Error('Added file reused existing canonical ID');
   if(!(await mem.blob(thirdKey)))throw Error('New original not available');
+  if(typeof mem.updateCues!=='function')throw Error('Cue writer missing from original library');
+  const planned=[{t:0,index:0,mediaId:grown.items[0].key},
+   {t:3000,index:1,mediaId:grown.items[1].key,videoAtMs:200}];
+  await mem.updateCues(story.id,planned);
+  const storedPlan=(await mem.get(story.id)).narrationCues;
+  if(JSON.stringify(storedPlan)!==JSON.stringify(planned))
+   throw Error('Narration cues did not survive library writer readback');
   const before=JSON.stringify((await mem.get(story.id)).items);
   let rejected=false;
   try{
@@ -84,6 +91,7 @@ try{
    reorderedExistingKeys:order.join(',')===keys.slice().reverse().join(','),
    existingOriginalBytesIdentical:true,newFileHasNewId:true,
    invalidEditRejected:true,originalReferencesValid:audit.consistent,
+   narrationCuesStoredByLibrary:true,
    accountPrivate:true,photos:audit.photos,originals:audit.bytes};
  });
  assert.deepEqual(errors,[],'Original TALERA editor storage must load without JS errors');

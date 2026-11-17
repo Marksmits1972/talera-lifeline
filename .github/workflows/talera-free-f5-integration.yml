@@ -37,6 +37,8 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
       - name: Verify read-only TALERA library gateway preserves original IDs and bytes
         run: node r20-dev/free-10m-f5/f5-library-access.test.mjs
+      - name: Verify library original bytes and voice cue IDs before any backup or restore
+        run: node r20-dev/free-10m-f5/f5-library-integrity.test.mjs
       - name: Verify independent narration media IDs, timing and no shared presentation controls
         run: node r20-dev/free-10m-f5/f5-independent-narrator.test.mjs
       - name: Verify source-exact 11 November backup-only connection

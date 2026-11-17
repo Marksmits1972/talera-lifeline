@@ -1504,7 +1504,8 @@ try{
     noBlueMask:!ordinarySource.includes('taleraOrdinaryVideoMask')&&
       !ordinarySource.includes('talera-f5-ordinary-video-mask'),
     originalFirstPlay:ordinaryMotor.includes('video.onloadedmetadata=start')&&
-      ordinaryMotor.includes('video.src=url;start()'),
+      ordinaryMotor.includes("if(!readyPrimed||video.getAttribute('src')!==url)video.src=url;")&&
+      ordinaryMotor.includes('start();'),
     noDoubleLoad:!ordinaryMotor.includes('video.src=url;video.load()')
   };
   assert.ok(Object.values(ordinarySafety).every(Boolean),

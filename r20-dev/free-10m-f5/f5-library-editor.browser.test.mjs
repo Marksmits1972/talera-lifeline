@@ -20,6 +20,11 @@ const storage=scripts.find(m=>m[1].includes('talera-memory-store-v1'))?.[2];
 assert.ok(storage&&storage.includes('async function save(input,uploads,editId,canonicalIds){'));
 assert.ok(storage.includes('if(existing&&canonicalIds===undefined)for('));
 assert.ok(storage.includes("tx.objectStore('files').add(row)"));
+assert.ok(edited.includes("draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,"));
+assert.ok(edited.includes("async function writeFiles(entries){return mem.draftWriteRows("));
+assert.ok(edited.includes("async function deleteFiles(ids){return mem.draftDeleteKeys("));
+assert.ok(!edited.includes("async function writeFiles(entries){const db=await dbOpen()"));
+
 const html='<!doctype html><html lang="nl"><head><meta charset="utf-8"></head><body>'+
  '<script id="talera-memory-store-v1">'+storage+'</'+'script></body></html>';
 let page,browser,server,otherRequests=0;
@@ -60,6 +65,24 @@ try{
   const third=await originalPhoto('#1122cc','fictief-c.png');
   const story=await mem.save({title:'Fictieve test',date:'1990-01-01',
    text:'geen persoonsgegevens'},[first,second]);
+  // Temporary draft writes/deletes use the SAME account-local owner.
+  // No alternate store or copied original media should be created.
+  const draftKey='talera-v4-work:synthetic-test-draft';
+  if(typeof mem.draftWriteRows!=='function'||typeof mem.draftDeleteKeys!=='function')
+    throw Error('Draft writes do not use the library owner');
+  await mem.draftWriteRows([[draftKey,first]]);
+  const draftRead=await mem.blob(draftKey);
+  if(!(draftRead instanceof Blob)||draftRead.size!==first.size)
+    throw Error('Concept was not written to the original account-local library');
+  await mem.draftDeleteKeys([draftKey]);
+  if(await mem.blob(draftKey))
+    throw Error('Temporary draft deletion left a stale original library record');
+  // Rejection must not partially write unvalidated draft records.
+  let invalidDraftRejected=false;
+  try{await mem.draftWriteRows([[draftKey,first],['',second]])}
+  catch(error){invalidDraftRejected=String(error.message).includes('conceptbestanden')}
+  if(!invalidDraftRejected||await mem.blob(draftKey))
+    throw Error('Invalid draft batch wrote partial data');
   const keys=story.items.map(item=>item.key);
   if(keys.length!==2||keys[0]===keys[1])throw Error('Initial canonical IDs invalid');
   const bytes=async id=>[...new Uint8Array(await (await mem.blob(id)).arrayBuffer())];

@@ -809,14 +809,12 @@ function rebuildDirectOrdinaryPresentation(html){
   once("    if(changed&&memory&&!memory._photoLoading&&Array.isArray(memory.photos)&&memory.photos.length){\n      memory._photoIndex=0;",
     "    if(changed&&memory&&!memory._photoLoading&&Array.isArray(memory.photos)&&memory.photos.length){\n      taleraOrdinaryVideoMask(memory._taleraLocal&&!memory._zeroItems?.some(x=>x.kind==='audio')&&\n        memory._zeroFrames?.[0]?.kind==='video');\n      memory._photoIndex=0;",
     'MASK_INITIAL_VIDEO_BEFORE_STILL');
-  // First decoded motion frame becomes visible atomically, not the JPEG
-  // :phone-v1 which remains only in the existing timeline strip.
+  // Keep the real video element visible for WebKit's first-frame decoder.
+  // Only its static JPEG is screened by the already-present ordinary mask.
+  // Hiding the video itself can prevent requestVideoFrameCallback indefinitely.
   ordinaryOnce("video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';",
-    "video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none;opacity:0';",
-    'FIRST_MOTION_FRAME_HIDDEN_UNTIL_READY');
-  once("        video.onplaying=syncSound;\n        video.ontimeupdate=syncSound;",
-    "        const showDecodedVideo=()=>{\n          if(!valid()||video.paused)return;\n          const reveal=()=>{if(valid()&&!video.paused&&video.readyState>=2)video.style.opacity='1'};\n          if(typeof video.requestVideoFrameCallback==='function')video.requestVideoFrameCallback(reveal);\n          else requestAnimationFrame(reveal);\n        };\n        video.onplaying=()=>{showDecodedVideo();syncSound()};\n        video.ontimeupdate=syncSound;",
-    'FIRST_MOTION_FRAME_ATOMIC_REVEAL');
+    "video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none;opacity:1';",
+    'FIRST_ORIGINAL_VIDEO_DIRECT_VISIBILITY');
   // First iPhone start: repeated 0.4 s hard seeks made cold audio stutter.
   // Retain the approved shared audio element and a last-resort drift check,
   // never chase each early timeupdate while both decoders are warming.

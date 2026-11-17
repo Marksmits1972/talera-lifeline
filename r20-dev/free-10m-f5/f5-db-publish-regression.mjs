@@ -43,7 +43,7 @@ for(const page of ['mijn-leven','present','tell']){
       .replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE')
    })),
    deleteScript:deleteMarker>=0&&deleteClose>deleteMarker?
-    a.slice(deleteMarker,Math.min(deleteClose,deleteMarker+4800))
+    a.slice(deleteMarker,Math.min(deleteClose,deleteMarker+12000))
       .replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE'):null
   }));
 

@@ -31,6 +31,18 @@ for(const page of ['mijn-leven','present','tell']){
    a.includes('async function taleraV61PersistMediaIds(')
   ];
   assert.ok(components.every(Boolean),'Legacy deletion, private story store and cue writer must remain intact');
+  // Inspect approved edit rehydration and association between draft IDs and canonical IDs.
+  for(const key of [
+    'async function boot(', 'function boot(', '?edit=', 'g.existing=',
+    'g.media.push(', 'g.media=', 'assets.set(', 'row.items||[]',
+    'const row=await mem.get(', 'const row=await mem.save('
+  ]){
+    const positions=[];let idx=-1;
+    while((idx=a.indexOf(key,idx+1))>=0)positions.push(idx);
+    const views=positions.slice(0,4).map(pos=>a.slice(Math.max(0,pos-650),pos+2300)
+      .replaceAll(privateA,'ACCOUNT_SCOPED_DATABASE'));
+    console.log('TALERA_LIBRARY_EDIT_ID_ROUTE',JSON.stringify({key,count:positions.length,views}));
+  }
   // Read-only structural diagnostics from the same anonymous editor snapshot.
   // Never inspect account records, personal media, cookies or sessions.
   const patterns=[

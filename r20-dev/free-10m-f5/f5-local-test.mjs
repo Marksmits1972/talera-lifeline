@@ -441,7 +441,9 @@ async function run(){
     'await mem.updateCues(persisted.id,mapped);',
     'draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,',
     'async function writeFiles(entries){return mem.draftWriteRows(',
-    'async function deleteFiles(ids){return mem.draftDeleteKeys('
+    'async function deleteFiles(ids){return mem.draftDeleteKeys(',
+    'draftReadPayload:readDraftPayload,',
+    'const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);'
   ]){
     assert.ok(String(storyEditor.data).includes(marker),
       'Signed-in editor lost permanent-ID library contract: '+marker);

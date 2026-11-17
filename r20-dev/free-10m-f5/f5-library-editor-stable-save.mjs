@@ -79,5 +79,77 @@ export function preserveOriginalMediaIdsOnEdit(html){
    "DRAFT_DELETE_GATEWAY");
  exact("async function readDraft(){const db=await dbOpen();try{const t=db.transaction('files','readonly'),s=t.objectStore('files');const m=await new Promise(res=>{const r=s.get(MANIFEST);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)});const a=Array.isArray(m&&m.blob)?m.blob:[];const ids=[...new Set(a.flatMap(g=>[...(g.media||[]),...(g.voice?[g.voice]:[])]))];const t2=db.transaction('files','readonly'),s2=t2.objectStore('files');const r=await Promise.all(ids.map(id=>new Promise(res=>{const q=s2.get(PREFIX+id);q.onsuccess=()=>res([id,q.result&&q.result.blob]);q.onerror=()=>res([id,null])})));r.forEach(([id,f])=>{if(f)assets.set(id,f)});const thumbTx=db.transaction('files','readonly'),thumbStore=thumbTx.objectStore('files');const found=await Promise.all(ids.map(id=>new Promise(res=>{const r=thumbStore.get(PREFIX+'preview:'+id);r.onsuccess=()=>res([id,r.result?.blob]);r.onerror=()=>res([id,null])})));found.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});groups=a.map(g=>({...g,media:(g.media||[]).filter(id=>assets.has(id)),voice:assets.has(g.voice)?g.voice:''})).filter(g=>g&&g.id)}finally{db.close()}}","async function readDraft(){\n const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);\n originals.forEach(([id,f])=>{if(f)assets.set(id,f)});\n previews.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});\n groups=catalog.map(g=>({...g,\n  media:(g.media||[]).filter(id=>assets.has(id)),\n  voice:assets.has(g.voice)?g.voice:''\n })).filter(g=>g&&g.id);\n}","DRAFT_READ_GATEWAY");
  exact("async function loadDuplicateCache(){\n if(taleraDuplicateCache)return taleraDuplicateCache;\n const db=await dbOpen();\n try{const req=db.transaction('files','readonly').objectStore('files').get(PREFIX+'duplicate-index-v7');\n const row=await new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});\n taleraDuplicateCache=row&&typeof row.blob==='object'&&!Array.isArray(row.blob)?row.blob:{};return taleraDuplicateCache;\n }finally{db.close()}\n}","async function loadDuplicateCache(){\n if(taleraDuplicateCache)return taleraDuplicateCache;\n const cached=await mem.blob(PREFIX+'duplicate-index-v7');\n taleraDuplicateCache=cached&&typeof cached==='object'&&!Array.isArray(cached)?cached:{};\n return taleraDuplicateCache;\n}","DUPLICATE_INDEX_READ_GATEWAY");
+ return relocateApprovedDeletionIntoLibrary(html);
+}
+function relocateApprovedDeletionIntoLibrary(html){
+ // Same approved full-delete and orphan-repair algorithms, physically moved
+ // inside the existing account-local TaleraMemories library, not re-created.
+ const tag='<script id="talera-v9-complete-delete">';
+ const start=html.indexOf(tag);
+ const end=start<0?-1:html.indexOf('</script>',start+tag.length);
+ if(start<0||end<0||html.indexOf(tag,start+tag.length)!==-1)
+  throw Error('TALERA_LIBRARY_DELETE_SCRIPT_DRIFT');
+ const original=html.slice(start+tag.length,end);
+ const extract=(begin,finish,label)=>{
+  const at=original.indexOf(begin),last=at<0?-1:original.indexOf(finish,at+begin.length);
+  if(at<0||last<0||original.indexOf(begin,at+begin.length)!==-1)
+   throw Error('TALERA_LIBRARY_DELETE_SOURCE_DRIFT_'+label);
+  return original.slice(at,last);
+ };
+ const deletionCore=extract('const DB=','function dropLocalHandoff(id){','ATOMIC_CORE');
+ const localHandoff=extract('function dropLocalHandoff(id){',
+  'window.__taleraV9FullDelete=async id=>{','LOCAL_HANDOFF');
+ const repairAnchor='window.__taleraV9RepairOrphans=()=>transaction({run(';
+ const repairAt=original.indexOf(repairAnchor),endIife=original.lastIndexOf('\n})();');
+ if(repairAt<0||endIife<repairAt||original.slice(endIife).trim()!== '})();' ||
+    !original.slice(repairAt,endIife).trim().endsWith('}});'))
+  throw Error('TALERA_LIBRARY_DELETE_ORPHAN_SOURCE_DRIFT');
+ const repair=original.slice(repairAt,endIife).replace(
+  'window.__taleraV9RepairOrphans=','const repairOrphans=');
+ if(!deletionCore.includes("db.transaction(['stories','files'],'readwrite')") ||
+    !deletionCore.includes('if(keep.has(key))continue;') ||
+    !deletionCore.includes('const used=new Set(') ||
+    !repair.includes('const live=new Set('))
+  throw Error('TALERA_LIBRARY_DELETE_SAFETY_GUARD_DRIFT');
+ const owner="const taleraLibraryRemoval=(()=>{\n"+
+  deletionCore+"\n"+repair+"\n"+
+  "const removePublishedStory=async id=>{\n"+
+  " const key=String(id||'');\n"+
+  " if(!LOCAL.test(key))throw Error('Ongeldig herinnerings-ID.');\n"+
+  " return removeStorage(key);\n"+
+  "};\n"+
+  "return Object.freeze({removePublishedStory,repairOrphans});\n"+
+  "})();\n";
+ const api="window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,"+
+  "draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,draftReadPayload:readDraftPayload,";
+ if(html.split(api).length!==2)throw Error('TALERA_LIBRARY_DELETE_API_DRIFT');
+ html=html.replace(api,owner+api+
+  "removePublishedStory:taleraLibraryRemoval.removePublishedStory,"+
+  "repairOrphanDrafts:taleraLibraryRemoval.repairOrphans,");
+ // The original public functions keep exactly the same names and localStorage
+ // cleanup; they now ask the library to do its atomic storage work.
+ const wrapper="(()=>{\n'use strict';\n"+
+  "if(window.__taleraV9FullDelete)return;\n"+
+  "const LOCAL=/^local-[a-z0-9-]+$/i;\n"+
+  localHandoff+
+  "window.__taleraV9FullDelete=async id=>{\n"+
+  " const key=String(id||'');\n"+
+  " if(!LOCAL.test(key))throw Error('Ongeldig herinnerings-ID.');\n"+
+  " if(typeof window.TaleraMemories?.removePublishedStory!=='function')\n"+
+  "  throw Error('De bibliotheek is niet beschikbaar.');\n"+
+  " const result=await window.TaleraMemories.removePublishedStory(key);\n"+
+  " dropLocalHandoff(key);\n"+
+  " return result;\n"+
+  "};\n"+
+  "window.__taleraV9RepairOrphans=()=>{\n"+
+  " if(typeof window.TaleraMemories?.repairOrphanDrafts!=='function')\n"+
+  "  throw Error('De bibliotheek is niet beschikbaar.');\n"+
+  " return window.TaleraMemories.repairOrphanDrafts();\n"+
+  "};\n"+
+  "})();";
+ const originalTag=tag+original+'</script>';
+ if(html.split(originalTag).length!==2)throw Error('TALERA_LIBRARY_DELETE_REPLACEMENT_DRIFT');
+ html=html.replace(originalTag,tag+wrapper+'</script>');
  return html;
 }
+

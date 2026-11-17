@@ -1318,10 +1318,18 @@ try{
     return true;
   },null,{timeout:12000});
   const ordinarySource=await page.content();
-  assert.ok(ordinarySource.includes('function taleraOrdinaryVideoMask(active)')&&
-    ordinarySource.includes("taleraOrdinaryVideoMask(frame?.kind==='video')")&&
-    ordinarySource.includes("pointer-events:none;opacity:1"),
-    'Video still must stay in wheel; ordinary stage uses visible native picture');
+  assert.ok(!ordinarySource.includes('taleraOrdinaryVideoMask')&&
+    !ordinarySource.includes('talera-f5-ordinary-video-mask')&&
+    ordinarySource.includes('video.onloadeddata=start')&&
+    ordinarySource.includes('video.oncanplay=start')&&
+    ordinarySource.includes('video.src=url;video.load()'),
+    'No blue overlay between memories; original video first frame must decode before play');
+  assert.ok(ordinarySource.includes('const adjacentOriginals=new Map()')&&
+    ordinarySource.includes('for(const offset of [-1,1])')&&
+    ordinarySource.includes("m._zeroFrames?.[0]?.kind!=='photo'"),
+    'Warm only two adjacent ORIGINAL photo images, never a second video or new app');
+  assert.equal(await page.locator('#talera-f5-ordinary-video-mask').count(),0,
+    'Ordinary video must never paint the obsolete blue inter-memory mask');
   assert.ok(ordinarySource.includes('now-lastSoundSeekAt<5000')&&
     ordinarySource.includes('Math.abs(audio.currentTime-video.currentTime)>1.5'),
     'The first cold original audio must not repeatedly seek every 0.4 second');
@@ -1346,6 +1354,8 @@ try{
     'Timeline movement must immediately stop the old ordinary video soundtrack');
   assert.equal(ordinaryWhileMoving.hidden,true,
     'The old ordinary video must disappear while the native timeline strip moves');
+  assert.equal(await page.locator('#talera-f5-ordinary-video-mask').count(),0,
+    'Swiping toward another memory may not paint a blue video mask');
   assert.equal(ordinaryWhileMoving.wheel,true);
   console.log('TALERA_TIMELINE_NAVIGATION_STOPS_ORDINARY_VIDEO_PASS',
     JSON.stringify({originalVideoStopped:true,originalVideoHidden:true,

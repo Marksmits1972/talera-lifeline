@@ -438,7 +438,10 @@ async function run(){
     'canonicalByDraft:g.canonicalByDraft?{...g.canonicalByDraft}:null',
     'if(existing&&canonicalIds===undefined)for(',
     "tx.objectStore('files').add(row)",
-    'await mem.updateCues(persisted.id,mapped);'
+    'await mem.updateCues(persisted.id,mapped);',
+    'draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,',
+    'async function writeFiles(entries){return mem.draftWriteRows(',
+    'async function deleteFiles(ids){return mem.draftDeleteKeys('
   ]){
     assert.ok(String(storyEditor.data).includes(marker),
       'Signed-in editor lost permanent-ID library contract: '+marker);

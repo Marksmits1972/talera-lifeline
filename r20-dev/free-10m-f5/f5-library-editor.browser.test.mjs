@@ -27,6 +27,13 @@ const port=8963;
 try{
  server=createServer((req,res)=>{
   if(req.method!=='GET'){otherRequests++;res.writeHead(405).end();return}
+  const moduleName=String(req.url||'').slice(1);
+  if(['f5-portable-idb.mjs','f5-portable-archive.mjs',
+      'f5-library-persistence.mjs'].includes(moduleName)){
+   res.writeHead(200,{'content-type':'text/javascript; charset=utf-8',
+    'cache-control':'no-store'});
+   res.end(readFileSync('r20-dev/free-10m-f5/'+moduleName,'utf8'));return;
+  }
   if(req.url!=='/'){res.writeHead(404).end();return}
   res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store'});
   res.end(html);
@@ -87,11 +94,69 @@ try{
   if(after!==before)throw Error('Rejected edit changed original story');
   const audit=await mem.audit();
   if(!audit.consistent)throw Error('Incomplete library after edit');
+  // The SAME published library must survive complete lossless export and
+  // readback/restore without changing any original file or permanent ID.
+  const sourceDb='talera-free-local-'+('b'.repeat(32))+'-v1';
+  const targetDb='talera-free-local-'+('c'.repeat(32))+'-v1';
+  const backup=await import('/f5-portable-idb.mjs');
+  const codec=await import('/f5-portable-archive.mjs');
+  const archive=await backup.exportExistingFreeLibrary(sourceDb);
+  const decoded=await codec.decodeFreeArchive(archive);
+  const archived=decoded.stories.find(row=>row.id===story.id);
+  if(!archived||archived.items.map(x=>x.key).join(',')!==
+       grown.items.map(x=>x.key).join(','))
+   throw Error('Backup lost permanent media IDs or ordering');
+  if(JSON.stringify(archived.narrationCues)!==JSON.stringify(planned))
+   throw Error('Backup changed narration cues');
+  const exportedFiles=new Map(decoded.files.map(file=>[file.key,file.blob]));
+  for(const key of grown.items.map(item=>item.key)){
+   const file=exportedFiles.get(key),src=await mem.blob(key);
+   if(!(file instanceof Blob)||!(src instanceof Blob))
+    throw Error('Backup missing original media');
+   if(JSON.stringify([...new Uint8Array(await file.arrayBuffer())])!==
+      JSON.stringify([...new Uint8Array(await src.arrayBuffer())]))
+    throw Error('Backup modified original bytes');
+  }
+  const createTarget=await new Promise((resolve,reject)=>{
+   const req=indexedDB.open(targetDb,1);
+   req.onupgradeneeded=()=>{
+    req.result.createObjectStore('stories',{keyPath:'id'});
+    req.result.createObjectStore('files',{keyPath:'key'});
+   };
+   req.onerror=()=>reject(req.error);
+   req.onsuccess=()=>resolve(req.result);
+  });
+  createTarget.close();
+  const preview=await backup.previewFreeLibraryRestore(archive,targetDb,
+   {allowOtherOrigin:true});
+  if(!preview.safeToRestore)throw Error('Safe restore preview refused valid empty target');
+  const imported=await backup.restoreFreeLibrary(archive,targetDb,
+   {allowOtherOrigin:true,confirmed:true});
+  if(!imported.readbackPassed||!imported.sourcePreserved)
+   throw Error('Restore was incomplete');
+  const persistence=await import('/f5-library-persistence.mjs');
+  const target=await persistence.openExisting(targetDb,true);
+  const restored=await persistence.readAll(target);
+  target.close();
+  const restoredStory=restored.stories.find(row=>row.id===story.id);
+  if(!restoredStory||restoredStory.items.map(x=>x.key).join(',')!==
+      grown.items.map(x=>x.key).join(',')||
+      JSON.stringify(restoredStory.narrationCues)!==JSON.stringify(planned))
+   throw Error('Restored story changed permanent media IDs, order or cues');
+  const restoredMedia=new Map(restored.files.map(file=>[file.key,file.blob]));
+  for(const key of grown.items.map(item=>item.key)){
+   const file=restoredMedia.get(key),src=await mem.blob(key);
+   if(!(file instanceof Blob)||!(src instanceof Blob)||
+       JSON.stringify([...new Uint8Array(await file.arrayBuffer())])!==
+       JSON.stringify([...new Uint8Array(await src.arrayBuffer())]))
+    throw Error('Restored original media bytes are not identical');
+  }
   return {storyUnchangedId:grown.id===story.id,
    reorderedExistingKeys:order.join(',')===keys.slice().reverse().join(','),
    existingOriginalBytesIdentical:true,newFileHasNewId:true,
    invalidEditRejected:true,originalReferencesValid:audit.consistent,
    narrationCuesStoredByLibrary:true,
+   backupAndRestoreByteIdentical:true,restoredMediaIdsAndCuesIdentical:true,
    accountPrivate:true,photos:audit.photos,originals:audit.bytes};
  });
  assert.deepEqual(errors,[],'Original TALERA editor storage must load without JS errors');

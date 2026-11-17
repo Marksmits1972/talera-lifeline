@@ -27,6 +27,9 @@ assert.ok(!edited.includes("async function writeFiles(entries){const db=await db
 assert.ok(edited.includes("draftReadPayload:readDraftPayload,"));
 assert.ok(edited.includes("const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);"));
 assert.ok(!edited.includes("async function readDraft(){const db=await dbOpen()"));
+assert.ok(edited.includes("const cached=await mem.blob(PREFIX+'duplicate-index-v7');"));
+assert.ok(!edited.includes("const req=db.transaction('files','readonly').objectStore('files').get(PREFIX+'duplicate-index-v7')"));
+
 
 
 const html='<!doctype html><html lang="nl"><head><meta charset="utf-8"></head><body>'+
@@ -83,6 +86,13 @@ try{
      recovered.originals[0][1]?.size!==first.size||
      recovered.previews.length!==1||recovered.previews[0][1]?.size!==second.size)
    throw Error('Editor draft library did not read original, manifest and preview intact');
+  const duplicateKey=namespace+'duplicate-index-v7';
+  const duplicates={'test-hash':{signature:'synthetic',size:first.size}};
+  await mem.draftWriteRows([[duplicateKey,duplicates]]);
+  const restoredIndex=await mem.blob(duplicateKey);
+  if(!restoredIndex||restoredIndex['test-hash']?.signature!=='synthetic')
+   throw Error('Duplicate index could not be read via canonical library');
+  await mem.draftDeleteKeys([duplicateKey]);
   await mem.draftDeleteKeys(draftRows.map(row=>row[0]));
   if(await mem.blob(manifestKey)||await mem.blob(namespace+conceptId)||
      await mem.blob(namespace+'preview:'+conceptId))

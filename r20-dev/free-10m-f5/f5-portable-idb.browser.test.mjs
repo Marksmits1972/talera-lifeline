@@ -65,6 +65,51 @@ try{
   return Array.from(new Uint8Array(await file.arrayBuffer()));
  },legacyDb);
  assert.ok(archiveData.length>90);
+ // Construct a checksum-valid but semantically damaged synthetic archive.
+ // Preview/restore must reject the stale voice media ID BEFORE writing.
+ const badCueArchiveData=await pageA.evaluate(async databaseName=>{
+  const p=await import('/f5-library-persistence.mjs');
+  const {createFreeArchive}=await import('/f5-portable-archive.mjs');
+  const db=await p.openExisting(databaseName,false);
+  let rows;try{rows=await p.readAll(db)}finally{db.close()}
+  const invalid={...rows.stories[0],
+   narrationCues:[{t:0,index:0,mediaId:'nonexistent-visual-media'}]};
+  const bad=await createFreeArchive({stories:[invalid],files:rows.files,
+   sourceScope:databaseName,sourceOrigin:location.origin});
+  return Array.from(new Uint8Array(await bad.arrayBuffer()));
+ },legacyDb);
+ // A local export must also refuse a story referring to missing originals.
+ const missingOriginalExportRejected=await pageA.evaluate(async dbname=>{
+  const original=indexedDB.open(dbname,1);
+  const db=await new Promise((ok,bad)=>{
+   original.onsuccess=()=>ok(original.result);
+   original.onerror=()=>bad(original.error);
+  });
+  const brokenId='local-missing-original-synthetic';
+  const write=async row=>{
+   const tx=db.transaction('stories','readwrite');
+   if(row)tx.objectStore('stories').add(row);
+   else tx.objectStore('stories').delete(brokenId);
+   await new Promise((ok,bad)=>{
+    tx.oncomplete=ok;tx.onabort=()=>bad(tx.error);
+   });
+  };
+  let refused=false;
+  try{
+   await write({id:brokenId,source:'pwa-local',
+    items:[{key:'no-such-original',kind:'photo'}]});
+   try{
+    const p=await import('/f5-portable-idb.mjs');
+    await p.exportExistingFreeLibrary(dbname);
+   }catch(e){refused=String(e.message).includes('MISSING_ORIGINAL_MEDIA_ID')}
+  }finally{
+   await write(null);
+   db.close();
+  }
+  return refused;
+ },legacyDb);
+ assert.equal(missingOriginalExportRejected,true,
+   'Back-up export must fail closed on a missing original file');
  await pageB.evaluate(async target=>{
   const req=indexedDB.open(target,1);
   req.onupgradeneeded=()=>{
@@ -86,6 +131,12 @@ try{
   const reviewed=await m.previewFreeLibraryRestore(backup,data.target,{allowOtherOrigin:true});
   const rejectUnconfirmed=await rejects(()=>m.restoreFreeLibrary(backup,data.target,
     {allowOtherOrigin:true}));
+  const invalidCues=new Blob([new Uint8Array(data.badCue)]);
+  const invalidCuePreviewRejected=await rejects(()=>
+   m.previewFreeLibraryRestore(invalidCues,data.target,{allowOtherOrigin:true}));
+  const invalidCueRestoreRejected=await rejects(()=>
+   m.restoreFreeLibrary(invalidCues,data.target,
+    {allowOtherOrigin:true,confirmed:true}));
   const changed=new Uint8Array(data.bytes.slice());changed[changed.length-1]^=255;
   const corruptRejected=await rejects(()=>m.restoreFreeLibrary(new Blob([changed]),data.target,
     {allowOtherOrigin:true,confirmed:true}));
@@ -103,12 +154,15 @@ try{
   const originals=await Promise.all([0,1,2].map(n=>get(f.get(data.id+':'+n))));
   const binary=await Promise.all(originals.map(async row=>Array.from(new Uint8Array(await row.blob.arrayBuffer()))));
   db.close();
-  return {disallowOther,reviewed,rejectUnconfirmed,corruptRejected,finished,
-   duplicateRejected,preserved,restored,binary};
- },{bytes:archiveData,target:targetDb,id});
+  return {disallowOther,reviewed,rejectUnconfirmed,
+   invalidCuePreviewRejected,invalidCueRestoreRejected,
+   corruptRejected,finished,duplicateRejected,preserved,restored,binary};
+ },{bytes:archiveData,badCue:badCueArchiveData,target:targetDb,id});
  assert.equal(result.disallowOther,true);
  assert.equal(result.rejectUnconfirmed,true);
  assert.equal(result.corruptRejected,true);
+ assert.equal(result.invalidCuePreviewRejected,true);
+ assert.equal(result.invalidCueRestoreRejected,true);
  assert.equal(result.reviewed.safeToRestore,true);
  assert.equal(result.reviewed.storyCount,1);
  assert.equal(result.reviewed.mediaStoreEntries,4);

@@ -101,6 +101,8 @@ jobs:
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser verify complete original-media export, checksum and nondestructive restore
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
+      - name: Browser verify permanent original media IDs survive editor reorder and edit
+        run: node r20-dev/free-10m-f5/f5-library-editor.browser.test.mjs
       - name: Archive factual test result only
         if: success()
         uses: actions/upload-artifact@v4

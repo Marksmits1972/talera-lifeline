@@ -338,7 +338,7 @@ function warmUpFirstSwipePhotoStrip(html){
    "      if(cache.size>35)cache.delete(cache.keys().next().value);\n"+
    "    }\n"+
    "  }";
- const warmPrefetch="  function prefetch(){\n"+
+ const warmPrefetch="  const adjacentOriginals=new Map();\n  function prefetch(){\n"+
    "    const items=all(),c=Math.round(state.p),dir=Math.sign(state.v);\n"+
    "    for(let off=(dir>=0?-3:-9);off<=(dir>=0?9:3);off++){\n"+
    "      const mem=items[c+off];if(!mem||!mem.image)continue;\n"+
@@ -350,6 +350,21 @@ function warmUpFirstSwipePhotoStrip(html){
    "      cache.set(mem.id,img);\n"+
    "      if(cache.size>35)cache.delete(cache.keys().next().value);\n"+
    "    }\n"+
+   "    // Exactly one real PHOTO on either side is decoded ahead of a swipe.\n"+
+   "    // Existing video stills stay in the thumbnail cache; never read full videos.\n"+
+   "    const needed=new Set();\n"+
+   "    for(const offset of [-1,1]){\n"+
+   "      const m=items[c+offset];\n"+
+   "      if(!m||m._photoLoading||m._zeroFrames?.[0]?.kind!=='photo')continue;\n"+
+   "      const src=m.photos?.[0];\n"+
+   "      if(typeof src!=='string'||!src)continue;\n"+
+   "      needed.add(m.id);\n"+
+   "      if(adjacentOriginals.get(m.id)?.src===src)continue;\n"+
+   "      const image=new Image();image.decoding='async';image.src=src;\n"+
+   "      adjacentOriginals.set(m.id,image);\n"+
+   "      if(typeof image.decode==='function')void image.decode().catch(()=>{});\n"+
+   "    }\n"+
+   "    for(const id of adjacentOriginals.keys())if(!needed.has(id))adjacentOriginals.delete(id);\n"+
    "  }";
  replace(oldPrefetch,warmPrefetch,'PREFETCH');
  const oldSub="  if(runtime?.subscribe)runtime.subscribe(()=>{if(state.visible||state.drag||window.__taleraBandRolling)return;state.p=book.state().index;state.center=-1;});";
@@ -780,41 +795,13 @@ function rebuildDirectOrdinaryPresentation(html){
     assert.equal(part.split(a).length,2,'DIRECT_ORDINARY_'+k);
     html=html.slice(0,first)+part.replace(a,b)+html.slice(last);
   };
-  // FIRST_COLD_VIDEO_NO_STILL: thumbnail is exclusively a wheel/cover asset.
-  // It is never the large ordinary-video frame. No alteration to narrator.
-  const ordinaryMask=String.raw`  function taleraOrdinaryVideoMask(active){
-    const stage=document.getElementById('photoStage');
-    const host=stage?.parentElement||stage;
-    const existing=document.getElementById('talera-f5-ordinary-video-mask');
-    if(!active){existing?.remove();return}
-    if(!host||existing)return;
-    const mask=document.createElement('div');
-    mask.id='talera-f5-ordinary-video-mask';
-    mask.style.cssText='position:absolute;inset:0;background:#071a3d;z-index:11;pointer-events:none';
-    host.appendChild(mask);
-  }
-`;
-  once("  function playOrdinaryVideo(memory,index){",ordinaryMask+"  function playOrdinaryVideo(memory,index){",'ORDINARY_THUMB_STRIP_ONLY');
-  // Remove the previous mask as the video leaves, never when the thumbnail
-  // wheel is merely rendered. Keep all original image bytes unchanged.
-  once("    ordinaryVideoToken++;ordinaryRecoverSound=null;ordinarySoundHint(false);",
-    "    ordinaryVideoToken++;ordinaryRecoverSound=null;ordinarySoundHint(false);\n    taleraOrdinaryVideoMask(false);",
-    'ORDINARY_MASK_CLEANUP');
-  once("    closeOrdinaryVideo(true);\n    const id=memory.id,key=frame.key,token=ordinaryVideoToken;",
-    "    closeOrdinaryVideo(true);\n    taleraOrdinaryVideoMask(true);\n    const id=memory.id,key=frame.key,token=ordinaryVideoToken;",
-    'MASK_BEFORE_ORIGINAL_VIDEO_READ');
-  once("      memory._photoIndex=next;memory.image=src;\n      settleVisiblePhoto(memory);renderDots(memory);",
-    "      memory._photoIndex=next;memory.image=src;\n      taleraOrdinaryVideoMask(frame?.kind==='video');\n      settleVisiblePhoto(memory);renderDots(memory);",
-    'NO_VIDEO_POSTER_AS_MAIN_STAGE');
-  once("    if(changed&&memory&&!memory._photoLoading&&Array.isArray(memory.photos)&&memory.photos.length){\n      memory._photoIndex=0;",
-    "    if(changed&&memory&&!memory._photoLoading&&Array.isArray(memory.photos)&&memory.photos.length){\n      taleraOrdinaryVideoMask(memory._taleraLocal&&!memory._zeroItems?.some(x=>x.kind==='audio')&&\n        memory._zeroFrames?.[0]?.kind==='video');\n      memory._photoIndex=0;",
-    'MASK_INITIAL_VIDEO_BEFORE_STILL');
-  // Keep the real video element visible for WebKit's first-frame decoder.
-  // Only its static JPEG is screened by the already-present ordinary mask.
-  // Hiding the video itself can prevent requestVideoFrameCallback indefinitely.
-  ordinaryOnce("video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';",
-    "video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none;opacity:1';",
-    'FIRST_ORIGINAL_VIDEO_DIRECT_VISIBILITY');
+  // Never add a blue frame between stories. The original 11-cell wheel
+  // already previews the next video while the same native player warms up.
+  // On a cold video open, wait for the ORIGINAL video frame to decode before
+  // requesting playback. Preserve the exact existing shared audio node.
+  ordinaryOnce("        video.onloadedmetadata=start;","        video.onloadedmetadata=()=>{if(video.readyState>=2)start()};\n        video.onloadeddata=start;\n        video.oncanplay=start;",'FIRST_REAL_VIDEO_FRAME_BEFORE_PLAY');
+  ordinaryOnce("        video.src=url;start();","        video.src=url;video.load();",'NO_EAGER_COLD_VIDEO_START');
+  once("        ordinaryVideo.onplaying=ordinaryVideo.ontimeupdate=null;","        ordinaryVideo.onplaying=ordinaryVideo.ontimeupdate=ordinaryVideo.onloadeddata=ordinaryVideo.oncanplay=null;",'CLEANUP_FIRST_FRAME_HANDLERS');
   // First iPhone start: repeated 0.4 s hard seeks made cold audio stutter.
   // Retain the approved shared audio element and a last-resort drift check,
   // never chase each early timeupdate while both decoders are warming.

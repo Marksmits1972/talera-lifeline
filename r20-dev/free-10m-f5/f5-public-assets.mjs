@@ -770,6 +770,16 @@ function rebuildDirectOrdinaryPresentation(html){
   once("window.__taleraV31SelectPhoto?.(memoryId,index,true);","window.__taleraOrdinarySelectPhoto?.(memoryId,index,true);",'ORDINARY_TAP_ENTRY_ONLY');
   once(" function activate(memory){\n   if(!memory||!memory._taleraLocal){disposePresentation();return}\n   if(memory._photoLoading){void hydrate(memory).then(()=>{if(runtime.currentMemory()?.id===memory.id)activate(memory)});return}\n   void present(memory);\n }"," function activate(memory){\n   if(!memory||!memory._taleraLocal){disposePresentation();return}\n   if(memory._photoLoading){void hydrate(memory).then(()=>{if(runtime.currentMemory()?.id===memory.id)activate(memory)});return}\n   // Routing only: the original recorded-voice functions remain untouched.\n   if(!memory._zeroItems?.some(item=>item.kind==='audio')){\n     if(activeId!==null)disposePresentation();\n     window.__taleraOrdinaryActivate?.(memory);\n     return;\n   }\n   void present(memory);\n }",'ONE_ENGINE_ROUTER');
 
+  // Restrict source-exact edits to the ORDINARY video function; the narrator
+  // also uses some of the same HTMLMediaElement styles and must not be edited.
+  const ordinaryOnce=(a,b,k)=>{
+    const first=html.indexOf('  function playOrdinaryVideo(memory,index){');
+    const last=html.indexOf('  function showPhoto(memory,index,manual=false){',first);
+    assert.ok(first>=0&&last>first,'DIRECT_ORDINARY_SCOPE_'+k);
+    const part=html.slice(first,last);
+    assert.equal(part.split(a).length,2,'DIRECT_ORDINARY_'+k);
+    html=html.slice(0,first)+part.replace(a,b)+html.slice(last);
+  };
   // FIRST_COLD_VIDEO_NO_STILL: thumbnail is exclusively a wheel/cover asset.
   // It is never the large ordinary-video frame. No alteration to narrator.
   const ordinaryMask=String.raw`  function taleraOrdinaryVideoMask(active){
@@ -801,7 +811,7 @@ function rebuildDirectOrdinaryPresentation(html){
     'MASK_INITIAL_VIDEO_BEFORE_STILL');
   // First decoded motion frame becomes visible atomically, not the JPEG
   // :phone-v1 which remains only in the existing timeline strip.
-  once("video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';",
+  ordinaryOnce("video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none';",
     "video.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:12;pointer-events:none;opacity:0';",
     'FIRST_MOTION_FRAME_HIDDEN_UNTIL_READY');
   once("        video.onplaying=syncSound;\n        video.ontimeupdate=syncSound;",

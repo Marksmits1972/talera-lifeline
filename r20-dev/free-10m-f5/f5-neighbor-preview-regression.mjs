@@ -103,8 +103,10 @@ assert.ok(shipped.includes("if(!memory._zeroItems?.some(item=>item.kind==='audio
   shipped.includes('window.__taleraOrdinaryActivate?.(memory)'),
   'Unvoiced memory must bypass original narrator before playing ordinary video');
 assert.ok(shipped.includes('function playOrdinaryVideo(memory,index)') &&
-  shipped.includes("window.TaleraMemories?.blob?.(key)"),
-  'Ordinary video must use the same original media store independently');
+  shipped.includes("window.TaleraLibrary?.blob?.(key)") &&
+  shipped.includes('window.TaleraLibrary=window.TaleraLibraryFactory.create(window.TaleraMemories)') &&
+  !shipped.includes("window.TaleraMemories?.blob?.(key)"),
+  'Ordinary video must read original media through the single account-local library');
 const narratorMarkers=['function taleraInlineSync(s){','function taleraInlineVoiceEnded(s){',
   'function taleraInlinePlayMedia(s,frame,muted,finished){'];
 for(const marker of narratorMarkers){

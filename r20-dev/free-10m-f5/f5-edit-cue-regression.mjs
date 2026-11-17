@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
+import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
 
 const html=readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
 const account='a'.repeat(64);
@@ -78,6 +79,23 @@ const editorCode=[...wired.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
  .map(x=>x[1]).find(x=>x.includes('g.canonicalByDraft=Object.fromEntries('));
 assert.ok(editorCode);
 new vm.Script(editorCode,{filename:'f5-editor-canonical-media-refs.js'});
+// Original media IDs now survive an edit with uploads, including a reorder.
+const stable=preserveOriginalMediaIdsOnEdit(wired);
+assert.ok(stable.includes('async function save(input,uploads,editId,canonicalIds){'));
+assert.ok(stable.includes("if(existing&&canonicalIds===undefined)for(var k=0;"));
+assert.ok(stable.includes("if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;"));
+assert.ok(stable.includes("tx.objectStore('files').add(row)"));
+assert.ok(stable.includes('canonicalIds);const persisted=await mem.get(row.id);'));
+assert.ok(stable.includes('g.canonicalByDraft[id]||null'));
+assert.ok(stable.includes("birthYear:Number(input.birthYear)||(existing?.birthYear||null)"));
+assert.ok(!stable.includes("const row=await mem.save({title,date:g.date"));
+const stableScripts=[...stable.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
+ .map(m=>m[1]);
+const storeScript=stableScripts.find(src=>src.includes('async function save(input,uploads,editId,canonicalIds)'));
+const editScript=stableScripts.find(src=>src.includes('g.canonicalByDraft[id]||null'));
+assert.ok(storeScript&&editScript);
+new vm.Script(storeScript,{filename:'TALERA_LIBRARY_STABLE_ORIGINAL_STORE.js'});
+new vm.Script(editScript,{filename:'TALERA_LIBRARY_STABLE_ORIGINAL_EDITOR.js'});
 console.log('TALERA_F5_EDITED_NARRATION_ID_REBIND',JSON.stringify({
  passed:true,syntheticOnly:true,keptOriginalBlobs:true,
  cuesPreserveTimeAndOrder:true,noInvalidCrossAccountIds:true,

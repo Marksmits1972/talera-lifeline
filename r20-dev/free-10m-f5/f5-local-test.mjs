@@ -174,7 +174,8 @@ async function run(){
   assert.equal((await request('GET','/__f5/backup?db='+matchedDb[1],
     {cookie:identities[0].cookie})).status,404,'Never accept client-chosen DB namespace');
   for(const modulePath of ['/__f5/backup-controller.mjs',
-   '/__f5/f5-portable-idb.mjs','/__f5/f5-portable-archive.mjs']){
+   '/__f5/f5-portable-idb.mjs','/__f5/f5-portable-archive.mjs',
+   '/__f5/f5-library-persistence.mjs']){
     assert.equal((await request('GET',modulePath,{gate:false})).status,403);
     assert.equal((await request('GET',modulePath)).status,401);
     const moduleOk=await request('GET',modulePath,{cookie:identities[0].cookie});

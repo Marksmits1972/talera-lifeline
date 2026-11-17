@@ -10,7 +10,7 @@ function server(port){
  const s=createServer((req,res)=>{
   if(req.method!=='GET')posts++;
   const path=req.url==='/'?'':req.url;
-  const allowed=new Set(['','/f5-portable-idb.mjs','/f5-portable-archive.mjs']);
+  const allowed=new Set(['','/f5-portable-idb.mjs','/f5-portable-archive.mjs','/f5-library-persistence.mjs']);
   if(!allowed.has(path)){res.writeHead(404).end();return}
   res.setHeader('access-control-allow-origin','none');
   res.setHeader('cache-control','no-store');

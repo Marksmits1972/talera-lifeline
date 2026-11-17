@@ -15,7 +15,7 @@ const currentAccount=new Map([[8865,accountA],[8866,accountB]]);
 const originA='http://127.0.0.1:8865',originB='http://127.0.0.1:8866';
 let serverA,serverB,browser,posts=0,accountReads=0;
 function serve(port,db){
- const names=new Set(['f5-backup-controller.mjs','f5-portable-idb.mjs','f5-portable-archive.mjs']);
+ const names=new Set(['f5-backup-controller.mjs','f5-portable-idb.mjs','f5-portable-archive.mjs','f5-library-persistence.mjs']);
  const srv=createServer((req,res)=>{
   if(req.method!=='GET'){posts++;res.writeHead(405).end();return}
   res.setHeader('cache-control','no-store');

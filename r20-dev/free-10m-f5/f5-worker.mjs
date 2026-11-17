@@ -130,6 +130,7 @@ const PUBLIC_INSTALL_ICON_PATHS=new Set([
 const BACKUP_MODULES=Object.freeze({
  '/__f5/f5-portable-idb.mjs':'f5-portable-idb.mjs',
  '/__f5/f5-portable-archive.mjs':'f5-portable-archive.mjs',
+ '/__f5/f5-library-persistence.mjs':'f5-library-persistence.mjs',
  '/__f5/backup-controller.mjs':'f5-backup-controller.mjs'
 });
 const HEX64=/^[a-f0-9]{64}$/;

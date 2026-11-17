@@ -43,7 +43,12 @@ jobs:
         run: |
           if [ "$GITHUB_REF_NAME" = feature/free-f5-independent-narrator-20261112 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
+            if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
+              # Library I/O moved; approved schema, archive codec and media cue writer remain protected.
+              git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+            else
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+            fi
             # The approved backup UI wording is immutable; media/storage codecs remain source-exact.
             if [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ] || [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"

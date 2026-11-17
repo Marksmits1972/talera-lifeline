@@ -800,7 +800,7 @@ function rebuildDirectOrdinaryPresentation(html){
   // On a cold video open, wait for the ORIGINAL video frame to decode before
   // requesting playback. Preserve the exact existing shared audio node.
   ordinaryOnce("        video.onloadedmetadata=start;","        video.onloadedmetadata=()=>{if(video.readyState>=2)start()};\n        video.onloadeddata=start;\n        video.oncanplay=start;",'FIRST_REAL_VIDEO_FRAME_BEFORE_PLAY');
-  ordinaryOnce("        video.src=url;start();","        video.src=url;video.load();",'NO_EAGER_COLD_VIDEO_START');
+  ordinaryOnce("        video.src=url;start();","        video.src=url;\n        // Setting src already starts loading. Do not reset iPhone decoding with load().\n        // If iOS ignores preload, use the original play route only as a fallback.\n        setTimeout(()=>{if(valid()&&video.paused)start()},1200);",'NO_DOUBLE_LOAD_COLD_VIDEO_START');
   once("        ordinaryVideo.onplaying=ordinaryVideo.ontimeupdate=null;","        ordinaryVideo.onplaying=ordinaryVideo.ontimeupdate=ordinaryVideo.onloadeddata=ordinaryVideo.oncanplay=null;",'CLEANUP_FIRST_FRAME_HANDLERS');
   // First iPhone start: repeated 0.4 s hard seeks made cold audio stutter.
   // Retain the approved shared audio element and a last-resort drift check,

@@ -847,7 +847,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = e1a9d407a4c14d1a42825483a8f1779f1298170f
+          test "$(git rev-parse HEAD^)" = daffa29b8d5947d0a93d7ce2116fff77f5380ca5
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD

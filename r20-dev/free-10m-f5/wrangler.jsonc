@@ -3,6 +3,9 @@
   "main": "./f5-worker.mjs",
   "compatibility_date": "2026-09-18",
   "workers_dev": true,
+  "send_email": [
+    { "name": "EMAIL" }
+  ],
   "assets": {
     "directory": "../free-10m-delivery/public",
     "binding": "ASSETS",

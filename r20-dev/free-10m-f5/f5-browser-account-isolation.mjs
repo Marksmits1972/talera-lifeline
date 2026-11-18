@@ -114,6 +114,7 @@ async function view(page,target){
    JSON.stringify(await page.locator('#talera-more-menu [data-view]')
      .evaluateAll(rows=>rows.map(n=>n.getAttribute('data-view')).slice(0,35))));
 }
+let passwordRecoveryUiChecked=false;
 async function login(page,user){
  await menu(page);
  if(!(await page.locator('#talera-more-menu form[data-form="login"]').count())){
@@ -123,6 +124,29 @@ async function login(page,user){
  }
  const form=page.locator('#talera-more-menu form[data-form="login"]');
  await form.waitFor({timeout:10000});
+ // Test the actual signed-out TALERA menu and same-origin recovery views.
+ // Email delivery is NOT faked here: missing verified sender must fail closed.
+ if(!passwordRecoveryUiChecked){
+  const recovery=page.locator('#talera-more-menu a[href="/wachtwoord-vergeten"]');
+  assert.equal(await recovery.count(),1,'Recovery link should appear exactly once in login');
+  assert.equal(await recovery.isVisible(),true,'Recovery link must be visible');
+  const tab=await page.context().newPage();
+  try{
+   const opening=await tab.goto(origin+(await recovery.getAttribute('href')));
+   assert.equal(opening.status(),200);
+   assert.match(await tab.title(),/Wachtwoord vergeten/);
+   await tab.locator('input[name="email"]').fill(user.email);
+   await tab.locator('form button[type="submit"]').click();
+   await tab.waitForFunction(()=>/tijdelijk niet beschikbaar/i.test(
+    document.querySelector('#status')?.textContent||''),null,{timeout:12000});
+   const confirmation=await tab.goto(origin+'/wachtwoord-instellen#e='+
+    encodeURIComponent(user.email)+'&t='+'a'.repeat(64));
+   assert.equal(confirmation.status(),200);
+   await tab.waitForFunction(()=>location.hash==='',null,{timeout:8000});
+   assert.equal(await tab.locator('input[name="newPassword"]').count(),1);
+  }finally{await tab.close()}
+  passwordRecoveryUiChecked=true;
+ }
  await form.locator('[name="email"]').fill(user.email);
  await form.locator('[name="login-password"]').fill(user.password);
  await Promise.all([

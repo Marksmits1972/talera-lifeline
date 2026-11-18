@@ -94,18 +94,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = e54b8e53a3ad99492fc7902241bb78f73b3063e1
-          test "$(git diff --name-only e54b8e53a3ad99492fc7902241bb78f73b3063e1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          test "$(git rev-parse HEAD^)" = 788be85f72a28b6e2477338739dfb8226fc04977
+          test "$(git diff --name-only 788be85f72a28b6e2477338739dfb8226fc04977 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const api='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/44259422365';
+          const api='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/44295666403';
           const r=await fetch(api,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,
             Accept:'application/vnd.github+json'
           },signal:AbortSignal.timeout(20000)});
           assert.equal(r.status,200,'Cannot verify prior 28/28 CI success');
           const run=await r.json();
-          assert.equal(run.head_sha,'e54b8e53a3ad99492fc7902241bb78f73b3063e1');
+          assert.equal(run.head_sha,'788be85f72a28b6e2477338739dfb8226fc04977');
           assert.equal(run.event,'push');
           assert.equal(run.status,'completed');
           assert.equal(run.conclusion,'success');
@@ -613,7 +613,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_ACTIVE_VERSION: 362d6a14-abf6-4038-a5f6-02f03ab153b1
+      F5_ACTIVE_VERSION: 6e16915c-51c4-4b8c-918e-d6f8e6ece966
       F5_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -628,13 +628,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          # Only the exact 28/28-green legacy Beluister and session-guard repair may be published.
+          # Only the exact 28/28-green own-first-video white-stage repair may be published.
           # Never alter user media, the accepted still/video handoff or account data.
-          test "$(git rev-parse HEAD^)" = e54b8e53a3ad99492fc7902241bb78f73b3063e1
-          test "$(git diff --name-only e54b8e53a3ad99492fc7902241bb78f73b3063e1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
-          test "$(git diff --name-only b1d6d4d248e620b45622ca719fccd13003496b1d e54b8e53a3ad99492fc7902241bb78f73b3063e1)" = "$EXPECTED"
-          git merge-base --is-ancestor b1d6d4d248e620b45622ca719fccd13003496b1d HEAD
+          test "$(git rev-parse HEAD^)" = 788be85f72a28b6e2477338739dfb8226fc04977
+          test "$(git diff --name-only 788be85f72a28b6e2477338739dfb8226fc04977 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-worker.mjs)
+          test "$(git diff --name-only 21cfe3f33967635a85a4c145fac1823acef19f12 788be85f72a28b6e2477338739dfb8226fc04977)" = "$EXPECTED"
+          git merge-base --is-ancestor 21cfe3f33967635a85a4c145fac1823acef19f12 HEAD
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -783,4 +783,4 @@ jobs:
           NODE
       - name: Restore preceding TALERA QA Worker on post-deploy failure
         if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
-        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after Beluister session-guard verification failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after original video visible-stage verification failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc

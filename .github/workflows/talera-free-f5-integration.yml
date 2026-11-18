@@ -847,7 +847,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = daffa29b8d5947d0a93d7ce2116fff77f5380ca5
+          test "$(git rev-parse HEAD^)" = 2ad30c005ae198650665b9b09a2a4d74dbe93893
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
@@ -1060,33 +1060,3 @@ jobs:
       - name: Restore previous TALERA version if deploy or postdeploy verification fails
         if: ${{ failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure') }}
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after failed no-example release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
-
-  diagnose_tell_public_bundled_examples:
-    name: Diagnose sample texts in SAME TALERA Tell page
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: node r20-dev/free-10m-delivery/build.mjs
-      - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
-      - name: Print remaining sample-source locations
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const {referencePages,guestPages}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
-          for(const [name,collection] of Object.entries({referencePages,guestPages})){
-            const html=fs.readFileSync('r20-dev/free-10m-delivery/public'+collection['/tell'],'utf8');
-            for(const needle of ['Test 081','talera-500-fotoband-','TALERA_STRESS_MEMORIES']){
-              const at=html.indexOf(needle);
-              console.log('TELL_EXAMPLE_MARKER',JSON.stringify({
-                route:name,token:needle,present:at>=0,
-                context:at>=0?html.slice(Math.max(0,at-250),at+350):''
-              }));
-            }
-          }
-          NODE

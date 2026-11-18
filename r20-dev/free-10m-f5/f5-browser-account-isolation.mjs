@@ -255,6 +255,26 @@ try{
         text:(x.textContent||'').slice(0,28)}))
    }));
    console.log('TALERA_F5_ACCOUNT_MENU_ROUTE_PROBE',JSON.stringify({route,...check}));
+   // The published iPhone bug was VISIBLE example tiles after login expired,
+   // not just unused demo data in a build. Verify the actual rendered surface.
+   if(route==='/mijn-leven'){
+     const visibleExamples=await page.evaluate(()=>{
+       const visible=el=>{
+         const s=getComputedStyle(el),r=el.getBoundingClientRect();
+         return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;
+       };
+       return {
+         topicCards:[...document.querySelectorAll('.talera-topic-card')].filter(visible).length,
+         demoCards:[...document.querySelectorAll('#demoCards > *')].filter(visible).length,
+         exampleStoryVisible:/Test 081|Voorbeelden hieronder bekijken/i.test(document.body.innerText)
+       };
+     });
+     assert.deepEqual(visibleExamples,{topicCards:0,demoCards:0,exampleStoryVisible:false},
+       'Logged-out Home MUST visually contain no example stories: '+
+       JSON.stringify(visibleExamples));
+     console.log('TALERA_F5_GUEST_HOME_VISUALLY_EMPTY_PASS',
+       JSON.stringify({...visibleExamples,realIphoneAccepted:false}));
+   }
    if(route==='/mijn-leven'){
      // The home-screen Meer tap was not covered by the old successful menu
      // test, which fell back to /present. Record the REAL home entry behavior

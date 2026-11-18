@@ -278,6 +278,28 @@ try{
   console.log('TALERA_F5_HOME_OWNER_RECORDS_STILL_WORK_PASS',
     JSON.stringify({saved:1,ownHero:true,ownPhoto:true,ownerYear:true,
       exampleCount:0,originalPwa:true,iphoneAccepted:false}));
+  // REPORTED IPHONE REGRESSION: Home shows the original own photo, but
+  // opening the existing /present route without ?memory= stays completely
+  // blank. Previous browser tests used ?memory= and missed this path.
+  const ordinaryRoot=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+  assert.equal(ordinaryRoot.status(),200);
+  await page.waitForFunction(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return !!m&&!m._photoLoading&&m._zeroFrames?.length===3;
+  },null,{timeout:16000});
+  const rootVisible=await centerPixel(page);
+  const rootState=await page.evaluate(()=>({
+    memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
+    frames:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length||0,
+    photo:window.__taleraTimelineRuntime?.currentMemory?.()?.photos?.[0]||null,
+    heroNotEmpty:!!document.querySelector('#photoStage img:not([hidden])')
+  }));
+  assert.ok(dominant(rootVisible,0),
+    'HOME_HAS_OWN_PHOTO_BUT_DEFAULT_PRESENTATION_IS_BLANK: '+
+      JSON.stringify({rootState,rootVisible}));
+  console.log('TALERA_HOME_TO_DEFAULT_PRESENT_OWN_PHOTO_VISIBLE_PASS',
+    JSON.stringify({ownerPhoto:true,defaultRoute:true,originalMediaIdPreserved:true,
+      realIphoneAccepted:false}));
   await load(page,plain,3);
   // Native timeline regression: with only ONE real local memory near today,
   // releasing a finger drag must preserve the finger-selected historical year.

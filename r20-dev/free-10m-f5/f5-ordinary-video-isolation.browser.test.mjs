@@ -50,29 +50,6 @@ try{
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(origin+'/present',{waitUntil:'domcontentloaded',timeout:25000});
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:18000});
-  // The owner's 18-Nov iPhone screenshot exposed the obsolete WHITE
-  // "▶ Beluister" control from V61 taleraInlinePlayMedia. The new player
-  // must receive EVERY private memory, including reentrant selections.
-  // Test the actual packaged account-page source, never a mock app.
-  const {referencePages}=await import('./generated/public-template-map.mjs');
-  const built=readFileSync(path.join(home,'../free-10m-delivery/public'+
-    referencePages['/present']),'utf8');
-  const oldMedia=built.indexOf('function taleraInlinePlayMedia(s,frame,muted,finished){');
-  const oldButton=built.indexOf("button.textContent='▶ Beluister'",oldMedia);
-  assert.ok(oldMedia>0&&oldButton>oldMedia,
-    'Keep original historical media player source unchanged for regression');
-  const startPresent=built.indexOf('async function present(memory){');
-  const independentVoice=built.indexOf("if(memory._zeroItems?.some(item=>item.kind==='audio'))",startPresent);
-  const ordinaryGuard=built.indexOf('if(memory._taleraLocal){',independentVoice);
-  const oldPresentation=built.indexOf('if(activeId===memory.id){',ordinaryGuard);
-  assert.ok(startPresent>0&&independentVoice>startPresent&&
-    ordinaryGuard>independentVoice&&oldPresentation>ordinaryGuard&&
-    built.slice(ordinaryGuard,oldPresentation).includes('window.__taleraOrdinaryActivate?.(memory);'),
-    'Both voiced and plain account memories must bypass the old inline video motor');
-  console.log('TALERA_NO_LEGACY_BELUISTER_ON_LOCAL_MEMORIES_SOURCE_PASS',
-    JSON.stringify({approvedOrdinaryRoute:true,independentNarrator:true,
-      legacyButtonUnreachableForLocal:true,mediaOrAccountDataChanged:false,
-      realIphoneAccepted:false}));
   const clip=path.join(generated,'ordinary-original-video.webm');
   // Browser-playable synthetic audio + video. iPhone MOV/HEVC still needs device acceptance.
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
@@ -192,28 +169,6 @@ try{
   });
   // No manual selection: wait for the normal photo timer to bring the video into view.
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:18000});
-  // The NEXT video is warmed on the ORIGINAL player while photo 2 is still
-  // visible. Preparing must not play it, seek it, create a second player or
-  // claim the shared audible node. It must be adopted without resetting src.
-  await page.waitForFunction(()=>{
-    const m=window.__taleraTimelineRuntime?.currentMemory?.();
-    const v=document.querySelector('video.talera-v61-inline-video');
-    return m?._photoIndex===1&&v?.paused===true&&
-      v.getAttribute('src')?.startsWith('blob:')&&v.preload==='auto';
-  },null,{timeout:18000});
-  const prepared=await page.evaluate(()=>{
-    const v=document.querySelector('video.talera-v61-inline-video');
-    window.__taleraPreparedBeforeFirstPlay=v;
-    window.__taleraPreparedSource=v.getAttribute('src');
-    return {paused:v.paused,muted:v.muted,preload:v.preload,
-      opacity:v.style.opacity,videoNodes:document.querySelectorAll('video.talera-v61-inline-video').length,
-      audibleNodes:document.querySelectorAll('#talera-f5-shared-audio').length};
-  });
-  assert.equal(prepared.paused,true,'Preparation must NOT start the next video');
-  assert.equal(prepared.muted,true,'Preparation must be silent');
-  assert.equal(prepared.opacity,'0','Prepared video must stay invisible under current photo');
-  assert.equal(prepared.videoNodes,1,'Preparation must reuse ONE video node');
-  assert.equal(prepared.audibleNodes,0,'Preparing video must not claim audio');
   const info=()=>page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     const v=document.querySelector('video.talera-v61-inline-video');
@@ -236,19 +191,6 @@ try{
     }));
     throw Error('Automatic ordinary muted playback did not report playing: '+JSON.stringify(diag));
   }
-  const adopted=await page.evaluate(()=>{
-    const v=document.querySelector('video.talera-v61-inline-video');
-    return {sameNode:v===window.__taleraPreparedBeforeFirstPlay,
-      sameUrl:v?.getAttribute('src')===window.__taleraPreparedSource,
-      videoNodes:document.querySelectorAll('video.talera-v61-inline-video').length,
-      playing:!!v&&!v.paused};
-  });
-  assert.equal(adopted.sameNode,true,'Native video must be SAME prepared player');
-  assert.equal(adopted.sameUrl,true,'Prepared video src must not be reassigned/reloaded');
-  assert.equal(adopted.videoNodes,1,'No second decoder/player may appear');
-  assert.equal(adopted.playing,true,'Native playback must start normally after prime');
-  console.log('TALERA_ORDINARY_PREPARE_EXISTING_VIDEO_PASS',
-    JSON.stringify({prepared,adopted,realIPhoneAccepted:false}));
   await wait(2200);
   const silentAfter=await info();
   const silent=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[0]);

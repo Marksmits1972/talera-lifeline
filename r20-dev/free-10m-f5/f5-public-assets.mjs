@@ -808,15 +808,6 @@ function rebuildDirectOrdinaryPresentation(html){
   once("            if(valid()&&taleraSharedAudible.isOwner(owner))\n              try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
     "            if(valid()&&taleraSharedAudible.isOwner(owner)&&video.currentTime>2&&audio.readyState>=3)\n              try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
     'NO_COLD_METADATA_SEEK');
-  once("  let ordinaryVideoBridge=null;\n  const clearOrdinaryVideoBridge=","  let ordinaryVideoBridge=null;\n\n  // At most ONE original video is prepared, on the SAME native element used\n  // for playback. No second video/audio player, no persistent media cache.\n  let ordinaryPreparedVideo=null,ordinaryPreparePending=null,ordinaryPrepareEpoch=0;\n  function discardPreparedVideo(){\n    ordinaryPrepareEpoch++;ordinaryPreparePending=null;\n    const old=ordinaryPreparedVideo;ordinaryPreparedVideo=null;\n    if(!old)return;\n    if(ordinaryVideo===old.video){\n      old.video.pause();old.video.removeAttribute('src');\n    }\n    URL.revokeObjectURL(old.url);\n  }\n  function prepareOrdinaryNextVideo(memory,index){\n    if(!ordinaryMemory(memory)||runtime.currentMemory()?.id!==memory.id||\n       memory._photoIndex!==index||ordinaryVideoOwner||document.hidden)return;\n    const length=memory._zeroFrames?.length||0;\n    if(length<2)return;\n    const next=memory._zeroFrames[(index+1)%length];\n    if(next?.kind!=='video'||!next.key){\n      discardPreparedVideo();return;\n    }\n    if(ordinaryPreparedVideo?.id===memory.id&&\n       ordinaryPreparedVideo.key===next.key)return;\n    if(ordinaryPreparePending?.id===memory.id&&\n       ordinaryPreparePending.key===next.key)return;\n    discardPreparedVideo();\n    const epoch=ordinaryPrepareEpoch,id=memory.id,key=next.key;\n    ordinaryPreparePending={id,key,epoch};\n    void (async()=>{\n      let url=null;\n      try{\n        const original=await window.TaleraLibrary?.blob?.(key);\n        if(!(original instanceof Blob)||!original.size)return;\n        const valid=()=>ordinaryPrepareEpoch===epoch&&\n          ordinaryMemory(memory)&&runtime.currentMemory()?.id===id&&\n          memory._photoIndex===index&&!ordinaryVideoOwner&&!document.hidden;\n        if(!valid())return;\n        url=URL.createObjectURL(original);\n        const stage=document.getElementById('photoStage');\n        if(!stage||!valid()){URL.revokeObjectURL(url);return}\n        const video=ordinaryVideo||document.createElement('video');\n        video.className='talera-v61-inline-video';\n        video.playsInline=true;video.setAttribute('playsinline','');\n        video.setAttribute('webkit-playsinline','');\n        video.preload='auto';video.controls=false;\n        video.muted=true;video.defaultMuted=true;\n        video.setAttribute('muted','');\n        video.style.cssText='position:absolute;inset:0;width:100%;height:100%;opacity:0;z-index:12;pointer-events:none';\n        if(video.parentElement!==(stage.parentElement||stage))\n          (stage.parentElement||stage).appendChild(video);\n        ordinaryVideo=video;\n        ordinaryPreparedVideo={id,key,url,video};\n        video.src=url;\n        // This is media preparation only: NEVER call play(), seek or claim sound.\n        video.load();\n      }catch(error){\n        if(url){if(ordinaryPreparedVideo?.url===url)ordinaryPreparedVideo=null;\n          URL.revokeObjectURL(url)}\n      }finally{\n        if(ordinaryPreparePending?.epoch===epoch)ordinaryPreparePending=null;\n      }\n    })();\n  }\n  const clearOrdinaryVideoBridge=","PRIME_HELPERS");
-  once("  function closeOrdinaryVideo(keepElement=false){\n    ordinaryVideoToken++;","  function closeOrdinaryVideo(keepElement=false,preservePrepared=false){\n    const retainPrepared=keepElement===true&&preservePrepared===true&&\n      ordinaryPreparedVideo?.video===ordinaryVideo;\n    if(!retainPrepared)discardPreparedVideo();\n    ordinaryVideoToken++;","PRIME_CLOSE_GUARD");
-  once("      ordinaryVideo.pause();ordinaryVideo.removeAttribute('src');","      ordinaryVideo.pause();if(!retainPrepared)ordinaryVideo.removeAttribute('src');","PRIME_KEEP_NATIVE_SOURCE");
-  once("    // WebKit's media gesture permission is tied to that element.\n    closeOrdinaryVideo(true);\n    const id=memory.id,key=frame.key,token=ordinaryVideoToken;","    // WebKit's media gesture permission is tied to that element.\n    const readyPrimed=ordinaryPreparedVideo?.id===memory.id&&\n      ordinaryPreparedVideo.key===frame.key&&ordinaryPreparedVideo.video===ordinaryVideo;\n    closeOrdinaryVideo(true,readyPrimed);\n    const id=memory.id,key=frame.key,token=ordinaryVideoToken;","PRIME_ADOPT_PREPARED");
-  once("        const original=await window.TaleraLibrary?.blob?.(key);\n        if(!(original instanceof Blob)||!original.size)throw Error('Video ontbreekt bij media-ID');\n        url=URL.createObjectURL(original);","        const prepared=readyPrimed?ordinaryPreparedVideo:null;\n        if(prepared){ordinaryPreparedVideo=null;url=prepared.url;}\n        else{\n          const original=await window.TaleraLibrary?.blob?.(key);\n          if(!(original instanceof Blob)||!original.size)throw Error('Video ontbreekt bij media-ID');\n          url=URL.createObjectURL(original);\n        }","PRIME_SKIP_SECOND_IDB");
-  once("        video.src=url;start();","        // Do not reset the decoder/media pipeline after a successful prime.\n        if(!readyPrimed||video.getAttribute('src')!==url)video.src=url;\n        start();","PRIME_PRESERVE_DECODER");
-  once("      if(frame?.kind==='video')playOrdinaryVideo(memory,next);\n      scheduleAuto(memory);","      if(frame?.kind==='video')playOrdinaryVideo(memory,next);\n      else prepareOrdinaryNextVideo(memory,next);\n      scheduleAuto(memory);","PRIME_NEXT_FRAME_ONLY");
-  once("    if(memory._zeroFrames?.[index]?.kind==='video')playOrdinaryVideo(memory,index);","    if(memory._zeroFrames?.[index]?.kind==='video')playOrdinaryVideo(memory,index);\n    else prepareOrdinaryNextVideo(memory,index);","PRIME_INITIAL_PHOTO");
-  once("    if(document.hidden&&ordinaryVideo)ordinaryVideo.pause();","    if(document.hidden){discardPreparedVideo();if(ordinaryVideo)ordinaryVideo.pause()}","PRIME_BACKGROUND_CLEANUP");
   if(html.includes('readyNeighbour?.currentSrc'))throw Error('Old neighbor bitmap remains');
   if(html.includes('const fallback=mem._taleraLocal?('))throw Error('Old shared bitmap remains');
   return html;
@@ -948,20 +939,6 @@ function isolateNarratedMemories(html){
    html=html.replace(before,after);
  };
  exact(oldStart,newStart,'TYPE_ROUTER');
- // A voice record is already dispatched above to the independent narrator.
- // A NON-voice local record must likewise never fall through to the old
- // V61 inline-player. That player can create a white "▶ Beluister" button
- // if Safari refuses play(), even though the approved ordinary motor uses
- // ONE muted video node and a persistent shared audible node instead.
- // This guards direct/reentrant present(memory) calls during rapid swipes.
- exact("  taleraIndependentNarrator.stop();\n  if(activeId===memory.id){",
-   "  taleraIndependentNarrator.stop();\n"+
-   "  if(memory._taleraLocal){\n"+
-   "    if(taleraInline)disposePresentation();\n"+
-   "    window.__taleraOrdinaryActivate?.(memory);\n"+
-   "    return; // Never enter obsolete V61 audio-permission overlay.\n"+
-   "  }\n  if(activeId===memory.id){",
-   'BLOCK_LEGACY_PRESENT_ON_LOCAL_MEMORY');
  exact("if(!memory||!memory._taleraLocal){disposePresentation();return}",
   "if(!memory||!memory._taleraLocal){taleraIndependentNarrator.stop();disposePresentation();return}",
   'DEACTIVATION');
@@ -1162,18 +1139,7 @@ const guestPages={};
 for(const [route,filename] of Object.entries(routes)){
  const raw=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
  let guest=raw;
- if(route==='/present'){
-   guest=removeBuiltInPresentationExamples(guest);
-   // A missing Safari session previously loaded the ORIGINAL, unscoped
-   // local story list and the obsolete V61 "▶ Beluister" media controller.
-   // Signed-out presentation is an EMPTY login entry, NEVER a back door
-   // to old local media or an alternative video player.
-   const boot='   const rows=await store.list();\n   const memories=rows.map(toMemory).filter(Boolean);';
-   assert.equal(guest.split(boot).length,2,'GUEST_PRESENT_LOCAL_BOOT_SOURCE_DRIFT');
-   guest=guest.replace(boot,
-     '   const rows=[]; // Login required: no local media read.\n'+
-     '   const memories=rows.map(toMemory).filter(Boolean);');
- }
+ if(route==='/present')guest=removeBuiltInPresentationExamples(guest);
  if(route==='/mijn-leven'){
    guest=removeAllBuiltInHomeExamples(showOwnedStoriesOnly(guest));
    // No account session: NEVER load or show personal records from an unscoped

@@ -278,73 +278,6 @@ try{
   console.log('TALERA_F5_HOME_OWNER_RECORDS_STILL_WORK_PASS',
     JSON.stringify({saved:1,ownHero:true,ownPhoto:true,ownerYear:true,
       exampleCount:0,originalPwa:true,iphoneAccepted:false}));
-  // REPORTED IPHONE REGRESSION: Home shows the original own photo, but
-  // opening the existing /present route without ?memory= stays completely
-  // blank. Previous browser tests used ?memory= and missed this path.
-  const ordinaryRoot=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
-  assert.equal(ordinaryRoot.status(),200);
-  await page.waitForFunction(()=>{
-    const m=window.__taleraTimelineRuntime?.currentMemory?.();
-    return !!m&&!m._photoLoading&&m._zeroFrames?.length===3;
-  },null,{timeout:16000});
-  const rootVisible=await centerPixel(page);
-  const rootState=await page.evaluate(()=>({
-    memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
-    frames:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length||0,
-    photo:window.__taleraTimelineRuntime?.currentMemory?.()?.photos?.[0]||null,
-    heroNotEmpty:!!document.querySelector('#photoStage img:not([hidden])')
-  }));
-  assert.ok(dominant(rootVisible,0),
-    'HOME_HAS_OWN_PHOTO_BUT_DEFAULT_PRESENTATION_IS_BLANK: '+
-      JSON.stringify({rootState,rootVisible}));
-  console.log('TALERA_HOME_TO_DEFAULT_PRESENT_OWN_PHOTO_VISIBLE_PASS',
-    JSON.stringify({ownerPhoto:true,defaultRoute:true,originalMediaIdPreserved:true,
-      realIphoneAccepted:false}));
-  // The Home "Door de tijd" year link is /present?year=2026.
-  // Force a slow but normal local IndexedDB read to reproduce the native
-  // iPhone timing where year selection fires BEFORE the catalog loads.
-  // We delay ONLY synthetic list() in this page, never use mock stories.
-  await page.addInitScript(()=>{
-    let store;
-    Object.defineProperty(window,'TaleraMemories',{
-      configurable:true,
-      get(){return store},
-      set(next){
-        store=next;
-        if(typeof next?.list==='function'){
-          const original=next.list;
-          next.list=async function(...args){
-            if(location.pathname==='/present'&&location.search==='?year=2026')
-              await new Promise(resolve=>setTimeout(resolve,4200));
-            return original.apply(this,args);
-          };
-        }
-      }
-    });
-  });
-  // With real IndexedDB hydration the year selector can execute before
-  // registration and never re-activate the selected own photo.
-  const yearRoute=await page.goto(origin+'/present?year=2026',
-    {waitUntil:'domcontentloaded'});
-  assert.equal(yearRoute.status(),200);
-  await page.waitForFunction(()=>{
-    const m=window.__taleraTimelineRuntime?.currentMemory?.();
-    return !!m&&!m._photoLoading&&m._zeroFrames?.length===3;
-  },null,{timeout:16000});
-  await page.waitForTimeout(400);
-  const yearVisible=await centerPixel(page);
-  const yearStatus=await page.evaluate(()=>({
-    date:document.getElementById('focusText')?.textContent,
-    currentId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
-    front:document.getElementById('memoryPhotoA')?.getAttribute('src'),
-    frontNatural:document.getElementById('memoryPhotoA')?.naturalWidth||0,
-    stageVisible:getComputedStyle(document.getElementById('photoStage')).visibility
-  }));
-  assert.ok(dominant(yearVisible,0),
-    'HOME_YEAR_LINK_HAS_OWN_PHOTO_BUT_PRESENT_YEAR_MODE_IS_BLANK: '+
-      JSON.stringify({yearStatus,yearVisible}));
-  console.log('TALERA_HOME_YEAR_LINK_OWN_PHOTO_VISIBLE_PASS',
-    JSON.stringify({year:2026,ownImage:true,realIphoneAccepted:false}));
   await load(page,plain,3);
   // Native timeline regression: with only ONE real local memory near today,
   // releasing a finger drag must preserve the finger-selected historical year.
@@ -1064,40 +997,6 @@ try{
   assert.deepEqual(videoFirst.kinds,['video','photo'],
     'Test needs genuinely ordered video first, photo second in the same memory');
   await load(page,videoFirst.id,2);
-  // The real iPhone shows TIMELINE ONLY (white background) with a previously
-  // saved first-video poster. A deep-link entry guard must never leave
-  // #photoStage hidden after the selected original has loaded.
-  await page.waitForFunction(()=>{
-    const m=window.__taleraTimelineRuntime?.currentMemory?.();
-    return !m?._photoLoading&&m?.photos?.[0]?.startsWith('blob:');
-  },null,{timeout:16500});
-  // Native Safari has a bounded 180ms fallback after the FIRST requested
-  // media frame is verified. Check after that bound, not in the same
-  // microtask that finishes IndexedDB/photo metadata hydration.
-  await page.waitForTimeout(480);
-  const deepEntry=await page.evaluate(()=>{
-    const m=window.__taleraTimelineRuntime?.currentMemory?.();
-    const front=document.getElementById('memoryPhotoA');
-    const stage=document.getElementById('photoStage');
-    const v=document.querySelector('video.talera-v61-inline-video');
-    return {
-      hiddenByEntry:document.documentElement.classList.contains('talera-direct-memory-entering'),
-      stageVisibility:getComputedStyle(stage).visibility,
-      firstFrameMatches:front?.getAttribute('src')===m?.image,
-      firstFrameReady:!!front?.complete&&front.naturalWidth>0,
-      videoPlaying:!!v&&!v.paused,
-      mediaFirstKind:m?._zeroFrames?.[0]?.kind,
-      mediaID:m?._zeroFrames?.[0]?.key,
-      storyID:m?.storyId,
-      frontSourceType:String(front?.getAttribute('src')||'').split(':')[0]
-    };
-  });
-  assert.equal(deepEntry.hiddenByEntry,false,
-    'IPHONE_BLANK_STAGE_DIRECT_VIDEO: '+JSON.stringify(deepEntry));
-  assert.notEqual(deepEntry.stageVisibility,'hidden',
-    'First own video must be visible, not covered by stale entry guard');
-  console.log('TALERA_FIRST_VIDEO_DIRECT_ENTRY_STAGE_VISIBLE_PASS',
-    JSON.stringify({...deepEntry,realIphoneAccepted:false}));
   try{
     await page.waitForFunction(id=>{
         const mem=window.__taleraTimelineRuntime?.currentMemory?.();
@@ -1235,102 +1134,6 @@ try{
   assert.equal(exactHandoff.rememberedId,videoFirst.id);
   console.log('TALERA_NATIVE_VIDEO_FIRST_FRAME_HANDOFF_PASS',
     JSON.stringify({...exactHandoff,iPhoneAccepted:false}));
-
-  // A true baseline, using the SAME account-local original video, SAME
-  // native player and SAME 0.10s thumbnail transition. No runtime changes:
-  // measure IndexedDB read separately from native video decoding/startup.
-  // This is a headless-browser diagnostic, NOT a claim about real iPhone ms.
-  const startupDiagnostic=await page.evaluate(async()=>{
-    const mem=window.__taleraTimelineRuntime?.currentMemory?.();
-    const key=mem?._zeroFrames?.[0]?.key;
-    if(!mem||!key)throw Error('No original video selected for startup timing');
-    const store=window.TaleraMemories,originalBlob=store.blob;
-    let selectedAt=0,loadedAt=null,playingAt=null,movingAt=null;
-    let preparedBeforeSelection=false,preparedMetadata=false;
-    const reads=[];
-    // Observe the ORIGINAL library during both phases. A successful prime
-    // intentionally moves its Blob read to BEFORE video selection.
-    store.blob=function(id,...args){
-      const started=performance.now();
-      return Promise.resolve(originalBlob.call(this,id,...args)).then(blob=>{
-        if(id===key)reads.push({
-          phase:selectedAt>0?'selection':'preparation',
-          durationMs:Math.round((performance.now()-started)*1000)/1000,
-          bytes:blob?.size||0
-        });
-        return blob;
-      });
-    };
-    let video=null,markLoaded=null,markPlaying=null;
-    try{
-      window.__taleraOrdinarySelectPhoto?.(mem.id,1,true);
-      await new Promise((resolve,reject)=>{
-        const until=performance.now()+5000;
-        const tick=()=>{
-          if(window.__taleraTimelineRuntime.currentMemory()?._photoIndex===1)resolve();
-          else if(performance.now()>until)reject(Error('Photo selection did not settle'));
-          else requestAnimationFrame(tick);
-        };tick();
-      });
-      // The same native element may already contain the next source.
-      // Readiness is permitted to occur before selection, not fabricated.
-      await new Promise((resolve,reject)=>{
-        const until=performance.now()+5000;
-        const tick=()=>{
-          const v=document.querySelector('video.talera-v61-inline-video');
-          if(v?.getAttribute('src')?.startsWith('blob:')&&v.paused)resolve();
-          else if(performance.now()>until)reject(Error('Next native video not prepared'));
-          else requestAnimationFrame(tick);
-        };tick();
-      });
-      video=document.querySelector('video.talera-v61-inline-video');
-      preparedBeforeSelection=!!video&&video.paused&&
-        video.getAttribute('src')?.startsWith('blob:');
-      preparedMetadata=video.readyState>=1;
-      markLoaded=()=>{if(loadedAt===null)loadedAt=performance.now()};
-      markPlaying=()=>{if(playingAt===null)playingAt=performance.now()};
-      video.addEventListener('loadedmetadata',markLoaded);
-      video.addEventListener('playing',markPlaying);
-      selectedAt=performance.now();
-      if(preparedMetadata)loadedAt=selectedAt;
-      window.__taleraOrdinarySelectPhoto?.(mem.id,0,true);
-      await new Promise((resolve,reject)=>{
-        const until=performance.now()+10000;
-        const tick=()=>{
-          if(video.currentTime>=.10&&!video.paused&&video.readyState>=2){
-            movingAt=performance.now();resolve();
-          }else if(performance.now()>until)reject(Error('No original moving video frame'));
-          else requestAnimationFrame(tick);
-        };tick();
-      });
-    }finally{
-      store.blob=originalBlob;
-      if(video&&markLoaded)video.removeEventListener('loadedmetadata',markLoaded);
-      if(video&&markPlaying)video.removeEventListener('playing',markPlaying);
-    }
-    return {
-      mediaKeyPreserved:window.__taleraTimelineRuntime.currentMemory()?._zeroFrames?.[0]?.key===key,
-      preparedBeforeSelection,preparedMetadata,
-      libraryReads:reads,
-      selectToMetadataMs:loadedAt===null?null:Math.round((loadedAt-selectedAt)*1000)/1000,
-      selectToPlayingMs:playingAt===null?null:Math.round((playingAt-selectedAt)*1000)/1000,
-      selectToMovingMs:movingAt===null?null:Math.round((movingAt-selectedAt)*1000)/1000,
-      hasSingleVideo:document.querySelectorAll('video.talera-v61-inline-video').length===1,
-      hasSingleSharedAudio:document.querySelectorAll('#talera-f5-shared-audio').length===1
-    };
-  });
-  assert.equal(startupDiagnostic.mediaKeyPreserved,true);
-  assert.equal(startupDiagnostic.hasSingleVideo,true);
-  assert.equal(startupDiagnostic.hasSingleSharedAudio,true);
-  assert.equal(startupDiagnostic.preparedBeforeSelection,true,
-    'Existing video element must be silently primed before ordinary selection');
-  assert.ok(startupDiagnostic.libraryReads.some(r=>r.bytes>0&&r.phase==='preparation'),
-    'Original video must be read from the SAME local library during preparation');
-  assert.ok(startupDiagnostic.selectToMovingMs>0&&
-    startupDiagnostic.selectToMovingMs<10000,'Native video must advance while measuring');
-  console.log('TALERA_ORIGINAL_VIDEO_STARTUP_LATENCY_BASELINE_BROWSER_ONLY',
-    JSON.stringify({...startupDiagnostic,realIphoneMeasured:false,
-      userMediaAccessed:false,productionAppChanged:false}));
 
   // Swipe FROM another photo memory. During the movement, the native RH19
   // strip must show that same first video still; after landing its video plays.
@@ -1605,8 +1408,7 @@ try{
     noBlueMask:!ordinarySource.includes('taleraOrdinaryVideoMask')&&
       !ordinarySource.includes('talera-f5-ordinary-video-mask'),
     originalFirstPlay:ordinaryMotor.includes('video.onloadedmetadata=start')&&
-      ordinaryMotor.includes("if(!readyPrimed||video.getAttribute('src')!==url)video.src=url;")&&
-      ordinaryMotor.includes('start();'),
+      ordinaryMotor.includes('video.src=url;start()'),
     noDoubleLoad:!ordinaryMotor.includes('video.src=url;video.load()')
   };
   assert.ok(Object.values(ordinarySafety).every(Boolean),

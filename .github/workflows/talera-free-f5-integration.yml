@@ -5,6 +5,7 @@ on:
     branches: [feature/free-10m-f5-integrated-staging-20261108, feature/free-f5-approved-20261111-backup-only, feature/free-f5-independent-narrator-20261112, feature/free-f5-narrator-story-swipe-20261113, feature/free-f5-library-boundary-20261117]
     paths:
       - 'r20-dev/free-10m-f5/**'
+      - 'r20-dev/free-10m-auth-pilot/**'
       - '.github/workflows/talera-free-f5-integration.yml'
   pull_request:
     branches: [feature/free-10m-social-memory-do-20261108]

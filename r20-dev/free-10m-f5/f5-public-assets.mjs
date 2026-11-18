@@ -1141,8 +1141,38 @@ function stopOldPresentationWhenTimelineMoves(html){
 }
 
 const refs={};
+// Build the logged-out entry from the very same zero-example source.
+// The old immutable 7-Nov shell held 500 demonstrations and could reappear
+// whenever an iPhone session expired. NEVER serve that snapshot as a fallback.
+const guestPages={};
 for(const [route,filename] of Object.entries(routes)){
- let html=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
+ const raw=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
+ let guest=raw;
+ if(route==='/present')guest=removeBuiltInPresentationExamples(guest);
+ if(route==='/mijn-leven'){
+   guest=removeAllBuiltInHomeExamples(showOwnedStoriesOnly(guest));
+   // No account session: NEVER load or show personal records from an unscoped
+   // local library, even if an older iPhone kept stale IndexedDB records.
+   const ownRead="rows=(await store.list()).filter(x=>x&&x.source==='pwa-local');";
+   assert.equal(guest.split(ownRead).length,2,'GUEST_LOCAL_LIBRARY_READ_SOURCE_DRIFT');
+   guest=guest.replace(ownRead,'rows=[];');
+ }
+ if(route==='/mijn-leven'){
+   assert.ok(guest.includes('window.__taleraReferenceMemories=[];')&&
+     !guest.includes('Test 081')&&!guest.includes('talera-500-fotoband-081'),
+     'GUEST_HOME_STILL_HAS_DEMO_MEMORIES');
+ }
+ if(route==='/present'){
+   assert.ok(guest.includes('const MEMORIES = [];')&&
+     !guest.includes('TALERA_STRESS_MEMORIES')&&
+     !guest.includes('talera-500-fotoband-'),
+     'GUEST_PRESENTATION_STILL_HAS_DEMO_MEMORIES');
+ }
+ assert.ok(guest.includes('talera-more-menu'),'GUEST_ORIGINAL_LOGIN_MENU_MISSING');
+ const guestFile=sha(guest)+'.html';
+ writeFileSync(path.join(publicDir,'__talera_free','f5references',guestFile),guest,'utf8');
+ guestPages[route]='/__talera_free/f5references/'+guestFile;
+ let html=raw;
  if(route==='/present')html=removeBuiltInPresentationExamples(html);
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);
@@ -1297,6 +1327,7 @@ for(const mandatory of ['/sw.js','/manifest.webmanifest'])
 writeFileSync(path.join(generated,'public-template-map.mjs'),
   '// Generated only from current approved anonymous public TALERA source.\n'+
   'export const referencePages = Object.freeze('+JSON.stringify(refs,null,2)+');\n'+
+ 'export const guestPages = Object.freeze('+JSON.stringify(guestPages,null,2)+');\n'+
   'export const verifiedPublicScripts = Object.freeze('+JSON.stringify(scripts,null,2)+');\n'+
   'export const verifiedPublicSupport = Object.freeze('+JSON.stringify(support,null,2)+');\n');
 const report={result:'BUILT (not browser-certified)',source:origin,

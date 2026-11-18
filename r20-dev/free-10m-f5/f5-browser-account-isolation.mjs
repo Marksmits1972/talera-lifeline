@@ -178,6 +178,31 @@ async function inventory(page){
 let result;
 try{
  await workerStart();
+ // Regression for the owner's reported 18-Nov defect: an expired/missing
+ // session must never expose the immutable 7-Nov example catalog.
+ // Test the EXACT same locally built Worker and existing two app routes.
+ for(const route of ['/mijn-leven','/present']){
+   const response=await fetch(origin+route,{headers:{'x-talera-f5-key':gate}});
+   assert.equal(response.status,200,'Anonymous original route must remain available');
+   assert.equal(response.headers.get('x-talera-free-f5'),'anonymous-snapshot-only');
+   const html=await response.text();
+   assert.ok(!html.includes('talera-500-fotoband-')&&
+     !html.includes('Test 081')&&!html.includes('TALERA_STRESS_MEMORIES'),
+     'No demo source may return after account session expires: '+route);
+   if(route==='/mijn-leven'){
+     assert.ok(html.includes('window.__taleraReferenceMemories=[];'),
+       'Signed-out Home must have zero bundled memories');
+     assert.ok(html.includes('rows=[];'),
+       'Signed-out Home must not read an unscoped local library');
+   }else{
+     assert.ok(html.includes('const MEMORIES = [];'),
+       'Signed-out presentation must contain no 50+450 examples');
+   }
+   assert.ok(html.includes('talera-more-menu'),
+     'Existing login/signup UI remains on the same route');
+ }
+ console.log('TALERA_F5_GUEST_HOME_PRESENT_ZERO_DEMO_SOURCE_PASS',
+   JSON.stringify({routes:2,examples:0,privateRecordsAccessed:false,realIphoneAccepted:false}));
  const ids=await Promise.all(users.map(createUser));
  browser=await chromium.launch({headless:true});
  const context=await browser.newContext({

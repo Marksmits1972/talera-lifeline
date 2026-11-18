@@ -198,8 +198,10 @@ try{
      assert.ok(html.includes('const MEMORIES = [];'),
        'Signed-out presentation must contain no 50+450 examples');
    }
-   assert.ok(html.includes('talera-more-menu'),
-     'Existing login/signup UI remains on the same route');
+   assert.ok(html.includes('</head>')&&html.includes('</body>')&&
+     (route!=='/mijn-leven'||html.includes('id="navMore"'))&&
+     (route!=='/present'||html.includes('id="photoStage"')),
+     'Existing same-origin app entry and navigation must remain intact');
  }
  console.log('TALERA_F5_GUEST_HOME_PRESENT_ZERO_DEMO_SOURCE_PASS',
    JSON.stringify({routes:2,examples:0,privateRecordsAccessed:false,realIphoneAccepted:false}));

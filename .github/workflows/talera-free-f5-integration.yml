@@ -950,6 +950,14 @@ jobs:
               assert.ok(filename,'Missing existing app page '+route);
               const html=fs.readFileSync(publicDir+filename,'utf8');
               assert.ok(html.length>50000,'Unexpectedly small app page');
+              if(route==='/tell'){
+                for(const matcher of [/Test 081/ig,/talera-500-fotoband-/ig,/TALERA_STRESS_MEMORIES/ig]){
+                  const hit=matcher.exec(html);
+                  if(hit)console.log('UNREMOVED_TELL_EXAMPLE_SOURCE',JSON.stringify({
+                    token:hit[0],at:hit.index,excerpt:html.slice(Math.max(0,hit.index-220),hit.index+260)
+                  }));
+                }
+              }
               assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/i.test(html),
                 'Bundled example story remains: '+route);
               assert.ok(!/https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-/i.test(html),

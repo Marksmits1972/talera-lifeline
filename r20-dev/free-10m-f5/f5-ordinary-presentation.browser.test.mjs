@@ -278,6 +278,73 @@ try{
   console.log('TALERA_F5_HOME_OWNER_RECORDS_STILL_WORK_PASS',
     JSON.stringify({saved:1,ownHero:true,ownPhoto:true,ownerYear:true,
       exampleCount:0,originalPwa:true,iphoneAccepted:false}));
+  // REPORTED IPHONE REGRESSION: Home shows the original own photo, but
+  // opening the existing /present route without ?memory= stays completely
+  // blank. Previous browser tests used ?memory= and missed this path.
+  const ordinaryRoot=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+  assert.equal(ordinaryRoot.status(),200);
+  await page.waitForFunction(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return !!m&&!m._photoLoading&&m._zeroFrames?.length===3;
+  },null,{timeout:16000});
+  const rootVisible=await centerPixel(page);
+  const rootState=await page.evaluate(()=>({
+    memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
+    frames:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length||0,
+    photo:window.__taleraTimelineRuntime?.currentMemory?.()?.photos?.[0]||null,
+    heroNotEmpty:!!document.querySelector('#photoStage img:not([hidden])')
+  }));
+  assert.ok(dominant(rootVisible,0),
+    'HOME_HAS_OWN_PHOTO_BUT_DEFAULT_PRESENTATION_IS_BLANK: '+
+      JSON.stringify({rootState,rootVisible}));
+  console.log('TALERA_HOME_TO_DEFAULT_PRESENT_OWN_PHOTO_VISIBLE_PASS',
+    JSON.stringify({ownerPhoto:true,defaultRoute:true,originalMediaIdPreserved:true,
+      realIphoneAccepted:false}));
+  // The Home "Door de tijd" year link is /present?year=2026.
+  // Force a slow but normal local IndexedDB read to reproduce the native
+  // iPhone timing where year selection fires BEFORE the catalog loads.
+  // We delay ONLY synthetic list() in this page, never use mock stories.
+  await page.addInitScript(()=>{
+    let store;
+    Object.defineProperty(window,'TaleraMemories',{
+      configurable:true,
+      get(){return store},
+      set(next){
+        store=next;
+        if(typeof next?.list==='function'){
+          const original=next.list;
+          next.list=async function(...args){
+            if(location.pathname==='/present'&&location.search==='?year=2026')
+              await new Promise(resolve=>setTimeout(resolve,4200));
+            return original.apply(this,args);
+          };
+        }
+      }
+    });
+  });
+  // With real IndexedDB hydration the year selector can execute before
+  // registration and never re-activate the selected own photo.
+  const yearRoute=await page.goto(origin+'/present?year=2026',
+    {waitUntil:'domcontentloaded'});
+  assert.equal(yearRoute.status(),200);
+  await page.waitForFunction(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return !!m&&!m._photoLoading&&m._zeroFrames?.length===3;
+  },null,{timeout:16000});
+  await page.waitForTimeout(400);
+  const yearVisible=await centerPixel(page);
+  const yearStatus=await page.evaluate(()=>({
+    date:document.getElementById('focusText')?.textContent,
+    currentId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
+    front:document.getElementById('memoryPhotoA')?.getAttribute('src'),
+    frontNatural:document.getElementById('memoryPhotoA')?.naturalWidth||0,
+    stageVisible:getComputedStyle(document.getElementById('photoStage')).visibility
+  }));
+  assert.ok(dominant(yearVisible,0),
+    'HOME_YEAR_LINK_HAS_OWN_PHOTO_BUT_PRESENT_YEAR_MODE_IS_BLANK: '+
+      JSON.stringify({yearStatus,yearVisible}));
+  console.log('TALERA_HOME_YEAR_LINK_OWN_PHOTO_VISIBLE_PASS',
+    JSON.stringify({year:2026,ownImage:true,realIphoneAccepted:false}));
   await load(page,plain,3);
   // Native timeline regression: with only ONE real local memory near today,
   // releasing a finger drag must preserve the finger-selected historical year.
@@ -997,6 +1064,40 @@ try{
   assert.deepEqual(videoFirst.kinds,['video','photo'],
     'Test needs genuinely ordered video first, photo second in the same memory');
   await load(page,videoFirst.id,2);
+  // The real iPhone shows TIMELINE ONLY (white background) with a previously
+  // saved first-video poster. A deep-link entry guard must never leave
+  // #photoStage hidden after the selected original has loaded.
+  await page.waitForFunction(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return !m?._photoLoading&&m?.photos?.[0]?.startsWith('blob:');
+  },null,{timeout:16500});
+  // Native Safari has a bounded 180ms fallback after the FIRST requested
+  // media frame is verified. Check after that bound, not in the same
+  // microtask that finishes IndexedDB/photo metadata hydration.
+  await page.waitForTimeout(480);
+  const deepEntry=await page.evaluate(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    const front=document.getElementById('memoryPhotoA');
+    const stage=document.getElementById('photoStage');
+    const v=document.querySelector('video.talera-v61-inline-video');
+    return {
+      hiddenByEntry:document.documentElement.classList.contains('talera-direct-memory-entering'),
+      stageVisibility:getComputedStyle(stage).visibility,
+      firstFrameMatches:front?.getAttribute('src')===m?.image,
+      firstFrameReady:!!front?.complete&&front.naturalWidth>0,
+      videoPlaying:!!v&&!v.paused,
+      mediaFirstKind:m?._zeroFrames?.[0]?.kind,
+      mediaID:m?._zeroFrames?.[0]?.key,
+      storyID:m?.storyId,
+      frontSourceType:String(front?.getAttribute('src')||'').split(':')[0]
+    };
+  });
+  assert.equal(deepEntry.hiddenByEntry,false,
+    'IPHONE_BLANK_STAGE_DIRECT_VIDEO: '+JSON.stringify(deepEntry));
+  assert.notEqual(deepEntry.stageVisibility,'hidden',
+    'First own video must be visible, not covered by stale entry guard');
+  console.log('TALERA_FIRST_VIDEO_DIRECT_ENTRY_STAGE_VISIBLE_PASS',
+    JSON.stringify({...deepEntry,realIphoneAccepted:false}));
   try{
     await page.waitForFunction(id=>{
         const mem=window.__taleraTimelineRuntime?.currentMemory?.();

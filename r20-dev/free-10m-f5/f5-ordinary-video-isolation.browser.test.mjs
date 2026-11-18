@@ -50,6 +50,29 @@ try{
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(origin+'/present',{waitUntil:'domcontentloaded',timeout:25000});
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:18000});
+  // The owner's 18-Nov iPhone screenshot exposed the obsolete WHITE
+  // "▶ Beluister" control from V61 taleraInlinePlayMedia. The new player
+  // must receive EVERY private memory, including reentrant selections.
+  // Test the actual packaged account-page source, never a mock app.
+  const {referencePages}=await import('./generated/public-template-map.mjs');
+  const built=readFileSync(path.join(home,'../free-10m-delivery/public'+
+    referencePages['/present']),'utf8');
+  const oldMedia=built.indexOf('function taleraInlinePlayMedia(s,frame,muted,finished){');
+  const oldButton=built.indexOf("button.textContent='▶ Beluister'",oldMedia);
+  assert.ok(oldMedia>0&&oldButton>oldMedia,
+    'Keep original historical media player source unchanged for regression');
+  const startPresent=built.indexOf('async function present(memory){');
+  const independentVoice=built.indexOf("if(memory._zeroItems?.some(item=>item.kind==='audio'))",startPresent);
+  const ordinaryGuard=built.indexOf('if(memory._taleraLocal){',independentVoice);
+  const oldPresentation=built.indexOf('if(activeId===memory.id){',ordinaryGuard);
+  assert.ok(startPresent>0&&independentVoice>startPresent&&
+    ordinaryGuard>independentVoice&&oldPresentation>ordinaryGuard&&
+    built.slice(ordinaryGuard,oldPresentation).includes('window.__taleraOrdinaryActivate?.(memory);'),
+    'Both voiced and plain account memories must bypass the old inline video motor');
+  console.log('TALERA_NO_LEGACY_BELUISTER_ON_LOCAL_MEMORIES_SOURCE_PASS',
+    JSON.stringify({approvedOrdinaryRoute:true,independentNarrator:true,
+      legacyButtonUnreachableForLocal:true,mediaOrAccountDataChanged:false,
+      realIphoneAccepted:false}));
   const clip=path.join(generated,'ordinary-original-video.webm');
   // Browser-playable synthetic audio + video. iPhone MOV/HEVC still needs device acceptance.
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',

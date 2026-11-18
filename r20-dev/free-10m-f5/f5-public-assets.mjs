@@ -939,6 +939,20 @@ function isolateNarratedMemories(html){
    html=html.replace(before,after);
  };
  exact(oldStart,newStart,'TYPE_ROUTER');
+ // A voice record is already dispatched above to the independent narrator.
+ // A NON-voice local record must likewise never fall through to the old
+ // V61 inline-player. That player can create a white "▶ Beluister" button
+ // if Safari refuses play(), even though the approved ordinary motor uses
+ // ONE muted video node and a persistent shared audible node instead.
+ // This guards direct/reentrant present(memory) calls during rapid swipes.
+ exact("  taleraIndependentNarrator.stop();\n  if(activeId===memory.id){",
+   "  taleraIndependentNarrator.stop();\n"+
+   "  if(memory._taleraLocal){\n"+
+   "    if(taleraInline)disposePresentation();\n"+
+   "    window.__taleraOrdinaryActivate?.(memory);\n"+
+   "    return; // Never enter obsolete V61 audio-permission overlay.\n"+
+   "  }\n  if(activeId===memory.id){",
+   'BLOCK_LEGACY_PRESENT_ON_LOCAL_MEMORY');
  exact("if(!memory||!memory._taleraLocal){disposePresentation();return}",
   "if(!memory||!memory._taleraLocal){taleraIndependentNarrator.stop();disposePresentation();return}",
   'DEACTIVATION');
@@ -1139,7 +1153,18 @@ const guestPages={};
 for(const [route,filename] of Object.entries(routes)){
  const raw=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
  let guest=raw;
- if(route==='/present')guest=removeBuiltInPresentationExamples(guest);
+ if(route==='/present'){
+   guest=removeBuiltInPresentationExamples(guest);
+   // A missing Safari session previously loaded the ORIGINAL, unscoped
+   // local story list and the obsolete V61 "▶ Beluister" media controller.
+   // Signed-out presentation is an EMPTY login entry, NEVER a back door
+   // to old local media or an alternative video player.
+   const boot='   const rows=await store.list();\n   const memories=rows.map(toMemory).filter(Boolean);';
+   assert.equal(guest.split(boot).length,2,'GUEST_PRESENT_LOCAL_BOOT_SOURCE_DRIFT');
+   guest=guest.replace(boot,
+     '   const rows=[]; // Login required: no local media read.\n'+
+     '   const memories=rows.map(toMemory).filter(Boolean);');
+ }
  if(route==='/mijn-leven'){
    guest=removeAllBuiltInHomeExamples(showOwnedStoriesOnly(guest));
    // No account session: NEVER load or show personal records from an unscoped

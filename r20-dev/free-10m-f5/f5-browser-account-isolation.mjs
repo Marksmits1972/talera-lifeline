@@ -137,8 +137,14 @@ async function login(page,user){
    assert.match(await tab.title(),/Wachtwoord vergeten/);
    await tab.locator('input[name="email"]').fill(user.email);
    await tab.locator('form button[type="submit"]').click();
-   await tab.waitForFunction(()=>/tijdelijk niet beschikbaar/i.test(
+   // A native local send-email binding may be present even when real sender
+   // verification is NOT proven. Both safe responses are allowed: explicit
+   // service unavailable or non-enumerating conditional acknowledgement.
+   await tab.waitForFunction(()=>/tijdelijk niet beschikbaar|Als dit e-mailadres bij een TALERA-account hoort/i.test(
     document.querySelector('#status')?.textContent||''),null,{timeout:12000});
+   const statusText=await tab.locator('#status').innerText();
+   assert.ok(!/mail (?:is |werd )?verzonden/i.test(statusText),
+     'Never claim real email delivery in a synthetic browser test');
    const confirmation=await tab.goto(origin+'/wachtwoord-instellen#e='+
     encodeURIComponent(user.email)+'&t='+'a'.repeat(64));
    assert.equal(confirmation.status(),200);

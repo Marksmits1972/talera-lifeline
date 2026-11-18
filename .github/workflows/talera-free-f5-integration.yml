@@ -841,13 +841,23 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Normalize existing account ID whitespace for the GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')"
+          CLEAN="$(printf '%s' "$RAW" | tr -cd 'a-fA-F0-9')"
+          test "$RAW" = "$CLEAN"
+          test "${#CLEAN}" -eq 32
+          echo "::add-mask::$CLEAN"
+          echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN" >> "$GITHUB_ENV"
       - name: Require owner-authorized SAME-APP release and previously green exact protected runtime
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 2ad30c005ae198650665b9b09a2a4d74dbe93893
+          test "$(git rev-parse HEAD^)" = 795b39e4b05bd3658373e099c313fb215604cab2
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD

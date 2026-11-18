@@ -94,18 +94,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = 32ca946377e6e64e4c77dad91177a12332404fac
-          test "$(git diff --name-only d3cf67d2e413e9caed5e63dd007ca0371acf99fa HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          test "$(git rev-parse HEAD^)" = e54b8e53a3ad99492fc7902241bb78f73b3063e1
+          test "$(git diff --name-only e54b8e53a3ad99492fc7902241bb78f73b3063e1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const api='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/44255646867';
+          const api='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/44259422365';
           const r=await fetch(api,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,
             Accept:'application/vnd.github+json'
           },signal:AbortSignal.timeout(20000)});
           assert.equal(r.status,200,'Cannot verify prior 28/28 CI success');
           const run=await r.json();
-          assert.equal(run.head_sha,'d3cf67d2e413e9caed5e63dd007ca0371acf99fa');
+          assert.equal(run.head_sha,'e54b8e53a3ad99492fc7902241bb78f73b3063e1');
           assert.equal(run.event,'push');
           assert.equal(run.status,'completed');
           assert.equal(run.conclusion,'success');
@@ -613,7 +613,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_ACTIVE_VERSION: 03a3f880-d30c-4385-938d-e2b6edab3a11
+      F5_ACTIVE_VERSION: 362d6a14-abf6-4038-a5f6-02f03ab153b1
       F5_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -628,13 +628,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          # Only the exact 28/28-green zero-demo repair may be published.
+          # Only the exact 28/28-green legacy Beluister and session-guard repair may be published.
           # Never alter user media, the accepted still/video handoff or account data.
-          test "$(git rev-parse HEAD^)" = 32ca946377e6e64e4c77dad91177a12332404fac
-          test "$(git diff --name-only d3cf67d2e413e9caed5e63dd007ca0371acf99fa HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-worker.mjs)
-          test "$(git diff --name-only a1d16cb88eb977f676c1b22f427f6a215279376d d3cf67d2e413e9caed5e63dd007ca0371acf99fa)" = "$EXPECTED"
-          git merge-base --is-ancestor a1d16cb88eb977f676c1b22f427f6a215279376d HEAD
+          test "$(git rev-parse HEAD^)" = e54b8e53a3ad99492fc7902241bb78f73b3063e1
+          test "$(git diff --name-only e54b8e53a3ad99492fc7902241bb78f73b3063e1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
+          test "$(git diff --name-only b1d6d4d248e620b45622ca719fccd13003496b1d e54b8e53a3ad99492fc7902241bb78f73b3063e1)" = "$EXPECTED"
+          git merge-base --is-ancestor b1d6d4d248e620b45622ca719fccd13003496b1d HEAD
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -680,7 +680,7 @@ jobs:
           assert.equal(before.find(b=>b.name==='AUTH_STORAGE_JURISDICTION')?.text,'eu');
           assert.equal(before.find(b=>b.name==='SOCIAL_STORAGE_JURISDICTION')?.text,'eu');
           fs.writeFileSync('/tmp/talera-library-preflight.json',JSON.stringify({version:process.env.F5_ACTIVE_VERSION,restoreVersion:process.env.F5_RESTORE_VERSION,bindings:before}));
-          console.log('CURRENT_17_NOV_LIVE_AND_APPROVED_16_NOV_RESTORE_AND_17_BINDINGS_VERIFIED');
+          console.log('CURRENT_18_NOV_QA_AND_APPROVED_16_NOV_RESTORE_AND_17_BINDINGS_VERIFIED');
           NODE
       - name: Build the exact tested integrated library without changing personal data
         run: |
@@ -757,7 +757,10 @@ jobs:
               !page.includes('TALERA_STRESS_MEMORIES'),
               'PUBLISHED_ANONYMOUS_PAGE_HAS_OLD_SAMPLE_CATALOG');
           }
-          console.log('SAME_ORIGIN_GUEST_0_EXAMPLES_POSTDEPLOY_PASS');
+          assert.ok(guestPresent.includes('const rows=[]; // Login required: no local media read.') &&
+            !guestPresent.includes('const rows=await store.list();'),
+            'SIGNED_OUT_PRESENT_MUST_NOT_OPEN_LOCAL_VIDEO_OR_LEGACY_BELUISTER');
+          console.log('SAME_ORIGIN_GUEST_0_EXAMPLES_AND_NO_LOCAL_VIDEO_POSTDEPLOY_PASS');
           const h=JSON.parse(fs.readFileSync('/tmp/talera-library-qa-health.json','utf8'));
           assert.equal(h.ok,true);assert.equal(h.officialTaleraConnected,false);
           const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+'/workers/scripts/'+process.env.F5_STAGE_NAME;
@@ -780,4 +783,4 @@ jobs:
           NODE
       - name: Restore preceding TALERA QA Worker on post-deploy failure
         if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
-        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after zero-demo guest-shell verification failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after Beluister session-guard verification failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc

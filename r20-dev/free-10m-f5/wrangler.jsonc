@@ -4,7 +4,7 @@
   "compatibility_date": "2026-09-18",
   "workers_dev": true,
   "send_email": [
-    { "name": "EMAIL" }
+    { "name": "EMAIL", "allowed_sender_addresses": ["accountherstel@talera.app"] }
   ],
   "assets": {
     "directory": "../free-10m-delivery/public",
@@ -65,6 +65,6 @@
     "SOCIAL_STORAGE_JURISDICTION": "local-test",
     "F5_EASY_INVITE_SHA256": "a0fab1377f49a759b57f63318262ebe89fabfc990e8e93ceac2984561482b9d4",
     "F5_EASY_INVITE_EXPIRES": "1794859200000",
-    "TALERA_RESET_FROM": "accountherstel@talera.com"
+    "TALERA_RESET_FROM": "accountherstel@talera.app"
   }
 }

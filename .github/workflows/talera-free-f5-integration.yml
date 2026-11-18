@@ -46,6 +46,24 @@ jobs:
           node --check r20-dev/free-10m-auth-pilot/auth-local-test.mjs
           node --check r20-dev/free-10m-f5/f5-password-reset-page.mjs
           node r20-dev/free-10m-auth-pilot/auth-local-test.mjs
+      - name: Verify requested TALERA .app password recovery sender and protected bindings
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          for(const name of ['wrangler.jsonc','wrangler.staging.jsonc']){
+            const config=JSON.parse(fs.readFileSync('r20-dev/free-10m-f5/'+name,'utf8'));
+            assert.equal(config.vars.TALERA_RESET_FROM,'accountherstel@talera.app');
+            assert.deepEqual(config.send_email,[{
+              name:'EMAIL',allowed_sender_addresses:['accountherstel@talera.app']
+            }]);
+            assert.deepEqual(config.durable_objects.bindings.map(x=>x.class_name),[
+              'FreeAuthAccount','FreeAuthEmail','FreeAuthHandle','FreeAuthSession',
+              'FreeAuthRate','FreeSocialMemory','FreeSocialSharePointer'
+            ]);
+          }
+          console.log('TALERA_RECOVERY_FROM_APP_DOMAIN_CONFIGURED_BUT_NOT_VERIFIED_FOR_DELIVERY');
+          NODE
       - name: Verify library original bytes and voice cue IDs before any backup or restore
         run: node r20-dev/free-10m-f5/f5-library-integrity.test.mjs
       - name: Verify independent narration media IDs, timing and no shared presentation controls

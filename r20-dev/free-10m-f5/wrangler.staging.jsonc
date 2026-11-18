@@ -3,6 +3,9 @@
   "main": "./f5-worker.mjs",
   "compatibility_date": "2026-09-18",
   "workers_dev": true,
+  "send_email": [
+    { "name": "EMAIL" }
+  ],
   "assets": {
     "directory": "../free-10m-delivery/public",
     "binding": "ASSETS",
@@ -61,6 +64,7 @@
     "AUTH_STORAGE_JURISDICTION": "eu",
     "SOCIAL_STORAGE_JURISDICTION": "eu",
     "F5_EASY_INVITE_SHA256": "34c8d1e77ec9d476189a098422d3fb68f2493e89b3af26a24e0607855707db8d",
-    "F5_EASY_INVITE_EXPIRES": "1794859200000"
+    "F5_EASY_INVITE_EXPIRES": "1794859200000",
+    "TALERA_RESET_FROM": "accountherstel@talera.com"
   }
 }

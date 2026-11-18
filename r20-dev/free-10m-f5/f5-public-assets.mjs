@@ -1225,6 +1225,14 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
  if(route==='/tell')html=shapeOwnStoryTopics(html);
  html=stripBundledExamplePhotoLinks(html);
+ if(route==='/tell'){
+   for(const token of ['Test 081','talera-500-fotoband-','TALERA_STRESS_MEMORIES']){
+     const at=html.indexOf(token);
+     if(at>=0)console.log('TALERA_TELL_BUNDLED_EXAMPLE_DIAGNOSTIC',JSON.stringify({
+       token,at,context:html.slice(Math.max(0,at-180),at+220)
+     }));
+   }
+ }
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  const hash=sha(html),file=hash+'.html';

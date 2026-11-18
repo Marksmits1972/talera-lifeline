@@ -11,7 +11,7 @@ import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 import {approvedAssets,anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {assetizeHtml} from '../free-10m-delivery/rewrite.mjs';
 import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birthdate-worker.mjs';
-import {referencePages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
+import {referencePages,guestPages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
 import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
@@ -635,8 +635,11 @@ async function publicPage(request,env){
       }
     });
   }
-  const asset=anonymousShells[sourcePath];
-  if(!asset)return deny(503,'Anonieme PWA-shell ontbreekt');
+  // No session must NEVER return the old 7-Nov anonymous shell containing
+  // bundled example memories. Use the zero-example guest variant of the
+  // SAME TALERA page; real account records are not read without sign-in.
+  const asset=guestPages[sourcePath];
+  if(!asset)return deny(503,'Lege anonieme PWA-shell ontbreekt');
   const r=await env.ASSETS.fetch(new Request(new URL(asset,origin)));
   if(!r.ok)return deny(503,'Anonieme PWA-shell is niet beschikbaar');
   const headers=new Headers(r.headers);

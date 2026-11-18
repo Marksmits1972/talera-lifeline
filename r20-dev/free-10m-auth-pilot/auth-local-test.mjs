@@ -184,7 +184,8 @@ async function run(){
  assert.equal(sent.status,200);
  assert.equal(sent.data.message.to,legacyRecord.email);
  assert.ok(sent.data.message.text.includes('wachtwoord-instellen#'));
- const link=sent.data.message.text.match(/https?:\\/\\/[^\\s]+/)?.[0];
+ const startLink=sent.data.message.text.indexOf('https://');
+ const link=startLink<0?'':sent.data.message.text.slice(startLink).split(String.fromCharCode(10))[0].trim();
  assert.ok(link);
  const parameters=new URLSearchParams(new URL(link).hash.slice(1));
  assert.equal(parameters.get('e'),legacyRecord.email);

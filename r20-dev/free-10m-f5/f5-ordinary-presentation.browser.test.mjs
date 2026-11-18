@@ -1071,6 +1071,10 @@ try{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     return !m?._photoLoading&&m?.photos?.[0]?.startsWith('blob:');
   },null,{timeout:16500});
+  // Native Safari has a bounded 180ms fallback after the FIRST requested
+  // media frame is verified. Check after that bound, not in the same
+  // microtask that finishes IndexedDB/photo metadata hydration.
+  await page.waitForTimeout(480);
   const deepEntry=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     const front=document.getElementById('memoryPhotoA');

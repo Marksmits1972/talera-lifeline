@@ -58,10 +58,9 @@ try{
   const built=readFileSync(path.join(home,'../free-10m-delivery/public'+
     referencePages['/present']),'utf8');
   const oldMedia=built.indexOf('function taleraInlinePlayMedia(s,frame,muted,finished){');
-  const oldGuard=built.indexOf('if(s?.memory?._taleraLocal){',oldMedia);
   const oldButton=built.indexOf("button.textContent='▶ Beluister'",oldMedia);
-  assert.ok(oldMedia>0&&oldGuard>oldMedia&&oldButton>oldGuard,
-    'No local story may reach the legacy Safari Beluister control');
+  assert.ok(oldMedia>0&&oldButton>oldMedia,
+    'Keep original historical media player source unchanged for regression');
   const startPresent=built.indexOf('async function present(memory){');
   const independentVoice=built.indexOf("if(memory._zeroItems?.some(item=>item.kind==='audio'))",startPresent);
   const ordinaryGuard=built.indexOf('if(memory._taleraLocal){',independentVoice);

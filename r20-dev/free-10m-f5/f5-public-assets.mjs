@@ -948,6 +948,34 @@ function isolateNarratedMemories(html){
    html=html.replace(before,after);
  };
  exact(oldStart,newStart,'TYPE_ROUTER');
+ // A voice record is already dispatched above to the independent narrator.
+ // A NON-voice local record must likewise never fall through to the old
+ // V61 inline-player. That player can create a white "▶ Beluister" button
+ // if Safari refuses play(), even though the approved ordinary motor uses
+ // ONE muted video node and a persistent shared audible node instead.
+ // This guards direct/reentrant present(memory) calls during rapid swipes.
+ exact("  taleraIndependentNarrator.stop();\n  if(activeId===memory.id){",
+   "  taleraIndependentNarrator.stop();\n"+
+   "  if(memory._taleraLocal){\n"+
+   "    if(taleraInline)disposePresentation();\n"+
+   "    window.__taleraOrdinaryActivate?.(memory);\n"+
+   "    return; // Never enter obsolete V61 audio-permission overlay.\n"+
+   "  }\n  if(activeId===memory.id){",
+   'BLOCK_LEGACY_PRESENT_ON_LOCAL_MEMORY');
+ // A stale V61 timer may still call its media helper on a local record.
+ // Redirect this final entrance to the same approved ordinary/narrator
+ // router; do not merely hide a button while an old video remains paused.
+ exact("function taleraInlinePlayMedia(s,frame,muted,finished){\n  if(s!==taleraInline||!frame)return;",
+   "function taleraInlinePlayMedia(s,frame,muted,finished){\n"+
+   "  if(s?.memory?._taleraLocal){\n"+
+   "    const memory=s.memory;\n"+
+   "    if(taleraInline)disposePresentation();\n"+
+   "    if(memory._zeroItems?.some(x=>x.kind==='audio'))\n"+
+   "      void taleraIndependentNarrator.open(memory);\n"+
+   "    else window.__taleraOrdinaryActivate?.(memory);\n"+
+   "    return; // No legacy Beluister UI for account-owned memories.\n"+
+   "  }\n  if(s!==taleraInline||!frame)return;",
+   'BLOCK_LEGACY_MEDIA_HELPER_ON_LOCAL_MEMORY');
  exact("if(!memory||!memory._taleraLocal){disposePresentation();return}",
   "if(!memory||!memory._taleraLocal){taleraIndependentNarrator.stop();disposePresentation();return}",
   'DEACTIVATION');

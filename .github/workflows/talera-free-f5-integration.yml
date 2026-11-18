@@ -142,7 +142,10 @@ jobs:
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
-          npx --no-install playwright install --with-deps chromium
+          # Hosted Ubuntu already includes browser runtime libraries. Download
+          # only the same Playwright Chromium version; do not repeat the entire
+          # OS dependency installation that stalled the previous verification.
+          npx --no-install playwright install chromium
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets

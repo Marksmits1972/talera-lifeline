@@ -962,20 +962,6 @@ function isolateNarratedMemories(html){
    "    return; // Never enter obsolete V61 audio-permission overlay.\n"+
    "  }\n  if(activeId===memory.id){",
    'BLOCK_LEGACY_PRESENT_ON_LOCAL_MEMORY');
- // A stale V61 timer may still call its media helper on a local record.
- // Redirect this final entrance to the same approved ordinary/narrator
- // router; do not merely hide a button while an old video remains paused.
- exact("function taleraInlinePlayMedia(s,frame,muted,finished){\n  if(s!==taleraInline||!frame)return;",
-   "function taleraInlinePlayMedia(s,frame,muted,finished){\n"+
-   "  if(s?.memory?._taleraLocal){\n"+
-   "    const memory=s.memory;\n"+
-   "    if(taleraInline)disposePresentation();\n"+
-   "    if(memory._zeroItems?.some(x=>x.kind==='audio'))\n"+
-   "      void taleraIndependentNarrator.open(memory);\n"+
-   "    else window.__taleraOrdinaryActivate?.(memory);\n"+
-   "    return; // No legacy Beluister UI for account-owned memories.\n"+
-   "  }\n  if(s!==taleraInline||!frame)return;",
-   'BLOCK_LEGACY_MEDIA_HELPER_ON_LOCAL_MEMORY');
  exact("if(!memory||!memory._taleraLocal){disposePresentation();return}",
   "if(!memory||!memory._taleraLocal){taleraIndependentNarrator.stop();disposePresentation();return}",
   'DEACTIVATION');

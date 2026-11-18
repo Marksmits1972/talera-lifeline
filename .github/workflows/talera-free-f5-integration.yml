@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   f5_isolated_local:
@@ -87,23 +88,54 @@ jobs:
           node --check r20-dev/free-10m-f5/f5-neighbor-preview.mjs
       - name: Verify Cloudflare compilation without deployment
         run: npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.jsonc --outdir .talera-f5-buildcheck
+      - name: Verify prior FULL browser test on the exact same runtime SHA
+        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'qa-deploy-TALERA-free-library-20261117' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 32ca946377e6e64e4c77dad91177a12332404fac
+          test "$(git diff --name-only d3cf67d2e413e9caed5e63dd007ca0371acf99fa HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const api='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/44255646867';
+          const r=await fetch(api,{headers:{
+            Authorization:'Bearer '+process.env.GH_TOKEN,
+            Accept:'application/vnd.github+json'
+          },signal:AbortSignal.timeout(20000)});
+          assert.equal(r.status,200,'Cannot verify prior 28/28 CI success');
+          const run=await r.json();
+          assert.equal(run.head_sha,'d3cf67d2e413e9caed5e63dd007ca0371acf99fa');
+          assert.equal(run.event,'push');
+          assert.equal(run.status,'completed');
+          assert.equal(run.conclusion,'success');
+          assert.equal(run.name,'TALERA Free F5 - isolated single-origin integration tests');
+          console.log('PREVIOUS_FULL_28_STEP_BROWSER_CI_EXACT_SOURCE_VERIFIED');
+          NODE
       - name: Install headless mobile browser and small synthetic video generator for the reported issue
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps chromium
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs
       - name: Browser verify standalone voice/video narrator AND latest original presentation
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Browser verify existing real-account login, switching, privacy and original menu
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
       - name: Browser verify back-up panel, private session and two local browser contexts
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser verify complete original-media export, checksum and nondestructive restore
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs
       - name: Browser verify permanent original media IDs survive editor reorder and edit
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-library-editor.browser.test.mjs
       - name: Archive factual test result only
         if: success()
@@ -598,10 +630,10 @@ jobs:
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
           # Only the exact 28/28-green zero-demo repair may be published.
           # Never alter user media, the accepted still/video handoff or account data.
-          test "$(git rev-parse HEAD^)" = d3cf67d2e413e9caed5e63dd007ca0371acf99fa
+          test "$(git rev-parse HEAD^)" = 32ca946377e6e64e4c77dad91177a12332404fac
           test "$(git diff --name-only d3cf67d2e413e9caed5e63dd007ca0371acf99fa HEAD)" = .github/workflows/talera-free-f5-integration.yml
           EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-worker.mjs)
-          test "$(git diff --name-only a1d16cb88eb977f676c1b22f427f6a215279376d HEAD^)" = "$EXPECTED"
+          test "$(git diff --name-only a1d16cb88eb977f676c1b22f427f6a215279376d d3cf67d2e413e9caed5e63dd007ca0371acf99fa)" = "$EXPECTED"
           git merge-base --is-ancestor a1d16cb88eb977f676c1b22f427f6a215279376d HEAD
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109

@@ -162,9 +162,9 @@ async function requestPasswordReset(req,env){
  destination.hash='e='+encodeURIComponent(email)+'&t='+token;
  try{
   await env.EMAIL.send({from,to:email,subject:'TALERA — wachtwoord herstellen',
-   text:'Je hebt een nieuw wachtwoord voor TALERA aangevraagd.\\n\\n'+
-    'Open deze persoonlijke link (15 minuten geldig, eenmalig):\\n'+destination.href+
-    '\\n\\nNiet aangevraagd? Negeer dan deze e-mail. Je huidige wachtwoord blijft werken.'});
+   text:'Je hebt een nieuw wachtwoord voor TALERA aangevraagd.\n\n'+
+    'Open deze persoonlijke link (15 minuten geldig, eenmalig):\n'+destination.href+
+    '\n\nNiet aangevraagd? Negeer dan deze e-mail. Je huidige wachtwoord blijft werken.'});
  }catch{
   await home.cancelPasswordReset(tokenHash);
   // Same generic response for existing and absent account: no enumeration.

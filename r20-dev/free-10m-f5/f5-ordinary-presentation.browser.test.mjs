@@ -1019,6 +1019,36 @@ try{
   assert.deepEqual(videoFirst.kinds,['video','photo'],
     'Test needs genuinely ordered video first, photo second in the same memory');
   await load(page,videoFirst.id,2);
+  // The real iPhone shows TIMELINE ONLY (white background) with a previously
+  // saved first-video poster. A deep-link entry guard must never leave
+  // #photoStage hidden after the selected original has loaded.
+  await page.waitForFunction(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return !m?._photoLoading&&m?.photos?.[0]?.startsWith('blob:');
+  },null,{timeout:16500});
+  const deepEntry=await page.evaluate(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    const front=document.getElementById('memoryPhotoA');
+    const stage=document.getElementById('photoStage');
+    const v=document.querySelector('video.talera-v61-inline-video');
+    return {
+      hiddenByEntry:document.documentElement.classList.contains('talera-direct-memory-entering'),
+      stageVisibility:getComputedStyle(stage).visibility,
+      firstFrameMatches:front?.getAttribute('src')===m?.image,
+      firstFrameReady:!!front?.complete&&front.naturalWidth>0,
+      videoPlaying:!!v&&!v.paused,
+      mediaFirstKind:m?._zeroFrames?.[0]?.kind,
+      mediaID:m?._zeroFrames?.[0]?.key,
+      storyID:m?.storyId,
+      frontSourceType:String(front?.getAttribute('src')||'').split(':')[0]
+    };
+  });
+  assert.equal(deepEntry.hiddenByEntry,false,
+    'IPHONE_BLANK_STAGE_DIRECT_VIDEO: '+JSON.stringify(deepEntry));
+  assert.notEqual(deepEntry.stageVisibility,'hidden',
+    'First own video must be visible, not covered by stale entry guard');
+  console.log('TALERA_FIRST_VIDEO_DIRECT_ENTRY_STAGE_VISIBLE_PASS',
+    JSON.stringify({...deepEntry,realIphoneAccepted:false}));
   try{
     await page.waitForFunction(id=>{
         const mem=window.__taleraTimelineRuntime?.currentMemory?.();

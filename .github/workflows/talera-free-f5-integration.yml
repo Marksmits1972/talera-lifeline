@@ -581,7 +581,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_ACTIVE_VERSION: 5035abc2-d4c7-41ad-a9dc-70ef5e92c3da
+      F5_ACTIVE_VERSION: 03a3f880-d30c-4385-938d-e2b6edab3a11
       F5_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -596,13 +596,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          # The last video-readiness code is EXACTLY the 28/28-green commit.
-          # Publication may change THIS workflow only, not presentation or user media code.
-          test "$(git rev-parse HEAD^)" = 31b447750b5e856f5ac65d50351a23c4670d3875
-          test "$(git diff --name-only 31b447750b5e856f5ac65d50351a23c4670d3875 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)
-          test "$(git diff --name-only ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD^)" = "$EXPECTED"
-          git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
+          # Only the exact 28/28-green zero-demo repair may be published.
+          # Never alter user media, the accepted still/video handoff or account data.
+          test "$(git rev-parse HEAD^)" = d3cf67d2e413e9caed5e63dd007ca0371acf99fa
+          test "$(git diff --name-only d3cf67d2e413e9caed5e63dd007ca0371acf99fa HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          EXPECTED=$(printf "%s\n" r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-worker.mjs)
+          test "$(git diff --name-only a1d16cb88eb977f676c1b22f427f6a215279376d HEAD^)" = "$EXPECTED"
+          git merge-base --is-ancestor a1d16cb88eb977f676c1b22f427f6a215279376d HEAD
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           test "$F5_STAGE_NAME" = talera-free-f5-storage-qa-20261109
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -707,9 +707,25 @@ jobs:
             test "$(curl --max-time 25 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$path")" = 200
           done
           test "$(curl --max-time 25 -sS -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/__f5/backup")" = 401
+          # Verify the actual anonymous login-fallback, not only HTTP 200.
+          # This was the path that leaked 500 example stories on an expired session.
+          curl --max-time 25 -fsS "https://$F5_STAGE_HOST/mijn-leven" >/tmp/talera-f5-empty-home.html
+          curl --max-time 25 -fsS "https://$F5_STAGE_HOST/present" >/tmp/talera-f5-empty-present.html
           curl --max-time 25 -fsS "https://$F5_STAGE_HOST/__f5/health" >/tmp/talera-library-qa-health.json
           node --input-type=module <<'NODE'
           import fs from 'node:fs';import assert from 'node:assert/strict';
+          const guestHome=fs.readFileSync('/tmp/talera-f5-empty-home.html','utf8');
+          const guestPresent=fs.readFileSync('/tmp/talera-f5-empty-present.html','utf8');
+          assert.ok(guestHome.includes('window.__taleraReferenceMemories=[];')&&
+            guestHome.includes('rows=[];')&&guestPresent.includes('const MEMORIES = [];'),
+            'EXPIRED_SESSION_MUST_SHOW_EMPTY_TALERA_NOT_EXAMPLES');
+          for(const page of [guestHome,guestPresent]){
+            assert.ok(!page.includes('Test 081')&&
+              !page.includes('talera-500-fotoband-')&&
+              !page.includes('TALERA_STRESS_MEMORIES'),
+              'PUBLISHED_ANONYMOUS_PAGE_HAS_OLD_SAMPLE_CATALOG');
+          }
+          console.log('SAME_ORIGIN_GUEST_0_EXAMPLES_POSTDEPLOY_PASS');
           const h=JSON.parse(fs.readFileSync('/tmp/talera-library-qa-health.json','utf8'));
           assert.equal(h.ok,true);assert.equal(h.officialTaleraConnected,false);
           const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+'/workers/scripts/'+process.env.F5_STAGE_NAME;
@@ -730,6 +746,6 @@ jobs:
           assert.notEqual(versions?.[0]?.version_id,process.env.F5_ACTIVE_VERSION);
           console.log('SAME_TALERA_ORIGIN_LIBRARY_ACCEPTANCE_PUBLISHED; IPHONE_TEST_STILL_OPEN');
           NODE
-      - name: Restore preceding 17-Nov QA Worker on post-deploy failure
+      - name: Restore preceding TALERA QA Worker on post-deploy failure
         if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
-        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore preceding 17 November TALERA QA after prewarm publication failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after zero-demo guest-shell verification failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc

@@ -1154,21 +1154,21 @@ const refs={};
 // retaining the same normal user-selected photo import and saved media IDs.
 function removeLegacyTellSampleImporter(html){
  const begin="const seed=url.hostname==='picsum.photos'?url.pathname.match(";
- const start=html.indexOf(begin);
- assert.ok(start>0&&html.indexOf(begin,start+1)===-1,
-  'TELL_LEGACY_SAMPLE_IMPORTER_SOURCE_MOVED');
- const end=html.indexOf('else{',start);
- assert.ok(end>start&&end-start<350,
-  'TELL_LEGACY_SAMPLE_IMPORTER_BRANCH_MOVED');
- const old=html.slice(start,end+5);
- assert.ok(old.includes('talera-500-fotoband-')&&
-  old.includes('if(seed)quick.demoSeed=seed;'),
-  'TELL_SAMPLE_ONLY_SOURCE_CHANGED');
- // The ordinary fetch is unchanged. Only the special sample-seed branch
- // is removed, leaving its original braces and error handling intact.
- html=html.slice(0,start)+'{'+html.slice(end+5);
- assert.ok(!html.includes('talera-500-fotoband-'),
-  'TELL_BUNDLED_SAMPLE_IMPORT_LEFTOVER');
+ let count=0,start;
+ while((start=html.indexOf(begin))>=0){
+  const end=html.indexOf('else{',start);
+  assert.ok(end>start&&end-start<350,'TELL_LEGACY_SAMPLE_IMPORTER_BRANCH_MOVED');
+  const old=html.slice(start,end+5);
+  assert.ok(old.includes('talera-500-fotoband-')&&
+   old.includes('if(seed)quick.demoSeed=seed;'),
+   'TELL_SAMPLE_ONLY_SOURCE_CHANGED');
+  // Keep the ordinary user-photo fetch and its error handling.
+  html=html.slice(0,start)+'{'+html.slice(end+5);
+  count++;
+  assert.ok(count<=8,'TELL_SAMPLE_IMPORTER_UNEXPECTED_DUPLICATES');
+ }
+ assert.ok(count>0&&!html.includes('talera-500-fotoband-'),
+  'TELL_LEGACY_SAMPLE_IMPORTER_LEFTOVER');
  return html;
 }
 function stripBundledExamplePhotoLinks(html){

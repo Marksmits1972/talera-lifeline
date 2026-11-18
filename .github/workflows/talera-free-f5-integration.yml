@@ -39,7 +39,12 @@ jobs:
       - name: Verify read-only TALERA library gateway preserves original IDs and bytes
         run: node r20-dev/free-10m-f5/f5-library-access.test.mjs
       - name: Test account password recovery on same underlying Durable Objects with fake local mail
-        run: node r20-dev/free-10m-auth-pilot/auth-local-test.mjs
+        run: |
+          node --check r20-dev/free-10m-auth-pilot/auth-pilot-worker.mjs
+          node --check r20-dev/free-10m-auth-pilot/auth-objects.mjs
+          node --check r20-dev/free-10m-auth-pilot/auth-local-test.mjs
+          node --check r20-dev/free-10m-f5/f5-password-reset-page.mjs
+          node r20-dev/free-10m-auth-pilot/auth-local-test.mjs
       - name: Verify library original bytes and voice cue IDs before any backup or restore
         run: node r20-dev/free-10m-f5/f5-library-integrity.test.mjs
       - name: Verify independent narration media IDs, timing and no shared presentation controls

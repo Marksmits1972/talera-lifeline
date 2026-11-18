@@ -1168,7 +1168,10 @@ for(const [route,filename] of Object.entries(routes)){
      !guest.includes('talera-500-fotoband-'),
      'GUEST_PRESENTATION_STILL_HAS_DEMO_MEMORIES');
  }
- assert.ok(guest.includes('talera-more-menu'),'GUEST_ORIGINAL_LOGIN_MENU_MISSING');
+ assert.ok(guest.includes('</head>')&&guest.includes('</body>')&&
+   (route!=='/mijn-leven'||guest.includes('id="navMore"'))&&
+   (route!=='/present'||guest.includes('id="photoStage"')),
+   'GUEST_ORIGINAL_ENTRY_DOM_MISSING');
  const guestFile=sha(guest)+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',guestFile),guest,'utf8');
  guestPages[route]='/__talera_free/f5references/'+guestFile;

@@ -1146,6 +1146,17 @@ function stopOldPresentationWhenTimelineMoves(html){
 }
 
 const refs={};
+// Remove the original sample stories' internet-photo addresses from every
+// generated entry page. This does NOT touch private IndexedDB, saved media,
+// ordinary user URLs, the video engine, or logos.
+function stripBundledExamplePhotoLinks(html){
+ const sampleImage=/https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^\s"'<>)]*/gi;
+ const sampleImgAttribute=/(<img\b[^>]*?)\s(?:src|srcset|poster)=(["'])https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^"']*\2/gi;
+ html=html.replace(sampleImgAttribute,'$1').replace(sampleImage,'');
+ assert.ok(!/https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-/i.test(html),
+  'BUILT_IN_SAMPLE_PHOTO_URL_REMAINED');
+ return html;
+}
 // Build the logged-out entry from the very same zero-example source.
 // The old immutable 7-Nov shell held 500 demonstrations and could reappear
 // whenever an iPhone session expired. NEVER serve that snapshot as a fallback.
@@ -1173,6 +1184,7 @@ for(const [route,filename] of Object.entries(routes)){
    assert.equal(guest.split(ownRead).length,2,'GUEST_LOCAL_LIBRARY_READ_SOURCE_DRIFT');
    guest=guest.replace(ownRead,'rows=[];');
  }
+ guest=stripBundledExamplePhotoLinks(guest);
  if(route==='/mijn-leven'){
    assert.ok(guest.includes('window.__taleraReferenceMemories=[];')&&
      !guest.includes('Test 081')&&!guest.includes('talera-500-fotoband-081'),
@@ -1212,6 +1224,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
  if(route==='/tell')html=shapeOwnStoryTopics(html);
+ html=stripBundledExamplePhotoLinks(html);
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  const hash=sha(html),file=hash+'.html';

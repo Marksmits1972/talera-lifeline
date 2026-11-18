@@ -301,6 +301,27 @@ try{
     JSON.stringify({ownerPhoto:true,defaultRoute:true,originalMediaIdPreserved:true,
       realIphoneAccepted:false}));
   // The Home "Door de tijd" year link is /present?year=2026.
+  // Force a slow but normal local IndexedDB read to reproduce the native
+  // iPhone timing where year selection fires BEFORE the catalog loads.
+  // We delay ONLY synthetic list() in this page, never use mock stories.
+  await page.addInitScript(()=>{
+    let store;
+    Object.defineProperty(window,'TaleraMemories',{
+      configurable:true,
+      get(){return store},
+      set(next){
+        store=next;
+        if(typeof next?.list==='function'){
+          const original=next.list;
+          next.list=async function(...args){
+            if(location.pathname==='/present'&&location.search==='?year=2026')
+              await new Promise(resolve=>setTimeout(resolve,4200));
+            return original.apply(this,args);
+          };
+        }
+      }
+    });
+  });
   // With real IndexedDB hydration the year selector can execute before
   // registration and never re-activate the selected own photo.
   const yearRoute=await page.goto(origin+'/present?year=2026',

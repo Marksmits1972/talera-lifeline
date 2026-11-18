@@ -813,3 +813,242 @@ jobs:
       - name: Restore preceding TALERA QA Worker on post-deploy failure
         if: ${{ failure() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure') }}
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after original video visible-stage verification failure" --config r20-dev/free-10m-f5/wrangler.library-acceptance.generated.jsonc
+
+
+  publish_existing_empty_20261118:
+    name: Publish ZERO sample stories to the SAME TALERA Free app
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-empty-20261118' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    concurrency:
+      group: talera-free-f5-storage-only-iphone-qa-20261109
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
+      F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
+      F5_EXPECTED_LIVE_VERSION: 5035abc2-d4c7-41ad-a9dc-70ef5e92c3da
+      F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Require owner-authorized SAME-APP release and previously green exact protected runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
+          test "$(git rev-parse HEAD^)" = e1a9d407a4c14d1a42825483a8f1779f1298170f
+          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
+          git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
+          git diff --exit-code 6c5a9fec9d90c67b3ac6fea6cd4f721d69dc8be0 HEAD -- \
+            r20-dev/free-10m-f5/f5-worker.mjs \
+            r20-dev/free-10m-f5/f5-local-scope.mjs \
+            r20-dev/free-10m-f5/f5-portable-idb.mjs \
+            r20-dev/free-10m-f5/f5-portable-archive.mjs \
+            r20-dev/free-10m-f5/f5-backup-controller.mjs \
+            r20-dev/free-10m-auth-pilot/
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          const base='6c5a9fec9d90c67b3ac6fea6cd4f721d69dc8be0';
+          const files=execFileSync('git',['diff','--name-only',base,'HEAD^'],{encoding:'utf8'}).trim().split('\n');
+          const allowed=new Set([
+            '.github/workflows/talera-free-f5-integration.yml',
+            'r20-dev/free-10m-f5/f5-browser-account-isolation.mjs',
+            'r20-dev/free-10m-f5/f5-public-assets.mjs',
+            'r20-dev/free-10m-f5/wrangler.jsonc',
+            'r20-dev/free-10m-f5/wrangler.staging.jsonc'
+          ]);
+          assert.ok(files.length>0&&files.every(x=>allowed.has(x)),'Unexpected app/source difference from green browser runtime');
+          assert.ok(process.env.GH_TOKEN,'Cannot check prior browser result');
+          const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/44339981307';
+          const response=await fetch(uri,{headers:{
+            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
+          },signal:AbortSignal.timeout(20000)});
+          assert.equal(response.status,200,'Prior complete browser result unreadable');
+          const run=await response.json();
+          assert.equal(run.head_sha,base);
+          assert.equal(run.status,'completed');
+          assert.equal(run.conclusion,'success');
+          console.log('ORIGINAL_VIDEO_ACCOUNT_LOCAL_MEDIA_PROTECTED_GREEN_BASELINE_AND_ONLY_EMPTY_STORY_SOURCE_DIFF');
+          NODE
+      - name: Verify existing 17 account and media bindings, exact live version, official recovery
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';import fs from 'node:fs';
+          const accountId=(process.env.CLOUDFLARE_ACCOUNT_ID||'').replace(/[^a-fA-F0-9]/g,'');
+          assert.equal(accountId.length,32,'Existing account identifier not configured');
+          assert.ok(process.env.CLOUDFLARE_API_TOKEN,'Existing release authorization missing');
+          const root='https://api.cloudflare.com/client/v4/accounts/'+accountId+'/workers/scripts/'+process.env.F5_STAGE_NAME;
+          const get=async part=>{
+            const r=await fetch(root+part,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},
+              signal:AbortSignal.timeout(25000)});
+            assert.equal(r.status,200,'Protected QA read '+part);
+            const j=await r.json();assert.equal(j.success,true);return j.result;
+          };
+          const [d,s,current,official]=await Promise.all([
+            get('/deployments'),get('/settings'),
+            get('/versions/'+process.env.F5_EXPECTED_LIVE_VERSION),
+            get('/versions/'+process.env.F5_OFFICIAL_RESTORE_VERSION)
+          ]);
+          assert.deepEqual(d.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),
+            [[process.env.F5_EXPECTED_LIVE_VERSION,100]],
+            'QA version changed; refuse unexpected overwrite');
+          const norm=x=>({name:x.name,type:x.type,class_name:x.class_name||null,
+            namespace_id:x.namespace_id||null,text:x.text||null});
+          const sort=a=>a.map(norm).sort((a,b)=>a.name.localeCompare(b.name));
+          const before=sort(s.bindings||[]);
+          assert.equal(before.length,17,'The original 17 QA bindings must be preserved');
+          assert.deepEqual(before,sort(current.resources?.bindings||[]),'Current active bindings drifted');
+          assert.deepEqual(before,sort(official.resources?.bindings||[]),'16 Nov owner-approved restore resources drifted');
+          assert.equal(before.filter(x=>x.type==='durable_object_namespace').length,7);
+          assert.equal(before.filter(x=>x.type==='secret_text').length,5);
+          assert.equal(before.filter(x=>x.type==='assets').length,1);
+          assert.ok(!before.some(x=>x.name==='EMAIL'||x.name==='TALERA_RESET_FROM'),
+            'Do not introduce unverified email service into this sample-removal release');
+          const names=['AUTH_STORAGE_JURISDICTION','SOCIAL_STORAGE_JURISDICTION',
+            'F5_EASY_INVITE_SHA256','F5_EASY_INVITE_EXPIRES'];
+          assert.deepEqual(before.filter(x=>x.type==='plain_text').map(x=>x.name).sort(),names.slice().sort());
+          assert.equal(before.find(x=>x.name==='AUTH_STORAGE_JURISDICTION').text,'eu');
+          fs.writeFileSync('/tmp/talera-empty-stories-preflight.json',JSON.stringify({
+            version:process.env.F5_EXPECTED_LIVE_VERSION,bindings:before
+          }));
+          console.log('SAME_EXISTING_APP_APPROVED_RESTORE_AND_17_IDENTICAL_BINDINGS_GUARDED');
+          NODE
+      - name: Build same TALERA with no examples and verify account and personal media contracts
+        run: |
+          set -euo pipefail
+          npm ci
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node r20-dev/free-10m-f5/f5-library-access.test.mjs
+          node r20-dev/free-10m-f5/f5-library-integrity.test.mjs
+          node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+          node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
+          node r20-dev/free-10m-auth-pilot/auth-local-test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';import fs from 'node:fs';
+          const root='r20-dev/free-10m-f5/generated/public-template-map.mjs';
+          const {referencePages,guestPages}=await import('./'+root);
+          const publicDir='r20-dev/free-10m-delivery/public';
+          let pages=0;
+          for(const collection of [referencePages,guestPages]){
+            for(const route of ['/mijn-leven','/present','/tell']){
+              const filename=collection[route];
+              assert.ok(filename,'Missing existing app page '+route);
+              const html=fs.readFileSync(publicDir+filename,'utf8');
+              assert.ok(html.length>50000,'Unexpectedly small app page');
+              assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/i.test(html),
+                'Bundled example story remains: '+route);
+              assert.ok(!/https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-/i.test(html),
+                'Internet sample-photo link remains: '+route);
+              if(route==='/mijn-leven')assert.ok(html.includes('window.__taleraReferenceMemories=[];'));
+              if(route==='/present')assert.ok(html.includes('const MEMORIES = [];'));
+              pages++;
+            }
+          }
+          assert.equal(pages,6);
+          console.log('ALL_SIX_REAL_USER_AND_SIGNED_OUT_TALERA_PAGES_ZERO_STORIES_ZERO_SAMPLE_PHOTO_LINKS');
+          NODE
+      - name: Prepare original Worker without unverified email binding or account migration
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';import assert from 'node:assert/strict';
+          const before=JSON.parse(fs.readFileSync('/tmp/talera-empty-stories-preflight.json','utf8')).bindings;
+          const c=JSON.parse(fs.readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          assert.equal(c.name,'talera-free-f5-combined-stage-20261108');
+          c.name=process.env.F5_STAGE_NAME;
+          delete c.send_email;
+          delete c.vars.TALERA_RESET_FROM;
+          const names=['AUTH_STORAGE_JURISDICTION','SOCIAL_STORAGE_JURISDICTION',
+            'F5_EASY_INVITE_SHA256','F5_EASY_INVITE_EXPIRES'];
+          assert.deepEqual(Object.keys(c.vars).sort(),names.slice().sort());
+          for(const name of names){
+            const live=before.find(x=>x.name===name&&x.type==='plain_text');
+            assert.ok(live?.text,'Missing original nonsecret value '+name);
+            c.vars[name]=live.text;
+          }
+          const expected=['FreeAuthAccount','FreeAuthEmail','FreeAuthHandle','FreeAuthSession',
+            'FreeAuthRate','FreeSocialMemory','FreeSocialSharePointer'];
+          assert.deepEqual(c.durable_objects.bindings.map(x=>x.class_name),expected);
+          assert.ok(!c.d1_databases?.length&&!c.r2_buckets?.length&&!c.services?.length);
+          c.migrations=[{tag:'free-f5-storage-iphone-qa-20261109-v1',new_sqlite_classes:expected}];
+          c.keep_vars=true;
+          fs.writeFileSync('r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc',
+            JSON.stringify(c,null,2)+'\n');
+          console.log('PRESERVE_ORIGINAL_ACCOUNT_STORES_MEDIA_IDS_SECRETS_WITH_NO_EMAIL_PROVIDER_CHANGE');
+          NODE
+          npx --no-install wrangler deploy --dry-run \
+            --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc \
+            --outdir .talera-owner-empty-dryrun
+      - name: Confirm unchanged live QA version immediately before update
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const accountId=process.env.CLOUDFLARE_ACCOUNT_ID.replace(/[^a-fA-F0-9]/g,'');
+          const uri='https://api.cloudflare.com/client/v4/accounts/'+accountId+'/workers/scripts/'+
+            process.env.F5_STAGE_NAME+'/deployments';
+          const response=await fetch(uri,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},
+            signal:AbortSignal.timeout(20000)});
+          assert.equal(response.status,200);
+          const j=await response.json();assert.equal(j.success,true);
+          assert.deepEqual(j.result.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),
+            [[process.env.F5_EXPECTED_LIVE_VERSION,100]],'App changed while checking, do not overwrite');
+          NODE
+      - name: Publish zero-example TALERA to SAME currently used app origin
+        id: deployed
+        run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
+      - name: Verify live blank stories, same private account bindings and app routes
+        run: |
+          set -euo pipefail
+          for route in /mijn-leven /present /tell; do
+            test "$(curl -fsS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$route")" = 200
+          done
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/__f5/backup")" = 401
+          curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven" >/tmp/talera-empty-home.html
+          curl -fsS --max-time 25 "https://$F5_STAGE_HOST/present" >/tmp/talera-empty-present.html
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';import fs from 'node:fs';
+          const home=fs.readFileSync('/tmp/talera-empty-home.html','utf8');
+          const present=fs.readFileSync('/tmp/talera-empty-present.html','utf8');
+          assert.ok(home.includes('window.__taleraReferenceMemories=[];')&&present.includes('const MEMORIES = [];'));
+          assert.ok(present.includes('const rows=[]; // Login required: no local media read.'));
+          for(const html of [home,present]){
+            assert.ok(!/Test 081|talera-500-fotoband-|TALERA_STRESS_MEMORIES/i.test(html));
+            assert.ok(!/https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-/i.test(html));
+          }
+          const accountId=process.env.CLOUDFLARE_ACCOUNT_ID.replace(/[^a-fA-F0-9]/g,'');
+          const base='https://api.cloudflare.com/client/v4/accounts/'+accountId+
+            '/workers/scripts/'+process.env.F5_STAGE_NAME;
+          const get=async suffix=>{
+            const r=await fetch(base+suffix,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},
+              signal:AbortSignal.timeout(20000)});
+            assert.equal(r.status,200);const d=await r.json();assert.equal(d.success,true);return d.result;
+          };
+          const [s,d]=await Promise.all([get('/settings'),get('/deployments')]);
+          const norm=x=>({name:x.name,type:x.type,class_name:x.class_name||null,
+            namespace_id:x.namespace_id||null,text:x.text||null});
+          const sort=a=>a.map(norm).sort((a,b)=>a.name.localeCompare(b.name));
+          const before=JSON.parse(fs.readFileSync('/tmp/talera-empty-stories-preflight.json','utf8')).bindings;
+          assert.deepEqual(sort(s.bindings||[]),before,'Any secret/account binding difference must roll back');
+          assert.equal(d.deployments?.[0]?.versions?.length,1);
+          assert.equal(d.deployments[0].versions[0].percentage,100);
+          assert.notEqual(d.deployments[0].versions[0].version_id,process.env.F5_EXPECTED_LIVE_VERSION);
+          console.log('OWNER_AUTHORIZED_EMPTY_TALERA_LIVE_SAME_ORIGIN_ZERO_EXAMPLES_17_BINDINGS_UNCHANGED');
+          NODE
+      - name: Restore previous TALERA version if deploy or postdeploy verification fails
+        if: ${{ failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure') }}
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after failed no-example release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc

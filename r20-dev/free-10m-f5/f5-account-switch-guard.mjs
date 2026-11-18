@@ -177,7 +177,15 @@ function taleraCleanFreeMenu(){
   }else if(active==='account'){
     prune('privacy');prune('forgot');
   }else if(active==='login'){
+    // Replace the old incomplete password view with real same-origin recovery.
     prune('forgot');
+    const recoveryLink=document.createElement('a');
+    recoveryLink.href='/wachtwoord-vergeten';
+    recoveryLink.textContent='Wachtwoord vergeten?';
+    recoveryLink.style.cssText='display:block;text-align:center;padding:12px;margin:12px auto;color:inherit;text-decoration:underline';
+    const loginForm=body.querySelector('form[data-form="login"]')||body.querySelector('form');
+    if(loginForm)loginForm.insertAdjacentElement('afterend',recoveryLink);
+    else body.append(recoveryLink);
   }else if(active==='settings'){
     prune('privacy');
   }else if(active==='help'){

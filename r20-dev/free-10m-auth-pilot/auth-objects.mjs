@@ -44,6 +44,41 @@ export class FreeAuthAccount extends DurableObject {
    return {imported:true,verifiedMatchingExisting:false};
   });
  }
+ // Recovery stays in the EXISTING per-account object. No account copy or migration.
+ async beginPasswordReset(tokenHash,expiresAt){
+  if(!/^[a-f0-9]{64}$/.test(tokenHash)||!Number.isSafeInteger(expiresAt)||
+      expiresAt<=Date.now()||expiresAt>Date.now()+16*60000)throw Error('INVALID_RESET_TOKEN');
+  return this.ctx.storage.transaction(async txn=>{
+   const account=await txn.get('account');
+   if(!account||account.status!=='active')return false;
+   await txn.put('password-reset-v1',{tokenHash,expiresAt});
+   return true;
+  });
+ }
+ async cancelPasswordReset(tokenHash){
+  if(!/^[a-f0-9]{64}$/.test(tokenHash))throw Error('INVALID_RESET_TOKEN');
+  return this.ctx.storage.transaction(async txn=>{
+   const previous=await txn.get('password-reset-v1');
+   if(!previous||!safeEqualHex(previous.tokenHash,tokenHash))return false;
+   await txn.delete('password-reset-v1');
+   return true;
+  });
+ }
+ async completePasswordReset(tokenHash,newSalt,newHash){
+  if(!/^[a-f0-9]{64}$/.test(tokenHash)||!/^[a-f0-9]{64}$/.test(newSalt)||
+     !/^[a-f0-9]{64}$/.test(newHash))throw Error('INVALID_RESET_UPDATE');
+  return this.ctx.storage.transaction(async txn=>{
+   const account=await txn.get('account');
+   const previous=await txn.get('password-reset-v1');
+   if(!account||account.status!=='active'||!previous||
+      !Number.isSafeInteger(previous.expiresAt)||previous.expiresAt<=Date.now()||
+      !safeEqualHex(previous.tokenHash,tokenHash))return false;
+   await txn.put('account',{...account,
+     password_salt:newSalt,password_hash:newHash,epoch:account.epoch+1});
+   await txn.delete('password-reset-v1');
+   return true;
+  });
+ }
  async verify(password){
   const row=await this.ctx.storage.get('account');
   // Dummy PBKDF2 work for unknown accounts avoids trivially fast account enumeration.

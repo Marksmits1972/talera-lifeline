@@ -3,6 +3,7 @@
 // code, temporary browser gate, or automatic account creation is required.
 // There is intentionally NO TALERA_BASE, D1, R2 or existing customer binding.
 import authPilot from '../free-10m-auth-pilot/auth-pilot-worker.mjs';
+import {passwordResetPage} from './f5-password-reset-page.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
   readSessionCookie,sessionCookie,shaHex,safeEqualHex,json,sameOrigin,body
@@ -125,7 +126,8 @@ function hideUnselectedEntryPhoto(html,requestUrl){
  return html.replace('<head>','<head>'+markup);
 }
 
-const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile']);
+const AUTH_PATHS=new Set(['/api/register','/api/login','/api/logout','/api/me','/api/profile',
+ '/api/password-reset/request','/api/password-reset/confirm']);
 // iOS fetches install icons independently of the browser login cookie.
 // These four static install resources are public. Account data remains private.
 const PUBLIC_INSTALL_ICON_PATHS=new Set([
@@ -773,6 +775,8 @@ export default {
         location:'/mijn-leven','cache-control':'no-store'
       }});
     }
+    if(m==='GET'&&!url.search&&(p==='/wachtwoord-vergeten'||p==='/wachtwoord-instellen'))
+      return passwordResetPage(p==='/wachtwoord-vergeten'?'request':'confirm');
     if(m==='GET'&&PUBLIC_INSTALL_ICON_PATHS.has(p))
       return publicPwaSupport(request,env);
     // Preserve the ALREADY iPhone-approved 9-November original back route.

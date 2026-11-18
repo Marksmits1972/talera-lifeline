@@ -167,6 +167,56 @@ async function run(){
   }
  });
  assert.equal(expired.status,409,'Expired legacy session must not be imported');
+ // Full single-use recovery of the SAME existing synthetic account.
+ const missingMail=await request('GET','/__local-qa/reset-mail',{testOnly:true});
+ assert.equal(missingMail.status,200);
+ assert.equal(missingMail.data.message,null);
+ const unknownRequest=await request('POST','/api/password-reset/request',{
+  ip:'192.0.2.90',body:{email:'never-registered@example.invalid'}
+ });
+ assert.equal(unknownRequest.status,200,'Unknown address should not be disclosed');
+ assert.equal((await request('GET','/__local-qa/reset-mail',{testOnly:true})).data.message,null);
+ const resetStart=await request('POST','/api/password-reset/request',{
+  ip:'192.0.2.91',body:{email:legacyRecord.email}
+ });
+ assert.equal(resetStart.status,200,'Recovery request');
+ const sent=await request('GET','/__local-qa/reset-mail',{testOnly:true});
+ assert.equal(sent.status,200);
+ assert.equal(sent.data.message.to,legacyRecord.email);
+ assert.ok(sent.data.message.text.includes('wachtwoord-instellen#'));
+ const link=sent.data.message.text.match(/https?:\\/\\/[^\\s]+/)?.[0];
+ assert.ok(link);
+ const parameters=new URLSearchParams(new URL(link).hash.slice(1));
+ assert.equal(parameters.get('e'),legacyRecord.email);
+ const token=parameters.get('t');
+ assert.match(token,/^[0-9a-f]{64}$/);
+ const oldSession=await request('GET','/api/me',{cookie:'talera_sid='+legacyToken});
+ assert.equal(oldSession.status,200);
+ const wrongReset=await request('POST','/api/password-reset/confirm',{
+  ip:'192.0.2.92',body:{email:legacyRecord.email,token:'1'.repeat(64),newPassword:'Synthetic_new_password_2026'}
+ });
+ assert.equal(wrongReset.status,400,'Forged link must be rejected');
+ const newPassword='Synthetic_new_password_2026';
+ const resetFinish=await request('POST','/api/password-reset/confirm',{
+  ip:'192.0.2.93',body:{email:legacyRecord.email,token,newPassword}
+ });
+ assert.equal(resetFinish.status,200,'Recovery must replace only account password');
+ const replay=await request('POST','/api/password-reset/confirm',{
+  ip:'192.0.2.94',body:{email:legacyRecord.email,token,newPassword:'YetAnotherPassword_2026'}
+ });
+ assert.equal(replay.status,400,'Single-use link must not replay');
+ assert.equal((await request('GET','/api/me',{cookie:'talera_sid='+legacyToken})).status,401,
+  'All old sessions must be invalidated by epoch');
+ assert.equal((await request('POST','/api/login',{
+  ip:'192.0.2.95',body:{email:legacyRecord.email,password:legacyPassword}
+ })).status,401,'Old password must no longer authenticate');
+ const recoveredLogin=await request('POST','/api/login',{
+  ip:'192.0.2.96',body:{email:legacyRecord.email,password:newPassword}
+ });
+ assert.equal(recoveredLogin.status,200,'New password must work');
+ assert.equal(recoveredLogin.data.account.id,legacyId,'Existing account ID must be preserved');
+ assert.equal((await request('GET','/api/me',{cookie:created[1].cookie})).status,200,
+  'Other account must remain untouched');
  return {result:'PASS',isolatedAccounts:6,individualAccountDOs:true,
   uniqueEmailAndHandle:true,originalPasswordMethodPreserved:true,
   sessionsSurviveWorkerRestart:true,individualLogoutRevokesOneSession:true,
@@ -176,6 +226,7 @@ async function run(){
   legacySaltAndHashPreserved:true,
   legacyUnexpiredSessionRestoredByHash:true,
   expiredLegacySessionExcluded:true,
+  passwordResetSingleUse:true,otherAccountPreserved:true,oldSessionsInvalidated:true,
   fullTenMillionFreeUsersProven:false};
 }
 try{

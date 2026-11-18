@@ -3,6 +3,7 @@ import pilot from './auth-pilot-worker.mjs';
 export {FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate} from './auth-objects.mjs';
 import {validEmail,namespacedHash,shaHex} from './auth-util.mjs';
 
+let latestResetMail=null;
 export default {
  async fetch(request,env,ctx){
   const u=new URL(request.url);
@@ -72,6 +73,18 @@ export default {
    const hash=token?await shaHex(token):null;
    return Response.json({isValidHash:hash!==null,hasNoRawToken:!String(hash||'').includes(token)});
   }
-  return pilot.fetch(request,env,ctx);
+  if(u.pathname==='/__local-qa/reset-mail'&&request.method==='GET'){
+   if(request.headers.get('x-local-qa-only')!=='LOCAL_TEST_NO_PRODUCTION')
+    return Response.json({error:'denied'},{status:403});
+   return Response.json({message:latestResetMail});
+  }
+  const simulatedEnv={...env,TALERA_RESET_FROM:'noreply@example.invalid',
+   EMAIL:{send:async message=>{
+    if(!message?.to?.endsWith('@example.invalid')||
+       message.from!=='noreply@example.invalid')throw Error('NOT_SYNTHETIC_EMAIL');
+    latestResetMail=message;
+    return {messageId:'local-fake-not-delivered'};
+   }}};
+  return pilot.fetch(request,simulatedEnv,ctx);
  }
 };

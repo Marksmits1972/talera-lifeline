@@ -1149,6 +1149,28 @@ const refs={};
 // Remove the original sample stories' internet-photo addresses from every
 // generated entry page. This does NOT touch private IndexedDB, saved media,
 // ordinary user URLs, the video engine, or logos.
+// The original Tell editor had a hidden importer for a 500-story
+// internet-photo demonstration. Remove that special sample importer while
+// retaining the same normal user-selected photo import and saved media IDs.
+function removeLegacyTellSampleImporter(html){
+ const begin="const seed=url.hostname==='picsum.photos'?url.pathname.match(";
+ const start=html.indexOf(begin);
+ assert.ok(start>0&&html.indexOf(begin,start+1)===-1,
+  'TELL_LEGACY_SAMPLE_IMPORTER_SOURCE_MOVED');
+ const end=html.indexOf('else{',start);
+ assert.ok(end>start&&end-start<350,
+  'TELL_LEGACY_SAMPLE_IMPORTER_BRANCH_MOVED');
+ const old=html.slice(start,end+5);
+ assert.ok(old.includes('talera-500-fotoband-')&&
+  old.includes('if(seed)quick.demoSeed=seed;'),
+  'TELL_SAMPLE_ONLY_SOURCE_CHANGED');
+ // The ordinary fetch is unchanged. Only the special sample-seed branch
+ // is removed, leaving its original braces and error handling intact.
+ html=html.slice(0,start)+'{'+html.slice(end+5);
+ assert.ok(!html.includes('talera-500-fotoband-'),
+  'TELL_BUNDLED_SAMPLE_IMPORT_LEFTOVER');
+ return html;
+}
 function stripBundledExamplePhotoLinks(html){
  const sampleImage=/https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^\s"'<>)]*/gi;
  const sampleImgAttribute=/(<img\b[^>]*?)\s(?:src|srcset|poster)=(["'])https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-[^"']*\2/gi;
@@ -1184,6 +1206,7 @@ for(const [route,filename] of Object.entries(routes)){
    assert.equal(guest.split(ownRead).length,2,'GUEST_LOCAL_LIBRARY_READ_SOURCE_DRIFT');
    guest=guest.replace(ownRead,'rows=[];');
  }
+ if(route==='/tell')guest=removeLegacyTellSampleImporter(guest);
  guest=stripBundledExamplePhotoLinks(guest);
  if(route==='/mijn-leven'){
    assert.ok(guest.includes('window.__taleraReferenceMemories=[];')&&
@@ -1223,16 +1246,9 @@ for(const [route,filename] of Object.entries(routes)){
  // apply later speculative iPhone video-poster modifications.
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
- if(route==='/tell')html=shapeOwnStoryTopics(html);
+ if(route==='/tell')html=removeLegacyTellSampleImporter(shapeOwnStoryTopics(html));
  html=stripBundledExamplePhotoLinks(html);
- if(route==='/tell'){
-   for(const token of ['Test 081','talera-500-fotoband-','TALERA_STRESS_MEMORIES']){
-     const at=html.indexOf(token);
-     if(at>=0)console.log('TALERA_TELL_BUNDLED_EXAMPLE_DIAGNOSTIC',JSON.stringify({
-       token,at,context:html.slice(Math.max(0,at-180),at+220)
-     }));
-   }
- }
+
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  const hash=sha(html),file=hash+'.html';

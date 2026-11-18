@@ -300,6 +300,30 @@ try{
   console.log('TALERA_HOME_TO_DEFAULT_PRESENT_OWN_PHOTO_VISIBLE_PASS',
     JSON.stringify({ownerPhoto:true,defaultRoute:true,originalMediaIdPreserved:true,
       realIphoneAccepted:false}));
+  // The Home "Door de tijd" year link is /present?year=2026.
+  // With real IndexedDB hydration the year selector can execute before
+  // registration and never re-activate the selected own photo.
+  const yearRoute=await page.goto(origin+'/present?year=2026',
+    {waitUntil:'domcontentloaded'});
+  assert.equal(yearRoute.status(),200);
+  await page.waitForFunction(()=>{
+    const m=window.__taleraTimelineRuntime?.currentMemory?.();
+    return !!m&&!m._photoLoading&&m._zeroFrames?.length===3;
+  },null,{timeout:16000});
+  await page.waitForTimeout(400);
+  const yearVisible=await centerPixel(page);
+  const yearStatus=await page.evaluate(()=>({
+    date:document.getElementById('focusText')?.textContent,
+    currentId:window.__taleraTimelineRuntime?.currentMemory?.()?.id,
+    front:document.getElementById('memoryPhotoA')?.getAttribute('src'),
+    frontNatural:document.getElementById('memoryPhotoA')?.naturalWidth||0,
+    stageVisible:getComputedStyle(document.getElementById('photoStage')).visibility
+  }));
+  assert.ok(dominant(yearVisible,0),
+    'HOME_YEAR_LINK_HAS_OWN_PHOTO_BUT_PRESENT_YEAR_MODE_IS_BLANK: '+
+      JSON.stringify({yearStatus,yearVisible}));
+  console.log('TALERA_HOME_YEAR_LINK_OWN_PHOTO_VISIBLE_PASS',
+    JSON.stringify({year:2026,ownImage:true,realIphoneAccepted:false}));
   await load(page,plain,3);
   // Native timeline regression: with only ONE real local memory near today,
   // releasing a finger drag must preserve the finger-selected historical year.

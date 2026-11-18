@@ -102,12 +102,16 @@ function hideUnselectedEntryPhoto(html,requestUrl){
      const m=window.__taleraTimelineRuntime?.currentMemory?.();
      if(!isTarget(m)||!photoReady(m)||settling)return;
      settling=true;
-     // The normal photo layer and synced foreground have two frames to
-     // settle; do not display the earlier default during navigation.
-     requestAnimationFrame(()=>requestAnimationFrame(()=>{
+     // Retain the original two-frame anti-flash handoff. On WebKit, a
+     // first local video may start while the nested rAF callback is delayed
+     // or suppressed, leaving a fully loaded own image/video HIDDEN.
+     // Fallback only after isTarget + decoded photoReady have succeeded.
+     const finish=()=>{
        settling=false;
        reveal();
-     }));
+     };
+     requestAnimationFrame(()=>requestAnimationFrame(finish));
+     setTimeout(finish,180);
    };
    poll=setInterval(tick,40);
    tick();

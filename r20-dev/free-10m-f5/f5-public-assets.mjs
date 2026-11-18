@@ -1159,12 +1159,8 @@ function removeLegacyTellSampleImporter(html){
   const end=html.indexOf('else{',start);
   assert.ok(end>start&&end-start<350,'TELL_LEGACY_SAMPLE_IMPORTER_BRANCH_MOVED');
   const old=html.slice(start,end+5);
-  if(!old.includes('if(seed)quick.demoSeed=seed;'))
-   console.log('TELL_DEMO_IMPORT_BRANCH_DIAGNOSTIC',JSON.stringify({
-     position:start,context:old.slice(0,580)
-   }));
   assert.ok(old.includes('talera-500-fotoband-')&&
-   old.includes('if(seed)quick.demoSeed=seed;'),
+   /if\(seed\)(?:quick|draft)\.demoSeed=seed;/.test(old),
    'TELL_SAMPLE_ONLY_SOURCE_CHANGED');
   // Keep the ordinary user-photo fetch and its error handling.
   html=html.slice(0,start)+'{'+html.slice(end+5);

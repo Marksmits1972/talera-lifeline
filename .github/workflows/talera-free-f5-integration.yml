@@ -1060,3 +1060,33 @@ jobs:
       - name: Restore previous TALERA version if deploy or postdeploy verification fails
         if: ${{ failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure') }}
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after failed no-example release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
+
+  diagnose_tell_public_bundled_examples:
+    name: Diagnose sample texts in SAME TALERA Tell page
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node r20-dev/free-10m-delivery/build.mjs
+      - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Print remaining sample-source locations
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const {referencePages,guestPages}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
+          for(const [name,collection] of Object.entries({referencePages,guestPages})){
+            const html=fs.readFileSync('r20-dev/free-10m-delivery/public'+collection['/tell'],'utf8');
+            for(const needle of ['Test 081','talera-500-fotoband-','TALERA_STRESS_MEMORIES']){
+              const at=html.indexOf(needle);
+              console.log('TELL_EXAMPLE_MARKER',JSON.stringify({
+                route:name,token:needle,present:at>=0,
+                context:at>=0?html.slice(Math.max(0,at-250),at+350):''
+              }));
+            }
+          }
+          NODE

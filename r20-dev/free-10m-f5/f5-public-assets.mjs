@@ -1343,7 +1343,9 @@ for(const [route,filename] of Object.entries(routes)){
    assert.equal(guest.split(ownRead).length,2,'GUEST_LOCAL_LIBRARY_READ_SOURCE_DRIFT');
    guest=guest.replace(ownRead,'rows=[];');
  }
- if(route==='/tell')guest=removeLegacyTellSampleImporter(guest);
+ // Guest and authenticated /tell are TWO variants of the SAME original editor.
+ // Apply the SAME layout styling to both; leave account/library gates untouched.
+ if(route==='/tell')guest=removeLegacyTellSampleImporter(polishTellEditorLayout(guest));
  guest=closeAnonymousPersonalLibrary(guest);
  guest=stripBundledExamplePhotoLinks(guest);
  if(route==='/mijn-leven'){

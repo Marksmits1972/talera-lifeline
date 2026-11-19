@@ -960,7 +960,7 @@ try{
  await page.waitForFunction(async hash=>{
    const r=await fetch('/api/shares',{credentials:'same-origin',cache:'no-store'});
    if(!r.ok)return false;
-   return (await r.json()).items?.some(x=>x.id===hash&&x.revoked_at!==null);
+   return (await r.json()).items?.some(x=>x.id===hash&&x.revoked_at!=null);
  },issuedShareHash,{timeout:15000});
  const revokedProof=await page.evaluate(async hash=>{
    const r=await fetch('/api/shares',{credentials:'same-origin',cache:'no-store'});

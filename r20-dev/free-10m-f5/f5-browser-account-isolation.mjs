@@ -625,7 +625,7 @@ try{
    story:await window.TaleraMemories.get(id),
    media:await window.TaleraMemories.blob(id+':0')
  }),a.id);
- assert.equal(foreignOriginal.story,null,
+ assert.ok(foreignOriginal.story==null,
    'Second account must not read first account original story');
  assert.equal(foreignOriginal.media,null,
    'Second account must not read first account original media Blob');

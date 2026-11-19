@@ -1321,6 +1321,16 @@ for(const [route,filename] of Object.entries(routes)){
    const at=raw.indexOf(term);
    return {term,at,sample:at<0?'':raw.slice(Math.max(0,at-520),Math.min(raw.length,at+950)).replace(/\s+/g,' ').slice(0,1460)};
   };
+  const section=(needle,max)=>{const at=raw.indexOf(needle);return {needle,at,text:at<0?'':raw.slice(at,at+max)};};
+  console.log('TALERA_LAYOUT_FUNCTIONS',JSON.stringify([
+    section('function setupV20Tags(g,details){',7600),
+    section('function taleraV16InstallToolbar(g){',4200),
+    section('function taleraV14',2600),
+    section('.talera-v14-heading{',1600),
+    section('.talera-tags-v20{',1200),
+    section('#app .work.talera-compact-work #details',2700),
+    section('#app .work.talera-compact-work .work-tools',2400)
+  ]));
   console.log('TALERA_LAYOUT_SOURCE_INSPECTION',JSON.stringify({sourceBytes:raw.length,probes:["function setupV20Tags(g,details)","talera-tags-v20","Kenmerk toevoegen","Bedenk een titel","Titel","Plaatsen","<main","workHeader","photoGrid","photo-grid","photoTiles","talera-work","memory-editor","media-grid","workScreen","v9-work","v9-editor"].map(findProbe)}));
  }
  if(route==='/present')html=removeBuiltInPresentationExamples(html);

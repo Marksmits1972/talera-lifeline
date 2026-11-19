@@ -244,7 +244,11 @@ try{
    ...devices['iPhone 13'],serviceWorkers:'allow',
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
  });
- const registrationPage=await context.newPage();
+ const registrationContext=await browser.newContext({
+   ...devices['iPhone 13'],serviceWorkers:'allow',
+   extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.79'}
+ });
+ const registrationPage=await registrationContext.newPage();
  try{
    const route=await registrationPage.goto(origin+'/present?talera_menu=hub',
      {waitUntil:'domcontentloaded'});
@@ -342,7 +346,7 @@ try{
      'The original confirmation tap must leave the user really signed in');
    assert.ok(structure.forms.some(f=>/register|signup/i.test(f.formName)),
      'Original account registration form missing in actual mobile UI');
- }finally{await registrationPage.close()}
+ }finally{await registrationContext.close()}
  const page=await context.newPage();
  // Passive synthetic-only trace: which original UI account/settings screens
  // actually call a Free API? Never record queries, bodies, cookies or tokens.

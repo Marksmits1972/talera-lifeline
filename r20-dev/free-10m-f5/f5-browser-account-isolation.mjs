@@ -344,6 +344,50 @@ try{
    });
    assert.deepEqual(registered,{status:200,hasAccount:true},
      'The original confirmation tap must leave the user really signed in');
+   // A second browser with the same email must never silently appear to
+   // accept registration: reproduce a real owner-visible 409 in the SAME app.
+   const existingContext=await browser.newContext({
+     ...devices['iPhone 13'],serviceWorkers:'allow',
+     extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.78'}
+   });
+   try{
+     const existingPage=await existingContext.newPage();
+     const registeredPage=await existingPage.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+     assert.equal(registeredPage.status(),200);
+     await waitForLibrary(existingPage);
+     await menu(existingPage);
+     await view(existingPage,'account');
+     await view(existingPage,'register');
+     const previous=existingPage.locator('#talera-more-menu form[data-form="register"]');
+     await previous.locator('input[name="birthDate"]').waitFor({state:'visible',timeout:10000});
+     await previous.locator('input[name="displayName"]').fill(signupUser.displayName);
+     await previous.locator('input[name="username"]').fill(signupUser.username+'2');
+     await previous.locator('input[name="birthDate"]').fill('1974-04-02');
+     await previous.locator('input[name="email"]').fill(signupUser.email);
+     await previous.locator('input[name="register-password"]').fill(signupUser.password);
+     await previous.locator('input[name="register-confirm"]').fill(signupUser.password);
+     const duplicateResponse=existingPage.waitForResponse(res=>
+       new URL(res.url()).pathname==='/api/register',{timeout:17000});
+     await previous.locator('button[type="submit"]').first().click();
+     const duplicate=await duplicateResponse;
+     await existingPage.waitForTimeout(350);
+     const result=await existingPage.evaluate(()=>{
+       const panel=document.getElementById('talera-more-menu');
+       const form=panel?.querySelector('form[data-form="register"]');
+       const status=[...panel.querySelectorAll('[role="alert"],.feedback,.notice,.message')]
+         .map(el=>({text:(el.textContent||'').trim().slice(0,250),
+           visible:!!el.getBoundingClientRect().height})).filter(x=>x.text);
+       return {formStillVisible:!!form,allNotice:status,
+         tailText:(panel?.innerText||'').slice(-700)};
+     });
+     console.log('TALERA_DUPLICATE_ACCOUNT_REGISTRATION_FEEDBACK',JSON.stringify({
+       serverStatus:duplicate.status(),ui:result
+     }));
+     assert.equal(duplicate.status(),409,
+       'Existing email in new Free system must refuse duplicate registration');
+     assert.ok(/Registreren is niet gelukt|niet beschikbaar|bestaat al|bezet/i.test(result.tailText),
+       'The user must see a clear refusal when their email is already in Free');
+   }finally{await existingContext.close()}
    assert.ok(structure.forms.some(f=>/register|signup/i.test(f.formName)),
      'Original account registration form missing in actual mobile UI');
  }finally{await registrationContext.close()}

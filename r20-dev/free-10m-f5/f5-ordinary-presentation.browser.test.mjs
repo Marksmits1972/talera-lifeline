@@ -278,6 +278,34 @@ try{
   console.log('TALERA_F5_HOME_OWNER_RECORDS_STILL_WORK_PASS',
     JSON.stringify({saved:1,ownHero:true,ownPhoto:true,ownerYear:true,
       exampleCount:0,originalPwa:true,iphoneAccepted:false}));
+  // Real iPhone report 19 Nov: Home shows a genuine owner photo and "3 eigen"
+  // yet tapping that very photo lands on a white presentation. Follow the
+  // ORIGINAL Home photo tap: never fabricate or directly navigate the URL.
+  await page.locator('#heroImage').click({timeout:7000});
+  await page.waitForFunction(()=>location.pathname==='/present',null,{timeout:12000});
+  await page.waitForFunction(id=>{
+    const mem=window.__taleraTimelineRuntime?.currentMemory?.();
+    return mem?.storyId===id&&!mem._photoLoading&&mem._zeroFrames?.length===3;
+  },plain,{timeout:18000});
+  const afterRealHeroTap=await page.evaluate(()=>({
+    url:location.pathname+location.search,
+    memoryId:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+    hiddenByEntry:document.documentElement.classList.contains('talera-direct-memory-entering'),
+    stageVisibility:getComputedStyle(document.getElementById('photoStage')).visibility,
+    frontReady:!!document.getElementById('memoryPhotoA')?.naturalWidth,
+    selectedYear:document.getElementById('focusText')?.textContent,
+    accountApiPresent:!!window.TaleraMemories?.list
+  }));
+  assert.equal(afterRealHeroTap.hiddenByEntry,false,
+    'HOME_PHOTO_TAP_CANNOT_LEAVE_MEMORY_STAGE_HIDDEN: '+JSON.stringify(afterRealHeroTap));
+  assert.notEqual(afterRealHeroTap.stageVisibility,'hidden',
+    'HOME_PHOTO_TAP_STILL_WHITE: '+JSON.stringify(afterRealHeroTap));
+  const afterHeroTapPixels=await centerPixel(page);
+  assert.ok(dominant(afterHeroTapPixels,0),
+    'HOME_PHOTO_TAP_MUST_DISPLAY_ORIGINAL_OWN_PHOTO: '+
+    JSON.stringify({afterRealHeroTap,afterHeroTapPixels}));
+  console.log('TALERA_REAL_HOME_PHOTO_TAP_OPENS_VISIBLE_OWNER_MEMORY_PASS',
+    JSON.stringify({storyIdCorrect:true,originalPhotoVisible:true,originalLocalDataUnchanged:true}));
   // REPORTED IPHONE REGRESSION: Home shows the original own photo, but
   // opening the existing /present route without ?memory= stays completely
   // blank. Previous browser tests used ?memory= and missed this path.

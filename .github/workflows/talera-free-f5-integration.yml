@@ -884,7 +884,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = c93a94f2d08ac435bf3d56a2c06363c92728432e
+          test "$(git rev-parse HEAD^)" = acf25b0636fec1661dfd8314715beeb8b79d194e
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
@@ -933,6 +933,19 @@ jobs:
             j.name==='Audit original local story delete method in same TALERA code');
           assert.equal(audit?.conclusion,'success',
             'Existing transactional delete and owner-action source audit not green');
+          const certifiedUri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
+            '/actions/runs/44477168538';
+          const proof=await fetch(certifiedUri,{headers:{
+            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
+          },signal:AbortSignal.timeout(20000)});
+          assert.equal(proof.status,200,'Owner local deletion full browser proof unreadable');
+          const passed=await proof.json();
+          assert.equal(passed.head_sha,'acf25b0636fec1661dfd8314715beeb8b79d194e',
+            'Not the exact original owner-clear build and account regression source');
+          assert.equal(passed.status,'completed');
+          assert.equal(passed.conclusion,'success',
+            'Owner story deletion and original media/back-up/regression CI not green');
+          console.log('SAME_APP_OWNER_CLEAR_FULL_BROWSER_ALL_CHECKS_GREEN');
           console.log('SAME_APP_OWNER_CLEAR_ORIGINAL_ACCOUNT_STORE_SOURCE_AUDITED');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery

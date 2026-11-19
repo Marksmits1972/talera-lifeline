@@ -284,6 +284,48 @@ try{
      };
    });
    console.log('TALERA_REAL_REGISTRATION_FORM_STRUCTURE',JSON.stringify(structure));
+   const menuSource=readFileSync(path.join(here,'generated','approved-menu-original.mjs'),'utf8');
+   const sourceLocations=['/api/register',"data-form=\"register\"","form.dataset.form","case 'register'","data-form='register'"];
+   console.log('TALERA_REGISTRATION_SOURCE_HANDLERS',JSON.stringify(
+     sourceLocations.map(needle=>{
+       const at=menuSource.indexOf(needle);
+       return {needle,found:at>=0,context:at<0?'':menuSource.slice(
+         Math.max(0,at-900),Math.min(menuSource.length,at+1250))};
+     })
+   ));
+   const signupUser={
+     email:'f5-ui-register-'+testKey+'@example.invalid',
+     username:'f5uiregister'+testKey,
+     displayName:'F5 synthetic UI registration',
+     password:'F5_Synthetic_Registration_Test_Only_2026!'
+   };
+   const registrationTraffic=[];
+   registrationPage.on('response',response=>{
+     const url=new URL(response.url());
+     if(url.origin===origin&&url.pathname==='/api/register')
+       registrationTraffic.push({status:response.status(),method:response.request().method()});
+   });
+   const form=registrationPage.locator('#talera-more-menu form[data-form="register"]');
+   await form.locator('input[name="displayName"]').fill(signupUser.displayName);
+   await form.locator('input[name="username"]').fill(signupUser.username);
+   await form.locator('input[name="email"]').fill(signupUser.email);
+   await form.locator('input[name="register-password"]').fill(signupUser.password);
+   await form.locator('input[name="register-confirm"]').fill(signupUser.password);
+   const nativeValidity=await form.evaluate(form=>({
+     valid:form.checkValidity(),
+     invalid:[...form.elements].filter(e=>e.willValidate&&!e.checkValidity())
+       .map(e=>({name:e.name,reason:e.validity?.valueMissing?'required':e.validity?.patternMismatch?'pattern':e.validationMessage.slice(0,130)}))
+   }));
+   await form.locator('button[type="submit"]').first().click();
+   await registrationPage.waitForTimeout(1800);
+   const afterSubmit=await registrationPage.evaluate(()=>({
+     url:location.pathname,menu:document.getElementById('talera-more-menu')?.innerText?.slice(-750),
+     registered:document.documentElement.dataset.taleraAuth||'',
+     registrationOpen:!!document.querySelector('form[data-form="register"]')
+   }));
+   console.log('TALERA_REAL_REGISTRATION_SUBMIT_DIAGNOSTIC',JSON.stringify({
+     nativeValidity,registrationTraffic,afterSubmit
+   }));
    assert.ok(structure.forms.some(f=>/register|signup/i.test(f.formName)),
      'Original account registration form missing in actual mobile UI');
  }finally{await registrationPage.close()}

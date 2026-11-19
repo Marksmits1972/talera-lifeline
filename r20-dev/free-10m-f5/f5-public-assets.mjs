@@ -1186,114 +1186,56 @@ function stripBundledExamplePhotoLinks(html){
 // User-requested account-local reset. Accessible from the REAL Home page,
 // not only from a one-time URL fragment or a native browser confirm dialog.
 // Keep all original account IDs, menu, presentation and DB code untouched.
+// Owner-approved ONE-TIME local deletion. The URL is intentionally explicit:
+// ordinary visitors, other accounts and normal app openings are untouched.
+// The current phone must open the URL because Free originals are in its IDB.
 function installOwnerRequestedClearAllStories(html){
  const js=String.raw`(function(){
-  if(location.pathname!=='/mijn-leven')return;
-  const requested=location.hash==='#wis-alle-verhalen'||
-    new URLSearchParams(location.search).has('wis-alle-verhalen');
-  if(requested)history.replaceState(null,'',location.pathname);
-  function makeEl(tag,text){
-   const e=document.createElement(tag);if(text)e.textContent=text;return e;
-  }
-  async function awaitOwnStore(){
+  if(location.pathname!=='/mijn-leven'||
+     new URLSearchParams(location.search).get('wis-alle-verhalen')!=='nu')return;
+  // Remove the destructive URL FIRST so Back/refresh cannot wipe new stories.
+  history.replaceState(null,'','/mijn-leven');
+  async function execute(){
+   if(document.readyState==='loading')
+    await new Promise(resolve=>document.addEventListener('DOMContentLoaded',resolve,{once:true}));
+   const status=document.createElement('div');
+   status.id='talera-own-reset-progress';
+   status.setAttribute('role','status');
+   status.style.cssText='position:fixed;z-index:2147483640;inset:0;'+
+    'padding:35vh 25px 0;text-align:center;background:#f6f5f2;'+
+    'color:#091e43;font:bold 20px/1.5 system-ui;';
+   status.textContent='Je herinneringen worden verwijderd…';
+   document.body.appendChild(status);
    for(let i=0;i<180;i++){
-    const store=window.TaleraMemories;
-    if(store?.localOnly===true&&typeof store.list==='function'&&
-       typeof store.remove==='function')return store;
-    await new Promise(r=>setTimeout(r,100));
+    const s=window.TaleraMemories;
+    if(s?.localOnly===true&&typeof s.list==='function'&&typeof s.remove==='function'){
+     const list=await s.list();
+     if(!Array.isArray(list)||list.some(item=>
+       !item||item.source!=='pwa-local'||typeof item.id!=='string'||
+       !/^local-[a-z0-9-]{8,90}$/i.test(item.id)))
+      throw Error('De lokale verhalenlijst kon niet veilig worden gecontroleerd.');
+     for(const item of list)await s.remove(item.id);
+     const still=await s.list();
+     if(!Array.isArray(still)||still.length!==0)
+      throw Error('Niet alle herinneringen zijn verwijderd.');
+     status.textContent='Je herinneringen zijn verwijderd.';
+     location.replace('/mijn-leven');
+     return;
+    }
+    await new Promise(resolve=>setTimeout(resolve,100));
    }
-   throw Error('Opslag van dit account is niet beschikbaar. Er is niets gewist.');
+   throw Error('De lokale herinneringenopslag is niet bereikbaar.');
   }
-  async function rowsForDeletion(store){
-   const rows=await store.list();
-   if(!Array.isArray(rows)||rows.some(row=>!row||
-      row.source!=='pwa-local'||typeof row.id!=='string'||
-      !/^local-[a-z0-9-]{8,90}$/i.test(row.id)))
-     throw Error('De herinneringenlijst kon niet veilig worden gecontroleerd. Er is niets gewist.');
-   return rows;
-  }
-  async function main(){
-   const store=await awaitOwnStore();
-   if(document.readyState==='loading')await new Promise(resolve=>
-      document.addEventListener('DOMContentLoaded',resolve,{once:true}));
-   const initial=await rowsForDeletion(store);
-   const host=document.getElementById('v17-year-summary');
-   if(!host)throw Error('Mijn leven is niet klaar om herinneringen te wissen.');
-   if(initial.length===0){
-    if(requested)alert('Je eigen verhalenlijst is al leeg.');
-    return;
-   }
-   let busy=false;
-   const trigger=makeEl('button','Wis alle herinneringen');
-   trigger.id='talera-owner-clear-stories';trigger.type='button';
-   trigger.style.cssText='display:block;margin:6px 0 0;padding:5px 8px;'+
-     'border:1px solid #b9c6d8;border-radius:7px;background:#fff;'+
-     'color:#27496d;font:600 12px system-ui;cursor:pointer;';
-   trigger.setAttribute('aria-label','Wis alle eigen herinneringen van dit account');
-   host.insertAdjacentElement('afterend',trigger);
-   function modal(){
-    if(document.getElementById('talera-owner-clear-confirm'))return;
-    const shade=makeEl('div');shade.id='talera-owner-clear-confirm';
-    shade.style.cssText='position:fixed;inset:0;z-index:2147483600;'+
-      'background:rgba(7,26,61,.70);display:flex;align-items:center;'+
-      'justify-content:center;padding:20px;box-sizing:border-box;';
-    const panel=makeEl('section');panel.setAttribute('role','dialog');
-    panel.setAttribute('aria-modal','true');
-    panel.setAttribute('aria-labelledby','talera-clear-title');
-    panel.style.cssText='background:#fff;color:#071a3d;border-radius:16px;'+
-      'padding:22px;max-width:450px;width:100%;box-sizing:border-box;'+
-      'font:16px/1.5 system-ui;box-shadow:0 15px 38px #0004;';
-    const heading=makeEl('h2','Alle herinneringen verwijderen?');
-    heading.id='talera-clear-title';heading.style.cssText='font-size:22px;margin:0 0 10px';
-    const info=makeEl('p');info.style.cssText='margin:0 0 18px';
-    const status=makeEl('p');status.id='talera-clear-result';
-    status.style.cssText='min-height:1.5em;margin:10px 0';
-    const actions=makeEl('div');actions.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
-    const cancel=makeEl('button','Annuleren');cancel.type='button';
-    const confirm=makeEl('button','Ja, verwijder alles');confirm.type='button';
-    for(const b of [cancel,confirm])b.style.cssText='padding:12px;border-radius:9px;'+
-      'font:600 15px system-ui;border:1px solid #9aa9bd;cursor:pointer';
-    confirm.id='talera-clear-confirm-button';
-    confirm.style.background='#091d44';confirm.style.color='white';
-    cancel.addEventListener('click',()=>{if(!busy)shade.remove()});
-    confirm.addEventListener('click',async()=>{
-     if(busy)return;busy=true;cancel.disabled=true;confirm.disabled=true;
-     try{
-      const latest=await rowsForDeletion(store);
-      info.textContent='Bezig met verwijderen van '+latest.length+' herinneringen…';
-      for(const row of latest)await store.remove(row.id);
-      const remaining=await rowsForDeletion(store);
-      if(remaining.length)throw Error(remaining.length+' herinneringen staan er nog.');
-      status.textContent='Alle herinneringen zijn verwijderd. Mijn leven wordt opnieuw geopend.';
-      // Verify the original store is empty BEFORE reloading; the fresh Home
-      // will rehydrate the same per-account IndexedDB without a stale cover.
-      location.replace('/mijn-leven');
-     }catch(err){
-      status.textContent=String(err?.message||err);
-      busy=false;cancel.disabled=false;confirm.disabled=false;
-     }
-    });
-    panel.append(heading,info,status,actions);actions.append(cancel,confirm);
-    shade.append(panel);document.body.append(shade);
-    void rowsForDeletion(store).then(rows=>{
-      info.textContent='Je verwijdert '+rows.length+' eigen herinneringen, inclusief de bijbehorende lokale foto’s, video’s en opnamen. Dit kan niet ongedaan worden gemaakt.';
-      if(!rows.length){status.textContent='Je verhalenlijst is al leeg.';confirm.disabled=true;}
-    }).catch(err=>{status.textContent=String(err?.message||err);confirm.disabled=true});
-    cancel.focus();
-   }
-   trigger.addEventListener('click',modal);
-   if(requested)modal();
-  }
-  void main().catch(e=>{
-   const message=String(e?.message||e);
-   if(requested)alert(message);
-   else console.error('TALERA_OWNER_CLEAR_UNAVAILABLE',message);
+  void execute().catch(error=>{
+   const message='Wissen is niet gelukt: '+String(error?.message||error);
+   const status=document.getElementById('talera-own-reset-progress');
+   if(status)status.textContent=message;
+   else alert(message);
   });
  })();`;
  assert.ok(html.includes('window.TaleraMemories=')&&
-   html.includes('id="v17-year-summary"')&&html.includes('</body>')&&
-   !html.includes('id="talera-owner-delete-on-request"'),
-   'OWNER_CLEAR_ORIGINAL_SCOPED_STORE_NOT_FOUND');
+   html.includes('</body>')&&!html.includes('id="talera-owner-delete-on-request"'),
+   'OWNER_CLEAR_EXISTING_SAME_ORIGIN_LOCAL_STORE_MISSING');
  return html.replace('</body>',
   '<script id="talera-owner-delete-on-request">'+js+'</script></body>');
 }
@@ -1319,6 +1261,9 @@ for(const [route,filename] of Object.entries(routes)){
  }
  if(route==='/mijn-leven'){
    guest=removeAllBuiltInHomeExamples(showOwnedStoriesOnly(guest));
+   // The owner's iPhone may show legacy local stories without a valid session.
+   // Apply the one-time reset only on the explicit reset URL in BOTH shells.
+   guest=installOwnerRequestedClearAllStories(guest);
    // No account session: NEVER load or show personal records from an unscoped
    // local library, even if an older iPhone kept stale IndexedDB records.
    const ownRead="rows=(await store.list()).filter(x=>x&&x.source==='pwa-local');";

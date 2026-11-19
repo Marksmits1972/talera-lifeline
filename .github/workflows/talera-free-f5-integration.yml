@@ -817,7 +817,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish ZERO sample stories to the SAME TALERA Free app
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-empty-20261118' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-ownerclear-20261119' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     concurrency:
@@ -831,7 +831,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 5035abc2-d4c7-41ad-a9dc-70ef5e92c3da
+      F5_EXPECTED_LIVE_VERSION: d96760fe-92ba-41ef-bd5d-7adf8dddb5a2
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -877,6 +877,7 @@ jobs:
             '.github/workflows/talera-free-f5-integration.yml',
             'r20-dev/free-10m-f5/f5-browser-account-isolation.mjs',
             'r20-dev/free-10m-f5/f5-public-assets.mjs',
+            'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs',
             'r20-dev/free-10m-f5/wrangler.jsonc',
             'r20-dev/free-10m-f5/wrangler.staging.jsonc'
           ]);
@@ -891,7 +892,17 @@ jobs:
           assert.equal(run.head_sha,base);
           assert.equal(run.status,'completed');
           assert.equal(run.conclusion,'success');
-          console.log('ORIGINAL_VIDEO_ACCOUNT_LOCAL_MEDIA_PROTECTED_GREEN_BASELINE_AND_ONLY_EMPTY_STORY_SOURCE_DIFF');
+          const recent='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
+            '/actions/runs/44472464033';
+          const latest=await fetch(recent,{headers:{
+            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
+          },signal:AbortSignal.timeout(20000)});
+          assert.equal(latest.status,200,'Owner reset regression result unreadable');
+          const report=await latest.json();
+          assert.equal(report.head_sha,'e9cd4895ad4af1c08a43e4709b403157da5a6e4f');
+          assert.equal(report.status,'completed','Owner reset browser suite not finished');
+          assert.equal(report.conclusion,'success','Owner reset browser suite not green');
+          console.log('ORIGINAL_VIDEO_ACCOUNT_LOCAL_MEDIA_AND_OWNER_CLEAR_BROWSER_TESTS_GREEN');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
         run: |

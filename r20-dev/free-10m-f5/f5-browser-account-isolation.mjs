@@ -199,6 +199,84 @@ async function saveSyntheticPhoto(page,n){
      dbs:(await indexedDB.databases()).map(x=>x.name)};
  },{png:onePixelPng,n});
 }
+// Real DOM layout check on the SAME /tell page and synthetic account only.
+// Verify original UI controls and photo IDs are unchanged while the *existing*
+// tags box is rendered below the original photo grid, never cloned.
+async function verifyTellEditorLayout(page,storyId){
+ const edit=await page.context().newPage();
+ try{
+  const response=await edit.goto(origin+'/tell?edit='+encodeURIComponent(storyId),
+   {waitUntil:'domcontentloaded',timeout:25000});
+  assert.equal(response.status(),200,'Original editing route must remain available');
+  const work=edit.locator('.work.talera-compact-work.talera-r16-editor');
+  try{await work.waitFor({state:'visible',timeout:11000})}
+  catch(err){
+   const opener=edit.locator('[data-open]').first();
+   if(!(await opener.count()))throw err;
+   await opener.click();
+   await work.waitFor({state:'visible',timeout:11000});
+  }
+  await edit.locator('.talera-tags-toggle').waitFor({state:'visible',timeout:12000});
+  const layout=await edit.evaluate(()=>{
+   const work=document.querySelector('.work.talera-r16-editor');
+   const photos=work?.querySelector('.talera-work-tiles');
+   const tags=work?.querySelector('.talera-tags-v20');
+   const title=work?.querySelector('#title');
+   const date=work?.querySelector('#dateToggle');
+   const toolbar=work?.querySelector('.work-tools.talera-r16-toolbar');
+   const toggle=tags?.querySelector('.talera-tags-toggle');
+   const rect=e=>e?.getBoundingClientRect().toJSON()||null;
+   return {
+     originalButtons:['speak','write','publish'].map(id=>work?.querySelectorAll('#'+id).length||0),
+     originalMediaTiles:photos?.querySelectorAll('.tile').length||0,
+     topicBelowPhotos:!!photos&&tags?.previousElementSibling===photos,
+     tagButtonText:toggle?.textContent||'',
+     title:rect(title),date:rect(date),photos:rect(photos),tags:rect(tags),
+     toolbar:rect(toolbar),height:innerHeight,
+     mainColor:getComputedStyle(document.querySelector('#main')).backgroundColor,
+     workColor:getComputedStyle(work).backgroundColor,
+     hasLayoutCss:!!document.getElementById('talera-free-tell-layout-only')
+   };
+  });
+  assert.equal(layout.hasLayoutCss,true,'Approved layout CSS not installed in original Tell');
+  assert.deepEqual(layout.originalButtons,[1,1,1],
+    'Original Tell, Write or Publish button was replaced or duplicated');
+  assert.ok(layout.originalMediaTiles>=1,'Existing photo grid must remain intact');
+  assert.equal(layout.topicBelowPhotos,true,'Tags must follow the original photo grid');
+  assert.match(layout.tagButtonText,/herinnering|memory|souvenir|Erinnerung|recuerdo/i);
+  assert.ok(layout.title&&layout.date&&layout.date.top>=layout.title.bottom+3,
+    'Editor title and date need visible breathing room: '+JSON.stringify(layout));
+  assert.ok(layout.photos&&layout.tags&&layout.tags.top>=layout.photos.bottom-2,
+    'Topic row must remain under photos, not between title and media');
+  assert.ok(layout.toolbar&&layout.toolbar.bottom>layout.height*.69,
+    'Editor action row is unnecessarily high, leaving unused lower screen space');
+  assert.equal(layout.workColor,'rgb(255, 255, 255)',
+    'Original editing surface must have one even background');
+  const beforeY=layout.photos.top;
+  await edit.locator('.talera-tags-toggle').click();
+  await edit.waitForFunction(()=>
+    document.querySelector('.talera-tags-toggle')?.getAttribute('aria-expanded')==='true'&&
+    !document.querySelector('.talera-tags-panel')?.hidden,
+    null,{timeout:7000});
+  const expanded=await edit.evaluate(()=>({
+    photosTop:document.querySelector('.talera-work-tiles').getBoundingClientRect().top,
+    tagPanelVisible:!document.querySelector('.talera-tags-panel').hidden,
+    selectedMediaCount:document.querySelectorAll('.talera-work-tiles .tile').length,
+    originalButtons:['speak','write','publish'].map(id=>document.querySelectorAll('#'+id).length)
+  }));
+  assert.ok(Math.abs(expanded.photosTop-beforeY)<3,
+    'Opening topics must not push or jump the photo grid');
+  assert.equal(expanded.tagPanelVisible,true);
+  assert.equal(expanded.selectedMediaCount,layout.originalMediaTiles);
+  assert.deepEqual(expanded.originalButtons,[1,1,1]);
+  console.log('TALERA_TELL_EDITOR_LAYOUT_ONLY_PASS',JSON.stringify({
+    photos:layout.originalMediaTiles,topicBelowPhotos:true,
+    titleAndDateSeparated:true,bottomActionsRebalanced:true,
+    originalButtonsPreserved:true,topicOpenDoesNotMovePhotos:true,
+    originalMediaUntouched:true,syntheticOnly:true,realIphoneAccepted:false
+  }));
+ }finally{await edit.close()}
+}
 async function inventory(page){
  return page.evaluate(async()=>{
    const rows=await window.TaleraMemories.list();
@@ -615,6 +693,7 @@ try{
  const a=await saveSyntheticPhoto(page,1);
  assert.equal(a.kind,'photo');
  assert.ok(a.bytes>10,'Synthetic local original photo Blob was not saved');
+ await verifyTellEditorLayout(page,a.id);
  await logout(page);
  await assertSignedOutEmpty(page,a.id);
  const guest=await login(page,users[1]);

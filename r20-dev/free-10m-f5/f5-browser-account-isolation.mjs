@@ -849,9 +849,18 @@ try{
          const css=s=>{const el=document.querySelector(s),v=el&&getComputedStyle(el);
            return v?{width:v.width,padding:v.padding,maxWidth:v.maxWidth,
              fontSize:v.fontSize,transform:v.transform,zoom:v.zoom}:null};
+         const heading=document.querySelector('.talera-tags-toggle');
+         const range=document.createRange();
+         if(heading?.firstChild)range.selectNodeContents(heading.firstChild);
+         const headingMetrics=heading?{
+           lineRects:range.getClientRects().length,
+           scrollWidth:heading.scrollWidth,clientWidth:heading.clientWidth,
+           whiteSpace:getComputedStyle(heading).whiteSpace
+         }:null;
          return {
            viewport:{innerWidth,clientWidth:document.documentElement.clientWidth,
              scale:visualViewport?.scale,dpr:devicePixelRatio},
+           headingMetrics,
            app:rect('#app'),main:rect('#main'),
            work:rect('.work.talera-r16-editor'),
            photos:rect('.talera-work-tiles'),toggle:rect('.talera-tags-toggle'),
@@ -867,6 +876,16 @@ try{
          JSON.stringify({beforeSize,afterSize}));
        assert.ok(beforeSize.work&&afterSize.work&&beforeSize.photos&&afterSize.photos,
          'The original editor and photo grid must exist');
+       assert.ok(beforeSize.work.width>=beforeSize.viewport.innerWidth-34 &&
+         afterSize.work.width>=afterSize.viewport.innerWidth-34,
+         'Tell editor must retain full original wide layout: '+
+         JSON.stringify({beforeSize,afterSize}));
+       assert.ok([beforeSize,afterSize].every(x=>x.headingMetrics &&
+         x.headingMetrics.lineRects===1 &&
+         x.headingMetrics.whiteSpace==='nowrap' &&
+         x.headingMetrics.scrollWidth<=x.headingMetrics.clientWidth+1),
+         'Full characteristics question must fit on ONE line with no clipping: '+
+         JSON.stringify({beforeSize,afterSize}));
        assert.ok(Math.abs(beforeSize.work.width-afterSize.work.width)<2 &&
          Math.abs(beforeSize.photos.width-afterSize.photos.width)<2 &&
          Math.abs(beforeSize.photos.x-afterSize.photos.x)<2 &&

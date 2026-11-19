@@ -27,7 +27,9 @@ export {
   FreeSocialMemory,FreeSocialSharePointer
 } from '../free-10m-social-do/social-objects.mjs';
 
-const PUBLIC_PAGES=new Set(['/mijn-leven','/meldingen','/present','/tell']);
+// One owner-requested, hard-to-guess action URL on the SAME Home shell.
+const OWNER_PURGE_PATH='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c';
+const PUBLIC_PAGES=new Set(['/mijn-leven','/meldingen','/present','/tell',OWNER_PURGE_PATH]);
 // The approved V25 menu has exactly three visible destinations; the fourth
 // "Gedeeld" destination was retired, but the original home grid stayed four
 // columns wide. Adjust ONLY the three-column CSS rule, never the nav nodes,
@@ -602,8 +604,8 @@ async function publicPage(request,env){
   const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
   // Notifications is an existing tab in the approved Home markup/CSS.
   // Reuse its EXACT Home shell; the original route-aware JS selects the tab.
-  const homeScreen=pathname==='/mijn-leven'||pathname==='/meldingen';
-  const sourcePath=pathname==='/meldingen'?'/mijn-leven':pathname;
+  const homeScreen=pathname==='/mijn-leven'||pathname==='/meldingen'||pathname===OWNER_PURGE_PATH;
+  const sourcePath=pathname==='/meldingen'||pathname===OWNER_PURGE_PATH?'/mijn-leven':pathname;
   if(!env.ASSETS)return deny(503,'PWA-bestanden niet beschikbaar');
   const sessionToken=readSessionCookie(request);
   const actor=sessionToken?await sessionAccount(request,env):null;

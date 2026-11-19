@@ -1152,3 +1152,73 @@ jobs:
           console.log('TALERA_ORIGINAL_REMOVE_SOURCE',html.slice(p,p+2100));
           assert.ok(html.includes('talera-owner-delete-on-request'),'Owner clear path must be in same signed-in Home');
           NODE
+
+  audit_existing_live_version_20261119:
+    name: Read-only verify unexpectedly changed SAME TALERA version
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-audit-current-talera-free-20261119' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
+    steps:
+      - name: Inspect live and preceding script version metadata without changing any settings
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          const account=String(process.env.CLOUDFLARE_ACCOUNT_ID||'').replace(/[^a-f0-9]/gi,'');
+          assert.equal(account.length,32);
+          const token=process.env.CLOUDFLARE_API_TOKEN;
+          assert.ok(token);
+          const base='https://api.cloudflare.com/client/v4/accounts/'+account+
+            '/workers/scripts/'+process.env.F5_STAGE_NAME;
+          const get=async path=>{
+            const r=await fetch(base+path,{headers:{Authorization:'Bearer '+token},
+              signal:AbortSignal.timeout(20000)});
+            assert.equal(r.status,200,'Read-only QA metadata path inaccessible '+path);
+            const x=await r.json();assert.equal(x.success,true);
+            return x.result;
+          };
+          const deployments=await get('/deployments');
+          const live=deployments.deployments?.[0]?.versions;
+          assert.equal(live?.length,1,'Mixed deployment; no assumptions');
+          assert.equal(live[0].percentage,100);
+          const actual=live[0].version_id;
+          const previous='d96760fe-92ba-41ef-bd5d-7adf8dddb5a2';
+          const official='c085893a-af9c-4d8d-ae6a-2ef81bcfb324';
+          const [current,a,b,settings]=await Promise.all([
+            get('/versions/'+actual),get('/versions/'+previous),
+            get('/versions/'+official),get('/settings')
+          ]);
+          const summary=z=>{
+            const bindings=(z.resources?.bindings||[]).map(b=>({
+              name:b.name,type:b.type,class_name:b.class_name||null,
+              namespace_id:b.namespace_id||null,
+              text:b.type==='plain_text'?b.text:null
+            })).sort((x,y)=>x.name.localeCompare(y.name));
+            return {
+              id:z.id,number:z.number,
+              metadata:{created_on:z.metadata?.created_on,
+                modified_on:z.metadata?.modified_on,source:z.metadata?.source},
+              keys:Object.keys(z.resources||{}),
+              bindingsCount:bindings.length,
+              doCount:bindings.filter(x=>x.type==='durable_object_namespace').length,
+              bindingsDigest:createHash('sha256').update(JSON.stringify(bindings)).digest('hex').slice(0,18),
+              sourceDigest:z.resources?.script?.etag||z.resources?.script?.hash||null,
+              assetName:z.resources?.script?.name||null
+            };
+          };
+          const currentInfo=summary(current),previousInfo=summary(a),officialInfo=summary(b);
+          const currentBind=(settings.bindings||[]).map(x=>({name:x.name,type:x.type})).sort((x,y)=>x.name.localeCompare(y.name));
+          const data={current:currentInfo,previous:previousInfo,approved:officialInfo,
+            settingsCount:currentBind.length,
+            settingsNameTypes:currentBind,
+            currentIsPrevious:actual===previous,
+            sameBindingsAsPreceding:currentInfo.bindingsDigest===previousInfo.bindingsDigest,
+            sameBindingsAsApproved:currentInfo.bindingsDigest===officialInfo.bindingsDigest};
+          console.log('TALERA_SAME_ORIGIN_ACTUAL_VERSION_READ_ONLY',JSON.stringify(data));
+          NODE

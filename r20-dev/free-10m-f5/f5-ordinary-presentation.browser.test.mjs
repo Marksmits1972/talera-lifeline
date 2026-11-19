@@ -302,6 +302,10 @@ try{
     const mem=window.__taleraTimelineRuntime?.currentMemory?.();
     return mem?.storyId===id&&!mem._photoLoading&&mem._zeroFrames?.length===3;
   },plain,{timeout:18000});
+  // The original Safari transition intentionally keeps the first frame
+  // covered until it is decoded and up to 180ms of settling have elapsed.
+  await page.waitForFunction(()=>!document.documentElement.classList.contains(
+    'talera-direct-memory-entering'),null,{timeout:7000});
   const afterRealHeroTap=await page.evaluate(()=>({
     url:location.pathname+location.search,
     memoryId:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,

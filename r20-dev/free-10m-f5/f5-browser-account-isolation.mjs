@@ -846,6 +846,10 @@ try{
        const scroller=await follower.evaluate(()=>{
          const panel=document.querySelector('.talera-tags-panel');
          const toolbar=document.querySelector('.work.talera-r16-editor .work-tools.talera-r16-toolbar');
+         const publish=document.querySelector('.work.talera-r16-editor #publish');
+         const publishBounds=publish?.getBoundingClientRect();
+         const viewportBottom=(window.visualViewport?.offsetTop||0)+
+           (window.visualViewport?.height||innerHeight);
          const before=panel.scrollTop;
          const toolbarBeforeScroll=toolbar?.getBoundingClientRect().bottom;
          const pageBeforeScroll=document.scrollingElement?.scrollTop||0;
@@ -857,7 +861,11 @@ try{
            toolbarBottom:toolbar?.getBoundingClientRect().bottom,
            toolbarTop:toolbar?.getBoundingClientRect().top,
            panelBottom:panel.getBoundingClientRect().bottom,
-           toolbarBeforeScroll,
+           publishTop:publishBounds?.top,publishBottom:publishBounds?.bottom,
+           publishHitTest:!!publishBounds&&document.elementFromPoint(
+             publishBounds.left+publishBounds.width*.5,
+             publishBounds.top+publishBounds.height*.5)?.closest('#publish')===publish,
+           viewportBottom,toolbarBeforeScroll,
            pageBeforeScroll,pageAfterScroll:document.scrollingElement?.scrollTop||0,
            viewport:window.visualViewport?.height||innerHeight,
            fakeTiles:document.querySelectorAll('.talera-work-tiles .tile[data-visual-only=yes]').length,
@@ -873,8 +881,13 @@ try{
        const gapToActions=scroller.toolbarTop-scroller.panelBottom;
        assert.ok(gapToActions>=9,
          'Characteristics must not overlap the fixed action toolbar: '+JSON.stringify(scroller));
+       assert.ok(scroller.toolbarBottom<=scroller.viewportBottom-8 &&
+         scroller.publishBottom<=scroller.viewportBottom-8 &&
+         scroller.publishTop>=0 && scroller.publishHitTest,
+         'iPhone Publish/Save MUST remain visible and touchable after expansion: '+
+           JSON.stringify(scroller));
        if(scroller.clientHeight<scroller.viewport*.35)
-         assert.ok(gapToActions<=28,
+         assert.ok(gapToActions<=34,
            'Unused white gap must be given to the scrollable characteristics: '+
              JSON.stringify(scroller));
        assert.ok(Math.abs(scroller.toolbarBottom-scroller.toolbarBeforeScroll)<2,

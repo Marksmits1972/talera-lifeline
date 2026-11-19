@@ -884,7 +884,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = d3226902a87852643f608e182ab96ceeb1444628
+          test "$(git rev-parse HEAD^)" = e022808c3e9bb1b9071569e3e6799ef0b7ae6170
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
@@ -1149,8 +1149,22 @@ jobs:
             test "$(curl -fsS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$route")" = 200
           done
           test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/__f5/backup")" = 401
-          curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven?wis-alle-verhalen=nu" >/tmp/talera-guest-wipe.html
-          grep -Fq 'id="talera-owner-delete-on-request"' /tmp/talera-guest-wipe.html
+          # The edge may briefly serve the preceding version right after
+          # deployment succeeds. Verify the NEW guest script after propagation,
+          # not on the first subsecond old-cache response.
+          found=0
+          for attempt in $(seq 1 12); do
+            code=$(curl -sS --max-time 25 -o /tmp/talera-guest-wipe.html -w '%{http_code}' \
+              "https://$F5_STAGE_HOST/mijn-leven?wis-alle-verhalen=nu" || echo 000)
+            if [ "$code" = 200 ] && grep -Fq 'id="talera-owner-delete-on-request"' /tmp/talera-guest-wipe.html; then
+              found=1
+              echo "TALERA_REAL_GUEST_RESET_URL_ACTIVE_ATTEMPT=$attempt"
+              break
+            fi
+            echo "TALERA_RESET_EDGE_NOT_YET_VISIBLE_ATTEMPT=$attempt CODE=$code"
+            sleep 3
+          done
+          test "$found" = 1
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven" >/tmp/talera-empty-home.html
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/present" >/tmp/talera-empty-present.html
           node --input-type=module <<'NODE'

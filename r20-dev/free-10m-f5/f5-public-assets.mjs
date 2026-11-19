@@ -737,7 +737,7 @@ function polishTellEditorLayout(html){
   'body:has(#app .talera-r16-editor){background:#fff!important;}',
   'body:has(#app .talera-r16-editor) #app{min-height:100dvh!important;background:#fff!important;display:flex!important;flex-direction:column!important;}',
   'body:has(#app .talera-r16-editor) #main{flex:1 0 auto!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
-  '#app #main .work.talera-compact-work.talera-r16-editor{width:calc(100% - 36px)!important;min-width:0!important;box-sizing:border-box!important;flex:1 0 auto!important;min-height:calc(100dvh - 138px)!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor{width:100%!important;min-width:0!important;box-sizing:border-box!important;flex:1 0 auto!important;min-height:calc(100dvh - 138px)!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor #details{padding:13px 0 0!important;margin:0 0 8px!important;background:#fff!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:9px!important;padding:6px 0 12px!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{padding:8px 0!important;line-height:1.38!important;}',
@@ -746,7 +746,7 @@ function polishTellEditorLayout(html){
   // The original accessible toggle keeps its labels, selection state,
   // expand/collapse logic, and selected tags; only its visual affordance changes.
   '#app #main .work.talera-r16-editor .talera-tags-v20{flex:none;margin:10px 0 14px!important;padding:0!important;border:0!important;background:#fff!important;}',
-  '#app #main .work.talera-r16-editor .talera-tags-toggle{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;width:100%!important;min-height:56px!important;padding:13px 16px!important;border:1px solid #dbe4ef!important;border-radius:15px!important;background:#f5f8fc!important;color:#224d7c!important;text-align:left!important;font-size:15px!important;font-weight:700!important;line-height:1.32!important;cursor:pointer!important;}',
+  '#app #main .work.talera-r16-editor .talera-tags-toggle{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;width:100%!important;min-height:56px!important;padding:13px 12px!important;border:1px solid #dbe4ef!important;border-radius:15px!important;background:#f5f8fc!important;color:#224d7c!important;text-align:left!important;font-size:clamp(13px,3.85vw,15px)!important;font-weight:700!important;line-height:1.32!important;white-space:nowrap!important;cursor:pointer!important;}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle::after{content:"⌄";flex:none;font-size:24px;font-weight:400;line-height:1;transition:transform .16s ease;}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]::after{transform:rotate(180deg);}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle:focus-visible{outline:2px solid #224d7c!important;outline-offset:2px!important;}',

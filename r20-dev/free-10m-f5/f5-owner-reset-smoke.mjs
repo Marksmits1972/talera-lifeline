@@ -44,13 +44,19 @@ async function check(shell,requested){
    removed.push(id);rows=rows.filter(x=>x.id!==id);
   }
  };
- const errors=[];
- new Script(m[1],{filename:'exact-TALERA-owner-one-time-reset.js'})
- .runInContext(createContext({
+ const errors=[],perPhone=new Map();
+ const localStorage={
+  getItem(key){return perPhone.get(key)||null},
+  setItem(key,value){perPhone.set(key,value)}
+ };
+ const actualScript=new Script(m[1],{filename:'exact-TALERA-owner-one-time-reset.js'});
+ const context=createContext({
    document,history,location,window:{TaleraMemories:store},
-   URLSearchParams,Promise,setTimeout,console:{error:x=>errors.push(String(x))},
+   URLSearchParams,Promise,setTimeout,localStorage,
+   console:{error:x=>errors.push(String(x))},
    alert:msg=>errors.push('alert '+msg)
- }));
+ });
+ actualScript.runInContext(context);
  for(let i=0;i<60;i++)await Promise.resolve();
  if(requested){
    assert.equal(location.search,'','Destructive URL must not persist in browser history');
@@ -58,6 +64,14 @@ async function check(shell,requested){
    assert.deepEqual(rows,[]);
    assert.equal(redirects.at(-1),'/mijn-leven');
    assert.ok(messages.find(x=>x.id==='talera-own-reset-progress'));
+   assert.equal(perPhone.get('talera-free-owner-cleanup-cfd3450b58ef9410b64a26cc84c2045c'),
+     'done','Only a confirmed nonempty deletion marks the one-time link complete');
+   rows=[{id:'local-new-after-cleanup-abc123456',source:'pwa-local'}];
+   location.pathname='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c';
+   actualScript.runInContext(context);
+   for(let i=0;i<60;i++)await Promise.resolve();
+   assert.equal(removed.length,3,'Reopening the link may never delete new stories');
+   assert.equal(rows.length,1,'New stories after cleanup must be preserved');
  }else{
    assert.deepEqual(removed,[],'Normal Home MUST NEVER delete memories');
    assert.equal(rows.length,3);

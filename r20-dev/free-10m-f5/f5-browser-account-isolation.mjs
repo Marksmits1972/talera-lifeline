@@ -950,6 +950,59 @@ try{
          'Opening characteristics must not shift photos upward: '+JSON.stringify(expanded));
        await follower.locator('.talera-tags-toggle').click();
        assert.equal(await follower.locator('.talera-tags-toggle').getAttribute('aria-expanded'),'false');
+       // The owner's larger iPhone has substantially more unused space.
+       // On that viewport the choices must grow into the free region, while
+       // the unchanged, original bottom action bar stays pinned in layout.
+       await follower.setViewportSize({width:390,height:844});
+       await follower.waitForTimeout(120);
+       const tallBefore=await follower.evaluate(()=>{
+         const bounds=s=>document.querySelector(s)?.getBoundingClientRect();
+         return {
+           toolbarTop:bounds('.work-tools.talera-r16-toolbar')?.top,
+           toolbarBottom:bounds('.work-tools.talera-r16-toolbar')?.bottom,
+           photoTop:bounds('.talera-work-tiles')?.top,
+           photoWidth:bounds('.talera-work-tiles')?.width,
+           titleTop:bounds('.talera-v14-heading #title')?.top,
+           dateTop:bounds('.talera-v14-heading #dateToggle')?.top,
+           tagsTop:bounds('.talera-tags-toggle')?.top
+         };
+       });
+       await follower.locator('.talera-tags-toggle').click();
+       await follower.waitForTimeout(140);
+       const tallAfter=await follower.evaluate(()=>{
+         const bounds=s=>document.querySelector(s)?.getBoundingClientRect();
+         const panel=document.querySelector('.talera-tags-panel');
+         const publish=document.querySelector('#publish');
+         const rect=publish?.getBoundingClientRect();
+         const bottom=window.visualViewport?.height||innerHeight;
+         return {
+           toolbarTop:bounds('.work-tools.talera-r16-toolbar')?.top,
+           toolbarBottom:bounds('.work-tools.talera-r16-toolbar')?.bottom,
+           photoTop:bounds('.talera-work-tiles')?.top,
+           photoWidth:bounds('.talera-work-tiles')?.width,
+           panelHeight:panel?.getBoundingClientRect().height,
+           panelClientHeight:panel?.clientHeight,
+           panelScrollHeight:panel?.scrollHeight,
+           publishTouchable:!!rect&&rect.top>=0&&rect.bottom<=bottom-8&&
+             document.elementFromPoint(rect.left+rect.width*.5,
+               rect.top+rect.height*.5)?.closest('#publish')===publish
+         };
+       });
+       console.log('TALERA_FREE_TELL_TALL_GAP_USE',
+         JSON.stringify({before:tallBefore,after:tallAfter}));
+       assert.ok(tallAfter.panelHeight>=120&&
+         tallAfter.panelScrollHeight>tallAfter.panelClientHeight+12,
+         'Tall iPhone must use the otherwise empty gap for scrollable topics: '+
+           JSON.stringify({tallBefore,tallAfter}));
+       assert.ok(Math.abs(tallBefore.toolbarTop-tallAfter.toolbarTop)<2 &&
+         Math.abs(tallBefore.toolbarBottom-tallAfter.toolbarBottom)<2 &&
+         Math.abs(tallBefore.photoTop-tallAfter.photoTop)<2 &&
+         Math.abs(tallBefore.photoWidth-tallAfter.photoWidth)<2 &&
+         tallAfter.publishTouchable,
+         'Tall iPhone must preserve photos and the original fixed action bar: '+
+           JSON.stringify({tallBefore,tallAfter}));
+       await follower.locator('.talera-tags-toggle').click();
+       await follower.setViewportSize({width:390,height:664});
        console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({
          visualOnly:true,titleAndDateSeparated:true,topicBelowMedia:true,
          openKeepsPhotoPosition:true,originalControlsPreserved:true,

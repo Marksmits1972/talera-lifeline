@@ -796,7 +796,7 @@ try{
            nativeActions:['speak','write','publish'].map(id=>({
              id,exists:!!q('#'+id),text:(q('#'+id)?.textContent||'').trim()
            })),
-           originalTiles:q('.talera-work-tiles .tiles')?.children.length||0
+           originalTiles:document.querySelectorAll('.talera-work-tiles .tile[data-id]').length
          };
        });
        assert.ok(layout.title?.visible&&layout.date?.visible&&

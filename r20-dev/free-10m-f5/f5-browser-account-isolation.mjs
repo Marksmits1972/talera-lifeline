@@ -826,8 +826,46 @@ try{
          'Tell/Speak/Publish handlers must not be removed');
        assert.equal(layout.backgrounds.work,'rgb(255, 255, 255)',
          'Tell editor background must be uniform white');
-       const beforePhotos=layout.photos.top;
+       // Four DOM-only visual tiles mimic the owner's five-photo iPhone grid.
+       // No IndexedDB writes, media uploads, or test memories persist.
+       await follower.evaluate(()=>{
+         const grid=document.querySelector('.talera-work-tiles .tiles');
+         if(!grid)throw Error('Original photo grid absent');
+         for(let i=0;i<4;i++){
+           const tile=document.createElement('div');
+           tile.className='tile';
+           tile.dataset.visualOnly='yes';
+           tile.setAttribute('aria-hidden','true');
+           grid.insertBefore(tile,grid.lastElementChild);
+         }
+       });
+       const beforePhotos=await follower.evaluate(()=>
+         document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top);
        await follower.locator('.talera-tags-toggle').click();
+       await follower.waitForTimeout(120);
+       const scroller=await follower.evaluate(()=>{
+         const panel=document.querySelector('.talera-tags-panel');
+         const toolbar=document.querySelector('.work.talera-r16-editor .work-tools.talera-r16-toolbar');
+         const before=panel.scrollTop;
+         panel.scrollTop=panel.scrollHeight;
+         const after=panel.scrollTop;
+         return {
+           before,after,scrollHeight:panel.scrollHeight,clientHeight:panel.clientHeight,
+           overflow:getComputedStyle(panel).overflowY,
+           toolbarBottom:toolbar?.getBoundingClientRect().bottom,
+           viewport:window.visualViewport?.height||innerHeight,
+           fakeTiles:document.querySelectorAll('.talera-work-tiles .tile[data-visual-only=yes]').length,
+           photoTop:document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top
+         };
+       });
+       assert.equal(scroller.fakeTiles,4,'Five-photo visual test missing tiles');
+       assert.equal(scroller.overflow,'auto','Topic panel must independently scroll');
+       assert.ok(scroller.scrollHeight>scroller.clientHeight+15,
+         'Long topic options must be bounded: '+JSON.stringify(scroller));
+       assert.ok(scroller.after>scroller.before+15,
+         'The final characteristic must be reachable: '+JSON.stringify(scroller));
+       assert.ok(scroller.toolbarBottom<=scroller.viewport+12,
+         'The original bottom toolbar must stay visible: '+JSON.stringify(scroller));
        const expanded=await follower.evaluate(()=>{
          const panel=document.querySelector('.talera-tags-panel');
          return {expanded:document.querySelector('.talera-tags-toggle')?.getAttribute('aria-expanded'),
@@ -844,6 +882,8 @@ try{
        console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({
          visualOnly:true,titleAndDateSeparated:true,topicBelowMedia:true,
          openKeepsPhotoPosition:true,originalControlsPreserved:true,
+         fivePhotoScreenSimulated:true,onlyTagPanelScrollable:true,
+         lastCharacteristicReachable:true,bottomToolbarVisible:true,
          noPersonalData:true,realIphoneAccepted:false
        }));
      }

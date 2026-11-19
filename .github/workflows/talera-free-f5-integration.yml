@@ -858,7 +858,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: d96760fe-92ba-41ef-bd5d-7adf8dddb5a2
+      F5_EXPECTED_LIVE_VERSION: 2883afae-2299-4c15-bacd-d5bb593cee1b
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -946,6 +946,18 @@ jobs:
           assert.equal(passed.conclusion,'success',
             'Owner story deletion and original media/back-up/regression CI not green');
           console.log('SAME_APP_OWNER_CLEAR_FULL_BROWSER_ALL_CHECKS_GREEN');
+          const qa='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
+            '/actions/runs/44481706507';
+          const qaResp=await fetch(qa,{headers:{
+            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
+          },signal:AbortSignal.timeout(20000)});
+          assert.equal(qaResp.status,200,'Current owner-clear Home button browser proof unreadable');
+          const qaRun=await qaResp.json();
+          assert.equal(qaRun.head_sha,'a0008110bfd41b0191199fe591bdcf5d38976c9b');
+          assert.equal(qaRun.status,'completed');
+          assert.equal(qaRun.conclusion,'success',
+            'Visible Home reset + correct account storage/media regression is not green');
+          console.log('CURRENT_SAME_APP_VISIBLE_CLEAR_HOME_FULL_BROWSER_GREEN');
           console.log('SAME_APP_OWNER_CLEAR_ORIGINAL_ACCOUNT_STORE_SOURCE_AUDITED');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
@@ -1027,7 +1039,18 @@ jobs:
                 'Bundled example story remains: '+route);
               assert.ok(!/https:\/\/picsum\.photos\/seed\/talera-(?:v11-clean|500-fotoband)-/i.test(html),
                 'Internet sample-photo link remains: '+route);
-              if(route==='/mijn-leven')assert.ok(html.includes('window.__taleraReferenceMemories=[];'));
+              if(route==='/mijn-leven'){
+                assert.ok(html.includes('window.__taleraReferenceMemories=[];'));
+                if(collection===referencePages){
+                  assert.ok(html.includes('id="talera-owner-delete-on-request"')&&
+                    html.includes("Wis alle herinneringen")&&
+                    html.includes("talera-clear-confirm-button"),
+                    'Owner visible in-app wipe control missing from signed-in Home');
+                }else{
+                  assert.ok(!html.includes('id="talera-owner-delete-on-request"'),
+                    'Guest MUST NOT be able to delete anyone else local story records');
+                }
+              }
               if(route==='/present')assert.ok(html.includes('const MEMORIES = [];'));
               pages++;
             }

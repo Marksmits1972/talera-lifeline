@@ -1316,6 +1316,13 @@ for(const [route,filename] of Object.entries(routes)){
  writeFileSync(path.join(publicDir,'__talera_free','f5references',guestFile),guest,'utf8');
  guestPages[route]='/__talera_free/f5references/'+guestFile;
  let html=raw;
+ if(route==='/tell'){
+  const findProbe=(term)=>{
+   const at=raw.indexOf(term);
+   return {term,at,sample:at<0?'':raw.slice(Math.max(0,at-520),Math.min(raw.length,at+950)).replace(/\s+/g,' ').slice(0,1460)};
+  };
+  console.log('TALERA_LAYOUT_SOURCE_INSPECTION',JSON.stringify({sourceBytes:raw.length,probes:["function setupV20Tags(g,details)","talera-tags-v20","Kenmerk toevoegen","Bedenk een titel","Titel","Plaatsen","<main","workHeader","photoGrid","photo-grid","photoTiles","talera-work","memory-editor","media-grid","workScreen","v9-work","v9-editor"].map(findProbe)}));
+ }
  if(route==='/present')html=removeBuiltInPresentationExamples(html);
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);

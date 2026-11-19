@@ -1050,7 +1050,35 @@ try{
          const overlays=[...document.querySelectorAll('[role=dialog],dialog,[class*=modal],[class*=write],[class*=editor]')].filter(e=>e.getClientRects().length)
            .slice(-15).map(e=>({tag:e.tagName,id:e.id,class:e.className,
              outer:e.outerHTML.slice(0,1500)}));
-         return {active:focus?.outerHTML.slice(0,1100),boxes,buttons,overlays};
+         const measure=(e)=>{const r=e.getBoundingClientRect(),v=getComputedStyle(e);
+           return {tag:e.tagName,id:e.id,className:e.className,
+             x:r.x,y:r.y,width:r.width,height:r.height,scrollHeight:e.scrollHeight,
+             clientHeight:e.clientHeight,scrollTop:e.scrollTop,
+             display:v.display,overflow:v.overflow,overflowY:v.overflowY,
+             position:v.position,visibility:v.visibility,opacity:v.opacity,
+             flex:v.flex,gridTemplateColumns:v.gridTemplateColumns,padding:v.padding,
+             maxHeight:v.maxHeight,minHeight:v.minHeight,
+             heightStyle:v.height,transform:v.transform};
+         };
+         const writerElems=['#taleraWriterOverlay','.talera-writer-top',
+           '.talera-writer-body','#taleraWriterPhotos','#taleraWriterText']
+           .map(s=>document.querySelector(s)).filter(Boolean);
+         const sources=[...document.querySelectorAll('style,script')].map(e=>e.textContent||'')
+           .filter(t=>t.includes('taleraWriterPhotos')).map(t=>{
+             const at=t.indexOf('taleraWriterPhotos');
+             return {length:t.length,context:t.slice(Math.max(0,at-1950),at+3500).slice(0,5300)};
+           }).slice(0,8);
+         const rules=[];
+         for(const sheet of document.styleSheets){
+           try{for(const rule of sheet.cssRules||[]){
+             const cs=rule.cssText||'';
+             if(/talera-writer|taleraWriterPhotos|taleraWriterText/.test(cs))
+               rules.push(cs.slice(0,1100));
+           }}catch{}
+         }
+         return {active:focus?.outerHTML.slice(0,1100),boxes,buttons,overlays,
+           sizing:writerElems.map(measure),originalCss:rules.slice(-38),
+           sourceFragments:sources};
        });
        console.log('TALERA_FREE_WRITE_OVERLAY_DOM_READONLY',JSON.stringify(writerDiag));
        console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({

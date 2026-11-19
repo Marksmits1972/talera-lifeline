@@ -1614,19 +1614,25 @@ try{
   console.log('TALERA_OWNER_REMOVE_METHOD_SOURCE',await page.evaluate(()=>
     window.TaleraMemories.remove.toString().slice(0,2000)));
 
-  let ownerClearDialogs=0;
-  page.on('dialog',async d=>{
-    if(d.type()==='confirm'){ownerClearDialogs++;await d.accept();}
-    else await d.dismiss();
-  });
-  await page.goto(origin+'/mijn-leven#wis-alle-verhalen',
-    {waitUntil:'domcontentloaded'});
+  // The owner reset must be discoverable without any special link: old
+  // one-time URL fragments and native browser confirm() were unreliable
+  // in the real iPhone in-app browser. Use the actual Home action.
+  let nativeDialogs=0;
+  page.on('dialog',async d=>{nativeDialogs++;await d.dismiss()});
+  await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+  await page.locator('#talera-owner-clear-stories').waitFor({state:'visible',timeout:18000});
+  assert.ok((await page.locator('#talera-owner-clear-stories').textContent()).includes('Wis alle'));
+  await page.locator('#talera-owner-clear-stories').click();
+  await page.locator('#talera-owner-clear-confirm').waitFor({state:'visible',timeout:5000});
+  assert.equal(await page.locator('#talera-clear-confirm-button').isEnabled(),true);
+  assert.equal(nativeDialogs,0,'Owner reset must use the in-app confirmation, not a native popup');
+  await page.locator('#talera-clear-confirm-button').click();
   await page.waitForFunction(async()=>
     !!window.TaleraMemories?.list&&
     (await window.TaleraMemories.list()).length===0&&
     /^(nog leeg|still empty)$/i.test(document.getElementById('v17-year-summary')?.textContent?.trim()||''),
     null,{timeout:20000});
-  assert.equal(ownerClearDialogs,1,'Only one explicit owner confirmation must occur');
+  assert.equal(nativeDialogs,0,'No native confirm alert should be required');
   // The Home can briefly return an empty pre-hydration catalog during
   // account-scoped IndexedDB open. Require durable deletion across a fresh
   // page load, never mistake that transient state for persisted deletion.

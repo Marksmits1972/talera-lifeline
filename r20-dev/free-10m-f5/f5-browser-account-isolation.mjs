@@ -768,6 +768,75 @@ try{
      assert.equal(proof.photoBytes,a.bytes,'Original photo bytes changed across screens');
      if(route==='/present')assert.equal(proof.selectedPresentationId,a.id,
        'Ordinary presentation failed to select the stored story');
+     if(route==='/tell'){
+       // Visual-only regression on the ORIGINAL editor of this same account.
+       // No change to title, date, photo order, tag data or publish handlers.
+       const editor=await follower.goto(origin+'/tell?edit='+encodeURIComponent(a.id),
+         {waitUntil:'domcontentloaded'});
+       assert.equal(editor.status(),200,'Existing Tell editor edit route must open');
+       await follower.waitForFunction(()=>
+         !!document.querySelector('.work.talera-r16-editor .talera-tags-v20')&&
+         !!document.querySelector('.work.talera-r16-editor .talera-work-tiles .tile'),
+         null,{timeout:20000});
+       const layout=await follower.evaluate(()=>{
+         const q=s=>document.querySelector(s);
+         const bounds=s=>{const e=q(s);if(!e)return null;
+           const r=e.getBoundingClientRect();
+           return {top:r.top,bottom:r.bottom,left:r.left,width:r.width,
+             height:r.height,visible:r.height>0&&r.width>0}};
+         const bg=s=>{const e=q(s);return e?getComputedStyle(e).backgroundColor:null};
+         return {
+           title:bounds('.talera-v14-heading #title'),
+           date:bounds('.talera-v14-heading #dateToggle'),
+           photos:bounds('.talera-work-tiles'),
+           topics:bounds('.talera-tags-v20'),
+           topicButton:bounds('.talera-tags-toggle'),
+           actions:bounds('.work-tools.talera-r16-toolbar'),
+           backgrounds:{body:bg('body'),app:bg('#app'),work:bg('.work.talera-r16-editor')},
+           nativeActions:['speak','write','publish'].map(id=>({
+             id,exists:!!q('#'+id),text:(q('#'+id)?.textContent||'').trim()
+           })),
+           originalTiles:q('.talera-work-tiles .tiles')?.children.length||0
+         };
+       });
+       assert.ok(layout.title?.visible&&layout.date?.visible&&
+         layout.photos?.visible&&layout.topics?.visible&&
+         layout.topicButton?.height>=46&&layout.actions?.visible,
+         'Approved Tell layout missing original editor controls: '+JSON.stringify(layout));
+       assert.ok(layout.date.top-layout.title.bottom>=1,
+         'Title and date still crowd each other: '+JSON.stringify(layout));
+       assert.ok(layout.photos.top>=layout.date.bottom-1,
+         'Photo tiles overlap title/date: '+JSON.stringify(layout));
+       assert.ok(layout.topics.top>=layout.photos.bottom-1,
+         'Characteristics must stay BELOW photo grid: '+JSON.stringify(layout));
+       assert.ok(layout.actions.top>=layout.topics.bottom-1,
+         'Original actions must stay below topic editor: '+JSON.stringify(layout));
+       assert.equal(layout.originalTiles,1,'Same one original photo tile expected');
+       assert.deepEqual(layout.nativeActions.map(x=>x.exists),[true,true,true],
+         'Tell/Speak/Publish handlers must not be removed');
+       assert.equal(layout.backgrounds.work,'rgb(255, 255, 255)',
+         'Tell editor background must be uniform white');
+       const beforePhotos=layout.photos.top;
+       await follower.locator('.talera-tags-toggle').click();
+       const expanded=await follower.evaluate(()=>{
+         const panel=document.querySelector('.talera-tags-panel');
+         return {expanded:document.querySelector('.talera-tags-toggle')?.getAttribute('aria-expanded'),
+           panelVisible:!!panel&&!panel.hidden,
+           photoTop:document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top,
+           topicTop:document.querySelector('.talera-tags-v20')?.getBoundingClientRect().top};
+       });
+       assert.equal(expanded.expanded,'true','Original characteristic toggle no longer opens');
+       assert.equal(expanded.panelVisible,true,'Characteristic choices are still hidden');
+       assert.ok(Math.abs(expanded.photoTop-beforePhotos)<3,
+         'Opening characteristics must not shift photos upward: '+JSON.stringify(expanded));
+       await follower.locator('.talera-tags-toggle').click();
+       assert.equal(await follower.locator('.talera-tags-toggle').getAttribute('aria-expanded'),'false');
+       console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({
+         visualOnly:true,titleAndDateSeparated:true,topicBelowMedia:true,
+         openKeepsPhotoPosition:true,originalControlsPreserved:true,
+         noPersonalData:true,realIphoneAccepted:false
+       }));
+     }
      console.log('TALERA_F5_ONE_LIBRARY_THREE_AUTHENTICATED_SCREENS_PASS',
        JSON.stringify({route,accountIdUnchanged:true,storyIdUnchanged:true,
          photoBytesIntact:true,realIPhoneAccepted:false}));

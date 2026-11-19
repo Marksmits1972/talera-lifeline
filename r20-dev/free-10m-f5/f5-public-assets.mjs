@@ -721,6 +721,15 @@ function polishTellEditorLayout(html){
   owner=owner.replace(legacyPrompt,humanPrompt);
  }
  html=html.slice(0,start)+owner+html.slice(end+1);
+ // The original native tile grid may be inserted AFTER setupV20Tags runs.
+ // Perform the same DOM-only placement when that exact grid is inserted,
+ // instead of depending on the order of animation frames.
+ const nativeGridInsert="details.insertAdjacentElement('afterend',tiles);";
+ assert.equal(html.split(nativeGridInsert).length,2,
+   'TELL_LAYOUT_NATIVE_TILE_INSERTION_CHANGED');
+ html=html.replace(nativeGridInsert,nativeGridInsert+
+   " const topicsBelowPhotos=details.querySelector(':scope > .talera-tags-v20');"+
+   " if(topicsBelowPhotos)tiles.insertAdjacentElement('afterend',topicsBelowPhotos);");
  const css=[
   '<style id="talera-free-tell-layout-only">',
   // The light canvas must continue to the bottom of the phone, not stop

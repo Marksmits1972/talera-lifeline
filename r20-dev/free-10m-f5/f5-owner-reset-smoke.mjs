@@ -6,6 +6,9 @@ import {Script,createContext} from 'node:vm';
 import {referencePages,guestPages} from './generated/public-template-map.mjs';
 const root='r20-dev/free-10m-delivery/public';
 const originalWorker=readFileSync('r20-dev/free-10m-f5/f5-worker.mjs','utf8');
+assert.ok(originalWorker.includes("const OWNER_PURGE_PATH='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c';")&&
+ originalWorker.includes("pathname===OWNER_PURGE_PATH?'/mijn-leven':pathname"),
+ 'Reset action path must resolve to original signed-in or guest Home page');
 assert.ok(originalWorker.includes("if(url.pathname==='/mijn-leven'&&key==='wis-alle-verhalen'&&id==='nu')return true;"),
   'The same app must allow this exact reset query through its normal route security');
 async function check(shell,requested){
@@ -18,8 +21,9 @@ async function check(shell,requested){
    items:[{kind:'photo',key:'local-aabbccdd-1234-4678-abb0-12345678900'+i+':0'}]
  }));
  const otherAccount=[{id:'local-unrelated-account-story'}],removed=[],messages=[],redirects=[];
- const location={pathname:'/mijn-leven',
-   search:requested?'?wis-alle-verhalen=nu':'',
+ const location={pathname:requested?
+    '/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c':'/mijn-leven',
+   search:'',
    replace(value){redirects.push(value)}
  };
  const document={

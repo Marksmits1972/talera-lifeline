@@ -141,7 +141,7 @@ jobs:
       - name: Install headless mobile browser and small synthetic video generator for the reported issue
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: |
-          npm install --no-save --no-package-lock playwright@1.56.1
+          npm install --no-save --no-package-lock playwright@1.56.1 @ffmpeg-installer/linux-x64@4.4.1
           # Hosted Ubuntu already includes browser runtime libraries. Download
           # only the same Playwright Chromium version; do not repeat the entire
           # OS dependency installation that stalled the previous verification.
@@ -172,8 +172,15 @@ jobs:
             npx --no-install playwright install chromium
           fi
           if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq ffmpeg
+            # The Ubuntu apt mirror returned HTTP 503 before any browser
+            # regression started. Use the NPM-shipped test-only FFmpeg binary.
+            # Do not install OS packages or change the TALERA product code.
+            ffmpeg_path="$(node -p "require('@ffmpeg-installer/linux-x64').path")"
+            test -x "$ffmpeg_path"
+            mkdir -p "$RUNNER_TEMP/talera-f5-test-bin"
+            ln -s "$ffmpeg_path" "$RUNNER_TEMP/talera-f5-test-bin/ffmpeg"
+            echo "$RUNNER_TEMP/talera-f5-test-bin" >> "$GITHUB_PATH"
+            "$RUNNER_TEMP/talera-f5-test-bin/ffmpeg" -version | head -n 1
           fi
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}

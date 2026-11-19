@@ -429,6 +429,54 @@ try{
  assert.equal(readback.id,a.id);
  assert.equal(readback.size,a.bytes,'Original file changed during account switches');
  assert.match(readback.type,/image\/png/);
+ // The original signed-in app must expose the SAME account-local story in
+ // Home, the ordinary presentation and the Tell editor on the SAME origin.
+ // Do not create a second app, account, test Worker, or copy any media.
+ for(const route of ['/mijn-leven','/present','/tell']){
+   const follower=await context.newPage();
+   try{
+     const response=await follower.goto(origin+route,{waitUntil:'domcontentloaded'});
+     assert.equal(response.status(),200,'Authenticated route unavailable: '+route);
+     await follower.waitForFunction(async id=>{
+       const store=window.TaleraMemories;
+       if(typeof store?.list!=='function')return false;
+       const rows=await store.list();
+       return rows.some(row=>row?.id===id&&
+         row.title==='synthetic ACCOUNT ISOLATION 1');
+     },a.id,{timeout:20000});
+     if(route==='/present'){
+       await follower.waitForFunction(id=>{
+         const memory=window.__taleraTimelineRuntime?.currentMemory?.();
+         return memory?.storyId===id && memory._taleraLocal &&
+           memory._zeroFrames?.length===1 && !memory._photoLoading;
+       },a.id,{timeout:20000});
+     }
+     const proof=await follower.evaluate(async id=>{
+       const store=window.TaleraMemories;
+       const story=await store.get(id);
+       const original=await store.blob(story.items[0].key);
+       const current=window.__taleraTimelineRuntime?.currentMemory?.();
+       return {
+         storyId:story?.id,mediaId:story?.items?.[0]?.key,
+         title:story?.title,text:story?.text,photoBytes:original?.size||0,
+         selectedPresentationId:current?.storyId||null,
+         libraryReader:typeof window.TaleraLibrary?.get==='function'
+       };
+     },a.id);
+     assert.equal(proof.storyId,a.id,'Story ID changed across app screens');
+     assert.equal(proof.mediaId,readback.id+':0',
+       'Original stored media ID must survive every screen');
+     assert.equal(proof.title,'synthetic ACCOUNT ISOLATION 1');
+     assert.equal(proof.text,'Local-only imaginary image');
+     assert.equal(proof.photoBytes,a.bytes,'Original photo bytes changed across screens');
+     if(route==='/present')assert.equal(proof.selectedPresentationId,a.id,
+       'Ordinary presentation failed to select the stored story');
+     console.log('TALERA_F5_ONE_LIBRARY_THREE_AUTHENTICATED_SCREENS_PASS',
+       JSON.stringify({route,accountIdUnchanged:true,storyIdUnchanged:true,
+         photoBytesIntact:true,realIPhoneAccepted:false}));
+   }finally{await follower.close()}
+ }
+
  // Synthetic social reference ONLY: the photo is still inside IndexedDB.
  // Exercise the ORIGINAL menu end-to-end with a real local story title and
  // actual Durable Object link. No photo/media payload is uploaded.

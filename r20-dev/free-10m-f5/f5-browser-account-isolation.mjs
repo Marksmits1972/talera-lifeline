@@ -1078,7 +1078,15 @@ try{
          }
          return {active:focus?.outerHTML.slice(0,1100),boxes,buttons,overlays,
            sizing:writerElems.map(measure),originalCss:rules.slice(-38),
-           sourceFragments:sources};
+           sourceFragments:sources,
+           originalMotion:[...document.querySelectorAll('script')].map(e=>e.textContent||'')
+             .filter(t=>t.includes('function taleraV4WriterMotion'))
+             .map(t=>{const at=t.indexOf('function taleraV4WriterMotion');
+               return t.slice(at,at+8500)}).slice(0,1),
+           keyboardLogic:[...document.querySelectorAll('script,style')].map(e=>e.textContent||'')
+             .filter(t=>t.includes('talera-writer-keyboard-open'))
+             .slice(0,5).map(t=>{const at=t.indexOf('talera-writer-keyboard-open');
+               return t.slice(Math.max(0,at-900),at+1400)})};
        });
        console.log('TALERA_FREE_WRITE_OVERLAY_DOM_READONLY',JSON.stringify(writerDiag));
        console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({

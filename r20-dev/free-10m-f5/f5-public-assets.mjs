@@ -713,10 +713,10 @@ function polishTellEditorLayout(html){
  // localized question as the authenticated editor. Visual text only.
  const legacyPrompt="  toggle.textContent='＋ '+text('tag.add','Kenmerk toevoegen');";
  if(owner.includes(legacyPrompt)){
-  const humanPrompt="  const lang=String(window.TaleraI18n?.language||'nl').slice(0,2);\\n"+
-    "  const names={nl:'Waar gaat deze herinnering over?',en:'What is this memory about?',\\n"+
-    "    de:'Worum geht es in dieser Erinnerung?',fr:'De quoi parle ce souvenir ?',\\n"+
-    "    es:'¿De qué trata este recuerdo?'};\\n"+
+  const humanPrompt="  const lang=String(window.TaleraI18n?.language||'nl').slice(0,2);\n"+
+    "  const names={nl:'Waar gaat deze herinnering over?',en:'What is this memory about?',\n"+
+    "    de:'Worum geht es in dieser Erinnerung?',fr:'De quoi parle ce souvenir ?',\n"+
+    "    es:'¿De qué trata este recuerdo?'};\n"+
     "  toggle.textContent='＋ '+(names[lang]||names.nl);";
   owner=owner.replace(legacyPrompt,humanPrompt);
  }

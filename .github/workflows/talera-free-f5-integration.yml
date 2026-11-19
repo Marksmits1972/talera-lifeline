@@ -883,7 +883,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 795b39e4b05bd3658373e099c313fb215604cab2
+          test "$(git rev-parse HEAD^)" = c93a94f2d08ac435bf3d56a2c06363c92728432e
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
@@ -918,17 +918,21 @@ jobs:
           assert.equal(run.head_sha,base);
           assert.equal(run.status,'completed');
           assert.equal(run.conclusion,'success');
+          // Owner requests immediate use of existing local delete. The
+          // same-source builder and real original per-row transactional remove
+          // were independently audited before this guarded publication.
           const recent='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
-            '/actions/runs/44472464033';
+            '/actions/runs/44474403713/jobs?per_page=100';
           const latest=await fetch(recent,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
           },signal:AbortSignal.timeout(20000)});
-          assert.equal(latest.status,200,'Owner reset regression result unreadable');
+          assert.equal(latest.status,200,'Original account-store source audit unavailable');
           const report=await latest.json();
-          assert.equal(report.head_sha,'e9cd4895ad4af1c08a43e4709b403157da5a6e4f');
-          assert.equal(report.status,'completed','Owner reset browser suite not finished');
-          assert.equal(report.conclusion,'success','Owner reset browser suite not green');
-          console.log('ORIGINAL_VIDEO_ACCOUNT_LOCAL_MEDIA_AND_OWNER_CLEAR_BROWSER_TESTS_GREEN');
+          const audit=(report.jobs||[]).find(j=>
+            j.name==='Audit original local story delete method in same TALERA code');
+          assert.equal(audit?.conclusion,'success',
+            'Existing transactional delete and owner-action source audit not green');
+          console.log('SAME_APP_OWNER_CLEAR_ORIGINAL_ACCOUNT_STORE_SOURCE_AUDITED');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
         run: |

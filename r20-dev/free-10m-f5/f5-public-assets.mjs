@@ -1179,6 +1179,52 @@ function stripBundledExamplePhotoLinks(html){
   'BUILT_IN_SAMPLE_PHOTO_URL_REMAINED');
  return html;
 }
+// Existing per-account IndexedDB records live on the owner's iPhone. An
+// explicit same-origin Home URL fragment lets that one signed-in owner
+// request a confirmed reset without affecting anyone else's account.
+// Do not add this to the signed-out guest HTML.
+function installOwnerRequestedClearAllStories(html){
+ const js=String.raw`(function(){
+  if(location.pathname!=='/mijn-leven'||location.hash!=='#wis-alle-verhalen')return;
+  // Never repeat a destructive action on page refresh or browser Back.
+  history.replaceState(null,'',location.pathname+location.search);
+  async function run(){
+   let store=null;
+   for(let i=0;i<180;i++){
+    if(window.TaleraMemories?.localOnly===true&&
+       typeof window.TaleraMemories.list==='function'&&
+       typeof window.TaleraMemories.remove==='function'){
+      store=window.TaleraMemories;break;
+    }
+    await new Promise(resolve=>setTimeout(resolve,100));
+   }
+   if(!store)throw Error('Persoonlijke opslag niet beschikbaar. Er is niets verwijderd.');
+   const rows=await store.list();
+   if(!Array.isArray(rows)||rows.some(row=>
+      !row||typeof row.id!=='string'||
+      !/^local-[a-z0-9-]{8,90}$/i.test(row.id))){
+    throw Error('Ongeldige herinneringslijst. Er is niets verwijderd.');
+   }
+   if(!rows.length){alert('Je verhalenlijst is al leeg.');return;}
+   if(!confirm('Alle '+rows.length+' herinneringen van dit account op dit toestel verwijderen, inclusief de bijbehorende media? Dit kan niet ongedaan worden gemaakt.'))return;
+   for(const row of rows)await store.remove(row.id);
+   const remaining=await store.list();
+   if(!Array.isArray(remaining)||remaining.length){
+    throw Error('Er zijn nog '+(remaining?.length??'?')+' herinneringen. Probeer het opnieuw.');
+   }
+   location.replace('/mijn-leven');
+  }
+  void run().catch(e=>{
+   alert(String(e?.message||e));
+  });
+ })();`;
+ assert.ok(html.includes('window.TaleraMemories=')&&
+   html.includes('</body>')&&
+   !html.includes('id="talera-owner-delete-on-request"'),
+   'OWNER_CLEAR_ORIGINAL_SCOPED_STORE_NOT_FOUND');
+ return html.replace('</body>',
+  '<script id="talera-owner-delete-on-request">'+js+'</script></body>');
+}
 // Build the logged-out entry from the very same zero-example source.
 // The old immutable 7-Nov shell held 500 demonstrations and could reappear
 // whenever an iPhone session expired. NEVER serve that snapshot as a fallback.
@@ -1246,6 +1292,7 @@ for(const [route,filename] of Object.entries(routes)){
  // apply later speculative iPhone video-poster modifications.
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
+ if(route==='/mijn-leven')html=installOwnerRequestedClearAllStories(html);
  if(route==='/tell')html=removeLegacyTellSampleImporter(shapeOwnStoryTopics(html));
  html=stripBundledExamplePhotoLinks(html);
 

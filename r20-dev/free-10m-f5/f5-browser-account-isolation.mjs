@@ -841,8 +841,38 @@ try{
        });
        const beforePhotos=await follower.evaluate(()=>
          document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top);
+       // The iPhone owner reports the entire editor width jumping when
+       // opening characteristics. Verify the same dimensions before/after.
+       const sizeSnapshot=()=>follower.evaluate(()=>{
+         const rect=s=>{const el=document.querySelector(s),r=el?.getBoundingClientRect();
+           return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
+         const css=s=>{const el=document.querySelector(s),v=el&&getComputedStyle(el);
+           return v?{width:v.width,padding:v.padding,maxWidth:v.maxWidth,
+             fontSize:v.fontSize,transform:v.transform,zoom:v.zoom}:null};
+         return {
+           viewport:{innerWidth,clientWidth:document.documentElement.clientWidth,
+             scale:visualViewport?.scale,dpr:devicePixelRatio},
+           app:rect('#app'),main:rect('#main'),
+           work:rect('.work.talera-r16-editor'),
+           photos:rect('.talera-work-tiles'),toggle:rect('.talera-tags-toggle'),
+           toolbar:rect('.work-tools.talera-r16-toolbar'),
+           workStyle:css('.work.talera-r16-editor'),mainStyle:css('#main')
+         };
+       });
+       const beforeSize=await sizeSnapshot();
        await follower.locator('.talera-tags-toggle').click();
        await follower.waitForTimeout(120);
+       const afterSize=await sizeSnapshot();
+       console.log('TALERA_FREE_TELL_SIZE_BEFORE_AFTER_OPEN',
+         JSON.stringify({beforeSize,afterSize}));
+       assert.ok(beforeSize.work&&afterSize.work&&beforeSize.photos&&afterSize.photos,
+         'The original editor and photo grid must exist');
+       assert.ok(Math.abs(beforeSize.work.width-afterSize.work.width)<2 &&
+         Math.abs(beforeSize.photos.width-afterSize.photos.width)<2 &&
+         Math.abs(beforeSize.photos.x-afterSize.photos.x)<2 &&
+         Math.abs((beforeSize.viewport.scale||1)-(afterSize.viewport.scale||1))<.01,
+         'Editor must not change width or visual zoom on characteristics expansion: '+
+           JSON.stringify({beforeSize,afterSize}));
        const scroller=await follower.evaluate(()=>{
          const panel=document.querySelector('.talera-tags-panel');
          const toolbar=document.querySelector('.work.talera-r16-editor .work-tools.talera-r16-toolbar');

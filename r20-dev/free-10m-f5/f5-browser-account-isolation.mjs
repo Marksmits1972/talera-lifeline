@@ -244,6 +244,49 @@ try{
    ...devices['iPhone 13'],serviceWorkers:'allow',
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
  });
+ const registrationPage=await context.newPage();
+ try{
+   const route=await registrationPage.goto(origin+'/present?talera_menu=hub',
+     {waitUntil:'domcontentloaded'});
+   assert.equal(route.status(),200,'Existing account menu route unavailable');
+   await waitForLibrary(registrationPage);
+   await menu(registrationPage);
+   let navigation=await registrationPage.evaluate(()=>
+     [...document.querySelectorAll('#talera-more-menu [data-view]')]
+       .map(x=>({view:x.getAttribute('data-view'),label:(x.textContent||'').trim().slice(0,70)})));
+   console.log('TALERA_REAL_REGISTRATION_NAVIGATION',JSON.stringify(navigation));
+   if(!navigation.some(x=>['signup','register','create'].includes(x.view))){
+     const account=registrationPage.locator('#talera-more-menu [data-view="account"]');
+     if(await account.count())await account.first().click();
+     navigation=await registrationPage.evaluate(()=>
+       [...document.querySelectorAll('#talera-more-menu [data-view]')]
+         .map(x=>({view:x.getAttribute('data-view'),label:(x.textContent||'').trim().slice(0,70)})));
+     console.log('TALERA_REAL_REGISTRATION_ACCOUNT_NAVIGATION',JSON.stringify(navigation));
+   }
+   const next=navigation.find(x=>['signup','register','create'].includes(x.view));
+   assert.ok(next,'Owner registration action unreachable from original account menu');
+   await registrationPage.locator('#talera-more-menu [data-view="'+next.view+'"]').first().click();
+   const structure=await registrationPage.evaluate(()=>{
+     const container=document.getElementById('talera-more-menu');
+     return {
+       forms:[...container.querySelectorAll('form')].map(f=>({
+         formName:f.dataset.form||'',noValidate:f.noValidate,
+         fields:[...f.elements].map(e=>({
+           tag:e.tagName,name:e.name||'',type:e.type||'',
+           required:e.required||false,minLength:e.minLength,
+           min:e.min||'',max:e.max||'',pattern:e.pattern||'',
+           placeholder:e.placeholder||'',text:e.tagName==='BUTTON'?(e.textContent||'').trim().slice(0,55):''
+         }))
+       })),
+       buttons:[...container.querySelectorAll('button')].map(b=>({
+         type:b.type,action:b.dataset.action||'',view:b.dataset.view||'',
+         text:(b.textContent||'').trim().slice(0,55)})).slice(-15)
+     };
+   });
+   console.log('TALERA_REAL_REGISTRATION_FORM_STRUCTURE',JSON.stringify(structure));
+   assert.ok(structure.forms.some(f=>/register|signup/i.test(f.formName)),
+     'Original account registration form missing in actual mobile UI');
+ }finally{await registrationPage.close()}
  const page=await context.newPage();
  // Passive synthetic-only trace: which original UI account/settings screens
  // actually call a Free API? Never record queries, bodies, cookies or tokens.

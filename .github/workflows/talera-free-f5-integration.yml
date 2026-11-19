@@ -141,7 +141,7 @@ jobs:
       - name: Install headless mobile browser and small synthetic video generator for the reported issue
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: |
-          npm install --no-save --no-package-lock playwright@1.56.1 @ffmpeg-installer/linux-x64
+          npm install --no-save --no-package-lock playwright@1.56.1 @ffmpeg-installer/linux-x64 @ffprobe-installer/linux-x64
           # Hosted Ubuntu already includes browser runtime libraries. Download
           # only the same Playwright Chromium version; do not repeat the entire
           # OS dependency installation that stalled the previous verification.
@@ -179,6 +179,9 @@ jobs:
             test -x "$ffmpeg_path"
             mkdir -p "$RUNNER_TEMP/talera-f5-test-bin"
             ln -s "$ffmpeg_path" "$RUNNER_TEMP/talera-f5-test-bin/ffmpeg"
+            ffprobe_path="$PWD/node_modules/@ffprobe-installer/linux-x64/ffprobe"
+            test -x "$ffprobe_path"
+            ln -s "$ffprobe_path" "$RUNNER_TEMP/talera-f5-test-bin/ffprobe"
             echo "$RUNNER_TEMP/talera-f5-test-bin" >> "$GITHUB_PATH"
             "$RUNNER_TEMP/talera-f5-test-bin/ffmpeg" -version | head -n 1
           fi

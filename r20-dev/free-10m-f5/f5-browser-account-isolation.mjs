@@ -311,6 +311,10 @@ try{
    await form.locator('input[name="email"]').fill(signupUser.email);
    await form.locator('input[name="register-password"]').fill(signupUser.password);
    await form.locator('input[name="register-confirm"]').fill(signupUser.password);
+   // DOB is injected after the legacy menu's first synchronous render.
+   // Wait for the real visible input just as the owner does on their iPhone.
+   await form.locator('input[name="birthDate"]').waitFor({state:'visible',timeout:10000});
+   await form.locator('input[name="birthDate"]').fill('1974-04-02');
    const nativeValidity=await form.evaluate(form=>({
      valid:form.checkValidity(),
      invalid:[...form.elements].filter(e=>e.willValidate&&!e.checkValidity())
@@ -326,6 +330,16 @@ try{
    console.log('TALERA_REAL_REGISTRATION_SUBMIT_DIAGNOSTIC',JSON.stringify({
      nativeValidity,registrationTraffic,afterSubmit
    }));
+   assert.equal(nativeValidity.valid,true,'Fully completed registration must satisfy browser validation');
+   assert.equal(registrationTraffic.length,1,'Confirmation tap must send exactly one account request');
+   assert.equal(registrationTraffic[0].status,200,
+     'Fully completed original TALERA registration must succeed (server status only)');
+   const registered=await registrationPage.evaluate(async()=>{
+     const res=await fetch('/api/me',{credentials:'same-origin'});
+     return {status:res.status,hasAccount:!!(await res.json()).account?.id};
+   });
+   assert.deepEqual(registered,{status:200,hasAccount:true},
+     'The original confirmation tap must leave the user really signed in');
    assert.ok(structure.forms.some(f=>/register|signup/i.test(f.formName)),
      'Original account registration form missing in actual mobile UI');
  }finally{await registrationPage.close()}

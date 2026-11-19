@@ -737,7 +737,7 @@ function polishTellEditorLayout(html){
   'body:has(#app .talera-r16-editor){background:#fff!important;}',
   'body:has(#app .talera-r16-editor) #app{min-height:100dvh!important;background:#fff!important;display:flex!important;flex-direction:column!important;}',
   'body:has(#app .talera-r16-editor) #main{flex:1 0 auto!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
-  '#app #main .work.talera-compact-work.talera-r16-editor{flex:1 0 auto!important;min-height:calc(100dvh - 138px)!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor{width:calc(100% - 36px)!important;min-width:0!important;box-sizing:border-box!important;flex:1 0 auto!important;min-height:calc(100dvh - 138px)!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor #details{padding:13px 0 0!important;margin:0 0 8px!important;background:#fff!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:9px!important;padding:6px 0 12px!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{padding:8px 0!important;line-height:1.38!important;}',

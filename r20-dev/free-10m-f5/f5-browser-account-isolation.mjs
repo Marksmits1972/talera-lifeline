@@ -231,6 +231,8 @@ async function assertSignedOutEmpty(page,previousStoryId){
      const heroVisible=hero?.getAttribute('src')||null;
      return {
        rows:rows.length,previousIdInRows:rows.some(x=>x?.id===id),
+       privateStoryReadable:!!(await window.TaleraMemories.get(id)),
+       privateOriginalReadable:!!(await window.TaleraMemories.blob(id+':0')),
        sessionStatus:session.status,privatePresentation:!!active?._taleraLocal,
        previousStoryInPage:(document.body?.innerText||'').includes(
          'synthetic ACCOUNT ISOLATION 1'),
@@ -241,6 +243,10 @@ async function assertSignedOutEmpty(page,previousStoryId){
    assert.equal(state.sessionStatus,401,'Signed-out account must be revoked '+route);
    assert.equal(state.rows,0,'Signed-out page read a personal library '+route);
    assert.equal(state.previousIdInRows,false,'Account story leaked to guest '+route);
+   assert.equal(state.privateStoryReadable,false,
+     'Guest could read a signed-out original story '+route);
+   assert.equal(state.privateOriginalReadable,false,
+     'Guest could read a signed-out original media Blob '+route);
    assert.equal(state.privatePresentation,false,
      'Signed-out presentation selected a private memory '+route);
    assert.equal(state.previousStoryInPage,false,
@@ -615,6 +621,14 @@ try{
  assert.equal(guest,ids[1],'Second login must switch browser to second ID');
  const beforeB=await inventory(page);
  assert.ok(!beforeB.ids.includes(a.id),'Second account can see FIRST local story');
+ const foreignOriginal=await page.evaluate(async id=>({
+   story:await window.TaleraMemories.get(id),
+   media:await window.TaleraMemories.blob(id+':0')
+ }),a.id);
+ assert.equal(foreignOriginal.story,null,
+   'Second account must not read first account original story');
+ assert.equal(foreignOriginal.media,null,
+   'Second account must not read first account original media Blob');
  const b=await saveSyntheticPhoto(page,2);
  assert.ok(b.bytes>10);
  const afterB=await inventory(page);

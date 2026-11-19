@@ -858,11 +858,14 @@ try{
            whiteSpace:getComputedStyle(heading).whiteSpace
          }:null;
          return {
-           viewport:{innerWidth,clientWidth:document.documentElement.clientWidth,
+           viewport:{innerWidth,innerHeight,clientWidth:document.documentElement.clientWidth,
+             visibleHeight:visualViewport?.height||innerHeight,
              scale:visualViewport?.scale,dpr:devicePixelRatio},
            headingMetrics,
            app:rect('#app'),main:rect('#main'),
            work:rect('.work.talera-r16-editor'),
+           title:rect('.talera-v14-heading #title'),
+           date:rect('.talera-v14-heading #dateToggle'),
            photos:rect('.talera-work-tiles'),toggle:rect('.talera-tags-toggle'),
            toolbar:rect('.work-tools.talera-r16-toolbar'),
            workStyle:css('.work.talera-r16-editor'),mainStyle:css('#main')
@@ -876,6 +879,18 @@ try{
          JSON.stringify({beforeSize,afterSize}));
        assert.ok(beforeSize.work&&afterSize.work&&beforeSize.photos&&afterSize.photos,
          'The original editor and photo grid must exist');
+       assert.ok(beforeSize.title&&beforeSize.date&&
+         beforeSize.title.y>=beforeSize.work.y-1 &&
+         beforeSize.date.y>=beforeSize.title.y+beforeSize.title.height-1 &&
+         beforeSize.photos.y>=beforeSize.date.y+beforeSize.date.height-1 &&
+         beforeSize.photos.y<=180,
+         'Title, date, and photos must move UP without overlap: '+
+           JSON.stringify(beforeSize));
+       assert.ok(beforeSize.toolbar&&afterSize.toolbar&&
+         Math.abs(afterSize.toolbar.y-beforeSize.toolbar.y)<3 &&
+         afterSize.toolbar.y+afterSize.toolbar.height<=
+           afterSize.viewport.visibleHeight-8,
+         'Original action controls must remain stationary');
        assert.ok(beforeSize.work.width>=beforeSize.viewport.innerWidth-34 &&
          afterSize.work.width>=afterSize.viewport.innerWidth-34,
          'Tell editor must retain full original wide layout: '+

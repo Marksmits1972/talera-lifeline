@@ -306,6 +306,12 @@ try{
   // covered until it is decoded and up to 180ms of settling have elapsed.
   await page.waitForFunction(()=>!document.documentElement.classList.contains(
     'talera-direct-memory-entering'),null,{timeout:7000});
+  // The original deep-link photo guard intentionally waits for a decoded
+  // first frame and then two rAFs/180ms. Don't treat that brief entry
+  // handoff as a permanently white stage on slow CI frame scheduling.
+  await page.waitForFunction(()=>
+    !document.documentElement.classList.contains('talera-direct-memory-entering'),
+    null,{timeout:3500});
   const afterRealHeroTap=await page.evaluate(()=>({
     url:location.pathname+location.search,
     memoryId:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,

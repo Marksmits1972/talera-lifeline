@@ -146,8 +146,10 @@ jobs:
           # only the same Playwright Chromium version; do not repeat the entire
           # OS dependency installation that stalled the previous verification.
           npx --no-install playwright install chromium
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs

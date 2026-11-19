@@ -847,12 +847,16 @@ try{
          const panel=document.querySelector('.talera-tags-panel');
          const toolbar=document.querySelector('.work.talera-r16-editor .work-tools.talera-r16-toolbar');
          const before=panel.scrollTop;
+         const toolbarBeforeScroll=toolbar?.getBoundingClientRect().bottom;
+         const pageBeforeScroll=document.scrollingElement?.scrollTop||0;
          panel.scrollTop=panel.scrollHeight;
          const after=panel.scrollTop;
          return {
            before,after,scrollHeight:panel.scrollHeight,clientHeight:panel.clientHeight,
            overflow:getComputedStyle(panel).overflowY,
            toolbarBottom:toolbar?.getBoundingClientRect().bottom,
+           toolbarBeforeScroll,
+           pageBeforeScroll,pageAfterScroll:document.scrollingElement?.scrollTop||0,
            viewport:window.visualViewport?.height||innerHeight,
            fakeTiles:document.querySelectorAll('.talera-work-tiles .tile[data-visual-only=yes]').length,
            photoTop:document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top
@@ -864,8 +868,11 @@ try{
          'Long topic options must be bounded: '+JSON.stringify(scroller));
        assert.ok(scroller.after>scroller.before+15,
          'The final characteristic must be reachable: '+JSON.stringify(scroller));
-       assert.ok(scroller.toolbarBottom<=scroller.viewport+12,
-         'The original bottom toolbar must stay visible: '+JSON.stringify(scroller));
+       assert.ok(Math.abs(scroller.toolbarBottom-scroller.toolbarBeforeScroll)<2,
+         'Scrolling the choices must NOT move the original toolbar: '+
+           JSON.stringify(scroller));
+       assert.equal(scroller.pageAfterScroll,scroller.pageBeforeScroll,
+         'Scrolling the choices must NOT scroll the whole page');
        const expanded=await follower.evaluate(()=>{
          const panel=document.querySelector('.talera-tags-panel');
          return {expanded:document.querySelector('.talera-tags-toggle')?.getAttribute('aria-expanded'),
@@ -883,7 +890,7 @@ try{
          visualOnly:true,titleAndDateSeparated:true,topicBelowMedia:true,
          openKeepsPhotoPosition:true,originalControlsPreserved:true,
          fivePhotoScreenSimulated:true,onlyTagPanelScrollable:true,
-         lastCharacteristicReachable:true,bottomToolbarVisible:true,
+         lastCharacteristicReachable:true,bottomToolbarStationary:true,
          noPersonalData:true,realIphoneAccepted:false
        }));
      }

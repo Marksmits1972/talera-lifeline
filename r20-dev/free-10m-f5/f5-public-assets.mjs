@@ -1191,8 +1191,10 @@ function stripBundledExamplePhotoLinks(html){
 // The current phone must open the URL because Free originals are in its IDB.
 function installOwnerRequestedClearAllStories(html){
  const js=String.raw`(function(){
-  if(location.pathname!=='/mijn-leven'||
-     new URLSearchParams(location.search).get('wis-alle-verhalen')!=='nu')return;
+  const explicitlyRequested=location.pathname==='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c'||
+    (location.pathname==='/mijn-leven'&&
+     new URLSearchParams(location.search).get('wis-alle-verhalen')==='nu');
+  if(!explicitlyRequested)return;
   // Remove the destructive URL FIRST so Back/refresh cannot wipe new stories.
   history.replaceState(null,'','/mijn-leven');
   async function execute(){

@@ -1595,6 +1595,38 @@ try{
     JSON.stringify({originalVideoStopped:true,originalVideoHidden:true,
       nativeNodeRetained:true,noNewPlayer:true,iphoneAccepted:false}));
 
+  // Owner explicitly requests a truly empty account-local story list.
+  // Use the SAME existing PWA and the original account's IndexedDB; confirm
+  // that an explicit reset cannot affect the original media engine or other IDs.
+  const beforeOwnerClear=await page.evaluate(async()=>
+    (await window.TaleraMemories.list()).length);
+  assert.ok(beforeOwnerClear>=3,'Need original saved account stories for clear test');
+  let ownerClearDialogs=0;
+  page.on('dialog',async d=>{
+    if(d.type()==='confirm'){ownerClearDialogs++;await d.accept();}
+    else await d.dismiss();
+  });
+  await page.goto(origin+'/mijn-leven#wis-alle-verhalen',
+    {waitUntil:'domcontentloaded'});
+  await page.waitForFunction(async()=>
+    !!window.TaleraMemories?.list&&
+    (await window.TaleraMemories.list()).length===0&&
+    /^(nog leeg|still empty)$/i.test(document.getElementById('v17-year-summary')?.textContent?.trim()||''),
+    null,{timeout:20000});
+  assert.equal(ownerClearDialogs,1,'Only one explicit owner confirmation must occur');
+  assert.equal(await page.evaluate(async()=>
+    (await window.TaleraMemories.list()).length),0,
+    'Existing owner reset must delete the local stories, not just hide cards');
+  const afterOwnerClear=await page.evaluate(()=>({
+    photo:document.getElementById('heroImage')?.getAttribute('src'),
+    year:document.getElementById('v17-year-summary')?.textContent?.trim(),
+    examples:window.__taleraReferenceMemories?.length
+  }));
+  assert.equal(afterOwnerClear.photo,null,'A cleared account must show no previous cover');
+  assert.equal(afterOwnerClear.examples,0,'No bundled examples return after clearing stories');
+  console.log('TALERA_OWNER_CONFIRMED_LOCAL_STORY_CLEAR_PASS',
+    JSON.stringify({before:beforeOwnerClear,after:0,accountStoreOnly:true,
+      exampleStories:0,realIphoneAccepted:false}));
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

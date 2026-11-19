@@ -1250,6 +1250,20 @@ function installOwnerRequestedClearAllStories(html){
   '<script id="talera-owner-delete-on-request">'+js+'</script></body>');
 }
 
+// The logged-out app must never surface unscoped legacy memories or save
+// personal stories without an account. No original IndexedDB bytes change.
+// The existing single-use, same-origin owner cleanup remains available.
+function closeAnonymousPersonalLibrary(html){
+ const marker=/window\.TaleraMemories=\{[^\n;]*localOnly:true\};/g;
+ const matches=[...html.matchAll(marker)];
+ assert.equal(matches.length,1,'GUEST_ORIGINAL_MEMORY_OWNER_MARKER_DRIFT');
+ const at=matches[0].index+matches[0][0].length;
+ const gate="(function(){\n  const purge=location.pathname==='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c'||\n    (location.pathname==='/mijn-leven'&&\n      new URLSearchParams(location.search).get('wis-alle-verhalen')==='nu');\n  if(purge)return; // Preserve the existing, explicitly requested one-off cleanup.\n  const original=window.TaleraMemories;\n  if(!original||original.localOnly!==true)\n    throw Error('TALERA_GUEST_LIBRARY_OWNER_MISSING');\n  const signIn=async()=>{throw Error('Meld je aan om herinneringen op te slaan.')};\n  // Normal guest pages must never read or write the historical unscoped store.\n  // An authenticated reload gets the unmodified account-local library.\n  Object.assign(original,{\n    list:async()=>[],get:async()=>null,blob:async()=>null,\n    mediaUrl:async()=>null,displayUrl:async()=>null,\n    save:signIn,remove:signIn,retime:signIn,setTags:signIn,\n    setBirthday:signIn,birthday:()=>null\n  });\n})();";
+ if(html.includes('TALERA_GUEST_LIBRARY_OWNER_MISSING'))
+  throw Error('GUEST_LIBRARY_GATE_DUPLICATED');
+ return html.slice(0,at)+'\n'+gate+'\n'+html.slice(at);
+}
+
 // Build the logged-out entry from the very same zero-example source.
 // The old immutable 7-Nov shell held 500 demonstrations and could reappear
 // whenever an iPhone session expired. NEVER serve that snapshot as a fallback.
@@ -1281,6 +1295,7 @@ for(const [route,filename] of Object.entries(routes)){
    guest=guest.replace(ownRead,'rows=[];');
  }
  if(route==='/tell')guest=removeLegacyTellSampleImporter(guest);
+ guest=closeAnonymousPersonalLibrary(guest);
  guest=stripBundledExamplePhotoLinks(guest);
  if(route==='/mijn-leven'){
    assert.ok(guest.includes('window.__taleraReferenceMemories=[];')&&

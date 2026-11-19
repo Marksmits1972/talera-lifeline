@@ -1033,63 +1033,88 @@ try{
        });
        await follower.locator('.talera-tags-toggle').click();
        await follower.setViewportSize({width:390,height:664});
-       // Read-only inspection of the ORIGINAL writing overlay on the SAME
-       // temporary browser, before modifying its visual layout.
+       // Six-photo visual regression in the EXISTING original writer and same
+       // account context. Five extra previews are DOM-only clones of the
+       // original local Blob image: never alter the library, media or story.
        await follower.locator('#write').click();
-       await follower.waitForTimeout(250);
-       const writerDiag=await follower.evaluate(()=>{
-         const focus=document.activeElement;
-         const boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=true]')).map(e=>({
-           tag:e.tagName,id:e.id,classes:e.className,
-           parent:e.parentElement?.outerHTML.slice(0,1100),
-           rect:(r=>({x:r.x,y:r.y,width:r.width,height:r.height}))(e.getBoundingClientRect()),
-           placeholder:e.getAttribute('placeholder'),value:e.value?.slice(0,70)
-         }));
-         const buttons=[...document.querySelectorAll('button')].filter(e=>e.getClientRects().length)
-           .map(e=>({id:e.id,class:e.className,text:(e.textContent||'').trim().slice(0,55)})).slice(-30);
-         const overlays=[...document.querySelectorAll('[role=dialog],dialog,[class*=modal],[class*=write],[class*=editor]')].filter(e=>e.getClientRects().length)
-           .slice(-15).map(e=>({tag:e.tagName,id:e.id,class:e.className,
-             outer:e.outerHTML.slice(0,1500)}));
-         const measure=(e)=>{const r=e.getBoundingClientRect(),v=getComputedStyle(e);
-           return {tag:e.tagName,id:e.id,className:e.className,
-             x:r.x,y:r.y,width:r.width,height:r.height,scrollHeight:e.scrollHeight,
-             clientHeight:e.clientHeight,scrollTop:e.scrollTop,
-             display:v.display,overflow:v.overflow,overflowY:v.overflowY,
-             position:v.position,visibility:v.visibility,opacity:v.opacity,
-             flex:v.flex,gridTemplateColumns:v.gridTemplateColumns,padding:v.padding,
-             maxHeight:v.maxHeight,minHeight:v.minHeight,
-             heightStyle:v.height,transform:v.transform};
-         };
-         const writerElems=['#taleraWriterOverlay','.talera-writer-top',
-           '.talera-writer-body','#taleraWriterPhotos','#taleraWriterText']
-           .map(s=>document.querySelector(s)).filter(Boolean);
-         const sources=[...document.querySelectorAll('style,script')].map(e=>e.textContent||'')
-           .filter(t=>t.includes('taleraWriterPhotos')).map(t=>{
-             const at=t.indexOf('taleraWriterPhotos');
-             return {length:t.length,context:t.slice(Math.max(0,at-1950),at+3500).slice(0,5300)};
-           }).slice(0,8);
-         const rules=[];
-         for(const sheet of document.styleSheets){
-           try{for(const rule of sheet.cssRules||[]){
-             const cs=rule.cssText||'';
-             if(/talera-writer|taleraWriterPhotos|taleraWriterText/.test(cs))
-               rules.push(cs.slice(0,1100));
-           }}catch{}
+       await follower.locator('#taleraWriterOverlay #taleraWriterText').waitFor();
+       const originalWriterText=await follower.locator('#taleraWriterText').inputValue();
+       await follower.evaluate(()=>{
+         const strip=document.querySelector('#taleraWriterPhotos');
+         const first=strip.querySelector('.talera-writer-thumbnail');
+         if(!first)throw Error('Existing local story has no original writer photo');
+         while(strip.children.length<6){
+           const visual=first.cloneNode(true);
+           visual.dataset.visualOnly='yes';
+           strip.append(visual);
          }
-         return {active:focus?.outerHTML.slice(0,1100),boxes,buttons,overlays,
-           sizing:writerElems.map(measure),originalCss:rules.slice(-38),
-           sourceFragments:sources,
-           originalMotion:[...document.querySelectorAll('script')].map(e=>e.textContent||'')
-             .filter(t=>t.includes('function taleraV4WriterMotion'))
-             .map(t=>{const at=t.indexOf('function taleraV4WriterMotion');
-               return t.slice(at,at+8500)}).slice(0,1),
-           keyboardLogic:[...document.querySelectorAll('script,style')].map(e=>e.textContent||'')
-             .filter(t=>t.includes('talera-writer-keyboard-open'))
-             .slice(0,5).map(t=>{const at=t.indexOf('talera-writer-keyboard-open');
-               return t.slice(Math.max(0,at-900),at+1400)})};
        });
-       console.log('TALERA_FREE_WRITE_OVERLAY_DOM_READONLY',JSON.stringify(writerDiag));
-       console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({
+       await follower.waitForTimeout(90);
+       // The real iPhone adds this class when its keyboard reduces the visual
+       // viewport. Simulate the same rule without changing the test phone.
+       await follower.evaluate(()=>
+         document.body.classList.add('talera-writer-keyboard-open'));
+       const writerInitial=await follower.evaluate(()=>{
+         const q=s=>document.querySelector(s),r=e=>e.getBoundingClientRect();
+         const strip=q('#taleraWriterPhotos'),body=q('.talera-writer-body');
+         const area=q('#taleraWriterText'),done=q('#taleraWriterDone');
+         const thumbs=Array.from(strip.querySelectorAll('.talera-writer-thumbnail'));
+         const cols=getComputedStyle(strip).gridTemplateColumns.split(' ').length;
+         return {
+           count:thumbs.length,columns:cols,display:getComputedStyle(strip).display,
+           photoSrcLocal:strip.querySelector('img')?.src.startsWith('blob:'),
+           photoTop:r(strip).top,photoBottom:r(strip).bottom,
+           sixthBottom:r(thumbs[5]).bottom,bodyBottom:r(body).bottom,
+           textTop:r(area).top,textHeight:r(area).height,scrollTop:body.scrollTop,
+           doneTop:r(done).top
+         };
+       });
+       console.log('TALERA_FREE_WRITE_PHOTOS_INITIAL',JSON.stringify(writerInitial));
+       assert.ok(writerInitial.count===6&&writerInitial.columns===3&&
+         writerInitial.display==='grid'&&writerInitial.photoSrcLocal&&
+         writerInitial.sixthBottom<=writerInitial.bodyBottom-60&&
+         writerInitial.textTop<writerInitial.bodyBottom-40&&
+         writerInitial.scrollTop<3,
+         'All six existing/local previews must be visible with the keyboard '+ 
+         'and the original textarea must remain accessible: '+JSON.stringify(writerInitial));
+       const longStory=Array.from({length:70},(_,i)=>
+         'Dit moment herinner ik me nog goed, regel '+(i+1)).join('\n');
+       await follower.locator('#taleraWriterText').fill(longStory);
+       await follower.waitForTimeout(180);
+       const writerGrowth=await follower.evaluate(()=>{
+         const strip=document.querySelector('#taleraWriterPhotos');
+         const body=document.querySelector('.talera-writer-body');
+         const area=document.querySelector('#taleraWriterText');
+         const done=document.querySelector('#taleraWriterDone');
+         return {
+           bodyScroll:body.scrollTop,textHeight:area.getBoundingClientRect().height,
+           photosBottom:strip.getBoundingClientRect().bottom,
+           doneVisible:done.getBoundingClientRect().bottom>=0&&
+             done.getBoundingClientRect().bottom<innerHeight,
+           photoCount:strip.querySelectorAll('img').length
+         };
+       });
+       console.log('TALERA_FREE_WRITE_PHOTOS_PROGRESSIVE_SCROLL',
+         JSON.stringify(writerGrowth));
+       assert.ok(writerGrowth.textHeight>writerInitial.textHeight+100&&
+         writerGrowth.bodyScroll>60&&
+         writerGrowth.photosBottom<writerInitial.photoBottom-60&&
+         writerGrowth.doneVisible&&writerGrowth.photoCount===6,
+         'As text grows the ORIGINAL writer must gradually scroll photos out '+ 
+         'of view without losing Done or media: '+JSON.stringify({writerInitial,writerGrowth}));
+       // Preserve the original unchanged synthetic story and save it using
+       // the ORIGINAL Done handler. Never write the long visual test text.
+       await follower.locator('#taleraWriterText').fill(originalWriterText);
+       await follower.locator('#taleraWriterDone').click();
+       assert.equal(await follower.locator('#story').inputValue(),
+         originalWriterText,'Original story must survive the writer overlay');
+       assert.equal(await follower.locator('#taleraWriterOverlay').count(),0,
+         'The original Done handler must still close the writer');
+       console.log('TALERA_FREE_WRITE_SIX_PHOTO_CARET_AND_SAVE_PASS',
+         JSON.stringify({realIphoneAccepted:false,originalLocalMedia:true,
+           sixPreviewsVisibleInitially:true,photosScrollAwayAsTextGrows:true,
+           originalDoneAndStoryPreserved:true,noNewMediaOrUserData:true}));
+              console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({
          visualOnly:true,titleAndDateSeparated:true,topicBelowMedia:true,
          openKeepsPhotoPosition:true,originalControlsPreserved:true,
          fivePhotoScreenSimulated:true,onlyTagPanelScrollable:true,

@@ -881,11 +881,36 @@ try{
        const gapToActions=scroller.toolbarTop-scroller.panelBottom;
        assert.ok(gapToActions>=9,
          'Characteristics must not overlap the fixed action toolbar: '+JSON.stringify(scroller));
-       assert.ok(scroller.toolbarBottom<=scroller.viewportBottom-8 &&
-         scroller.publishBottom<=scroller.viewportBottom-8 &&
-         scroller.publishTop>=0 && scroller.publishHitTest,
-         'iPhone Publish/Save MUST remain visible and touchable after expansion: '+
-           JSON.stringify(scroller));
+       // Shorter phones cannot fit six photo tiles, the expanded topics and
+       // the action toolbar simultaneously. In that case the SAME original
+       // work sheet must scroll to the existing Publish button: no trapped UI.
+       const reach=await follower.evaluate(()=>{
+         const work=document.querySelector('.work.talera-r16-editor');
+         const publish=work.querySelector('#publish');
+         const viewportBottom=(window.visualViewport?.offsetTop||0)+
+           (window.visualViewport?.height||innerHeight);
+         const first=publish.getBoundingClientRect();
+         const initiallyVisible=first.top>=0&&first.bottom<=viewportBottom-8;
+         if(!initiallyVisible)work.scrollTop=work.scrollHeight;
+         const rect=publish.getBoundingClientRect();
+         return {
+           initiallyVisible,workScrollTop:work.scrollTop,
+           workClientHeight:work.clientHeight,workScrollHeight:work.scrollHeight,
+           workOverflow:getComputedStyle(work).overflowY,
+           publishTop:rect.top,publishBottom:rect.bottom,
+           viewportBottom,
+           touchable:rect.top>=0&&rect.bottom<=viewportBottom-8&&
+             document.elementFromPoint(rect.left+rect.width*.5,
+               rect.top+rect.height*.5)?.closest('#publish')===publish
+         };
+       });
+       assert.ok(reach.touchable && (reach.initiallyVisible ||
+         (reach.workOverflow==='auto'&&reach.workScrollTop>20)),
+         'iPhone Publish/Save must be touchable either directly or by scrolling the SAME editor: '+
+           JSON.stringify({scroller,reach}));
+       await follower.evaluate(()=>{
+         document.querySelector('.work.talera-r16-editor').scrollTop=0;
+       });
        if(scroller.clientHeight<scroller.viewport*.35)
          assert.ok(gapToActions<=34,
            'Unused white gap must be given to the scrollable characteristics: '+

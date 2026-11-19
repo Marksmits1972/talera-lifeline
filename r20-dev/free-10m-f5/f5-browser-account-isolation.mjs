@@ -879,8 +879,43 @@ try{
        assert.ok(scroller.after>scroller.before+15,
          'The final characteristic must be reachable: '+JSON.stringify(scroller));
        const gapToActions=scroller.toolbarTop-scroller.panelBottom;
-       assert.ok(gapToActions>=9,
-         'Characteristics must not overlap the fixed action toolbar: '+JSON.stringify(scroller));
+       // The original three-action bar must stay in the reserved white strip
+       // while ONLY the upper work sheet scrolls underneath it.
+       const pinned=await follower.evaluate(()=>{
+         const work=document.querySelector('.work.talera-r16-editor');
+         const bar=work.querySelector('.work-tools.talera-r16-toolbar');
+         const publish=bar.querySelector('#publish');
+         const photo=document.querySelector('.talera-work-tiles');
+         const vp=(window.visualViewport?.offsetTop||0)+
+           (window.visualViewport?.height||innerHeight);
+         work.scrollTop=0;
+         const first=bar.getBoundingClientRect();
+         const firstPhotoTop=photo.getBoundingClientRect().top;
+         work.scrollTop=work.scrollHeight;
+         const second=bar.getBoundingClientRect();
+         const publishRect=publish.getBoundingClientRect();
+         return {
+           firstTop:first.top,firstBottom:first.bottom,
+           secondTop:second.top,secondBottom:second.bottom,
+           viewportBottom:vp,scrolled:work.scrollTop,
+           photoMoved:firstPhotoTop-photo.getBoundingClientRect().top,
+           barPosition:getComputedStyle(bar).position,
+           publishTouchable:publishRect.top>=0&&publishRect.bottom<=vp-8&&
+             document.elementFromPoint(publishRect.left+publishRect.width*.5,
+               publishRect.top+publishRect.height*.5)?.closest('#publish')===publish
+         };
+       });
+       assert.ok(pinned.scrolled>20&&pinned.photoMoved>20,
+         'Editor must still scroll its original media and topics: '+JSON.stringify(pinned));
+       assert.ok(pinned.barPosition==='sticky'&&
+         Math.abs(pinned.firstTop-pinned.secondTop)<2&&
+         Math.abs(pinned.firstBottom-pinned.secondBottom)<2&&
+         pinned.firstBottom<=pinned.viewportBottom-8&&pinned.publishTouchable,
+         'Tell/Write/Publish MUST be fixed at bottom while work sheet scrolls: '+
+           JSON.stringify(pinned));
+       await follower.evaluate(()=>{
+         document.querySelector('.work.talera-r16-editor').scrollTop=0;
+       });
        // Shorter phones cannot fit six photo tiles, the expanded topics and
        // the action toolbar simultaneously. In that case the SAME original
        // work sheet must scroll to the existing Publish button: no trapped UI.
@@ -911,7 +946,7 @@ try{
        await follower.evaluate(()=>{
          document.querySelector('.work.talera-r16-editor').scrollTop=0;
        });
-       if(scroller.clientHeight<scroller.viewport*.35)
+       if(scroller.clientHeight<scroller.viewport*.35 && gapToActions>=0)
          assert.ok(gapToActions<=34,
            'Unused white gap must be given to the scrollable characteristics: '+
              JSON.stringify(scroller));

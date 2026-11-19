@@ -1001,6 +1001,36 @@ try{
          tallAfter.publishTouchable,
          'Tall iPhone must preserve photos and the original fixed action bar: '+
            JSON.stringify({tallBefore,tallAfter}));
+       // A selected characteristic must not create a new hidden footer.
+       // Test with a DOM-only chip: never persist data in a real account.
+       const selectedChip=await follower.evaluate(()=>{
+         const selected=document.querySelector('.talera-tags-selected');
+         if(!selected)return {exists:false};
+         const chip=document.createElement('span');
+         chip.textContent='Jeugd ×';
+         chip.dataset.visualOnly='yes';
+         selected.append(chip);
+         window.dispatchEvent(new Event('resize'));
+         return {exists:true};
+       });
+       assert.ok(selectedChip.exists,'Original selected-characteristics area missing');
+       await follower.waitForTimeout(120);
+       const chosenTall=await follower.evaluate(()=>{
+         const bar=document.querySelector('.work-tools.talera-r16-toolbar')?.getBoundingClientRect();
+         const panel=document.querySelector('.talera-tags-panel')?.getBoundingClientRect();
+         const chosen=document.querySelector('.talera-tags-selected')?.getBoundingClientRect();
+         return {barTop:bar?.top,barBottom:bar?.bottom,
+           panelHeight:panel?.height,chosenHeight:chosen?.height,
+           chosenTop:chosen?.top,viewport:visualViewport?.height||innerHeight};
+       });
+       console.log('TALERA_FREE_TELL_SELECTED_TAG_GAP',JSON.stringify(chosenTall));
+       assert.ok(Math.abs(tallBefore.toolbarTop-chosenTall.barTop)<2 &&
+         chosenTall.barBottom<=chosenTall.viewport-8,
+         'Selected topic may NOT move original bottom actions: '+
+           JSON.stringify({tallBefore,chosenTall}));
+       await follower.evaluate(()=>{
+         document.querySelector('.talera-tags-selected [data-visual-only=yes]')?.remove();
+       });
        await follower.locator('.talera-tags-toggle').click();
        await follower.setViewportSize({width:390,height:664});
        console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({

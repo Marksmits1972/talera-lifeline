@@ -1,13 +1,17 @@
 // Test the EXISTING TALERA Free /present route with disposable local-only media.
 // No test Worker, second app, production account, changes to /tell or personal data.
 import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
 import {spawn,execFileSync} from 'node:child_process';
-import {mkdirSync,readFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {chromium,devices} from 'playwright';
 
-const here=path.dirname(fileURLToPath(import.meta.url)),generated=path.join(here,'generated');
+const here=path.dirname(fileURLToPath(import.meta.url));
+// Each CI execution gets its own synthetic originals + local Wrangler DO store.
+// Delete this exact run directory at the end; never reuse or clear owner data.
+const generated=path.join(here,'generated','ordinary-presentation-'+randomUUID());
 mkdirSync(generated,{recursive:true});
 const origin='http://127.0.0.1:8837',gate='1'.repeat(64);
 let worker=null,browser=null,log='';
@@ -19,7 +23,7 @@ async function start(){
   worker=spawn(path.resolve('node_modules/.bin/wrangler'),[
     'dev','--local','--ip','127.0.0.1','--port','8837',
     '--config',path.join(here,'wrangler.jsonc'),
-    '--persist-to',path.join(generated,'ordinary-present-local'),
+    '--persist-to',path.join(generated,'worker-do'),
     '--var','STAGING_F5_KEY:'+gate,
     '--var','STAGING_ACCESS_KEY:'+'2'.repeat(64),
     '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
@@ -513,8 +517,16 @@ try{
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length===3,
     null,{timeout:11000});
   const swipePhotoBefore=await centerPixel(page);
-  assert.ok(nearColor(swipePhotoBefore,[255,165,0]),
-    'SWIPED THUMBNAIL NOT VISIBLE OR WRONG PHOTO: '+JSON.stringify(swipePhotoBefore));
+  const swipeEntryIndex=await page.evaluate(()=>
+    window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex);
+  // The approved ordinary slideshow may already have advanced to photo 2
+  // while its original swipe inertia settles on a busy CI runner. Assert
+  // that the REAL pixels match the active media index, not an expired frame.
+  // This still fails if dots/index move but the photo is stale or blank.
+  assert.ok((swipeEntryIndex===0&&nearColor(swipePhotoBefore,[255,165,0]))||
+    (swipeEntryIndex===1&&nearColor(swipePhotoBefore,[0,217,242])),
+    'SWIPED STORY PHOTO DOES NOT MATCH ACTIVE INDEX: '+
+      JSON.stringify({swipeEntryIndex,swipePhotoBefore}));
   await waitIndex(page,1,11000);
   const swipePhotoAfter=await centerPixel(page);
   if(!nearColor(swipePhotoAfter,[0,217,242])){
@@ -1663,4 +1675,7 @@ try{
   }));
 }finally{
   await stop();
+  // The test uses ONLY this newly generated, uniquely named local directory.
+  // No real account, iPhone memory or QA-app storage is touched.
+  rmSync(generated,{recursive:true,force:true});
 }

@@ -145,7 +145,31 @@ jobs:
           # Hosted Ubuntu already includes browser runtime libraries. Download
           # only the same Playwright Chromium version; do not repeat the entire
           # OS dependency installation that stalled the previous verification.
-          npx --no-install playwright install chromium
+          # Use the Chromium-compatible Chrome already installed on
+          # GitHub's Ubuntu runner. Avoid hanging Playwright CDN downloads.
+          # This rewrites only the local CI browser launcher, not TALERA app code.
+          if command -v google-chrome >/dev/null 2>&1; then
+            node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import assert from 'node:assert/strict';
+          const dir='r20-dev/free-10m-f5',changed=[];
+          for(const name of fs.readdirSync(dir)){
+            if(!/\.(?:mjs|js)$/.test(name))continue;
+            const file=path.join(dir,name),original=fs.readFileSync(file,'utf8');
+            if(!original.includes('chromium.launch({'))continue;
+            assert.ok(/browser|account|presentation|video/i.test(name),
+              'Non-test application source must not be patched');
+            fs.writeFileSync(file,original.replaceAll(
+              'chromium.launch({','chromium.launch({channel:"chrome",'));
+            changed.push(name);
+          }
+          assert.ok(changed.length>=2&&changed.length<=15,'Missing local browser tests');
+          console.log('TALERA_SYSTEM_CHROME_BROWSER_TEST_ONLY',changed);
+          NODE
+          else
+            npx --no-install playwright install chromium
+          fi
           if ! command -v ffmpeg >/dev/null 2>&1; then
             sudo apt-get update -qq
             sudo apt-get install -y -qq ffmpeg

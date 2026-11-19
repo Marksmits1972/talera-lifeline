@@ -1033,6 +1033,26 @@ try{
        });
        await follower.locator('.talera-tags-toggle').click();
        await follower.setViewportSize({width:390,height:664});
+       // Read-only inspection of the ORIGINAL writing overlay on the SAME
+       // temporary browser, before modifying its visual layout.
+       await follower.locator('#write').click();
+       await follower.waitForTimeout(250);
+       const writerDiag=await follower.evaluate(()=>{
+         const focus=document.activeElement;
+         const boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=true]')).map(e=>({
+           tag:e.tagName,id:e.id,classes:e.className,
+           parent:e.parentElement?.outerHTML.slice(0,1100),
+           rect:(r=>({x:r.x,y:r.y,width:r.width,height:r.height}))(e.getBoundingClientRect()),
+           placeholder:e.getAttribute('placeholder'),value:e.value?.slice(0,70)
+         }));
+         const buttons=[...document.querySelectorAll('button')].filter(e=>e.getClientRects().length)
+           .map(e=>({id:e.id,class:e.className,text:(e.textContent||'').trim().slice(0,55)})).slice(-30);
+         const overlays=[...document.querySelectorAll('[role=dialog],dialog,[class*=modal],[class*=write],[class*=editor]')].filter(e=>e.getClientRects().length)
+           .slice(-15).map(e=>({tag:e.tagName,id:e.id,class:e.className,
+             outer:e.outerHTML.slice(0,1500)}));
+         return {active:focus?.outerHTML.slice(0,1100),boxes,buttons,overlays};
+       });
+       console.log('TALERA_FREE_WRITE_OVERLAY_DOM_READONLY',JSON.stringify(writerDiag));
        console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({
          visualOnly:true,titleAndDateSeparated:true,topicBelowMedia:true,
          openKeepsPhotoPosition:true,originalControlsPreserved:true,

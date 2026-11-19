@@ -251,8 +251,10 @@ async function assertSignedOutEmpty(page,previousStoryId){
    }
    checked.push(route);
  }
- const home=await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
- assert.equal(home.status(),200);
+ // Signed-out Home is intentionally an empty guest surface without an
+ // account menu. Return through the ORIGINAL /present menu for login.
+ const entry=await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+ assert.equal(entry.status(),200);
  await waitForLibrary(page);
  console.log('TALERA_F5_LOGOUT_ALL_THREE_SCREENS_EMPTY_PASS',
    JSON.stringify({checked,originalMediaNeverDeleted:true,syntheticOnly:true,

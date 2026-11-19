@@ -1601,6 +1601,9 @@ try{
   const beforeOwnerClear=await page.evaluate(async()=>
     (await window.TaleraMemories.list()).length);
   assert.ok(beforeOwnerClear>=3,'Need original saved account stories for clear test');
+  console.log('TALERA_OWNER_REMOVE_METHOD_SOURCE',await page.evaluate(()=>
+    window.TaleraMemories.remove.toString().slice(0,2000)));
+
   let ownerClearDialogs=0;
   page.on('dialog',async d=>{
     if(d.type()==='confirm'){ownerClearDialogs++;await d.accept();}
@@ -1614,6 +1617,21 @@ try{
     /^(nog leeg|still empty)$/i.test(document.getElementById('v17-year-summary')?.textContent?.trim()||''),
     null,{timeout:20000});
   assert.equal(ownerClearDialogs,1,'Only one explicit owner confirmation must occur');
+  // The Home can briefly return an empty pre-hydration catalog during
+  // account-scoped IndexedDB open. Require durable deletion across a fresh
+  // page load, never mistake that transient state for persisted deletion.
+  await page.waitForTimeout(1600);
+  const beforeReload=await page.evaluate(async()=>({
+    url:location.pathname+location.search+location.hash,
+    count:(await window.TaleraMemories.list()).length
+  }));
+  console.log('TALERA_OWNER_CLEAR_BEFORE_RELOAD',JSON.stringify(beforeReload));
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(async()=>
+    !!window.TaleraMemories?.list&&
+    (await window.TaleraMemories.list()).length===0,
+    null,{timeout:15000});
+
   assert.equal(await page.evaluate(async()=>
     (await window.TaleraMemories.list()).length),0,
     'Existing owner reset must delete the local stories, not just hide cards');

@@ -750,14 +750,44 @@ function polishTellEditorLayout(html){
   '#app #main .work.talera-r16-editor .talera-tags-toggle::after{content:"⌄";flex:none;font-size:24px;font-weight:400;line-height:1;transition:transform .16s ease;}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]::after{transform:rotate(180deg);}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle:focus-visible{outline:2px solid #224d7c!important;outline-offset:2px!important;}',
-  '#app #main .work.talera-r16-editor .talera-tags-panel{margin-top:10px!important;border-color:#dbe4ef!important;background:#fff!important;}',
+  // Only the expanded CHARACTERISTICS CHOICES scroll. Photo grid, toggle and\n  // original recorder/writer/publish controls remain in their existing places.\n  '#app #main .work.talera-r16-editor .talera-tags-panel{margin-top:10px!important;border-color:#dbe4ef!important;background:#fff!important;max-height:min(22dvh,220px)!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}',
   '#app #main .work.talera-r16-editor .talera-tags-selected:not(:empty){margin-top:10px!important;}',
   '#app #main .work.talera-r16-editor .work-tools.talera-r16-toolbar{margin-top:auto!important;padding-top:16px!important;padding-bottom:16px!important;background:#fff!important;border-top:0!important;}',
   '#app>.submit.talera-r16-empty-publish{background:#fff!important;border-top:0!important;box-shadow:none!important;padding:0!important;min-height:0!important;}',
   '</style>'
  ].join('');
+// Safari/other mobile browsers have different usable viewport heights.
+ // After the ORIGINAL toggle opens, bound ONLY the choices panel to the
+ // space above the existing bottom toolbar; no tag click/save handlers change.
+ const scrollScript=[
+  '<script id="talera-free-tell-topic-scroll-only">',
+  '(function(){',
+  ' const panelSelector=".work.talera-r16-editor .talera-tags-panel";',
+  ' function bound(){',
+  '  const p=document.querySelector(panelSelector);if(!p||p.hidden)return;',
+  '  const work=p.closest(".work.talera-r16-editor");',
+  '  const toolbar=work?.querySelector(".work-tools.talera-r16-toolbar");',
+  '  const vv=window.visualViewport;',
+  '  const bottom=(vv?vv.offsetTop+vv.height:window.innerHeight);',
+  '  const top=p.getBoundingClientRect().top;',
+  '  const toolbarHeight=toolbar?.getBoundingClientRect().height||80;',
+  '  const available=Math.floor(bottom-top-toolbarHeight-30);',
+  '  const cap=Math.min(220,Math.floor((vv?.height||window.innerHeight)*.25));',
+  '  p.style.setProperty("max-height",Math.max(72,Math.min(cap,available))+"px","important");',
+  ' }',
+  ' document.addEventListener("click",function(e){',
+  '  if(e.target.closest(".work.talera-r16-editor .talera-tags-toggle"))',
+  '    requestAnimationFrame(bound);',
+  ' });',
+  ' window.addEventListener("resize",bound,{passive:true});',
+  ' window.visualViewport?.addEventListener("resize",bound,{passive:true});',
+  ' requestAnimationFrame(bound);',
+  '})();',
+  '</script>'
+ ].join('');
  assert.equal(html.split('</head>').length,2,'TELL_LAYOUT_DOCUMENT_HEAD_CHANGED');
- return html.replace('</head>',css+'</head>');
+ assert.equal(html.split('</body>').length,2,'TELL_LAYOUT_DOCUMENT_BODY_CHANGED');
+ return html.replace('</head>',css+'</head>').replace('</body>',scrollScript+'</body>');
 }
 // Reuse the ORIGINAL RH19 presentation and V3 swipe engine for topic routes.
 // Only current authenticated account's local stories may enter these selections.

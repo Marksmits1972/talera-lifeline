@@ -19,6 +19,39 @@ permissions:
   actions: read
 
 jobs:
+  f5_actual_registration_button:
+    name: Diagnose real TALERA account confirmation button in SAME app
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build exact original TALERA Free interface
+        run: |
+          npm ci
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Run existing synthetic account browser regression without unrelated photo-slider checks
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const path='r20-dev/free-10m-f5/f5-browser-account-isolation.mjs';
+          const original=fs.readFileSync(path,'utf8');
+          const token='chromium.launch({headless:true})';
+          assert.equal(original.split(token).length,2);
+          fs.writeFileSync(path,original.replace(token,
+            'chromium.launch({channel:"chrome",headless:true})'));
+          NODE
+          node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
+
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
     runs-on: ubuntu-24.04

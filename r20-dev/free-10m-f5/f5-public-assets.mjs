@@ -1183,48 +1183,121 @@ function stripBundledExamplePhotoLinks(html){
 // explicit same-origin Home URL fragment lets that one signed-in owner
 // request a confirmed reset without affecting anyone else's account.
 // Do not add this to the signed-out guest HTML.
+// User-requested account-local reset. Accessible from the REAL Home page,
+// not only from a one-time URL fragment or a native browser confirm dialog.
+// Keep all original account IDs, menu, presentation and DB code untouched.
 function installOwnerRequestedClearAllStories(html){
  const js=String.raw`(function(){
-  if(location.pathname!=='/mijn-leven'||location.hash!=='#wis-alle-verhalen')return;
-  // Never repeat a destructive action on page refresh or browser Back.
-  history.replaceState(null,'',location.pathname+location.search);
-  async function run(){
-   let store=null;
-   for(let i=0;i<180;i++){
-    if(window.TaleraMemories?.localOnly===true&&
-       typeof window.TaleraMemories.list==='function'&&
-       typeof window.TaleraMemories.remove==='function'){
-      store=window.TaleraMemories;break;
-    }
-    await new Promise(resolve=>setTimeout(resolve,100));
-   }
-   if(!store)throw Error('Persoonlijke opslag niet beschikbaar. Er is niets verwijderd.');
-   const rows=await store.list();
-   if(!Array.isArray(rows)||rows.some(row=>
-      !row||typeof row.id!=='string'||
-      !/^local-[a-z0-9-]{8,90}$/i.test(row.id))){
-    throw Error('Ongeldige herinneringslijst. Er is niets verwijderd.');
-   }
-   if(!rows.length){alert('Je verhalenlijst is al leeg.');return;}
-   if(!confirm('Alle '+rows.length+' herinneringen van dit account op dit toestel verwijderen, inclusief de bijbehorende media? Dit kan niet ongedaan worden gemaakt.'))return;
-   for(const row of rows)await store.remove(row.id);
-   const remaining=await store.list();
-   if(!Array.isArray(remaining)||remaining.length){
-    throw Error('Er zijn nog '+(remaining?.length??'?')+' herinneringen. Probeer het opnieuw.');
-   }
-   location.replace('/mijn-leven');
+  if(location.pathname!=='/mijn-leven')return;
+  const requested=location.hash==='#wis-alle-verhalen'||
+    new URLSearchParams(location.search).has('wis-alle-verhalen');
+  if(requested)history.replaceState(null,'',location.pathname);
+  function makeEl(tag,text){
+   const e=document.createElement(tag);if(text)e.textContent=text;return e;
   }
-  void run().catch(e=>{
-   alert(String(e?.message||e));
+  async function awaitOwnStore(){
+   for(let i=0;i<180;i++){
+    const store=window.TaleraMemories;
+    if(store?.localOnly===true&&typeof store.list==='function'&&
+       typeof store.remove==='function')return store;
+    await new Promise(r=>setTimeout(r,100));
+   }
+   throw Error('Opslag van dit account is niet beschikbaar. Er is niets gewist.');
+  }
+  async function rowsForDeletion(store){
+   const rows=await store.list();
+   if(!Array.isArray(rows)||rows.some(row=>!row||
+      row.source!=='pwa-local'||typeof row.id!=='string'||
+      !/^local-[a-z0-9-]{8,90}$/i.test(row.id)))
+     throw Error('De herinneringenlijst kon niet veilig worden gecontroleerd. Er is niets gewist.');
+   return rows;
+  }
+  async function main(){
+   const store=await awaitOwnStore();
+   if(document.readyState==='loading')await new Promise(resolve=>
+      document.addEventListener('DOMContentLoaded',resolve,{once:true}));
+   const initial=await rowsForDeletion(store);
+   const host=document.getElementById('v17-year-summary');
+   if(!host)throw Error('Mijn leven is niet klaar om herinneringen te wissen.');
+   if(initial.length===0){
+    if(requested)alert('Je eigen verhalenlijst is al leeg.');
+    return;
+   }
+   let busy=false;
+   const trigger=makeEl('button','Wis alle herinneringen');
+   trigger.id='talera-owner-clear-stories';trigger.type='button';
+   trigger.style.cssText='display:block;margin:6px 0 0;padding:5px 8px;'+
+     'border:1px solid #b9c6d8;border-radius:7px;background:#fff;'+
+     'color:#27496d;font:600 12px system-ui;cursor:pointer;';
+   trigger.setAttribute('aria-label','Wis alle eigen herinneringen van dit account');
+   host.insertAdjacentElement('afterend',trigger);
+   function modal(){
+    if(document.getElementById('talera-owner-clear-confirm'))return;
+    const shade=makeEl('div');shade.id='talera-owner-clear-confirm';
+    shade.style.cssText='position:fixed;inset:0;z-index:2147483600;'+
+      'background:rgba(7,26,61,.70);display:flex;align-items:center;'+
+      'justify-content:center;padding:20px;box-sizing:border-box;';
+    const panel=makeEl('section');panel.setAttribute('role','dialog');
+    panel.setAttribute('aria-modal','true');
+    panel.setAttribute('aria-labelledby','talera-clear-title');
+    panel.style.cssText='background:#fff;color:#071a3d;border-radius:16px;'+
+      'padding:22px;max-width:450px;width:100%;box-sizing:border-box;'+
+      'font:16px/1.5 system-ui;box-shadow:0 15px 38px #0004;';
+    const heading=makeEl('h2','Alle herinneringen verwijderen?');
+    heading.id='talera-clear-title';heading.style.cssText='font-size:22px;margin:0 0 10px';
+    const info=makeEl('p');info.style.cssText='margin:0 0 18px';
+    const status=makeEl('p');status.id='talera-clear-result';
+    status.style.cssText='min-height:1.5em;margin:10px 0';
+    const actions=makeEl('div');actions.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
+    const cancel=makeEl('button','Annuleren');cancel.type='button';
+    const confirm=makeEl('button','Ja, verwijder alles');confirm.type='button';
+    for(const b of [cancel,confirm])b.style.cssText='padding:12px;border-radius:9px;'+
+      'font:600 15px system-ui;border:1px solid #9aa9bd;cursor:pointer';
+    confirm.id='talera-clear-confirm-button';
+    confirm.style.background='#091d44';confirm.style.color='white';
+    cancel.addEventListener('click',()=>{if(!busy)shade.remove()});
+    confirm.addEventListener('click',async()=>{
+     if(busy)return;busy=true;cancel.disabled=true;confirm.disabled=true;
+     try{
+      const latest=await rowsForDeletion(store);
+      info.textContent='Bezig met verwijderen van '+latest.length+' herinneringen…';
+      for(const row of latest)await store.remove(row.id);
+      const remaining=await rowsForDeletion(store);
+      if(remaining.length)throw Error(remaining.length+' herinneringen staan er nog.');
+      status.textContent='Alle herinneringen zijn verwijderd. Mijn leven wordt opnieuw geopend.';
+      // Verify the original store is empty BEFORE reloading; the fresh Home
+      // will rehydrate the same per-account IndexedDB without a stale cover.
+      location.replace('/mijn-leven');
+     }catch(err){
+      status.textContent=String(err?.message||err);
+      busy=false;cancel.disabled=false;confirm.disabled=false;
+     }
+    });
+    panel.append(heading,info,status,actions);actions.append(cancel,confirm);
+    shade.append(panel);document.body.append(shade);
+    void rowsForDeletion(store).then(rows=>{
+      info.textContent='Je verwijdert '+rows.length+' eigen herinneringen, inclusief de bijbehorende lokale foto’s, video’s en opnamen. Dit kan niet ongedaan worden gemaakt.';
+      if(!rows.length){status.textContent='Je verhalenlijst is al leeg.';confirm.disabled=true;}
+    }).catch(err=>{status.textContent=String(err?.message||err);confirm.disabled=true});
+    cancel.focus();
+   }
+   trigger.addEventListener('click',modal);
+   if(requested)modal();
+  }
+  void main().catch(e=>{
+   const message=String(e?.message||e);
+   if(requested)alert(message);
+   else console.error('TALERA_OWNER_CLEAR_UNAVAILABLE',message);
   });
  })();`;
  assert.ok(html.includes('window.TaleraMemories=')&&
-   html.includes('</body>')&&
+   html.includes('id="v17-year-summary"')&&html.includes('</body>')&&
    !html.includes('id="talera-owner-delete-on-request"'),
    'OWNER_CLEAR_ORIGINAL_SCOPED_STORE_NOT_FOUND');
  return html.replace('</body>',
   '<script id="talera-owner-delete-on-request">'+js+'</script></body>');
 }
+
 // Build the logged-out entry from the very same zero-example source.
 // The old immutable 7-Nov shell held 500 demonstrations and could reappear
 // whenever an iPhone session expired. NEVER serve that snapshot as a fallback.

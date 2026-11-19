@@ -1208,6 +1208,13 @@ function installOwnerRequestedClearAllStories(html){
     'color:#091e43;font:bold 20px/1.5 system-ui;';
    status.textContent='Je herinneringen worden verwijderd…';
    document.body.appendChild(status);
+   const onceKey='talera-free-owner-cleanup-cfd3450b58ef9410b64a26cc84c2045c';
+   try{
+    if(localStorage.getItem(onceKey)==='done'){
+     status.textContent='Dit eenmalige wisadres is al gebruikt.';
+     location.replace('/mijn-leven');return;
+    }
+   }catch(_){}
    for(let i=0;i<180;i++){
     const s=window.TaleraMemories;
     if(s?.localOnly===true&&typeof s.list==='function'&&typeof s.remove==='function'){
@@ -1220,6 +1227,7 @@ function installOwnerRequestedClearAllStories(html){
      const still=await s.list();
      if(!Array.isArray(still)||still.length!==0)
       throw Error('Niet alle herinneringen zijn verwijderd.');
+     if(list.length)try{localStorage.setItem(onceKey,'done')}catch(_){}
      status.textContent='Je herinneringen zijn verwijderd.';
      location.replace('/mijn-leven');
      return;

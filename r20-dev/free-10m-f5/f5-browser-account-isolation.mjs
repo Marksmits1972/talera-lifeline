@@ -315,7 +315,12 @@ async function assertSignedOutEmpty(page,previousStoryId){
        previousStoryInPage:(document.body?.innerText||'').includes(
          'synthetic ACCOUNT ISOLATION 1'),
        visibleHero:heroVisible,
-       demoCards:[...document.querySelectorAll('#demoCards > *')].length
+       demoCards:[...document.querySelectorAll('#demoCards > *')].length,
+       guestEditorLayout:!!document.getElementById('talera-free-tell-layout-only'),
+       guestEditorMovesTags:[...document.scripts].some(script=>
+         script.textContent.includes("media.insertAdjacentElement('afterend',box)")),
+       guestEditorHasTopicPrompt:[...document.scripts].some(script=>
+         script.textContent.includes('Waar gaat deze herinnering over?'))
      };
    },previousStoryId);
    assert.equal(state.sessionStatus,401,'Signed-out account must be revoked '+route);
@@ -329,6 +334,11 @@ async function assertSignedOutEmpty(page,previousStoryId){
      'Signed-out presentation selected a private memory '+route);
    assert.equal(state.previousStoryInPage,false,
      'Signed-out page still contains original story text '+route);
+   if(route==='/tell'){
+     assert.ok(state.guestEditorLayout&&state.guestEditorMovesTags&&
+       state.guestEditorHasTopicPrompt,
+       'Signed-out Tell must render SAME approved layout, not old editor');
+   }
    if(route==='/mijn-leven'){
      assert.equal(state.visibleHero,null,'Signed-out Home shows old private photo');
      assert.equal(state.demoCards,0,'Signed-out Home must not add example cards');

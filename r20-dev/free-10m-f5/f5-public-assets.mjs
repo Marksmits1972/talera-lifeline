@@ -708,6 +708,18 @@ function polishTellEditorLayout(html){
    " };\n"+
    " placeBelowMedia();\n"+
    " if(box.parentElement===details)requestAnimationFrame(placeBelowMedia);");
+ // The signed-out editor has the original one-line label. Keep its
+ // EXISTING tag button, events and tags intact, but present the SAME visible
+ // localized question as the authenticated editor. Visual text only.
+ const legacyPrompt="  toggle.textContent='＋ '+text('tag.add','Kenmerk toevoegen');";
+ if(owner.includes(legacyPrompt)){
+  const humanPrompt="  const lang=String(window.TaleraI18n?.language||'nl').slice(0,2);\\n"+
+    "  const names={nl:'Waar gaat deze herinnering over?',en:'What is this memory about?',\\n"+
+    "    de:'Worum geht es in dieser Erinnerung?',fr:'De quoi parle ce souvenir ?',\\n"+
+    "    es:'¿De qué trata este recuerdo?'};\\n"+
+    "  toggle.textContent='＋ '+(names[lang]||names.nl);";
+  owner=owner.replace(legacyPrompt,humanPrompt);
+ }
  html=html.slice(0,start)+owner+html.slice(end+1);
  const css=[
   '<style id="talera-free-tell-layout-only">',

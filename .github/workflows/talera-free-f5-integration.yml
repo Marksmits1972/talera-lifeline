@@ -1083,3 +1083,30 @@ jobs:
       - name: Restore previous TALERA version if deploy or postdeploy verification fails
         if: ${{ failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure') }}
         run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after failed no-example release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
+
+  diagnose_owner_local_delete_source_20261119:
+    name: Audit original local story delete method in same TALERA code
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node r20-dev/free-10m-delivery/build.mjs
+      - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Show only static original deletion method from account-scoped page source
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const {referencePages}=await import('./r20-dev/free-10m-f5/generated/public-template-map.mjs');
+          const html=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages['/mijn-leven'],'utf8');
+          const p=html.indexOf('async function remove(')>=0?html.indexOf('async function remove('):html.indexOf('function remove(');
+          assert.ok(p>=0,'Original memory deletion source missing');
+          console.log('TALERA_ORIGINAL_REMOVE_SOURCE',html.slice(p,p+2100));
+          assert.ok(html.includes('talera-owner-delete-on-request'),'Owner clear path must be in same signed-in Home');
+          NODE

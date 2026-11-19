@@ -1245,3 +1245,20 @@ jobs:
             sameBindingsAsApproved:currentInfo.bindingsDigest===officialInfo.bindingsDigest};
           console.log('TALERA_SAME_ORIGIN_ACTUAL_VERSION_READ_ONLY',JSON.stringify(data));
           NODE
+
+  f5_owner_reset_exact_home_smoke:
+    name: Verify in-app deletion on exact generated TALERA Home, no other app
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node r20-dev/free-10m-delivery/build.mjs
+      - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Exercise actual signed-in Home reset button and link with account-local store
+        run: node r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs

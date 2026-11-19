@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
-import {mkdirSync,readFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium,devices} from 'playwright';
@@ -14,6 +14,7 @@ const generated=path.join(here,'generated');
 mkdirSync(generated,{recursive:true});
 const origin='http://127.0.0.1:8829',gate='1'.repeat(64);
 const testKey=randomUUID().replaceAll('-','').slice(0,12);
+const syntheticStoragePath=path.join(generated,'browser-account-test-'+testKey);
 const users=[1,2].map(n=>({
   email:'f5-browser-account-'+testKey+'-'+n+'@example.invalid',
   username:'f5browser'+testKey+n,
@@ -27,7 +28,7 @@ async function workerStart(){
   const executable=path.resolve('node_modules/.bin/wrangler');
   worker=spawn(executable,['dev','--local','--ip','127.0.0.1','--port','8829',
     '--config',path.join(here,'wrangler.jsonc'),'--persist-to',
-    path.join(generated,'browser-account-test-'+testKey),
+    syntheticStoragePath,
     '--var','STAGING_F5_KEY:'+gate,'--var','STAGING_ACCESS_KEY:'+'2'.repeat(64),
     '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
     '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_F5_ACCOUNT_BROWSER_ONLY_NEVER_PRODUCTION_20261109',
@@ -204,6 +205,58 @@ async function inventory(page){
    return {ids:rows.map(r=>r.id),
      dbs:(await indexedDB.databases()).map(x=>x.name)};
  });
+}
+// Logout hides private memories without deleting their original IndexedDB bytes.
+// A fresh request to ALL THREE original PWA screens must contain zero personal
+// records; no test data is ever uploaded to the deployed app or other accounts.
+async function assertSignedOutEmpty(page,previousStoryId){
+ const immediate=await page.evaluate(async()=>({
+   count:(await window.TaleraMemories.list()).length,
+   previousIdVisible:(document.body?.innerText||'').includes('synthetic ACCOUNT ISOLATION 1')
+ }));
+ assert.equal(immediate.count,0,'Logout must immediately hide private story rows');
+ assert.equal(immediate.previousIdVisible,false,
+   'Logout must immediately remove old account story text');
+ const checked=[];
+ for(const route of ['/mijn-leven','/present','/tell']){
+   const response=await page.goto(origin+route,{waitUntil:'domcontentloaded'});
+   assert.equal(response.status(),200,'Signed-out TALERA screen unavailable '+route);
+   await page.waitForFunction(()=>typeof window.TaleraMemories?.list==='function',
+     null,{timeout:18000});
+   const state=await page.evaluate(async id=>{
+     const rows=await window.TaleraMemories.list();
+     const session=await fetch('/api/me',{credentials:'same-origin'});
+     const active=window.__taleraTimelineRuntime?.currentMemory?.();
+     const hero=document.getElementById('heroImage');
+     const heroVisible=hero?.getAttribute('src')||null;
+     return {
+       rows:rows.length,previousIdInRows:rows.some(x=>x?.id===id),
+       sessionStatus:session.status,privatePresentation:!!active?._taleraLocal,
+       previousStoryInPage:(document.body?.innerText||'').includes(
+         'synthetic ACCOUNT ISOLATION 1'),
+       visibleHero:heroVisible,
+       demoCards:[...document.querySelectorAll('#demoCards > *')].length
+     };
+   },previousStoryId);
+   assert.equal(state.sessionStatus,401,'Signed-out account must be revoked '+route);
+   assert.equal(state.rows,0,'Signed-out page read a personal library '+route);
+   assert.equal(state.previousIdInRows,false,'Account story leaked to guest '+route);
+   assert.equal(state.privatePresentation,false,
+     'Signed-out presentation selected a private memory '+route);
+   assert.equal(state.previousStoryInPage,false,
+     'Signed-out page still contains original story text '+route);
+   if(route==='/mijn-leven'){
+     assert.equal(state.visibleHero,null,'Signed-out Home shows old private photo');
+     assert.equal(state.demoCards,0,'Signed-out Home must not add example cards');
+   }
+   checked.push(route);
+ }
+ const home=await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+ assert.equal(home.status(),200);
+ await waitForLibrary(page);
+ console.log('TALERA_F5_LOGOUT_ALL_THREE_SCREENS_EMPTY_PASS',
+   JSON.stringify({checked,originalMediaNeverDeleted:true,syntheticOnly:true,
+     sameDeployedOriginUntouched:true,realIphoneAccepted:false}));
 }
 let result;
 try{
@@ -555,6 +608,7 @@ try{
  assert.equal(a.kind,'photo');
  assert.ok(a.bytes>10,'Synthetic local original photo Blob was not saved');
  await logout(page);
+ await assertSignedOutEmpty(page,a.id);
  const guest=await login(page,users[1]);
  assert.equal(guest,ids[1],'Second login must switch browser to second ID');
  const beforeB=await inventory(page);
@@ -564,6 +618,7 @@ try{
  const afterB=await inventory(page);
  assert.ok(!afterB.ids.includes(a.id),'First story appeared after second save');
  await logout(page);
+ await assertSignedOutEmpty(page,b.id);
  assert.equal(await login(page,users[0]),ids[0]);
  const returning=await inventory(page);
  assert.ok(returning.ids.includes(a.id),'Returning original account lost local memory');
@@ -917,4 +972,7 @@ try{
 }finally{
  if(browser)await browser.close();
  if(worker){worker.kill('SIGTERM');await delay(300)}
+ // Remove ONLY this run's unique local synthetic Durable Object directory.
+ // Never touch browser-owner storage, other tests or a deployed TALERA Worker.
+ rmSync(syntheticStoragePath,{recursive:true,force:true});
 }

@@ -855,6 +855,8 @@ try{
            before,after,scrollHeight:panel.scrollHeight,clientHeight:panel.clientHeight,
            overflow:getComputedStyle(panel).overflowY,
            toolbarBottom:toolbar?.getBoundingClientRect().bottom,
+           toolbarTop:toolbar?.getBoundingClientRect().top,
+           panelBottom:panel.getBoundingClientRect().bottom,
            toolbarBeforeScroll,
            pageBeforeScroll,pageAfterScroll:document.scrollingElement?.scrollTop||0,
            viewport:window.visualViewport?.height||innerHeight,
@@ -868,6 +870,13 @@ try{
          'Long topic options must be bounded: '+JSON.stringify(scroller));
        assert.ok(scroller.after>scroller.before+15,
          'The final characteristic must be reachable: '+JSON.stringify(scroller));
+       const gapToActions=scroller.toolbarTop-scroller.panelBottom;
+       assert.ok(gapToActions>=9,
+         'Characteristics must not overlap the fixed action toolbar: '+JSON.stringify(scroller));
+       if(scroller.clientHeight<scroller.viewport*.35)
+         assert.ok(gapToActions<=28,
+           'Unused white gap must be given to the scrollable characteristics: '+
+             JSON.stringify(scroller));
        assert.ok(Math.abs(scroller.toolbarBottom-scroller.toolbarBeforeScroll)<2,
          'Scrolling the choices must NOT move the original toolbar: '+
            JSON.stringify(scroller));

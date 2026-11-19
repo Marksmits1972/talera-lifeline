@@ -689,6 +689,55 @@ function shapeOwnStoryTopics(html){
  assert.ok(html.includes('talera-tags-own-input'),'Editor input must remain within original work screen');
  return html;
 }
+// TALERA Free /tell: approved spacing and visual hierarchy ONLY.
+// Keep the original tag editor instance and every existing click/save handler;
+// move its existing DOM node below the already-present native photo tiles.
+function polishTellEditorLayout(html){
+ const start=html.indexOf('function setupV20Tags(g,details){');
+ const end=html.indexOf('}function setupV10(',start);
+ assert.ok(start>0&&end>start,'TELL_LAYOUT_TAG_OWNER_MOVED');
+ let owner=html.slice(start,end+1);
+ const before=' details.append(box);';
+ assert.equal(owner.split(before).length,2,'TELL_LAYOUT_SINGLE_TAG_CONTAINER_REQUIRED');
+ owner=owner.replace(before,
+   " details.append(box);\n"+
+   " // Reposition the SAME tag container below the original photo grid.\n"+
+   " const placeBelowMedia=()=>{\n"+
+   "  const media=details.parentElement?.querySelector(':scope > .talera-work-tiles');\n"+
+   "  if(media&&box.previousElementSibling!==media)media.insertAdjacentElement('afterend',box);\n"+
+   " };\n"+
+   " placeBelowMedia();\n"+
+   " if(box.parentElement===details)requestAnimationFrame(placeBelowMedia);");
+ html=html.slice(0,start)+owner+html.slice(end+1);
+ const css=[
+  '<style id="talera-free-tell-layout-only">',
+  // The light canvas must continue to the bottom of the phone, not stop
+  // below the existing action toolbar and leave a contrasting seam.
+  'body:has(#app .talera-r16-editor){background:#fff!important;}',
+  'body:has(#app .talera-r16-editor) #app{min-height:100dvh!important;background:#fff!important;display:flex!important;flex-direction:column!important;}',
+  'body:has(#app .talera-r16-editor) #main{flex:1 0 auto!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor{flex:1 0 auto!important;min-height:calc(100dvh - 138px)!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor #details{padding:13px 0 0!important;margin:0 0 8px!important;background:#fff!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:9px!important;padding:6px 0 12px!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{padding:8px 0!important;line-height:1.38!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #dateToggle{margin:4px 0 0!important;padding:7px 0!important;line-height:1.42!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor .talera-work-tiles{margin:13px 0 10px!important;background:#fff!important;}',
+  // The original accessible toggle keeps its labels, selection state,
+  // expand/collapse logic, and selected tags; only its visual affordance changes.
+  '#app #main .work.talera-r16-editor .talera-tags-v20{flex:none;margin:10px 0 14px!important;padding:0!important;border:0!important;background:#fff!important;}',
+  '#app #main .work.talera-r16-editor .talera-tags-toggle{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;width:100%!important;min-height:56px!important;padding:13px 16px!important;border:1px solid #dbe4ef!important;border-radius:15px!important;background:#f5f8fc!important;color:#224d7c!important;text-align:left!important;font-size:15px!important;font-weight:700!important;line-height:1.32!important;cursor:pointer!important;}',
+  '#app #main .work.talera-r16-editor .talera-tags-toggle::after{content:"⌄";flex:none;font-size:24px;font-weight:400;line-height:1;transition:transform .16s ease;}',
+  '#app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]::after{transform:rotate(180deg);}',
+  '#app #main .work.talera-r16-editor .talera-tags-toggle:focus-visible{outline:2px solid #224d7c!important;outline-offset:2px!important;}',
+  '#app #main .work.talera-r16-editor .talera-tags-panel{margin-top:10px!important;border-color:#dbe4ef!important;background:#fff!important;}',
+  '#app #main .work.talera-r16-editor .talera-tags-selected:not(:empty){margin-top:10px!important;}',
+  '#app #main .work.talera-r16-editor .work-tools.talera-r16-toolbar{margin-top:auto!important;padding-top:16px!important;padding-bottom:16px!important;background:#fff!important;border-top:0!important;}',
+  '#app>.submit.talera-r16-empty-publish{background:#fff!important;border-top:0!important;box-shadow:none!important;padding:0!important;min-height:0!important;}',
+  '</style>'
+ ].join('');
+ assert.equal(html.split('</head>').length,2,'TELL_LAYOUT_DOCUMENT_HEAD_CHANGED');
+ return html.replace('</head>',css+'</head>');
+}
 // Reuse the ORIGINAL RH19 presentation and V3 swipe engine for topic routes.
 // Only current authenticated account's local stories may enter these selections.
 function filterOwnTopicPresentation(html){
@@ -1316,23 +1365,6 @@ for(const [route,filename] of Object.entries(routes)){
  writeFileSync(path.join(publicDir,'__talera_free','f5references',guestFile),guest,'utf8');
  guestPages[route]='/__talera_free/f5references/'+guestFile;
  let html=raw;
- if(route==='/tell'){
-  const findProbe=(term)=>{
-   const at=raw.indexOf(term);
-   return {term,at,sample:at<0?'':raw.slice(Math.max(0,at-520),Math.min(raw.length,at+950)).replace(/\s+/g,' ').slice(0,1460)};
-  };
-  const section=(needle,max)=>{const at=raw.indexOf(needle);return {needle,at,text:at<0?'':raw.slice(at,at+max)};};
-  console.log('TALERA_LAYOUT_FUNCTIONS',JSON.stringify([
-    section('function setupV20Tags(g,details){',7600),
-    section('function taleraV16InstallToolbar(g){',4200),
-    section('function taleraV14',2600),
-    section('.talera-v14-heading{',1600),
-    section('.talera-tags-v20{',1200),
-    section('#app .work.talera-compact-work #details',2700),
-    section('#app .work.talera-compact-work .work-tools',2400)
-  ]));
-  console.log('TALERA_LAYOUT_SOURCE_INSPECTION',JSON.stringify({sourceBytes:raw.length,probes:["function setupV20Tags(g,details)","talera-tags-v20","Kenmerk toevoegen","Bedenk een titel","Titel","Plaatsen","<main","workHeader","photoGrid","photo-grid","photoTiles","talera-work","memory-editor","media-grid","workScreen","v9-work","v9-editor"].map(findProbe)}));
- }
  if(route==='/present')html=removeBuiltInPresentationExamples(html);
  if(route==='/present')html=fixPhotoOnlyPresentation(html);
  if(route==='/present')html=fixFirstSwipePhotoLoad(html);
@@ -1353,7 +1385,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
  if(route==='/mijn-leven')html=installOwnerRequestedClearAllStories(html);
- if(route==='/tell')html=removeLegacyTellSampleImporter(shapeOwnStoryTopics(html));
+ if(route==='/tell')html=removeLegacyTellSampleImporter(polishTellEditorLayout(shapeOwnStoryTopics(html)));
  html=stripBundledExamplePhotoLinks(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);

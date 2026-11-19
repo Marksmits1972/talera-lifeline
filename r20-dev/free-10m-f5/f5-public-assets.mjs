@@ -737,7 +737,7 @@ function polishTellEditorLayout(html){
   'body:has(#app .talera-r16-editor){background:#fff!important;}',
   'body:has(#app .talera-r16-editor) #app{min-height:100dvh!important;background:#fff!important;display:flex!important;flex-direction:column!important;}',
   'body:has(#app .talera-r16-editor) #main{flex:1 0 auto!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
-  '#app #main .work.talera-compact-work.talera-r16-editor{flex:1 0 auto!important;min-height:calc(100dvh - 138px)!important;display:flex!important;flex-direction:column!important;background:#fff!important;}',
+  '#app #main .work.talera-compact-work.talera-r16-editor{flex:1 1 auto!important;min-height:0!important;max-height:calc(100dvh - 138px)!important;display:flex!important;flex-direction:column!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;background:#fff!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor #details{padding:13px 0 0!important;margin:0 0 8px!important;background:#fff!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:9px!important;padding:6px 0 12px!important;}',
   '#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{padding:8px 0!important;line-height:1.38!important;}',
@@ -752,7 +752,7 @@ function polishTellEditorLayout(html){
   '#app #main .work.talera-r16-editor .talera-tags-toggle:focus-visible{outline:2px solid #224d7c!important;outline-offset:2px!important;}',
   // Only the expanded CHARACTERISTICS CHOICES scroll. Photo grid, toggle and
   // original recorder/writer/publish controls remain in their existing places.
-  '#app #main .work.talera-r16-editor .talera-tags-panel{margin-top:10px!important;border-color:#dbe4ef!important;background:#fff!important;max-height:min(30dvh,220px)!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}',
+  '#app #main .work.talera-r16-editor .talera-tags-panel{margin-top:10px!important;border-color:#dbe4ef!important;background:#fff!important;max-height:min(30dvh,220px)!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}',
   '#app #main .work.talera-r16-editor .talera-tags-selected:not(:empty){margin-top:10px!important;}',
   '#app #main .work.talera-r16-editor .work-tools.talera-r16-toolbar{margin-top:auto!important;padding-top:16px!important;padding-bottom:16px!important;background:#fff!important;border-top:0!important;}',
   '#app>.submit.talera-r16-empty-publish{background:#fff!important;border-top:0!important;box-shadow:none!important;padding:0!important;min-height:0!important;}',

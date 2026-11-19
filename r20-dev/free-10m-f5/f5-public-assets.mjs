@@ -750,7 +750,9 @@ function polishTellEditorLayout(html){
   '#app #main .work.talera-r16-editor .talera-tags-toggle::after{content:"⌄";flex:none;font-size:24px;font-weight:400;line-height:1;transition:transform .16s ease;}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]::after{transform:rotate(180deg);}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle:focus-visible{outline:2px solid #224d7c!important;outline-offset:2px!important;}',
-  // Only the expanded CHARACTERISTICS CHOICES scroll. Photo grid, toggle and\n  // original recorder/writer/publish controls remain in their existing places.\n  '#app #main .work.talera-r16-editor .talera-tags-panel{margin-top:10px!important;border-color:#dbe4ef!important;background:#fff!important;max-height:min(22dvh,220px)!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}',
+  // Only the expanded CHARACTERISTICS CHOICES scroll. Photo grid, toggle and
+  // original recorder/writer/publish controls remain in their existing places.
+  '#app #main .work.talera-r16-editor .talera-tags-panel{margin-top:10px!important;border-color:#dbe4ef!important;background:#fff!important;max-height:min(22dvh,220px)!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}',
   '#app #main .work.talera-r16-editor .talera-tags-selected:not(:empty){margin-top:10px!important;}',
   '#app #main .work.talera-r16-editor .work-tools.talera-r16-toolbar{margin-top:auto!important;padding-top:16px!important;padding-bottom:16px!important;background:#fff!important;border-top:0!important;}',
   '#app>.submit.talera-r16-empty-publish{background:#fff!important;border-top:0!important;box-shadow:none!important;padding:0!important;min-height:0!important;}',

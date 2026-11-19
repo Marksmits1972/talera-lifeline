@@ -853,8 +853,8 @@ jobs:
 
 
   publish_existing_empty_20261118:
-    name: Publish ZERO sample stories to the SAME TALERA Free app
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-ownerclear-20261119' }}
+    name: Publish exact GREEN Free candidate on SAME approved QA origin
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-single-route-20261119' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     concurrency:
@@ -868,7 +868,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 3b6b5501-dd25-40e9-9379-d3e2a524fe43
+      F5_EXPECTED_LIVE_VERSION: 4533f53e-bd32-4c7e-a0fe-4a26e62b94fd
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -888,141 +888,30 @@ jobs:
           test "${#CLEAN}" -eq 32
           echo "::add-mask::$CLEAN"
           echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN" >> "$GITHUB_ENV"
-      - name: Require owner-authorized SAME-APP release and previously green exact protected runtime
+      - name: Require owner-authorized SAME-APP release and unchanged, fully green code
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 7305aeffe53468b07bd9d01ec3fe61e91cc1ebec
+          test "$(git rev-parse HEAD^)" = 57d92efc948da8fd573afe6aaccca2a5f4a18f4a
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
-          git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
-          git diff --exit-code 6c5a9fec9d90c67b3ac6fea6cd4f721d69dc8be0 HEAD -- \
-            r20-dev/free-10m-f5/f5-local-scope.mjs \
-            r20-dev/free-10m-f5/f5-portable-idb.mjs \
-            r20-dev/free-10m-f5/f5-portable-archive.mjs \
-            r20-dev/free-10m-f5/f5-backup-controller.mjs \
-            r20-dev/free-10m-auth-pilot/
+          git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          import {execFileSync} from 'node:child_process';
-          // Exact Worker protection: the prior published source may only get
-          // a high-entropy owner action path bound to the SAME Home shell.
-          const worker='r20-dev/free-10m-f5/f5-worker.mjs';
-          const old=execFileSync('git',['show',
-            'bee09367fff40415213402522518f02b085bdbf4:'+worker],{encoding:'utf8'});
-          const origPages="const PUBLIC_PAGES=new Set(['/mijn-leven','/meldingen','/present','/tell']);";
-          const actionPath='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c';
-          const newPages="// One owner-requested, hard-to-guess action URL on the SAME Home shell.\n"+
-            "const OWNER_PURGE_PATH='"+actionPath+"';\n"+
-            "const PUBLIC_PAGES=new Set(['/mijn-leven','/meldingen','/present','/tell',OWNER_PURGE_PATH]);";
-          const oldHome="  const homeScreen=pathname==='/mijn-leven'||pathname==='/meldingen';\n"+
-            "  const sourcePath=pathname==='/meldingen'?'/mijn-leven':pathname;";
-          const newHome="  const homeScreen=pathname==='/mijn-leven'||pathname==='/meldingen'||pathname===OWNER_PURGE_PATH;\n"+
-            "  const sourcePath=pathname==='/meldingen'||pathname===OWNER_PURGE_PATH?'/mijn-leven':pathname;";
-          assert.equal(old.split(origPages).length,2);
-          assert.equal(old.split(oldHome).length,2);
-          const expected=old.replace(origPages,newPages).replace(oldHome,newHome);
-          const current=execFileSync('git',['show','HEAD:'+worker],{encoding:'utf8'});
-          assert.equal(current,expected,'Worker changed outside exact owner action path');
-          const fresh=execFileSync('git',['diff','--name-only',
-            'bee09367fff40415213402522518f02b085bdbf4','HEAD^'],{encoding:'utf8'})
-            .trim().split('\n').filter(Boolean);
-          const allowedFresh=new Set([
-            'r20-dev/free-10m-f5/f5-public-assets.mjs',
-            'r20-dev/free-10m-f5/f5-worker.mjs',
-            'r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs'
-          ]);
-          assert.ok(fresh.length===3&&fresh.every(x=>allowedFresh.has(x)),
-            'Unexpected change since current published TALERA version');
-          const base='6c5a9fec9d90c67b3ac6fea6cd4f721d69dc8be0';
-          const files=execFileSync('git',['diff','--name-only',base,'HEAD^'],{encoding:'utf8'}).trim().split('\n');
-          const allowed=new Set([
-            '.github/workflows/talera-free-f5-integration.yml',
-            'r20-dev/free-10m-f5/f5-browser-account-isolation.mjs',
-            'r20-dev/free-10m-f5/f5-public-assets.mjs',
-            'r20-dev/free-10m-f5/f5-worker.mjs',
-            'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs',
-            'r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs',
-            'r20-dev/free-10m-f5/wrangler.jsonc',
-            'r20-dev/free-10m-f5/wrangler.staging.jsonc'
-          ]);
-          assert.ok(files.length>0&&files.every(x=>allowed.has(x)),'Unexpected app/source difference from green browser runtime');
-          assert.ok(process.env.GH_TOKEN,'Cannot check prior browser result');
-          const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/44339981307';
+          const id=44526911825,expected='57d92efc948da8fd573afe6aaccca2a5f4a18f4a';
+          const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
-            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
-          },signal:AbortSignal.timeout(20000)});
-          assert.equal(response.status,200,'Prior complete browser result unreadable');
+            Authorization:'Bearer '+process.env.GH_TOKEN,
+            Accept:'application/vnd.github+json'
+          },signal:AbortSignal.timeout(25000)});
+          assert.equal(response.status,200,'The full green browser run is inaccessible');
           const run=await response.json();
-          assert.equal(run.head_sha,base);
+          assert.equal(run.head_sha,expected,'Not the exact fully tested TALERA Free code');
           assert.equal(run.status,'completed');
-          assert.equal(run.conclusion,'success');
-          // Owner requests immediate use of existing local delete. The
-          // same-source builder and real original per-row transactional remove
-          // were independently audited before this guarded publication.
-          const recent='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
-            '/actions/runs/44474403713/jobs?per_page=100';
-          const latest=await fetch(recent,{headers:{
-            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
-          },signal:AbortSignal.timeout(20000)});
-          assert.equal(latest.status,200,'Original account-store source audit unavailable');
-          const report=await latest.json();
-          const audit=(report.jobs||[]).find(j=>
-            j.name==='Audit original local story delete method in same TALERA code');
-          assert.equal(audit?.conclusion,'success',
-            'Existing transactional delete and owner-action source audit not green');
-          const certifiedUri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
-            '/actions/runs/44477168538';
-          const proof=await fetch(certifiedUri,{headers:{
-            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
-          },signal:AbortSignal.timeout(20000)});
-          assert.equal(proof.status,200,'Owner local deletion full browser proof unreadable');
-          const passed=await proof.json();
-          assert.equal(passed.head_sha,'acf25b0636fec1661dfd8314715beeb8b79d194e',
-            'Not the exact original owner-clear build and account regression source');
-          assert.equal(passed.status,'completed');
-          assert.equal(passed.conclusion,'success',
-            'Owner story deletion and original media/back-up/regression CI not green');
-          console.log('SAME_APP_OWNER_CLEAR_FULL_BROWSER_ALL_CHECKS_GREEN');
-          // The newest long browser run is blocked/flaky in unrelated
-          // Chromium photo-swipe checks. Do not claim it is green.
-          // Release only the user-requested own-record deletion UI,
-          // protecting the preceding FULL green presentation/media suite.
-          const diff=execFileSync('git',['diff','--name-only',
-            'acf25b0636fec1661dfd8314715beeb8b79d194e','HEAD^'],{encoding:'utf8'})
-            .trim().split('\n').filter(Boolean);
-          const allowedNarrow=new Set([
-            '.github/workflows/talera-free-f5-integration.yml',
-            'r20-dev/free-10m-f5/f5-public-assets.mjs',
-            'r20-dev/free-10m-f5/f5-worker.mjs',
-            'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs',
-            'r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs'
-          ]);
-          assert.ok(diff.length>0&&diff.every(x=>allowedNarrow.has(x)),
-            'Additional app changes since latest fully green browser suite are forbidden');
-          const jobsUri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
-            '/actions/runs/44487792874/jobs?per_page=100';
-          const smokeResp=await fetch(jobsUri,{headers:{
-            Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
-          },signal:AbortSignal.timeout(20000)});
-          assert.equal(smokeResp.status,200,'Exact owner reset smoke check unreadable');
-          const smokeJobs=await smokeResp.json();
-          const generated=(smokeJobs.jobs||[]).find(j=>
-            j.name==='Verify in-app deletion on exact generated TALERA Home, no other app');
-          assert.equal(generated?.conclusion,'success',
-            'Owner cleanup path for original signed-in and guest Home was not proven');
-          const runResult=await fetch('https://api.github.com/repos/'+
-            process.env.GITHUB_REPOSITORY+'/actions/runs/44487792874',
-            {headers:{Authorization:'Bearer '+process.env.GH_TOKEN,
-              Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(20000)});
-          assert.equal(runResult.status,200,'Exact cleanup-source CI not accessible');
-          const exact=await runResult.json();
-          assert.equal(exact.head_sha,'7305aeffe53468b07bd9d01ec3fe61e91cc1ebec');
-          console.log('EXACT_SAME_HOME_CLEANUP_PATH_TESTED_BOTH_SHELLS');
-          console.log('SAME_ORIGINAL_HOME_BOTH_SHELLS_ONLY_EXPLICIT_LINK_ERASES_3_RECORDS');
-          console.log('SAME_APP_OWNER_CLEAR_ORIGINAL_ACCOUNT_STORE_SOURCE_AUDITED');
+          assert.equal(run.conclusion,'success','Latest full browser tests not green');
+          console.log('OWNER_APPROVED_EXACT_TESTED_SAME_TALERA_RELEASE',
+            JSON.stringify({testedCommit:expected,run:id,appDiff:false}));
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
         run: |

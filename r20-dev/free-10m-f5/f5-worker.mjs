@@ -161,6 +161,11 @@ function allowedLocalUiSearch(url){
   // by F5's local-memory-only query filter (real iPhone 404). Permit only
   // the literal original hub entry, with no extra parameters or redirects.
   if(url.pathname==='/present'&&key==='talera_menu'&&id==='hub')return true;
+  // Owner explicitly chose to purge locally saved stories on the SAME device.
+  // No ordinary page request is destructive. The account store is never
+  // selected by URL: only the browser's existing local TaleraMemories store.
+  if(url.pathname==='/mijn-leven'&&key==='wis-alle-verhalen'&&id==='nu')return true;
+
   // The already-approved home has shortcut URLs for year browsing and its
   // original sample memories. Do not invent a new timeline or open any API:
   // validate ONLY those literal existing first-party presentation selectors.

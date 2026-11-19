@@ -280,6 +280,19 @@ try{
    const pageResult=await page.goto(origin+route,{waitUntil:'domcontentloaded'});
    assert.equal(pageResult.status(),200,'Original page unavailable: '+route);
    await page.waitForTimeout(1500);
+   // An old, unscoped guest database may remain on a real iPhone from earlier
+   // F5 builds. No signed-out route may expose it or publish more records.
+   const guestLibrary=await page.evaluate(async()=>{
+     const store=window.TaleraMemories;
+     if(!store?.localOnly||typeof store.list!=='function')return {available:false};
+     const rows=await store.list();
+     let publishRejected=false;
+     try{await store.save({title:'Synthetisch gastverhaal',date:'2001-01-01',text:'geen data'},[])}
+     catch{publishRejected=true}
+     return {available:true,records:rows.length,publishRejected};
+   });
+   assert.deepEqual(guestLibrary,{available:true,records:0,publishRejected:true},
+     'Signed-out TALERA route must not access or write any unscoped guest records: '+route);
    const check=await page.evaluate(()=>({
      menu:!!document.getElementById('talera-more-menu'),
      library:typeof window.TaleraMemories?.list,

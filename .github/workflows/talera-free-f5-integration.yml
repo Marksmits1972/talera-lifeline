@@ -858,7 +858,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 2883afae-2299-4c15-bacd-d5bb593cee1b
+      F5_EXPECTED_LIVE_VERSION: 4673cd54-b665-4550-862e-10b060749068
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -884,12 +884,11 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = b6828e8010af94543d7a6de81016932488a728b1
+          test "$(git rev-parse HEAD^)" = d3226902a87852643f608e182ab96ceeb1444628
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git merge-base --is-ancestor 10021f4e5dda4d11256b7e991f3f1bd01e9baf30 HEAD
           git merge-base --is-ancestor ff34c64540b42f1cfd1734a6a053a4b5398047cb HEAD
           git diff --exit-code 6c5a9fec9d90c67b3ac6fea6cd4f721d69dc8be0 HEAD -- \
-            r20-dev/free-10m-f5/f5-worker.mjs \
             r20-dev/free-10m-f5/f5-local-scope.mjs \
             r20-dev/free-10m-f5/f5-portable-idb.mjs \
             r20-dev/free-10m-f5/f5-portable-archive.mjs \
@@ -898,12 +897,30 @@ jobs:
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import {execFileSync} from 'node:child_process';
+          // Exactly one explicitly allowed URL-gate change to the original Worker.
+          // No original account, presentation or private media logic changed.
+          const worker='r20-dev/free-10m-f5/f5-worker.mjs';
+          const originalWorker=execFileSync('git',['show',
+            'c94ee603314c1ac5711558186138521deeb4ab48:'+worker],{encoding:'utf8'});
+          const anchor="  if(url.pathname==='/present'&&key==='talera_menu'&&id==='hub')return true;";
+          const addition=[
+            '  // Owner explicitly chose to purge locally saved stories on the SAME device.',
+            '  // No ordinary page request is destructive. The account store is never',
+            "  // selected by URL: only the browser's existing local TaleraMemories store.",
+            "  if(url.pathname==='/mijn-leven'&&key==='wis-alle-verhalen'&&id==='nu')return true;",
+            ''
+          ].join('\n');
+          assert.equal(originalWorker.split(anchor).length,2);
+          const expectedWorker=originalWorker.replace(anchor,anchor+'\n'+addition);
+          const currentWorker=execFileSync('git',['show','HEAD:'+worker],{encoding:'utf8'});
+          assert.equal(currentWorker,expectedWorker,'Unexpected Worker changes outside single purge URL gate');
           const base='6c5a9fec9d90c67b3ac6fea6cd4f721d69dc8be0';
           const files=execFileSync('git',['diff','--name-only',base,'HEAD^'],{encoding:'utf8'}).trim().split('\n');
           const allowed=new Set([
             '.github/workflows/talera-free-f5-integration.yml',
             'r20-dev/free-10m-f5/f5-browser-account-isolation.mjs',
             'r20-dev/free-10m-f5/f5-public-assets.mjs',
+            'r20-dev/free-10m-f5/f5-worker.mjs',
             'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs',
             'r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs',
             'r20-dev/free-10m-f5/wrangler.jsonc',
@@ -957,13 +974,14 @@ jobs:
           const allowedNarrow=new Set([
             '.github/workflows/talera-free-f5-integration.yml',
             'r20-dev/free-10m-f5/f5-public-assets.mjs',
+            'r20-dev/free-10m-f5/f5-worker.mjs',
             'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs',
             'r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs'
           ]);
           assert.ok(diff.length>0&&diff.every(x=>allowedNarrow.has(x)),
             'Additional app changes since latest fully green browser suite are forbidden');
           const jobsUri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+
-            '/actions/runs/44483209261/jobs?per_page=100';
+            '/actions/runs/44484929172/jobs?per_page=100';
           const smokeResp=await fetch(jobsUri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'
           },signal:AbortSignal.timeout(20000)});
@@ -972,8 +990,8 @@ jobs:
           const generated=(smokeJobs.jobs||[]).find(j=>
             j.name==='Verify in-app deletion on exact generated TALERA Home, no other app');
           assert.equal(generated?.conclusion,'success',
-            'Visible button, same account-only removal and URL reset not proven');
-          console.log('SAME_ORIGINAL_HOME_3_ROWS_DELETED_BUTTON_AND_LINK_PROVEN');
+            'One-time reset of three records in both existing TALERA Home shells not proven');
+          console.log('SAME_ORIGINAL_HOME_BOTH_SHELLS_ONLY_EXPLICIT_LINK_ERASES_3_RECORDS');
           console.log('SAME_APP_OWNER_CLEAR_ORIGINAL_ACCOUNT_STORE_SOURCE_AUDITED');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
@@ -1059,12 +1077,13 @@ jobs:
                 assert.ok(html.includes('window.__taleraReferenceMemories=[];'));
                 if(collection===referencePages){
                   assert.ok(html.includes('id="talera-owner-delete-on-request"')&&
-                    html.includes("Wis alle herinneringen")&&
-                    html.includes("talera-clear-confirm-button"),
-                    'Owner visible in-app wipe control missing from signed-in Home');
+                    html.includes("wis-alle-verhalen")&&
+                    !html.includes("talera-clear-confirm-button"),
+                    'Owner single-use reset missing from signed-in Home');
                 }else{
-                  assert.ok(!html.includes('id="talera-owner-delete-on-request"'),
-                    'Guest MUST NOT be able to delete anyone else local story records');
+                  assert.ok(html.includes('id="talera-owner-delete-on-request"')&&
+                    html.includes("wis-alle-verhalen"),
+                    'Owner one-time same-device reset missing from guest Home');
                 }
               }
               if(route==='/present')assert.ok(html.includes('const MEMORIES = [];'));
@@ -1130,6 +1149,8 @@ jobs:
             test "$(curl -fsS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$route")" = 200
           done
           test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/__f5/backup")" = 401
+          curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven?wis-alle-verhalen=nu" >/tmp/talera-guest-wipe.html
+          grep -Fq 'id="talera-owner-delete-on-request"' /tmp/talera-guest-wipe.html
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven" >/tmp/talera-empty-home.html
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/present" >/tmp/talera-empty-present.html
           node --input-type=module <<'NODE'

@@ -759,6 +759,13 @@ function polishTellEditorLayout(html){
   // the room left above it.
   '@media (min-height:760px){#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading{gap:9px!important;}#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{padding:5px 0!important;}#app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #dateToggle{padding:6px 0!important;}#app #main .work.talera-compact-work.talera-r16-editor .talera-work-tiles{margin:10px 0!important;}#app #main .work.talera-r16-editor .talera-tags-v20{margin:8px 0!important;}}',
   '#app #main .work.talera-r16-editor .work-tools.talera-r16-toolbar{margin-top:auto!important;padding-top:16px!important;padding-bottom:16px!important;background:#fff!important;border-top:0!important;}',
+  // Reuse the ORIGINAL writing overlay and original image/object URLs:
+  // six real photos begin visibly above the original textarea, and both
+  // naturally scroll in its EXISTING writer-body as V4 grows the typed text.
+  // The previous keyboard rule hid photos on focus. Override it specifically.
+  '#taleraWriterOverlay #taleraWriterPhotos:not([hidden]){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;align-items:start!important;padding:8px 2px 10px!important;margin:0 0 10px!important;}',
+  'body.talera-writer-keyboard-open #taleraWriterOverlay #taleraWriterPhotos:not([hidden]){display:grid!important;}',
+  '#taleraWriterOverlay #taleraWriterPhotos .talera-writer-thumbnail{aspect-ratio:1!important;max-height:none!important;}',
   '#app>.submit.talera-r16-empty-publish{background:#fff!important;border-top:0!important;box-shadow:none!important;padding:0!important;min-height:0!important;}',
   '</style>'
  ].join('');

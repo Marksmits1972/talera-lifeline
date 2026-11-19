@@ -281,7 +281,22 @@ try{
   // Real iPhone report 19 Nov: Home shows a genuine owner photo and "3 eigen"
   // yet tapping that very photo lands on a white presentation. Follow the
   // ORIGINAL Home photo tap: never fabricate or directly navigate the URL.
-  await page.locator('#heroImage').click({timeout:7000});
+  // Tap the VISIBLE photo area above the white Home sheet. Clicking the
+  // image element's geometric centre lands behind the sheet on iPhone.
+  const exposedHeroPoint=await page.evaluate(()=>{
+    const image=document.getElementById('heroImage')?.getBoundingClientRect();
+    const sheet=document.getElementById('sheet')?.getBoundingClientRect();
+    if(!image||!sheet)return null;
+    const x=image.left+image.width*0.52;
+    const y=Math.min(sheet.top-70,image.top+image.height*0.46);
+    const target=document.elementFromPoint(x,y);
+    return {x,y,imageBottom:image.bottom,sheetTop:sheet.top,
+      targetTag:target?.tagName,targetId:target?.id||'',
+      isAboveSheet:y<sheet.top};
+  });
+  assert.ok(exposedHeroPoint?.isAboveSheet,'Original Home photo not exposed above white sheet');
+  console.log('TALERA_HOME_EXPOSED_PHOTO_TAP_POINT',JSON.stringify(exposedHeroPoint));
+  await page.mouse.click(exposedHeroPoint.x,exposedHeroPoint.y);
   await page.waitForFunction(()=>location.pathname==='/present',null,{timeout:12000});
   await page.waitForFunction(id=>{
     const mem=window.__taleraTimelineRuntime?.currentMemory?.();

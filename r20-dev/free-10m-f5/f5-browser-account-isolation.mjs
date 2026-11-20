@@ -1721,6 +1721,44 @@ try{
      assert.equal(guestFeedback.commentCount,1);
      assert.equal(guestFeedback.comments[0].name,'Iris');
      assert.ok(!guestFeedback.accountName,'Anonymous guest requires no TALERA account');
+     // An owner-authenticated private TALERA comment on the very SAME memory
+     // must never appear in the WhatsApp guest's token-scoped response.
+     const shareRequest=shareNetwork.find(x=>x.method==='POST'&&
+       /^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(x.path));
+     assert.ok(shareRequest,'Existing social owner route must be known');
+     const sharedStoryId=shareRequest.path.split('/')[3];
+     const internalText='PRIVATE_TALERA_COMMENT_MUST_NOT_LEAK_TO_GUEST';
+     const privateComment=await sharePage.evaluate(async({id,text})=>{
+       const result=await fetch('/__social/memory/'+id+'/comment',{
+         method:'POST',credentials:'same-origin',
+         headers:{'content-type':'application/json'},
+         body:JSON.stringify({body:text})
+       });
+       return {status:result.status,data:await result.json()};
+     },{id:sharedStoryId,text:internalText});
+     assert.equal(privateComment.status,200,
+       'Original signed-in conversation remains functional');
+     const privateView=await sharePage.evaluate(async id=>{
+       const result=await fetch('/__social/memory/'+id+'/view',{
+         credentials:'same-origin'});
+       return {status:result.status,data:await result.json()};
+     },sharedStoryId);
+     assert.equal(privateView.status,200);
+     assert.ok(privateView.data.comments?.some(x=>x.body===internalText),
+       'Signed-in owner must keep their original private comment');
+     const guestPrivateProbe=await guest.request.get(issued.link+'/feedback');
+     assert.equal(guestPrivateProbe.status(),200);
+     const guestIsolated=await guestPrivateProbe.json();
+     assert.equal(guestIsolated.commentCount,1,
+       'Account-only private comments may not be counted by guest');
+     assert.equal(guestIsolated.likes,1,
+       'Only the hearts on this invitation may be counted');
+     assert.ok(guestIsolated.comments.every(x=>x.body!==internalText),
+       'Private account messages must never leak to a share-token recipient');
+     console.log('TALERA_FREE_ONE_GUEST_SHARE_PRIVATE_ACCOUNT_COMMENT_ISOLATION_PASS',
+       JSON.stringify({guestComments:guestIsolated.commentCount,
+        originalPrivateCommentStillPresent:true,originalPresenterUnchanged:true}));
+
      const alienReaction=await guest.request.post(issued.link+'/heart',{
        headers:{origin:'https://attacker.invalid','content-type':'application/json'},
        data:{guestId:'00000000-0000-4000-8000-000000000000'}});

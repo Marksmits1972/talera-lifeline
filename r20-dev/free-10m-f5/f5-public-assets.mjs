@@ -1939,6 +1939,9 @@ function taleraUploadMediaProgress(path,blob,label){
 async function taleraVerifiedGuestShareMime(item,original,position){
  const declared=String(original.type||item.mime||'').split(';')[0].trim().toLowerCase();
  const expected=item.kind==='photo'?'image/':item.kind+'/';
+ const major=declared.split('/')[0];
+ if(['image','video','audio'].includes(major)&&!declared.startsWith(expected))
+  throw Error('Origineel bestand '+position+' heeft een ander mediatype dan de bibliotheek registreert. Er is niets gedeeld.');
  const allowed=/^(image\/(?:jpeg|png|webp|gif|heic|heif)|video\/(?:mp4|webm|quicktime)|audio\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/;
  if(allowed.test(declared)&&declared.startsWith(expected))return declared;
  const head=new Uint8Array(await original.slice(0,256).arrayBuffer());

@@ -1571,6 +1571,12 @@ try{
      assert.match(html,/synthetic ACCOUNT ISOLATION 1/);
      assert.match(html,/<meta property="og:title" content="Een persoonlijke herinnering via TALERA">/);
      assert.match(html,/<meta property="og:site_name" content="TALERA">/);
+     assert.match(html,/<meta property="og:description" content="Tik om deze herinnering te bekijken\.">/,
+       'Invitation card must have one short, nonrepeated prompt');
+     assert.ok(!html.includes('Iemand deelt deze herinnering persoonlijk met je.'),
+       'Old duplicated WhatsApp card explanation must be removed');
+     assert.ok(html.includes('header{background:#17344a;color:#fff'),
+       'The actual recipient view uses TALERA navy, never WhatsApp green');
      assert.ok(!issued.link.includes('/__social/shared/'),
        'Only the friendly compact address belongs in the visible invitation');
 

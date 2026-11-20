@@ -1503,6 +1503,19 @@ try{
    assert.match(issued.id,/^[a-f0-9]{64}$/);
    assert.ok(issued.link.startsWith(origin+'/__social/shared/'),
      'Recipient link must remain on the same app origin');
+   assert.ok(Math.abs(issued.expiresAt-(Date.now()+168*3600000))<60000,
+     'Temporary share must use exactly the original seven-day expiry');
+   const withoutConsent=await sharePage.evaluate(async id=>{
+     const r=await fetch('/api/pwa/memory-link',{
+       method:'POST',credentials:'same-origin',
+       headers:{'content-type':'application/json'},
+       body:JSON.stringify({localMemoryId:id,title:'No consent',
+         storyText:'Never publish',eventDate:'',consent:false})
+     });
+     return r.status;
+   },a.id);
+   assert.equal(withoutConsent,400,
+     'Share may never publish memory content without explicit consent');
    const anonymous=await browser.newContext({
      ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate,
        'cf-connecting-ip':'192.0.2.91'}

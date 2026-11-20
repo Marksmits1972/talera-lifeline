@@ -1755,6 +1755,30 @@ try{
        'Only the hearts on this invitation may be counted');
      assert.ok(guestIsolated.comments.every(x=>x.body!==internalText),
        'Private account messages must never leak to a share-token recipient');
+     // Old internal social read route is reachable only with the same
+     // capability. It must NOT reveal the owner's account-only thread.
+     const rawShare=Buffer.from(new URL(issued.link).pathname.split('/')[2],'base64url');
+     assert.equal(rawShare.byteLength,32,'Original capability entropy remains 256 bits');
+     const rawShareToken=rawShare.toString('hex');
+     const legacyGuest=await guest.request.get(origin+
+       '/__social/memory/'+sharedStoryId+'/view',{
+        headers:{'x-qa-share-token':rawShareToken}});
+     assert.equal(legacyGuest.status(),200,
+       'Legacy token-view remains functional for the same guest invitation');
+     const legacyBody=await legacyGuest.json();
+     assert.equal(legacyBody.commentCount,1,
+       'Legacy token-view must not count account-only comments');
+     assert.equal(legacyBody.likes,1,
+       'Legacy token-view must not include account-only hearts');
+     assert.ok(legacyBody.comments.every(x=>x.body!==internalText),
+       'Legacy token-view must never expose account-only comment text');
+     const unauthenticated=await guest.request.get(origin+
+       '/__social/memory/'+sharedStoryId+'/view');
+     assert.equal(unauthenticated.status(),403,
+       'No free access by guessing a story ID without the capability');
+     console.log('TALERA_GUEST_OLD_SOCIAL_TOKEN_VIEW_PRIVACY_PASS',
+      JSON.stringify({onlyOwnSharedReactions:true,accountConversationProtected:true}));
+
      console.log('TALERA_FREE_ONE_GUEST_SHARE_PRIVATE_ACCOUNT_COMMENT_ISOLATION_PASS',
        JSON.stringify({guestComments:guestIsolated.commentCount,
         originalPrivateCommentStillPresent:true,originalPresenterUnchanged:true}));
@@ -1883,6 +1907,10 @@ try{
      assert.equal(revoke.status,200,'Synthetic owner must revoke own share');
      assert.equal((await guest.request.get(issued.link,{headers:{accept:'text/html'}})).status(),404);
      assert.equal((await guest.request.get(issued.link+'/photo')).status(),404);
+     assert.equal((await guest.request.get(origin+
+       '/__social/memory/'+sharedStoryId+'/view',{
+        headers:{'x-qa-share-token':rawShareToken}})).status(),403,
+       'Legacy capability access is denied immediately after revocation');
      assert.equal((await guest.request.get(videoPath,{headers:{range:'bytes=0-1'}})).status(),404,
        'Revoked guest media must not be streamable anymore');
      // Photo-only Free memories are legitimate. Verify NO public access before

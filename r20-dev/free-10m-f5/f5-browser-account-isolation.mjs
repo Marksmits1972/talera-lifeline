@@ -1758,6 +1758,41 @@ try{
      console.log('TALERA_FREE_ONE_GUEST_SHARE_PRIVATE_ACCOUNT_COMMENT_ISOLATION_PASS',
        JSON.stringify({guestComments:guestIsolated.commentCount,
         originalPrivateCommentStillPresent:true,originalPresenterUnchanged:true}));
+     // Two invitations to the SAME selected memory are independent access
+     // capabilities: neither comments nor temporary media may cross links.
+     const siblingInvite=await sharePage.evaluate(async id=>{
+       const r=await fetch('/api/memories/'+id+'/shares',{
+         method:'POST',credentials:'same-origin',
+         headers:{'content-type':'application/json'},
+         body:JSON.stringify({hours:1,consent:true})
+       });
+       return {status:r.status,data:await r.json()};
+     },sharedStoryId);
+     assert.equal(siblingInvite.status,200,'Existing owner can share the same memory twice');
+     const siblingUrl=new URL(siblingInvite.data.link,origin).href;
+     assert.notEqual(siblingUrl,issued.link,'Different recipients get separate share capabilities');
+     const siblingFeedbackRes=await guest.request.get(siblingUrl+'/feedback');
+     assert.equal(siblingFeedbackRes.status(),200);
+     const siblingFeedback=await siblingFeedbackRes.json();
+     assert.deepEqual({likes:siblingFeedback.likes,comments:siblingFeedback.commentCount},
+       {likes:0,comments:0},'Two links must never exchange guest reactions');
+     assert.equal((await guest.request.get(siblingUrl+'/photo')).status(),404,
+       'An unuploaded photo for share B cannot reuse share A media');
+     assert.equal((await guest.request.get(issued.link+'/photo')).status(),200,
+       'An existing valid share A keeps its own permitted media');
+     const siblingRevoke=await sharePage.evaluate(async id=>{
+       const r=await fetch('/api/shares/'+id+'/revoke',{
+         method:'POST',credentials:'same-origin'});
+       return r.status;
+     },siblingInvite.data.id);
+     assert.equal(siblingRevoke,200);
+     assert.equal((await guest.request.get(siblingUrl+'/feedback')).status(),404);
+     assert.equal((await guest.request.get(issued.link+'/feedback')).status(),200,
+       'Revoking one invitation must not revoke another');
+     console.log('TALERA_FREE_ONE_MEMORY_MULTIPLE_LINK_RIGHTS_ISOLATION_PASS',
+       JSON.stringify({oneMemory:true,separateGuestReactions:true,separateMedia:true,
+        selectiveRevoke:true,presenterUnchanged:true}));
+
 
      const alienReaction=await guest.request.post(issued.link+'/heart',{
        headers:{origin:'https://attacker.invalid','content-type':'application/json'},

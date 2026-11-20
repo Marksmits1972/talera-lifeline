@@ -77,7 +77,7 @@ export class FreeSocialMemory extends DurableObject{
  async stageShare(actor,{title,storyText,eventDate}={}){
   this.checkOwner(actor);
   if(typeof title!=='string'||!title.trim()||title.length>180||
-     typeof storyText!=='string'||!storyText.trim()||storyText.length>12000||
+     typeof storyText!=='string'||storyText.length>12000||
      typeof eventDate!=='string'||!/^\d{0,4}(?:-\d{2}-\d{2})?$/.test(eventDate))
     throw Error('INVALID_SHARE_CONTENT');
   const expires=now()+10*60000;
@@ -123,6 +123,7 @@ export class FreeSocialMemory extends DurableObject{
   if(!info)return null;
   const media=this.sql.exec("SELECT kind FROM share_media WHERE token_hash=?",hash)
     .toArray().map(r=>r.kind);
+  if(!info.story_text.trim()&&!media.length)return null;
   return {title:info.title,storyText:info.story_text,eventDate:info.event_date,
    hasPhoto:media.includes('photo'),hasAudio:media.includes('audio'),
    hasVideo:media.includes('video')};

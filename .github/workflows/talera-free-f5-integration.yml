@@ -927,12 +927,12 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = d736d75383c2bc2bdef4779613c4951038add3f3
+          test "$(git rev-parse HEAD^)" = ae999043b80307c2d82a6122aa12da6c784f6f2e
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=44763055759,expected='d736d75383c2bc2bdef4779613c4951038add3f3';
+          const id=44784418754,expected='ae999043b80307c2d82a6122aa12da6c784f6f2e';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,

@@ -1498,6 +1498,25 @@ try{
      !!document.querySelector('#talera-clean-social [data-action=share]'),
      null,{timeout:15000});
    await sharePage.waitForTimeout(1600);
+   // Test-only source inspection: the original signed-in TALERA WhatsApp adapter
+   // is generated from the approved UI, never replaced by a guest prototype.
+   const shareAdapterSource=await sharePage.evaluate(async()=>{
+     const urls=performance.getEntriesByType('resource').map(x=>x.name)
+       .filter(x=>x.includes('/f5scripts/'));
+     const list=await Promise.all(urls.map(async u=>{
+       try{return {url:new URL(u).pathname,code:await(await fetch(u)).text()}}
+       catch{return {url:new URL(u).pathname,code:''}}
+     }));
+     const match=list.find(x=>x.code.includes('const shareAdapter={'));
+     if(!match)return {bundles:list.map(x=>({url:x.url,bytes:x.code.length})),
+       found:false};
+     const start=match.code.indexOf('const shareAdapter={');
+     const finish=match.code.indexOf('const share=',start);
+     return {found:true,source:match.url,
+       adapter:match.code.slice(start,finish>start?Math.min(start+10000,finish+15):start+7000)};
+   });
+   console.log('TALERA_ORIGINAL_WHATSAPP_ADAPTER_TEST_SOURCE',
+     JSON.stringify(shareAdapterSource));
    // Source of truth: inspect the AUTHENTIC TALERA comment sheet.
    // Never invent a second guest comment form without checking this markup.
    await sharePage.locator('#talera-clean-social [data-action=comments]').click();

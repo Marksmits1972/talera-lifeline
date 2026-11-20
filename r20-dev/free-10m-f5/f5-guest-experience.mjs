@@ -326,6 +326,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  '#talera-v5-editor-pencil,#talera-v21-pencil{display:none!important;visibility:hidden!important;pointer-events:none!important}',
  'body[data-talera-guest="one-memory"] #memoryCaption{z-index:81!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important}',
  'body[data-talera-guest="one-memory"] #memoryStoryScroll{z-index:80!important;pointer-events:auto!important}',
+ 'body[data-talera-guest="one-memory"] #talera-flow-home{z-index:95!important;pointer-events:auto!important}',
  'html.talera-guest-video-fallback #photoStage{background-image:url("'+(share.hasPhoto?escapeHtml(pagePath)+'/photo':'')+'");background-position:center;background-size:cover}',
  'html.talera-guest-video-fallback #photoStage img,html.talera-guest-video-fallback #memoryPhotoA,html.talera-guest-video-fallback #memoryPhotoB{visibility:hidden!important}',
  'html.talera-guest-video-fallback .talera-v61-first-frame-bridge{visibility:hidden!important}',

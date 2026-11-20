@@ -102,8 +102,11 @@ export default{
     const hash=await shaHex(payload.token);
     return json(await home.revokeShare(requireActor(actor),hash));
    }
-   if(op==='like')return json(await home.like(actor,tokenHash));
-   if(op==='comment')return json(await home.comment(actor,tokenHash,payload.body));
+   // Public guests react only through the revocable, token-scoped
+   // /s/:token/{heart,comment} route. The original account conversation
+   // must never accept a token-only guest mutation.
+   if(op==='like')return json(await home.like(requireActor(actor),null));
+   if(op==='comment')return json(await home.comment(requireActor(actor),null,payload.body));
    return denied('Niet gevonden',404);
   }catch(e){
    const code=String(e?.message||'INTERNAL');

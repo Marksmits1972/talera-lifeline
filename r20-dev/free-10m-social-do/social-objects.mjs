@@ -79,7 +79,7 @@ export class FreeSocialMemory extends DurableObject{
  }
  async stageShare(actor,{title,storyText,eventDate}={}){
   this.checkOwner(actor);
-  if(typeof title!=='string'||!title.trim()||title.length>180||
+  if(typeof title!=='string'||title.length>180||
      typeof storyText!=='string'||storyText.length>12000||
      typeof eventDate!=='string'||!/^\d{0,4}(?:-\d{2}-\d{2})?$/.test(eventDate))
     throw Error('INVALID_SHARE_CONTENT');

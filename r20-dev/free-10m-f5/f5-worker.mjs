@@ -738,8 +738,15 @@ async function publicWhatsAppMemory(request,env){
  const photo=content.hasPhoto?'<img src="'+u.pathname+'/photo" alt="Foto bij deze herinnering">':'';
  const video=content.hasVideo?'<video controls playsinline preload="none" src="'+u.pathname+'/video"></video>':'';
  const audio=content.hasAudio?'<audio controls preload="none" src="'+u.pathname+'/audio"></audio>':'';
+ const previewMeta='<meta property="og:type" content="article">'+
+  '<meta property="og:title" content="'+title+'">'+
+  '<meta property="og:description" content="Tijdelijk gedeelde TALERA-herinnering">'+
+  '<meta property="og:url" content="'+safeShareHtml(u.href)+'">'+
+  (content.hasPhoto?'<meta property="og:image" content="'+
+    safeShareHtml(u.origin+u.pathname+'/photo')+'">':'');
  const body='<!doctype html><html lang="nl"><head><meta charset="utf-8">'+
   '<meta name="viewport" content="width=device-width, initial-scale=1">'+
+  previewMeta+
   '<meta name="robots" content="noindex,nofollow">'+
   '<title>'+title+' – TALERA</title><style>'+
   '*{box-sizing:border-box}body{margin:0;background:#f8f9f7;color:#17344a;font:17px/1.55 -apple-system,system-ui,sans-serif}'+

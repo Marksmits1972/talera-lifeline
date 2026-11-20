@@ -1566,6 +1566,14 @@ for(const name of paths){
    const replacement='  let existing=null;\n  try{existing=await findStoryId(memoryId)}catch(e){if(e.status!==404)throw e}\n  if(existing)return {storyId:existing};';
    assert.equal(shipped.split(old).length,2,'WHATSAPP_ORIGINAL_AUTHOR_ADAPTER_DRIFT');
    shipped=shipped.replace(old,replacement);
+   // Photo-only memories are valid originals too. The original editor used
+   // to require story text even when the selected memory had a real photo.
+   // Preserve fail-closed behavior for an empty memory: a share with neither
+   // text nor photo is still denied, and any failed photo upload is revoked.
+   const onlyText='if(!title||!storyText)throw Error(';
+   const withPhoto="if(!title||(!storyText&&!/^(https?:\\/\\/|blob:|data:image\\/)/i.test(String(item?.image||''))))throw Error(";
+   assert.equal(shipped.split(onlyText).length,2,'WHATSAPP_PHOTO_ONLY_CONSENT_SOURCE_DRIFT');
+   shipped=shipped.replace(onlyText,withPhoto);
  }
  const filename=sha(shipped)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');

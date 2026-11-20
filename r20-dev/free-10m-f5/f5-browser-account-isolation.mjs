@@ -11,6 +11,20 @@ import {chromium,devices} from 'playwright';
 import {guestClientScript} from './f5-guest-experience.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
+// Temporary source audit in the existing CI browser regression only.
+// The actual presentation HTML is generated from the original TALERA asset
+// and was never checked into GitHub; inspect its exact adapter contract.
+if(process.env.CI){
+ const map=await import('./generated/public-template-map.mjs');
+ const file=path.resolve('r20-dev/free-10m-delivery/public'+map.guestPages['/present']);
+ const html=readFileSync(file,'utf8');
+ for(const term of ['function toMemory(', 'async function hydrate(memory)', 'const rows=[]; // Login required', 'window.TaleraMemories=', 'async function initLocal']){
+  const i=html.indexOf(term);
+  console.log('TALERA_GUEST_ORIGINAL_PRESENT_SOURCE_DIAGNOSTIC',JSON.stringify({
+   term,found:i>=0,at:i,source:i>=0?html.slice(i,i+(term==='function toMemory('?3400:term==='async function hydrate(memory)'?5800:2400)):''}));
+ }
+}
+
 const generated=path.join(here,'generated');
 mkdirSync(generated,{recursive:true});
 const origin='http://127.0.0.1:8829',gate='1'.repeat(64);

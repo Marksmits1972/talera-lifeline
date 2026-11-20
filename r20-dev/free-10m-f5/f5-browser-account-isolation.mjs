@@ -1810,6 +1810,33 @@ try{
      console.log('TALERA_GUEST_IPHONE_SAFARI_RANGE_HEAD_AND_SEEK_PASS',
       JSON.stringify({byteProbe:true,seek:true,suffix:true,
        invalidRangeDenied:true,mediaPrivateToSameToken:true,realIphoneAccepted:false}));
+     // A paused-but-open video must not be covered by the timed invitation.
+     // Reopen the same synthetic one-memory link after the permitted video
+     // upload; this tests the actual guest page on the existing F5 runtime.
+     await guest.goto(issued.link,{waitUntil:'domcontentloaded'});
+     await guest.evaluate(()=>{
+       for(const key of Object.keys(localStorage))
+        if(key.startsWith('talera-promo-seen-v1-'))localStorage.removeItem(key);
+     });
+     await guest.reload({waitUntil:'domcontentloaded'});
+     await guest.locator('#openGuestVideo').click();
+     assert.equal(await guest.locator('#guestVideoLayer').isVisible(),true);
+     await guest.waitForTimeout(10300);
+     assert.equal(await guest.locator('#guestPromo').isHidden(),true,
+       'A visible paused video must not be interrupted after ten seconds');
+     await guest.locator('#closeGuestVideo').click();
+     await guest.locator('#guestPromo:not([hidden])').waitFor({timeout:3000});
+     await guest.locator('#guestPromo a[href^="/ontdek-talera#"]').click();
+     await guest.waitForURL(/\/ontdek-talera#s\//);
+     await guest.locator('#returnGuestStory').click();
+     await guest.waitForURL(issued.link);
+     const followedOnce=await guest.evaluate(()=>Object.keys(localStorage).some(
+       key=>key.startsWith('talera-promo-seen-v1-')&&localStorage.getItem(key)==='1'));
+     assert.equal(followedOnce,true,'Following the introduction dismisses this invite permanently');
+     assert.equal(await guest.locator('#guestPromo').isHidden(),true);
+     console.log('TALERA_GUEST_VIDEO_OVERLAY_AND_ONE_TIME_INTRO_PASS',
+       JSON.stringify({pausedVideoUninterrupted:true,closingVideoReleasesInvite:true,
+        introVisitedOnce:true,exactReturnToStory:true,iphoneAccepted:false}));
      // Revoke only the newly generated synthetic share. Verify that the raw
      // capability and photo are both immediately inaccessible.
      const revoke=await sharePage.evaluate(async token=>{

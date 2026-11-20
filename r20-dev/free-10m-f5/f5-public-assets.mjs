@@ -940,7 +940,7 @@ function rebuildDirectOrdinaryPresentation(html){
   // Freeze the SAME ordinary picture + shared sound clock, without
   // replacing the player or altering the user-owned original media.
   once("  window.__taleraOrdinaryActivate=(memory)=>{",
-    "  window.__taleraOrdinaryPauseForShare=()=>{\\n    clearAuto();ownSerial++;closeOrdinaryVideo(true);\\n  };\\n  window.__taleraOrdinaryActivate=(memory)=>{",
+    "  window.__taleraOrdinaryPauseForShare=()=>{\n    clearAuto();ownSerial++;closeOrdinaryVideo(true);\n  };\n  window.__taleraOrdinaryActivate=(memory)=>{",
     'WHATSAPP_PAUSE_ORDINARY');
   once("  function playOrdinaryVideo(memory,index){\n    if(!ordinaryMemory",
     "  function playOrdinaryVideo(memory,index){\n    if(window.__taleraSharePauseActive)return;\n    if(!ordinaryMemory",

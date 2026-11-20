@@ -1448,8 +1448,11 @@ try{
  // list/revoke checks, so this new temporary share cannot change their counts.
  // All data are unique, local synthetic test inputs in the SAME F5 code.
  const sharePage=await context.newPage();
- const createdLinks=[];
+ const createdLinks=[],shareNetwork=[];
  sharePage.on('response',async r=>{
+   const p=new URL(r.url()).pathname;
+   if(/^\/api\/(?:pwa\/memory-link|memories\/[^/]+\/shares|shares\/)/.test(p))
+     shareNetwork.push({method:r.request().method(),path:p,status:r.status()});
    if(/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(new URL(r.url()).pathname)&&
       r.request().method()==='POST'){
      const data=await r.json().catch(()=>({}));
@@ -1472,18 +1475,14 @@ try{
      null,{timeout:15000});
    await sharePage.locator('#talera-clean-consent').check();
    await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
-   await sharePage.waitForFunction(()=>{
-     const sheet=document.querySelector('#talera-clean-overlay:not([hidden])');
-     return !!sheet?.querySelector('[data-action=send]:not(:disabled)') ||
-       !!sheet?.querySelector('.status')?.textContent?.match(/niet gevonden|niet beschikbaar|kan niet|fout|verlopen/i);
-   },null,{timeout:18000});
+   await sharePage.waitForTimeout(1900);
    const status=await sharePage.evaluate(()=>{
      const sheet=document.querySelector('#talera-clean-overlay:not([hidden])');
      return {status:sheet?.querySelector('.status')?.textContent,
        enabled:!sheet?.querySelector('[data-action=send]')?.disabled};
    });
    console.log('TALERA_FREE_WHATSAPP_ACTUAL_PREPARE_DIAG',JSON.stringify({
-     status,createdLinks,onlySyntheticAccount:true
+     status,createdLinks,shareNetwork,onlySyntheticAccount:true
    }));
    assert.equal(status.enabled,true,
      'The ORIGINAL WhatsApp button must prepare a real live share, not 404');

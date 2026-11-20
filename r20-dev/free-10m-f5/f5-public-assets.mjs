@@ -1930,10 +1930,75 @@ function taleraUploadMediaProgress(path,blob,label){
      "if(wasShare){taleraNativeSharePhoto=null;window.__taleraFreePauseForShare?.(false)}");
 
    const fullShareCopy="\nasync function taleraCompleteOriginalMemoryCopy(memory,shareId){\n if(!memory?._taleraLocal||typeof memory.storyId!=='string')\n  throw Error('De gekozen herinnering moet uit jouw lokale TALERA-bibliotheek komen.');\n const library=window.TaleraLibrary||window.TaleraMemories;\n if(typeof library?.get!=='function'||typeof library?.blob!=='function')\n  throw Error('De originele TALERA-bibliotheek is niet beschikbaar.');\n const row=await library.get(memory.storyId);\n if(!row||row.id!==memory.storyId||!Array.isArray(row.items))\n  throw Error('De oorspronkelijke herinnering kon niet worden gecontroleerd.');\n if(row.items.length>24)throw Error('Deze herinnering heeft te veel mediabestanden voor een veilige uitnodiging.');\n const allowed=/^(image\\/(?:jpeg|png|webp|gif|heic|heif)|video\\/(?:mp4|webm|quicktime)|audio\\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/;\n const manifest={version:1,items:[],posters:[],narrationCues:[],narrationDurationMs:\n  Number.isSafeInteger(row.narrationDurationMs)&&row.narrationDurationMs>=0?\n   row.narrationDurationMs:0,\n  datePrecision:String(row.datePrecision||'unknown').slice(0,20),\n  time:String(row.time||'12:00:00').slice(0,20)};\n let total=0,partCount=0;\n const sources=[];\n for(const item of row.items){\n  if(!item||!['photo','video','audio'].includes(item.kind)||\n     typeof item.key!=='string')throw Error('Een oorspronkelijk mediabestand ontbreekt.');\n  const blob=await library.blob(item.key);\n  if(!(blob instanceof Blob)||!blob.size||!allowed.test(blob.type)||\n     !blob.type.startsWith(item.kind==='photo'?'image/':item.kind+'/'))\n   throw Error('Het originele bestand '+(sources.length+1)+' kan niet verliesvrij worden gedeeld.');\n  total+=blob.size;\n  const parts=Math.ceil(blob.size/1048576);\n  partCount+=parts;\n  if(total>96*1048576||parts>96||partCount>192)\n   throw Error('Deze herinnering bevat meer media dan veilig tijdelijk kunnen worden overgedragen. Er is niets verzonden.');\n  sources.push({item,blob,parts});\n  manifest.items.push({kind:item.kind,mime:blob.type,size:blob.size,parts,hashes:[]});\n }\n const visuals=row.items.filter(item=>item.kind==='photo'||item.kind==='video');\n const cues=Array.isArray(row.narrationCues)?row.narrationCues:[];\n if(cues.length>1000)throw Error('De oorspronkelijke vertelmarkeringen zijn te uitgebreid.');\n for(const original of cues){\n  if(!original||!Number.isSafeInteger(original.t)||!Number.isSafeInteger(original.index))\n   throw Error('De vertelmarkeringen zijn onvolledig.');\n  const cue={...original};\n  if(cue.mediaId){\n   const index=row.items.findIndex(item=>item.key===cue.mediaId);\n   if(index<0||!['photo','video'].includes(row.items[index].kind))\n    throw Error('Een vertelmarkering verwijst naar ontbrekende media.');\n   cue.mediaIndex=index;\n   delete cue.mediaId;\n  }\n  manifest.narrationCues.push(cue);\n }\n for(let index=0;index<sources.length;index++){\n  const source=sources[index];\n  for(let part=0;part<source.parts;part++){\n   const blob=source.blob.slice(part*1048576,Math.min((part+1)*1048576,source.blob.size),source.blob.type);\n   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),\n     n=>n.toString(16).padStart(2,'0')).join('');\n   manifest.items[index].hashes.push(hash);\n   await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+\n      '/media/'+index+'/'+part,blob,\n      'Origineel '+(index+1)+'/'+sources.length+' · deel '+(part+1)+'/'+source.parts);\n  }\n }\n // Transfer only EXISTING account-local :phone-v1 thumbnails. Original video\n // blobs, album order, IDs, narration cues and local poster bytes are unchanged.\n let posterBytes=0;\n for(let index=0;index<sources.length;index++){\n  const item=sources[index].item;\n  if(item.kind!=='video')continue;\n  const still=await library.blob(item.key+':phone-v1');\n  if(!(still instanceof Blob)||!still.size||still.size>1500000||\n     !['image/jpeg','image/png','image/webp'].includes(still.type))continue;\n  if(total+posterBytes+still.size>96*1048576)continue;\n  const digest=await crypto.subtle.digest('SHA-256',await still.arrayBuffer());\n  const hex=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');\n  try{\n   await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+\n     '/poster/'+index,still,'Videominiatuur '+(index+1)+'/'+sources.length);\n  }catch(error){continue}\n  posterBytes+=still.size;\n  manifest.posters.push({mediaIndex:index,mime:still.type,size:still.size,sha256:hex});\n }\n // This commit is the publication boundary. No partial photo sequence or\n // dropped narration may be called ready and passed to WhatsApp.\n await coreRequest('/api/shares/'+encodeURIComponent(shareId)+'/manifest',{\n  method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(manifest)});\n if(String(window.__taleraTimelineRuntime?.currentMemory?.()?.storyId)!==row.id)\n  throw Error('De gekozen herinnering is tijdens het delen veranderd.');\n return true;\n}\n";
+
+   // Same account-local original bytes. Only the temporary guest copy's
+   // content-type can be corrected after checking the actual file header.
+   // Safari sometimes preserves iPhone .m4v/.mov clips as video/x-m4v or
+   // an untyped Blob even though the original video and poster are intact.
+   const originalMimeReader=String.raw\`
+async function taleraVerifiedGuestShareMime(item,original,position){
+ const declared=String(original.type||item.mime||'').split(';')[0].trim().toLowerCase();
+ const expected=item.kind==='photo'?'image/':item.kind+'/';
+ const allowed=/^(image\\/(?:jpeg|png|webp|gif|heic|heif)|video\\/(?:mp4|webm|quicktime)|audio\\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/;
+ if(allowed.test(declared)&&declared.startsWith(expected))return declared;
+ const head=new Uint8Array(await original.slice(0,256).arrayBuffer());
+ const word=(at,n)=>String.fromCharCode(...head.slice(at,at+n));
+ const ftyp=head.length>=12&&word(4,4)==='ftyp';
+ const brand=ftyp?word(8,4).toLowerCase():'';
+ let mime=null;
+ if(item.kind==='video'){
+  if(ftyp)mime=brand==='qt  '?'video/quicktime':'video/mp4';
+  else if(head[0]===26&&head[1]===69&&head[2]===223&&head[3]===163&&
+     word(0,head.length).toLowerCase().includes('webm'))mime='video/webm';
+ }else if(item.kind==='photo'){
+  if(head[0]===255&&head[1]===216&&head[2]===255)mime='image/jpeg';
+  else if(head[0]===137&&word(1,3)==='PNG')mime='image/png';
+  else if(word(0,4)==='RIFF'&&word(8,4)==='WEBP')mime='image/webp';
+  else if(word(0,4)==='GIF8')mime='image/gif';
+  else if(ftyp&&['heic','heix','hevc','hevx'].includes(brand))mime='image/heic';
+  else if(ftyp&&['mif1','msf1','heif'].includes(brand))mime='image/heif';
+ }else if(item.kind==='audio'){
+  if(ftyp)mime='audio/mp4';
+  else if(word(0,4)==='RIFF'&&word(8,4)==='WAVE')mime='audio/wav';
+  else if(word(0,4)==='OggS')mime='audio/ogg';
+  else if(word(0,3)==='ID3'||head[0]===255&&(head[1]&224)===224)
+   mime='audio/mpeg';
+  else if(head[0]===255&&(head[1]&246)===240)mime='audio/aac';
+ }
+ if(!mime)throw Error('Bestand '+position+' heeft een niet-herkenbaar '+
+  'origineel formaat ('+(declared||'zonder formaat')+'). De video blijft '+
+  'veilig bewaard; er is niets gedeeld.');
+ return mime;
+}
+\`;
+   const originalShareChecks=[
+    [
+     "  if(!(blob instanceof Blob)||!blob.size||!allowed.test(blob.type)||\\n     !blob.type.startsWith(item.kind==='photo'?'image/':item.kind+'/'))\\n   throw Error('Het originele bestand '+(sources.length+1)+' kan niet verliesvrij worden gedeeld.');",
+     "  if(!(blob instanceof Blob)||!blob.size)\\n   throw Error('Origineel bestand '+(sources.length+1)+' ontbreekt in de bibliotheek. Er is niets gedeeld.');\\n  const mime=await taleraVerifiedGuestShareMime(item,blob,sources.length+1);"
+    ],
+    [
+     "  sources.push({item,blob,parts});",
+     "  sources.push({item,blob,parts,mime});"
+    ],
+    [
+     "  manifest.items.push({kind:item.kind,mime:blob.type,size:blob.size,parts,hashes:[]});",
+     "  manifest.items.push({kind:item.kind,mime,size:blob.size,parts,hashes:[]});"
+    ],
+    [
+     "const blob=source.blob.slice(part*1048576,Math.min((part+1)*1048576,source.blob.size),source.blob.type);",
+     "const blob=source.blob.slice(part*1048576,Math.min((part+1)*1048576,source.blob.size),source.mime);"
+    ]
+   ];
+   let shareWithVerifiedMime=fullShareCopy;
+   for(const [before,after] of originalShareChecks){
+    assert.equal(shareWithVerifiedMime.split(before).length,2,
+      'TALERA_GUEST_MIME_SOURCE_DRIFT_'+before.slice(0,35));
+    shareWithVerifiedMime=shareWithVerifiedMime.replace(before,after);
+   }
    const adapterPoint="const shareAdapter={";
    assert.equal(shipped.split(adapterPoint).length,2,'WHATSAPP_PROGRESS_ADAPTER_SOURCE_DRIFT');
    shipped=shipped.replace(adapterPoint,uploader+'\n'+adapterPoint);
-   shipped=shipped.replace(adapterPoint,fullShareCopy+'\n'+adapterPoint);
+   shipped=shipped.replace(adapterPoint,originalMimeReader+'\n'+shareWithVerifiedMime+'\n'+adapterPoint);
    for(const [medium,variable,label] of [
       ['photo','preview','Foto uploaden'],
       ['photo-full','full','Volledige foto uploaden'],

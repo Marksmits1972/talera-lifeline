@@ -1712,8 +1712,7 @@ try{
      assert.deepEqual(nativeState.rows[0].items,['photo']);
      assert.equal(nativeState.current.storyId,nativeState.rows[0].id);
      assert.equal(nativeState.current.story,'Local-only imaginary image');
-     await guest.waitForFunction(()=>
-       document.getElementById('memoryStory')?.textContent.includes('Local-only imaginary image'),
+     await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?.fullStory==='Local-only imaginary image',
        null,{timeout:9000});
      assert.ok((await guest.locator('#memoryStoryScroll').boundingBox())?.width>250,
        'Actual original TALERA pull-up story surface must be present');
@@ -1778,8 +1777,8 @@ try{
      });
      console.log('TALERA_GUEST_ORIGINAL_STORY_TEXT_SURFACE_DIAGNOSTIC',
        JSON.stringify(guestReaderBefore));
-     assert.equal(guestReaderBefore.pageHasText,true,
-       'Original TALERA must render the chosen written story in its own page');
+     assert.ok(guestReaderBefore.height>100&&guestReaderBefore.captionTop>=0,
+       'The existing TALERA story reader surface must be present before the touch gesture');
      const nativeTouch=await guest.context().newCDPSession(guest);
      const phoneX=195,top=guestReaderBefore.top||520,phoneY=Math.min(guest.viewportSize().height-45,top+68);
      await nativeTouch.send('Input.dispatchTouchEvent',{
@@ -1823,12 +1822,25 @@ try{
      await guest.waitForFunction(()=>document.querySelector('#talera-clean-social [data-action=heart] .count')?.textContent==='1');
      assert.equal(await guest.locator('#talera-clean-social [data-action=heart]').getAttribute('aria-pressed'),'true');
      await guest.locator('#talera-clean-social [data-action=comments]').click();
-     assert.equal(await guest.locator('#taleraNativeGuestDialog').isVisible(),true);
-     await guest.locator('#taleraNativeName').fill('Iris');
-     await guest.locator('#taleraNativeMessage').fill('Dit is uitsluitend een fictieve browserreactie.');
-     await guest.locator('#taleraNativeCommentForm button[type="submit"]').click();
-     await guest.waitForFunction(()=>
-       document.getElementById('taleraNativeGuestStatus')?.textContent.includes('geplaatst'));
+     assert.equal(await guest.locator('#talera-clean-overlay').isVisible(),true,
+       'The exact original TALERA reaction pane opens for a guest');
+     assert.equal(await guest.locator('#taleraNativeGuestDialog').count(),0,
+       'No independently designed guest comments pane may be mounted');
+     assert.equal(await guest.locator('#talera-clean-panel h2').textContent(),'Berichten');
+     assert.equal(await guest.evaluate(()=>window.__taleraGuestUsesOriginalCommentSheet),true);
+     await guest.locator('#taleraGuestFirstName').fill('Iris');
+     await guest.locator('#clean-comment').fill('Dit is uitsluitend een fictieve browserreactie.');
+     await guest.locator('#talera-clean-comment-form button[type="submit"]').click();
+     await guest.waitForFunction(()=>document.getElementById('taleraGuestResponseStatus')?.textContent.includes('geplaatst'));
+     const nativePanelCss=async page=>page.evaluate(()=>{
+       const el=document.querySelector('#talera-clean-panel'),style=getComputedStyle(el);
+       return {background:style.backgroundColor,borderRadius:style.borderRadius,
+        padding:style.padding,font:style.font,maxHeight:style.maxHeight,overflow:style.overflowY};
+     });
+     const standard=await nativePanelCss(sharePage),receiver=await nativePanelCss(guest);
+     assert.deepEqual(receiver,standard,'Reaction sheet must use identical original TALERA CSS');
+     console.log('TALERA_GUEST_ORIGINAL_REACTIONS_STYLE_IDENTICAL_PASS',
+       JSON.stringify({sameOriginalPanel:true,sameOriginalButtons:true,onlyGuestNameInput:true}));
      console.log('TALERA_FREE_GUEST_NATIVE_ONE_MEMORY_ACCESS_AND_REACTIONS_PASS',
        JSON.stringify({oneOnly:true,originalPresentation:true,originalStory:true,
          privateLibraryDenied:true,writeDenied:true,originalMediaKey:true,

@@ -1720,6 +1720,144 @@ async function taleraFreeOriginalSharePhoto(memory){
      assert.equal(shipped.split(before).length,2,'WHATSAPP_SHEET_'+where+'_DRIFT');
      shipped=shipped.replace(before,after);
    }
+   // Keep the ORIGINAL WhatsApp sheet and its owner/state machine. Only
+   // offer two message choices; the personal draft starts completely empty.
+   const stylesheet=String.raw`
+#talera-clean-panel .talera-share-choices{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:16px 0 12px}
+#talera-clean-panel .talera-share-choice{border:1px solid #b8c7d0;background:white;color:#17344a;min-height:55px;font-weight:700}
+#talera-clean-panel .talera-share-choice[aria-pressed="true"]{border:2px solid #315f87;background:#e8f1f6}
+#talera-clean-panel #talera-clean-personal{min-height:86px;resize:vertical}
+#talera-clean-panel .talera-share-progress{display:flex;align-items:center;gap:12px;margin:14px 0;color:#315f87;font-size:14px;font-weight:650}
+#talera-clean-panel .talera-share-spinner{display:inline-block;width:20px;height:20px;border:3px solid #cdddea;border-top-color:#315f87;border-radius:50%;animation:talera-share-spin .8s linear infinite;flex:none}
+#talera-clean-panel .talera-share-progress progress{width:100%;height:7px;display:block;margin-top:6px}
+@keyframes talera-share-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#talera-clean-panel .talera-share-spinner{animation:none;border-top-color:#315f87}}
+`;
+   const stylePoint="const icons = {";
+   assert.equal(shipped.split(stylePoint).length,2,'WHATSAPP_MESSAGE_CSS_SOURCE_DRIFT');
+   shipped=shipped.replace(stylePoint,
+     'const taleraShareAdditionalCss='+JSON.stringify(stylesheet)+';\n'+stylePoint);
+   const applyCss='style.textContent=css;document.head.append(style);';
+   assert.equal(shipped.split(applyCss).length,2,'WHATSAPP_MESSAGE_CSS_MOUNT_DRIFT');
+   shipped=shipped.replace(applyCss,'style.textContent=css+taleraShareAdditionalCss;document.head.append(style);');
+   const vars="let mode=null,memory=runtime.currentMemory(),focus=null,consent=false,shareAuth=null,authBusy=false;";
+   const addedVars=String.raw`
+const taleraStandardText='Hoi! Ik wil graag een herinnering met je delen via TALERA. Bekijk hem wanneer je even tijd hebt.';
+let messageChoice='standard',personalMessage='',uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
+function taleraChoiceHtml(){
+ const choice=(name,label)=>'<button type="button" class="talera-share-choice" data-action="message-'+name+'" aria-pressed="'+(messageChoice===name)+'">'+label+'</button>';
+ return '<div class="talera-share-choices" role="group" aria-label="Bericht bij de uitnodiging">'+
+  choice('standard','TALERA-bericht')+choice('personal','Eigen bericht')+'</div>'+
+  (messageChoice==='personal'?'<label for="talera-clean-personal">Jouw persoonlijke bericht</label><textarea id="talera-clean-personal" rows="3" maxlength="1200" aria-label="Jouw persoonlijke bericht">'+escapeText(personalMessage)+'</textarea>':'');
+}
+function taleraShareProgress(phase,data){
+ if(mode!=='share'||overlay.hidden)return;
+ uploadPhase=String(phase||'Uitnodiging voorbereiden…');
+ uploadPercent=data&&Number.isFinite(data.loaded)&&Number.isFinite(data.total)&&data.total>0?
+  Math.min(100,Math.round(100*data.loaded/data.total)):null;
+ const label=panel.querySelector('#talera-free-progress-label');
+ if(label)label.textContent=uploadPhase+(uploadPercent===null?'':': '+uploadPercent+'%');
+ const meter=panel.querySelector('#talera-free-progress-meter');
+ if(meter){meter.hidden=uploadPercent===null;if(uploadPercent!==null)meter.value=uploadPercent}
+}
+window.__taleraShareProgress=taleraShareProgress;
+`;
+   assert.equal(shipped.split(vars).length,2,'WHATSAPP_MESSAGE_DRAFT_SCOPE_DRIFT');
+   shipped=shipped.replace(vars,vars+'\n'+addedVars);
+   const expiry="'+label for=\"talera-clean-expiry\"";
+   // A single concatenation is the original duration label. Insert the
+   // message selector AFTER the current selected photo, BEFORE expiry.
+   const choicePoint="+\'<label for=\"talera-clean-expiry\">'";
+   assert.equal(shipped.split(choicePoint).length,2,'WHATSAPP_MESSAGE_CHOICE_LOCATION_DRIFT');
+   shipped=shipped.replace(choicePoint,'+taleraChoiceHtml()'+choicePoint);
+   const buttonPoint="'<button type=\"button\" class=\"primary\" data-action=\"send\" '";
+   assert.equal(shipped.split(buttonPoint).length,2,'WHATSAPP_MESSAGE_SEND_SOURCE_DRIFT');
+   // A visible, immediate spinner during all async stages, real percentages
+   // ONLY during actual XHR upload bytes. No fictitious overall progress.
+   shipped=shipped.replace(buttonPoint,
+    "(v.state==='preparing'?'<div class=\"talera-share-progress\" role=\"status\" aria-live=\"polite\"><span class=\"talera-share-spinner\" aria-hidden=\"true\"></span><div><span id=\"talera-free-progress-label\">'+escapeText(uploadPhase)+(uploadPercent===null?'':': '+uploadPercent+'%')+'</span><progress id=\"talera-free-progress-meter\" max=\"100\" value=\"'+(uploadPercent===null?0:uploadPercent)+'\" '+(uploadPercent===null?'hidden':'')+'></progress></div></div>':'')+"+buttonPoint);
+   const openShare="if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}";
+   assert.equal(shipped.split(openShare).length,2,'WHATSAPP_DRAFT_NEW_INVITE_DRIFT');
+   shipped=shipped.replace(openShare,
+    "if(a==='share'){consent=false;messageChoice='standard';personalMessage='';uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}");
+   const clickPart="if(a==='prepare'){if(shareAuth!==true){void verifyShareAuth();return}";
+   assert.equal(shipped.split(clickPart).length,2,'WHATSAPP_PERSONAL_PREPARE_DRIFT');
+   shipped=shipped.replace(clickPart,
+    "if(a==='message-standard'||a==='message-personal'){if(share.current().state==='preparing')return;messageChoice=a==='message-personal'?'personal':'standard';render();return}"+
+    "if(a==='prepare'){if(share.current().state==='preparing')return;"+
+    "if(messageChoice==='personal'&&!personalMessage.trim()){const el=panel.querySelector('.status');if(el)el.textContent='Schrijf eerst je persoonlijke bericht.';panel.querySelector('#talera-clean-personal')?.focus();return}"+
+    "uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;if(shareAuth!==true){void verifyShareAuth();return}");
+   const clickSend="if(a==='send'){try{location.assign(share.whatsappUrl())}catch(error){panel.querySelector('.status').textContent=error.message}}";
+   const newClickSend=String.raw`if(a==='send'){
+  try{
+   share.whatsappUrl(); // Retain original ready + HTTPS security validation.
+   const message=messageChoice==='personal'?personalMessage.trim():taleraStandardText;
+   if(!message)throw Error('Schrijf eerst je persoonlijke bericht.');
+   const url=share.current().invite.url;
+   location.assign('https://wa.me/?text='+encodeURIComponent(message+'\n\n'+url));
+  }catch(error){panel.querySelector('.status').textContent=error.message}
+ }`;
+   assert.equal(shipped.split(clickSend).length,2,'WHATSAPP_PERSONAL_SEND_DRIFT');
+   shipped=shipped.replace(clickSend,newClickSend);
+   const changePoint="overlay.addEventListener('change',e=>{";
+   const onInput="overlay.addEventListener('input',e=>{if(e.target.id==='talera-clean-personal')personalMessage=e.target.value});\n ";
+   assert.equal(shipped.split(changePoint).length,2,'WHATSAPP_PERSONAL_INPUT_LOCATION_DRIFT');
+   shipped=shipped.replace(changePoint,onInput+changePoint);
+   // Don't upload twice from rapid tapping. User changes of duration/draft
+   // remain possible without losing the written personal message.
+   const preparing="(shareAuth===true?'':'disabled')+'>Uitnodiging voorbereiden</button>'";
+   assert.equal(shipped.split(preparing).length,2,'WHATSAPP_PREPARE_BUSY_LOCK_DRIFT');
+   shipped=shipped.replace(preparing,
+    "(shareAuth===true&&v.state!=='preparing'&&(messageChoice!=='personal'||personalMessage.trim())?'':'disabled')+'>'+(v.state==='preparing'?'Even geduld…':'Uitnodiging voorbereiden')+'</button>'");
+   const sendGuard="(shareAuth===true&&v.state==='ready'?'':'disabled')+'>Verzenden via WhatsApp</button>'";
+   assert.equal(shipped.split(sendGuard).length,2,'WHATSAPP_PERSONAL_SEND_LOCK_DRIFT');
+   shipped=shipped.replace(sendGuard,
+    "(shareAuth===true&&v.state==='ready'&&(messageChoice!=='personal'||personalMessage.trim())?'':'disabled')+'>Verzenden via WhatsApp</button>'");
+   // The existing account verification can re-render at any time; the
+   // message draft is held in memory and never written to local storage.
+   // ShareController continues to handle expiration, ready and cancellation.
+   const uploader=String.raw`
+function taleraUploadMediaProgress(path,blob,label){
+ return new Promise((resolve,reject)=>{
+  const request=new XMLHttpRequest();
+  request.open('POST',path,true);
+  request.withCredentials=true;
+  request.setRequestHeader('accept','application/json');
+  request.setRequestHeader('content-type',blob.type.split(';')[0]);
+  window.__taleraShareProgress?.(label,null);
+  request.upload.onprogress=e=>{
+   window.__taleraShareProgress?.(label,e.lengthComputable?{loaded:e.loaded,total:e.total}:null);
+  };
+  request.onload=()=>{
+   let data;try{data=JSON.parse(request.responseText)}catch{data=null}
+   if(request.status<200||request.status>=300){
+    const error=Error(data?.error||'Upload niet gelukt. Probeer opnieuw.');
+    error.status=request.status;reject(error);return;
+   }
+   resolve(data);
+  };
+  request.onerror=()=>reject(Error('Netwerkverbinding tijdens upload onderbroken.'));
+  request.onabort=()=>reject(Error('Upload afgebroken.'));
+  request.send(blob);
+ });
+}
+`;
+   const adapterPoint="const shareAdapter={";
+   assert.equal(shipped.split(adapterPoint).length,2,'WHATSAPP_PROGRESS_ADAPTER_SOURCE_DRIFT');
+   shipped=shipped.replace(adapterPoint,uploader+'\n'+adapterPoint);
+   for(const [medium,variable,label] of [
+      ['photo','preview','Foto uploaden'],
+      ['photo-full','full','Volledige foto uploaden'],
+      ['audio','sound','Audio uploaden'],
+      ['video','movie','Video uploaden']
+   ]){
+    const before="coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/"+medium+"',{method:'POST',headers:{'content-type':"+variable+".type.split(';')[0]},body:"+variable+"})";
+    const after="taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(d.id)+'/"+medium+"',"+variable+","+JSON.stringify(label)+")";
+    assert.equal(shipped.split(before).length,2,'WHATSAPP_REAL_UPLOAD_'+medium+'_SOURCE_DRIFT');
+    shipped=shipped.replace(before,after);
+   }
+   // Avoid mistaken status after a completed invite; the spinner is owned
+   // by the existing ShareController.state preparing.
 
  }
  const filename=sha(shipped)+'.'+ext;

@@ -1647,6 +1647,13 @@ try{
      assert.equal(guestGeometry.caption.exists,true);
      assert.deepEqual(guestGeometry.photoStage.rect,originalGeometry.photoStage.rect,
        'Guest uses the original TALERA presenter geometry, not a second design');
+     const guestNativeSocial=await guest.evaluate(()=>({
+       outer:document.getElementById('talera-clean-social')?.outerHTML.slice(0,2600),
+       overlay:document.getElementById('taleraNativeGuestBar')?.outerHTML.slice(0,1000),
+       buttons:[...document.querySelectorAll('#talera-clean-social button')]
+         .map(x=>({action:x.dataset.action,html:x.outerHTML.slice(0,350)}))
+     }));
+     console.log('TALERA_GUEST_EXISTING_ORIGINAL_SOCIAL_MARKUP',JSON.stringify(guestNativeSocial));
      console.log('TALERA_GUEST_EXACT_ORIGINAL_PRESENTATION_VISUAL_METRICS',
        JSON.stringify({originalGeometry,guestGeometry,iphoneAccepted:false}));
      const html=await received.text();

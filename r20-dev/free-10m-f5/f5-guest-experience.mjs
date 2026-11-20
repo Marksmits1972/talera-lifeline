@@ -60,7 +60,11 @@ nav{display:flex;align-items:center;justify-content:space-between;gap:12px;paddi
 h1{font-size:clamp(37px,6vw,68px);line-height:1.06;margin:0 0 20px;letter-spacing:-.03em}
 .lead{font-size:clamp(18px,2.4vw,23px);line-height:1.5;color:#48677e;margin:0 0 22px}
 .cta{display:inline-flex;justify-content:center;align-items:center;text-align:center;text-decoration:none;background:#214c73;color:#fff;border-radius:14px;padding:14px 23px;font-weight:800;min-height:50px}
-.return{display:inline-block;margin:15px 0 0;color:#214c73;font-weight:750;text-decoration:underline;text-underline-offset:3px}
+.return{display:inline-flex;align-items:center;justify-content:center;margin:0;background:#214c73;color:#fff;padding:14px 21px;border-radius:14px;min-height:50px;font-weight:800;text-decoration:none}
+.return[hidden]{display:none!important}
+.guest-landing-actions{display:flex;align-items:flex-start;flex-direction:column;gap:14px}
+.guest-landing-actions .cta{background:#e1edf6;color:#214c73}
+@media(max-width:730px){.guest-landing-actions>a{max-width:100%;width:auto;min-width:220px}}
 .visual{height:370px;border-radius:28px;background:linear-gradient(145deg,#122f51,#436e99);padding:29px;color:#fff;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 24px 60px #16395e24}
 .vision{font-size:clamp(27px,4vw,39px);font-weight:800;letter-spacing:-.03em;line-height:1.14}
 .pill{background:#ffffff2a;border:1px solid #ffffff70;border-radius:19px;padding:10px 15px;width:max-content}
@@ -95,7 +99,7 @@ ${hasVideo?'<section class="video-layer" id="guestVideoLayer" hidden aria-label=
 </body></html>`;
 }
 export function renderTaleraLanding(){
- return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Ontdek TALERA – Bewaar jouw levensverhalen</title><style>${landingCSS}</style><script defer src="/__f5/guest-ui.js"></script></head><body data-talera-page="landing"><div class="wrap"><nav><a class="logo" href="/mijn-leven"><img src="/pwa-192.png" alt="">TALERA</a></nav><main><div class="hero"><section><h1>Jouw leven verdient een verhaal.</h1><p class="lead">Breng jouw foto's, herinneringen en ingesproken verhalen samen in een persoonlijke levenslijn. Bewaar ze op je eigen telefoon en deel bewust wat je wilt delen.</p><a class="cta" href="/mijn-leven">Ontdek TALERA Free</a><div><a class="return" id="returnGuestStory" href="/mijn-leven" hidden>Terug naar jouw herinnering</a></div></section><div class="visual" aria-hidden="true"><span class="pill">Mijn leven</span><div class="vision">Jouw momenten.<br>Jouw stem.<br>Jouw verhaal.</div><div class="life-line"></div><span>Herinneringen die blijven</span></div></div><section class="features" aria-label="Wat TALERA voor jou doet"><article><h2>Foto's en momenten</h2><p>Geef belangrijke momenten een herkenbare plek op jouw tijdlijn.</p></article><article><h2>Vertel het zelf</h2><p>Bewaar het verhaal achter jouw herinneringen, ook met jouw eigen stem.</p></article><article><h2>Deel bewust</h2><p>Laat iemand één gekozen herinnering beleven zonder toegang tot de rest van jouw privéleven.</p></article></section></main><footer>TALERA Free · Jouw herinneringen blijven van jou.</footer></div></body></html>`;
+ return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Ontdek TALERA – Bewaar jouw levensverhalen</title><style>${landingCSS}</style><script defer src="/__f5/guest-ui.js"></script></head><body data-talera-page="landing"><div class="wrap"><nav><a class="logo" href="/mijn-leven"><img src="/pwa-192.png" alt="">TALERA</a></nav><main><div class="hero"><section><h1>Jouw leven verdient een verhaal.</h1><p class="lead">Breng jouw foto's, herinneringen en ingesproken verhalen samen in een persoonlijke levenslijn. Bewaar ze op je eigen telefoon en deel bewust wat je wilt delen.</p><div class="guest-landing-actions"><a class="return" id="returnGuestStory" href="/mijn-leven" hidden>← Terug naar jouw herinnering</a><a class="cta" href="/mijn-leven">Ontdek TALERA Free</a></div></section><div class="visual" aria-hidden="true"><span class="pill">Mijn leven</span><div class="vision">Jouw momenten.<br>Jouw stem.<br>Jouw verhaal.</div><div class="life-line"></div><span>Herinneringen die blijven</span></div></div><section class="features" aria-label="Wat TALERA voor jou doet"><article><h2>Foto's en momenten</h2><p>Geef belangrijke momenten een herkenbare plek op jouw tijdlijn.</p></article><article><h2>Vertel het zelf</h2><p>Bewaar het verhaal achter jouw herinneringen, ook met jouw eigen stem.</p></article><article><h2>Deel bewust</h2><p>Laat iemand één gekozen herinnering beleven zonder toegang tot de rest van jouw privéleven.</p></article></section></main><footer>TALERA Free · Jouw herinneringen blijven van jou.</footer></div></body></html>`;
 }
 export const guestClientScript=String.raw`(()=>{
 'use strict';
@@ -318,6 +322,9 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  const guestUi=[
  '<style id="talera-native-guest-style">',
  '#talera-clean-social [data-action="share"]{display:none!important}',
+ '#talera-v5-editor-pencil{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+ 'html.talera-guest-video-fallback #photoStage img,html.talera-guest-video-fallback #memoryPhotoA,html.talera-guest-video-fallback #memoryPhotoB{visibility:hidden!important}',
+ 'html.talera-guest-video-fallback .talera-v61-first-frame-bridge{visibility:hidden!important}',
  '#talera-clean-panel input#taleraGuestFirstName{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b8c7d0;border-radius:12px;background:#fff;color:inherit;font:inherit}',
  '#taleraNativeInvite[hidden]{display:none!important}#taleraNativeInvite{position:fixed;inset:0;z-index:2147480200;background:#06192fc9;display:flex;align-items:center;justify-content:center;padding:20px;font:15px -apple-system,sans-serif}',
  '#taleraNativeInvite .inner{background:#fff;color:#304653;border-radius:20px;max-width:390px;padding:25px 20px}',
@@ -402,6 +409,31 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   " try{show(await req('heart','POST',{guestId}))}",
   " catch(e){tell(e.message)}finally{if(button)button.disabled=false}",
   "}",
+  "// Stop ALL original media when a recipient leaves the link or hides Safari.",
+  "// The original narrator and ordinary player keep their private app behaviour.",
+  "const stopGuestMedia=()=>{",
+  " window.__taleraFreePauseForShare?.(true);",
+  " window.__taleraSharePauseActive=true;",
+  " for(const media of document.querySelectorAll('audio,video'))",
+  "  try{media.pause()}catch{}",
+  " const audio=document.getElementById('talera-f5-shared-audio');",
+  " if(audio)try{audio.pause()}catch{}",
+  "};",
+  "window.addEventListener('pagehide',stopGuestMedia,{once:true});",
+  "document.addEventListener('visibilitychange',()=>{if(document.hidden)stopGuestMedia()});",
+  "// Hide the old giant VIDEO placeholder only when a real frame is not",
+  "// available yet. The existing full-screen video remains untouched.",
+  "const refreshVideoFallback=()=>{",
+  " const memory=window.__taleraTimelineRuntime?.currentMemory?.();",
+  " const index=memory?._photoIndex||0,frame=memory?._zeroFrames?.[index];",
+  " const still=memory?.photos?.[index];",
+  " const missing=frame?.kind==='video'&&",
+  "   !(typeof still==='string'&&still.startsWith('blob:'));",
+  " document.documentElement.classList.toggle('talera-guest-video-fallback',!!missing);",
+  "};",
+  "refreshVideoFallback();",
+  "const coverWatch=setInterval(refreshVideoFallback,120);",
+  "window.addEventListener('pagehide',()=>clearInterval(coverWatch),{once:true});",
   "const nativeLogo=()=>{",
   " const a=$('talera-flow-home');if(!a)return;",
   " const href='/ontdek-talera#'+base.slice(1);",
@@ -415,8 +447,10 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "window.addEventListener('pagehide',()=>logoObserver.disconnect(),{once:true});",
   "document.addEventListener('click',e=>{syncNodes();",
   " const logo=e.target.closest?.('#talera-flow-home');",
+  " const forbidden=e.target.closest?.('#talera-v5-editor-pencil');",
+  " if(forbidden){e.preventDefault();e.stopImmediatePropagation();e.stopPropagation();return}",
   " if(logo){e.preventDefault();e.stopImmediatePropagation();e.stopPropagation();",
-  "  markPromoSeen();location.assign('/ontdek-talera#'+base.slice(1));return}",
+  "  stopGuestMedia();markPromoSeen();location.assign('/ontdek-talera#'+base.slice(1));return}",
   " const close=e.target.closest?.('#talera-clean-overlay [data-action=close]');",
   " if(close&&!overlay.hidden){e.preventDefault();e.stopImmediatePropagation();e.stopPropagation();",
   "  closeComments();return}",
@@ -461,7 +495,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "document.addEventListener('click',()=>{if(promoDue)setTimeout(checkPromo,0)},true);",
   "document.addEventListener('focusout',()=>{if(promoDue)setTimeout(checkPromo,0)},true);",
   "$('taleraNativeInviteClose').addEventListener('click',()=>{markPromoSeen();promo.hidden=true});",
-  "$('taleraNativeIntroLink').addEventListener('click',markPromoSeen);",
+  "$('taleraNativeIntroLink').addEventListener('click',()=>{stopGuestMedia();markPromoSeen()});",
   "if(!promoSeen())setTimeout(()=>{promoDue=true;checkPromo()},10000);",
   "void load();",
   "}",

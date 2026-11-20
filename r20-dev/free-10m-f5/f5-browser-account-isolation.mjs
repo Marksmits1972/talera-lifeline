@@ -1689,6 +1689,18 @@ try{
      });
      assert.equal(guestGeometry.photoStage.exists,true);
      assert.equal(guestGeometry.caption.exists,true);
+     assert.equal(guestGeometry.editor.visible,false,
+       'Guest must never show the private-account edit pencil');
+     // Even a synthetic click on the old (hidden) pencil must not navigate
+     // into /tell or into an account session on the same origin.
+     await guest.evaluate(()=>{
+       document.getElementById('talera-v5-editor-pencil')?.dispatchEvent(
+         new MouseEvent('click',{bubbles:true,cancelable:true}));
+     });
+     await guest.waitForTimeout(250);
+     assert.equal(guest.url(),issued.link,
+       'Guest pencil must not navigate to original private editor');
+     console.log('TALERA_GUEST_EDITOR_HIDDEN_AND_CLICK_BLOCKED_PASS');
      assert.deepEqual(guestGeometry.photoStage.rect,originalGeometry.photoStage.rect,
        'Guest uses the original TALERA presenter geometry, not a second design');
      const guestNativeSocial=await guest.evaluate(()=>{
@@ -1859,7 +1871,21 @@ try{
      await intro.click();
      await guest.waitForURL(/\/ontdek-talera#s\//);
      assert.equal(await guest.locator('#returnGuestStory').isVisible(),true);
+     assert.equal(await guest.locator('#returnGuestStory').textContent(),
+       '← Terug naar jouw herinnering');
+     const returnVisual=await guest.locator('#returnGuestStory').evaluate(el=>{
+       const s=getComputedStyle(el),r=el.getBoundingClientRect();
+       return {background:s.backgroundColor,decoration:s.textDecorationLine,
+         height:r.height,width:r.width,
+         beforeDiscover:el.compareDocumentPosition(
+           document.querySelector('.guest-landing-actions .cta'))&
+           Node.DOCUMENT_POSITION_FOLLOWING};
+     });
+     assert.ok(returnVisual.height>=48&&returnVisual.width>180&&
+       returnVisual.decoration==='none'&&returnVisual.beforeDiscover,
+       'Guest gets a prominent first-position return button on intro page');
      await guest.locator('#returnGuestStory').click();
+     console.log('TALERA_GUEST_INTRO_DIRECT_RETURN_BUTTON_PASS');
      await guest.waitForURL(issued.link);
      await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
        null,{timeout:20000});
@@ -2469,6 +2495,51 @@ try{
        assert.equal((await guest.request.get(invitation.link+'/media/3/2')).status(),200);
        assert.equal(copy.presentation,true);
        assert.equal(copy.storyLift,true);
+       // Synthetic video fallback, not a new test app or presentation:
+       // the giant legacy VIDEO image must be invisible until genuine
+       // video frames are rendered by the unchanged TALERA player.
+       const posterGuard=await guest.evaluate(async()=>{
+         const m=window.__taleraTimelineRuntime.currentMemory();
+         const frame=m._zeroFrames[0],oldKind=frame.kind;
+         const prior=m.photos[0],oldIndex=m._photoIndex;
+         try{
+           m._photoIndex=0;frame.kind='video';
+           m.photos[0]='data:image/svg+xml,%3Csvg%3E%3C/svg%3E';
+           await new Promise(resolve=>setTimeout(resolve,320));
+           const el=document.getElementById('memoryPhotoA');
+           return {fallback:document.documentElement.classList.contains(
+               'talera-guest-video-fallback'),
+             placeholderHidden:!!el&&getComputedStyle(el).visibility==='hidden'};
+         }finally{
+           frame.kind=oldKind;m.photos[0]=prior;m._photoIndex=oldIndex;
+         }
+       });
+       assert.deepEqual(posterGuard,{fallback:true,placeholderHidden:true},
+         'The original video playback may not show an oversized VIDEO placeholder');
+       await guest.waitForTimeout(280);
+       assert.equal(await guest.evaluate(()=>document.documentElement.classList.contains(
+         'talera-guest-video-fallback')),false,
+         'Guest photo must remain visible after the video placeholder is gone');
+       // Safari moves to WhatsApp/background without always sending a full
+       // unload; stop the original narrator AND its separate shared audio.
+       const stopped=await guest.evaluate(()=>{
+         const audio=window.__taleraF5SharedAudible?.get?.();
+         let stops=0;
+         if(audio){
+           const native=audio.pause.bind(audio);
+           audio.pause=()=>{stops++;return native()};
+         }
+         Object.defineProperty(document,'hidden',{value:true,configurable:true});
+         try{document.dispatchEvent(new Event('visibilitychange'))}
+         finally{delete document.hidden}
+         return {stopState:window.__taleraSharePauseActive===true,
+           sharedSoundPaused:!!audio?.paused,stops};
+       });
+       assert.ok(stopped.stopState&&stopped.sharedSoundPaused&&stopped.stops>0,
+         'Hidden guest must stop both the video and shared narrator audio');
+       console.log('TALERA_GUEST_VIDEO_PLACEHOLDER_AND_BACKGROUND_AUDIO_STOP_PASS',
+         JSON.stringify({videoLabelHidden:true,sharedAudioStopped:true,
+           guestEditorBlocked:true,realIphoneAccepted:false}));
        const revoked=await sharePage.evaluate(async token=>
          (await fetch('/api/shares/'+token+'/revoke',
            {method:'POST',credentials:'same-origin'})).status,invitation.id);

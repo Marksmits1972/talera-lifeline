@@ -1541,11 +1541,7 @@ async function getPublic(name){
 }
 for(const name of paths){
  const first=await getPublic(name),second=await getPublic(name);
- if(name==='/__clean/ui-integration.mjs'&&first.status===200){
-  const sourceLines=first.body.split('\n');
-  console.log('TALERA_F5_WHATSAPP_ORIGINAL_LOOKUP_CODE',
-    JSON.stringify({lines:sourceLines.slice(10,44),share:sourceLines.slice(155,172)}));
- }
+
  // Optional older public scripts are not needed until a real page references them.
  if(first.status===404&&second.status===404)continue;
  assert.equal(first.status,200,'F5 public script must exist: '+name);
@@ -1560,6 +1556,16 @@ for(const name of paths){
  if(name==='/__clean/menu-integration.mjs'){
    writeFileSync(path.join(generated,'approved-menu-original.mjs'),first.body);
    shipped=keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body)))));
+ }
+ if(name==='/__clean/ui-integration.mjs'){
+   // The original author-owned WhatsApp action treats a missing previous
+   // server link (normal for a LOCAL Free story) as a fatal error. Only in
+   // its original PUBLISH adapter, a 404 means "create the consented link".
+   // Keep social hearts, comments, auth and all visual code unchanged.
+   const old='  const existing=await findStoryId(memoryId);\n  if(existing)return {storyId:existing};';
+   const replacement='  let existing=null;\n  try{existing=await findStoryId(memoryId)}catch(e){if(e.status!==404)throw e}\n  if(existing)return {storyId:existing};';
+   assert.equal(shipped.split(old).length,2,'WHATSAPP_ORIGINAL_AUTHOR_ADAPTER_DRIFT');
+   shipped=shipped.replace(old,replacement);
  }
  const filename=sha(shipped)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');

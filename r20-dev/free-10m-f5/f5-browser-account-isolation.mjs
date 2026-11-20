@@ -1758,6 +1758,10 @@ try{
      const suffix=await guest.request.get(videoPath,{headers:{range:'bytes=-16'}});
      assert.equal(suffix.status(),206);
      assert.equal(suffix.headers()['content-range'],'bytes 1008-1023/1024');
+     const pastEnd=await guest.request.get(videoPath,{headers:{range:'bytes=1000-999999'}});
+     assert.equal(pastEnd.status(),206,'iPhone range extending beyond the end must be clipped');
+     assert.equal(pastEnd.headers()['content-range'],'bytes 1000-1023/1024');
+     assert.equal((await pastEnd.body()).length,24);
      const bad=await guest.request.get(videoPath,{headers:{range:'bytes=1024-1030'}});
      assert.equal(bad.status(),416,'Out-of-bounds ranges must not reveal media');
      assert.equal(bad.headers()['content-range'],'bytes */1024');

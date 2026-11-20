@@ -655,6 +655,43 @@ async function run(){
   const clientScript=await request('GET','/__f5/guest-ui.js',{gate:false});
   assert.equal(clientScript.status,200);
   assert.match(String(clientScript.data),/10?000/);
+  // Video/audio playback requires HTTP 206 and byte ranges on iPhone Safari.
+  // Bytes here are test-only media transport fixtures, not playable client media.
+  const sampleVideo=Uint8Array.from({length:1024},(_,i)=>i%256);
+  sampleVideo.set(new TextEncoder().encode('ftyp'),4);
+  const mediaSend=await fetch(origin+'/api/shares/'+createdInvite.data.id+'/video',{
+   method:'POST',
+   headers:{origin,'x-talera-f5-key':f5,cookie:identities[0].cookie,
+    'content-type':'video/mp4'},
+   body:sampleVideo,signal:AbortSignal.timeout(17000)
+  });
+  assert.equal(mediaSend.status,200,'Consented synthetic media upload stays on same share');
+  const mediaUrl=origin+guestPath+'/video';
+  const range=await fetch(mediaUrl,{
+   headers:{'range':'bytes=0-1',accept:'video/mp4'},signal:AbortSignal.timeout(17000)});
+  assert.equal(range.status,206,'iPhone Safari 2-byte probe must work');
+  assert.equal(range.headers.get('content-range'),'bytes 0-1/1024');
+  assert.equal(range.headers.get('accept-ranges'),'bytes');
+  assert.deepEqual([...new Uint8Array(await range.arrayBuffer())],[0,1]);
+  const middle=await fetch(mediaUrl,{
+   headers:{range:'bytes=128-159'},signal:AbortSignal.timeout(17000)});
+  assert.equal(middle.status,206);
+  assert.equal((await middle.arrayBuffer()).byteLength,32);
+  const suffix=await fetch(mediaUrl,{
+   headers:{range:'bytes=-16'},signal:AbortSignal.timeout(17000)});
+  assert.equal(suffix.status,206);
+  assert.equal(suffix.headers.get('content-range'),'bytes 1008-1023/1024');
+  assert.equal((await suffix.arrayBuffer()).byteLength,16);
+  const head=await fetch(mediaUrl,{method:'HEAD',signal:AbortSignal.timeout(17000)});
+  assert.equal(head.status,200);
+  assert.equal(head.headers.get('content-length'),'1024');
+  assert.equal((await head.arrayBuffer()).byteLength,0);
+  const invalid=await fetch(mediaUrl,{
+   headers:{range:'bytes=1024-1030'},signal:AbortSignal.timeout(17000)});
+  assert.equal(invalid.status,416);
+  assert.equal(invalid.headers.get('content-range'),'bytes */1024');
+  assert.equal((await invalid.arrayBuffer()).byteLength,0);
+  console.log('TALERA_GUEST_IPHONE_VIDEO_RANGE_206_AND_HEAD_PASS');
   const guestFeedbackPath=guestPath+'/feedback';
   const firstFeedback=await request('GET',guestFeedbackPath,{
    gate:false,extra:{'x-talera-guest-id':dummyGuestId}});
@@ -696,6 +733,8 @@ async function run(){
    cookie:identities[0].cookie,body:{}});
   assert.equal(withdrawn.status,200);
   assert.equal((await request('GET',guestPath,{gate:false})).status,404);
+  assert.equal((await fetch(mediaUrl,{headers:{range:'bytes=0-1'}})).status,404,
+    'Revoked video bytes are never readable');
   assert.equal((await request('GET',guestFeedbackPath,{gate:false})).status,404);
   assert.equal((await request('POST',guestPath+'/heart',{gate:false,
    body:{guestId:dummyGuestId}})).status,404);

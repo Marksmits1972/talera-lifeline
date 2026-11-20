@@ -1734,6 +1734,40 @@ try{
      assert.match(imageResponse.headers()['content-type']||'',/image\/jpeg/i);
      assert.ok((await imageResponse.body()).length>100,
        'Temp shared photo must contain actual pixels');
+     // The CURRENT running browser suite validates the real deployed Worker
+     // source, not the obsolete F5 local helper. Synthetic transport bytes
+     // only: this proves iPhone Range/HEAD, NOT actual iPhone codec playback.
+     const syntheticVideo=await sharePage.evaluate(async token=>{
+       const bytes=Uint8Array.from({length:1024},(_,i)=>i&255);
+       bytes.set(new TextEncoder().encode('ftyp'),4);
+       const r=await fetch('/api/shares/'+token+'/video',{
+         method:'POST',credentials:'same-origin',
+         headers:{'content-type':'video/mp4'},body:bytes});
+       return {status:r.status,details:await r.json()};
+     },issued.id);
+     assert.equal(syntheticVideo.status,200,'Consented video test is stored under the existing share token');
+     const videoPath=issued.link+'/video';
+     const probe=await guest.request.get(videoPath,{headers:{range:'bytes=0-1'}});
+     assert.equal(probe.status(),206,'iPhone must get two-byte video probe');
+     assert.equal(probe.headers()['content-range'],'bytes 0-1/1024');
+     assert.equal(probe.headers()['accept-ranges'],'bytes');
+     assert.deepEqual([...await probe.body()],[0,1]);
+     const seek=await guest.request.get(videoPath,{headers:{range:'bytes=128-159'}});
+     assert.equal(seek.status(),206);
+     assert.equal((await seek.body()).length,32);
+     const suffix=await guest.request.get(videoPath,{headers:{range:'bytes=-16'}});
+     assert.equal(suffix.status(),206);
+     assert.equal(suffix.headers()['content-range'],'bytes 1008-1023/1024');
+     const bad=await guest.request.get(videoPath,{headers:{range:'bytes=1024-1030'}});
+     assert.equal(bad.status(),416,'Out-of-bounds ranges must not reveal media');
+     assert.equal(bad.headers()['content-range'],'bytes */1024');
+     const headVideo=await guest.request.fetch(videoPath,{method:'HEAD'});
+     assert.equal(headVideo.status(),200);
+     assert.equal(headVideo.headers()['content-length'],'1024');
+     assert.equal((await headVideo.body()).length,0);
+     console.log('TALERA_GUEST_IPHONE_SAFARI_RANGE_HEAD_AND_SEEK_PASS',
+      JSON.stringify({byteProbe:true,seek:true,suffix:true,
+       invalidRangeDenied:true,mediaPrivateToSameToken:true,realIphoneAccepted:false}));
      // Revoke only the newly generated synthetic share. Verify that the raw
      // capability and photo are both immediately inaccessible.
      const revoke=await sharePage.evaluate(async token=>{
@@ -1745,6 +1779,8 @@ try{
      assert.equal(revoke.status,200,'Synthetic owner must revoke own share');
      assert.equal((await guest.request.get(issued.link,{headers:{accept:'text/html'}})).status(),404);
      assert.equal((await guest.request.get(issued.link+'/photo')).status(),404);
+     assert.equal((await guest.request.get(videoPath,{headers:{range:'bytes=0-1'}})).status(),404,
+       'Revoked guest media must not be streamable anymore');
      // Photo-only Free memories are legitimate. Verify NO public access before
      // the consented photo arrives; after upload verify the same one-memory
      // token opens, and revoke it without touching the private original.

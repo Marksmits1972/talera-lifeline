@@ -121,9 +121,11 @@ export class FreeSocialMemory extends DurableObject{
   if(!this.access(null,hash))return null;
   const info=this.sql.exec("SELECT title,story_text,event_date FROM share_snapshot WHERE token_hash=?",hash).toArray()[0];
   if(!info)return null;
-  const pic=this.sql.exec("SELECT 1 AS present FROM share_media WHERE token_hash=? AND kind='photo'",hash).toArray()[0];
+  const media=this.sql.exec("SELECT kind FROM share_media WHERE token_hash=?",hash)
+    .toArray().map(r=>r.kind);
   return {title:info.title,storyText:info.story_text,eventDate:info.event_date,
-   hasPhoto:!!pic};
+   hasPhoto:media.includes('photo'),hasAudio:media.includes('audio'),
+   hasVideo:media.includes('video')};
  }
  async sharedMedia(hash,kind){
   verifyTokenHash(hash);

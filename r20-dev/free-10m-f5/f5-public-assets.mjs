@@ -1790,13 +1790,37 @@ window.__taleraShareProgress=taleraShareProgress;
    const clickSend="if(a==='send'){try{location.assign(share.whatsappUrl())}catch(error){panel.querySelector('.status').textContent=error.message}}";
    const newClickSend=String.raw`if(a==='send'){
   try{
-   share.whatsappUrl(); // Retain original ready + HTTPS security validation.
+   share.whatsappUrl(); // Same READY, consent, HTTPS and 256-bit link proof.
    const message=messageChoice==='personal'?personalMessage.trim():taleraStandardText;
    if(!message)throw Error('Schrijf eerst je persoonlijke bericht.');
    const url=share.current().invite.url;
-   location.assign('https://wa.me/?text='+encodeURIComponent(message+'\n'+url));
+   const caption=message+'\n'+url;
+   const fallback=()=>location.assign('https://wa.me/?text='+encodeURIComponent(caption));
+   const photo=taleraNativeSharePhoto;
+   // A native JPEG photo + caption needs the iOS OS share sheet. No file
+   // upload or image conversion here: share() MUST start in this tap.
+   let capable=false;
+   if(photo&&typeof navigator.share==='function'&&typeof navigator.canShare==='function'){
+    try{capable=navigator.canShare({files:[photo]})===true}catch(error){}
+   }
+   if(!capable){fallback();return}
+   const status=panel.querySelector('.status');
+   if(status)status.textContent='Kies WhatsApp. Controleer de foto, jouw tekst en de link voordat je verzendt.';
+   try{
+    const task=navigator.share({files:[photo],text:caption});
+    Promise.resolve(task).catch(error=>{
+      // Canceling the iOS share sheet must NEVER send anything by itself.
+      if(error?.name==='AbortError')return;
+      if(status)status.textContent='Foto delen lukt hier niet. Je kunt de gewone WhatsApp-uitnodiging gebruiken.';
+      fallback();
+    });
+   }catch(error){
+    if(error?.name==='AbortError')return;
+    fallback();
+   }
   }catch(error){panel.querySelector('.status').textContent=error.message}
  }`;
+
    assert.equal(shipped.split(clickSend).length,2,'WHATSAPP_PERSONAL_SEND_DRIFT');
    shipped=shipped.replace(clickSend,newClickSend);
    const changePoint="overlay.addEventListener('change',e=>{";
@@ -1842,6 +1866,29 @@ function taleraUploadMediaProgress(path,blob,label){
  });
 }
 `;
+   // Web Share MUST be invoked from the user's actual tap; its image File
+   // is prepared in advance during the existing consented upload. Both
+   // payloads stay in memory; no personal media or message saved elsewhere.
+   const nativeSlot="const shareAdapter={";
+   assert.equal(shipped.split(nativeSlot).length,2,'WHATSAPP_NATIVE_SLOT_DRIFT');
+   shipped=shipped.replace(nativeSlot,
+     "let taleraNativeSharePhoto=null;\n"+nativeSlot);
+   const previewSource="  const preview=await previewPhotoBlob(current);";
+   assert.equal(shipped.split(previewSource).length,2,'WHATSAPP_NATIVE_PREVIEW_DRIFT');
+   shipped=shipped.replace(previewSource,
+     "  taleraNativeSharePhoto=null;\n"+
+     previewSource+"\n"+
+     "  if(preview?.size&&preview.type==='image/jpeg'&&typeof File==='function')"+
+     "taleraNativeSharePhoto=new File([preview],'talera-herinnering.jpg',{type:'image/jpeg'});");
+   const currentOpen="if(a==='share'){consent=false;messageChoice='standard';personalMessage='';uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}";
+   assert.equal(shipped.split(currentOpen).length,2,'WHATSAPP_NATIVE_OPEN_RESET_DRIFT');
+   shipped=shipped.replace(currentOpen,
+     currentOpen.replace('consent=false;','consent=false;taleraNativeSharePhoto=null;'));
+   const currentClose="if(wasShare)window.__taleraFreePauseForShare?.(false);";
+   assert.equal(shipped.split(currentClose).length,2,'WHATSAPP_NATIVE_CLOSE_RESET_DRIFT');
+   shipped=shipped.replace(currentClose,
+     "if(wasShare){taleraNativeSharePhoto=null;window.__taleraFreePauseForShare?.(false)}");
+
    const adapterPoint="const shareAdapter={";
    assert.equal(shipped.split(adapterPoint).length,2,'WHATSAPP_PROGRESS_ADAPTER_SOURCE_DRIFT');
    shipped=shipped.replace(adapterPoint,uploader+'\n'+adapterPoint);

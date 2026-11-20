@@ -1291,17 +1291,24 @@ try{
    'Original menu must resolve real link to LOCAL story title, not a remote copy');
  // Click the APPROVED original revoke control, never a replacement UI.
  await revoke.click();
- await page.waitForFunction(async hash=>{
-   const r=await fetch('/api/shares',{credentials:'same-origin',cache:'no-store'});
-   if(!r.ok)return false;
-   return (await r.json()).items?.some(x=>x.id===hash&&x.revoked_at!=null);
- },issuedShareHash,{timeout:15000});
+ // Safari/service-worker requests can finish out of order. Require
+ // THREE successive authenticated owner responses confirming the same
+ // revoke, rather than accepting one transient UI/list result.
  const revokedProof=await page.evaluate(async hash=>{
-   const r=await fetch('/api/shares',{credentials:'same-origin',cache:'no-store'});
-   const rows=(await r.json()).items||[];
-   const row=rows.find(x=>x.id===hash);
-   return {status:r.status,matchingRows:rows.filter(x=>x.id===hash).length,
-     revoked:row?.revoked_at!==null&&row?.revoked_at!==undefined};
+   let confirmed=0,last=null;
+   for(let attempt=0;attempt<35;attempt++){
+     const r=await fetch('/api/shares',{credentials:'same-origin',
+       cache:'reload',headers:{'cache-control':'no-cache'}});
+     const rows=r.ok?((await r.json()).items||[]):[];
+     const match=rows.find(x=>x.id===hash);
+     last={status:r.status,matchingRows:rows.filter(x=>x.id===hash).length,
+       revoked:match?.revoked_at!==null&&match?.revoked_at!==undefined};
+     confirmed=last.status===200&&last.matchingRows===1&&last.revoked?
+       confirmed+1:0;
+     if(confirmed>=3)return last;
+     await new Promise(resolve=>setTimeout(resolve,120));
+   }
+   return last;
  },issuedShareHash);
  if(!revokedProof.revoked){
    // Distinguish stale menu/service-worker state from the actual

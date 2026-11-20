@@ -2421,6 +2421,11 @@ try{
          narrationCues:[]
        },files);
        if(record.items.length!==4)return {error:'missing original media in library'};
+       const thumb=await photo('#cf9d44','existing-video-still.png');
+       if(!await window.TaleraMemories.cacheVideoPoster(record.items[3].key,thumb))
+         return {error:'cannot cache stored video thumbnail'};
+       const thumbSha=Array.from(new Uint8Array(await crypto.subtle.digest(
+         'SHA-256',await thumb.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
        const cues=[{t:0,index:0,mediaId:record.items[0].key},
          {t:2600,index:1,mediaId:record.items[1].key},
          {t:5100,index:2,mediaId:record.items[3].key,videoAtMs:300}];
@@ -2480,7 +2485,7 @@ try{
          digests.push(hex);
        }
        return {id:record.id,kinds:record.items.map(x=>x.kind),digests,
-         cues};
+         thumbSha,cues};
      });
      assert.equal(completeFixture.error,undefined);
      assert.deepEqual(completeFixture.kinds,['photo','photo','audio','video']);
@@ -2517,8 +2522,12 @@ try{
            hashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
              'SHA-256',await blob.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
          }
+         const thumb=await window.TaleraMemories.blob(selected.items[3].key+':phone-v1');
+         if(!thumb)return {error:'missing authorized video still'};
+         const thumbSha=Array.from(new Uint8Array(await crypto.subtle.digest(
+           'SHA-256',await thumb.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
          return {count:rows.length,kinds:selected.items.map(x=>x.kind),
-           hashes,cues:selected.narrationCues,
+           hashes,thumbSha,cues:selected.narrationCues,
            localOnly:window.TaleraMemories.localOnly===true,
            presentation:!!document.getElementById('photoStage'),
            storyLift:!!document.getElementById('memoryStoryScroll')};
@@ -2529,6 +2538,9 @@ try{
          'Every original photo, video and audio item must keep its order');
        assert.deepEqual(copy.hashes,completeFixture.digests,
          'Original album, voice and video file bytes must be identical');
+       assert.equal(copy.thumbSha,completeFixture.thumbSha,
+         'The existing video thumbnail must arrive byte-identical at the guest');
+       assert.equal((await guest.request.get(invitation.link+'/poster/3')).status(),200);
        const simplified=copy.cues.map(c=>({
          t:c.t,index:c.index,mediaIndex:copy.kinds.findIndex((kind,i)=>
            c.mediaId===('local-'+invitation.id.slice(0,32)+':'+i)),
@@ -2604,6 +2616,7 @@ try{
        assert.equal(revoked,200);
        assert.equal((await guest.request.get(invitation.link)).status(),404);
        assert.equal((await guest.request.get(invitation.link+'/media/0/0')).status(),404);
+       assert.equal((await guest.request.get(invitation.link+'/poster/3')).status(),404);
        console.log('TALERA_GUEST_COMPLETE_ORIGINAL_MULTIMEDIA_NARRATION_PASS',
          JSON.stringify({mediaCount:4,photographs:2,voice:true,video:true,
            originalBytesIdentical:true,allCuesExact:true,sameOriginalPresenter:true,
@@ -2613,6 +2626,98 @@ try{
        await sharePage.evaluate(async id=>{
          await window.TaleraMemories?.remove?.(id);
        },completeFixture.id).catch(()=>{});
+     }
+
+
+     // Six authentic library video records and their six already cached stills.
+     // These byte-transport fixtures test THE real app/guest code, not codec playback.
+     const sixVideos=await sharePage.evaluate(async()=>{
+       const files=[];
+       for(let i=0;i<6;i++){
+         const bytes=new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,i,0,0,0,0,0,0,0]);
+         files.push(new File([bytes],'original-video-'+i+'.mp4',{type:'video/mp4'}));
+       }
+       const row=await window.TaleraMemories.save({
+         title:'SIX ORIGINAL VIDEO POSTERS',date:'2005-02-06',
+         text:'Six original videos with six already cached stills.',
+         narrationCues:[]
+       },files);
+       if(row.items.length!==6||row.items.some(x=>x.kind!=='video'))
+         return {error:'six original video items not preserved'};
+       const hashes=[];
+       for(let i=0;i<6;i++){
+         const canvas=document.createElement('canvas');canvas.width=24;canvas.height=24;
+         const ctx=canvas.getContext('2d');ctx.fillStyle='hsl('+(i*54)+',60%,48%)';
+         ctx.fillRect(0,0,24,24);
+         const still=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.85));
+         if(!await window.TaleraMemories.cacheVideoPoster(row.items[i].key,still))
+           return {error:'stored thumbnail '+i+' could not be cached'};
+         hashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
+           'SHA-256',await still.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
+       }
+       return {id:row.id,hashes};
+     });
+     assert.equal(sixVideos.error,undefined,JSON.stringify(sixVideos));
+     try{
+       await sharePage.goto(origin+'/present?memory='+encodeURIComponent(sixVideos.id),
+         {waitUntil:'domcontentloaded'});
+       await sharePage.waitForFunction(id=>
+         window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+         sixVideos.id,{timeout:20000});
+       await sharePage.locator('#talera-clean-social [data-action=share]')
+         .waitFor({state:'visible',timeout:16000});
+       await sharePage.locator('#talera-clean-social [data-action=share]').click();
+       await sharePage.waitForFunction(()=>!!document.querySelector(
+         '#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
+         null,{timeout:15000});
+       await sharePage.locator('#talera-clean-consent').check();
+       await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
+       await sharePage.waitForFunction(()=>!!document.querySelector(
+         '#talera-clean-overlay [data-action=send]:not([disabled])'),
+         null,{timeout:45000});
+       const invite=createdLinks.at(-1);
+       assert.equal(invite?.status,200);
+       const opened=await guest.goto(invite.link,{waitUntil:'domcontentloaded'});
+       assert.equal(opened.status(),200);
+       await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
+         null,{timeout:20000});
+       const outcome=await guest.evaluate(async()=>{
+         const rows=await window.TaleraMemories.list(),row=rows[0],hashes=[];
+         for(const item of row.items){
+           const still=await window.TaleraMemories.blob(item.key+':phone-v1');
+           if(!still)return {error:'missing shared video poster'};
+           hashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
+             'SHA-256',await still.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
+         }
+         return {rows:rows.length,kinds:row.items.map(x=>x.kind),hashes,
+           entryCover:!!document.querySelector('#taleraGuestEntryCover img[src*="/poster/0"]'),
+           originalPresenter:!!document.getElementById('photoStage')};
+       });
+       assert.equal(outcome.error,undefined,JSON.stringify(outcome));
+       assert.equal(outcome.rows,1);
+       assert.deepEqual(outcome.kinds,Array(6).fill('video'),
+         'Six video source items, not six extra photos');
+       assert.deepEqual(outcome.hashes,sixVideos.hashes,
+         'All six cached sidecars must survive sharing byte-identically');
+       assert.ok(outcome.entryCover&&outcome.originalPresenter,
+         'A video-only WhatsApp guest must start with the stored first thumbnail');
+       for(let i=0;i<6;i++){
+         const response=await guest.request.get(invite.link+'/poster/'+i);
+         assert.equal(response.status(),200,'Video poster '+i+' must be accessible');
+         assert.equal(response.headers()['cache-control'],'private, no-store');
+       }
+       assert.equal((await sharePage.evaluate(async token=>
+         (await fetch('/api/shares/'+token+'/revoke',
+           {method:'POST',credentials:'same-origin'})).status,invite.id)),200);
+       for(let i=0;i<6;i++)assert.equal(
+         (await guest.request.get(invite.link+'/poster/'+i)).status(),404,
+         'Revoked share must deny video thumbnail '+i);
+       console.log('TALERA_GUEST_SIX_EXISTING_VIDEO_THUMBNAILS_SECURE_HANDOFF_PASS',
+         JSON.stringify({videos:6,posters:6,orderUnchanged:true,
+           integrityVerified:true,revocationVerified:true,iPhoneAccepted:false}));
+     }finally{
+       await sharePage.evaluate(async id=>window.TaleraMemories?.remove?.(id),
+         sixVideos.id).catch(()=>{});
      }
 
      // Real first-frame regression: use a playable video INSIDE the same
@@ -2653,6 +2758,9 @@ try{
          text:'This genuine video is the FIRST item and the story remains private.',
          narrationCues:[]
        },[clip]);
+       const image=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.85));
+       if(!await window.TaleraMemories.cacheVideoPoster(row.items[0].key,image))
+         throw Error('Cold first-video thumbnail must already exist in library');
        return row.id;
      });
      try{

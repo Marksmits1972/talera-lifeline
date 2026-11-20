@@ -2073,13 +2073,17 @@ try{
        const m=window.__taleraTimelineRuntime.currentMemory();
        return m?._zeroItems?.map(x=>x.kind);
      });
-     assert.deepEqual(sharedMediaKinds,['photo','video']);
+     // A manually appended unrelated legacy video is not part of the
+     // finalized source-exact original memory manifest and must not silently
+     // change the recipient's playback sequence.
+     assert.deepEqual(sharedMediaKinds,['photo']);
      assert.equal(await guest.locator('#photoStage').count(),1);
      assert.equal(await guest.locator('#memoryStoryScroll').count(),1);
      assert.equal(await guest.locator('#openGuestVideo').count(),0,
        'The old independent video overlay must not be part of native TALERA');
      console.log('TALERA_GUEST_NATIVE_MEDIA_USES_ORIGINAL_PRESENTER_PASS',
-       JSON.stringify({photoAndVideo:true,originalTimeline:true,iphoneAccepted:false}));
+       JSON.stringify({sourceExactPhotoOnly:true,unlistedVideoNotInjected:true,
+        originalTimeline:true,iphoneAccepted:false}));
      // Revoke only the newly generated synthetic share. Verify that the raw
      // capability and photo are both immediately inaccessible.
      const revoke=await sharePage.evaluate(async token=>{
@@ -2299,6 +2303,127 @@ try{
        await sharePage.evaluate(async id=>{
          await window.TaleraMemories?.remove?.(id);
        },untitledId).catch(()=>{});
+     }
+     // A real original-library story with multiple photos, its own voice
+     // and video files, and time-coded narration must share ALL file bytes
+     // in the original order, not a reduced poster snapshot.
+     const completeFixture=await sharePage.evaluate(async()=>{
+       const photo=async(color,name)=>{
+         const canvas=document.createElement('canvas');
+         canvas.width=48;canvas.height=48;
+         const c=canvas.getContext('2d');
+         c.fillStyle=color;c.fillRect(0,0,48,48);
+         const b=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+         return new File([b],name,{type:'image/png'});
+       };
+       const wav=new Uint8Array(844),v=new DataView(wav.buffer);
+       const word=(at,s)=>{for(let i=0;i<s.length;i++)wav[at+i]=s.charCodeAt(i)};
+       word(0,'RIFF');v.setUint32(4,836,true);word(8,'WAVE');
+       word(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);
+       v.setUint16(22,1,true);v.setUint32(24,8000,true);
+       v.setUint32(28,16000,true);v.setUint16(32,2,true);
+       v.setUint16(34,16,true);word(36,'data');v.setUint32(40,800,true);
+       const video=new Uint8Array(64);
+       video.set(new TextEncoder().encode('ftyp'),4);
+       const files=[await photo('#bd2d57','first.png'),
+         await photo('#168e8b','second.png'),
+         new File([wav],'narration.wav',{type:'audio/wav'}),
+         new File([video],'clip.mp4',{type:'video/mp4'})];
+       const record=await window.TaleraMemories.save({
+         title:'SYNTHETIC COMPLETE MEMORY',date:'2003-04-05',
+         text:'One selected, multi-media, timed narrative only.',
+         narrationCues:[]
+       },files);
+       if(record.items.length!==4)return {error:'missing original media in library'};
+       const cues=[{t:0,index:0,mediaId:record.items[0].key},
+         {t:2600,index:1,mediaId:record.items[1].key},
+         {t:5100,index:2,mediaId:record.items[3].key,videoAtMs:300}];
+       await window.TaleraMemories.updateCues(record.id,cues);
+       const digests=[];
+       for(const original of record.items){
+         const blob=await window.TaleraMemories.blob(original.key);
+         const hex=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',
+           await blob.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
+         digests.push(hex);
+       }
+       return {id:record.id,kinds:record.items.map(x=>x.kind),digests,
+         cues};
+     });
+     assert.equal(completeFixture.error,undefined);
+     assert.deepEqual(completeFixture.kinds,['photo','photo','audio','video']);
+     try{
+       await sharePage.goto(origin+'/present?memory='+encodeURIComponent(completeFixture.id),
+         {waitUntil:'domcontentloaded'});
+       await sharePage.waitForFunction(id=>
+         window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+         completeFixture.id,{timeout:20000});
+       await sharePage.locator('#talera-clean-social [data-action=share]')
+         .waitFor({state:'visible',timeout:16000});
+       await sharePage.waitForTimeout(1500);
+       await sharePage.locator('#talera-clean-social [data-action=share]').click();
+       await sharePage.waitForFunction(()=>!!document.querySelector(
+         '#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
+         null,{timeout:16000});
+       await sharePage.locator('#talera-clean-consent').check();
+       await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
+       await sharePage.waitForFunction(()=>!!document.querySelector(
+          '#talera-clean-overlay [data-action=send]:not([disabled])'),
+         null,{timeout:45000});
+       const invitation=createdLinks.at(-1);
+       assert.equal(invitation?.status,200);
+       const opened=await guest.goto(invitation.link,{waitUntil:'domcontentloaded'});
+       assert.equal(opened.status(),200);
+       await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
+         null,{timeout:22000});
+       const copy=await guest.evaluate(async()=>{
+         const rows=await window.TaleraMemories.list();
+         const selected=rows[0],hashes=[];
+         for(const item of selected.items){
+           const blob=await window.TaleraMemories.blob(item.key);
+           if(!blob)return {error:'missing complete original item',item:item.kind};
+           hashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
+             'SHA-256',await blob.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
+         }
+         return {count:rows.length,kinds:selected.items.map(x=>x.kind),
+           hashes,cues:selected.narrationCues,
+           localOnly:window.TaleraMemories.localOnly===true,
+           presentation:!!document.getElementById('photoStage'),
+           storyLift:!!document.getElementById('memoryStoryScroll')};
+       });
+       assert.equal(copy.error,undefined,JSON.stringify(copy));
+       assert.equal(copy.count,1,'Guest must see exactly one memory');
+       assert.deepEqual(copy.kinds,completeFixture.kinds,
+         'Every original photo, video and audio item must keep its order');
+       assert.deepEqual(copy.hashes,completeFixture.digests,
+         'Original album, voice and video file bytes must be identical');
+       const simplified=copy.cues.map(c=>({
+         t:c.t,index:c.index,mediaIndex:copy.kinds.findIndex((kind,i)=>
+           c.mediaId===('local-'+invitation.id.slice(0,32)+':'+i)),
+         videoAtMs:c.videoAtMs
+       }));
+       assert.deepEqual(simplified,[
+         {t:0,index:0,mediaIndex:0,videoAtMs:undefined},
+         {t:2600,index:1,mediaIndex:1,videoAtMs:undefined},
+         {t:5100,index:2,mediaIndex:3,videoAtMs:300}
+       ],'Exact narration timing and referenced frame IDs must survive sharing');
+       assert.equal(copy.localOnly,true);
+       assert.equal(copy.presentation,true);
+       assert.equal(copy.storyLift,true);
+       const revoked=await sharePage.evaluate(async token=>
+         (await fetch('/api/shares/'+token+'/revoke',
+           {method:'POST',credentials:'same-origin'})).status,invitation.id);
+       assert.equal(revoked,200);
+       assert.equal((await guest.request.get(invitation.link)).status(),404);
+       assert.equal((await guest.request.get(invitation.link+'/media/0/0')).status(),404);
+       console.log('TALERA_GUEST_COMPLETE_ORIGINAL_MULTIMEDIA_NARRATION_PASS',
+         JSON.stringify({mediaCount:4,photographs:2,voice:true,video:true,
+           originalBytesIdentical:true,allCuesExact:true,sameOriginalPresenter:true,
+           revokedChunkDenied:true,accountLibraryPrivate:true,iphoneAccepted:false,
+           codecPlaybackNotProven:true}));
+     }finally{
+       await sharePage.evaluate(async id=>{
+         await window.TaleraMemories?.remove?.(id);
+       },completeFixture.id).catch(()=>{});
      }
    }finally{await anonymous.close()}
  }finally{await sharePage.close()}

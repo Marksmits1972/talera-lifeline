@@ -2345,7 +2345,23 @@ try{
        const cues=[{t:0,index:0,mediaId:record.items[0].key},
          {t:2600,index:1,mediaId:record.items[1].key},
          {t:5100,index:2,mediaId:record.items[3].key,videoAtMs:300}];
-       await window.TaleraMemories.updateCues(record.id,cues);
+       const library=window.TaleraMemories;
+       const cueWriter=typeof library.updateCues==='function'?library:
+         (typeof window.TaleraLibrary?.updateCues==='function'?window.TaleraLibrary:null);
+       if(cueWriter){
+         await cueWriter.updateCues(record.id,cues);
+       }else{
+         // The public /present facade does not expose the original editor's
+         // cue writer. Re-save via its own stable-ID contract, never another DB.
+         await library.save({
+           title:'SYNTHETIC COMPLETE MEMORY',date:'2003-04-05',
+           text:'One selected, multi-media, timed narrative only.',
+           narrationCues:cues
+         },files,record.id,record.items.map(x=>x.key));
+       }
+       const checked=await library.get(record.id);
+       if(JSON.stringify(checked.narrationCues)!==JSON.stringify(cues))
+         return {error:'original cue writer did not retain the same cue IDs'};
        const digests=[];
        for(const original of record.items){
          const blob=await window.TaleraMemories.blob(original.key);

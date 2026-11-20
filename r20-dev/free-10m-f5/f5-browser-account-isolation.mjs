@@ -1549,6 +1549,57 @@ try{
      assert.equal(revoke.status,200,'Synthetic owner must revoke own share');
      assert.equal((await guest.request.get(issued.link,{headers:{accept:'text/html'}})).status(),404);
      assert.equal((await guest.request.get(issued.link+'/photo')).status(),404);
+     // Photo-only Free memories are legitimate. Verify NO public access before
+     // the consented photo arrives; after upload verify the same one-memory
+     // token opens, and revoke it without touching the private original.
+     const pictureOnly=await sharePage.evaluate(async localId=>{
+       const post=async(path,data)=>{
+         const r=await fetch(path,{method:'POST',credentials:'same-origin',
+           headers:{'content-type':'application/json'},body:JSON.stringify(data)});
+         return {status:r.status,data:await r.json()};
+       };
+       const created=await post('/api/pwa/memory-link',{
+         localMemoryId:localId+'-photo-only',
+         title:'synthetic PHOTO ONLY',storyText:'',eventDate:'',consent:true
+       });
+       if(created.status!==200)return {step:'stage',created};
+       const share=await post('/api/memories/'+created.data.memoryId+'/shares',
+         {hours:1,consent:true});
+       if(share.status!==200)return {step:'token',share};
+       const before=await fetch(share.data.link,{
+         headers:{accept:'text/html'},credentials:'omit'});
+       const canvas=document.createElement('canvas');
+       canvas.width=96;canvas.height=96;
+       const ctx=canvas.getContext('2d');
+       ctx.fillStyle='#224466';ctx.fillRect(0,0,96,96);
+       const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.83));
+       const media=await fetch('/api/shares/'+share.data.id+'/photo',{
+         method:'POST',credentials:'same-origin',
+         headers:{'content-type':'image/jpeg'},body:jpeg
+       });
+       const after=await fetch(share.data.link,{
+         headers:{accept:'text/html'},credentials:'omit'});
+       const html=await after.text();
+       const revoke=await fetch('/api/shares/'+share.data.id+'/revoke',{
+         method:'POST',credentials:'same-origin'});
+       const unavailable=await fetch(share.data.link,{
+         headers:{accept:'text/html'},credentials:'omit'});
+       return {before:before.status,after:after.status,
+         media:media.status,revoke:revoke.status,
+         unavailable:unavailable.status,
+         hasPhoto:html.includes('/photo'),hasTitle:html.includes('synthetic PHOTO ONLY'),
+         expiresAt:share.data.expiresAt};
+     },a.id);
+     assert.deepEqual({
+       before:pictureOnly.before,after:pictureOnly.after,
+       media:pictureOnly.media,revoke:pictureOnly.revoke,
+       unavailable:pictureOnly.unavailable,
+       hasPhoto:pictureOnly.hasPhoto,hasTitle:pictureOnly.hasTitle
+     },{before:404,after:200,media:200,revoke:200,unavailable:404,
+       hasPhoto:true,hasTitle:true},
+       'Photo-only memory must be private until consented media exists, then revocable');
+     assert.ok(Math.abs(pictureOnly.expiresAt-(Date.now()+3600000))<60000,
+       'Photo-only temporary share must honour one-hour choice');
      console.log('TALERA_FREE_WHATSAPP_SHARE_READY_RECIPIENT_PHOTO_REVOKED_PASS',
        JSON.stringify({originalWhatsAppUI:true,receiverHtml:200,photo:200,
          revoke:200,expiredLinkAfterRevoke:404,otherStoriesUntouched:true,

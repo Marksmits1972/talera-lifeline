@@ -1591,14 +1591,6 @@ for(const name of paths){
    shipped=keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body)))));
  }
  if(name==='/__clean/ui-integration.mjs'){
-// CI source audit ONLY. Read the unchanged original TALERA Reacties UI contract;
-// never ship a second guest-designed comment pane.
-const auditWords=["if(a==='comments')","function render()","data-action=\"comments\"","mode==='comments'","talera-clean-panel","const css=","function open("];
-console.log("TALERA_NATIVE_REACTIONS_UI_SOURCE_AUDIT",JSON.stringify(auditWords.map(word=>{
- const at=shipped.indexOf(word);
- return {word,at,source:at>=0?shipped.slice(Math.max(0,at-320),at+1850):""};
-})));
-
    // The original author-owned WhatsApp action treats a missing previous
    // server link (normal for a LOCAL Free story) as a fatal error. Only in
    // its original PUBLISH adapter, a 404 means "create the consented link".

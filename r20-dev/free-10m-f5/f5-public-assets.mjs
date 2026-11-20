@@ -1790,10 +1790,21 @@ window.__taleraShareProgress=taleraShareProgress;
    const clickSend="if(a==='send'){try{location.assign(share.whatsappUrl())}catch(error){panel.querySelector('.status').textContent=error.message}}";
    const newClickSend=String.raw`if(a==='send'){
   try{
-   share.whatsappUrl(); // Same READY, consent, HTTPS and 256-bit link proof.
+   const view=share.current();
+   if(view.state!=='ready'||!view.invite?.url)
+    throw Error('Uitnodiging nog niet gereed');
+   const target=new URL(view.invite.url);
+   const localOnly=location.protocol==='http:'&&
+    (location.hostname==='127.0.0.1'||location.hostname==='localhost')&&
+    target.origin===location.origin;
+   if((target.protocol!=='https:'&&!localOnly)||
+      target.origin!==location.origin||
+      !/^\/s\/[A-Za-z0-9_-]{43}$/.test(target.pathname)||
+      target.search||target.hash)
+    throw Error('Onveilige uitnodigingslink');
    const message=messageChoice==='personal'?personalMessage.trim():taleraStandardText;
    if(!message)throw Error('Schrijf eerst je persoonlijke bericht.');
-   const url=share.current().invite.url;
+   const url=target.href;
    const caption=message+'\n'+url;
    const fallback=()=>location.assign('https://wa.me/?text='+encodeURIComponent(caption));
    const photo=taleraNativeSharePhoto;

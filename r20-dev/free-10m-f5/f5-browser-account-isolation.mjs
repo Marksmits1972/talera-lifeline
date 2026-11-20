@@ -1648,84 +1648,83 @@ try{
       social:'#talera-clean-social',caption:'#memoryCaption',
       home:'#talera-flow-home',editor:'#talera-v5-editor-pencil'
      });
+     // The recipient MUST get the original presentation DOM, timeline,
+     // lift-to-read panel and media motor. No custom navy hero or story modal.
+     await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
+       null,{timeout:20000});
      const guestGeometry=await visualMetrics(guest,{
-      photoStage:'.stage',photo:'.cover',social:'.bottom',
-      caption:'.hero',logo:'.brand',entry:'.top'
+       photoStage:'#photoStage',photo:'#memoryPhotoA',
+       social:'#talera-clean-social',caption:'#memoryCaption',
+       home:'#talera-flow-home',editor:'#talera-v5-editor-pencil'
      });
-     console.log('TALERA_GUEST_VS_APPROVED_PRESENTATION_VISUAL_METRICS',
-      JSON.stringify({originalGeometry,guestGeometry,
-       realIphoneAccepted:false,protection:'no UI or account changes'}));
+     assert.equal(guestGeometry.photoStage.exists,true);
+     assert.equal(guestGeometry.caption.exists,true);
+     assert.deepEqual(guestGeometry.photoStage.rect,originalGeometry.photoStage.rect,
+       'Guest uses the original TALERA presenter geometry, not a second design');
+     console.log('TALERA_GUEST_EXACT_ORIGINAL_PRESENTATION_VISUAL_METRICS',
+       JSON.stringify({originalGeometry,guestGeometry,iphoneAccepted:false}));
      const html=await received.text();
      assert.match(html,/synthetic ACCOUNT ISOLATION 1/);
-     assert.match(html,/<meta property="og:title" content="Een persoonlijke herinnering via TALERA">/);
-     assert.match(html,/<meta property="og:site_name" content="TALERA">/);
-     assert.match(html,/<meta property="og:description" content="Tik om deze herinnering te bekijken\.">/,
-       'Invitation card must have one short, nonrepeated prompt');
-     assert.ok(!html.includes('Iemand deelt deze herinnering persoonlijk met je.'),
-       'Old duplicated WhatsApp card explanation must be removed');
-     assert.ok(html.includes('class="stage"')&&
-       html.includes('background:linear-gradient(145deg,#244764,#071b30)')&&
-       html.includes('color:#17344a'),
-       'Guest presents the real memory in TALERA navy, never WhatsApp green');
-     assert.ok(!issued.link.includes('/__social/shared/'),
-       'Only the friendly compact address belongs in the visible invitation');
-
      assert.match(html,/Local-only imaginary image/);
-     assert.ok(html.includes('<img ')&&html.includes('/photo')&&
-       html.includes('property="og:image"')&&
-       html.includes(issued.link+'/photo'),
-       'The original WhatsApp link must expose the consented shared image as preview');
-     // Real browser recipient journey: one story, original media, logo to the
-     // same-origin TALERA introduction and return to the very same share.
-     assert.equal(await guest.locator('#openGuestStory').isVisible(),true);
-     await guest.locator('#openGuestStory').click();
-     assert.equal(await guest.locator('#storySheet').isVisible(),true);
-     await guest.locator('[data-close="storySheet"]').click();
-     assert.equal(await guest.locator('#storySheet').isHidden(),true);
-     assert.ok((await guest.locator('a.brand').getAttribute('href'))
-       .startsWith('/ontdek-talera#s/'));
-     await guest.locator('a.brand').click();
+     assert.match(html,/<meta property="og:title" content="Een persoonlijke herinnering via TALERA">/);
+     assert.match(html,/<meta property="og:image" content=/);
+     assert.ok(html.includes(issued.link+'/photo'));
+     assert.ok(!html.includes('class="stage"'),
+       'Separate improvised WhatsApp guest hero has been retired');
+     assert.ok(html.includes('id="photoStage"')&&
+       html.includes('id="memoryStoryScroll"')&&
+       html.includes('id="memoryCaption"')&&
+       html.includes('window.TaleraGuestOneMemory={list,get}'),
+       'Guest must have the ORIGINAL timeline, photo, story lift and scoped library adapter');
+     const nativeState=await guest.evaluate(async()=>{
+       const rows=await window.TaleraMemories.list();
+       const current=window.__taleraTimelineRuntime.currentMemory();
+       return {rows:rows.map(x=>({id:x.id,title:x.title,text:x.text,items:x.items.map(y=>y.kind)})),
+         current:{storyId:current.storyId,local:current._taleraLocal,
+          story:current.fullStory,photos:current.photos.length},
+         timeline:!!document.querySelector('.timeline'),
+         storyLift:!!document.querySelector('#memoryStoryScroll'),
+         photosInStage:!!document.querySelector('#photoStage'),
+         canEdit:typeof window.TaleraMemories.save==='function'};
+     });
+     assert.equal(nativeState.rows.length,1,'Bearer token must see exactly one memory');
+     assert.equal(nativeState.rows[0].text,'Local-only imaginary image');
+     assert.deepEqual(nativeState.rows[0].items,['photo']);
+     assert.equal(nativeState.current.storyId,nativeState.rows[0].id);
+     assert.equal(nativeState.current.story,'Local-only imaginary image');
+     assert.ok(nativeState.timeline&&nativeState.storyLift&&nativeState.photosInStage);
+     assert.equal((await guest.evaluate(async()=>window.TaleraMemories.get('local-unrelated-secret'))),null,
+       'A guessed local memory ID is inaccessible to a guest');
+     assert.equal((await guest.evaluate(async()=>window.TaleraMemories.blob('local-unrelated-secret:0'))),null,
+       'A guessed local media key is inaccessible to a guest');
+     const deniedGuestWrite=await guest.evaluate(async()=>{
+       try{await window.TaleraMemories.save({title:'FORBIDDEN'},[]);return false}
+       catch{return true}
+     });
+     assert.equal(deniedGuestWrite,true,'Guest cannot write to the owner library');
+     const intro=guest.locator('#taleraNativeGuestBar a');
+     assert.ok((await intro.getAttribute('href')).startsWith('/ontdek-talera#s/'));
+     await intro.click();
      await guest.waitForURL(/\/ontdek-talera#s\//);
-     assert.equal(await guest.locator('#returnGuestStory').isVisible(),true,
-       'The introduction may not lose the selected protected memory');
-     assert.equal(await guest.locator('a.cta').getAttribute('href'),'/mijn-leven',
-       'TALERA Free signup is voluntary, not required for guest playback');
+     assert.equal(await guest.locator('#returnGuestStory').isVisible(),true);
      await guest.locator('#returnGuestStory').click();
      await guest.waitForURL(issued.link);
-     assert.equal(await guest.locator('#openGuestStory').isVisible(),true);
-     assert.equal(await guest.locator('#guestPromo').isHidden(),true,
-       'Commercial invite must not interrupt initial memory opening');
-     await guest.locator('#guestPromo:not([hidden])').waitFor({timeout:15000});
-     assert.equal(await guest.locator('#guestPromo').isVisible(),true,
-       'A single unobtrusive invite appears only after ten seconds of viewing');
-     await guest.locator('#dismissGuestPromo').click();
-     assert.equal(await guest.locator('#guestPromo').isHidden(),true);
-     const dismissed=await guest.evaluate(()=>Object.keys(localStorage)
-       .some(k=>k.startsWith('talera-promo-seen-v1-')&&localStorage.getItem(k)==='1'));
-     assert.equal(dismissed,true,'Do not repeatedly interrupt this invitation');
-     // Playback guard cannot treat a temporary pause as media completion.
-     // Only natural end/error/empty or explicit video close releases the hold.
-     assert.match(guestClientScript,/unfinishedMedia\.size\|\|typing\(\)/);
-     assert.match(guestClientScript,/node\.addEventListener\('play',\(\)=>unfinishedMedia\.add\(node\)\)/);
-     assert.doesNotMatch(guestClientScript,/addEventListener\('pause',popupCheck\)/);
-     assert.match(guestClientScript,/for\(const type of \['ended','emptied','error'\]\)/);
-     console.log('TALERA_GUEST_PAUSED_MEDIA_NEVER_TRIGGERS_INVITE_GUARD_PASS');
-     console.log('TALERA_FREE_GUEST_PRESENTATION_INTRO_RETURN_AND_POPUP_PASS',
-       JSON.stringify({oneMemory:true,introSameOrigin:true,returnExactShare:true,
-         popupAfterTenSeconds:true,existingPwaUnaffected:true}));
-     // End-to-end guest interaction uses the SAME temporary capability;
-     // no account registration, external database or new app.
-     await guest.locator('#guestHeart').click();
+     await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
+       null,{timeout:20000});
+     await guest.locator('#taleraNativeHeart').click();
+     await guest.waitForFunction(()=>document.getElementById('taleraNativeHearts')?.textContent==='1');
+     assert.equal(await guest.locator('#taleraNativeHeart').getAttribute('aria-pressed'),'true');
+     await guest.locator('#taleraNativeCommentOpen').click();
+     assert.equal(await guest.locator('#taleraNativeGuestDialog').isVisible(),true);
+     await guest.locator('#taleraNativeName').fill('Iris');
+     await guest.locator('#taleraNativeMessage').fill('Dit is uitsluitend een fictieve browserreactie.');
+     await guest.locator('#taleraNativeCommentForm button[type="submit"]').click();
      await guest.waitForFunction(()=>
-       document.getElementById('heartCount').textContent==='1');
-     assert.equal(await guest.locator('#guestHeart').getAttribute('aria-pressed'),'true');
-     await guest.locator('#openGuestComments').click();
-     assert.equal(await guest.locator('#commentSheet').isVisible(),true);
-     await guest.locator('#guestName').fill('Iris');
-     await guest.locator('#guestMessage').fill('Dit is uitsluitend een fictieve browserreactie.');
-     await guest.locator('#guestCommentForm button[type="submit"]').click();
-     await guest.waitForFunction(()=>
-       document.getElementById('guestStatus').textContent.includes('geplaatst'));
+       document.getElementById('taleraNativeGuestStatus')?.textContent.includes('geplaatst'));
+     console.log('TALERA_FREE_GUEST_NATIVE_ONE_MEMORY_ACCESS_AND_REACTIONS_PASS',
+       JSON.stringify({oneOnly:true,originalPresentation:true,originalStory:true,
+         privateLibraryDenied:true,writeDenied:true,originalMediaKey:true,
+         feedback:true,introReturn:true,iphoneAccepted:false}));
      const guestSnapshot=await guest.request.get(issued.link+'/feedback',
        {headers:{'x-talera-guest-id':await guest.evaluate(()=>
          sessionStorage.getItem('talera-guest-browser-v1'))}});
@@ -1862,7 +1861,7 @@ try{
        headers:{origin:'https://attacker.invalid','content-type':'application/json'},
        data:{guestId:'00000000-0000-4000-8000-000000000000'}});
      assert.equal(alienReaction.status(),403);
-     await guest.locator('[data-close="commentSheet"]').click();
+     await guest.locator('#taleraNativeCommentClose').click();
      console.log('TALERA_FREE_GUEST_NAMED_REACTION_AND_ORIGIN_PROTECTION_PASS',
        JSON.stringify({accountRequired:false,guestLike:true,
          guestFirstName:true,foreignOriginDenied:true,realIphoneAccepted:false}));
@@ -1909,33 +1908,22 @@ try{
      console.log('TALERA_GUEST_IPHONE_SAFARI_RANGE_HEAD_AND_SEEK_PASS',
       JSON.stringify({byteProbe:true,seek:true,suffix:true,
        invalidRangeDenied:true,mediaPrivateToSameToken:true,realIphoneAccepted:false}));
-     // A paused-but-open video must not be covered by the timed invitation.
-     // Reopen the same synthetic one-memory link after the permitted video
-     // upload; this tests the actual guest page on the existing F5 runtime.
+     // The original TALERA local presenter, not a custom modal, must
+     // contain the selected real share media after a fresh guest opening.
      await guest.goto(issued.link,{waitUntil:'domcontentloaded'});
-     await guest.evaluate(()=>{
-       for(const key of Object.keys(localStorage))
-        if(key.startsWith('talera-promo-seen-v1-'))localStorage.removeItem(key);
+     await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
+       null,{timeout:20000});
+     const sharedMediaKinds=await guest.evaluate(()=>{
+       const m=window.__taleraTimelineRuntime.currentMemory();
+       return m?._zeroItems?.map(x=>x.kind);
      });
-     await guest.reload({waitUntil:'domcontentloaded'});
-     await guest.locator('#openGuestVideo').click();
-     assert.equal(await guest.locator('#guestVideoLayer').isVisible(),true);
-     await guest.waitForTimeout(10300);
-     assert.equal(await guest.locator('#guestPromo').isHidden(),true,
-       'A visible paused video must not be interrupted after ten seconds');
-     await guest.locator('#closeGuestVideo').click();
-     await guest.locator('#guestPromo:not([hidden])').waitFor({timeout:3000});
-     await guest.locator('#guestPromo a[href^="/ontdek-talera#"]').click();
-     await guest.waitForURL(/\/ontdek-talera#s\//);
-     await guest.locator('#returnGuestStory').click();
-     await guest.waitForURL(issued.link);
-     const followedOnce=await guest.evaluate(()=>Object.keys(localStorage).some(
-       key=>key.startsWith('talera-promo-seen-v1-')&&localStorage.getItem(key)==='1'));
-     assert.equal(followedOnce,true,'Following the introduction dismisses this invite permanently');
-     assert.equal(await guest.locator('#guestPromo').isHidden(),true);
-     console.log('TALERA_GUEST_VIDEO_OVERLAY_AND_ONE_TIME_INTRO_PASS',
-       JSON.stringify({pausedVideoUninterrupted:true,closingVideoReleasesInvite:true,
-        introVisitedOnce:true,exactReturnToStory:true,iphoneAccepted:false}));
+     assert.deepEqual(sharedMediaKinds,['photo','video']);
+     assert.equal(await guest.locator('#photoStage').count(),1);
+     assert.equal(await guest.locator('#memoryStoryScroll').count(),1);
+     assert.equal(await guest.locator('#openGuestVideo').count(),0,
+       'The old independent video overlay must not be part of native TALERA');
+     console.log('TALERA_GUEST_NATIVE_MEDIA_USES_ORIGINAL_PRESENTER_PASS',
+       JSON.stringify({photoAndVideo:true,originalTimeline:true,iphoneAccepted:false}));
      // Revoke only the newly generated synthetic share. Verify that the raw
      // capability and photo are both immediately inaccessible.
      const revoke=await sharePage.evaluate(async token=>{

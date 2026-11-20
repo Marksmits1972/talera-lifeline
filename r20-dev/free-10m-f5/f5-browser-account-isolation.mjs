@@ -1648,6 +1648,20 @@ try{
          return true;
        });
        assert.equal(blank,true,'Synthetic photo needs an original media reference');
+       // Verify the share button itself pauses both media types in the
+       // ORIGINAL page; never rely on a vacant audio/video DOM.
+       await sharePage.evaluate(()=>{
+         window.__taleraWhatsappMediaProbe=[];
+         for(const kind of ['audio','video']){
+           const node=document.createElement(kind);
+           let playing=true,calls=0;
+           Object.defineProperty(node,'paused',{configurable:true,get:()=>!playing});
+           node.pause=()=>{calls++;playing=false};
+           node.dataset.taleraShareProbe=kind;
+           document.body.append(node);
+           window.__taleraWhatsappMediaProbe.push({node,kind,get calls(){return calls}});
+         }
+       });
        await sharePage.locator('#talera-clean-social [data-action=share]').click();
        await sharePage.waitForFunction(()=>
          !!document.querySelector('#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
@@ -1658,6 +1672,10 @@ try{
        }));
        assert.deepEqual(paused,{requested:true,media:true},
          'Opening WhatsApp must pause picture and all audio/video');
+       const halted=await sharePage.evaluate(()=>
+         window.__taleraWhatsappMediaProbe.map(x=>({kind:x.kind,calls:x.calls})));
+       assert.deepEqual(halted,[{kind:'audio',calls:1},{kind:'video',calls:1}],
+         'WhatsApp must synchronously stop playing audio AND video elements');
        await sharePage.locator('#talera-clean-consent').check();
        await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
        await sharePage.waitForFunction(()=>
@@ -1684,6 +1702,14 @@ try{
        assert.equal(await sharePage.evaluate(()=>
          window.__taleraSharePauseActive),false,
          'Closing the share sheet may release pause without autoplay');
+       const stillHalted=await sharePage.evaluate(()=>{
+         const list=window.__taleraWhatsappMediaProbe;
+         const result=list.every(x=>x.node.paused&&x.calls===1);
+         list.forEach(x=>x.node.remove());
+         delete window.__taleraWhatsappMediaProbe;
+         return result;
+       });
+       assert.equal(stillHalted,true,'Closing WhatsApp must never restart media');
        console.log('TALERA_FREE_UNTITLED_PHOTO_WHATSAPP_AND_PLAYBACK_PAUSE_PASS',
          JSON.stringify({realTitleRequired:false,realStoryTextRequired:false,
            originalPhotoByMediaId:true,playbackPaused:true,

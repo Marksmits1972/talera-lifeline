@@ -1935,11 +1935,11 @@ function taleraUploadMediaProgress(path,blob,label){
    // content-type can be corrected after checking the actual file header.
    // Safari sometimes preserves iPhone .m4v/.mov clips as video/x-m4v or
    // an untyped Blob even though the original video and poster are intact.
-   const originalMimeReader=String.raw\`
+   const originalMimeReader=String.raw`
 async function taleraVerifiedGuestShareMime(item,original,position){
  const declared=String(original.type||item.mime||'').split(';')[0].trim().toLowerCase();
  const expected=item.kind==='photo'?'image/':item.kind+'/';
- const allowed=/^(image\\/(?:jpeg|png|webp|gif|heic|heif)|video\\/(?:mp4|webm|quicktime)|audio\\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/;
+ const allowed=/^(image\/(?:jpeg|png|webp|gif|heic|heif)|video\/(?:mp4|webm|quicktime)|audio\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/;
  if(allowed.test(declared)&&declared.startsWith(expected))return declared;
  const head=new Uint8Array(await original.slice(0,256).arrayBuffer());
  const word=(at,n)=>String.fromCharCode(...head.slice(at,at+n));
@@ -1970,11 +1970,11 @@ async function taleraVerifiedGuestShareMime(item,original,position){
   'veilig bewaard; er is niets gedeeld.');
  return mime;
 }
-\`;
+`;
    const originalShareChecks=[
     [
-     "  if(!(blob instanceof Blob)||!blob.size||!allowed.test(blob.type)||\\n     !blob.type.startsWith(item.kind==='photo'?'image/':item.kind+'/'))\\n   throw Error('Het originele bestand '+(sources.length+1)+' kan niet verliesvrij worden gedeeld.');",
-     "  if(!(blob instanceof Blob)||!blob.size)\\n   throw Error('Origineel bestand '+(sources.length+1)+' ontbreekt in de bibliotheek. Er is niets gedeeld.');\\n  const mime=await taleraVerifiedGuestShareMime(item,blob,sources.length+1);"
+     "  if(!(blob instanceof Blob)||!blob.size||!allowed.test(blob.type)||\n     !blob.type.startsWith(item.kind==='photo'?'image/':item.kind+'/'))\n   throw Error('Het originele bestand '+(sources.length+1)+' kan niet verliesvrij worden gedeeld.');",
+     "  if(!(blob instanceof Blob)||!blob.size)\n   throw Error('Origineel bestand '+(sources.length+1)+' ontbreekt in de bibliotheek. Er is niets gedeeld.');\n  const mime=await taleraVerifiedGuestShareMime(item,blob,sources.length+1);"
     ],
     [
      "  sources.push({item,blob,parts});",

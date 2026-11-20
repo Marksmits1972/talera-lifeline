@@ -761,7 +761,7 @@ async function publicWhatsAppMemory(request,env){
  const previewMeta='<meta property="og:type" content="article">'+
   '<meta property="og:site_name" content="TALERA">'+
   '<meta property="og:title" content="Een persoonlijke herinnering via TALERA">'+
-  '<meta property="og:description" content="Iemand deelt deze herinnering persoonlijk met je.">'+
+  '<meta property="og:description" content="Tik om deze herinnering te bekijken.">'+
   '<meta name="twitter:card" content="summary_large_image">'+
   '<meta property="og:url" content="'+safeShareHtml(u.href)+'">'+
   (content.hasPhoto?'<meta property="og:image" content="'+
@@ -771,11 +771,12 @@ async function publicWhatsAppMemory(request,env){
   previewMeta+
   '<meta name="robots" content="noindex,nofollow">'+
   '<title>'+title+' – TALERA</title><style>'+
-  '*{box-sizing:border-box}body{margin:0;background:#f8f9f7;color:#17344a;font:17px/1.55 -apple-system,system-ui,sans-serif}'+
-  'header{background:white;padding:22px;text-align:center;letter-spacing:.22em;font-size:17px;font-weight:800}'+
-  'main{max-width:680px;margin:20px auto;padding:22px;background:white;border-radius:22px}'+
-  'h1{font-size:25px;margin:0 0 12px}img,video{display:block;max-width:100%;width:100%;height:auto;border-radius:14px;margin:18px 0}audio{display:block;width:100%;margin:18px 0}'+
-  'p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#66747f}'+
+  '*{box-sizing:border-box}body{margin:0;background:#f2f5f8;color:#17344a;font:17px/1.55 -apple-system,system-ui,sans-serif}'+
+  'header{background:#17344a;color:#fff;padding:20px;text-align:center;letter-spacing:.18em;font-size:18px;font-weight:800}'+
+  'main{max-width:680px;margin:20px auto;padding:24px;background:#fff;border:1px solid #dbe5ed;border-radius:20px;box-shadow:0 6px 30px rgba(23,52,74,.07)}'+
+  'h1{color:#17344a;font-size:26px;line-height:1.25;margin:0 0 12px}img,video{display:block;max-width:100%;width:100%;height:auto;border-radius:14px;margin:18px 0}audio{display:block;width:100%;margin:18px 0}'+
+  'p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#5f7181}'+
+  '@media(max-width:700px){main{margin:12px;padding:18px;border-radius:18px}}'+
   '</style></head><body><header>TALERA</header><main><h1>'+title+
   '</h1>'+(date?'<small>'+date+'</small>':'')+photo+video+audio+'<p>'+story+
   '</p><small>Deze herinnering is tijdelijk met je gedeeld.</small></main></body></html>';

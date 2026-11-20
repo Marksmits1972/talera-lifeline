@@ -1694,6 +1694,12 @@ try{
      assert.deepEqual(nativeState.rows[0].items,['photo']);
      assert.equal(nativeState.current.storyId,nativeState.rows[0].id);
      assert.equal(nativeState.current.story,'Local-only imaginary image');
+     await guest.waitForFunction(()=>
+       document.getElementById('memoryStory')?.textContent.includes('Local-only imaginary image'),
+       null,{timeout:9000});
+     assert.ok((await guest.locator('#memoryStoryScroll').boundingBox())?.width>250,
+       'Actual original TALERA pull-up story surface must be present');
+     console.log('TALERA_GUEST_ORIGINAL_PULL_UP_STORY_TEXT_HYDRATED_PASS');
      assert.ok(nativeState.timeline&&nativeState.storyLift&&nativeState.photosInStage);
      await guest.waitForFunction(()=>{
        const m=window.__taleraTimelineRuntime?.currentMemory?.();

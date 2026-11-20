@@ -29,6 +29,9 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_draft (singleton INTEGER PRIMARY KEY CHECK(singleton=1), title TEXT NOT NULL, story_text TEXT NOT NULL, event_date TEXT NOT NULL, expires_at INTEGER NOT NULL)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_snapshot (token_hash TEXT PRIMARY KEY, title TEXT NOT NULL, story_text TEXT NOT NULL, event_date TEXT NOT NULL)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_media (token_hash TEXT NOT NULL, kind TEXT NOT NULL, mime TEXT NOT NULL, bytes BLOB NOT NULL, PRIMARY KEY(token_hash,kind))");
+  this.sql.exec("CREATE TABLE IF NOT EXISTS guest_feedback_hearts (token_hash TEXT NOT NULL, actor_key TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(token_hash,actor_key))");
+  this.sql.exec("CREATE TABLE IF NOT EXISTS guest_feedback_comments (id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, actor_key TEXT NOT NULL, display_name TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL)");
+
  }
  async initialize(storyId,actor){
   verifyStoryId(storyId);verifyAccountId(actor);
@@ -144,6 +147,8 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec("DELETE FROM share_draft WHERE expires_at<=?",now());
   this.sql.exec("DELETE FROM share_media WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM share_snapshot WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
+  this.sql.exec("DELETE FROM guest_feedback_hearts WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
+  this.sql.exec("DELETE FROM guest_feedback_comments WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   await this.refreshContentAlarm();
  }
  async grant(actor,recipientId){
@@ -170,7 +175,55 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec('UPDATE shares SET revoked_at=? WHERE token_hash=?',now(),tokenHash);
   this.sql.exec('DELETE FROM share_media WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM share_snapshot WHERE token_hash=?',tokenHash);
+  this.sql.exec('DELETE FROM guest_feedback_hearts WHERE token_hash=?',tokenHash);
+  this.sql.exec('DELETE FROM guest_feedback_comments WHERE token_hash=?',tokenHash);
   return response(true,{revoked:true});
+ }
+ // A browser identity is anonymous and NOT a verified human identity.
+ // Server-side per-link and per-browser bounds limit obvious abuse.
+ async guestFeedback(tokenHash,{action,guestId,actorId=null,name='',body=''}={}){
+  verifyTokenHash(tokenHash);
+  if(!this.access(null,tokenHash))throw Error('ACCESS_DENIED');
+  if(!['feedback','heart','comment'].includes(action))throw Error('INVALID_GUEST_ACTION');
+  if(actorId)verifyAccountId(actorId);
+  if(guestId!=null&&guestId!==''&&!/^[a-f0-9-]{36}$/.test(guestId))
+   throw Error('INVALID_GUEST_ID');
+  const actorKey=actorId?'account:'+actorId:'browser:'+String(guestId||'');
+  if(action!=='feedback'&&!actorId&&!/^[a-f0-9-]{36}$/.test(guestId||''))
+   throw Error('INVALID_GUEST_ID');
+  if(action==='heart'){
+   const total=this.sql.exec('SELECT COUNT(*) AS c FROM guest_feedback_hearts WHERE token_hash=?',tokenHash).toArray()[0].c;
+   const exists=this.sql.exec('SELECT actor_key FROM guest_feedback_hearts WHERE token_hash=? AND actor_key=?',tokenHash,actorKey).toArray()[0];
+   if(!exists&&total>=200)throw Error('GUEST_FEEDBACK_FULL');
+   this.sql.exec('INSERT INTO guest_feedback_hearts(token_hash,actor_key,created_at) VALUES (?,?,?) ON CONFLICT(token_hash,actor_key) DO NOTHING',tokenHash,actorKey,now());
+  }
+  if(action==='comment'){
+   const text=String(body||'').trim(),display=String(name||'').trim();
+   if(!text||text.length>1000||/[<>]/.test(text)||
+      !/^[\p{L}][\p{L}\p{M} .'-]{0,31}$/u.test(display))
+    throw Error('INVALID_GUEST_COMMENT');
+   const all=this.sql.exec('SELECT COUNT(*) AS c FROM guest_feedback_comments WHERE token_hash=?',tokenHash).toArray()[0].c;
+   if(all>=60)throw Error('GUEST_FEEDBACK_FULL');
+   const recent=this.sql.exec('SELECT COUNT(*) AS c,MAX(created_at) AS last FROM guest_feedback_comments WHERE token_hash=? AND actor_key=?',tokenHash,actorKey).toArray()[0];
+   if(recent.c>=5||recent.last!=null&&now()-recent.last<30000)
+    throw Error('GUEST_RATE_LIMIT');
+   this.sql.exec('INSERT INTO guest_feedback_comments(id,token_hash,actor_key,display_name,body,created_at) VALUES (?,?,?,?,?,?)',
+    crypto.randomUUID(),tokenHash,actorKey,display,text,now());
+  }
+  const legacyLikes=this.sql.exec('SELECT COUNT(*) AS c FROM reactions').toArray()[0].c;
+  const guestLikes=this.sql.exec('SELECT COUNT(*) AS c FROM guest_feedback_hearts WHERE token_hash=?',tokenHash).toArray()[0].c;
+  const legacyComments=this.sql.exec('SELECT id,body,created_at FROM comments ORDER BY created_at DESC,id LIMIT 20').toArray()
+    .map(c=>({id:c.id,body:c.body,name:'TALERA-gebruiker',created_at:c.created_at}));
+  const guestComments=this.sql.exec('SELECT id,display_name,body,created_at FROM guest_feedback_comments WHERE token_hash=? ORDER BY created_at DESC,id LIMIT 20',tokenHash).toArray()
+    .map(c=>({id:c.id,body:c.body,name:c.display_name,created_at:c.created_at}));
+  const storedComments=this.sql.exec('SELECT COUNT(*) AS c FROM guest_feedback_comments WHERE token_hash=?',tokenHash).toArray()[0].c;
+  const oldComments=this.sql.exec('SELECT COUNT(*) AS c FROM comments').toArray()[0].c;
+  const comments=[...legacyComments,...guestComments]
+    .sort((a,b)=>b.created_at-a.created_at||a.id.localeCompare(b.id)).slice(0,20)
+    .map(({id,body,name})=>({id,body,name}));
+  const reaction=this.sql.exec('SELECT actor_key FROM guest_feedback_hearts WHERE token_hash=? AND actor_key=?',tokenHash,actorKey).toArray()[0];
+  const legacyReaction=actorId?this.sql.exec('SELECT actor_key FROM reactions WHERE actor_key=?','account:'+actorId).toArray()[0]:null;
+  return {ok:true,likes:legacyLikes+guestLikes,liked:!!reaction||!!legacyReaction,commentCount:oldComments+storedComments,comments,accountName:actorId?name:null};
  }
  async like(actor,tokenHash){
   if(!this.access(actor,tokenHash))throw Error('ACCESS_DENIED');

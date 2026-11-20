@@ -736,6 +736,8 @@ async function publicWhatsAppMemory(request,env){
  const title=safeShareHtml(content.title),story=safeShareHtml(content.storyText);
  const date=safeShareHtml(content.eventDate);
  const photo=content.hasPhoto?'<img src="'+u.pathname+'/photo" alt="Foto bij deze herinnering">':'';
+ const video=content.hasVideo?'<video controls playsinline preload="none" src="'+u.pathname+'/video"></video>':'';
+ const audio=content.hasAudio?'<audio controls preload="none" src="'+u.pathname+'/audio"></audio>':'';
  const body='<!doctype html><html lang="nl"><head><meta charset="utf-8">'+
   '<meta name="viewport" content="width=device-width, initial-scale=1">'+
   '<meta name="robots" content="noindex,nofollow">'+
@@ -743,16 +745,16 @@ async function publicWhatsAppMemory(request,env){
   '*{box-sizing:border-box}body{margin:0;background:#f8f9f7;color:#17344a;font:17px/1.55 -apple-system,system-ui,sans-serif}'+
   'header{background:white;padding:22px;text-align:center;letter-spacing:.22em;font-size:17px;font-weight:800}'+
   'main{max-width:680px;margin:20px auto;padding:22px;background:white;border-radius:22px}'+
-  'h1{font-size:25px;margin:0 0 12px}img{display:block;max-width:100%;width:100%;height:auto;border-radius:14px;margin:18px 0}'+
+  'h1{font-size:25px;margin:0 0 12px}img,video{display:block;max-width:100%;width:100%;height:auto;border-radius:14px;margin:18px 0}audio{display:block;width:100%;margin:18px 0}'+
   'p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#66747f}'+
   '</style></head><body><header>TALERA</header><main><h1>'+title+
-  '</h1>'+(date?'<small>'+date+'</small>':'')+photo+'<p>'+story+
+  '</h1>'+(date?'<small>'+date+'</small>':'')+photo+video+audio+'<p>'+story+
   '</p><small>Deze herinnering is tijdelijk met je gedeeld.</small></main></body></html>';
  return new Response(body,{status:200,headers:{
   'content-type':'text/html; charset=utf-8',
   'cache-control':'private, no-store','referrer-policy':'no-referrer',
   'x-content-type-options':'nosniff','x-robots-tag':'noindex, nofollow',
-  'content-security-policy':"default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  'content-security-policy':"default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
  }});
 }
 async function publicPage(request,env){

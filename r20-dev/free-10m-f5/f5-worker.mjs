@@ -19,6 +19,7 @@ import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
 import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
 import {localBackupPage} from './f5-local-backup-page.mjs';
+import {renderGuestPresentation,renderTaleraLanding,guestClientScript} from './f5-guest-experience.mjs';
 
 export {
   FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
@@ -766,26 +767,62 @@ async function publicWhatsAppMemory(request,env){
   '<meta property="og:url" content="'+safeShareHtml(u.href)+'">'+
   (content.hasPhoto?'<meta property="og:image" content="'+
     safeShareHtml(u.origin+u.pathname+'/photo')+'">':'');
- const body='<!doctype html><html lang="nl"><head><meta charset="utf-8">'+
-  '<meta name="viewport" content="width=device-width, initial-scale=1">'+
-  previewMeta+
-  '<meta name="robots" content="noindex,nofollow">'+
-  '<title>'+title+' – TALERA</title><style>'+
-  '*{box-sizing:border-box}body{margin:0;background:#f2f5f8;color:#17344a;font:17px/1.55 -apple-system,system-ui,sans-serif}'+
-  'header{background:#17344a;color:#fff;padding:20px;text-align:center;letter-spacing:.18em;font-size:18px;font-weight:800}'+
-  'main{max-width:680px;margin:20px auto;padding:24px;background:#fff;border:1px solid #dbe5ed;border-radius:20px;box-shadow:0 6px 30px rgba(23,52,74,.07)}'+
-  'h1{color:#17344a;font-size:26px;line-height:1.25;margin:0 0 12px}img,video{display:block;max-width:100%;width:100%;height:auto;border-radius:14px;margin:18px 0}audio{display:block;width:100%;margin:18px 0}'+
-  'p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#5f7181}'+
-  '@media(max-width:700px){main{margin:12px;padding:18px;border-radius:18px}}'+
-  '</style></head><body><header>TALERA</header><main><h1>'+title+
-  '</h1>'+(date?'<small>'+date+'</small>':'')+photo+video+audio+'<p>'+story+
-  '</p><small>Deze herinnering is tijdelijk met je gedeeld.</small></main></body></html>';
+ const body=renderGuestPresentation(content,u.pathname,previewMeta);
  return new Response(body,{status:200,headers:{
   'content-type':'text/html; charset=utf-8',
   'cache-control':'private, no-store','referrer-policy':'no-referrer',
   'x-content-type-options':'nosniff','x-robots-tag':'noindex, nofollow',
-  'content-security-policy':"default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  'content-security-policy':"default-src 'none'; img-src 'self'; media-src 'self'; connect-src 'self'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
  }});
+
+}
+// One revocable token, one existing social Durable Object, no separate account
+// or outside destination. Social actions cannot query another memory.
+async function publicGuestFeedback(request,env){
+ const u=new URL(request.url),path=u.pathname,method=request.method;
+ const route=/^\/(s\/[A-Za-z0-9_-]{43}|__social\/shared\/[a-f0-9]{64})\/(feedback|heart|comment)$/.exec(path);
+ if(!route||u.search)return deny(404,'Niet gevonden');
+ const action=route[2];
+ if(method!==(action==='feedback'?'GET':'POST'))
+  return deny(405,'Methode niet toegestaan');
+ const encoded=route[1].split('/')[1];
+ const token=route[1].startsWith('s/')?expandWhatsAppToken(encoded):encoded;
+ if(!token)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ if(action!=='feedback'&&
+    (!sameOrigin(request)||!(request.headers.get('content-type')||'').toLowerCase().startsWith('application/json')))
+  return deny(403,'Ongeldige aanvraag');
+ const forwarded=new URL('/__social/shared/'+token,u);
+ const lookup=await socialApi(new Request(forwarded,{method:'GET',headers:request.headers}),env);
+ if(!lookup.ok)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ const data=await lookup.json();
+ if(!data.ok||!FREE_SHARE_ID.test(data.storyId||''))
+  return deny(404,'Deze deellink is verlopen of ingetrokken');
+ const hash=await shaHex(token);
+ let payload={};
+ if(action!=='feedback'){
+  if(Number(request.headers.get('content-length')||0)>2400)return deny(413,'Reactie te groot');
+  const raw=await request.text();
+  if(raw.length>2400)return deny(413,'Reactie te groot');
+  try{payload=JSON.parse(raw)}catch{return deny(400,'Ongeldige reactie')}
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))
+   return deny(400,'Ongeldige reactie');
+ }
+ const actor=await sessionAccount(request,env);
+ const guestId=action==='feedback'?request.headers.get('x-talera-guest-id'):payload.guestId;
+ try{
+  const result=await socialMemoryHome(env,data.storyId).guestFeedback(hash,{
+   action,guestId,actorId:actor?.id||null,
+   name:actor?.displayName||payload.firstName||'',body:payload.body||''
+  });
+  return json(result);
+ }catch(e){
+  const code=String(e?.message||'');
+  if(code.startsWith('INVALID_'))return deny(400,'Controleer jouw voornaam en reactie');
+  if(code==='GUEST_RATE_LIMIT')return deny(429,'Er zijn te snel reacties geplaatst. Probeer later opnieuw.');
+  if(code==='GUEST_FEEDBACK_FULL')return deny(429,'Deze herinnering kan momenteel geen nieuwe reacties ontvangen.');
+  if(code==='ACCESS_DENIED')return deny(404,'Deze deellink is verlopen of ingetrokken');
+  return deny(503,'Reacties tijdelijk niet beschikbaar');
+ }
 }
 async function publicPage(request,env){
   const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
@@ -1036,6 +1073,19 @@ export default {
         return publicWhatsAppMemory(request,env);
       if(m==='GET'&&/^\/s\/[A-Za-z0-9_-]{43}(?:\/(?:photo|photo-full|audio|video))?$/.test(p))
         return publicWhatsAppMemory(request,env);
+      if(m==='GET'&&p==='/ontdek-talera'&&!url.search)
+        return new Response(renderTaleraLanding(),{status:200,headers:{
+         'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=300',
+         'referrer-policy':'no-referrer','x-content-type-options':'nosniff',
+         'content-security-policy':"default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        }});
+      if(m==='GET'&&p==='/__f5/guest-ui.js'&&!url.search)
+        return new Response(guestClientScript,{status:200,headers:{
+         'content-type':'text/javascript; charset=utf-8',
+         'cache-control':'public, max-age=300','x-content-type-options':'nosniff'
+        }});
+      if(/^\/(?:s\/[A-Za-z0-9_-]{43}|__social\/shared\/[a-f0-9]{64})\/(?:feedback|heart|comment)$/.test(p))
+        return publicGuestFeedback(request,env);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       // The original decade shortcut linked to ?decade=N, but the existing
       // presentation only has a working ?year=N selector. Reuse that approved

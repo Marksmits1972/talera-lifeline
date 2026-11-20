@@ -301,6 +301,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "const $=id=>document.getElementById(id),base=location.pathname;",
   "let initialized=false;",
   "function start(){",
+  "if(initialized)return;",
   "const social=$('talera-clean-social'),overlay=$('talera-clean-overlay'),panel=$('talera-clean-panel');",
   "if(!social||!overlay||!panel)return;",
   "initialized=true;window.__taleraGuestUsesOriginalCommentSheet=true;",

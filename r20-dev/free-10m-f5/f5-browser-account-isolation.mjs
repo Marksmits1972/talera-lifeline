@@ -1662,6 +1662,36 @@ try{
      console.log('TALERA_FREE_GUEST_PRESENTATION_INTRO_RETURN_AND_POPUP_PASS',
        JSON.stringify({oneMemory:true,introSameOrigin:true,returnExactShare:true,
          popupAfterTenSeconds:true,existingPwaUnaffected:true}));
+     // End-to-end guest interaction uses the SAME temporary capability;
+     // no account registration, external database or new app.
+     await guest.locator('#guestHeart').click();
+     await guest.waitForFunction(()=>
+       document.getElementById('heartCount').textContent==='1');
+     assert.equal(await guest.locator('#guestHeart').getAttribute('aria-pressed'),'true');
+     await guest.locator('#openGuestComments').click();
+     assert.equal(await guest.locator('#commentSheet').isVisible(),true);
+     await guest.locator('#guestName').fill('Iris');
+     await guest.locator('#guestMessage').fill('Dit is uitsluitend een fictieve browserreactie.');
+     await guest.locator('#guestCommentForm button[type="submit"]').click();
+     await guest.waitForFunction(()=>
+       document.getElementById('guestStatus').textContent.includes('geplaatst'));
+     const guestSnapshot=await guest.request.get(issued.link+'/feedback',
+       {headers:{'x-talera-guest-id':await guest.evaluate(()=>
+         sessionStorage.getItem('talera-guest-browser-v1'))}});
+     assert.equal(guestSnapshot.status(),200);
+     const guestFeedback=await guestSnapshot.json();
+     assert.equal(guestFeedback.likes,1);
+     assert.equal(guestFeedback.commentCount,1);
+     assert.equal(guestFeedback.comments[0].name,'Iris');
+     assert.ok(!guestFeedback.accountName,'Anonymous guest requires no TALERA account');
+     const alienReaction=await guest.request.post(issued.link+'/heart',{
+       headers:{origin:'https://attacker.invalid','content-type':'application/json'},
+       data:{guestId:'00000000-0000-4000-8000-000000000000'}});
+     assert.equal(alienReaction.status(),403);
+     await guest.locator('[data-close="commentSheet"]').click();
+     console.log('TALERA_FREE_GUEST_NAMED_REACTION_AND_ORIGIN_PROTECTION_PASS',
+       JSON.stringify({accountRequired:false,guestLike:true,
+         guestFirstName:true,foreignOriginDenied:true,realIphoneAccepted:false}));
      const imageResponse=await guest.request.get(issued.link+'/photo');
      assert.equal(imageResponse.status(),200,'Temporary shared photo must load');
      assert.match(imageResponse.headers()['content-type']||'',/image\/jpeg/i);

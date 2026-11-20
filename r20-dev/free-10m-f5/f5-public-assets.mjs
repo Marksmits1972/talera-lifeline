@@ -1541,6 +1541,11 @@ async function getPublic(name){
 }
 for(const name of paths){
  const first=await getPublic(name),second=await getPublic(name);
+ if(name==='/__clean/ui-integration.mjs'&&first.status===200){
+  const sourceLines=first.body.split('\n');
+  console.log('TALERA_F5_WHATSAPP_ORIGINAL_LOOKUP_CODE',
+    JSON.stringify({lines:sourceLines.slice(10,44),share:sourceLines.slice(155,172)}));
+ }
  // Optional older public scripts are not needed until a real page references them.
  if(first.status===404&&second.status===404)continue;
  assert.equal(first.status,200,'F5 public script must exist: '+name);

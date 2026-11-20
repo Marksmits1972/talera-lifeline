@@ -1746,6 +1746,8 @@ try{
      assert.equal(privateView.status,200);
      assert.ok(privateView.data.comments?.some(x=>x.body===internalText),
        'Signed-in owner must keep their original private comment');
+     const privateCountBefore=privateView.data.commentCount;
+
      const guestPrivateProbe=await guest.request.get(issued.link+'/feedback');
      assert.equal(guestPrivateProbe.status(),200);
      const guestIsolated=await guestPrivateProbe.json();
@@ -1772,10 +1774,34 @@ try{
        'Legacy token-view must not include account-only hearts');
      assert.ok(legacyBody.comments.every(x=>x.body!==internalText),
        'Legacy token-view must never expose account-only comment text');
+     // Anonymous share rights must never mutate the original signed-in
+     // TALERA account's conversation via legacy social endpoints.
+     const privateSocialPath=origin+'/__social/memory/'+sharedStoryId;
+     const tokenOnlyReply=await guest.request.post(privateSocialPath+'/comment',{
+       headers:{origin,'x-qa-share-token':rawShareToken,
+        'content-type':'application/json'},
+       data:{body:'DO_NOT_WRITE_PRIVATE_THREAD'}});
+     assert.equal(tokenOnlyReply.status(),403,
+       'Only the protected guest /s/:token/comment can accept anonymous text');
+     const tokenOnlyHeart=await guest.request.post(privateSocialPath+'/like',{
+       headers:{origin,'x-qa-share-token':rawShareToken,
+        'content-type':'application/json'},data:{}});
+     assert.equal(tokenOnlyHeart.status(),403,
+       'Only the protected guest /s/:token/heart can accept anonymous hearts');
      const unauthenticated=await guest.request.get(origin+
        '/__social/memory/'+sharedStoryId+'/view');
      assert.equal(unauthenticated.status(),403,
        'No free access by guessing a story ID without the capability');
+     const ownerAfterTokenAttempts=await sharePage.evaluate(async id=>{
+       const r=await fetch('/__social/memory/'+id+'/view',{credentials:'same-origin'});
+       return {status:r.status,data:await r.json()};
+     },sharedStoryId);
+     assert.equal(ownerAfterTokenAttempts.status,200);
+     assert.equal(ownerAfterTokenAttempts.data.commentCount,privateCountBefore,
+       'Anonymous token-only write attempts never change original account comments');
+     assert.ok(ownerAfterTokenAttempts.data.comments.some(x=>x.body===internalText),
+       'Original account-only comment is unchanged after guest attempts');
+
      console.log('TALERA_GUEST_OLD_SOCIAL_TOKEN_VIEW_PRIVACY_PASS',
       JSON.stringify({onlyOwnSharedReactions:true,accountConversationProtected:true}));
 

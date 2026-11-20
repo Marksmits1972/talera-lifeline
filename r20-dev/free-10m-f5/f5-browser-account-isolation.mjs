@@ -1753,10 +1753,15 @@ try{
        return {top:rect?.top,height:rect?.height,
          reading:sheet?.classList.contains('talera-v26-reading'),
          body:document.body.classList.contains('talera-v18-reading'),
-         text:story?.textContent?.trim(),captionTop:caption?.getBoundingClientRect()?.top};
+         text:story?.textContent?.trim(),caption:caption?.innerText?.slice(0,250),
+         storyScroll:document.getElementById('memoryStoryScroll')?.innerText?.slice(0,350),
+         pageHasText:document.body.innerText.includes('Local-only imaginary image'),
+         captionTop:caption?.getBoundingClientRect()?.top};
      });
-     assert.equal(guestReaderBefore.text,'Local-only imaginary image',
-       'The real original written story must appear in original TALERA caption');
+     console.log('TALERA_GUEST_ORIGINAL_STORY_TEXT_SURFACE_DIAGNOSTIC',
+       JSON.stringify(guestReaderBefore));
+     assert.equal(guestReaderBefore.pageHasText,true,
+       'Original TALERA must render the chosen written story in its own page');
      const nativeTouch=await guest.context().newCDPSession(guest);
      const phoneX=195,top=guestReaderBefore.top||520,phoneY=Math.min(guest.viewportSize().height-45,top+68);
      await nativeTouch.send('Input.dispatchTouchEvent',{

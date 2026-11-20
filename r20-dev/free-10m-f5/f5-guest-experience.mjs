@@ -323,7 +323,10 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  const guestUi=[
  '<style id="talera-native-guest-style">',
  '#talera-clean-social [data-action="share"]{display:none!important}',
- '#talera-v5-editor-pencil{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+ '#talera-v5-editor-pencil,#talera-v21-pencil{display:none!important;visibility:hidden!important;pointer-events:none!important}',
+ 'body[data-talera-guest="one-memory"] #memoryCaption{z-index:30!important;pointer-events:auto!important}',
+ 'body[data-talera-guest="one-memory"] #memoryStoryScroll{pointer-events:auto!important}',
+ 'html.talera-guest-video-fallback #photoStage{background-image:url("'+(share.hasPhoto?escapeHtml(pagePath)+'/photo':'')+'");background-position:center;background-size:cover}',
  'html.talera-guest-video-fallback #photoStage img,html.talera-guest-video-fallback #memoryPhotoA,html.talera-guest-video-fallback #memoryPhotoB{visibility:hidden!important}',
  'html.talera-guest-video-fallback .talera-v61-first-frame-bridge{visibility:hidden!important}',
  '#talera-clean-panel input#taleraGuestFirstName{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b8c7d0;border-radius:12px;background:#fff;color:inherit;font:inherit}',
@@ -434,6 +437,29 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "};",
   "refreshVideoFallback();",
   "const coverWatch=setInterval(refreshVideoFallback,120);",
+  "const entryCover=$('taleraGuestEntryCover');",
+  "let coverReady=false;",
+  "const revealOriginal=()=>{if(coverReady)return;coverReady=true;",
+  " entryCover?.remove();document.documentElement.classList.remove('talera-guest-first-frame-pending')};",
+  "const refreshFirstFrame=()=>{if(coverReady||!entryCover)return;",
+  " const m=window.__taleraTimelineRuntime?.currentMemory?.();",
+  " if(!m||m._photoLoading||!Array.isArray(m._zeroFrames))return;",
+  " const i=m._photoIndex||0,kind=m._zeroFrames[i]?.kind;",
+  " if(kind==='video'){",
+  "  const native=[...document.querySelectorAll('video')].find(v=>v.isConnected&&",
+  "   v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2&&",
+  "   (v.currentTime>0.02||v.ended));",
+  "  if(native)revealOriginal();",
+  " }else if(kind==='photo'){",
+  "  const selected=m.photos?.[i];",
+  "  const image=[...document.querySelectorAll('#photoStage img')].find(img=>",
+  "   img.currentSrc===selected&&img.complete&&img.naturalWidth>0);",
+  "  if(typeof selected==='string'&&selected.startsWith('blob:')&&image)revealOriginal();",
+  " }else if(!kind)revealOriginal();",
+  "};",
+  "const frameWatch=setInterval(refreshFirstFrame,80);",
+  "window.addEventListener('pagehide',()=>clearInterval(frameWatch),{once:true});",
+  "refreshFirstFrame();",
   "window.addEventListener('pagehide',()=>clearInterval(coverWatch),{once:true});",
   "const nativeLogo=()=>{",
   " const a=$('talera-flow-home');if(!a)return;",
@@ -448,7 +474,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "window.addEventListener('pagehide',()=>logoObserver.disconnect(),{once:true});",
   "document.addEventListener('click',e=>{syncNodes();",
   " const logo=e.target.closest?.('#talera-flow-home');",
-  " const forbidden=e.target.closest?.('#talera-v5-editor-pencil');",
+  " const forbidden=e.target.closest?.('#talera-v5-editor-pencil,#talera-v21-pencil,a[href^=\"/tell\"],button[data-action=edit]');",
   " if(forbidden){e.preventDefault();e.stopImmediatePropagation();e.stopPropagation();return}",
   " if(logo){e.preventDefault();e.stopImmediatePropagation();e.stopPropagation();",
   "  stopGuestMedia();markPromoSeen();location.assign('/ontdek-talera#'+base.slice(1));return}",
@@ -508,6 +534,23 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "}",
   "})();"
  ].join('\n');
+ // Only the selected guest capability receives a first-frame visual handoff.
+ // The approved TALERA video and narration motors are untouched.
+ const firstFrameImage=share.hasPhoto?escapeHtml(pagePath)+'/photo':null;
+ const bootstrap='<style id="talera-guest-first-frame-bootstrap">'+
+  'html,body{background:#17344a}'+
+  '#taleraGuestEntryCover{position:fixed;inset:0;z-index:18;pointer-events:none;overflow:hidden;background:#17344a}'+
+  '#taleraGuestEntryCover img{display:block;width:100%;height:100%;object-fit:cover}'+
+  '</style>'+
+  (firstFrameImage?'<link rel="preload" as="image" href="'+firstFrameImage+'">':'');
+ if(!html.includes('</head>')||!/<body\b[^>]*>/i.test(html))
+  throw Error('GUEST_NATIVE_DOCUMENT_FRAME_BOOTSTRAP_DRIFT');
+ html=html.replace('</head>',bootstrap+'</head>');
+ html=html.replace(/<body\b[^>]*>/i,tag=>tag.slice(0,-1)+
+  ' data-talera-guest="one-memory">'+
+  (firstFrameImage?'<div id="taleraGuestEntryCover" aria-hidden="true"><img src="'+
+    firstFrameImage+'" alt=""></div>':''));
+
  html=html.replace('</head>','<meta name="robots" content="noindex,nofollow,noarchive">'+
   '<meta name="referrer" content="no-referrer">'+openGraph+'</head>');
  html=html.replace('</body>',guestUi+'<script id="talera-native-guest-social">'+social+'</script></body>');

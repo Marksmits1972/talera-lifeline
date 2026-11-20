@@ -210,20 +210,15 @@ export class FreeSocialMemory extends DurableObject{
    this.sql.exec('INSERT INTO guest_feedback_comments(id,token_hash,actor_key,display_name,body,created_at) VALUES (?,?,?,?,?,?)',
     crypto.randomUUID(),tokenHash,actorKey,display,text,now());
   }
-  const legacyLikes=this.sql.exec('SELECT COUNT(*) AS c FROM reactions').toArray()[0].c;
+  // Guest capability grants access to ONE share only. Never expose messages
+  // or reaction counts from the account-only conversation for this memory.
+  // Existing account reactions and comments remain untouched and private.
   const guestLikes=this.sql.exec('SELECT COUNT(*) AS c FROM guest_feedback_hearts WHERE token_hash=?',tokenHash).toArray()[0].c;
-  const legacyComments=this.sql.exec('SELECT id,body,created_at FROM comments ORDER BY created_at DESC,id LIMIT 20').toArray()
-    .map(c=>({id:c.id,body:c.body,name:'TALERA-gebruiker',created_at:c.created_at}));
-  const guestComments=this.sql.exec('SELECT id,display_name,body,created_at FROM guest_feedback_comments WHERE token_hash=? ORDER BY created_at DESC,id LIMIT 20',tokenHash).toArray()
-    .map(c=>({id:c.id,body:c.body,name:c.display_name,created_at:c.created_at}));
+  const guestComments=this.sql.exec('SELECT id,display_name,body FROM guest_feedback_comments WHERE token_hash=? ORDER BY created_at DESC,id LIMIT 20',tokenHash).toArray()
+    .map(c=>({id:c.id,body:c.body,name:c.display_name}));
   const storedComments=this.sql.exec('SELECT COUNT(*) AS c FROM guest_feedback_comments WHERE token_hash=?',tokenHash).toArray()[0].c;
-  const oldComments=this.sql.exec('SELECT COUNT(*) AS c FROM comments').toArray()[0].c;
-  const comments=[...legacyComments,...guestComments]
-    .sort((a,b)=>b.created_at-a.created_at||a.id.localeCompare(b.id)).slice(0,20)
-    .map(({id,body,name})=>({id,body,name}));
   const reaction=this.sql.exec('SELECT actor_key FROM guest_feedback_hearts WHERE token_hash=? AND actor_key=?',tokenHash,actorKey).toArray()[0];
-  const legacyReaction=actorId?this.sql.exec('SELECT actor_key FROM reactions WHERE actor_key=?','account:'+actorId).toArray()[0]:null;
-  return {ok:true,likes:legacyLikes+guestLikes,liked:!!reaction||!!legacyReaction,commentCount:oldComments+storedComments,comments,accountName:actorId?name:null};
+  return {ok:true,likes:guestLikes,liked:!!reaction,commentCount:storedComments,comments:guestComments,accountName:actorId?name:null};
  }
  async like(actor,tokenHash){
   if(!this.access(actor,tokenHash))throw Error('ACCESS_DENIED');

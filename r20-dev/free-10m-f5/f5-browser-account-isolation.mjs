@@ -3,7 +3,7 @@
 // No customer browser/storage, no Cloudflare deploy, no UI design changes.
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
-import {spawn,execFileSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -2618,22 +2618,43 @@ try{
      // Real first-frame regression: use a playable video INSIDE the same
      // account-local library and same /s/token presenter, not a mock app.
      // A deliberate 500ms media delay reproduces a cold iPhone entry.
-     const realClipPath=path.join(generated,'guest-first-frame-'+testKey+'.mp4');
-     execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-nostdin','-y',
-       '-f','lavfi','-i','testsrc2=duration=2.2:size=160x120:rate=15',
-       '-an','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',
-       '-movflags','+faststart',realClipPath],{timeout:25000});
-     const realClipB64=readFileSync(realClipPath).toString('base64');
-     const movingFirstId=await sharePage.evaluate(async encoded=>{
-       const clip=new File([Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))],
-         'first-moving-memory.mp4',{type:'video/mp4'});
+     const movingFirstId=await sharePage.evaluate(async()=>{
+       // In-page synthetic moving-video input, with NO external ffmpeg,
+       // storage service, test Worker or alternative presentation.
+       if(typeof MediaRecorder!=='function'||!HTMLCanvasElement.prototype.captureStream)
+         throw Error('SYNTHETIC_NATIVE_VIDEO_CAPTURE_UNAVAILABLE');
+       const mime=['video/webm;codecs=vp8','video/webm'].find(
+         type=>MediaRecorder.isTypeSupported(type));
+       if(!mime)throw Error('NO_BROWSER_DECODABLE_SYNTHETIC_VIDEO');
+       const canvas=document.createElement('canvas');
+       canvas.width=160;canvas.height=120;
+       const ctx=canvas.getContext('2d'),stream=canvas.captureStream(15);
+       const pieces=[],recorder=new MediaRecorder(stream,
+         {mimeType:mime,videoBitsPerSecond:240000});
+       const stopped=new Promise((resolve,reject)=>{
+         recorder.ondataavailable=e=>{if(e.data.size)pieces.push(e.data)};
+         recorder.onerror=()=>reject(Error('NATIVE_VIDEO_TEST_RECORDING_FAILED'));
+         recorder.onstop=resolve;
+       });
+       recorder.start(100);
+       for(let i=0;i<30;i++){
+         ctx.fillStyle=i%2?'#178cbb':'#bd5578';
+         ctx.fillRect(0,0,canvas.width,canvas.height);
+         ctx.fillStyle='#ffffff';ctx.fillRect(i*3%140,16,16,50);
+         await new Promise(resolve=>setTimeout(resolve,48));
+       }
+       recorder.stop();await stopped;
+       stream.getTracks().forEach(t=>t.stop());
+       const data=new Blob(pieces,{type:mime});
+       if(data.size<600)throw Error('EMPTY_BROWSER_GENERATED_REAL_VIDEO');
+       const clip=new File([data],'first-moving-memory.webm',{type:'video/webm'});
        const row=await window.TaleraMemories.save({
          title:'GUEST NATIVE FIRST VIDEO TEST',date:'2006-02-03',
          text:'This genuine video is the FIRST item and the story remains private.',
          narrationCues:[]
        },[clip]);
        return row.id;
-     },realClipB64);
+     });
      try{
        await sharePage.goto(origin+'/present?memory='+encodeURIComponent(movingFirstId),
          {waitUntil:'domcontentloaded'});

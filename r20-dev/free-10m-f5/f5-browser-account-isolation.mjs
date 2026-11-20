@@ -1303,6 +1303,23 @@ try{
    return {status:r.status,matchingRows:rows.filter(x=>x.id===hash).length,
      revoked:row?.revoked_at!==null&&row?.revoked_at!==undefined};
  },issuedShareHash);
+ if(!revokedProof.revoked){
+   // Distinguish stale menu/service-worker state from the actual
+   // authenticated owner list and guest-token revocation.
+   const direct=await page.request.get(origin+'/api/shares',{
+     headers:{'x-talera-f5-key':gate,'cache-control':'no-cache'}});
+   const items=(await direct.json().catch(()=>({items:[]}))).items||[];
+   const match=items.find(x=>x.id===issuedShareHash);
+   const guestLink=await page.request.get(origin+linked.link,{
+     headers:{'x-talera-f5-key':gate,accept:'text/html'}});
+   console.log('TALERA_OWNER_REVOKE_CONSISTENCY_DIAGNOSTIC',JSON.stringify({
+     browser:revokedProof,direct:{status:direct.status(),
+       matchCount:items.filter(x=>x.id===issuedShareHash).length,
+       revoked:match?.revoked_at!=null,revokedAt:match?.revoked_at},
+     guestStatus:guestLink.status(),
+     menu:(await page.locator('#talera-more-menu').innerText()).slice(0,320)
+   }));
+ }
  assert.deepEqual(revokedProof,{status:200,matchingRows:1,revoked:true},
    'Only the exact issued capability may be considered revoked');
  const cachedRead=await page.evaluate(async link=>{

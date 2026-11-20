@@ -359,6 +359,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  "document.addEventListener('focusout',()=>{if(promoDue)setTimeout(checkPromo,0)},true);",
  "$('taleraNativeInviteClose').addEventListener('click',()=>{markPromoSeen();promo.hidden=true});",
  "$('taleraNativeIntroLink').addEventListener('click',markPromoSeen);",
+ "$('taleraNativeGuestBar').querySelector('a').addEventListener('click',markPromoSeen);",
  "if(!promoSeen())setTimeout(()=>{promoDue=true;checkPromo()},10000);",
  'void load();',
  '})();'

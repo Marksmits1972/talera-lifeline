@@ -1526,9 +1526,9 @@ for(const name of paths){
  const first=await getPublic(name),second=await getPublic(name);
  // Diagnostic only: inspect the already-approved, cookie-free original
  // share UI's route/scroll contract. No personal data or API calls.
- if(name==='/__clean/share-controller.mjs'&&first.status===200){
+ if((name==='/__clean/share-controller.mjs'||name==='/__clean/ui-integration.mjs'||name==='/__clean/social-controller.mjs')&&first.status===200){
   const lines=first.body.split('\n');
-  const needles=/WhatsApp|Uitnodiging|uitnodiging|memory-link|\/api\/|consent|toestemming|overflow|share-sheet|share-modal|Niet gevonden|voorbereiden|preview|verzenden|Verzenden/ig;
+  const needles=/WhatsApp|Uitnodiging|uitnodiging|memory-link|\/api\/|consent|toestemming|overflow|share-sheet|share-modal|Niet gevonden|voorbereiden|preview|verzenden|Verzenden|createInvite|publish\(|prepare\(|shareUrl|endpoint/ig;
   const hits=[];
   for(let i=0;i<lines.length;i++){
    if(needles.test(lines[i])){

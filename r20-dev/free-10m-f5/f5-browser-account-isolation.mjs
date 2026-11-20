@@ -1521,7 +1521,7 @@ try{
        return {status:r.status,data:await r.json()};
      },issued.id);
      assert.equal(revoke.status,200,'Synthetic owner must revoke own share');
-     assert.equal((await guest.request.get(issued.link)).status(),404);
+     assert.equal((await guest.request.get(issued.link,{headers:{accept:'text/html'}})).status(),404);
      assert.equal((await guest.request.get(issued.link+'/photo')).status(),404);
      console.log('TALERA_FREE_WHATSAPP_SHARE_READY_RECIPIENT_PHOTO_REVOKED_PASS',
        JSON.stringify({originalWhatsAppUI:true,receiverHtml:200,photo:200,

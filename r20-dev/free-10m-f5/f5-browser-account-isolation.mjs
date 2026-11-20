@@ -1557,7 +1557,17 @@ try{
      }});
    });
    await sharePage.locator('#talera-clean-overlay [data-action=send]').click();
-   const payload=await sharePage.evaluate(()=>window.__taleraNativeShareProbe.at(-1));
+   const nativeDiag=await sharePage.evaluate(()=>({
+     payload:window.__taleraNativeShareProbe?.at(-1),
+     count:window.__taleraNativeShareProbe?.length,
+     pathname:location.pathname,
+     status:document.querySelector('#talera-clean-overlay .status')?.textContent,
+     buttonDisabled:document.querySelector('#talera-clean-overlay [data-action=send]')?.disabled,
+     hasNative:typeof navigator.share,hasCapability:typeof navigator.canShare,
+     overlayHidden:document.querySelector('#talera-clean-overlay')?.hidden
+   }));
+   console.log('TALERA_NATIVE_PHOTO_SHARE_PREPARE_PROBE',JSON.stringify(nativeDiag));
+   const payload=nativeDiag.payload;
    assert.equal(payload?.name,'talera-herinnering.jpg');
    assert.equal(payload?.type,'image/jpeg');
    assert.ok(payload.size>100,'Native iOS share must attach actual JPEG pixels');

@@ -1631,6 +1631,37 @@ try{
        html.includes('property="og:image"')&&
        html.includes(issued.link+'/photo'),
        'The original WhatsApp link must expose the consented shared image as preview');
+     // Real browser recipient journey: one story, original media, logo to the
+     // same-origin TALERA introduction and return to the very same share.
+     assert.equal(await guest.locator('#openGuestStory').isVisible(),true);
+     await guest.locator('#openGuestStory').click();
+     assert.equal(await guest.locator('#storySheet').isVisible(),true);
+     await guest.locator('[data-close="storySheet"]').click();
+     assert.equal(await guest.locator('#storySheet').isHidden(),true);
+     assert.ok((await guest.locator('a.brand').getAttribute('href'))
+       .startsWith('/ontdek-talera#s/'));
+     await guest.locator('a.brand').click();
+     await guest.waitForURL(/\/ontdek-talera#s\//);
+     assert.equal(await guest.locator('#returnGuestStory').isVisible(),true,
+       'The introduction may not lose the selected protected memory');
+     assert.equal(await guest.locator('a.cta').getAttribute('href'),'/mijn-leven',
+       'TALERA Free signup is voluntary, not required for guest playback');
+     await guest.locator('#returnGuestStory').click();
+     await guest.waitForURL(issued.link);
+     assert.equal(await guest.locator('#openGuestStory').isVisible(),true);
+     assert.equal(await guest.locator('#guestPromo').isHidden(),true,
+       'Commercial invite must not interrupt initial memory opening');
+     await guest.locator('#guestPromo:not([hidden])').waitFor({timeout:15000});
+     assert.equal(await guest.locator('#guestPromo').isVisible(),true,
+       'A single unobtrusive invite appears only after ten seconds of viewing');
+     await guest.locator('#dismissGuestPromo').click();
+     assert.equal(await guest.locator('#guestPromo').isHidden(),true);
+     const dismissed=await guest.evaluate(()=>Object.keys(localStorage)
+       .some(k=>k.startsWith('talera-promo-seen-v1-')&&localStorage.getItem(k)==='1'));
+     assert.equal(dismissed,true,'Do not repeatedly interrupt this invitation');
+     console.log('TALERA_FREE_GUEST_PRESENTATION_INTRO_RETURN_AND_POPUP_PASS',
+       JSON.stringify({oneMemory:true,introSameOrigin:true,returnExactShare:true,
+         popupAfterTenSeconds:true,existingPwaUnaffected:true}));
      const imageResponse=await guest.request.get(issued.link+'/photo');
      assert.equal(imageResponse.status(),200,'Temporary shared photo must load');
      assert.match(imageResponse.headers()['content-type']||'',/image\/jpeg/i);

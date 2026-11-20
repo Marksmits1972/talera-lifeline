@@ -1851,10 +1851,15 @@ function taleraUploadMediaProgress(path,blob,label){
       ['audio','sound','Audio uploaden'],
       ['video','movie','Video uploaden']
    ]){
-    const before="coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/"+medium+"',{method:'POST',headers:{'content-type':"+variable+".type.split(';')[0]},body:"+variable+"})";
+    const start="coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/"+medium+"'";
+    assert.equal(shipped.split(start).length,2,'WHATSAPP_REAL_UPLOAD_'+medium+'_START_DRIFT');
+    const from=shipped.indexOf(start),end=shipped.indexOf('})',from);
+    assert.ok(from>=0&&end>from&&end-from<280,'WHATSAPP_REAL_UPLOAD_'+medium+'_CLOSING_DRIFT');
+    const before=shipped.slice(from,end+2);
+    assert.ok(before.includes("method:'POST'")&&before.includes('body:'+variable)&&
+      before.includes("'content-type'"),'WHATSAPP_REAL_UPLOAD_'+medium+'_BODY_DRIFT');
     const after="taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(d.id)+'/"+medium+"',"+variable+","+JSON.stringify(label)+")";
-    assert.equal(shipped.split(before).length,2,'WHATSAPP_REAL_UPLOAD_'+medium+'_SOURCE_DRIFT');
-    shipped=shipped.replace(before,after);
+    shipped=shipped.slice(0,from)+after+shipped.slice(end+2);
    }
    // Avoid mistaken status after a completed invite; the spinner is owned
    // by the existing ShareController.state preparing.

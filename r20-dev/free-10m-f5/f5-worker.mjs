@@ -731,7 +731,8 @@ async function publicWhatsAppMemory(request,env){
  const short=/^\/s\/([A-Za-z0-9_-]{43})(?:\/(photo|photo-full|audio|video))?$/.exec(u.pathname);
  const decoded=short?expandWhatsAppToken(short[1]):null;
  const m=legacy||(decoded?[short[0],decoded,short[2]]:null);
- if(!m||request.method!=='GET')return deny(404,'Link niet gevonden');
+ if(!m||!(request.method==='GET'||request.method==='HEAD'&&!!m[2]))
+  return deny(404,'Link niet gevonden');
  // Only the random token grants access. Never expose the owner's private
  // library, account ID, other stories or originals via this public route.
  const target=new URL('/__social/shared/'+m[1],u);
@@ -746,11 +747,48 @@ async function publicWhatsAppMemory(request,env){
  if(m[2]){
   const media=await home.sharedMedia(hash,m[2]);
   if(!media)return deny(404,'Foto of media niet gevonden');
-  return new Response(media.bytes,{status:200,headers:{
-   'content-type':media.mime,'cache-control':'private, no-store',
-   'x-content-type-options':'nosniff','referrer-policy':'no-referrer',
+  const length=media.bytes.byteLength;
+  const isStream=m[2]==='video'||m[2]==='audio';
+  const headers=new Headers({
+   'content-type':media.mime,
+   'cache-control':'private, no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer',
    'cross-origin-resource-policy':'same-origin'
-  }});
+  });
+  if(isStream)headers.set('accept-ranges','bytes');
+  const range=isStream?request.headers.get('range'):null;
+  if(range){
+   // iPhone Safari may ask for 0-1 bytes to detect a video, then seek.
+   // Only one explicit byte range is supported, never multipart or negative spans.
+   const match=/^bytes=(\d*)-(\d*)$/.exec(range);
+   const startRaw=match?.[1],endRaw=match?.[2];
+   let first=NaN,last=NaN;
+   if(match&&(startRaw||endRaw)){
+    if(startRaw){
+     first=Number(startRaw);
+     last=endRaw?Number(endRaw):length-1;
+    }else{
+     const suffix=Number(endRaw);
+     if(Number.isSafeInteger(suffix)&&suffix>0){
+      first=Math.max(0,length-suffix);
+      last=length-1;
+     }
+    }
+   }
+   if(!Number.isSafeInteger(first)||!Number.isSafeInteger(last)||
+      first<0||first>=length||last<first||last>=length){
+    headers.set('content-range','bytes */'+length);
+    headers.set('content-length','0');
+    return new Response(null,{status:416,headers});
+   }
+   headers.set('content-range','bytes '+first+'-'+last+'/'+length);
+   headers.set('content-length',String(last-first+1));
+   return new Response(request.method==='HEAD'?null:media.bytes.slice(first,last+1),
+    {status:206,headers});
+  }
+  headers.set('content-length',String(length));
+  return new Response(request.method==='HEAD'?null:media.bytes,{status:200,headers});
  }
  const content=await home.shareContent(hash);
  if(!content)return deny(404,'Deze deellink is verlopen of ingetrokken');
@@ -1067,11 +1105,11 @@ export default {
       if(revoke)return revokeAccountShare(request,env,revoke[1]);
       const grantRevoke=/^\/api\/memories\/([A-Za-z0-9_-]{8,80})\/grants\/([0-9a-fA-F-]{36})\/revoke$/.exec(p);
       if(grantRevoke)return revokeAccountGrant(request,env,grantRevoke[1],grantRevoke[2]);
-      if(m==='GET'&&/^\/__social\/shared\/[a-f0-9]{64}(?:\/(?:photo|photo-full|audio|video))?$/.test(p)&&
+      if((m==='GET'||m==='HEAD')&&/^\/__social\/shared\/[a-f0-9]{64}(?:\/(?:photo|photo-full|audio|video))?$/.test(p)&&
          (p.endsWith('/photo')||p.endsWith('/photo-full')||p.endsWith('/audio')||
           p.endsWith('/video')||(request.headers.get('accept')||'').includes('text/html')))
         return publicWhatsAppMemory(request,env);
-      if(m==='GET'&&/^\/s\/[A-Za-z0-9_-]{43}(?:\/(?:photo|photo-full|audio|video))?$/.test(p))
+      if((m==='GET'||m==='HEAD')&&/^\/s\/[A-Za-z0-9_-]{43}(?:\/(?:photo|photo-full|audio|video))?$/.test(p))
         return publicWhatsAppMemory(request,env);
       if(m==='GET'&&p==='/ontdek-talera'&&!url.search)
         return new Response(renderTaleraLanding(),{status:200,headers:{

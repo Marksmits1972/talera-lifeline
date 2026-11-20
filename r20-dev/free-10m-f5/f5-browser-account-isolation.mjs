@@ -1752,7 +1752,26 @@ try{
      // The original presentation has no separate story modal. Only the
      // optional TALERA introduction appears after 10s of idle viewing.
      assert.equal(await guest.locator('#taleraNativeInvite').isHidden(),true);
-     await guest.locator('#taleraNativeInvite:not([hidden])').waitFor({timeout:15000});
+     try{
+       await guest.locator('#taleraNativeInvite:not([hidden])').waitFor({timeout:15000});
+     }catch(error){
+       console.log('TALERA_GUEST_NATIVE_PROMO_BLOCK_DIAGNOSTIC',
+         JSON.stringify(await guest.evaluate(()=>{
+           const e=document.getElementById('taleraNativeInvite');
+           const key=Object.keys(localStorage).filter(k=>k.startsWith('talera-promo-seen-v1-'));
+           const media=[...document.querySelectorAll('audio,video')];
+           return {nativeSocialInitialized:window.__taleraGuestUsesOriginalCommentSheet,
+             promoExists:!!e,promoHidden:e?.hidden,promoDisplay:e?getComputedStyle(e).display:null,
+             seenKeys:key.map(k=>[k,localStorage.getItem(k)]),
+             reading:document.body.classList.contains('talera-v18-reading'),
+             sheetReading:document.querySelector('.memory-space')?.classList.contains('talera-v26-reading'),
+             modalHidden:document.getElementById('talera-clean-overlay')?.hidden,
+             activeMedia:media.filter(m=>!m.paused&&!m.ended).map(m=>m.tagName),
+             focused:document.activeElement?.tagName,
+             originalHeart:!!document.querySelector('#talera-clean-social [data-action=heart]')};
+         })));
+       throw error;
+     }
      assert.equal(await guest.locator('#taleraNativeInvite').isVisible(),true);
      await guest.locator('#taleraNativeInviteClose').click();
      assert.equal(await guest.locator('#taleraNativeInvite').isHidden(),true);

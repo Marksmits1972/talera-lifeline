@@ -1647,13 +1647,22 @@ try{
      assert.equal(guestGeometry.caption.exists,true);
      assert.deepEqual(guestGeometry.photoStage.rect,originalGeometry.photoStage.rect,
        'Guest uses the original TALERA presenter geometry, not a second design');
-     const guestNativeSocial=await guest.evaluate(()=>({
-       outer:document.getElementById('talera-clean-social')?.outerHTML.slice(0,2600),
-       overlay:document.getElementById('taleraNativeGuestBar')?.outerHTML.slice(0,1000),
-       buttons:[...document.querySelectorAll('#talera-clean-social button')]
-         .map(x=>({action:x.dataset.action,html:x.outerHTML.slice(0,350)}))
-     }));
-     console.log('TALERA_GUEST_EXISTING_ORIGINAL_SOCIAL_MARKUP',JSON.stringify(guestNativeSocial));
+     const guestNativeSocial=await guest.evaluate(()=>{
+       const bar=document.getElementById('talera-clean-social');
+       const oldExtra=document.getElementById('taleraNativeGuestBar');
+       const share=bar?.querySelector('[data-action=share]');
+       return {bar:!!bar,oldExtra:!!oldExtra,
+         actions:[...(bar?.querySelectorAll('button[data-action]')||[])].map(b=>b.dataset.action),
+         shareHidden:share?getComputedStyle(share).display==='none':false,
+         heart:!!bar?.querySelector('[data-action=heart]'),
+         comments:!!bar?.querySelector('[data-action=comments]')};
+     });
+     assert.equal(guestNativeSocial.bar,true,'Reuse original TALERA social toolbar');
+     assert.equal(guestNativeSocial.oldExtra,false,'No duplicate bespoke guest reaction toolbar');
+     assert.equal(guestNativeSocial.heart,true);
+     assert.equal(guestNativeSocial.comments,true);
+     assert.equal(guestNativeSocial.shareHidden,true,
+       'Anonymous visitor cannot share another memory from original toolbar');
      console.log('TALERA_GUEST_EXACT_ORIGINAL_PRESENTATION_VISUAL_METRICS',
        JSON.stringify({originalGeometry,guestGeometry,iphoneAccepted:false}));
      const html=await received.text();
@@ -1729,7 +1738,7 @@ try{
      assert.equal(guestSeen,true,'Do not repeat the same optional TALERA invitation');
      console.log('TALERA_GUEST_ORIGINAL_PRESENTATION_UNINTERRUPTED_TEN_SECOND_INTRO_PASS');
 
-     const intro=guest.locator('#taleraNativeGuestBar a');
+     const intro=guest.locator('#talera-flow-home');
      assert.ok((await intro.getAttribute('href')).startsWith('/ontdek-talera#s/'));
      await intro.click();
      await guest.waitForURL(/\/ontdek-talera#s\//);
@@ -1738,10 +1747,10 @@ try{
      await guest.waitForURL(issued.link);
      await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
        null,{timeout:20000});
-     await guest.locator('#taleraNativeHeart').click();
-     await guest.waitForFunction(()=>document.getElementById('taleraNativeHearts')?.textContent==='1');
-     assert.equal(await guest.locator('#taleraNativeHeart').getAttribute('aria-pressed'),'true');
-     await guest.locator('#taleraNativeCommentOpen').click();
+     await guest.locator('#talera-clean-social [data-action=heart]').click();
+     await guest.waitForFunction(()=>document.querySelector('#talera-clean-social [data-action=heart] .count')?.textContent==='1');
+     assert.equal(await guest.locator('#talera-clean-social [data-action=heart]').getAttribute('aria-pressed'),'true');
+     await guest.locator('#talera-clean-social [data-action=comments]').click();
      assert.equal(await guest.locator('#taleraNativeGuestDialog').isVisible(),true);
      await guest.locator('#taleraNativeName').fill('Iris');
      await guest.locator('#taleraNativeMessage').fill('Dit is uitsluitend een fictieve browserreactie.');

@@ -8,6 +8,7 @@ import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium,devices} from 'playwright';
+import {guestClientScript} from './f5-guest-experience.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const generated=path.join(here,'generated');
@@ -1659,6 +1660,13 @@ try{
      const dismissed=await guest.evaluate(()=>Object.keys(localStorage)
        .some(k=>k.startsWith('talera-promo-seen-v1-')&&localStorage.getItem(k)==='1'));
      assert.equal(dismissed,true,'Do not repeatedly interrupt this invitation');
+     // Playback guard cannot treat a temporary pause as media completion.
+     // Only natural end/error/empty or explicit video close releases the hold.
+     assert.match(guestClientScript,/unfinishedMedia\.size\|\|typing\(\)/);
+     assert.match(guestClientScript,/node\.addEventListener\('play',\(\)=>unfinishedMedia\.add\(node\)\)/);
+     assert.doesNotMatch(guestClientScript,/addEventListener\('pause',popupCheck\)/);
+     assert.match(guestClientScript,/for\(const type of \['ended','emptied','error'\]\)/);
+     console.log('TALERA_GUEST_PAUSED_MEDIA_NEVER_TRIGGERS_INVITE_GUARD_PASS');
      console.log('TALERA_FREE_GUEST_PRESENTATION_INTRO_RETURN_AND_POPUP_PASS',
        JSON.stringify({oneMemory:true,introSameOrigin:true,returnExactShare:true,
          popupAfterTenSeconds:true,existingPwaUnaffected:true}));

@@ -3,7 +3,7 @@
 // No customer browser/storage, no Cloudflare deploy, no UI design changes.
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
-import {spawn} from 'node:child_process';
+import {spawn,execFileSync} from 'node:child_process';
 import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -2613,6 +2613,121 @@ try{
        await sharePage.evaluate(async id=>{
          await window.TaleraMemories?.remove?.(id);
        },completeFixture.id).catch(()=>{});
+     }
+
+     // Real first-frame regression: use a playable video INSIDE the same
+     // account-local library and same /s/token presenter, not a mock app.
+     // A deliberate 500ms media delay reproduces a cold iPhone entry.
+     const realClipPath=path.join(generated,'guest-first-frame-'+testKey+'.mp4');
+     execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-nostdin','-y',
+       '-f','lavfi','-i','testsrc2=duration=2.2:size=160x120:rate=15',
+       '-an','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',
+       '-movflags','+faststart',realClipPath],{timeout:25000});
+     const realClipB64=readFileSync(realClipPath).toString('base64');
+     const movingFirstId=await sharePage.evaluate(async encoded=>{
+       const clip=new File([Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))],
+         'first-moving-memory.mp4',{type:'video/mp4'});
+       const row=await window.TaleraMemories.save({
+         title:'GUEST NATIVE FIRST VIDEO TEST',date:'2006-02-03',
+         text:'This genuine video is the FIRST item and the story remains private.',
+         narrationCues:[]
+       },[clip]);
+       return row.id;
+     },realClipB64);
+     try{
+       await sharePage.goto(origin+'/present?memory='+encodeURIComponent(movingFirstId),
+         {waitUntil:'domcontentloaded'});
+       await sharePage.waitForFunction(id=>
+         window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+         movingFirstId,{timeout:25000});
+       await sharePage.locator('#talera-clean-social [data-action=share]')
+         .waitFor({state:'visible',timeout:15000});
+       await sharePage.locator('#talera-clean-social [data-action=share]').click();
+       await sharePage.waitForFunction(()=>!!document.querySelector(
+         '#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
+         null,{timeout:14000});
+       await sharePage.locator('#talera-clean-consent').check();
+       await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
+       await sharePage.waitForFunction(()=>!!document.querySelector(
+         '#talera-clean-overlay [data-action=send]:not([disabled])'),
+         null,{timeout:45000});
+       const movingInvite=createdLinks.at(-1);
+       assert.equal(movingInvite?.status,200);
+       await guest.addInitScript(()=>{
+         window.__taleraGuestVideoFirstPaint=[];
+         const start=()=>{
+           let frames=0;
+           const sample=()=>{
+             if(frames++>=270)return;
+             const cover=document.getElementById('taleraGuestEntryCover');
+             const v=document.querySelector('video.talera-v61-inline-video');
+             const old=[...document.querySelectorAll('#photoStage img[src^="data:image/svg+xml"]')];
+             const root=document.documentElement,body=document.body;
+             window.__taleraGuestVideoFirstPaint.push({
+               cover:!!cover&&getComputedStyle(cover).display!=='none'&&
+                 getComputedStyle(cover).visibility!=='hidden',
+               video:!!v&&v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0,
+               kind:window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.[
+                 window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex||0]?.kind||'',
+               exposedVideoText:old.some(x=>getComputedStyle(x).visibility!=='hidden'&&
+                 getComputedStyle(x).display!=='none'),
+               bodyColor:getComputedStyle(body).backgroundColor,
+               fallback:root.classList.contains('talera-guest-video-fallback')
+             });
+             requestAnimationFrame(sample);
+           };
+           requestAnimationFrame(sample);
+         };
+         if(document.readyState==='loading')
+           document.addEventListener('DOMContentLoaded',start,{once:true});
+         else start();
+       });
+       await guest.route('**/media/0/0',async route=>{
+         await new Promise(done=>setTimeout(done,500));
+         await route.continue();
+       });
+       const response=await guest.goto(movingInvite.link,{waitUntil:'domcontentloaded'});
+       assert.equal(response.status(),200);
+       await guest.waitForFunction(()=>
+         window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.[0]?.kind==='video',
+         null,{timeout:22000});
+       await guest.waitForFunction(()=>
+         !document.getElementById('taleraGuestEntryCover')&&
+         [...document.querySelectorAll('video.talera-v61-inline-video')].some(v=>
+           v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2),
+         null,{timeout:25000});
+       const paint=await guest.evaluate(()=>{
+         const frames=window.__taleraGuestVideoFirstPaint||[];
+         const onVideo=frames.filter(f=>f.kind==='video');
+         return {
+           sampled:frames.length,
+           heldVideoSamples:onVideo.filter(f=>f.cover&&!f.video).length,
+           exposedBeforeVideo:onVideo.filter(f=>!f.cover&&!f.video).length,
+           oldSvgVisible:frames.filter(f=>f.exposedVideoText&&!f.cover).length,
+           finalNativeVideo:!!document.querySelector('video.talera-v61-inline-video')?.videoWidth,
+           guestOnly:document.body.dataset.taleraGuest==='one-memory',
+           originalStory:!!document.getElementById('memoryStoryScroll'),
+           startingColors:[...new Set(frames.slice(0,12).map(f=>f.bodyColor))]
+         };
+       });
+       assert.ok(paint.sampled>=3&&paint.heldVideoSamples>=1,
+         'The guest must HOLD its visual cover during cold native video loading');
+       assert.equal(paint.exposedBeforeVideo,0,
+         'Never reveal an unready native video as the first guest image');
+       assert.equal(paint.oldSvgVisible,0,
+         'The legacy giant VIDEO placeholder must not appear during any first paint');
+       assert.ok(paint.finalNativeVideo&&paint.guestOnly&&paint.originalStory);
+       assert.ok(paint.startingColors.every(color=>color!=='rgb(255, 255, 255)'),
+         'Guest first DOM paint must have the TALERA backdrop, not white');
+       console.log('TALERA_GUEST_REAL_VIDEO_COLD_FIRST_PAINT_NO_WHITE_OR_VIDEO_LABEL_PASS',
+         JSON.stringify({...paint,originalEngineUnchanged:true,iphoneAccepted:false}));
+       const revoked=await sharePage.evaluate(async token=>
+         (await fetch('/api/shares/'+token+'/revoke',
+           {method:'POST',credentials:'same-origin'})).status,movingInvite.id);
+       assert.equal(revoked,200);
+     }finally{
+       await sharePage.evaluate(async id=>await window.TaleraMemories?.remove?.(id),
+         movingFirstId).catch(()=>{});
      }
    }finally{await anonymous.close()}
  }finally{await sharePage.close()}

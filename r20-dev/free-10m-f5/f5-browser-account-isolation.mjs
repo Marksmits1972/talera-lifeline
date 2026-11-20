@@ -1538,6 +1538,40 @@ try{
      'Recipient link must use the compact SAME-app origin without shortening token entropy');
    assert.ok(Math.abs(issued.expiresAt-(Date.now()+168*3600000))<60000,
      'Temporary share must use exactly the original seven-day expiry');
+   // Native iOS share is invoked from the final click, with no asynchronous
+   // photo lookup after the user gesture. Verify all THREE required items
+   // use the SAME previously prepared invitation, no fake WhatsApp send.
+   await sharePage.evaluate(()=>{
+     window.__taleraNativeShareProbe=[];
+     Object.defineProperty(navigator,'canShare',{configurable:true,value:data=>
+       Array.isArray(data?.files)&&data.files.length===1&&
+       data.files[0].type==='image/jpeg'});
+     Object.defineProperty(navigator,'share',{configurable:true,value:data=>{
+       const file=data.files?.[0];
+       window.__taleraNativeShareProbe.push({
+         name:file?.name,type:file?.type,size:file?.size,
+         count:data.files?.length,text:data.text,
+         hasSeparateUrl:Object.hasOwn(data,'url')
+       });
+       return Promise.resolve();
+     }});
+   });
+   await sharePage.locator('#talera-clean-overlay [data-action=send]').click();
+   const payload=await sharePage.evaluate(()=>window.__taleraNativeShareProbe.at(-1));
+   assert.equal(payload?.name,'talera-herinnering.jpg');
+   assert.equal(payload?.type,'image/jpeg');
+   assert.ok(payload.size>100,'Native iOS share must attach actual JPEG pixels');
+   assert.equal(payload.count,1,'Only the selected memory photo may be shared');
+   assert.equal(payload.text,
+     'Hoi! Ik deel graag een persoonlijke herinnering met je via TALERA.\n'+issued.link,
+     'The exact default caption and restricted recipient URL must travel together');
+   assert.equal(payload.hasSeparateUrl,false,
+     'iOS text with the URL must be one share body, not a second URL item');
+   assert.equal(new URL(sharePage.url()).pathname,'/present',
+     'Simulated native photo share must not navigate away from the same app');
+   console.log('TALERA_FREE_NATIVE_IOS_PHOTO_CAPTION_AND_LINK_SHARE_PAYLOAD_PASS',
+     JSON.stringify({picture:true,caption:true,sameSecureLink:true,realIphoneAccepted:false}));
+
    const compactPath=new URL(issued.link).pathname;
    assert.match(compactPath,/^\/s\/[A-Za-z0-9_-]{43}$/);
    assert.equal(issued.id.length,64,'Original 256-bit capability and revocation ID unchanged');
@@ -1726,6 +1760,18 @@ try{
          'Weet je nog dat moment? Dit wilde ik met je delen.');
        assert.equal(await sharePage.locator('.talera-share-progress').count(),0,
          'Loading indicator must disappear after the invitation is ready');
+       await sharePage.locator('#talera-clean-overlay [data-action=send]').click();
+       const personalPayload=await sharePage.evaluate(()=>
+         window.__taleraNativeShareProbe?.at(-1));
+       assert.equal(personalPayload?.type,'image/jpeg');
+       assert.ok(personalPayload.size>100);
+       const personalLink=createdLinks.at(-1)?.link;
+       assert.equal(personalPayload.text,
+         'Weet je nog dat moment? Dit wilde ik met je delen.\n'+personalLink,
+         'Personal invitation must NOT receive any automatic promotional copy');
+       console.log('TALERA_FREE_NATIVE_IOS_PERSONAL_PHOTO_AND_LINK_SHARE_PAYLOAD_PASS',
+         JSON.stringify({image:true,ownWordsOnly:true,secureLink:true,realIphoneAccepted:false}));
+
        const issuedUntitled=createdLinks.at(-1);
        assert.equal(createdLinks.length,3,'Original, direct photo-only and untitled UI invitations are distinct');
        assert.equal(issuedUntitled.status,200);

@@ -887,7 +887,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-whatsapp-library-20261120' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-video-thumbnails-20261121' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     concurrency:
@@ -901,7 +901,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 910da5ac-68f3-4d0f-8a85-788f88cdf180
+      F5_EXPECTED_LIVE_VERSION: cc6eb198-e6de-47fe-999d-4e5eef3a32d5
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -927,12 +927,12 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = d08c31d59b46bf177159226d73e90954c3d83343
+          test "$(git rev-parse HEAD^)" = 1fc473909f2eeed16c625bf41a7742899fbca508
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=44829177992,expected='d08c31d59b46bf177159226d73e90954c3d83343';
+          const id=44832751935,expected='1fc473909f2eeed16c625bf41a7742899fbca508';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,

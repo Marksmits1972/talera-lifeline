@@ -1686,6 +1686,28 @@ try{
      assert.equal(nativeState.current.storyId,nativeState.rows[0].id);
      assert.equal(nativeState.current.story,'Local-only imaginary image');
      assert.ok(nativeState.timeline&&nativeState.storyLift&&nativeState.photosInStage);
+     await guest.waitForFunction(()=>{
+       const m=window.__taleraTimelineRuntime?.currentMemory?.();
+       return !m?._photoLoading&&m?.photos?.[0]?.startsWith('blob:');
+     },null,{timeout:18000});
+     const nativePhoto=await guest.evaluate(()=>{
+       const stage=document.getElementById('photoStage');
+       const m=window.__taleraTimelineRuntime.currentMemory();
+       const photo=document.getElementById('memoryPhotoA');
+       const rect=stage.getBoundingClientRect();
+       return {kind:m._zeroFrames[0].kind,blobSource:m.photos[0].startsWith('blob:'),
+         width:rect.width,height:rect.height,viewportW:innerWidth,viewportH:innerHeight,
+         renderedNaturalWidth:photo?.naturalWidth||0};
+     });
+     assert.equal(nativePhoto.kind,'photo');
+     assert.equal(nativePhoto.blobSource,true);
+     assert.equal(nativePhoto.width,nativePhoto.viewportW,
+       'The real TALERA photo stage must fill the phone width');
+     assert.equal(nativePhoto.height,nativePhoto.viewportH,
+       'The real TALERA photo stage must fill the available phone viewport');
+     console.log('TALERA_GUEST_TRUE_ORIGINAL_PHOTO_FULL_AVAILABLE_VIEWPORT_PASS',
+       JSON.stringify({...nativePhoto,iphoneAccepted:false}));
+
      assert.equal((await guest.evaluate(async()=>window.TaleraMemories.get('local-unrelated-secret'))),null,
        'A guessed local memory ID is inaccessible to a guest');
      assert.equal((await guest.evaluate(async()=>window.TaleraMemories.blob('local-unrelated-secret:0'))),null,

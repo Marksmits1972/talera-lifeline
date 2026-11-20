@@ -814,10 +814,6 @@ try{
            checkbox:!!panel?.querySelector('#talera-clean-consent')};
        });
        const initialShareModal=await modalSnapshot();
-       await follower.locator('#talera-clean-consent').check();
-       await follower.locator('#talera-clean-overlay [data-action=prepare]').click();
-       await follower.waitForTimeout(300);
-       const failedShareModal=await modalSnapshot();
        await follower.setViewportSize({width:390,height:610});
        await follower.waitForTimeout(140);
        const smallShareModal=await modalSnapshot();
@@ -831,17 +827,13 @@ try{
        assert.ok(smallShareModal.panel?.touchAction==='pan-y'&&
          smallShareModal.panel?.overflowY==='auto'&&
          sheetScroll.scrollable&&sheetScroll.after>sheetScroll.before+25,
-         'Original WhatsApp sheet must support native iPhone touch scrolling: '+
+         'Original WhatsApp sheet must support iPhone touch scrolling: '+
            JSON.stringify({smallShareModal,sheetScroll}));
        console.log('TALERA_F5_WHATSAPP_NATIVE_SCROLL_PASS',JSON.stringify({
          touchAction:smallShareModal.panel.touchAction,
          overflowY:smallShareModal.panel.overflowY,
          scrollTop:sheetScroll.after,onlyOriginalModal:true,
          realIphoneAccepted:false
-       }));
-       console.log('TALERA_F5_WHATSAPP_SHEET_AND_API_DIAG',JSON.stringify({
-         initialShareModal,failedShareModal,smallShareModal,shareTraffic,
-         syntheticOnly:true,realAccountNeverTouched:true
        }));
      }
      if(route==='/tell'){
@@ -1452,6 +1444,91 @@ try{
    socialRevokePreserved:true,missingRoutesHidden:true,iphoneAccepted:false
  }));
 
+ // Test the ORIGINAL presentation's WhatsApp click AFTER existing social
+ // list/revoke checks, so this new temporary share cannot change their counts.
+ // All data are unique, local synthetic test inputs in the SAME F5 code.
+ const sharePage=await context.newPage();
+ const createdLinks=[];
+ sharePage.on('response',async r=>{
+   if(/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(new URL(r.url()).pathname)&&
+      r.request().method()==='POST'){
+     const data=await r.json().catch(()=>({}));
+     createdLinks.push({status:r.status(),...data});
+   }
+ });
+ try{
+   const route=await sharePage.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+   assert.equal(route.status(),200);
+   await sharePage.waitForFunction(id=>
+     window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,a.id,
+     {timeout:20000});
+   await sharePage.waitForFunction(()=>
+     !!document.querySelector('#talera-clean-social [data-action=share]'),
+     null,{timeout:15000});
+   await sharePage.waitForTimeout(1600);
+   await sharePage.locator('#talera-clean-social [data-action=share]').click();
+   await sharePage.waitForFunction(()=>
+     !!document.querySelector('#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
+     null,{timeout:15000});
+   await sharePage.locator('#talera-clean-consent').check();
+   await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
+   await sharePage.waitForFunction(()=>{
+     const sheet=document.querySelector('#talera-clean-overlay:not([hidden])');
+     return !!sheet?.querySelector('[data-action=send]:not(:disabled)') ||
+       !!sheet?.querySelector('.status')?.textContent?.match(/niet gevonden|niet beschikbaar|kan niet|fout|verlopen/i);
+   },null,{timeout:18000});
+   const status=await sharePage.evaluate(()=>{
+     const sheet=document.querySelector('#talera-clean-overlay:not([hidden])');
+     return {status:sheet?.querySelector('.status')?.textContent,
+       enabled:!sheet?.querySelector('[data-action=send]')?.disabled};
+   });
+   console.log('TALERA_FREE_WHATSAPP_ACTUAL_PREPARE_DIAG',JSON.stringify({
+     status,createdLinks,onlySyntheticAccount:true
+   }));
+   assert.equal(status.enabled,true,
+     'The ORIGINAL WhatsApp button must prepare a real live share, not 404');
+   assert.equal(createdLinks.length,1,'Only ONE temporary share should be created');
+   const issued=createdLinks[0];
+   assert.equal(issued.status,200,'Share creation must succeed');
+   assert.match(issued.id,/^[a-f0-9]{64}$/);
+   assert.ok(issued.link.startsWith(origin+'/__social/shared/'),
+     'Recipient link must remain on the same app origin');
+   const anonymous=await browser.newContext({
+     ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate,
+       'cf-connecting-ip':'192.0.2.91'}
+   });
+   try{
+     const guest=await anonymous.newPage();
+     const received=await guest.goto(issued.link,{waitUntil:'domcontentloaded'});
+     assert.equal(received.status(),200,
+       'Receiver must see the actual consented photo/text, not JSON or 404');
+     const html=await received.text();
+     assert.match(html,/synthetic ACCOUNT ISOLATION 1/);
+     assert.match(html,/Local-only imaginary image/);
+     assert.ok(html.includes('<img ')&&html.includes('/photo'),
+       'The recipient must see the actual uploaded image in the shared memory');
+     const imageResponse=await guest.request.get(issued.link+'/photo');
+     assert.equal(imageResponse.status(),200,'Temporary shared photo must load');
+     assert.match(imageResponse.headers()['content-type']||'',/image\/jpeg/i);
+     assert.ok((await imageResponse.body()).length>100,
+       'Temp shared photo must contain actual pixels');
+     // Revoke only the newly generated synthetic share. Verify that the raw
+     // capability and photo are both immediately inaccessible.
+     const revoke=await sharePage.evaluate(async token=>{
+       const r=await fetch('/api/shares/'+token+'/revoke',{
+         method:'POST',credentials:'same-origin'
+       });
+       return {status:r.status,data:await r.json()};
+     },issued.id);
+     assert.equal(revoke.status,200,'Synthetic owner must revoke own share');
+     assert.equal((await guest.request.get(issued.link)).status(),404);
+     assert.equal((await guest.request.get(issued.link+'/photo')).status(),404);
+     console.log('TALERA_FREE_WHATSAPP_SHARE_READY_RECIPIENT_PHOTO_REVOKED_PASS',
+       JSON.stringify({originalWhatsAppUI:true,receiverHtml:200,photo:200,
+         revoke:200,expiredLinkAfterRevoke:404,otherStoriesUntouched:true,
+         noRealRecipients:true,oneExistingWorker:true,realIphoneAccepted:false}));
+   }finally{await anonymous.close()}
+ }finally{await sharePage.close()}
  // This complements the STATIC source-route inventory with REAL requests
  // made by existing menu controls, without activating any privacy toggle,
  // publishing, sharing, or unported media/upload path.

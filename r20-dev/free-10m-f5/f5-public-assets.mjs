@@ -1574,6 +1574,15 @@ for(const name of paths){
    const withPhoto="if(!title||(!storyText&&!/^(https?:\\/\\/|blob:|data:image\\/)/i.test(String(item?.image||''))))throw Error(";
    assert.equal(shipped.split(onlyText).length,2,'WHATSAPP_PHOTO_ONLY_CONSENT_SOURCE_DRIFT');
    shipped=shipped.replace(onlyText,withPhoto);
+   // A full iPhone original can exceed the bounded DO media limit. The
+   // consented preview JPEG is always uploaded and shown by the recipient;
+   // do not revoke a valid photo invitation merely because the optional
+   // full-resolution *copy* is larger than the temporary share allowance.
+   // The actual original photo remains unchanged in the local library.
+   const oldFull="if(full)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo-full'";
+   const safeFull="if(full&&full.size<=1800000)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo-full'";
+   assert.equal(shipped.split(oldFull).length,2,'WHATSAPP_OPTIONAL_FULL_PHOTO_SOURCE_DRIFT');
+   shipped=shipped.replace(oldFull,safeFull);
  }
  const filename=sha(shipped)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');

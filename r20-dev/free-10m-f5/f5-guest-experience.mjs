@@ -290,6 +290,10 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  '#taleraNativeGuestDialog input,#taleraNativeGuestDialog textarea{box-sizing:border-box;display:block;width:100%;padding:12px;margin:6px 0 12px;border:1px solid #b5c6cd;border-radius:12px;font:inherit}',
  '#taleraNativeGuestDialog textarea{min-height:95px}#taleraNativeGuestDialog button{border:0;border-radius:13px;background:#304653;color:white;padding:12px;font:700 14px -apple-system,sans-serif}',
  '#taleraNativeGuestDialog .reply{border-bottom:1px solid #b5c6cd;padding:9px 0}#taleraNativeGuestStatus{font-size:13px}',
+ '#taleraNativeInvite[hidden]{display:none!important}#taleraNativeInvite{position:fixed;inset:0;z-index:2147480200;background:#06192fc9;display:flex;align-items:center;justify-content:center;padding:20px;font:15px -apple-system,sans-serif}',
+ '#taleraNativeInvite .inner{background:#fff;color:#304653;border-radius:20px;max-width:390px;padding:25px 20px}',
+ '#taleraNativeInvite button{background:#304653;color:white;border:0;border-radius:12px;padding:12px 15px}',
+ '#taleraNativeInvite a{color:#304653;font-weight:750}',
  '</style>',
  '<div id="taleraNativeGuestBar" aria-label="Reageren op deze gedeelde herinnering">',
  '<a href="/ontdek-talera#'+escapeHtml(pagePath.slice(1))+'">TALERA</a>',
@@ -301,7 +305,11 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  '<label for="taleraNativeName">Jouw voornaam</label><input id="taleraNativeName" maxlength="32" autocomplete="given-name" required>',
  '<label for="taleraNativeMessage">Jouw reactie</label><textarea id="taleraNativeMessage" maxlength="1000" required></textarea>',
  '<button type="submit">Reactie plaatsen</button><p id="taleraNativeGuestStatus" role="status"></p>',
- '</form></div></section>'
+ '</form></div></section>',
+ '<section id="taleraNativeInvite" hidden><div class="inner"><h2>Ontdek TALERA</h2>',
+ '<p>Bewaar ook jouw persoonlijke herinneringen.</p>',
+ '<p><a id="taleraNativeIntroLink" href="/ontdek-talera#'+escapeHtml(pagePath.slice(1))+'">Ontdek TALERA</a></p>',
+ '<button id="taleraNativeInviteClose" type="button">Niet nu</button></div></section>'
  ].join('');
  const social=[
  ';(function(){',
@@ -336,6 +344,22 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  " try{show(await req('comment','POST',{guestId,firstName:$('taleraNativeName').value,body:$('taleraNativeMessage').value}));",
  "  $('taleraNativeMessage').value='';$('taleraNativeGuestStatus').textContent='Je reactie is geplaatst.'}",
  " catch(error){$('taleraNativeGuestStatus').textContent=error.message}finally{b.disabled=false}});",
+ "const promo=$('taleraNativeInvite');let promoDue=false;",
+ "const promoKey=()=>{let hash=2166136261;for(let i=0;i<base.length;i++){hash^=base.charCodeAt(i);hash=Math.imul(hash,16777619)}return 'talera-promo-seen-v1-'+(hash>>>0).toString(16)};",
+ "const promoSeen=()=>{try{return localStorage.getItem(promoKey())==='1'}catch{return false}};",
+ "const markPromoSeen=()=>{try{localStorage.setItem(promoKey(),'1')}catch{}};",
+ "const unfinishedMedia=new Set();",
+ "const activeMedia=()=>[...document.querySelectorAll('audio,video')].some(m=>!m.paused&&!m.ended);",
+ "const storyRaised=()=>document.body.classList.contains('talera-v18-reading')||!!document.querySelector('.memory-space.talera-v26-reading');",
+ "const typing=()=>!!document.activeElement?.closest?.('input,textarea,[contenteditable=true]');",
+ "const checkPromo=()=>{if(!promoDue||promoSeen()||activeMedia()||unfinishedMedia.size||storyRaised()||typing()||!$('taleraNativeGuestDialog').hidden)return;promoDue=false;promo.hidden=false};",
+ "document.addEventListener('play',e=>{if(e.target.matches?.('audio,video'))unfinishedMedia.add(e.target)},true);",
+ "for(const event of ['ended','error','emptied'])document.addEventListener(event,e=>{unfinishedMedia.delete(e.target);checkPromo()},true);",
+ "document.addEventListener('click',()=>{if(promoDue)setTimeout(checkPromo,0)},true);",
+ "document.addEventListener('focusout',()=>{if(promoDue)setTimeout(checkPromo,0)},true);",
+ "$('taleraNativeInviteClose').addEventListener('click',()=>{markPromoSeen();promo.hidden=true});",
+ "$('taleraNativeIntroLink').addEventListener('click',markPromoSeen);",
+ "if(!promoSeen())setTimeout(()=>{promoDue=true;checkPromo()},10000);",
  'void load();',
  '})();'
  ].join('\n');

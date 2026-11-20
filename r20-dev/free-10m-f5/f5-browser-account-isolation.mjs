@@ -1512,7 +1512,8 @@ try{
      const received=await guest.goto(issued.link,{waitUntil:'domcontentloaded'});
      console.log('TALERA_FREE_WHATSAPP_RECIPIENT_DIAG',JSON.stringify({
        status:received.status(),contentType:received.headers()['content-type'],
-       prefix:(await received.text()).slice(0,400)}));
+       prefix:(await received.text()).slice(0,400),
+       failureDetails:received.status()>=500?(await received.text()).slice(-4200):null}));
      assert.equal(received.status(),200,
        'Receiver must see the actual consented photo/text, not JSON or 404');
      const html=await received.text();

@@ -1481,6 +1481,24 @@ try{
      !!document.querySelector('#talera-clean-social [data-action=share]'),
      null,{timeout:15000});
    await sharePage.waitForTimeout(1600);
+   // Source of truth: inspect the AUTHENTIC TALERA comment sheet.
+   // Never invent a second guest comment form without checking this markup.
+   await sharePage.locator('#talera-clean-social [data-action=comments]').click();
+   await sharePage.waitForTimeout(250);
+   const originalReplyUi=await sharePage.evaluate(()=>{
+     const overlay=document.querySelector('#talera-clean-overlay');
+     const panel=overlay?.querySelector('#talera-clean-panel');
+     const buttons=panel?[...panel.querySelectorAll('button')].map(x=>({
+       text:x.textContent?.trim().slice(0,60),action:x.dataset.action,
+       outer:x.outerHTML.slice(0,600)})):[];
+     const body=panel?.innerHTML.slice(0,11500)||'';
+     const inputs=panel?[...panel.querySelectorAll('input,textarea,form')].map(x=>x.outerHTML.slice(0,500)):[];
+     return {overlayVisible:!!overlay&&!overlay.hidden,
+       panelClass:panel?.className,panelMarkup:body,buttons,inputs};
+   });
+   console.log('TALERA_ORIGINAL_COMMENT_SHEET_MARKUP_SOURCE',JSON.stringify(originalReplyUi));
+   if(await sharePage.locator('#talera-clean-overlay [data-action=close]').count())
+     await sharePage.locator('#talera-clean-overlay [data-action=close]').click();
    // Reproduce an iPhone display URL that is stale/not yet an image. Sharing
    // must read the unchanged original photo Blob by its account-library key,
    // NOT dereference this temporary player URL or create a text-only link.

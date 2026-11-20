@@ -1480,6 +1480,18 @@ try{
      !!document.querySelector('#talera-clean-social [data-action=share]'),
      null,{timeout:15000});
    await sharePage.waitForTimeout(1600);
+   // Reproduce an iPhone display URL that is stale/not yet an image. Sharing
+   // must read the unchanged original photo Blob by its account-library key,
+   // NOT dereference this temporary player URL or create a text-only link.
+   const originalPhotoSafe=await sharePage.evaluate(()=>{
+     const memory=window.__taleraTimelineRuntime?.currentMemory?.();
+     if(!memory?._taleraLocal||!memory.storyId||
+        !memory._zeroFrames?.some(f=>f.kind==='photo'))return false;
+     memory.image='data:text/plain,stale-player-image-is-not-original';
+     memory.previewImage='data:text/plain,stale-player-preview-is-not-original';
+     return true;
+   });
+   assert.equal(originalPhotoSafe,true,'Synthetic account needs an original local photo');
    await sharePage.locator('#talera-clean-social [data-action=share]').click();
    await sharePage.waitForFunction(()=>
      !!document.querySelector('#talera-clean-overlay:not([hidden]) [data-action=prepare]'),

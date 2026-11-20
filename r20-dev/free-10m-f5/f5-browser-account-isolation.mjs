@@ -1324,7 +1324,9 @@ try{
        matchCount:items.filter(x=>x.id===issuedShareHash).length,
        revoked:match?.revoked_at!=null,revokedAt:match?.revoked_at},
      guestStatus:guestLink.status(),
-     menu:(await page.locator('#talera-more-menu').innerText()).slice(0,320)
+     menu:(await page.locator('#talera-more-menu').innerText()).slice(0,320),
+     recentNetwork:apiTrace.slice(-35),
+     pageErrors:errors.slice(-8)
    }));
  }
  assert.deepEqual(revokedProof,{status:200,matchingRows:1,revoked:true},

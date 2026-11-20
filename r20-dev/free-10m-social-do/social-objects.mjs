@@ -238,6 +238,24 @@ export class FreeSocialMemory extends DurableObject{
  async view(actor,tokenHash){
   if(!this.access(actor,tokenHash))throw Error('ACCESS_DENIED');
   const owner=this.owner();
+  // A share token grants only a single guest view, NEVER the owner's
+  // account-only reaction thread. Authenticated owner/grantees keep the
+  // original social view unchanged.
+  let accountGranted=false;
+  if(actor){
+   verifyAccountId(actor);
+   accountGranted=actor===owner.owner_id;
+   if(!accountGranted){
+    const grant=this.sql.exec('SELECT revoked_at FROM grants WHERE recipient_id=?',actor).toArray()[0];
+    accountGranted=!!grant&&grant.revoked_at===null;
+   }
+  }
+  if(!accountGranted){
+   if(!tokenHash||!this.access(null,tokenHash))throw Error('ACCESS_DENIED');
+   const guest=await this.guestFeedback(tokenHash,{action:'feedback'});
+   return response(true,{storyId:owner.story_id,likes:guest.likes,
+    commentCount:guest.commentCount,comments:guest.comments});
+  }
   const likes=this.sql.exec('SELECT COUNT(*) AS total FROM reactions').toArray()[0].total;
   const commentCount=this.sql.exec('SELECT COUNT(*) AS total FROM comments').toArray()[0].total;
   const comments=this.sql.exec('SELECT id,body,created_at FROM comments ORDER BY created_at DESC,id LIMIT 20').toArray();

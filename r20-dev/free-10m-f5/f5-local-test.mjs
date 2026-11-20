@@ -2,6 +2,7 @@
 // No live TALERA database, account, media, service or production deployment.
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {renderGuestPresentation,renderTaleraLanding,guestClientScript} from './f5-guest-experience.mjs';
 import {spawn} from 'node:child_process';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -618,6 +619,87 @@ async function run(){
   assert.equal((await request('GET',link.data.link)).status,403);
   assert.equal((await request('GET','/api/me',{
     cookie:identities[1].cookie})).status,401);
+  // Actual same-origin recipient route with synthetic media-free memory.
+  // No sample story is written to any user's library or production account.
+  const dummyGuestId=randomUUID();
+  const escapeExample=renderGuestPresentation({
+   title:'<Fictieve titel>',storyText:'<script>alert(1)</script>',
+   eventDate:'1990-01-01',hasPhoto:false,hasAudio:false,hasVideo:false
+  },'/s/'+('A'.repeat(43)),'');
+  assert.ok(escapeExample.includes('&lt;Fictieve titel&gt;'));
+  assert.ok(escapeExample.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+  assert.ok(escapeExample.includes('href="/ontdek-talera#s/'));
+  assert.match(guestClientScript,/setTimeout\(\(\)=>\{popupPending=true;popupCheck\(\)\},10000\)/);
+  assert.match(guestClientScript,/playing\(\)\|\|typing\(\)/);
+  assert.match(renderTaleraLanding(),/Terug naar jouw herinnering/);
+  const prepared=await request('POST','/api/pwa/memory-link',{
+   cookie:identities[0].cookie,
+   body:{localMemoryId:'synthetic-f5-guest-20261120',title:'Synthetische herinnering',
+    storyText:'Alleen een automatische testtekst.',eventDate:'1990-01-01',consent:true}
+  });
+  assert.equal(prepared.status,200,'Existing account-owned share draft must be created');
+  assert.match(prepared.data.memoryId,/^[a-f0-9]{64}$/);
+  const createdInvite=await request('POST',
+   '/api/memories/'+prepared.data.memoryId+'/shares',{
+    cookie:identities[0].cookie,body:{consent:true,hours:1}});
+  assert.equal(createdInvite.status,200,'Guest uses SAME existing share route');
+  assert.match(createdInvite.data.link,/\/s\/[A-Za-z0-9_-]{43}$/);
+  const guestPath=new URL(createdInvite.data.link).pathname;
+  const guestPage=await request('GET',guestPath,{gate:false});
+  assert.equal(guestPage.status,200,'Guest must not need account');
+  assert.match(String(guestPage.data),/class="stage"/);
+  assert.match(String(guestPage.data),/Synthetische herinnering/);
+  assert.match(String(guestPage.data),/\/ontdek-talera#s\//);
+  assert.ok(!String(guestPage.data).includes('talera_sid='));
+  assert.equal((await request('GET','/ontdek-talera',{gate:false})).status,200);
+  const clientScript=await request('GET','/__f5/guest-ui.js',{gate:false});
+  assert.equal(clientScript.status,200);
+  assert.match(String(clientScript.data),/10?000/);
+  const guestFeedbackPath=guestPath+'/feedback';
+  const firstFeedback=await request('GET',guestFeedbackPath,{
+   gate:false,extra:{'x-talera-guest-id':dummyGuestId}});
+  assert.equal(firstFeedback.status,200,'Guest feedback no login');
+  assert.equal(firstFeedback.data.likes,0);
+  const attack=await request('POST',guestPath+'/heart',{gate:false,
+   extra:{origin:'https://external-attacker.example'},body:{guestId:dummyGuestId}});
+  assert.equal(attack.status,403,'Foreign origin cannot react via the share token');
+  const heart=await request('POST',guestPath+'/heart',{
+   gate:false,body:{guestId:dummyGuestId}});
+  assert.equal(heart.status,200);
+  assert.equal(heart.data.likes,1);
+  const duplicate=await request('POST',guestPath+'/heart',{
+   gate:false,body:{guestId:dummyGuestId}});
+  assert.equal(duplicate.status,200);
+  assert.equal(duplicate.data.likes,1,'Same guest browser only gets one heart');
+  const guestComment=await request('POST',guestPath+'/comment',{gate:false,
+   body:{guestId:dummyGuestId,firstName:'Iris',body:'Fictieve gastreactie'}});
+  assert.equal(guestComment.status,200,'Named guests can respond without an account');
+  assert.equal(guestComment.data.comments[0].name,'Iris');
+  const fastRepeat=await request('POST',guestPath+'/comment',{gate:false,
+   body:{guestId:dummyGuestId,firstName:'Iris',body:'Te snel'}});
+  assert.equal(fastRepeat.status,429,'Bound guest response frequency');
+  const signedComment=await request('POST',guestPath+'/comment',{
+   cookie:identities[0].cookie,
+   body:{guestId:randomUUID(),firstName:'Valse naam',body:'Eigenaar reactie'}});
+  assert.equal(signedComment.status,200);
+  assert.ok(signedComment.data.comments.some(c=>c.name===users[0].displayName),
+   'Signed-in account name overrides guest-provided nickname');
+  const readBack=await request('GET',guestFeedbackPath,{gate:false,
+   extra:{'x-talera-guest-id':dummyGuestId}});
+  assert.equal(readBack.status,200);
+  assert.equal(readBack.data.likes,1);
+  assert.equal(readBack.data.liked,true);
+  assert.equal(readBack.data.commentCount,2);
+  const invalidGuestPath=guestPath.slice(0,-1)+(guestPath.endsWith('A')?'B':'A');
+  assert.equal((await request('GET',invalidGuestPath+'/feedback',{gate:false})).status,404);
+  const withdrawn=await request('POST','/api/shares/'+createdInvite.data.id+'/revoke',{
+   cookie:identities[0].cookie,body:{}});
+  assert.equal(withdrawn.status,200);
+  assert.equal((await request('GET',guestPath,{gate:false})).status,404);
+  assert.equal((await request('GET',guestFeedbackPath,{gate:false})).status,404);
+  assert.equal((await request('POST',guestPath+'/heart',{gate:false,
+   body:{guestId:dummyGuestId}})).status,404);
+  console.log('TALERA_GUEST_SINGLE_MEMORY_LANDING_FEEDBACK_AND_REVOCATION_PASS');
   return {
     result:'PASS: F5 bounded one-origin integration in local real Cloudflare runtime',
     syntheticAccounts:4,syntheticMemories:1,oneTapIphoneSyntheticLoginVerified:true,successfulLocalPublishRedirectVerified:true,originalLocalMemoryPresentationRouteVerified:true,originalStandaloneIframePlayerActuallyLoaded:true,localRequests:calls,

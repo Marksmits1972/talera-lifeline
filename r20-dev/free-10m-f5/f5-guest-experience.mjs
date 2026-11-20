@@ -130,14 +130,15 @@ function dismissKey(){
 function wasDismissed(){try{return localStorage.getItem(dismissKey())==='1'}catch{return false}}
 function markDismissed(){try{localStorage.setItem(dismissKey(),'1')}catch{}}
 let popupPending=false,popupShown=false,feedback={likes:0,comments:[]};
-const audio=$('guestAudio'),video=$('guestVideo');
+const audio=$('guestAudio'),video=$('guestVideo'),videoLayer=$('guestVideoLayer');
 const playing=()=>[audio,video].some(x=>x&&!x.paused&&!x.ended);
 // Once media has started, pausing is not completion. Hold the invite until
 // ended or the visitor explicitly closes a video, never mid-story.
 const unfinishedMedia=new Set();
 const typing=()=>{const el=document.activeElement;return el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&el.closest('#commentSheet')};
 function popupCheck(){
- if(!popupPending||popupShown||wasDismissed()||playing()||unfinishedMedia.size||typing())return;
+ if(!popupPending||popupShown||wasDismissed()||playing()||unfinishedMedia.size||typing()||
+    (videoLayer&&!videoLayer.hidden))return;
  popupPending=false;popupShown=true;
  $('guestPromo').hidden=false;
 }
@@ -153,6 +154,9 @@ if(!wasDismissed()){
 $('dismissGuestPromo').addEventListener('click',()=>{
  $('guestPromo').hidden=true;popupPending=false;markDismissed();
 });
+// Following the voluntary invitation counts as seen, too: do not interrupt
+// the same shared story again after returning from the introduction.
+$('guestPromo').querySelector('a[href^="/ontdek-talera#"]').addEventListener('click',markDismissed);
 function openSheet(id){const el=$(id);if(el)el.hidden=false}
 function closeSheet(id){const el=$(id);if(el)el.hidden=true;popupCheck()}
 $('openGuestStory').addEventListener('click',()=>openSheet('storySheet'));
@@ -160,7 +164,6 @@ $('openGuestComments').addEventListener('click',()=>{openSheet('commentSheet');v
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeSheet(b.dataset.close)));
 $('storySheet').addEventListener('click',e=>{if(e.target.id==='storySheet')closeSheet('storySheet')});
 $('commentSheet').addEventListener('click',e=>{if(e.target.id==='commentSheet')closeSheet('commentSheet')});
-const videoLayer=$('guestVideoLayer');
 if(videoLayer){
  $('openGuestVideo').addEventListener('click',()=>{
   if(audio&&!audio.paused){audio.pause();unfinishedMedia.delete(audio)}

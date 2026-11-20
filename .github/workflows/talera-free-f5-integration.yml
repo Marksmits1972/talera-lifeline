@@ -927,9 +927,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 790a520036320234da49429e75a714282fe110dc
-          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^^)" = 790a520036320234da49429e75a714282fe110dc
+          test "$(git diff --name-only HEAD^^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code HEAD^^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const id=44739220222,expected='790a520036320234da49429e75a714282fe110dc';
@@ -1175,7 +1175,25 @@ jobs:
               signal:AbortSignal.timeout(20000)});
             assert.equal(r.status,200);const d=await r.json();assert.equal(d.success,true);return d.result;
           };
-          const [s,d]=await Promise.all([get('/settings'),get('/deployments')]);
+          const s=await get('/settings');
+          // The publish CLI returns before the deployment listing is
+          // guaranteed to reflect its new version. Never falsely fail and
+          // roll back a healthy release because this read is briefly stale.
+          // Bound the wait; if the new version never appears, fail closed.
+          let d;
+          for(let attempt=1;attempt<=12;attempt++){
+            d=await get('/deployments');
+            const active=d.deployments?.[0]?.versions||[];
+            if(active.length===1&&active[0].percentage===100&&
+               active[0].version_id!==process.env.F5_EXPECTED_LIVE_VERSION){
+              console.log('TALERA_NEW_DEPLOYMENT_VERIFIED_AFTER_PROPAGATION_ATTEMPT='+attempt);
+              break;
+            }
+            if(attempt<12){
+              console.log('TALERA_DEPLOYMENT_LISTING_PROPAGATION_PENDING='+attempt);
+              await new Promise(resolve=>setTimeout(resolve,3000));
+            }
+          }
           const norm=x=>({name:x.name,type:x.type,class_name:x.class_name||null,
             namespace_id:x.namespace_id||null,text:x.text||null});
           const sort=a=>a.map(norm).sort((a,b)=>a.name.localeCompare(b.name));

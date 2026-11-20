@@ -1549,6 +1549,16 @@ for(const name of paths){
  assert.equal(first.body,second.body,'Unstable/possibly personalized public JS: '+name);
  const ext=name.endsWith('.mjs')?'mjs':'js';
  let shipped=first.body;
+ // Temporary source-read diagnostic: approved static, public scripts only.
+ if(name==='/__clean/share-controller.mjs'||name==='/__clean/ui-integration.mjs'){
+   const markers=name.endsWith('share-controller.mjs')
+     ?['Deze herinnering heeft nog geen tekst','veilige publicatie','Veilige publicatie','photo','video','publish','state=','open(']
+     :['Deel deze herinnering','Deel via WhatsApp','Deel via','talera-clean-overlay','data-action','data-action="share"','shareSheet','shareController'];
+   const bits=markers.map(term=>{const at=shipped.indexOf(term);
+     return {term,at,context:at<0?'':shipped.slice(Math.max(0,at-1450),at+3200)}});
+   console.log('TALERA_GITHUB_ORIGINAL_WHATSAPP_SOURCE_'+name,
+     JSON.stringify({length:shipped.length,bits}));
+ }
  // The original menu signs in/out IN PLACE, leaving the already loaded
  // account-scoped IndexedDB code bound to the PREVIOUS person. Reopen the
  // exact SAME URL only after a successful auth transition. The existing

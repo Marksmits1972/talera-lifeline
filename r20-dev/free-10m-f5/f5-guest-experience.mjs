@@ -132,16 +132,22 @@ function markDismissed(){try{localStorage.setItem(dismissKey(),'1')}catch{}}
 let popupPending=false,popupShown=false,feedback={likes:0,comments:[]};
 const audio=$('guestAudio'),video=$('guestVideo');
 const playing=()=>[audio,video].some(x=>x&&!x.paused&&!x.ended);
+// Once media has started, pausing is not completion. Hold the invite until
+// ended or the visitor explicitly closes a video, never mid-story.
+const unfinishedMedia=new Set();
 const typing=()=>{const el=document.activeElement;return el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&el.closest('#commentSheet')};
 function popupCheck(){
- if(!popupPending||popupShown||wasDismissed()||playing()||typing())return;
+ if(!popupPending||popupShown||wasDismissed()||playing()||unfinishedMedia.size||typing())return;
  popupPending=false;popupShown=true;
  $('guestPromo').hidden=false;
 }
 if(!wasDismissed()){
  setTimeout(()=>{popupPending=true;popupCheck()},10000);
- for(const node of [audio,video].filter(Boolean))
-  for(const type of ['pause','ended','emptied'])node.addEventListener(type,popupCheck);
+ for(const node of [audio,video].filter(Boolean)){
+  node.addEventListener('play',()=>unfinishedMedia.add(node));
+  for(const type of ['ended','emptied','error'])
+   node.addEventListener(type,()=>{unfinishedMedia.delete(node);popupCheck()});
+ }
  document.addEventListener('focusout',()=>setTimeout(popupCheck,0));
 }
 $('dismissGuestPromo').addEventListener('click',()=>{
@@ -157,10 +163,10 @@ $('commentSheet').addEventListener('click',e=>{if(e.target.id==='commentSheet')c
 const videoLayer=$('guestVideoLayer');
 if(videoLayer){
  $('openGuestVideo').addEventListener('click',()=>{
-  if(audio&&!audio.paused)audio.pause();
+  if(audio&&!audio.paused){audio.pause();unfinishedMedia.delete(audio)}
   videoLayer.hidden=false;
  });
- $('closeGuestVideo').addEventListener('click',()=>{video.pause();videoLayer.hidden=true;popupCheck()});
+ $('closeGuestVideo').addEventListener('click',()=>{video.pause();unfinishedMedia.delete(video);videoLayer.hidden=true;popupCheck()});
 }
 async function api(path,method='GET',data){
  const opts={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json','x-talera-guest-id':guestId}};

@@ -778,6 +778,53 @@ try{
      assert.equal(proof.photoBytes,a.bytes,'Original photo bytes changed across screens');
      if(route==='/present')assert.equal(proof.selectedPresentationId,a.id,
        'Ordinary presentation failed to select the stored story');
+     if(route==='/present'){
+       // The existing WhatsApp sheet is part of the ORIGINAL presentation.
+       // Trace its first failed request using only synthetic local memories,
+       // not the owner's account or an external WhatsApp delivery.
+       const shareTraffic=[];
+       follower.on('response',r=>{
+         if(/\/api\/(?:pwa|memories|shares)/.test(new URL(r.url()).pathname))
+           shareTraffic.push({method:r.request().method(),
+             pathname:new URL(r.url()).pathname,status:r.status()});
+       });
+       await follower.waitForFunction(()=>{
+         const bar=document.querySelector('#talera-clean-social');
+         return !!bar&&!bar.hidden&&!!bar.querySelector('[data-action=share]');
+       },null,{timeout:15000});
+       await follower.waitForTimeout(1700);
+       await follower.locator('#talera-clean-social [data-action=share]').click();
+       await follower.waitForFunction(()=>
+         !!document.querySelector('#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
+         null,{timeout:12000});
+       await follower.waitForTimeout(250);
+       const modalSnapshot=()=>follower.evaluate(()=>{
+         const el=document.querySelector('#talera-clean-overlay');
+         const panel=el?.firstElementChild;
+         const z=element=>{if(!element)return null;const cs=getComputedStyle(element),
+           b=element.getBoundingClientRect();return {top:b.top,bottom:b.bottom,
+             height:b.height,scrollHeight:element.scrollHeight,
+             clientHeight:element.clientHeight,overflowY:cs.overflowY,
+             position:cs.position,maxHeight:cs.maxHeight};
+         };
+         return {overlay:z(el),panel:z(panel),status:panel?.querySelector('.status')?.textContent,
+           prepareDisabled:panel?.querySelector('[data-action=prepare]')?.disabled,
+           sendDisabled:panel?.querySelector('[data-action=send]')?.disabled,
+           checkbox:!!panel?.querySelector('#talera-clean-consent')};
+       });
+       const initialShareModal=await modalSnapshot();
+       await follower.locator('#talera-clean-consent').check();
+       await follower.locator('#talera-clean-overlay [data-action=prepare]').click();
+       await follower.waitForTimeout(300);
+       const failedShareModal=await modalSnapshot();
+       await follower.setViewportSize({width:390,height:610});
+       await follower.waitForTimeout(140);
+       const smallShareModal=await modalSnapshot();
+       console.log('TALERA_F5_WHATSAPP_SHEET_AND_API_DIAG',JSON.stringify({
+         initialShareModal,failedShareModal,smallShareModal,shareTraffic,
+         syntheticOnly:true,realAccountNeverTouched:true
+       }));
+     }
      if(route==='/tell'){
        // Visual-only regression on the ORIGINAL editor of this same account.
        // No change to title, date, photo order, tag data or publish handlers.

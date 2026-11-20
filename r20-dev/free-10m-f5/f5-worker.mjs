@@ -19,7 +19,7 @@ import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
 import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
 import {localBackupPage} from './f5-local-backup-page.mjs';
-import {renderGuestPresentation,renderTaleraLanding,guestClientScript} from './f5-guest-experience.mjs';
+import {renderOriginalTaleraShare,renderTaleraLanding,guestClientScript} from './f5-guest-experience.mjs';
 
 export {
   FreeAuthAccount,FreeAuthEmail,FreeAuthHandle,FreeAuthSession,FreeAuthRate
@@ -807,12 +807,21 @@ async function publicWhatsAppMemory(request,env){
   '<meta property="og:url" content="'+safeShareHtml(u.href)+'">'+
   (content.hasPhoto?'<meta property="og:image" content="'+
     safeShareHtml(u.origin+u.pathname+'/photo')+'">':'');
- const body=renderGuestPresentation(content,u.pathname,previewMeta);
- return new Response(body,{status:200,headers:{
+ // Use the SAME packaged original TALERA presenter as authenticated /present.
+ // Never modify its timeline, story lift gesture, original player or narrator.
+ // Only this one /s/<capability> response receives an anonymous read adapter.
+ const asset=referencePages['/present'];
+ if(!asset||!env.ASSETS)return deny(503,'Originele TALERA-presentatie ontbreekt');
+ const original=await env.ASSETS.fetch(new Request(new URL(asset,u.origin)));
+ if(!original.ok)return deny(503,'Originele TALERA-presentatie niet bereikbaar');
+ const guest=renderOriginalTaleraShare(await original.text(),content,u.pathname,m[1],previewMeta);
+ const prepared=await assetizeHtml(guest,new Set(approvedAssets));
+ return new Response(prepared.html,{status:200,headers:{
   'content-type':'text/html; charset=utf-8',
   'cache-control':'private, no-store','referrer-policy':'no-referrer',
   'x-content-type-options':'nosniff','x-robots-tag':'noindex, nofollow',
-  'content-security-policy':"default-src 'none'; img-src 'self'; media-src 'self'; connect-src 'self'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  'content-security-policy':F5_BROWSER_CSP,
+  'x-talera-free-f5':'original-presentation-one-memory-capability'
  }});
 
 }

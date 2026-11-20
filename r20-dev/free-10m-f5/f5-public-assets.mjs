@@ -1554,6 +1554,16 @@ for(const name of paths){
    const markers=name.endsWith('share-controller.mjs')
      ?['Deze herinnering heeft nog geen tekst','veilige publicatie','Veilige publicatie','photo','video','publish','state=','open(']
      :['Deel deze herinnering','Deel via WhatsApp','Deel via','talera-clean-overlay','data-action','data-action="share"','shareSheet','shareController'];
+   if(name==='/__clean/ui-integration.mjs'){
+     const noText=shipped.indexOf('Deze herinnering heeft nog geen tekst');
+     const func=shipped.indexOf('function render()');
+     const handler=shipped.indexOf("bar.addEventListener");
+     console.log('TALERA_GITHUB_WHATSAPP_UI_VALIDATION_SOURCE',JSON.stringify({
+       noText,aroundNoText:noText<0?null:shipped.slice(noText-900,noText+950),
+       func,aroundRender:func<0?null:shipped.slice(func,func+8500),
+       handler,aroundHandler:handler<0?null:shipped.slice(handler,handler+4000)
+     }));
+   }
    const bits=markers.map(term=>{const at=shipped.indexOf(term);
      return {term,at,context:at<0?'':shipped.slice(Math.max(0,at-1450),at+3200)}});
    console.log('TALERA_GITHUB_ORIGINAL_WHATSAPP_SOURCE_'+name,

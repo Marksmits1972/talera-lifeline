@@ -1496,6 +1496,27 @@ try{
    await sharePage.waitForFunction(()=>
      !!document.querySelector('#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
      null,{timeout:15000});
+   // One compact selector, truly EMPTY personal field, and draft survives
+   // changing the expiry and switching back to the default invitation.
+   const choices=sharePage.locator('#talera-clean-overlay .talera-share-choice');
+   assert.equal(await choices.count(),2,'Exactly two original WhatsApp message options');
+   assert.equal(await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').getAttribute('aria-pressed'),'true');
+   assert.equal(await sharePage.locator('#talera-clean-personal').count(),0);
+   await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').click();
+   assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),'',
+     'Own WhatsApp message must start with an entirely blank text field');
+   const personalDraft='Hé, weet je nog die middag?';
+   await sharePage.locator('#talera-clean-personal').fill(personalDraft);
+   await sharePage.locator('#talera-clean-expiry').selectOption('24');
+   assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),personalDraft,
+     'Changing validity may not delete the unsent personal message');
+   await sharePage.locator('#talera-clean-expiry').selectOption('168');
+   await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').click();
+   assert.equal(await sharePage.locator('#talera-clean-personal').count(),0);
+   await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').click();
+   assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),personalDraft);
+   await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').click();
+   // Use the standard message in the previously proven one-invite test.
    await sharePage.locator('#talera-clean-consent').check();
    await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
    await sharePage.waitForTimeout(1900);
@@ -1687,11 +1708,18 @@ try{
          window.__taleraWhatsappMediaProbe.map(x=>({kind:x.kind,calls:x.calls})));
        assert.deepEqual(halted,[{kind:'audio',calls:1},{kind:'video',calls:1}],
          'WhatsApp must synchronously stop playing audio AND video elements');
+       await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').click();
+       assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),'');
+       await sharePage.locator('#talera-clean-personal').fill('Weet je nog dat moment? Dit wilde ik met je delen.');
        await sharePage.locator('#talera-clean-consent').check();
        await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
        await sharePage.waitForFunction(()=>
          !document.querySelector('#talera-clean-overlay [data-action=send]')?.disabled,
          null,{timeout:20000});
+       assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),
+         'Weet je nog dat moment? Dit wilde ik met je delen.');
+       assert.equal(await sharePage.locator('.talera-share-progress').count(),0,
+         'Loading indicator must disappear after the invitation is ready');
        const issuedUntitled=createdLinks.at(-1);
        assert.equal(createdLinks.length,3,'Original, direct photo-only and untitled UI invitations are distinct');
        assert.equal(issuedUntitled.status,200);

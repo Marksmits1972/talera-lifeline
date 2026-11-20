@@ -141,6 +141,25 @@ export class FreeSocialMemory extends DurableObject{
    hash,kind,mime,bytes);
   return response(true,{stored:true});
  }
+
+ // Temporary read-only video thumbnails; never album photos or narration entries.
+ async saveSharePoster(actor,hash,index,mime,bytes){
+  this.checkOwner(actor);verifyTokenHash(hash);
+  if(!Number.isInteger(index)||index<0||index>=24||
+     !['image/jpeg','image/png','image/webp'].includes(mime)||
+     !(bytes instanceof Uint8Array)||bytes.byteLength<1||bytes.byteLength>1500000)
+   throw Error('INVALID_SHARE_POSTER');
+  if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
+  const kind='poster-'+index;
+  const previous=this.sql.exec('SELECT length(bytes) AS n FROM share_media WHERE token_hash=? AND kind=?',
+   hash,kind).toArray()[0]?.n||0;
+  const total=this.sql.exec('SELECT COALESCE(SUM(length(bytes)),0) AS n FROM share_media WHERE token_hash=?',
+   hash).toArray()[0]?.n||0;
+  if(total-previous+bytes.byteLength>96*1048576)throw Error('SHARE_TOTAL_SIZE_LIMIT');
+  this.sql.exec('INSERT INTO share_media(token_hash,kind,mime,bytes) VALUES (?,?,?,?) ON CONFLICT(token_hash,kind) DO UPDATE SET mime=excluded.mime,bytes=excluded.bytes',
+   hash,kind,mime,bytes);
+  return response(true,{stored:true});
+ }
  async completeShareManifest(actor,hash,document){
   this.checkOwner(actor);verifyTokenHash(hash);
   if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
@@ -179,6 +198,30 @@ export class FreeSocialMemory extends DurableObject{
    }
    if(actual!==item.size)throw Error('SHARE_MEDIA_LENGTH_MISMATCH');
   }
+
+  // Sidecars are separate from the complete source manifest and preserve its order.
+  const posters=document.posters===undefined?[]:document.posters;
+  if(!Array.isArray(posters)||posters.length>document.items.length)
+   throw Error('INVALID_SHARE_POSTER_MANIFEST');
+  const posterIndices=new Set();
+  for(const poster of posters){
+   if(!poster||!Number.isInteger(poster.mediaIndex)||
+      poster.mediaIndex<0||poster.mediaIndex>=document.items.length||
+      document.items[poster.mediaIndex]?.kind!=='video'||
+      posterIndices.has(poster.mediaIndex)||
+      !['image/jpeg','image/png','image/webp'].includes(poster.mime)||
+      !Number.isSafeInteger(poster.size)||poster.size<1||poster.size>1500000||
+      typeof poster.sha256!=='string'||!/^[a-f0-9]{64}$/.test(poster.sha256))
+    throw Error('INVALID_SHARE_POSTER_MANIFEST');
+   posterIndices.add(poster.mediaIndex);
+   const saved=this.sql.exec('SELECT mime,bytes FROM share_media WHERE token_hash=? AND kind=?',
+    hash,'poster-'+poster.mediaIndex).toArray()[0];
+   if(!saved||saved.mime!==poster.mime||saved.bytes.byteLength!==poster.size)
+    throw Error('INCOMPLETE_SHARE_POSTER');
+   const digest=await crypto.subtle.digest('SHA-256',saved.bytes);
+   const hex=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+   if(hex!==poster.sha256)throw Error('SHARE_POSTER_HASH_MISMATCH');
+  }
   const visual=document.items.map((item,index)=>
     ['photo','video'].includes(item.kind)?index:null).filter(x=>x!==null);
   for(const cue of document.narrationCues){
@@ -197,6 +240,20 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec('INSERT INTO share_manifest(token_hash,document) VALUES (?,?) ON CONFLICT(token_hash) DO UPDATE SET document=excluded.document',
    hash,raw);
   return response(true,{complete:true,originalItems:document.items.length});
+ }
+
+ async sharedPoster(hash,index){
+  verifyTokenHash(hash);
+  if(!Number.isInteger(index)||index<0||index>=24||!this.access(null,hash))return null;
+  const raw=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',
+   hash).toArray()[0]?.document;
+  if(!raw)return null;
+  const meta=JSON.parse(raw).posters?.find(p=>p.mediaIndex===index);
+  if(!meta)return null;
+  const row=this.sql.exec('SELECT mime,bytes FROM share_media WHERE token_hash=? AND kind=?',
+   hash,'poster-'+index).toArray()[0];
+  return row&&row.mime===meta.mime&&row.bytes.byteLength===meta.size?
+   {mime:row.mime,bytes:row.bytes}:null;
  }
  async sharedPart(hash,index,part){
   verifyTokenHash(hash);

@@ -255,7 +255,17 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
     media.push({key:id+':'+media.length,kind,path:pagePath+'/'+kind});
   }
  }
- if(!media.length&&!String(share.storyText||'').trim())throw Error('EMPTY_GUEST_SHARE');
+
+ const originalMedia=media.slice();
+ const posters=Array.isArray(share.manifest?.posters)?share.manifest.posters:[];
+ const posterLinks=Object.fromEntries(posters.map(p=>[
+   String(p.mediaIndex),pagePath+'/poster/'+p.mediaIndex
+ ]));
+ for(const p of posters)media.push({
+  key:id+':'+p.mediaIndex+':phone-v1',kind:'photo',
+  mime:p.mime,path:pagePath+'/poster/'+p.mediaIndex,posterSha256:p.sha256
+ });
+ if(!originalMedia.length&&!String(share.storyText||'').trim())throw Error('EMPTY_GUEST_SHARE');
  const date=String(share.eventDate||'');
  const exact=/^\d{4}-\d{2}-\d{2}$/.test(date),year=/^\d{4}$/.test(date);
  const manifest=share.manifest?.version===1?share.manifest:null;
@@ -272,7 +282,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   datePrecision:manifest?.datePrecision||(exact?'exact':year?'year':'unknown'),
   time:manifest?.time||'12:00:00',
   narrationCues:cues,narrationDurationMs:manifest?.narrationDurationMs||0,
-  items:media.map(x=>({key:x.key,kind:x.kind}))};
+  items:originalMedia.map(x=>({key:x.key,kind:x.kind}))};
  const safe=x=>JSON.stringify(x).replace(/</g,'\\u003c').replace(/>/g,'\\u003e')
   .replace(/&/g,'\\u0026').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
  const bridge=[
@@ -304,7 +314,12 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   '  if(!r.ok)return null;data=await r.blob();',
   ' }',
   ' if(!data.size||data.size>96*1048576||!data.type.startsWith(item.kind===\'photo\'?\'image/\':item.kind+\'/\'))return null;',
-  ' cache.set(key,data);return data;',
+  ' if(item.posterSha256){',
+ '  const digest=await crypto.subtle.digest("SHA-256",await data.arrayBuffer());',
+ '  const hex=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,"0")).join("");',
+ '  if(hex!==item.posterSha256)return null;',
+ ' }',
+ ' cache.set(key,data);return data;',
   '};',
   'const mediaUrl=async key=>{const b=await blob(key);if(!b)return null;',
   ' const url=URL.createObjectURL(b);objectUrls.add(url);return url;};',
@@ -328,7 +343,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  'body[data-talera-guest="one-memory"] #memoryStoryScroll{z-index:80!important;pointer-events:auto!important}',
  'body[data-talera-guest="one-memory"] #talera-flow-home{z-index:95!important;pointer-events:auto!important}',
  'body[data-talera-guest="one-memory"] #photoStage img[src^="data:image/svg+xml"],body[data-talera-guest="one-memory"] #photoStage img[src^="data:image/svg%2Bxml"]{visibility:hidden!important}',
- 'html.talera-guest-video-fallback #photoStage{background-image:url("'+(share.hasPhoto?escapeHtml(pagePath)+'/photo':'')+'");background-position:center;background-size:cover}',
+ 'html.talera-guest-video-fallback #photoStage{background-image:var(--talera-guest-poster,url("'+(share.hasPhoto?escapeHtml(pagePath)+'/photo':'')+'"));background-position:center;background-size:cover}',
  'html.talera-guest-video-fallback #photoStage img,html.talera-guest-video-fallback #memoryPhotoA,html.talera-guest-video-fallback #memoryPhotoB{visibility:hidden!important}',
  'html.talera-guest-video-fallback .talera-v61-first-frame-bridge{visibility:hidden!important}',
  '#talera-clean-panel input#taleraGuestFirstName{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b8c7d0;border-radius:12px;background:#fff;color:inherit;font:inherit}',
@@ -429,11 +444,16 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "document.addEventListener('visibilitychange',()=>{if(document.hidden)stopGuestMedia()});",
   "// Hide the old giant VIDEO placeholder only when a real frame is not",
   "// available yet. The existing full-screen video remains untouched.",
+  "const guestPosterUrls="+JSON.stringify(posterLinks)+";",
   "const refreshVideoFallback=()=>{",
   " const memory=window.__taleraTimelineRuntime?.currentMemory?.();",
   " const index=memory?._photoIndex||0,frame=memory?._zeroFrames?.[index];",
   " const native=[...document.querySelectorAll('video.talera-v61-inline-video')].find(v=>",
   "  v.isConnected&&v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2);",
+  " const src=frame?.kind==='video'?guestPosterUrls[String(index)]:null;",
+  " const stage=$('photoStage');",
+  " if(src&&stage)stage.style.setProperty('--talera-guest-poster','url(\\\"'+src+'\\\")');",
+  " else stage?.style.removeProperty('--talera-guest-poster');",
   " const missing=frame?.kind==='video'&&!native;",
   " document.documentElement.classList.toggle('talera-guest-video-fallback',!!missing);",
   "};",
@@ -448,7 +468,10 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "const entryCover=$('taleraGuestEntryCover');",
   "let coverReady=false,queuedVideo=null,waitingForPhoto=false;",
   "const revealOriginal=()=>{if(coverReady)return;coverReady=true;",
-  " entryCover?.remove();document.documentElement.classList.remove('talera-guest-first-frame-pending')};",
+  " if(entryCover){entryCover.style.transition='opacity 130ms ease-out';",
+  "  requestAnimationFrame(()=>{entryCover.style.opacity='0'});",
+  "  setTimeout(()=>entryCover.remove(),165);}",
+  " document.documentElement.classList.remove('talera-guest-first-frame-pending')};",
   "const stillSelected=(kind,index)=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();",
   " return !!(m&&!m._photoLoading&&m._zeroFrames?.[m._photoIndex||0]?.kind===kind&&",
   "   (m._photoIndex||0)===index)};",
@@ -569,7 +592,11 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  ].join('\n');
  // Only the selected guest capability receives a first-frame visual handoff.
  // The approved TALERA video and narration motors are untouched.
- const firstFrameImage=share.hasPhoto?escapeHtml(pagePath)+'/photo':null;
+ const firstVisualIndex=share.manifest?.items?.findIndex(item=>
+  item.kind==='photo'||item.kind==='video')??-1;
+ const firstPoster=posters.find(p=>p.mediaIndex===firstVisualIndex);
+ const firstFrameImage=firstPoster?escapeHtml(pagePath)+'/poster/'+firstPoster.mediaIndex:
+  (share.hasPhoto?escapeHtml(pagePath)+'/photo':null);
  const hasVisual=!!(share.hasPhoto||share.hasVideo);
  const bootstrap='<style id="talera-guest-first-frame-bootstrap">'+
   'html,html body{background:#17344a!important}'+

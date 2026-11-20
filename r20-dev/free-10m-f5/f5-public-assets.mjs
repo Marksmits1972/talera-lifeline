@@ -937,6 +937,20 @@ function rebuildDirectOrdinaryPresentation(html){
   once("            if(valid()&&taleraSharedAudible.isOwner(owner))\n              try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
     "            if(valid()&&taleraSharedAudible.isOwner(owner)&&video.currentTime>2&&audio.readyState>=3)\n              try{audio.currentTime=Math.max(0,video.currentTime)}catch(error){}",
     'NO_COLD_METADATA_SEEK');
+  // Freeze the SAME ordinary picture + shared sound clock, without
+  // replacing the player or altering the user-owned original media.
+  once("  window.__taleraOrdinaryActivate=(memory)=>{",
+    "  window.__taleraOrdinaryPauseForShare=()=>{\\n    clearAuto();ownSerial++;closeOrdinaryVideo(true);\\n  };\\n  window.__taleraOrdinaryActivate=(memory)=>{",
+    'WHATSAPP_PAUSE_ORDINARY');
+  once("  function playOrdinaryVideo(memory,index){\n    if(!ordinaryMemory",
+    "  function playOrdinaryVideo(memory,index){\n    if(window.__taleraSharePauseActive)return;\n    if(!ordinaryMemory",
+    'WHATSAPP_VIDEO_SUSPEND');
+  once("  function showPhoto(memory,index,manual=false){\n    if(!ordinaryMemory",
+    "  function showPhoto(memory,index,manual=false){\n    if(window.__taleraSharePauseActive)return;\n    if(!ordinaryMemory",
+    'WHATSAPP_PHOTO_SUSPEND');
+  once("  function scheduleAuto(memory){\n    clearAuto();",
+    "  function scheduleAuto(memory){\n    clearAuto();\n    if(window.__taleraSharePauseActive)return;",
+    'WHATSAPP_TIMER_SUSPEND');
   if(html.includes('readyNeighbour?.currentSrc'))throw Error('Old neighbor bitmap remains');
   if(html.includes('const fallback=mem._taleraLocal?('))throw Error('Old shared bitmap remains');
   return html;
@@ -1042,6 +1056,28 @@ function installReadOnlyLibraryGateway(html){
  assert.equal(mounted.split(old).length,2,'LIBRARY_NARRATOR_ROUTER_MARKER_CHANGED');
  return mounted.replace(old,
   'const taleraIndependentNarrator=taleraCreateIndependentNarrator({stage,store:window.TaleraLibrary,runtime});');
+}
+
+// Stop the original narrator, ordinary picture and sound when the existing
+// WhatsApp dialog opens. Do not resume behind the user's back on closing it.
+function pausePresentationDuringWhatsApp(html){
+ const reader="const taleraIndependentNarrator=taleraCreateIndependentNarrator({stage,store:window.TaleraLibrary,runtime});";
+ const pause=String.raw`
+window.__taleraFreePauseForShare=active=>{
+ window.__taleraSharePauseActive=Boolean(active);
+ if(!active)return;
+ window.__taleraOrdinaryPauseForShare?.();
+ taleraIndependentNarrator.stop();
+ for(const media of document.querySelectorAll('audio,video')){
+  try{if(!media.paused)media.pause()}catch(e){}
+ }
+};
+`;
+ assert.equal(html.split(reader).length,2,'WHATSAPP_NARRATOR_SOURCE_DRIFT');
+ html=html.replace(reader,reader+'\n'+pause);
+ const activate=' function activate(memory){\n';
+ assert.equal(html.split(activate).length,2,'WHATSAPP_ACTIVATE_SOURCE_DRIFT');
+ return html.replace(activate,activate+'   if(window.__taleraSharePauseActive)return;\n');
 }
 
 // Each recorded memory is controlled by an entirely separate motor.
@@ -1462,6 +1498,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=keepNativeTimelineDateAfterPhotoLanding(html);
  if(route==='/present')html=stopOldPresentationWhenTimelineMoves(html);
  if(route==='/present')html=installReadOnlyLibraryGateway(html);
+ if(route==='/present')html=pausePresentationDuringWhatsApp(html);
  // Use the ORIGINAL, already approved V61 video preview from the
  // 7-Nov-2026 product-owner-selected version, byte-for-byte. Do not
  // apply later speculative iPhone video-poster modifications.
@@ -1549,30 +1586,6 @@ for(const name of paths){
  assert.equal(first.body,second.body,'Unstable/possibly personalized public JS: '+name);
  const ext=name.endsWith('.mjs')?'mjs':'js';
  let shipped=first.body;
- // Temporary source-read diagnostic: approved static, public scripts only.
- if(name==='/__clean/share-controller.mjs'||name==='/__clean/ui-integration.mjs'){
-   const markers=name.endsWith('share-controller.mjs')
-     ?['Deze herinnering heeft nog geen tekst','veilige publicatie','Veilige publicatie','photo','video','publish','state=','open(']
-     :['Deel deze herinnering','Deel via WhatsApp','Deel via','talera-clean-overlay','data-action','data-action="share"','shareSheet','shareController'];
-   if(name==='/__clean/ui-integration.mjs'){
-     const noText=shipped.indexOf('Deze herinnering heeft nog geen tekst');
-     const func=shipped.indexOf('function render()');
-     const handler=shipped.indexOf("bar.addEventListener");
-     console.log('TALERA_GITHUB_WHATSAPP_UI_VALIDATION_SOURCE',JSON.stringify({
-       noText,aroundNoText:noText<0?null:shipped.slice(noText-900,noText+950),
-       func,aroundRender:func<0?null:shipped.slice(func,func+8500),
-       handler,aroundHandler:handler<0?null:shipped.slice(handler,handler+4000)
-     }));
-   }
-   const bits=markers.map(term=>{const at=shipped.indexOf(term);
-     return {term,at,context:at<0?'':shipped.slice(Math.max(0,at-1450),at+3200)}});
-   console.log('TALERA_GITHUB_ORIGINAL_WHATSAPP_SOURCE_'+name,
-     JSON.stringify({length:shipped.length,bits}));
- }
- // The original menu signs in/out IN PLACE, leaving the already loaded
- // account-scoped IndexedDB code bound to the PREVIOUS person. Reopen the
- // exact SAME URL only after a successful auth transition. The existing
- // Storage and back-up panel alone also links to the authenticated archive.
  if(name==='/__clean/menu-integration.mjs'){
    writeFileSync(path.join(generated,'approved-menu-original.mjs'),first.body);
    shipped=keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body)))));
@@ -1687,6 +1700,27 @@ async function taleraFreeOriginalSharePhoto(memory){
    const photoConsentSafe="if(!title||(!storyText&&!item?._zeroItems?.some(x=>x.kind==='photo')))throw Error(";
    assert.equal(shipped.split(photoConsent).length,2,'WHATSAPP_PHOTO_CONSENT_SOURCE_DRIFT');
    shipped=shipped.replace(photoConsent,photoConsentSafe);
+   // A real memory never needs a title: keep the user's original unchanged
+   // and use the neutral name that the existing dialog already displays.
+   const titleBefore="const title=String(item?.title||item?.story||item?.name||'').trim();";
+   const titleAfter="const title=String(item?.title||item?.story||item?.name||'').trim()||'Herinnering';";
+   assert.equal(shipped.split(titleBefore).length,2,'WHATSAPP_OPTIONAL_TITLE_DRIFT');
+   shipped=shipped.replace(titleBefore,titleAfter);
+   // Empty records remain blocked; text OR existing locally recorded photo,
+   // audio, or video is sufficient for a consented temporary invitation.
+   const contentBefore="if(!title||(!storyText&&!item?._zeroItems?.some(x=>x.kind==='photo')))throw Error(";
+   const contentAfter="if(!storyText&&!item?._zeroItems?.some(x=>['photo','audio','video'].includes(x.kind)))throw Error(";
+   assert.equal(shipped.split(contentBefore).length,2,'WHATSAPP_MEDIA_ONLY_DRIFT');
+   shipped=shipped.replace(contentBefore,contentAfter);
+   const oldOpen="function open(next){if(motion)return;mode=next;focus=document.activeElement;overlay.hidden=false;bar.hidden=true;render();panel.focus();if(next==='share')void verifyShareAuth()}";
+   const newOpen="function open(next){if(motion)return;mode=next;focus=document.activeElement;if(next==='share')window.__taleraFreePauseForShare?.(true);overlay.hidden=false;bar.hidden=true;render();panel.focus();if(next==='share')void verifyShareAuth()}";
+   const oldClose="function close(){mode=null;overlay.hidden=true;bar.hidden=false;share.close();checkMotion();focus?.focus?.()}";
+   const newClose="function close(){const wasShare=mode==='share';mode=null;overlay.hidden=true;bar.hidden=false;share.close();if(wasShare)window.__taleraFreePauseForShare?.(false);checkMotion();focus?.focus?.()}";
+   for(const [before,after,where] of [[oldOpen,newOpen,'OPEN'],[oldClose,newClose,'CLOSE']]){
+     assert.equal(shipped.split(before).length,2,'WHATSAPP_SHEET_'+where+'_DRIFT');
+     shipped=shipped.replace(before,after);
+   }
+
  }
  const filename=sha(shipped)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');

@@ -1764,13 +1764,13 @@ window.__taleraShareProgress=taleraShareProgress;
 `;
    assert.equal(shipped.split(vars).length,2,'WHATSAPP_MESSAGE_DRAFT_SCOPE_DRIFT');
    shipped=shipped.replace(vars,vars+'\n'+addedVars);
-   const expiry="'+label for=\"talera-clean-expiry\"";
+
    // A single concatenation is the original duration label. Insert the
    // message selector AFTER the current selected photo, BEFORE expiry.
-   const choicePoint="+\'<label for=\"talera-clean-expiry\">'";
+   const choicePoint = `+'<label for="talera-clean-expiry">`;
    assert.equal(shipped.split(choicePoint).length,2,'WHATSAPP_MESSAGE_CHOICE_LOCATION_DRIFT');
    shipped=shipped.replace(choicePoint,'+taleraChoiceHtml()'+choicePoint);
-   const buttonPoint="'<button type=\"button\" class=\"primary\" data-action=\"send\" '";
+   const buttonPoint = `'<button type="button" class="primary" data-action="send" `;
    assert.equal(shipped.split(buttonPoint).length,2,'WHATSAPP_MESSAGE_SEND_SOURCE_DRIFT');
    // A visible, immediate spinner during all async stages, real percentages
    // ONLY during actual XHR upload bytes. No fictitious overall progress.
@@ -1800,7 +1800,7 @@ window.__taleraShareProgress=taleraShareProgress;
    assert.equal(shipped.split(clickSend).length,2,'WHATSAPP_PERSONAL_SEND_DRIFT');
    shipped=shipped.replace(clickSend,newClickSend);
    const changePoint="overlay.addEventListener('change',e=>{";
-   const onInput="overlay.addEventListener('input',e=>{if(e.target.id==='talera-clean-personal')personalMessage=e.target.value});\n ";
+   const onInput="overlay.addEventListener('input',e=>{if(e.target.id==='talera-clean-personal'){personalMessage=e.target.value;const can=!!personalMessage.trim(),v=share.current(),prep=panel.querySelector('[data-action=prepare]'),send=panel.querySelector('[data-action=send]');if(prep)prep.disabled=shareAuth!==true||v.state==='preparing'||!can;if(send)send.disabled=shareAuth!==true||v.state!=='ready'||!can}});\\n ";
    assert.equal(shipped.split(changePoint).length,2,'WHATSAPP_PERSONAL_INPUT_LOCATION_DRIFT');
    shipped=shipped.replace(changePoint,onInput+changePoint);
    // Don't upload twice from rapid tapping. User changes of duration/draft

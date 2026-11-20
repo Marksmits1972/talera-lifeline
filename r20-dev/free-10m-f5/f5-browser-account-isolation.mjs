@@ -1688,6 +1688,18 @@ try{
        catch{return true}
      });
      assert.equal(deniedGuestWrite,true,'Guest cannot write to the owner library');
+     // The original presentation has no separate story modal. Only the
+     // optional TALERA introduction appears after 10s of idle viewing.
+     assert.equal(await guest.locator('#taleraNativeInvite').isHidden(),true);
+     await guest.locator('#taleraNativeInvite:not([hidden])').waitFor({timeout:15000});
+     assert.equal(await guest.locator('#taleraNativeInvite').isVisible(),true);
+     await guest.locator('#taleraNativeInviteClose').click();
+     assert.equal(await guest.locator('#taleraNativeInvite').isHidden(),true);
+     const guestSeen=await guest.evaluate(()=>Object.keys(localStorage).some(
+       k=>k.startsWith('talera-promo-seen-v1-')&&localStorage.getItem(k)==='1'));
+     assert.equal(guestSeen,true,'Do not repeat the same optional TALERA invitation');
+     console.log('TALERA_GUEST_ORIGINAL_PRESENTATION_UNINTERRUPTED_TEN_SECOND_INTRO_PASS');
+
      const intro=guest.locator('#taleraNativeGuestBar a');
      assert.ok((await intro.getAttribute('href')).startsWith('/ontdek-talera#s/'));
      await intro.click();

@@ -1510,6 +1510,9 @@ try{
    try{
      const guest=await anonymous.newPage();
      const received=await guest.goto(issued.link,{waitUntil:'domcontentloaded'});
+     console.log('TALERA_FREE_WHATSAPP_RECIPIENT_DIAG',JSON.stringify({
+       status:received.status(),contentType:received.headers()['content-type'],
+       prefix:(await received.text()).slice(0,400)}));
      assert.equal(received.status(),200,
        'Receiver must see the actual consented photo/text, not JSON or 404');
      const html=await received.text();

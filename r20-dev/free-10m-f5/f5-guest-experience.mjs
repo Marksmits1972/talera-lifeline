@@ -221,3 +221,129 @@ $('guestCommentForm').addEventListener('submit',async e=>{
 });
 void loadFeedback();
 })();`;
+
+
+// The actual original /present is the sole presentation motor. This adapter
+// supplies ONLY one authorized share, without IndexedDB/account access.
+export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openGraph=''){
+ if(!/^\/(?:s\/[A-Za-z0-9_-]{43}|__social\/shared\/[a-f0-9]{64})$/.test(pagePath)||
+    !/^[a-f0-9]{64}$/.test(tokenHex))throw Error('INVALID_GUEST_CAPABILITY');
+ if(typeof original!=='string'||!original.includes('id="photoStage"')||
+    !original.includes('id="memoryStoryScroll"')||
+    !original.includes('TaleraLibraryFactory.create(')||
+    original.includes('TALERA_STRESS_MEMORIES'))
+  throw Error('ORIGINAL_TALERA_PRESENTER_NOT_VERIFIED');
+ const marker=/window\.TaleraMemories=\{[^\n;]*localOnly:true\};/g;
+ const matched=[...original.matchAll(marker)];
+ if(matched.length!==1)throw Error('ORIGINAL_LIBRARY_BRIDGE_MARKER_DRIFT');
+ const id='local-'+tokenHex.slice(0,32);
+ const media=[];
+ for(const kind of ['photo','video','audio']){
+  if(share['has'+kind[0].toUpperCase()+kind.slice(1)])
+   media.push({key:id+':'+media.length,kind,path:pagePath+'/'+kind});
+ }
+ if(!media.length&&!String(share.storyText||'').trim())throw Error('EMPTY_GUEST_SHARE');
+ const date=String(share.eventDate||'');
+ const exact=/^\d{4}-\d{2}-\d{2}$/.test(date),year=/^\d{4}$/.test(date);
+ const row={id,source:'pwa-local',title:share.title==='Herinnering'?'':String(share.title||''),
+  text:String(share.storyText||''),date:exact?date:year?date+'-01-01':new Date().toISOString().slice(0,10),
+  datePrecision:exact?'exact':year?'year':'unknown',time:'12:00:00',
+  narrationCues:[],narrationDurationMs:0,
+  items:media.map(x=>({key:x.key,kind:x.kind}))};
+ const safe=x=>JSON.stringify(x).replace(/</g,'\\u003c').replace(/>/g,'\\u003e')
+  .replace(/&/g,'\\u0026').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+ const bridge=[
+  ';(function(){',
+  "'use strict';",
+  'const row=__GUEST_ROW__,items=__GUEST_MEDIA__,cache=new Map(),objectUrls=new Set();',
+  "const deny=async()=>{throw Error('Alleen lezen: deze herinnering is persoonlijk gedeeld.')};",
+  "const list=async()=>[{...row,items:row.items.map(x=>({...x}))}];",
+  "const get=async id=>id===row.id?(await list())[0]:null;",
+  'const blob=async key=>{',
+  ' const item=items.find(x=>x.key===key);if(!item)return null;',
+  ' if(cache.has(key))return cache.get(key);',
+  " const r=await fetch(item.path,{credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});",
+  ' if(!r.ok)return null;const data=await r.blob();',
+  ' if(!data.size||data.size>1800000||!data.type.startsWith(item.kind===\'photo\'?\'image/\':item.kind+\'/\'))return null;',
+  ' cache.set(key,data);return data;',
+  '};',
+  'const mediaUrl=async key=>{const b=await blob(key);if(!b)return null;',
+  ' const url=URL.createObjectURL(b);objectUrls.add(url);return url;};',
+  'const memories=window.TaleraMemories;',
+  "if(!memories||memories.localOnly!==true)throw Error('UNSEALED_PRIVATE_LIBRARY');",
+  'Object.assign(memories,{list,get,blob,mediaUrl,displayUrl:mediaUrl,',
+  ' save:deny,remove:deny,retime:deny,setTags:deny,setBirthday:deny,birthday:()=>null,audit:deny});',
+  'window.TaleraGuestOneMemory={list,get};',
+  "window.addEventListener('pagehide',()=>{for(const url of objectUrls)URL.revokeObjectURL(url);}, {once:true});",
+  '})();'
+ ].join('\n').replace('__GUEST_ROW__',safe(row)).replace('__GUEST_MEDIA__',safe(media));
+ let html=original.slice(0,matched[0].index+matched[0][0].length)+'\n'+bridge+'\n'+
+  original.slice(matched[0].index+matched[0][0].length);
+ // Do not mount a separate photo stage, story sheet, player or timeline.
+ // The original TALERA DOM retains its own iPhone lift-to-read gesture.
+ const guestUi=[
+ '<style id="talera-native-guest-style">',
+ '#taleraNativeGuestBar{position:fixed;z-index:2147480000;top:calc(8px + env(safe-area-inset-top));right:10px;display:flex;gap:6px;font:700 12px -apple-system,sans-serif}',
+ '#taleraNativeGuestBar button,#taleraNativeGuestBar a{border:1px solid #ffffff9c;border-radius:20px;min-height:38px;padding:9px 10px;background:#304653e8;color:white;text-decoration:none;font:inherit}',
+ '#taleraNativeGuestDialog[hidden]{display:none!important}#taleraNativeGuestDialog{position:fixed;inset:0;z-index:2147480100;display:flex;align-items:flex-end;background:#06192fbb}',
+ '#taleraNativeGuestDialog .inner{width:100%;max-height:83dvh;overflow:auto;border-radius:23px 23px 0 0;background:white;color:#304653;padding:22px 18px calc(20px + env(safe-area-inset-bottom));font:15px -apple-system,sans-serif}',
+ '#taleraNativeGuestDialog input,#taleraNativeGuestDialog textarea{box-sizing:border-box;display:block;width:100%;padding:12px;margin:6px 0 12px;border:1px solid #b5c6cd;border-radius:12px;font:inherit}',
+ '#taleraNativeGuestDialog textarea{min-height:95px}#taleraNativeGuestDialog button{border:0;border-radius:13px;background:#304653;color:white;padding:12px;font:700 14px -apple-system,sans-serif}',
+ '#taleraNativeGuestDialog .reply{border-bottom:1px solid #b5c6cd;padding:9px 0}#taleraNativeGuestStatus{font-size:13px}',
+ '</style>',
+ '<div id="taleraNativeGuestBar" aria-label="Reageren op deze gedeelde herinnering">',
+ '<a href="/ontdek-talera#'+escapeHtml(pagePath.slice(1))+'">TALERA</a>',
+ '<button id="taleraNativeHeart" type="button" aria-pressed="false">♡ <span id="taleraNativeHearts">0</span></button>',
+ '<button id="taleraNativeCommentOpen" type="button">Reacties · <span id="taleraNativeCommentCount">0</span></button></div>',
+ '<section id="taleraNativeGuestDialog" hidden><div class="inner">',
+ '<button id="taleraNativeCommentClose" type="button">Sluiten</button><h2>Reacties</h2>',
+ '<div id="taleraNativeCommentList"></div><form id="taleraNativeCommentForm">',
+ '<label for="taleraNativeName">Jouw voornaam</label><input id="taleraNativeName" maxlength="32" autocomplete="given-name" required>',
+ '<label for="taleraNativeMessage">Jouw reactie</label><textarea id="taleraNativeMessage" maxlength="1000" required></textarea>',
+ '<button type="submit">Reactie plaatsen</button><p id="taleraNativeGuestStatus" role="status"></p>',
+ '</form></div></section>'
+ ].join('');
+ const social=[
+ ';(function(){',
+ "'use strict';",
+ 'const $=id=>document.getElementById(id),base=location.pathname;',
+ "const key='talera-guest-browser-v1';",
+ 'let guestId;',
+ "try{guestId=sessionStorage.getItem(key);if(!/^[a-f0-9-]{36}$/.test(guestId||'')){guestId=crypto.randomUUID();sessionStorage.setItem(key,guestId)}}catch{guestId=crypto.randomUUID()}",
+ 'const req=async(action,method=\'GET\',data)=>{',
+ " const opt={method,credentials:'omit',cache:'no-store',headers:{'accept':'application/json','x-talera-guest-id':guestId}};",
+ " if(data){opt.headers['content-type']='application/json';opt.body=JSON.stringify(data)}",
+ " const r=await fetch(base+'/'+action,opt);const d=await r.json().catch(()=>({}));",
+ " if(!r.ok||d.ok===false)throw Error(d.error||'Reactie mislukt');return d;",
+ '};',
+ 'const show=d=>{',
+ " $('taleraNativeHearts').textContent=String(d.likes||0);",
+ " $('taleraNativeCommentCount').textContent=String(d.commentCount||0);",
+ " $('taleraNativeHeart').setAttribute('aria-pressed',String(!!d.liked));",
+ " const list=$('taleraNativeCommentList');list.replaceChildren();",
+ " for(const c of d.comments||[]){const div=document.createElement('div');div.className='reply';",
+ "  const strong=document.createElement('strong');strong.textContent=c.name||'';",
+ "  const p=document.createElement('p');p.textContent=c.body||'';div.append(strong,p);list.append(div)}",
+ " $('taleraNativeName').required=!d.accountName;",
+ " $('taleraNativeName').hidden=!!d.accountName;",
+ '};',
+ "const load=async()=>{try{show(await req('feedback'))}catch(e){$('taleraNativeGuestStatus').textContent=e.message}};",
+ "$('taleraNativeHeart').addEventListener('click',async()=>{const b=$('taleraNativeHeart');b.disabled=true;",
+ " try{show(await req('heart','POST',{guestId}))}catch(e){$('taleraNativeGuestStatus').textContent=e.message}finally{b.disabled=false}});",
+ "$('taleraNativeCommentOpen').addEventListener('click',()=>{$('taleraNativeGuestDialog').hidden=false;void load()});",
+ "$('taleraNativeCommentClose').addEventListener('click',()=>{$('taleraNativeGuestDialog').hidden=true});",
+ "$('taleraNativeCommentForm').addEventListener('submit',async e=>{e.preventDefault();const b=e.currentTarget.querySelector('[type=submit]');b.disabled=true;",
+ " try{show(await req('comment','POST',{guestId,firstName:$('taleraNativeName').value,body:$('taleraNativeMessage').value}));",
+ "  $('taleraNativeMessage').value='';$('taleraNativeGuestStatus').textContent='Je reactie is geplaatst.'}",
+ " catch(error){$('taleraNativeGuestStatus').textContent=error.message}finally{b.disabled=false}});",
+ 'void load();',
+ '})();'
+ ].join('\n');
+ html=html.replace('</head>','<meta name="robots" content="noindex,nofollow,noarchive">'+
+  '<meta name="referrer" content="no-referrer">'+openGraph+'</head>');
+ html=html.replace('</body>',guestUi+'<script id="talera-native-guest-social">'+social+'</script></body>');
+ if(!html.includes('window.TaleraGuestOneMemory={list,get}')||
+    !html.includes('id="memoryStoryScroll"')||!html.includes('id="photoStage"'))
+  throw Error('GUEST_NATIVE_PRESENTATION_NOT_PRESERVED');
+ return html;
+}

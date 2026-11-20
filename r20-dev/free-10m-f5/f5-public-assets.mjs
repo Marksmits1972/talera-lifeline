@@ -1583,6 +1583,90 @@ for(const name of paths){
    const safeFull="if(full&&full.size<=1800000)await coreRequest('/api/shares/'+encodeURIComponent(d.id)+'/photo-full'";
    assert.equal(shipped.split(oldFull).length,2,'WHATSAPP_OPTIONAL_FULL_PHOTO_SOURCE_DRIFT');
    shipped=shipped.replace(oldFull,safeFull);
+   // Free originals live in the one account-local library, not in timeline
+   // display URLs (which can be a placeholder, cached poster or expired blob:).
+   // Read only the chosen original photo by its permanent media ID. No writes.
+   const originalPhotoReader=String.raw`
+async function taleraFreeOriginalSharePhoto(memory){
+ if(!memory?._taleraLocal)return null;
+ const id=String(memory.storyId||'');
+ const library=window.TaleraLibrary||window.TaleraMemories;
+ if(!id.startsWith('local-')||typeof library?.get!=='function'||
+    typeof library?.blob!=='function')
+  throw Error('De originele herinnering is niet beschikbaar om te delen.');
+ const record=await library.get(id);
+ if(!record||record.id!==id||!Array.isArray(record.items))
+  throw Error('De gekozen herinnering kon niet uit je bibliotheek worden gelezen.');
+ const photos=record.items.filter(f=>f?.kind==='photo'&&typeof f.key==='string');
+ if(!photos.length)return null;
+ const frame=Array.isArray(memory._zeroFrames)?
+  memory._zeroFrames[Math.max(0,Number(memory._photoIndex)||0)]:null;
+ const chosen=photos.find(f=>f.key===frame?.key)||photos[0];
+ const blob=await library.blob(chosen.key);
+ if(!(blob instanceof Blob)||!blob.size||!String(blob.type).startsWith('image/'))
+  throw Error('De originele foto ontbreekt in je bibliotheek. Er is niets gedeeld.');
+ return blob;
+}
+`;
+   const originalPreviewStart='async function previewPhotoBlob(memory){';
+   const previewEnd=' const src=URL.createObjectURL(original);';
+   const startPreview=shipped.indexOf(originalPreviewStart);
+   const endPreview=shipped.indexOf(previewEnd,startPreview);
+   assert.ok(startPreview>=0&&endPreview>startPreview,'WHATSAPP_PREVIEW_SOURCE_DRIFT');
+   assert.equal(shipped.split(originalPreviewStart).length,2,'WHATSAPP_PREVIEW_DUPLICATE');
+   const previewStart=String.raw`async function previewPhotoBlob(memory){
+ const libraryPhoto=await taleraFreeOriginalSharePhoto(memory);
+ const source=String(memory?.image||memory?.previewImage||'').trim();
+ if(!libraryPhoto&&!source)return null;
+ if(!libraryPhoto&&!/^(https?:\/\/|blob:|data:image\/)/i.test(source))
+  throw Error('Deze foto kan niet veilig voor WhatsApp worden voorbereid.');
+ let original=libraryPhoto;
+ if(!original){
+  let res;
+  try{res=await fetch(source,{mode:'cors',credentials:'same-origin',cache:'no-store'})}
+  catch{throw Error('De foto kan niet worden geladen. Er is nog niets gedeeld.')}
+  if(!res.ok)throw Error('De foto is niet beschikbaar. Er is nog niets gedeeld.');
+  original=await res.blob();
+ }
+ if(!original.type.startsWith('image/'))
+  throw Error('Deze herinnering bevat geen bruikbare foto.');
+`;
+   shipped=shipped.slice(0,startPreview)+originalPhotoReader+'\n'+previewStart+
+     shipped.slice(endPreview);
+   const originalFullStart='async function presentationPhotoBlob(memory){';
+   const fullEnd=' const url=URL.createObjectURL(blob),img=new Image();';
+   const startFull=shipped.indexOf(originalFullStart);
+   const endFull=shipped.indexOf(fullEnd,startFull);
+   assert.ok(startFull>=0&&endFull>startFull,'WHATSAPP_FULL_PHOTO_SOURCE_DRIFT');
+   assert.equal(shipped.split(originalFullStart).length,2,'WHATSAPP_FULL_PHOTO_DUPLICATE');
+   const fullStart=String.raw`async function presentationPhotoBlob(memory){
+ const libraryPhoto=await taleraFreeOriginalSharePhoto(memory);
+ const source=String(memory?.image||memory?.previewImage||'').trim();
+ if(!libraryPhoto&&!source)return null;
+ if(!libraryPhoto&&!/^(https?:\/\/|blob:|data:image\/)/i.test(source))
+  throw Error('De foto kan niet veilig worden geladen.');
+ let blob=libraryPhoto;
+ if(!blob){
+  let response;
+  try{response=await fetch(source,{mode:'cors',credentials:'same-origin',cache:'no-store'})}
+  catch{throw Error('De originele foto kan niet worden geladen.')}
+  if(!response.ok)throw Error('De originele foto is niet beschikbaar.');
+  blob=await response.blob();
+ }
+ if(!blob.type.startsWith('image/'))
+  throw Error('Geen bruikbare foto voor de presentatie.');
+`;
+   shipped=shipped.slice(0,startFull)+fullStart+shipped.slice(endFull);
+   const fullCall='  const full=await presentationPhotoBlob(current);';
+   assert.equal(shipped.split(fullCall).length,2,'WHATSAPP_OPTIONAL_FULL_PHOTO_CALL_DRIFT');
+   shipped=shipped.replace(fullCall,
+     '  const full=await presentationPhotoBlob(current).catch(()=>null);');
+   // The actual photo-only proof comes from the stored media reference, not
+   // from a placeholder image URL that happens to start with data:image/.
+   const photoConsent="if(!title||(!storyText&&!/^(https?:\\/\\/|blob:|data:image\\/)/i.test(String(item?.image||''))))throw Error(";
+   const photoConsentSafe="if(!title||(!storyText&&!item?._zeroItems?.some(x=>x.kind==='photo')))throw Error(";
+   assert.equal(shipped.split(photoConsent).length,2,'WHATSAPP_PHOTO_CONSENT_SOURCE_DRIFT');
+   shipped=shipped.replace(photoConsent,photoConsentSafe);
  }
  const filename=sha(shipped)+'.'+ext;
  writeFileSync(path.join(publicDir,'__talera_free','f5scripts',filename),shipped,'utf8');

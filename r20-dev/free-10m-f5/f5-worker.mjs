@@ -709,6 +709,40 @@ async function legacyShareApi(request,env){
   catch{return deny(400,'Dit type of formaat media kan niet veilig worden gedeeld')}
   return json({ok:true});
  }
+
+ const partUpload=/^\/api\/shares\/([a-f0-9]{64})\/media\/(\d{1,2})\/(\d{1,2})$/.exec(p);
+ if(partUpload){
+  if(m!=='POST')return deny(405,'Methode niet toegestaan');
+  if(Number(request.headers.get('content-length')||0)>1048576)
+   return deny(413,'Een onderdeel is te groot');
+  const hash=await shaHex(partUpload[1]);
+  const storyId=await accountHome(env,actor.id).socialShareStory(hash);
+  if(!storyId)return deny(403,'Dit deelbestand hoort niet bij dit account');
+  const bytes=new Uint8Array(await request.arrayBuffer());
+  const mime=(request.headers.get('content-type')||'').split(';')[0].toLowerCase();
+  try{
+   await socialMemoryHome(env,storyId).saveSharePart(actor.id,hash,
+    Number(partUpload[2]),Number(partUpload[3]),mime,bytes);
+  }catch{return deny(400,'Dit originele mediadeel kon niet veilig worden opgeslagen')}
+  return json({ok:true});
+ }
+ const finalize=/^\/api\/shares\/([a-f0-9]{64})\/manifest$/.exec(p);
+ if(finalize){
+  if(m!=='POST')return deny(405,'Methode niet toegestaan');
+  if(Number(request.headers.get('content-length')||0)>30000)
+   return deny(413,'Deeloverzicht te groot');
+  const raw=await request.text();
+  if(raw.length>30000)return deny(413,'Deeloverzicht te groot');
+  const hash=await shaHex(finalize[1]);
+  const storyId=await accountHome(env,actor.id).socialShareStory(hash);
+  if(!storyId)return deny(403,'Dit deeloverzicht hoort niet bij dit account');
+  let document;
+  try{document=JSON.parse(raw)}catch{return deny(400,'Ongeldig deeloverzicht')}
+  try{await socialMemoryHome(env,storyId).completeShareManifest(actor.id,hash,document)}
+  catch{return deny(409,'De volledige herinnering is nog niet veilig overgebracht')}
+  return json({ok:true,complete:true});
+ }
+
  const revoke=/^\/api\/shares\/([a-f0-9]{64})\/revoke$/.exec(p);
  if(revoke){
   if(m!=='POST')return deny(405,'Methode niet toegestaan');
@@ -727,8 +761,8 @@ function safeShareHtml(value){
 }
 async function publicWhatsAppMemory(request,env){
  const u=new URL(request.url);
- const legacy=/^\/__social\/shared\/([a-f0-9]{64})(?:\/(photo|photo-full|audio|video))?$/.exec(u.pathname);
- const short=/^\/s\/([A-Za-z0-9_-]{43})(?:\/(photo|photo-full|audio|video))?$/.exec(u.pathname);
+ const legacy=/^\/__social\/shared\/([a-f0-9]{64})(?:\/(photo|photo-full|audio|video|media\/\d{1,2}\/\d{1,2}))?$/.exec(u.pathname);
+ const short=/^\/s\/([A-Za-z0-9_-]{43})(?:\/(photo|photo-full|audio|video|media\/\d{1,2}\/\d{1,2}))?$/.exec(u.pathname);
  const decoded=short?expandWhatsAppToken(short[1]):null;
  const m=legacy||(decoded?[short[0],decoded,short[2]]:null);
  if(!m||!(request.method==='GET'||request.method==='HEAD'&&!!m[2]))
@@ -744,6 +778,19 @@ async function publicWhatsAppMemory(request,env){
   return deny(404,'Deze deellink is verlopen of ingetrokken');
  const home=socialMemoryHome(env,data.storyId);
  const hash=await shaHex(m[1]);
+
+ if(m[2]&&/^media\/\d{1,2}\/\d{1,2}$/.test(m[2])){
+  const [_,asset,part]=m[2].split('/');
+  const stored=await home.sharedPart(hash,Number(asset),Number(part));
+  if(!stored)return deny(404,'Dit deelbestand is niet beschikbaar');
+  return new Response(request.method==='HEAD'?null:stored.bytes,{
+   status:200,headers:{
+    'content-type':stored.mime,'content-length':String(stored.bytes.byteLength),
+    'cache-control':'private, no-store','x-content-type-options':'nosniff',
+    'referrer-policy':'no-referrer','cross-origin-resource-policy':'same-origin'
+   }
+  });
+ }
  if(m[2]){
   const media=await home.sharedMedia(hash,m[2]);
   if(!media)return deny(404,'Foto of media niet gevonden');
@@ -1108,7 +1155,7 @@ export default {
           deny(401,'Aanmelden vereist');
       }
       if(p==='/api/pwa/memory-link'||/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(p)||
-         /^\/api\/shares\/[a-f0-9]{64}\/(?:photo|photo-full|audio|video|revoke)$/.test(p))
+         /^\/api\/shares\/[a-f0-9]{64}\/(?:photo|photo-full|audio|video|revoke|manifest|media\/\d{1,2}\/\d{1,2})$/.test(p))
         return legacyShareApi(request,env);
       if(p==='/api/shares'||p==='/api/my-grants')
         return accountSocialLists(request,env);
@@ -1116,11 +1163,11 @@ export default {
       if(revoke)return revokeAccountShare(request,env,revoke[1]);
       const grantRevoke=/^\/api\/memories\/([A-Za-z0-9_-]{8,80})\/grants\/([0-9a-fA-F-]{36})\/revoke$/.exec(p);
       if(grantRevoke)return revokeAccountGrant(request,env,grantRevoke[1],grantRevoke[2]);
-      if((m==='GET'||m==='HEAD')&&/^\/__social\/shared\/[a-f0-9]{64}(?:\/(?:photo|photo-full|audio|video))?$/.test(p)&&
+      if((m==='GET'||m==='HEAD')&&/^\/__social\/shared\/[a-f0-9]{64}(?:\/(?:photo|photo-full|audio|video|media\/\d{1,2}\/\d{1,2}))?$/.test(p)&&
          (p.endsWith('/photo')||p.endsWith('/photo-full')||p.endsWith('/audio')||
-          p.endsWith('/video')||(request.headers.get('accept')||'').includes('text/html')))
+          p.endsWith('/video')||/\/media\/\d{1,2}\/\d{1,2}$/.test(p)||(request.headers.get('accept')||'').includes('text/html')))
         return publicWhatsAppMemory(request,env);
-      if((m==='GET'||m==='HEAD')&&/^\/s\/[A-Za-z0-9_-]{43}(?:\/(?:photo|photo-full|audio|video))?$/.test(p))
+      if((m==='GET'||m==='HEAD')&&/^\/s\/[A-Za-z0-9_-]{43}(?:\/(?:photo|photo-full|audio|video|media\/\d{1,2}\/\d{1,2}))?$/.test(p))
         return publicWhatsAppMemory(request,env);
       if(m==='GET'&&p==='/ontdek-talera'&&!url.search)
         return new Response(renderTaleraLanding(),{status:200,headers:{

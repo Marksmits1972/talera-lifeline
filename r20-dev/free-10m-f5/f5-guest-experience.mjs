@@ -238,17 +238,35 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  if(matched.length!==1)throw Error('ORIGINAL_LIBRARY_BRIDGE_MARKER_DRIFT');
  const id='local-'+tokenHex.slice(0,32);
  const media=[];
- for(const kind of ['photo','video','audio']){
-  if(share['has'+kind[0].toUpperCase()+kind.slice(1)])
-   media.push({key:id+':'+media.length,kind,path:pagePath+'/'+kind});
+ if(share.manifest?.version===1){
+  for(const [index,item] of share.manifest.items.entries()){
+   media.push({key:id+':'+index,kind:item.kind,mime:item.mime,
+    path:pagePath+'/media/'+index,parts:item.parts,size:item.size,
+    hashes:item.hashes});
+  }
+ }else{
+  for(const kind of ['photo','video','audio']){
+   if(share['has'+kind[0].toUpperCase()+kind.slice(1)])
+    media.push({key:id+':'+media.length,kind,path:pagePath+'/'+kind});
+  }
  }
  if(!media.length&&!String(share.storyText||'').trim())throw Error('EMPTY_GUEST_SHARE');
  const date=String(share.eventDate||'');
  const exact=/^\d{4}-\d{2}-\d{2}$/.test(date),year=/^\d{4}$/.test(date);
+ const manifest=share.manifest?.version===1?share.manifest:null;
+ const cues=(manifest?.narrationCues||[]).map(cue=>{
+  const restored={...cue};
+  if(Object.hasOwn(restored,'mediaIndex')){
+   restored.mediaId=media[restored.mediaIndex].key;
+   delete restored.mediaIndex;
+  }
+  return restored;
+ });
  const row={id,source:'pwa-local',title:String(share.title||''),
   text:String(share.storyText||''),date:exact?date:year?date+'-01-01':new Date().toISOString().slice(0,10),
-  datePrecision:exact?'exact':year?'year':'unknown',time:'12:00:00',
-  narrationCues:[],narrationDurationMs:0,
+  datePrecision:manifest?.datePrecision||(exact?'exact':year?'year':'unknown'),
+  time:manifest?.time||'12:00:00',
+  narrationCues:cues,narrationDurationMs:manifest?.narrationDurationMs||0,
   items:media.map(x=>({key:x.key,kind:x.kind}))};
  const safe=x=>JSON.stringify(x).replace(/</g,'\\u003c').replace(/>/g,'\\u003e')
   .replace(/&/g,'\\u0026').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
@@ -262,9 +280,25 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   'const blob=async key=>{',
   ' const item=items.find(x=>x.key===key);if(!item)return null;',
   ' if(cache.has(key))return cache.get(key);',
-  " const r=await fetch(item.path,{credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});",
-  ' if(!r.ok)return null;const data=await r.blob();',
-  ' if(!data.size||data.size>1800000||!data.type.startsWith(item.kind===\'photo\'?\'image/\':item.kind+\'/\'))return null;',
+  ' let data;',
+  ' if(item.parts){',
+  '  const blobs=[];let total=0;',
+  '  for(let part=0;part<item.parts;part++){',
+  "   const r=await fetch(item.path+'/'+part,{credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});",
+  '   if(!r.ok||r.headers.get("content-type")!==item.mime)return null;',
+  '   const bytes=await r.arrayBuffer();if(!bytes.byteLength||bytes.byteLength>1048576)return null;',
+  '   if(!crypto.subtle)return null;',
+  '   const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");',
+  '   if(hash!==item.hashes[part])return null;',
+  '   total+=bytes.byteLength;if(total>96*1048576)return null;blobs.push(bytes);',
+  '  }',
+  '  if(total!==item.size)return null;',
+  '  data=new Blob(blobs,{type:item.mime});',
+  ' }else{',
+  "  const r=await fetch(item.path,{credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});",
+  '  if(!r.ok)return null;data=await r.blob();',
+  ' }',
+  ' if(!data.size||data.size>96*1048576||!data.type.startsWith(item.kind===\'photo\'?\'image/\':item.kind+\'/\'))return null;',
   ' cache.set(key,data);return data;',
   '};',
   'const mediaUrl=async key=>{const b=await blob(key);if(!b)return null;',

@@ -29,6 +29,7 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_draft (singleton INTEGER PRIMARY KEY CHECK(singleton=1), title TEXT NOT NULL, story_text TEXT NOT NULL, event_date TEXT NOT NULL, expires_at INTEGER NOT NULL)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_snapshot (token_hash TEXT PRIMARY KEY, title TEXT NOT NULL, story_text TEXT NOT NULL, event_date TEXT NOT NULL)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_media (token_hash TEXT NOT NULL, kind TEXT NOT NULL, mime TEXT NOT NULL, bytes BLOB NOT NULL, PRIMARY KEY(token_hash,kind))");
+  this.sql.exec("CREATE TABLE IF NOT EXISTS share_manifest (token_hash TEXT PRIMARY KEY, document TEXT NOT NULL)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS guest_feedback_hearts (token_hash TEXT NOT NULL, actor_key TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(token_hash,actor_key))");
   this.sql.exec("CREATE TABLE IF NOT EXISTS guest_feedback_comments (id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, actor_key TEXT NOT NULL, display_name TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL)");
 
@@ -119,6 +120,98 @@ export class FreeSocialMemory extends DurableObject{
    hash,kind,mime,bytes);
   return response(true,{stored:true});
  }
+
+ // Exact temporary copy of ONE consented memory. Store the original bytes in
+ // bounded parts of the existing, token-scoped social DO, not a new media service.
+ async saveSharePart(actor,hash,index,part,mime,bytes){
+  this.checkOwner(actor);verifyTokenHash(hash);
+  if(!Number.isInteger(index)||index<0||index>=24||
+     !Number.isInteger(part)||part<0||part>=96)
+   throw Error('INVALID_SHARE_PART');
+  if(typeof mime!=='string'||!/^(image\/(?:jpeg|png|webp|gif|heic|heif)|video\/(?:mp4|webm|quicktime)|audio\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/.test(mime))
+   throw Error('INVALID_SHARE_MIME');
+  if(!(bytes instanceof Uint8Array)||bytes.byteLength<1||bytes.byteLength>1048576)
+   throw Error('INVALID_SHARE_PART_SIZE');
+  if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
+  const kind='asset-'+index+'-'+part;
+  const previous=this.sql.exec('SELECT length(bytes) AS n FROM share_media WHERE token_hash=? AND kind=?',hash,kind).toArray()[0]?.n||0;
+  const total=this.sql.exec('SELECT COALESCE(SUM(length(bytes)),0) AS n FROM share_media WHERE token_hash=?',hash).toArray()[0]?.n||0;
+  if(total-previous+bytes.byteLength>96*1048576)throw Error('SHARE_TOTAL_SIZE_LIMIT');
+  this.sql.exec('INSERT INTO share_media(token_hash,kind,mime,bytes) VALUES (?,?,?,?) ON CONFLICT(token_hash,kind) DO UPDATE SET mime=excluded.mime,bytes=excluded.bytes',
+   hash,kind,mime,bytes);
+  return response(true,{stored:true});
+ }
+ async completeShareManifest(actor,hash,document){
+  this.checkOwner(actor);verifyTokenHash(hash);
+  if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
+  if(!document||document.version!==1||!Array.isArray(document.items)||
+    document.items.length>24||!Array.isArray(document.narrationCues)||
+    document.narrationCues.length>1000||
+    !Number.isSafeInteger(document.narrationDurationMs)||
+    document.narrationDurationMs<0||document.narrationDurationMs>86400000)
+   throw Error('INVALID_SHARE_MANIFEST');
+  const metadata=this.sql.exec('SELECT story_text FROM share_snapshot WHERE token_hash=?',hash).toArray()[0];
+  if(!metadata||(!document.items.length&&!metadata.story_text.trim()))
+   throw Error('EMPTY_SHARE');
+  let total=0,partsTotal=0;
+  for(let index=0;index<document.items.length;index++){
+   const item=document.items[index];
+   if(!item||!['photo','video','audio'].includes(item.kind)||
+      typeof item.mime!=='string'||
+      !/^(image\/(?:jpeg|png|webp|gif|heic|heif)|video\/(?:mp4|webm|quicktime)|audio\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/.test(item.mime)||
+      !item.mime.startsWith(item.kind==='photo'?'image/':item.kind+'/')||
+      !Number.isSafeInteger(item.size)||item.size<1||
+      !Number.isSafeInteger(item.parts)||item.parts<1||item.parts>96||
+      item.parts!==Math.ceil(item.size/1048576)||
+      !Array.isArray(item.hashes)||item.hashes.length!==item.parts||
+      !item.hashes.every(h=>typeof h==='string'&&/^[a-f0-9]{64}$/.test(h)))
+    throw Error('INVALID_SHARE_MEDIA_MANIFEST');
+   total+=item.size;partsTotal+=item.parts;
+   if(total>96*1048576||partsTotal>192)throw Error('SHARE_TOTAL_SIZE_LIMIT');
+   let actual=0;
+   for(let part=0;part<item.parts;part++){
+    const stored=this.sql.exec('SELECT mime,length(bytes) AS n FROM share_media WHERE token_hash=? AND kind=?',
+      hash,'asset-'+index+'-'+part).toArray()[0];
+    if(!stored||stored.mime!==item.mime||stored.n<1||
+       stored.n>1048576||(part<item.parts-1&&stored.n!==1048576))
+     throw Error('INCOMPLETE_SHARE_MEDIA');
+    actual+=stored.n;
+   }
+   if(actual!==item.size)throw Error('SHARE_MEDIA_LENGTH_MISMATCH');
+  }
+  const visual=document.items.map((item,index)=>
+    ['photo','video'].includes(item.kind)?index:null).filter(x=>x!==null);
+  for(const cue of document.narrationCues){
+   if(!cue||typeof cue!=='object'||Array.isArray(cue)||
+      !Number.isSafeInteger(cue.t)||cue.t<0||cue.t>86400000||
+      !Number.isSafeInteger(cue.index)||cue.index<0||cue.index>=Math.max(1,visual.length)||
+      Object.hasOwn(cue,'mediaId')||
+      (cue.mediaIndex!==undefined&&
+        (!Number.isInteger(cue.mediaIndex)||!visual.includes(cue.mediaIndex)))||
+      (cue.videoAtMs!==undefined&&
+       (!Number.isSafeInteger(cue.videoAtMs)||cue.videoAtMs<0)))
+    throw Error('INVALID_SHARE_VOICE_CUE');
+  }
+  const raw=JSON.stringify(document);
+  if(raw.length>30000)throw Error('SHARE_MANIFEST_TOO_LARGE');
+  this.sql.exec('INSERT INTO share_manifest(token_hash,document) VALUES (?,?) ON CONFLICT(token_hash) DO UPDATE SET document=excluded.document',
+   hash,raw);
+  return response(true,{complete:true,originalItems:document.items.length});
+ }
+ async sharedPart(hash,index,part){
+  verifyTokenHash(hash);
+  if(!Number.isInteger(index)||index<0||index>=24||
+     !Number.isInteger(part)||part<0||part>=96||
+     !this.access(null,hash))return null;
+  const raw=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',hash).toArray()[0]?.document;
+  if(!raw)return null;
+  const item=JSON.parse(raw).items?.[index];
+  if(!item||part>=item.parts)return null;
+  const row=this.sql.exec('SELECT mime,bytes FROM share_media WHERE token_hash=? AND kind=?',
+    hash,'asset-'+index+'-'+part).toArray()[0];
+  return row&&row.mime===item.mime?{mime:row.mime,bytes:row.bytes}:null;
+ }
+
  async shareContent(hash){
   verifyTokenHash(hash);
   if(!this.access(null,hash))return null;
@@ -126,10 +219,12 @@ export class FreeSocialMemory extends DurableObject{
   if(!info)return null;
   const media=this.sql.exec("SELECT kind FROM share_media WHERE token_hash=?",hash)
     .toArray().map(r=>r.kind);
-  if(!info.story_text.trim()&&!media.length)return null;
+  const raw=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',hash).toArray()[0]?.document;
+  const manifest=raw?JSON.parse(raw):null;
+  if(!info.story_text.trim()&&!(manifest?.items?.length||media.length))return null;
+  const has=kind=>manifest?manifest.items.some(x=>x.kind===kind):media.includes(kind);
   return {title:info.title,storyText:info.story_text,eventDate:info.event_date,
-   hasPhoto:media.includes('photo'),hasAudio:media.includes('audio'),
-   hasVideo:media.includes('video')};
+   hasPhoto:has('photo'),hasAudio:has('audio'),hasVideo:has('video'),manifest};
  }
  async sharedMedia(hash,kind){
   verifyTokenHash(hash);
@@ -147,6 +242,7 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec("DELETE FROM share_draft WHERE expires_at<=?",now());
   this.sql.exec("DELETE FROM share_media WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM share_snapshot WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
+  this.sql.exec("DELETE FROM share_manifest WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM guest_feedback_hearts WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM guest_feedback_comments WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   await this.refreshContentAlarm();
@@ -175,6 +271,7 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec('UPDATE shares SET revoked_at=? WHERE token_hash=?',now(),tokenHash);
   this.sql.exec('DELETE FROM share_media WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM share_snapshot WHERE token_hash=?',tokenHash);
+  this.sql.exec('DELETE FROM share_manifest WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM guest_feedback_hearts WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM guest_feedback_comments WHERE token_hash=?',tokenHash);
   return response(true,{revoked:true});

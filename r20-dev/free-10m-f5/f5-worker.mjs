@@ -611,6 +611,22 @@ async function scopedShareId(accountId,localMemoryId){
  if(!FREE_SHARE_ID.test(localMemoryId||''))throw Error('INVALID_LOCAL_SHARE_ID');
  return shaHex('talera-free-whatsapp-v1:'+accountId+':'+localMemoryId);
 }
+// Reversible compact spelling of the EXISTING cryptographically-random
+// 256-bit share token. No shortened capability, no database, no new origin.
+// Old /__social/shared/<hex> URLs continue to work and revoke unchanged.
+function compactWhatsAppToken(hex){
+ if(!/^[a-f0-9]{64}$/.test(hex))throw Error('INVALID_SHARE_TOKEN');
+ const binary=String.fromCharCode(...(hex.match(/../g)||[]).map(h=>parseInt(h,16)));
+ return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function expandWhatsAppToken(short){
+ if(!/^[A-Za-z0-9_-]{43}$/.test(short||''))return null;
+ try{
+  const binary=atob(short.replace(/-/g,'+').replace(/_/g,'/')+'=');
+  const hex=Array.from(binary,c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join('');
+  return compactWhatsAppToken(hex)===short?hex:null;
+ }catch{return null}
+}
 async function legacyShareApi(request,env){
  const u=new URL(request.url),p=u.pathname,m=request.method;
  const actor=await sessionAccount(request,env);
@@ -674,7 +690,7 @@ async function legacyShareApi(request,env){
   const d=await response.json();
   const token=/^\/__social\/shared\/([a-f0-9]{64})$/.exec(d.link||'')?.[1];
   if(!token)return deny(503,'Deellink kon niet veilig worden aangemaakt');
-  return json({id:token,link:u.origin+d.link,expiresAt:d.expiresAt});
+  return json({id:token,link:u.origin+'/s/'+compactWhatsAppToken(token),expiresAt:d.expiresAt});
  }
  const upload=/^\/api\/shares\/([a-f0-9]{64})\/(photo|photo-full|audio|video)$/.exec(p);
  if(upload){
@@ -709,7 +725,11 @@ function safeShareHtml(value){
  }[c]));
 }
 async function publicWhatsAppMemory(request,env){
- const u=new URL(request.url),m=/^\/__social\/shared\/([a-f0-9]{64})(?:\/(photo|photo-full|audio|video))?$/.exec(u.pathname);
+ const u=new URL(request.url);
+ const legacy=/^\/__social\/shared\/([a-f0-9]{64})(?:\/(photo|photo-full|audio|video))?$/.exec(u.pathname);
+ const short=/^\/s\/([A-Za-z0-9_-]{43})(?:\/(photo|photo-full|audio|video))?$/.exec(u.pathname);
+ const decoded=short?expandWhatsAppToken(short[1]):null;
+ const m=legacy||(decoded?[short[0],decoded,short[2]]:null);
  if(!m||request.method!=='GET')return deny(404,'Link niet gevonden');
  // Only the random token grants access. Never expose the owner's private
  // library, account ID, other stories or originals via this public route.
@@ -739,8 +759,10 @@ async function publicWhatsAppMemory(request,env){
  const video=content.hasVideo?'<video controls playsinline preload="none" src="'+u.pathname+'/video"></video>':'';
  const audio=content.hasAudio?'<audio controls preload="none" src="'+u.pathname+'/audio"></audio>':'';
  const previewMeta='<meta property="og:type" content="article">'+
-  '<meta property="og:title" content="'+title+'">'+
-  '<meta property="og:description" content="Tijdelijk gedeelde TALERA-herinnering">'+
+  '<meta property="og:site_name" content="TALERA">'+
+  '<meta property="og:title" content="Een persoonlijke herinnering via TALERA">'+
+  '<meta property="og:description" content="Iemand deelt deze herinnering persoonlijk met je.">'+
+  '<meta name="twitter:card" content="summary_large_image">'+
   '<meta property="og:url" content="'+safeShareHtml(u.href)+'">'+
   (content.hasPhoto?'<meta property="og:image" content="'+
     safeShareHtml(u.origin+u.pathname+'/photo')+'">':'');
@@ -1010,6 +1032,8 @@ export default {
       if(m==='GET'&&/^\/__social\/shared\/[a-f0-9]{64}(?:\/(?:photo|photo-full|audio|video))?$/.test(p)&&
          (p.endsWith('/photo')||p.endsWith('/photo-full')||p.endsWith('/audio')||
           p.endsWith('/video')||(request.headers.get('accept')||'').includes('text/html')))
+        return publicWhatsAppMemory(request,env);
+      if(m==='GET'&&/^\/s\/[A-Za-z0-9_-]{43}(?:\/(?:photo|photo-full|audio|video))?$/.test(p))
         return publicWhatsAppMemory(request,env);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       // The original decade shortcut linked to ?decade=N, but the existing

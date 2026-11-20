@@ -245,7 +245,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  if(!media.length&&!String(share.storyText||'').trim())throw Error('EMPTY_GUEST_SHARE');
  const date=String(share.eventDate||'');
  const exact=/^\d{4}-\d{2}-\d{2}$/.test(date),year=/^\d{4}$/.test(date);
- const row={id,source:'pwa-local',title:share.title==='Herinnering'?'':String(share.title||''),
+ const row={id,source:'pwa-local',title:String(share.title||''),
   text:String(share.storyText||''),date:exact?date:year?date+'-01-01':new Date().toISOString().slice(0,10),
   datePrecision:exact?'exact':year?'year':'unknown',time:'12:00:00',
   narrationCues:[],narrationDurationMs:0,

@@ -1286,11 +1286,29 @@ try{
    throw error;
  }
 
+ // The preceding grant-revoke uses the same modal async busy state.
+ // Do not click another control before the original menu has finished its
+ // repaint: such clicks may be discarded without any HTTP request.
+ await page.waitForFunction(()=>{
+   const menu=document.getElementById('talera-more-menu');
+   const action=menu?.querySelector('[data-revoke]');
+   return !!menu&&!menu.hidden&&!!action&&!action.disabled&&
+     !menu.querySelector('[data-revoke-grant]');
+ },null,{timeout:10000});
  const menuLinkStatus=await page.locator('#talera-more-menu').innerText();
  assert.ok(menuLinkStatus.includes('synthetic ACCOUNT ISOLATION 1'),
    'Original menu must resolve real link to LOCAL story title, not a remote copy');
- // Click the APPROVED original revoke control, never a replacement UI.
+ // The actual existing menu button MUST send its owner-authenticated
+ // revoke mutation; a stale list response never counts as success.
+ const ownerRevoke=page.waitForResponse(response=>{
+   const pathname=new URL(response.url()).pathname;
+   return /^\/api\/shares\/[a-f0-9]{64}(?:\/revoke)?$/.test(pathname)&&
+     ['POST','DELETE'].includes(response.request().method());
+ },{timeout:10000});
  await revoke.click();
+ const actualRevoke=await ownerRevoke;
+ assert.equal(actualRevoke.status(),200,
+   'Original menu must submit an authenticated owner revoke');
  // Safari/service-worker requests can finish out of order. Require
  // THREE successive authenticated owner responses confirming the same
  // revoke, rather than accepting one transient UI/list result.

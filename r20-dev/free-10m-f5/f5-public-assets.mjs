@@ -1700,10 +1700,10 @@ async function taleraFreeOriginalSharePhoto(memory){
    const photoConsentSafe="if(!title||(!storyText&&!item?._zeroItems?.some(x=>x.kind==='photo')))throw Error(";
    assert.equal(shipped.split(photoConsent).length,2,'WHATSAPP_PHOTO_CONSENT_SOURCE_DRIFT');
    shipped=shipped.replace(photoConsent,photoConsentSafe);
-   // A real memory never needs a title: keep the user's original unchanged
-   // and use the neutral name that the existing dialog already displays.
+   // The owner's title is optional. Never invent "Herinnering" when
+   // the saved memory has no title: retain the exact empty original field.
    const titleBefore="const title=String(item?.title||item?.story||item?.name||'').trim();";
-   const titleAfter="const title=String(item?.title||item?.story||item?.name||'').trim()||'Herinnering';";
+   const titleAfter=titleBefore;
    assert.equal(shipped.split(titleBefore).length,2,'WHATSAPP_OPTIONAL_TITLE_DRIFT');
    shipped=shipped.replace(titleBefore,titleAfter);
    // Empty records remain blocked; text OR existing locally recorded photo,

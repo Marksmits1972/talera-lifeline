@@ -1619,8 +1619,10 @@ try{
        'Invitation card must have one short, nonrepeated prompt');
      assert.ok(!html.includes('Iemand deelt deze herinnering persoonlijk met je.'),
        'Old duplicated WhatsApp card explanation must be removed');
-     assert.ok(html.includes('header{background:#17344a;color:#fff'),
-       'The actual recipient view uses TALERA navy, never WhatsApp green');
+     assert.ok(html.includes('class="stage"')&&
+       html.includes('background:linear-gradient(145deg,#244764,#071b30)')&&
+       html.includes('color:#17344a'),
+       'Guest presents the real memory in TALERA navy, never WhatsApp green');
      assert.ok(!issued.link.includes('/__social/shared/'),
        'Only the friendly compact address belongs in the visible invitation');
 

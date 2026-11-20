@@ -163,7 +163,7 @@ if(videoLayer){
  $('closeGuestVideo').addEventListener('click',()=>{video.pause();videoLayer.hidden=true;popupCheck()});
 }
 async function api(path,method='GET',data){
- const opts={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json'}};
+ const opts={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json','x-talera-guest-id':guestId}};
  if(data){opts.headers['content-type']='application/json';opts.body=JSON.stringify(data)}
  const res=await fetch(base+'/'+path,opts);
  const result=await res.json().catch(()=>({}));

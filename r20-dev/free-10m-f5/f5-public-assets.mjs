@@ -692,6 +692,21 @@ function shapeOwnStoryTopics(html){
 // TALERA Free /tell: approved spacing and visual hierarchy ONLY.
 // Keep the original tag editor instance and every existing click/save handler;
 // move its existing DOM node below the already-present native photo tiles.
+// Reuse the original fixed WhatsApp sheet; only make its EXISTING
+// scrollable body accept native iPhone touch panning. No share API,
+ // account, media or invitation changes.
+function enableOriginalWhatsAppTouchScroll(html){
+ const css='<style id="talera-free-whatsapp-native-touch-only">'+
+  '#talera-clean-overlay > :first-child{'+
+   'overflow-y:auto!important;'+
+   '-webkit-overflow-scrolling:touch!important;'+
+   'touch-action:pan-y!important;'+
+   'overscroll-behavior-y:contain!important;'+
+  '}'+
+  '</style>';
+ assert.equal(html.split('</head>').length,2,'PRESENT_SHARE_STYLE_INJECTION_SOURCE_DRIFT');
+ return html.replace('</head>',css+'</head>');
+}
 function polishTellEditorLayout(html){
  const start=html.indexOf('function setupV20Tags(g,details){');
  const end=html.indexOf('}function setupV10(',start);
@@ -1411,6 +1426,7 @@ for(const [route,filename] of Object.entries(routes)){
  // Guest and authenticated /tell are TWO variants of the SAME original editor.
  // Apply the SAME layout styling to both; leave account/library gates untouched.
  if(route==='/tell')guest=removeLegacyTellSampleImporter(polishTellEditorLayout(guest));
+ if(route==='/present')guest=enableOriginalWhatsAppTouchScroll(guest);
  guest=closeAnonymousPersonalLibrary(guest);
  guest=stripBundledExamplePhotoLinks(guest);
  if(route==='/mijn-leven'){
@@ -1453,6 +1469,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
  if(route==='/mijn-leven')html=installOwnerRequestedClearAllStories(html);
  if(route==='/tell')html=removeLegacyTellSampleImporter(polishTellEditorLayout(shapeOwnStoryTopics(html)));
+ if(route==='/present')html=enableOriginalWhatsAppTouchScroll(html);
  html=stripBundledExamplePhotoLinks(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
@@ -1524,23 +1541,6 @@ async function getPublic(name){
 }
 for(const name of paths){
  const first=await getPublic(name),second=await getPublic(name);
- // Diagnostic only: inspect the already-approved, cookie-free original
- // share UI's route/scroll contract. No personal data or API calls.
- if((name==='/__clean/share-controller.mjs'||name==='/__clean/ui-integration.mjs'||name==='/__clean/social-controller.mjs')&&first.status===200){
-  const lines=first.body.split('\n');
-  const needles=/WhatsApp|Uitnodiging|uitnodiging|memory-link|\/api\/|consent|toestemming|overflow|share-sheet|share-modal|Niet gevonden|voorbereiden|preview|verzenden|Verzenden|createInvite|publish\(|prepare\(|shareUrl|endpoint/ig;
-  const hits=[];
-  for(let i=0;i<lines.length;i++){
-   if(needles.test(lines[i])){
-    needles.lastIndex=0;
-    hits.push({line:i+1,text:lines.slice(Math.max(0,i-2),Math.min(lines.length,i+4)).join('\n').slice(0,1100)});
-   }
-   needles.lastIndex=0;
-  }
-  console.log('TALERA_F5_ORIGINAL_SHARE_PUBLIC_SOURCE_DIAG',JSON.stringify({
-   source:name,bytes:first.body.length,hits:hits.slice(0,95)
-  }));
- }
  // Optional older public scripts are not needed until a real page references them.
  if(first.status===404&&second.status===404)continue;
  assert.equal(first.status,200,'F5 public script must exist: '+name);

@@ -1612,6 +1612,35 @@ try{
        prefix:received.status()!==200?(await received.text()).slice(0,400):'expected HTML'}));
      assert.equal(received.status(),200,
        'Receiver must see the actual consented photo/text, not JSON or 404');
+     // Compare the exact existing authenticated presentation geometry with
+     // this single-memory guest route; source of truth is the SAME PWA Worker.
+     const visualMetrics=async(page,selectors)=>page.evaluate(map=>{
+      const measure=selector=>{
+       const el=document.querySelector(selector);
+       if(!el)return {exists:false};
+       const c=getComputedStyle(el),b=el.getBoundingClientRect();
+       return {exists:true,visible:c.display!=='none'&&c.visibility!=='hidden',
+        tag:el.tagName,
+        rect:{top:Math.round(b.top),left:Math.round(b.left),
+         width:Math.round(b.width),height:Math.round(b.height)},
+        position:c.position,objectFit:c.objectFit,
+        backgroundColor:c.backgroundColor,borderRadius:c.borderRadius,
+        fontSize:c.fontSize,zIndex:c.zIndex};
+      };
+      return Object.fromEntries(Object.entries(map).map(([key,selector])=>[key,measure(selector)]));
+     },selectors);
+     const originalGeometry=await visualMetrics(sharePage,{
+      photoStage:'#photoStage',photo:'#memoryPhotoA',
+      social:'#talera-clean-social',caption:'#memoryCaption',
+      home:'#talera-flow-home',editor:'#talera-v5-editor-pencil'
+     });
+     const guestGeometry=await visualMetrics(guest,{
+      photoStage:'.stage',photo:'.cover',social:'.bottom',
+      caption:'.hero',logo:'.brand',entry:'.top'
+     });
+     console.log('TALERA_GUEST_VS_APPROVED_PRESENTATION_VISUAL_METRICS',
+      JSON.stringify({originalGeometry,guestGeometry,
+       realIphoneAccepted:false,protection:'no UI or account changes'}));
      const html=await received.text();
      assert.match(html,/synthetic ACCOUNT ISOLATION 1/);
      assert.match(html,/<meta property="og:title" content="Een persoonlijke herinnering via TALERA">/);

@@ -1922,6 +1922,16 @@ function taleraUploadMediaProgress(path,blob,label){
     shipped=shipped.slice(0,from)+after+shipped.slice(end+2);
    }
 
+   // Legacy standalone audio/video previews are optional. The new immutable
+   // original-memory manifest below transfers ALL source bytes in safe chunks.
+   // Never let a >1.8MB old preview endpoint reject an otherwise complete share.
+   for(const [variable,kind] of [['sound','audio'],['movie','video']]){
+    const before="if("+variable+")await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(d.id)+'/"+kind+"'";
+    const after="if("+variable+"&&"+variable+".size<=1800000)await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(d.id)+'/"+kind+"'";
+    assert.equal(shipped.split(before).length,2,'WHATSAPP_LEGACY_LARGE_'+kind+'_GUARD_DRIFT');
+    shipped=shipped.replace(before,after);
+   }
+
    const oldCompleteReturn="  return {url:d.link,shareId:d.id,durationHours,expiresAt:d.expiresAt,photo:!!preview,audio:!!sound,video:!!movie};";
    assert.equal(shipped.split(oldCompleteReturn).length,2,'WHATSAPP_ORIGINAL_COMPLETE_RETURN_SOURCE_DRIFT');
    const newCompleteReturn="  try{await taleraCompleteOriginalMemoryCopy(current,d.id)}catch(error){"+

@@ -2330,7 +2330,7 @@ try{
        v.setUint16(22,1,true);v.setUint32(24,8000,true);
        v.setUint32(28,16000,true);v.setUint16(32,2,true);
        v.setUint16(34,16,true);word(36,'data');v.setUint32(40,800,true);
-       const video=new Uint8Array(64);
+       const video=new Uint8Array(2*1048576+37);
        video.set(new TextEncoder().encode('ftyp'),4);
        const files=[await photo('#bd2d57','first.png'),
          await photo('#168e8b','second.png'),
@@ -2414,6 +2414,10 @@ try{
          {t:5100,index:2,mediaIndex:3,videoAtMs:300}
        ],'Exact narration timing and referenced frame IDs must survive sharing');
        assert.equal(copy.localOnly,true);
+       // The original source video is larger than the old 1.8MB limit;
+       // three SHA-256-verified chunks must remain accessible only via the
+       // ONE finished guest capability, without an alternate media Worker.
+       assert.equal((await guest.request.get(invitation.link+'/media/3/2')).status(),200);
        assert.equal(copy.presentation,true);
        assert.equal(copy.storyLift,true);
        const revoked=await sharePage.evaluate(async token=>

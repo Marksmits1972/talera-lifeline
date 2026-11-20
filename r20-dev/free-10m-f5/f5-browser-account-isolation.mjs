@@ -1642,6 +1642,21 @@ try{
      'iOS text with the URL must be one share body, not a second URL item');
    assert.equal(new URL(sharePage.url()).pathname,'/present',
      'Simulated native photo share must not navigate away from the same app');
+   await sharePage.waitForFunction(()=>!!document.getElementById('talera-wa-handoff-status'),
+     null,{timeout:10000});
+   const handoff=await sharePage.evaluate(()=>({
+     message:document.getElementById('talera-wa-handoff-status')?.textContent||'',
+     originalPresenter:!!document.getElementById('photoStage'),
+     originalStory:!!document.getElementById('memoryStoryScroll'),
+     shareOverlayClosed:document.getElementById('talera-clean-overlay')?.hidden,
+     noUnconfirmedSuccess:!(/succesvol verzonden|bericht is verzonden/i.test(
+       document.getElementById('talera-wa-handoff-status')?.textContent||''))
+   }));
+   assert.ok(handoff.message.includes('Controleer in WhatsApp')&&
+     handoff.originalPresenter&&handoff.originalStory&&
+     handoff.shareOverlayClosed&&handoff.noUnconfirmedSuccess,
+     'WhatsApp handoff must truthfully return to original TALERA presenter');
+   console.log('TALERA_FREE_WHATSAPP_TRUTHFUL_RETURN_TO_ORIGINAL_MEMORY_PASS');
    console.log('TALERA_FREE_NATIVE_IOS_PHOTO_CAPTION_AND_LINK_SHARE_PAYLOAD_PASS',
      JSON.stringify({picture:true,caption:true,sameSecureLink:true,realIphoneAccepted:false}));
 

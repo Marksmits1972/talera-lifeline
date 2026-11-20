@@ -767,7 +767,9 @@ async function publicWhatsAppMemory(request,env){
    if(match&&(startRaw||endRaw)){
     if(startRaw){
      first=Number(startRaw);
-     last=endRaw?Number(endRaw):length-1;
+     // RFC 9110: a requested final byte beyond EOF is clipped, not 416.
+     const wantedEnd=endRaw?Number(endRaw):length-1;
+     last=Number.isSafeInteger(wantedEnd)?Math.min(wantedEnd,length-1):NaN;
     }else{
      const suffix=Number(endRaw);
      if(Number.isSafeInteger(suffix)&&suffix>0){

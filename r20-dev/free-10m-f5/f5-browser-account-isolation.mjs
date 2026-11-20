@@ -1737,6 +1737,49 @@ try{
        k=>k.startsWith('talera-promo-seen-v1-')&&localStorage.getItem(k)==='1'));
      assert.equal(guestSeen,true,'Do not repeat the same optional TALERA invitation');
      console.log('TALERA_GUEST_ORIGINAL_PRESENTATION_UNINTERRUPTED_TEN_SECOND_INTRO_PASS');
+     // User acceptance requirement: the actual original caption panel MUST
+     // rise on a phone touch-drag, not merely exist as hidden HTML.
+     const guestReaderBefore=await guest.evaluate(()=>{
+       const sheet=document.querySelector('.memory-space');
+       const caption=document.getElementById('memoryCaption');
+       const story=document.getElementById('memoryStory');
+       const rect=sheet?.getBoundingClientRect();
+       return {top:rect?.top,height:rect?.height,
+         reading:sheet?.classList.contains('talera-v26-reading'),
+         body:document.body.classList.contains('talera-v18-reading'),
+         text:story?.textContent?.trim(),captionTop:caption?.getBoundingClientRect()?.top};
+     });
+     assert.equal(guestReaderBefore.text,'Local-only imaginary image',
+       'The real original written story must appear in original TALERA caption');
+     const nativeTouch=await guest.context().newCDPSession(guest);
+     const phoneX=195,top=guestReaderBefore.top||520,phoneY=Math.min(guest.viewportSize().height-45,top+68);
+     await nativeTouch.send('Input.dispatchTouchEvent',{
+       type:'touchStart',touchPoints:[{x:phoneX,y:phoneY}]});
+     for(let i=1;i<=7;i++){
+       await nativeTouch.send('Input.dispatchTouchEvent',{
+         type:'touchMove',touchPoints:[{x:phoneX,y:phoneY-i*55}]});
+       await guest.waitForTimeout(30);
+     }
+     await nativeTouch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+     await guest.waitForTimeout(450);
+     const guestReaderAfter=await guest.evaluate(()=>{
+       const sheet=document.querySelector('.memory-space');
+       const caption=document.getElementById('memoryCaption');
+       return {top:sheet?.getBoundingClientRect()?.top,
+         reading:sheet?.classList.contains('talera-v26-reading'),
+         body:document.body.classList.contains('talera-v18-reading'),
+         captionTop:caption?.getBoundingClientRect()?.top,
+         text:document.getElementById('memoryStory')?.textContent?.trim()};
+     });
+     console.log('TALERA_GUEST_REAL_ORIGINAL_UPWARD_STORY_GESTURE_DIAGNOSTIC',
+       JSON.stringify({before:guestReaderBefore,after:guestReaderAfter,
+         originalPresenter:true,realIphoneAccepted:false}));
+     assert.ok(guestReaderAfter.reading||guestReaderAfter.body||
+       guestReaderAfter.top<guestReaderBefore.top-55||
+       guestReaderAfter.captionTop<guestReaderBefore.captionTop-55,
+       'Original TALERA guest story must be raised by real mobile touch gesture');
+     console.log('TALERA_GUEST_ORIGINAL_UPWARD_STORY_READER_PASS');
+
 
      const intro=guest.locator('#talera-flow-home');
      assert.ok((await intro.getAttribute('href')).startsWith('/ontdek-talera#s/'));

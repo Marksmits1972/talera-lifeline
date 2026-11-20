@@ -901,7 +901,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: aa46beb9-89b9-47a2-a123-3a0afca4a315
+      F5_EXPECTED_LIVE_VERSION: af7e7c95-9b0d-4fa4-87ec-c9a35f9faff6
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -927,12 +927,12 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = a386507031fb6f5d946ec50fee9c12ffe5b1a745
+          test "$(git rev-parse HEAD^)" = 99a39b067604b5b8e80835f0896f38c3ff28e882
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=44695120964,expected='a386507031fb6f5d946ec50fee9c12ffe5b1a745';
+          const id=44701279513,expected='99a39b067604b5b8e80835f0896f38c3ff28e882';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,

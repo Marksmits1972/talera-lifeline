@@ -1808,6 +1808,20 @@ try{
        'The real TALERA photo stage must fill the phone width');
      assert.equal(nativePhoto.height,nativePhoto.viewportH,
        'The real TALERA photo stage must fill the available phone viewport');
+     // No invented VIDEO/white frame in the guest path, and the first
+     // original photo must be revealed only once its native pixels load.
+     await guest.waitForFunction(()=>!document.getElementById('taleraGuestEntryCover'),
+       null,{timeout:8000});
+     const firstFrame=await guest.evaluate(()=>({
+       originalPhoto:document.getElementById('memoryPhotoA')?.naturalWidth>0,
+       noWhiteInterstitial:document.documentElement.style.backgroundColor!=='white',
+       noVideoFallback:!document.documentElement.classList.contains('talera-guest-video-fallback'),
+       guestOnly:document.body.dataset.taleraGuest==='one-memory'
+     }));
+     assert.ok(firstFrame.originalPhoto&&firstFrame.noVideoFallback&&firstFrame.guestOnly,
+       'Guest first-frame hold must yield to a decoded ORIGINAL photo');
+     console.log('TALERA_GUEST_FIRST_REAL_FRAME_NO_INTERSTITIAL_PASS',
+       JSON.stringify({noPlaceholderOverlay:true,originalPresenter:true}));
      console.log('TALERA_GUEST_TRUE_ORIGINAL_PHOTO_FULL_AVAILABLE_VIEWPORT_PASS',
        JSON.stringify({...nativePhoto,iphoneAccepted:false}));
 

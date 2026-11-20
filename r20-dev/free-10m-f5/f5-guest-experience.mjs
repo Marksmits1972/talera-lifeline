@@ -430,9 +430,9 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "const refreshVideoFallback=()=>{",
   " const memory=window.__taleraTimelineRuntime?.currentMemory?.();",
   " const index=memory?._photoIndex||0,frame=memory?._zeroFrames?.[index];",
-  " const still=memory?.photos?.[index];",
-  " const missing=frame?.kind==='video'&&",
-  "   !(typeof still==='string'&&still.startsWith('blob:'));",
+  " const native=[...document.querySelectorAll('video.talera-v61-inline-video')].find(v=>",
+  "  v.isConnected&&v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2);",
+  " const missing=frame?.kind==='video'&&!native;",
   " document.documentElement.classList.toggle('talera-guest-video-fallback',!!missing);",
   "};",
   "refreshVideoFallback();",
@@ -446,9 +446,8 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   " if(!m||m._photoLoading||!Array.isArray(m._zeroFrames))return;",
   " const i=m._photoIndex||0,kind=m._zeroFrames[i]?.kind;",
   " if(kind==='video'){",
-  "  const native=[...document.querySelectorAll('video')].find(v=>v.isConnected&&",
-  "   v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2&&",
-  "   (v.currentTime>0.02||v.ended));",
+  "  const native=[...document.querySelectorAll('video.talera-v61-inline-video')].find(v=>v.isConnected&&",
+  "   v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2);",
   "  if(native)revealOriginal();",
   " }else if(kind==='photo'){",
   "  const selected=m.photos?.[i];",
@@ -537,9 +536,10 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  // Only the selected guest capability receives a first-frame visual handoff.
  // The approved TALERA video and narration motors are untouched.
  const firstFrameImage=share.hasPhoto?escapeHtml(pagePath)+'/photo':null;
+ const hasVisual=!!(share.hasPhoto||share.hasVideo);
  const bootstrap='<style id="talera-guest-first-frame-bootstrap">'+
   'html,body{background:#17344a}'+
-  '#taleraGuestEntryCover{position:fixed;inset:0;z-index:18;pointer-events:none;overflow:hidden;background:#17344a}'+
+  '#taleraGuestEntryCover{position:fixed;inset:0;z-index:24;pointer-events:none;overflow:hidden;background:#17344a}'+
   '#taleraGuestEntryCover img{display:block;width:100%;height:100%;object-fit:cover}'+
   '</style>'+
   (firstFrameImage?'<link rel="preload" as="image" href="'+firstFrameImage+'">':'');
@@ -548,8 +548,9 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  html=html.replace('</head>',bootstrap+'</head>');
  html=html.replace(/<body\b[^>]*>/i,tag=>tag.slice(0,-1)+
   ' data-talera-guest="one-memory">'+
-  (firstFrameImage?'<div id="taleraGuestEntryCover" aria-hidden="true"><img src="'+
-    firstFrameImage+'" alt=""></div>':''));
+  (hasVisual?'<div id="taleraGuestEntryCover" aria-hidden="true">'+
+    (firstFrameImage?'<img src="'+firstFrameImage+'" alt="">':'')+
+    '</div>':''));
 
  html=html.replace('</head>','<meta name="robots" content="noindex,nofollow,noarchive">'+
   '<meta name="referrer" content="no-referrer">'+openGraph+'</head>');

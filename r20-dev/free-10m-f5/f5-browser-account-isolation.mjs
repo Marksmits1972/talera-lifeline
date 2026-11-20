@@ -1531,8 +1531,10 @@ try{
      const html=await received.text();
      assert.match(html,/synthetic ACCOUNT ISOLATION 1/);
      assert.match(html,/Local-only imaginary image/);
-     assert.ok(html.includes('<img ')&&html.includes('/photo'),
-       'The recipient must see the actual uploaded image in the shared memory');
+     assert.ok(html.includes('<img ')&&html.includes('/photo')&&
+       html.includes('property="og:image"')&&
+       html.includes(issued.link+'/photo'),
+       'The original WhatsApp link must expose the consented shared image as preview');
      const imageResponse=await guest.request.get(issued.link+'/photo');
      assert.equal(imageResponse.status(),200,'Temporary shared photo must load');
      assert.match(imageResponse.headers()['content-type']||'',/image\/jpeg/i);

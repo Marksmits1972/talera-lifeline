@@ -1744,30 +1744,6 @@ async function taleraFreeOriginalSharePhoto(memory){
    const addedVars=String.raw`
 const taleraStandardText='Hoi! Ik deel graag een persoonlijke herinnering met je via TALERA.';
 let messageChoice='standard',personalMessage='',uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
-
-let taleraWhatsAppHandoffPending=false;
-// The iOS share API only hands off to another app. It does NOT confirm
-// delivery. Therefore never claim "successfully sent" without proof.
-function taleraWhatsAppHandoffNotice(){
- if(!taleraWhatsAppHandoffPending||document.hidden)return;
- taleraWhatsAppHandoffPending=false;
- try{close()}catch{}
- let note=document.getElementById('talera-wa-handoff-note');
- if(note)note.remove();
- note=document.createElement('div');
- note.id='talera-wa-handoff-note';
- note.setAttribute('role','status');
- note.setAttribute('aria-live','polite');
- note.style.cssText='position:fixed;left:16px;right:16px;bottom:calc(85px + env(safe-area-inset-bottom,0px));padding:14px 18px;background:#17344a;color:white;font:600 15px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;border-radius:15px;z-index:2147480222;box-shadow:0 7px 25px #06192f44;text-align:center;pointer-events:none';
- note.textContent='WhatsApp is geopend. Controleer daar of je uitnodiging is verzonden.';
- document.body.append(note);
- setTimeout(()=>note.remove(),8500);
-}
-window.addEventListener('pageshow',taleraWhatsAppHandoffNotice);
-document.addEventListener('visibilitychange',()=>{
- if(!document.hidden)taleraWhatsAppHandoffNotice();
-});
-
 function taleraChoiceHtml(){
  const choice=(name,label)=>'<button type="button" class="talera-share-choice" data-action="message-'+name+'" aria-pressed="'+(messageChoice===name)+'">'+label+'</button>';
  return '<div class="talera-share-choices" role="group" aria-label="Bericht bij de uitnodiging">'+
@@ -1830,7 +1806,7 @@ window.__taleraShareProgress=taleraShareProgress;
    if(!message)throw Error('Schrijf eerst je persoonlijke bericht.');
    const url=target.href;
    const caption=message+'\n'+url;
-   const fallback=()=>{taleraWhatsAppHandoffPending=true;location.assign('https://wa.me/?text='+encodeURIComponent(caption))};
+   const fallback=()=>location.assign('https://wa.me/?text='+encodeURIComponent(caption));
    const photo=taleraNativeSharePhoto;
    // A native JPEG photo + caption needs the iOS OS share sheet. No file
    // upload or image conversion here: share() MUST start in this tap.
@@ -1843,9 +1819,9 @@ window.__taleraShareProgress=taleraShareProgress;
    if(status)status.textContent='Kies WhatsApp. Controleer de foto, jouw tekst en de link voordat je verzendt.';
    try{
     const task=navigator.share({files:[photo],text:caption});
-    Promise.resolve(task).then(()=>{taleraWhatsAppHandoffPending=true;taleraWhatsAppHandoffNotice()}).catch(error=>{
+    Promise.resolve(task).catch(error=>{
       // Canceling the iOS share sheet must NEVER send anything by itself.
-      if(error?.name==='AbortError'){taleraWhatsAppHandoffPending=false;return;}
+      if(error?.name==='AbortError')return;
       if(status)status.textContent='Foto delen lukt hier niet. Je kunt de gewone WhatsApp-uitnodiging gebruiken.';
       fallback();
     });

@@ -1664,7 +1664,7 @@ try{
          !document.querySelector('#talera-clean-overlay [data-action=send]')?.disabled,
          null,{timeout:20000});
        const issuedUntitled=createdLinks.at(-1);
-       assert.equal(createdLinks.length,2,'Only two synthetic UI invitations should exist');
+       assert.equal(createdLinks.length,3,'Original, direct photo-only and untitled UI invitations are distinct');
        assert.equal(issuedUntitled.status,200);
        const photoOnlyView=await guest.goto(issuedUntitled.link,
          {waitUntil:'domcontentloaded'});

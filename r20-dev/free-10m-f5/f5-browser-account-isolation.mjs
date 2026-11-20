@@ -805,6 +805,7 @@ try{
            b=element.getBoundingClientRect();return {top:b.top,bottom:b.bottom,
              height:b.height,scrollHeight:element.scrollHeight,
              clientHeight:element.clientHeight,overflowY:cs.overflowY,
+             touchAction:cs.touchAction,webkitOverflowScrolling:cs.webkitOverflowScrolling,
              position:cs.position,maxHeight:cs.maxHeight};
          };
          return {overlay:z(el),panel:z(panel),status:panel?.querySelector('.status')?.textContent,
@@ -820,6 +821,24 @@ try{
        await follower.setViewportSize({width:390,height:610});
        await follower.waitForTimeout(140);
        const smallShareModal=await modalSnapshot();
+       const sheetScroll=await follower.evaluate(()=>{
+         const sheet=document.querySelector('#talera-clean-overlay')?.firstElementChild;
+         const before=sheet?.scrollTop||0;
+         if(sheet)sheet.scrollTop=120;
+         return {before,after:sheet?.scrollTop||0,
+           scrollable:!!sheet&&sheet.scrollHeight>sheet.clientHeight};
+       });
+       assert.ok(smallShareModal.panel?.touchAction==='pan-y'&&
+         smallShareModal.panel?.overflowY==='auto'&&
+         sheetScroll.scrollable&&sheetScroll.after>sheetScroll.before+25,
+         'Original WhatsApp sheet must support native iPhone touch scrolling: '+
+           JSON.stringify({smallShareModal,sheetScroll}));
+       console.log('TALERA_F5_WHATSAPP_NATIVE_SCROLL_PASS',JSON.stringify({
+         touchAction:smallShareModal.panel.touchAction,
+         overflowY:smallShareModal.panel.overflowY,
+         scrollTop:sheetScroll.after,onlyOriginalModal:true,
+         realIphoneAccepted:false
+       }));
        console.log('TALERA_F5_WHATSAPP_SHEET_AND_API_DIAG',JSON.stringify({
          initialShareModal,failedShareModal,smallShareModal,shareTraffic,
          syntheticOnly:true,realAccountNeverTouched:true

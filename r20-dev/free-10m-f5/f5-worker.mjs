@@ -605,7 +605,7 @@ async function revokeAccountGrant(request,env,storyId,recipientId){
 // EXISTING EU per-memory social DO, never another app or global story store.
 // The local Free library and original media never leave the device except
 // for a specific, consented, short-lived share snapshot.
-const FREE_SHARE_ID=/^[A-Za-z0-9_-]{8,80}$/;
+const FREE_SHARE_ID=/^[A-Za-z0-9_.:-]{8,160}$/;
 const FREE_SHARE_TOKEN=/^[a-f0-9]{64}$/;
 async function scopedShareId(accountId,localMemoryId){
  if(!FREE_SHARE_ID.test(localMemoryId||''))throw Error('INVALID_LOCAL_SHARE_ID');

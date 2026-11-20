@@ -327,6 +327,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  'body[data-talera-guest="one-memory"] #memoryCaption{z-index:81!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important}',
  'body[data-talera-guest="one-memory"] #memoryStoryScroll{z-index:80!important;pointer-events:auto!important}',
  'body[data-talera-guest="one-memory"] #talera-flow-home{z-index:95!important;pointer-events:auto!important}',
+ 'body[data-talera-guest="one-memory"] #photoStage img[src^="data:image/svg+xml"],body[data-talera-guest="one-memory"] #photoStage img[src^="data:image/svg%2Bxml"]{visibility:hidden!important}',
  'html.talera-guest-video-fallback #photoStage{background-image:url("'+(share.hasPhoto?escapeHtml(pagePath)+'/photo':'')+'");background-position:center;background-size:cover}',
  'html.talera-guest-video-fallback #photoStage img,html.talera-guest-video-fallback #memoryPhotoA,html.talera-guest-video-fallback #memoryPhotoB{visibility:hidden!important}',
  'html.talera-guest-video-fallback .talera-v61-first-frame-bridge{visibility:hidden!important}',
@@ -438,24 +439,52 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "};",
   "refreshVideoFallback();",
   "const coverWatch=setInterval(refreshVideoFallback,120);",
+  "// The native motor may replace the original image src before the next",
+  "// polling interval. Match the VIDEO fall-back in the same microtask.",
+  "const posterStage=$('photoStage');",
+  "const posterObserver=new MutationObserver(refreshVideoFallback);",
+  "if(posterStage)posterObserver.observe(posterStage,{subtree:true,childList:true,attributes:true,attributeFilter:['src']});",
+  "window.addEventListener('pagehide',()=>posterObserver.disconnect(),{once:true});",
   "const entryCover=$('taleraGuestEntryCover');",
-  "let coverReady=false;",
+  "let coverReady=false,queuedVideo=null,waitingForPhoto=false;",
   "const revealOriginal=()=>{if(coverReady)return;coverReady=true;",
   " entryCover?.remove();document.documentElement.classList.remove('talera-guest-first-frame-pending')};",
+  "const stillSelected=(kind,index)=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();",
+  " return !!(m&&!m._photoLoading&&m._zeroFrames?.[m._photoIndex||0]?.kind===kind&&",
+  "   (m._photoIndex||0)===index)};",
+  "const afterPaint=check=>requestAnimationFrame(()=>requestAnimationFrame(()=>{",
+  " if(!coverReady&&check())revealOriginal();",
+  "}));",
   "const refreshFirstFrame=()=>{if(coverReady||!entryCover)return;",
   " const m=window.__taleraTimelineRuntime?.currentMemory?.();",
   " if(!m||m._photoLoading||!Array.isArray(m._zeroFrames))return;",
   " const i=m._photoIndex||0,kind=m._zeroFrames[i]?.kind;",
   " if(kind==='video'){",
-  "  const native=[...document.querySelectorAll('video.talera-v61-inline-video')].find(v=>v.isConnected&&",
-  "   v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2);",
-  "  if(native)revealOriginal();",
+  "  const native=[...document.querySelectorAll('video.talera-v61-inline-video')].find(v=>",
+  "   v.isConnected&&v.videoWidth>0&&v.videoHeight>0&&v.readyState>=2&&",
+  "   getComputedStyle(v).display!=='none');",
+  "  if(!native)return;",
+  "  const same=()=>stillSelected('video',i)&&native.isConnected&&",
+  "   native.readyState>=2&&native.videoWidth>0&&getComputedStyle(native).display!=='none';",
+  "  // A decoded metadata frame is not always a COMPOSITED frame on iOS.",
+  "  // When available, wait for the original player's video-frame callback.",
+  "  if(typeof native.requestVideoFrameCallback==='function'&&queuedVideo!==native){",
+  "   queuedVideo=native;",
+  "   try{native.requestVideoFrameCallback(()=>afterPaint(same))}catch{}",
+  "  }",
+  "  // WebKit can omit the callback. A moving, decoded frame plus two actual",
+  "  // browser paints is a bounded fallback; never alter or seek the player.",
+  "  if(native.currentTime>0.12&&native.readyState>=3)afterPaint(same);",
   " }else if(kind==='photo'){",
   "  const selected=m.photos?.[i];",
   "  const image=[...document.querySelectorAll('#photoStage img')].find(img=>",
   "   img.currentSrc===selected&&img.complete&&img.naturalWidth>0);",
-  "  if(typeof selected==='string'&&selected.startsWith('blob:')&&image)revealOriginal();",
-  " }else if(!kind)revealOriginal();",
+  "  if(!waitingForPhoto&&typeof selected==='string'&&selected.startsWith('blob:')&&image){",
+  "   waitingForPhoto=true;",
+  "   afterPaint(()=>stillSelected('photo',i)&&image.isConnected&&",
+  "    image.complete&&image.naturalWidth>0&&image.currentSrc===selected);",
+  "  }",
+  " }else if(!kind)afterPaint(()=>!window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.length);",
   "};",
   "const frameWatch=setInterval(refreshFirstFrame,80);",
   "window.addEventListener('pagehide',()=>clearInterval(frameWatch),{once:true});",
@@ -543,14 +572,17 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  const firstFrameImage=share.hasPhoto?escapeHtml(pagePath)+'/photo':null;
  const hasVisual=!!(share.hasPhoto||share.hasVideo);
  const bootstrap='<style id="talera-guest-first-frame-bootstrap">'+
-  'html,body{background:#17344a}'+
-  '#taleraGuestEntryCover{position:fixed;inset:0;z-index:24;pointer-events:none;overflow:hidden;background:#17344a}'+
+  'html,html body{background:#17344a!important}'+
+  '#taleraGuestEntryCover{position:fixed;inset:0;z-index:2147480180;pointer-events:none;overflow:hidden;background:#17344a}'+
   '#taleraGuestEntryCover img{display:block;width:100%;height:100%;object-fit:cover}'+
   '</style>'+
   (firstFrameImage?'<link rel="preload" as="image" href="'+firstFrameImage+'">':'');
  if(!html.includes('</head>')||!/<body\b[^>]*>/i.test(html))
   throw Error('GUEST_NATIVE_DOCUMENT_FRAME_BOOTSTRAP_DRIFT');
- html=html.replace('</head>',bootstrap+'</head>');
+ // Bootstrap paint MUST be present at the start of <head>, before the first
+ // original style or script can make a white/default VIDEO frame visible.
+ if(html.split('<head>').length!==2)throw Error('GUEST_FIRST_FRAME_HEAD_DRIFT');
+ html=html.replace('<head>','<head>'+bootstrap);
  html=html.replace(/<body\b[^>]*>/i,tag=>tag.slice(0,-1)+
   ' data-talera-guest="one-memory">'+
   (hasVisual?'<div id="taleraGuestEntryCover" aria-hidden="true">'+

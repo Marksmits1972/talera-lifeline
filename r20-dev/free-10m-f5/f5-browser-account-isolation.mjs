@@ -1618,6 +1618,81 @@ try{
        JSON.stringify({originalWhatsAppUI:true,receiverHtml:200,photo:200,
          revoke:200,expiredLinkAfterRevoke:404,otherStoriesUntouched:true,
          noRealRecipients:true,oneExistingWorker:true,realIphoneAccepted:false}));
+     // Verify the actual original share sheet also accepts an UNTITLED,
+     // TEXTLESS memory which contains an existing account-private photo.
+     // This is a temporary synthetic browser record, removed afterwards.
+     const untitledId=await sharePage.evaluate(async png=>{
+       const blob=new File([Uint8Array.from(atob(png),c=>c.charCodeAt(0))],
+         'untitled-whatsapp-synthetic.png',{type:'image/png'});
+       const record=await window.TaleraMemories.save({
+         title:'temporary synthetic placeholder',
+         date:'2001-02-01',text:'temporary synthetic placeholder',
+         narrationCues:[]
+       },[blob]);
+       return record.id;
+     },onePixelPng);
+     try{
+       await sharePage.goto(origin+'/present?memory='+encodeURIComponent(untitledId),
+         {waitUntil:'domcontentloaded'});
+       await sharePage.waitForFunction(id=>
+         window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,
+         untitledId,{timeout:20000});
+       await sharePage.waitForFunction(()=>
+         !!document.querySelector('#talera-clean-social [data-action=share]'),
+         null,{timeout:15000});
+       await sharePage.waitForTimeout(1700);
+       const blank=await sharePage.evaluate(()=>{
+         const m=window.__taleraTimelineRuntime.currentMemory();
+         if(!m._taleraLocal||!m._zeroItems.some(x=>x.kind==='photo'))return false;
+         m.title='';m.story='';m.fullStory='';m.text='';m.description='';
+         return true;
+       });
+       assert.equal(blank,true,'Synthetic photo needs an original media reference');
+       await sharePage.locator('#talera-clean-social [data-action=share]').click();
+       await sharePage.waitForFunction(()=>
+         !!document.querySelector('#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
+         null,{timeout:12000});
+       const paused=await sharePage.evaluate(()=>({
+         requested:window.__taleraSharePauseActive===true,
+         media:[...document.querySelectorAll('audio,video')].every(m=>m.paused)
+       }));
+       assert.deepEqual(paused,{requested:true,media:true},
+         'Opening WhatsApp must pause picture and all audio/video');
+       await sharePage.locator('#talera-clean-consent').check();
+       await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
+       await sharePage.waitForFunction(()=>
+         !document.querySelector('#talera-clean-overlay [data-action=send]')?.disabled,
+         null,{timeout:20000});
+       const issuedUntitled=createdLinks.at(-1);
+       assert.equal(createdLinks.length,2,'Only two synthetic UI invitations should exist');
+       assert.equal(issuedUntitled.status,200);
+       const photoOnlyView=await guest.goto(issuedUntitled.link,
+         {waitUntil:'domcontentloaded'});
+       assert.equal(photoOnlyView.status(),200);
+       const untitledHtml=await photoOnlyView.text();
+       assert.match(untitledHtml,/Herinnering/);
+       assert.ok(untitledHtml.includes('<img ')&&untitledHtml.includes('/photo'),
+         'Untitled photo-only sharing must still include the original photo');
+       assert.equal((await guest.request.get(issuedUntitled.link+'/photo')).status(),200);
+       const stopped=await sharePage.evaluate(async token=>{
+         const response=await fetch('/api/shares/'+token+'/revoke',
+           {method:'POST',credentials:'same-origin'});
+         return response.status;
+       },issuedUntitled.id);
+       assert.equal(stopped,200);
+       await sharePage.locator('#talera-clean-overlay [data-action=close]').click();
+       assert.equal(await sharePage.evaluate(()=>
+         window.__taleraSharePauseActive),false,
+         'Closing the share sheet may release pause without autoplay');
+       console.log('TALERA_FREE_UNTITLED_PHOTO_WHATSAPP_AND_PLAYBACK_PAUSE_PASS',
+         JSON.stringify({realTitleRequired:false,realStoryTextRequired:false,
+           originalPhotoByMediaId:true,playbackPaused:true,
+           syntheticShareRevoked:true,realIphoneAccepted:false}));
+     }finally{
+       await sharePage.evaluate(async id=>{
+         await window.TaleraMemories?.remove?.(id);
+       },untitledId).catch(()=>{});
+     }
    }finally{await anonymous.close()}
  }finally{await sharePage.close()}
  // This complements the STATIC source-route inventory with REAL requests

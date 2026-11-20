@@ -1981,7 +1981,7 @@ try{
        headers:{origin:'https://attacker.invalid','content-type':'application/json'},
        data:{guestId:'00000000-0000-4000-8000-000000000000'}});
      assert.equal(alienReaction.status(),403);
-     await guest.locator('#taleraNativeCommentClose').click();
+     await guest.locator('#talera-clean-overlay [data-action=close]').click();
      console.log('TALERA_FREE_GUEST_NAMED_REACTION_AND_ORIGIN_PROTECTION_PASS',
        JSON.stringify({accountRequired:false,guestLike:true,
          guestFirstName:true,foreignOriginDenied:true,realIphoneAccepted:false}));

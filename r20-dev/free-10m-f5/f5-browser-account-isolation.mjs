@@ -1449,6 +1449,17 @@ try{
  // All data are unique, local synthetic test inputs in the SAME F5 code.
  const sharePage=await context.newPage();
  const createdLinks=[],shareNetwork=[];
+ sharePage.on('request',req=>{
+   if(new URL(req.url()).pathname==='/api/pwa/memory-link'&&req.method()==='POST'){
+     const payload=req.postDataJSON()||{};
+     shareNetwork.push({phase:'payload-structure',keys:Object.keys(payload),
+       localMemoryIdType:typeof payload.localMemoryId,
+       localMemoryIdLength:String(payload.localMemoryId||'').length,
+       localMemoryIdFits:/^[A-Za-z0-9_-]{8,80}$/.test(String(payload.localMemoryId||'')),
+       consent:payload.consent,titleLength:String(payload.title||'').length,
+       storyLength:String(payload.storyText||'').length});
+   }
+ });
  sharePage.on('response',async r=>{
    const p=new URL(r.url()).pathname;
    if(/^\/api\/(?:pwa\/memory-link|memories\/[^/]+\/shares|shares\/)/.test(p))

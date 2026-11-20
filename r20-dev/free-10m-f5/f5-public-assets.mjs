@@ -1800,7 +1800,7 @@ window.__taleraShareProgress=taleraShareProgress;
    assert.equal(shipped.split(clickSend).length,2,'WHATSAPP_PERSONAL_SEND_DRIFT');
    shipped=shipped.replace(clickSend,newClickSend);
    const changePoint="overlay.addEventListener('change',e=>{";
-   const onInput="overlay.addEventListener('input',e=>{if(e.target.id==='talera-clean-personal'){personalMessage=e.target.value;const can=!!personalMessage.trim(),v=share.current(),prep=panel.querySelector('[data-action=prepare]'),send=panel.querySelector('[data-action=send]');if(prep)prep.disabled=shareAuth!==true||v.state==='preparing'||!can;if(send)send.disabled=shareAuth!==true||v.state!=='ready'||!can}});\\n ";
+   const onInput="overlay.addEventListener('input',e=>{if(e.target.id==='talera-clean-personal'){personalMessage=e.target.value;const can=!!personalMessage.trim(),v=share.current(),prep=panel.querySelector('[data-action=prepare]'),send=panel.querySelector('[data-action=send]');if(prep)prep.disabled=shareAuth!==true||v.state==='preparing'||!can;if(send)send.disabled=shareAuth!==true||v.state!=='ready'||!can}});\n ";
    assert.equal(shipped.split(changePoint).length,2,'WHATSAPP_PERSONAL_INPUT_LOCATION_DRIFT');
    shipped=shipped.replace(changePoint,onInput+changePoint);
    // Don't upload twice from rapid tapping. User changes of duration/draft

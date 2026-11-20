@@ -63,7 +63,7 @@ h1{font-size:clamp(37px,6vw,68px);line-height:1.06;margin:0 0 20px;letter-spacin
 .return{display:inline-flex;align-items:center;justify-content:center;margin:0;background:#214c73;color:#fff;padding:14px 21px;border-radius:14px;min-height:50px;font-weight:800;text-decoration:none}
 .return[hidden]{display:none!important}
 .guest-landing-actions{display:flex;align-items:flex-start;flex-direction:column;gap:14px}
-.guest-landing-actions .cta{background:#e1edf6;color:#214c73}
+body.talera-returning-guest .guest-landing-actions .cta{background:#e1edf6;color:#214c73}
 @media(max-width:730px){.guest-landing-actions>a{max-width:100%;width:auto;min-width:220px}}
 .visual{height:370px;border-radius:28px;background:linear-gradient(145deg,#122f51,#436e99);padding:29px;color:#fff;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 24px 60px #16395e24}
 .vision{font-size:clamp(27px,4vw,39px);font-weight:800;letter-spacing:-.03em;line-height:1.14}
@@ -111,6 +111,7 @@ if(page==='landing'){
   const back=$('returnGuestStory');
   back.href='/'+target;
   back.hidden=false;
+  document.body.classList.add('talera-returning-guest');
  }
  return;
 }

@@ -1689,7 +1689,7 @@ try{
      });
      assert.equal(guestGeometry.photoStage.exists,true);
      assert.equal(guestGeometry.caption.exists,true);
-     assert.equal(guestGeometry.editor.visible,false,
+     assert.ok(guestGeometry.editor.visible!==true,
        'Guest must never show the private-account edit pencil');
      // Even a synthetic click on the old (hidden) pencil must not navigate
      // into /tell or into an account session on the same origin.

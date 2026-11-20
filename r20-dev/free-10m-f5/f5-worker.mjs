@@ -600,6 +600,161 @@ async function revokeAccountGrant(request,env,storyId,recipientId){
   const result=await socialMemoryHome(env,storyId).revokeGrant(actor.id,recipientId);
   return json(result,result.ok?200:409);
 }
+// The original, iPhone-approved WhatsApp sheet already calls these exact
+// routes. Implement them within the SAME authenticated F5 Worker using the
+// EXISTING EU per-memory social DO, never another app or global story store.
+// The local Free library and original media never leave the device except
+// for a specific, consented, short-lived share snapshot.
+const FREE_SHARE_ID=/^[A-Za-z0-9_-]{8,80}$/;
+const FREE_SHARE_TOKEN=/^[a-f0-9]{64}$/;
+async function scopedShareId(accountId,localMemoryId){
+ if(!FREE_SHARE_ID.test(localMemoryId||''))throw Error('INVALID_LOCAL_SHARE_ID');
+ return shaHex('talera-free-whatsapp-v1:'+accountId+':'+localMemoryId);
+}
+async function legacyShareApi(request,env){
+ const u=new URL(request.url),p=u.pathname,m=request.method;
+ const actor=await sessionAccount(request,env);
+ if(!actor)return deny(401,'Aanmelden vereist');
+ if(m!=='GET'&&!sameOrigin(request))return deny(403,'Ongeldige herkomst');
+ const link=/^\/api\/pwa\/memory-link$/.test(p);
+ if(link){
+  let local;
+  if(m==='GET'){
+   if(u.searchParams.size!==1)return deny(400,'Ongeldige zoekopdracht');
+   local=u.searchParams.get('localMemoryId');
+   if(!FREE_SHARE_ID.test(local||''))return deny(400,'Ongeldige herinnering');
+   const id=await scopedShareId(actor.id,local);
+   try{
+    const state=await socialMemoryHome(env,id).readyShare(actor.id);
+    return state.ready?json({memoryId:id}):deny(404,'Niet gevonden');
+   }catch{return deny(404,'Niet gevonden')}
+  }
+  if(m!=='POST')return deny(405,'Methode niet toegestaan');
+  if(Number(request.headers.get('content-length')||0)>16500)
+   return deny(413,'Herinnering te groot om te delen');
+  const raw=await request.text();
+  if(raw.length>16500)return deny(413,'Herinnering te groot om te delen');
+  let info;
+  try{info=JSON.parse(raw)}catch{return deny(400,'Ongeldige aanvraag')}
+  if(!info||info.consent!==true||!FREE_SHARE_ID.test(info.localMemoryId||''))
+   return deny(400,'Toestemming of herinnering ontbreekt');
+  local=info.localMemoryId;
+  const id=await scopedShareId(actor.id,local);
+  const home=socialMemoryHome(env,id);
+  const initial=await home.initialize(id,actor.id);
+  if(!initial.ok)return deny(409,'Herinnering is niet van dit account');
+  try{
+   await home.stageShare(actor.id,{title:info.title,storyText:info.storyText,
+     eventDate:info.eventDate||''});
+  }catch{return deny(400,'Deeltekst of datum is niet geldig')}
+  await accountHome(env,actor.id).rememberSocialStory(id);
+  return json({memoryId:id});
+ }
+ const create=/^\/api\/memories\/([a-f0-9]{64})\/shares$/.exec(p);
+ if(create){
+  if(m!=='POST')return deny(405,'Methode niet toegestaan');
+  if(Number(request.headers.get('content-length')||0)>1000)
+   return deny(413,'Aanvraag te groot');
+  let payload;
+  try{const raw=await request.text();if(raw.length>1000)throw Error();
+    payload=JSON.parse(raw)}catch{return deny(400,'Ongeldige aanvraag')}
+  if(!payload||payload.consent!==true||![1,24,168,720].includes(Number(payload.hours)))
+   return deny(400,'Toestemming of geldigheidsduur ontbreekt');
+  const home=socialMemoryHome(env,create[1]);
+  let ready;
+  try{ready=await home.readyShare(actor.id)}catch{return deny(403,'Geen eigendom van herinnering')}
+  if(!ready.ready)return deny(409,'Deelvoorbereiding verlopen; probeer opnieuw');
+  const forward=new URL('/__social/memory/'+create[1]+'/share',u);
+  const headers=new Headers(request.headers);
+  headers.set('content-type','application/json');
+  const forwarded=new Request(forward,{method:'POST',headers,
+    body:JSON.stringify({mode:'whatsapp',hours:Number(payload.hours)})});
+  const response=await socialApi(forwarded,env);
+  if(!response.ok)return response;
+  const d=await response.json();
+  const token=/^\/__social\/shared\/([a-f0-9]{64})$/.exec(d.link||'')?.[1];
+  if(!token)return deny(503,'Deellink kon niet veilig worden aangemaakt');
+  return json({id:token,link:u.origin+d.link,expiresAt:d.expiresAt});
+ }
+ const upload=/^\/api\/shares\/([a-f0-9]{64})\/(photo|photo-full|audio|video)$/.exec(p);
+ if(upload){
+  if(m!=='POST')return deny(405,'Methode niet toegestaan');
+  const bytesHint=Number(request.headers.get('content-length')||0);
+  if(bytesHint>1800000)return deny(413,'Media te groot voor veilige tijdelijke deelopslag');
+  const hash=await shaHex(upload[1]);
+  const storyId=await accountHome(env,actor.id).socialShareStory(hash);
+  if(!storyId)return deny(403,'Deze deellink hoort niet bij dit account');
+  const bytes=new Uint8Array(await request.arrayBuffer());
+  if(!bytes.byteLength||bytes.byteLength>1800000)
+   return deny(413,'Media te groot voor veilige tijdelijke deelopslag');
+  const mime=(request.headers.get('content-type')||'').split(';')[0].toLowerCase();
+  try{await socialMemoryHome(env,storyId).saveShareMedia(actor.id,hash,upload[2],mime,bytes)}
+  catch{return deny(400,'Dit type of formaat media kan niet veilig worden gedeeld')}
+  return json({ok:true});
+ }
+ const revoke=/^\/api\/shares\/([a-f0-9]{64})\/revoke$/.exec(p);
+ if(revoke){
+  if(m!=='POST')return deny(405,'Methode niet toegestaan');
+  const rawHash=await shaHex(revoke[1]);
+  const ownerShare=await accountHome(env,actor.id).socialShareStory(rawHash);
+  if(!ownerShare)return revokeAccountShare(request,env,revoke[1]);
+  const revoked=await socialMemoryHome(env,ownerShare).revokeShare(actor.id,rawHash);
+  return json(revoked,revoked.ok?200:404);
+ }
+ return deny(404,'Niet gevonden');
+}
+function safeShareHtml(value){
+ return String(value??'').replace(/[&<>"']/g,c=>({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+ }[c]));
+}
+async function publicWhatsAppMemory(request,env){
+ const u=new URL(request.url),m=/^\/__social\/shared\/([a-f0-9]{64})(?:\/(photo|photo-full|audio|video))?$/.exec(u.pathname);
+ if(!m||request.method!=='GET')return deny(404,'Link niet gevonden');
+ // Only the random token grants access. Never expose the owner's private
+ // library, account ID, other stories or originals via this public route.
+ const target=new URL('/__social/shared/'+m[1],u);
+ const lookup=await socialApi(new Request(target,{method:'GET',
+  headers:request.headers}),env);
+ if(!lookup.ok)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ const data=await lookup.json();
+ if(!data.ok||!FREE_SHARE_ID.test(data.storyId||''))
+  return deny(404,'Deze deellink is verlopen of ingetrokken');
+ const home=socialMemoryHome(env,data.storyId);
+ const hash=await shaHex(m[1]);
+ if(m[2]){
+  const media=await home.sharedMedia(hash,m[2]);
+  if(!media)return deny(404,'Foto of media niet gevonden');
+  return new Response(media.bytes,{status:200,headers:{
+   'content-type':media.mime,'cache-control':'private, no-store',
+   'x-content-type-options':'nosniff','referrer-policy':'no-referrer',
+   'cross-origin-resource-policy':'same-origin'
+  }});
+ }
+ const content=await home.shareContent(hash);
+ if(!content)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ const title=safeShareHtml(content.title),story=safeShareHtml(content.storyText);
+ const date=safeShareHtml(content.eventDate);
+ const photo=content.hasPhoto?'<img src="'+u.pathname+'/photo" alt="Foto bij deze herinnering">':'';
+ const body='<!doctype html><html lang="nl"><head><meta charset="utf-8">'+
+  '<meta name="viewport" content="width=device-width, initial-scale=1">'+
+  '<meta name="robots" content="noindex,nofollow">'+
+  '<title>'+title+' – TALERA</title><style>'+
+  '*{box-sizing:border-box}body{margin:0;background:#f8f9f7;color:#17344a;font:17px/1.55 -apple-system,system-ui,sans-serif}'+
+  'header{background:white;padding:22px;text-align:center;letter-spacing:.22em;font-size:17px;font-weight:800}'+
+  'main{max-width:680px;margin:20px auto;padding:22px;background:white;border-radius:22px}'+
+  'h1{font-size:25px;margin:0 0 12px}img{display:block;max-width:100%;width:100%;height:auto;border-radius:14px;margin:18px 0}'+
+  'p{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#66747f}'+
+  '</style></head><body><header>TALERA</header><main><h1>'+title+
+  '</h1>'+(date?'<small>'+date+'</small>':'')+photo+'<p>'+story+
+  '</p><small>Deze herinnering is tijdelijk met je gedeeld.</small></main></body></html>';
+ return new Response(body,{status:200,headers:{
+  'content-type':'text/html; charset=utf-8',
+  'cache-control':'private, no-store','referrer-policy':'no-referrer',
+  'x-content-type-options':'nosniff','x-robots-tag':'noindex, nofollow',
+  'content-security-policy':"default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+ }});
+}
 async function publicPage(request,env){
   const pathname=new URL(request.url).pathname,origin=new URL(request.url).origin;
   // Notifications is an existing tab in the approved Home markup/CSS.
@@ -809,7 +964,10 @@ export default {
     // Exact original embedded player route is allowed before the normal
     // strict search-param gate, which intentionally covers only top pages.
     if(p==='/vertelmodus-embed')return privateEmbeddedPlayer(request,env);
-    if(url.search&&!allowedLocalUiSearch(url)&&!allowedVersionCheck(url,m)){
+    const exactLegacyShareLookup=p==='/api/pwa/memory-link'&&m==='GET'&&
+      url.searchParams.size===1&&url.searchParams.has('localMemoryId')&&
+      FREE_SHARE_ID.test(url.searchParams.get('localMemoryId')||'');
+    if(url.search&&!exactLegacyShareLookup&&!allowedLocalUiSearch(url)&&!allowedVersionCheck(url,m)){
       const canonical=canonicalReferralUiPath(url,m);
       if(!canonical)return deny(404,'Niet gevonden');
       return new Response(null,{status:302,headers:{
@@ -831,12 +989,19 @@ export default {
         return actor?deny(409,'Herinneringen staan alleen lokaal op je telefoon'):
           deny(401,'Aanmelden vereist');
       }
+      if(p==='/api/pwa/memory-link'||/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(p)||
+         /^\/api\/shares\/[a-f0-9]{64}\/(?:photo|photo-full|audio|video|revoke)$/.test(p))
+        return legacyShareApi(request,env);
       if(p==='/api/shares'||p==='/api/my-grants')
         return accountSocialLists(request,env);
       const revoke=/^\/api\/shares\/([a-f0-9]{64})(?:\/revoke)?$/.exec(p);
       if(revoke)return revokeAccountShare(request,env,revoke[1]);
       const grantRevoke=/^\/api\/memories\/([A-Za-z0-9_-]{8,80})\/grants\/([0-9a-fA-F-]{36})\/revoke$/.exec(p);
       if(grantRevoke)return revokeAccountGrant(request,env,grantRevoke[1],grantRevoke[2]);
+      if(m==='GET'&&/^\/__social\/shared\/[a-f0-9]{64}(?:\/(?:photo|photo-full|audio|video))?$/.test(p)&&
+         (p.endsWith('/photo')||p.endsWith('/photo-full')||p.endsWith('/audio')||
+          p.endsWith('/video')||(request.headers.get('accept')||'').includes('text/html')))
+        return publicWhatsAppMemory(request,env);
       if(p.startsWith('/__social/'))return socialApi(request,env);
       // The original decade shortcut linked to ?decade=N, but the existing
       // presentation only has a working ?year=N selector. Reuse that approved

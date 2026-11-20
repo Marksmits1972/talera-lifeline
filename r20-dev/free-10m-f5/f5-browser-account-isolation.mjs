@@ -2351,13 +2351,36 @@ try{
        if(cueWriter){
          await cueWriter.updateCues(record.id,cues);
        }else{
-         // The public /present facade does not expose the original editor's
-         // cue writer. Re-save via its own stable-ID contract, never another DB.
-         await library.save({
-           title:'SYNTHETIC COMPLETE MEMORY',date:'2003-04-05',
-           text:'One selected, multi-media, timed narrative only.',
-           narrationCues:cues
-         },files,record.id,record.items.map(x=>x.key));
+         // Only the real /tell editor exposes the original cue writer. For
+         // this SYNTHETIC transport regression, seed just the cue metadata
+         // in the SAME pre-existing account-private IndexedDB stories row.
+         // All media blobs and canonical IDs stay owned by TALERA's library.
+         const names=(await indexedDB.databases()).map(x=>x.name)
+           .filter(name=>/^talera-free-local-[a-f0-9]{32}-v1$/.test(name||''));
+         if(names.length!==1)throw Error('Synthetic private library scope ambiguous');
+         const db=await new Promise((resolve,reject)=>{
+           const request=indexedDB.open(names[0],1);
+           request.onupgradeneeded=()=>{request.transaction.abort();reject(Error('Unexpected new test DB'))};
+           request.onerror=()=>reject(request.error);
+           request.onsuccess=()=>resolve(request.result);
+         });
+         try{
+           await new Promise((resolve,reject)=>{
+             const tx=db.transaction('stories','readwrite');
+             const store=tx.objectStore('stories');
+             const request=store.get(record.id);
+             request.onsuccess=()=>{
+               const row=request.result;
+               if(!row||row.id!==record.id){tx.abort();return}
+               row.narrationCues=cues;
+               store.put(row);
+             };
+             request.onerror=()=>tx.abort();
+             tx.onerror=()=>{};
+             tx.onabort=()=>reject(tx.error||Error('Synthetic cue fixture rejected'));
+             tx.oncomplete=()=>resolve();
+           });
+         }finally{db.close()}
        }
        const checked=await library.get(record.id);
        if(JSON.stringify(checked.narrationCues)!==JSON.stringify(cues))

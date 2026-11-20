@@ -78,7 +78,7 @@ export class FreeSocialMemory extends DurableObject{
   this.checkOwner(actor);
   if(typeof title!=='string'||!title.trim()||title.length>180||
      typeof storyText!=='string'||!storyText.trim()||storyText.length>12000||
-     typeof eventDate!=='string'||!/^\\d{0,4}(?:-\\d{2}-\\d{2})?$/.test(eventDate))
+     typeof eventDate!=='string'||!/^\d{0,4}(?:-\d{2}-\d{2})?$/.test(eventDate))
     throw Error('INVALID_SHARE_CONTENT');
   const expires=now()+10*60000;
   this.sql.exec("INSERT INTO share_draft(singleton,title,story_text,event_date,expires_at) VALUES (1,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET title=excluded.title,story_text=excluded.story_text,event_date=excluded.event_date,expires_at=excluded.expires_at",

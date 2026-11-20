@@ -1524,6 +1524,23 @@ async function getPublic(name){
 }
 for(const name of paths){
  const first=await getPublic(name),second=await getPublic(name);
+ // Diagnostic only: inspect the already-approved, cookie-free original
+ // share UI's route/scroll contract. No personal data or API calls.
+ if(name==='/__clean/share-controller.mjs'&&first.status===200){
+  const lines=first.body.split('\n');
+  const needles=/WhatsApp|Uitnodiging|uitnodiging|memory-link|\/api\/|consent|toestemming|overflow|share-sheet|share-modal|Niet gevonden|voorbereiden|preview|verzenden|Verzenden/ig;
+  const hits=[];
+  for(let i=0;i<lines.length;i++){
+   if(needles.test(lines[i])){
+    needles.lastIndex=0;
+    hits.push({line:i+1,text:lines.slice(Math.max(0,i-2),Math.min(lines.length,i+4)).join('\n').slice(0,1100)});
+   }
+   needles.lastIndex=0;
+  }
+  console.log('TALERA_F5_ORIGINAL_SHARE_PUBLIC_SOURCE_DIAG',JSON.stringify({
+   source:name,bytes:first.body.length,hits:hits.slice(0,95)
+  }));
+ }
  // Optional older public scripts are not needed until a real page references them.
  if(first.status===404&&second.status===404)continue;
  assert.equal(first.status,200,'F5 public script must exist: '+name);

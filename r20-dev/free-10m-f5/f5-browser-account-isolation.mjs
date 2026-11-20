@@ -2554,15 +2554,22 @@ try{
            m.photos[0]='data:image/svg+xml,%3Csvg%3E%3C/svg%3E';
            await new Promise(resolve=>setTimeout(resolve,320));
            const el=document.getElementById('memoryPhotoA');
+           const sheet=document.getElementById('memoryCaption');
+           const reader=document.getElementById('memoryStoryScroll');
+           const css=sheet&&getComputedStyle(sheet);
            return {fallback:document.documentElement.classList.contains(
                'talera-guest-video-fallback'),
-             placeholderHidden:!!el&&getComputedStyle(el).visibility==='hidden'};
+             placeholderHidden:!!el&&getComputedStyle(el).visibility==='hidden',
+             storyStillAvailable:!!reader&&!!sheet&&
+               css.visibility==='visible'&&css.opacity==='1'&&
+               css.pointerEvents==='auto'&&Number(css.zIndex)>=80};
          }finally{
            frame.kind=oldKind;m.photos[0]=prior;m._photoIndex=oldIndex;
          }
        });
-       assert.deepEqual(posterGuard,{fallback:true,placeholderHidden:true},
-         'The original video playback may not show an oversized VIDEO placeholder');
+       assert.deepEqual(posterGuard,{fallback:true,placeholderHidden:true,
+         storyStillAvailable:true},
+         'No oversized VIDEO placeholder; original text remains available during video');
        await guest.waitForTimeout(280);
        assert.equal(await guest.evaluate(()=>document.documentElement.classList.contains(
          'talera-guest-video-fallback')),false,

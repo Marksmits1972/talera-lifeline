@@ -1513,10 +1513,16 @@ try{
    const issued=createdLinks[0];
    assert.equal(issued.status,200,'Share creation must succeed');
    assert.match(issued.id,/^[a-f0-9]{64}$/);
-   assert.ok(issued.link.startsWith(origin+'/__social/shared/'),
-     'Recipient link must remain on the same app origin');
+   assert.ok(issued.link.startsWith(origin+'/s/'),
+     'Recipient link must use the compact SAME-app origin without shortening token entropy');
    assert.ok(Math.abs(issued.expiresAt-(Date.now()+168*3600000))<60000,
      'Temporary share must use exactly the original seven-day expiry');
+   const compactPath=new URL(issued.link).pathname;
+   assert.match(compactPath,/^\\/s\\/[A-Za-z0-9_-]{43}$/);
+   assert.equal(issued.id.length,64,'Original 256-bit capability and revocation ID unchanged');
+   // Verify the recipient's public invitation keeps both photo metadata
+   // and friendly caption, not a large raw 64-character token in the URL.
+
    const withoutConsent=await sharePage.evaluate(async id=>{
      const r=await fetch('/api/pwa/memory-link',{
        method:'POST',credentials:'same-origin',
@@ -1542,6 +1548,11 @@ try{
        'Receiver must see the actual consented photo/text, not JSON or 404');
      const html=await received.text();
      assert.match(html,/synthetic ACCOUNT ISOLATION 1/);
+     assert.match(html,/<meta property="og:title" content="Een persoonlijke herinnering via TALERA">/);
+     assert.match(html,/<meta property="og:site_name" content="TALERA">/);
+     assert.ok(!issued.link.includes('/__social/shared/'),
+       'Only the friendly compact address belongs in the visible invitation');
+
      assert.match(html,/Local-only imaginary image/);
      assert.ok(html.includes('<img ')&&html.includes('/photo')&&
        html.includes('property="og:image"')&&

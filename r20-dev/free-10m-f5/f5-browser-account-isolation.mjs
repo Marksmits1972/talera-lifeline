@@ -2365,7 +2365,11 @@ try{
          return response.status;
        },issuedUntitled.id);
        assert.equal(stopped,200);
-       await sharePage.locator('#talera-clean-overlay [data-action=close]').click();
+       // The new WhatsApp handoff confirmation returns automatically to the
+       // original memory. The older flow kept the share sheet open instead;
+       // both must release the pause without re-starting any media.
+       if(await sharePage.locator('#talera-clean-overlay').isVisible())
+         await sharePage.locator('#talera-clean-overlay [data-action=close]').click();
        assert.equal(await sharePage.evaluate(()=>
          window.__taleraSharePauseActive),false,
          'Closing the share sheet may release pause without autoplay');

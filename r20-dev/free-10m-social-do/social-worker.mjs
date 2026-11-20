@@ -84,11 +84,17 @@ export default{
    if(op==='grant')return json(await home.grant(requireActor(actor),verifyAccountId(payload.recipientId)));
    if(op==='revoke-grant')return json(await home.revokeGrant(requireActor(actor),verifyAccountId(payload.recipientId)));
    if(op==='share'){
+    const hours=payload.mode==='whatsapp'?Number(payload.hours):1;
+    if(![1,24,168,720].includes(hours))throw Error('INVALID_SHARE_DURATION');
     const raw=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
-    const hash=await shaHex(raw),expires=Date.now()+3600000;
-    await home.addShare(requireActor(actor),hash,expires);
+    const hash=await shaHex(raw),expires=Date.now()+hours*3600000;
+    if(payload.mode==='whatsapp')await home.startShare(requireActor(actor),hash,expires);
+    else await home.addShare(requireActor(actor),hash,expires);
     const stored=await pointer(env,hash).point(id,hash,expires);
-    if(!stored.ok)throw Error('POINTER_UNAVAILABLE');
+    if(!stored.ok){
+      await home.revokeShare(requireActor(actor),hash);
+      throw Error('POINTER_UNAVAILABLE');
+    }
     return json({ok:true,link:'/__social/shared/'+raw,expiresAt:expires});
    }
    if(op==='revoke-share'){

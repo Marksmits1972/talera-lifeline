@@ -1760,6 +1760,22 @@ try{
          'Weet je nog dat moment? Dit wilde ik met je delen.');
        assert.equal(await sharePage.locator('.talera-share-progress').count(),0,
          'Loading indicator must disappear after the invitation is ready');
+       // The second memory navigated to a fresh document. Its native share
+       // bridge must be simulated again; nothing is sent to a real contact.
+       await sharePage.evaluate(()=>{
+         window.__taleraNativeShareProbe=[];
+         Object.defineProperty(navigator,'canShare',{configurable:true,value:data=>
+           Array.isArray(data?.files)&&data.files.length===1&&
+           data.files[0].type==='image/jpeg'});
+         Object.defineProperty(navigator,'share',{configurable:true,value:data=>{
+           const file=data.files?.[0];
+           window.__taleraNativeShareProbe.push({
+             name:file?.name,type:file?.type,size:file?.size,
+             count:data.files?.length,text:data.text
+           });
+           return Promise.resolve();
+         }});
+       });
        await sharePage.locator('#talera-clean-overlay [data-action=send]').click();
        const personalPayload=await sharePage.evaluate(()=>
          window.__taleraNativeShareProbe?.at(-1));

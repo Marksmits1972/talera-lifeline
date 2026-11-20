@@ -2039,7 +2039,7 @@ try{
          JSON.stringify({image:true,ownWordsOnly:true,secureLink:true,realIphoneAccepted:false}));
 
        const issuedUntitled=createdLinks.at(-1);
-       assert.equal(createdLinks.length,3,'Original, direct photo-only and untitled UI invitations are distinct');
+       assert.equal(createdLinks.length,4,'Original, independent sibling, direct photo-only and untitled UI invitations are distinct');
        assert.equal(issuedUntitled.status,200);
        const photoOnlyView=await guest.goto(issuedUntitled.link,
          {waitUntil:'domcontentloaded'});

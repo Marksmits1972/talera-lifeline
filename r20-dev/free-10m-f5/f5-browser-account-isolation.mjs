@@ -2355,11 +2355,19 @@ try{
          // this SYNTHETIC transport regression, seed just the cue metadata
          // in the SAME pre-existing account-private IndexedDB stories row.
          // All media blobs and canonical IDs stay owned by TALERA's library.
-         const names=(await indexedDB.databases()).map(x=>x.name)
-           .filter(name=>/^talera-free-local-[a-f0-9]{32}-v1$/.test(name||''));
-         if(names.length!==1)throw Error('Synthetic private library scope ambiguous');
+         const me=await (await fetch('/api/me',{credentials:'same-origin'})).json();
+         if(!/^[a-f0-9-]{36}$/i.test(me.account?.id||''))
+           throw Error('No verified owner for synthetic cue fixture');
+         const digest=await crypto.subtle.digest('SHA-256',
+           new TextEncoder().encode('TALERA_FREE_BROWSER_MEMORY_V1:'+
+             me.account.id.toLowerCase()));
+         const hex=Array.from(new Uint8Array(digest),n=>
+           n.toString(16).padStart(2,'0')).join('');
+         const dbName='talera-free-local-'+hex.slice(0,32)+'-v1';
+         if(!(await indexedDB.databases()).some(x=>x.name===dbName))
+           throw Error('Original account-private DB does not exist');
          const db=await new Promise((resolve,reject)=>{
-           const request=indexedDB.open(names[0],1);
+           const request=indexedDB.open(dbName,1);
            request.onupgradeneeded=()=>{request.transaction.abort();reject(Error('Unexpected new test DB'))};
            request.onerror=()=>reject(request.error);
            request.onsuccess=()=>resolve(request.result);

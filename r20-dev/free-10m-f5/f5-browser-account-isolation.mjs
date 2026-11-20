@@ -1518,7 +1518,7 @@ try{
    assert.ok(Math.abs(issued.expiresAt-(Date.now()+168*3600000))<60000,
      'Temporary share must use exactly the original seven-day expiry');
    const compactPath=new URL(issued.link).pathname;
-   assert.match(compactPath,/^\\/s\\/[A-Za-z0-9_-]{43}$/);
+   assert.match(compactPath,/^\/s\/[A-Za-z0-9_-]{43}$/);
    assert.equal(issued.id.length,64,'Original 256-bit capability and revocation ID unchanged');
    // Verify the recipient's public invitation keeps both photo metadata
    // and friendly caption, not a large raw 64-character token in the URL.

@@ -1455,7 +1455,7 @@ try{
      shareNetwork.push({phase:'payload-structure',keys:Object.keys(payload),
        localMemoryIdType:typeof payload.localMemoryId,
        localMemoryIdLength:String(payload.localMemoryId||'').length,
-       localMemoryIdFits:/^[A-Za-z0-9_-]{8,80}$/.test(String(payload.localMemoryId||'')),
+       localMemoryIdFits:/^[A-Za-z0-9_.:-]{8,160}$/.test(String(payload.localMemoryId||'')),
        consent:payload.consent,titleLength:String(payload.title||'').length,
        storyLength:String(payload.storyText||'').length});
    }
@@ -1512,8 +1512,7 @@ try{
      const received=await guest.goto(issued.link,{waitUntil:'domcontentloaded'});
      console.log('TALERA_FREE_WHATSAPP_RECIPIENT_DIAG',JSON.stringify({
        status:received.status(),contentType:received.headers()['content-type'],
-       prefix:(await received.text()).slice(0,400),
-       failureDetails:received.status()>=500?(await received.text()).slice(-4200):null}));
+       prefix:received.status()!==200?(await received.text()).slice(0,400):'expected HTML'}));
      assert.equal(received.status(),200,
        'Receiver must see the actual consented photo/text, not JSON or 404');
      const html=await received.text();

@@ -1742,7 +1742,7 @@ async function taleraFreeOriginalSharePhoto(memory){
    shipped=shipped.replace(applyCss,'style.textContent=css+taleraShareAdditionalCss;document.head.append(style);');
    const vars="let mode=null,memory=runtime.currentMemory(),focus=null,consent=false,shareAuth=null,authBusy=false;";
    const addedVars=String.raw`
-const taleraStandardText='Hoi! Ik wil graag een herinnering met je delen via TALERA. Bekijk hem wanneer je even tijd hebt.';
+const taleraStandardText='Hoi! Ik deel graag een persoonlijke herinnering met je via TALERA.';
 let messageChoice='standard',personalMessage='',uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
 function taleraChoiceHtml(){
  const choice=(name,label)=>'<button type="button" class="talera-share-choice" data-action="message-'+name+'" aria-pressed="'+(messageChoice===name)+'">'+label+'</button>';
@@ -1794,7 +1794,7 @@ window.__taleraShareProgress=taleraShareProgress;
    const message=messageChoice==='personal'?personalMessage.trim():taleraStandardText;
    if(!message)throw Error('Schrijf eerst je persoonlijke bericht.');
    const url=share.current().invite.url;
-   location.assign('https://wa.me/?text='+encodeURIComponent(message+'\n\n'+url));
+   location.assign('https://wa.me/?text='+encodeURIComponent(message+'\n'+url));
   }catch(error){panel.querySelector('.status').textContent=error.message}
  }`;
    assert.equal(shipped.split(clickSend).length,2,'WHATSAPP_PERSONAL_SEND_DRIFT');

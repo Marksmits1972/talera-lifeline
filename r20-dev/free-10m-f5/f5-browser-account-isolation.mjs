@@ -2635,15 +2635,23 @@ try{
        const files=[];
        for(let i=0;i<6;i++){
          const bytes=new Uint8Array([0,0,0,20,102,116,121,112,105,115,111,109,i,0,0,0,0,0,0,0]);
-         files.push(new File([bytes],'original-video-'+i+'.mp4',{type:'video/mp4'}));
+         files.push(new File([bytes],'original-video-'+i+'.mp4',
+           {type:i===5?'video/x-m4v':'video/mp4'}));
        }
        const row=await window.TaleraMemories.save({
          title:'SIX ORIGINAL VIDEO POSTERS',date:'2005-02-06',
          text:'Six original videos with six already cached stills.',
          narrationCues:[]
        },files);
-       if(row.items.length!==6||row.items.some(x=>x.kind!=='video'))
-         return {error:'six original video items not preserved'};
+       if(row.items.length!==6||row.items.some(x=>x.kind!=='video')||
+          row.items[5].mime!=='video/x-m4v')
+         return {error:'sixth original iPhone MIME alias lost in private library'};
+       const sourceHashes=[];
+       for(const original of row.items){
+         const video=await window.TaleraMemories.blob(original.key);
+         sourceHashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
+           'SHA-256',await video.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
+       }
        const hashes=[];
        for(let i=0;i<6;i++){
          const canvas=document.createElement('canvas');canvas.width=24;canvas.height=24;
@@ -2655,7 +2663,7 @@ try{
          hashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
            'SHA-256',await still.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
        }
-       return {id:row.id,hashes};
+       return {id:row.id,hashes,sourceHashes};
      });
      assert.equal(sixVideos.error,undefined,JSON.stringify(sixVideos));
      try{
@@ -2682,14 +2690,20 @@ try{
        await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
          null,{timeout:20000});
        const outcome=await guest.evaluate(async()=>{
-         const rows=await window.TaleraMemories.list(),row=rows[0],hashes=[];
+         const rows=await window.TaleraMemories.list(),row=rows[0],hashes=[],sourceHashes=[];
          for(const item of row.items){
            const still=await window.TaleraMemories.blob(item.key+':phone-v1');
            if(!still)return {error:'missing shared video poster'};
            hashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
              'SHA-256',await still.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
+           const original=await window.TaleraMemories.blob(item.key);
+           if(!original)return {error:'missing shared original video'};
+           sourceHashes.push(Array.from(new Uint8Array(await crypto.subtle.digest(
+             'SHA-256',await original.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join(''));
+           if(item===row.items[5]&&original.type!=='video/mp4')
+             return {error:'nonstandard iPhone sixth video type not safely verified'};
          }
-         return {rows:rows.length,kinds:row.items.map(x=>x.kind),hashes,
+         return {rows:rows.length,kinds:row.items.map(x=>x.kind),hashes,sourceHashes,
            entryCover:!!document.querySelector('#taleraGuestEntryCover img[src*="/poster/0"]'),
            originalPresenter:!!document.getElementById('photoStage')};
        });
@@ -2699,6 +2713,8 @@ try{
          'Six video source items, not six extra photos');
        assert.deepEqual(outcome.hashes,sixVideos.hashes,
          'All six cached sidecars must survive sharing byte-identically');
+       assert.deepEqual(outcome.sourceHashes,sixVideos.sourceHashes,
+         'All six original video bytes survive iPhone MIME normalization without changes');
        assert.ok(outcome.entryCover&&outcome.originalPresenter,
          'A video-only WhatsApp guest must start with the stored first thumbnail');
        for(let i=0;i<6;i++){
@@ -2713,7 +2729,7 @@ try{
          (await guest.request.get(invite.link+'/poster/'+i)).status(),404,
          'Revoked share must deny video thumbnail '+i);
        console.log('TALERA_GUEST_SIX_EXISTING_VIDEO_THUMBNAILS_SECURE_HANDOFF_PASS',
-         JSON.stringify({videos:6,posters:6,orderUnchanged:true,
+         JSON.stringify({videos:6,posters:6,iphoneSixthMimeNormalized:true,originalBytesEqual:true,orderUnchanged:true,
            integrityVerified:true,revocationVerified:true,iPhoneAccepted:false}));
      }finally{
        await sharePage.evaluate(async id=>window.TaleraMemories?.remove?.(id),

@@ -866,8 +866,10 @@ try{
      'Second storage container must still have the EXACT same signed-in account');
    assert.deepEqual(separated.storyIds,[],
      'Different PWA/Safari storage container unexpectedly read the first container');
-   assert.deepEqual(separated.dbs,beforeReload.localDbs,
-     'Account namespaced DB identifier must match in both browser containers');
+   assert.equal(separated.dbs.length,1,
+     'Fresh isolated browser storage must create only the signed-in account DB');
+   assert.ok(beforeReload.localDbs.includes(separated.dbs[0]),
+     'The SAME account must still select the SAME derived DB name in both containers');
    const stillOriginal=await originalInventory();
    assert.deepEqual(stillOriginal,afterReload,
      'Opening another isolated browser container must not delete original media');

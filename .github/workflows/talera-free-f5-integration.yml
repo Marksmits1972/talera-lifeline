@@ -888,7 +888,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-untagged-home-20261121' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-narrator-recovery-20261121' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     concurrency:
@@ -902,7 +902,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 265eab16-44c8-43fa-9dec-e0a5d1a877fb
+      F5_EXPECTED_LIVE_VERSION: da480210-b030-427f-9d6f-b4a2eeed3614
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -928,12 +928,12 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 9d9ce749e5b12533ecc099845c7725a27907cd58
+          test "$(git rev-parse HEAD^)" = 801a3f1cb1ed64403c28def78b79bbc91383a4df
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=44922530412,expected='9d9ce749e5b12533ecc099845c7725a27907cd58';
+          const id=44925758910,expected='801a3f1cb1ed64403c28def78b79bbc91383a4df';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,
@@ -1041,7 +1041,15 @@ jobs:
                     'Owner one-time same-device reset missing from guest Home');
                 }
               }
-              if(route==='/present')assert.ok(html.includes('const MEMORIES = [];'));
+              if(route==='/present'){
+                assert.ok(html.includes('const MEMORIES = [];'));
+                if(collection===referencePages){
+                  assert.ok(html.includes('recoverInterruptedStart(s,media)')&&
+                    html.includes('resumeOnVisible')&&
+                    html.includes('taleraIndependentNarrator'),
+                    'The fully-tested narrator recovery is absent from the authenticated present route');
+                }
+              }
               pages++;
             }
           }

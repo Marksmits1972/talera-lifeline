@@ -704,6 +704,52 @@ try{
  const a=await saveSyntheticPhoto(page,1);
  assert.equal(a.kind,'photo');
  assert.ok(a.bytes>10,'Synthetic local original photo Blob was not saved');
+ // Real user's original stories may have NO title and NO topic. The same
+ // account-local storage, original frame and ordinary presentation must work
+ // without inventing a title or category. No device records are involved.
+ const untitled=await page.evaluate(async png=>{
+   const image=new File([Uint8Array.from(atob(png),c=>c.charCodeAt(0))],
+     'untitled-synthetic.png',{type:'image/png'});
+   const saved=await window.TaleraMemories.save({
+     title:'',date:'1977-03-14',text:'Synthetic story without title or topic',
+     tags:[],narrationCues:[]
+   },[image]);
+   const row=await window.TaleraMemories.get(saved.id);
+   const file=await window.TaleraMemories.blob(row.items?.[0]?.key);
+   return {id:row.id,title:row.title,source:row.source,
+     tags:row.tags||[],photoBytes:file?.size||0};
+ },onePixelPng);
+ assert.equal(untitled.title,'','Do not invent an owner title');
+ assert.equal(untitled.source,'pwa-local');
+ assert.deepEqual(untitled.tags,[]);
+ assert.ok(untitled.photoBytes>10,'Untitled original photo lost');
+ const untitledViewer=await page.context().newPage();
+ try{
+   const response=await untitledViewer.goto(origin+'/present?memory='+
+     encodeURIComponent(untitled.id),{waitUntil:'domcontentloaded'});
+   assert.equal(response.status(),200);
+   await untitledViewer.waitForFunction(id=>{
+     const memory=window.__taleraTimelineRuntime?.currentMemory?.();
+     const photo=document.getElementById('memoryPhotoA');
+     return memory?.storyId===id && memory?._taleraLocal &&
+       !memory._photoLoading && photo?.complete && photo.naturalWidth>0;
+   },untitled.id,{timeout:25000});
+   const proof=await untitledViewer.evaluate(async id=>{
+     const row=await window.TaleraMemories.get(id);
+     const blob=await window.TaleraMemories.blob(row.items[0].key);
+     return {id:row.id,title:row.title,photoBytes:blob?.size||0,
+       selectedId:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+       naturalWidth:document.getElementById('memoryPhotoA')?.naturalWidth||0};
+   },untitled.id);
+   assert.equal(proof.id,untitled.id);
+   assert.equal(proof.title,'');
+   assert.equal(proof.selectedId,untitled.id);
+   assert.equal(proof.photoBytes,untitled.photoBytes);
+   assert.ok(proof.naturalWidth>0);
+   console.log('TALERA_F5_UNTITLED_UNTAGGED_LOCAL_PHOTO_PRESENTATION_PASS',
+     JSON.stringify({syntheticOnly:true,sameOrigin:true,sameAccount:true,
+       originalBytesIntact:true,realIPhoneAccepted:false}));
+ }finally{await untitledViewer.close()}
  await verifyTellEditorLayout(page,a.id);
  await logout(page);
  await assertSignedOutEmpty(page,a.id);

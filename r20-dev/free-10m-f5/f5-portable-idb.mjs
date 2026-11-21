@@ -2,7 +2,7 @@
 // NOT injected into approved /tell, /present or home. No network and no media cloud.
 // A later explicit user-triggered UI is required before any production restore.
 import {createFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
-import {requireName,openExisting,readAll,restoreRowsAtomic,verifyLibraryMediaIntegrity} from './f5-library-persistence.mjs';
+import {requireName,openExisting,readAll,restoreRowsAtomic,verifyLibraryMediaIntegrity,verifyRestoredLibraryReadback} from './f5-library-persistence.mjs';
 export async function exportExistingFreeLibrary(databaseName){
  const db=await openExisting(databaseName,false);
  try{
@@ -63,11 +63,9 @@ export async function restoreFreeLibrary(archive,databaseName,
  try{
   await restoreRowsAtomic(db,decoded);
   const returned=await readAll(db);
-  const foundStories=new Set(returned.stories.map(x=>x.id));
-  const foundFiles=new Set(returned.files.map(x=>x.key));
-  if(!decoded.stories.every(x=>foundStories.has(x.id))||
-     !decoded.files.every(x=>foundFiles.has(x.key)))
-   throw Error('TALERA_RESTORE_READBACK_INCOMPLETE');
+  // Treat restore as successful only after complete record, original
+  // media byte, File metadata, media order and cue readback equality.
+  await verifyRestoredLibraryReadback(decoded,returned);
   return {restoredStories:decoded.stories.length,
    restoredMediaEntries:decoded.files.length,
    sourcePreserved:true,existingRecordsOverwritten:false,

@@ -108,7 +108,7 @@ jobs:
             if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
               # Library I/O moved; approved schema, archive codec and media cue writer remain protected.
               git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
-            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-idb.mjs)" = "ecbfb2f06d3326ab69e493f919accd78dfb37c3a"
+            test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-idb.mjs)" = "3f81a299a252773b393d8bfcc3e2f8ff46bb9437"
             else
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
             fi

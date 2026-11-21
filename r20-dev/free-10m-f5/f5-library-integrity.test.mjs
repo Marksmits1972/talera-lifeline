@@ -1,7 +1,7 @@
 // TALERA Free: same library-integrity contract used by backup and restore.
 // Pure synthetic test values; no user library, no new Worker or app.
 import assert from 'node:assert/strict';
-import {verifyLibraryMediaIntegrity} from './f5-library-persistence.mjs';
+import {verifyLibraryMediaIntegrity,verifyRestoredLibraryReadback} from './f5-library-persistence.mjs';
 
 const photo=new File([new Uint8Array([1,2,3])],'old-photo.heic',{type:'image/heic'});
 const video=new File([new Uint8Array([4,5])],'old-video.mov',{type:'video/quicktime'});
@@ -62,6 +62,24 @@ assert.equal(legacy.explicitCuesChecked,0);
 assert.deepEqual({...verifyLibraryMediaIntegrity({stories:[
  {id:'local-text-only',text:'alleen tekst',items:[]}
 ],files:[]})},{stories:1,originalsChecked:0,explicitCuesChecked:0});
+// A restored library must match all original binary bytes, ordered items,
+ // narration plan and metadata, not merely contain the same record IDs.
+const verified=await verifyRestoredLibraryReadback({stories:[story],files},{
+ stories:[{...story}],files:files.map(row=>({...row}))
+});
+assert.deepEqual({...verified},{storyCount:1,fileCount:4,exact:true});
+await assert.rejects(()=>verifyRestoredLibraryReadback({stories:[story],files},{
+ stories:[{...story}],files:files.map(row=>row.key==='video-84'?
+  {...row,blob:new File([Uint8Array.from([4,6])],'old-video.mov',{type:'video/quicktime'})}:row)
+}),/TALERA_RESTORE_READBACK_MISMATCH/);
+await assert.rejects(()=>verifyRestoredLibraryReadback({stories:[story],files},{
+ stories:[{...story,narrationCues:[{t:9000,index:0}]}],files
+}),/TALERA_RESTORE_READBACK_MISMATCH/);
+await assert.rejects(()=>verifyRestoredLibraryReadback({stories:[story],files},{
+ stories:[story],files:files.filter(row=>row.key!=='photo-42')
+}),/TALERA_RESTORE_READBACK_MISMATCH/);
+console.log('TALERA_RESTORE_ORIGINAL_BYTES_AND_CUES_VERIFIED_PASS');
+
 console.log('TALERA_LIBRARY_ORIGINAL_AND_VOICE_REFERENCES_PASS',JSON.stringify({
  noBytesChanged:true,missingOriginalRejected:true,
  blankOriginalRejected:true,badVoiceCueRejected:true,

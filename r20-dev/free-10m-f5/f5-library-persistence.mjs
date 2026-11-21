@@ -106,6 +106,68 @@ export function verifyLibraryMediaIntegrity({stories,files}={}){
   explicitCuesChecked});
 }
 
+// Compare every restored record to the already-verified archive after the
+// IndexedDB transaction commits. Large original media are checked in bounded
+// chunks; no media is sent to a server, copied into a second library or changed.
+export async function verifyRestoredLibraryReadback(expected,actual){
+ const bad=()=>{throw Error('TALERA_RESTORE_READBACK_MISMATCH')};
+ if(!Array.isArray(expected?.stories)||!Array.isArray(expected?.files)||
+    !Array.isArray(actual?.stories)||!Array.isArray(actual?.files))bad();
+ const chunkBytes=4*1024*1024;
+ const same=async(a,b,depth=0)=>{
+  if(depth>=48)bad();
+  if(a instanceof Blob||b instanceof Blob){
+   if(!(a instanceof Blob)||!(b instanceof Blob)||
+      a.size!==b.size||a.type!==b.type)bad();
+   const aFile=typeof File==='function'&&a instanceof File;
+   const bFile=typeof File==='function'&&b instanceof File;
+   if(aFile!==bFile||(aFile&&(a.name!==b.name||a.lastModified!==b.lastModified)))bad();
+   for(let start=0;start<a.size;start+=chunkBytes){
+    const end=Math.min(a.size,start+chunkBytes);
+    const left=new Uint8Array(await a.slice(start,end).arrayBuffer());
+    const right=new Uint8Array(await b.slice(start,end).arrayBuffer());
+    if(left.length!==right.length)bad();
+    for(let i=0;i<left.length;i++)if(left[i]!==right[i])bad();
+   }
+   return;
+  }
+  if(a instanceof Date||b instanceof Date){
+   if(!(a instanceof Date)||!(b instanceof Date)||a.getTime()!==b.getTime())bad();
+   return;
+  }
+  if(a instanceof ArrayBuffer||b instanceof ArrayBuffer){
+   if(!(a instanceof ArrayBuffer)||!(b instanceof ArrayBuffer)||
+      a.byteLength!==b.byteLength)bad();
+   const left=new Uint8Array(a),right=new Uint8Array(b);
+   for(let i=0;i<left.length;i++)if(left[i]!==right[i])bad();
+   return;
+  }
+  if(a===null||b===null||typeof a!=='object'||typeof b!=='object'){
+   if(!Object.is(a,b))bad();
+   return;
+  }
+  if(Array.isArray(a)||Array.isArray(b)){
+   if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length)bad();
+   for(let i=0;i<a.length;i++)await same(a[i],b[i],depth+1);
+   return;
+  }
+  const keysA=Object.keys(a).sort(),keysB=Object.keys(b).sort();
+  if(keysA.length!==keysB.length||keysA.some((key,i)=>key!==keysB[i]))bad();
+  for(const key of keysA)await same(a[key],b[key],depth+1);
+ };
+ const gotStories=new Map(actual.stories.map(row=>[row.id,row]));
+ const gotFiles=new Map(actual.files.map(row=>[row.key,row]));
+ for(const row of expected.stories){
+  if(!gotStories.has(row.id))bad();
+  await same(row,gotStories.get(row.id));
+ }
+ for(const row of expected.files){
+  if(!gotFiles.has(row.key))bad();
+  await same(row,gotFiles.get(row.key));
+ }
+ return Object.freeze({storyCount:expected.stories.length,fileCount:expected.files.length,exact:true});
+}
+
 export async function restoreRowsAtomic(db,decoded){
   // One atomic IndexedDB transaction for both stores: fail/QuotaExceeded
   // aborts the WHOLE import, never deletes or replaces existing media/stories.

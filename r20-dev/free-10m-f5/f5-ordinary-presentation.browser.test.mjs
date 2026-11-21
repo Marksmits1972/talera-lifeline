@@ -911,6 +911,34 @@ try{
 
 
 
+  // Safari can abort the first play request during a cold PWA document
+  // transition. An AbortError on the SAME existing original audio element
+  // must not silently freeze the narrator clock and every timed photo.
+  const interrupted=await ctx.newPage();
+  try{
+    await interrupted.addInitScript(()=>{
+      const original=HTMLMediaElement.prototype.play;
+      let interruptedOnce=false;
+      HTMLMediaElement.prototype.play=function(...args){
+        if(!interruptedOnce&&this.tagName==='AUDIO'&&
+           this.closest('.talera-independent-narrator-layer')){
+          interruptedOnce=true;
+          return Promise.reject(new DOMException(
+            'Synthetic iPhone WebKit playback interruption','AbortError'));
+        }
+        return original.apply(this,args);
+      };
+    });
+    await load(interrupted,narrated.id,4);
+    await interrupted.waitForFunction(()=>{
+      const a=document.querySelector('.talera-independent-narrator-layer audio');
+      return a&&!a.paused&&a.currentTime>.12;
+    },null,{timeout:8000});
+    console.log('TALERA_F5_COLD_IPHONE_ABORTED_FIRST_PLAY_RECOVERS_PASS',
+      JSON.stringify({syntheticAbortError:true,originalVoiceElement:true,
+        photoVideoCueClockProtected:true,realIphoneAccepted:false}));
+  }finally{await interrupted.close()}
+
   // iPhone MediaRecorder produces AAC/M4A voice recordings, not the WAV
   // fixture above. Verify the REAL account-local /tell writer, persisted
   // original audio/mp4 bytes and timed photo/video cues across a cold reopen.

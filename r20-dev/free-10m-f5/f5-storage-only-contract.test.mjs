@@ -41,6 +41,14 @@ const account2='45dc3d56-b7fb-44cf-bc3f-4c04338f64c6';
 const s1=await privateAccountScope(account1);
 const s2=await privateAccountScope(account2);
 assert.match(s1,/^[a-f0-9]{64}$/);
+// Golden account-local namespace fixed before the owner's real iPhone media.
+// An accidental change would point the SAME signed-in account at a new,
+// empty IndexedDB while its prior original blobs remain hidden on-device.
+// Never change this mapping without an explicitly approved, verified,
+// nondestructive migration plan.
+assert.equal(s1,
+  'a6afaca11456c65ab2b306da6eba92b3890a82d161a644862bc39c4c467ef03c',
+  'SAME USER ACCOUNT NOW POINTS TO A DIFFERENT PRIVATE LIBRARY');
 assert.notEqual(s1,s2,'Account separation is mandatory');
 assert.equal(s1,await privateAccountScope(account1),'Same account must restore same local storage');
 const html='<html><head><style>body{color:#071A3D}</style></head><body>'+

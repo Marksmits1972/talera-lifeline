@@ -835,7 +835,8 @@ try{
  // Same login does NOT imply the same browser/PWA storage container.
  // Reproduce the owner's "still signed in, but 0 stories" observation
  // without erasing originals or creating a second TALERA app. Both contexts
- // visit the SAME origin using the SAME verified account session cookie.
+ // visit the SAME origin, log in to the SAME account UUID, and use their
+ // own valid HttpOnly sessions.
  // Their separate IndexedDB containers must not be conflated or silently
  // migrated. This is a possible mechanism, not proof of its occurrence on
  // the physical iPhone after the Worker release.
@@ -845,7 +846,7 @@ try{
  });
  try{
    const otherPage=await otherContainer.newPage();
-   const guestEntry=await otherPage.goto(origin+'/mijn-leven',
+   const guestEntry=await otherPage.goto(origin+'/present?talera_menu=hub',
      {waitUntil:'domcontentloaded'});
    assert.equal(guestEntry.status(),200);
    await waitForLibrary(otherPage);

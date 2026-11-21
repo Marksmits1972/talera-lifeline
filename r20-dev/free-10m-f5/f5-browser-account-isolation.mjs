@@ -844,13 +844,16 @@ try{
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
  });
  try{
-   // Copy the browser's actual HttpOnly session cookie. Restricting cookie
-   // enumeration to an HTTP URL can hide Secure cookies on local loopback.
-   const ownCookies=await context.cookies();
-   assert.ok(ownCookies.some(x=>x.name==='talera_sid'),
-     'Need one real authenticated browser session, not a simulated login');
-   await otherContainer.addCookies(ownCookies);
    const otherPage=await otherContainer.newPage();
+   const guestEntry=await otherPage.goto(origin+'/mijn-leven',
+     {waitUntil:'domcontentloaded'});
+   assert.equal(guestEntry.status(),200);
+   await waitForLibrary(otherPage);
+   // A separate iPhone Safari/PWA container can hold ANOTHER valid session
+   // for the exact same account, without sharing local IndexedDB contents.
+   const matchedAccount=await login(otherPage,users[0]);
+   assert.equal(matchedAccount,ids[0],
+     'Original TALERA login must resolve the SAME account in both containers');
    const response=await otherPage.goto(origin+'/mijn-leven',
      {waitUntil:'domcontentloaded'});
    assert.equal(response.status(),200);

@@ -205,10 +205,22 @@ try{
    req.onsuccess=()=>resolve(req.result);
   });
   createTarget.close();
-  const preview=await backup.previewFreeLibraryRestore(archive,targetDb,
+  // Modern private account archives cannot cross into another account.
+  let blocked=false;
+  try{await backup.previewFreeLibraryRestore(archive,targetDb,{allowOtherOrigin:true})}
+  catch(e){blocked=String(e.message).includes('TALERA_RESTORE_OTHER_ACCOUNT_BLOCKED')}
+  if(!blocked)throw Error('Cross-account import unexpectedly accepted');
+  // Exercise historical legacy-file migration with an explicitly unscoped
+  // synthetic archive. Same-account cross-origin is covered by backup UI test.
+  const legacyArchive=await codec.createFreeArchive({
+   stories:decoded.stories,files:decoded.files,
+   sourceScope:'talera-lifeline-dev-local-v1',
+   sourceOrigin:location.origin,createdAt:new Date().toISOString()
+  });
+  const preview=await backup.previewFreeLibraryRestore(legacyArchive,targetDb,
    {allowOtherOrigin:true});
   if(!preview.safeToRestore)throw Error('Safe restore preview refused valid empty target');
-  const imported=await backup.restoreFreeLibrary(archive,targetDb,
+  const imported=await backup.restoreFreeLibrary(legacyArchive,targetDb,
    {allowOtherOrigin:true,confirmed:true});
   if(!imported.readbackPassed||!imported.sourcePreserved)
    throw Error('Restore was incomplete');

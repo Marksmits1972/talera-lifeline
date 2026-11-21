@@ -15,6 +15,12 @@ export async function exportExistingFreeLibrary(databaseName){
  }finally{db.close()}
 }
 async function preview(decoded,name,allowOtherOrigin){
+ // Another TALERA software version may use a different browser origin,
+ // but a DIFFERENT private account must not be imported as a version update.
+ // Historical unscoped archives remain an explicit legacy migration only.
+ if(decoded.sourceScope!==name&&
+    decoded.sourceScope!=='talera-lifeline-dev-local-v1')
+  throw Error('TALERA_RESTORE_OTHER_ACCOUNT_BLOCKED');
  const sourceMatches=decoded.sourceScope===name &&
    decoded.sourceOrigin===location.origin;
  if(!sourceMatches&&!allowOtherOrigin)

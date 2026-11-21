@@ -10,8 +10,9 @@ const prefix='r20-dev/free-10m-f5/';
 const accountA='11111111-1111-4111-8111-111111111111';
 const accountB='22222222-2222-4222-8222-222222222222';
 const dbA='talera-free-local-'+(await privateAccountScope(accountA)).slice(0,32)+'-v1';
-const dbB='talera-free-local-'+(await privateAccountScope(accountB)).slice(0,32)+'-v1';
-const currentAccount=new Map([[8865,accountA],[8866,accountB]]);
+// Same authenticated account across two separate browser origins.
+const dbB='talera-free-local-'+(await privateAccountScope(accountA)).slice(0,32)+'-v1';
+const currentAccount=new Map([[8865,accountA],[8866,accountA]]);
 const originA='http://127.0.0.1:8865',originB='http://127.0.0.1:8866';
 let serverA,serverB,browser,posts=0,accountReads=0;
 function serve(port,db){
@@ -101,6 +102,17 @@ try{
  assert.match(download.suggestedFilename(),/\.talera$/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
+ // Cross-origin consent must never authorize an unrelated account.
+ const foreignDb='talera-free-local-'+(await privateAccountScope(accountB)).slice(0,32)+'-v1';
+ const foreignBlocked=await b.evaluate(async({bytes,foreignDb})=>{
+  const backup=await import('/__f5/f5-portable-idb.mjs');
+  try{
+   await backup.previewFreeLibraryRestore(new Blob([new Uint8Array(bytes)]),
+    foreignDb,{allowOtherOrigin:true});
+   return false;
+  }catch(e){return String(e.message).includes('TALERA_RESTORE_OTHER_ACCOUNT_BLOCKED')}
+ },{bytes:Array.from(fileBytes),foreignDb});
+ assert.equal(foreignBlocked,true,'Different account cannot import private backup');
  await b.locator('#restore-file').setInputFiles({name:'mijn-talera.talera',
   mimeType:'application/octet-stream',buffer:fileBytes});
  await b.locator('#preview-restore').click();
@@ -141,7 +153,7 @@ try{
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  // Simulate a different account logging in while this old page stays open.
  // The UI must fail closed rather than export the previous account's library.
- currentAccount.set(8866,accountA);
+ currentAccount.set(8866,accountB);
  await b.locator('#restore-file').setInputFiles({name:'opnieuw.talera',
   mimeType:'application/octet-stream',buffer:fileBytes});
  await b.locator('#preview-restore').click();
@@ -160,7 +172,8 @@ try{
  console.log('TALERA_FREE_F5_BACKUP_UI_TWO_ORIGINS_PASS',JSON.stringify({
   voluntarySaveDownload:true,twoIsolatedBrowserOrigins:true,permissionRequired:true,
   consentRequiredBeforeWrite:true,recordIdsIntact:true,voiceCuesIntact:true,
-  originalMovBytesIntact:true,preexistingStoriesPreserved:true,duplicateRestoresRejected:true,
+  originalMovBytesIntact:true,sameAccountOtherOriginRestored:true,
+  foreignAccountBlocked:true,preexistingStoriesPreserved:true,duplicateRestoresRejected:true,
   corruptedArchiveRejected:true,networkUploads:posts,realIPhoneValidated:false,
   mainTaleraUiModified:false
  }));

@@ -801,6 +801,7 @@ try{
        topicCards:[...topics?.children||[]].map(x=>({text:x.textContent?.trim(),
          html:x.outerHTML.slice(0,900)})).slice(0,3),
        originalCards:[...cards?.children||[]].map(x=>({text:x.textContent?.trim(),
+         id:new URL(x.getAttribute('href')||'',location.origin).searchParams.get('memory'),
          html:x.outerHTML.slice(0,1000),visible:visible(x)})).slice(0,5),
        topicOnlyClass:document.documentElement.classList.contains('talera-untagged-memory-cards')
      };
@@ -809,6 +810,44 @@ try{
    assert.equal(shown.topicsVisible,true,'Previously approved topic tiles disappeared');
    assert.equal(shown.cardsVisible,true,
      'Saved untitled/no-topic story is INVISIBLE as soon as one tagged story exists');
+   assert.equal(shown.topicOnlyClass,true,
+     'Existing original cards must remain visible alongside approved topic tiles');
+   assert.ok(shown.originalCards.some(x=>x.id===untitled.id&&x.visible),
+     'The untitled/no-topic story must have its EXISTING clickable card');
+   assert.ok(shown.originalCards.some(x=>x.id===a.id&&x.visible),
+     'Other untagged owner stories must remain visible');
+   assert.ok(shown.originalCards.some(x=>x.id===tagged.id&&!x.visible),
+     'A tagged story must not be duplicated in both Home sections');
+   assert.ok(shown.topicCards.some(x=>x.text.includes('Reizen')),
+     'Existing approved owner topic tile disappeared');
+   await mixedHome.reload({waitUntil:'domcontentloaded'});
+   await mixedHome.waitForFunction(ids=>{
+     const cards=document.querySelector('#myCards');
+     const links=[...cards?.querySelectorAll('a[href*="?memory="]')||[]];
+     const tag=links.find(a=>a.href.includes(encodeURIComponent(ids.tagged)));
+     const own=links.find(a=>a.href.includes(encodeURIComponent(ids.untitled)));
+     return tag&&own&&getComputedStyle(tag).display==='none'&&
+       getComputedStyle(own).display!=='none'&&
+       getComputedStyle(cards).display!=='none'&&
+       document.querySelectorAll('#demoCards .talera-topic-card').length===1;
+   },{untitled:untitled.id,tagged:tagged.id},{timeout:18000});
+   const persisted=await mixedHome.evaluate(async ids=>{
+     const store=window.TaleraMemories;
+     const a=await store.get(ids.untitled),b=await store.get(ids.tagged);
+     const photoA=a&&await store.blob(a.items[0].key);
+     const photoB=b&&await store.blob(b.items[0].key);
+     return {aId:a?.id,bId:b?.id,taggedTags:b?.tags||[],
+       aBytes:photoA?.size||0,bBytes:photoB?.size||0};
+   },{untitled:untitled.id,tagged:tagged.id});
+   assert.equal(persisted.aId,untitled.id);
+   assert.equal(persisted.bId,tagged.id);
+   assert.deepEqual(persisted.taggedTags,['Reizen']);
+   assert.equal(persisted.aBytes,untitled.photoBytes);
+   assert.ok(persisted.bBytes>10);
+   console.log('TALERA_F5_MIXED_TOPIC_AND_UNTAGGED_ORIGINAL_CARDS_VISIBLE_PASS',
+     JSON.stringify({syntheticOnly:true,originalMemoryIdsUnchanged:true,
+       originalPhotoBytesUnchanged:true,noDuplicateTaggedStoryCards:true,
+       approvedTopicTilesPreserved:true,realIphoneAccepted:false}));
  }finally{await mixedHome.close()}
  await verifyTellEditorLayout(page,a.id);
  await logout(page);

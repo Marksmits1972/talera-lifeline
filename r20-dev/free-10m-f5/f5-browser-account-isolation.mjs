@@ -832,6 +832,51 @@ try{
    sameAccount:true,sameOrigin:true,existingMediaBytesIntact:true,
    databaseNamesStable:true,otherOriginsNotTested:true,realIPhoneAccepted:false
  }));
+ // Same login does NOT imply the same browser/PWA storage container.
+ // Reproduce the owner's "still signed in, but 0 stories" observation
+ // without erasing originals or creating a second TALERA app. Both contexts
+ // visit the SAME origin using the SAME verified account session cookie.
+ // Their separate IndexedDB containers must not be conflated or silently
+ // migrated. This is a possible mechanism, not proof of its occurrence on
+ // the physical iPhone after the Worker release.
+ const otherContainer=await browser.newContext({
+   ...devices['iPhone 13'],serviceWorkers:'allow',
+   extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
+ });
+ try{
+   const ownCookies=await context.cookies(origin);
+   assert.ok(ownCookies.some(x=>x.name==='talera_sid'),
+     'Need one real authenticated browser session, not a simulated login');
+   await otherContainer.addCookies(ownCookies);
+   const otherPage=await otherContainer.newPage();
+   const response=await otherPage.goto(origin+'/mijn-leven',
+     {waitUntil:'domcontentloaded'});
+   assert.equal(response.status(),200);
+   await waitForLibrary(otherPage);
+   const separated=await otherPage.evaluate(async()=>{
+     const me=await fetch('/api/me',{credentials:'same-origin'});
+     const actor=me.ok?(await me.json()).account?.id:null;
+     const rows=await window.TaleraMemories.list();
+     const dbs=typeof indexedDB.databases==='function'?
+       (await indexedDB.databases()).map(x=>x.name).filter(x=>
+         typeof x==='string'&&x.startsWith('talera-free-local-')).sort():[];
+     return {actor,storyIds:rows.map(x=>x.id),dbs};
+   });
+   assert.equal(separated.actor,ids[0],
+     'Second storage container must still have the EXACT same signed-in account');
+   assert.deepEqual(separated.storyIds,[],
+     'Different PWA/Safari storage container unexpectedly read the first container');
+   assert.deepEqual(separated.dbs,beforeReload.localDbs,
+     'Account namespaced DB identifier must match in both browser containers');
+   const stillOriginal=await originalInventory();
+   assert.deepEqual(stillOriginal,afterReload,
+     'Opening another isolated browser container must not delete original media');
+   console.log('TALERA_SAME_LOGIN_SEPARATE_BROWSER_STORAGE_EXPLAINS_EMPTY_LIBRARY_PASS',
+     JSON.stringify({sameAccount:true,sameOrigin:true,
+       separateBrowserStorageContainers:true,
+       originalRecordsStillIntact:true,originalMediaBytesStillIntact:true,
+       provesPhysicalIphoneCause:false,syntheticOnly:true}));
+ }finally{await otherContainer.close()}
  // The original signed-in app must expose the SAME account-local story in
  // Home, the ordinary presentation and the Tell editor on the SAME origin.
  // Do not create a second app, account, test Worker, or copy any media.

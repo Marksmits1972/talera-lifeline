@@ -1083,8 +1083,13 @@ try{
   // remain identical. This verifies same-origin reload, not a physical
   // iPhone OS storage eviction or a full production deployment.
   await page.reload({waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>typeof window.TaleraMemories?.get==='function',
-    null,{timeout:15000});
+  await page.waitForFunction(async id=>{
+    if(typeof window.TaleraMemories?.list!=='function')return false;
+    const rows=await window.TaleraMemories.list();
+    const cards=document.getElementById('myCards');
+    return rows.some(x=>x.id===id)&&!!cards?.children?.length&&
+      getComputedStyle(cards).display!=='none';
+  },sixPhotoStory.id,{timeout:15000});
   const sixPhotoReload=await page.evaluate(async id=>{
     const me=await fetch('/api/me',{credentials:'same-origin'});
     const account=me.ok?(await me.json()).account?.id:null;

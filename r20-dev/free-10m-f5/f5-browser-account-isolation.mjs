@@ -821,16 +821,33 @@ try{
    assert.ok(shown.topicCards.some(x=>x.text.includes('Reizen')),
      'Existing approved owner topic tile disappeared');
    await mixedHome.reload({waitUntil:'domcontentloaded'});
-   await mixedHome.waitForFunction(ids=>{
-     const cards=document.querySelector('#myCards');
-     const links=[...cards?.querySelectorAll('a[href*="?memory="]')||[]];
-     const tag=links.find(a=>a.href.includes(encodeURIComponent(ids.tagged)));
-     const own=links.find(a=>a.href.includes(encodeURIComponent(ids.untitled)));
-     return tag&&own&&getComputedStyle(tag).display==='none'&&
-       getComputedStyle(own).display!=='none'&&
-       getComputedStyle(cards).display!=='none'&&
-       document.querySelectorAll('#demoCards .talera-topic-card').length===1;
-   },{untitled:untitled.id,tagged:tagged.id},{timeout:18000});
+   try{
+     await mixedHome.waitForFunction(ids=>{
+       const cards=document.querySelector('#myCards');
+       const links=[...cards?.querySelectorAll('a[href*="?memory="]')||[]];
+       const tag=links.find(a=>a.href.includes(encodeURIComponent(ids.tagged)));
+       const own=links.find(a=>a.href.includes(encodeURIComponent(ids.untitled)));
+       return tag&&own&&getComputedStyle(tag).display==='none'&&
+         getComputedStyle(own).display!=='none'&&
+         getComputedStyle(cards).display!=='none'&&
+         document.querySelectorAll('#demoCards .talera-topic-card').length===1;
+     },{untitled:untitled.id,tagged:tagged.id},{timeout:8500});
+   }catch(e){
+     const diagnostic=await mixedHome.evaluate(async()=>{
+       const cards=document.querySelector('#myCards'),topics=document.querySelector('#demoCards');
+       const rows=await window.TaleraMemories?.list?.();
+       return {url:location.href,classes:document.documentElement.className,
+         rows:rows?.map(x=>({id:x.id,tags:x.tags,title:x.title})),
+         cardsStyle:cards&&getComputedStyle(cards).display,
+         cards:[...cards?.children||[]].map(x=>({href:x.getAttribute('href'),
+           display:getComputedStyle(x).display,html:x.outerHTML.slice(0,250)})),
+         topics:[...topics?.children||[]].map(x=>x.textContent?.trim()),
+         filter:!!cards?.__taleraApplyTopicCardVisibility,
+         observer:!!cards?.__taleraTopicCardObserver};
+     });
+     console.log('TALERA_F5_MIXED_TOPIC_POST_RELOAD_DIAGNOSTIC',JSON.stringify(diagnostic));
+     throw e;
+   }
    const persisted=await mixedHome.evaluate(async ids=>{
      const store=window.TaleraMemories;
      const a=await store.get(ids.untitled),b=await store.get(ids.tagged);

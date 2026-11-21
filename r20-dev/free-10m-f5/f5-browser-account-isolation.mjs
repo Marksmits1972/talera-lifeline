@@ -801,7 +801,7 @@ try{
        topicCards:[...topics?.children||[]].map(x=>({text:x.textContent?.trim(),
          html:x.outerHTML.slice(0,900)})).slice(0,3),
        originalCards:[...cards?.children||[]].map(x=>({text:x.textContent?.trim(),
-         id:new URL(x.getAttribute('href')||'',location.origin).searchParams.get('memory'),
+         id:new URL((x.matches('a.memory-card')?x:x.querySelector('a.memory-card'))?.getAttribute('href')||'',location.origin).searchParams.get('memory'),
          html:x.outerHTML.slice(0,1000),visible:visible(x)})).slice(0,5),
        topicOnlyClass:document.documentElement.classList.contains('talera-untagged-memory-cards')
      };
@@ -827,8 +827,10 @@ try{
        const links=[...cards?.querySelectorAll('a[href*="?memory="]')||[]];
        const tag=links.find(a=>a.href.includes(encodeURIComponent(ids.tagged)));
        const own=links.find(a=>a.href.includes(encodeURIComponent(ids.untitled)));
-       return tag&&own&&getComputedStyle(tag).display==='none'&&
-         getComputedStyle(own).display!=='none'&&
+       const tagCard=tag?.closest('.talera-v7-published-card')||tag;
+       const ownCard=own?.closest('.talera-v7-published-card')||own;
+       return tagCard&&ownCard&&getComputedStyle(tagCard).display==='none'&&
+         getComputedStyle(ownCard).display!=='none'&&getComputedStyle(own).display!=='none'&&
          getComputedStyle(cards).display!=='none'&&
          document.querySelectorAll('#demoCards .talera-topic-card').length===1;
      },{untitled:untitled.id,tagged:tagged.id},{timeout:8500});

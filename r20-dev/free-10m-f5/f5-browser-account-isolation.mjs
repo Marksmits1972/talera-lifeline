@@ -844,7 +844,9 @@ try{
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
  });
  try{
-   const ownCookies=await context.cookies(origin);
+   // Copy the browser's actual HttpOnly session cookie. Restricting cookie
+   // enumeration to an HTTP URL can hide Secure cookies on local loopback.
+   const ownCookies=await context.cookies();
    assert.ok(ownCookies.some(x=>x.name==='talera_sid'),
      'Need one real authenticated browser session, not a simulated login');
    await otherContainer.addCookies(ownCookies);

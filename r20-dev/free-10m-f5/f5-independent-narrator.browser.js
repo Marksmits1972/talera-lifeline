@@ -417,10 +417,24 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
       swipePointer:null,swipeSuspended:false,swipeWasPlaying:false,
-      visibilityChange:null,tapTarget:null,onSoundTap:null,
+      visibilityChange:null,resumeOnVisible:false,tapTarget:null,onSoundTap:null,
       onSoundTouchStart:null,onSoundTouchEnd:null,soundTouch:null,retry:null};
-    s.visibilityChange=()=>{if(!isCurrent(s))return;
-      if(document.hidden){s.audio?.pause();s.video?.pause()}};
+    // iOS may preserve this exact PWA document when it goes to background.
+    // Pause on hide, but resume only media that had been playing before hide.
+    // A rejected Safari autoplay attempt uses the existing single-tap hint.
+    s.visibilityChange=()=>{
+      if(!isCurrent(s))return;
+      if(document.hidden){
+        s.resumeOnVisible=!!s.audio&&!s.audio.paused&&!s.audio.ended&&
+          (s.phase==='voice'||s.phase==='originals');
+        s.audio?.pause();s.video?.pause();
+      }else if(s.resumeOnVisible){
+        s.resumeOnVisible=false;
+        if(s.audio&&!s.audio.ended&&!s.swipeSuspended&&
+           (s.phase==='voice'||s.phase==='originals'))
+          attemptPlay(s,s.audio);
+      }
+    };
     document.addEventListener('visibilitychange',s.visibilityChange);
     active=s;
     bindSwipeSuspension(s);

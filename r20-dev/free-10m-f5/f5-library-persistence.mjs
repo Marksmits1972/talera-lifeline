@@ -68,6 +68,7 @@ export function verifyLibraryMediaIntegrity({stories,files}={}){
   const items=story.items??[];
   if(!Array.isArray(items))throw Error('TALERA_LIBRARY_INVALID_STORY_MEDIA');
   const visuals=new Set();
+  let visualCount=0;
   for(const item of items){
    const key=item?.key;
    if(typeof key!=='string'||!key||!filesByKey.has(key))
@@ -76,17 +77,29 @@ export function verifyLibraryMediaIntegrity({stories,files}={}){
    if(!(original instanceof Blob)||!Number.isSafeInteger(original.size)||original.size<=0)
     throw Error('TALERA_LIBRARY_MISSING_OR_EMPTY_ORIGINAL_MEDIA');
    originalsChecked++;
-   if(item.kind==='photo'||item.kind==='video')visuals.add(key);
+   if(item.kind==='photo'||item.kind==='video'){
+    visuals.add(key);
+    visualCount++;
+   }
   }
   const cues=story.narrationCues??[];
   if(!Array.isArray(cues))throw Error('TALERA_LIBRARY_INVALID_VOICE_CUES');
   for(const cue of cues){
-   // Older accepted recordings contain index-only cues; no new ID is invented.
+   // Match the existing narrator: permanent mediaId overrides an old index.
+   // Legacy index-only cues stay supported, but must resolve to a real frame.
+   const time=Number(cue?.t);
+   if(!Number.isFinite(time)||time<0)
+    throw Error('TALERA_LIBRARY_INVALID_VOICE_CUE_TIME');
    const ref=cue?.mediaId;
-   if(ref===undefined||ref===null||ref==='')continue;
-   if(typeof ref!=='string'||!visuals.has(ref))
-    throw Error('TALERA_LIBRARY_INVALID_VOICE_MEDIA_ID');
-   explicitCuesChecked++;
+   if(ref!==undefined&&ref!==null&&ref!==''){
+    if(typeof ref!=='string'||!visuals.has(ref))
+     throw Error('TALERA_LIBRARY_INVALID_VOICE_MEDIA_ID');
+    explicitCuesChecked++;
+   }else{
+    const index=Number(cue?.index);
+    if(!Number.isInteger(index)||index<0||index>=visualCount)
+     throw Error('TALERA_LIBRARY_INVALID_VOICE_MEDIA_INDEX');
+   }
   }
  }
  return Object.freeze({stories:stories.length,originalsChecked,

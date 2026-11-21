@@ -38,6 +38,22 @@ reject([{...story,narrationCues:null,items:{'0':'photo-42'}}],
  files,/TALERA_LIBRARY_INVALID_STORY_MEDIA/);
 reject([story,story],files,/TALERA_LIBRARY_INVALID_OR_DUPLICATE_STORY_ID/);
 reject([story],[...files,files[0]],/TALERA_LIBRARY_INVALID_OR_DUPLICATE_FILE_ID/);
+// Reject stale index-only narration references before exporting or restoring.
+reject([{...story,narrationCues:[{t:0,index:2}]}],files,
+ /TALERA_LIBRARY_INVALID_VOICE_MEDIA_INDEX/);
+reject([{...story,narrationCues:[{t:0,index:-1}]}],files,
+ /TALERA_LIBRARY_INVALID_VOICE_MEDIA_INDEX/);
+reject([{...story,narrationCues:[{t:0,index:'not-an-index'}]}],files,
+ /TALERA_LIBRARY_INVALID_VOICE_MEDIA_INDEX/);
+reject([{...story,narrationCues:[{t:-2,index:0}]}],files,
+ /TALERA_LIBRARY_INVALID_VOICE_CUE_TIME/);
+reject([{...story,narrationCues:[{t:NaN,index:0}]}],files,
+ /TALERA_LIBRARY_INVALID_VOICE_CUE_TIME/);
+// A valid permanent mediaId overrides a stale legacy index, as in narrator.
+const idOverridesLegacy=verifyLibraryMediaIntegrity({stories:[
+ {...story,narrationCues:[{t:0,index:88,mediaId:'video-84'}]}
+],files});
+assert.equal(idOverridesLegacy.explicitCuesChecked,1);
 // Backwards compatibility: existing index-only cues must remain valid.
 const legacy=verifyLibraryMediaIntegrity({stories:[
  {...story,narrationCues:[{t:0,index:0},{t:500,index:1}]}
@@ -49,5 +65,6 @@ assert.deepEqual({...verifyLibraryMediaIntegrity({stories:[
 console.log('TALERA_LIBRARY_ORIGINAL_AND_VOICE_REFERENCES_PASS',JSON.stringify({
  noBytesChanged:true,missingOriginalRejected:true,
  blankOriginalRejected:true,badVoiceCueRejected:true,
- indexOnlyLegacyCompatible:true,syntheticOnly:true,realIPhoneAccepted:false
+ indexOnlyLegacyCompatible:true,indexOnlyCueValidated:true,
+  idTakesPrecedence:true,syntheticOnly:true,realIPhoneAccepted:false
 }));

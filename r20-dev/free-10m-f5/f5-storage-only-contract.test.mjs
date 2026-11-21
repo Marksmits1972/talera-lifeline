@@ -24,8 +24,9 @@ assert.ok(gateway.includes('scopeLocalMemories(privateHtml,await privateAccountS
 assert.ok(gateway.includes("pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped))):scoped"),
   'Only recording media-ID integrity is allowed as an editor storage correction');
 assert.ok(gateway.includes("const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;")&&
-  gateway.includes('assetizeHtml(silenced,new Set(approvedAssets))'),
-  'Only the explicitly requested, original editor video muting guard may alter original markup');
+  gateway.includes('const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(silenced):silenced;')&&
+  gateway.includes('assetizeHtml(threeTabHome,new Set(approvedAssets))'),
+  'Existing approved editor video muting and three-tab Home must retain the same scoped storage');
 assert.ok(gateway.includes("if(p==='/api/version'&&m==='GET')"),
   'Restore the original periodic version check without replacing the UI');
 assert.ok(gateway.includes('allowedVersionCheck(url,m)'),

@@ -737,6 +737,34 @@ try{
  assert.equal(readback.id,a.id);
  assert.equal(readback.size,a.bytes,'Original file changed during account switches');
  assert.match(readback.type,/image\/png/);
+ // Opening a new software page on the SAME origin and account must read
+ // the existing local library, not silently create a blank replacement.
+ // Different browser origins are deliberately NOT equated by this test.
+ const originalInventory=async()=>page.evaluate(async id=>{
+   const session=await fetch('/api/me',{credentials:'same-origin'});
+   const account=session.ok?(await session.json()).account?.id:null;
+   const stories=await window.TaleraMemories.list();
+   const original=await window.TaleraMemories.blob(id+':0');
+   const localDbs=typeof indexedDB.databases==='function'?
+     (await indexedDB.databases()).map(x=>x.name).filter(x=>
+       typeof x==='string'&&x.startsWith('talera-free-local-')).sort():[];
+   return {account,ids:stories.map(x=>x.id).sort(),
+     mediaBytes:original?.size||0,localDbs};
+ },a.id);
+ const beforeReload=await originalInventory();
+ await page.reload({waitUntil:'domcontentloaded'});
+ await waitForLibrary(page);
+ const afterReload=await originalInventory();
+ assert.deepEqual(afterReload,beforeReload,
+   'Reload on the same TALERA origin replaced the account library');
+ assert.equal(afterReload.account,ids[0],
+   'Reload changed the verified account UUID');
+ assert.ok(afterReload.ids.includes(a.id)&&afterReload.mediaBytes===a.bytes,
+   'Reload lost the original story or media bytes');
+ console.log('TALERA_F5_SAME_ORIGIN_REOPEN_ORIGINAL_LIBRARY_PASS',JSON.stringify({
+   sameAccount:true,sameOrigin:true,existingMediaBytesIntact:true,
+   databaseNamesStable:true,otherOriginsNotTested:true,realIPhoneAccepted:false
+ }));
  // The original signed-in app must expose the SAME account-local story in
  // Home, the ordinary presentation and the Tell editor on the SAME origin.
  // Do not create a second app, account, test Worker, or copy any media.

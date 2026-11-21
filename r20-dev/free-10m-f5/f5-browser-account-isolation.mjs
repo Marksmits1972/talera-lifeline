@@ -858,7 +858,10 @@ try{
    const response=await otherPage.goto(origin+'/mijn-leven',
      {waitUntil:'domcontentloaded'});
    assert.equal(response.status(),200);
-   await waitForLibrary(otherPage);
+   // Home owns the original memory store but intentionally routes account
+   // menus via /present; it does not itself mount the menu dialog.
+   await otherPage.waitForFunction(()=>typeof window.TaleraMemories?.list==='function',
+     null,{timeout:15000});
    const separated=await otherPage.evaluate(async()=>{
      const me=await fetch('/api/me',{credentials:'same-origin'});
      const actor=me.ok?(await me.json()).account?.id:null;

@@ -1016,6 +1016,120 @@ try{
       physicalIphoneAccepted:false}));
   await load(page,plain,3);
 
+  // Owner-reported release-risk: a real iPhone story with SIX photos and
+  // ONE voice stayed visible after closing the PWA, but earlier stories were
+  // absent after a Worker release. Protect the exact same local account
+  // library across a full fresh document load, without creating another
+  // app, database, storage owner, or copying any customer media.
+  await page.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>typeof window.TaleraMemories?.updateCues==='function',
+    null,{timeout:15000});
+  const sixPhotoStory=await page.evaluate(async voice=>{
+    const colors=['#de2525','#26bd46','#245be2','#e5a422','#a43bd3','#24b8ba'];
+    const uploads=[];
+    for(let i=0;i<colors.length;i++){
+      const canvas=document.createElement('canvas');
+      canvas.width=144;canvas.height=144;
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle=colors[i];ctx.fillRect(0,0,144,144);
+      const image=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+      if(!image?.size)throw Error('Synthetic original iPhone photo missing');
+      uploads.push(new File([image],'original-'+i+'.png',{type:'image/png'}));
+    }
+    uploads.push(new File([Uint8Array.from(atob(voice),x=>x.charCodeAt(0))],
+      'original-six-photo-voice.m4a',{type:'audio/mp4'}));
+    const saved=await window.TaleraMemories.save({
+      title:'',date:'1989-05-06',time:'14:20:00',
+      tags:[],text:'Synthetic account-only voice memory with six original photos',
+      narrationCues:[],narrationDurationMs:3200
+    },uploads);
+    const keys=saved.items.map(x=>x.key);
+    if(saved.items.length!==7||saved.items.some((x,i)=>
+      x.kind!==(i<6?'photo':'audio')))
+      throw Error('The actual TALERA library lost six photo/voice references');
+    const cues=keys.slice(0,6).map((mediaId,index)=>({
+      t:index*500,index,mediaId
+    }));
+    await window.TaleraMemories.updateCues(saved.id,cues);
+    const hash=async blob=>Array.from(new Uint8Array(await crypto.subtle.digest(
+      'SHA-256',await blob.arrayBuffer())),b=>
+      b.toString(16).padStart(2,'0')).join('');
+    const digests=await Promise.all(keys.map(async key=>{
+      const blob=await window.TaleraMemories.blob(key);
+      if(!(blob instanceof Blob)||!blob.size)
+        throw Error('Original photo/voice Blob missing after save');
+      return hash(blob);
+    }));
+    const me=await fetch('/api/me',{credentials:'same-origin'});
+    if(!me.ok)throw Error('Original account session not available');
+    const account=(await me.json()).account?.id;
+    const dbs=(await indexedDB.databases()).map(x=>x.name||'')
+      .filter(x=>x.startsWith('talera-free-local-')).sort();
+    return {id:saved.id,account,keys,digests,cues,dbs};
+  },readFileSync(syntheticIphoneVoice).toString('base64'));
+  assert.equal(sixPhotoStory.keys.length,7);
+  assert.equal(sixPhotoStory.cues.length,6);
+  assert.ok(sixPhotoStory.account&&sixPhotoStory.dbs.length===1);
+  await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(async id=>{
+    if(!window.TaleraMemories?.list)return false;
+    const rows=await window.TaleraMemories.list();
+    const own=document.getElementById('myCards');
+    return rows.some(r=>r.id===id)&&own?.children?.length>0&&
+      getComputedStyle(own).display!=='none';
+  },sixPhotoStory.id,{timeout:15000});
+  // A refreshed PWA gets new HTML/scripts; the account UUID, physical
+  // IndexedDB namespace, original file hashes, photo order and cues must
+  // remain identical. This verifies same-origin reload, not a physical
+  // iPhone OS storage eviction or a full production deployment.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>typeof window.TaleraMemories?.get==='function',
+    null,{timeout:15000});
+  const sixPhotoReload=await page.evaluate(async id=>{
+    const me=await fetch('/api/me',{credentials:'same-origin'});
+    const account=me.ok?(await me.json()).account?.id:null;
+    const row=await window.TaleraMemories.get(id);
+    if(!row)throw Error('Previously persisted six-photo voice story is gone');
+    const blobs=await Promise.all(row.items.map(x=>window.TaleraMemories.blob(x.key)));
+    const hashes=await Promise.all(blobs.map(async blob=>{
+      if(!(blob instanceof Blob)||!blob.size)
+        throw Error('Original audio or picture missing after PWA reload');
+      return Array.from(new Uint8Array(await crypto.subtle.digest(
+        'SHA-256',await blob.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
+    }));
+    const dbs=(await indexedDB.databases()).map(x=>x.name||'')
+      .filter(x=>x.startsWith('talera-free-local-')).sort();
+    const own=document.getElementById('myCards');
+    return {account,id:row.id,keys:row.items.map(x=>x.key),digests:hashes,
+      cues:row.narrationCues,dbs,title:row.title,tags:row.tags||[],
+      ownCardVisible:!!own&&own.children.length>0&&
+        getComputedStyle(own).display!=='none'};
+  },sixPhotoStory.id);
+  assert.equal(sixPhotoReload.account,sixPhotoStory.account);
+  assert.equal(sixPhotoReload.id,sixPhotoStory.id);
+  assert.deepEqual(sixPhotoReload.keys,sixPhotoStory.keys);
+  assert.deepEqual(sixPhotoReload.digests,sixPhotoStory.digests);
+  assert.deepEqual(sixPhotoReload.cues,sixPhotoStory.cues);
+  assert.deepEqual(sixPhotoReload.dbs,sixPhotoStory.dbs);
+  assert.equal(sixPhotoReload.title,'');
+  assert.deepEqual(sixPhotoReload.tags,[]);
+  assert.equal(sixPhotoReload.ownCardVisible,true);
+  await load(page,sixPhotoStory.id,6);
+  await page.waitForFunction(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    const memory=window.__taleraTimelineRuntime?.currentMemory?.();
+    return audio&&!audio.paused&&audio.currentTime>.06&&
+      memory?._zeroFrames?.length===6&&
+      memory?._taleraNarrationCues?.length===6;
+  },null,{timeout:14000});
+  console.log('TALERA_FREE_SIX_PHOTO_VOICE_ACCOUNT_LIBRARY_RELOAD_PASS',
+    JSON.stringify({sameOrigin:true,sameAccount:true,allSevenMediaIDsStable:true,
+      originalPhotoAndVoiceHashesIdentical:true,allSixCuesIdentical:true,
+      titleAndTagsOptional:true,homeAndNarratorBothReadable:true,
+      realWorkerVersionTransitionTested:false,realIphoneAccepted:false,
+      syntheticOnly:true}));
+  await load(page,plain,3);
+
   // A real LEFT/RIGHT gesture from a playing voice memory must immediately
   // reveal the EXISTING 11-photo wheel and select another saved memory.
   // No new viewer, test app, audio ID or narrator-specific swipe engine.

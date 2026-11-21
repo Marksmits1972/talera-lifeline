@@ -1119,9 +1119,10 @@ try{
       blocked:!!e.target?.closest?.('a,button,[role=button],input,select,textarea')
     }),{capture:true,once:true});
   });
-  // The owner naturally taps the visible first PHOTO, not a hidden scroller.
-  // This must unlock voice and subsequent media without an extra player UI.
-  await page.locator('#photoStage').tap({timeout:6000});
+  // The original picture is intentionally covered by the existing user
+  // gesture surface. Use that actual hit target, never force an underlying
+  // aria-hidden photoStage click or add an alternate player/view.
+  await page.locator('#memoryStoryScroll').tap({timeout:6000});
   await page.waitForTimeout(500);
   const tapReport=await page.evaluate(()=>({events:window.__taleraNarratorTapDiagnostics,
     hint:!!document.getElementById('talera-f5-narrator-sound-hint'),

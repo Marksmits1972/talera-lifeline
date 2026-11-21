@@ -771,6 +771,45 @@ try{
      JSON.stringify({syntheticOnly:true,oldCardsReused:true,
        originalRecordsUnchanged:true,realIPhoneAccepted:false}));
  }finally{await untitledHome.close()}
+ // Regression first: the original approved topic tiles must coexist with
+ // previously saved untitled/untagged stories in the SAME owner library.
+ // Nothing here creates a new user-visible topic or migrates original media.
+ const tagged=await page.evaluate(async png=>{
+   const image=new File([Uint8Array.from(atob(png),c=>c.charCodeAt(0))],
+     'tagged-synthetic.png',{type:'image/png'});
+   const record=await window.TaleraMemories.save({
+     title:'Tagged local regression',date:'1986-05-16',text:'Tagged technical record',
+     tags:['Reizen'],narrationCues:[]
+   },[image]);
+   return {id:record.id,tags:record.tags,photoKey:record.items?.[0]?.key};
+ },onePixelPng);
+ const mixedHome=await page.context().newPage();
+ try{
+   const res=await mixedHome.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+   assert.equal(res.status(),200);
+   await mixedHome.waitForFunction(async ids=>{
+     const rows=await window.TaleraMemories?.list?.();
+     return rows?.some(x=>x.id===ids.untitled)&&rows?.some(x=>x.id===ids.tagged)&&
+       document.querySelectorAll('#demoCards .talera-topic-card').length>0;
+   },{untitled:untitled.id,tagged:tagged.id},{timeout:18000});
+   const shown=await mixedHome.evaluate(()=>{
+     const cards=document.querySelector('#myCards');
+     const topics=document.querySelector('#demoCards');
+     const visible=node=>!!node&&getComputedStyle(node).display!=='none';
+     return {
+       cardsVisible:visible(cards),topicsVisible:visible(topics),
+       topicCards:[...topics?.children||[]].map(x=>({text:x.textContent?.trim(),
+         html:x.outerHTML.slice(0,900)})).slice(0,3),
+       originalCards:[...cards?.children||[]].map(x=>({text:x.textContent?.trim(),
+         html:x.outerHTML.slice(0,1000),visible:visible(x)})).slice(0,5),
+       topicOnlyClass:document.documentElement.classList.contains('talera-untagged-memory-cards')
+     };
+   });
+   console.log('TALERA_F5_MIXED_TOPIC_HOME_CURRENT_RENDER',JSON.stringify(shown));
+   assert.equal(shown.topicsVisible,true,'Previously approved topic tiles disappeared');
+   assert.equal(shown.cardsVisible,true,
+     'Saved untitled/no-topic story is INVISIBLE as soon as one tagged story exists');
+ }finally{await mixedHome.close()}
  await verifyTellEditorLayout(page,a.id);
  await logout(page);
  await assertSignedOutEmpty(page,a.id);

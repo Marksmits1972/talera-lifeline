@@ -750,6 +750,27 @@ try{
      JSON.stringify({syntheticOnly:true,sameOrigin:true,sameAccount:true,
        originalBytesIntact:true,realIPhoneAccepted:false}));
  }finally{await untitledViewer.close()}
+ // The approved Home previously hid the ORIGINAL memory cards unconditionally.
+ // If these existing records have no topics, they must not produce an empty
+ // Home while the same account's stories and photos remain in IndexedDB.
+ const untitledHome=await page.context().newPage();
+ try{
+   const response=await untitledHome.goto(origin+'/mijn-leven',
+     {waitUntil:'domcontentloaded'});
+   assert.equal(response.status(),200);
+   await untitledHome.waitForFunction(async id=>{
+     const store=window.TaleraMemories;
+     if(typeof store?.list!=='function')return false;
+     const rows=await store.list();
+     const cards=document.getElementById('myCards');
+     return rows.some(x=>x.id===id) && cards?.children.length>0 &&
+       document.documentElement.classList.contains('talera-untagged-memory-cards') &&
+       getComputedStyle(cards).display!=='none';
+   },untitled.id,{timeout:25000});
+   console.log('TALERA_F5_UNTAGGED_OWNER_HOME_EXISTING_CARDS_VISIBLE_PASS',
+     JSON.stringify({syntheticOnly:true,oldCardsReused:true,
+       originalRecordsUnchanged:true,realIPhoneAccepted:false}));
+ }finally{await untitledHome.close()}
  await verifyTellEditorLayout(page,a.id);
  await logout(page);
  await assertSignedOutEmpty(page,a.id);

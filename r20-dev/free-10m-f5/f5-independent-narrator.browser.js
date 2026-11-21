@@ -110,18 +110,42 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       });
     };
   }
+  // A cold iOS document can interrupt its very first play() while the
+  // underlying source is being prepared. The original implementation ignored
+  // AbortError forever; with a voice-driven clock that also freezes all photos.
+  // Re-try at most twice on the SAME audio node, never on a swipe, page hide,
+  // memory change or intentional pause. Then offer the existing tap unlock.
+  function recoverInterruptedStart(s,media){
+    if(!isCurrent(s)||s.audio!==media||!media.paused||media.ended||
+       s.swipeSuspended||document.hidden)return;
+    if(s.interruptedRetries>=2){offerPlay(s,media);return}
+    s.interruptedRetries++;
+    if(s.interruptedRetryTimer)clearTimeout(s.interruptedRetryTimer);
+    s.interruptedRetryTimer=setTimeout(()=>{
+      s.interruptedRetryTimer=null;
+      if(isCurrent(s)&&s.audio===media&&media.paused&&!media.ended&&
+         !s.swipeSuspended&&!document.hidden)
+        attemptPlay(s,media);
+    },220);
+  }
   function attemptPlay(s,media){
     if(!isCurrent(s)||!media||s.swipeSuspended)return;
     prepareNativePlayback(s);
     setAudible(media);
     try{Promise.resolve(media.play()).then(()=>{
+      s.interruptedRetries=0;
       clearButton(s);
     }).catch(error=>{
+      if(!isCurrent(s))return;
       if(error?.name==='NotAllowedError')offerPlay(s,media);
-      else if(error?.name!=='AbortError')
-        console.warn('TALERA vertelgeluid niet gestart',error);
+      else if(error?.name==='AbortError')recoverInterruptedStart(s,media);
+      else console.warn('TALERA vertelgeluid niet gestart',error);
     })}
-    catch(error){if(error?.name==='NotAllowedError')offerPlay(s,media)}
+    catch(error){
+      if(error?.name==='NotAllowedError')offerPlay(s,media);
+      else if(error?.name==='AbortError')recoverInterruptedStart(s,media);
+      else console.warn('TALERA vertelgeluid niet gestart',error);
+    }
   }
   function removeVideo(s){
     if(!s.video)return;
@@ -184,6 +208,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     ])if(handler)document.removeEventListener(event,handler,event!=='talera:wheel-motion');
     if(s.timer)clearInterval(s.timer);
     if(s.postTimer)clearTimeout(s.postTimer);
+    if(s.interruptedRetryTimer)clearTimeout(s.interruptedRetryTimer);
     if(s.audio){
       s.audio.onplay=s.audio.onpause=s.audio.onended=null;
       s.audio.ontimeupdate=s.audio.onseeking=s.audio.onseeked=null;
@@ -416,6 +441,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       nativeAudioSession:null,
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
+      interruptedRetries:0,interruptedRetryTimer:null,
       swipePointer:null,swipeSuspended:false,swipeWasPlaying:false,
       visibilityChange:null,resumeOnVisible:false,tapTarget:null,onSoundTap:null,
       onSoundTouchStart:null,onSoundTouchEnd:null,soundTouch:null,retry:null};

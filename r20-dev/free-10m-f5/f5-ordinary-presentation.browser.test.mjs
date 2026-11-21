@@ -911,6 +911,83 @@ try{
 
 
 
+  // iPhone MediaRecorder produces AAC/M4A voice recordings, not the WAV
+  // fixture above. Verify the REAL account-local /tell writer, persisted
+  // original audio/mp4 bytes and timed photo/video cues across a cold reopen.
+  const syntheticIphoneVoice=path.join(generated,'iphone-aac-narration.m4a');
+  execFileSync('ffmpeg',['-y','-f','lavfi',
+    '-i','sine=frequency=495:duration=3.2',
+    '-c:a','aac','-b:a','96k','-movflags','+faststart',
+    syntheticIphoneVoice],{timeout:25000,stdio:'ignore'});
+  await page.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>typeof window.TaleraMemories?.updateCues==='function',
+    null,{timeout:15000});
+  const aacStory=await page.evaluate(async ({voice,video})=>{
+    const bytes=x=>Uint8Array.from(atob(x),c=>c.charCodeAt(0));
+    const photo=new File([await new Promise(resolve=>{
+      const canvas=document.createElement('canvas');
+      canvas.width=120;canvas.height=120;
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#1dcf4c';ctx.fillRect(0,0,120,120);
+      canvas.toBlob(resolve,'image/png');
+    })],'iphone-voice-photo.png',{type:'image/png'});
+    const originalVideo=new File([bytes(video)],'iphone-story-original.webm',
+      {type:'video/webm'});
+    const originalVoice=new File([bytes(voice)],'iphone-original-voice.m4a',
+      {type:'audio/mp4'});
+    const saved=await window.TaleraMemories.save({
+      title:'',date:'2026-11-12',time:'18:45:00',
+      text:'Technical only: original iPhone-style AAC voice and media',
+      narrationCues:[],narrationDurationMs:3200
+    },[photo,originalVideo,originalVoice]);
+    const images=saved.items.filter(x=>x.kind==='photo'||x.kind==='video');
+    const recorded=saved.items.find(x=>x.kind==='audio');
+    if(!recorded||images.length!==2)
+      throw Error('Original account-local editor lost the AAC recording or image/video IDs');
+    const cues=[{t:0,index:0,mediaId:images[0].key},
+      {t:700,index:1,mediaId:images[1].key,videoAtMs:0}];
+    await window.TaleraMemories.updateCues(saved.id,cues);
+    const row=await window.TaleraMemories.get(saved.id);
+    const blob=await window.TaleraMemories.blob(recorded.key);
+    return {id:saved.id,voiceId:recorded.key,voiceSize:blob?.size||0,
+      voiceType:blob?.type,frameKeys:images.map(x=>x.key),
+      cues:row.narrationCues};
+  },{voice:readFileSync(syntheticIphoneVoice).toString('base64'),
+     video:readFileSync(syntheticOriginal).toString('base64')});
+  assert.ok(aacStory.voiceSize>15000,'Original AAC iPhone voice not persisted');
+  assert.match(aacStory.voiceType||'',/^audio\/mp4/);
+  assert.deepEqual(aacStory.cues.map(x=>x.mediaId),aacStory.frameKeys);
+  await load(page,aacStory.id,2);
+  await page.waitForFunction(()=>{
+    const a=document.querySelector('.talera-independent-narrator-layer audio');
+    return a&&!a.paused&&a.currentTime>.06;
+  },null,{timeout:14000});
+  // Cold restart within the SAME authenticated PWA storage container.
+  await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+  await load(page,aacStory.id,2);
+  const aacReopen=await page.evaluate(async id=>{
+    const row=await window.TaleraMemories.get(id);
+    const voice=row.items.find(x=>x.kind==='audio');
+    const original=await window.TaleraMemories.blob(voice.key);
+    const mem=window.__taleraTimelineRuntime?.currentMemory?.();
+    return {voiceId:voice.key,voiceType:original?.type,
+      voiceSize:original?.size||0,frames:mem?._zeroFrames?.map(x=>x.key),
+      cues:mem?._taleraNarrationCues?.map(x=>x.mediaId)};
+  },aacStory.id);
+  assert.equal(aacReopen.voiceId,aacStory.voiceId);
+  assert.equal(aacReopen.voiceSize,aacStory.voiceSize);
+  assert.deepEqual(aacReopen.frames,aacStory.frameKeys);
+  assert.deepEqual(aacReopen.cues,aacStory.frameKeys);
+  await page.waitForFunction(()=>{
+    const a=document.querySelector('.talera-independent-narrator-layer audio');
+    return a&&!a.paused&&a.currentTime>.06;
+  },null,{timeout:14000});
+  console.log('TALERA_F5_ORIGINAL_IPHONE_AAC_VOICE_REOPENS_WITH_SAME_MEDIA_IDS_PASS',
+    JSON.stringify({syntheticOnly:true,accountOriginalBlobsIntact:true,
+      originalAACPlayback:true,timedPhotoAndVideoCuesIntact:true,
+      physicalIphoneAccepted:false}));
+  await load(page,plain,3);
+
   // A real LEFT/RIGHT gesture from a playing voice memory must immediately
   // reveal the EXISTING 11-photo wheel and select another saved memory.
   // No new viewer, test app, audio ID or narrator-specific swipe engine.

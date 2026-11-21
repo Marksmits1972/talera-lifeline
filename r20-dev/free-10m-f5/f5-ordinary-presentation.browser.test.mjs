@@ -734,6 +734,33 @@ try{
     'Recorded voice must not be silently muted in the real PWA');
   assert.ok(voiceSound.volume>0,'Voice volume must be audible');
   assert.equal(voiceSound.dots,4,'Existing orange photo dots must be present');
+  // Simulate the SAME iPhone PWA being backgrounded and foregrounded without
+  // a full document reload. A preserved WebKit page must not stay forever on
+  // the first photo after visibilitychange pauses the voice clock.
+  const hiddenNarration=await page.evaluate(()=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    if(!audio||audio.paused)throw Error('Narrator not actively playing');
+    window.__taleraSyntheticPwaHidden=true;
+    Object.defineProperty(document,'hidden',{configurable:true,
+      get:()=>window.__taleraSyntheticPwaHidden});
+    document.dispatchEvent(new Event('visibilitychange'));
+    return {paused:audio.paused,at:audio.currentTime};
+  });
+  assert.equal(hiddenNarration.paused,true,
+    'Existing narrated voice must pause when PWA enters background');
+  await page.evaluate(()=>{
+    window.__taleraSyntheticPwaHidden=false;
+    document.dispatchEvent(new Event('visibilitychange'));
+    delete document.hidden;
+  });
+  await page.waitForFunction(previous=>{
+    const audio=document.querySelector('.talera-independent-narrator-layer audio');
+    return audio&&!audio.paused&&!audio.muted&&
+      audio.currentTime>previous+0.08;
+  },hiddenNarration.at,{timeout:12000});
+  console.log('TALERA_F5_NARRATED_PWA_FOREGROUND_VOICE_RESUMES_PASS',
+    JSON.stringify({syntheticVisibility:true,originalPlayer:true,
+      originalMediaUnchanged:true,realIphoneAccepted:false}));
   const firstNarrated=await centerPixel(page);
   assert.ok(dominant(firstNarrated,0),
     'Independent narrator did not paint its OWN first original photo: '+JSON.stringify(firstNarrated));

@@ -1078,6 +1078,35 @@ try{
     };
   });
   await load(page,narrated.id,4);
+  // This is a NEW document load after saving the real account-local record:
+  // the persisted voice Blob and canonical picture/video cues must be present
+  // BEFORE diagnosing any iPhone autoplay rejection.
+  const reopenedNarration=await page.evaluate(async id=>{
+    const row=await window.TaleraMemories.get(id);
+    const voice=row?.items?.find(x=>x.kind==='audio');
+    const blob=voice&&await window.TaleraMemories.blob(voice.key);
+    const frames=(row?.items||[]).filter(x=>x.kind==='photo'||x.kind==='video');
+    const selected=window.__taleraTimelineRuntime?.currentMemory?.();
+    return {id:row?.id,voiceId:voice?.key,
+      voiceBytes:blob?.size||0,voiceMime:blob?.type,
+      cueCount:row?.narrationCues?.length||0,
+      cueIds:(row?.narrationCues||[]).map(c=>c.mediaId),
+      frameIds:frames.map(x=>x.key),
+      voiceHydrated:!!selected?._zeroItems?.some(x=>x.kind==='audio'),
+      frameCount:selected?._zeroFrames?.length};
+  },narrated.id);
+  assert.equal(reopenedNarration.id,narrated.id);
+  assert.equal(reopenedNarration.voiceId,narrated.voiceId);
+  assert.ok(reopenedNarration.voiceBytes>100,'Cold reopen lost original voice bytes');
+  assert.deepEqual(reopenedNarration.cueIds,narrated.cues.map(x=>x.mediaId),
+    'Cold reopen lost original canonical picture/video cue IDs');
+  assert.equal(reopenedNarration.frameCount,4);
+  assert.equal(reopenedNarration.voiceHydrated,true,
+    'Cold reopen routed a narrated story to the ordinary picture player');
+  console.log('TALERA_F5_COLD_REOPEN_ORIGINAL_VOICE_AND_CUES_PRESERVED_PASS',
+    JSON.stringify({sameAccount:true,originalVoiceId:true,
+      canonicalCues:true,voiceBytes:reopenedNarration.voiceBytes,
+      syntheticOnly:true,realIphoneAccepted:false}));
   const voiceHint=page.locator('#talera-f5-narrator-sound-hint');
   await voiceHint.waitFor({state:'visible',timeout:10000});
   assert.equal(await voiceHint.textContent(),'Tik één keer voor geluid');
@@ -1090,7 +1119,9 @@ try{
       blocked:!!e.target?.closest?.('a,button,[role=button],input,select,textarea')
     }),{capture:true,once:true});
   });
-  await page.locator('#memoryStoryScroll').tap({timeout:6000});
+  // The owner naturally taps the visible first PHOTO, not a hidden scroller.
+  // This must unlock voice and subsequent media without an extra player UI.
+  await page.locator('#photoStage').tap({timeout:6000});
   await page.waitForTimeout(500);
   const tapReport=await page.evaluate(()=>({events:window.__taleraNarratorTapDiagnostics,
     hint:!!document.getElementById('talera-f5-narrator-sound-hint'),

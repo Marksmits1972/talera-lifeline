@@ -172,10 +172,10 @@ photoRepairButton.addEventListener('click',async()=>{
   const result=await repairVerifiedUnreadablePhotos(file,db,{
    allowOtherOrigin:cross.checked,confirmed:true
   });
+  invalidate();
   message(status,'Fotoherstel bevestigd op dit toestel: '+result.repairedPhotos+
    ' onleesbare originele foto(’s) byte-identiek teruggezet, zonder herinneringen,'+
    ' media-ID’s, video of geluid te wijzigen. Controleer nu Mijn leven en de foto’s.');
-  invalidate();
  }catch(error){
   // This error can ALSO come from post-write verification. Do not claim
   // "nothing changed" when the IndexedDB write may have committed.
@@ -187,8 +187,8 @@ photoRepairButton.addEventListener('click',async()=>{
    /NO_PROVEN_BAD_PHOTOS/.test(code)?
    'Er zijn geen aantoonbaar onleesbare originele foto’s gevonden om te herstellen.':
    'Herstel niet bevestigd. Bewaar het originele back-upbestand; er is niets aan de presentatie gewijzigd.';
-  message(status,reason);
   invalidate();
+  message(status,reason);
  }finally{
   photoRepairConsent.disabled=false;preview.disabled=!chooser.files?.[0];
  }

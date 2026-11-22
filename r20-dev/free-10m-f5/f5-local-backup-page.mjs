@@ -47,12 +47,6 @@ h3{font-size:1.07rem;margin:18px 0 10px}
 <button type="button" id="preview-restore" disabled>Bestand controleren</button>
 </div>
 <output id="restore-status" role="status"></output>
-<div id="backup-photo-repair" hidden>
-<h3>Alleen onleesbare foto's veilig herstellen</h3>
-<p class="note">Dit is geen volledige back-upterugzetting. De app controleert iedere betrokken oorspronkelijke foto opnieuw, behoudt de herinneringen en media-ID's en vervangt uitsluitend foto's die in jouw bibliotheek aantoonbaar niet leesbaar zijn en in de gekozen back-up wel. De overige bestanden blijven onaangeroerd.</p>
-<label><input type="checkbox" id="confirm-photo-repair"> Ik geef uitdrukkelijk toestemming om uitsluitend aantoonbaar onleesbare originele foto's in mijn bestaande bibliotheek vanuit dit bestand te herstellen.</label>
-<button type="button" id="run-photo-repair" disabled>Herstel onleesbare foto's</button>
-</div>
 <div id="backup-step-confirm" hidden>
 <h3>Stap 3 — Zet herinneringen terug</h3>
 <label><input type="checkbox" id="confirm-restore"> Ik heb de controle gelezen en wil deze herinneringen terugzetten.</label>

@@ -2,11 +2,16 @@ name: TALERA Free F5 - private voluntary local backup end-to-end QA
 # Historical synthetic-account browser exercises are retained as code only.
 # They must not run automatically: TALERA Free tests now use real owner accounts.
 on:
+  push:
+    branches: [feature/free-f5-library-boundary-20261117]
+    paths:
+      - '.github/workflows/talera-free-f5-portable-archive-qa.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   archive_codec:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -56,3 +61,214 @@ jobs:
           fi
           git diff --exit-code "$BASE" HEAD -- r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-editor-video-mute-guard.mjs r20-dev/free-10m-delivery/
           echo 'TALERA_FREE_BACKUP_ONLY_NO_APPROVED_PLAYER_OR_UI_CHANGES'
+
+  deploy_owner_approved_photo_restore_same_pwa:
+    name: Publish owner-authorized library photo restore on ONE existing TALERA PWA
+    if: github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-photo-restore-20261122'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    concurrency:
+      group: talera-free-f5-storage-only-iphone-qa-20261109
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
+      F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
+      F5_EXPECTED_LIVE_VERSION: b1e63423-49f5-43fd-a463-5f1a9f8b411e
+      F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Pin single approved photo-only source change and forbid any engine change
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
+          test "$(git rev-parse HEAD^)" = eb6bda2906ad8ee08e105a4ff3883e17df37efe2
+          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-portable-archive-qa.yml
+          git merge-base --is-ancestor 54dbf70af9210ce671a03f441d76e442daf2f962 HEAD
+          git diff --name-only 54dbf70af9210ce671a03f441d76e442daf2f962 HEAD -- r20-dev/ r19-dev/ src/ package.json package-lock.json >/tmp/talera-photo-source-diff
+          printf '%s\n' 'r20-dev/free-10m-f5/f5-library-persistence.mjs' 'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs' >/tmp/talera-photo-expected-diff
+          diff -u /tmp/talera-photo-expected-diff /tmp/talera-photo-source-diff
+          test "$(git hash-object r20-dev/free-10m-f5/f5-library-persistence.mjs)" = 8b8625d07969b9fe0412619b86ac8142e85b0855
+          git diff --exit-code 54dbf70af9210ce671a03f441d76e442daf2f962 HEAD -- \
+            r20-dev/free-10m-f5/f5-worker.mjs \
+            r20-dev/free-10m-f5/f5-public-assets.mjs \
+            r20-dev/free-10m-f5/f5-portable-archive.mjs \
+            r20-dev/free-10m-f5/f5-portable-idb.mjs \
+            r20-dev/free-10m-f5/f5-backup-controller.mjs \
+            r20-dev/free-10m-f5/f5-local-backup-page.mjs \
+            r20-dev/free-10m-f5/f5-local-scope.mjs
+          echo 'ONLY_LIBRARY_RESTORE_SOURCE_CHANGED_NO_ENGINE_NO_NEW_APP_NO_SYNTHETIC_TEST'
+      - name: Normalize existing GitHub Cloudflare deployment credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          RAW="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')"
+          CLEAN="$(printf '%s' "$RAW" | tr -cd 'a-fA-F0-9')"
+          test "$RAW" = "$CLEAN"
+          test "$(printf '%s' "$CLEAN" | wc -c)" -eq 32
+          echo "::add-mask::$CLEAN"
+          echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN" >> "$GITHUB_ENV"
+      - name: Verify exact live Worker version, unchanged account bindings and original rollback
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+
+            '/workers/scripts/'+process.env.F5_STAGE_NAME;
+          const get=async part=>{
+            const r=await fetch(root+part,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},
+              signal:AbortSignal.timeout(25000)});
+            assert.equal(r.status,200,'Read-only existing TALERA Worker preflight '+part);
+            const j=await r.json();assert.equal(j.success,true);return j.result;
+          };
+          const [d,s,live,official]=await Promise.all([
+            get('/deployments'),get('/settings'),
+            get('/versions/'+process.env.F5_EXPECTED_LIVE_VERSION),
+            get('/versions/'+process.env.F5_OFFICIAL_RESTORE_VERSION)
+          ]);
+          assert.deepEqual(d.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),
+            [[process.env.F5_EXPECTED_LIVE_VERSION,100]],'TALERA active app changed: abort');
+          const norm=x=>({name:x.name,type:x.type,class_name:x.class_name||null,
+            namespace_id:x.namespace_id||null,text:x.text||null});
+          const sort=xs=>xs.map(norm).sort((a,b)=>a.name.localeCompare(b.name));
+          const before=sort(s.bindings||[]);
+          assert.equal(before.length,17,'Account or media binding count drift');
+          assert.deepEqual(before,sort(live.resources?.bindings||[]),'Existing account binding drift');
+          assert.deepEqual(before,sort(official.resources?.bindings||[]),'Official fallback binding drift');
+          assert.equal(before.filter(x=>x.type==='durable_object_namespace').length,7);
+          assert.equal(before.filter(x=>x.type==='secret_text').length,5);
+          assert.equal(before.filter(x=>x.type==='assets').length,1);
+          assert.deepEqual(before.filter(x=>x.type==='plain_text').map(x=>x.name).sort(),
+            ['AUTH_STORAGE_JURISDICTION','SOCIAL_STORAGE_JURISDICTION',
+             'F5_EASY_INVITE_SHA256','F5_EASY_INVITE_EXPIRES'].sort());
+          assert.equal(before.find(x=>x.name==='AUTH_STORAGE_JURISDICTION').text,'eu');
+          fs.writeFileSync('/tmp/talera-photo-restore-preflight.json',JSON.stringify({bindings:before}));
+          console.log('EXACT_ONE_CURRENT_TALERA_WORKER_AND_ALL_17_EXISTING_BINDINGS_VERIFIED');
+          NODE
+      - name: Compile original app and inspect updated archive library without any synthetic media
+        run: |
+          set -euo pipefail
+          npm ci
+          node --check r20-dev/free-10m-f5/f5-library-persistence.mjs
+          node --check r20-dev/free-10m-f5/f5-portable-idb.mjs
+          node --check r20-dev/free-10m-f5/f5-portable-archive.mjs
+          node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          cmp r20-dev/free-10m-f5/f5-library-persistence.mjs \
+              r20-dev/free-10m-delivery/public/__talera_free/f5backup/f5-library-persistence.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const source=fs.readFileSync('r20-dev/free-10m-f5/f5-library-persistence.mjs','utf8');
+          for(const phrase of [
+            'const photoKeys=new Set(decoded.stories.flatMap',
+            'const bytes=new Uint8Array(await original.arrayBuffer());',
+            'new File([bytes],original.name,{type:original.type,lastModified:original.lastModified})',
+            'new Blob([bytes],{type:original.type})',
+            'for(const row of ownedFiles)f.add(row);',
+            "db.transaction(['stories','files'],'readwrite')",
+            'TALERA_RESTORE_PHOTO_COPY_METADATA_MISMATCH'
+          ])assert.ok(source.includes(phrase),'Missing photo restore contract: '+phrase);
+          console.log('APP_ASSET_EQUALS_LATEST_OWNER_APPROVED_LIBRARY_SOURCE_NO_SYNTHETIC_MEDIA');
+          NODE
+      - name: Prepare EXACT existing seven-DO TALERA config, never migrate private data
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';import assert from 'node:assert/strict';
+          const before=JSON.parse(fs.readFileSync('/tmp/talera-photo-restore-preflight.json','utf8')).bindings;
+          const c=JSON.parse(fs.readFileSync('r20-dev/free-10m-f5/wrangler.staging.jsonc','utf8'));
+          assert.equal(c.name,'talera-free-f5-combined-stage-20261108');
+          c.name=process.env.F5_STAGE_NAME;
+          delete c.send_email;
+          delete c.vars.TALERA_RESET_FROM;
+          const names=['AUTH_STORAGE_JURISDICTION','SOCIAL_STORAGE_JURISDICTION',
+            'F5_EASY_INVITE_SHA256','F5_EASY_INVITE_EXPIRES'];
+          assert.deepEqual(Object.keys(c.vars).sort(),names.slice().sort());
+          for(const name of names){
+            const stored=before.find(x=>x.name===name&&x.type==='plain_text');
+            assert.ok(stored?.text,'Missing existing nonsecret config '+name);
+            c.vars[name]=stored.text;
+          }
+          assert.deepEqual(c.durable_objects.bindings.map(x=>x.class_name),
+            ['FreeAuthAccount','FreeAuthEmail','FreeAuthHandle','FreeAuthSession','FreeAuthRate',
+             'FreeSocialMemory','FreeSocialSharePointer']);
+          assert.ok(!c.d1_databases?.length&&!c.r2_buckets?.length&&!c.services?.length);
+          c.migrations=[{tag:'free-f5-storage-iphone-qa-20261109-v1',
+            new_sqlite_classes:c.durable_objects.bindings.map(x=>x.class_name)}];
+          c.keep_vars=true;
+          fs.writeFileSync('r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc',
+            JSON.stringify(c,null,2)+'\n');
+          console.log('PRESERVE_EXISTING_TALERA_WORKER_SESSION_BINDINGS_MIGRATIONS_AND_PRIVATE_DATA');
+          NODE
+          npx --no-install wrangler deploy --dry-run --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc --outdir .talera-photo-restore-dryrun
+      - name: Recheck original published app version immediately before write
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const u='https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+
+            '/workers/scripts/'+process.env.F5_STAGE_NAME+'/deployments';
+          const r=await fetch(u,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},
+            signal:AbortSignal.timeout(25000)});
+          assert.equal(r.status,200);const j=await r.json();assert.equal(j.success,true);
+          assert.deepEqual(j.result.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),
+            [[process.env.F5_EXPECTED_LIVE_VERSION,100]],'Unexpected TALERA live update: abort');
+          NODE
+      - name: Publish only repaired library asset on SAME existing TALERA Free Worker
+        id: deployed
+        run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc
+      - name: Read-only verify same PWA origin, private route and unchanged 17 bindings
+        run: |
+          set -euo pipefail
+          for route in /mijn-leven /present /tell; do
+            test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST$route")" = 200
+          done
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "https://$F5_STAGE_HOST/__f5/backup")" = 401
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';import fs from 'node:fs';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+
+            '/workers/scripts/'+process.env.F5_STAGE_NAME;
+          const get=async part=>{
+            const r=await fetch(root+part,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},
+              signal:AbortSignal.timeout(25000)});
+            assert.equal(r.status,200,'TALERA postdeploy read '+part);
+            const j=await r.json();assert.equal(j.success,true);return j.result;
+          };
+          const prev=JSON.parse(fs.readFileSync('/tmp/talera-photo-restore-preflight.json','utf8')).bindings;
+          let d;
+          for(let n=0;n<12;n++){
+            d=await get('/deployments');
+            const active=d.deployments?.[0]?.versions||[];
+            if(active.length===1&&active[0].percentage===100&&
+               active[0].version_id!==process.env.F5_EXPECTED_LIVE_VERSION)break;
+            if(n<11)await new Promise(resolve=>setTimeout(resolve,3000));
+          }
+          const active=d.deployments?.[0]?.versions||[];
+          assert.equal(active.length,1);
+          assert.equal(active[0].percentage,100);
+          assert.notEqual(active[0].version_id,process.env.F5_EXPECTED_LIVE_VERSION,
+            'New TALERA version not active');
+          const s=await get('/settings');
+          const norm=x=>({name:x.name,type:x.type,class_name:x.class_name||null,
+            namespace_id:x.namespace_id||null,text:x.text||null});
+          const sorted=arr=>arr.map(norm).sort((a,b)=>a.name.localeCompare(b.name));
+          assert.deepEqual(sorted(s.bindings||[]),prev,'TALERA private account or media bindings changed');
+          console.log('SAME_TALERA_FREE_LIVE_PHOTO_RESTORE_RELEASE_SUCCESS',JSON.stringify({
+            previous:process.env.F5_EXPECTED_LIVE_VERSION,
+            deployedVersion:active[0].version_id,
+            bindings:prev.length,
+            iPhoneDeviceMediaAccepted:false
+          }));
+          NODE
+      - name: Rollback only this SAME TALERA QA Worker on release or postrelease failure
+        if: failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure')
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore preceding TALERA Free QA after photo-only restore failure" --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc

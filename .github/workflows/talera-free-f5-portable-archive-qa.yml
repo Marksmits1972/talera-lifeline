@@ -10,6 +10,73 @@ on:
 permissions:
   contents: read
 jobs:
+  verify_owner_photo_library_build:
+    name: Check original TALERA photo library build with NO synthetic media or deployment
+    if: github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-build-TALERA-free-original-photo-storage-20261122'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify approved owner scope: storage and existing backup UI ONLY
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
+          test "$(git rev-parse HEAD^)" = 7b4f2cc4b9da67a283d6cbd42a7b98c91b3eaf29
+          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-portable-archive-qa.yml
+          git merge-base --is-ancestor b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD
+          git diff --name-only b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD -- r20-dev/ r19-dev/ src/ package.json package-lock.json > /tmp/talera-photo-changes
+          printf '%s\n' 'r20-dev/free-10m-f5/f5-backup-controller.mjs' 'r20-dev/free-10m-f5/f5-local-backup-page.mjs' 'r20-dev/free-10m-f5/f5-portable-idb.mjs' 'r20-dev/free-10m-f5/f5-public-assets.mjs' > /tmp/talera-photo-allowed
+          diff -u /tmp/talera-photo-allowed /tmp/talera-photo-changes
+          test "$(git hash-object r20-dev/free-10m-f5/f5-public-assets.mjs)" = fbdfc645229bf92fce8195df68db50a0abddc790
+          git diff --exit-code b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD -- \
+            r20-dev/free-10m-f5/f5-independent-narrator.browser.js \
+            r20-dev/free-10m-f5/f5-library-access.browser.js \
+            r20-dev/free-10m-f5/f5-library-persistence.mjs \
+            r20-dev/free-10m-f5/f5-worker.mjs \
+            r20-dev/free-10m-f5/f5-portable-archive.mjs \
+            r20-dev/free-10m-f5/f5-local-scope.mjs \
+            r20-dev/free-10m-delivery/
+          echo 'ONLY_ORIGINAL_PHOTO_STORAGE_INPUT_AND_EXISTING_BACKUP_UI_CHANGED'
+      - name: Build unchanged single TALERA PWA with owned original photo bytes
+        run: |
+          set -euo pipefail
+          npm ci
+          node --check r20-dev/free-10m-f5/f5-public-assets.mjs
+          node --check r20-dev/free-10m-f5/f5-portable-idb.mjs
+          node --check r20-dev/free-10m-f5/f5-backup-controller.mjs
+          node --check r20-dev/free-10m-f5/f5-local-backup-page.mjs
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {referencePages} from './r20-dev/free-10m-f5/generated/public-template-map.mjs';
+          const base=path.resolve('r20-dev/free-10m-delivery/public');
+          assert.deepEqual(Object.keys(referencePages).sort(),
+            ['/mijn-leven','/present','/tell'].sort());
+          for(const [route,url] of Object.entries(referencePages)){
+           const html=fs.readFileSync(path.join(base,url.slice(1)),'utf8');
+           for(const phrase of ['var taleraOwnedPhotoUploads=[];',
+              'new File([ownedBytes],selected.name,',
+              'new Blob([ownedBytes],{type:selected.type})',
+              "blob:taleraOwnedPhotoUploads[j]",
+              "window.TaleraMemories={save:save,list:list,get:get,blob:blob,mediaUrl:mediaUrl,displayUrl:displayUrl"])
+            assert.equal(html.split(phrase).length,2,route+': library storage contract drift '+phrase);
+           assert.equal(html.includes("blob:uploads[j]}"),false,'Picker-backed photo still stored '+route);
+          }
+          console.log('ONE_TALERA_PWA_THREE_ROUTES_OWNED_ORIGINAL_PHOTO_INPUT_BUILD_PASSED');
+          NODE
+      - name: Prove no fixture, account data, Worker or deployment was touched
+        run: echo 'STATIC_ONLY_NO_SYNTHETIC_PHOTOS_NO_PERSONAL_DATA_NO_WORKER_DEPLOY'
   archive_codec:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04

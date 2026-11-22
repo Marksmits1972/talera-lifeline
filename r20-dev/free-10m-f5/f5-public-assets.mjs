@@ -1146,6 +1146,44 @@ function showExistingNarratedSwipeBand(html){
 }
 // Single, compatible read-only gateway over the ORIGINAL local IndexedDB
 // owner. No new database, media copy, player, Worker or additional origin.
+// Make ONLY original PHOTO uploads independent of Safari's file picker
+// backing before the ORIGINAL account-local IndexedDB save transaction.
+// This modifies the existing TaleraMemories.save storage input, not any
+// presentation, narration, album or timeline code. Files keep their
+// original bytes, type, name, lastModified and media IDs (no new schema).
+function stabilizeOriginalPhotoStorage(html){
+ const pre="  var db=await open(),tx=db.transaction(['stories','files'],'readwrite'),finish=done(tx);";
+ const original="  for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:uploads[j]});";
+ assert.equal(html.split(pre).length,2,'PHOTO_STORAGE_SAVE_TRANSACTION_SOURCE_DRIFT');
+ assert.equal(html.split(original).length,2,'PHOTO_STORAGE_FILE_WRITE_SOURCE_DRIFT');
+ const owned=String.raw`
+  // Protect the originals: do not persist a photo File whose bytes still
+  // depend on a temporary iOS Photos/Files picker handle.
+  var taleraOwnedPhotoUploads=[];
+  for(var photoIndex=0;photoIndex<uploads.length;photoIndex++){
+   var selected=uploads[photoIndex];
+   if(typeOf(selected)!=='photo'){taleraOwnedPhotoUploads.push(selected);continue}
+   if(!(selected instanceof Blob)||!selected.size)
+    throw Error('De oorspronkelijke foto kan niet worden gelezen.');
+   var ownedBytes=new Uint8Array(await selected.arrayBuffer());
+   if(ownedBytes.byteLength!==selected.size)
+    throw Error('De oorspronkelijke foto is onvolledig; niets opgeslagen.');
+   var isCameraFile=typeof File==='function'&&selected instanceof File;
+   var ownedOriginal=isCameraFile?
+    new File([ownedBytes],selected.name,
+      {type:selected.type,lastModified:selected.lastModified}):
+    new Blob([ownedBytes],{type:selected.type});
+   if(ownedOriginal.size!==selected.size||ownedOriginal.type!==selected.type||
+      (isCameraFile&&(ownedOriginal.name!==selected.name||
+        ownedOriginal.lastModified!==selected.lastModified)))
+    throw Error('De foto kon niet identiek worden opgeslagen.');
+   taleraOwnedPhotoUploads.push(ownedOriginal);
+  }
+`;
+ return html.replace(pre,owned+pre).replace(original,
+  "  for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:taleraOwnedPhotoUploads[j]});");
+}
+
 function installReadOnlyLibraryGateway(html){
  const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
  assert.ok(raw.includes('TaleraLibraryFactory')&&!raw.includes('</script'),
@@ -1627,6 +1665,9 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/tell')html=removeLegacyTellSampleImporter(polishTellEditorLayout(shapeOwnStoryTopics(html)));
  if(route==='/present')html=enableOriginalWhatsAppTouchScroll(html);
  html=stripBundledExamplePhotoLinks(html);
+ // The ONLY new persistent-data change is the original photo File's
+ // byte-owned input in the existing account-local file store.
+ html=stabilizeOriginalPhotoStorage(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

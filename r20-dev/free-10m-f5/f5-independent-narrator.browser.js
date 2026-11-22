@@ -426,7 +426,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     const host=stage.parentElement||stage;
     const layer=document.createElement('div');
     layer.className='talera-independent-narrator-layer';
-    layer.style.cssText='position:absolute;inset:0;overflow:hidden;z-index:12;pointer-events:none';
+    layer.style.cssText='position:absolute;inset:0;overflow:hidden;z-index:3;pointer-events:none';
     const photo=document.createElement('img');
     photo.className='talera-independent-narrator-photo';
     photo.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none';

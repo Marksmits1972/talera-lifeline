@@ -310,6 +310,50 @@ try{
   // covered until it is decoded and up to 180ms of settling have elapsed.
   await page.waitForFunction(()=>!document.documentElement.classList.contains(
     'talera-direct-memory-entering'),null,{timeout:7000});
+  // Use real browser TOUCH input on the existing native reading scroller,
+  // not a test-only second drag handler or a user memory mutation.
+  const readingDragStart=await page.evaluate(()=>{
+    const scroller=document.getElementById('memoryStoryScroll');
+    const sheet=document.getElementById('memoryCaption');
+    scroller.scrollTop=0;
+    const frame=scroller.getBoundingClientRect();
+    const handle=sheet.getBoundingClientRect();
+    return {
+      x:Math.max(frame.left+28,Math.min(frame.right-28,handle.left+36)),
+      y:Math.max(frame.top+48,Math.min(frame.bottom-45,handle.top+30)),
+      max:scroller.scrollHeight-scroller.clientHeight,
+      touchAction:getComputedStyle(scroller).touchAction
+    };
+  });
+  assert.ok(readingDragStart.max>125,
+    'The original story sheet must offer a real vertical pull-up range');
+  assert.equal(readingDragStart.touchAction,'pan-y');
+  let readingDragPosition=[];
+  const touchSession=await page.context().newCDPSession(page);
+  try{
+    const x=readingDragStart.x,y=readingDragStart.y,id=47;
+    await touchSession.send('Input.dispatchTouchEvent',{
+      type:'touchStart',touchPoints:[{x,y,id}]});
+    for(const delta of [48,105]){
+      await touchSession.send('Input.dispatchTouchEvent',{
+        type:'touchMove',touchPoints:[{x,y:y-delta,id}]});
+      await page.waitForTimeout(95);
+      readingDragPosition.push(await page.evaluate(()=>
+        document.getElementById('memoryStoryScroll').scrollTop));
+    }
+    await touchSession.send('Input.dispatchTouchEvent',
+      {type:'touchEnd',touchPoints:[]});
+  }finally{
+    await touchSession.detach();
+    await page.evaluate(()=>{document.getElementById('memoryStoryScroll').scrollTop=0});
+  }
+  assert.ok(readingDragPosition[0]>=16&&
+    readingDragPosition[1]>readingDragPosition[0]+16,
+    'The ORIGINAL white reading paper must move proportionally with two upward finger moves: '+
+    JSON.stringify({readingDragStart,readingDragPosition}));
+  console.log('TALERA_ORIGINAL_READING_PANEL_FOLLOWS_FINGER_PASS',
+    JSON.stringify({syntheticIphoneTouch:true,readingDragPosition,
+      noSecondDragController:true,realIphoneAccepted:false}));
   // The original deep-link photo guard intentionally waits for a decoded
   // first frame and then two rAFs/180ms. Don't treat that brief entry
   // handoff as a permanently white stage on slow CI frame scheduling.
@@ -773,6 +817,48 @@ try{
     const v=document.querySelector('video.talera-independent-narrator-video');
     return !!v&&v.muted===true;
   },null,{timeout:8000});
+  // A narrated VIDEO must not cover the already-present title/reading
+  // sheet. The narrator owns audio/video; the existing sheet owns text.
+  const readingDuringNarratedVideo=await page.evaluate(()=>{
+    const video=document.querySelector('.talera-independent-narrator-layer video');
+    const layer=document.querySelector('.talera-independent-narrator-layer');
+    const stage=document.getElementById('photoStage');
+    const scroll=document.getElementById('memoryStoryScroll');
+    const sheet=document.getElementById('memoryCaption');
+    const title=document.getElementById('memoryStory');
+    const arrow=getComputedStyle(sheet,'::before');
+    const stack=el=>Number.parseInt(getComputedStyle(el).zIndex,10);
+    return {
+      narratorVideoPresent:!!video,
+      stageZ:stack(stage),narratorZ:stack(layer),readingZ:stack(scroll),
+      title:(title?.textContent||'').trim(),
+      titleOpacity:Number(getComputedStyle(title).opacity),
+      paperVisible:getComputedStyle(scroll).visibility==='visible'&&
+        getComputedStyle(scroll).display!=='none',
+      arrowSize:Number.parseFloat(arrow.fontSize),
+      arrowText:arrow.content,
+      arrowColor:arrow.color,
+      touchAction:getComputedStyle(scroll).touchAction
+    };
+  });
+  assert.equal(readingDuringNarratedVideo.narratorVideoPresent,true);
+  assert.equal(readingDuringNarratedVideo.title,'Independent voice playback',
+    'Original user title must remain available during video narration');
+  assert.ok(readingDuringNarratedVideo.stageZ<
+     readingDuringNarratedVideo.narratorZ &&
+     readingDuringNarratedVideo.narratorZ<
+     readingDuringNarratedVideo.readingZ,
+    'Narrated video must remain BEHIND original pull-up reading/title layer: '+
+     JSON.stringify(readingDuringNarratedVideo));
+  assert.ok(readingDuringNarratedVideo.paperVisible&&
+    readingDuringNarratedVideo.titleOpacity>=0.8,
+    'Original title/paper must remain visible when narrated video starts');
+  assert.ok(readingDuringNarratedVideo.arrowSize>=22&&
+    readingDuringNarratedVideo.arrowText.includes('↑'),
+    'The existing pull-up arrow must be clearly visible on a phone');
+  assert.equal(readingDuringNarratedVideo.touchAction,'pan-y');
+  console.log('TALERA_NARRATOR_VIDEO_KEEPS_ORIGINAL_TITLE_AND_READING_GRIP_PASS',
+    JSON.stringify({...readingDuringNarratedVideo,realIphoneAccepted:false}));
   await page.waitForFunction(()=>{
     const dots=[...document.querySelectorAll('.talera-photo-dot')];
     return dots.length===4&&dots[3].classList.contains('active')&&

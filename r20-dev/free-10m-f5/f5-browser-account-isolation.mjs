@@ -701,6 +701,47 @@ try{
  await waitForLibrary(page);
  const owner=await login(page,users[0]);
  assert.equal(owner,ids[0],'First actual menu login must select existing account ID');
+ // A genuinely empty but signed-in Free library must not produce a white
+ // Home screen. Verify the ORIGINAL Home shell before creating test stories,
+ // and after a cold reload, on this same account and app origin.
+ const emptyHome=await context.newPage();
+ try{
+   const response=await emptyHome.goto(origin+'/mijn-leven',
+     {waitUntil:'domcontentloaded'});
+   assert.equal(response.status(),200,'Original empty-account Home unavailable');
+   const painted=async()=>{
+     await emptyHome.waitForFunction(async()=>{
+       if(typeof window.TaleraMemories?.list!=='function')return false;
+       const rows=await window.TaleraMemories.list();
+       return rows.length===0&&!!document.getElementById('navMore');
+     },null,{timeout:20000});
+     return emptyHome.evaluate(async()=>{
+       const rows=await window.TaleraMemories.list();
+       const isPainted=element=>{
+         if(!element)return false;
+         const style=getComputedStyle(element),bounds=element.getBoundingClientRect();
+         return style.display!=='none'&&style.visibility!=='hidden'&&
+           bounds.width>0&&bounds.height>0;
+       };
+       return {count:rows.length,
+         homeVisible:isPainted(document.getElementById('talera-flow-home')),
+         navigationVisible:isPainted(document.getElementById('navMore')),
+         visibleText:(document.body.innerText||'').trim().length};
+     });
+   };
+   for(const phase of ['first-open','cold-reload']){
+     if(phase==='cold-reload')
+       await emptyHome.reload({waitUntil:'domcontentloaded'});
+     const shell=await painted();
+     assert.equal(shell.count,0,'Empty account must not contain sample stories');
+     assert.ok(shell.homeVisible&&shell.navigationVisible&&shell.visibleText>15,
+       'The existing signed-in Home became a blank screen at '+phase+': '+
+       JSON.stringify(shell));
+   }
+   console.log('TALERA_F5_EMPTY_SIGNED_IN_HOME_AND_RELOAD_VISIBLE_PASS',
+     JSON.stringify({syntheticOnly:true,sameApp:true,sameOrigin:true,
+       noInventedStories:true,realIphoneAccepted:false}));
+ }finally{await emptyHome.close()}
  const a=await saveSyntheticPhoto(page,1);
  assert.equal(a.kind,'photo');
  assert.ok(a.bytes>10,'Synthetic local original photo Blob was not saved');

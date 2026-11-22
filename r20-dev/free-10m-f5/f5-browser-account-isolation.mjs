@@ -724,7 +724,7 @@ try{
            bounds.width>0&&bounds.height>0;
        };
        return {count:rows.length,
-         homeVisible:isPainted(document.getElementById('talera-flow-home')),
+         primaryNavigationVisible:isPainted(document.getElementById('navMine')),
          navigationVisible:isPainted(document.getElementById('navMore')),
          visibleText:(document.body.innerText||'').trim().length};
      });
@@ -734,7 +734,7 @@ try{
        await emptyHome.reload({waitUntil:'domcontentloaded'});
      const shell=await painted();
      assert.equal(shell.count,0,'Empty account must not contain sample stories');
-     assert.ok(shell.homeVisible&&shell.navigationVisible&&shell.visibleText>15,
+     assert.ok(shell.primaryNavigationVisible&&shell.navigationVisible&&shell.visibleText>100,
        'The existing signed-in Home became a blank screen at '+phase+': '+
        JSON.stringify(shell));
    }

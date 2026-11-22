@@ -29,17 +29,20 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 2ded36c9dd7e014f52981ddb8a052000e89e147f
+          test "$(git rev-parse HEAD^)" = aef9c7a6658445c411af66cb52cf8682640d27b7
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-portable-archive-qa.yml
           git merge-base --is-ancestor b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD
           git diff --name-only b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD -- r20-dev/ r19-dev/ src/ package.json package-lock.json > /tmp/talera-photo-changes
-          printf '%s\n' 'r20-dev/free-10m-f5/f5-backup-controller.mjs' 'r20-dev/free-10m-f5/f5-local-backup-page.mjs' 'r20-dev/free-10m-f5/f5-portable-idb.mjs' 'r20-dev/free-10m-f5/f5-public-assets.mjs' > /tmp/talera-photo-allowed
+          printf '%s\n' 'r20-dev/free-10m-f5/f5-public-assets.mjs' > /tmp/talera-photo-allowed
           diff -u /tmp/talera-photo-allowed /tmp/talera-photo-changes
           test "$(git hash-object r20-dev/free-10m-f5/f5-public-assets.mjs)" = 4d48c46bf2f411decc8eaf5317c4087520a9cb96
           git diff --exit-code b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD -- \
             r20-dev/free-10m-f5/f5-independent-narrator.browser.js \
             r20-dev/free-10m-f5/f5-library-access.browser.js \
             r20-dev/free-10m-f5/f5-library-persistence.mjs \
+            r20-dev/free-10m-f5/f5-portable-idb.mjs \
+            r20-dev/free-10m-f5/f5-backup-controller.mjs \
+            r20-dev/free-10m-f5/f5-local-backup-page.mjs \
             r20-dev/free-10m-f5/f5-worker.mjs \
             r20-dev/free-10m-f5/f5-portable-archive.mjs \
             r20-dev/free-10m-f5/f5-local-scope.mjs \

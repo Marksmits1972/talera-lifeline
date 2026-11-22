@@ -423,7 +423,9 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     const plan=taleraIndependentNarrationPlan(memory);
     const voice=memory._zeroItems.find(item=>item.kind==='audio');
     const id=memory.id,run=++generation;
-    const host=stage.parentElement||stage;
+    // Render the SAME independent narrator INSIDE the already approved
+    // photo stage so iPhone compositing cannot cover its reading sheet.
+    const host=stage;
     const layer=document.createElement('div');
     layer.className='talera-independent-narrator-layer';
     layer.style.cssText='position:absolute;inset:0;overflow:hidden;z-index:3;pointer-events:none';

@@ -510,7 +510,7 @@ try{
   assert.equal(await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory().storyId),plain);
 
   const mp4=path.join(generated,'ordinary-original-video.mp4');
-  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=3',
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
     '-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',mp4],
     {timeout:20000,stdio:'ignore'});
   const mixed=await page.evaluate(async b64=>{
@@ -700,6 +700,7 @@ try{
           window.__taleraVideoActuallyPlayingLayout={
             currentTime:video.currentTime,readyState:video.readyState,
             playing:!video.paused,videoRect:bounds(video),
+            videoInsidePhotoStage:document.getElementById('photoStage')?.contains(video),
             storyScroll:bounds(scroll),scrollTop:scroll?.scrollTop,
             titleText:title?.textContent?.trim(),titleRect:bounds(title),
             titleInViewportPx:visible(title?.getBoundingClientRect(),sr),
@@ -772,6 +773,7 @@ try{
   console.log('TALERA_ACTUAL_PLAYING_VIDEO_TITLE_AND_GRIP_SCREEN_GEOMETRY',
     JSON.stringify(originalVideoDuringMotion));
   assert.ok(originalVideoDuringMotion?.playing&&
+    originalVideoDuringMotion?.videoInsidePhotoStage&&
     originalVideoDuringMotion?.gripInViewportPx>=25&&
     originalVideoDuringMotion?.gripIsTopHit,
     'The story handle was not visibly reachable once VIDEO was ACTUALLY PLAYING: '+

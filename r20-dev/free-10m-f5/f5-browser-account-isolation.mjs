@@ -789,6 +789,51 @@ try{
    console.log('TALERA_F5_EMPTY_SIGNED_IN_HOME_AND_RELOAD_VISIBLE_PASS',
      JSON.stringify({syntheticOnly:true,sameApp:true,sameOrigin:true,
        noInventedStories:true,realIphoneAccepted:false}));
+   // The owner's real iPhone still showed the OLD Home memory as a flash.
+   // The earlier test only checked the DESTINATION before-first-paint.
+   // Start at the ACTUAL Home, synthesize the original More click, and
+   // verify the outgoing Home is immediately hidden BEFORE navigation.
+   const outgoing=await emptyHome.evaluate(()=>{
+     const home=document.getElementById('navMore');
+     const originalHref=home?.getAttribute('href');
+     const marker=document.getElementById('talera-f5-home-outgoing-menu-nav');
+     const paintStyle=document.getElementById('talera-f5-home-outgoing-menu-mask');
+     const click=new MouseEvent('click',{bubbles:true,cancelable:true,button:0});
+     home?.dispatchEvent(click);
+     return {originalHref,markerPresent:!!marker,stylePresent:!!paintStyle,
+       nativeNavigationPrevented:click.defaultPrevented,
+       classOnSource:document.documentElement.classList.contains(
+         'talera-f5-home-leaving-for-original-menu'),
+       oldHomeNotVisible:getComputedStyle(document.body).visibility==='hidden',
+       neutralBackground:getComputedStyle(document.documentElement).backgroundColor};
+   });
+   assert.deepEqual(outgoing,{
+     originalHref:'/present?talera_menu=hub',markerPresent:true,
+     stylePresent:true,nativeNavigationPrevented:true,
+     classOnSource:true,oldHomeNotVisible:true,
+     neutralBackground:'rgb(247, 245, 240)'
+   },'Original Home must mask its own old memory BEFORE starting menu navigation');
+   await emptyHome.waitForURL(url=>url.pathname==='/present'&&
+      url.search==='?talera_menu=hub',{timeout:12000});
+   await emptyHome.waitForFunction(()=>{
+     const menu=document.getElementById('talera-more-menu');
+     return !!menu&&!menu.hidden;
+   },null,{timeout:14000});
+   const afterMenu=await emptyHome.evaluate(()=>({
+     originalMenuVisible:!document.getElementById('talera-more-menu').hidden,
+     destinationGuardReleased:
+       !document.documentElement.classList.contains('talera-hub-menu-booting'),
+     hasOriginalPresentationStage:!!document.getElementById('photoStage')
+   }));
+   assert.deepEqual(afterMenu,{
+     originalMenuVisible:true,destinationGuardReleased:true,
+     hasOriginalPresentationStage:true
+   },'Original menu should open after outgoing neutral repaint with player intact');
+   console.log('TALERA_F5_HOME_OUTGOING_REAL_NAV_NO_OLD_MEMORY_FLASH_PASS',
+     JSON.stringify({sourceHomeMaskedBeforeNavigation:true,
+       originalHrefAndMenuPreserved:true,destinationPrepaintGuardAlsoPassed:true,
+       originalPresentationUnaffected:true,syntheticOnly:true,
+       physicalIphoneAccepted:false}));
  }finally{await emptyHome.close()}
  const a=await saveSyntheticPhoto(page,1);
  assert.equal(a.kind,'photo');

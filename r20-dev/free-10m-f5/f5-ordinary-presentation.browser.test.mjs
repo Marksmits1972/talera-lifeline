@@ -890,7 +890,7 @@ try{
     const scroll=document.getElementById('memoryStoryScroll');
     const sheet=document.getElementById('memoryCaption');
     const title=document.getElementById('memoryStory');
-    const arrow=getComputedStyle(sheet,'::before');
+    const grip=document.getElementById('talera-f5-story-grip');
     const stack=el=>Number.parseInt(getComputedStyle(el).zIndex,10);
     return {
       narratorVideoPresent:!!video,
@@ -899,9 +899,10 @@ try{
       titleOpacity:Number(getComputedStyle(title).opacity),
       paperVisible:getComputedStyle(scroll).visibility==='visible'&&
         getComputedStyle(scroll).display!=='none',
-      arrowSize:Number.parseFloat(arrow.fontSize),
-      arrowText:arrow.content,
-      arrowColor:arrow.color,
+      arrowSize:grip?Number.parseFloat(getComputedStyle(grip).fontSize):0,
+      arrowText:grip?.textContent||'',
+      gripWidth:grip?.getBoundingClientRect().width||0,
+      gripHeight:grip?.getBoundingClientRect().height||0,
       touchAction:getComputedStyle(scroll).touchAction
     };
   });
@@ -918,8 +919,10 @@ try{
     readingDuringNarratedVideo.titleOpacity>=0.8,
     'Original title/paper must remain visible when narrated video starts');
   assert.ok(readingDuringNarratedVideo.arrowSize>=22&&
-    readingDuringNarratedVideo.arrowText.includes('↑'),
-    'The existing pull-up arrow must be clearly visible on a phone');
+    readingDuringNarratedVideo.arrowText.includes('↑')&&
+    readingDuringNarratedVideo.gripWidth>=60&&
+    readingDuringNarratedVideo.gripHeight>=40,
+    'The existing pull-up arrow must be visible and easy to grab on a phone');
   assert.equal(readingDuringNarratedVideo.touchAction,'pan-y');
   console.log('TALERA_NARRATOR_VIDEO_KEEPS_ORIGINAL_TITLE_AND_READING_GRIP_PASS',
     JSON.stringify({...readingDuringNarratedVideo,realIphoneAccepted:false}));

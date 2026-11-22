@@ -607,6 +607,33 @@ try{
     'Reading sheet jumped or kept sliding after finger release: '+
     JSON.stringify({gripDuring,gripAfter}));
   await page.evaluate(()=>document.getElementById('memoryStoryScroll').scrollTop=0);
+  // The owner uses a REAL iPhone finger, not a mouse. Send two genuine
+  // synthetic touch moves to the SAME 66x43 native grip, with no new UI or
+  // alternate video engine, and inspect scrolling before releasing.
+  const gripTouchSession=await page.context().newCDPSession(page);
+  let touchPositions=[];
+  try{
+    const id=74,x=gx,y=gy;
+    await gripTouchSession.send('Input.dispatchTouchEvent',{
+      type:'touchStart',touchPoints:[{x,y,id}]});
+    for(const amount of [50,100]){
+      await gripTouchSession.send('Input.dispatchTouchEvent',{
+        type:'touchMove',touchPoints:[{x,y:y-amount,id}]});
+      await page.waitForTimeout(85);
+      touchPositions.push(await page.evaluate(()=>
+        document.getElementById('memoryStoryScroll').scrollTop));
+    }
+    await gripTouchSession.send('Input.dispatchTouchEvent',{
+      type:'touchEnd',touchPoints:[]});
+  }finally{await gripTouchSession.detach()}
+  assert.ok(touchPositions[0]>=35&&touchPositions[1]>=85&&
+    touchPositions[1]>touchPositions[0]+25,
+    'Native phone touch did not move SAME original reading sheet: '+
+    JSON.stringify(touchPositions));
+  await page.evaluate(()=>document.getElementById('memoryStoryScroll').scrollTop=0);
+  console.log('TALERA_FREE_READING_GRIP_SYNTHETIC_IPHONE_TOUCH_PASS',
+    JSON.stringify({touchPositions,sameOriginalSheet:true,
+      realIphoneAccepted:false}));
   console.log('TALERA_FREE_ORIGINAL_READING_GRIP_DRAG_RESULT',
     JSON.stringify({gripMovedDuring,gripWidth:gripBounds.width,gripHeight:gripBounds.height,
       draggedPx:gripDuring-gripInitial.top,noInertia:true,sameSheet:true,
@@ -779,7 +806,19 @@ try{
     'The story handle was not visibly reachable once VIDEO was ACTUALLY PLAYING: '+
     JSON.stringify(originalVideoDuringMotion));
   const originalTitleLayer=await page.evaluate(()=>window.__taleraOriginalVideoTitleLayer);
-  assert.ok(originalTitleLayer&&originalTitleLayer.scrollZ>originalTitleLayer.videoZ&&
+  // The original video is now INSIDE #photoStage. Its own z-index (12)
+  // is local to the stage (z=1); compare the stage against the unchanged
+  // reading sheet (z=8), not two elements in distinct stacking contexts.
+  const videoStageHierarchy=await page.evaluate(()=>{
+    const stage=document.getElementById('photoStage');
+    const video=document.querySelector('video.talera-v61-inline-video');
+    const scroll=document.getElementById('memoryStoryScroll');
+    return {inside:stage?.contains(video),
+      stageZ:Number(getComputedStyle(stage).zIndex),
+      scrollZ:Number(getComputedStyle(scroll).zIndex)};
+  });
+  assert.ok(originalTitleLayer&&videoStageHierarchy.inside&&
+    videoStageHierarchy.stageZ<videoStageHierarchy.scrollZ&&
     originalTitleLayer.gripVisible&&originalTitleLayer.captionDisplay!=='none'&&
     Number(originalTitleLayer.captionOpacity)>.8&&
     Number(originalTitleLayer.titleOpacity)>.8,

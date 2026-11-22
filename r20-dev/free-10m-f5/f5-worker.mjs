@@ -72,19 +72,36 @@ function shieldHomeWhileOpeningExistingMenu(html,requestUrl){
         event.ctrlKey||event.shiftKey||event.altKey)return;
      const link=event.target?.closest?.('a#navMore');
      if(!link||link.getAttribute('href')!==target)return;
-     // Keep the original URL, history behavior and menu script. On iOS,
-     // the old painted Home can otherwise persist for a visible half-second.
-     // Paint a neutral frame BEFORE the browser navigates to that same URL.
+     // Reuse the SAME approved account menu already mounted on Home.
+     // Its original open/render/back/close handlers and local account state
+     // remain responsible; never navigate through the presentation engine.
+     // Keep the original URL as a safe fallback when its module is unavailable.
      event.preventDefault();
-     root.classList.add(cssClass);
-     let gone=false;
-     let fallback;
-     const enter=()=>{
-       if(gone)return;gone=true;clearTimeout(fallback);
-       window.location.assign(target);
+     const native=()=>{
+       const controller=window.__taleraMoreMenu;
+       if(!controller?.ready||typeof controller.open!=='function'||
+          !document.getElementById('talera-more-menu'))return false;
+       controller.open('hub');
+       return true;
      };
-     fallback=setTimeout(enter,650); // Hidden/background iOS fallback.
-     requestAnimationFrame(()=>requestAnimationFrame(enter));
+     if(native())return;
+     let attempts=0;
+     const tryOnceReady=()=>{
+       if(native())return;
+       if(++attempts<12){setTimeout(tryOnceReady,20);return}
+       // The fallback retains the previously iPhone-proven no-photo-flash
+       // protection if the approved menu script could not initialize.
+       root.classList.add(cssClass);
+       let gone=false;
+       let fallback;
+       const enter=()=>{
+         if(gone)return;gone=true;clearTimeout(fallback);
+         window.location.assign(target);
+       };
+       fallback=setTimeout(enter,650);
+       requestAnimationFrame(()=>requestAnimationFrame(enter));
+     };
+     tryOnceReady();
    },true);
  })();`;
  const mask='<style id="talera-f5-home-outgoing-menu-mask">'+
@@ -92,7 +109,11 @@ function shieldHomeWhileOpeningExistingMenu(html,requestUrl){
    'html.talera-f5-home-leaving-for-original-menu body{visibility:hidden!important}'+
    '</style>';
  const script='<script id="talera-f5-home-outgoing-menu-nav">'+early+'</script>';
- return html.replace('<head>','<head>'+mask+script);
+ // This is the original /present account-menu module, not a copied menu,
+ // player, new route, new app or account binding. ES modules run after HTML
+ // parsing, so its existing DOM bootstrap sees the real Home document.
+ const nativeMenu='<script id="talera-f5-home-original-menu-module" type="module" src="/__clean/menu-integration.mjs"></script>';
+ return html.replace('<head>','<head>'+mask+script+nativeMenu);
 }
 
 // The APPROVED Home "Meer" navigates to /present?talera_menu=hub.

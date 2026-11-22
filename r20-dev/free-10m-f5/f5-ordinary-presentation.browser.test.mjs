@@ -1472,6 +1472,11 @@ try{
   await page.evaluate(()=>{
     const voice=document.querySelector('.talera-independent-narrator-layer audio');
     window.__taleraSwipeVoiceToStop=voice;
+    // This synthetic 4.6-second voice must stay active while headless Chrome
+    // decodes the video and we check the FIRST live swipe movement.
+    // Its natural end is tested separately; never let it auto-advance here.
+    // This changes test input only, not shipped TALERA playback code.
+    voice.loop=true;
     voice.currentTime=1.85;voice.dispatchEvent(new Event('timeupdate'));
   });
   await page.waitForFunction(()=>{

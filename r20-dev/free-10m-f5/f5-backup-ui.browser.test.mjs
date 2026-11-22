@@ -102,6 +102,99 @@ try{
  assert.match(download.suggestedFilename(),/\.talera$/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
+ // RONDE 2: a *truly empty* account-local library, using the exact SAME
+ // existing TALERA backup page + same origin in a fresh browser storage
+ // context. This is disposable CI state, NOT a second app/Worker/user URL.
+ // The owner's iPhone IndexedDB, account and real media remain untouched.
+ const emptyContext=await browser.newContext({acceptDownloads:true,
+  viewport:{width:390,height:844}});
+ try{
+  const empty=await emptyContext.newPage();
+  empty.on('pageerror',e=>errors.push('EMPTY '+e.message));
+  await empty.goto(originA+'/__f5/backup');
+  const startsEmpty=await empty.evaluate(async expectedDb=>{
+   const databases=await indexedDB.databases();
+   return !databases.some(row=>row.name===expectedDb);
+  },dbA);
+  assert.equal(startsEmpty,true,
+   'Fresh TALERA Free storage must not contain prefilled sample memories');
+  await empty.locator('#restore-file').setInputFiles({
+   name:'talera-lokale-proef-backup.talera',
+   mimeType:'application/octet-stream',buffer:fileBytes
+  });
+  await empty.locator('#preview-restore').click();
+  await empty.waitForFunction(()=>
+   document.getElementById('restore-status').textContent.includes('Geen dubbele'));
+  assert.match(await empty.locator('#restore-status').textContent(),
+   /Gecontroleerd: 1 herinnering/);
+  assert.equal(await empty.locator('#other-origin').isChecked(),false,
+   'Same origin/same account must not need the other-origin override');
+  assert.equal(await empty.locator('#run-restore').isDisabled(),true,
+   'Even a totally empty library must require explicit restore consent');
+  await empty.locator('#confirm-restore').check();
+  await empty.locator('#run-restore').click();
+  await empty.waitForFunction(()=>
+   document.getElementById('restore-status').textContent.includes('Herstel voltooid'));
+  await empty.reload({waitUntil:'domcontentloaded'});
+  const afterReload=await empty.evaluate(async db=>{
+   const open=indexedDB.open(db,1);
+   const database=await new Promise((ok,bad)=>{
+    open.onsuccess=()=>ok(open.result);open.onerror=()=>bad(open.error)
+   });
+   const tx=database.transaction(['stories','files'],'readonly');
+   const all=store=>new Promise((ok,bad)=>{
+    const q=tx.objectStore(store).getAll();
+    q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)
+   });
+   const [stories,files]=await Promise.all([all('stories'),all('files')]);
+   database.close();
+   const video=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:1');
+   const voice=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:2');
+   const image=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:0');
+   return {
+    stories:stories.map(row=>({
+     id:row.id,title:row.title,items:row.items,cues:row.narrationCues
+    })),
+    fileIds:files.map(row=>row.key).sort(),
+    videoName:video?.blob?.name,
+    videoBytes:video?.blob?Array.from(new Uint8Array(await video.blob.arrayBuffer())):[],
+    voiceBytes:voice?.blob?Array.from(new Uint8Array(await voice.blob.arrayBuffer())):[],
+    imageBytes:image?.blob?Array.from(new Uint8Array(await image.blob.arrayBuffer())):[]
+   };
+  },dbA);
+  assert.equal(afterReload.stories.length,1,
+   'An empty Free library restore must not generate any example stories');
+  assert.equal(afterReload.stories[0].id,'local-old-1950-01-01-synthetic-record');
+  assert.equal(afterReload.stories[0].title,'Oud origineel fictief verhaal');
+  assert.deepEqual(afterReload.stories[0].items.map(row=>row.key),[
+   'local-old-1950-01-01-synthetic-record:0',
+   'local-old-1950-01-01-synthetic-record:1',
+   'local-old-1950-01-01-synthetic-record:2'
+  ]);
+  assert.equal(afterReload.stories[0].cues[1].videoAtMs,300);
+  assert.deepEqual(afterReload.imageBytes,[2,4,6,8]);
+  assert.deepEqual(afterReload.videoBytes,[33,22,11,99]);
+  assert.deepEqual(afterReload.voiceBytes,[7,6,5,4]);
+  assert.equal(afterReload.videoName,'origineel.mov');
+  assert.equal(afterReload.fileIds.length,4,
+   'Exact originals and existing preview must be restored, no extra media');
+  await empty.locator('#restore-file').setInputFiles({
+   name:'talera-lokale-proef-backup.talera',
+   mimeType:'application/octet-stream',buffer:fileBytes
+  });
+  await empty.locator('#preview-restore').click();
+  await empty.waitForFunction(()=>
+   document.getElementById('restore-status').textContent.includes('Conflict'));
+  assert.equal(await empty.locator('#run-restore').isDisabled(),true,
+   'Restoring twice must never silently duplicate or overwrite the record');
+  console.log('TALERA_FREE_EMPTY_LOCAL_LIBRARY_RESTORE_SAME_ORIGIN_PASS',
+   JSON.stringify({startsWithoutStories:true,prefilledExamples:0,
+    sameExistingOrigin:true,separatePrivateBrowserStorageOnly:true,
+    explicitConsent:true,restoredStoryCount:1,allOriginalMediaBytesIdentical:true,
+    exactOriginalMediaIDs:true,voiceCuesIdentical:true,afterReopenReadable:true,
+    duplicateRestoreBlocked:true,serverUploadCount:posts,
+    personalIphoneDataTouched:false,physicalIPhoneAcceptance:false}));
+ }finally{await emptyContext.close()}
  // Cross-origin consent must never authorize an unrelated account.
  const foreignDb='talera-free-local-'+(await privateAccountScope(accountB)).slice(0,32)+'-v1';
  const foreignBlocked=await b.evaluate(async({bytes,foreignDb})=>{

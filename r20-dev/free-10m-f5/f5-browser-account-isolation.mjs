@@ -811,6 +811,18 @@ try{
          triggers:possible,documentTitle:document.title};
      });
      console.log('TALERA_F5_HOME_NATIVE_MENU_REUSE_DIAGNOSTIC',JSON.stringify(reuse));
+     // Inspect only the already-built, APPROVED PUBLIC menu's entry hook.
+     // This proves the correct native open/back API before modifying navigation.
+     const originalMenuJs=readFileSync(path.join(generated,'approved-menu-original.mjs'),'utf8');
+     const hooks=['function open(', 'function openMenu(', 'function close(',
+       'function go(', 'function mount(', 'const trigger=', 'function create',
+       'window.Talera', 'window.__talera', 'addEventListener(\'click\'',
+       "id='talera-more-menu'", 'id="talera-more-menu"'];
+     const locations=hooks.map(q=>({q,index:originalMenuJs.indexOf(q)}))
+       .filter(x=>x.index>=0).map(x=>({hook:x.q,
+         near:originalMenuJs.slice(Math.max(0,x.index-450),x.index+1150)}));
+     console.log('TALERA_F5_ORIGINAL_PUBLIC_MENU_HOOK_DIAGNOSTIC',JSON.stringify(locations).slice(0,14000));
+
    }finally{await menuProbe.close()}
    // The owner's real iPhone still showed the OLD Home memory as a flash.
    // The earlier test only checked the DESTINATION before-first-paint.

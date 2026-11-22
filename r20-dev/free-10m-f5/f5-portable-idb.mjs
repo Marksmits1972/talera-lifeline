@@ -44,12 +44,113 @@ async function preview(decoded,name,allowOtherOrigin){
   };
  }finally{db.close()}
 }
-export async function previewFreeLibraryRestore(archive,databaseName,{allowOtherOrigin=false}={}){
+// One temporary, read-only iPhone photo diagnosis INSIDE the existing
+// "Bestand controleren" action. Only the FIRST photo of at most six real
+// memories is inspected from each source. No extra screen, account, media,
+// IndexedDB write, transcode, deletion, upload, or player change.
+const PHOTO_DIAGNOSTIC_MAX_STORIES=6;
+async function localImageStatus(blob){
+ if(!(blob instanceof Blob)||!blob.size)return 'ontbreekt';
+ if(blob.size>30*1024*1024)return 'te-groot';
+ if(typeof Image!=='function')return 'onbekend';
+ let url=null;
+ try{
+  url=URL.createObjectURL(blob);
+  return await new Promise(resolve=>{
+   const image=new Image();
+   let completed=false,timeout=null;
+   const finish=value=>{
+    if(completed)return;completed=true;
+    if(timeout!==null)clearTimeout(timeout);
+    image.onload=image.onerror=null;
+    resolve(value);
+   };
+   timeout=setTimeout(()=>finish('tijdslimiet'),5000);
+   image.onload=()=>finish(image.naturalWidth>0?'leesbaar':'niet-leesbaar');
+   image.onerror=()=>finish('niet-leesbaar');
+   image.src=url;
+   if(image.complete&&image.naturalWidth>0)finish('leesbaar');
+  });
+ }catch(_){return 'niet-leesbaar'}
+ finally{if(url)URL.revokeObjectURL(url)}
+}
+async function imageSignature(blob){
+ if(!(blob instanceof Blob)||blob.size<12)return 'onbekend';
+ try{
+  const h=new Uint8Array(await blob.slice(0,20).arrayBuffer());
+  const word=(from,n)=>String.fromCharCode(...h.slice(from,from+n));
+  if(h[0]===255&&h[1]===216&&h[2]===255)return 'jpeg';
+  if(h[0]===137&&word(1,3)==='PNG')return 'png';
+  if(word(0,4)==='RIFF'&&word(8,4)==='WEBP')return 'webp';
+  if(word(0,4)==='GIF8')return 'gif';
+  if(word(4,4)==='ftyp'){
+   const brand=word(8,4).toLowerCase();
+   if(['heic','heix','hevc','hevx'].includes(brand))return 'heic';
+   if(['mif1','msf1','heif'].includes(brand))return 'heif';
+   if(['avif','avis'].includes(brand))return 'avif';
+  }
+ }catch(_){}
+ return 'onbekend';
+}
+function signatureDisagrees(type,signature){
+ const mime=String(type||'').toLowerCase().split(';')[0].trim();
+ if(!mime||signature==='onbekend')return false;
+ const families={
+  'image/jpeg':['jpeg'],'image/png':['png'],'image/webp':['webp'],
+  'image/gif':['gif'],'image/heic':['heic','heif'],
+  'image/heif':['heic','heif'],'image/avif':['avif']
+ };
+ return Array.isArray(families[mime])&&!families[mime].includes(signature);
+}
+async function inspectLocalPhotoSnapshot(snapshot){
+ const files=new Map(snapshot.files.map(row=>[row.key,row.blob]));
+ const first=Array.isArray(snapshot.stories)?snapshot.stories
+  .filter(story=>Array.isArray(story.items)&&story.items.some(item=>item?.kind==='photo'))
+  .slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))
+  .slice(0,PHOTO_DIAGNOSTIC_MAX_STORIES):[];
+ const records=[];
+ for(const story of first){
+  const item=story.items.find(x=>x?.kind==='photo');
+  const original=files.get(item.key),mobile=files.get(item.key+':phone-v1');
+  const [source,mobileView,signature]=await Promise.all([
+   localImageStatus(original),localImageStatus(mobile),imageSignature(original)
+  ]);
+  records.push(Object.freeze({
+   date:/^\d{4}-\d{2}-\d{2}$/.test(story.date||'')?story.date:'onbekende datum',
+   original:source,mobile:mobileView,
+   type:typeof original?.type==='string'?original.type.slice(0,50):'',
+   signature,
+   typeMismatch:signatureDisagrees(original?.type,signature)
+  }));
+ }
+ return Object.freeze({checked:records.length,records});
+}
+async function compareReadOnlyPhotoSources(decoded,name){
+ const db=await openExisting(name,true);
+ let existing;
+ try{existing=await readAll(db)}finally{db.close()}
+ // Neither source is modified; images are decoded in memory then released.
+ const archive=await inspectLocalPhotoSnapshot(decoded);
+ const library=await inspectLocalPhotoSnapshot(existing);
+ return Object.freeze({archive,library,readOnly:true,filesUploaded:false});
+}
+
+export async function previewFreeLibraryRestore(archive,databaseName,{allowOtherOrigin=false,inspectPhotos=false}={}){
  requireName(databaseName,true);
  // Verify checksum & every media reference BEFORE even inspecting target state.
  const decoded=await decodeFreeArchive(archive);
  verifyLibraryMediaIntegrity(decoded);
- return preview(decoded,databaseName,allowOtherOrigin===true);
+ const review=await preview(decoded,databaseName,allowOtherOrigin===true);
+ // Only this owner's explicit conflicting-preview operation performs an
+ // optional diagnostic; the restore API and safe-to-restore behavior do not.
+ if(inspectPhotos!==true||review.safeToRestore)return review;
+ try{
+  return {...review,photoAudit:await compareReadOnlyPhotoSources(decoded,databaseName)};
+ }catch(_){
+  // Never turn a successful collision safety check into an unsafe import
+  // just because Safari could not inspect an image.
+  return {...review,photoAuditUnavailable:true};
+ }
 }
 export async function restoreFreeLibrary(archive,databaseName,
  {allowOtherOrigin=false,confirmed=false}={}){

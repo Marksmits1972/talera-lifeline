@@ -853,92 +853,31 @@ function filterOwnTopicPresentation(html){
  one('<head>','<head>'+"<script id=\"talera-topic-visibility-guard\">if(new URLSearchParams(location.search).has('theme'))document.documentElement.classList.add('talera-topic-loading');</script><style id=\"talera-topic-visibility-style\">html.talera-topic-loading #photoStage,html.talera-topic-loading #memoryCaption{visibility:hidden!important}</style>",'ONLY_TOPIC_LOADING_GUARD');
  return html;
 }
-// Keep the existing RH19 story title and sheet above native inline videos.
-// Their video node is appended at z-index 12; the original scroll layer was
-// z-index 4, so its title/arrow vanished as soon as the video replaced its
-// thumbnail. No player, narrator, media order or horizontal swipe changes.
-//
-// The existing sheet is still the ONLY vertical reader. Its native scrolling
-// remains intact everywhere except its small visible grab area, where pointer
-// motion drives the SAME scrollTop one-for-one (no velocity or snap animation).
+// The approved standalone social toolbar and PHOTO view pencil are already
+// present. Only the two older controls inside the opened reading paper are
+// duplicates. Hide them solely while reading without removing their source
+// nodes or changing handlers, gestures, narration, media or storage.
+// Keep the ORIGINAL reading paper above the narrator's media, and retain
+// its native vertical scroll as the only pull-up gesture owner. The small
+// decorative arrow already exists: enlarge it without adding a new control.
 function clarifyExistingReadingGrip(html){
- for(const required of ['id="memoryStoryScroll"','id="memoryCaption"',
-   'id="memoryStory"','class="memory-sheet is-visible"'])
-   assert.ok(html.includes(required),'ORIGINAL_READING_SHEET_CHANGED: '+required);
- const marker='id="talera-f5-story-grip-style"';
- assert.ok(!html.includes(marker)&&
-   !html.includes('id="talera-f5-story-grip"'),
-   'ORIGINAL_READING_GRIP_ALREADY_INSTALLED');
- const css=String.raw`
-<style id="talera-f5-story-grip-style">
-/* Keep the original reading layer in front of the native player (z=12). */
-.memory-space #memoryStoryScroll{
-  z-index:36!important;overscroll-behavior-y:contain!important;
+ for(const marker of ['id="memoryCaption"','id="memoryStoryScroll"','id="memoryStory"'])
+   assert.ok(html.includes(marker),'PRESENT_EXISTING_READING_SOURCE_MOVED_'+marker);
+ const css='<style id="talera-free-original-reading-grip">'+
+  '#memoryCaption::before{content:"↑"!important;top:10px!important;left:19px!important;'+
+   'width:36px!important;height:36px!important;line-height:36px!important;'+
+   'font-size:23px!important;font-weight:700!important;text-align:center!important;'+
+   'color:rgba(15,39,71,.88)!important;'+
+   'text-shadow:0 1px 1px rgba(255,255,255,.75)!important;'+
+   'pointer-events:none!important}'+
+  '#memoryStoryScroll{overflow-y:auto!important;touch-action:pan-y!important;'+
+   '-webkit-overflow-scrolling:touch!important;scroll-behavior:auto!important;'+
+   'scroll-snap-type:none!important;overscroll-behavior-y:contain!important}'+
+  '#memoryCaption{touch-action:pan-y!important}'+
+  '</style>';
+ assert.equal(html.split('</head>').length,2,'PRESENT_READING_HEAD_MOVED');
+ return html.replace('</head>',css+'</head>');
 }
-.memory-space #memoryCaption::before{display:none!important}
-#talera-f5-story-grip{
-  position:absolute!important;top:5px!important;left:14px!important;
-  width:66px!important;height:43px!important;min-width:66px!important;
-  min-height:43px!important;box-sizing:border-box!important;
-  margin:0!important;padding:0!important;
-  display:flex!important;align-items:center!important;justify-content:center!important;
-  border:1px solid rgba(15,39,71,.17)!important;border-radius:22px!important;
-  background:rgba(247,244,239,.78)!important;color:#0f2747!important;
-  font:750 23px/1 -apple-system,BlinkMacSystemFont,sans-serif!important;
-  box-shadow:0 1px 5px rgba(15,39,71,.10)!important;
-  z-index:5!important;touch-action:none!important;
-  user-select:none!important;-webkit-user-select:none!important;
-  -webkit-tap-highlight-color:transparent!important;cursor:grab!important;
-}
-#talera-f5-story-grip:active{cursor:grabbing!important}
-#talera-f5-story-grip:focus-visible{outline:2px solid #0f2747!important;outline-offset:2px!important}
-</style>`;
- const js=String.raw`
-<script id="talera-f5-story-grip-script">
-(()=>{
- const scroll=document.getElementById('memoryStoryScroll');
- const sheet=document.getElementById('memoryCaption');
- if(!scroll||!sheet||document.getElementById('talera-f5-story-grip'))return;
- const grip=document.createElement('button');
- grip.type='button';grip.id='talera-f5-story-grip';
- grip.textContent='↑';
- grip.setAttribute('aria-label','Sleep omhoog of omlaag om het verhaal te lezen');
- sheet.prepend(grip);
- let drag=null;
- grip.addEventListener('pointerdown',e=>{
-   if(e.isPrimary===false||(e.pointerType==='mouse'&&e.button!==0))return;
-   drag={id:e.pointerId,y:e.clientY,top:scroll.scrollTop};
-   try{grip.setPointerCapture(e.pointerId)}catch(_){}
-   e.stopPropagation();e.preventDefault();
- },{passive:false});
- grip.addEventListener('pointermove',e=>{
-   if(!drag||e.pointerId!==drag.id)return;
-   const max=Math.max(0,scroll.scrollHeight-scroll.clientHeight);
-   scroll.scrollTop=Math.max(0,Math.min(max,drag.top+drag.y-e.clientY));
-   e.stopPropagation();e.preventDefault();
- },{passive:false});
- const end=e=>{
-   if(!drag||e.pointerId!==drag.id)return;
-   drag=null;
-   try{if(grip.hasPointerCapture(e.pointerId))grip.releasePointerCapture(e.pointerId)}catch(_){}
-   e.stopPropagation();
- };
- grip.addEventListener('pointerup',end);
- grip.addEventListener('pointercancel',end);
- // Keyboard support uses precisely the same existing sheet scroll.
- grip.addEventListener('keydown',e=>{
-   if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
-   e.preventDefault();
-   scroll.scrollTop+=e.key==='ArrowUp'?96:-96;
- });
-})();
-</script>`;
- assert.equal(html.split('</head>').length,2,'ORIGINAL_READING_HEAD_CHANGED');
- assert.equal(html.split('</body>').length,2,'ORIGINAL_READING_BODY_CHANGED');
- return html.replace('</head>',css+'</head>')
-   .replace('</body>',js+'</body>');
-}
-
 function hideDuplicateReadingSheetActions(html){
  const necessary=[
   'id="memoryCaption"',
@@ -1547,7 +1486,6 @@ for(const [route,filename] of Object.entries(routes)){
  // Apply the SAME layout styling to both; leave account/library gates untouched.
  if(route==='/tell')guest=removeLegacyTellSampleImporter(polishTellEditorLayout(guest));
  if(route==='/present')guest=enableOriginalWhatsAppTouchScroll(guest);
- if(route==='/present')guest=clarifyExistingReadingGrip(guest);
  guest=closeAnonymousPersonalLibrary(guest);
  guest=stripBundledExamplePhotoLinks(guest);
  if(route==='/mijn-leven'){
@@ -1593,7 +1531,6 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=installOwnerRequestedClearAllStories(html);
  if(route==='/tell')html=removeLegacyTellSampleImporter(polishTellEditorLayout(shapeOwnStoryTopics(html)));
  if(route==='/present')html=enableOriginalWhatsAppTouchScroll(html);
-
  html=stripBundledExamplePhotoLinks(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);

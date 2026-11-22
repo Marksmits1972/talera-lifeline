@@ -1152,8 +1152,8 @@ function showExistingNarratedSwipeBand(html){
 // presentation, narration, album or timeline code. Files keep their
 // original bytes, type, name, lastModified and media IDs (no new schema).
 function stabilizeOriginalPhotoStorage(html){
- const pre="  var db=await open(),tx=db.transaction(['stories','files'],'readwrite'),finish=done(tx);";
- const original="  for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:uploads[j]});";
+ const pre="var db=await open(),tx=db.transaction(['stories','files'],'readwrite'),finish=done(tx);";
+ const original="for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:uploads[j]});";
  assert.equal(html.split(pre).length,2,'PHOTO_STORAGE_SAVE_TRANSACTION_SOURCE_DRIFT');
  assert.equal(html.split(original).length,2,'PHOTO_STORAGE_FILE_WRITE_SOURCE_DRIFT');
  const owned=String.raw`
@@ -1181,7 +1181,7 @@ function stabilizeOriginalPhotoStorage(html){
   }
 `;
  return html.replace(pre,owned+pre).replace(original,
-  "  for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:taleraOwnedPhotoUploads[j]});");
+  "for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:taleraOwnedPhotoUploads[j]});");
 }
 
 function installReadOnlyLibraryGateway(html){

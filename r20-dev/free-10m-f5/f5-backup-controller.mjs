@@ -14,6 +14,31 @@ const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore
 const selected=el('selected-file'),checkStep=el('backup-step-check'),finalStep=el('backup-step-confirm');
 let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
 const message=(element,text)=>{element.textContent=text;};
+// Read-only browser diagnosis on the EXISTING status area. No new button,
+// screen, media fixture, permanent state, or upload. First photo per memory.
+function readOnlyPhotoLine(label,source){
+ if(!source?.checked)return label+': geen eerste foto's gecontroleerd.';
+ return label+' — eerste foto per herinnering: '+
+  source.records.map(row=>{
+   const date=row.date==='onbekende datum'?'onbekende datum':row.date;
+   const types=row.type||'onbekend type';
+   return date+': origineel '+row.original+' ('+types+
+    ', inhoud '+row.signature+'), mobiele foto '+row.mobile+
+    (row.typeMismatch?' [bestandstype wijkt af van inhoud]':'');
+  }).join('; ')+'.';
+}
+function readOnlyPhotoText(result){
+ if(result?.photoAudit){
+  const checked=result.photoAudit;
+  return '\nAlleen lokaal onderzocht, NIETS teruggezet. '+
+    readOnlyPhotoLine('Back-upbestand',checked.archive)+'\n'+
+    readOnlyPhotoLine('Huidige bibliotheek',checked.library);
+ }
+ if(result?.photoAuditUnavailable)
+  return '\nDe aanvullende lokale fotocontrole kon niet worden uitgevoerd; niets gewijzigd.';
+ return '';
+}
+
 const failText=e=>{
  const raw=e instanceof Error?e.message:String(e);
  if(/ACCOUNT_CHANGED|SESSION_EXPIRED|SESSION_UNVERIFIED/.test(raw))
@@ -92,13 +117,15 @@ preview.addEventListener('click',async()=>{
  message(status,'Bestand controleren…');
  try{
   await assertCurrentAccount();
-  const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:cross.checked});
+  const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:cross.checked,inspectPhotos:true});
   review=result;reviewFile=file;reviewCross=cross.checked;
   finalStep.hidden=!result.safeToRestore;
+  status.style.whiteSpace='pre-line';
   message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en). '+
    (result.crossOrigin?'Back-up uit een andere TALERA-versie. ':'')+
    (result.safeToRestore?'Geen dubbele gegevens. Ga nu door met stap 3 om terug te zetten.':
-    'Conflict met bestaande gegevens: deze herinneringen staan al in TALERA. Er is niets gewijzigd of teruggezet.'));
+    'Conflict met bestaande gegevens: deze herinneringen staan al in TALERA. Er is niets gewijzigd of teruggezet.')+
+   readOnlyPhotoText(result));
  }catch(e){message(status,'Controle gestopt (niets gewijzigd): '+failText(e))}
  finally{preview.disabled=!chooser.files?.[0]}
 });

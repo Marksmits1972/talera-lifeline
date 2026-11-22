@@ -936,7 +936,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 9624013cd68698e802a034210016d8bcf92f74a9
+          test "$(git rev-parse HEAD^)" = d141abd5f1b5362ac190c7053eeafcfc9b0d051b
+          test "$(git diff --name-only 9624013cd68698e802a034210016d8bcf92f74a9 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 9624013cd68698e802a034210016d8bcf92f74a9 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
@@ -1107,9 +1109,9 @@ jobs:
           import {localBackupPage} from './r20-dev/free-10m-f5/f5-local-backup-page.mjs';
           const html=localBackupPage('talera-free-local-'+'a'.repeat(32)+'-v1');
           const labels=['Stap 1 — Kies een back-upbestand','id="restore-file"',
-            'id="selected-file"','Stap 2 — Controleer het bestand',
-            'id="backup-step-check" hidden','Stap 3 — Zet herinneringen terug',
-            'id="backup-step-confirm" hidden'];
+            'id="selected-file"','id="backup-step-check" hidden',
+            'Stap 2 — Controleer het bestand','id="backup-step-confirm" hidden',
+            'Stap 3 — Zet herinneringen terug'];
           let cursor=-1;
           for(const label of labels){
             const pos=html.indexOf(label);

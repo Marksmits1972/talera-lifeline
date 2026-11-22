@@ -17,7 +17,7 @@ const message=(element,text)=>{element.textContent=text;};
 // Read-only browser diagnosis on the EXISTING status area. No new button,
 // screen, media fixture, permanent state, or upload. First photo per memory.
 function readOnlyPhotoLine(label,source){
- if(!source?.checked)return label+': geen eerste foto's gecontroleerd.';
+ if(!source?.checked)return label+": geen eerste foto's gecontroleerd.";
  return label+' — eerste foto per herinnering: '+
   source.records.map(row=>{
    const date=row.date==='onbekende datum'?'onbekende datum':row.date;

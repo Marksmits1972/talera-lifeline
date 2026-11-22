@@ -890,7 +890,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-home-outgoing-menu-flash-repair-20261122' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-direct-home-menu-no-white-screen-20261122' }}
     needs: [f5_isolated_local, f5_actual_registration_button]
     runs-on: ubuntu-24.04
     timeout-minutes: 22
@@ -905,7 +905,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: f9d49668-bbcd-44ed-a300-c9fa9308c0ac
+      F5_EXPECTED_LIVE_VERSION: abe8d090-6547-45ca-8ff6-4d91046f1a31
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -931,12 +931,12 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = b4b24929ce4745246078d3ed4aa5fb381dce1107
+          test "$(git rev-parse HEAD^)" = d20339a312482d755869a719c2ecd3a589fc36bd
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=45031463947,expected='b4b24929ce4745246078d3ed4aa5fb381dce1107';
+          const id=45038635016,expected='d20339a312482d755869a719c2ecd3a589fc36bd';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,
@@ -1150,6 +1150,25 @@ jobs:
             sleep 3
           done
           test "$fresh" = 1
+          # The reported iPhone bug was a one-second white transition.
+          # Verify the NEW direct Home menu script on the very SAME origin;
+          # plain HTTP 200 or a generic old Home page is insufficient.
+          native_menu=0
+          for attempt in $(seq 1 12); do
+            code=$(curl -sS --max-time 25 -o /tmp/talera-menu-fast-home.html -w '%{http_code}' \
+              "https://$F5_STAGE_HOST/mijn-leven" || echo 000)
+            if [ "$code" = 200 ] &&
+               grep -Fq 'id="talera-f5-home-original-menu-module"' /tmp/talera-menu-fast-home.html &&
+               grep -Fq "controller.open('hub')" /tmp/talera-menu-fast-home.html &&
+               grep -Fq 'src="/__clean/menu-integration.mjs"' /tmp/talera-menu-fast-home.html; then
+              native_menu=1
+              echo "TALERA_DIRECT_HOME_ORIGINAL_MENU_ON_SAME_LIVE_ORIGIN_PASS_ATTEMPT=$attempt"
+              break
+            fi
+            echo "TALERA_DIRECT_HOME_MENU_PROPAGATION_WAIT_ATTEMPT=$attempt CODE=$code"
+            sleep 3
+          done
+          test "$native_menu" = 1
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven" >/tmp/talera-empty-home.html
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/present" >/tmp/talera-empty-present.html
           # A real iPhone showed the GUEST editor, while old CI covered only

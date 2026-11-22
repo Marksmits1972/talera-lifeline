@@ -50,6 +50,51 @@ function evenlySpaceThreeHomeTabs(html){
 // Avoid that unrelated first frame. Only a direct, valid ONE-story selection is
 // gated; all ordinary timelines, topic filters, voice, swipe and photos stay
 // exactly as before. No image/media copy, URL change or persistent state.
+// Prevent the OLD Home photo or narration from remaining painted while iOS
+// fetches the ORIGINAL More/menu destination. The earlier destination-only
+// guard did not cover this outgoing frame (observed on the real iPhone).
+// This touches only the existing #navMore link on /mijn-leven, with exactly
+// its approved href. Nothing changes about the regular presentation/player.
+function shieldHomeWhileOpeningExistingMenu(html,requestUrl){
+ const url=new URL(requestUrl);
+ if(url.pathname!=='/mijn-leven'||url.search)return html;
+ if(typeof html!=='string'||html.split('<head>').length!==2||
+    !html.includes('id="navMore"')||
+    !html.includes('/present?talera_menu=hub'))
+   throw Error('TALERA_HOME_MORE_OUTGOING_SOURCE_DRIFT');
+ const early=String.raw`(function(){
+   const target='/present?talera_menu=hub';
+   const root=document.documentElement;
+   const cssClass='talera-f5-home-leaving-for-original-menu';
+   window.addEventListener('pageshow',()=>root.classList.remove(cssClass));
+   document.addEventListener('click',event=>{
+     if(event.defaultPrevented||event.button!==0||event.metaKey||
+        event.ctrlKey||event.shiftKey||event.altKey)return;
+     const link=event.target?.closest?.('a#navMore');
+     if(!link||link.getAttribute('href')!==target)return;
+     // Keep the original URL, history behavior and menu script. On iOS,
+     // the old painted Home can otherwise persist for a visible half-second.
+     // Paint a neutral frame BEFORE the browser navigates to that same URL.
+     event.preventDefault();
+     root.classList.add(cssClass);
+     let gone=false;
+     let fallback;
+     const enter=()=>{
+       if(gone)return;gone=true;clearTimeout(fallback);
+       window.location.assign(target);
+     };
+     fallback=setTimeout(enter,650); // Hidden/background iOS fallback.
+     requestAnimationFrame(()=>requestAnimationFrame(enter));
+   },true);
+ })`;
+ const mask='<style id="talera-f5-home-outgoing-menu-mask">'+
+   'html.talera-f5-home-leaving-for-original-menu{background:#f7f5f0!important}'+
+   'html.talera-f5-home-leaving-for-original-menu body{visibility:hidden!important}'+
+   '</style>';
+ const script='<script id="talera-f5-home-outgoing-menu-nav">'+early+'</script>';
+ return html.replace('<head>','<head>'+mask+script);
+}
+
 // The APPROVED Home "Meer" navigates to /present?talera_menu=hub.
 // Before the original account menu mounts, the original presentation may
 // briefly paint a selected photo/video/narrator. Mask ONLY that intermediate
@@ -1035,7 +1080,8 @@ async function publicPage(request,env){
     const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));
     const storyEntryHtml=hideUnselectedEntryPhoto(converted.html,request.url);
     const menuEntryHtml=preventHomeMenuPresentationFlash(storyEntryHtml,request.url);
-    return new Response(menuEntryHtml,{
+    const outgoingHomeHtml=shieldHomeWhileOpeningExistingMenu(menuEntryHtml,request.url);
+    return new Response(outgoingHomeHtml,{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
         'x-content-type-options':'nosniff','x-talera-free-f5':'personalized-durable-account',
@@ -1059,7 +1105,8 @@ async function publicPage(request,env){
   if(sessionToken&&!actor)headers.set('set-cookie',sessionCookie('',0));
   if(homeScreen){
     // Logged-out Home and its existing Notifications tab share the same bar.
-    return new Response(evenlySpaceThreeHomeTabs(await r.text()),{status:200,headers});
+    return new Response(shieldHomeWhileOpeningExistingMenu(
+      evenlySpaceThreeHomeTabs(await r.text()),request.url),{status:200,headers});
   }
   if(pathname==='/present'){
     const entry=hideUnselectedEntryPhoto(await r.text(),request.url);

@@ -777,7 +777,7 @@ try{
   console.log('TALERA_FREE_VIDEO_KEEP_ORIGINAL_TITLE_ABOVE_PLAYER_PASS',
     JSON.stringify({...originalTitleLayer,realIphoneAccepted:false}));
   assert.ok(gripMovedDuring,
-    'Original grip missed the user's drag; center hit and pointer events: '+
+    "Original grip missed the drag; center hit and pointer events: "+
     JSON.stringify({hit:gripBeforeDrag,trace:pointerTrace,
       during:gripDuring,after:gripAfter}));
   await waitIndex(page,0,12000);

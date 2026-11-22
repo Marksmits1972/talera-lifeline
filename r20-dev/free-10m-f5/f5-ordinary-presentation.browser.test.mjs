@@ -1451,6 +1451,98 @@ try{
       titleAndTagsOptional:true,homeAndNarratorBothReadable:true,
       realWorkerVersionTransitionTested:false,realIphoneAccepted:false,
       syntheticOnly:true}));
+
+  // The owner's physical Safari restore showed six cue dots but a BROKEN
+  // rendered picture. Previous backup tests compared Blob bytes only; this
+  // regression now covers actual export -> restore into EMPTY browser storage
+  // -> original photo + voice presentation, all on the SAME Free Worker/origin.
+  // All input is disposable synthetic data; real iPhone storage is untouched.
+  const backupPage=await ctx.newPage();
+  let restoredContext;
+  try{
+    const backupResp=await backupPage.goto(origin+'/__f5/backup',
+      {waitUntil:'domcontentloaded'});
+    assert.equal(backupResp.status(),200);
+    await backupPage.waitForFunction(()=>
+      document.getElementById('talera-free-backup')?.dataset.ready==='yes');
+    await backupPage.locator('#make-backup').click();
+    await backupPage.locator('#save-backup').waitFor({state:'visible',timeout:25000});
+    const downloadPromise=backupPage.waitForEvent('download');
+    await backupPage.locator('#save-backup').click();
+    const downloaded=await downloadPromise;
+    const archiveBytes=readFileSync(await downloaded.path());
+    assert.ok(archiveBytes.length>300,'Real Free export must include media bytes');
+
+    restoredContext=await browser.newContext({
+      ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate}
+    });
+    await restoredContext.addCookies([{name:'talera_sid',value:sid,
+      domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+    const restoredPage=await restoredContext.newPage();
+    restoredPage.on('pageerror',e=>errors.push('RESTORED '+e.message));
+    await restoredPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+    await restoredPage.waitForFunction(()=>
+      typeof window.TaleraMemories?.list==='function');
+    const initial=await restoredPage.evaluate(()=>window.TaleraMemories.list());
+    assert.equal(initial.length,0,
+      'Only a genuinely empty independent browser storage partition can be restored');
+    await restoredPage.goto(origin+'/__f5/backup',{waitUntil:'domcontentloaded'});
+    await restoredPage.waitForFunction(()=>
+      document.getElementById('talera-free-backup')?.dataset.ready==='yes');
+    await restoredPage.locator('#restore-file').setInputFiles({
+      name:'talera-synthetic-same-app.talera',mimeType:'application/octet-stream',
+      buffer:archiveBytes
+    });
+    await restoredPage.locator('#preview-restore').click();
+    await restoredPage.waitForFunction(()=>
+      document.getElementById('restore-status')?.textContent.includes('Geen dubbele'),
+      null,{timeout:25000});
+    assert.equal(await restoredPage.locator('#backup-step-confirm').isVisible(),true);
+    await restoredPage.locator('#confirm-restore').check();
+    await restoredPage.locator('#run-restore').click();
+    await restoredPage.waitForFunction(()=>
+      document.getElementById('restore-status')?.textContent.includes('Herstel voltooid'),
+      null,{timeout:30000});
+    await load(restoredPage,sixPhotoStory.id,6);
+    await restoredPage.waitForFunction(()=>
+      [...document.querySelectorAll('#photoStage img')]
+        .some(img=>img.complete&&img.naturalWidth>0&&
+          img.currentSrc.startsWith('blob:')),
+      null,{timeout:12000});
+    const rendered=await restoredPage.evaluate(async id=>{
+      const memory=window.__taleraTimelineRuntime?.currentMemory?.();
+      const row=await window.TaleraMemories.get(id);
+      const photos=row.items.filter(x=>x.kind==='photo');
+      const files=await Promise.all(photos.map(x=>window.TaleraMemories.blob(x.key)));
+      const frames=memory?._zeroFrames||[];
+      const decoded=await Promise.all(frames.map(async frame=>{
+        if(frame.kind!=='photo'||!frame.url)return false;
+        const image=new Image();image.src=frame.url;
+        try{await image.decode();return image.naturalWidth>0}catch{return false}
+      }));
+      const voiceKey=row.items.find(x=>x.kind==='audio')?.key;
+      const voice=voiceKey&&await window.TaleraMemories.blob(voiceKey);
+      return {storyId:memory?.storyId,frameCount:frames.length,
+        decodedPhotos:decoded.filter(Boolean).length,
+        allBlobsPresent:files.every(b=>b instanceof Blob&&b.size>0),
+        soundPresent:voice instanceof Blob&&voice.size>100,
+        renderedImage:[...document.querySelectorAll('#photoStage img')]
+          .some(img=>img.complete&&img.naturalWidth>0&&
+            img.currentSrc.startsWith('blob:'))};
+    },sixPhotoStory.id);
+    assert.equal(rendered.storyId,sixPhotoStory.id);
+    assert.equal(rendered.frameCount,6);
+    assert.equal(rendered.decodedPhotos,6,
+      'Restored photos MUST decode in the actual presentation; byte checks are insufficient');
+    assert.equal(rendered.allBlobsPresent,true);
+    assert.equal(rendered.soundPresent,true);
+    assert.equal(rendered.renderedImage,true);
+    console.log('TALERA_RESTORED_SAME_PWA_ORIGINAL_PHOTOS_AND_VOICE_RENDER_PASS',
+      JSON.stringify({...rendered,syntheticOnly:true,physicalIphoneAccepted:false}));
+  }finally{
+    await backupPage.close();
+    if(restoredContext)await restoredContext.close();
+  }
   await load(page,plain,3);
 
   // A real LEFT/RIGHT gesture from a playing voice memory must immediately

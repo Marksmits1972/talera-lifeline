@@ -86,7 +86,7 @@ function shieldHomeWhileOpeningExistingMenu(html,requestUrl){
      fallback=setTimeout(enter,650); // Hidden/background iOS fallback.
      requestAnimationFrame(()=>requestAnimationFrame(enter));
    },true);
- })`;
+ })();`;
  const mask='<style id="talera-f5-home-outgoing-menu-mask">'+
    'html.talera-f5-home-leaving-for-original-menu{background:#f7f5f0!important}'+
    'html.talera-f5-home-leaving-for-original-menu body{visibility:hidden!important}'+
@@ -129,7 +129,7 @@ function preventHomeMenuPresentationFlash(html,requestUrl){
    check();
    window.addEventListener('pagehide',()=>{observer.disconnect();clearTimeout(fallback)},
      {once:true});
- })`;
+ })();`;
  const markup='<script id="talera-f5-menu-entry-before-paint">'+early+'</script>'+
   '<style id="talera-f5-menu-entry-no-presentation-flash">'+
   'html.talera-hub-menu-booting{background:#f7f5f0!important}'+

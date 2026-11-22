@@ -886,9 +886,9 @@ function clarifyExistingReadingGrip(html){
   margin:0!important;padding:0!important;
   display:flex!important;align-items:center!important;justify-content:center!important;
   border:0!important;border-radius:0!important;
-  background:transparent!important;color:rgba(15,39,71,.88)!important;
-  font:700 23px/1 -apple-system,BlinkMacSystemFont,sans-serif!important;
-  text-shadow:0 1px 1px rgba(255,255,255,.75)!important;
+  background:transparent!important;color:rgba(255,253,248,.94)!important;
+  font:600 20px/1 -apple-system,BlinkMacSystemFont,sans-serif!important;
+  text-shadow:0 1px 2px rgba(5,19,33,.85),0 0 2px rgba(5,19,33,.5)!important;
   box-shadow:none!important;appearance:none!important;-webkit-appearance:none!important;
   z-index:5!important;touch-action:none!important;
   user-select:none!important;-webkit-user-select:none!important;

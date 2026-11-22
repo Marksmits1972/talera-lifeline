@@ -104,7 +104,8 @@ try{
   assert.ok(sid,'Session cookie not returned');
   browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
   const ctx=await browser.newContext({
-    ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate}
+    ...devices['iPhone 13'],acceptDownloads:true,
+    extraHTTPHeaders:{'x-talera-f5-key':gate}
   });
   await ctx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);

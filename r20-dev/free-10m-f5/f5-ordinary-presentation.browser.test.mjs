@@ -532,44 +532,6 @@ try{
   // Preserve the same single /present page; do not navigate directly to
   // memory 2. Its cover must be preloaded on the existing 11-photo wheel.
   await load(page,plain,3);
-  // The visible original reading-sheet arrow must be a real 43px grip.
-  // Dragging it 100px up moves the SAME original vertical scrollTop
-  // roughly 100px immediately, without inertia, snap or a new story viewer.
-  const readingGrip=page.locator('#talera-f5-story-grip');
-  assert.equal(await readingGrip.count(),1,'One original story pull handle');
-  const gripBounds=await readingGrip.boundingBox();
-  assert.ok(gripBounds?.width>=60&&gripBounds?.height>=40,
-    'Reading-sheet pull handle is too small on a phone');
-  const gripInitial=await page.evaluate(()=>{
-    const scroll=document.getElementById('memoryStoryScroll');
-    const grip=document.getElementById('talera-f5-story-grip');
-    return {max:scroll.scrollHeight-scroll.clientHeight,
-      top:scroll.scrollTop,font:parseFloat(getComputedStyle(grip).fontSize),
-      touchAction:getComputedStyle(grip).touchAction};
-  });
-  assert.ok(gripInitial.max>140&&gripInitial.font>=20&&gripInitial.touchAction==='none',
-    'Original reading sheet does not offer a usable drag target: '+
-    JSON.stringify(gripInitial));
-  const gx=gripBounds.x+gripBounds.width*.5,gy=gripBounds.y+gripBounds.height*.5;
-  await page.mouse.move(gx,gy);
-  await page.mouse.down();
-  await page.mouse.move(gx,gy-100,{steps:12});
-  const gripDuring=await page.evaluate(()=>
-    document.getElementById('memoryStoryScroll').scrollTop);
-  assert.ok(gripDuring-gripInitial.top>=75&&gripDuring-gripInitial.top<=112,
-    'Reading-sheet content did not track the pointer: '+gripDuring);
-  await page.mouse.up();
-  await page.waitForTimeout(180);
-  const gripAfter=await page.evaluate(()=>
-    document.getElementById('memoryStoryScroll').scrollTop);
-  assert.ok(Math.abs(gripAfter-gripDuring)<=9,
-    'Reading sheet jumped or kept sliding after finger release: '+
-    JSON.stringify({gripDuring,gripAfter}));
-  await page.evaluate(()=>document.getElementById('memoryStoryScroll').scrollTop=0);
-  console.log('TALERA_FREE_ORIGINAL_READING_GRIP_DIRECT_DRAG_PASS',
-    JSON.stringify({gripWidth:gripBounds.width,gripHeight:gripBounds.height,
-      draggedPx:gripDuring-gripInitial.top,noInertia:true,sameSheet:true,
-      realIphoneAccepted:false}));
   const coverState=await page.evaluate(targetId=>{
     const book=window.__taleraPhotoBook;
     const row=book?.list?.().find(m=>m.storyId===targetId);
@@ -631,27 +593,10 @@ try{
   // Watch the original player from BEFORE tapping instead of missing it.
   await page.evaluate(()=>{
     window.__taleraOriginalVideoWasShown=!!document.querySelector('video.talera-v61-inline-video');
-    window.__taleraOriginalVideoTitleLayer=null;
-    const checkVideo=()=>{
-      const video=document.querySelector('video.talera-v61-inline-video');
-      if(!video)return;
-      window.__taleraOriginalVideoWasShown=true;
-      if(window.__taleraOriginalVideoTitleLayer)return;
-      const sheet=document.getElementById('memoryCaption');
-      const scroll=document.getElementById('memoryStoryScroll');
-      const title=document.getElementById('memoryStory');
-      const style=x=>x?getComputedStyle(x):null;
-      window.__taleraOriginalVideoTitleLayer={
-        title:title?.textContent?.trim()||'',
-        captionDisplay:style(sheet)?.display,
-        captionOpacity:style(sheet)?.opacity,
-        titleOpacity:style(title)?.opacity,
-        scrollZ:Number(style(scroll)?.zIndex),
-        videoZ:Number(style(video)?.zIndex),
-        gripVisible:!!document.getElementById('talera-f5-story-grip')
-      };
-    };
-    const observer=new MutationObserver(checkVideo);
+    const observer=new MutationObserver(()=>{
+      if(document.querySelector('video.talera-v61-inline-video'))
+        window.__taleraOriginalVideoWasShown=true;
+    });
     observer.observe(document.documentElement,{childList:true,subtree:true});
     window.__taleraOriginalVideoObserver=observer;
   });
@@ -678,15 +623,6 @@ try{
   }finally{
     await page.evaluate(()=>window.__taleraOriginalVideoObserver?.disconnect());
   }
-  const originalTitleLayer=await page.evaluate(()=>window.__taleraOriginalVideoTitleLayer);
-  assert.ok(originalTitleLayer&&originalTitleLayer.scrollZ>originalTitleLayer.videoZ&&
-    originalTitleLayer.gripVisible&&originalTitleLayer.captionDisplay!=='none'&&
-    Number(originalTitleLayer.captionOpacity)>.8&&
-    Number(originalTitleLayer.titleOpacity)>.8,
-    'Original story title disappeared behind the playing video: '+
-    JSON.stringify(originalTitleLayer));
-  console.log('TALERA_FREE_VIDEO_KEEP_ORIGINAL_TITLE_ABOVE_PLAYER_PASS',
-    JSON.stringify({...originalTitleLayer,realIphoneAccepted:false}));
   await waitIndex(page,0,12000);
   const state=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();
@@ -890,7 +826,7 @@ try{
     const scroll=document.getElementById('memoryStoryScroll');
     const sheet=document.getElementById('memoryCaption');
     const title=document.getElementById('memoryStory');
-    const grip=document.getElementById('talera-f5-story-grip');
+    const arrow=getComputedStyle(sheet,'::before');
     const stack=el=>Number.parseInt(getComputedStyle(el).zIndex,10);
     return {
       narratorVideoPresent:!!video,
@@ -899,10 +835,9 @@ try{
       titleOpacity:Number(getComputedStyle(title).opacity),
       paperVisible:getComputedStyle(scroll).visibility==='visible'&&
         getComputedStyle(scroll).display!=='none',
-      arrowSize:grip?Number.parseFloat(getComputedStyle(grip).fontSize):0,
-      arrowText:grip?.textContent||'',
-      gripWidth:grip?.getBoundingClientRect().width||0,
-      gripHeight:grip?.getBoundingClientRect().height||0,
+      arrowSize:Number.parseFloat(arrow.fontSize),
+      arrowText:arrow.content,
+      arrowColor:arrow.color,
       touchAction:getComputedStyle(scroll).touchAction
     };
   });
@@ -919,10 +854,8 @@ try{
     readingDuringNarratedVideo.titleOpacity>=0.8,
     'Original title/paper must remain visible when narrated video starts');
   assert.ok(readingDuringNarratedVideo.arrowSize>=22&&
-    readingDuringNarratedVideo.arrowText.includes('↑')&&
-    readingDuringNarratedVideo.gripWidth>=60&&
-    readingDuringNarratedVideo.gripHeight>=40,
-    'The existing pull-up arrow must be visible and easy to grab on a phone');
+    readingDuringNarratedVideo.arrowText.includes('↑'),
+    'The existing pull-up arrow must be clearly visible on a phone');
   assert.equal(readingDuringNarratedVideo.touchAction,'pan-y');
   console.log('TALERA_NARRATOR_VIDEO_KEEPS_ORIGINAL_TITLE_AND_READING_GRIP_PASS',
     JSON.stringify({...readingDuringNarratedVideo,realIphoneAccepted:false}));

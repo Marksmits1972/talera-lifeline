@@ -728,6 +728,27 @@ try{
  await waitForLibrary(page);
  const owner=await login(page,users[0]);
  assert.equal(owner,ids[0],'First actual menu login must select existing account ID');
+ // Signed-in iPhone entry must carry the same BEFORE-FIRST-PAINT guard.
+ // Plain /present must keep the exact original presentation unhindered.
+ const [signedHub,ordinaryPresent]=await Promise.all([
+   context.request.get(origin+'/present?talera_menu=hub'),
+   context.request.get(origin+'/present')
+ ]);
+ assert.equal(signedHub.status(),200);
+ assert.equal(ordinaryPresent.status(),200);
+ const [hubHtml,ordinaryHtml]=await Promise.all([
+   signedHub.text(),ordinaryPresent.text()
+ ]);
+ assert.ok(hubHtml.includes('id="talera-f5-menu-entry-before-paint"')&&
+   hubHtml.includes('html.talera-hub-menu-booting body{visibility:hidden!important}'),
+   'Signed-in Home More must shield personal photo/video until the original menu opens');
+ assert.ok(!ordinaryHtml.includes('talera-f5-menu-entry-before-paint')&&
+   ordinaryHtml.includes('id="photoStage"'),
+   'Normal presentation must NEVER be prehidden or re-rendered for menu navigation');
+ console.log('TALERA_F5_SIGNED_IN_HOME_MORE_NO_PHOTO_FLASH_PASS',
+   JSON.stringify({sameAppOrigin:true,originalMenuRoute:true,
+     normalPresentationUnaffected:true,privateLibraryNotRead:true,
+     realIphoneAccepted:false}));
  // A genuinely empty but signed-in Free library must not produce a white
  // Home screen. Verify the ORIGINAL Home shell before creating test stories,
  // and after a cold reload, on this same account and app origin.

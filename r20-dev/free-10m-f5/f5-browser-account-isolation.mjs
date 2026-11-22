@@ -789,6 +789,29 @@ try{
    console.log('TALERA_F5_EMPTY_SIGNED_IN_HOME_AND_RELOAD_VISIBLE_PASS',
      JSON.stringify({syntheticOnly:true,sameApp:true,sameOrigin:true,
        noInventedStories:true,realIphoneAccepted:false}));
+   // Read-only diagnostic: can the EXISTING account menu module mount on
+   // the existing Home without navigating through the presentation engine?
+   // Same app, same origin, no second product or synthetic persistence.
+   const menuProbe=await context.newPage();
+   try{
+     await menuProbe.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+     await menuProbe.addScriptTag({url:'/__clean/menu-integration.mjs',type:'module'});
+     await menuProbe.waitForTimeout(500);
+     const reuse=await menuProbe.evaluate(()=>{
+       const shell=document.getElementById('talera-more-menu');
+       const possible=[...document.querySelectorAll('button,a')].filter(el=>
+         !el.closest('#talera-more-menu')&&
+         /more|meer|\\u2022\\u2022\\u2022/i.test(
+           (el.textContent||'')+' '+(el.getAttribute('aria-label')||'')
+         )).map(el=>({tag:el.tagName,id:el.id,cls:el.className,
+           text:el.textContent?.trim().slice(0,75),
+           html:el.outerHTML.slice(0,900)})).slice(0,12);
+       return {menuExists:!!shell,hidden:shell?.hidden,
+         menuHtml:shell?.outerHTML.slice(0,650),
+         triggers:possible,documentTitle:document.title};
+     });
+     console.log('TALERA_F5_HOME_NATIVE_MENU_REUSE_DIAGNOSTIC',JSON.stringify(reuse));
+   }finally{await menuProbe.close()}
    // The owner's real iPhone still showed the OLD Home memory as a flash.
    // The earlier test only checked the DESTINATION before-first-paint.
    // Start at the ACTUAL Home, synthesize the original More click, and

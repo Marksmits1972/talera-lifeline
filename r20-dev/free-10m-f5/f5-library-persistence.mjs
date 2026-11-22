@@ -169,6 +169,35 @@ export async function verifyRestoredLibraryReadback(expected,actual){
 }
 
 export async function restoreRowsAtomic(db,decoded){
+  // The chosen iPhone .talera File can be disk-backed. Its Blob slices are
+  // perfectly readable during an immediate checksum/readback, but retaining
+  // those slices in IndexedDB can leave later WebKit object URLs unreadable.
+  // Make an owned, byte-exact copy of photos and image previews BEFORE opening
+  // the write transaction. Never transcode, rename, migrate or touch players.
+  const photoKeys=new Set(decoded.stories.flatMap(story=>
+    (story.items||[]).filter(item=>item?.kind==='photo').map(item=>item.key)));
+  const ownedFiles=[];
+  for(const row of decoded.files){
+   const original=row?.blob;
+   if(!(original instanceof Blob)||
+      !(photoKeys.has(row.key)||String(original.type).startsWith('image/'))){
+    ownedFiles.push(row);continue;
+   }
+   // A Uint8Array, not a Blob slice, severs the storage object's dependency
+   // on the picker/File-provider lifetime. Fail before writing on read errors.
+   const bytes=new Uint8Array(await original.arrayBuffer());
+   if(bytes.byteLength!==original.size)
+    throw Error('TALERA_RESTORE_PHOTO_COPY_SIZE_MISMATCH');
+   const isFile=typeof File==='function'&&original instanceof File;
+   const owned=isFile?
+    new File([bytes],original.name,{type:original.type,lastModified:original.lastModified}):
+    new Blob([bytes],{type:original.type});
+   if(owned.size!==original.size||owned.type!==original.type||
+      (isFile&&(owned.name!==original.name||
+        owned.lastModified!==original.lastModified)))
+    throw Error('TALERA_RESTORE_PHOTO_COPY_METADATA_MISMATCH');
+   ownedFiles.push({...row,blob:owned});
+  }
   // One atomic IndexedDB transaction for both stores: fail/QuotaExceeded
   // aborts the WHOLE import, never deletes or replaces existing media/stories.
   await new Promise((resolve,reject)=>{
@@ -184,7 +213,7 @@ export async function restoreRowsAtomic(db,decoded){
    try{
     const s=tx.objectStore('stories'),f=tx.objectStore('files');
     for(const row of decoded.stories)s.add(row);
-    for(const row of decoded.files)f.add(row);
+    for(const row of ownedFiles)f.add(row);
    }catch(error){try{tx.abort()}catch{}finish(error)}
   });
 }

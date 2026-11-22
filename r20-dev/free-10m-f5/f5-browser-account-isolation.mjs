@@ -676,51 +676,49 @@ try{
      const homeMore=page.locator('#navMore');
      assert.equal(await homeMore.getAttribute('href'),'/present?talera_menu=hub',
        'Original home menu href changed; preserve its navigation contract');
-     const [menuNav]=await Promise.all([
-       page.waitForResponse(r=>r.url().includes('/present?talera_menu=hub')&&
-         r.request().isNavigationRequest(),{timeout:14000}),
-       homeMore.click()
-     ]);
-     assert.equal(menuNav.status(),200,'Original home More link must not land on JSON 404');
-     const routeHtml=await menuNav.text();
-     assert.ok(routeHtml.includes('talera-f5-menu-entry-before-paint')&&
-       routeHtml.includes('talera-f5-menu-entry-no-presentation-flash'),
-       'Home More must suppress presentation BEFORE first paint, not after its player appears');
-     await page.waitForFunction(()=>{
-       const n=document.getElementById('talera-more-menu');
-       return !!n&&!n.hidden;
-     },null,{timeout:11000});
-     // The early guard must release only when the ORIGINAL account menu is
-     // mounted, so closing it still reveals the untouched presentation.
-     const noFlash=await page.evaluate(()=>{
-       const root=document.documentElement;
-       const panel=document.getElementById('talera-more-menu');
-       root.classList.add('talera-hub-menu-booting');
-       const hiddenDuringTransition=getComputedStyle(document.body).visibility==='hidden';
-       root.classList.remove('talera-hub-menu-booting');
-       const visibleAfterMenu=getComputedStyle(document.body).visibility==='visible';
-       return {guardPresent:!!document.getElementById('talera-f5-menu-entry-before-paint'),
-         guardReleased:!root.classList.contains('talera-hub-menu-booting'),
-         hiddenDuringTransition,visibleAfterMenu,menuDisplayed:!panel?.hidden,
-         preservedOriginalStage:!!document.getElementById('photoStage')};
-     });
-     assert.deepEqual(noFlash,{
-       guardPresent:true,guardReleased:true,hiddenDuringTransition:true,
-       visibleAfterMenu:true,menuDisplayed:true,preservedOriginalStage:true
-     },'Home account entry should show the menu without a visible story flash');
+     // The ORIGINAL account menu must appear in THIS Home document.
+     // A /present request is forbidden on the normal More tap: that was
+     // the cause of the real iPhone's one-second blank interstitial.
+     await page.waitForFunction(()=>
+       window.__taleraMoreMenu?.ready&&
+       typeof window.__taleraMoreMenu.open==='function',null,{timeout:12000});
+     const homeUrl=page.url();
+     await homeMore.click();
+     await page.locator('#talera-more-menu:not([hidden])').waitFor({timeout:3500});
+     const direct=await page.evaluate(()=>({
+       sameHome:location.pathname==='/mijn-leven',
+       originalHref:document.getElementById('navMore')?.getAttribute('href'),
+       menuVisible:!document.getElementById('talera-more-menu')?.hidden,
+       renderedMenu:document.getElementById('talera-more-menu')
+         ?.getBoundingClientRect().width>0,
+       bodyVisible:getComputedStyle(document.body).visibility==='visible',
+       nativeMenuModule:document.getElementById('talera-f5-home-original-menu-module')
+         ?.getAttribute('src')==='/__clean/menu-integration.mjs',
+       noPresentationStage:!document.getElementById('photoStage'),
+       noBlankMask:!document.documentElement.classList.contains(
+         'talera-f5-home-leaving-for-original-menu')
+     }));
+     assert.deepEqual(direct,{
+       sameHome:true,originalHref:'/present?talera_menu=hub',
+       menuVisible:true,renderedMenu:true,bodyVisible:true,
+       nativeMenuModule:true,noPresentationStage:true,noBlankMask:true
+     },'Home More must open ORIGINAL account menu directly without navigation or blank paint');
+     assert.equal(page.url(),homeUrl,'Home More unexpectedly opened the presentation route');
      console.log('TALERA_F5_HOME_MENU_NO_STORY_FLASH_PASS',JSON.stringify({
-       prepaintMaskVerified:true,originalMenuImmediateSurface:true,
+       originalMenuImmediateSurface:true,sourceHomeNeverHidden:true,
        originalPresentationMotorUnmodified:true,originalHomeHrefUnchanged:true,
-       sameOrigin:true,realIphoneAccepted:false
+       noPresentationNavigation:true,sameOrigin:true,realIphoneAccepted:false
      }));
      console.log('TALERA_F5_HOME_MORE_END_TO_END_PASS',JSON.stringify({
        originalMenuOpened:true,sameOrigin:true,newSeparateApp:false,
-       originalBottomNavigationMarkupUntouched:true
+       originalBottomNavigationMarkupUntouched:true,noWhiteInterstitial:true
      }));
+     await page.locator('#talera-more-menu [data-action="close"]').click();
+
 
    }
 
-   if(check.menu&&check.library==='function'){activeRoute=route;break}
+   if(route==='/present'&&check.menu&&check.library==='function'){activeRoute=route;break}
  }
  assert.ok(activeRoute,
    'No original PWA screen initializes a live account menu and local memory store');
@@ -789,86 +787,56 @@ try{
    console.log('TALERA_F5_EMPTY_SIGNED_IN_HOME_AND_RELOAD_VISIBLE_PASS',
      JSON.stringify({syntheticOnly:true,sameApp:true,sameOrigin:true,
        noInventedStories:true,realIphoneAccepted:false}));
-   // Read-only diagnostic: can the EXISTING account menu module mount on
-   // the existing Home without navigating through the presentation engine?
-   // Same app, same origin, no second product or synthetic persistence.
-   const menuProbe=await context.newPage();
-   try{
-     await menuProbe.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
-     await menuProbe.addScriptTag({url:'/__clean/menu-integration.mjs',type:'module'});
-     await menuProbe.waitForTimeout(500);
-     const reuse=await menuProbe.evaluate(()=>{
-       const shell=document.getElementById('talera-more-menu');
-       const possible=[...document.querySelectorAll('button,a')].filter(el=>
-         !el.closest('#talera-more-menu')&&
-         /more|meer|\\u2022\\u2022\\u2022/i.test(
-           (el.textContent||'')+' '+(el.getAttribute('aria-label')||'')
-         )).map(el=>({tag:el.tagName,id:el.id,cls:el.className,
-           text:el.textContent?.trim().slice(0,75),
-           html:el.outerHTML.slice(0,900)})).slice(0,12);
-       return {menuExists:!!shell,hidden:shell?.hidden,
-         menuHtml:shell?.outerHTML.slice(0,650),
-         triggers:possible,documentTitle:document.title};
-     });
-     console.log('TALERA_F5_HOME_NATIVE_MENU_REUSE_DIAGNOSTIC',JSON.stringify(reuse));
-     // Inspect only the already-built, APPROVED PUBLIC menu's entry hook.
-     // This proves the correct native open/back API before modifying navigation.
-     const originalMenuJs=readFileSync(path.join(generated,'approved-menu-original.mjs'),'utf8');
-     const hooks=['function open(', 'function openMenu(', 'function close(',
-       'function go(', 'function mount(', 'const trigger=', 'function create',
-       'window.Talera', 'window.__talera', 'addEventListener(\'click\'',
-       "id='talera-more-menu'", 'id="talera-more-menu"'];
-     const locations=hooks.map(q=>({q,index:originalMenuJs.indexOf(q)}))
-       .filter(x=>x.index>=0).map(x=>({hook:x.q,
-         near:originalMenuJs.slice(Math.max(0,x.index-450),x.index+1150)}));
-     console.log('TALERA_F5_ORIGINAL_PUBLIC_MENU_HOOK_DIAGNOSTIC',JSON.stringify(locations).slice(0,14000));
-
-   }finally{await menuProbe.close()}
-   // The owner's real iPhone still showed the OLD Home memory as a flash.
-   // The earlier test only checked the DESTINATION before-first-paint.
-   // Start at the ACTUAL Home, synthesize the original More click, and
-   // verify the outgoing Home is immediately hidden BEFORE navigation.
+   // Real Home More must expose the EXACT approved menu in the SAME
+   // page: no old photo flash, no destination page and no white paint.
+   await emptyHome.waitForFunction(()=>
+     window.__taleraMoreMenu?.ready&&
+     typeof window.__taleraMoreMenu.open==='function',null,{timeout:15000});
    const outgoing=await emptyHome.evaluate(()=>{
      const home=document.getElementById('navMore');
      const originalHref=home?.getAttribute('href');
-     const marker=document.getElementById('talera-f5-home-outgoing-menu-nav');
-     const paintStyle=document.getElementById('talera-f5-home-outgoing-menu-mask');
+     const beforeUrl=location.href;
      const click=new MouseEvent('click',{bubbles:true,cancelable:true,button:0});
      home?.dispatchEvent(click);
-     return {originalHref,markerPresent:!!marker,stylePresent:!!paintStyle,
-       nativeNavigationPrevented:click.defaultPrevented,
-       classOnSource:document.documentElement.classList.contains(
+     const shell=document.getElementById('talera-more-menu');
+     return {originalHref,defaultNavigationPrevented:click.defaultPrevented,
+       stayedOnHome:location.href===beforeUrl&&location.pathname==='/mijn-leven',
+       nativeMenuPresent:!!document.getElementById('talera-f5-home-original-menu-module'),
+       originalMenuVisible:!!shell&&!shell.hidden&&shell.getBoundingClientRect().width>0,
+       sourceHomeVisible:getComputedStyle(document.body).visibility==='visible',
+       noOutgoingMask:!document.documentElement.classList.contains(
          'talera-f5-home-leaving-for-original-menu'),
-       oldHomeNotVisible:getComputedStyle(document.body).visibility==='hidden',
-       neutralBackground:getComputedStyle(document.documentElement).backgroundColor};
+       noPresentationStage:!document.getElementById('photoStage')};
    });
    assert.deepEqual(outgoing,{
-     originalHref:'/present?talera_menu=hub',markerPresent:true,
-     stylePresent:true,nativeNavigationPrevented:true,
-     classOnSource:true,oldHomeNotVisible:true,
-     neutralBackground:'rgb(247, 245, 240)'
-   },'Original Home must mask its own old memory BEFORE starting menu navigation');
-   await emptyHome.waitForURL(url=>url.pathname==='/present'&&
-      url.search==='?talera_menu=hub',{timeout:12000});
-   await emptyHome.waitForFunction(()=>{
-     const menu=document.getElementById('talera-more-menu');
-     return !!menu&&!menu.hidden;
-   },null,{timeout:14000});
+     originalHref:'/present?talera_menu=hub',
+     defaultNavigationPrevented:true,stayedOnHome:true,
+     nativeMenuPresent:true,originalMenuVisible:true,
+     sourceHomeVisible:true,noOutgoingMask:true,noPresentationStage:true
+   },'REAL Home More must render existing menu synchronously without any blank screen');
+   await emptyHome.locator('#talera-more-menu [data-view="settings"]').first().click();
+   await emptyHome.locator('#talera-more-menu [data-view="storage"]').first()
+     .waitFor({state:'visible',timeout:7000});
+   assert.equal(new URL(emptyHome.url()).pathname,'/mijn-leven',
+     'Settings should stay inside Home instead of loading a presentation');
+   await emptyHome.locator('#talera-more-menu [data-action="back"]').click();
+   await emptyHome.locator('#talera-more-menu [data-action="close"]').click();
    const afterMenu=await emptyHome.evaluate(()=>({
-     originalMenuVisible:!document.getElementById('talera-more-menu').hidden,
-     destinationGuardReleased:
-       !document.documentElement.classList.contains('talera-hub-menu-booting'),
-     hasOriginalPresentationStage:!!document.getElementById('photoStage')
+     originalMenuClosed:document.getElementById('talera-more-menu')?.hidden,
+     originalHomeVisible:getComputedStyle(document.body).visibility==='visible',
+     originalNavigationVisible:document.getElementById('navMore')
+       ?.getBoundingClientRect().width>0,
+     stillHome:location.pathname==='/mijn-leven'
    }));
    assert.deepEqual(afterMenu,{
-     originalMenuVisible:true,destinationGuardReleased:true,
-     hasOriginalPresentationStage:true
-   },'Original menu should open after outgoing neutral repaint with player intact');
+     originalMenuClosed:true,originalHomeVisible:true,
+     originalNavigationVisible:true,stillHome:true
+   },'Original menu Back and Close must preserve Home and its local media context');
    console.log('TALERA_F5_HOME_OUTGOING_REAL_NAV_NO_OLD_MEMORY_FLASH_PASS',
-     JSON.stringify({sourceHomeMaskedBeforeNavigation:true,
-       originalHrefAndMenuPreserved:true,destinationPrepaintGuardAlsoPassed:true,
-       originalPresentationUnaffected:true,syntheticOnly:true,
-       physicalIphoneAccepted:false}));
+     JSON.stringify({sameHome:true,originalMenuReused:true,
+       originalHrefAndMenuPreserved:true,originalSettingsAndBackWorking:true,
+       noNavigationOrBlankFrame:true,originalPresentationUnaffected:true,
+       syntheticOnly:true,physicalIphoneAccepted:false}));
  }finally{await emptyHome.close()}
  const a=await saveSyntheticPhoto(page,1);
  assert.equal(a.kind,'photo');

@@ -1081,7 +1081,9 @@ try{
   assert.ok(readingDuringNarratedVideo.paperVisible&&
     readingDuringNarratedVideo.titleOpacity>=0.8,
     'Original title/paper must remain visible when narrated video starts');
-  assert.ok(readingDuringNarratedVideo.arrowSize>=22&&
+  // The owner chose a smaller visible 20px arrow; the full finger target
+  // must still be at least 60x40px during moving narrated video.
+  assert.ok(readingDuringNarratedVideo.arrowSize===20&&
     readingDuringNarratedVideo.arrowText.includes('↑')&&
     readingDuringNarratedVideo.gripWidth>=60&&
     readingDuringNarratedVideo.gripHeight>=40,

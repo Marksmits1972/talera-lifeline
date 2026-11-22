@@ -2,7 +2,8 @@
 // archives and original media never leave local IndexedDB or reach a server.
 // This module runs only on the separately authenticated /__f5/backup route.
 import {
- exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary
+ exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary,
+ repairVerifiedUnreadablePhotos
 } from '/__f5/f5-portable-idb.mjs';
 const el=id=>document.getElementById(id);
 const root=el('talera-free-backup'),db=root?.dataset.database;
@@ -12,6 +13,7 @@ const make=el('make-backup'),save=el('save-backup'),exportStatus=el('export-stat
 const chooser=el('restore-file'),cross=el('other-origin'),preview=el('preview-restore');
 const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore-status');
 const selected=el('selected-file'),checkStep=el('backup-step-check'),finalStep=el('backup-step-confirm');
+const photoRepairStep=el('backup-photo-repair'),photoRepairConsent=el('confirm-photo-repair'),photoRepairButton=el('run-photo-repair');
 let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
 const message=(element,text)=>{element.textContent=text;};
 // Read-only browser diagnosis on the EXISTING status area. No new button,
@@ -74,6 +76,7 @@ async function assertCurrentAccount(){
 function invalidate(){
  review=null;reviewFile=null;reviewCross=null;restore.disabled=true;
  confirm.checked=false;finalStep.hidden=true;
+ photoRepairConsent.checked=false;photoRepairStep.hidden=true;photoRepairButton.disabled=true;
  message(status,chooser.files?.[0]?'Keuze gewijzigd. Controleer het bestand opnieuw.':'');
 }
 function showFileSelection(){
@@ -91,6 +94,12 @@ chooser.addEventListener('change',()=>{
 cross.addEventListener('change',invalidate);
 confirm.addEventListener('change',()=>{
  restore.disabled=!(review?.safeToRestore&&confirm.checked&&reviewFile===chooser.files?.[0]&&reviewCross===cross.checked);
+});
+photoRepairConsent.addEventListener('change',()=>{
+ photoRepairButton.disabled=!(review?.photoAudit&&
+  review.safeToRestore===false&&photoRepairConsent.checked&&
+  reviewFile===chooser.files?.[0]&&reviewCross===cross.checked&&
+  !photoRepairStep.hidden);
 });
 make.addEventListener('click',async()=>{
  make.disabled=true;
@@ -120,6 +129,10 @@ preview.addEventListener('click',async()=>{
   const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:cross.checked,inspectPhotos:true});
   review=result;reviewFile=file;reviewCross=cross.checked;
   finalStep.hidden=!result.safeToRestore;
+  const bad=result.photoAudit?.library?.records?.some(x=>x.original==='niet-leesbaar');
+  const fromBackup=result.photoAudit?.archive?.records?.some(x=>x.original==='leesbaar');
+  photoRepairStep.hidden=!(result.safeToRestore===false&&bad&&fromBackup);
+  photoRepairConsent.checked=false;photoRepairButton.disabled=true;
   status.style.whiteSpace='pre-line';
   message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en). '+
    (result.crossOrigin?'Back-up uit een andere TALERA-versie. ':'')+
@@ -145,6 +158,42 @@ restore.addEventListener('click',async()=>{
   review=null;finalStep.hidden=true;confirm.checked=false;
  }finally{confirm.disabled=false;preview.disabled=!chooser.files?.[0]}
 });
+// A distinct, owner-confirmed write action: NEVER reuse the normal conflict-
+// safe restore button, and NEVER repair implicitly during "Bestand controleren".
+photoRepairButton.addEventListener('click',async()=>{
+ const file=chooser.files?.[0];
+ if(!review?.photoAudit||review.safeToRestore!==false||
+    photoRepairStep.hidden||!photoRepairConsent.checked||
+    file!==reviewFile||cross.checked!==reviewCross)return invalidate();
+ photoRepairButton.disabled=true;photoRepairConsent.disabled=true;preview.disabled=true;
+ message(status,'Herstel controleert alle originele foto-ID’s opnieuw. Sluit dit venster niet tijdens deze handeling.');
+ try{
+  await assertCurrentAccount();
+  const result=await repairVerifiedUnreadablePhotos(file,db,{
+   allowOtherOrigin:cross.checked,confirmed:true
+  });
+  message(status,'Fotoherstel bevestigd op dit toestel: '+result.repairedPhotos+
+   ' onleesbare originele foto(’s) byte-identiek teruggezet, zonder herinneringen,'+
+   ' media-ID’s, video of geluid te wijzigen. Controleer nu Mijn leven en de foto’s.');
+  invalidate();
+ }catch(error){
+  // This error can ALSO come from post-write verification. Do not claim
+  // "nothing changed" when the IndexedDB write may have committed.
+  const code=error instanceof Error?error.message:String(error);
+  const reason=/STORY_DETAILS_OR_MEDIA_ORDER_DIFFER/.test(code)?
+   'De inhoud of volgorde van deze herinnering wijkt af van de back-up. Veilig gestopt.':
+   /STORED_PHOTO_NOT_READABLE|PHOTO_BYTE_MISMATCH/.test(code)?
+   'De leescontrole na het schrijven is niet geslaagd. Bewaar het originele back-upbestand.':
+   /NO_PROVEN_BAD_PHOTOS/.test(code)?
+   'Er zijn geen aantoonbaar onleesbare originele foto’s gevonden om te herstellen.':
+   'Herstel niet bevestigd. Bewaar het originele back-upbestand; er is niets aan de presentatie gewijzigd.';
+  message(status,reason);
+  invalidate();
+ }finally{
+  photoRepairConsent.disabled=false;preview.disabled=!chooser.files?.[0];
+ }
+});
+
 window.addEventListener('pagehide',()=>{if(downloadUrl)URL.revokeObjectURL(downloadUrl)});
 make.disabled=false;
 showFileSelection();

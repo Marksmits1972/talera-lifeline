@@ -61,9 +61,9 @@ const seed=async(page,db,present)=>{
    files.add({key:id+':2',blob:new File([Uint8Array.from([7,6,5,4])],
     'stem.wav',{type:'audio/wav'})});
    files.add({key:'talera-v4-work:preview:synthetic',blob:new Blob(['preview'],{type:'image/jpeg'})});
-  }else{
+  }else if(present==='new'){
    stories.add({id:'local-existing-1980-synthetic',title:'Bestaande herinnering',items:[]});
-  }
+  } // present==='empty': initialize the ORIGINAL schema without any stories/media
   await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error);tx.onerror=()=>bad(tx.error)});
   d.close();
  },{db,present});
@@ -122,6 +122,31 @@ try{
    name:'talera-lokale-proef-backup.talera',
    mimeType:'application/octet-stream',buffer:fileBytes
   });
+  // The live app opens its original stories/files schema via Mijn leven.
+  // Never weaken openExisting(): a direct back-up deep link must refuse to
+  // silently INVENT a missing database or pretend missing iPhone data is empty.
+  await empty.locator('#preview-restore').click();
+  await empty.waitForFunction(()=>
+   document.getElementById('restore-status').textContent.includes('Geen lokale herinneringen'));
+  assert.equal(await empty.evaluate(async db=>
+   !(await indexedDB.databases()).some(row=>row.name===db),dbA),true,
+   'A failed preview must never create or replace private iPhone storage');
+  await seed(empty,dbA,'empty'); // original schema, ZERO stories and ZERO files
+  const counts=await empty.evaluate(async db=>{
+   const req=indexedDB.open(db,1);
+   const opened=await new Promise((ok,bad)=>{
+    req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error);
+   });
+   const tx=opened.transaction(['stories','files'],'readonly');
+   const count=name=>new Promise((ok,bad)=>{
+    const q=tx.objectStore(name).count();
+    q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
+   });
+   const result=await Promise.all([count('stories'),count('files')]);
+   opened.close();return result;
+  },dbA);
+  assert.deepEqual(counts,[0,0],
+   'The existing Free account library must truly be empty before import');
   await empty.locator('#preview-restore').click();
   await empty.waitForFunction(()=>
    document.getElementById('restore-status').textContent.includes('Geen dubbele'));

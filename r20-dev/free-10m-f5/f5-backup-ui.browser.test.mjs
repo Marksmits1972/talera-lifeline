@@ -84,6 +84,14 @@ try{
  assert.equal(await a.locator('#export-status').textContent(),'',
   'A second or tenth back-up must not falsely claim this is the first');
  assert.equal(await a.locator('#restore-status').textContent(),'');
+ assert.equal(await a.locator('#preview-restore').isDisabled(),true,
+  'Step 2 must remain disabled until a backup file is selected');
+ assert.equal(await a.locator('#backup-step-check').isVisible(),false);
+ assert.equal(await a.locator('#backup-step-confirm').isVisible(),false);
+ assert.match(await a.locator('#selected-file').textContent(),/Nog geen back-upbestand/);
+ const chooserBox=await a.locator('.file-choose').boundingBox();
+ assert.ok(chooserBox&&chooserBox.height>=56&&chooserBox.width>=250,
+  'Step 1 must offer a prominent mobile-size file selection target');
  assert.equal(await a.getByRole('button',{name:'Back-up maken'}).count(),1);
  await a.getByRole('button',{name:'Back-up maken'}).click();
  await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('Bestanden'));
@@ -122,6 +130,13 @@ try{
    name:'talera-lokale-proef-backup.talera',
    mimeType:'application/octet-stream',buffer:fileBytes
   });
+  assert.equal(await empty.locator('#backup-step-check').isVisible(),true,
+   'Only after step 1 may step 2 be shown');
+  assert.equal(await empty.locator('#preview-restore').isEnabled(),true);
+  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),false,
+   'Step 3 must not be offered before validation');
+  assert.equal(await empty.locator('#selected-file').textContent(),
+   'Gekozen bestand: talera-lokale-proef-backup.talera');
   // The live app opens its original stories/files schema via Mijn leven.
   // Never weaken openExisting(): a direct back-up deep link must refuse to
   // silently INVENT a missing database or pretend missing iPhone data is empty.
@@ -152,6 +167,8 @@ try{
    document.getElementById('restore-status').textContent.includes('Geen dubbele'));
   assert.match(await empty.locator('#restore-status').textContent(),
    /Gecontroleerd: 1 herinnering/);
+  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),true,
+   'Step 3 may be shown only after successful conflict-free preview');
   assert.equal(await empty.locator('#other-origin').isChecked(),false,
    'Same origin/same account must not need the other-origin override');
   assert.equal(await empty.locator('#run-restore').isDisabled(),true,
@@ -212,6 +229,8 @@ try{
    document.getElementById('restore-status').textContent.includes('Conflict'));
   assert.equal(await empty.locator('#run-restore').isDisabled(),true,
    'Restoring twice must never silently duplicate or overwrite the record');
+  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),false,
+   'Conflict must hide step 3 instead of presenting a confusing grey restore button');
   console.log('TALERA_FREE_EMPTY_LOCAL_LIBRARY_RESTORE_SAME_ORIGIN_PASS',
    JSON.stringify({startsWithoutStories:true,prefilledExamples:0,
     sameExistingOrigin:true,separatePrivateBrowserStorageOnly:true,
@@ -240,6 +259,7 @@ try{
  await b.locator('#preview-restore').click();
  await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Geen dubbele'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
+ assert.equal(await b.locator('#backup-step-confirm').isVisible(),true);
  await b.locator('#confirm-restore').check();
  assert.equal(await b.locator('#run-restore').isEnabled(),true);
  await b.locator('#run-restore').click();

@@ -11,6 +11,7 @@ if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(db||''))
 const make=el('make-backup'),save=el('save-backup'),exportStatus=el('export-status');
 const chooser=el('restore-file'),cross=el('other-origin'),preview=el('preview-restore');
 const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore-status');
+const selected=el('selected-file'),checkStep=el('backup-step-check'),finalStep=el('backup-step-confirm');
 let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
 const message=(element,text)=>{element.textContent=text;};
 const failText=e=>{
@@ -47,9 +48,21 @@ async function assertCurrentAccount(){
 
 function invalidate(){
  review=null;reviewFile=null;reviewCross=null;restore.disabled=true;
- message(status,'Bestand gewijzigd. Controleer het opnieuw.');
+ confirm.checked=false;finalStep.hidden=true;
+ message(status,chooser.files?.[0]?'Keuze gewijzigd. Controleer het bestand opnieuw.':'');
 }
-chooser.addEventListener('change',invalidate);
+function showFileSelection(){
+ const file=chooser.files?.[0];
+ selected.textContent=file?'Gekozen bestand: '+file.name:'Nog geen back-upbestand gekozen.';
+ selected.dataset.selected=file?'yes':'no';
+ checkStep.hidden=!file;
+ preview.disabled=!file;
+}
+chooser.addEventListener('change',()=>{
+ cross.checked=false;
+ invalidate();
+ showFileSelection();
+});
 cross.addEventListener('change',invalidate);
 confirm.addEventListener('change',()=>{
  restore.disabled=!(review?.safeToRestore&&confirm.checked&&reviewFile===chooser.files?.[0]&&reviewCross===cross.checked);
@@ -81,12 +94,13 @@ preview.addEventListener('click',async()=>{
   await assertCurrentAccount();
   const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:cross.checked});
   review=result;reviewFile=file;reviewCross=cross.checked;
+  finalStep.hidden=!result.safeToRestore;
   message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en). '+
    (result.crossOrigin?'Back-up uit een andere TALERA-versie. ':'')+
-   (result.safeToRestore?'Geen dubbele gegevens. Vink de bevestiging aan om terug te zetten.':
-    'Conflict met bestaande gegevens: terugzetten niet mogelijk.'));
+   (result.safeToRestore?'Geen dubbele gegevens. Ga nu door met stap 3 om terug te zetten.':
+    'Conflict met bestaande gegevens: deze herinneringen staan al in TALERA. Er is niets gewijzigd of teruggezet.'));
  }catch(e){message(status,'Controle gestopt (niets gewijzigd): '+failText(e))}
- finally{preview.disabled=false}
+ finally{preview.disabled=!chooser.files?.[0]}
 });
 restore.addEventListener('click',async()=>{
  const file=chooser.files?.[0];
@@ -98,13 +112,13 @@ restore.addEventListener('click',async()=>{
   await assertCurrentAccount();
   const result=await restoreFreeLibrary(file,db,{allowOtherOrigin:cross.checked,confirmed:true});
   message(status,'Herstel voltooid: '+result.restoredStories+' herinnering(en) toegevoegd. Controleer ze bij Mijn leven.');
-  review=null;
+  review=null;finalStep.hidden=true;confirm.checked=false;
  }catch(e){
   message(status,'Terugzetten gestopt. Bestaande herinneringen blijven staan. '+failText(e));
-  review=null;
- }finally{confirm.disabled=false;preview.disabled=false}
+  review=null;finalStep.hidden=true;confirm.checked=false;
+ }finally{confirm.disabled=false;preview.disabled=!chooser.files?.[0]}
 });
 window.addEventListener('pagehide',()=>{if(downloadUrl)URL.revokeObjectURL(downloadUrl)});
 make.disabled=false;
-preview.disabled=false;
+showFileSelection();
 root.dataset.ready='yes';

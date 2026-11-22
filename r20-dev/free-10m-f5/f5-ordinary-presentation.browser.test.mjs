@@ -764,6 +764,9 @@ try{
   }finally{
     await page.evaluate(()=>window.__taleraOriginalVideoObserver?.disconnect());
   }
+  await page.waitForFunction(()=>
+    !!window.__taleraVideoActuallyPlayingLayout,
+    null,{timeout:6500});
   const originalVideoDuringMotion=await page.evaluate(()=>
     window.__taleraVideoActuallyPlayingLayout);
   console.log('TALERA_ACTUAL_PLAYING_VIDEO_TITLE_AND_GRIP_SCREEN_GEOMETRY',

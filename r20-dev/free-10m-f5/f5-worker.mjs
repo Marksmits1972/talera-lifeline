@@ -1061,8 +1061,10 @@ async function publicPage(request,env){
     // Logged-out Home and its existing Notifications tab share the same bar.
     return new Response(evenlySpaceThreeHomeTabs(await r.text()),{status:200,headers});
   }
-  if(pathname==='/present')
-    return new Response(hideUnselectedEntryPhoto(await r.text(),request.url),{status:200,headers});
+  if(pathname==='/present'){
+    const entry=hideUnselectedEntryPhoto(await r.text(),request.url);
+    return new Response(preventHomeMenuPresentationFlash(entry,request.url),{status:200,headers});
+  }
   return new Response(r.body,{status:200,headers});
 }
 // Strictly session-bound, same-origin, NO personal-media network endpoint.

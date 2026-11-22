@@ -25,11 +25,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Verify approved owner scope: storage and existing backup UI ONLY
+      - name: Verify approved owner scope, storage and existing backup UI ONLY
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 7b4f2cc4b9da67a283d6cbd42a7b98c91b3eaf29
+          test "$(git rev-parse HEAD^)" = 25bf7f763b6d5681a6c17e430a968a373b656973
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-portable-archive-qa.yml
           git merge-base --is-ancestor b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD
           git diff --name-only b1f521264202dd16e9d502b2cca47d55c0254e67 HEAD -- r20-dev/ r19-dev/ src/ package.json package-lock.json > /tmp/talera-photo-changes

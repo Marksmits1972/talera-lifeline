@@ -300,8 +300,10 @@ try{
  assert.ok(accountReads>=4,'Every archive action must check current account session');
  assert.equal(await b.getByRole('button',{name:'Bestand controleren'}).count(),1,
   'Restore inspection must always be named exactly the same');
- assert.equal(await b.getByRole('button',{name:'Herinneringen terugzetten'}).count(),1,
-  'Restore label must not change after success or repeated restore');
+ assert.equal(await b.locator('#run-restore').count(),1,
+  'The protected restore action must remain intact after success or repeated restore');
+ assert.equal(await b.locator('#backup-step-confirm').isVisible(),false,
+  'After a conflict or invalid file, the final restore step must stay hidden');
  assert.match(await a.locator('main').innerText(),/niet versleuteld/i);
  assert.ok(!(await a.locator('main').innerText()).includes('besloten proef'),
   'Existing real Free backup must not be falsely marked as a demo');

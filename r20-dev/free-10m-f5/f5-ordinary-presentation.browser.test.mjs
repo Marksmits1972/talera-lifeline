@@ -553,10 +553,17 @@ try{
     return {max:scroll.scrollHeight-scroll.clientHeight,
       top:scroll.scrollTop,font:parseFloat(css.fontSize),
       touchAction:css.touchAction,background:css.backgroundColor,
-      borderWidth:css.borderTopWidth,shadow:css.boxShadow};
+      foreground:css.color,fontWeight:css.fontWeight,
+      borderWidth:css.borderTopWidth,shadow:css.boxShadow,
+      arrowContrast:css.textShadow};
   });
-  assert.ok(gripInitial.max>140&&gripInitial.font>=20&&gripInitial.touchAction==='none',
+  assert.ok(gripInitial.max>140&&gripInitial.font===20&&gripInitial.touchAction==='none',
     'Original reading sheet does not offer a usable drag target: '+
+    JSON.stringify(gripInitial));
+  assert.ok(gripInitial.foreground==='rgba(255, 253, 248, 0.94)'&&
+      gripInitial.fontWeight==='600'&&
+      gripInitial.arrowContrast.includes('rgba(5, 19, 33'),
+    'Subtle arrow color or contrast changed unexpectedly: '+
     JSON.stringify(gripInitial));
   // Only the subtle original ↑ is visible; retain a large invisible iPhone
   // finger target and the exact original scroll motion tested below.

@@ -632,10 +632,55 @@ try{
   await page.evaluate(()=>{
     window.__taleraOriginalVideoWasShown=!!document.querySelector('video.talera-v61-inline-video');
     window.__taleraOriginalVideoTitleLayer=null;
+    window.__taleraVideoActuallyPlayingLayout=null;
+    let watchingVideo=null;
+    const watchActualPlayback=video=>{
+      if(video===watchingVideo)return;
+      watchingVideo=video;
+      let frames=0;
+      const sample=()=>{
+        if(++frames>900||!video.isConnected)return;
+        // A poster/thumbnail and a hidden video DOM node are NOT enough.
+        // Measure the real, playing, decoded VIDEO after its first frames.
+        if(video.readyState>=2&&!video.paused&&video.currentTime>=0.14){
+          const scroll=document.getElementById('memoryStoryScroll');
+          const title=document.getElementById('memoryStory');
+          const grip=document.getElementById('talera-f5-story-grip');
+          const bounds=el=>el?.getBoundingClientRect().toJSON()||null;
+          const hit=grip?.getBoundingClientRect();
+          const element=hit?document.elementFromPoint(hit.x+hit.width/2,
+            hit.y+hit.height/2):null;
+          const visible=(r,parent)=>{
+            if(!r||!parent)return 0;
+            return Math.max(0,Math.min(r.bottom,parent.bottom,innerHeight)-
+              Math.max(r.top,parent.top,0));
+          };
+          const sr=scroll?.getBoundingClientRect();
+          window.__taleraVideoActuallyPlayingLayout={
+            currentTime:video.currentTime,readyState:video.readyState,
+            playing:!video.paused,videoRect:bounds(video),
+            storyScroll:bounds(scroll),scrollTop:scroll?.scrollTop,
+            titleText:title?.textContent?.trim(),titleRect:bounds(title),
+            titleInViewportPx:visible(title?.getBoundingClientRect(),sr),
+            gripRect:bounds(grip),
+            gripInViewportPx:visible(hit,sr),
+            gripHitElement:element?.id||element?.className||element?.tagName||'',
+            gripIsTopHit:!!element?.closest?.('#talera-f5-story-grip'),
+            bodyClass:document.body.className,
+            scrollZ:getComputedStyle(scroll).zIndex,
+            videoZ:getComputedStyle(video).zIndex
+          };
+          return;
+        }
+        requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    };
     const checkVideo=()=>{
       const video=document.querySelector('video.talera-v61-inline-video');
       if(!video)return;
       window.__taleraOriginalVideoWasShown=true;
+      watchActualPlayback(video);
       if(window.__taleraOriginalVideoTitleLayer)return;
       const sheet=document.getElementById('memoryCaption');
       const scroll=document.getElementById('memoryStoryScroll');
@@ -678,6 +723,15 @@ try{
   }finally{
     await page.evaluate(()=>window.__taleraOriginalVideoObserver?.disconnect());
   }
+  const originalVideoDuringMotion=await page.evaluate(()=>
+    window.__taleraVideoActuallyPlayingLayout);
+  console.log('TALERA_ACTUAL_PLAYING_VIDEO_TITLE_AND_GRIP_SCREEN_GEOMETRY',
+    JSON.stringify(originalVideoDuringMotion));
+  assert.ok(originalVideoDuringMotion?.playing&&
+    originalVideoDuringMotion?.gripInViewportPx>=25&&
+    originalVideoDuringMotion?.gripIsTopHit,
+    'The story handle was not visibly reachable once VIDEO was ACTUALLY PLAYING: '+
+    JSON.stringify(originalVideoDuringMotion));
   const originalTitleLayer=await page.evaluate(()=>window.__taleraOriginalVideoTitleLayer);
   assert.ok(originalTitleLayer&&originalTitleLayer.scrollZ>originalTitleLayer.videoZ&&
     originalTitleLayer.gripVisible&&originalTitleLayer.captionDisplay!=='none'&&

@@ -39,6 +39,27 @@ for(const [name,marker,bytes] of markers){
  }));
 }
 
+// Read-only source diagnosis for the existing presentation title and
+// pull-up reading paper. Do not inject a second player or touch controller.
+const readingMarkers=[
+ ['captionMarkup','id="memoryCaption"',1900],
+ ['storyMarkup','id="memoryStory"',1600],
+ ['scrollMarkup','id="memoryStoryScroll"',1100],
+ ['storyHandleCss','#memoryCaption',3400],
+ ['readingClass','talera-v18-reading',4700],
+ ['captionTouch','memoryCaption.addEventListener',5100],
+ ['storyTouch','memoryStoryScroll.addEventListener',5100],
+ ['captionTransforms','translateY(',1700],
+ ['captionOpen','function openStory',3200],
+ ['captionToggle','function toggleStory',3200],
+ ['titleFast','talera-v21-title-fast',1900]
+];
+for(const [name,needle,bytes] of readingMarkers){
+ const at=page.indexOf(needle);
+ console.log('TALERA_READING_PANEL_SOURCE',JSON.stringify({
+   name,found:at>=0,offset:at,sample:at<0?'':page.slice(Math.max(0,at-700),at+bytes)
+ }));
+}
 const wheelMarkers=[
  ['wheelController','const N=11,pages=[],cache=new Map()',20500],
  ['wheelPointerDown',"story.addEventListener('pointerdown'",10200],

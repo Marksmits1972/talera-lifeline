@@ -861,7 +861,7 @@ function filterOwnTopicPresentation(html){
 // The existing sheet is still the ONLY vertical reader. Its native scrolling
 // remains intact everywhere except its small visible grab area, where pointer
 // motion drives the SAME scrollTop one-for-one (no velocity or snap animation).
-function keepStoryTitleAndReadingGrip(html){
+function clarifyExistingReadingGrip(html){
  for(const required of ['id="memoryStoryScroll"','id="memoryCaption"',
    'id="memoryStory"','class="memory-sheet is-visible"'])
    assert.ok(html.includes(required),'ORIGINAL_READING_SHEET_CHANGED: '+required);
@@ -939,31 +939,6 @@ function keepStoryTitleAndReadingGrip(html){
    .replace('</body>',js+'</body>');
 }
 
-// The approved standalone social toolbar and PHOTO view pencil are already
-// present. Only the two older controls inside the opened reading paper are
-// duplicates. Hide them solely while reading without removing their source
-// nodes or changing handlers, gestures, narration, media or storage.
-// Keep the ORIGINAL reading paper above the narrator's media, and retain
-// its native vertical scroll as the only pull-up gesture owner. The small
-// decorative arrow already exists: enlarge it without adding a new control.
-function clarifyExistingReadingGrip(html){
- for(const marker of ['id="memoryCaption"','id="memoryStoryScroll"','id="memoryStory"'])
-   assert.ok(html.includes(marker),'PRESENT_EXISTING_READING_SOURCE_MOVED_'+marker);
- const css='<style id="talera-free-original-reading-grip">'+
-  '#memoryCaption::before{content:"↑"!important;top:10px!important;left:19px!important;'+
-   'width:36px!important;height:36px!important;line-height:36px!important;'+
-   'font-size:23px!important;font-weight:700!important;text-align:center!important;'+
-   'color:rgba(15,39,71,.88)!important;'+
-   'text-shadow:0 1px 1px rgba(255,255,255,.75)!important;'+
-   'pointer-events:none!important}'+
-  '#memoryStoryScroll{overflow-y:auto!important;touch-action:pan-y!important;'+
-   '-webkit-overflow-scrolling:touch!important;scroll-behavior:auto!important;'+
-   'scroll-snap-type:none!important;overscroll-behavior-y:contain!important}'+
-  '#memoryCaption{touch-action:pan-y!important}'+
-  '</style>';
- assert.equal(html.split('</head>').length,2,'PRESENT_READING_HEAD_MOVED');
- return html.replace('</head>',css+'</head>');
-}
 function hideDuplicateReadingSheetActions(html){
  const necessary=[
   'id="memoryCaption"',
@@ -1572,7 +1547,7 @@ for(const [route,filename] of Object.entries(routes)){
  // Apply the SAME layout styling to both; leave account/library gates untouched.
  if(route==='/tell')guest=removeLegacyTellSampleImporter(polishTellEditorLayout(guest));
  if(route==='/present')guest=enableOriginalWhatsAppTouchScroll(guest);
- if(route==='/present')guest=keepStoryTitleAndReadingGrip(guest);
+ if(route==='/present')guest=clarifyExistingReadingGrip(guest);
  guest=closeAnonymousPersonalLibrary(guest);
  guest=stripBundledExamplePhotoLinks(guest);
  if(route==='/mijn-leven'){
@@ -1618,7 +1593,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=installOwnerRequestedClearAllStories(html);
  if(route==='/tell')html=removeLegacyTellSampleImporter(polishTellEditorLayout(shapeOwnStoryTopics(html)));
  if(route==='/present')html=enableOriginalWhatsAppTouchScroll(html);
- if(route==='/present')html=keepStoryTitleAndReadingGrip(html);
+
  html=stripBundledExamplePhotoLinks(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);

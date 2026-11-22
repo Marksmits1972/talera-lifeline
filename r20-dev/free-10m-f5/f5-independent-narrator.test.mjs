@@ -204,7 +204,8 @@ assert.ok(fetchedMedia.includes('video-C'));
 assert.equal(fakeDots[2].classList.active,true,'Orange video dot must follow voice cue');
 // Narrator video compositor must stop immediately at horizontal swipe intent,
 // independently of the existing photo-wheel gesture implementation.
-const voiceLayer=host.children.find(x=>x.className==='talera-independent-narrator-layer'&&!x.removed);
+const voiceLayer=stage.children.find(x=>x.className==='talera-independent-narrator-layer'&&!x.removed);
+assert.ok(voiceLayer,'Narrated player remains within original photo stage');
 const validPhotoTarget={
  closest(selector){return selector==='#memoryStoryScroll'?{}:null}
 };
@@ -274,7 +275,7 @@ assert.equal(documentListeners.get('pointerdown')?.size||0,0,
   'Narrator pointer listeners must be removed after story change');
 assert.equal(documentListeners.get('talera:wheel-motion')?.size||0,0,
   'Narrator wheel-finish listener must never leak into ordinary presentation');
-assert.ok(host.children.every(x=>x.removed||!x.className?.includes('talera-independent-narrator-layer')));
+assert.ok(stage.children.every(x=>x.removed||!x.className?.includes('talera-independent-narrator-layer')));
 assert.ok(revoked.includes('blob:independent-voice'));
 
 // A persistent global presenter OFF must not silence the separated narrator.

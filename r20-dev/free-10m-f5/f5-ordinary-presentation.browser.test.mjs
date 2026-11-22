@@ -551,23 +551,58 @@ try{
     'Original reading sheet does not offer a usable drag target: '+
     JSON.stringify(gripInitial));
   const gx=gripBounds.x+gripBounds.width*.5,gy=gripBounds.y+gripBounds.height*.5;
+  const gripBeforeDrag=await page.evaluate(([x,y])=>{
+    const grip=document.getElementById('talera-f5-story-grip');
+    const scroll=document.getElementById('memoryStoryScroll');
+    const sheet=document.getElementById('memoryCaption');
+    const style=el=>{const c=getComputedStyle(el);return {id:el.id,
+      tag:el.tagName,cls:typeof el.className==='string'?el.className:'',
+      pointer:c.pointerEvents,touch:c.touchAction,opacity:c.opacity,
+      z:c.zIndex,visibility:c.visibility,position:c.position,
+      display:c.display}};
+    const at=document.elementFromPoint(x,y);
+    window.__taleraGripPointerTrace=[];
+    for(const [target,name] of [[grip,'grip'],[scroll,'scroll'],[document,'document']])
+      for(const phase of ['pointerdown','pointermove','pointerup','pointercancel'])
+        target.addEventListener(phase,e=>{
+          if(window.__taleraGripPointerTrace.length>55)return;
+          window.__taleraGripPointerTrace.push({name,phase,at:e.clientY,
+            target:e.target?.id||e.target?.tagName,
+            capture:target.hasPointerCapture?.(e.pointerId)||false,
+            scrollTop:scroll.scrollTop});
+        },{capture:true,passive:true});
+    return {coordinate:[x,y],
+      top:at?.id||at?.className||at?.tagName,
+      topIsGrip:at===grip,grip:style(grip),sheet:style(sheet),
+      scroll:style(scroll),
+      layers:document.elementsFromPoint(x,y).slice(0,9).map(style),
+      rects:{grip:grip.getBoundingClientRect().toJSON(),
+        sheet:sheet.getBoundingClientRect().toJSON(),
+        scroll:scroll.getBoundingClientRect().toJSON()}};
+  },[gx,gy]);
+  console.log('TALERA_REAL_READING_GRIP_HIT_AREA_BEFORE_DRAG',
+    JSON.stringify(gripBeforeDrag));
   await page.mouse.move(gx,gy);
   await page.mouse.down();
   await page.mouse.move(gx,gy-100,{steps:12});
   const gripDuring=await page.evaluate(()=>
     document.getElementById('memoryStoryScroll').scrollTop);
-  assert.ok(gripDuring-gripInitial.top>=75&&gripDuring-gripInitial.top<=112,
-    'Reading-sheet content did not track the pointer: '+gripDuring);
+  const gripMovedDuring=gripDuring-gripInitial.top>=75&&
+    gripDuring-gripInitial.top<=112;
+  const pointerTrace=await page.evaluate(()=>window.__taleraGripPointerTrace);
+  console.log('TALERA_REAL_READING_GRIP_POINTER_TRACE',
+    JSON.stringify({moved:gripMovedDuring,gripDuring,
+      gripInitial:gripInitial.top,events:pointerTrace}));
   await page.mouse.up();
   await page.waitForTimeout(180);
   const gripAfter=await page.evaluate(()=>
     document.getElementById('memoryStoryScroll').scrollTop);
-  assert.ok(Math.abs(gripAfter-gripDuring)<=9,
+  if(gripMovedDuring)assert.ok(Math.abs(gripAfter-gripDuring)<=9,
     'Reading sheet jumped or kept sliding after finger release: '+
     JSON.stringify({gripDuring,gripAfter}));
   await page.evaluate(()=>document.getElementById('memoryStoryScroll').scrollTop=0);
-  console.log('TALERA_FREE_ORIGINAL_READING_GRIP_DIRECT_DRAG_PASS',
-    JSON.stringify({gripWidth:gripBounds.width,gripHeight:gripBounds.height,
+  console.log('TALERA_FREE_ORIGINAL_READING_GRIP_DRAG_RESULT',
+    JSON.stringify({gripMovedDuring,gripWidth:gripBounds.width,gripHeight:gripBounds.height,
       draggedPx:gripDuring-gripInitial.top,noInertia:true,sameSheet:true,
       realIphoneAccepted:false}));
   const coverState=await page.evaluate(targetId=>{
@@ -741,6 +776,10 @@ try{
     JSON.stringify(originalTitleLayer));
   console.log('TALERA_FREE_VIDEO_KEEP_ORIGINAL_TITLE_ABOVE_PLAYER_PASS',
     JSON.stringify({...originalTitleLayer,realIphoneAccepted:false}));
+  assert.ok(gripMovedDuring,
+    'Original grip missed the user's drag; center hit and pointer events: '+
+    JSON.stringify({hit:gripBeforeDrag,trace:pointerTrace,
+      during:gripDuring,after:gripAfter}));
   await waitIndex(page,0,12000);
   const state=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();

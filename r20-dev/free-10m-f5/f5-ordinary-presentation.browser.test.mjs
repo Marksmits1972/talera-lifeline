@@ -510,7 +510,7 @@ try{
   assert.equal(await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory().storyId),plain);
 
   const mp4=path.join(generated,'ordinary-original-video.mp4');
-  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=3',
     '-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',mp4],
     {timeout:20000,stdio:'ignore'});
   const mixed=await page.evaluate(async b64=>{
@@ -532,6 +532,12 @@ try{
   // Preserve the same single /present page; do not navigate directly to
   // memory 2. Its cover must be preloaded on the existing 11-photo wheel.
   await load(page,plain,3);
+  // The original deep-link transition intentionally hides the paper until
+  // its first photo has decoded. Do not grab a hidden button 0ms after
+  // domcontentloaded; this was the source of false one-off drag failures.
+  await page.waitForFunction(()=>
+    !document.documentElement.classList.contains('talera-direct-memory-entering'),
+    null,{timeout:9000});
   // The visible original reading-sheet arrow must be a real 43px grip.
   // Dragging it 100px up moves the SAME original vertical scrollTop
   // roughly 100px immediately, without inertia, snap or a new story viewer.

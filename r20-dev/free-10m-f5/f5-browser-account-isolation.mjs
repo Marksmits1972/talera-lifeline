@@ -682,10 +682,37 @@ try{
        homeMore.click()
      ]);
      assert.equal(menuNav.status(),200,'Original home More link must not land on JSON 404');
+     const routeHtml=await menuNav.text();
+     assert.ok(routeHtml.includes('talera-f5-menu-entry-before-paint')&&
+       routeHtml.includes('talera-f5-menu-entry-no-presentation-flash'),
+       'Home More must suppress presentation BEFORE first paint, not after its player appears');
      await page.waitForFunction(()=>{
        const n=document.getElementById('talera-more-menu');
        return !!n&&!n.hidden;
      },null,{timeout:11000});
+     // The early guard must release only when the ORIGINAL account menu is
+     // mounted, so closing it still reveals the untouched presentation.
+     const noFlash=await page.evaluate(()=>{
+       const root=document.documentElement;
+       const panel=document.getElementById('talera-more-menu');
+       root.classList.add('talera-hub-menu-booting');
+       const hiddenDuringTransition=getComputedStyle(document.body).visibility==='hidden';
+       root.classList.remove('talera-hub-menu-booting');
+       const visibleAfterMenu=getComputedStyle(document.body).visibility==='visible';
+       return {guardPresent:!!document.getElementById('talera-f5-menu-entry-before-paint'),
+         guardReleased:!root.classList.contains('talera-hub-menu-booting'),
+         hiddenDuringTransition,visibleAfterMenu,menuDisplayed:!panel?.hidden,
+         preservedOriginalStage:!!document.getElementById('photoStage')};
+     });
+     assert.deepEqual(noFlash,{
+       guardPresent:true,guardReleased:true,hiddenDuringTransition:true,
+       visibleAfterMenu:true,menuDisplayed:true,preservedOriginalStage:true
+     },'Home account entry should show the menu without a visible story flash');
+     console.log('TALERA_F5_HOME_MENU_NO_STORY_FLASH_PASS',JSON.stringify({
+       prepaintMaskVerified:true,originalMenuImmediateSurface:true,
+       originalPresentationMotorUnmodified:true,originalHomeHrefUnchanged:true,
+       sameOrigin:true,realIphoneAccepted:false
+     }));
      console.log('TALERA_F5_HOME_MORE_END_TO_END_PASS',JSON.stringify({
        originalMenuOpened:true,sameOrigin:true,newSeparateApp:false,
        originalBottomNavigationMarkupUntouched:true

@@ -549,13 +549,26 @@ try{
   const gripInitial=await page.evaluate(()=>{
     const scroll=document.getElementById('memoryStoryScroll');
     const grip=document.getElementById('talera-f5-story-grip');
+    const css=getComputedStyle(grip);
     return {max:scroll.scrollHeight-scroll.clientHeight,
-      top:scroll.scrollTop,font:parseFloat(getComputedStyle(grip).fontSize),
-      touchAction:getComputedStyle(grip).touchAction};
+      top:scroll.scrollTop,font:parseFloat(css.fontSize),
+      touchAction:css.touchAction,background:css.backgroundColor,
+      borderWidth:css.borderTopWidth,shadow:css.boxShadow};
   });
   assert.ok(gripInitial.max>140&&gripInitial.font>=20&&gripInitial.touchAction==='none',
     'Original reading sheet does not offer a usable drag target: '+
     JSON.stringify(gripInitial));
+  // Only the subtle original ↑ is visible; retain a large invisible iPhone
+  // finger target and the exact original scroll motion tested below.
+  assert.ok((gripInitial.background==='rgba(0, 0, 0, 0)'||
+      gripInitial.background==='transparent')&&
+      gripInitial.borderWidth==='0px'&&gripInitial.shadow==='none',
+    'The original little story arrow grew a visible button again: '+
+    JSON.stringify(gripInitial));
+  console.log('TALERA_SUBTLE_ORIGINAL_ARROW_WITH_INVISIBLE_TOUCH_TARGET_PASS',
+    JSON.stringify({visualButton:false,arrowFontPx:gripInitial.font,
+      hitWidth:gripBounds.width,hitHeight:gripBounds.height,
+      realIphoneAccepted:false}));
   const gx=gripBounds.x+gripBounds.width*.5,gy=gripBounds.y+gripBounds.height*.5;
   const gripBeforeDrag=await page.evaluate(([x,y])=>{
     const grip=document.getElementById('talera-f5-story-grip');

@@ -50,6 +50,49 @@ function evenlySpaceThreeHomeTabs(html){
 // Avoid that unrelated first frame. Only a direct, valid ONE-story selection is
 // gated; all ordinary timelines, topic filters, voice, swipe and photos stay
 // exactly as before. No image/media copy, URL change or persistent state.
+// The APPROVED Home "Meer" navigates to /present?talera_menu=hub.
+// Before the original account menu mounts, the original presentation may
+// briefly paint a selected photo/video/narrator. Mask ONLY that intermediate
+// first paint, never the menu or the ordinary /present engine. Preserve the
+// same original menu DOM, route, click handlers, account and local media.
+function preventHomeMenuPresentationFlash(html,requestUrl){
+ const url=new URL(requestUrl);
+ if(url.pathname!=='/present'||url.search!=='?talera_menu=hub')return html;
+ if(typeof html!=='string'||html.split('<head>').length!==2||
+    !html.includes('id="photoStage"')||!html.includes('</head>'))
+   throw Error('TALERA_ORIGINAL_HOME_MENU_ENTRY_SOURCE_DRIFT');
+ const early=String.raw`(function(){
+   const root=document.documentElement;
+   root.classList.add('talera-hub-menu-booting');
+   let observer=null;
+   const finish=()=>{
+     root.classList.remove('talera-hub-menu-booting');
+     if(observer)observer.disconnect();
+     clearTimeout(fallback);
+   };
+   const check=()=>{
+     const menu=document.getElementById('talera-more-menu');
+     // The ORIGINAL menu now owns the screen; reveal body and preserve its
+     // existing close/back behavior, without touching the presentation.
+     if(menu&&!menu.hidden&&menu.getBoundingClientRect().width>0)finish();
+   };
+   observer=new MutationObserver(check);
+   observer.observe(document,{childList:true,subtree:true,attributes:true,
+     attributeFilter:['hidden','class','style']});
+   const fallback=setTimeout(finish,8000); // Never strand the app if menu fails.
+   document.addEventListener('DOMContentLoaded',check,{once:true});
+   check();
+   window.addEventListener('pagehide',()=>{observer.disconnect();clearTimeout(fallback)},
+     {once:true});
+ })`;
+ const markup='<script id="talera-f5-menu-entry-before-paint">'+early+'</script>'+
+  '<style id="talera-f5-menu-entry-no-presentation-flash">'+
+  'html.talera-hub-menu-booting{background:#f7f5f0!important}'+
+  'html.talera-hub-menu-booting body{visibility:hidden!important}'+
+  '</style>';
+ return html.replace('<head>','<head>'+markup);
+}
+
 function hideUnselectedEntryPhoto(html,requestUrl){
  const url=new URL(requestUrl);
  if(url.pathname!=='/present'||url.searchParams.size!==1||
@@ -991,7 +1034,8 @@ async function publicPage(request,env){
     const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(silenced):silenced;
     const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));
     const storyEntryHtml=hideUnselectedEntryPhoto(converted.html,request.url);
-    return new Response(storyEntryHtml,{
+    const menuEntryHtml=preventHomeMenuPresentationFlash(storyEntryHtml,request.url);
+    return new Response(menuEntryHtml,{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
         'x-content-type-options':'nosniff','x-talera-free-f5':'personalized-durable-account',

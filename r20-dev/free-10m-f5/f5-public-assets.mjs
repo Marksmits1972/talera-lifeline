@@ -878,15 +878,18 @@ function clarifyExistingReadingGrip(html){
 .memory-space #memoryStoryScroll{overscroll-behavior-y:contain!important}
 .memory-space #memoryCaption::before{display:none!important}
 #talera-f5-story-grip{
-  position:absolute!important;top:5px!important;left:14px!important;
+  /* The 66x43 finger target is invisible. Only the original small arrow
+     is drawn, slightly more legible; no rounded button, card or halo. */
+  position:absolute!important;top:5px!important;left:4px!important;
   width:66px!important;height:43px!important;min-width:66px!important;
   min-height:43px!important;box-sizing:border-box!important;
   margin:0!important;padding:0!important;
   display:flex!important;align-items:center!important;justify-content:center!important;
-  border:1px solid rgba(15,39,71,.17)!important;border-radius:22px!important;
-  background:rgba(247,244,239,.78)!important;color:#0f2747!important;
-  font:750 23px/1 -apple-system,BlinkMacSystemFont,sans-serif!important;
-  box-shadow:0 1px 5px rgba(15,39,71,.10)!important;
+  border:0!important;border-radius:0!important;
+  background:transparent!important;color:rgba(15,39,71,.88)!important;
+  font:700 23px/1 -apple-system,BlinkMacSystemFont,sans-serif!important;
+  text-shadow:0 1px 1px rgba(255,255,255,.75)!important;
+  box-shadow:none!important;appearance:none!important;-webkit-appearance:none!important;
   z-index:5!important;touch-action:none!important;
   user-select:none!important;-webkit-user-select:none!important;
   -webkit-tap-highlight-color:transparent!important;cursor:grab!important;

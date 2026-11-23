@@ -2235,7 +2235,14 @@ for(const name of supportNames){
  if(name==='/sw.js'){
   // Extend only the verified SAME original worker; never cache private HTML
   // unencrypted, or store original photos, audio, video or user stories here.
-  a=Buffer.from(buildF5OfflineServiceWorker(a.toString('utf8')),'utf8');
+  // Changed app/worker code gets a different offline cache version.
+  // Never reuse a stale encrypted page after a software update.
+  const offlinePackageVersion=sha(Buffer.concat([
+   Buffer.from(JSON.stringify({referencePages:refs,scripts})),
+   readFileSync(path.join(here,'f5-worker.mjs')),
+   readFileSync(path.join(here,'f5-offline-sw.mjs'))
+  ])).slice(0,32);
+  a=Buffer.from(buildF5OfflineServiceWorker(a.toString('utf8'),offlinePackageVersion),'utf8');
  }
  if(name==='/manifest.webmanifest'){
   // Preserve original PWA identity, start URL, display and all non-icon settings.

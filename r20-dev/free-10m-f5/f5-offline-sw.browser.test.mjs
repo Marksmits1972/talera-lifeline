@@ -22,6 +22,8 @@ import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
  const state={epoch:0,grant:{id:'old-account'},locks:0};
  const scope={...state,Response,
   finishLogout:async()=>{entered();await paused;return true},
+  // Mirror the actual SW's account-store read used by stale response mapping.
+  read:async key=>scope[key],
   lock:async()=>{scope.locks++;scope.grant=null;scope.epoch++},
   fetch:async()=>new Response('{"ok":false}',{status:401})
  };

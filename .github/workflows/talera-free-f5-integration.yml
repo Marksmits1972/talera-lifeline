@@ -911,7 +911,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-same-day-chronology-20261123' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-random-year-home-photo-20261123' }}
     needs: [f5_isolated_local, f5_actual_registration_button]
     runs-on: ubuntu-24.04
     timeout-minutes: 22
@@ -926,7 +926,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: ce21b157-84cf-4a14-90d7-65ad55a4e5be
+      F5_EXPECTED_LIVE_VERSION: 65614ca6-a538-401a-a166-f34f8cdf720d
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -952,16 +952,16 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 70edbe9763035e78fb4fe972409f8a7fb72cad23
-          test "$(git diff --name-only 70edbe9763035e78fb4fe972409f8a7fb72cad23 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 70edbe9763035e78fb4fe972409f8a7fb72cad23 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          test "$(git diff --name-only a2f8df5a5808efc414b0f8e027e7764fff55aa6d 70edbe9763035e78fb4fe972409f8a7fb72cad23)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
-          git diff --exit-code a2f8df5a5808efc414b0f8e027e7764fff55aa6d 70edbe9763035e78fb4fe972409f8a7fb72cad23 -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-library-persistence.mjs r20-dev/free-10m-f5/f5-offline-sw.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs
+          test "$(git rev-parse HEAD^)" = f20e6efb244e6ba078ea15e0898fd694b56f831a
+          test "$(git diff --name-only f20e6efb244e6ba078ea15e0898fd694b56f831a HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code f20e6efb244e6ba078ea15e0898fd694b56f831a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git diff --name-only 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa f20e6efb244e6ba078ea15e0898fd694b56f831a)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
+          git diff --exit-code 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa f20e6efb244e6ba078ea15e0898fd694b56f831a -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-library-persistence.mjs r20-dev/free-10m-f5/f5-offline-sw.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=45255881691,expected='70edbe9763035e78fb4fe972409f8a7fb72cad23';
+          const id=45279393092,expected='f20e6efb244e6ba078ea15e0898fd694b56f831a';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,
@@ -1226,6 +1226,11 @@ jobs:
           test "$native_menu" = 1
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven" >/tmp/talera-empty-home.html
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/present" >/tmp/talera-empty-present.html
+          # The new, owner-approved selected-year random Home photo must be
+          # served by the SAME live origin, not merely exist in GitHub.
+          grep -Fq 'randomHomeYearPhoto' /tmp/talera-empty-home.html
+          grep -Fq 'homeYearChosenByUser' /tmp/talera-empty-home.html
+          echo 'TALERA_SAME_LIVE_HOME_RANDOM_SELECTED_YEAR_SOURCE_PASS'
           # A real iPhone showed the GUEST editor, while old CI covered only
           # authenticated /tell. Verify this EXACT same public guest route
           # now serves the approved photo-first layout, not the older label.

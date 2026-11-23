@@ -113,6 +113,11 @@ try{
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  await page.goto(at+'/tell');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
+ await page.goto(at+'/present?talera_menu=hub');
+ assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
+ await page.goto(at+'/');
+ assert.equal(new URL(page.url()).pathname,'/mijn-leven','Installed PWA root must reach cached Home');
+ assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  await page.goto(at+'/__f5/backup');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  const me=await page.evaluate(async()=>{const r=await fetch('/api/me');return r.json()});

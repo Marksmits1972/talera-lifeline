@@ -51,6 +51,9 @@ assert.equal(installStart.origin,'http://127.0.0.1:8872','Install route must sta
 const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
 const at='http://127.0.0.1:8872';
+// WebKit's Playwright offline flag can abort navigation before SW responds.
+// For WebKit disconnect the SAME synthetic origin's actual transport instead.
+const webkitTransportOnly=process.env.TALERA_OFFLINE_BROWSER==='webkit';
 let server,browser,activePage,requests=0,serverLogouts=0,offlineBackend=false,offlineBlocked=0;const trace=[];
 let releaseStaleGuestCheck=null,markStaleGuestCheckStarted;
 const staleGuestCheckStarted=new Promise(ok=>{markStaleGuestCheckStarted=ok});
@@ -191,7 +194,7 @@ try{
  const cached=await page.evaluate(()=>caches.match('/mijn-leven').then(x=>!!x));
  assert.equal(cached,false,'Private HTML must NEVER be stored unencrypted in CacheStorage');
  offlineBackend=true;
- await ctx.setOffline(true);
+ if(!webkitTransportOnly)await ctx.setOffline(true);
  await page.goto(at+'/mijn-leven');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  await page.goto(at+'/tell');
@@ -214,7 +217,7 @@ try{
  const denied=await page.goto(at+'/mijn-leven');
  assert.equal(denied.status(),503,'Local logout MUST block offline private page');
  offlineBackend=false;
- await ctx.setOffline(false);
+ if(!webkitTransportOnly)await ctx.setOffline(false);
  await page.goto(at+'/mijn-leven');
  assert.match(await page.locator('h1').innerText(),/ANONYMOUS/);
  assert.ok(serverLogouts>=1,'Pending offline logout must revoke the server session online');
@@ -223,7 +226,8 @@ try{
   body:JSON.stringify({account:'B'})});if(!r.ok)throw Error('LOGIN_B_FAILED')});
  await page.reload();
  await waitReady(page,B);
- await ctx.setOffline(true);
+ if(!webkitTransportOnly)await ctx.setOffline(true);
+ offlineBackend=true;
  await page.goto(at+'/mijn-leven');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 22222222/);
  assert.doesNotMatch(await page.locator('h1').innerText(),/11111111/);

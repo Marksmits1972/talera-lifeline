@@ -911,7 +911,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-backup-picker-steps-20261122' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-offline-new-moment-20261123' }}
     needs: [f5_isolated_local, f5_actual_registration_button]
     runs-on: ubuntu-24.04
     timeout-minutes: 22
@@ -926,7 +926,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: f644ee3b-1602-4d42-9db5-29c93465e452
+      F5_EXPECTED_LIVE_VERSION: d873f53e-4ca2-42ed-8e01-725b3368e38e
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -952,14 +952,14 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 7d2d8fdccaed92b17c32d0a7d209c1d5c2bfc61f
-          test "$(git diff --name-only 7d2d8fdccaed92b17c32d0a7d209c1d5c2bfc61f HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 7d2d8fdccaed92b17c32d0a7d209c1d5c2bfc61f HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 0a45f637b08bcb4fb0b99efcefc06a551d34f336
+          test "$(git diff --name-only 0a45f637b08bcb4fb0b99efcefc06a551d34f336 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 0a45f637b08bcb4fb0b99efcefc06a551d34f336 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=45046527683,expected='7d2d8fdccaed92b17c32d0a7d209c1d5c2bfc61f';
+          const id=45227733455,expected='0a45f637b08bcb4fb0b99efcefc06a551d34f336';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,

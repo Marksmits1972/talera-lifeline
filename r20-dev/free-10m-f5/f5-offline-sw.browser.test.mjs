@@ -96,7 +96,7 @@ try{
  await page.reload();
  await page.waitForFunction(async()=>{
   const db=await new Promise((ok,bad)=>{const r=indexedDB.open('talera-f5-offline-shell-v1',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error)});
-  try{return await new Promise(ok=>{const q=db.transaction('shell','readonly').objectStore('shell').get('ready');q.onsuccess=()=>ok(q.result?.id==='11111111-1111-4111-8111-111111111111');q.onerror=()=>ok(false)})}
+  try{return await new Promise(ok=>{const store=db.transaction('shell','readonly').objectStore('shell'),q=store.get('ready'),g=store.get('grant');let ready,grant;const finish=()=>{if(ready!==undefined&&grant!==undefined)ok(ready==='11111111-1111-4111-8111-111111111111'&&grant===ready)};q.onsuccess=()=>{ready=q.result?.id||null;finish()};g.onsuccess=()=>{grant=g.result?.id||null;finish()};q.onerror=g.onerror=()=>ok(false)})}
   finally{db.close()}
  },null,{timeout:60000});
  const initial=await state(page);
@@ -129,7 +129,7 @@ try{
  await page.reload();
  await page.waitForFunction(async()=>{
   const db=await new Promise((ok,bad)=>{const r=indexedDB.open('talera-f5-offline-shell-v1',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error)});
-  try{return await new Promise(ok=>{const q=db.transaction('shell','readonly').objectStore('shell').get('ready');q.onsuccess=()=>ok(q.result?.id==='22222222-2222-4222-8222-222222222222');q.onerror=()=>ok(false)})}
+  try{return await new Promise(ok=>{const store=db.transaction('shell','readonly').objectStore('shell'),q=store.get('ready'),g=store.get('grant');let ready,grant;const finish=()=>{if(ready!==undefined&&grant!==undefined)ok(ready==='22222222-2222-4222-8222-222222222222'&&grant===ready)};q.onsuccess=()=>{ready=q.result?.id||null;finish()};g.onsuccess=()=>{grant=g.result?.id||null;finish()};q.onerror=g.onerror=()=>ok(false)})}
   finally{db.close()}
  },null,{timeout:60000});
  await ctx.setOffline(true);

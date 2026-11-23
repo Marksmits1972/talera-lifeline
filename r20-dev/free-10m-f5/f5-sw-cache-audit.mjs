@@ -21,21 +21,24 @@ const summary={
   containsDynamicCacheWrites:/\.put\s*\(|\.addAll\s*\(|\.add\s*\(/.test(sw),
   hasSkipWaiting:/\bskipWaiting\s*\(/.test(sw),
 };
-// The original minimal SW only fetches each navigation and shows a 503 page
-// offline. That is safe against cross-account HTML cache leakage, but it is
-// NOT a cold-start offline solution for private local memories. Do not turn
-// the safe "no account HTML caching" result into an offline-ready claim.
-assert.equal(summary.hasCacheStorage,false,
-  'Original PWA SW must not silently persist account-specific HTML');
-assert.equal(summary.containsDynamicCacheWrites,false,
-  'Personal Free HTML must not be cached across users on one device');
-assert.match(sw,/event\.request\.mode\s*!==\s*["']navigate["']/,
-  'Original SW navigation behavior changed; re-audit cache safety');
-assert.match(sw,/respondWith\(fetch\(event\.request\)\.catch/,
-  'Original SW must not synthesize account HTML for offline navigation');
-assert.match(sw,/status\s*:\s*503/,
-  'Unknown offline fallback may expose cached account data');
-summary.cacheAccountLeakDetected=false;
+// New SAME-origin worker caches only safe STATIC files unencrypted. Account
+// page snapshots and /api/me identity are stored AES-GCM encrypted in a
+// separate local shell database, never media, stories or a second library.
+// This is source-contract evidence, NOT iPhone offline acceptance.
+assert.equal(summary.hasCacheStorage,true,'Offline static app shell not packaged');
+assert.equal(summary.containsDynamicCacheWrites,true,'Static code not cached for offline use');
+for(const marker of [
+ 'talera-f5-offline-shell-v1','talera-f5-offline-static-v1',
+ 'crypto.subtle.encrypt','crypto.subtle.decrypt',
+ "taleraRead('pending-logout')","taleraRead('grant')",
+ "event.respondWith(auth(req))","event.respondWith(navigate(event))",
+ 'TALERA_OFFLINE_PREPARE_V1'
+])assert.ok(sw.includes(marker),'Critical offline account/crypto contract missing: '+marker);
+assert.match(sw,/if\(response\.ok.*?\)/s,'Offline network-first source contract missing');
+assert.ok(!sw.includes('cache.put(event.request'),'Private page must never enter CacheStorage');
+summary.accountShellEncryptedAtRest=true;
+summary.accountLogoutBlocksOffline=true;
+summary.fullOfflineAcceptanceOnIphone=false;
 summary.offlineColdStartReady=false;
 console.log('TALERA_F5_ORIGINAL_SW_INSPECTION',JSON.stringify(summary));
 // The SW source is public; bounded logging allows a concrete manual

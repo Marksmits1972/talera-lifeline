@@ -62,7 +62,7 @@ await assert.rejects(()=>createFreeArchive({stories,files:[...files,{key:'oops',
 await assert.rejects(()=>createFreeArchive({stories,files:files.slice(1),sourceScope:scope}).then(decodeFreeArchive),/MISSING_STORY_MEDIA/);
 // Large original video proof (> old 128 MiB cap) without a full-file arrayBuffer.
 const mib=new Uint8Array(1024*1024).fill(0xa5);
-const largeVideo=new File(Array.from({length:132},()=>mib),'grote-originele-video.mov',
+const largeVideo=new File(Array.from({length:180},()=>mib),'grote-originele-video.mov',
  {type:'video/quicktime',lastModified:1700000000000});
 const largeBackup=await createFreeArchive({
  stories:[],files:[{key:'synthetic-large-video',blob:largeVideo}],
@@ -70,14 +70,14 @@ const largeBackup=await createFreeArchive({
 });
 const largeSummary=await inspectFreeArchive(largeBackup);
 assert.equal(largeSummary.parsed.schema,'talera-free-lossless-local-2');
-assert.equal(largeSummary.binaryBytes,132*1024*1024);
-assert.equal(largeSummary.parsed.binaries[0].sha256Chunks.length,33);
+assert.equal(largeSummary.binaryBytes,180*1024*1024);
+assert.equal(largeSummary.parsed.binaries[0].sha256Chunks.length,45);
 const largeDecoded=await decodeFreeArchive(largeBackup);
 const recovered=largeDecoded.files[0].blob;
 assert.equal(recovered.size,largeVideo.size);
 assert.equal(recovered.name,largeVideo.name);
 assert.equal(recovered.lastModified,largeVideo.lastModified);
-for(const position of [0,64*1024*1024,131*1024*1024]){
+for(const position of [0,64*1024*1024,179*1024*1024]){
  assert.deepEqual(new Uint8Array(await recovered.slice(position,position+1024*1024).arrayBuffer()),mib);
 }
 // Tamper with one byte in a later chunk; do not load the entire archive in RAM.
@@ -116,5 +116,5 @@ console.log('TALERA_F5_PORTABLE_ARCHIVE_CODEC_PASS',JSON.stringify({
  editorDraftManifest:true,checksumTamperingRejected:true,partialBackupRejected:true,
  duplicateIDsRejected:true,originalSourceNotModified:true,
  metadataNeverUploaded:true,physicalIPhoneRestoreCertified:false,
- multiChunkLargeVideoBytes:138412032,legacyV1ArchiveSupported:true
+ multiChunkLargeVideoBytes:188743680,legacyV1ArchiveSupported:true
 }));

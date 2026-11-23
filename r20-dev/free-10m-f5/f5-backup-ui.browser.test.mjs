@@ -288,7 +288,22 @@ try{
   mimeType:'application/octet-stream',buffer:corrupt});
  await b.locator('#preview-restore').click();
  await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Bestand beschadigd'));
+ assert.match(await b.locator('#restore-status').textContent(),/controlecode: MEDIA_CHECKSUM/,
+  'An invalid media chunk must show a safe, specific LOCAL error code to diagnose the iPhone .talera selection');
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
+ // A manifest checksum failure is distinct from a corrupt media chunk.
+ // Neither may expose memory titles, file IDs, media bytes, or an import button.
+ const brokenManifest=Buffer.from(fileBytes);
+ const magicBytes=new TextEncoder().encode('TALERA-FREE-LOCAL-V1\\n'.replace('\\n','\n')).length;
+ brokenManifest[magicBytes+4]^=1;
+ await b.locator('#restore-file').setInputFiles({name:'beschadigd-manifest.talera',
+  mimeType:'application/octet-stream',buffer:brokenManifest});
+ await b.locator('#preview-restore').click();
+ await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Bestand beschadigd'));
+ assert.match(await b.locator('#restore-status').textContent(),/controlecode: MANIFEST_CHECKSUM/,
+  'An invalid manifest must have a different safe local error code');
+ assert.equal(await b.locator('#run-restore').isDisabled(),true);
+ assert.equal(await b.locator('#backup-step-confirm').isVisible(),false);
  // Simulate a different account logging in while this old page stays open.
  // The UI must fail closed rather than export the previous account's library.
  currentAccount.set(8866,accountB);

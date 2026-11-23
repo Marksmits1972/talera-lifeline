@@ -2641,14 +2641,24 @@ try{
     throw Error('SAME_HOME_YEAR_FIXTURE_READBACK '+JSON.stringify(state)+' '+String(error));
   }
   const chooseOriginalYear=async(year,id)=>{
-    await page.evaluate(y=>{
+    const yearEventDiagnostic=await page.evaluate(y=>{
       // Deterministic RNG only INSIDE technical test. Product uses Math.random.
       window.Math.random=()=>.999;
       const rail=document.getElementById('v17-year-slider');
+      const inspect=()=>({value:rail.value,min:rail.min,max:rail.max,type:rail.type,
+        selected:document.getElementById('v17-selected-year')?.textContent,
+        summary:document.getElementById('v17-year-summary')?.textContent});
+      const before=inspect();
       rail.value=String(y);
+      const set=inspect();
       rail.dispatchEvent(new Event('input',{bubbles:true}));
+      const input=inspect();
       rail.dispatchEvent(new Event('change',{bubbles:true}));
+      const change=inspect();
+      return {year:y,before,set,input,change};
     },year);
+    console.log('TALERA_HOME_SLIDER_OWNER_RANDOM_DIAGNOSTIC',
+      JSON.stringify(yearEventDiagnostic));
     try{
       await page.waitForFunction(([y,href])=>{
         const hero=document.getElementById('heroCaption');

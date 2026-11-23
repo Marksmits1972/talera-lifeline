@@ -225,6 +225,28 @@ try{
         };
       });
       console.log('TALERA_OFFLINE_ACTUAL_NEW_MEMORY_ENTRY',JSON.stringify(creationEntry));
+      // Exercise the ACTUAL original home button, not a fabricated editor URL.
+      // This must open the SAME account-scoped /tell page with no backend.
+      const newMomentControl=offlinePage.locator('a.action-start[href="/tell"]');
+      assert.equal(await newMomentControl.count(),1,
+        'Original New Moment link not available on offline Home');
+      const [newMomentResponse]=await Promise.all([
+        offlinePage.waitForNavigation({waitUntil:'domcontentloaded',timeout:18000}),
+        newMomentControl.click()
+      ]);
+      assert.equal(newMomentResponse?.status(),200,
+        'Original New Moment button opened unavailable offline editor');
+      assert.equal(await newMomentResponse.headerValue('x-talera-offline'),
+        'verified-device-shell','Original New Moment did not use verified offline editor');
+      assert.equal(new URL(offlinePage.url()).pathname,'/tell');
+      await offlinePage.waitForFunction(()=>!!window.TaleraMemories?.save,
+        null,{timeout:15000});
+      console.log('TALERA_OFFLINE_ORIGINAL_NEW_MOMENT_BUTTON_OPENS_EDITOR_PASS');
+      const returnedHome=await offlinePage.goto(origin+'/mijn-leven',
+        {waitUntil:'domcontentloaded',timeout:18000});
+      assert.equal(returnedHome?.status(),200,
+        'Original offline editor could not return to My Life');
+
 
       assert.ok(await offlinePage.evaluate(async id=>
         (await window.TaleraMemories.list()).some(x=>x.id===id),saved.id),

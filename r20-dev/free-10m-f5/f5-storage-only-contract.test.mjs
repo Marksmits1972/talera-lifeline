@@ -79,7 +79,7 @@ assert.throws(()=>scopeLocalMemories(html,'123'),/INVALID_PRIVATE_LOCAL_SCOPE/);
 // must remain compatible with private editor media-ID preservation.
 // This is read-only source/HTML composition, not a new app or media test.
 const packagedTellPath=referencePages['/tell'];
-assert.match(packagedTellPath||'',/^\\/__talera_free\\/f5references\\/[a-f0-9]{64}\\.html$/,
+assert.match(packagedTellPath||'',new RegExp('^/__talera_free/f5references/[a-f0-9]{64}[.]html$'),
  'Expected the exact same /tell artifact that the existing Worker serves');
 const packagedTell=readFileSync('r20-dev/free-10m-delivery/public'+packagedTellPath,'utf8');
 assert.equal(packagedTell.split('blob:taleraOwnedPhotoUploads[j]').length,2,

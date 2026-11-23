@@ -31,6 +31,10 @@ for(const source of diagnosticSources){
 console.log('TALERA_HOME_EXACT_HERO_YEAR_SOURCE',
  JSON.stringify({sources:diagnosticSources.map(x=>({name:x.name,length:x.text.length})),
   extracts}).slice(0,46000));
+const timelineSourceStart=diagnosticHome.indexOf('const setHero=(m)=>{');
+assert.ok(timelineSourceStart>0,'Original Home year controller absent');
+console.log('TALERA_ORIGINAL_HOME_YEAR_HERO_RENDER_SLICE',
+ JSON.stringify(diagnosticHome.slice(timelineSourceStart,timelineSourceStart+6600)));
 const originalWorker=readFileSync('r20-dev/free-10m-f5/f5-worker.mjs','utf8');
 assert.ok(originalWorker.includes("const OWNER_PURGE_PATH='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c';")&&
  originalWorker.includes("pathname===OWNER_PURGE_PATH?'/mijn-leven':pathname"),

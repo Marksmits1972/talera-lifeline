@@ -177,22 +177,37 @@ try{
     console.log('TALERA_REAL_APP_OFFLINE_PREPARATION_STATE',
       JSON.stringify({...s,accountMatched:s?.grant===account,
         ownSyntheticPhotoSaved:!!saved?.id,errors:offlineErrors.slice(-5)}));
-    await offlineCtx.setOffline(true);
-    const home=await offlinePage.goto(origin+'/mijn-leven',
-      {waitUntil:'domcontentloaded'});
-    assert.equal(home.status(),200,'Real PWA offline home returned unavailable 503');
-    assert.equal(await home.headerValue('x-talera-offline'),'verified-device-shell',
-      'Home did not use the encrypted offline device shell');
-    assert.ok(await offlinePage.evaluate(async id=>
-      (await window.TaleraMemories.list()).some(x=>x.id===id),saved.id),
-      'A real local photo disappeared after offline reload');
-    const present=await offlinePage.goto(origin+'/present?memory='+
-      encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
-    assert.equal(present.status(),200,
-      'Real saved-photo presentation route returned unavailable offline');
-    console.log('TALERA_REAL_OWNER_PHOTO_OFFLINE_START_AND_PRESENT_PASS',
-      JSON.stringify({sameWorker:true,sameOrigin:true,ownPhoto:true,
-        realIphoneAccepted:false}));
+    // Playwright's "offline" flag may leave Service Worker fetches ONLINE.
+    // Kill only this disposable local Wrangler process and wait for closure.
+    // Restart that SAME local origin/DO test store before any other regressions.
+    const oldWorker=worker;
+    await new Promise((ok,bad)=>{
+      if(oldWorker.exitCode!==null)return ok();
+      const timer=setTimeout(()=>bad(Error('LOCAL_WORKER_SHUTDOWN_TIMEOUT')),9000);
+      oldWorker.once('exit',()=>{clearTimeout(timer);ok()});
+      if(!oldWorker.kill('SIGTERM')){clearTimeout(timer);bad(Error('LOCAL_WORKER_NOT_STOPPED'))}
+    });
+    console.log('TALERA_REAL_APP_LOCAL_SERVER_TRULY_DISCONNECTED');
+    try{
+      const home=await offlinePage.goto(origin+'/mijn-leven',
+        {waitUntil:'domcontentloaded',timeout:18000});
+      assert.equal(home.status(),200,'Real PWA offline home returned unavailable 503');
+      assert.equal(await home.headerValue('x-talera-offline'),'verified-device-shell',
+        'Real offline home did not use encrypted device shell');
+      assert.ok(await offlinePage.evaluate(async id=>
+        (await window.TaleraMemories.list()).some(x=>x.id===id),saved.id),
+        'A real local photo disappeared after offline reload');
+      const present=await offlinePage.goto(origin+'/present?memory='+
+        encodeURIComponent(saved.id),{waitUntil:'domcontentloaded',timeout:18000});
+      assert.equal(present.status(),200,
+        'Real saved-photo presentation route returned unavailable offline');
+      console.log('TALERA_REAL_OWNER_PHOTO_OFFLINE_START_AND_PRESENT_PASS',
+        JSON.stringify({sameWorker:true,sameOrigin:true,ownPhoto:true,
+          realIphoneAccepted:false}));
+    }finally{
+      await start();
+      console.log('TALERA_SAME_TEST_WORKER_RESTARTED_WITH_PERSISTED_DO_STORE');
+    }
   }finally{await offlineCtx.close();}
   // The VERY SAME authenticated Free PWA must begin with ZERO bundled
   // memories on Home, not merely an image-less Test 081 hero or a synthetic

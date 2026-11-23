@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
-import {chromium} from 'playwright';
+import {chromium,webkit} from 'playwright';
 import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
 // Exercise the REAL SW's account transition before creating a browser fixture.
 // A request may still be awaiting a local logout check when the next login wins.
@@ -150,7 +150,8 @@ async function waitReady(page,id){
 }
 try{
  server=createServer(fixture);await new Promise(ok=>server.listen(8872,'127.0.0.1',ok));
- browser=await chromium.launch();
+ browser=process.env.TALERA_OFFLINE_BROWSER==='webkit'?
+  await webkit.launch():await chromium.launch();
  const ctx=await browser.newContext({serviceWorkers:'allow'});
  const page=await ctx.newPage();activePage=page;
  await page.goto(at+'/mijn-leven');

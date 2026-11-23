@@ -12,7 +12,7 @@ const sw=readFileSync(path.join('r20-dev/free-10m-delivery/public',swPath.slice(
 const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
 const at='http://127.0.0.1:8872';
-let server,browser,requests=0,serverLogouts=0;
+let server,browser,requests=0,serverLogouts=0;const trace=[];
 const account=req=>{
  const c=req.headers.cookie||'';
  return c.includes('sid=A')?A:c.includes('sid=B')?B:null;
@@ -29,6 +29,8 @@ function documentPage(req,id){
 function fixture(req,res){
  requests++;
  const pathname=new URL(req.url,at).pathname,id=account(req);
+ if(['/mijn-leven','/present','/tell','/__f5/backup','/api/me','/api/login','/api/logout'].includes(pathname))
+  trace.push({path:pathname,method:req.method,verified:!!id});
  if(req.method==='POST'&&pathname==='/api/login'){
   let input='';req.on('data',b=>input+=b);req.on('end',()=>{
    const selected=JSON.parse(input||'{}').account;
@@ -103,7 +105,7 @@ try{
  // Safe diagnostic: only synthetic account IDs and state booleans.
  // Distinguish a missing grant from a race or an absent SW controller.
  const controller=await page.evaluate(()=>!!navigator.serviceWorker.controller);
- console.log('TALERA_OFFLINE_A_PRECHECK',JSON.stringify({initial,controller}));
+ console.log('TALERA_OFFLINE_A_PRECHECK',JSON.stringify({initial,controller,trace:trace.slice(-24),page:(await page.locator('h1').innerText())}));
  assert.equal(initial.account,A,'Local encrypted grant vanished immediately after readiness');assert.equal(initial.ready,A);
  assert.equal(initial.keyExtractable,false);assert.equal(initial.pageEncrypted,true);
  const cached=await page.evaluate(()=>caches.match('/mijn-leven').then(x=>!!x));

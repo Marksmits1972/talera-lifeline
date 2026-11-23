@@ -45,8 +45,19 @@ const failText=e=>{
   return 'Je account is gewijzigd. Open Back-ups opnieuw.';
  if(/EXPLICIT_CONSENT|DIFFERENT_ORIGIN/.test(raw))
   return 'Vink eerst aan dat de back-up uit een andere TALERA-versie mag komen.';
- if(/CHECKSUM|INVALID_MANIFEST|INVALID_ORIGIN|ARCHIVE_/.test(raw))
-  return 'Bestand beschadigd of ongeldig. Kies een ander back-upbestand.';
+ // The iPhone may fail at the manifest, a media checksum, or Files I/O.
+ // Display ONLY bounded invariant codes from the archive implementation:
+ // never expose story titles, account hashes, media IDs, paths, or file bytes.
+ // The actual archive/IndexedDB stays read-only during this inspection.
+ if(/^TALERA_ARCHIVE_[A-Z0-9_]{3,60}$/.test(raw))
+  return 'Bestand beschadigd of ongeldig (controlecode: '+
+   raw.slice('TALERA_ARCHIVE_'.length)+'). Er is niets gewijzigd.';
+ if(e?.name==='NotReadableError'||e?.name==='NotFoundError'||e?.name==='AbortError')
+  return 'Safari kon het gekozen bestand niet volledig lezen (controlecode: BESTAND_LEZEN). Er is niets gewijzigd.';
+ if(e?.name==='QuotaExceededError'||e?.name==='RangeError')
+  return 'De bestandscontrole liep tegen een geheugenlimiet aan (controlecode: GEHEUGEN). Er is niets gewijzigd.';
+ if(/CHECKSUM|INVALID_MANIFEST|INVALID_ORIGIN/.test(raw))
+  return 'Bestand beschadigd of ongeldig (controlecode: ANDERE_CONTROLE). Er is niets gewijzigd.';
  if(/DATABASE_NOT_FOUND|NO_INDEXEDDB|NO_STORIES_FOUND/.test(raw))
   return 'Geen lokale herinneringen gevonden. Open eerst Mijn leven.';
  if(/EXISTING_CONTENT|DUPLICATE/.test(raw))

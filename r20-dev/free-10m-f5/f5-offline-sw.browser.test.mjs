@@ -157,6 +157,9 @@ try{
   await webkit.launch():await chromium.launch();
  const ctx=await browser.newContext({serviceWorkers:'allow'});
  const page=await ctx.newPage();activePage=page;
+ // Only for the WebKit diagnostic: fail clearly rather than hanging on a
+ // disconnected network during service-worker navigation. No app changes.
+ if(webkitTransportOnly)page.setDefaultNavigationTimeout(15000);
  await page.goto(at+'/mijn-leven');
  await page.evaluate(async()=>{await navigator.serviceWorker.register('/sw.js',{scope:'/'});
   await navigator.serviceWorker.ready});

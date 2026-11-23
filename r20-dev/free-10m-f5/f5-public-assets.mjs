@@ -611,6 +611,42 @@ function removeAllBuiltInHomeExamples(html){
  return html;
 }
 
+
+// Owner-approved HOME cover: one random original PHOTO from the year selected
+// by the existing V17 indicator. No new player, storage, year-scale or data.
+function randomPhotoFromSelectedHomeYear(html){
+ const legacy="  const ownHero=show.find(x=>x.src)||show[0];\n"+
+   "  if(ownHero)selectHero(ownHero);\n  else {";
+ assert.equal(html.split(legacy).length,2,'HOME_LEGACY_HERO_SOURCE_DRIFT');
+ html=html.replace(legacy,
+   "  const ownHero=show.find(x=>x.src)||show[0];\n"+
+   "  if(!ownHero){");
+ const open='<script id="talera-flow-v17-time">';
+ const a=html.indexOf(open),b=a<0?-1:html.indexOf('</script>',a+open.length);
+ assert.ok(a>0&&b>a&&html.indexOf(open,a+1)<0,
+   'HOME_YEAR_CONTROLLER_NOT_UNIQUE');
+ let script=html.slice(a+open.length,b);
+ const once=(before,after,key)=>{
+   assert.equal(script.split(before).length,2,'HOME_YEAR_RANDOM_SOURCE_DRIFT_'+key);
+   script=script.replace(before,after);
+ };
+ const feature="let homePhotoRequest=0,activeHomePhotoUrl=null;\nconst releaseHomePhoto=url=>{\n if(url&&url.startsWith('blob:'))try{URL.revokeObjectURL(url)}catch(e){}\n};\nconst clearHomePhoto=()=>{\n const image=$('heroImage'),caption=$('heroCaption'),note=$('heroNote');\n if(image){image.removeAttribute('src');image.classList.remove('ready')}\n if(caption){caption.style.display='none';caption.dataset.presentHref=''}\n if(note)note.textContent='';\n releaseHomePhoto(activeHomePhotoUrl);activeHomePhotoUrl=null;\n};\nconst randomHomeYearPhoto=async(matches)=>{\n const ticket=++homePhotoRequest,selectedYear=current;\n const choices=[];\n for(const memory of matches){\n  if(memory.demo||!memory.record||memory.year!==selectedYear)continue;\n  for(const item of memory.record.items||[]){\n   if(item?.kind==='photo'&&typeof item.key==='string'&&item.key)\n    choices.push({memory,key:item.key});\n  }\n }\n if(!choices.length){clearHomePhoto();return}\n const offset=Math.floor(Math.random()*choices.length);\n for(let i=0;i<choices.length;i++){\n  const choice=choices[(offset+i)%choices.length];\n  let src=null;\n  try{src=await window.TaleraMemories?.displayUrl?.(choice.key)}catch(e){}\n  if(ticket!==homePhotoRequest||current!==selectedYear){\n   releaseHomePhoto(src);return;\n  }\n  if(!src)continue;\n  const previous=activeHomePhotoUrl;\n  activeHomePhotoUrl=src;\n  setHero({...choice.memory,src});\n  if(previous!==src)releaseHomePhoto(previous);\n  return;\n }\n clearHomePhoto();\n};\nwindow.addEventListener('pagehide',()=>releaseHomePhoto(activeHomePhotoUrl),{once:true});\n";
+ once("const nodes=[];",feature+"const nodes=[];",'ORIGINAL_MEDIA_URL_RELEASE');
+ once("const render=(year,moveHero)=>{\n",
+   "const render=(year,moveHero)=>{\n homePhotoRequest++;\n",'PENDING_PHOTO_RACE');
+ once(" if(moveHero)setHero(matches.find(m=>m.src&&!m.demo)||matches.find(m=>m.src));\n }\n};\nconst drawMarks=",
+   " }\n if(moveHero)randomHomeYearPhoto(matches);\n};\nconst drawMarks=",
+   'MATCHED_YEAR_ONLY');
+ once("rail.addEventListener('input',()=>render(rail.value,true));",
+   "rail.addEventListener('input',()=>render(rail.value,false));\n"+
+   "rail.addEventListener('change',()=>render(rail.value,true));",
+   'AFTER_SLIDER_RELEASE');
+ once(" render(initial,false);"," render(initial,true);",'RANDOM_ON_OPEN');
+ assert.ok(!script.includes('if(moveHero)setHero(matches.find'),
+   'Original first-photo selection still active');
+ return html.slice(0,a+open.length)+script+html.slice(b);
+}
+
 // Derive the original Home cards solely from owner-created story tags.
 // No test/sample topic categories, no duplicate stories, no cloud queries.
 function showOwnedStoriesOnly(html){
@@ -1685,6 +1721,7 @@ for(const [route,filename] of Object.entries(routes)){
  // apply later speculative iPhone video-poster modifications.
  if(route==='/mijn-leven')html=showOwnedStoriesOnly(html);
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
+ if(route==='/mijn-leven')html=randomPhotoFromSelectedHomeYear(html);
  if(route==='/mijn-leven')html=installOwnerRequestedClearAllStories(html);
  if(route==='/tell')html=removeLegacyTellSampleImporter(polishTellEditorLayout(shapeOwnStoryTopics(html)));
  if(route==='/present')html=enableOriginalWhatsAppTouchScroll(html);

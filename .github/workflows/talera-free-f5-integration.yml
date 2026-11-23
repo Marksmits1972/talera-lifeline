@@ -109,7 +109,9 @@ jobs:
             git merge-base --is-ancestor 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD
             if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
               # Library I/O moved; approved schema, archive codec and media cue writer remain protected.
-              git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+              # Owner-authorized archive-only fix; preserve all other original sources.
+              git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-archive.mjs)" = "81ff51759b01cb19c5ae36c80ce42d263c8ae013"
             test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-idb.mjs)" = "e9af73a51f575760ee531b4f1faebb32b5adee48"
             else
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs

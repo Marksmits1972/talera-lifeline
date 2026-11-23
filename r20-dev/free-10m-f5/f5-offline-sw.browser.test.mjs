@@ -9,6 +9,11 @@ const {verifiedPublicSupport}=await import('./generated/public-template-map.mjs'
 const swPath=verifiedPublicSupport['/sw.js'];
 assert.match(swPath,/^\/__talera_free\/f5support\/[a-f0-9]{64}\.js$/);
 const sw=readFileSync(path.join('r20-dev/free-10m-delivery/public',swPath.slice(1)));
+const manifestPath=verifiedPublicSupport['/manifest.webmanifest'];
+assert.ok(manifestPath,'Approved PWA manifest missing');
+const manifest=JSON.parse(readFileSync(path.join('r20-dev/free-10m-delivery/public',manifestPath.slice(1)),'utf8'));
+const installStart=new URL(manifest.start_url,'http://127.0.0.1:8872');
+assert.equal(installStart.origin,'http://127.0.0.1:8872','Install route must stay within one same-origin TALERA app');
 const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
 const at='http://127.0.0.1:8872';
@@ -124,9 +129,9 @@ try{
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  await page.goto(at+'/present?talera_menu=hub');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
- await page.goto(at+'/');
- assert.equal(new URL(page.url()).pathname,'/mijn-leven','Installed PWA root must reach cached Home');
- assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
+ await page.goto(installStart.href);
+ assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/,
+  'Installed PWA must reopen its ACTUAL approved manifest start URL offline');
  await page.goto(at+'/__f5/backup');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  const me=await page.evaluate(async()=>{const r=await fetch('/api/me');return r.json()});

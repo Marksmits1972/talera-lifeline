@@ -34,7 +34,7 @@ const PUBLIC_PAGES=new Set(['/mijn-leven','/meldingen','/present','/tell',OWNER_
  // Offline provision only from an authenticated SAME TALERA page. The worker
  // checks the HttpOnly account session itself: no identity, media or secret
  // travels in a postMessage or moves into a second library.
- const OFFLINE_PREPARE_SNIPPET="<script id=\"talera-f5-offline-prep-v1\">(function(){if(!('serviceWorker' in navigator))return;navigator.serviceWorker.ready.then(function(r){r.active?.postMessage({type:'TALERA_OFFLINE_PREPARE_V1'})}).catch(function(){});})();</script>";
+ const OFFLINE_PREPARE_SNIPPET="<script id=\"talera-f5-offline-prep-v1\">(function(){if(!('serviceWorker' in navigator))return;function prepare(){navigator.serviceWorker.ready.then(function(r){r.active?.postMessage({type:'TALERA_OFFLINE_PREPARE_V1'})}).catch(function(){})}navigator.serviceWorker.addEventListener('controllerchange',prepare);prepare()})();</script>";
  function scheduleVerifiedOfflineShell(html){
   if(typeof html!=='string'||html.split('</head>').length!==2||
      html.includes('talera-f5-offline-prep-v1'))

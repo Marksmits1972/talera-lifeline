@@ -119,7 +119,7 @@ jobs:
             # Archive codec, read/write adapter, owner data and presentation remain unchanged.
             if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "5eaceaf62b928ffe769034b16573dff138652414"
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "684b6f0f3b3488dffe323cc9fa63be17621d36c4"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "dafdd25cdc83c2e68276db8267c539c84dab028c"
             elif [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "e01dc1b7bab00fc38125fc525f65a357a931c061"

@@ -17,7 +17,7 @@ assert.equal(installStart.origin,'http://127.0.0.1:8872','Install route must sta
 const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
 const at='http://127.0.0.1:8872';
-let server,browser,requests=0,serverLogouts=0;const trace=[];
+let server,browser,activePage,requests=0,serverLogouts=0;const trace=[];
 const account=req=>{
  const c=req.headers.cookie||'';
  return c.includes('sid=A')?A:c.includes('sid=B')?B:null;
@@ -103,7 +103,7 @@ try{
  server=createServer(fixture);await new Promise(ok=>server.listen(8872,'127.0.0.1',ok));
  browser=await chromium.launch();
  const ctx=await browser.newContext({serviceWorkers:'allow'});
- const page=await ctx.newPage();
+ const page=await ctx.newPage();activePage=page;
  await page.goto(at+'/mijn-leven');
  await page.evaluate(async()=>{await navigator.serviceWorker.register('/sw.js',{scope:'/'});
   await navigator.serviceWorker.ready});
@@ -161,6 +161,20 @@ try{
    encryptedShell:true,plainPrivatePageCached:false,offlineLogoutBlocks:true,
    reconnectRevokesSession:true,separateUserAppCreated:false,actualIphoneTested:false,requestCount:requests}));
  await ctx.close();
+}catch(error){
+ // The diagnostic is bounded, synthetic and strictly read-only. A red test
+ // must show whether failure preceded login, local preparation or offline navigation.
+ let local=null,controller=null,location=null;
+ if(activePage&&!activePage.isClosed()){
+  try{local=await state(activePage)}catch(e){local='unavailable:'+String(e)}
+  try{controller=await activePage.evaluate(()=>!!navigator.serviceWorker.controller)}catch{}
+  try{location=activePage.url()}catch{}
+ }
+ console.error('TALERA_OFFLINE_FAILURE_DIAGNOSTIC',JSON.stringify({
+  error:String(error),local,controller,location,requests,serverLogouts,
+  trace:trace.slice(-80)
+ }));
+ throw error;
 }finally{
  if(browser)await browser.close();
  if(server)await new Promise(ok=>server.close(ok));

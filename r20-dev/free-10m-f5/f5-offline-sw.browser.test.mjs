@@ -5,6 +5,38 @@ import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {chromium} from 'playwright';
+import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
+// Exercise the REAL SW's account transition before creating a browser fixture.
+// A request may still be awaiting a local logout check when the next login wins.
+{
+ const first=OFFLINE_RUNTIME.indexOf('async function me(event){');
+ const last=OFFLINE_RUNTIME.indexOf('\nasync function auth(request)',first);
+ assert.ok(first>=0&&last>first,'Real offline account checker missing');
+ const source=OFFLINE_RUNTIME.slice(first,last);
+ let entered,release;
+ const paused=new Promise(ok=>{release=ok});
+ const started=new Promise(ok=>{entered=ok});
+ const Response=class{
+  constructor(body,opts={}){this.status=opts.status||200;this.body=body}
+ };
+ const state={epoch:0,grant:{id:'old-account'},locks:0};
+ const scope={...state,Response,
+  finishLogout:async()=>{entered();await paused;return true},
+  lock:async()=>{scope.locks++;scope.grant=null;scope.epoch++},
+  fetch:async()=>new Response('{"ok":false}',{status:401})
+ };
+ const checker=new Function('scope','with(scope){'+source+';return me;}')(scope);
+ const request=checker({request:'/api/me',waitUntil:()=>{}});
+ await started;
+ scope.epoch++;
+ scope.grant={id:'new-account'};
+ release();
+ const answer=await request;
+ assert.equal(answer.status,409,'Old preflight must not authorize a late guest response');
+ assert.equal(scope.grant.id,'new-account','New local account was erased by stale preflight');
+ assert.equal(scope.locks,0,'Old preflight requested account lock after newer login');
+ console.log('TALERA_OFFLINE_STALE_PREFLIGHT_NEWER_ACCOUNT_PROTECTED_PASS');
+}
 const {verifiedPublicSupport}=await import('./generated/public-template-map.mjs');
 const swPath=verifiedPublicSupport['/sw.js'];
 assert.match(swPath,/^\/__talera_free\/f5support\/[a-f0-9]{64}\.js$/);

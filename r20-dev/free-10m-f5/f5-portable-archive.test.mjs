@@ -60,6 +60,38 @@ await assert.rejects(()=>decodeFreeArchive(new Blob([bytes.slice(0,bytes.length-
 await assert.rejects(()=>createFreeArchive({stories:[story,{...story}],files,sourceScope:scope}),/DUPLICATE_KEY/);
 await assert.rejects(()=>createFreeArchive({stories,files:[...files,{key:'oops',blob:new Map()}],sourceScope:scope}),/UNKNOWN_RECORD_TYPE/);
 await assert.rejects(()=>createFreeArchive({stories,files:files.slice(1),sourceScope:scope}).then(decodeFreeArchive),/MISSING_STORY_MEDIA/);
+// Reproduce the observed iPhone failure class: the platform may append bytes
+// when it composes an archive from ORIGINAL IndexedDB File references, while
+// Blob.slice() returns correct byte-bounded Blob pieces. This test does not
+// pretend to be an actual Safari run; it enforces a portable archive contract.
+const nativeBlob=globalThis.Blob;
+let wholeFileAssemblies=0;
+globalThis.Blob=new Proxy(nativeBlob,{construct(target,args,newTarget){
+ const [parts,options]=args;
+ if(Array.isArray(parts)&&parts.some(p=>p instanceof File)){
+  wholeFileAssemblies++;
+  // Synthetic iOS-like extra bytes, never added to real media.
+  return Reflect.construct(target,[[...parts,Uint8Array.of(0xa5,0x5a)],options],newTarget);
+ }
+ return Reflect.construct(target,args,newTarget);
+}});
+try{
+ const portable=await createFreeArchive({stories,files,sourceScope:scope});
+ const check=await inspectFreeArchive(portable);
+ assert.equal(check.files,files.length);
+ assert.equal(wholeFileAssemblies,0,
+  'Archive composition must never pass original iPhone File objects directly into Blob()');
+ const restored=await decodeFreeArchive(portable);
+ assert.deepEqual(restored.files.map(x=>x.key),files.map(x=>x.key));
+ for(let i=0;i<files.length;i++){
+  if(files[i].blob instanceof nativeBlob){
+   assert.deepEqual(new Uint8Array(await restored.files[i].blob.arrayBuffer()),
+    new Uint8Array(await files[i].blob.arrayBuffer()),
+    'Byte-identical originals after byte-bounded archive composition');
+  }
+ }
+}finally{globalThis.Blob=nativeBlob}
+
 // Large original video proof (> old 128 MiB cap) without a full-file arrayBuffer.
 const mib=new Uint8Array(1024*1024).fill(0xa5);
 const largeVideo=new File(Array.from({length:180},()=>mib),'grote-originele-video.mov',

@@ -40,6 +40,21 @@ function serve(port,db){
 }
 const seed=async(page,db,present)=>{
  await page.evaluate(async ({db,present})=>{
+  // Generate genuine JPEG bytes for the SAME existing local backup code path.
+  // The prior four-byte "photo" could pass checksum tests without decoding.
+  // Prepare before starting IndexedDB's synchronous write transaction.
+  let genuineJpeg=null;
+  if(present==='old'){
+   const canvas=document.createElement('canvas');
+   canvas.width=3;canvas.height=2;
+   const ctx=canvas.getContext('2d');
+   ctx.fillStyle='#2b568d';ctx.fillRect(0,0,3,2);
+   const jpeg=await new Promise((ok,bad)=>canvas.toBlob(
+    value=>value?ok(value):bad(Error('SYNTHETIC_JPEG_NOT_ENCODED')),'image/jpeg',.91));
+   genuineJpeg=new Uint8Array(await jpeg.arrayBuffer());
+   if(genuineJpeg.length<100||genuineJpeg[0]!==255||genuineJpeg[1]!==216)
+    throw Error('SYNTHETIC_JPEG_BYTES_INVALID');
+  }
   const open=indexedDB.open(db,1);
   open.onupgradeneeded=()=>{
    open.result.createObjectStore('stories',{keyPath:'id'});
@@ -54,8 +69,8 @@ const seed=async(page,db,present)=>{
     items:[{key:id+':0',kind:'photo'},{key:id+':1',kind:'video'},
      {key:id+':2',kind:'audio'}],
     narrationCues:[{t:0,index:0},{t:4000,index:1,videoAtMs:300},{t:7000,index:0}]});
-   files.add({key:id+':0',blob:new File([Uint8Array.from([2,4,6,8])],
-    'origineel.heic',{type:'image/heic'})});
+   files.add({key:id+':0',blob:new File([genuineJpeg],
+    'origineel.jpg',{type:'image/jpeg'})});
    files.add({key:id+':1',blob:new File([Uint8Array.from([33,22,11,99])],
     'origineel.mov',{type:'video/quicktime'})});
    files.add({key:id+':2',blob:new File([Uint8Array.from([7,6,5,4])],
@@ -77,6 +92,30 @@ try{
  await a.goto(originA+'/__f5/backup');
  await b.goto(originB+'/__f5/backup');
  await seed(a,dbA,'old');await seed(b,dbB,'new');
+ // Confirm that the ORIGINAL IndexedDB photo really decodes before export.
+ const sourceJpeg=await a.evaluate(async name=>{
+  const req=indexedDB.open(name,1);
+  const db=await new Promise((ok,bad)=>{req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error)});
+  const tx=db.transaction('files','readonly');
+  const row=await new Promise((ok,bad)=>{
+   const q=tx.objectStore('files').get('local-old-1950-01-01-synthetic-record:0');
+   q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
+  });
+  db.close();
+  const source=row.blob,bytes=Array.from(new Uint8Array(await source.arrayBuffer()));
+  const url=URL.createObjectURL(source),image=new Image();
+  try{
+   image.src=url;
+   await image.decode();
+   return {bytes,width:image.naturalWidth,height:image.naturalHeight,
+    name:source.name,type:source.type};
+  }finally{URL.revokeObjectURL(url)}
+ },dbA);
+ assert.equal(sourceJpeg.width,3);
+ assert.equal(sourceJpeg.height,2);
+ assert.equal(sourceJpeg.name,'origineel.jpg');
+ assert.equal(sourceJpeg.type,'image/jpeg');
+ assert.ok(sourceJpeg.bytes.length>100);
  assert.equal(await a.locator('#talera-free-backup').getAttribute('data-database'),dbA);
  assert.equal(await a.getByRole('heading',{name:'Back-ups'}).count(),1);
  assert.equal(await a.getByRole('heading',{name:'Back-up maken'}).count(),1);
@@ -215,6 +254,15 @@ try{
    const video=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:1');
    const voice=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:2');
    const image=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:0');
+   // Byte equality alone is not proof the restored photo can be displayed.
+   const imageUrl=URL.createObjectURL(image.blob),decodedPhoto=new Image();
+   let photoDimensions=null;
+   try{
+    decodedPhoto.src=imageUrl;
+    await decodedPhoto.decode();
+    photoDimensions=[decodedPhoto.naturalWidth,decodedPhoto.naturalHeight];
+   }catch(_){photoDimensions=null}
+   finally{URL.revokeObjectURL(imageUrl)}
    return {
     stories:stories.map(row=>({
      id:row.id,title:row.title,items:row.items,cues:row.narrationCues
@@ -223,7 +271,8 @@ try{
     videoName:video?.blob?.name,
     videoBytes:video?.blob?Array.from(new Uint8Array(await video.blob.arrayBuffer())):[],
     voiceBytes:voice?.blob?Array.from(new Uint8Array(await voice.blob.arrayBuffer())):[],
-    imageBytes:image?.blob?Array.from(new Uint8Array(await image.blob.arrayBuffer())):[]
+    imageBytes:image?.blob?Array.from(new Uint8Array(await image.blob.arrayBuffer())):[],
+    imageMime:image?.blob?.type,imageName:image?.blob?.name,photoDimensions
    };
   },dbA);
   assert.equal(afterReload.stories.length,1,
@@ -236,7 +285,12 @@ try{
    'local-old-1950-01-01-synthetic-record:2'
   ]);
   assert.equal(afterReload.stories[0].cues[1].videoAtMs,300);
-  assert.deepEqual(afterReload.imageBytes,[2,4,6,8]);
+  assert.deepEqual(afterReload.imageBytes,sourceJpeg.bytes,
+   'The genuine JPEG must be byte-identical before export and after IndexedDB restore');
+  assert.deepEqual(afterReload.photoDimensions,[3,2],
+   'The RESTORED original JPEG must actually decode and display after page reload');
+  assert.equal(afterReload.imageMime,'image/jpeg');
+  assert.equal(afterReload.imageName,'origineel.jpg');
   assert.deepEqual(afterReload.videoBytes,[33,22,11,99]);
   assert.deepEqual(afterReload.voiceBytes,[7,6,5,4]);
   assert.equal(afterReload.videoName,'origineel.mov');
@@ -258,6 +312,7 @@ try{
     sameExistingOrigin:true,separatePrivateBrowserStorageOnly:true,
     explicitConsent:true,restoredStoryCount:1,allOriginalMediaBytesIdentical:true,
     exactOriginalMediaIDs:true,voiceCuesIdentical:true,afterReopenReadable:true,
+    restoredJpegActuallyDecodes:true,
     duplicateRestoreBlocked:true,serverUploadCount:posts,
     personalIphoneDataTouched:false,physicalIPhoneAcceptance:false}));
  }finally{await emptyContext.close()}

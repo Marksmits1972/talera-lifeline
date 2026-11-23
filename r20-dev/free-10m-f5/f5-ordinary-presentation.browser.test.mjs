@@ -197,6 +197,41 @@ try{
       assert.ok(await offlinePage.evaluate(async id=>
         (await window.TaleraMemories.list()).some(x=>x.id===id),saved.id),
         'A real local photo disappeared after offline reload');
+      // Make an additional local photo memory with the ALREADY-EXISTING
+      // device-stored photo while the real test server is truly shut down.
+      // No separate app, network upload, or production photo access.
+      const newlySavedOffline=await offlinePage.evaluate(async originalId=>{
+        const original=await window.TaleraMemories.get(originalId);
+        const item=original.items.find(x=>x.kind==='photo');
+        if(!item)throw Error('ORIGINAL_TEST_PHOTO_NOT_FOUND');
+        const bytes=await window.TaleraMemories.blob(item.key);
+        if(!bytes?.size)throw Error('ORIGINAL_TEST_PHOTO_BYTES_UNREADABLE');
+        const memory=await window.TaleraMemories.save({
+          title:'Locally saved while fully offline',
+          date:'2026-11-23',time:'16:01:00',
+          text:'Offline creation with the same original app and account'
+        },[new File([bytes],'same-local-photo.png',{type:bytes.type||'image/png'})]);
+        return {id:memory?.id,itemCount:memory?.items?.length};
+      },saved.id);
+      assert.match(newlySavedOffline.id,/^local-[a-z0-9-]{8,90}$/i,
+        'Offline same-device memory was not committed to local library');
+      const returnPage=await offlinePage.goto(origin+'/mijn-leven?published='+
+        encodeURIComponent(newlySavedOffline.id),
+        {waitUntil:'domcontentloaded',timeout:18000});
+      assert.equal(returnPage.status(),200,
+        'Offline newly-saved memory return showed unavailable 503');
+      assert.equal(await returnPage.headerValue('x-talera-offline'),
+        'verified-device-shell','Offline save returned through an unverified page');
+      assert.ok(await offlinePage.evaluate(async id=>
+        (await window.TaleraMemories.list()).some(row=>row.id===id),
+        newlySavedOffline.id),'Newly created offline memory was not readable');
+      const editPage=await offlinePage.goto(origin+'/tell?edit='+
+        encodeURIComponent(newlySavedOffline.id),
+        {waitUntil:'domcontentloaded',timeout:18000});
+      assert.equal(editPage.status(),200,'Offline owner-local edit route unavailable');
+      console.log('TALERA_REAL_APP_OFFLINE_NEW_MEMORY_SAVE_AND_RETURN_PASS',
+        JSON.stringify({accountLocal:true,sameOrigin:true,noBackend:true,
+          savedIdValid:true,originalMediaRetained:true,realIphoneAccepted:false}));
       const present=await offlinePage.goto(origin+'/present?memory='+
         encodeURIComponent(saved.id),{waitUntil:'domcontentloaded',timeout:18000});
       assert.equal(present.status(),200,

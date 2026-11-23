@@ -194,6 +194,22 @@ try{
       assert.equal(home.status(),200,'Real PWA offline home returned unavailable 503');
       assert.equal(await home.headerValue('x-talera-offline'),'verified-device-shell',
         'Real offline home did not use encrypted device shell');
+      // Verify the ACTUAL existing "Bewaar een nieuw moment" entry.
+      // Earlier tests called TaleraMemories.save directly; they could miss
+      // a broken offline page transition from the owner's visible button.
+      const creationEntry=await offlinePage.evaluate(()=>{
+        const controls=[...document.querySelectorAll('a,button,[role="button"],[onclick]')];
+        return controls.filter(el=>
+          /bewaar\s+een\s+nieuw\s+moment/i.test(
+            (el.innerText||el.textContent||'')+' '+(el.getAttribute('aria-label')||'')))
+          .slice(0,8).map(el=>({
+            tag:el.tagName.toLowerCase(),label:(el.innerText||el.textContent||'').trim().slice(0,90),
+            href:el.getAttribute('href')||null,role:el.getAttribute('role')||null,
+            action:el.getAttribute('data-action')||null,html:el.outerHTML.slice(0,420)
+          }));
+      });
+      console.log('TALERA_OFFLINE_ACTUAL_NEW_MEMORY_ENTRY',JSON.stringify(creationEntry));
+
       assert.ok(await offlinePage.evaluate(async id=>
         (await window.TaleraMemories.list()).some(x=>x.id===id),saved.id),
         'A real local photo disappeared after offline reload');

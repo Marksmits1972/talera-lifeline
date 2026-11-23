@@ -39,6 +39,36 @@ import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
  assert.equal(scope.locks,0,'Old preflight requested account lock after newer login');
  console.log('TALERA_OFFLINE_STALE_PREFLIGHT_NEWER_ACCOUNT_PROTECTED_PASS');
 }
+// Same actual TALERA offline invitation on an iOS service-worker update.
+// Verify a page that first sees the OLD worker prepares the replacement too.
+{
+ const source=readFileSync('r20-dev/free-10m-f5/f5-worker.mjs','utf8');
+ const literal=source.match(/const OFFLINE_PREPARE_SNIPPET=("(?:\\.|[^"\\])*");/);
+ assert.ok(literal,'Approved private page offline preparation snippet missing');
+ const html=JSON.parse(literal[1]);
+ const script=/<script[^>]*>([\\s\\S]*?)<\\/script>/.exec(html)?.[1];
+ assert.ok(script,'Existing private offline preparation script missing');
+ const seen=[],listeners=new Map();
+ let active={postMessage:data=>seen.push(['old',data.type])};
+ const serviceWorker={
+  ready:Promise.resolve({get active(){return active}}),
+  addEventListener:(type,fn)=>listeners.set(type,fn)
+ };
+ new Function('navigator',script)({serviceWorker});
+ await new Promise(ok=>setImmediate(ok));
+ assert.deepEqual(seen,[['old','TALERA_OFFLINE_PREPARE_V1']],
+  'Initial verified active service worker did not receive offline prepare');
+ active={postMessage:data=>seen.push(['new',data.type])};
+ assert.equal(typeof listeners.get('controllerchange'),'function',
+  'A replacement iPhone PWA worker cannot receive offline preparation');
+ listeners.get('controllerchange')();
+ await new Promise(ok=>setImmediate(ok));
+ assert.deepEqual(seen,[
+  ['old','TALERA_OFFLINE_PREPARE_V1'],
+  ['new','TALERA_OFFLINE_PREPARE_V1']
+ ],'Replacement service worker missed same-account offline preparation');
+ console.log('TALERA_OFFLINE_CONTROLLERCHANGE_PREPARE_PASS');
+}
 const {verifiedPublicSupport}=await import('./generated/public-template-map.mjs');
 const swPath=verifiedPublicSupport['/sw.js'];
 assert.match(swPath,/^\/__talera_free\/f5support\/[a-f0-9]{64}\.js$/);

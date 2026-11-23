@@ -2621,9 +2621,25 @@ try{
     return {older:older.id,newer:newer.id};
   });
   await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.TaleraMemories?.list&&
-    document.getElementById('v17-year-summary')?.textContent?.includes('eigen'),
-    null,{timeout:18000});
+  try{
+    await page.waitForFunction(async ids=>{
+      const saved=await window.TaleraMemories?.list?.();
+      const slider=document.getElementById('v17-year-slider');
+      return Array.isArray(saved)&&ids.every(id=>saved.some(s=>s.id===id))&&
+        Number(slider?.max)>=2026;
+    },[yearHeroRecords.older,yearHeroRecords.newer],{timeout:20000});
+  }catch(error){
+    const state=await page.evaluate(async()=>{
+      const saved=await window.TaleraMemories?.list?.()||[];
+      return {dates:saved.map(m=>[m.id,m.date]),year:
+        document.getElementById('v17-selected-year')?.textContent,
+        summary:document.getElementById('v17-year-summary')?.textContent,
+        slider:[document.getElementById('v17-year-slider')?.min,
+          document.getElementById('v17-year-slider')?.max],
+        hero:document.getElementById('heroTitle')?.textContent};
+    });
+    throw Error('SAME_HOME_YEAR_FIXTURE_READBACK '+JSON.stringify(state)+' '+String(error));
+  }
   const chooseOriginalYear=async(year,id)=>{
     await page.evaluate(y=>{
       // Deterministic RNG only INSIDE technical test. Product uses Math.random.

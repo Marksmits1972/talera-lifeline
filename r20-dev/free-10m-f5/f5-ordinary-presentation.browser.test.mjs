@@ -330,6 +330,21 @@ try{
     throw Error('CLEAN_HOME_INIT_DIAGNOSTIC '+JSON.stringify(state)+
       ' pageerrors='+JSON.stringify(errors.slice(0,12))+' cause='+String(error));
   }
+  // Read-only source inventory for the EXISTING Home timeline and hero.
+  // Runs against the same local TALERA browser fixture, no new app or data.
+  const homeSourceInventory=await page.evaluate(()=>{
+    const keys=['heroImage','selectHero','image.src=m.src','v17-selected-year',
+      'v17-year-summary','v17-timebox','ownCounts'];
+    return [...document.scripts].filter(x=>x.textContent?.length>200).map(node=>{
+      const src=node.textContent||'';
+      const matches=keys.map(key=>({key,pos:src.indexOf(key)})).filter(x=>x.pos>=0);
+      return {id:node.id||'',len:src.length,matches:matches.map(({key,pos})=>({
+        key,around:src.slice(Math.max(0,pos-820),Math.min(src.length,pos+1650))
+      }))};
+    }).filter(x=>x.matches.length).slice(0,12);
+  });
+  console.log('TALERA_EXISTING_HOME_HERO_TIMELINE_SOURCE_INVENTORY',
+    JSON.stringify(homeSourceInventory).slice(0,25000));
   const cleanHome=await page.evaluate(async()=>{
     const saved=await window.TaleraMemories.list();
     const hero=document.getElementById('heroCaption');

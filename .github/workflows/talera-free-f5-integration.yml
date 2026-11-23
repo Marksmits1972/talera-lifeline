@@ -233,6 +233,12 @@ jobs:
       - name: Browser verify back-up panel, private session and two local browser contexts
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
+      - name: Browser verify encrypted offline same-PWA start and offline logout
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
+        run: |
+          node --check r20-dev/free-10m-f5/f5-offline-sw.mjs
+          node --check r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs
+          node r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs

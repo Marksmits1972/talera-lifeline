@@ -46,7 +46,7 @@ import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
  const literal=source.match(/const OFFLINE_PREPARE_SNIPPET=("(?:\\.|[^"\\])*");/);
  assert.ok(literal,'Approved private page offline preparation snippet missing');
  const html=JSON.parse(literal[1]);
- const script=/<script[^>]*>([\\s\\S]*?)<\\/script>/.exec(html)?.[1];
+ const script=/<script[^>]*>([\s\S]*?)<\/script>/.exec(html)?.[1];
  assert.ok(script,'Existing private offline preparation script missing');
  const seen=[],listeners=new Map();
  let active={postMessage:data=>seen.push(['old',data.type])};

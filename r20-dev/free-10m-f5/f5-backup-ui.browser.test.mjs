@@ -110,6 +110,28 @@ try{
  assert.match(download.suggestedFilename(),/\.talera$/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
+ // Simulate an iOS Blob assembly anomaly affecting ONLY the final .talera Blob.
+ // The existing app must NEVER offer download of an archive whose bytes do not
+ // agree with its checksum-verified manifest. Synthetic browser fixture only.
+ await a.evaluate(()=>{
+  const NativeBlob=window.Blob;
+  window.__taleraNativeBackupBlob=NativeBlob;
+  window.Blob=new Proxy(NativeBlob,{construct(target,args,newTarget){
+   const [parts,opts]=args;
+   if(Array.isArray(parts)&&parts.length>2&&
+      parts[0] instanceof Uint8Array&&parts[1] instanceof Uint8Array){
+    return Reflect.construct(target,[[...parts,Uint8Array.of(0xa5)],opts],newTarget);
+   }
+   return Reflect.construct(target,args,newTarget);
+  }});
+ });
+ await a.getByRole('button',{name:'Back-up maken'}).click();
+ await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('Back-up niet gemaakt'));
+ assert.match(await a.locator('#export-status').textContent(),/EXTRA_BYTES/,
+  'Export must reject a malformed archive BEFORE a download is offered');
+ assert.equal(await a.locator('#save-backup').isVisible(),false,
+  'A failed pre-download archive check may not leave a stale download button');
+ await a.evaluate(()=>{window.Blob=window.__taleraNativeBackupBlob;delete window.__taleraNativeBackupBlob});
  // RONDE 2: a *truly empty* account-local library, using the exact SAME
  // existing TALERA backup page + same origin in a fresh browser storage
  // context. This is disposable CI state, NOT a second app/Worker/user URL.
@@ -290,6 +312,13 @@ try{
  await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Bestand beschadigd'));
  assert.match(await b.locator('#restore-status').textContent(),/controlecode: MEDIA_CHECKSUM/,
   'An invalid media chunk must show a safe, specific LOCAL error code to diagnose the iPhone .talera selection');
+ assert.equal(await b.locator('#run-restore').isDisabled(),true);
+ // A valid archive with even one appended byte must STILL be rejected.
+ // Never silently trim unexpected data from a personal iPhone backup.
+ await b.locator('#restore-file').setInputFiles({name:'extra-bytes.talera',
+  mimeType:'application/octet-stream',buffer:Buffer.concat([fileBytes,Buffer.from([0xa5])])});
+ await b.locator('#preview-restore').click();
+ await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('EXTRA_BYTES'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  // A manifest checksum failure is distinct from a corrupt media chunk.
  // Neither may expose memory titles, file IDs, media bytes, or an import button.

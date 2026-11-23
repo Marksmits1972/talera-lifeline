@@ -100,7 +100,11 @@ try{
   finally{db.close()}
  },null,{timeout:60000});
  const initial=await state(page);
- assert.equal(initial.account,A);assert.equal(initial.ready,A);
+ // Safe diagnostic: only synthetic account IDs and state booleans.
+ // Distinguish a missing grant from a race or an absent SW controller.
+ const controller=await page.evaluate(()=>!!navigator.serviceWorker.controller);
+ console.log('TALERA_OFFLINE_A_PRECHECK',JSON.stringify({initial,controller}));
+ assert.equal(initial.account,A,'Local encrypted grant vanished immediately after readiness');assert.equal(initial.ready,A);
  assert.equal(initial.keyExtractable,false);assert.equal(initial.pageEncrypted,true);
  const cached=await page.evaluate(()=>caches.match('/mijn-leven').then(x=>!!x));
  assert.equal(cached,false,'Private HTML must NEVER be stored unencrypted in CacheStorage');

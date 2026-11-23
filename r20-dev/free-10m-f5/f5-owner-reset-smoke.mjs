@@ -9,7 +9,7 @@ const root='r20-dev/free-10m-delivery/public';
 // the existing fast Home test job: no personal data or new app/Worker.
 const diagnosticHome=readFileSync(root+referencePages['/mijn-leven'],'utf8');
 const diagnosticSources=[{name:'actual-home-html',text:diagnosticHome}];
-for(const match of diagnosticHome.matchAll(/<script\\b[^>]*\\bsrc\\s*=\\s*["'](\\/[^"']+)["']/g)){
+for(const match of diagnosticHome.matchAll(/<script\b[^>]*\bsrc\s*=\s*["'](\/[^"']+)["']/g)){
  if(!match[1].startsWith('/__talera_free/'))continue;
  try{diagnosticSources.push({name:match[1],text:readFileSync(root+match[1],'utf8')})}catch{}
 }

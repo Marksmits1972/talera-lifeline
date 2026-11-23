@@ -134,8 +134,8 @@ jobs:
           echo 'TALERA_FREE_BACKUP_ONLY_NO_APPROVED_PLAYER_OR_UI_CHANGES'
 
   deploy_owner_approved_original_photo_storage_same_pwa:
-    name: Publish owner-approved lossless sliced archive correction on SAME TALERA Free PWA
-    if: github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-lossless-sliced-archive-20261123'
+    name: Publish owner-approved offline TALERA Free on SAME existing PWA
+    if: github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-offline-shell-20261123'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     concurrency:
@@ -148,7 +148,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 88483944-a896-4d54-bdd2-07dcc18787eb
+      F5_EXPECTED_LIVE_VERSION: fd50915a-852f-4464-a55b-33cc2063d90d
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -158,57 +158,53 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Lock exact owner-approved lossless sliced archive, green CI, protected engines
+      - name: Lock EXACT already-green offline TALERA app code and preserve all other media
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          BASE=a890399d5d9dd657954507ff0df6796de89b8c5a
+          APPROVED=5f49207cb1248c4830fb68ebcb8a8e49592ae50e
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 4364ad72c0242e2ce58c9fe9969b8a42fc59f9a3
+          test "$(git rev-parse HEAD^)" = "$APPROVED"
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-portable-archive-qa.yml
-          git merge-base --is-ancestor c3d6f6b1317415690a04bdbaa74602b400b8df98 HEAD
-          git diff --name-only c3d6f6b1317415690a04bdbaa74602b400b8df98 HEAD > /tmp/talera-archive-actual-changes
+          git diff --exit-code "$APPROVED" HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          git merge-base --is-ancestor "$BASE" "$APPROVED"
+          git diff --name-only "$BASE" HEAD > /tmp/talera-offline-actual-files
           printf '%s\n' \
             '.github/workflows/talera-free-f5-integration.yml' \
             '.github/workflows/talera-free-f5-portable-archive-qa.yml' \
-            'r20-dev/free-10m-f5/f5-portable-archive.mjs' \
-            'r20-dev/free-10m-f5/f5-portable-archive.test.mjs' > /tmp/talera-archive-allowed-changes
-          diff -u /tmp/talera-archive-allowed-changes /tmp/talera-archive-actual-changes
-          test "$(git hash-object r20-dev/free-10m-f5/f5-portable-archive.mjs)" = 81ff51759b01cb19c5ae36c80ce42d263c8ae013
-          test "$(git hash-object r20-dev/free-10m-f5/f5-portable-archive.test.mjs)" = 3f01f5425017e08e3e26884d246d65e1fa385ca3
-          test "$(git hash-object .github/workflows/talera-free-f5-integration.yml)" = 68ead40f5538125db8f9f160630d2e146d72aa7d
-          test "$(git hash-object r20-dev/free-10m-f5/f5-backup-controller.mjs)" = 0c74937115718e2a84fc62f915bd14dabfcd4eef
-          test "$(git hash-object r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs)" = 2894c3f9a3a17af720ebef3ae0c6734d0c54335e
-          test "$(git hash-object r20-dev/free-10m-f5/f5-public-assets.mjs)" = 4d48c46bf2f411decc8eaf5317c4087520a9cb96
-          test "$(git hash-object r20-dev/free-10m-f5/f5-library-editor-stable-save.mjs)" = 6d358f912b1f149b9583d0211781a022db52e210
-          test "$(git hash-object r20-dev/free-10m-f5/f5-worker.mjs)" = 3f9fe9225f3cea34a70d688b24ed11e78fc9aba9
-          test "$(git hash-object r20-dev/free-10m-f5/f5-portable-idb.mjs)" = e9af73a51f575760ee531b4f1faebb32b5adee48
-          test "$(git hash-object r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = 5eaceaf62b928ffe769034b16573dff138652414
-          test "$(git hash-object r20-dev/free-10m-f5/f5-local-scope.mjs)" = e5f0893017b649072647ad543c848987fc84e589
-          git diff --exit-code c3d6f6b1317415690a04bdbaa74602b400b8df98 HEAD -- \
+            'r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs' \
+            'r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs' \
+            'r20-dev/free-10m-f5/f5-offline-sw.mjs' \
+            'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs' \
+            'r20-dev/free-10m-f5/f5-public-assets.mjs' \
+            'r20-dev/free-10m-f5/f5-sw-cache-audit.mjs' \
+            'r20-dev/free-10m-f5/f5-worker.mjs' > /tmp/talera-offline-allowed-files
+          diff -u <(sort /tmp/talera-offline-allowed-files) <(sort /tmp/talera-offline-actual-files)
+          git diff --exit-code "$BASE" HEAD -- \
             r20-dev/free-10m-delivery/ \
-            r20-dev/free-10m-f5/f5-worker.mjs \
-            r20-dev/free-10m-f5/f5-public-assets.mjs \
-            r20-dev/free-10m-f5/f5-library-editor-stable-save.mjs \
             r20-dev/free-10m-f5/f5-independent-narrator.browser.js \
-            r20-dev/free-10m-f5/f5-library-access.browser.js \
             r20-dev/free-10m-f5/f5-library-persistence.mjs \
             r20-dev/free-10m-f5/f5-portable-idb.mjs \
+            r20-dev/free-10m-f5/f5-portable-archive.mjs \
             r20-dev/free-10m-f5/f5-backup-controller.mjs \
-            r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs \
             r20-dev/free-10m-f5/f5-local-backup-page.mjs \
-            r20-dev/free-10m-f5/f5-local-scope.mjs
+            r20-dev/free-10m-f5/f5-library-editor-stable-save.mjs
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const url='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/45150677834';
+          const target='5f49207cb1248c4830fb68ebcb8a8e49592ae50e';
+          const runId=45200987633;
+          const url='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+runId;
           const r=await fetch(url,{headers:{Authorization:'Bearer '+process.env.GH_TOKEN,
             Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
-          assert.equal(r.status,200,'Cannot verify prior complete TALERA archive CI');
+          assert.equal(r.status,200,'Full browser test run not retrievable');
           const j=await r.json();
-          assert.equal(j.head_sha,'4364ad72c0242e2ce58c9fe9969b8a42fc59f9a3');
+          assert.equal(j.head_sha,target,'Full tests were for different code');
           assert.equal(j.status,'completed');
-          assert.equal(j.conclusion,'success');
-          console.log('TALERA_LOSSLESS_SLICED_ARCHIVE_EXACT_SOURCE_GREEN_CI_OWNER_APPROVED');
+          assert.equal(j.conclusion,'success','Full offline and existing app tests not green');
+          console.log('TALERA_OWNER_APPROVED_EXACT_GREEN_OFFLINE_SOURCE_NO_OTHER_APP_CHANGES',
+            JSON.stringify({testedCommit:target,greenRun:runId,oneApp:true,deviceAccepted:false}));
           NODE
       - name: Normalize existing GitHub Cloudflare deployment credentials
         run: |
@@ -257,7 +253,7 @@ jobs:
           fs.writeFileSync('/tmp/talera-photo-restore-preflight.json',JSON.stringify({bindings:before}));
           console.log('EXACT_ONE_CURRENT_TALERA_WORKER_AND_ALL_17_EXISTING_BINDINGS_VERIFIED');
           NODE
-      - name: Compile only approved lossless sliced archive fix; unchanged engines
+      - name: Compile approved offline account shell and unchanged original media engines
         run: |
           set -euo pipefail
           npm ci
@@ -271,8 +267,11 @@ jobs:
           node --check r20-dev/free-10m-f5/f5-portable-archive.test.mjs
           node --check r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
           node --check r20-dev/free-10m-f5/f5-worker.mjs
+          node --check r20-dev/free-10m-f5/f5-offline-sw.mjs
+          node --check r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
           node r20-dev/free-10m-f5/f5-library-access.test.mjs
           node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
           node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
@@ -352,7 +351,7 @@ jobs:
           assert.deepEqual(j.result.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),
             [[process.env.F5_EXPECTED_LIVE_VERSION,100]],'Unexpected TALERA live update: abort');
           NODE
-      - name: Publish exact lossless sliced archive fix on SAME existing TALERA Free Worker
+      - name: Publish EXACT tested offline shell to SAME existing TALERA Free Worker
         id: deployed
         run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc
       - name: Verify same PWA origin, privacy gates and unchanged 17 bindings
@@ -391,7 +390,7 @@ jobs:
             namespace_id:x.namespace_id||null,text:x.text||null});
           const sorted=arr=>arr.map(norm).sort((a,b)=>a.name.localeCompare(b.name));
           assert.deepEqual(sorted(s.bindings||[]),prev,'TALERA private account or media bindings changed');
-          console.log('SAME_TALERA_FREE_LOSSLESS_SLICED_ARCHIVE_RELEASE_SUCCESS',JSON.stringify({
+          console.log('SAME_TALERA_FREE_OFFLINE_SHELL_RELEASE_SUCCESS',JSON.stringify({
             previous:process.env.F5_EXPECTED_LIVE_VERSION,
             deployedVersion:active[0].version_id,
             bindings:prev.length,
@@ -400,4 +399,4 @@ jobs:
           NODE
       - name: Rollback only this SAME TALERA QA Worker on release or postrelease failure
         if: failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure')
-        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore preceding TALERA Free QA after lossless archive fix failure" --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore preceding TALERA Free QA after offline shell release failure" --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc

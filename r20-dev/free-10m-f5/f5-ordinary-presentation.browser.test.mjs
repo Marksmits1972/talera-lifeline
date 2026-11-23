@@ -197,16 +197,32 @@ try{
       // Verify the ACTUAL existing "Bewaar een nieuw moment" entry.
       // Earlier tests called TaleraMemories.save directly; they could miss
       // a broken offline page transition from the owner's visible button.
+      await offlinePage.waitForTimeout(1000);
       const creationEntry=await offlinePage.evaluate(()=>{
-        const controls=[...document.querySelectorAll('a,button,[role="button"],[onclick]')];
-        return controls.filter(el=>
-          /bewaar\s+een\s+nieuw\s+moment/i.test(
+        const tiny=el=>({
+          tag:el.tagName.toLowerCase(),
+          label:String(el.innerText||el.textContent||'').trim().slice(0,110),
+          href:el.getAttribute('href'),role:el.getAttribute('role'),
+          action:el.getAttribute('data-action'),
+          html:el.outerHTML.slice(0,370)
+        });
+        const all=[...document.querySelectorAll('a,button,[role="button"],[onclick]')];
+        const words=/bewaar|nieuw|moment|memory|herinner|create|add|save|new/i;
+        const leafs=[...document.querySelectorAll('body *')]
+          .filter(el=>el.children.length===0&&words.test(el.textContent||''));
+        return {
+          path:location.pathname+location.search,ready:document.readyState,
+          bodyPreview:(document.body.innerText||'').slice(0,1000),
+          anchors:[...document.querySelectorAll('a')].slice(0,40).map(tiny),
+          buttons:[...document.querySelectorAll('button')].slice(0,40).map(tiny),
+          matchingControls:all.filter(el=>words.test(
             (el.innerText||el.textContent||'')+' '+(el.getAttribute('aria-label')||'')))
-          .slice(0,8).map(el=>({
-            tag:el.tagName.toLowerCase(),label:(el.innerText||el.textContent||'').trim().slice(0,90),
-            href:el.getAttribute('href')||null,role:el.getAttribute('role')||null,
-            action:el.getAttribute('data-action')||null,html:el.outerHTML.slice(0,420)
-          }));
+            .slice(0,16).map(tiny),
+          matchingLeafs:leafs.slice(0,14).map(el=>({
+            label:el.textContent?.trim().slice(0,80),
+            parent:el.parentElement?.outerHTML.slice(0,400)
+          }))
+        };
       });
       console.log('TALERA_OFFLINE_ACTUAL_NEW_MEMORY_ENTRY',JSON.stringify(creationEntry));
 

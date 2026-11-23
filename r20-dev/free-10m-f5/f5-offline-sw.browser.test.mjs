@@ -20,10 +20,11 @@ const account=req=>{
 function documentPage(req,id){
  const which=req.url?.split('?')[0]||'/';
  const title=id?'PRIVATE '+id+' '+which:'ANONYMOUS';
+ // The REAL F5 Worker inserts offline preparation ONLY in authenticated HTML.
+ const privatePrepare=id?'<script>(function(){if(!("serviceWorker" in navigator))return;'+
+  'navigator.serviceWorker.ready.then(r=>r.active?.postMessage({type:"TALERA_OFFLINE_PREPARE_V1"})).catch(()=>{})})();</script>':'';
  const body='<!doctype html><html lang="nl"><head><meta charset="utf-8"></head><body>'+
-  '<h1>'+title+'</h1><script>(function(){if(!("serviceWorker" in navigator))return;'+
-  'navigator.serviceWorker.ready.then(r=>r.active?.postMessage({type:"TALERA_OFFLINE_PREPARE_V1"})).catch(()=>{})})();</script>'+
-  '</body></html>';
+  '<h1>'+title+'</h1>'+privatePrepare+'</body></html>';
  return body;
 }
 function fixture(req,res){

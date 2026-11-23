@@ -134,8 +134,8 @@ jobs:
           echo 'TALERA_FREE_BACKUP_ONLY_NO_APPROVED_PLAYER_OR_UI_CHANGES'
 
   deploy_owner_approved_original_photo_storage_same_pwa:
-    name: Publish owner-approved offline TALERA Free on SAME existing PWA
-    if: github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-offline-shell-20261123'
+    name: Publish owner-approved iPhone offline correction on SAME TALERA Free PWA
+    if: github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-offline-iphone-retest-20261123'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     concurrency:
@@ -148,7 +148,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: fd50915a-852f-4464-a55b-33cc2063d90d
+      F5_EXPECTED_LIVE_VERSION: 8073a6d2-50a8-44f6-a4ec-e006e51644ef
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -158,13 +158,13 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Lock EXACT already-green offline TALERA app code and preserve all other media
+      - name: Lock owner-approved EXACT tested offline iPhone source; preserve original data
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          BASE=a890399d5d9dd657954507ff0df6796de89b8c5a
-          APPROVED=5f49207cb1248c4830fb68ebcb8a8e49592ae50e
+          BASE=071ec579d613b89c23b5e8ab5660621914e81d8c
+          APPROVED=42e6879ec11f47966126d5f4d17990bc62c952e2
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
           test "$(git rev-parse HEAD^)" = "$APPROVED"
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-portable-archive-qa.yml
@@ -174,12 +174,9 @@ jobs:
           printf '%s\n' \
             '.github/workflows/talera-free-f5-integration.yml' \
             '.github/workflows/talera-free-f5-portable-archive-qa.yml' \
-            'r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs' \
             'r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs' \
             'r20-dev/free-10m-f5/f5-offline-sw.mjs' \
             'r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs' \
-            'r20-dev/free-10m-f5/f5-public-assets.mjs' \
-            'r20-dev/free-10m-f5/f5-sw-cache-audit.mjs' \
             'r20-dev/free-10m-f5/f5-worker.mjs' > /tmp/talera-offline-allowed-files
           diff -u <(sort /tmp/talera-offline-allowed-files) <(sort /tmp/talera-offline-actual-files)
           git diff --exit-code "$BASE" HEAD -- \
@@ -193,18 +190,21 @@ jobs:
             r20-dev/free-10m-f5/f5-library-editor-stable-save.mjs
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const target='5f49207cb1248c4830fb68ebcb8a8e49592ae50e';
-          const runId=45200987633;
+          const target='42e6879ec11f47966126d5f4d17990bc62c952e2';
+          const runId=45216984259;
           const url='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+runId;
           const r=await fetch(url,{headers:{Authorization:'Bearer '+process.env.GH_TOKEN,
             Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
-          assert.equal(r.status,200,'Full browser test run not retrievable');
+          assert.equal(r.status,200,'Exact full browser test run inaccessible');
           const j=await r.json();
-          assert.equal(j.head_sha,target,'Full tests were for different code');
+          assert.equal(j.head_sha,target,'Tested source differs');
+          assert.equal(j.event,'push');
           assert.equal(j.status,'completed');
-          assert.equal(j.conclusion,'success','Full offline and existing app tests not green');
-          console.log('TALERA_OWNER_APPROVED_EXACT_GREEN_OFFLINE_SOURCE_NO_OTHER_APP_CHANGES',
-            JSON.stringify({testedCommit:target,greenRun:runId,oneApp:true,deviceAccepted:false}));
+          assert.equal(j.conclusion,'success','Full offline, WebKit and original app tests must be green');
+          assert.equal(j.name,'TALERA Free F5 - isolated single-origin integration tests');
+          console.log('TALERA_OWNER_APPROVED_EXACT_GREEN_IPHONE_OFFLINE_SOURCE',JSON.stringify({
+            testedCommit:target,greenRun:runId,singleApp:true,deviceAccepted:false
+          }));
           NODE
       - name: Normalize existing GitHub Cloudflare deployment credentials
         run: |
@@ -253,7 +253,7 @@ jobs:
           fs.writeFileSync('/tmp/talera-photo-restore-preflight.json',JSON.stringify({bindings:before}));
           console.log('EXACT_ONE_CURRENT_TALERA_WORKER_AND_ALL_17_EXISTING_BINDINGS_VERIFIED');
           NODE
-      - name: Compile approved offline account shell and unchanged original media engines
+      - name: Compile approved iPhone offline shell and unchanged original engines
         run: |
           set -euo pipefail
           npm ci
@@ -351,7 +351,7 @@ jobs:
           assert.deepEqual(j.result.deployments?.[0]?.versions?.map(x=>[x.version_id,x.percentage]),
             [[process.env.F5_EXPECTED_LIVE_VERSION,100]],'Unexpected TALERA live update: abort');
           NODE
-      - name: Publish EXACT tested offline shell to SAME existing TALERA Free Worker
+      - name: Publish EXACT tested iPhone offline correction to SAME TALERA Free Worker
         id: deployed
         run: npx --no-install wrangler deploy --keep-vars --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc
       - name: Verify same PWA origin, privacy gates and unchanged 17 bindings
@@ -390,7 +390,7 @@ jobs:
             namespace_id:x.namespace_id||null,text:x.text||null});
           const sorted=arr=>arr.map(norm).sort((a,b)=>a.name.localeCompare(b.name));
           assert.deepEqual(sorted(s.bindings||[]),prev,'TALERA private account or media bindings changed');
-          console.log('SAME_TALERA_FREE_OFFLINE_SHELL_RELEASE_SUCCESS',JSON.stringify({
+          console.log('SAME_TALERA_FREE_IPHONE_OFFLINE_RETEST_RELEASE_SUCCESS',JSON.stringify({
             previous:process.env.F5_EXPECTED_LIVE_VERSION,
             deployedVersion:active[0].version_id,
             bindings:prev.length,
@@ -399,4 +399,4 @@ jobs:
           NODE
       - name: Rollback only this SAME TALERA QA Worker on release or postrelease failure
         if: failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure')
-        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore preceding TALERA Free QA after offline shell release failure" --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc
+        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore preceding TALERA Free QA after iPhone offline correction release failure" --config r20-dev/free-10m-f5/wrangler.photo-restore.generated.jsonc

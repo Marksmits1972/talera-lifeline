@@ -2667,8 +2667,10 @@ try{
     getComputedStyle(document.getElementById('heroCaption')).display==='none',
     null,{timeout:10000});
   // Original records/IDs and media must remain in same account-local catalog.
-  assert.ok(await page.evaluate(async ids=>ids.every(id=>true===!!(await window.TaleraMemories.get(id))),
-    [yearHeroRecords.older,yearHeroRecords.newer]));
+  assert.ok(await page.evaluate(async ids=>{
+    for(const id of ids)if(!(await window.TaleraMemories.get(id)))return false;
+    return true;
+  },[yearHeroRecords.older,yearHeroRecords.newer]));
   console.log('TALERA_HOME_RANDOM_PHOTO_SELECTED_YEAR_PASS',
     JSON.stringify({originalYearIndicator:true,randomAcrossPhotos:true,
       switchAfterSliderRelease:true,emptyYearDoesNotShowAnotherYear:true,

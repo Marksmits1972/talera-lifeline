@@ -15,7 +15,20 @@ export function preserveOriginalMediaIdsOnEdit(html){
  exact("birthYear:Number(input.birthYear)||null,source:'pwa-local'};","birthYear:Number(input.birthYear)||(existing?.birthYear||null),source:'pwa-local'};","PRESERVE_YEAR");
  exact("phoneCopies.push(typeOf(uploads[p])==='photo'?await phoneRendition(uploads[p]):null);","phoneCopies.push(!(existing&&canonicalIds!==undefined&&canonicalIds[p])&&typeOf(uploads[p])==='photo'?await phoneRendition(uploads[p]):null);","NO_COPY_REUSED");
  exact("if(existing)for(var k=0;k<(existing.items||[]).length;k++){","if(existing&&canonicalIds===undefined)for(var k=0;k<(existing.items||[]).length;k++){","KEEP_ORIGINALS");
- exact("for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:uploads[j]});","for(var j=0;j<files.length;j++){\n   if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;\n   const row={key:files[j].key,blob:uploads[j]};\n   if(existing&&canonicalIds!==undefined)tx.objectStore('files').add(row);\n   else tx.objectStore('files').put(row);\n  }","ADD_ONLY_NEW");
+ // Keep the already approved media-ID-safe editor write compatible with the
+ // byte-owned original PHOTO File input of the CURRENT packaged /tell page.
+ // The old anonymous reference is retained only for existing source tests.
+ // Exactly one writer must be present; ambiguous or changed sources fail closed.
+ const pickerWriter="for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:uploads[j]});";
+ const ownedWriter="for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:taleraOwnedPhotoUploads[j]});";
+ const pickerCount=html.split(pickerWriter).length-1;
+ const ownedCount=html.split(ownedWriter).length-1;
+ if(pickerCount+ownedCount!==1)
+  throw Error('TALERA_LIBRARY_EDITOR_SAVE_DRIFT_ADD_ONLY_NEW:'+(pickerCount+ownedCount));
+ const blobArray=ownedCount?'taleraOwnedPhotoUploads':'uploads';
+ exact(ownedCount?ownedWriter:pickerWriter,
+  "for(var j=0;j<files.length;j++){\n   if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;\n   const row={key:files[j].key,blob:"+blobArray+"[j]};\n   if(existing&&canonicalIds!==undefined)tx.objectStore('files').add(row);\n   else tx.objectStore('files').put(row);\n  }",
+  "ADD_ONLY_NEW");
  exact("const title=g.title.trim();const row=await mem.save(","const title=g.title.trim();\n const canonicalIds=g.existing?(()=>{\n  if(!g.canonicalByDraft||typeof g.canonicalByDraft!=='object')\n   throw Error('Deze oudere conceptbewerking bevat geen veilige media-ID-koppelingen. De bestaande herinnering blijft intact.');\n  return [...g.media,...(g.voice?[g.voice]:[])].map(id=>g.canonicalByDraft[id]||null);\n })():undefined;\n const row=await mem.save(","EDITOR_IDS");
  exact("},uploads,g.existing||undefined);const persisted=await mem.get(row.id);","},uploads,g.existing||undefined,canonicalIds);const persisted=await mem.get(row.id);","EDITOR_SAVE_FOURTH_ARG");
  exact("window.TaleraMemories={save:save,","async function setNarrationCuesForStory(storyId,cues){\n const story=await get(storyId);\n if(!story||story.source!=='pwa-local'||!Array.isArray(cues))\n  throw Error('Het vertelplan kan niet veilig aan deze herinnering worden gekoppeld.');\n const updated={...story,narrationCues:cues,narrationSchema:'media-id-v1'};\n const db=await open(),tx=db.transaction('stories','readwrite'),finished=done(tx);\n tx.objectStore('stories').put(updated);\n await finished;\n return updated;\n}\nwindow.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,","CUE_WRITER_LIBRARY_OWNER");

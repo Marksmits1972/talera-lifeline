@@ -70,6 +70,8 @@ jobs:
         run: node r20-dev/free-10m-delivery/build.mjs
       - name: Package only public PWA references and stable external JavaScript
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Inspect exact existing service worker for safe offline design (read-only)
+        run: node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
       - name: Verify read-only TALERA library gateway preserves original IDs and bytes
         run: |
           node r20-dev/free-10m-f5/f5-library-access.test.mjs

@@ -2591,6 +2591,7 @@ try{
     beforeReload.positions[1]<beforeReload.positions[2],
     'Same-day posts without event times must be chronological from first to LAST: '+
     JSON.stringify({stored:sameDayPosts.creation,order:beforeReload}));
+  // Reopen the same original /present route; no app reinstall or data reset.
   const afterReload=await checkSameDateOrder();
   assert.deepEqual(afterReload.positions,beforeReload.positions,
     'Same-day chronological order must survive a fresh page load');

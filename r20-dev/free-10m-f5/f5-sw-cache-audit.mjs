@@ -30,11 +30,12 @@ assert.equal(summary.containsDynamicCacheWrites,true,'Static code not cached for
 for(const marker of [
  'talera-f5-offline-shell-v1','talera-f5-offline-static-v1',
  'crypto.subtle.encrypt','crypto.subtle.decrypt',
- "taleraRead('pending-logout')","taleraRead('grant')",
+ "read('pending-logout')","read('grant')",
  "event.respondWith(auth(req))","event.respondWith(navigate(event))",
  'TALERA_OFFLINE_PREPARE_V1'
 ])assert.ok(sw.includes(marker),'Critical offline account/crypto contract missing: '+marker);
-assert.match(sw,/if\(response\.ok.*?\)/s,'Offline network-first source contract missing');
+assert.ok(sw.includes('async function navigate(event)')&&sw.includes('await fetch(event.request)'),
+ 'Offline network-first navigation source contract missing');
 assert.ok(!sw.includes('cache.put(event.request'),'Private page must never enter CacheStorage');
 summary.accountShellEncryptedAtRest=true;
 summary.accountLogoutBlocksOffline=true;

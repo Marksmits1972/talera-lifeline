@@ -49,7 +49,7 @@ assert.equal(installStart.origin,'http://127.0.0.1:8872','Install route must sta
 const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
 const at='http://127.0.0.1:8872';
-let server,browser,activePage,requests=0,serverLogouts=0;const trace=[];
+let server,browser,activePage,requests=0,serverLogouts=0,offlineBackend=false,offlineBlocked=0;const trace=[];
 let releaseStaleGuestCheck=null,markStaleGuestCheckStarted;
 const staleGuestCheckStarted=new Promise(ok=>{markStaleGuestCheckStarted=ok});
 const account=req=>{
@@ -68,6 +68,9 @@ function documentPage(req,id){
 }
 function fixture(req,res){
  requests++;
+ // Chromium may leave Service Worker fetches online despite Playwright offline mode.
+ // Block backend transport too, preserving the genuine offline-logout contract.
+ if(offlineBackend){offlineBlocked++;req.socket.destroy();return}
  const pathname=new URL(req.url,at).pathname,id=account(req);
  if(['/mijn-leven','/present','/tell','/__f5/backup','/api/me','/api/login','/api/logout'].includes(pathname))
   trace.push({path:pathname,method:req.method,verified:!!id});
@@ -184,6 +187,7 @@ try{
  await side.close();
  const cached=await page.evaluate(()=>caches.match('/mijn-leven').then(x=>!!x));
  assert.equal(cached,false,'Private HTML must NEVER be stored unencrypted in CacheStorage');
+ offlineBackend=true;
  await ctx.setOffline(true);
  await page.goto(at+'/mijn-leven');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
@@ -201,9 +205,12 @@ try{
  const logout=await page.evaluate(async()=>{const r=await fetch('/api/logout',{method:'POST',credentials:'same-origin',
   headers:{'content-type':'application/json'},body:'{}'});return r.json()});
  assert.equal(logout.ok,true);
- assert.equal((await state(page)).pending,true);
+ assert.equal((await state(page)).pending,true,'Offline logout must remain pending until reconnect');
+ assert.equal(serverLogouts,0,'Offline logout must not reach the account server while disconnected');
+ assert.ok(offlineBlocked>0,'Offline logout must attempt the disconnected backend');
  const denied=await page.goto(at+'/mijn-leven');
  assert.equal(denied.status(),503,'Local logout MUST block offline private page');
+ offlineBackend=false;
  await ctx.setOffline(false);
  await page.goto(at+'/mijn-leven');
  assert.match(await page.locator('h1').innerText(),/ANONYMOUS/);
@@ -234,7 +241,7 @@ try{
  }
  console.error('TALERA_OFFLINE_FAILURE_DIAGNOSTIC',JSON.stringify({
   error:String(error),local,controller,location,requests,serverLogouts,
-  trace:trace.slice(-80)
+  offlineBackend,offlineBlocked,trace:trace.slice(-80)
  }));
  throw error;
 }finally{

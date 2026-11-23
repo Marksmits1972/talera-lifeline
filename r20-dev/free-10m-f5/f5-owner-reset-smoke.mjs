@@ -5,36 +5,6 @@ import {readFileSync} from 'node:fs';
 import {Script,createContext} from 'node:vm';
 import {referencePages,guestPages} from './generated/public-template-map.mjs';
 const root='r20-dev/free-10m-delivery/public';
-// Read-only exact generated original Home source inspection. This runs in
-// the existing fast Home test job: no personal data or new app/Worker.
-const diagnosticHome=readFileSync(root+referencePages['/mijn-leven'],'utf8');
-const diagnosticSources=[{name:'actual-home-html',text:diagnosticHome}];
-for(const match of diagnosticHome.matchAll(/<script\b[^>]*\bsrc\s*=\s*["'](\/[^"']+)["']/g)){
- if(!match[1].startsWith('/__talera_free/'))continue;
- try{diagnosticSources.push({name:match[1],text:readFileSync(root+match[1],'utf8')})}catch{}
-}
-const diagnosticTerms=['const selectHero=','const ownHero=','image.src=m.src',
-  'v17-selected-year','v17-year-preview','v17-timebox','const show=',
-  'TaleraMemories.list()','function refreshYear','const renderYear',
-  'const setYear','selectedYear','yearSlider','yearRange'];
-const extracts=[];
-for(const source of diagnosticSources){
- for(const token of diagnosticTerms){
-  let pos=0,hits=0;
-  while((pos=source.text.indexOf(token,pos))>=0&&hits<2){
-   extracts.push({file:source.name,term:token,pos,
-     snippet:source.text.slice(Math.max(0,pos-850),Math.min(source.text.length,pos+1450))});
-   pos+=token.length;hits++;
-  }
- }
-}
-console.log('TALERA_HOME_EXACT_HERO_YEAR_SOURCE',
- JSON.stringify({sources:diagnosticSources.map(x=>({name:x.name,length:x.text.length})),
-  extracts}).slice(0,46000));
-const timelineSourceStart=diagnosticHome.indexOf('const setHero=(m)=>{');
-assert.ok(timelineSourceStart>0,'Original Home year controller absent');
-console.log('TALERA_ORIGINAL_HOME_YEAR_HERO_RENDER_SLICE',
- JSON.stringify(diagnosticHome.slice(timelineSourceStart,timelineSourceStart+6600)));
 const originalWorker=readFileSync('r20-dev/free-10m-f5/f5-worker.mjs','utf8');
 assert.ok(originalWorker.includes("const OWNER_PURGE_PATH='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c';")&&
  originalWorker.includes("pathname===OWNER_PURGE_PATH?'/mijn-leven':pathname"),

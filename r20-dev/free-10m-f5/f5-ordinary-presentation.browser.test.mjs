@@ -111,6 +111,89 @@ try{
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
+  // iPhone regression: real authenticated TALERA Worker, saved local image,
+  // then same home-screen PWA routes offline. No second app or Worker.
+  const offlineCtx=await browser.newContext({
+    ...devices['iPhone 13'],serviceWorkers:'allow',
+    extraHTTPHeaders:{'x-talera-f5-key':gate}
+  });
+  try{
+    await offlineCtx.addCookies([{name:'talera_sid',value:sid,
+      domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+    const offlinePage=await offlineCtx.newPage();
+    const offlineErrors=[];
+    offlinePage.on('pageerror',e=>offlineErrors.push(String(e.message).slice(0,180)));
+    const entry=await offlinePage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+    assert.equal(entry.status(),200,'Existing authenticated TALERA home required');
+    await offlinePage.evaluate(async()=>{
+      await navigator.serviceWorker.register('/sw.js',{scope:'/'});
+      await navigator.serviceWorker.ready;
+    });
+    await offlinePage.reload({waitUntil:'domcontentloaded'});
+    await offlinePage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    const saved=await offlinePage.evaluate(async()=>{
+      const c=document.createElement('canvas');c.width=64;c.height=64;
+      c.getContext('2d').fillStyle='#2356a9';
+      c.getContext('2d').fillRect(0,0,64,64);
+      const b=await new Promise(ok=>c.toBlob(ok,'image/png'));
+      return window.TaleraMemories.save({
+        title:'Synthetic offline picture',date:'2026-11-23',
+        time:'16:00:00',text:'Technical test only'
+      },[new File([b],'synthetic-offline.png',{type:'image/png'})]);
+    });
+    const account=await offlinePage.evaluate(async()=>{
+      const r=await fetch('/api/me');
+      if(!r.ok)throw Error('Synthetic session expired');
+      return (await r.json()).account?.id;
+    });
+    assert.match(account,/^[0-9a-f-]{36}$/i);
+    const state=async()=>offlinePage.evaluate(async()=>{
+      const db=await new Promise((ok,bad)=>{
+        const r=indexedDB.open('talera-f5-offline-shell-v1',1);
+        r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error);
+      });
+      try{
+        const read=key=>new Promise((ok,bad)=>{
+          const r=db.transaction('shell','readonly').objectStore('shell').get(key);
+          r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error);
+        });
+        const keys=['grant','ready','me','page:/mijn-leven',
+          'page:/present','page:/tell','page:/__f5/backup','pending-logout'];
+        const v=await Promise.all(keys.map(read));
+        return {controlled:!!navigator.serviceWorker.controller,
+          grant:v[0]?.id||null,ready:v[1]?.id||null,me:v[2]?.id||null,
+          keyStored:!!v[0]?.key,
+          home:!!v[3]?.id,present:!!v[4]?.id,tell:!!v[5]?.id,
+          backup:!!v[6]?.id,pending:!!v[7]};
+      }finally{db.close()}
+    });
+    let s=null;
+    for(let n=0;n<120;n++){
+      s=await state();
+      if(s.grant===account&&s.ready===account&&s.home&&
+        s.present&&s.tell&&s.backup)break;
+      await offlinePage.waitForTimeout(300);
+    }
+    console.log('TALERA_REAL_APP_OFFLINE_PREPARATION_STATE',
+      JSON.stringify({...s,accountMatched:s?.grant===account,
+        ownSyntheticPhotoSaved:!!saved?.id,errors:offlineErrors.slice(-5)}));
+    await offlineCtx.setOffline(true);
+    const home=await offlinePage.goto(origin+'/mijn-leven',
+      {waitUntil:'domcontentloaded'});
+    assert.equal(home.status(),200,'Real PWA offline home returned unavailable 503');
+    assert.equal(await home.headerValue('x-talera-offline'),'verified-device-shell',
+      'Home did not use the encrypted offline device shell');
+    assert.ok(await offlinePage.evaluate(async id=>
+      (await window.TaleraMemories.list()).some(x=>x.id===id),saved.id),
+      'A real local photo disappeared after offline reload');
+    const present=await offlinePage.goto(origin+'/present?memory='+
+      encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
+    assert.equal(present.status(),200,
+      'Real saved-photo presentation route returned unavailable offline');
+    console.log('TALERA_REAL_OWNER_PHOTO_OFFLINE_START_AND_PRESENT_PASS',
+      JSON.stringify({sameWorker:true,sameOrigin:true,ownPhoto:true,
+        realIphoneAccepted:false}));
+  }finally{await offlineCtx.close();}
   // The VERY SAME authenticated Free PWA must begin with ZERO bundled
   // memories on Home, not merely an image-less Test 081 hero or a synthetic
   // 1990/year counter. Genuine owner records are never removed by this test.
@@ -2406,89 +2489,6 @@ try{
   console.log('TALERA_OWNER_CONFIRMED_LOCAL_STORY_CLEAR_PASS',
     JSON.stringify({before:beforeOwnerClear,after:0,accountStoreOnly:true,
       exampleStories:0,realIphoneAccepted:false}));
-  // iPhone regression: real authenticated TALERA Worker, saved local image,
-  // then same home-screen PWA routes offline. No second app or Worker.
-  const offlineCtx=await browser.newContext({
-    ...devices['iPhone 13'],serviceWorkers:'allow',
-    extraHTTPHeaders:{'x-talera-f5-key':gate}
-  });
-  try{
-    await offlineCtx.addCookies([{name:'talera_sid',value:sid,
-      domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
-    const offlinePage=await offlineCtx.newPage();
-    const offlineErrors=[];
-    offlinePage.on('pageerror',e=>offlineErrors.push(String(e.message).slice(0,180)));
-    const entry=await offlinePage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
-    assert.equal(entry.status(),200,'Existing authenticated TALERA home required');
-    await offlinePage.evaluate(async()=>{
-      await navigator.serviceWorker.register('/sw.js',{scope:'/'});
-      await navigator.serviceWorker.ready;
-    });
-    await offlinePage.reload({waitUntil:'domcontentloaded'});
-    await offlinePage.waitForFunction(()=>!!window.TaleraMemories?.save);
-    const saved=await offlinePage.evaluate(async()=>{
-      const c=document.createElement('canvas');c.width=64;c.height=64;
-      c.getContext('2d').fillStyle='#2356a9';
-      c.getContext('2d').fillRect(0,0,64,64);
-      const b=await new Promise(ok=>c.toBlob(ok,'image/png'));
-      return window.TaleraMemories.save({
-        title:'Synthetic offline picture',date:'2026-11-23',
-        time:'16:00:00',text:'Technical test only'
-      },[new File([b],'synthetic-offline.png',{type:'image/png'})]);
-    });
-    const account=await offlinePage.evaluate(async()=>{
-      const r=await fetch('/api/me');
-      if(!r.ok)throw Error('Synthetic session expired');
-      return (await r.json()).account?.id;
-    });
-    assert.match(account,/^[0-9a-f-]{36}$/i);
-    const state=async()=>offlinePage.evaluate(async()=>{
-      const db=await new Promise((ok,bad)=>{
-        const r=indexedDB.open('talera-f5-offline-shell-v1',1);
-        r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error);
-      });
-      try{
-        const read=key=>new Promise((ok,bad)=>{
-          const r=db.transaction('shell','readonly').objectStore('shell').get(key);
-          r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error);
-        });
-        const keys=['grant','ready','me','page:/mijn-leven',
-          'page:/present','page:/tell','page:/__f5/backup','pending-logout'];
-        const v=await Promise.all(keys.map(read));
-        return {controlled:!!navigator.serviceWorker.controller,
-          grant:v[0]?.id||null,ready:v[1]?.id||null,me:v[2]?.id||null,
-          keyStored:!!v[0]?.key,
-          home:!!v[3]?.id,present:!!v[4]?.id,tell:!!v[5]?.id,
-          backup:!!v[6]?.id,pending:!!v[7]};
-      }finally{db.close()}
-    });
-    let s=null;
-    for(let n=0;n<120;n++){
-      s=await state();
-      if(s.grant===account&&s.ready===account&&s.home&&
-        s.present&&s.tell&&s.backup)break;
-      await offlinePage.waitForTimeout(300);
-    }
-    console.log('TALERA_REAL_APP_OFFLINE_PREPARATION_STATE',
-      JSON.stringify({...s,accountMatched:s?.grant===account,
-        ownSyntheticPhotoSaved:!!saved?.id,errors:offlineErrors.slice(-5)}));
-    await offlineCtx.setOffline(true);
-    const home=await offlinePage.goto(origin+'/mijn-leven',
-      {waitUntil:'domcontentloaded'});
-    assert.equal(home.status(),200,'Real PWA offline home returned unavailable 503');
-    assert.equal(await home.headerValue('x-talera-offline'),'verified-device-shell',
-      'Home did not use the encrypted offline device shell');
-    assert.ok(await offlinePage.evaluate(async id=>
-      (await window.TaleraMemories.list()).some(x=>x.id===id),saved.id),
-      'A real local photo disappeared after offline reload');
-    const present=await offlinePage.goto(origin+'/present?memory='+
-      encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
-    assert.equal(present.status(),200,
-      'Real saved-photo presentation route returned unavailable offline');
-    console.log('TALERA_REAL_OWNER_PHOTO_OFFLINE_START_AND_PRESENT_PASS',
-      JSON.stringify({sameWorker:true,sameOrigin:true,ownPhoto:true,
-        realIphoneAccepted:false}));
-  }finally{await offlineCtx.close();}
   assert.deepEqual(errors,[],'Original presentation script runtime errors');
   console.log('TALERA_SAME_FREE_PRESENTATION_BROWSER_OK',JSON.stringify({
     photoAutoVisible:true,tapVisible:true,loop:true,

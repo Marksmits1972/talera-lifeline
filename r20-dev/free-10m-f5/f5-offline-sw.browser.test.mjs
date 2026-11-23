@@ -18,6 +18,8 @@ const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
 const at='http://127.0.0.1:8872';
 let server,browser,activePage,requests=0,serverLogouts=0;const trace=[];
+let releaseStaleGuestCheck=null,markStaleGuestCheckStarted;
+const staleGuestCheckStarted=new Promise(ok=>{markStaleGuestCheckStarted=ok});
 const account=req=>{
  const c=req.headers.cookie||'';
  return c.includes('sid=A')?A:c.includes('sid=B')?B:null;
@@ -53,6 +55,16 @@ function fixture(req,res){
  if(pathname==='/sw.js'){
   res.writeHead(200,{'content-type':'text/javascript','service-worker-allowed':'/'});
   res.end(sw);return;
+ }
+ // Hold a signed-out account reply until a later valid login is prepared.
+ // Both tabs use the SAME existing TALERA service worker and test origin.
+ if(pathname==='/api/me'&&req.headers['x-talera-delayed-guest-check']==='yes'&&!id){
+  releaseStaleGuestCheck=()=>{
+   res.writeHead(401,{'content-type':'application/json','cache-control':'no-store'});
+   res.end('{"ok":false}');
+  };
+  markStaleGuestCheckStarted();
+  return;
  }
  if(pathname==='/api/me'){
   res.writeHead(id?200:401,{'content-type':'application/json','cache-control':'no-store'});
@@ -108,6 +120,16 @@ try{
  await page.evaluate(async()=>{await navigator.serviceWorker.register('/sw.js',{scope:'/'});
   await navigator.serviceWorker.ready});
  await page.reload();
+ const side=await ctx.newPage();
+ await side.goto(at+'/mijn-leven');
+ assert.equal(await side.evaluate(()=>!!navigator.serviceWorker.controller),true,
+  'Second tab must use the SAME original service worker');
+ const staleGuestMe=side.evaluate(async()=>{
+  const r=await fetch('/api/me',{credentials:'same-origin',
+   headers:{'x-talera-delayed-guest-check':'yes'}});
+  return r.status;
+ });
+ await staleGuestCheckStarted;
  await page.evaluate(async()=>{const r=await fetch('/api/login',{method:'POST',
   credentials:'same-origin',headers:{'content-type':'application/json'},
   body:JSON.stringify({account:'A'})});if(!r.ok)throw Error('LOGIN_A_FAILED')});
@@ -120,6 +142,14 @@ try{
  console.log('TALERA_OFFLINE_A_PRECHECK',JSON.stringify({initial,controller,trace:trace.slice(-24),page:(await page.locator('h1').innerText())}));
  assert.equal(initial.account,A,'Local encrypted grant vanished immediately after readiness');assert.equal(initial.ready,A);
  assert.equal(initial.keyExtractable,false);assert.equal(initial.pageEncrypted,true);
+ assert.equal(typeof releaseStaleGuestCheck,'function');
+ releaseStaleGuestCheck();
+ assert.equal(await staleGuestMe,409,
+  'A delayed guest 401 must not invalidate a newer verified account login');
+ const afterStale=await state(page);
+ assert.equal(afterStale.account,A,'Stale guest request erased valid offline account');
+ assert.equal(afterStale.ready,A,'Stale guest request erased local offline readiness');
+ await side.close();
  const cached=await page.evaluate(()=>caches.match('/mijn-leven').then(x=>!!x));
  assert.equal(cached,false,'Private HTML must NEVER be stored unencrypted in CacheStorage');
  await ctx.setOffline(true);

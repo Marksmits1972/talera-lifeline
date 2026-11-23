@@ -226,6 +226,9 @@ jobs:
             echo "$RUNNER_TEMP/talera-f5-test-bin" >> "$GITHUB_PATH"
             "$RUNNER_TEMP/talera-f5-test-bin/ffmpeg" -version | head -n 1
           fi
+      - name: Browser verify back-up panel, private session and two local browser contexts
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
+        run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs
@@ -235,9 +238,6 @@ jobs:
       - name: Browser verify existing real-account login, switching, privacy and original menu
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
-      - name: Browser verify back-up panel, private session and two local browser contexts
-        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
-        run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
       - name: Browser verify complete original-media export, checksum and nondestructive restore
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs

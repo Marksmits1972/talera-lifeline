@@ -8,7 +8,7 @@ const root='r20-dev/free-10m-delivery/public';
 // Source-only inspection of the existing, unchanged year controller.
 // The app source is public code; no owner data or second app is accessed.
 const originalHomeHtml=readFileSync(root+referencePages['/mijn-leven'],'utf8');
-const scriptMatch=originalHomeHtml.match(/<script id="talera-flow-v17-time">([\\s\\S]*?)<\\/script>/);
+const scriptMatch=originalHomeHtml.match(/<script id="talera-flow-v17-time">([\s\S]*?)<\/script>/);
 assert.ok(scriptMatch,'Original year controller missing');
 console.log('TALERA_SOURCE_ONLY_YEAR_CONTROLLER',JSON.stringify(scriptMatch[1]));
 const originalWorker=readFileSync('r20-dev/free-10m-f5/f5-worker.mjs','utf8');

@@ -2649,12 +2649,30 @@ try{
       rail.dispatchEvent(new Event('input',{bubbles:true}));
       rail.dispatchEvent(new Event('change',{bubbles:true}));
     },year);
-    await page.waitForFunction(([y,href])=>{
-      const hero=document.getElementById('heroCaption');
-      const image=document.getElementById('heroImage');
-      return document.getElementById('v17-selected-year')?.textContent===String(y)&&
-        hero?.dataset.presentHref===href&&image?.hasAttribute('src');
-    },[year,'/present?memory='+encodeURIComponent(id)],{timeout:18000});
+    try{
+      await page.waitForFunction(([y,href])=>{
+        const hero=document.getElementById('heroCaption');
+        const image=document.getElementById('heroImage');
+        return document.getElementById('v17-selected-year')?.textContent===String(y)&&
+          hero?.dataset.presentHref===href&&image?.hasAttribute('src');
+      },[year,'/present?memory='+encodeURIComponent(id)],{timeout:18000});
+    }catch(e){
+      const diag=await page.evaluate(async()=>{
+        const own=await window.TaleraMemories?.list?.()||[];
+        return {year:document.getElementById('v17-selected-year')?.textContent,
+          summary:document.getElementById('v17-year-summary')?.textContent,
+          rail:document.getElementById('v17-year-slider')?.value,
+          cover:document.getElementById('heroImage')?.getAttribute('src'),
+          title:document.getElementById('heroTitle')?.textContent,
+          href:document.getElementById('heroCaption')?.dataset.presentHref,
+          captionDisplay:getComputedStyle(document.getElementById('heroCaption')).display,
+          displayUrlType:typeof window.TaleraMemories?.displayUrl,
+          rows:own.map(m=>({id:m.id,date:m.date,
+            photoKeys:(m.items||[]).filter(i=>i.kind==='photo').map(i=>i.key)}))};
+      });
+      throw Error('OWNER_RANDOM_YEAR_HERO_DIAGNOSTIC '+JSON.stringify(diag)+
+        ' PAGE_ERRORS='+JSON.stringify(errors.slice(-9))+' '+String(e));
+    }
     return page.evaluate(async()=>{
       const image=document.getElementById('heroImage');
       await image.decode();

@@ -1,6 +1,7 @@
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
+import {buildF5OfflineServiceWorker} from './f5-offline-sw.mjs';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu,keepOnlyFunctionalFreeMenu} from './f5-account-switch-guard.mjs';
 import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
@@ -2231,6 +2232,11 @@ for(const name of supportNames){
  const b=iconSize?await getApprovedLogo(iconSize):await get();
  if(!a&&!b)continue;
  assert.ok(a&&b&&a.equals(b),'Unstable public PWA resource '+name);
+ if(name==='/sw.js'){
+  // Extend only the verified SAME original worker; never cache private HTML
+  // unencrypted, or store original photos, audio, video or user stories here.
+  a=Buffer.from(buildF5OfflineServiceWorker(a.toString('utf8')),'utf8');
+ }
  if(name==='/manifest.webmanifest'){
   // Preserve original PWA identity, start URL, display and all non-icon settings.
   const manifest=JSON.parse(a.toString('utf8'));

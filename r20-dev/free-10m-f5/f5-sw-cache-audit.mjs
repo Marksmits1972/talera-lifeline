@@ -11,6 +11,14 @@ const map=await import('./generated/public-template-map.mjs');
 const swPath=map.verifiedPublicSupport['/sw.js'];
 assert.match(swPath||'',/^\/__talera_free\/f5support\/[a-f0-9]{64}\.js$/);
 const sw=readFileSync(path.join(root,swPath.slice(1)),'utf8');
+const manifestPath=map.verifiedPublicSupport['/manifest.webmanifest'];
+assert.ok(manifestPath,'Original PWA manifest not packaged');
+const manifest=JSON.parse(readFileSync(path.join(root,manifestPath.slice(1)),'utf8'));
+assert.ok(typeof manifest.start_url==='string'&&manifest.start_url.startsWith('/'),
+ 'Original PWA start route must be rooted within same app');
+console.log('TALERA_F5_ORIGINAL_PWA_START_ROUTE',JSON.stringify({
+ startUrl:manifest.start_url,scope:manifest.scope||null,display:manifest.display||null
+}));
 new vm.Script(sw,{filename:'same-talera-f5-service-worker.js'});
 assert.ok(sw.includes('self.addEventListener'),'Original service worker was not packaged');
 const summary={

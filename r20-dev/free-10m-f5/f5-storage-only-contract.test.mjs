@@ -3,6 +3,10 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {scopeLocalMemories,privateAccountScope} from './f5-local-scope.mjs';
+import {referencePages} from './generated/public-template-map.mjs';
+import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
+import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
+import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
 
 const root='r20-dev/';
 const base='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
@@ -71,6 +75,27 @@ assert.equal(result,
   'No markup or styling changes beyond isolated storage namespace');
 assert.ok(!scopeLocalMemories(html,s2).includes(privateDb),'Different user is isolated');
 assert.throws(()=>scopeLocalMemories(html,'123'),/INVALID_PRIVATE_LOCAL_SCOPE/);
+// Regression for the ACTUAL packaged /tell page: the latest photo File-copy
+// must remain compatible with private editor media-ID preservation.
+// This is read-only source/HTML composition, not a new app or media test.
+const packagedTellPath=referencePages['/tell'];
+assert.match(packagedTellPath||'',/^\\/__talera_free\\/f5references\\/[a-f0-9]{64}\\.html$/,
+ 'Expected the exact same /tell artifact that the existing Worker serves');
+const packagedTell=readFileSync('r20-dev/free-10m-delivery/public'+packagedTellPath,'utf8');
+assert.equal(packagedTell.split('blob:taleraOwnedPhotoUploads[j]').length,2,
+ 'Current /tell must store owned original photo bytes');
+assert.ok(!packagedTell.includes('blob:uploads[j]'),
+ 'No original photo picker-backed File may be persisted in /tell');
+const privateTell=preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(
+ alignEditedNarrationCueRefs(scopeLocalMemories(packagedTell,s1))));
+assert.equal(privateTell.split('const row={key:files[j].key,blob:taleraOwnedPhotoUploads[j]};').length,2,
+ 'Private editor must write the SAME byte-owned originals as new photo uploads');
+assert.ok(privateTell.includes('if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;'),
+ 'Editing must never overwrite existing media with reused original IDs');
+assert.ok(!privateTell.includes('blob:uploads[j]'),
+ 'Editor must never revert the byte-owned photo storage correction');
+console.log('TALERA_F5_PACKAGED_TELL_PHOTO_COPY_EDITOR_COMPOSITION_PASS');
+
 console.log('TALERA_FREE_WHATSAPP_STORAGE_ONLY_CONTRACT_PASS',JSON.stringify({
  source:base,sevenDurableObjectBindings:true,noLegacyD1R2ProductionBind:true,
  visualAndInteractionMarkupUnchanged:true,mediaAndCuesStoredInSingleAccountDb:true,

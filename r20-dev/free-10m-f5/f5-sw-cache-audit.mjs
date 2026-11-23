@@ -4,12 +4,14 @@
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import {createHash} from 'node:crypto';
 const root='r20-dev/free-10m-delivery/public';
 const map=await import('./generated/public-template-map.mjs');
 const swPath=map.verifiedPublicSupport['/sw.js'];
 assert.match(swPath||'',/^\/__talera_free\/f5support\/[a-f0-9]{64}\.js$/);
 const sw=readFileSync(path.join(root,swPath.slice(1)),'utf8');
+new vm.Script(sw,{filename:'same-talera-f5-service-worker.js'});
 assert.ok(sw.includes('self.addEventListener'),'Original service worker was not packaged');
 const summary={
   sha256:createHash('sha256').update(sw).digest('hex'),

@@ -31,6 +31,16 @@ export {
 // One owner-requested, hard-to-guess action URL on the SAME Home shell.
 const OWNER_PURGE_PATH='/mijn-leven/opschonen-cfd3450b58ef9410b64a26cc84c2045c';
 const PUBLIC_PAGES=new Set(['/mijn-leven','/meldingen','/present','/tell',OWNER_PURGE_PATH]);
+ // Offline provision only from an authenticated SAME TALERA page. The worker
+ // checks the HttpOnly account session itself: no identity, media or secret
+ // travels in a postMessage or moves into a second library.
+ const OFFLINE_PREPARE_SNIPPET="<script id=\"talera-f5-offline-prep-v1\">(function(){if(!('serviceWorker' in navigator))return;navigator.serviceWorker.ready.then(function(r){r.active?.postMessage({type:'TALERA_OFFLINE_PREPARE_V1'})}).catch(function(){});})();</script>";
+ function scheduleVerifiedOfflineShell(html){
+  if(typeof html!=='string'||html.split('</head>').length!==2||
+     html.includes('talera-f5-offline-prep-v1'))
+   throw Error('TALERA_OFFLINE_VERIFIED_HEAD_CHANGED');
+  return html.replace('</head>',OFFLINE_PREPARE_SNIPPET+'</head>');
+ }
 // The approved V25 menu has exactly three visible destinations; the fourth
 // "Gedeeld" destination was retired, but the original home grid stayed four
 // columns wide. Adjust ONLY the three-column CSS rule, never the nav nodes,
@@ -1102,10 +1112,11 @@ async function publicPage(request,env){
     const storyEntryHtml=hideUnselectedEntryPhoto(converted.html,request.url);
     const menuEntryHtml=preventHomeMenuPresentationFlash(storyEntryHtml,request.url);
     const outgoingHomeHtml=shieldHomeWhileOpeningExistingMenu(menuEntryHtml,request.url);
-    return new Response(outgoingHomeHtml,{
+    return new Response(scheduleVerifiedOfflineShell(outgoingHomeHtml),{
       status:200,headers:{
         'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
         'x-content-type-options':'nosniff','x-talera-free-f5':'personalized-durable-account',
+        'x-talera-offline-account':actor.id,
         'content-security-policy':F5_BROWSER_CSP
       }
     });
@@ -1143,10 +1154,11 @@ async function privateBackupPage(request,env){
  if(!actor)return deny(401,'Aanmelden vereist voor lokale back-up');
  const scope=await privateAccountScope(actor.id);
  const name='talera-free-local-'+scope.slice(0,32)+'-v1';
- return new Response(localBackupPage(name),{status:200,headers:{
+ return new Response(scheduleVerifiedOfflineShell(localBackupPage(name)),{status:200,headers:{
   'content-type':'text/html; charset=utf-8',
   'cache-control':'private, no-store','x-content-type-options':'nosniff',
-  'referrer-policy':'no-referrer','content-security-policy':F5_BROWSER_CSP
+  'referrer-policy':'no-referrer','content-security-policy':F5_BROWSER_CSP,
+  'x-talera-offline-account':actor.id
  }});
 }
 async function privateBackupModule(request,env,pathname){
@@ -1193,7 +1205,8 @@ async function privateEmbeddedPlayer(request,env){
     'x-frame-options':'SAMEORIGIN',
     'referrer-policy':'same-origin',
     'content-security-policy':csp,
-    'x-talera-free-f5':'original-iframe-zero-player'
+    'x-talera-free-f5':'original-iframe-zero-player',
+    'x-talera-offline-account':actor.id
   }});
 }
 async function publicPwaSupport(request,env){

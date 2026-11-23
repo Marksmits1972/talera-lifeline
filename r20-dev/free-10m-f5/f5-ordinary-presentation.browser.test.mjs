@@ -201,6 +201,13 @@ try{
         encodeURIComponent(saved.id),{waitUntil:'domcontentloaded',timeout:18000});
       assert.equal(present.status(),200,
         'Real saved-photo presentation route returned unavailable offline');
+      await offlinePage.waitForFunction(id=>{
+        const memory=window.__taleraTimelineRuntime?.currentMemory?.();
+        return memory?.storyId===id&&
+          [...document.querySelectorAll('#photoStage img')]
+            .some(img=>img.complete&&img.naturalWidth>0&&
+              img.currentSrc?.startsWith('blob:'));
+      },saved.id,{timeout:18000});
       console.log('TALERA_REAL_OWNER_PHOTO_OFFLINE_START_AND_PRESENT_PASS',
         JSON.stringify({sameWorker:true,sameOrigin:true,ownPhoto:true,
           realIphoneAccepted:false}));

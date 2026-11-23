@@ -232,6 +232,18 @@ try{
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  await page.goto(at+'/tell');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
+ // The SAME original post-save return and editor routes must open through
+ // encrypted Home/Tell pages. Never create or cache a second private page.
+ const ownerId='local-abc12345';
+ const published=await page.goto(at+'/mijn-leven?published='+ownerId);
+ assert.equal(published.status(),200,'Offline newly-saved memory returned 503');
+ assert.equal(await published.headerValue('x-talera-offline'),'verified-device-shell');
+ assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
+ const editing=await page.goto(at+'/tell?edit='+ownerId);
+ assert.equal(editing.status(),200,'Offline existing memory editor returned 503');
+ assert.equal(await editing.headerValue('x-talera-offline'),'verified-device-shell');
+ const foreign=await page.goto(at+'/mijn-leven?published=not-an-owner-id');
+ assert.equal(foreign.status(),503,'Unknown query must not unlock cached Home');
  await page.goto(at+'/present?talera_menu=hub');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 11111111/);
  await page.goto(installStart.href);

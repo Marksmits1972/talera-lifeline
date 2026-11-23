@@ -2586,14 +2586,14 @@ try{
       return {positions,times,storyCount:all.length};
     },sameDayPosts.ids);
   };
-  const beforeReload=await checkSameDateOrder();
-  assert.ok(beforeReload.positions[0]<beforeReload.positions[1]&&
-    beforeReload.positions[1]<beforeReload.positions[2],
+  const sameDateBeforeReopen=await checkSameDateOrder();
+  assert.ok(sameDateBeforeReopen.positions[0]<sameDateBeforeReopen.positions[1]&&
+    sameDateBeforeReopen.positions[1]<sameDateBeforeReopen.positions[2],
     'Same-day posts without event times must be chronological from first to LAST: '+
-    JSON.stringify({stored:sameDayPosts.creation,order:beforeReload}));
+    JSON.stringify({stored:sameDayPosts.creation,order:sameDateBeforeReopen}));
   // Reopen the same original /present route; no app reinstall or data reset.
-  const afterReload=await checkSameDateOrder();
-  assert.deepEqual(afterReload.positions,beforeReload.positions,
+  const sameDateAfterReopen=await checkSameDateOrder();
+  assert.deepEqual(sameDateAfterReopen.positions,sameDateBeforeReopen.positions,
     'Same-day chronological order must survive a fresh page load');
   console.log('TALERA_SAME_DATE_POST_CREATION_ORDER_PASS',
     JSON.stringify({chronological:true,originalMediaIds:true,

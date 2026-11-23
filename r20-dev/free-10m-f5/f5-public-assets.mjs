@@ -854,6 +854,28 @@ function filterOwnTopicPresentation(html){
  one('<head>','<head>'+"<script id=\"talera-topic-visibility-guard\">if(new URLSearchParams(location.search).has('theme'))document.documentElement.classList.add('talera-topic-loading');</script><style id=\"talera-topic-visibility-style\">html.talera-topic-loading #photoStage,html.talera-topic-loading #memoryCaption{visibility:hidden!important}</style>",'ONLY_TOPIC_LOADING_GUARD');
  return html;
 }
+// The original IndexedDB list is keyed by random stable memory IDs, so
+// equal event date/time values could appear in arbitrary swipe order.
+// Order ONLY the source rows by their persisted creation timestamps BEFORE
+// the existing toMemory() conversion and unchanged native time-axis sort.
+// Different event dates and expressly entered event times continue to be
+// sorted by the original presentation engine. Never rewrite timestamps,
+// media IDs, original data, gestures or the photo/voice/video players.
+function orderSameDateOwnerPostsAtReadBoundary(html){
+ const before='   const rows=await store.list();\n   const memories=rows.map(toMemory).filter(Boolean);';
+ assert.equal(html.split(before).length,2,
+   'SAME_DATE_OWNER_READ_BOUNDARY_SOURCE_DRIFT');
+ const after="   const rows=(await store.list()).slice().sort((a,b)=>{\n"+
+   "     const timestamp=row=>{\n"+
+   "       const n=Date.parse(String(row?.createdAt||''));\n"+
+   "       return Number.isFinite(n)?n:0;\n"+
+   "     };\n"+
+   "     return timestamp(a)-timestamp(b);\n"+
+   "   });\n"+
+   "   const memories=rows.map(toMemory).filter(Boolean);";
+ return html.replace(before,after);
+}
+
 // Keep the existing RH19 story title and sheet above native inline videos.
 // An ordinary video is appended at z=12 above its original reading scroll.
 // Lower the existing video's presentation z-index instead of lifting the
@@ -1655,6 +1677,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=capVisibleTimelineAtToday(html);
  if(route==='/present')html=keepNativeTimelineDateAfterPhotoLanding(html);
  if(route==='/present')html=stopOldPresentationWhenTimelineMoves(html);
+ if(route==='/present')html=orderSameDateOwnerPostsAtReadBoundary(html);
  if(route==='/present')html=installReadOnlyLibraryGateway(html);
  if(route==='/present')html=pausePresentationDuringWhatsApp(html);
  // Use the ORIGINAL, already approved V61 video preview from the

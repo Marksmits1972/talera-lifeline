@@ -2550,6 +2550,55 @@ try{
     JSON.stringify({originalVideoStopped:true,originalVideoHidden:true,
       nativeNodeRetained:true,noNewPlayer:true,iphoneAccepted:false}));
 
+  // Owner acceptance: for memories dated on the SAME calendar day with no
+  // explicit event time, their original creation order must be the
+  // left-to-right order. Never invent an event time or change media/IDs.
+  const sameDayPosts=await page.evaluate(async()=>{
+    const ids=[],creation=[];
+    for(let n=0;n<3;n++){
+      const canvas=document.createElement('canvas');canvas.width=canvas.height=24;
+      const context=canvas.getContext('2d');
+      context.fillStyle=['#c83242','#399b4d','#325ab7'][n];
+      context.fillRect(0,0,24,24);
+      const image=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
+      const story=await window.TaleraMemories.save({
+        title:'Chronological post '+(n+1),date:'2026-11-23',
+        text:'Owner same-day no-time ordering contract'
+      },[new File([image],'chrono-'+n+'.png',{type:'image/png'})]);
+      ids.push(story.id);
+      creation.push((await window.TaleraMemories.get(story.id))?.createdAt);
+      await new Promise(ok=>setTimeout(ok,65));
+    }
+    return {ids,creation};
+  });
+  assert.equal(new Set(sameDayPosts.ids).size,3);
+  assert.ok(sameDayPosts.creation.every(Boolean),
+    'Original local record creation timestamps must be retained');
+  const checkSameDateOrder=async()=>{
+    await load(page,sameDayPosts.ids[0],1);
+    await page.waitForFunction(ids=>ids.every(id=>
+      window.__taleraPhotoBook?.list()?.some(m=>m.storyId===id)),
+      sameDayPosts.ids,{timeout:15000});
+    return page.evaluate(ids=>{
+      const all=window.__taleraPhotoBook.list();
+      const positions=ids.map(id=>all.findIndex(m=>m.storyId===id));
+      const times=ids.map(id=>all.find(m=>m.storyId===id)?.ms);
+      return {positions,times,storyCount:all.length};
+    },sameDayPosts.ids);
+  };
+  const beforeReload=await checkSameDateOrder();
+  assert.ok(beforeReload.positions[0]<beforeReload.positions[1]&&
+    beforeReload.positions[1]<beforeReload.positions[2],
+    'Same-day posts without event times must be chronological from first to LAST: '+
+    JSON.stringify({stored:sameDayPosts.creation,order:beforeReload}));
+  const afterReload=await checkSameDateOrder();
+  assert.deepEqual(afterReload.positions,beforeReload.positions,
+    'Same-day chronological order must survive a fresh page load');
+  console.log('TALERA_SAME_DATE_POST_CREATION_ORDER_PASS',
+    JSON.stringify({chronological:true,originalMediaIds:true,
+      originalEventDate:true,storedCreationTimestamps:true,
+      realIphoneAccepted:false}));
+
   // Owner explicitly requests a truly empty account-local story list.
   // Use the SAME existing PWA and the original account's IndexedDB; confirm
   // that an explicit reset cannot affect the original media engine or other IDs.

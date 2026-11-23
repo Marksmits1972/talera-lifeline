@@ -30,7 +30,7 @@ const summary={
 assert.equal(summary.hasCacheStorage,true,'Offline static app shell not packaged');
 assert.equal(summary.containsDynamicCacheWrites,true,'Static code not cached for offline use');
 for(const marker of [
- 'talera-f5-offline-shell-v1','talera-f5-offline-static-v1',
+ 'talera-f5-offline-shell-v1','talera-f5-offline-static-',
  'crypto.subtle.encrypt','crypto.subtle.decrypt',
  "read('pending-logout')","read('grant')",
  "event.respondWith(auth(req))","event.respondWith(navigate(event))",

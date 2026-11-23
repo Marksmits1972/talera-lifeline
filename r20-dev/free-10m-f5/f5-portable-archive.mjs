@@ -11,13 +11,23 @@ const MAX_RECORDS=100000;
 const MAX_DEPTH=48;
 const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 const hash=async bytes=>hex(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)));
-async function chunkHashes(blob){
- const checksums=[];
- for(let off=0;off<blob.size;off+=CHUNK_BYTES){
+// Hash EXACTLY the bounded Blob slices we later append to the archive.
+ // iPhone IndexedDB can return File objects whose whole-object Blob
+ // composition behaves differently from their slice().arrayBuffer() reads.
+ // Keep the original untouched; never transcode, truncate, or load full media.
+async function checkedChunks(blob){
+ const checksums=[],parts=[],size=blob.size;
+ for(let off=0;off<size;off+=CHUNK_BYTES){
   ensure(checksums.length<MAX_CHUNKS,'TOO_MANY_MEDIA_CHUNKS');
-  checksums.push(await hash(await blob.slice(off,Math.min(off+CHUNK_BYTES,blob.size)).arrayBuffer()));
+  const end=Math.min(off+CHUNK_BYTES,size);
+  const part=blob.slice(off,end);
+  ensure(part.size===end-off,'SOURCE_SLICE_SIZE');
+  const bytes=await part.arrayBuffer();
+  ensure(bytes.byteLength===end-off,'SOURCE_READ_SIZE');
+  checksums.push(await hash(bytes));
+  parts.push(part);
  }
- return checksums;
+ return {checksums,parts};
 }
 const ensure=(ok,code)=>{if(!ok)throw Error('TALERA_ARCHIVE_'+code)};
 function keyString(row,store){
@@ -57,10 +67,11 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
   if(v instanceof Blob){
    ensure(Number.isSafeInteger(v.size)&&v.size>=0,'INVALID_BINARY_SIZE');
    const index=binaries.length;
-   binaries.push({length:v.size,chunkBytes:CHUNK_BYTES,sha256Chunks:await chunkHashes(v),
+   const {checksums,parts}=await checkedChunks(v);
+   binaries.push({length:v.size,chunkBytes:CHUNK_BYTES,sha256Chunks:checksums,
     type:v.type||'',name:typeof File!=='undefined'&&v instanceof File?v.name:null,
     lastModified:typeof File!=='undefined'&&v instanceof File?v.lastModified:null});
-   chunks.push(v);
+   chunks.push(...parts);
    return ['bin',index];
   }
   if(v instanceof Date){
@@ -70,9 +81,11 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
    ensure(Number.isSafeInteger(v.byteLength),'INVALID_BINARY_SIZE');
    const index=binaries.length;
    const blob=new Blob([v]);
+   ensure(blob.size===v.byteLength,'SOURCE_BINARY_SIZE');
+   const {checksums,parts}=await checkedChunks(blob);
    binaries.push({length:v.byteLength,chunkBytes:CHUNK_BYTES,
-    sha256Chunks:await chunkHashes(blob),type:'application/octet-stream',arrayBuffer:true});
-   chunks.push(blob);return ['bin',index];
+    sha256Chunks:checksums,type:'application/octet-stream',arrayBuffer:true});
+   chunks.push(...parts);return ['bin',index];
   }
   ensure(!seen.has(v),'CYCLIC_VALUE');seen.add(v);
   try{
@@ -114,7 +127,12 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
  prefix.set(MAGIC);
  new DataView(prefix.buffer).setUint32(MAGIC.length,manifest.length,true);
  prefix.set(Uint8Array.from((await hash(manifest)).match(/.{2}/g).map(x=>parseInt(x,16))),MAGIC.length+4);
- return new Blob([prefix,manifest,...chunks],{type:'application/octet-stream'});
+ const expected=prefix.byteLength+manifest.byteLength+
+  binaries.reduce((total,bin)=>total+bin.length,0);
+ ensure(Number.isSafeInteger(expected),'INVALID_ARCHIVE_SIZE');
+ const archive=new Blob([prefix,manifest,...chunks],{type:'application/octet-stream'});
+ ensure(archive.size===expected,archive.size>expected?'EXTRA_BYTES':'TRUNCATED_MEDIA');
+ return archive;
 }
 export async function inspectFreeArchive(archive){
  ensure(archive instanceof Blob,'FILE_REQUIRED');

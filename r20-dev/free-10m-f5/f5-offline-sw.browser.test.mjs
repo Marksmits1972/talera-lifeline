@@ -84,6 +84,16 @@ const state=async page=>page.evaluate(async()=>{
    pending:!!pending};
  }finally{db.close()}
 });
+async function waitReady(page,id){
+ let last;
+ for(let i=0;i<260;i++){
+  last=await state(page);
+  if(last.account===id&&last.ready===id&&last.pageEncrypted&&last.keyExtractable===false)
+   return last;
+  await new Promise(ok=>setTimeout(ok,150));
+ }
+ throw Error('OFFLINE_PREPARATION_INCOMPLETE '+JSON.stringify(last));
+}
 try{
  server=createServer(fixture);await new Promise(ok=>server.listen(8872,'127.0.0.1',ok));
  browser=await chromium.launch();
@@ -97,11 +107,7 @@ try{
   credentials:'same-origin',headers:{'content-type':'application/json'},
   body:JSON.stringify({account:'A'})});if(!r.ok)throw Error('LOGIN_A_FAILED')});
  await page.reload();
- await page.waitForFunction(async()=>{
-  const db=await new Promise((ok,bad)=>{const r=indexedDB.open('talera-f5-offline-shell-v1',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error)});
-  try{return await new Promise(ok=>{const store=db.transaction('shell','readonly').objectStore('shell'),q=store.get('ready'),g=store.get('grant');let ready,grant;const finish=()=>{if(ready!==undefined&&grant!==undefined)ok(ready==='11111111-1111-4111-8111-111111111111'&&grant===ready)};q.onsuccess=()=>{ready=q.result?.id||null;finish()};g.onsuccess=()=>{grant=g.result?.id||null;finish()};q.onerror=g.onerror=()=>ok(false)})}
-  finally{db.close()}
- },null,{timeout:60000});
+ await waitReady(page,A);
  const initial=await state(page);
  // Safe diagnostic: only synthetic account IDs and state booleans.
  // Distinguish a missing grant from a race or an absent SW controller.
@@ -139,11 +145,7 @@ try{
   credentials:'same-origin',headers:{'content-type':'application/json'},
   body:JSON.stringify({account:'B'})});if(!r.ok)throw Error('LOGIN_B_FAILED')});
  await page.reload();
- await page.waitForFunction(async()=>{
-  const db=await new Promise((ok,bad)=>{const r=indexedDB.open('talera-f5-offline-shell-v1',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error)});
-  try{return await new Promise(ok=>{const store=db.transaction('shell','readonly').objectStore('shell'),q=store.get('ready'),g=store.get('grant');let ready,grant;const finish=()=>{if(ready!==undefined&&grant!==undefined)ok(ready==='22222222-2222-4222-8222-222222222222'&&grant===ready)};q.onsuccess=()=>{ready=q.result?.id||null;finish()};g.onsuccess=()=>{grant=g.result?.id||null;finish()};q.onerror=g.onerror=()=>ok(false)})}
-  finally{db.close()}
- },null,{timeout:60000});
+ await waitReady(page,B);
  await ctx.setOffline(true);
  await page.goto(at+'/mijn-leven');
  assert.match(await page.locator('h1').innerText(),/PRIVATE 22222222/);

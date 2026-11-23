@@ -330,21 +330,6 @@ try{
     throw Error('CLEAN_HOME_INIT_DIAGNOSTIC '+JSON.stringify(state)+
       ' pageerrors='+JSON.stringify(errors.slice(0,12))+' cause='+String(error));
   }
-  // Read-only source inventory for the EXISTING Home timeline and hero.
-  // Runs against the same local TALERA browser fixture, no new app or data.
-  const homeSourceInventory=await page.evaluate(()=>{
-    const keys=['heroImage','selectHero','image.src=m.src','v17-selected-year',
-      'v17-year-summary','v17-timebox','ownCounts'];
-    return [...document.scripts].filter(x=>x.textContent?.length>200).map(node=>{
-      const src=node.textContent||'';
-      const matches=keys.map(key=>({key,pos:src.indexOf(key)})).filter(x=>x.pos>=0);
-      return {id:node.id||'',len:src.length,matches:matches.map(({key,pos})=>({
-        key,around:src.slice(Math.max(0,pos-820),Math.min(src.length,pos+1650))
-      }))};
-    }).filter(x=>x.matches.length).slice(0,12);
-  });
-  console.log('TALERA_EXISTING_HOME_HERO_TIMELINE_SOURCE_INVENTORY',
-    JSON.stringify(homeSourceInventory).slice(0,25000));
   const cleanHome=await page.evaluate(async()=>{
     const saved=await window.TaleraMemories.list();
     const hero=document.getElementById('heroCaption');
@@ -2613,6 +2598,81 @@ try{
   console.log('TALERA_SAME_DATE_POST_CREATION_ORDER_PASS',
     JSON.stringify({chronological:true,originalMediaIds:true,
       originalEventDate:true,storedCreationTimestamps:true,
+      realIphoneAccepted:false}));
+
+  // Owner-approved large HOME image: random private original photo from the
+  // year under the EXISTING indicator, without changing playback or storage.
+  // This runs on the SAME local TALERA app/account and is synthetic only.
+  const yearHeroRecords=await page.evaluate(async()=>{
+    const makePhoto=async(color,name)=>{
+      const c=document.createElement('canvas');c.width=c.height=40;
+      c.getContext('2d').fillStyle=color;c.getContext('2d').fillRect(0,0,40,40);
+      const blob=await new Promise(ok=>c.toBlob(ok,'image/png'));
+      return new File([blob],name+'.png',{type:'image/png'});
+    };
+    const older=await window.TaleraMemories.save({
+      title:'Year slider 2024 original photos',date:'2024-06-15',
+      text:'Synthetic in-app hero contract'
+    },[await makePhoto('#d42135','red'),await makePhoto('#29aa42','green')]);
+    const newer=await window.TaleraMemories.save({
+      title:'Year slider 2025 original photo',date:'2025-08-10',
+      text:'Synthetic in-app hero contract'
+    },[await makePhoto('#2356bd','blue')]);
+    return {older:older.id,newer:newer.id};
+  });
+  await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.TaleraMemories?.list&&
+    document.getElementById('v17-year-summary')?.textContent?.includes('eigen'),
+    null,{timeout:18000});
+  const chooseOriginalYear=async(year,id)=>{
+    await page.evaluate(y=>{
+      // Deterministic RNG only INSIDE technical test. Product uses Math.random.
+      window.Math.random=()=>.999;
+      const rail=document.getElementById('v17-year-slider');
+      rail.value=String(y);
+      rail.dispatchEvent(new Event('input',{bubbles:true}));
+      rail.dispatchEvent(new Event('change',{bubbles:true}));
+    },year);
+    await page.waitForFunction(([y,href])=>{
+      const hero=document.getElementById('heroCaption');
+      const image=document.getElementById('heroImage');
+      return document.getElementById('v17-selected-year')?.textContent===String(y)&&
+        hero?.dataset.presentHref===href&&image?.hasAttribute('src');
+    },[year,'/present?memory='+encodeURIComponent(id)],{timeout:18000});
+    return page.evaluate(async()=>{
+      const image=document.getElementById('heroImage');
+      await image.decode();
+      const c=document.createElement('canvas');c.width=c.height=12;
+      c.getContext('2d').drawImage(image,0,0,12,12);
+      return [...c.getContext('2d').getImageData(6,6,1,1).data].slice(0,3);
+    });
+  };
+  const greenYear=await chooseOriginalYear(2024,yearHeroRecords.older);
+  assert.ok(greenYear[1]>greenYear[0]*1.5&&greenYear[1]>greenYear[2]*1.5,
+    'Selected-year random photo did not choose second ORIGINAL 2024 picture: '+
+    JSON.stringify(greenYear));
+  const blueYear=await chooseOriginalYear(2025,yearHeroRecords.newer);
+  assert.ok(blueYear[2]>blueYear[0]*1.5&&blueYear[2]>blueYear[1]*1.5,
+    'Hero kept old year or old photo instead of original 2025 media: '+
+    JSON.stringify(blueYear));
+  // Empty years may not borrow a photo/title from another calendar year.
+  await page.evaluate(()=>{
+    const rail=document.getElementById('v17-year-slider');
+    rail.value='2023';
+    rail.dispatchEvent(new Event('input',{bubbles:true}));
+    rail.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  await page.waitForFunction(()=>document.getElementById('v17-selected-year')?.textContent==='2023'&&
+    !document.getElementById('heroImage')?.hasAttribute('src')&&
+    getComputedStyle(document.getElementById('heroCaption')).display==='none',
+    null,{timeout:10000});
+  // Original records/IDs and media must remain in same account-local catalog.
+  assert.ok(await page.evaluate(async ids=>ids.every(id=>true===!!(await window.TaleraMemories.get(id))),
+    [yearHeroRecords.older,yearHeroRecords.newer]));
+  console.log('TALERA_HOME_RANDOM_PHOTO_SELECTED_YEAR_PASS',
+    JSON.stringify({originalYearIndicator:true,randomAcrossPhotos:true,
+      switchAfterSliderRelease:true,emptyYearDoesNotShowAnotherYear:true,
+      storedRecordsPreserved:true,presentationUntouched:true,
       realIphoneAccepted:false}));
 
   // Owner explicitly requests a truly empty account-local story list.

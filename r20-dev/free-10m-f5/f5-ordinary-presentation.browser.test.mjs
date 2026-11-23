@@ -1487,9 +1487,25 @@ try{
     const initial=await restoredPage.evaluate(()=>window.TaleraMemories.list());
     assert.equal(initial.length,0,
       'Only a genuinely empty independent browser storage partition can be restored');
-    await restoredPage.goto(origin+'/__f5/backup',{waitUntil:'domcontentloaded'});
-    await restoredPage.waitForFunction(()=>
-      document.getElementById('talera-free-backup')?.dataset.ready==='yes');
+    const restorePageResponse=await restoredPage.goto(origin+'/__f5/backup',{waitUntil:'domcontentloaded'});
+    try{
+      await restoredPage.waitForFunction(()=>
+        document.getElementById('talera-free-backup')?.dataset.ready==='yes');
+    }catch(error){
+      // Diagnostics only. Preserve the exact original readiness requirement.
+      const inspection=await restoredPage.evaluate(()=>({
+        pathname:location.pathname,
+        documentReadyState:document.readyState,
+        ready:document.getElementById('talera-free-backup')?.dataset.ready||null,
+        backupElementPresent:!!document.getElementById('talera-free-backup'),
+        restoreInputPresent:!!document.getElementById('restore-file'),
+        scriptCount:document.scripts.length
+      })).catch(e=>({inspectionError:String(e)}));
+      console.error('TALERA_RESTORE_PAGE_READINESS_DIAGNOSTIC',
+        JSON.stringify({httpStatus:restorePageResponse?.status(),inspection,
+          errors:errors.slice(-6),timeout:String(error),syntheticOnly:true}));
+      throw error;
+    }
     await restoredPage.locator('#restore-file').setInputFiles({
       name:'talera-synthetic-same-app.talera',mimeType:'application/octet-stream',
       buffer:archiveBytes
@@ -1915,6 +1931,30 @@ try{
     'First video sidecar must already exist in original account-scoped IDB: '+
       JSON.stringify(persistedVideoPoster));
 
+  if(!(firstMediaCover.pixel[2]>firstMediaCover.pixel[0]*1.4&&
+    firstMediaCover.pixel[2]>firstMediaCover.pixel[1]*1.4)){
+    // Do not waive the blue-first-frame assertion. Identify whether the
+    // encrypted local poster itself is black or only the presented image.
+    const stored=await page.evaluate(async id=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      const first=m._zeroItems.find(it=>it.kind==='video');
+      const blob=await window.TaleraMemories.blob(first.key+':phone-v1');
+      if(!blob)return {posterPresent:false};
+      const url=URL.createObjectURL(blob);
+      try{
+        const img=new Image();img.src=url;await img.decode();
+        const c=document.createElement('canvas');c.width=32;c.height=32;
+        const g=c.getContext('2d',{willReadFrequently:true});
+        g.drawImage(img,0,0,32,32);
+        return {posterPresent:true,type:blob.type,size:blob.size,
+          storedPixel:Array.from(g.getImageData(16,16,1,1).data).slice(0,3),
+          videoPlaying:!!document.querySelector('video.talera-v61-inline-video') &&
+            !document.querySelector('video.talera-v61-inline-video').paused};
+      }finally{URL.revokeObjectURL(url)}
+    },videoFirst.id).catch(e=>({inspectionError:String(e)}));
+    console.error('TALERA_FIRST_VIDEO_ORIGINAL_POSTER_DIAGNOSTIC',
+      JSON.stringify({stored,cover:firstMediaCover,syntheticOnly:true}));
+  }
   assert.ok(firstMediaCover.pixel[2]>firstMediaCover.pixel[0]*1.4&&
     firstMediaCover.pixel[2]>firstMediaCover.pixel[1]*1.4,
     'First-media VIDEO cover is not its BLUE first frame: '+

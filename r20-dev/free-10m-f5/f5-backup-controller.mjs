@@ -4,6 +4,7 @@
 import {
  exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary
 } from '/__f5/f5-portable-idb.mjs';
+import {inspectFreeArchive} from '/__f5/f5-portable-archive.mjs';
 const el=id=>document.getElementById(id);
 const root=el('talera-free-backup'),db=root?.dataset.database;
 if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(db||''))
@@ -111,6 +112,10 @@ make.addEventListener('click',async()=>{
  try{
   await assertCurrentAccount();
   const archive=await exportExistingFreeLibrary(db);
+  // Fail closed BEFORE offering a download if iOS assembled extra or missing
+  // Blob bytes. Checks exact manifest size + checksum, without changing media.
+  // This never uploads, rewrites, or restores the owner's local memories.
+  await inspectFreeArchive(archive);
   downloadUrl=URL.createObjectURL(archive);
   save.href=downloadUrl;
   save.download='talera-free-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.talera';

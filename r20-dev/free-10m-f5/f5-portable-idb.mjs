@@ -2,7 +2,7 @@
 // NOT injected into approved /tell, /present or home. No network and no media cloud.
 // A later explicit user-triggered UI is required before any production restore.
 import {createFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
-import {requireName,openExisting,readAll,restoreRowsAtomic,verifyLibraryMediaIntegrity,verifyRestoredLibraryReadback} from './f5-library-persistence.mjs';
+import {requireName,openExisting,readAll,restoreRowsAtomic,verifyLibraryMediaIntegrity,verifyRestoredLibraryReadback,identicalLibraryFile} from './f5-library-persistence.mjs';
 export async function exportExistingFreeLibrary(databaseName){
  const db=await openExisting(databaseName,false);
  try{
@@ -29,15 +29,23 @@ async function preview(decoded,name,allowOtherOrigin){
  try{
   const existing=await readAll(db);
   const stories=new Set(existing.stories.map(x=>x.id));
-  const files=new Set(existing.files.map(x=>x.key));
+  const files=new Map(existing.files.map(x=>[x.key,x]));
   const collisionStories=decoded.stories.filter(x=>stories.has(x.id)).map(x=>x.id);
-  const collisionFiles=decoded.files.filter(x=>files.has(x.key)).map(x=>x.key);
+  const collisionFiles=[],identicalFiles=[];
+  for(const row of decoded.files){
+   if(!files.has(row.key))continue;
+   if(await identicalLibraryFile(row,files.get(row.key)))identicalFiles.push(row.key);
+   else collisionFiles.push(row.key);
+  }
   return {
    sourceScope:decoded.sourceScope,sourceOrigin:decoded.sourceOrigin,
    targetScope:name,crossOrigin:!sourceMatches,
    storyCount:decoded.stories.length,mediaStoreEntries:decoded.files.length,
    alreadyPresentStories:collisionStories.length,
-   alreadyPresentMediaEntries:collisionFiles.length,
+   alreadyPresentMediaEntries:collisionFiles.length+identicalFiles.length,
+   identicalMediaEntries:identicalFiles.length,
+   conflictingMediaEntries:collisionFiles.length,
+   currentStoryCount:existing.stories.length,
    safeToRestore:collisionStories.length===0&&collisionFiles.length===0,
    // Names/keys stay local to caller. No logging or server telemetry.
    collisionStories,collisionFiles

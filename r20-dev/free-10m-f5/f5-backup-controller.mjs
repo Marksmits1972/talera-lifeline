@@ -62,7 +62,7 @@ const failText=e=>{
  if(/DATABASE_NOT_FOUND|NO_INDEXEDDB|NO_STORIES_FOUND/.test(raw))
   return 'Geen lokale herinneringen gevonden. Open eerst Mijn leven.';
  if(/EXISTING_CONTENT|DUPLICATE/.test(raw))
-  return 'Deze herinneringen staan al in de app. Er is niets veranderd.';
+  return 'Er zijn bestaande herinneringen of afwijkende bestandsrecords. Er is niets overschreven.';
  return 'Controleer het bestand en probeer opnieuw.';
 };
 // The backup page may stay open while the user switches accounts in another tab.
@@ -140,7 +140,11 @@ preview.addEventListener('click',async()=>{
   message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en). '+
    (result.crossOrigin?'Back-up uit een andere TALERA-versie. ':'')+
    (result.safeToRestore?'Geen dubbele gegevens. Ga nu door met stap 3 om terug te zetten.':
-    'Conflict met bestaande gegevens: deze herinneringen staan al in TALERA. Er is niets gewijzigd of teruggezet.')+
+    'Conflict met bestaande gegevens. Bestaande herinneringen: '+result.alreadyPresentStories+
+    '. Afwijkende bestandsrecords: '+result.conflictingMediaEntries+
+    '. Er is niets gewijzigd of teruggezet.')+
+   '\nHuidige bibliotheek: '+result.currentStoryCount+' herinnering(en). '+
+   'Identieke bestandsrecords veilig herbruikbaar: '+result.identicalMediaEntries+'.'+
    readOnlyPhotoText(result));
  }catch(e){message(status,'Controle gestopt (niets gewijzigd): '+failText(e))}
  finally{preview.disabled=!chooser.files?.[0]}

@@ -128,7 +128,44 @@ try{
   const backup=new Blob([new Uint8Array(data.bytes)]);
   async function rejects(fn){try{await fn();return false}catch{return true}}
   const disallowOther=await rejects(()=>m.previewFreeLibraryRestore(backup,data.target));
+  // Existing identical media and technical manifest records must be reused
+  // without any overwrite. A differing file must block the entire restore.
+  const persistence=await import('/f5-library-persistence.mjs');
+  const {decodeFreeArchive}=await import('/f5-portable-archive.mjs');
+  const decoded=await decodeFreeArchive(backup);
+  const conn=await persistence.openExisting(data.target,true);
+  const shared=decoded.files.find(row=>row.key===data.id+':0');
+  const manifest=decoded.files.find(row=>row.key==='talera-v4-work:manifest');
+  const wrong=decoded.files.find(row=>row.key===data.id+':1');
+  const change=async(removeWrong=false)=>{
+   const tx=conn.transaction('files','readwrite'),f=tx.objectStore('files');
+   if(removeWrong)f.delete(wrong.key);
+   else{
+    f.add(shared);f.add(manifest);
+    f.add({...wrong,blob:new Blob(['different'],{type:wrong.blob.type})});
+   }
+   await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
+  };
+  await change();
+  const blocked=await m.previewFreeLibraryRestore(backup,data.target,{allowOtherOrigin:true});
+  if(blocked.safeToRestore||blocked.conflictingMediaEntries!==1||
+     blocked.identicalMediaEntries!==2||blocked.alreadyPresentStories!==0)
+   throw Error('Conflict classification failed');
+  if(!await rejects(()=>m.restoreFreeLibrary(backup,data.target,{allowOtherOrigin:true,confirmed:true})))
+   throw Error('Conflicting media import accepted');
+  // Exercise the atomic writer itself, including a race after preview.
+  if(!await rejects(()=>persistence.restoreRowsAtomic(conn,decoded)))
+   throw Error('Atomic writer overwrote a differing record');
+  const untouched=await persistence.readAll(conn);
+  if(untouched.stories.some(row=>row.id===data.id)||
+     untouched.files.some(row=>row.key===data.id+':2')||
+     !(await persistence.identicalLibraryFile(shared,untouched.files.find(row=>row.key===shared.key))))
+   throw Error('Failed atomic restore changed existing records or added partial data');
+  await change(true);
+  conn.close();
   const reviewed=await m.previewFreeLibraryRestore(backup,data.target,{allowOtherOrigin:true});
+  if(!reviewed.safeToRestore||reviewed.identicalMediaEntries!==2)
+   throw Error('Identical retained records did not permit restore');
   const rejectUnconfirmed=await rejects(()=>m.restoreFreeLibrary(backup,data.target,
     {allowOtherOrigin:true}));
   const invalidCues=new Blob([new Uint8Array(data.badCue)]);
@@ -166,6 +203,7 @@ try{
  assert.equal(result.reviewed.safeToRestore,true);
  assert.equal(result.reviewed.storyCount,1);
  assert.equal(result.reviewed.mediaStoreEntries,4);
+ assert.equal(result.reviewed.identicalMediaEntries,2);
  assert.equal(result.finished.restoredStories,1);
  assert.equal(result.finished.readbackPassed,true);
  assert.equal(result.duplicateRejected,true);

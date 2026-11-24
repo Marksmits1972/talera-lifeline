@@ -168,6 +168,20 @@ export async function verifyRestoredLibraryReadback(expected,actual){
  return Object.freeze({storyCount:expected.stories.length,fileCount:expected.files.length,exact:true});
 }
 
+// Compare complete file records, not merely IDs, size or media type.
+// The same bounded byte/metadata comparison also verifies restored readback.
+export async function identicalLibraryFile(expected,actual){
+ if(!expected||!actual||expected.key!==actual.key)return false;
+ try{
+  await verifyRestoredLibraryReadback({stories:[],files:[expected]},
+    {stories:[],files:[actual]});
+  return true;
+ }catch(error){
+  if(error?.message==='TALERA_RESTORE_READBACK_MISMATCH')return false;
+  throw error;
+ }
+}
+
 export async function restoreRowsAtomic(db,decoded){
   // The chosen iPhone .talera File can be disk-backed. Its Blob slices are
   // perfectly readable during an immediate checksum/readback, but retaining
@@ -210,10 +224,41 @@ export async function restoreRowsAtomic(db,decoded){
    tx.oncomplete=()=>finish(null);
    tx.onabort=()=>finish(tx.error||Error('TALERA_RESTORE_ATOMIC_IMPORT_ABORTED'));
    tx.onerror=()=>{};
+   // Revalidate file collisions inside the SAME read/write transaction:
+   // another editor/tab cannot change a checked record before commit.
+   // Keep the transaction active only during an asynchronous byte comparison,
+   // using key-only requests (no repeated copies of large media).
+   const abort=error=>{try{tx.abort()}catch{}finish(error)};
    try{
     const s=tx.objectStore('stories'),f=tx.objectStore('files');
     for(const row of decoded.stories)s.add(row);
-    for(const row of ownedFiles)f.add(row);
-   }catch(error){try{tx.abort()}catch{}finish(error)}
+    let index=0;
+    const next=()=>{
+     if(index>=ownedFiles.length)return;
+     const row=ownedFiles[index++],req=f.get(row.key);
+     req.onsuccess=()=>{
+      try{
+       if(req.result===undefined){f.add(row);next();return}
+       let settled=false,equal=false,failed=null;
+       identicalLibraryFile(row,req.result).then(
+        result=>{equal=result;settled=true},
+        error=>{failed=error;settled=true});
+       const keepAlive=()=>{
+        const pulse=f.getKey(row.key);
+        pulse.onsuccess=()=>{
+         try{
+          if(!settled){keepAlive();return}
+          if(failed)throw failed;
+          if(!equal)throw Error('TALERA_RESTORE_EXISTING_CONTENT_MUST_NOT_BE_OVERWRITTEN');
+          next(); // exact match: do not write this record at all
+         }catch(error){abort(error)}
+        };
+       };
+       keepAlive();
+      }catch(error){abort(error)}
+     };
+    };
+    next();
+   }catch(error){abort(error)}
   });
 }

@@ -223,9 +223,25 @@ try{
   },dbA);
   assert.deepEqual(counts,[0,0],
    'The existing Free account library must truly be empty before import');
+  // Reproduce the real iPhone flow: no stories, but a retained identical
+  // technical file record from the archive. No destructive cleanup.
+  await empty.evaluate(async({db,bytes})=>{
+   const {decodeFreeArchive}=await import('/__f5/f5-portable-archive.mjs');
+   const p=await import('/__f5/f5-library-persistence.mjs');
+   const decoded=await decodeFreeArchive(new Blob([new Uint8Array(bytes)]));
+   const retained=decoded.files.find(row=>row.key==='talera-v4-work:preview:synthetic');
+   if(!retained)throw Error('Existing technical fixture absent');
+   const conn=await p.openExisting(db,true);
+   const tx=conn.transaction('files','readwrite');
+   tx.objectStore('files').add(retained);
+   await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
+   conn.close();
+  },{db:dbA,bytes:Array.from(fileBytes)});
   await empty.locator('#preview-restore').click();
   await empty.waitForFunction(()=>
    document.getElementById('restore-status').textContent.includes('Geen dubbele'));
+  assert.match(await empty.locator('#restore-status').textContent(),
+   /Identieke bestandsrecords veilig herbruikbaar: 1/);
   assert.match(await empty.locator('#restore-status').textContent(),
    /Gecontroleerd: 1 herinnering/);
   assert.equal(await empty.locator('#backup-step-confirm').isVisible(),true,

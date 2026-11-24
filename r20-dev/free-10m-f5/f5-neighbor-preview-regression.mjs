@@ -116,7 +116,7 @@ assert.equal(memoryStores.length,1,'Exactly one physical library owner');
 assert.ok(memoryStores[0][2].includes('const taleraPayload=')&&
  memoryStores[0][2].includes('taleraPayload.read('),
  'Only the existing library owner may resolve original payloads');
-const playerWithoutLibrarySource=shipped.replace(libraryFactory,'').replace(memoryStores[0][0],'');
+const playerWithoutLibrarySource=shipped.replace(memoryStores[0][0],'').replace(libraryFactory,'');
 for(const name of ['list','get','blob','mediaUrl','displayUrl']){
  assert.ok(!playerWithoutLibrarySource.includes('store.'+name+'('),
   'The presentation may not bypass the library for '+name);

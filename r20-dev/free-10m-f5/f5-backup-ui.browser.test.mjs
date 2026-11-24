@@ -147,10 +147,32 @@ try{
  await a.waitForFunction(()=>document.getElementById('export-status')?.textContent.includes('Back-up klaar'));
  assert.equal(await a.locator('#save-backup').textContent(),'Bewaar bestand');
  assert.match(await a.locator('#export-status').textContent(),/Bestanden/);
+ assert.equal(await a.locator('#save-backup').getAttribute('download'),'TALERA-back-up.talera');
+ // Exercise the exact native share action with a synthetic share target.
+ // This proves the payload, not iOS Files replacement or actual persistence.
+ await a.evaluate(()=>{
+  Object.defineProperty(navigator,'canShare',{configurable:true,value:({files})=>
+   files.length===1&&files[0] instanceof File});
+  Object.defineProperty(navigator,'share',{configurable:true,value:async ({files})=>{
+   const file=files[0];
+   window.__backupShareResult={name:file.name,size:file.size,type:file.type};
+  }});
+ });
+ await a.locator('#save-backup').click();
+ await a.waitForFunction(()=>window.__backupShareResult?.name==='TALERA-back-up.talera');
+ const shared=await a.evaluate(()=>window.__backupShareResult);
+ assert.ok(shared.size>200);
+ assert.equal(shared.type,'application/octet-stream');
+ await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('niet zelfstandig controleren'));
+ await a.evaluate(()=>{
+  delete navigator.share;
+  Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false});
+ });
  const downloadPromise=a.waitForEvent('download');
  await a.locator('#save-backup').click();
  const download=await downloadPromise;
- assert.match(download.suggestedFilename(),/\.talera$/);
+ assert.equal(download.suggestedFilename(),'TALERA-back-up.talera');
+ assert.match(await a.locator('#export-status').textContent(),/extra kopie/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
  // Simulate an iOS Blob assembly anomaly affecting ONLY the final .talera Blob.

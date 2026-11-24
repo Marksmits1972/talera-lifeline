@@ -30,7 +30,7 @@ h3{font-size:1.07rem;margin:18px 0 10px}
 <p>Je herinneringen blijven in deze app. Een back-upbestand bewaar je zelf.</p>
 <p class="note">Een back-up bevat je foto's, video's en geluid. Het bestand is niet versleuteld: bewaar het privé.</p>
 <section><h2>Back-up maken</h2>
-<p>Maak een back-up en tik daarna op 'Bewaar bestand'.</p>
+<p>Maak een back-up en tik daarna op 'Bewaar bestand'. Bewaar <strong>TALERA-back-up.talera</strong> in dezelfde eigen map in Bestanden. Kies 'Vervang' als je telefoon dit vraagt.</p>
 <button type="button" id="make-backup" disabled>Back-up maken</button>
 <a id="save-backup" class="save" download hidden>Bewaar bestand</a>
 <output id="export-status" role="status"></output>

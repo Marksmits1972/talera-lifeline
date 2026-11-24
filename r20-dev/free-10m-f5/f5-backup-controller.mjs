@@ -13,7 +13,8 @@ const make=el('make-backup'),save=el('save-backup'),exportStatus=el('export-stat
 const chooser=el('restore-file'),cross=el('other-origin'),preview=el('preview-restore');
 const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore-status');
 const selected=el('selected-file'),checkStep=el('backup-step-check'),finalStep=el('backup-step-confirm');
-let downloadUrl=null,review=null,reviewFile=null,reviewCross=null;
+const backupName='TALERA-back-up.talera';
+let downloadUrl=null,preparedFile=null,shareUnavailable=false,review=null,reviewFile=null,reviewCross=null;
 const message=(element,text)=>{element.textContent=text;};
 // Read-only browser diagnosis on the EXISTING status area. No new button,
 // screen, media fixture, permanent state, or upload. First photo per memory.
@@ -107,7 +108,7 @@ confirm.addEventListener('change',()=>{
 make.addEventListener('click',async()=>{
  make.disabled=true;
  if(downloadUrl){URL.revokeObjectURL(downloadUrl);downloadUrl=null}
- save.hidden=true;save.removeAttribute('href');
+ save.hidden=true;save.removeAttribute('href');preparedFile=null;shareUnavailable=false;
  message(exportStatus,'Back-up maken…');
  try{
   await assertCurrentAccount();
@@ -116,14 +117,44 @@ make.addEventListener('click',async()=>{
   // Blob bytes. Checks exact manifest size + checksum, without changing media.
   // This never uploads, rewrites, or restores the owner's local memories.
   await inspectFreeArchive(archive);
-  downloadUrl=URL.createObjectURL(archive);
+  preparedFile=new File([archive],backupName,{type:'application/octet-stream'});
+  downloadUrl=URL.createObjectURL(preparedFile);
   save.href=downloadUrl;
-  save.download='talera-free-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.talera';
+  save.download=backupName;
   save.hidden=false;
   message(exportStatus,'Back-up klaar ('+(archive.size/1048576).toFixed(1)+
-   ' MB). Tik op "Bewaar bestand" en controleer de download in Bestanden.');
+   ' MB). Tik op "Bewaar bestand". Kies in Bestanden dezelfde eigen map en bevestig Vervang als je al een TALERA-back-up hebt.');
  }catch(e){message(exportStatus,'Back-up niet gemaakt: '+failText(e))}
  finally{make.disabled=false}
+});
+// iPhone PWA cannot silently write into the external Files app. Prefer the
+// native share/save sheet when it accepts this exact prepared file. Preserve
+// the download fallback, but never claim a download replaced an old file.
+save.addEventListener('click',async event=>{
+ if(!preparedFile){event.preventDefault();return}
+ const payload={files:[preparedFile]};
+ let supported=false;
+ try{
+  supported=!shareUnavailable&&typeof navigator.share==='function'&&
+   typeof navigator.canShare==='function'&&navigator.canShare(payload);
+ }catch(_){}
+ if(!supported){
+  message(exportStatus,'Download aangeboden als '+backupName+
+   '. De browser kan een extra kopie maken. Controleer Bestanden; vervang de vorige back-up pas als het nieuwe bestand veilig is bewaard.');
+  return;
+ }
+ event.preventDefault();
+ try{
+  await navigator.share(payload);
+  message(exportStatus,'Bewaar de back-up in je eigen map in Bestanden. Controleer of '+backupName+' daar is bijgewerkt. TALERA kan dit niet zelfstandig controleren.');
+ }catch(e){
+  if(e?.name==='AbortError'){
+   message(exportStatus,'Bewaren geannuleerd. De bestaande back-up is niet door TALERA gewijzigd. Tik opnieuw op "Bewaar bestand".');
+   return;
+  }
+  shareUnavailable=true;
+  message(exportStatus,'Opslaan via het deelvenster is niet beschikbaar. Tik opnieuw op "Bewaar bestand" voor een download. Controleer daarna Bestanden.');
+ }
 });
 preview.addEventListener('click',async()=>{
  invalidate();confirm.checked=false;

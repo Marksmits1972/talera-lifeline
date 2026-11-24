@@ -322,8 +322,17 @@ try{
   window.__homeDeleteFixture={id:doomed.id,key:doomed.items[0].key,draft,independent};
  });
  const homeFixture=await page.evaluate(()=>window.__homeDeleteFixture);
- await page.addScriptTag({content:homeStorage});
- await page.evaluate(async f=>{
+ const homePage=await context.newPage();
+ const homeErrors=[];
+ homePage.on('pageerror',e=>homeErrors.push(e.message));
+ // Same existing test server/origin and same account IndexedDB, but a
+ // fresh document so the old editor's library cannot mask the Home code.
+ await homePage.route('http://127.0.0.1:'+port+'/',route=>route.fulfill({
+  contentType:'text/html; charset=utf-8',
+  body:'<!doctype html><html><body><script id="talera-memory-store-v1">'+homeStorage+'</'+'script></body></html>'
+ }));
+ await homePage.goto('http://127.0.0.1:'+port+'/',{waitUntil:'load'});
+ await homePage.evaluate(async f=>{
   const mem=window.TaleraMemories;
   if(await mem.remove(f.id)!==true||await mem.get(f.id)||await mem.blob(f.key)||
      await mem.blob('talera-v4-work:'+f.draft)||await mem.blob('talera-v4-work:preview:'+f.draft))
@@ -333,6 +342,8 @@ try{
      !(await mem.blob('talera-v4-work:'+f.independent)))
    throw Error('Home remove lost unrelated draft or retained deleted draft');
  },homeFixture);
+ assert.deepEqual(homeErrors,[],'Original Home storage must load without errors');
+ await homePage.close();
  console.log('TALERA_HOME_COMPLETE_DELETE_LINKED_DRAFT_PRESERVED_OTHER_DRAFT_PASS');
  assert.deepEqual(errors,[],'Original TALERA editor storage must load without JS errors');
  assert.equal(otherRequests,0,'No outgoing write requests permitted');

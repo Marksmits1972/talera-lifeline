@@ -237,6 +237,37 @@ try{
    await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
    conn.close();
   },{db:dbA,bytes:Array.from(fileBytes)});
+  // The owner's iPhone showed zero stories plus an identical record and
+  // one DIFFERENT record. Never enable restore or overwrite the latter.
+  const stray=await empty.evaluate(async({db,bytes})=>{
+   const {decodeFreeArchive}=await import('/__f5/f5-portable-archive.mjs');
+   const p=await import('/__f5/f5-library-persistence.mjs');
+   const decoded=await decodeFreeArchive(new Blob([new Uint8Array(bytes)]));
+   const key=decoded.stories[0].items[0].key;
+   const conn=await p.openExisting(db,true);
+   const tx=conn.transaction('files','readwrite');
+   tx.objectStore('files').add({key,blob:new Blob(['different synthetic bytes'],{type:'image/jpeg'})});
+   await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
+   conn.close();return key;
+  },{db:dbA,bytes:Array.from(fileBytes)});
+  await empty.locator('#preview-restore').click();
+  await empty.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Terugzetten is geblokkeerd door:'));
+  const blocked=await empty.locator('#restore-status').textContent();
+  assert.match(blocked,/Afwijkende bestandsrecords: 1/);
+  assert.match(blocked,/Huidige bibliotheek: 0 herinnering/);
+  assert.match(blocked,/Identieke bestandsrecords veilig herbruikbaar: 1/);
+  assert.match(blocked,/losstaand herinneringsbestand/);
+  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),false);
+  // Cleanup of ONLY our own synthetic conflicting fixture, no customer records.
+  await empty.evaluate(async({db,key})=>{
+   const p=await import('/__f5/f5-library-persistence.mjs');
+   const conn=await p.openExisting(db,true);
+   const tx=conn.transaction('files','readwrite');
+   tx.objectStore('files').delete(key);
+   await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
+   conn.close();
+  },{db:dbA,key:stray});
+  console.log('TALERA_EMPTY_STORIES_DIFFERENT_ORPHAN_FILE_BLOCKED_AND_CLASSIFIED_PASS');
   await empty.locator('#preview-restore').click();
   await empty.waitForFunction(()=>
    document.getElementById('restore-status').textContent.includes('Geen dubbele'));

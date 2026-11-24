@@ -109,7 +109,14 @@ assert.ok(shipped.includes('function playOrdinaryVideo(memory,index)') &&
   'Ordinary video must read original media through the single account-local library');
 const libraryFactory=readFileSync('r20-dev/free-10m-f5/f5-library-access.browser.js','utf8');
 assert.ok(shipped.includes(libraryFactory),'Shipped page must include the exact library gateway');
-const playerWithoutLibrarySource=shipped.replace(libraryFactory,'');
+// The account-local memory store is the sole physical IndexedDB owner.
+const memoryStores=[...shipped.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+ .filter(m=>m[1].includes('talera-memory-store-v1'));
+assert.equal(memoryStores.length,1,'Exactly one physical library owner');
+assert.ok(memoryStores[0][2].includes('const taleraPayload=')&&
+ memoryStores[0][2].includes('taleraPayload.read('),
+ 'Only the existing library owner may resolve original payloads');
+const playerWithoutLibrarySource=shipped.replace(libraryFactory,'').replace(memoryStores[0][0],'');
 for(const name of ['list','get','blob','mediaUrl','displayUrl']){
  assert.ok(!playerWithoutLibrarySource.includes('store.'+name+'('),
   'The presentation may not bypass the library for '+name);

@@ -926,9 +926,12 @@ try{
    assert.equal(res.status(),200);
    await mixedHome.waitForFunction(async ids=>{
      const rows=await window.TaleraMemories?.list?.();
+     const links=[...document.querySelectorAll('#myCards a[href*="?memory="]')];
+     const hasCard=id=>links.some(link=>new URL(link.href).searchParams.get('memory')===id);
      return rows?.some(x=>x.id===ids.untitled)&&rows?.some(x=>x.id===ids.tagged)&&
-       document.querySelectorAll('#demoCards .talera-topic-card').length>0;
-   },{untitled:untitled.id,tagged:tagged.id},{timeout:18000});
+       document.querySelectorAll('#demoCards .talera-topic-card').length>0&&
+       hasCard(ids.untitled)&&hasCard(ids.tagged)&&hasCard(ids.other);
+   },{untitled:untitled.id,tagged:tagged.id,other:a.id},{timeout:18000});
    const shown=await mixedHome.evaluate(()=>{
      const cards=document.querySelector('#myCards');
      const topics=document.querySelector('#demoCards');

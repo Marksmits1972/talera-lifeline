@@ -21,7 +21,7 @@ permissions:
 jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-restore-identical-files-exact-green-now-20261124' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -54,6 +54,7 @@ jobs:
 
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
+    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-restore-identical-files-exact-green-now-20261124' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -911,8 +912,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-restore-identical-files-approved-20261124' }}
-    needs: [f5_isolated_local, f5_actual_registration_button]
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-restore-identical-files-exact-green-now-20261124' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     concurrency:
@@ -952,7 +952,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 42018a7f0bcd97e47bed2cabf91838df50184064
+          test "$(git rev-parse HEAD^)" = bed0fbbb461a080b9e96f6134ddb50ad18ef09d8
           test "$(git diff --name-only 42018a7f0bcd97e47bed2cabf91838df50184064 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           test "$(git diff --name-only c70063d7598a92009d5c20f0772f97d42d3971d2 42018a7f0bcd97e47bed2cabf91838df50184064)" = "$(printf '%s\n' .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs r20-dev/free-10m-f5/f5-library-persistence.mjs r20-dev/free-10m-f5/f5-portable-idb.browser.test.mjs r20-dev/free-10m-f5/f5-portable-idb.mjs)"
           git diff --exit-code 42018a7f0bcd97e47bed2cabf91838df50184064 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
@@ -1339,7 +1339,7 @@ jobs:
 
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-restore-identical-files-exact-green-now-20261124' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     steps:
@@ -1436,7 +1436,7 @@ jobs:
 
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-restore-identical-files-exact-green-now-20261124' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:

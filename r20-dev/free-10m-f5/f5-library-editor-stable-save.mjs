@@ -238,19 +238,19 @@ export function completePublishedRemovalOnOtherPage(html,editorHtml){
  html=html.replace(old,()=>replacement);
  const oldDelete="if(existing)for(var k=0;k<(existing.items||[]).length;k++){";
  if(html.split(oldDelete).length!==2)throw Error('TALERA_LEGACY_SHARED_EDIT_GUARD_DRIFT');
- // These routes are readers, but retain their old library API. Guard a
- // legacy media replacement in its actual transaction rather than allow
- // any caller to overwrite bytes still referenced by another memory.
-
- // The complete replacement transaction is not supported on reader pages
- // when media are shared. Do not introduce an await-before-write race:
- // enforce that the media replacement uses the already guarded editor.
- const legacySave="var existing=editId?await get(editId):null;";
- if(html.split(legacySave).length!==2)throw Error('TALERA_LEGACY_SHARED_EDIT_ENTRY_DRIFT');
- const readGuard=legacySave+"\n if(existing&&uploads.length)throw Error('Bewerk mediabestanden via Herinnering bewerken.');";
- // Non-editor callers may still create new memories or edit text only.
- // The canonical editor remains the sole media replacement owner.
- return html.replace(legacySave,()=>readGuard);
+ // The legacy library API on reader pages is retained. Only a media
+ // replacement that would alter another story's original is refused.
+ // Validate under the SAME write transaction and execute original writes
+ // in the request callback so Safari cannot auto-commit.
+ const at=html.indexOf(oldDelete),last=html.indexOf("\n await finish;",at);
+ if(last<=at)throw Error('TALERA_LEGACY_SHARED_EDIT_WRITE_BOUNDARY_DRIFT');
+ const originalWrites=html.slice(at,last);
+ if(!originalWrites.includes("tx.objectStore('files').delete(existing.items[k].key)")||
+    !originalWrites.includes("tx.objectStore('stories').put(meta)")||
+    !originalWrites.includes("tx.objectStore('files').put({key:files[j].key,blob:"))
+  throw Error('TALERA_LEGACY_SHARED_EDIT_WRITE_SOURCE_DRIFT');
+ const guarded="await Promise.all([finish,new Promise((resolve,reject)=>{\n  const fail=error=>{try{tx.abort()}catch(_){}reject(error)};\n  const apply=()=>{try{\n   "+originalWrites+"\n   resolve();\n  }catch(error){fail(error)}};\n  if(!existing){apply();return}\n  const affected=new Set([...(existing.items||[]).map(item=>item.key),...files.map(item=>item.key)]);\n  const q=tx.objectStore('stories').getAll();\n  q.onerror=()=>fail(q.error||Error('Bibliotheekcontrole onderbroken.'));\n  q.onsuccess=()=>{\n   try{\n    if((q.result||[]).some(row=>row.id!==existing.id&&\n       (row.items||[]).some(item=>affected.has(item.key))))\n     throw Error('Bewerk gedeelde mediabestanden via Herinnering bewerken.');\n    apply();\n   }catch(error){fail(error)}\n  };\n })]);";
+ return html.slice(0,at)+guarded+html.slice(last+"\n await finish;".length);
 }
 
 function relocateApprovedDeletionIntoLibrary(html){

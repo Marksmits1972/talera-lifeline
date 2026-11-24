@@ -242,15 +242,15 @@ export function completePublishedRemovalOnOtherPage(html,editorHtml){
  // replacement that would alter another story's original is refused.
  // Validate under the SAME write transaction and execute original writes
  // in the request callback so Safari cannot auto-commit.
- const at=html.indexOf(oldDelete),last=html.indexOf("\n await finish;",at);
- if(last<=at)throw Error('TALERA_LEGACY_SHARED_EDIT_WRITE_BOUNDARY_DRIFT');
- const originalWrites=html.slice(at,last);
+ const at=html.indexOf(oldDelete),writeEnd=html.indexOf("\n await finish;",at);
+ if(writeEnd<=at)throw Error('TALERA_LEGACY_SHARED_EDIT_WRITE_BOUNDARY_DRIFT');
+ const originalWrites=html.slice(at,writeEnd);
  if(!originalWrites.includes("tx.objectStore('files').delete(existing.items[k].key)")||
     !originalWrites.includes("tx.objectStore('stories').put(meta)")||
     !originalWrites.includes("tx.objectStore('files').put({key:files[j].key,blob:"))
   throw Error('TALERA_LEGACY_SHARED_EDIT_WRITE_SOURCE_DRIFT');
  const guarded="await Promise.all([finish,new Promise((resolve,reject)=>{\n  const fail=error=>{try{tx.abort()}catch(_){}reject(error)};\n  const apply=()=>{try{\n   "+originalWrites+"\n   resolve();\n  }catch(error){fail(error)}};\n  if(!existing){apply();return}\n  const affected=new Set([...(existing.items||[]).map(item=>item.key),...files.map(item=>item.key)]);\n  const q=tx.objectStore('stories').getAll();\n  q.onerror=()=>fail(q.error||Error('Bibliotheekcontrole onderbroken.'));\n  q.onsuccess=()=>{\n   try{\n    if((q.result||[]).some(row=>row.id!==existing.id&&\n       (row.items||[]).some(item=>affected.has(item.key))))\n     throw Error('Bewerk gedeelde mediabestanden via Herinnering bewerken.');\n    apply();\n   }catch(error){fail(error)}\n  };\n })]);";
- return html.slice(0,at)+guarded+html.slice(last+"\n await finish;".length);
+ return html.slice(0,at)+guarded+html.slice(writeEnd+"\n await finish;".length);
 }
 
 function relocateApprovedDeletionIntoLibrary(html){

@@ -911,7 +911,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-random-year-home-photo-20261123' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-random-year-home-photo-approved-20261124' }}
     needs: [f5_isolated_local, f5_actual_registration_button]
     runs-on: ubuntu-24.04
     timeout-minutes: 22
@@ -952,16 +952,16 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = f20e6efb244e6ba078ea15e0898fd694b56f831a
-          test "$(git diff --name-only f20e6efb244e6ba078ea15e0898fd694b56f831a HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code f20e6efb244e6ba078ea15e0898fd694b56f831a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          test "$(git diff --name-only 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa f20e6efb244e6ba078ea15e0898fd694b56f831a)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
-          git diff --exit-code 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa f20e6efb244e6ba078ea15e0898fd694b56f831a -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-library-persistence.mjs r20-dev/free-10m-f5/f5-offline-sw.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs
+          test "$(git rev-parse HEAD^)" = 8e88d888e26d98053b0e718c7c8d920d4664aa34
+          test "$(git diff --name-only 8e88d888e26d98053b0e718c7c8d920d4664aa34 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 8e88d888e26d98053b0e718c7c8d920d4664aa34 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git diff --name-only 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa 8e88d888e26d98053b0e718c7c8d920d4664aa34)" = "$(printf '%s\n' .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs r20-dev/free-10m-f5/f5-offline-sw.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
+          git diff --exit-code 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa 8e88d888e26d98053b0e718c7c8d920d4664aa34 -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-library-persistence.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs
           test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=45279393092,expected='f20e6efb244e6ba078ea15e0898fd694b56f831a';
+          const id=45352460852,expected='8e88d888e26d98053b0e718c7c8d920d4664aa34';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,
@@ -973,7 +973,7 @@ jobs:
           assert.equal(run.status,'completed');
           assert.equal(run.conclusion,'success','Latest full browser tests not green');
           console.log('OWNER_APPROVED_EXACT_TESTED_BACKUP_UI_SAME_TALERA_RELEASE',
-            JSON.stringify({testedCommit:expected,run:id,appDiff:false}));
+            JSON.stringify({testedCommit:expected,run:id,appDiff:true}));
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
         run: |

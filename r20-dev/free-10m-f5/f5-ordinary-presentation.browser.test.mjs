@@ -1675,6 +1675,27 @@ try{
       domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
     const restoredPage=await restoredContext.newPage();
     restoredPage.on('pageerror',e=>errors.push('RESTORED '+e.message));
+    // Observe the existing authenticated backup module requests only.
+    // Never read/store archive bytes, personal story contents or credentials.
+    const restoreModuleTrace=[];
+    restoredPage.on('response',resp=>{
+      const p=new URL(resp.url()).pathname;
+      if(p.startsWith('/__f5/'))restoreModuleTrace.push({
+        path:p,status:resp.status(),
+        type:resp.headers()['content-type']||''
+      });
+    });
+    restoredPage.on('requestfailed',req=>{
+      const p=new URL(req.url()).pathname;
+      if(p.startsWith('/__f5/'))restoreModuleTrace.push({
+        path:p,error:req.failure()?.errorText||'failed'
+      });
+    });
+    restoredPage.on('console',msg=>{
+      if(msg.type()==='error')restoreModuleTrace.push({
+        console:'browser-error',message:msg.text().slice(0,220)
+      });
+    });
     await restoredPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
     await restoredPage.waitForFunction(()=>
       typeof window.TaleraMemories?.list==='function');
@@ -1697,7 +1718,8 @@ try{
       })).catch(e=>({inspectionError:String(e)}));
       console.error('TALERA_RESTORE_PAGE_READINESS_DIAGNOSTIC',
         JSON.stringify({httpStatus:restorePageResponse?.status(),inspection,
-          errors:errors.slice(-6),timeout:String(error),syntheticOnly:true}));
+          errors:errors.slice(-6),moduleTrace:restoreModuleTrace.slice(-18),
+          timeout:String(error),syntheticOnly:true}));
       throw error;
     }
     await restoredPage.locator('#restore-file').setInputFiles({

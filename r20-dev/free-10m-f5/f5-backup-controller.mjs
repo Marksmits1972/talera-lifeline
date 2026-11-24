@@ -77,7 +77,10 @@ function storageSummary(summary,totalBytes){
   'Overige binaire gegevens: '+mb(bytes.other)+'; bestandsadministratie: '+mb(totalBytes-summary.binaryBytes),
   'Extra binaire kopieën met identieke inhoud: '+copies+' ('+mb(duplicateBytes)+').',
   'Verliesvrij bespaard in deze back-up: '+mb(summary.savedBytes||0)+' ('+(summary.sharedEntries||0)+' gedeelde inhoudsverwijzingen).',
-  'De media-omvang hierboven telt alle oorspronkelijke verwijzingen; het back-upbestand bevat gedeelde bytes slechts eenmaal. Dit is geen meting van fysieke iPhone-opslag. Niets wordt verwijderd.'
+  (summary.sharedEntries>0?'De media-omvang hierboven telt alle oorspronkelijke verwijzingen; het back-upbestand bevat gedeelde bytes slechts eenmaal.':
+   copies>0?'In dit back-upbestand zijn de identieke bytes per bestandsrecord opgenomen, zoals vereist door de oudere herstelsoftware.':
+   'Dit back-upbestand bevat geen aangetoonde extra identieke binaire kopieën.')+
+  ' Dit is geen meting van fysieke iPhone-opslag. Niets wordt verwijderd.'
  ].join('\n');
 }
 let downloadUrl=null,preparedFile=null,shareUnavailable=false,review=null,reviewFile=null,reviewCross=null;
@@ -180,12 +183,13 @@ function clearPrepared(){
  save.hidden=true;save.removeAttribute('href');preparedFile=null;shareUnavailable=false;
 }
 function prepareDownload(archive,summary,name){
+ const details=storageSummary(summary,archive.size);
  const next=new File([archive],name,{type:'application/octet-stream'});
  const url=URL.createObjectURL(next);
  clearPrepared();
  preparedFile=next;downloadUrl=url;
  save.href=url;save.download=name;save.hidden=false;
- setDetails(exportDetails,storageSummary(summary,archive.size));
+ setDetails(exportDetails,details);
  setLegacyAvailable(summary.sharedEntries>0);
 }
 make.addEventListener('click',async()=>{
@@ -199,6 +203,7 @@ make.addEventListener('click',async()=>{
   // Blob bytes. Checks exact manifest size + checksum, without changing media.
   // This never uploads, rewrites, or restores the owner's local memories.
   const summary=await inspectFreeArchive(archive);
+  await assertCurrentAccount();
   prepareDownload(archive,summary,backupName);
   message(exportStatus,'Back-up klaar ('+(archive.size/1048576).toFixed(1)+
    ' MB). Tik op "Bewaar bestand". Kies in Bestanden dezelfde eigen map en bevestig Vervang als je al een TALERA-back-up hebt.');

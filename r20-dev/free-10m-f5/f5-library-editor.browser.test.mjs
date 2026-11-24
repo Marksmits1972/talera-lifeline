@@ -255,6 +255,34 @@ try{
    date:'1990-01-01',text:'synthetisch'},[sharePhoto,deletePhoto]);
   const [sharedKey,uniqueKey]=deleteMe.items.map(item=>item.key);
   const input={title:'Gedeelde video',date:'1990-01-01',text:'synthetisch'};
+  const staleFile=new File([Uint8Array.of(5,8,13)],'stale-edit.mov',
+   {type:'video/quicktime',lastModified:1700000000000});
+  const stale=await mem.save(input,[staleFile]);
+  // Interpose the existing IndexedDB get request during edit preflight.
+  // The code under test is unchanged: only the timing of a concurrent
+  // synthetic deletion is controlled by this fixture.
+  const originalGet=IDBObjectStore.prototype.get;
+  let armed=true,deleted=false;
+  IDBObjectStore.prototype.get=function(key){
+   const req=originalGet.call(this,key);
+   if(armed&&this.name==='files'&&key===stale.items[0].key){
+    armed=false;
+    req.addEventListener('success',()=>{
+     const db=this.transaction.db;
+     const tx=db.transaction(['stories','files'],'readwrite');
+     tx.objectStore('stories').delete(stale.id);
+     tx.objectStore('files').delete(stale.items[0].key);
+     tx.oncomplete=()=>{deleted=true};
+    });
+   }
+   return req;
+  };
+  let staleRejected=false;
+  try{await mem.save(input,[staleFile],stale.id,[stale.items[0].key])}
+  catch(e){staleRejected=/intussen|oorspronkelijk/i.test(String(e.message))}
+  finally{IDBObjectStore.prototype.get=originalGet}
+  if(!staleRejected||!deleted||await mem.get(stale.id)||await mem.blob(stale.items[0].key))
+   throw Error('Concurrent deleted story was resurrected or stale edit not rejected');
   const originalVideo=new File([Uint8Array.of(3,9,2,5,1)],'shared-original.mov',
    {type:'video/quicktime',lastModified:1700000000000});
   const identicalVideo=new File([Uint8Array.of(3,9,2,5,1)],originalVideo.name,
@@ -272,6 +300,23 @@ try{
      separateVideoStory.items[0].key===sharedVideoKey||
      separateMetadataStory.items[0].key===sharedVideoKey)
    throw Error('New video reuse lost bytes, metadata or exact canonical ID');
+  // Different chunks must not be treated as equal even if their first
+  // four MiB and original File metadata match. Use bounded synthetic bytes.
+  const chunk=new Uint8Array(4*1024*1024);chunk.fill(19);
+  const options={type:'video/quicktime',lastModified:1700000000000};
+  const largeA=new File([chunk,Uint8Array.of(1)],'chunk-check.mov',options);
+  const largeB=new File([chunk,Uint8Array.of(2)],'chunk-check.mov',options);
+  const multiA=await mem.save(input,[largeA]);
+  const multiB=await mem.save(input,[largeB]);
+  const multiCopy=await mem.save(input,[new File([largeA],largeA.name,options)]);
+  if(multiA.items[0].key===multiB.items[0].key||
+     multiA.items[0].key!==multiCopy.items[0].key)
+   throw Error('Multi-chunk comparison did not preserve exact content identity');
+  await mem.removePublishedStory(multiA.id);
+  if(!(await mem.blob(multiCopy.items[0].key)))
+   throw Error('Multi-chunk shared original was removed prematurely');
+  await mem.removePublishedStory(multiCopy.id);
+  await mem.removePublishedStory(multiB.id);
   const twinFrames=await mem.save(input,[identicalVideo,identicalVideo]);
   if(twinFrames.items[0].key===twinFrames.items[1].key)
    throw Error('Distinct cue positions in one story lost their IDs');

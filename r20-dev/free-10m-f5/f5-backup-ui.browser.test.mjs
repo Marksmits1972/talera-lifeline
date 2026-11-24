@@ -340,12 +340,8 @@ try{
    const database=await new Promise((ok,bad)=>{
     open.onsuccess=()=>ok(open.result);open.onerror=()=>bad(open.error)
    });
-   const tx=database.transaction(['stories','files'],'readonly');
-   const all=store=>new Promise((ok,bad)=>{
-    const q=tx.objectStore(store).getAll();
-    q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)
-   });
-   const [stories,files]=await Promise.all([all('stories'),all('files')]);
+   const persistence=await import('/__f5/f5-library-persistence.mjs');
+   const {stories,files}=await persistence.readAll(database);
    database.close();
    const video=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:1');
    const voice=files.find(row=>row.key==='local-old-1950-01-01-synthetic-record:2');
@@ -446,9 +442,8 @@ try{
  const state=await b.evaluate(async db=>{
   const req=indexedDB.open(db,1);
   const conn=await new Promise((ok,bad)=>{req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error)});
-  const tx=conn.transaction(['stories','files'],'readonly');
-  const getAll=s=>new Promise((ok,bad)=>{const q=tx.objectStore(s).getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
-  const [stories,files]=await Promise.all([getAll('stories'),getAll('files')]);
+  const persistence=await import('/__f5/f5-library-persistence.mjs');
+  const {stories,files}=await persistence.readAll(conn);
   conn.close();
   const movie=files.find(f=>f.key.endsWith(':1'));
   return {stories:stories.map(x=>({id:x.id,title:x.title,cues:x.narrationCues})),

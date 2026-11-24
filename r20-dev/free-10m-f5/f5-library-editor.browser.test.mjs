@@ -26,7 +26,7 @@ assert.ok(storage.includes("db.transaction(['stories','files'],'readwrite')"),
  'Original atomic deletion must live in the one library owner');
 assert.ok(storage&&storage.includes('async function save(input,uploads,editId,canonicalIds){'));
 assert.ok(storage.includes('if(existing&&canonicalIds===undefined)for('));
-assert.ok(storage.includes("tx.objectStore('files').add(row)"));
+assert.ok(storage.includes("taleraPayload.writePlans(tx.objectStore('files'),fresh"));
 assert.ok(edited.includes("draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,"));
 assert.ok(edited.includes("async function writeFiles(entries){return mem.draftWriteRows("));
 assert.ok(edited.includes("async function deleteFiles(ids){return mem.draftDeleteKeys("));
@@ -320,6 +320,20 @@ try{
   const twinFrames=await mem.save(input,[identicalVideo,identicalVideo]);
   if(twinFrames.items[0].key===twinFrames.items[1].key)
    throw Error('Distinct cue positions in one story lost their IDs');
+  const payloadDb='talera-free-local-'+('b'.repeat(32))+'-v1';
+  const rawFiles=async()=>{
+   const database=await new Promise((ok,bad)=>{const q=indexedDB.open(payloadDb,1);q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
+   try{return await new Promise((ok,bad)=>{const q=database.transaction('files','readonly').objectStore('files').getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)})}
+   finally{database.close()}
+  };
+  const raw=await rawFiles();
+  const distinctIds=[sharedVideoKey,separateMetadataStory.items[0].key,...twinFrames.items.map(item=>item.key)];
+  const links=distinctIds.map(key=>raw.find(row=>row.key===key));
+  if(links.some(row=>!row?.payloadKey||row.blob!==undefined)||new Set(links.map(row=>row.payloadKey)).size!==1)
+   throw Error('Different media IDs and File metadata did not share one physical original');
+  const payloadId=links[0].payloadKey;
+  if(raw.filter(row=>row.key===payloadId&&row.blob instanceof Blob&&row.blob.size===originalVideo.size).length!==1)
+   throw Error('One physical payload was not stored exactly once');
   const added=await mem.save(input,[differentVideo,identicalVideo],separateVideoStory.id,
    [separateVideoStory.items[0].key,null]);
   if(added.items[1].key!==sharedVideoKey||added.items[0].key!==separateVideoStory.items[0].key)
@@ -336,6 +350,8 @@ try{
   if(await mem.blob(sharedVideoKey))throw Error('Last shared video link retained its original');
   if(!(await mem.blob(separateMetadataStory.items[0].key)))throw Error('Distinct metadata original lost');
   await mem.removePublishedStory(separateMetadataStory.id);
+  if((await rawFiles()).some(row=>row.key===payloadId))
+   throw Error('Last reference deletion left the physical payload');
   console.log('TALERA_NEW_SHARED_ORIGINALS_AND_REFERENCE_DELETE_PASS');
   const privateDb='talera-free-local-'+('b'.repeat(32))+'-v1';
   const shareId='local-shared-synthetic-media';
@@ -356,12 +372,8 @@ try{
    const q=indexedDB.open(privateDb,1);
    q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
   });
-  const sharedRead=sharedDb.transaction(['stories','files'],'readonly');
-  const read=q=>new Promise((ok,bad)=>{
-   q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
-  });
-  const [sharedStories,sharedFiles]=await Promise.all([
-   read(sharedRead.objectStore('stories').getAll()),read(sharedRead.objectStore('files').getAll())]);
+  const persistence=await import('/f5-library-persistence.mjs');
+  const {stories:sharedStories,files:sharedFiles}=await persistence.readAll(sharedDb);
   sharedDb.close();
   const {createFreeArchive,decodeFreeArchive}=await import('/f5-portable-archive.mjs');
   const sharedRoundtrip=await decodeFreeArchive(await createFreeArchive({

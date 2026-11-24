@@ -183,12 +183,11 @@ try{
     {allowOtherOrigin:true,confirmed:true}));
   const req=indexedDB.open(data.target,1);
   const db=await new Promise((ok,err)=>{req.onsuccess=()=>ok(req.result);req.onerror=()=>err(req.error)});
-  const tx=db.transaction(['stories','files'],'readonly');
-  const s=tx.objectStore('stories'),f=tx.objectStore('files');
-  const get=req=>new Promise((ok,err)=>{req.onsuccess=()=>ok(req.result);req.onerror=()=>err(req.error)});
-  const preserved=await get(s.get('local-existing-new-story'));
-  const restored=await get(s.get(data.id));
-  const originals=await Promise.all([0,1,2].map(n=>get(f.get(data.id+':'+n))));
+  const persistence=await import('/f5-library-persistence.mjs');
+  const {stories,files}=await persistence.readAll(db);
+  const preserved=stories.find(row=>row.id==='local-existing-new-story');
+  const restored=stories.find(row=>row.id===data.id);
+  const originals=[0,1,2].map(n=>files.find(row=>row.key===data.id+':'+n));
   const binary=await Promise.all(originals.map(async row=>Array.from(new Uint8Array(await row.blob.arrayBuffer()))));
   db.close();
   return {disallowOther,reviewed,rejectUnconfirmed,

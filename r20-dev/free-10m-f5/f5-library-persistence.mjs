@@ -40,11 +40,157 @@ export async function openExisting(name,restoring){
   };
  });
 }
+
+// A media ID identifies a story position; identical original bytes can live
+// once in the SAME existing files store. No schema/database migration.
+// Raw pre-existing File/Blob records remain valid and are never rewritten.
+export function createOriginalPayloadStorage(){
+ const prefix='talera-original-payload-v1:';
+ const payloadKey=value=>typeof value==='string'&&
+  /^talera-original-payload-v1:[a-f0-9]{64}$/.test(value);
+ const link=row=>row&&Object.hasOwn(row,'payloadKey');
+ const failFormat=()=>{throw Error('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL')};
+ const chunk=4*1024*1024;
+ const hex=bytes=>Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('');
+ async function prepare(key,original){
+  if(typeof key!=='string'||!key||key.startsWith(prefix)||!(original instanceof Blob)||!original.size)failFormat();
+  const hashes=[];
+  for(let offset=0;offset<original.size;offset+=chunk){
+   const end=Math.min(offset+chunk,original.size);
+   const bytes=await original.slice(offset,end).arrayBuffer();
+   if(bytes.byteLength!==end-offset)failFormat();
+   hashes.push(hex(await crypto.subtle.digest('SHA-256',bytes)));
+  }
+  const hash=hex(await crypto.subtle.digest('SHA-256',
+   new TextEncoder().encode(original.size+':'+hashes.join(':'))));
+  const isFile=typeof File==='function'&&original instanceof File;
+  return {key,payloadKey:prefix+hash,blob:original,
+   metadata:{length:original.size,type:original.type,
+    name:isFile?original.name:null,lastModified:isFile?original.lastModified:null}};
+ }
+ function materialize(row,payload){
+  if(!link(row))return row;
+  if(Object.keys(row).sort().join(',')!=='key,metadata,payloadKey'||
+     !payloadKey(row.payloadKey)||!payload||payload.key!==row.payloadKey||
+     Object.keys(payload).sort().join(',')!=='blob,key'||!(payload.blob instanceof Blob))failFormat();
+  const m=row.metadata;
+  if(!m||Object.keys(m).sort().join(',')!=='lastModified,length,name,type'||
+     !Number.isSafeInteger(m.length)||m.length<=0||payload.blob.size!==m.length||
+     typeof m.type!=='string'||!(m.name===null&&m.lastModified===null||
+      typeof m.name==='string'&&Number.isFinite(m.lastModified)))failFormat();
+  const blob=m.name===null?payload.blob.slice(0,m.length,m.type):
+   new File([payload.blob],m.name,{type:m.type,lastModified:m.lastModified});
+  if(blob.size!==m.length||blob.type!==m.type||
+     (m.name!==null&&(blob.name!==m.name||blob.lastModified!==m.lastModified)))failFormat();
+  return {key:row.key,blob};
+ }
+ function logicalRows(rows){
+  if(!Array.isArray(rows))failFormat();
+  const map=new Map(rows.map(row=>[row.key,row]));
+  if(map.size!==rows.length)failFormat();
+  return rows.filter(row=>!payloadKey(row.key)).map(row=>
+   link(row)?materialize(row,map.get(row.payloadKey)):row);
+ }
+ function read(store,key,ok,fail){
+  const q=store.get(key);
+  q.onerror=()=>fail(q.error||Error('TALERA_LIBRARY_ORIGINAL_READ'));
+  q.onsuccess=()=>{
+   try{
+    const row=q.result;
+    if(!link(row)){ok(row);return}
+    if(!payloadKey(row.payloadKey))failFormat();
+    const p=store.get(row.payloadKey);
+    p.onerror=()=>fail(p.error||Error('TALERA_LIBRARY_PAYLOAD_READ'));
+    p.onsuccess=()=>{try{ok(materialize(row,p.result))}catch(e){fail(e)}};
+   }catch(e){fail(e)}
+  };
+ }
+ async function sameBytes(a,b){
+  if(!(a instanceof Blob)||a.size!==b.size)return false;
+  for(let offset=0;offset<a.size;offset+=chunk){
+   const end=Math.min(offset+chunk,a.size);
+   const x=new Uint8Array(await a.slice(offset,end).arrayBuffer());
+   const y=new Uint8Array(await b.slice(offset,end).arrayBuffer());
+   if(x.length!==end-offset||y.length!==x.length)return false;
+   for(let i=0;i<x.length;i++)if(x[i]!==y[i])return false;
+  }
+  return true;
+ }
+ // The caller owns the existing readwrite transaction and aborts on failure.
+ // Request chaining, including during bounded comparison, keeps it active.
+ function writePlans(store,plans,ok,fail,{replace=false}={}){
+  let index=0;
+  const next=()=>{
+   try{
+    if(index===plans.length){ok();return}
+    const p=plans[index++];
+    if(!p||!payloadKey(p.payloadKey))failFormat();
+    const q=store.get(p.payloadKey);
+    q.onerror=()=>fail(q.error||Error('TALERA_LIBRARY_PAYLOAD_READ'));
+    q.onsuccess=()=>{
+     try{
+      const addLink=()=>{
+       const row={key:p.key,payloadKey:p.payloadKey,metadata:p.metadata};
+       if(replace)store.put(row);else store.add(row);
+       next();
+      };
+      if(q.result===undefined){
+       store.add({key:p.payloadKey,blob:p.blob});addLink();return;
+      }
+      if(Object.keys(q.result).sort().join(',')!=='blob,key'||
+         !(q.result.blob instanceof Blob)||q.result.blob.size!==p.blob.size)failFormat();
+      let settled=false,equal=false,error=null;
+      sameBytes(q.result.blob,p.blob).then(v=>{equal=v;settled=true},
+       e=>{error=e;settled=true});
+      const pulse=()=>{
+       const check=store.getKey(p.payloadKey);
+       check.onerror=()=>fail(check.error||Error('TALERA_LIBRARY_PAYLOAD_READ'));
+       check.onsuccess=()=>{
+        try{
+         if(!settled){pulse();return}
+         if(error)throw error;
+         if(!equal||check.result!==p.payloadKey)failFormat();
+         addLink();
+        }catch(e){fail(e)}
+       };
+      };
+      pulse();
+     }catch(e){fail(e)}
+    };
+   }catch(e){fail(e)}
+  };
+  next();
+ }
+ // Called only after an explicitly requested deletion in the SAME transaction.
+ // Never delete a payload referenced by a surviving media-ID record.
+ function collectUnreferenced(store,fail){
+  const q=store.getAll();
+  q.onerror=()=>fail(q.error||Error('TALERA_LIBRARY_PAYLOAD_GC_READ'));
+  q.onsuccess=()=>{
+   try{
+    const rows=q.result||[],keys=new Set(rows.map(row=>row.key)),used=new Set();
+    for(const row of rows){
+     if(!link(row))continue;
+     if(!payloadKey(row.payloadKey)||!keys.has(row.payloadKey))failFormat();
+     used.add(row.payloadKey);
+    }
+    for(const row of rows)if(payloadKey(row.key)&&!used.has(row.key)){
+     if(Object.keys(row).sort().join(',')!=='blob,key'||!(row.blob instanceof Blob))failFormat();
+     store.delete(row.key);
+    }
+   }catch(e){fail(e)}
+  };
+ }
+ return Object.freeze({prepare,read,writePlans,logicalRows,collectUnreferenced,
+  isPayloadKey:payloadKey,isLink:link});
+}
+
+const originalPayloadStorage=createOriginalPayloadStorage();
 export async function readAll(db){
  const tx=db.transaction(['stories','files'],'readonly');
  const stories=requestResult(tx.objectStore('stories').getAll());
  const files=requestResult(tx.objectStore('files').getAll());
- return {stories:await stories,files:await files};
+ return {stories:await stories,files:originalPayloadStorage.logicalRows(await files)};
 }
 
 // Fail-closed relationship check for the ORIGINAL media within the single
@@ -190,8 +336,11 @@ export async function restoreRowsAtomic(db,decoded){
   // the write transaction. Never transcode, rename, migrate or touch players.
   const photoKeys=new Set(decoded.stories.flatMap(story=>
     (story.items||[]).filter(item=>item?.kind==='photo').map(item=>item.key)));
+  const originalKeys=new Set(decoded.stories.flatMap(story=>(story.items||[]).map(item=>item.key)));
   const ownedFiles=[];
   for(const row of decoded.files){
+   if(originalPayloadStorage.isPayloadKey(row?.key)||originalPayloadStorage.isLink(row))
+    throw Error('TALERA_RESTORE_RESERVED_INTERNAL_PAYLOAD');
    const original=row?.blob;
    if(!(original instanceof Blob)||
       !(photoKeys.has(row.key)||String(original.type).startsWith('image/'))){
@@ -211,6 +360,11 @@ export async function restoreRowsAtomic(db,decoded){
         owned.lastModified!==original.lastModified)))
     throw Error('TALERA_RESTORE_PHOTO_COPY_METADATA_MISMATCH');
    ownedFiles.push({...row,blob:owned});
+  }
+  const plans=new Map();
+  for(const row of ownedFiles)if(originalKeys.has(row.key)){
+   if(Object.keys(row).sort().join(',')!=='blob,key')throw Error('TALERA_RESTORE_INVALID_ORIGINAL_ROW');
+   plans.set(row.key,await originalPayloadStorage.prepare(row.key,row.blob));
   }
   // One atomic IndexedDB transaction for both stores: fail/QuotaExceeded
   // aborts the WHOLE import, never deletes or replaces existing media/stories.
@@ -235,12 +389,17 @@ export async function restoreRowsAtomic(db,decoded){
     let index=0;
     const next=()=>{
      if(index>=ownedFiles.length)return;
-     const row=ownedFiles[index++],req=f.get(row.key);
-     req.onsuccess=()=>{
+     const row=ownedFiles[index++];
+     originalPayloadStorage.read(f,row.key,existing=>{
       try{
-       if(req.result===undefined){f.add(row);next();return}
+       if(existing===undefined){
+        const plan=plans.get(row.key);
+        if(plan)originalPayloadStorage.writePlans(f,[plan],next,abort);
+        else{f.add(row);next()}
+        return;
+       }
        let settled=false,equal=false,failed=null;
-       identicalLibraryFile(row,req.result).then(
+       identicalLibraryFile(row,existing).then(
         result=>{equal=result;settled=true},
         error=>{failed=error;settled=true});
        const keepAlive=()=>{
@@ -256,7 +415,7 @@ export async function restoreRowsAtomic(db,decoded){
        };
        keepAlive();
       }catch(error){abort(error)}
-     };
+     },abort);
     };
     next();
    }catch(error){abort(error)}

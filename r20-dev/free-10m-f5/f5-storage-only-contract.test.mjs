@@ -88,8 +88,8 @@ assert.ok(!packagedTell.includes('blob:uploads[j]'),
  'No original photo picker-backed File may be persisted in /tell');
 const privateTell=preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(
  alignEditedNarrationCueRefs(scopeLocalMemories(packagedTell,s1))));
-assert.equal(privateTell.split('const row={key:files[j].key,blob:taleraOwnedPhotoUploads[j]};').length,2,
- 'Private editor must write the SAME byte-owned originals as new photo uploads');
+assert.ok(privateTell.includes('await taleraPayload.prepare(files[j].key,taleraOwnedPhotoUploads[j])'),
+ 'Private editor must store the SAME byte-owned originals in the shared payload');
 assert.ok(privateTell.includes('if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;'),
  'Editing must never overwrite existing media with reused original IDs');
 assert.ok(!privateTell.includes('blob:uploads[j]'),

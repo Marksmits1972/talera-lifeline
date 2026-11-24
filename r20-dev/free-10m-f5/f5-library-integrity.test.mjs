@@ -1,7 +1,7 @@
 // TALERA Free: same library-integrity contract used by backup and restore.
 // Pure synthetic test values; no user library, no new Worker or app.
 import assert from 'node:assert/strict';
-import {verifyLibraryMediaIntegrity,verifyRestoredLibraryReadback} from './f5-library-persistence.mjs';
+import {verifyLibraryMediaIntegrity,verifyRestoredLibraryReadback,createOriginalPayloadStorage} from './f5-library-persistence.mjs';
 
 const photo=new File([new Uint8Array([1,2,3])],'old-photo.heic',{type:'image/heic'});
 const video=new File([new Uint8Array([4,5])],'old-video.mov',{type:'video/quicktime'});
@@ -78,6 +78,25 @@ await assert.rejects(()=>verifyRestoredLibraryReadback({stories:[story],files},{
 await assert.rejects(()=>verifyRestoredLibraryReadback({stories:[story],files},{
  stories:[story],files:files.filter(row=>row.key!=='photo-42')
 }),/TALERA_RESTORE_READBACK_MISMATCH/);
+// Same bytes with separate File metadata and IDs require one physical row.
+const pool=createOriginalPayloadStorage();
+const planA=await pool.prepare('original-a',photo);
+const renamed=new File([photo],'other-original.heic',{type:'image/heic',lastModified:1000});
+const planB=await pool.prepare('original-b',renamed);
+const planC=await pool.prepare('original-c',new File([new Uint8Array([1,2,4])],'other-original.heic',{type:'image/heic',lastModified:1000}));
+assert.equal(planA.payloadKey,planB.payloadKey);
+assert.notEqual(planA.payloadKey,planC.payloadKey);
+const rowFor=p=>({key:p.key,payloadKey:p.payloadKey,metadata:p.metadata});
+const physical={key:planA.payloadKey,blob:photo};
+const logical=pool.logicalRows([rowFor(planA),rowFor(planB),physical,{key:'raw-old',blob:video}]);
+assert.deepEqual(logical.map(row=>row.key),['original-a','original-b','raw-old']);
+assert.equal(logical[1].blob.name,renamed.name);
+assert.equal(logical[1].blob.lastModified,renamed.lastModified);
+assert.deepEqual(new Uint8Array(await logical[1].blob.arrayBuffer()),new Uint8Array(await photo.arrayBuffer()));
+assert.throws(()=>pool.logicalRows([rowFor(planA)]),/TALERA_LIBRARY_INVALID_SHARED_ORIGINAL/);
+assert.throws(()=>pool.logicalRows([rowFor(planA),{...physical,blob:new Blob(['wrong size'])}]),/TALERA_LIBRARY_INVALID_SHARED_ORIGINAL/);
+assert.throws(()=>pool.logicalRows([{...rowFor(planB),metadata:{...planB.metadata,length:0}},physical]),/TALERA_LIBRARY_INVALID_SHARED_ORIGINAL/);
+console.log('TALERA_SHARED_ORIGINAL_LOGICAL_METADATA_CONTRACT_PASS');
 console.log('TALERA_RESTORE_ORIGINAL_BYTES_AND_CUES_VERIFIED_PASS');
 
 console.log('TALERA_LIBRARY_ORIGINAL_AND_VOICE_REFERENCES_PASS',JSON.stringify({

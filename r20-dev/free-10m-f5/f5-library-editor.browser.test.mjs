@@ -334,6 +334,34 @@ try{
   const payloadId=links[0].payloadKey;
   if(raw.filter(row=>row.key===payloadId&&row.blob instanceof Blob&&row.blob.size===originalVideo.size).length!==1)
    throw Error('One physical payload was not stored exactly once');
+  // Use the real archive and restore code for distinct IDs sharing the same
+  // original bytes, not merely a direct storage-helper roundtrip.
+  const sourceConn=await persistence.openExisting(payloadDb,false);
+  const sourceSnapshot=await persistence.readAll(sourceConn);
+  sourceConn.close();
+  const selectedStories=sourceSnapshot.stories.filter(row=>[firstVideoStory.id,separateMetadataStory.id,twinFrames.id].includes(row.id));
+  const selectedKeys=new Set(selectedStories.flatMap(row=>row.items.map(item=>item.key)));
+  const selectedFiles=sourceSnapshot.files.filter(row=>selectedKeys.has(row.key));
+  const compact=await codec.createFreeArchive({stories:selectedStories,files:selectedFiles,
+   sourceScope:targetDb,sourceOrigin:location.origin});
+  const compactSummary=await codec.inspectFreeArchive(compact);
+  if(compactSummary.sharedEntries!==selectedKeys.size-1||compactSummary.binaryBytes!==originalVideo.size)
+   throw Error('Backup did not store the shared original payload exactly once');
+  const compactResult=await backup.restoreFreeLibrary(compact,targetDb,{confirmed:true});
+  if(!compactResult.readbackPassed)throw Error('Shared-payload restore failed');
+  const restoredConn=await persistence.openExisting(targetDb,true);
+  const restoredRaw=await new Promise((ok,bad)=>{
+   const q=restoredConn.transaction('files','readonly').objectStore('files').getAll();
+   q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
+  });
+  const restoredLogical=await persistence.readAll(restoredConn);restoredConn.close();
+  const restoredLinks=restoredRaw.filter(row=>selectedKeys.has(row.key));
+  if(restoredLinks.length!==selectedKeys.size||
+     restoredLinks.some(row=>row.payloadKey!==payloadId||row.blob!==undefined)||
+     restoredRaw.filter(row=>row.key===payloadId&&row.blob instanceof Blob).length!==1)
+   throw Error('Restore recreated duplicate physical original payloads');
+  await persistence.verifyRestoredLibraryReadback({stories:selectedStories,files:selectedFiles},restoredLogical);
+  console.log('TALERA_SHARED_ORIGINAL_COMPACT_BACKUP_AND_RESTORE_PHYSICAL_RECORDS_PASS');
   const added=await mem.save(input,[differentVideo,identicalVideo],separateVideoStory.id,
    [separateVideoStory.items[0].key,null]);
   if(added.items[1].key!==sharedVideoKey||added.items[0].key!==separateVideoStory.items[0].key)

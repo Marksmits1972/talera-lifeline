@@ -90,8 +90,9 @@ const privateTell=preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(
  alignEditedNarrationCueRefs(scopeLocalMemories(packagedTell,s1))));
 assert.ok(privateTell.includes('await taleraPayload.prepare(files[j].key,taleraOwnedPhotoUploads[j])'),
  'Private editor must store the SAME byte-owned originals in the shared payload');
-assert.ok(privateTell.includes('if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;'),
- 'Editing must never overwrite existing media with reused original IDs');
+assert.ok(privateTell.includes('payloadPlans.push(existing&&canonicalIds!==undefined&&canonicalIds[j]?null:')&&
+ privateTell.includes('payloadPlans.filter((plan,j)=>plan&&!reused.has(j))'),
+ 'Editing must never create write plans for retained original media IDs');
 assert.ok(!privateTell.includes('blob:uploads[j]'),
  'Editor must never revert the byte-owned photo storage correction');
 console.log('TALERA_F5_PACKAGED_TELL_PHOTO_COPY_EDITOR_COMPOSITION_PASS');

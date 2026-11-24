@@ -182,6 +182,10 @@ try{
  assert.match(await a.locator('#export-status').textContent(),/extra kopie/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
+ const {inspectFreeArchive:inspectDownloaded}=await import('./f5-portable-archive.mjs');
+ const compactInfo=await inspectDownloaded(new Blob([fileBytes]));
+ assert.equal(compactInfo.sharedEntries,1);
+ assert.ok(compactInfo.savedBytes>0);
  // The normal backup remains compact and uses the established fixed name.
  // Only explicitly requesting the older software recovery file expands it.
  await a.locator('#export-details summary').click();
@@ -196,11 +200,15 @@ try{
   const info=await inspectFreeArchive(archive);
   const decoded=await decodeFreeArchive(archive);
   return {schema:info.parsed.schema,sharedEntries:info.sharedEntries,
-   bytes:archive.size,stories:decoded.stories.length,files:decoded.files.length};
+   bytes:archive.size,binaryBytes:info.binaryBytes,stories:decoded.stories.length,files:decoded.files.length};
  });
  assert.equal(recoveryInfo.schema,'talera-free-lossless-local-2');
  assert.equal(recoveryInfo.sharedEntries,0);
- assert.ok(recoveryInfo.bytes>fileBytes.length);
+ // Tiny test bytes can cost fewer bytes than the alias metadata itself.
+ // Check the exact amount of restored binary content, not manifest overhead.
+ assert.equal(recoveryInfo.binaryBytes,compactInfo.binaryBytes+compactInfo.savedBytes);
+ assert.equal(recoveryInfo.stories,compactInfo.stories);
+ assert.equal(recoveryInfo.files,compactInfo.files);
  await a.getByRole('button',{name:'Back-up maken',exact:true}).click();
  await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('Back-up klaar'));
  assert.equal(await a.locator('#save-backup').getAttribute('download'),'TALERA-back-up.talera');

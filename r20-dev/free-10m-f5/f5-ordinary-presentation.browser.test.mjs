@@ -88,7 +88,7 @@ async function load(page,id,count){
     return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===count;
   },[id,count],{timeout:20000});
 }
-try{
+backupRegression: try{
   await start();
   const suffix=Date.now().toString(36);
   const signed=await fetch(origin+'/api/register',{method:'POST',headers:{
@@ -1728,7 +1728,7 @@ try{
     });
     await restoredPage.locator('#preview-restore').click();
     await restoredPage.waitForFunction(()=>
-      document.getElementById('restore-status')?.textContent.includes('Geen dubbele'),
+      document.getElementById('restore-hint')?.textContent.includes('Geen dubbele'),
       null,{timeout:25000});
     assert.equal(await restoredPage.locator('#backup-step-confirm').isVisible(),true);
     await restoredPage.locator('#confirm-restore').check();
@@ -1775,6 +1775,14 @@ try{
   }finally{
     await backupPage.close();
     if(restoredContext)await restoredContext.close();
+  }
+  // Optional scoped backup regression: all existing original media and actual
+  // restore-to-presentation assertions above have executed unchanged.
+  // The default full suite still runs every subsequent gesture and reset test.
+  if(process.env.TALERA_BACKUP_REGRESSION_ONLY==='1'){
+    assert.deepEqual(errors,[],'Runtime errors during actual backup/presentation regression');
+    console.log('TALERA_SCOPED_ACTUAL_BACKUP_AND_RENDER_REGRESSION_PASS');
+    break backupRegression;
   }
   await load(page,plain,3);
 

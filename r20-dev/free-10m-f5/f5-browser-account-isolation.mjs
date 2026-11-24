@@ -924,19 +924,14 @@ try{
  try{
    const res=await mixedHome.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
    assert.equal(res.status(),200);
-   await mixedHome.waitForFunction(async ids=>{
-     const rows=await window.TaleraMemories?.list?.();
-     const links=[...document.querySelectorAll('#myCards a[href*="?memory="]')];
-     const hasCard=id=>links.some(link=>new URL(link.href).searchParams.get('memory')===id);
-     return rows?.some(x=>x.id===ids.untitled)&&rows?.some(x=>x.id===ids.tagged)&&
-       document.querySelectorAll('#demoCards .talera-topic-card').length>0&&
-       hasCard(ids.untitled)&&hasCard(ids.tagged)&&hasCard(ids.other);
-   },{untitled:untitled.id,tagged:tagged.id,other:a.id},{timeout:18000});
-   const shown=await mixedHome.evaluate(()=>{
+   // Read the complete DOM snapshot in the same synchronous polling turn.
+   // Topic rendering and original-card rendering finish independently.
+   // An async storage predicate can return before a subsequent refresh finishes.
+   const shown=await (await mixedHome.waitForFunction(ids=>{
      const cards=document.querySelector('#myCards');
      const topics=document.querySelector('#demoCards');
      const visible=node=>!!node&&getComputedStyle(node).display!=='none';
-     return {
+     const snapshot={
        cardsVisible:visible(cards),topicsVisible:visible(topics),
        topicCards:[...topics?.children||[]].map(x=>({text:x.textContent?.trim(),
          html:x.outerHTML.slice(0,900)})).slice(0,3),
@@ -945,7 +940,13 @@ try{
          html:x.outerHTML.slice(0,1000),visible:visible(x)})).slice(0,5),
        topicOnlyClass:document.documentElement.classList.contains('talera-untagged-memory-cards')
      };
-   });
+     if(!snapshot.cardsVisible||!snapshot.topicsVisible||!snapshot.topicOnlyClass||
+        !snapshot.originalCards.some(x=>x.id===ids.untitled&&x.visible)||
+        !snapshot.originalCards.some(x=>x.id===ids.other&&x.visible)||
+        !snapshot.originalCards.some(x=>x.id===ids.tagged&&!x.visible)||
+        !snapshot.topicCards.some(x=>x.text.includes('Reizen')))return false;
+     return snapshot;
+   },{untitled:untitled.id,tagged:tagged.id,other:a.id},{timeout:18000})).jsonValue();
    console.log('TALERA_F5_MIXED_TOPIC_HOME_CURRENT_RENDER',JSON.stringify(shown));
    assert.equal(shown.topicsVisible,true,'Previously approved topic tiles disappeared');
    assert.equal(shown.cardsVisible,true,

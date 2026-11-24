@@ -22,7 +22,7 @@ label{display:block;margin:12px 0}
 .file-hint{font-size:.95rem;overflow-wrap:anywhere;margin:8px 0 18px}
 .file-hint[data-selected="yes"]{font-weight:600;color:#23497e}
 h3{font-size:1.07rem;margin:18px 0 10px}
-.note{font-size:.93rem}output{display:block;white-space:pre-wrap;margin:12px 0;padding:12px;background:#eef2f7;border-radius:8px}output:empty{display:none}
+details{margin-top:14px}summary{cursor:pointer;color:#23497e;font-weight:600}details output{font-size:.9rem;overflow-wrap:anywhere}.note{font-size:.93rem}output{display:block;white-space:pre-wrap;margin:12px 0;padding:12px;background:#eef2f7;border-radius:8px}output:empty{display:none}
 </style></head>
 <body><main id="talera-free-backup" data-database="${dbName}">
 <a href="/mijn-leven">Terug naar Mijn leven</a>
@@ -34,6 +34,7 @@ h3{font-size:1.07rem;margin:18px 0 10px}
 <button type="button" id="make-backup" disabled>Back-up maken</button>
 <a id="save-backup" class="save" download hidden>Bewaar bestand</a>
 <output id="export-status" role="status"></output>
+<details id="export-details" hidden><summary>Technische details bekijken</summary><output id="export-details-text"></output></details>
 </section>
 <section><h2>Back-up terugzetten</h2>
 <p>Volg de stappen van boven naar beneden. Er wordt niets teruggezet zonder jouw bevestiging.</p>
@@ -48,10 +49,12 @@ h3{font-size:1.07rem;margin:18px 0 10px}
 </div>
 <output id="restore-status" role="status"></output>
 <div id="backup-step-confirm" hidden>
-<h3>Stap 3 — Zet herinneringen terug</h3>
-<label><input type="checkbox" id="confirm-restore"> Ik heb de controle gelezen en wil deze herinneringen terugzetten.</label>
+<h3>Stap 3 — Herinneringen terugzetten</h3>
+<p id="restore-hint" role="status"></p>
+<label><input type="checkbox" id="confirm-restore" disabled> Ik heb de controle gelezen en wil deze herinneringen terugzetten.</label>
 <button type="button" id="run-restore" disabled>Herinneringen terugzetten</button>
 </div>
+<details id="restore-details" hidden><summary>Technische details bekijken</summary><output id="restore-details-text"></output></details>
 </section>
 <p class="note">Bestaande herinneringen worden niet overschreven. Verwijder je oude app pas na controle van het herstel.</p>
 </main>

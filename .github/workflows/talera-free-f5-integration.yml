@@ -123,8 +123,8 @@ jobs:
             # the owner-requested ordered backup picker UI and controller are exact-blob guarded.
             # Archive codec, read/write adapter, owner data and presentation remain unchanged.
             if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "9c7f3784676b76b3cb17f4048b857f8779125bbb"
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "a9a6200c80c11ef8d581dfcc02d7485b04587790"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "642ba9365b7d5a2bcc8e12770872ebc43077aa17"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "c41216a0a4f5dca099e156efa7842d720a13e2f0"
             elif [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "e01dc1b7bab00fc38125fc525f65a357a931c061"
@@ -1199,7 +1199,7 @@ jobs:
           const ctrl=fs.readFileSync('r20-dev/free-10m-f5/f5-backup-controller.mjs','utf8');
           assert.ok(ctrl.includes('checkStep.hidden=!file')&&
             ctrl.includes('preview.disabled=!file')&&
-            ctrl.includes('finalStep.hidden=!result.safeToRestore')&&
+            ctrl.includes('finalStep.hidden=false;confirm.disabled=!result.safeToRestore;restore.disabled=true;')&&
             ctrl.includes('assertCurrentAccount()')&&
             ctrl.includes('restoreFreeLibrary(file,db,'));
           assert.ok(html.includes('Bestaande herinneringen worden niet overschreven'));

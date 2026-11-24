@@ -14,6 +14,68 @@ const chooser=el('restore-file'),cross=el('other-origin'),preview=el('preview-re
 const confirm=el('confirm-restore'),restore=el('run-restore'),status=el('restore-status');
 const selected=el('selected-file'),checkStep=el('backup-step-check'),finalStep=el('backup-step-confirm');
 const backupName='TALERA-back-up.talera';
+const restoreDetails=el('restore-details'),exportDetails=el('export-details');
+const restoreHint=el('restore-hint');
+const mb=n=>(n/1048576).toFixed(1)+' MB';
+function setDetails(details,lines){
+ details.open=false;details.hidden=!lines;
+ details.querySelector('output').textContent=lines||'';
+}
+// Aggregate the existing archive manifest; no extra reads of original media.
+// A fresh export contains all records from the account's local library snapshot.
+// Content identity uses the complete ordered SHA-256 chunk list, not file names.
+function storageSummary(summary,totalBytes){
+ const p=summary.parsed;
+ const field=(node,key)=>node?.[0]==='obj'?node[1].find(entry=>entry[0]===key)?.[1]:undefined;
+ const str=node=>node?.[0]==='str'?node[1]:undefined;
+ const originals=new Map();let links=0;
+ for(const story of p.stories){
+  const items=field(story,'items');
+  if(items?.[0]!=='arr')continue;
+  for(const item of items[1]){
+   const key=str(field(item,'key')),kind=str(field(item,'kind'));
+   if(!key)continue;
+   links++;
+   if(!originals.has(key))originals.set(key,['photo','video','audio'].includes(kind)?kind:'other');
+  }
+ }
+ const categories=['photo','video','audio','other','mobile','editor','unlinked'];
+ const counts=Object.fromEntries(categories.map(k=>[k,0]));
+ const bytes=Object.fromEntries(categories.map(k=>[k,0]));
+ const owners=new Map();
+ const walk=(node,category)=>{
+  if(!Array.isArray(node))return;
+  if(node[0]==='bin'){if(!owners.has(node[1]))owners.set(node[1],category);}
+  else if(node[0]==='arr')for(const value of node[1])walk(value,category);
+  else if(node[0]==='obj')for(const entry of node[1])walk(entry[1],category);
+ };
+ for(const row of p.files){
+  const key=str(field(row,'key'));
+  const category=originals.get(key)||(key?.endsWith(':phone-v1')&&originals.has(key.slice(0,-9))?'mobile':
+   key?.startsWith('talera-v4-work:')?'editor':'unlinked');
+  counts[category]++;walk(row,category);
+ }
+ for(const story of p.stories)walk(story,'other');
+ const seen=new Set();let copies=0,duplicateBytes=0;
+ for(let i=0;i<p.binaries.length;i++){
+  const bin=p.binaries[i];
+  bytes[owners.get(i)||'other']+=bin.length;
+  const sig=bin.length+':'+(bin.sha256Chunks?bin.sha256Chunks.join(','):bin.sha256);
+  if(seen.has(sig)){copies++;duplicateBytes+=bin.length;}else seen.add(sig);
+ }
+ return [
+  'Herinneringen: '+p.stories.length+'; mediakoppelingen: '+links+'; unieke originele media-ID’s: '+originals.size+'.',
+  'Originele foto’s: '+counts.photo+' ('+mb(bytes.photo)+')',
+  'Originele video’s: '+counts.video+' ('+mb(bytes.video)+')',
+  'Originele geluidsbestanden: '+counts.audio+' ('+mb(bytes.audio)+')',
+  'Mobiele versies: '+counts.mobile+' ('+mb(bytes.mobile)+')',
+  'Editorrecords: '+counts.editor+' ('+mb(bytes.editor)+')',
+  'Niet direct gekoppelde bestandsrecords: '+counts.unlinked+' ('+mb(bytes.unlinked)+')',
+  'Overige binaire gegevens: '+mb(bytes.other)+'; bestandsadministratie: '+mb(totalBytes-summary.binaryBytes),
+  'Extra binaire kopieën met identieke inhoud: '+copies+' ('+mb(duplicateBytes)+').',
+  'Dit betreft logische back-upgegevens, niet gemeten fysieke telefoonopslag. Identieke bytes zijn niet automatisch overbodig. Niets wordt verwijderd.'
+ ].join('\n');
+}
 let downloadUrl=null,preparedFile=null,shareUnavailable=false,review=null,reviewFile=null,reviewCross=null;
 const message=(element,text)=>{element.textContent=text;};
 // Read-only browser diagnosis on the EXISTING status area. No new button,
@@ -86,7 +148,8 @@ async function assertCurrentAccount(){
 
 function invalidate(){
  review=null;reviewFile=null;reviewCross=null;restore.disabled=true;
- confirm.checked=false;finalStep.hidden=true;
+ confirm.checked=false;confirm.disabled=true;finalStep.hidden=true;
+ message(restoreHint,'');setDetails(restoreDetails,'');
  message(status,chooser.files?.[0]?'Keuze gewijzigd. Controleer het bestand opnieuw.':'');
 }
 function showFileSelection(){
@@ -108,7 +171,7 @@ confirm.addEventListener('change',()=>{
 make.addEventListener('click',async()=>{
  make.disabled=true;
  if(downloadUrl){URL.revokeObjectURL(downloadUrl);downloadUrl=null}
- save.hidden=true;save.removeAttribute('href');preparedFile=null;shareUnavailable=false;
+ save.hidden=true;save.removeAttribute('href');preparedFile=null;shareUnavailable=false;setDetails(exportDetails,'');
  message(exportStatus,'Back-up maken…');
  try{
   await assertCurrentAccount();
@@ -116,7 +179,8 @@ make.addEventListener('click',async()=>{
   // Fail closed BEFORE offering a download if iOS assembled extra or missing
   // Blob bytes. Checks exact manifest size + checksum, without changing media.
   // This never uploads, rewrites, or restores the owner's local memories.
-  await inspectFreeArchive(archive);
+  const summary=await inspectFreeArchive(archive);
+  try{setDetails(exportDetails,storageSummary(summary,archive.size));}catch(_){}
   preparedFile=new File([archive],backupName,{type:'application/octet-stream'});
   downloadUrl=URL.createObjectURL(preparedFile);
   save.href=downloadUrl;
@@ -164,21 +228,30 @@ preview.addEventListener('click',async()=>{
  message(status,'Bestand controleren…');
  try{
   await assertCurrentAccount();
-  const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:cross.checked,inspectPhotos:true});
-  review=result;reviewFile=file;reviewCross=cross.checked;
-  finalStep.hidden=!result.safeToRestore;
+  const chosenCross=cross.checked;
+  const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:chosenCross,inspectPhotos:true});
+  let analysis='';
+  try{analysis='\n\n'+storageSummary(await inspectFreeArchive(file),file.size);}
+  catch(_){analysis='\n\nOpslagoverzicht niet beschikbaar.'}
+  // A changed selection invalidates the old result, even during a slow check.
+  if(file!==chooser.files?.[0]||chosenCross!==cross.checked)return invalidate();
+  const allPresent=result.alreadyPresentStories===result.storyCount&&result.storyCount>0&&
+   result.identicalMediaEntries===result.mediaStoreEntries&&result.conflictingMediaEntries===0;
+  setDetails(restoreDetails,'Huidige bibliotheek: '+result.currentStoryCount+' herinnering(en).\n'+
+   'Bestaande herinneringen: '+result.alreadyPresentStories+'\n'+
+   'Afwijkende bestandsrecords: '+result.conflictingMediaEntries+'\n'+
+   'Identieke bestandsrecords veilig herbruikbaar: '+result.identicalMediaEntries+'\n'+
+   'Technische editorrecords zonder herinneringen of conceptinhoud: '+result.ignoredTechnicalEntries+
+   (result.conflictingRecordKinds?.length?'\nTerugzetten is geblokkeerd door: '+[...new Set(result.conflictingRecordKinds)].join(', ')+'.':'')+
+   '\nEr is niets gewijzigd of teruggezet.'+analysis+readOnlyPhotoText(result));
+  review=result;reviewFile=file;reviewCross=chosenCross;
+  finalStep.hidden=false;confirm.disabled=!result.safeToRestore;restore.disabled=true;
   status.style.whiteSpace='pre-line';
-  message(status,'Gecontroleerd: '+result.storyCount+' herinnering(en). '+
-   (result.crossOrigin?'Back-up uit een andere TALERA-versie. ':'')+
-   (result.safeToRestore?'Geen dubbele gegevens. Ga nu door met stap 3 om terug te zetten.':
-    'Conflict met bestaande gegevens. Bestaande herinneringen: '+result.alreadyPresentStories+
-    '. Afwijkende bestandsrecords: '+result.conflictingMediaEntries+
-    '. Er is niets gewijzigd of teruggezet.')+
-   '\nHuidige bibliotheek: '+result.currentStoryCount+' herinnering(en). '+
-   'Identieke bestandsrecords veilig herbruikbaar: '+result.identicalMediaEntries+'.'+
-   (result.ignoredTechnicalEntries?'\nTechnische editorrecords zonder herinneringen of conceptinhoud: '+result.ignoredTechnicalEntries+'. Deze worden niet teruggezet of overschreven.':'')+
-   (result.conflictingRecordKinds?.length?'\nTerugzetten is geblokkeerd door: '+[...new Set(result.conflictingRecordKinds)].join(', ')+'. Bewaar het back-upbestand; er is niets overschreven.':'')+
-   readOnlyPhotoText(result));
+  message(status,'Bestand is in orde.\nGecontroleerd: '+result.storyCount+' herinnering(en).\n'+
+   'Bestandsgrootte: '+mb(file.size)+'\nBestandsafwijkingen: '+result.conflictingMediaEntries);
+  message(restoreHint,result.safeToRestore?'Geen dubbele gegevens. Bevestig hieronder om terug te zetten.':
+   allPresent?'Alle herinneringen uit deze back-up zijn al aanwezig. Terugzetten is niet nodig.':
+   'Conflict met bestaande gegevens. Terugzetten is geblokkeerd om je herinneringen te beschermen.');
  }catch(e){message(status,'Controle gestopt (niets gewijzigd): '+failText(e))}
  finally{preview.disabled=!chooser.files?.[0]}
 });
@@ -192,11 +265,12 @@ restore.addEventListener('click',async()=>{
   await assertCurrentAccount();
   const result=await restoreFreeLibrary(file,db,{allowOtherOrigin:cross.checked,confirmed:true});
   message(status,'Herstel voltooid: '+result.restoredStories+' herinnering(en) toegevoegd. Controleer ze bij Mijn leven.');
-  review=null;finalStep.hidden=true;confirm.checked=false;
+  review=null;confirm.checked=false;confirm.disabled=true;restore.disabled=true;
+  message(restoreHint,'Herstel voltooid. Controleer je herinneringen bij Mijn leven.');
  }catch(e){
   message(status,'Terugzetten gestopt. Bestaande herinneringen blijven staan. '+failText(e));
   review=null;finalStep.hidden=true;confirm.checked=false;
- }finally{confirm.disabled=false;preview.disabled=!chooser.files?.[0]}
+ }finally{confirm.disabled=!review?.safeToRestore;preview.disabled=!chooser.files?.[0]}
 });
 window.addEventListener('pagehide',()=>{if(downloadUrl)URL.revokeObjectURL(downloadUrl)});
 make.disabled=false;

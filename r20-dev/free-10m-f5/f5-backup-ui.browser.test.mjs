@@ -76,6 +76,7 @@ const seed=async(page,db,present)=>{
    files.add({key:id+':2',blob:new File([Uint8Array.from([7,6,5,4])],
     'stem.wav',{type:'audio/wav'})});
    files.add({key:'talera-v4-work:preview:synthetic',blob:new Blob(['preview'],{type:'image/jpeg'})});
+   files.add({key:'talera-v4-work:synthetic-duplicate-video',blob:new Blob([Uint8Array.from([33,22,11,99])],{type:'video/quicktime'})});
    files.add({key:'talera-v4-work:manifest',blob:[]});
    files.add({key:'talera-v4-work:duplicate-index-v7',blob:{
     [id+':0']:{signature:'synthetic-source-index',size:genuineJpeg.length,updated:'2026-11-24T00:00:00.000Z'}
@@ -141,6 +142,11 @@ try{
  await a.locator('#save-backup').waitFor({state:'visible'});
  assert.equal(await a.locator('#save-backup').textContent(),'Bewaar bestand');
  assert.equal(await a.getByRole('button',{name:'Back-up maken'}).isEnabled(),true);
+ assert.equal(await a.locator('#export-details').isVisible(),true);
+ assert.equal(await a.locator('#export-details-text').isVisible(),false);
+ await a.locator('#export-details summary').click();
+ assert.match(await a.locator('#export-details-text').textContent(),/Originele video’s: 1/);
+ assert.match(await a.locator('#export-details-text').textContent(),/Extra binaire kopieën met identieke inhoud: 1 /);
  // A subsequent back-up uses EXACTLY the same labels and original local
  // workflow, without a first-run or expired-success label.
  await a.getByRole('button',{name:'Back-up maken'}).click();
@@ -280,13 +286,17 @@ try{
    conn.close();return key;
   },{db:dbA,bytes:Array.from(fileBytes)});
   await empty.locator('#preview-restore').click();
-  await empty.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Terugzetten is geblokkeerd door:'));
-  const blocked=await empty.locator('#restore-status').textContent();
+  await empty.waitForFunction(()=>document.getElementById('restore-hint').textContent.includes('Conflict'));
+  assert.equal(await empty.locator('#restore-details-text').isVisible(),false);
+  await empty.locator('#restore-details summary').click();
+  const blocked=await empty.locator('#restore-details-text').textContent();
   assert.match(blocked,/Afwijkende bestandsrecords: 1/);
   assert.match(blocked,/Huidige bibliotheek: 0 herinnering/);
   assert.match(blocked,/Identieke bestandsrecords veilig herbruikbaar: 1/);
   assert.match(blocked,/losstaand herinneringsbestand/);
-  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),false);
+  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),true);
+  assert.equal(await empty.locator('#run-restore').isDisabled(),true);
+  assert.equal(await empty.locator('#confirm-restore').isDisabled(),true);
   // Cleanup of ONLY our own synthetic conflicting fixture, no customer records.
   await empty.evaluate(async({db,key})=>{
    const p=await import('/__f5/f5-library-persistence.mjs');
@@ -299,10 +309,11 @@ try{
   console.log('TALERA_EMPTY_STORIES_DIFFERENT_ORPHAN_FILE_BLOCKED_AND_CLASSIFIED_PASS');
   await empty.locator('#preview-restore').click();
   await empty.waitForFunction(()=>
-   document.getElementById('restore-status').textContent.includes('Geen dubbele'));
-  assert.match(await empty.locator('#restore-status').textContent(),
+   document.getElementById('restore-hint').textContent.includes('Geen dubbele'));
+  assert.equal(await empty.locator('#restore-details-text').isVisible(),false);
+  assert.match(await empty.locator('#restore-details-text').textContent(),
    /Identieke bestandsrecords veilig herbruikbaar: 1/);
-  assert.match(await empty.locator('#restore-status').textContent(),
+  assert.match(await empty.locator('#restore-details-text').textContent(),
    /Technische editorrecords zonder herinneringen of conceptinhoud: 2/);
   assert.match(await empty.locator('#restore-status').textContent(),
    /Gecontroleerd: 1 herinnering/);
@@ -374,7 +385,7 @@ try{
   assert.deepEqual(afterReload.videoBytes,[33,22,11,99]);
   assert.deepEqual(afterReload.voiceBytes,[7,6,5,4]);
   assert.equal(afterReload.videoName,'origineel.mov');
-  assert.equal(afterReload.fileIds.length,6,
+  assert.equal(afterReload.fileIds.length,7,
    'Exact originals and existing preview plus the untouched two technical records');
   assert.deepEqual(afterReload.technicalIndex,{},'Existing technical index must not be overwritten');
   assert.deepEqual(afterReload.technicalManifest,[],'Existing empty draft manifest must stay intact');
@@ -384,11 +395,12 @@ try{
   });
   await empty.locator('#preview-restore').click();
   await empty.waitForFunction(()=>
-   document.getElementById('restore-status').textContent.includes('Conflict'));
+   document.getElementById('restore-hint').textContent.includes('al aanwezig'));
   assert.equal(await empty.locator('#run-restore').isDisabled(),true,
    'Restoring twice must never silently duplicate or overwrite the record');
-  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),false,
-   'Conflict must hide step 3 instead of presenting a confusing grey restore button');
+  assert.equal(await empty.locator('#backup-step-confirm').isVisible(),true,
+   'A completed check keeps the disabled restore button visible');
+  assert.equal(await empty.locator('#confirm-restore').isDisabled(),true);
   console.log('TALERA_FREE_EMPTY_LOCAL_LIBRARY_RESTORE_SAME_ORIGIN_PASS',
    JSON.stringify({startsWithoutStories:true,prefilledExamples:0,
     sameExistingOrigin:true,separatePrivateBrowserStorageOnly:true,
@@ -417,7 +429,7 @@ try{
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  await b.locator('#other-origin').check();
  await b.locator('#preview-restore').click();
- await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Geen dubbele'));
+ await b.waitForFunction(()=>document.getElementById('restore-hint').textContent.includes('Geen dubbele'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  assert.equal(await b.locator('#backup-step-confirm').isVisible(),true);
  await b.locator('#confirm-restore').check();
@@ -440,7 +452,7 @@ try{
  assert.deepEqual(state.videoBytes,[33,22,11,99]);assert.equal(state.videoName,'origineel.mov');
  // Attempt to re-import: conflicts are presented, and the restore button stays disabled.
  await b.locator('#preview-restore').click();
- await b.waitForFunction(()=>document.getElementById('restore-status').textContent.includes('Conflict'));
+ await b.waitForFunction(()=>document.getElementById('restore-hint').textContent.includes('al aanwezig'));
  assert.equal(await b.locator('#run-restore').isDisabled(),true);
  // Corrupt archive cannot be previewed, let alone restored.
  const corrupt=Buffer.from(fileBytes);corrupt[corrupt.length-1]^=255;
@@ -485,7 +497,7 @@ try{
  assert.equal(await b.locator('#run-restore').count(),1,
   'The protected restore action must remain intact after success or repeated restore');
  assert.equal(await b.locator('#backup-step-confirm').isVisible(),false,
-  'After a conflict or invalid file, the final restore step must stay hidden');
+  'After an invalid file or account check, the final restore step must stay hidden');
  assert.match(await a.locator('main').innerText(),/niet versleuteld/i);
  assert.ok(!(await a.locator('main').innerText()).includes('besloten proef'),
   'Existing real Free backup must not be falsely marked as a demo');

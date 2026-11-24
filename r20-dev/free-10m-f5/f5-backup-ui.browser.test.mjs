@@ -182,6 +182,28 @@ try{
  assert.match(await a.locator('#export-status').textContent(),/extra kopie/);
  const fileBytes=readFileSync(await download.path());
  assert.ok(fileBytes.length>200);
+ // The normal backup remains compact and uses the established fixed name.
+ // Only explicitly requesting the older software recovery file expands it.
+ await a.locator('#export-details summary').click();
+ assert.equal(await a.locator('#legacy-backup').isVisible(),true);
+ await a.locator('#legacy-backup').click();
+ await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('oudere software klaar'));
+ assert.equal(await a.locator('#save-backup').getAttribute('download'),'TALERA-herstel-oudere-versie.talera');
+ const recoveryInfo=await a.evaluate(async()=>{
+  const {inspectFreeArchive,decodeFreeArchive}=await import('/__f5/f5-portable-archive.mjs');
+  const response=await fetch(document.getElementById('save-backup').href);
+  const archive=await response.blob();
+  const info=await inspectFreeArchive(archive);
+  const decoded=await decodeFreeArchive(archive);
+  return {schema:info.parsed.schema,sharedEntries:info.sharedEntries,
+   bytes:archive.size,stories:decoded.stories.length,files:decoded.files.length};
+ });
+ assert.equal(recoveryInfo.schema,'talera-free-lossless-local-2');
+ assert.equal(recoveryInfo.sharedEntries,0);
+ assert.ok(recoveryInfo.bytes>fileBytes.length);
+ await a.getByRole('button',{name:'Back-up maken',exact:true}).click();
+ await a.waitForFunction(()=>document.getElementById('export-status').textContent.includes('Back-up klaar'));
+ assert.equal(await a.locator('#save-backup').getAttribute('download'),'TALERA-back-up.talera');
  // Simulate an iOS Blob assembly anomaly affecting ONLY the final .talera Blob.
  // The existing app must NEVER offer download of an archive whose bytes do not
  // agree with its checksum-verified manifest. Synthetic browser fixture only.

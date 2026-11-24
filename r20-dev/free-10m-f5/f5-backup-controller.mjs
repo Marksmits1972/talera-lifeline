@@ -4,7 +4,7 @@
 import {
  exportExistingFreeLibrary,previewFreeLibraryRestore,restoreFreeLibrary
 } from '/__f5/f5-portable-idb.mjs';
-import {inspectFreeArchive} from '/__f5/f5-portable-archive.mjs';
+import {inspectFreeArchive,expandFreeArchiveForLegacy} from '/__f5/f5-portable-archive.mjs';
 const el=id=>document.getElementById(id);
 const root=el('talera-free-backup'),db=root?.dataset.database;
 if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(db||''))
@@ -16,6 +16,7 @@ const selected=el('selected-file'),checkStep=el('backup-step-check'),finalStep=e
 const backupName='TALERA-back-up.talera';
 const restoreDetails=el('restore-details'),exportDetails=el('export-details');
 const restoreHint=el('restore-hint');
+const legacy=el('legacy-backup'),legacyHint=el('legacy-backup-hint');
 const mb=n=>(n/1048576).toFixed(1)+' MB';
 function setDetails(details,lines){
  details.open=false;details.hidden=!lines;
@@ -171,10 +172,25 @@ cross.addEventListener('change',invalidate);
 confirm.addEventListener('change',()=>{
  restore.disabled=!(review?.safeToRestore&&confirm.checked&&reviewFile===chooser.files?.[0]&&reviewCross===cross.checked);
 });
-make.addEventListener('click',async()=>{
- make.disabled=true;
+function setLegacyAvailable(available){
+ legacy.hidden=!available;legacy.disabled=!available;legacyHint.hidden=!available;
+}
+function clearPrepared(){
  if(downloadUrl){URL.revokeObjectURL(downloadUrl);downloadUrl=null}
- save.hidden=true;save.removeAttribute('href');preparedFile=null;shareUnavailable=false;setDetails(exportDetails,'');
+ save.hidden=true;save.removeAttribute('href');preparedFile=null;shareUnavailable=false;
+}
+function prepareDownload(archive,summary,name){
+ const next=new File([archive],name,{type:'application/octet-stream'});
+ const url=URL.createObjectURL(next);
+ clearPrepared();
+ preparedFile=next;downloadUrl=url;
+ save.href=url;save.download=name;save.hidden=false;
+ setDetails(exportDetails,storageSummary(summary,archive.size));
+ setLegacyAvailable(summary.sharedEntries>0);
+}
+make.addEventListener('click',async()=>{
+ make.disabled=true;setLegacyAvailable(false);
+ clearPrepared();setDetails(exportDetails,'');
  message(exportStatus,'Back-up maken…');
  try{
   await assertCurrentAccount();
@@ -183,22 +199,46 @@ make.addEventListener('click',async()=>{
   // Blob bytes. Checks exact manifest size + checksum, without changing media.
   // This never uploads, rewrites, or restores the owner's local memories.
   const summary=await inspectFreeArchive(archive);
-  try{setDetails(exportDetails,storageSummary(summary,archive.size));}catch(_){}
-  preparedFile=new File([archive],backupName,{type:'application/octet-stream'});
-  downloadUrl=URL.createObjectURL(preparedFile);
-  save.href=downloadUrl;
-  save.download=backupName;
-  save.hidden=false;
+  prepareDownload(archive,summary,backupName);
   message(exportStatus,'Back-up klaar ('+(archive.size/1048576).toFixed(1)+
    ' MB). Tik op "Bewaar bestand". Kies in Bestanden dezelfde eigen map en bevestig Vervang als je al een TALERA-back-up hebt.');
  }catch(e){message(exportStatus,'Back-up niet gemaakt: '+failText(e))}
  finally{make.disabled=false}
+});
+// The compact prepared archive is verified and expanded only on explicit
+// user action. Use a distinct filename only for this exceptional recovery
+// copy, so it cannot accidentally replace the user's normal compact backup.
+legacy.addEventListener('click',async()=>{
+ if(!preparedFile||make.disabled||legacy.disabled)return;
+ const source=preparedFile;
+ make.disabled=true;legacy.disabled=true;save.hidden=true;
+ message(exportStatus,'Herstelbestand voor oudere software maken…');
+ try{
+  await assertCurrentAccount();
+  const archive=await expandFreeArchiveForLegacy(source);
+  const summary=await inspectFreeArchive(archive);
+  if(summary.parsed.schema!=='talera-free-lossless-local-2'||summary.sharedEntries!==0)
+   throw Error('TALERA_ARCHIVE_UNSUPPORTED_VERSION');
+  await assertCurrentAccount();
+  prepareDownload(archive,summary,'TALERA-herstel-oudere-versie.talera');
+  message(exportStatus,'Herstelbestand voor oudere software klaar ('+mb(archive.size)+'). Tik op "Bewaar bestand". Je gewone back-up in Bestanden wordt niet gewijzigd.');
+ }catch(e){
+  // Account changes invalidate the prepared archive, rather than leaving
+  // a formerly authorized file link active in the current account.
+  if(/ACCOUNT_CHANGED|SESSION_EXPIRED|SESSION_UNVERIFIED/.test(String(e?.message))){
+   clearPrepared();setDetails(exportDetails,'');setLegacyAvailable(false);
+  }else{
+   save.hidden=!preparedFile;setLegacyAvailable(!!preparedFile);
+  }
+  message(exportStatus,'Herstelbestand niet gemaakt: '+failText(e));
+ }finally{make.disabled=false}
 });
 // iPhone PWA cannot silently write into the external Files app. Prefer the
 // native share/save sheet when it accepts this exact prepared file. Preserve
 // the download fallback, but never claim a download replaced an old file.
 save.addEventListener('click',async event=>{
  if(!preparedFile){event.preventDefault();return}
+ const filename=preparedFile.name;
  const payload={files:[preparedFile]};
  let supported=false;
  try{
@@ -206,14 +246,14 @@ save.addEventListener('click',async event=>{
    typeof navigator.canShare==='function'&&navigator.canShare(payload);
  }catch(_){}
  if(!supported){
-  message(exportStatus,'Download aangeboden als '+backupName+
+  message(exportStatus,'Download aangeboden als '+filename+
    '. De browser kan een extra kopie maken. Controleer Bestanden; vervang de vorige back-up pas als het nieuwe bestand veilig is bewaard.');
   return;
  }
  event.preventDefault();
  try{
   await navigator.share(payload);
-  message(exportStatus,'Bewaar de back-up in je eigen map in Bestanden. Controleer of '+backupName+' daar is bijgewerkt. TALERA kan dit niet zelfstandig controleren.');
+  message(exportStatus,'Bewaar de back-up in je eigen map in Bestanden. Controleer of '+filename+' daar is bijgewerkt. TALERA kan dit niet zelfstandig controleren.');
  }catch(e){
   if(e?.name==='AbortError'){
    message(exportStatus,'Bewaren geannuleerd. De bestaande back-up is niet door TALERA gewijzigd. Tik opnieuw op "Bewaar bestand".');

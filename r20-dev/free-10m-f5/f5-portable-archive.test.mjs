@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {createFreeArchive,inspectFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
+import {createFreeArchive,inspectFreeArchive,decodeFreeArchive,expandFreeArchiveForLegacy} from './f5-portable-archive.mjs';
+import {execFileSync} from 'node:child_process';
 const scope='f5-browser-account-verified-7f8acd68b2';
 const audio=new File([Uint8Array.from([0,1,2,3,4,5,6,7,8,9])],'originele-stem.wav',
  {type:'audio/wav',lastModified:1690900000000});
@@ -154,6 +155,48 @@ const sharedLargeDecoded=await decodeFreeArchive(sharedLarge);
 assert.equal(sharedLargeDecoded.files[1].blob.name,largeTwin.name);
 assert.equal(sharedLargeDecoded.files[1].blob.lastModified,largeTwin.lastModified);
 assert.deepEqual(new Uint8Array(await sharedLargeDecoded.files[1].blob.slice(-1024*1024).arrayBuffer()),mib);
+// The actual owner-designated recovery software, not a simulated reader,
+// must be able to decode the explicitly expanded archive. Read its original
+// committed code; do not alter the recovery branch or retain a second app.
+const oldRef='1e6f49ccbdfe3346edc4815fbc44613a89d757fc';
+const oldPath='r20-dev/free-10m-f5/f5-portable-archive.mjs';
+assert.equal(execFileSync('git',['rev-parse',oldRef+':'+oldPath],{encoding:'utf8'}).trim(),
+ 'eb4e3183848658da7bbb40cc91b0823c0eeb4344');
+const oldSource=execFileSync('git',['show',oldRef+':'+oldPath]);
+const oldCodec=await import('data:text/javascript;base64,'+oldSource.toString('base64'));
+await assert.rejects(()=>oldCodec.decodeFreeArchive(sharedArchive),/UNSUPPORTED_VERSION/);
+const recoveryArchive=await expandFreeArchiveForLegacy(sharedArchive);
+assert.equal((await inspectFreeArchive(recoveryArchive)).parsed.schema,'talera-free-lossless-local-2');
+const oldRead=await oldCodec.decodeFreeArchive(recoveryArchive);
+assert.deepEqual(oldRead.stories,sharedDecoded.stories);
+assert.equal(oldRead.sourceScope,sharedDecoded.sourceScope);
+assert.equal(oldRead.sourceOrigin,sharedDecoded.sourceOrigin);
+assert.equal(oldRead.createdAt,sharedDecoded.createdAt);
+assert.deepEqual(oldRead.files.map(row=>row.key),sharedDecoded.files.map(row=>row.key));
+for(let i=0;i<oldRead.files.length;i++){
+ const want=sharedDecoded.files[i].blob,got=oldRead.files[i].blob;
+ if(want instanceof Blob){
+  assert.equal(got.type,want.type);
+  assert.equal(got instanceof File,want instanceof File);
+  if(want instanceof File){
+   assert.equal(got.name,want.name);assert.equal(got.lastModified,want.lastModified);
+  }
+  assert.deepEqual(new Uint8Array(await got.arrayBuffer()),new Uint8Array(await want.arrayBuffer()));
+ }else assert.deepEqual(got,want);
+}
+const expandedLarge=await expandFreeArchiveForLegacy(sharedLarge);
+const expandedLargeSummary=await inspectFreeArchive(expandedLarge);
+assert.equal(expandedLargeSummary.binaryBytes,360*1024*1024);
+assert.equal(expandedLargeSummary.sharedEntries,0);
+const oldLargeRead=await oldCodec.decodeFreeArchive(expandedLarge);
+assert.equal(oldLargeRead.files[1].blob.name,largeTwin.name);
+assert.equal(oldLargeRead.files[1].blob.lastModified,largeTwin.lastModified);
+assert.deepEqual(new Uint8Array(await oldLargeRead.files[1].blob.slice(-1024*1024).arrayBuffer()),mib);
+console.log('TALERA_EXACT_OFFICIAL_RECOVERY_CODEC_COMPATIBILITY_PASS',JSON.stringify({
+ officialCommit:oldRef,distinctOriginalIDs:true,originalMetadata:true,
+ oldCodecUnderstandsExpandedArchive:true,largeVideoBytes:expandedLargeSummary.binaryBytes,
+ localStorageMigration:false,realIPhoneValidated:false
+}));
 // Same-sized distinct bytes are never merged.
 const notDuplicate=await createFreeArchive({stories:[],files:[
  {key:'a',blob:new Blob([Uint8Array.of(1,2)])},
@@ -164,6 +207,7 @@ const sharedOffset=sharedLargeSummary.parsed.binaries[0]._offset;
 const damaged=new Blob([sharedLarge.slice(0,sharedOffset),Uint8Array.of(0),
  sharedLarge.slice(sharedOffset+1)]);
 await assert.rejects(()=>decodeFreeArchive(damaged),/MEDIA_CHECKSUM/);
+await assert.rejects(()=>expandFreeArchiveForLegacy(damaged),/MEDIA_CHECKSUM/);
 console.log('TALERA_LOSSLESS_SHARED_PAYLOAD_CODEC_PASS',JSON.stringify({
  distinctIDs:true,originalMetadata:true,arrayBufferKind:true,distinctBytesNotMerged:true,
  largeVideoBytes:sharedLargeSummary.binaryBytes,savedBytes:sharedLargeSummary.savedBytes,

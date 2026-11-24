@@ -34,7 +34,7 @@ details{margin-top:14px}summary{cursor:pointer;color:#23497e;font-weight:600}det
 <button type="button" id="make-backup" disabled>Back-up maken</button>
 <a id="save-backup" class="save" download hidden>Bewaar bestand</a>
 <output id="export-status" role="status"></output>
-<details id="export-details" hidden><summary>Technische details bekijken</summary><output id="export-details-text"></output></details>
+<details id="export-details" hidden><summary>Technische details bekijken</summary><output id="export-details-text"></output><button type="button" id="legacy-backup" hidden disabled>Maak herstelbestand voor oudere versie</button><p class="note" id="legacy-backup-hint" hidden>Alleen nodig bij terugkeer naar oudere TALERA-software. Dit bestand bevat alle originele bytes en is groter. Bewaar het alleen wanneer nodig.</p></details>
 </section>
 <section><h2>Back-up terugzetten</h2>
 <p>Volg de stappen van boven naar beneden. Er wordt niets teruggezet zonder jouw bevestiging.</p>

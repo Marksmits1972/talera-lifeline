@@ -41,7 +41,8 @@ function isPlain(v){
  const p=Object.getPrototypeOf(v);
  return p===Object.prototype||p===null;
 }
-export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=null,createdAt='2026-11-09T00:00:00.000Z'}){
+export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=null,createdAt='2026-11-09T00:00:00.000Z',legacyCompatible=false}){
+ ensure(typeof legacyCompatible==='boolean','INVALID_COMPATIBILITY_OPTION');
  ensure(Array.isArray(stories)&&Array.isArray(files),'INVALID_STORES');
  ensure(stories.length+files.length<=MAX_RECORDS,'TOO_MANY_RECORDS');
  ensure(typeof sourceScope==='string'&&sourceScope.length>5&&sourceScope.length<200,'INVALID_SCOPE');
@@ -60,7 +61,7 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
  const addBinary=(descriptor,parts)=>{
   const index=binaries.length;
   const signature=descriptor.length+':'+descriptor.sha256Chunks.join(',');
-  if(payloads.has(signature)){
+  if(!legacyCompatible&&payloads.has(signature)){
    descriptor.aliasOf=payloads.get(signature);
    sharedPayloads++;
   }else{
@@ -286,4 +287,15 @@ export async function decodeFreeArchive(archive){
  }
  return {sourceScope:p.sourceScope,sourceOrigin:p.sourceOrigin??null,createdAt:p.createdAt,stories,files,
   verifiedBinaryCount:p.binaries.length};
+}
+
+// Explicit recovery conversion. Validate all source checksums and logical
+// records FIRST, then re-encode a format understood by the protected older
+// TALERA reader. No mutation of the archive, local library or account.
+// This can increase archive size; never perform it automatically.
+export async function expandFreeArchiveForLegacy(archive){
+ const decoded=await decodeFreeArchive(archive);
+ return createFreeArchive({stories:decoded.stories,files:decoded.files,
+  sourceScope:decoded.sourceScope,sourceOrigin:decoded.sourceOrigin,
+  createdAt:decoded.createdAt,legacyCompatible:true});
 }

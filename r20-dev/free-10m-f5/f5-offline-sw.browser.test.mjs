@@ -6,6 +6,46 @@ import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {chromium,webkit} from 'playwright';
 import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
+// Test the SAME actual offline Worker source: an online authenticated backup
+// import is valid BEFORE local offline grant is ready, but never offline or
+// during logout. Account validation remains with the original server route.
+{
+ const begin=OFFLINE_RUNTIME.indexOf('async function assets(req){');
+ const end=OFFLINE_RUNTIME.indexOf('\nasync function navigate(event){',begin);
+ assert.ok(begin>=0&&end>begin,'Original offline asset handler moved');
+ const source=OFFLINE_RUNTIME.slice(begin,end);
+ const moduleRequest={url:'http://127.0.0.1/__f5/f5-portable-idb.mjs'};
+ const calls=[];
+ let accountReady=false,pendingLogout=false,serverAllowed=true,online=true;
+ const scope={
+  moduleRoute:u=>u.pathname==='/__f5/f5-portable-idb.mjs',
+  read:async key=>key==='grant'?(accountReady?{id:'synthetic-account'}:null):
+    key==='pending-logout'?pendingLogout:null,
+  fetch:async()=>{calls.push('network');if(!online)throw Error('OFFLINE');
+    return {status:serverAllowed?200:401,ok:serverAllowed}},
+  caches:{open:async()=>{calls.push('cache');return{
+    put:async()=>{},match:async()=>null
+  }}},
+  Response:class{constructor(body,opts){this.status=opts.status;this.body=body}},
+  URL
+ };
+ const assets=new Function('scope','with(scope){'+source+';return assets;}')(scope);
+ assert.equal((await assets(moduleRequest)).status,200,
+   'Signed-in online backup modules must not wait for an offline grant');
+ assert.deepEqual(calls,['network'],'Ungrounded backup module was cached');
+ serverAllowed=false;
+ assert.equal((await assets(moduleRequest)).status,401,
+   'The original server must reject unverified online modules');
+ online=false;serverAllowed=true;
+ assert.equal((await assets(moduleRequest)).status,401,
+   'Offline no-grant module must remain unavailable');
+ pendingLogout=true;online=true;
+ const before=calls.length;
+ assert.equal((await assets(moduleRequest)).status,401,
+   'Pending logout may not serve or load private backup module');
+ assert.equal(calls.length,before,'Pending logout accidentally fetched a module');
+ console.log('TALERA_BACKUP_MODULE_ONLINE_AUTH_BEFORE_OFFLINE_GRANT_PASS');
+}
 // Exercise the REAL SW's account transition before creating a browser fixture.
 // A request may still be awaiting a local logout check when the next login wins.
 {

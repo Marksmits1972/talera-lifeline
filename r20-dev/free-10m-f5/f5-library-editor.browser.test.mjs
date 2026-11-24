@@ -264,6 +264,25 @@ try{
    tx.oncomplete=ok;tx.onabort=()=>bad(tx.error);
   });
   db.close();
+  // A backup must preserve both memories and their ONE shared media ID.
+  // No duplicate logical original, even with distinct narrative catalog rows.
+  const sharedDb=await new Promise((ok,bad)=>{
+   const q=indexedDB.open(privateDb,1);
+   q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
+  });
+  const sharedRead=sharedDb.transaction(['stories','files'],'readonly');
+  const read=q=>new Promise((ok,bad)=>{
+   q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
+  });
+  const [sharedStories,sharedFiles]=await Promise.all([
+   read(sharedRead.objectStore('stories').getAll()),read(sharedRead.objectStore('files').getAll())]);
+  sharedDb.close();
+  const {createFreeArchive,decodeFreeArchive}=await import('/f5-portable-archive.mjs');
+  const sharedRoundtrip=await decodeFreeArchive(await createFreeArchive({
+   stories:sharedStories,files:sharedFiles,sourceScope:privateDb}));
+  if(sharedRoundtrip.stories.filter(row=>row.items?.some(item=>item.key===sharedKey)).length!==2||
+     sharedRoundtrip.files.filter(row=>row.key===sharedKey).length!==1)
+   throw Error('Backup did not preserve one shared original and both catalog links');
   if(typeof window.__taleraV9FullDelete!=='function'||
      typeof mem.removePublishedStory!=='function'||
      typeof mem.repairOrphanDrafts!=='function')
@@ -298,6 +317,11 @@ try{
    throw Error('Orphan cleanup deleted independent draft or retained orphan');
   // Synthetic cleanup is explicit and never touches owner/device data.
   await window.__taleraV9FullDelete(shareId);
+  if(await mem.get(shareId)||await mem.blob(sharedKey))
+   throw Error('Last reference removal retained shared original or story');
+  if(!(await mem.get(grown.id))||!(await mem.blob(keys[0])))
+   throw Error('Last reference removal damaged unrelated original');
+  console.log('TALERA_SHARED_ORIGINAL_BACKUP_AND_LAST_REFERENCE_DELETE_PASS');
   await mem.draftDeleteKeys([draftManifest,draftPrefix+keepDraft]);
   return {storyUnchangedId:grown.id===story.id,
    reorderedExistingKeys:order.join(',')===keys.slice().reverse().join(','),

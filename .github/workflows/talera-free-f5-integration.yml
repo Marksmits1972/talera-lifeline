@@ -1405,6 +1405,25 @@ jobs:
           assert.ok(p>=0,'Original memory deletion source missing');
           console.log('TALERA_ORIGINAL_REMOVE_SOURCE',html.slice(p,p+2100));
           assert.ok(html.includes('talera-owner-delete-on-request'),'Owner clear path must be in same signed-in Home');
+          // Read ONLY generated anonymous program source. No account records.
+          for(const route of ['/tell','/mijn-leven','/present']){
+            const src=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages[route],'utf8');
+            const scripts=[...src.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+            const store=scripts.find(m=>m[1].includes('talera-memory-store-v1'))?.[2];
+            assert.ok(store,'Missing existing library store '+route);
+            const save=store.indexOf('async function save(');
+            const next=store.indexOf('async function remove(',save);
+            assert.ok(save>=0&&next>save,'Cannot establish save boundary '+route);
+            console.log('TALERA_STATIC_SAVE_BOUNDARY '+route+'\n'+store.slice(save,next));
+            const begin=store.indexOf('const taleraSharedPublishedRemoval=');
+            const alternate=store.indexOf('const taleraLibraryRemoval=');
+            const core=begin>=0?begin:alternate;
+            if(core>=0){
+              const finish=store.indexOf('})();',core);
+              assert.ok(finish>core);
+              console.log('TALERA_STATIC_DELETE_BOUNDARY '+route+'\n'+store.slice(core,finish+5));
+            }
+          }
           NODE
 
   audit_existing_live_version_20261119:

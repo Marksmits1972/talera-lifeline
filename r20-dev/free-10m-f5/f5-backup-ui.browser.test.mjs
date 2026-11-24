@@ -76,6 +76,10 @@ const seed=async(page,db,present)=>{
    files.add({key:id+':2',blob:new File([Uint8Array.from([7,6,5,4])],
     'stem.wav',{type:'audio/wav'})});
    files.add({key:'talera-v4-work:preview:synthetic',blob:new Blob(['preview'],{type:'image/jpeg'})});
+   files.add({key:'talera-v4-work:manifest',blob:[]});
+   files.add({key:'talera-v4-work:duplicate-index-v7',blob:{
+    [id+':0']:{signature:'synthetic-source-index',size:genuineJpeg.length,updated:'2026-11-24T00:00:00.000Z'}
+   }});
   }else if(present==='new'){
    stories.add({id:'local-existing-1980-synthetic',title:'Bestaande herinnering',items:[]});
   } // present==='empty': initialize the ORIGINAL schema without any stories/media
@@ -233,7 +237,10 @@ try{
    if(!retained)throw Error('Existing technical fixture absent');
    const conn=await p.openExisting(db,true);
    const tx=conn.transaction('files','readwrite');
-   tx.objectStore('files').add(retained);
+   const store=tx.objectStore('files');
+   store.add(retained);
+   store.add({key:'talera-v4-work:manifest',blob:[]});
+   store.add({key:'talera-v4-work:duplicate-index-v7',blob:{}});
    await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
    conn.close();
   },{db:dbA,bytes:Array.from(fileBytes)});
@@ -273,6 +280,8 @@ try{
    document.getElementById('restore-status').textContent.includes('Geen dubbele'));
   assert.match(await empty.locator('#restore-status').textContent(),
    /Identieke bestandsrecords veilig herbruikbaar: 1/);
+  assert.match(await empty.locator('#restore-status').textContent(),
+   /Technische editorrecords zonder herinneringen of conceptinhoud: 2/);
   assert.match(await empty.locator('#restore-status').textContent(),
    /Gecontroleerd: 1 herinnering/);
   assert.equal(await empty.locator('#backup-step-confirm').isVisible(),true,
@@ -315,6 +324,8 @@ try{
      id:row.id,title:row.title,items:row.items,cues:row.narrationCues
     })),
     fileIds:files.map(row=>row.key).sort(),
+    technicalIndex:files.find(row=>row.key==='talera-v4-work:duplicate-index-v7')?.blob,
+    technicalManifest:files.find(row=>row.key==='talera-v4-work:manifest')?.blob,
     videoName:video?.blob?.name,
     videoBytes:video?.blob?Array.from(new Uint8Array(await video.blob.arrayBuffer())):[],
     voiceBytes:voice?.blob?Array.from(new Uint8Array(await voice.blob.arrayBuffer())):[],
@@ -341,8 +352,10 @@ try{
   assert.deepEqual(afterReload.videoBytes,[33,22,11,99]);
   assert.deepEqual(afterReload.voiceBytes,[7,6,5,4]);
   assert.equal(afterReload.videoName,'origineel.mov');
-  assert.equal(afterReload.fileIds.length,4,
-   'Exact originals and existing preview must be restored, no extra media');
+  assert.equal(afterReload.fileIds.length,6,
+   'Exact originals and existing preview plus the untouched two technical records');
+  assert.deepEqual(afterReload.technicalIndex,{},'Existing technical index must not be overwritten');
+  assert.deepEqual(afterReload.technicalManifest,[],'Existing empty draft manifest must stay intact');
   await empty.locator('#restore-file').setInputFiles({
    name:'talera-lokale-proef-backup.talera',
    mimeType:'application/octet-stream',buffer:fileBytes
@@ -360,7 +373,8 @@ try{
     explicitConsent:true,restoredStoryCount:1,allOriginalMediaBytesIdentical:true,
     exactOriginalMediaIDs:true,voiceCuesIdentical:true,afterReopenReadable:true,
     restoredJpegActuallyDecodes:true,
-    duplicateRestoreBlocked:true,serverUploadCount:posts,
+    duplicateRestoreBlocked:true,technicalIndexConflictNotBlocking:true,
+    actualOriginalConflictBlocked:true,localTechnicalRecordsUnchanged:true,serverUploadCount:posts,
     personalIphoneDataTouched:false,physicalIPhoneAcceptance:false}));
  }finally{await emptyContext.close()}
  // Cross-origin consent must never authorize an unrelated account.

@@ -14,6 +14,33 @@ export async function exportExistingFreeLibrary(databaseName){
    createdAt:new Date().toISOString()});
  }finally{db.close()}
 }
+// Only redundant editor administration may be omitted from portable recovery.
+// Do not touch the existing editor records, real drafts or original media.
+// Validate the archive in full before applying this narrow restore boundary.
+function isRedundantEditorRecord(row){
+ if(!row||Object.keys(row).sort().join(',')!=='blob,key')return false;
+ if(row.key==='talera-v4-work:manifest')
+  return Array.isArray(row.blob)&&row.blob.length===0;
+ if(row.key!=='talera-v4-work:duplicate-index-v7')return false;
+ const value=row.blob;
+ if(!value||Object.getPrototypeOf(value)!==Object.prototype)return false;
+ return Object.entries(value).every(([key,entry])=>
+  /^local-[a-z0-9-]+:[a-z0-9-]+$/i.test(key)&&
+  entry&&Object.getPrototypeOf(entry)===Object.prototype&&
+  Object.keys(entry).sort().join(',')==='signature,size,updated'&&
+  typeof entry.signature==='string'&&entry.signature.length>0&&
+  Number.isSafeInteger(entry.size)&&entry.size>=0&&
+  typeof entry.updated==='string'&&Number.isFinite(Date.parse(entry.updated)));
+}
+function portableRestoreSnapshot(decoded){
+ const refs=new Set(decoded.stories.flatMap(story=>(story.items||[]).map(item=>item.key)));
+ const catalog=decoded.files.find(row=>row.key==='talera-v4-work:manifest');
+ // Nonempty or unknown draft state must retain its complete original records.
+ const noDrafts=!catalog||(Array.isArray(catalog.blob)&&catalog.blob.length===0);
+ const files=decoded.files.filter(row=>!(
+  noDrafts&&!refs.has(row.key)&&isRedundantEditorRecord(row)));
+ return {...decoded,files,ignoredTechnicalEntries:decoded.files.length-files.length};
+}
 async function preview(decoded,name,allowOtherOrigin){
  // Another TALERA software version may use a different browser origin,
  // but a DIFFERENT private account must not be imported as a version update.
@@ -41,6 +68,7 @@ async function preview(decoded,name,allowOtherOrigin){
    sourceScope:decoded.sourceScope,sourceOrigin:decoded.sourceOrigin,
    targetScope:name,crossOrigin:!sourceMatches,
    storyCount:decoded.stories.length,mediaStoreEntries:decoded.files.length,
+   ignoredTechnicalEntries:decoded.ignoredTechnicalEntries||0,
    alreadyPresentStories:collisionStories.length,
    alreadyPresentMediaEntries:collisionFiles.length+identicalFiles.length,
    identicalMediaEntries:identicalFiles.length,
@@ -157,7 +185,9 @@ async function compareReadOnlyPhotoSources(decoded,name){
 export async function previewFreeLibraryRestore(archive,databaseName,{allowOtherOrigin=false,inspectPhotos=false}={}){
  requireName(databaseName,true);
  // Verify checksum & every media reference BEFORE even inspecting target state.
- const decoded=await decodeFreeArchive(archive);
+ const original=await decodeFreeArchive(archive);
+ verifyLibraryMediaIntegrity(original);
+ const decoded=portableRestoreSnapshot(original);
  verifyLibraryMediaIntegrity(decoded);
  const review=await preview(decoded,databaseName,allowOtherOrigin===true);
  // Only this owner's explicit conflicting-preview operation performs an
@@ -175,7 +205,9 @@ export async function restoreFreeLibrary(archive,databaseName,
  {allowOtherOrigin=false,confirmed=false}={}){
  if(confirmed!==true)throw Error('TALERA_RESTORE_EXPLICIT_CONFIRMATION_REQUIRED');
  requireName(databaseName,true);
- const decoded=await decodeFreeArchive(archive);
+ const original=await decodeFreeArchive(archive);
+ verifyLibraryMediaIntegrity(original);
+ const decoded=portableRestoreSnapshot(original);
  verifyLibraryMediaIntegrity(decoded);
  const review=await preview(decoded,databaseName,allowOtherOrigin===true);
  if(!review.safeToRestore)throw Error('TALERA_RESTORE_EXISTING_CONTENT_MUST_NOT_BE_OVERWRITTEN');

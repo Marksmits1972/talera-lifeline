@@ -61,7 +61,9 @@ function storageSummary(summary,totalBytes){
   const bin=p.binaries[i];
   bytes[owners.get(i)||'other']+=bin.length;
   const sig=bin.length+':'+(bin.sha256Chunks?bin.sha256Chunks.join(','):bin.sha256);
-  if(seen.has(sig)){copies++;duplicateBytes+=bin.length;}else seen.add(sig);
+  if(bin.aliasOf===undefined){
+   if(seen.has(sig)){copies++;duplicateBytes+=bin.length;}else seen.add(sig);
+  }
  }
  return [
   'Herinneringen: '+p.stories.length+'; mediakoppelingen: '+links+'; unieke originele media-ID’s: '+originals.size+'.',
@@ -73,7 +75,8 @@ function storageSummary(summary,totalBytes){
   'Niet direct gekoppelde bestandsrecords: '+counts.unlinked+' ('+mb(bytes.unlinked)+')',
   'Overige binaire gegevens: '+mb(bytes.other)+'; bestandsadministratie: '+mb(totalBytes-summary.binaryBytes),
   'Extra binaire kopieën met identieke inhoud: '+copies+' ('+mb(duplicateBytes)+').',
-  'Dit betreft logische back-upgegevens, niet gemeten fysieke telefoonopslag. Identieke bytes zijn niet automatisch overbodig. Niets wordt verwijderd.'
+  'Verliesvrij bespaard in deze back-up: '+mb(summary.savedBytes||0)+' ('+(summary.sharedEntries||0)+' gedeelde inhoudsverwijzingen).',
+  'De media-omvang hierboven telt alle oorspronkelijke verwijzingen; het back-upbestand bevat gedeelde bytes slechts eenmaal. Dit is geen meting van fysieke iPhone-opslag. Niets wordt verwijderd.'
  ].join('\n');
 }
 let downloadUrl=null,preparedFile=null,shareUnavailable=false,review=null,reviewFile=null,reviewCross=null;

@@ -146,7 +146,8 @@ try{
  assert.equal(await a.locator('#export-details-text').isVisible(),false);
  await a.locator('#export-details summary').click();
  assert.match(await a.locator('#export-details-text').textContent(),/Originele video’s: 1/);
- assert.match(await a.locator('#export-details-text').textContent(),/Extra binaire kopieën met identieke inhoud: 1 /);
+ assert.match(await a.locator('#export-details-text').textContent(),/Extra binaire kopieën met identieke inhoud: 0 /);
+ assert.match(await a.locator('#export-details-text').textContent(),/Verliesvrij bespaard in deze back-up: .*\(1 gedeelde inhoudsverwijzingen\)/);
  // A subsequent back-up uses EXACTLY the same labels and original local
  // workflow, without a first-run or expired-success label.
  await a.getByRole('button',{name:'Back-up maken'}).click();

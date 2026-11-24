@@ -51,7 +51,25 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
   ensure(u.origin===sourceOrigin&&['https:','http:'].includes(u.protocol),'INVALID_ORIGIN');
  }
  ensure(!Number.isNaN(Date.parse(createdAt)),'INVALID_DATE');
- const binaries=[],chunks=[];
+ const binaries=[],chunks=[],payloads=new Map();
+ let sharedPayloads=0;
+ // Keep a distinct binary descriptor for every logical record, including
+ // each File name, MIME, timestamp and ArrayBuffer/Blob kind. Only the
+ // payload is shared. A full ordered list of SHA-256 chunks identifies
+ // content, including its exact length. No filename/size-only matching.
+ const addBinary=(descriptor,parts)=>{
+  const index=binaries.length;
+  const signature=descriptor.length+':'+descriptor.sha256Chunks.join(',');
+  if(payloads.has(signature)){
+   descriptor.aliasOf=payloads.get(signature);
+   sharedPayloads++;
+  }else{
+   payloads.set(signature,index);
+   chunks.push(...parts);
+  }
+  binaries.push(descriptor);
+  return ['bin',index];
+ };
  const seen=new WeakSet();
  const encode=async(v,depth)=>{
   ensure(depth<MAX_DEPTH,'OBJECT_TOO_DEEP');
@@ -66,26 +84,21 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
   ensure(typeof v==='object','UNSUPPORTED_OBJECT');
   if(v instanceof Blob){
    ensure(Number.isSafeInteger(v.size)&&v.size>=0,'INVALID_BINARY_SIZE');
-   const index=binaries.length;
    const {checksums,parts}=await checkedChunks(v);
-   binaries.push({length:v.size,chunkBytes:CHUNK_BYTES,sha256Chunks:checksums,
+   return addBinary({length:v.size,chunkBytes:CHUNK_BYTES,sha256Chunks:checksums,
     type:v.type||'',name:typeof File!=='undefined'&&v instanceof File?v.name:null,
-    lastModified:typeof File!=='undefined'&&v instanceof File?v.lastModified:null});
-   chunks.push(...parts);
-   return ['bin',index];
+    lastModified:typeof File!=='undefined'&&v instanceof File?v.lastModified:null},parts);
   }
   if(v instanceof Date){
    ensure(Number.isFinite(v.getTime()),'INVALID_DATE');return['date',v.toISOString()];
   }
   if(v instanceof ArrayBuffer){
    ensure(Number.isSafeInteger(v.byteLength),'INVALID_BINARY_SIZE');
-   const index=binaries.length;
    const blob=new Blob([v]);
    ensure(blob.size===v.byteLength,'SOURCE_BINARY_SIZE');
    const {checksums,parts}=await checkedChunks(blob);
-   binaries.push({length:v.byteLength,chunkBytes:CHUNK_BYTES,
-    sha256Chunks:checksums,type:'application/octet-stream',arrayBuffer:true});
-   chunks.push(...parts);return ['bin',index];
+   return addBinary({length:v.byteLength,chunkBytes:CHUNK_BYTES,
+    sha256Chunks:checksums,type:'application/octet-stream',arrayBuffer:true},parts);
   }
   ensure(!seen.has(v),'CYCLIC_VALUE');seen.add(v);
   try{
@@ -113,7 +126,7 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
   return result;
  };
  const body={
-  schema:'talera-free-lossless-local-2',
+  schema:sharedPayloads?'talera-free-lossless-local-3':'talera-free-lossless-local-2',
   sourceScope,
   sourceOrigin,
   createdAt,
@@ -128,7 +141,7 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
  new DataView(prefix.buffer).setUint32(MAGIC.length,manifest.length,true);
  prefix.set(Uint8Array.from((await hash(manifest)).match(/.{2}/g).map(x=>parseInt(x,16))),MAGIC.length+4);
  const expected=prefix.byteLength+manifest.byteLength+
-  binaries.reduce((total,bin)=>total+bin.length,0);
+  binaries.reduce((total,bin)=>total+(bin.aliasOf===undefined?bin.length:0),0);
  ensure(Number.isSafeInteger(expected),'INVALID_ARCHIVE_SIZE');
  const archive=new Blob([prefix,manifest,...chunks],{type:'application/octet-stream'});
  ensure(archive.size===expected,archive.size>expected?'EXTRA_BYTES':'TRUNCATED_MEDIA');
@@ -148,7 +161,8 @@ export async function inspectFreeArchive(archive){
  let parsed;
  try{parsed=JSON.parse(td.decode(bytes))}catch{throw Error('TALERA_ARCHIVE_INVALID_MANIFEST')}
  const legacy=parsed?.schema==='talera-free-lossless-local-1';
- ensure(legacy||parsed?.schema==='talera-free-lossless-local-2','UNSUPPORTED_VERSION');
+ const shared=parsed?.schema==='talera-free-lossless-local-3';
+ ensure(legacy||shared||parsed?.schema==='talera-free-lossless-local-2','UNSUPPORTED_VERSION');
  ensure(typeof parsed.sourceScope==='string'&&parsed.sourceScope.length>5,'INVALID_SCOPE');
  const provenance=parsed.sourceOrigin;
  if(provenance!==undefined&&provenance!==null){
@@ -158,8 +172,9 @@ export async function inspectFreeArchive(archive){
  }
  ensure(Array.isArray(parsed.stories)&&Array.isArray(parsed.files)&&Array.isArray(parsed.binaries),'INVALID_STORES');
  ensure(parsed.stories.length+parsed.files.length<=MAX_RECORDS,'TOO_MANY_RECORDS');
- let offset=end;
- for(const bin of parsed.binaries){
+ let offset=end,savedBytes=0,sharedEntries=0,logicalBinaryBytes=0;
+ for(let index=0;index<parsed.binaries.length;index++){
+  const bin=parsed.binaries[index];
   ensure(Number.isSafeInteger(bin?.length)&&bin.length>=0,'INVALID_BINARY_SIZE');
   if(legacy){
    ensure(bin.length<=LEGACY_MAX_SINGLE_BINARY,'INVALID_BINARY_SIZE');
@@ -172,22 +187,38 @@ export async function inspectFreeArchive(archive){
    for(const checksum of bin.sha256Chunks)
     ensure(typeof checksum==='string'&&/^[a-f0-9]{64}$/.test(checksum),'INVALID_BINARY_CHECKSUM');
   }
-  ensure(Number.isSafeInteger(offset+bin.length)&&offset+bin.length<=archive.size,'TRUNCATED_MEDIA');
-  bin._offset=offset;
-  offset+=bin.length;
+  logicalBinaryBytes+=bin.length;
+  ensure(Number.isSafeInteger(logicalBinaryBytes),'INVALID_ARCHIVE_SIZE');
+  if(Object.hasOwn(bin,'aliasOf')){
+   ensure(shared&&Number.isInteger(bin.aliasOf)&&bin.aliasOf>=0&&bin.aliasOf<index,'INVALID_SHARED_PAYLOAD_REF');
+   const original=parsed.binaries[bin.aliasOf];
+   ensure(!Object.hasOwn(original,'aliasOf')&&original.length===bin.length&&
+    original.sha256Chunks.length===bin.sha256Chunks.length&&
+    original.sha256Chunks.every((hash,i)=>hash===bin.sha256Chunks[i]),'INVALID_SHARED_PAYLOAD');
+   bin._offset=original._offset;
+   savedBytes+=bin.length;sharedEntries++;
+  }else{
+   ensure(Number.isSafeInteger(offset+bin.length)&&offset+bin.length<=archive.size,'TRUNCATED_MEDIA');
+   bin._offset=offset;
+   offset+=bin.length;
+  }
  }
  ensure(offset===archive.size,'EXTRA_BYTES');
  return {sourceScope:parsed.sourceScope,sourceOrigin:parsed.sourceOrigin??null,createdAt:parsed.createdAt,
   stories:parsed.stories.length,files:parsed.files.length,binaries:parsed.binaries.length,
-  binaryBytes:parsed.binaries.reduce((total,b)=>total+b.length,0),
+  binaryBytes:offset-end,logicalBinaryBytes,savedBytes,sharedEntries,
   parsed};
 }
 export async function decodeFreeArchive(archive){
  const summary=await inspectFreeArchive(archive),p=summary.parsed;
- const reconstructed=[];
+ const reconstructed=[],verifiedParts=[];
  for(const bin of p.binaries){
-  const parts=[];
-  if(p.schema==='talera-free-lossless-local-1'){
+  // Aliases can only reference a previously verified physical payload.
+  // Reconstruct independent File/Blob metadata without a second hash read.
+  const parts=bin.aliasOf===undefined?[]:verifiedParts[bin.aliasOf];
+  if(bin.aliasOf!==undefined){
+   ensure(Array.isArray(parts),'INVALID_SHARED_PAYLOAD_REF');
+  }else if(p.schema==='talera-free-lossless-local-1'){
    const original=archive.slice(bin._offset,bin._offset+bin.length);
    ensure(await hash(await original.arrayBuffer())===bin.sha256,'MEDIA_CHECKSUM');
    parts.push(original);
@@ -199,6 +230,7 @@ export async function decodeFreeArchive(archive){
     parts.push(part);
    }
   }
+  verifiedParts.push(parts);
   let value;
   if(bin.arrayBuffer)value=await new Blob(parts).arrayBuffer();
   else if(bin.name!==null&&bin.name!==undefined){

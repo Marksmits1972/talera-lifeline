@@ -121,6 +121,55 @@ const corruptLarge=new Blob([
 ]);
 await assert.rejects(()=>decodeFreeArchive(corruptLarge),/MEDIA_CHECKSUM/);
 
+// Lossless shared payload: two different IDs and differing File metadata
+// must survive even though identical ORIGINAL video bytes are written once.
+const secondVideo=new File([movie],'andere-naam.mov',{type:'video/mp4',lastModified:1800000000000});
+const secondStory={...story,id:'local-second-memory',items:[{key:'local-second:0',kind:'video'}],
+ narrationCues:[],narrationDurationMs:0};
+const sharedArchive=await createFreeArchive({stories:[story,secondStory],
+ files:[...files,{key:'local-second:0',blob:secondVideo},
+ {key:'editor-identical-arraybuffer',blob:await movie.arrayBuffer()}],sourceScope:scope});
+const sharedSummary=await inspectFreeArchive(sharedArchive);
+assert.equal(sharedSummary.parsed.schema,'talera-free-lossless-local-3');
+assert.equal(sharedSummary.sharedEntries,2);
+assert.equal(sharedSummary.savedBytes,movie.size*2);
+assert.equal(sharedSummary.logicalBinaryBytes-sharedSummary.binaryBytes,movie.size*2);
+const sharedDecoded=await decodeFreeArchive(sharedArchive);
+assert.deepEqual(sharedDecoded.stories,[story,secondStory]);
+for(const [key,want] of [['local-test:1',movie],['local-second:0',secondVideo]]){
+ const got=sharedDecoded.files.find(row=>row.key===key).blob;
+ assert.equal(got.name,want.name);assert.equal(got.type,want.type);
+ assert.equal(got.lastModified,want.lastModified);
+ assert.deepEqual(new Uint8Array(await got.arrayBuffer()),new Uint8Array(await want.arrayBuffer()));
+}
+assert.deepEqual(new Uint8Array(sharedDecoded.files.find(row=>row.key==='editor-identical-arraybuffer').blob),
+ new Uint8Array(await movie.arrayBuffer()));
+const largeTwin=new File([largeVideo],'andere-grote-video.mov',{type:'video/mp4',lastModified:1800000000000});
+const sharedLarge=await createFreeArchive({stories:[],files:[
+ {key:'large-1',blob:largeVideo},{key:'large-2',blob:largeTwin}],sourceScope:scope});
+const sharedLargeSummary=await inspectFreeArchive(sharedLarge);
+assert.equal(sharedLargeSummary.binaryBytes,180*1024*1024);
+assert.equal(sharedLargeSummary.savedBytes,180*1024*1024);
+const sharedLargeDecoded=await decodeFreeArchive(sharedLarge);
+assert.equal(sharedLargeDecoded.files[1].blob.name,largeTwin.name);
+assert.equal(sharedLargeDecoded.files[1].blob.lastModified,largeTwin.lastModified);
+assert.deepEqual(new Uint8Array(await sharedLargeDecoded.files[1].blob.slice(-1024*1024).arrayBuffer()),mib);
+// Same-sized distinct bytes are never merged.
+const notDuplicate=await createFreeArchive({stories:[],files:[
+ {key:'a',blob:new Blob([Uint8Array.of(1,2)])},
+ {key:'b',blob:new Blob([Uint8Array.of(1,3)])}],sourceScope:scope});
+assert.equal((await inspectFreeArchive(notDuplicate)).sharedEntries,0);
+// Corrupted shared payload must fail even when both records refer to it.
+const sharedOffset=sharedLargeSummary.parsed.binaries[0]._offset;
+const damaged=new Blob([sharedLarge.slice(0,sharedOffset),Uint8Array.of(0),
+ sharedLarge.slice(sharedOffset+1)]);
+await assert.rejects(()=>decodeFreeArchive(damaged),/MEDIA_CHECKSUM/);
+console.log('TALERA_LOSSLESS_SHARED_PAYLOAD_CODEC_PASS',JSON.stringify({
+ distinctIDs:true,originalMetadata:true,arrayBufferKind:true,distinctBytesNotMerged:true,
+ largeVideoBytes:sharedLargeSummary.binaryBytes,savedBytes:sharedLargeSummary.savedBytes,
+ sharedPayloadCorruptionRejected:true,physicalPhoneStorageMeasured:false
+}));
+
 // Verify existing v1 archives remain restorable after the v2 change.
 const enc=new TextEncoder();
 const md=enc.encode('TALERA-FREE-LOCAL-V1\n');

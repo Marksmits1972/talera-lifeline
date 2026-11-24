@@ -122,19 +122,52 @@ export function exposeCompleteMemoryDelete(html){
   };
   const lang=String(window.TaleraI18n?.language||document.documentElement.lang||'nl').slice(0,2);
   const labels=strings[lang]||strings.en;
+  const optionsLabels={nl:'Meer opties voor deze herinnering',en:'More options for this memory',
+   de:'Weitere Optionen für diese Erinnerung',fr:'Plus d’options pour ce souvenir',
+   es:'Más opciones para este recuerdo'};
+  const menu=document.createElement('div');
+  menu.className='talera-editor-memory-options';
+  menu.style.cssText='position:absolute;right:0;top:0;z-index:30;width:44px;height:44px;';
+  const toggle=document.createElement('button');
+  toggle.type='button';toggle.className='talera-editor-memory-options-toggle';
+  toggle.setAttribute('aria-label',optionsLabels[lang]||optionsLabels.en);
+  toggle.setAttribute('aria-expanded','false');
+  toggle.setAttribute('aria-controls','talera-editor-memory-options-panel');
+  toggle.style.cssText='display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;color:#476376;font:700 23px/1 system-ui;cursor:pointer;';
+  toggle.textContent='⋯';
+  const panel=document.createElement('div');
+  panel.id='talera-editor-memory-options-panel';panel.hidden=true;
+  panel.style.cssText='position:absolute;top:44px;right:0;width:max-content;max-width:calc(100vw - 32px);background:#fff;border:1px solid #dbe4ef;border-radius:12px;box-shadow:0 4px 14px #0b1d401c;padding:4px;box-sizing:border-box;';
   const button=document.createElement('button');
   button.type='button';button.className='talera-delete-published-memory';
   button.textContent=labels[0];
-  button.style.cssText='display:block;align-self:center;min-height:44px;max-width:100%;padding:10px 12px;margin:12px auto 0;border:0;background:transparent;color:#a52229;font:inherit;font-size:15px;font-weight:600;text-decoration:underline;cursor:pointer;';
+  button.style.cssText='display:block;min-height:44px;max-width:100%;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#a52229;font:inherit;font-size:14px;font-weight:600;text-align:left;cursor:pointer;';
+  panel.append(button);menu.append(toggle,panel);
   let busy=false;
+  const closeMenu=()=>{
+   panel.hidden=true;toggle.setAttribute('aria-expanded','false');
+   document.removeEventListener('pointerdown',outside,true);
+   document.removeEventListener('keydown',escape,true);
+  };
+  const outside=event=>{if(!menu.contains(event.target)||!menu.isConnected)closeMenu()};
+  const escape=event=>{if(event.key==='Escape'){closeMenu();toggle.focus()}};
+  toggle.addEventListener('click',event=>{
+   event.preventDefault();event.stopPropagation();
+   if(busy)return;
+   if(!panel.hidden){closeMenu();return}
+   panel.hidden=false;toggle.setAttribute('aria-expanded','true');
+   document.addEventListener('pointerdown',outside,true);
+   document.addEventListener('keydown',escape,true);
+  });
   button.addEventListener('click',async event=>{
    event.preventDefault();event.stopPropagation();
-   if(busy||!button.isConnected||g.existing!==id)return;
+   if(busy||panel.hidden||!button.isConnected||g.existing!==id)return;
+   closeMenu();
    const store=window.TaleraMemories,remove=window.__taleraV9FullDelete;
    if(typeof store?.get!=='function'||typeof remove!=='function'){
     window.alert(labels[2]);return;
    }
-   busy=true;button.disabled=true;
+   busy=true;button.disabled=true;toggle.disabled=true;
    const work=button.closest('.work.talera-r16-editor');
    let locked=false;
    try{
@@ -150,14 +183,21 @@ export function exposeCompleteMemoryDelete(html){
    }catch(_){window.alert(labels[2]);}
    finally{
     if(locked&&work)work.inert=false;
-    busy=false;button.disabled=false;
+    busy=false;button.disabled=false;toggle.disabled=false;
    }
   });
   requestAnimationFrame(()=>{
    const work=box.closest('.work.talera-r16-editor');
-   if(!box.isConnected||!work||g.existing!==id||
-      work.querySelector('.talera-delete-published-memory'))return;
-   box.insertAdjacentElement('afterend',button);
+   const heading=work?.querySelector('.talera-v14-heading');
+   const title=heading?.querySelector('#title');
+   if(!box.isConnected||!work||!heading||!title||g.existing!==id||
+      work.querySelector('.talera-editor-memory-options'))return;
+   // Absolute overlay uses the previously blank upper-right corner, never
+   // another flex row. Reserve only horizontal room within the original title.
+   if(getComputedStyle(heading).position==='static')heading.style.position='relative';
+   title.style.setProperty('box-sizing','border-box','important');
+   title.style.setProperty('padding-right','48px','important');
+   heading.append(menu);
   });
  })();
  `;

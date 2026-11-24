@@ -1021,20 +1021,36 @@ try{
     {waitUntil:'domcontentloaded'});
   assert.equal(response.status(),200);
   const button=deleteEditor.locator('.talera-delete-published-memory');
-  try{await button.waitFor({state:'visible',timeout:11000})}
+  const toggle=deleteEditor.locator('.talera-editor-memory-options-toggle');
+  try{await toggle.waitFor({state:'visible',timeout:11000})}
   catch(err){
    const opener=deleteEditor.locator('[data-open]').first();
    if(!(await opener.count()))throw err;
    await opener.click();
-   await button.waitFor({state:'visible',timeout:11000});
+   await toggle.waitFor({state:'visible',timeout:11000});
   }
+  assert.equal(await toggle.count(),1);
   assert.equal(await button.count(),1);
+  assert.equal(await button.isVisible(),false,'Destructive action must be hidden initially');
+  const positions=()=>deleteEditor.evaluate(()=>['#title','.talera-work-tiles',
+    '.talera-tags-toggle','.work-tools.talera-r16-toolbar'].map(selector=>{
+     const r=document.querySelector(selector)?.getBoundingClientRect();
+     return r?[r.top,r.height]:null;
+    }));
+  const initial=await positions();
+  await toggle.click();await button.waitFor({state:'visible'});
+  assert.equal(await toggle.getAttribute('aria-expanded'),'true');
+  assert.deepEqual(await positions(),initial,'Options overlay must not shift existing editor controls');
+  await toggle.click();assert.equal(await button.isVisible(),false);
+  await toggle.click();await button.waitFor({state:'visible'});
   let cancelled=false;
   deleteEditor.once('dialog',async d=>{cancelled=true;await d.dismiss()});
   await button.click();
   await deleteEditor.waitForFunction(()=>!document.querySelector('.talera-delete-published-memory')?.disabled);
   assert.ok(cancelled,'Deletion needs an explicit confirmation');
   assert.equal(await deleteEditor.evaluate(async id=>!!(await window.TaleraMemories.get(id)),tagged.id),true);
+  assert.equal(await button.isVisible(),false,'Cancel closes the options menu');
+  await toggle.click();await button.waitFor({state:'visible'});
   let accepted=false;
   deleteEditor.once('dialog',async d=>{accepted=true;await d.accept()});
   await Promise.all([deleteEditor.waitForURL('**/mijn-leven',{timeout:15000}),button.click()]);

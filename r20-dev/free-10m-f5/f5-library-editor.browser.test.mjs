@@ -248,9 +248,50 @@ try{
   }
   // Existing complete-delete button MUST use the original bookcase and
   // preserve media shared with another memory in one atomic transaction.
+  // Separate fixture originals: no overlap with the earlier edited story.
+  const sharePhoto=await originalPhoto('#3399aa','shared-fixture.png');
+  const deletePhoto=await originalPhoto('#991199','unique-fixture.png');
   const deleteMe=await mem.save({title:'Weg te halen testherinnering',
-   date:'1990-01-01',text:'synthetisch'},[first,second]);
+   date:'1990-01-01',text:'synthetisch'},[sharePhoto,deletePhoto]);
   const [sharedKey,uniqueKey]=deleteMe.items.map(item=>item.key);
+  const input={title:'Gedeelde video',date:'1990-01-01',text:'synthetisch'};
+  const originalVideo=new File([Uint8Array.of(3,9,2,5,1)],'shared-original.mov',
+   {type:'video/quicktime',lastModified:1700000000000});
+  const identicalVideo=new File([Uint8Array.of(3,9,2,5,1)],originalVideo.name,
+   {type:originalVideo.type,lastModified:originalVideo.lastModified});
+  const differentVideo=new File([Uint8Array.of(3,9,2,5,2)],originalVideo.name,
+   {type:originalVideo.type,lastModified:originalVideo.lastModified});
+  const differentName=new File([identicalVideo],'other-original.mov',
+   {type:originalVideo.type,lastModified:originalVideo.lastModified});
+  const firstVideoStory=await mem.save(input,[originalVideo]);
+  const secondVideoStory=await mem.save(input,[identicalVideo]);
+  const separateVideoStory=await mem.save(input,[differentVideo]);
+  const separateMetadataStory=await mem.save(input,[differentName]);
+  const sharedVideoKey=firstVideoStory.items[0].key;
+  if(secondVideoStory.items[0].key!==sharedVideoKey||
+     separateVideoStory.items[0].key===sharedVideoKey||
+     separateMetadataStory.items[0].key===sharedVideoKey)
+   throw Error('New video reuse lost bytes, metadata or exact canonical ID');
+  const twinFrames=await mem.save(input,[identicalVideo,identicalVideo]);
+  if(twinFrames.items[0].key===twinFrames.items[1].key)
+   throw Error('Distinct cue positions in one story lost their IDs');
+  const added=await mem.save(input,[differentVideo,identicalVideo],separateVideoStory.id,
+   [separateVideoStory.items[0].key,null]);
+  if(added.items[1].key!==sharedVideoKey||added.items[0].key!==separateVideoStory.items[0].key)
+   throw Error('Adding identical media during edit changed original IDs');
+  // The actual deletion owner must keep the shared video until its last link.
+  await mem.removePublishedStory(firstVideoStory.id);
+  if(!(await mem.blob(sharedVideoKey))||!(await mem.get(secondVideoStory.id)))
+   throw Error('First removal deleted a shared video');
+  await mem.removePublishedStory(secondVideoStory.id);
+  if(!(await mem.blob(sharedVideoKey)))throw Error('Second removal deleted a shared video');
+  await mem.removePublishedStory(separateVideoStory.id);
+  if(!(await mem.blob(sharedVideoKey)))throw Error('Edit removal deleted another memory video');
+  await mem.removePublishedStory(twinFrames.id);
+  if(await mem.blob(sharedVideoKey))throw Error('Last shared video link retained its original');
+  if(!(await mem.blob(separateMetadataStory.items[0].key)))throw Error('Distinct metadata original lost');
+  await mem.removePublishedStory(separateMetadataStory.id);
+  console.log('TALERA_NEW_SHARED_ORIGINALS_AND_REFERENCE_DELETE_PASS');
   const privateDb='talera-free-local-'+('b'.repeat(32))+'-v1';
   const shareId='local-shared-synthetic-media';
   const req=indexedDB.open(privateDb,1);

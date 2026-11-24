@@ -372,7 +372,6 @@ try{
    const q=indexedDB.open(privateDb,1);
    q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error);
   });
-  const persistence=await import('/f5-library-persistence.mjs');
   const {stories:sharedStories,files:sharedFiles}=await persistence.readAll(sharedDb);
   sharedDb.close();
   const {createFreeArchive,decodeFreeArchive}=await import('/f5-portable-archive.mjs');

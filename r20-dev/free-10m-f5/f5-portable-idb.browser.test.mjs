@@ -183,7 +183,6 @@ try{
     {allowOtherOrigin:true,confirmed:true}));
   const req=indexedDB.open(data.target,1);
   const db=await new Promise((ok,err)=>{req.onsuccess=()=>ok(req.result);req.onerror=()=>err(req.error)});
-  const persistence=await import('/f5-library-persistence.mjs');
   const {stories,files}=await persistence.readAll(db);
   const preserved=stories.find(row=>row.id==='local-existing-new-story');
   const restored=stories.find(row=>row.id===data.id);

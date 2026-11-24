@@ -3,7 +3,16 @@ import {createOriginalPayloadStorage} from './f5-library-persistence.mjs';
 // Patch only the ORIGINAL private-account TaleraMemories save and editor call.
 // No migration, secondary database or Worker. Existing full-delete is exposed in the editor.
 
-function installOriginalPayloadReader(html){
+export function installOriginalPayloadReader(html){
+ // The packaged /tell source receives this self-contained browser function
+ // at build time, BEFORE Wrangler/esbuild may introduce server-only helpers.
+ const installed=html.split('const taleraPayload=').length-1;
+ if(installed){
+  if(installed!==1||!html.includes('taleraPayload.read(db.transaction(')||
+     !html.includes('var original=await blob(item.key);'))
+   throw Error('TALERA_PAYLOAD_ALREADY_INSTALLED_SOURCE_DRIFT');
+  return html;
+ }
  const old="async function blob(key){var db=await open(),r=await request(db.transaction('files','readonly').objectStore('files').get(String(key||'')));return r&&r.blob||null}";
  if(html.split(old).length!==2)throw Error('TALERA_PAYLOAD_READER_SOURCE_DRIFT');
  const source="const taleraPayload=("+createOriginalPayloadStorage.toString()+")();\n"+

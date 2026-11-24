@@ -2,7 +2,7 @@
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
 import {buildF5OfflineServiceWorker} from './f5-offline-sw.mjs';
-import {completePublishedRemovalOnOtherPage} from './f5-library-editor-stable-save.mjs';
+import {completePublishedRemovalOnOtherPage,installOriginalPayloadReader} from './f5-library-editor-stable-save.mjs';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu,keepOnlyFunctionalFreeMenu} from './f5-account-switch-guard.mjs';
 import {anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
@@ -1735,6 +1735,7 @@ for(const [route,filename] of Object.entries(routes)){
  // The signed-out shell is unchanged; /tell uses the same core via its editor adapter.
  if(route!=='/tell')html=completePublishedRemovalOnOtherPage(html,
    readFileSync(path.join(delivery,'generated','reference-tell.html'),'utf8'));
+ else html=installOriginalPayloadReader(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

@@ -239,8 +239,20 @@ backupRegression: try{
       assert.equal(await newMomentResponse.headerValue('x-talera-offline'),
         'verified-device-shell','Original New Moment did not use verified offline editor');
       assert.equal(new URL(offlinePage.url()).pathname,'/tell');
-      await offlinePage.waitForFunction(()=>!!window.TaleraMemories?.save,
-        null,{timeout:15000});
+      try{
+       await offlinePage.waitForFunction(()=>!!window.TaleraMemories?.save,
+         null,{timeout:15000});
+      }catch(error){
+       const state=await offlinePage.evaluate(()=>({
+        path:location.pathname,ready:document.readyState,
+        library:typeof window.TaleraMemories,
+        libraryScript:!!document.getElementById('talera-memory-store-v1'),
+        payloadReader:document.getElementById('talera-memory-store-v1')?.textContent.includes('const taleraPayload='),
+        bodyPreview:document.body.innerText.slice(0,600)
+       }));
+       console.log('TALERA_OFFLINE_EDITOR_LIBRARY_NOT_INITIALIZED',JSON.stringify(state));
+       throw error;
+      }
       console.log('TALERA_OFFLINE_ORIGINAL_NEW_MOMENT_BUTTON_OPENS_EDITOR_PASS');
       const returnedHome=await offlinePage.goto(origin+'/mijn-leven',
         {waitUntil:'domcontentloaded',timeout:18000});

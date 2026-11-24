@@ -926,8 +926,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 5c1326bd-1e11-4070-b23f-6bd7a6b76f37
-      F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
+      F5_EXPECTED_LIVE_VERSION: 377095e8-5ab5-42e3-9a5d-f7e1e71c9758
+      F5_OFFICIAL_RESTORE_VERSION: 58a9c644-85d4-4d2b-82f2-1cedf4e08e1d
     steps:
       - uses: actions/checkout@v4
         with:
@@ -946,16 +946,15 @@ jobs:
           test "${#CLEAN}" -eq 32
           echo "::add-mask::$CLEAN"
           echo "CLOUDFLARE_ACCOUNT_ID=$CLEAN" >> "$GITHUB_ENV"
-      - name: Verify exact prior successful regression steps and complete remaining tests before release
+      - name: Verify exact fully green candidate and unchanged product source before release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 60b07479446eb2cd43401aca0126d98f8952f8b5
-          test "$(git diff --name-only 60b07479446eb2cd43401aca0126d98f8952f8b5 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          test "$(git diff --name-only 5650100fbcad959dda874f706ffea1ba603c22d9 HEAD)" = "$(printf '%s\n' .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-backup-controller.mjs r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs r20-dev/free-10m-f5/f5-local-backup-page.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)"
-          git diff --exit-code a54f88847e13f377fa8978e767b75730d3a27d34 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json ':(exclude)r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs'
+          test "$(git rev-parse HEAD^)" = 3871fdded58cf221e8d56b1bf323d56f076e72c5
+          test "$(git diff --name-only 3871fdded58cf221e8d56b1bf323d56f076e72c5 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 3871fdded58cf221e8d56b1bf323d56f076e72c5 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -964,51 +963,23 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const prior=await get('45423746691');
-          assert.equal(prior.head_sha,'5650100fbcad959dda874f706ffea1ba603c22d9');
+          const prior=await get('45471362399');
+          assert.equal(prior.head_sha,'3871fdded58cf221e8d56b1bf323d56f076e72c5');
           assert.equal(prior.status,'completed');assert.equal(prior.conclusion,'success');
-          const prev=(await get('45423746691/jobs?per_page=100')).jobs.find(j=>j.id===138549956335);
-          assert.equal(prev?.conclusion,'success');
-          for(const name of ['Complete stable filename, native share, archive restore and editor regressions on the exact same code',
-            'Verify live blank stories, same private account bindings and app routes']){
-            assert.equal(prev.steps.find(s=>s.name===name)?.conclusion,'success');
-          }
-          const now=await get('45426553188');
-          assert.equal(now.head_sha,'a54f88847e13f377fa8978e767b75730d3a27d34');
-          assert.equal(now.status,'completed');assert.equal(now.conclusion,'failure');
-          const jobs=(await get('45426553188/jobs?per_page=100')).jobs;
-          const main=jobs.find(j=>j.id===138560015887);
-          assert.deepEqual(main.steps.filter(s=>s.conclusion==='failure').map(s=>s.name),
-            ['Browser verify standalone voice/video narrator AND latest original presentation']);
-          for(const name of ['Verify source-exact 11 November backup-only connection',
+          const jobs=(await get('45471362399/jobs?per_page=100')).jobs;
+          for(const id of [138719860370,138719860858,138719860898,138719860975])
+            assert.equal(jobs.find(j=>j.id===id)?.conclusion,'success');
+          const main=jobs.find(j=>j.id===138719860858);
+          for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
             'Verify Cloudflare compilation without deployment',
             'Browser verify back-up panel, private session and two local browser contexts',
-            'Browser verify encrypted offline same-PWA start and offline logout']){
+            'Browser verify encrypted offline same-PWA start and offline logout',
+            'Browser verify standalone voice/video narrator AND latest original presentation',
+            'Diagnose same TALERA offline shell with WebKit iPhone browser engine',
+            'Browser verify complete original-media export, checksum and nondestructive restore',
+            'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
-          }
-          for(const id of [138560015390,138560015834,138560015873])assert.equal(jobs.find(j=>j.id===id)?.conclusion,'success');
-          // The failed integration waited for the former backup-status text.
-          // The updated selector is re-tested through actual restored media
-          // rendering on the same generated product. No full-suite pass claimed.
-          const checked=await get('45428387074');
-          assert.equal(checked.head_sha,'60b07479446eb2cd43401aca0126d98f8952f8b5');
-          assert.equal(checked.status,'completed');assert.equal(checked.conclusion,'failure');
-          const completed=(await get('45428387074/jobs?per_page=100')).jobs.find(j=>j.id===138566562636);
-          assert.equal(completed.conclusion,'failure');
-          assert.deepEqual(completed.steps.filter(s=>s.conclusion==='failure').map(s=>s.name),
-            ['Verify exact stepwise backup UI built into SAME existing TALERA Worker']);
-          for(const name of ['Verify exact prior successful regression steps and complete remaining tests before release',
-            'Verify existing 17 account and media bindings, exact live version, official recovery',
-            'Build same TALERA with no examples and verify account and personal media contracts',
-            'Complete compact backup, duplicate-byte audit and actual restore rendering regressions',
-            'Prepare original Worker without unverified email binding or account migration']){
-            assert.equal(completed.steps.find(s=>s.name===name)?.conclusion,'success');
-          }
-          console.log('EXACT_SAME_CODE_COMPACT_BACKUP_AND_REAL_RENDER_REGRESSIONS_VERIFIED',
-            JSON.stringify({run:45428387074,commit:'60b07479446eb2cd43401aca0126d98f8952f8b5',onlyReleaseLabelCheckFailed:true}));
-          console.log('SCOPED_COMPACT_BACKUP_RELEASE_PRIOR_EVIDENCE_AND_CURRENT_RETEST_REQUIRED',
-            JSON.stringify({priorRun:45423746691,currentRun:45426553188,
-              failure:'old restore status selector',actualRenderRetestRequired:true}));
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45471362399');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
         run: |
@@ -1124,8 +1095,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code 60b07479446eb2cd43401aca0126d98f8952f8b5 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45428387074'
+          git diff --exit-code 3871fdded58cf221e8d56b1bf323d56f076e72c5 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45471362399'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail

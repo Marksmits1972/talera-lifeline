@@ -911,7 +911,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-random-year-home-photo-approved-20261124' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-random-year-home-photo-verified-20261124' }}
     needs: [f5_isolated_local, f5_actual_registration_button]
     runs-on: ubuntu-24.04
     timeout-minutes: 22
@@ -952,7 +952,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 8e88d888e26d98053b0e718c7c8d920d4664aa34
+          test "$(git rev-parse HEAD^)" = 71e73d6255489f098638fa98a31cf55cd9f110c6
           test "$(git diff --name-only 8e88d888e26d98053b0e718c7c8d920d4664aa34 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code 8e88d888e26d98053b0e718c7c8d920d4664aa34 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           test "$(git diff --name-only 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa 8e88d888e26d98053b0e718c7c8d920d4664aa34)" = "$(printf '%s\n' .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs r20-dev/free-10m-f5/f5-offline-sw.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
@@ -1226,11 +1226,46 @@ jobs:
           test "$native_menu" = 1
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/mijn-leven" >/tmp/talera-empty-home.html
           curl -fsS --max-time 25 "https://$F5_STAGE_HOST/present" >/tmp/talera-empty-present.html
-          # The new, owner-approved selected-year random Home photo must be
-          # served by the SAME live origin, not merely exist in GitHub.
-          grep -Fq 'randomHomeYearPhoto' /tmp/talera-empty-home.html
-          grep -Fq 'homeYearChosenByUser' /tmp/talera-empty-home.html
-          echo 'TALERA_SAME_LIVE_HOME_RANDOM_SELECTED_YEAR_SOURCE_PASS'
+          # The selected-year photo is account-only. Anonymous Home MUST NOT
+          # be required to contain the authenticated controller. Verify the
+          # exact built authenticated asset plus the live SW package digest
+          # (derived from referencePages, scripts, Worker and offline runtime).
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {referencePages,guestPages,verifiedPublicSupport} from './r20-dev/free-10m-f5/generated/public-template-map.mjs';
+          const root='r20-dev/free-10m-delivery/public';
+          const hash=b=>createHash('sha256').update(b).digest('hex');
+          const signedIn=fs.readFileSync(root+referencePages['/mijn-leven']);
+          const guest=fs.readFileSync(root+guestPages['/mijn-leven'],'utf8');
+          assert.notEqual(referencePages['/mijn-leven'],guestPages['/mijn-leven']);
+          assert.equal(hash(signedIn)+'.html',referencePages['/mijn-leven'].split('/').pop());
+          for(const marker of ['randomHomeYearPhoto','homeYearChosenByUser']){
+            assert.ok(signedIn.includes(marker),'Missing authenticated Home controller');
+            assert.ok(!guest.includes(marker),'Unexpected personal controller on guest Home');
+          }
+          const localSW=fs.readFileSync(root+verifiedPublicSupport['/sw.js']);
+          assert.equal(hash(localSW)+'.js',verifiedPublicSupport['/sw.js'].split('/').pop());
+          fs.writeFileSync('/tmp/talera-expected-release-sw.js',localSW);
+          console.log('TALERA_AUTHENTICATED_HOME_SOURCE_AND_RELEASE_SW_DIGEST_PASS');
+          NODE
+          # No real account/session is created or read in the live release gate.
+          # Check the exact deployed PWA software bytes and signed-out boundary.
+          verified=0
+          for attempt in $(seq 1 12); do
+            if curl -fsS --max-time 25 -H 'Cache-Control: no-cache' "https://$F5_STAGE_HOST/sw.js" -o /tmp/talera-live-release-sw.js &&
+               cmp -s /tmp/talera-expected-release-sw.js /tmp/talera-live-release-sw.js; then
+              verified=1
+              break
+            fi
+            sleep 3
+          done
+          test "$verified" = 1
+          curl -fsS --max-time 25 -D /tmp/talera-live-home-headers.txt "https://$F5_STAGE_HOST/mijn-leven" -o /tmp/talera-empty-home.html
+          grep -Eiq '^x-talera-free-f5:[[:space:]]*anonymous-snapshot-only' /tmp/talera-live-home-headers.txt
+          if grep -Fq 'randomHomeYearPhoto' /tmp/talera-empty-home.html; then exit 1; fi
+          echo 'TALERA_LIVE_EXACT_ACCOUNT_HOME_PACKAGE_DIGEST_AND_GUEST_BOUNDARY_PASS'
           # A real iPhone showed the GUEST editor, while old CI covered only
           # authenticated /tell. Verify this EXACT same public guest route
           # now serves the approved photo-first layout, not the older label.

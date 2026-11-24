@@ -1006,6 +1006,55 @@ try{
        approvedTopicTilesPreserved:true,realIphoneAccepted:false}));
  }finally{await mixedHome.close()}
  await verifyTellEditorLayout(page,a.id);
+ // Reuse the already existing tagged fixture after its final Home assertions.
+ // No new synthetic media or account; test the actual signed-in editor route.
+ const deleteEditor=await page.context().newPage();
+ try{
+  const before=await page.evaluate(async ids=>{
+   const store=window.TaleraMemories;
+   const other=await store.get(ids.keep);
+   const bytes=await (await store.blob(other.items[0].key)).arrayBuffer();
+   return {ids:(await store.list()).map(r=>r.id).sort(),
+     otherId:other.id,otherKey:other.items[0].key,bytes:[...new Uint8Array(bytes)]};
+  },{keep:a.id});
+  const response=await deleteEditor.goto(origin+'/tell?edit='+encodeURIComponent(tagged.id),
+    {waitUntil:'domcontentloaded'});
+  assert.equal(response.status(),200);
+  const button=deleteEditor.locator('.talera-delete-published-memory');
+  try{await button.waitFor({state:'visible',timeout:11000})}
+  catch(err){
+   const opener=deleteEditor.locator('[data-open]').first();
+   if(!(await opener.count()))throw err;
+   await opener.click();
+   await button.waitFor({state:'visible',timeout:11000});
+  }
+  assert.equal(await button.count(),1);
+  let cancelled=false;
+  deleteEditor.once('dialog',async d=>{cancelled=true;await d.dismiss()});
+  await button.click();
+  await deleteEditor.waitForFunction(()=>!document.querySelector('.talera-delete-published-memory')?.disabled);
+  assert.ok(cancelled,'Deletion needs an explicit confirmation');
+  assert.equal(await deleteEditor.evaluate(async id=>!!(await window.TaleraMemories.get(id)),tagged.id),true);
+  let accepted=false;
+  deleteEditor.once('dialog',async d=>{accepted=true;await d.accept()});
+  await Promise.all([deleteEditor.waitForURL('**/mijn-leven',{timeout:15000}),button.click()]);
+  assert.ok(accepted,'Deletion must wait for confirmation');
+  await waitForLibrary(deleteEditor);
+  const after=await deleteEditor.evaluate(async args=>{
+   const store=window.TaleraMemories;
+   const other=await store.get(args.keep);
+   const bytes=await (await store.blob(other.items[0].key)).arrayBuffer();
+   return {ids:(await store.list()).map(r=>r.id).sort(),
+    otherId:other.id,otherKey:other.items[0].key,bytes:[...new Uint8Array(bytes)],
+    deleted:!(await store.get(args.target)),mediaGone:!(await store.blob(args.targetKey))};
+  },{keep:a.id,target:tagged.id,targetKey:tagged.photoKey});
+  assert.deepEqual(after.ids,before.ids.filter(id=>id!==tagged.id));
+  assert.equal(after.otherId,before.otherId);
+  assert.equal(after.otherKey,before.otherKey);
+  assert.deepEqual(after.bytes,before.bytes);
+  assert.ok(after.deleted&&after.mediaGone);
+  console.log('TALERA_EXISTING_EDITOR_DELETE_CONFIRM_CANCEL_AND_EXACT_LIBRARY_READBACK_PASS');
+ }finally{await deleteEditor.close()}
  await logout(page);
  await assertSignedOutEmpty(page,a.id);
  const guest=await login(page,users[1]);

@@ -1,6 +1,6 @@
 // TALERA Free: permanent published media IDs, independent of visual order.
 // Patch only the ORIGINAL private-account TaleraMemories save and editor call.
-// No migration, secondary database, Worker, UI change or media deletion.
+// No migration, secondary database or Worker. Existing full-delete is exposed in the editor.
 export function preserveOriginalMediaIdsOnEdit(html){
  if(typeof html!=='string'||!html.includes('talera-memory-store-v1'))
   throw Error('TALERA_LIBRARY_EDITOR_SAVE_SOURCE_MISSING');
@@ -92,7 +92,76 @@ export function preserveOriginalMediaIdsOnEdit(html){
    "DRAFT_DELETE_GATEWAY");
  exact("async function readDraft(){const db=await dbOpen();try{const t=db.transaction('files','readonly'),s=t.objectStore('files');const m=await new Promise(res=>{const r=s.get(MANIFEST);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)});const a=Array.isArray(m&&m.blob)?m.blob:[];const ids=[...new Set(a.flatMap(g=>[...(g.media||[]),...(g.voice?[g.voice]:[])]))];const t2=db.transaction('files','readonly'),s2=t2.objectStore('files');const r=await Promise.all(ids.map(id=>new Promise(res=>{const q=s2.get(PREFIX+id);q.onsuccess=()=>res([id,q.result&&q.result.blob]);q.onerror=()=>res([id,null])})));r.forEach(([id,f])=>{if(f)assets.set(id,f)});const thumbTx=db.transaction('files','readonly'),thumbStore=thumbTx.objectStore('files');const found=await Promise.all(ids.map(id=>new Promise(res=>{const r=thumbStore.get(PREFIX+'preview:'+id);r.onsuccess=()=>res([id,r.result?.blob]);r.onerror=()=>res([id,null])})));found.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});groups=a.map(g=>({...g,media:(g.media||[]).filter(id=>assets.has(id)),voice:assets.has(g.voice)?g.voice:''})).filter(g=>g&&g.id)}finally{db.close()}}","async function readDraft(){\n const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);\n originals.forEach(([id,f])=>{if(f)assets.set(id,f)});\n previews.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});\n groups=catalog.map(g=>({...g,\n  media:(g.media||[]).filter(id=>assets.has(id)),\n  voice:assets.has(g.voice)?g.voice:''\n })).filter(g=>g&&g.id);\n}","DRAFT_READ_GATEWAY");
  exact("async function loadDuplicateCache(){\n if(taleraDuplicateCache)return taleraDuplicateCache;\n const db=await dbOpen();\n try{const req=db.transaction('files','readonly').objectStore('files').get(PREFIX+'duplicate-index-v7');\n const row=await new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});\n taleraDuplicateCache=row&&typeof row.blob==='object'&&!Array.isArray(row.blob)?row.blob:{};return taleraDuplicateCache;\n }finally{db.close()}\n}","async function loadDuplicateCache(){\n if(taleraDuplicateCache)return taleraDuplicateCache;\n const cached=await mem.blob(PREFIX+'duplicate-index-v7');\n taleraDuplicateCache=cached&&typeof cached==='object'&&!Array.isArray(cached)?cached:{};\n return taleraDuplicateCache;\n}","DUPLICATE_INDEX_READ_GATEWAY");
- return relocateApprovedDeletionIntoLibrary(html);
+
+ // Expose the existing complete-delete action in the original signed-in editor.
+ // The published ID comes from the current editor group, never from an arbitrary
+ // URL alone. The unchanged library owns the atomic deletion and media cleanup.
+ return exposeCompleteMemoryDelete(relocateApprovedDeletionIntoLibrary(html));
+}
+export function exposeCompleteMemoryDelete(html){
+ const start=html.indexOf('function setupV20Tags(g,details){');
+ const end=html.indexOf('}function setupV10(',start);
+ if(start<0||end<=start)throw Error('TALERA_EDITOR_DELETE_UI_SOURCE_DRIFT');
+ const section=html.slice(start,end+1);
+ const anchor=' details.append(box);';
+ if(section.split(anchor).length!==2||html.includes('talera-delete-published-memory'))
+  throw Error('TALERA_EDITOR_DELETE_UI_ANCHOR_DRIFT');
+ const action=String.raw`
+ // Only a genuinely published memory in this editor gets a destructive action.
+ (()=> {
+  const id=g.existing;
+  if(typeof id!=='string'||!/^local-[a-z0-9-]+$/i.test(id))return;
+  const requested=new URLSearchParams(location.search).get('edit');
+  if(requested&&requested!==id)return;
+  const strings={
+   nl:['Herinnering verwijderen','Wil je deze complete herinnering definitief verwijderen? Ook de bijbehorende foto’s, video’s en opname worden verwijderd. Dit kan niet ongedaan worden gemaakt zonder back-up.','Verwijderen is niet bevestigd. Controleer Mijn leven voordat je het opnieuw probeert.'],
+   en:['Delete memory','Permanently delete this entire memory, including its photos, videos and recording? This cannot be undone without a backup.','Deletion was not confirmed. Check My Life before trying again.'],
+   de:['Erinnerung löschen','Diese gesamte Erinnerung samt Fotos, Videos und Aufnahme endgültig löschen? Ohne Sicherung kann dies nicht rückgängig gemacht werden.','Löschen nicht bestätigt. Prüfe Mein Leben, bevor du es erneut versuchst.'],
+   fr:['Supprimer le souvenir','Supprimer définitivement ce souvenir, ses photos, vidéos et enregistrement ? Sans sauvegarde, cette action est irréversible.','Suppression non confirmée. Vérifiez Ma vie avant de réessayer.'],
+   es:['Eliminar recuerdo','¿Eliminar definitivamente este recuerdo, sus fotos, vídeos y grabación? No se puede deshacer sin una copia de seguridad.','No se ha confirmado la eliminación. Revisa Mi vida antes de volver a intentarlo.']
+  };
+  const lang=String(window.TaleraI18n?.language||document.documentElement.lang||'nl').slice(0,2);
+  const labels=strings[lang]||strings.en;
+  const button=document.createElement('button');
+  button.type='button';button.className='talera-delete-published-memory';
+  button.textContent=labels[0];
+  button.style.cssText='display:block;align-self:center;min-height:44px;max-width:100%;padding:10px 12px;margin:12px auto 0;border:0;background:transparent;color:#a52229;font:inherit;font-size:15px;font-weight:600;text-decoration:underline;cursor:pointer;';
+  let busy=false;
+  button.addEventListener('click',async event=>{
+   event.preventDefault();event.stopPropagation();
+   if(busy||!button.isConnected||g.existing!==id)return;
+   const store=window.TaleraMemories,remove=window.__taleraV9FullDelete;
+   if(typeof store?.get!=='function'||typeof remove!=='function'){
+    window.alert(labels[2]);return;
+   }
+   busy=true;button.disabled=true;
+   const work=button.closest('.work.talera-r16-editor');
+   let locked=false;
+   try{
+    const row=await store.get(id);
+    if(!button.isConnected||g.existing!==id||!row||row.id!==id||row.source!=='pwa-local')
+     throw Error('TALERA_DELETE_TARGET_NOT_CURRENT');
+    if(!window.confirm(labels[1]))return;
+    if(work){work.inert=true;locked=true;}
+    await remove(id);
+    if(await store.get(id))throw Error('TALERA_DELETE_READBACK_FAILED');
+    // Leave the deleted draft/editor route, not the original presentation.
+    location.replace('/mijn-leven');
+   }catch(_){window.alert(labels[2]);}
+   finally{
+    if(locked&&work)work.inert=false;
+    busy=false;button.disabled=false;
+   }
+  });
+  requestAnimationFrame(()=>{
+   const work=box.closest('.work.talera-r16-editor');
+   if(!box.isConnected||!work||g.existing!==id||
+      work.querySelector('.talera-delete-published-memory'))return;
+   box.insertAdjacentElement('afterend',button);
+  });
+ })();
+ `;
+ return html.slice(0,start)+section.replace(anchor,anchor+action)+html.slice(end+1);
 }
 function relocateApprovedDeletionIntoLibrary(html){
  // Same approved full-delete and orphan-repair algorithms, physically moved

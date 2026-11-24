@@ -125,13 +125,16 @@ export async function createFreeArchive({stories,files,sourceScope,sourceOrigin=
   }
   return result;
  };
+ // Determine format only AFTER encoding both stores and discovering aliases.
+ const encodedStories=await encodeStore(stories,'stories');
+ const encodedFiles=await encodeStore(files,'files');
  const body={
   schema:sharedPayloads?'talera-free-lossless-local-3':'talera-free-lossless-local-2',
   sourceScope,
   sourceOrigin,
   createdAt,
-  stories:await encodeStore(stories,'stories'),
-  files:await encodeStore(files,'files'),
+  stories:encodedStories,
+  files:encodedFiles,
   binaries
  };
  const manifest=te.encode(JSON.stringify(body));

@@ -114,7 +114,7 @@ jobs:
               # Library I/O moved; approved schema, archive codec and media cue writer remain protected.
               # Owner-authorized archive-only fix; preserve all other original sources.
               git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-archive.mjs)" = "f11d8a857d7ef091cb71142e47ca35020172fa01"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-archive.mjs)" = "58e715173508e3e0efd6f1ffae97505f3146c76d"
             test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-portable-idb.mjs)" = "e7b5cc4617aa6755a71ca6960d2171cbfdaa3d0e"
             else
             git diff --exit-code 3292ede23e7e4929ae4dd89fa9a10379c0583cb0 HEAD -- r20-dev/free-10m-delivery/ r20-dev/free-10m-f5/f5-local-scope.mjs r20-dev/free-10m-f5/f5-portable-archive.mjs r20-dev/free-10m-f5/f5-edit-cue-rebind.mjs

@@ -438,7 +438,7 @@ async function run(){
     'g.canonicalByDraft=Object.fromEntries(',
     'canonicalByDraft:g.canonicalByDraft?{...g.canonicalByDraft}:null',
     'if(existing&&canonicalIds===undefined)for(',
-    "tx.objectStore('files').add(row)",
+    "taleraPayload.writePlans(tx.objectStore('files'),fresh",
     'await mem.updateCues(persisted.id,mapped);',
     'draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,',
     'async function writeFiles(entries){return mem.draftWriteRows(',

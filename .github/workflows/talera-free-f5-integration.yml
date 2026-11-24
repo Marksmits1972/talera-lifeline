@@ -911,7 +911,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-random-year-home-photo-verified-20261124' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-editor-delete-approved-20261124' }}
     needs: [f5_isolated_local, f5_actual_registration_button]
     runs-on: ubuntu-24.04
     timeout-minutes: 22
@@ -926,7 +926,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 65614ca6-a538-401a-a166-f34f8cdf720d
+      F5_EXPECTED_LIVE_VERSION: 28101aa7-ccce-441b-b9b5-5323aed91121
       F5_OFFICIAL_RESTORE_VERSION: c085893a-af9c-4d8d-ae6a-2ef81bcfb324
     steps:
       - uses: actions/checkout@v4
@@ -952,16 +952,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 71e73d6255489f098638fa98a31cf55cd9f110c6
-          test "$(git diff --name-only 8e88d888e26d98053b0e718c7c8d920d4664aa34 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 8e88d888e26d98053b0e718c7c8d920d4664aa34 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          test "$(git diff --name-only 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa 8e88d888e26d98053b0e718c7c8d920d4664aa34)" = "$(printf '%s\n' .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs r20-dev/free-10m-f5/f5-offline-sw.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
-          git diff --exit-code 9b54a643baa483c87f8e5a63cdbcea7ab0191eaa 8e88d888e26d98053b0e718c7c8d920d4664aa34 -- r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-f5/f5-library-persistence.mjs r20-dev/free-10m-f5/f5-backup-controller.mjs
-          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code HEAD^ HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = adbf360a8498184002121709d753e3552dde92fb
+          test "$(git diff --name-only adbf360a8498184002121709d753e3552dde92fb HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          test "$(git diff --name-only db495a16f7114ef3319cfaafba42d6af5b808e8a adbf360a8498184002121709d753e3552dde92fb)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-library-editor-stable-save.mjs)"
+          git diff --exit-code adbf360a8498184002121709d753e3552dde92fb HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const id=45352460852,expected='8e88d888e26d98053b0e718c7c8d920d4664aa34';
+          const id=45395478415,expected='adbf360a8498184002121709d753e3552dde92fb';
           const uri='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id;
           const response=await fetch(uri,{headers:{
             Authorization:'Bearer '+process.env.GH_TOKEN,
@@ -972,7 +969,7 @@ jobs:
           assert.equal(run.head_sha,expected,'Not the exact fully tested TALERA Free code');
           assert.equal(run.status,'completed');
           assert.equal(run.conclusion,'success','Latest full browser tests not green');
-          console.log('OWNER_APPROVED_EXACT_TESTED_BACKUP_UI_SAME_TALERA_RELEASE',
+          console.log('OWNER_APPROVED_EXACT_TESTED_EDITOR_DELETE_SAME_TALERA_RELEASE',
             JSON.stringify({testedCommit:expected,run:id,appDiff:true}));
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery

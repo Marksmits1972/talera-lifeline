@@ -8,7 +8,7 @@ import {chromium} from 'playwright';
 import {scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
-import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
+import {preserveOriginalMediaIdsOnEdit,completePublishedRemovalOnOtherPage} from './f5-library-editor-stable-save.mjs';
 
 const original=readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
 const accountHash='b'.repeat(64);
@@ -39,6 +39,11 @@ assert.ok(!edited.includes("const req=db.transaction('files','readonly').objectS
 
 
 
+const homeRaw=readFileSync('r20-dev/free-10m-delivery/generated/reference-mijn-leven.html','utf8');
+const homeFixed=scopeLocalMemories(completePublishedRemovalOnOtherPage(homeRaw,original),accountHash);
+const homeStorage=[...homeFixed.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+ .find(m=>m[1].includes('talera-memory-store-v1'))?.[2];
+assert.ok(homeStorage?.includes('await taleraSharedPublishedRemoval(key)'));
 const html='<!doctype html><html lang="nl"><head><meta charset="utf-8"></head><body>'+
  '<script id="talera-v9-complete-delete">'+deletion+'</'+'script>'+
  '<script id="talera-memory-store-v1">'+storage+'</'+'script></body></html>';
@@ -302,6 +307,33 @@ try{
    backupAndRestoreByteIdentical:true,restoredMediaIdsAndCuesIdentical:true,
    accountPrivate:true,photos:audit.photos,originals:audit.bytes};
  });
+ // Verify the SAME Home storage remove method used by the owner's reset.
+ // Execute only the actual generated storage script in the existing browser harness.
+ await page.evaluate(async()=>{
+  const mem=window.TaleraMemories;
+  const photo=new File([new Uint8Array([1,2,3])],'delete-test.jpg',{type:'image/jpeg'});
+  const doomed=await mem.save({title:'Delete regression',date:'1990-01-01',text:'test'},[photo]);
+  const draft='home-linked-synthetic',independent='home-independent-synthetic';
+  await mem.draftWriteRows([
+   ['talera-v4-work:manifest',[{id:'linked',existing:doomed.id,media:[draft],voice:''},{id:'independent',existing:'',media:[independent],voice:''}]],
+   ['talera-v4-work:'+draft,photo],['talera-v4-work:preview:'+draft,photo],
+   ['talera-v4-work:'+independent,photo]
+  ]);
+  window.__homeDeleteFixture={id:doomed.id,key:doomed.items[0].key,draft,independent};
+ });
+ const homeFixture=await page.evaluate(()=>window.__homeDeleteFixture);
+ await page.addScriptTag({content:homeStorage});
+ await page.evaluate(async f=>{
+  const mem=window.TaleraMemories;
+  if(await mem.remove(f.id)!==true||await mem.get(f.id)||await mem.blob(f.key)||
+     await mem.blob('talera-v4-work:'+f.draft)||await mem.blob('talera-v4-work:preview:'+f.draft))
+   throw Error('Home remove left linked media or draft records');
+  const manifest=await mem.blob('talera-v4-work:manifest');
+  if(!Array.isArray(manifest)||manifest.some(g=>g.existing===f.id)||
+     !(await mem.blob('talera-v4-work:'+f.independent)))
+   throw Error('Home remove lost unrelated draft or retained deleted draft');
+ },homeFixture);
+ console.log('TALERA_HOME_COMPLETE_DELETE_LINKED_DRAFT_PRESERVED_OTHER_DRAFT_PASS');
  assert.deepEqual(errors,[],'Original TALERA editor storage must load without JS errors');
  assert.equal(otherRequests,0,'No outgoing write requests permitted');
  assert.ok(outcome.storyUnchangedId&&outcome.reorderedExistingKeys&&outcome.newFileHasNewId);

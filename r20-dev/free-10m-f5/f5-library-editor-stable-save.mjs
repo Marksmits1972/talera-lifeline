@@ -203,6 +203,35 @@ export function exposeCompleteMemoryDelete(html){
  `;
  return html.slice(0,start)+section.replace(anchor,anchor+action)+html.slice(end+1);
 }
+export function completePublishedRemovalOnOtherPage(html,editorHtml){
+ const startTag='<script id="talera-v9-complete-delete">';
+ const start=editorHtml.indexOf(startTag);
+ const end=start<0?-1:editorHtml.indexOf('</script>',start+startTag.length);
+ if(start<0||end<0||editorHtml.indexOf(startTag,start+startTag.length)!==-1)
+  throw Error('TALERA_SHARED_DELETE_SOURCE_DRIFT');
+ const source=editorHtml.slice(start+startTag.length,end);
+ const first=source.indexOf('const DB='),last=source.indexOf('function dropLocalHandoff(id){');
+ if(first<0||last<=first||source.indexOf('const DB=',first+1)!==-1)
+  throw Error('TALERA_SHARED_DELETE_CORE_DRIFT');
+ const core=source.slice(first,last);
+ if(!core.includes("db.transaction(['stories','files'],'readwrite')")||
+    !core.includes('if(keep.has(key))continue;')||
+    !core.includes('const used=new Set(')||
+    !core.includes('talera-lifeline-dev-local-v1'))
+  throw Error('TALERA_SHARED_DELETE_GUARD_DRIFT');
+ // Reuse the existing library's DB_NAME; the account scoper must still
+ // see exactly one legacy DB marker in the memory-store script.
+ const scopedCore=core.replace(/(['"])talera-lifeline-dev-local-v1\1/g,'DB_NAME');
+ if(scopedCore.includes('talera-lifeline-dev-local-v1'))
+  throw Error('TALERA_SHARED_DELETE_DB_DRIFT');
+ const old="async function remove(id){const key=String(id||'');const old=await get(key);if(!old||old.source!=='pwa-local'||!/^local-[a-z0-9-]+$/i.test(key))throw Error('Deze herinnering kan niet lokaal verwijderd worden.');const others=(await list()).filter(row=>row.id!==key);const used=new Set(others.flatMap(row=>(row.items||[]).map(item=>item.key)));const keys=[...new Set((old.items||[]).map(item=>item.key).filter(k=>k&&!used.has(k)))];const db=await open(),tx=db.transaction(['stories','files'],'readwrite'),finish=done(tx);tx.objectStore('stories').delete(key);for(const item of keys){tx.objectStore('files').delete(item);tx.objectStore('files').delete(item+PHONE_VARIANT)}await finish;return true;}";
+ if(html.split(old).length!==2)throw Error('TALERA_SHARED_DELETE_ORIGINAL_DRIFT');
+ const replacement="const taleraSharedPublishedRemoval=(()=>{\n"+scopedCore+
+  "\nreturn removeStorage;\n})();\n"+
+  "async function remove(id){const key=String(id||'');const old=await get(key);if(!old||old.source!=='pwa-local'||!/^local-[a-z0-9-]+$/i.test(key))throw Error('Deze herinnering kan niet lokaal verwijderd worden.');await taleraSharedPublishedRemoval(key);return true;}";
+ return html.replace(old,()=>replacement);
+}
+
 function relocateApprovedDeletionIntoLibrary(html){
  // Same approved full-delete and orphan-repair algorithms, physically moved
  // inside the existing account-local TaleraMemories library, not re-created.
@@ -248,6 +277,12 @@ function relocateApprovedDeletionIntoLibrary(html){
  html=html.replace(api,owner+api+
   "removePublishedStory:taleraLibraryRemoval.removePublishedStory,"+
   "repairOrphanDrafts:taleraLibraryRemoval.repairOrphans,");
+ // The simpler legacy library.remove API must use the same complete-delete
+ // core as the existing editor menu. Keep its boolean result contract.
+ const oldRemove="remove:remove,";
+ if(html.split(oldRemove).length!==2)throw Error('TALERA_LIBRARY_DELETE_ALIAS_DRIFT');
+ html=html.replace(oldRemove,
+  "remove:async id=>{await taleraLibraryRemoval.removePublishedStory(id);return true},");
  // The original public functions keep exactly the same names and localStorage
  // cleanup; they now ask the library to do its atomic storage work.
  const wrapper="(()=>{\n'use strict';\n"+

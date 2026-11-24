@@ -45,6 +45,17 @@ async function preview(decoded,name,allowOtherOrigin){
    alreadyPresentMediaEntries:collisionFiles.length+identicalFiles.length,
    identicalMediaEntries:identicalFiles.length,
    conflictingMediaEntries:collisionFiles.length,
+   conflictingRecordKinds:collisionFiles.map(key=>{
+    const current=files.get(key),prefix='talera-v4-work:';
+    const used=existing.stories.some(story=>(story.items||[]).some(item=>item.key===key||item.key+':phone-v1'===key));
+    if(used)return 'bestand van bestaande herinnering';
+    if(key===prefix+'manifest')return Array.isArray(current?.blob)&&current.blob.length===0?'lege conceptlijst':'conceptlijst';
+    if(key===prefix+'duplicate-index-v7')return 'tijdelijke duplicatenindex';
+    if(key.startsWith(prefix+'preview:'))return 'tijdelijke conceptminiatuur';
+    if(key.startsWith(prefix))return 'conceptbestand';
+    if(key.startsWith('local-'))return 'losstaand herinneringsbestand';
+    return 'overig opslagrecord';
+   }),
    currentStoryCount:existing.stories.length,
    safeToRestore:collisionStories.length===0&&collisionFiles.length===0,
    // Names/keys stay local to caller. No logging or server telemetry.

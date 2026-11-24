@@ -145,6 +145,7 @@ preview.addEventListener('click',async()=>{
     '. Er is niets gewijzigd of teruggezet.')+
    '\nHuidige bibliotheek: '+result.currentStoryCount+' herinnering(en). '+
    'Identieke bestandsrecords veilig herbruikbaar: '+result.identicalMediaEntries+'.'+
+   (result.conflictingRecordKinds?.length?'\nTerugzetten is geblokkeerd door: '+[...new Set(result.conflictingRecordKinds)].join(', ')+'. Bewaar het back-upbestand; er is niets overschreven.':'')+
    readOnlyPhotoText(result));
  }catch(e){message(status,'Controle gestopt (niets gewijzigd): '+failText(e))}
  finally{preview.disabled=!chooser.files?.[0]}

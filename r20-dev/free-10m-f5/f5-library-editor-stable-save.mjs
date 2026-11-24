@@ -10,12 +10,22 @@ function installOriginalPayloadReader(html){
   "async function blob(key){const db=await open();return new Promise((resolve,reject)=>{"+
   "taleraPayload.read(db.transaction('files','readonly').objectStore('files'),String(key||''),"+
   "row=>resolve(row?.blob||null),reject)});}";
- return html.replace(old,()=>source);
+ html=html.replace(old,()=>source);
+ const auditOld="var rec=await request(db.transaction('files','readonly').objectStore('files').get(item.key));\n   if(!rec||!rec.blob){missing.push({id:story.id,key:item.key});continue}\n   bytes+=Number(rec.blob.size)||0;";
+ const auditNew="var original=await blob(item.key);\n   if(!original){missing.push({id:story.id,key:item.key});continue}\n   bytes+=Number(original.size)||0;";
+ if(html.split(auditOld).length!==2)throw Error('TALERA_PAYLOAD_AUDIT_SOURCE_DRIFT');
+ return html.replace(auditOld,()=>auditNew);
 }
 function appendPayloadCleanup(html){
+ const blocks=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+  .filter(m=>m[1].includes('talera-memory-store-v1'));
+ if(blocks.length!==1)throw Error('TALERA_PAYLOAD_DELETE_STORE_DRIFT:'+blocks.length);
+ const block=blocks[0],source=block[2];
  const old="for(const key of gone){files.delete(key);files.delete(key+':phone-v1')}";
- if(html.split(old).length!==2)throw Error('TALERA_PAYLOAD_DELETE_SOURCE_DRIFT');
- return html.replace(old,()=>old+"\n  taleraPayload.collectUnreferenced(files,()=>{try{files.transaction.abort()}catch(_){}});");
+ const hits=source.split(old).length-1;
+ if(hits!==1)throw Error('TALERA_PAYLOAD_DELETE_SOURCE_DRIFT:'+hits);
+ const updated=source.replace(old,()=>old+"\n  taleraPayload.collectUnreferenced(files,()=>{try{files.transaction.abort()}catch(_){}});");
+ return html.slice(0,block.index)+block[0].replace(source,()=>updated)+html.slice(block.index+block[0].length);
 }
 
 export function preserveOriginalMediaIdsOnEdit(html){

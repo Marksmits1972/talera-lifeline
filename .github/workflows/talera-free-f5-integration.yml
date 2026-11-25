@@ -926,7 +926,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 86bf31cb-b662-413a-a08c-e3cc0b35fe1c
+      F5_EXPECTED_LIVE_VERSION: 7c0fbca6-39bc-409d-a80e-99b3688fcef4
       F5_OFFICIAL_RESTORE_VERSION: 58a9c644-85d4-4d2b-82f2-1cedf4e08e1d
     steps:
       - uses: actions/checkout@v4
@@ -952,9 +952,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 61274c0e5824c10b97c2c1139abeeb289bc2ab5a
-          test "$(git diff --name-only 61274c0e5824c10b97c2c1139abeeb289bc2ab5a HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 61274c0e5824c10b97c2c1139abeeb289bc2ab5a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 217554dc6cdd75cd5874b98839616cab4d06c448
+          test "$(git diff --name-only 217554dc6cdd75cd5874b98839616cab4d06c448 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 217554dc6cdd75cd5874b98839616cab4d06c448 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -963,13 +963,13 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const prior=await get('45564320901');
-          assert.equal(prior.head_sha,'61274c0e5824c10b97c2c1139abeeb289bc2ab5a');
+          const prior=await get('45579690673');
+          assert.equal(prior.head_sha,'217554dc6cdd75cd5874b98839616cab4d06c448');
           assert.equal(prior.status,'completed');assert.equal(prior.conclusion,'success');
-          const jobs=(await get('45564320901/jobs?per_page=100')).jobs;
-          for(const id of [139035291627,139035291881,139035291951,139035292099])
+          const jobs=(await get('45579690673/jobs?per_page=100')).jobs;
+          for(const id of [139086312120,139086311411,139086311839,139086311757])
             assert.equal(jobs.find(j=>j.id===id)?.conclusion,'success');
-          const main=jobs.find(j=>j.id===139035291627);
+          const main=jobs.find(j=>j.id===139086312120);
           for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
             'Verify Cloudflare compilation without deployment',
             'Browser verify back-up panel, private session and two local browser contexts',
@@ -979,8 +979,8 @@ jobs:
             'Browser verify complete original-media export, checksum and nondestructive restore',
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
-          assert.equal(jobs.find(j=>j.id===139035291951)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45564320901');
+          assert.equal(jobs.find(j=>j.id===139086311839)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45579690673');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
         run: |
@@ -1096,8 +1096,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code 61274c0e5824c10b97c2c1139abeeb289bc2ab5a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45564320901'
+          git diff --exit-code 217554dc6cdd75cd5874b98839616cab4d06c448 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45579690673'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail

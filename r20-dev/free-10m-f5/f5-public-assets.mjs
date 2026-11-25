@@ -1562,11 +1562,11 @@ function installTimelineLoupe(html){
  };
  const source=readFileSync(path.join(here,'f5-timeline-loupe.mjs'),'utf8').replaceAll('export ','');
  assert.ok(!source.includes('</script>'));
- one('let zoomPos=0;','let zoomPos=0;\\nlet taleraLoupeHoldId=null,taleraLoupeHoldMs=null;','HOLD_ID');
+ one('let zoomPos=0;','let zoomPos=0;\nlet taleraLoupeHoldId=null,taleraLoupeHoldMs=null;','HOLD_ID');
  one('  centerMs=clamp(centerMs,minCenter,LIFE_END);',
   '  centerMs=clamp(centerMs,taleraLoupeHoldId!==null&&centerMs===taleraLoupeHoldMs?LIFE_START:minCenter,LIFE_END);','LIFE_LIMIT');
- one('  if (!window.__taleraBandRolling) {\\n    if (userIsMoving) renderJourneyPreview();',
-  '  if (!window.__taleraBandRolling && !(taleraLoupeHoldId!==null&&taleraLoupeHoldId===activeMemoryId&&centerMs===taleraLoupeHoldMs)) {\\n    if (userIsMoving) renderJourneyPreview();','EXACT_SELECTION');
+ one('  if (!window.__taleraBandRolling) {\n    if (userIsMoving) renderJourneyPreview();',
+  '  if (!window.__taleraBandRolling && !(taleraLoupeHoldId!==null&&taleraLoupeHoldId===activeMemoryId&&centerMs===taleraLoupeHoldMs)) {\n    if (userIsMoving) renderJourneyPreview();','EXACT_SELECTION');
  const marker='surface.addEventListener("pointerdown",e=>{';
  const bind=`
 const taleraLoupe=mountTimelineLoupe({
@@ -1605,19 +1605,19 @@ function taleraNativeTimelineStart(){
  userIsMoving=true;window.__taleraIntegratedBand?.beginTimeline?.();
 }
 `;
- one(marker,source+'\\n'+bind+'\\n'+marker,'MOUNT');
- one('  if(e.target.closest("button")) return;\\n  userIsMoving = true;\\n  surface.setPointerCapture(e.pointerId);',
-  '  if(taleraLoupe.down(e))return;\\n  if(e.target.closest("button")) return;\\n  surface.setPointerCapture(e.pointerId);','DOWN');
- one('    window.__taleraIntegratedBand?.beginTimeline?.();\\n    reanchorDragAt(e.clientX);',
-  '    if(!taleraLoupe.arm(e))taleraNativeTimelineStart();\\n    reanchorDragAt(e.clientX);','ARM');
- one('  } else if(pointers.size===2) {\\n    markZoomDiscovered();',
-  '  } else if(pointers.size===2) {\\n    taleraLoupe.cancelPending();taleraNativeTimelineStart();\\n    markZoomDiscovered();','PINCH');
- one('surface.addEventListener("pointermove",e=>{\\n  if(!pointers.has(e.pointerId)) return;',
-  'surface.addEventListener("pointermove",e=>{\\n  if(taleraLoupe.move(e))return;\\n  if(!pointers.has(e.pointerId)) return;\\n  if(taleraLoupe.waiting(e))return;\\n  if(!userIsMoving)taleraNativeTimelineStart();','MOVE');
- one('function pointerEnd(e) {\\n  if(pointers.has(e.pointerId)) pointers.delete(e.pointerId);',
-  'function pointerEnd(e) {\\n  if(taleraLoupe.end(e))return;\\n  if(taleraLoupe.cancelPending(e.pointerId)){pointers.delete(e.pointerId);userIsMoving=false;return}\\n  if(!pointers.has(e.pointerId))return;\\n  pointers.delete(e.pointerId);','END');
- one('surface.addEventListener("wheel",e=>{\\n  e.preventDefault();\\n  userIsMoving = true;',
-  'surface.addEventListener("wheel",e=>{\\n  e.preventDefault();\\n  if(taleraLoupe.wheel(e))return;\\n  taleraLoupeHoldId=null;taleraLoupeHoldMs=null;\\n  userIsMoving = true;','WHEEL');
+ one(marker,source+'\n'+bind+'\n'+marker,'MOUNT');
+ one('  if(e.target.closest("button")) return;\n  userIsMoving = true;\n  surface.setPointerCapture(e.pointerId);',
+  '  if(taleraLoupe.down(e))return;\n  if(e.target.closest("button")) return;\n  surface.setPointerCapture(e.pointerId);','DOWN');
+ one('    window.__taleraIntegratedBand?.beginTimeline?.();\n    reanchorDragAt(e.clientX);',
+  '    if(!taleraLoupe.arm(e))taleraNativeTimelineStart();\n    reanchorDragAt(e.clientX);','ARM');
+ one('  } else if(pointers.size===2) {\n    markZoomDiscovered();',
+  '  } else if(pointers.size===2) {\n    taleraLoupe.cancelPending();taleraNativeTimelineStart();\n    markZoomDiscovered();','PINCH');
+ one('surface.addEventListener("pointermove",e=>{\n  if(!pointers.has(e.pointerId)) return;',
+  'surface.addEventListener("pointermove",e=>{\n  if(taleraLoupe.move(e))return;\n  if(!pointers.has(e.pointerId)) return;\n  if(taleraLoupe.waiting(e))return;\n  if(!userIsMoving)taleraNativeTimelineStart();','MOVE');
+ one('function pointerEnd(e) {\n  if(pointers.has(e.pointerId)) pointers.delete(e.pointerId);',
+  'function pointerEnd(e) {\n  if(taleraLoupe.end(e))return;\n  if(taleraLoupe.cancelPending(e.pointerId)){pointers.delete(e.pointerId);userIsMoving=false;return}\n  if(!pointers.has(e.pointerId))return;\n  pointers.delete(e.pointerId);','END');
+ one('surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  userIsMoving = true;',
+  'surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  if(taleraLoupe.wheel(e))return;\n  taleraLoupeHoldId=null;taleraLoupeHoldMs=null;\n  userIsMoving = true;','WHEEL');
  const css='<style id="talera-timeline-loupe-style">'+
  '#talera-timeline-loupe{position:absolute;left:50%;transform:translateX(-50%);bottom:38px;width:66.666%;height:58px;box-sizing:border-box;border-radius:25px;border:1px solid rgba(255,255,255,.9);background:#faf9f5;color:#0f2747;z-index:3;pointer-events:none;overflow:hidden;box-shadow:0 2px 9px rgba(15,39,71,.12)}'+
  '#talera-timeline-loupe[hidden]{display:none!important}'+

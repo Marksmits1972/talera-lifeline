@@ -111,6 +111,56 @@ backupRegression: try{
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
+  // Actual native-file input change regression. The previous tests invoked
+  // mem.save directly, which missed the owner's real import path.
+  const pickerPage=await ctx.newPage();
+  try{
+    const pickerErrors=[];
+    pickerPage.on('pageerror',e=>pickerErrors.push(e.message));
+    pickerPage.on('console',m=>{if(m.type()==='error')pickerErrors.push(m.text().slice(0,400))});
+    await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await pickerPage.waitForFunction(()=>typeof window.TaleraMemories?.draftWriteRows==='function',null,{timeout:15000});
+    const src=await pickerPage.evaluate(()=>{
+      const scripts=[...document.scripts].map(s=>s.textContent||'');
+      const script=scripts.find(s=>s.includes('async function importPhotos('))||'';
+      const at=script.indexOf('async function importPhotos(');
+      return {importSource:at<0?'not found':script.slice(at,at+6500),
+        inputs:[...document.querySelectorAll('input[type=file]')].map(e=>({id:e.id,accept:e.accept,hidden:e.hidden})),
+        body:document.body.innerText.slice(0,400)};
+    });
+    console.log('TALERA_ACTUAL_PICKER_SOURCE_DIAGNOSTIC',JSON.stringify(src));
+    // Valid real JPEG and QuickTime input via the original file picker.
+    const photoPath=path.join(generated,'picker-photo.jpg');
+    const videoPath=path.join(generated,'picker-video.mov');
+    execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=red:s=96x96:d=1',
+      '-frames:v','1','-threads','1',photoPath],{timeout:20000,stdio:'ignore'});
+    execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=96x96:d=1',
+      '-c:v','libx264','-pix_fmt','yuv420p','-threads','1','-movflags','+faststart',videoPath],
+      {timeout:20000,stdio:'ignore'});
+    for(const file of [photoPath,videoPath]){
+      await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+      await pickerPage.waitForFunction(()=>!!window.TaleraMemories?.save&&document.querySelector('input[type=file]'),null,{timeout:15000});
+      const input=pickerPage.locator('input[type=file]').first();
+      await input.setInputFiles(file);
+      try{
+        await pickerPage.waitForFunction(()=>document.querySelector('#talera-f5-media-status')||
+          document.body.innerText.includes('Import nog niet klaar:'),null,{timeout:25000});
+      }catch(error){
+        console.log('TALERA_PICKER_WAIT_FAILURE',JSON.stringify({file:path.basename(file),
+          body:(await pickerPage.locator('body').innerText()).slice(0,1800),pickerErrors}));
+        throw error;
+      }
+      const state=await pickerPage.evaluate(()=>({
+        count:window.__taleraF5PickerCounts,
+        status:document.querySelector('#talera-f5-media-status')?.textContent,
+        body:document.body.innerText.slice(0,1800)}));
+      console.log('TALERA_ACTUAL_PICKER_RESULT',JSON.stringify({file:path.basename(file),...state,pickerErrors}));
+      assert.ok(!state.body.includes('Import nog niet klaar:'),'Actual picker import failed: '+state.body);
+      assert.ok(state.status&&state.count?.count===1,'Real picker did not create a media editor');
+      assert.equal(state.count.videos,file.endsWith('.mov')?1:0);
+    }
+    console.log('TALERA_ACTUAL_PHOTO_AND_VIDEO_PICKER_IMPORT_PASS');
+  }finally{await pickerPage.close()}
   // iPhone regression: real authenticated TALERA Worker, saved local image,
   // then same home-screen PWA routes offline. No second app or Worker.
   const offlineCtx=await browser.newContext({

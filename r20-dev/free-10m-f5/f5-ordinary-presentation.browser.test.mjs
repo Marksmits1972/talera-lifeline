@@ -749,7 +749,7 @@ backupRegression: try{
     geoPage.on('pageerror',error=>geoErrors.push(error.message));
     await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
     await geoPage.waitForFunction(()=>!!window.TaleraMemories?.save);
-    const saved=await geoPage.evaluate(async()=>{
+    const fixtureBytes=await geoPage.evaluate(async()=>{
       const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
       const paint=canvas.getContext('2d');paint.fillStyle='#39ad72';paint.fillRect(0,0,64,64);
       const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
@@ -768,9 +768,35 @@ backupRegression: try{
       [51,59,6,5,53,18].forEach((n,i)=>{u32(82+i*8,n);u32(86+i*8,1)});
       const len=2+6+t.length,marker=Uint8Array.from([255,225,len>>8,len&255,69,120,105,102,0,0,...t]);
       const file=new File([original.subarray(0,2),marker,original.subarray(2)],'synthetic-gps.jpg',{type:'image/jpeg'});
-      const row=await window.TaleraMemories.save({title:'Synthetic GPS',date:'2026-11-10',text:'GPS contract'},[file]);
-      return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await file.arrayBuffer())]};
+      return [...new Uint8Array(await file.arrayBuffer())];
     });
+    // Import through the real picker and existing draft library, not direct
+    // injection into the final catalog. Test the exact original bytes first.
+    await geoPage.locator('#photoInput').setInputFiles({name:'synthetic-gps.jpg',mimeType:'image/jpeg',buffer:Buffer.from(fixtureBytes)});
+    let draftReady=false;
+    for(let attempt=0;attempt<150;attempt++){
+      draftReady=await geoPage.evaluate(async expected=>{
+        const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+        const original=d.originals.find(([,v])=>v instanceof Blob)?.[1];
+        if(!original)return false;
+        const bytes=new Uint8Array(await original.arrayBuffer());
+        return bytes.length===expected.length&&bytes.every((v,i)=>v===expected[i])&&
+          d.catalog.some(g=>g.media?.length===1)&&!document.getElementById('photoInput');
+      },fixtureBytes);
+      if(draftReady)break;
+      await geoPage.waitForTimeout(150);
+    }
+    assert.equal(draftReady,true,'Actual picker must retain every original GPS-bearing byte');
+    const saved=await geoPage.evaluate(async()=>{
+      const mem=window.TaleraMemories;
+      const d=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+      const original=d.originals.find(([,v])=>v instanceof Blob)?.[1];
+      const row=await mem.save({title:'Synthetic GPS',date:'2026-11-10',text:'GPS contract'},[original]);
+      const persisted=await mem.blob(row.items[0].key);
+      return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await persisted.arrayBuffer())]};
+    });
+    assert.deepEqual(saved.bytes,fixtureBytes,'GPS bytes unchanged after real picker and durable save');
+    console.log('TALERA_GEONAMES_REAL_PICKER_ORIGINAL_GPS_BYTES_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',physicalIphoneAccepted:false}));
     // Observe real same-origin HTTP requests at the browser context boundary.
     // Unique response prevents a pre-existing catalog value passing this test.
     const city='Testplaats-'+randomUUID().slice(0,8);

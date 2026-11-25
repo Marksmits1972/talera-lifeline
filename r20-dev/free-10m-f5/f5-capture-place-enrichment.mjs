@@ -2,7 +2,7 @@
 // The caller supplies the existing account-local library and its transaction owner.
 // Recheck only previously unresolved HEIF originals once after the parser fix.
 const checkedVersion=item=>/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(item?.mime||'')||/\.(?:heic|heif)$/i.test(item?.name||'')?'v2':'v1';
-export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{}}){
+export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{},retryItems=null,now=Date.now}){
  const stories=await list();
  if(!Array.isArray(stories))return {more:false,blocked:true};
  const known=new Map();
@@ -10,7 +10,7 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
  for(const story of stories)if(story?.source==='pwa-local')for(const item of story.items||[]){
   if(item.capturePlace)known.set(keyOf(item),item.capturePlace);
  }
- let count=0;
+ let count=0,nextRetry=Infinity;
  for(const initial of stories){
   if(initial?.source!=='pwa-local'||!Array.isArray(initial.items))continue;
   let story=initial;
@@ -19,6 +19,9 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
    if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||item.capturePlace||item.capturePlaceChecked===checkedVersion(item))continue;
    if(!available())return {more:true,blocked:true};
    if(unreadable.has(keyOf(item))||!canLookup()&&deferred.has(keyOf(item)))continue;
+   const retryKey=keyOf(item),retryAt=retryItems?.get(retryKey)||0;
+   if(retryAt>now()){nextRetry=Math.min(nextRetry,retryAt);continue}
+   retryItems?.delete(retryKey);
    if(count>=limit)return {more:true,blocked:false};
    count++;
    diagnose(item.key,'bestand-lezen');
@@ -50,7 +53,14 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
        diagnose(item.key,'geonames-aanvraag');
        const result=await lookup(gps);
        diagnose(item.key,result?.ok?(result.place?'geonames-plaats':'geonames-geen-plaats'):(result?.diagnostic||'geonames-fout'));
-       if(!result?.ok)return {more:true,blocked:true,retryAfterMs:result?.retryAfterMs===3600000?3600000:60000};
+       if(!result?.ok){
+        const delay=result?.retryAfterMs===3600000?3600000:60000;
+        // A single failed original may not monopolise the next scan. The
+        // actual provider/account backoff remains global, then another item
+        // gets its turn before retrying this one. No writes on failed lookup.
+        if(retryItems){retryItems.set(retryKey,now()+delay+60000)}
+        return {more:true,blocked:true,retryAfterMs:delay,...(retryItems?{diagnostic:result?.diagnostic||'geonames-fout'}:{})};
+       }
        place=result.place;
       }
      }
@@ -58,13 +68,13 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
     if(!available())return {more:true,blocked:true};
     // commit must compare the full snapshot and never recreate a deleted story.
     const updated=await commit(story,i,place);
-    if(!updated){diagnose(item.key,'catalogus-conflict');break}
+    if(!updated){diagnose(item.key,'catalogus-conflict');if(retryItems){const at=now()+1000;retryItems.set(retryKey,at);nextRetry=Math.min(nextRetry,at)}break}
     story=updated;
     if(place){known.set(keyOf(item),place);diagnose(item.key,'plaats-opgeslagen')}
-   }catch(_){diagnose(item.key,'verwerking-fout'); /* optional: never block normal save, read, playback or backup */ }
+   }catch(_){diagnose(item.key,'verwerking-fout');if(retryItems){const at=now()+60000;retryItems.set(retryKey,at);nextRetry=Math.min(nextRetry,at)} /* optional: never block normal save, read, playback or backup */ }
   }
  }
- return {more:false,blocked:false};
+ return Number.isFinite(nextRetry)?{more:true,blocked:true,retryAfterMs:Math.max(250,nextRetry-now()),itemRetryOnly:true}:{more:false,blocked:false};
 }
 export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,enabled}){
  if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(dbName)||!['/mijn-leven','/meldingen','/present','/tell'].includes(location.pathname)||window.top!==window)return;
@@ -74,7 +84,11 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  const canLookup=()=>enabled&&available()&&navigator.onLine!==false;
  const deferred=new Set(),unreadable=new Set();
  // TEMPORARY location diagnosis: in-memory codes only; no logs or persistent fields.
- const states=new Map(),probes=new Map();let diagnosticLookupUsed=false;
+ const states=new Map(),probes=new Map(),retryItems=new Map();let diagnosticLookupUsed=false,queueCode='wachtrij-start';
+ const queueStatus=code=>{if(queueCode===code)return;queueCode=code;window.dispatchEvent(new Event('talera-location-diagnosis'))};
+ // Bound reads in this optional service only. A slow historical original or
+ // unexpected IDB read must not prevent subsequent originals from being seen.
+ const bounded=(work,ms=12000)=>{let id;return Promise.race([Promise.resolve().then(work),new Promise((_,reject)=>{id=setTimeout(()=>reject(Error('CAPTURE_READ_TIMEOUT')),ms)})]).finally(()=>clearTimeout(id))};
  const diagnose=(key,code)=>{if(states.get(key)===code)return;states.set(key,code);if(states.size>256)states.delete(states.keys().next().value);window.dispatchEvent(new Event('talera-location-diagnosis'))};
  const safe=s=>typeof s==='string'&&s.length>0&&s.length<=120&&!/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(s);
  const valid=p=>{
@@ -125,7 +139,9 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
      return result?.ok?(result.place?'api-plaats-niet-opgeslagen':'geonames-geen-plaats'):(result?.diagnostic||'geonames-fout');
     })();probes.set(cacheKey,work);if(probes.size>64)probes.delete(probes.keys().next().value);
    }
-   return await probes.get(cacheKey);
+   const result=await probes.get(cacheKey);
+   if(result==='gps-wacht-verwerking')return queueCode;
+   return result;
   }catch(_){return 'diagnose-fout'}
  }});
  const commit=async(expected,index,place)=>{
@@ -149,16 +165,17 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  };
  const run=async()=>{
   timer=null;if(running||!available())return;
-  running=true;
+  running=true;queueStatus('wachtrij-bibliotheek-lezen');
   try{
-   const result=await enrichCapturePlaces({list:()=>store.list(),blob:id=>store.blob(id),readPlace,readGps,lookup,commit,available,canLookup,deferred,unreadable,diagnose});
+   const result=await enrichCapturePlaces({list:async()=>{const rows=await bounded(()=>store.list());queueStatus('wachtrij-bestanden');return rows},blob:id=>bounded(()=>store.blob(id)),readPlace:blob=>bounded(()=>readPlace(blob)),readGps:blob=>bounded(()=>readGps(blob)),lookup,commit,available,canLookup,deferred,unreadable,diagnose,retryItems});
    if(!result.more)unreadable.clear();
-   if(result.retryAfterMs)blockedUntil=Date.now()+result.retryAfterMs;
+   if(result.retryAfterMs&&!result.itemRetryOnly){blockedUntil=Date.now()+result.retryAfterMs;queueStatus(result.diagnostic||'wachtrij-pauze')}
+   else queueStatus(result.more?'wachtrij-vervolg':'wachtrij-klaar');
    if(result.more&&available()){
-    if(!result.blocked)schedule(30000);
-    else if(result.retryAfterMs&&canLookup())schedule(result.retryAfterMs);
+    if(!result.blocked)schedule(1000);
+    else if(result.retryAfterMs&&(canLookup()||result.itemRetryOnly))schedule(result.retryAfterMs);
    }
-  }catch(_){}finally{
+  }catch(_){queueStatus('wachtrij-leesfout');schedule(60000)}finally{
    running=false;
    if(pendingDelay!==null){const delay=pendingDelay;pendingDelay=null;schedule(delay)}
   }
@@ -182,6 +199,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  window.addEventListener('online',()=>{probes.clear();window.dispatchEvent(new Event('talera-location-diagnosis'));schedule()});
  window.addEventListener('pagehide',()=>{departing=true;if(timer!==null){clearTimeout(timer);timer=null}});
  window.addEventListener('pageshow',()=>{departing=false;schedule()});
+ window.addEventListener('focus',()=>schedule());
  document.addEventListener('visibilitychange',()=>{if(available())schedule()});
  schedule();
 }

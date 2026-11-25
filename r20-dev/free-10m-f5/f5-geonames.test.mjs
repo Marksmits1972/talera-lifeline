@@ -114,3 +114,13 @@ catalog=[structuredClone(record)];diagnosticCodes.length=0;
 await enrichCapturePlaces({...options,diagnose:(key,code)=>diagnosticCodes.push(code),readGps:async()=>null});
 assert.deepEqual(diagnosticCodes,['bestand-lezen','gps-niet-herkend']);
 console.log('TALERA_LOCATION_TEMPORARY_SAFE_DIAGNOSTIC_CODES_PASS');
+
+// Reproduce a stalled queue: first original fails, second must be visited
+// on the first allowed retry instead of the same item monopolising all scans.
+const stuck={...record,id:'stuck',items:[{...record.items[0],key:'stuck'}]};
+const healthy={...record,id:'healthy',items:[{...record.items[0],key:'healthy'}]};
+catalog=[structuredClone(stuck),structuredClone(healthy)];const retryItems=new Map();let clock=1000,attempts=[];const queueOptions={...options,retryItems,now:()=>clock,blob:async key=>new Blob([key==='stuck'?'bad':'gps'],{type:'image/jpeg'}),readGps:async blob=>({latitude:(await blob.text())==='bad'?1:2,longitude:0}),lookup:async gps=>{attempts.push(gps.latitude);return gps.latitude===1?{ok:false,diagnostic:'api-503'}:{ok:true,place:resolved}}};
+const failedScan=await enrichCapturePlaces(queueOptions);assert.equal(failedScan.retryAfterMs,60000);assert.equal(failedScan.diagnostic,'api-503');assert.deepEqual(attempts,[1]);
+clock+=60000;await enrichCapturePlaces(queueOptions);assert.deepEqual(attempts,[1,2]);assert.deepEqual(catalog[1].items[0].capturePlace,resolved);assert.equal(catalog[0].items[0].capturePlaceChecked,undefined);
+clock+=60000;await enrichCapturePlaces(queueOptions);assert.deepEqual(attempts,[1,2,1]);
+console.log('TALERA_LIBRARY_FAILED_ORIGINAL_DOES_NOT_MONOPOLISE_RETRY_QUEUE_PASS');

@@ -69,7 +69,22 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
  const motion=createLoupeMotion(dir=>{const changed=step(dir);if(changed)render();return changed});
  const now=()=>performance.now();
  const clearPending=()=>{if(!pending)return;clearTimeout(pending.timer);pending=null};
+ function layout(){
+  if(!opened)return;
+  const ruler=surface.getBoundingClientRect(),date=surface.querySelector('#focusText')?.getBoundingClientRect();
+  if(!date||!ruler.height)return;
+  // Only move the loupe, never the existing date/needle. Reserve room for
+  // the date's existing engaged/afterglow transform, also on small phones.
+  panel.style.bottom=Math.max(38,Math.ceil(ruler.bottom-date.top+12))+'px';
+ }
+ const resizeObserver=new ResizeObserver(layout);
+ resizeObserver.observe(surface);
+ const dateNode=surface.querySelector('#focusText');
+ if(dateNode)resizeObserver.observe(dateNode);
+ window.addEventListener('resize',layout,{passive:true});
+ window.visualViewport?.addEventListener('resize',layout,{passive:true});
  function render(){
+  layout();
   const current=selection();
   const days=loupeDays(current.ms,lifeStart,lifeEnd,locale());
   cells.forEach((cell,i)=>{cell.textContent=days[i].label;cell.classList.toggle('is-empty',!days[i].label);cell.classList.toggle('is-center',days[i].center)});

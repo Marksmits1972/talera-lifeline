@@ -407,11 +407,13 @@ async function testTimelineLoupe(){
    const needle=document.querySelector('#surface>.center-needle').getBoundingClientRect();
    return {width:p.width/r.width,center:Math.abs((p.left+p.right-r.left-r.right)/2),
      labels:[...document.querySelectorAll('#talera-timeline-loupe .talera-loupe-scale span')].map(e=>e.textContent),
-     dateSeparate:p.bottom<=d.top+2,needleVisible:needle.height>10};
+     dateSeparate:p.bottom<=d.top+2,needleVisible:needle.height>10,
+     panelTop:p.top,panelBottom:p.bottom,dateTop:d.top,rulerTop:r.top,rulerBottom:r.bottom};
   });
   assert.ok(geometry.width>.60&&geometry.width<.72&&geometry.center<2&&geometry.needleVisible);
   assert.equal(geometry.labels.length,7);assert.ok(geometry.labels.every(Boolean));
-  assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe');
+  assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe: '+JSON.stringify(geometry));
+  assert.ok(geometry.panelTop>=geometry.rulerTop-1,'Loupe must stay inside existing upper ruler: '+JSON.stringify(geometry));
   const seen=await lp.evaluate(()=>{window.__loupeTestVisited=[];window.__taleraTimelineRuntime.subscribe(m=>window.__loupeTestVisited.push(m.storyId));return window.__loupeTestVisited});
   assert.deepEqual(seen,[]);
   // One controlled continuous drag, including two memories at the same instant.

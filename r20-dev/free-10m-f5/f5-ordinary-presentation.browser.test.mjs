@@ -344,10 +344,120 @@ backupRegression: try{
       assert.deepEqual(pickerErrors,[],'Picker JS error');
     }finally{await pickerCtx.close()}
   }
+// Same authenticated product code and same local library; no test page or
+// altered player. The fresh browser context contains only synthetic fixtures.
+async function testTimelineLoupe(){
+ const loupeCtx=await browser.newContext({...devices['iPhone 13'],
+  extraHTTPHeaders:{'x-talera-f5-key':gate},serviceWorkers:'block'});
+ try{
+  await loupeCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+  const lp=await loupeCtx.newPage(),errs=[];
+  lp.on('pageerror',e=>errs.push(String(e.message)));
+  await lp.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+  await lp.waitForFunction(()=>!!window.TaleraMemories?.save);
+  const ids=await lp.evaluate(async()=>{
+   const dates=['2003-02-03','2003-02-03','2003-02-04','2003-02-12'];
+   const colors=['#922244','#228844','#225599','#aa8822'];
+   const result=[];
+   for(let i=0;i<dates.length;i++){
+    const canvas=document.createElement('canvas');canvas.width=48;canvas.height=48;
+    const ctx=canvas.getContext('2d');ctx.fillStyle=colors[i];ctx.fillRect(0,0,48,48);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    const row=await window.TaleraMemories.save({title:'Loupe '+i,date:dates[i],time:'12:00:00',text:'Synthetic timeline regression'},[new File([blob],'loupe-'+i+'.png',{type:'image/png'})]);
+    result.push(row.id);
+   }
+   return result;
+  });
+  await load(lp,ids[0],1);
+  await lp.waitForFunction(ids=>ids.every(id=>window.__taleraPhotoBook.list().some(m=>m.storyId===id)),ids);
+  const expected=await lp.evaluate(ids=>window.__taleraPhotoBook.list().filter(m=>ids.includes(m.storyId)).map(m=>({id:m.storyId,ms:m.ms})),ids);
+  // The original same-timestamp order is the sole authority; do not impose
+  // an invented second sort order on memories sharing an identical date.
+  assert.equal(expected.length,4);assert.equal(expected[0].ms,expected[1].ms);
+  await load(lp,expected[0].id,1);
+  await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
+  const box=await lp.locator('#surface').boundingBox();
+  assert.ok(box?.width>200&&box.height>100);
+  const x=box.x+box.width*.65,y=box.y+box.height-64;
+  const panel=lp.locator('#talera-timeline-loupe');
+  const state=()=>lp.evaluate(()=>({
+   open:!document.getElementById('talera-timeline-loupe').hidden,
+   id:window.__taleraTimelineRuntime.currentMemory()?.storyId,
+   runtimeId:window.__taleraTimelineRuntime.activeMemoryId(),
+   loupeId:document.getElementById('talera-timeline-loupe').dataset.memoryId,
+   center:window.__taleraTimelineRuntime.centerMs(),date:document.getElementById('focusText').textContent
+  }));
+  // An intentional drag, followed by a pause, can never open the loupe.
+  await lp.mouse.move(x,y);await lp.mouse.down();
+  await lp.mouse.move(x-32,y,{steps:4});await lp.waitForTimeout(2150);
+  assert.equal((await state()).open,false);await lp.mouse.up();
+  await load(lp,expected[0].id,1);
+  await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
+  // Small accidental movement still permits a two-second stationary hold.
+  await lp.mouse.move(x,y);await lp.mouse.down();await lp.mouse.move(x+3,y+2);
+  await lp.waitForTimeout(1100);assert.equal((await state()).open,false);
+  await panel.waitFor({state:'visible',timeout:3000});await lp.mouse.up();
+  const opened=await state();
+  assert.equal(opened.id,expected[0].id);assert.equal(opened.runtimeId,opened.loupeId);
+  assert.equal(opened.center,expected[0].ms);
+  const geometry=await lp.evaluate(()=>{
+   const r=document.getElementById('surface').getBoundingClientRect();
+   const p=document.getElementById('talera-timeline-loupe').getBoundingClientRect();
+   const d=document.getElementById('focusText').getBoundingClientRect();
+   const needle=document.querySelector('#surface>.center-needle').getBoundingClientRect();
+   return {width:p.width/r.width,center:Math.abs((p.left+p.right-r.left-r.right)/2),
+     labels:[...document.querySelectorAll('#talera-timeline-loupe .talera-loupe-scale span')].map(e=>e.textContent),
+     dateSeparate:p.bottom<=d.top+2,needleVisible:needle.height>10};
+  });
+  assert.ok(geometry.width>.60&&geometry.width<.72&&geometry.center<2&&geometry.needleVisible);
+  assert.equal(geometry.labels.length,7);assert.ok(geometry.labels.every(Boolean));
+  assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe');
+  const seen=await lp.evaluate(()=>{window.__loupeTestVisited=[];window.__taleraTimelineRuntime.subscribe(m=>window.__loupeTestVisited.push(m.storyId));return window.__loupeTestVisited});
+  assert.deepEqual(seen,[]);
+  // One controlled continuous drag, including two memories at the same instant.
+  await lp.mouse.move(x,y);await lp.mouse.down();
+  for(let i=1;i<=3;i++){
+   await lp.mouse.move(x-i*34,y);await lp.waitForTimeout(330);
+   const v=await state();
+   assert.equal(v.id,expected[i].id);assert.equal(v.center,expected[i].ms);
+   assert.equal(v.runtimeId,v.loupeId);
+  }
+  await lp.waitForTimeout(180);await lp.mouse.up();
+  assert.equal((await state()).open,true);
+  // Return in the opposite direction using the part beside the visible panel.
+  await lp.mouse.move(box.x+20,y);await lp.mouse.down();
+  for(let i=1;i<=3;i++){
+   await lp.mouse.move(box.x+20+i*34,y);await lp.waitForTimeout(330);
+   const v=await state();assert.equal(v.id,expected[3-i].id);assert.equal(v.center,expected[3-i].ms);
+  }
+  await lp.waitForTimeout(180);await lp.mouse.up();
+  const visited=await lp.evaluate(()=>window.__loupeTestVisited);
+  assert.deepEqual(visited,expected.slice(1).map(m=>m.id).concat(expected.slice(0,3).reverse().map(m=>m.id)));
+  // Fast flick has bounded adjacent motion. A fresh touch cancels the tail.
+  await lp.mouse.move(x,y);await lp.mouse.down();await lp.mouse.move(x-160,y);await lp.mouse.up();
+  await lp.mouse.move(x,y);await lp.mouse.down();
+  const stopped=await state();await lp.waitForTimeout(550);assert.equal((await state()).id,stopped.id);await lp.mouse.up();
+  const saved=await state();
+  const story=await lp.locator('#memoryStoryScroll').boundingBox();
+  const clickX=story.x+story.width*.45,clickY=story.y+story.height*.48;
+  await lp.evaluate(()=>{window.__loupeOutsideClicks=0;document.getElementById('memoryStoryScroll').addEventListener('click',()=>window.__loupeOutsideClicks++)});
+  await lp.mouse.click(clickX,clickY);
+  await panel.waitFor({state:'hidden'});
+  assert.equal((await state()).id,saved.id);assert.equal((await state()).center,saved.center);
+  assert.equal(await lp.evaluate(()=>window.__loupeOutsideClicks),0,'Outside close may not also click the original story');
+  await lp.mouse.click(clickX,clickY);
+  assert.equal(await lp.evaluate(()=>window.__loupeOutsideClicks),1,'Next distinct tap must reach existing story');
+  assert.ok(await lp.evaluate(async ids=>{for(const id of ids)if(!(await window.TaleraMemories.get(id)))return false;return true},ids));
+  assert.deepEqual(errs,[]);
+  console.log('TALERA_SHARED_TIMELINE_LOUPE_BROWSER_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',sameTimestamp:true,weekBoundary:true,originalOrder:true,closedTapConsumed:true,physicalIphoneAccepted:false}));
+ }finally{await loupeCtx.close()}
+}
+
   if(webkitPickerOnly){
     // Reuse the actual same-account, same-origin GPS-to-catalog browser scenario
     // with the WebKit engine before ending the existing picker-only run.
     await testGeoNamesCatalog();
+    await testTimelineLoupe();
     break backupRegression;
   }
   // iPhone regression: real authenticated TALERA Worker, saved local image,
@@ -944,6 +1054,7 @@ backupRegression: try{
   }finally{await geoCtx.close();await restartGeoWorker(false)}
   }
   await testGeoNamesCatalog();
+  await testTimelineLoupe();
 
   const initial=await page.evaluate(()=>({
     memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,

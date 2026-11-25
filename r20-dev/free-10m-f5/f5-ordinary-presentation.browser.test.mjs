@@ -171,9 +171,12 @@ backupRegression: try{
         }
       });
       const pickerPage=await pickerCtx.newPage(),pickerErrors=[];
+      let pickerPhase='initial-navigation';
+      const markPickerPhase=phase=>{pickerPhase=phase;console.log('TALERA_PICKER_PHASE',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),broken,deleteTest:!!fixture.deleteTest,phase}))};
+      pickerPage.on('framenavigated',frame=>{if(frame===pickerPage.mainFrame())console.log('TALERA_PICKER_NAVIGATION',JSON.stringify({phase:pickerPhase,route:new URL(frame.url()).pathname}))});
       pickerPage.on('pageerror',e=>{
         pickerErrors.push(e.message);
-        console.log('TALERA_PICKER_PAGE_ERROR_DETAIL',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),route:new URL(pickerPage.url()).pathname,message:e.message,stack:e.stack}));
+        console.log('TALERA_PICKER_PAGE_ERROR_DETAIL',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),route:new URL(pickerPage.url()).pathname,phase:pickerPhase,message:e.message,stack:e.stack}));
       });
       pickerPage.on('requestfailed',request=>{
         const url=request.url();
@@ -182,6 +185,7 @@ backupRegression: try{
       pickerPage.on('console',m=>{if(m.type()==='warning'&&m.text().includes('TALERA_'))console.log('TALERA_PICKER_BROWSER_WARNING',m.text())});
       await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
       await pickerPage.waitForFunction(()=>typeof window.TaleraMemories?.draftWriteRows==='function'&&!!document.getElementById('photoInput'),null,{timeout:15000});
+      markPickerPhase('seed-originals');
       const seed=await pickerPage.evaluate(async()=>{
         const mem=window.TaleraMemories;
         const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
@@ -208,6 +212,7 @@ backupRegression: try{
         return {items:firstStory.items,reads,rows:raw.map(x=>({keys:Object.keys(x),key:x.key,
           payloadKey:x.payloadKey,metadata:x.metadata,binaryBytes:x.binaryParts?.reduce((n,b)=>n+b.byteLength,0),blob:x.blob instanceof Blob?{size:x.blob.size,type:x.blob.type,kind:Object.prototype.toString.call(x.blob)}:null}))};
       });
+      markPickerPhase('seed-complete');
       console.log('TALERA_PICKER_PREVIOUS_SHARED_ORIGINALS',JSON.stringify({webkit:webkitPickerOnly,seed}));
       assert.ok(seed.reads.every(x=>x.ok),'Existing original read failed before picker: '+JSON.stringify(seed));
       if(broken){
@@ -296,8 +301,11 @@ backupRegression: try{
         assert.ok(Object.values(clean).every(Boolean),'Last damaged story removal changed healthy data: '+JSON.stringify(clean));
         await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
       }
+      markPickerPhase('reload-start');
       await pickerPage.reload({waitUntil:'domcontentloaded'});
+      markPickerPhase('reload-dom-ready');
       await pickerPage.waitForFunction(()=>!!document.getElementById('photoInput')&&!!window.TaleraMemories?.draftReadPayload,null,{timeout:15000});
+      markPickerPhase('picker-import');
       await pickerPage.locator('#photoInput').setInputFiles(file);
       const expectedBytes=readFileSync(file).toString('base64');
       try{
@@ -336,6 +344,7 @@ backupRegression: try{
           'Warning persisted after every known broken synthetic reference was removed');
         console.log('TALERA_LAST_DAMAGED_STORY_REMOVED_NO_DUPLICATE_WARNING_PASS',JSON.stringify({webkit:webkitPickerOnly}));
       }
+      markPickerPhase('publish-and-readback');
       const published=await pickerPage.evaluate(async ({brokenKey,originalSize})=>{
         const mem=window.TaleraMemories;
         const draft=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');

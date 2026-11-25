@@ -451,10 +451,16 @@ async function testTimelineLoupe(){
   await lp.waitForTimeout(180);await lp.mouse.up();
   assert.equal((await state()).open,true);
   // Return in the opposite direction using the part beside the visible panel.
+  const edge=await lp.evaluate(({x,y})=>{
+   const node=document.elementFromPoint(x,y);
+   return {hit:node?.id||node?.className||node?.tagName,insideSurface:!!node?.closest('#surface')};
+  },{x:box.x+20,y});
   await lp.mouse.move(box.x+20,y);await lp.mouse.down();
   for(let i=1;i<=3;i++){
    await lp.mouse.move(box.x+20+i*34,y);await lp.waitForTimeout(330);
-   const v=await state();assert.equal(v.id,expected[3-i].id);assert.equal(v.center,expected[3-i].ms);
+   const v=await state();
+   assert.equal(v.id,expected[3-i].id,'Reverse step '+i+': '+JSON.stringify({edge,state:v,steps:await lp.evaluate(()=>window.__loupeTestSteps)}));
+   assert.equal(v.center,expected[3-i].ms);
   }
   await lp.waitForTimeout(180);await lp.mouse.up();
   const {visited,steps}=await lp.evaluate(()=>({visited:window.__loupeTestVisited,steps:window.__loupeTestSteps}));

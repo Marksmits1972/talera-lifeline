@@ -109,6 +109,23 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
   return e.clientX>=r.left&&e.clientX<=r.right&&Math.abs(e.clientY-axis)<=20;
  }
  function cancelEvent(e){if(e.cancelable)e.preventDefault();e.stopImmediatePropagation()}
+ function beginPointer(e){
+  if(active!==null||e.button!==0||e.isPrimary===false)return;
+  stop();active=e.pointerId;
+  // The approved full-width band may include a different hit target than
+  // surface. Capture the owned gesture independently of that target.
+  try{surface.setPointerCapture(e.pointerId)}catch{}
+  motion.begin(e.clientX,now());
+ }
+ function finishPointer(e){
+  if(active!==e.pointerId)return;
+  active=null;
+  let previous=now();
+  if(e.type==='pointerup'&&motion.release(previous)){
+   const animate=t=>{frame=0;const dt=t-previous;previous=t;if(motion.coast(t,dt))frame=requestAnimationFrame(animate)};
+   frame=requestAnimationFrame(animate);
+  }else stop();
+ }
  // Consume the entire outside gesture, including its compatibility click.
  // A later, separate gesture is not consumed.
  document.addEventListener('pointerdown',e=>{
@@ -116,16 +133,18 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
   if(!opened)return;
   stop();
   if(active!==null){if(e.pointerId!==active)cancelEvent(e);return}
-  if(inside(e))return;
+  if(inside(e)){beginPointer(e);cancelEvent(e);return}
   outside={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
   swallowClick=true;cancelEvent(e);
  },true);
  document.addEventListener('pointermove',e=>{
+  if(opened&&active===e.pointerId){motion.move(e.clientX,now());cancelEvent(e);return}
   if(!outside||outside.id!==e.pointerId)return;
   if(Math.hypot(e.clientX-outside.x,e.clientY-outside.y)>LOUPE_SLOP_PX)outside.moved=true;
   cancelEvent(e);
  },true);
  function outsideEnd(e){
+  if(opened&&active===e.pointerId){finishPointer(e);cancelEvent(e);return}
   if(!outside||outside.id!==e.pointerId)return;
   const tap=!outside.moved&&Math.hypot(e.clientX-outside.x,e.clientY-outside.y)<=LOUPE_SLOP_PX&&e.type==='pointerup';
   outside=null;cancelEvent(e);if(tap)close();
@@ -161,9 +180,8 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
   },
   down(e){
    if(!opened)return false;
-   if(active!==null||!inside(e))return true;
-   stop();active=e.pointerId;surface.setPointerCapture(e.pointerId);
-   motion.begin(e.clientX,now());return true;
+   if(inside(e))beginPointer(e);
+   return true;
   },
   move(e){
    if(!opened)return false;
@@ -171,14 +189,7 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
   },
   end(e){
    if(!opened)return false;
-   if(active===e.pointerId){
-    active=null;
-    let previous=now();
-    if(e.type==='pointerup'&&motion.release(previous)){
-     const animate=t=>{frame=0;const dt=t-previous;previous=t;if(motion.coast(t,dt))frame=requestAnimationFrame(animate)};
-     frame=requestAnimationFrame(animate);
-    }else stop();
-   }
+   finishPointer(e);
    return true;
   },
   wheel(e){if(!opened)return false;stop();const t=now();if(t-lastWheel>=LOUPE_STEP_INTERVAL_MS&&Math.abs(e.deltaX)>Math.abs(e.deltaY)*.75&&e.deltaX){lastWheel=t;step(Math.sign(e.deltaX));render()}return true}

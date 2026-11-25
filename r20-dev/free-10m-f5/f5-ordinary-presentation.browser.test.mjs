@@ -113,6 +113,12 @@ backupRegression: try{
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
+  // Run the exact same loep regression independently when unrelated
+  // picker regressions fail; no substitute shell, source or data store.
+  if(process.env.TALERA_TIMELINE_LOUPE_ONLY==='1'){
+    await testTimelineLoupe();
+    break backupRegression;
+  }
   // Actual picker import on the real authenticated Worker, with a private
   // synthetic browser context containing previous memories. No live data.
   const photoPath=path.join(generated,'picker-photo.jpg');

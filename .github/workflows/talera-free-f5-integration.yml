@@ -1430,7 +1430,14 @@ jobs:
             export PATH="$PWD/node_modules/@ffmpeg-installer/linux-x64:$PATH"
           fi
           ffmpeg -version | head -n 1
+          set +e
+          TALERA_WEBKIT_PICKER_ONLY=1 TALERA_TIMELINE_LOUPE_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
+          loupe_status=$?
           TALERA_WEBKIT_PICKER_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
+          picker_status=$?
+          set -e
+          echo "WebKit exact loupe regression: $loupe_status; complete picker and location regression: $picker_status"
+          test "$loupe_status" -eq 0 && test "$picker_status" -eq 0
 
   audit_existing_live_version_20261119:
     name: Read-only verify unexpectedly changed SAME TALERA version

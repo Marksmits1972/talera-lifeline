@@ -561,9 +561,17 @@ async function testTimelineLoupe(){
   await lp.mouse.move(mx,my);await lp.mouse.down();await lp.mouse.move(mx-40,my);await lp.waitForTimeout(350);await lp.mouse.up();
   assert.equal((await state()).id,mixed.id,'Loupe must pass narrated memory ID to original engine');
   await lp.locator('.talera-independent-narrator-layer audio').waitFor({state:'attached',timeout:10000});
+  await lp.evaluate(()=>{window.__loupeNarratorAudio=window.__taleraF5SharedAudible.get()});
   await lp.mouse.move(mx,my);await lp.mouse.down();await lp.mouse.move(mx+40,my);await lp.waitForTimeout(350);await lp.mouse.up();
   assert.equal((await state()).id,expected[3].id,'Loupe must return to ordinary memory');
-  await lp.locator('.talera-independent-narrator-layer audio').waitFor({state:'detached',timeout:10000});
+  await lp.locator('.talera-independent-narrator-layer').waitFor({state:'detached',timeout:10000});
+  const soundHandoff=await lp.evaluate(()=>{
+   const audio=window.__taleraF5SharedAudible.get();
+   return {sameNode:audio===window.__loupeNarratorAudio,paused:audio.paused,
+    sourceCleared:!audio.hasAttribute('src'),singleNode:document.querySelectorAll('#talera-f5-shared-audio').length===1,
+    narratorClassCleared:!document.body.classList.contains('talera-v61-narration-visual')};
+  });
+  assert.ok(Object.values(soundHandoff).every(Boolean),'Existing shared audio must remain but the previous voice must stop: '+JSON.stringify(soundHandoff));
   assert.ok(await lp.evaluate(async m=>{
    const row=await window.TaleraMemories.get(m.id);
    return row?.items.some(x=>x.key===m.photoId)&&row.items.some(x=>x.key===m.audioId)&&row.narrationCues?.[0]?.mediaId===m.photoId;

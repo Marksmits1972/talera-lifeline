@@ -1597,6 +1597,10 @@ const taleraLoupe=mountTimelineLoupe({
   if(!target||!Number.isFinite(target.ms)||target.ms<LIFE_START||target.ms>LIFE_END)return false;
   taleraLoupeHoldId=target.id;taleraLoupeHoldMs=target.ms;
   clearTimeout(candidateTimer);clearTimeout(storySwitchTimer);pendingMemoryId=null;
+  // Use the already approved native timeline-motion notification before
+  // handing off a different memory. It stops the outgoing engine even if
+  // the next ordinary photo is already hydrated; no player changes needed.
+  document.dispatchEvent(new Event("talera:timeline-user-motion"));
   return window.__taleraPhotoBook.step(direction);
  }
 });

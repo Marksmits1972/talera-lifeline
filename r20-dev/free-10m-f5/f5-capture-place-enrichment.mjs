@@ -2,7 +2,7 @@
 // The caller supplies the existing account-local library and its transaction owner.
 // Recheck only previously unresolved HEIF originals once after the parser fix.
 const checkedVersion=item=>/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(item?.mime||'')||/\.(?:heic|heif)$/i.test(item?.name||'')?'v2':'v1';
-export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),limit=12}){
+export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12}){
  const stories=await list();
  if(!Array.isArray(stories))return {more:false,blocked:true};
  const known=new Map();
@@ -18,14 +18,22 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
    const item=story.items[i];
    if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||item.capturePlace||item.capturePlaceChecked===checkedVersion(item))continue;
    if(!available())return {more:true,blocked:true};
-   if(!canLookup()&&deferred.has(keyOf(item)))continue;
+   if(unreadable.has(keyOf(item))||!canLookup()&&deferred.has(keyOf(item)))continue;
    if(count>=limit)return {more:true,blocked:false};
    count++;
    try{
     let place=known.get(keyOf(item))||null;
     if(!place){
-     const original=await blob(item.key);
-     if(!(original instanceof Blob)||!original.size||original.size!==item.size||original.type!==item.mime)continue;
+     let original;
+     try{original=await blob(item.key)}catch(error){
+      // An invalid historical original is not a confirmed absence of GPS.
+      // Skip only within this bounded scan, so later intact media still get a turn.
+      if(error?.message!=='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL')throw error;
+      unreadable.add(keyOf(item));continue;
+     }
+     if(!(original instanceof Blob)||!original.size||original.size!==item.size||original.type!==item.mime){
+      unreadable.add(keyOf(item));continue;
+     }
      if(item.kind==='photo')place=await readPlace(original);
      if(!place){
       // Offline or before provider configuration, only explicit metadata
@@ -60,7 +68,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  let running=false,timer=null,departing=false;
  const available=()=>!departing&&!document.hidden;
  const canLookup=()=>enabled&&available()&&navigator.onLine!==false;
- const deferred=new Set();
+ const deferred=new Set(),unreadable=new Set();
  const safe=s=>typeof s==='string'&&s.length>0&&s.length<=120&&!/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(s);
  const valid=p=>{
   if(!p||p.source!=='geonames-nearby-place'||!/^[A-Z]{2}$/.test(p.countryCode)||p.countryCode==='ZZ'||!safe(p.city)||!safe(p.country))return false;
@@ -104,7 +112,8 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   timer=null;if(running||!available())return;
   running=true;
   try{
-   const result=await enrichCapturePlaces({list:()=>store.list(),blob:id=>store.blob(id),readPlace,readGps,lookup,commit,available,canLookup,deferred});
+   const result=await enrichCapturePlaces({list:()=>store.list(),blob:id=>store.blob(id),readPlace,readGps,lookup,commit,available,canLookup,deferred,unreadable});
+   if(!result.more)unreadable.clear();
    if(result.more&&available()){
     if(!result.blocked)schedule(30000);
     else if(result.retryAfterMs&&canLookup())schedule(result.retryAfterMs);

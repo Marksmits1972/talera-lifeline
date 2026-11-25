@@ -90,3 +90,16 @@ catalog[3].items[0].key='other-heif';
 await enrichCapturePlaces(retryOptions);assert.equal(retries,1);assert.deepEqual(catalog[1].items[0].capturePlace,resolved);assert.equal(catalog[0].items[0].capturePlace,undefined);assert.equal(catalog[2].items[0].capturePlace,undefined);
 await enrichCapturePlaces(retryOptions);assert.equal(retries,1);
 console.log('TALERA_HEIF_PREVIOUS_NEGATIVE_RECHECK_ONCE_PASS');
+
+// Invalid historical originals cannot occupy every slot of every bounded batch.
+const brokenItems=Array.from({length:3},(_,i)=>({...record.items[0],key:'unreadable-'+i}));
+catalog=[{...record,id:'old-unreadable',items:brokenItems},{...record,id:'healthy-after-old',items:[{...record.items[0],key:'healthy'}]}].map(x=>structuredClone(x));
+const unreadable=new Set();let goodLookups=0;
+const independent={...options,unreadable,limit:2,blob:async id=>{if(id==='unreadable-0')throw Error('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL');if(id.startsWith('unreadable-'))return null;return original;},lookup:async()=>{goodLookups++;return {ok:true,place:resolved}}};
+assert.equal((await enrichCapturePlaces(independent)).more,true);
+assert.equal(unreadable.size,2);
+assert.equal((await enrichCapturePlaces(independent)).more,false);
+assert.equal(goodLookups,1);
+assert.deepEqual(catalog[1].items[0].capturePlace,resolved);
+assert.ok(catalog[0].items.every(x=>!x.capturePlace&&!x.capturePlaceChecked));
+console.log('TALERA_UNREADABLE_HISTORICAL_MEDIA_DO_NOT_STARVE_LATER_GPS_PASS');

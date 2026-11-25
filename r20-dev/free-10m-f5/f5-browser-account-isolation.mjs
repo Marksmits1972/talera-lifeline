@@ -2131,8 +2131,10 @@ try{
    },a.id);
    assert.equal(withoutConsent,400,
      'Share may never publish memory content without explicit consent');
+   // This scenario explicitly asserts the Dutch guest copy. Pin the browser
+   // locale rather than relying on the runner's default (often en-US).
    const anonymous=await browser.newContext({
-     ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate,
+     ...devices['iPhone 13'],locale:'nl-NL',extraHTTPHeaders:{'x-talera-f5-key':gate,
        'cf-connecting-ip':'192.0.2.91'}
    });
    try{

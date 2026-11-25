@@ -187,6 +187,67 @@
  if(found.some(x=>x.latitude!==found[0].latitude||x.longitude!==found[0].longitude))return null;
  return Object.freeze(found[0]);
 }
+ async function readJpegCapturePlace(blob){
+ // Only the explicit IPTC Extension LocationCreated structure, never
+ // LocationShown, filename, current phone position or generic keywords.
+ const bytes=new Uint8Array(await blob.slice(0,2*1024*1024).arrayBuffer());
+ if(bytes.length<4||bytes[0]!==255||bytes[1]!==216)return null;
+ const signature='http://ns.adobe.com/xap/1.0/\0';
+ const extension='http://ns.adobe.com/xmp/extension/\0';
+ const begins=(p,end,s)=>end-p>=s.length&&[...s].every((c,i)=>bytes[p+i]===c.charCodeAt(0));
+ let packet=null,complete=false;
+ for(let p=2;p<bytes.length;){
+  if(bytes[p++]!==255)return null;
+  while(p<bytes.length&&bytes[p]===255)p++;
+  if(p>=bytes.length)return null;
+  const marker=bytes[p++];
+  if(marker===0xda||marker===0xd9){complete=true;break}
+  if(marker===1)continue;
+  if(marker===0||marker===0xd8||(marker>=0xd0&&marker<=0xd7)||p+2>bytes.length)return null;
+  const n=bytes[p]*256+bytes[p+1],start=p+2,end=p+n;
+  if(n<2||end>bytes.length)return null;
+  if(marker===0xe1){
+   if(begins(start,end,extension))return null;
+   if(begins(start,end,signature)){
+    if(packet!==null)return null;
+    packet=new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(start+signature.length,end));
+   }
+  }
+  p=end;
+ }
+ if(!complete||!packet||/<!DOCTYPE|<!ENTITY/i.test(packet)||typeof DOMParser!=='function')return null;
+ const xml=new DOMParser().parseFromString(packet,'application/xml');
+ if(xml.getElementsByTagNameNS('*','parsererror').length)return null;
+ const IPTC='http://iptc.org/std/Iptc4xmpExt/2008-02-29/',RDF='http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+ const children=(n,ns,name)=>Array.from(n.children).filter(x=>x.namespaceURI===ns&&x.localName===name);
+ const created=Array.from(xml.getElementsByTagNameNS(IPTC,'LocationCreated'));
+ if(created.length!==1)return null;
+ const bags=children(created[0],RDF,'Bag');
+ if(bags.length!==1||created[0].children.length!==1)return null;
+ const entries=children(bags[0],RDF,'li');
+ if(entries.length!==1||bags[0].children.length!==1)return null;
+ const item=entries[0],descs=children(item,RDF,'Description');
+ if(descs.length>1||(descs.length===1&&item.children.length!==1))return null;
+ const node=descs[0]||item;
+ function field(name){
+  const el=children(node,IPTC,name);
+  const attr=node.getAttributeNS(IPTC,name);
+  if(el.length>1||(el.length&&attr!==null)||el.some(x=>x.children.length))return null;
+  const s=(attr??el[0]?.textContent??'').normalize('NFC').trim();
+  if(!s||s.length>120||/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(s))return null;
+  return s;
+ }
+ const countryCode=field('CountryCode'),city=field('City'),country=field('CountryName');
+ // Initial support is intentionally limited to ISO alpha-2 with a
+ // recognisable country name. Unknown/contradictory codes fail closed.
+ if(!countryCode||!/^[A-Z]{2}$/.test(countryCode)||!city||!country)return null;
+ const iso='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW';
+ if(!iso.split(' ').includes(countryCode))return null;
+ const names=['nl','en','de','fr','es'].map(l=>new Intl.DisplayNames([l],{type:'region',fallback:'none'}).of(countryCode)).filter(Boolean);
+ const norm=s=>s.normalize('NFC').toLocaleLowerCase('en');
+ if(!names.some(x=>norm(x)===norm(country)))return null;
+ return Object.freeze({countryCode,country:names[0],city,source:'iptc-location-created'});
+}
  function create(store){
   if(!store||typeof store.list!=='function'||typeof store.get!=='function'||
      typeof store.blob!=='function'||typeof store.mediaUrl!=='function')
@@ -245,6 +306,11 @@
   };
   const api={
    listStories,readStory,orderedMedia,originalBlob,mediaUrl,displayUrl,playback,
+   async capturePlace(id){
+    requireId(id,'MEDIA_ID');
+    try{return await readJpegCapturePlace(await originalBlob(id))}
+    catch(_){return null}
+   },
    async captureGps(id){
     requireId(id,'MEDIA_ID');
     try{

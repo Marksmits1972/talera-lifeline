@@ -618,6 +618,38 @@ backupRegression: try{
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:15000});
   // With zero saved memories the original presentation must start empty:
   // neither the 50 fixed examples nor the 450 generated examples can appear.
+  // Test the production metadata reader inside this exact generated /present.
+  // Use only synthetic bytes, never an owner photo or a second app.
+  const capturePlaceResults=await page.evaluate(async()=>{
+    const ns='http://iptc.org/std/Iptc4xmpExt/2008-02-29/';
+    const jpeg=(field='LocationCreated',city='Arnhem',code='NL',country='Nederland')=>{
+      const packet='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:i="'+ns+'"><i:'+field+'><rdf:Bag><rdf:li rdf:parseType="Resource"><i:City>'+city+'</i:City><i:CountryCode>'+code+'</i:CountryCode><i:CountryName>'+country+'</i:CountryName></rdf:li></rdf:Bag></i:'+field+'></rdf:Description></rdf:RDF></x:xmpmeta>';
+      const data=new TextEncoder().encode('http://ns.adobe.com/xap/1.0/\0'+packet);
+      const size=data.length+2;
+      return new Blob([Uint8Array.from([255,216,255,225,size>>8,size&255]),data,Uint8Array.from([255,217])],{type:'image/jpeg'});
+    };
+    const rows=new Map([
+      ['created',jpeg()],['shown',jpeg('LocationShown')],
+      ['conflicting',jpeg('LocationCreated','Arnhem','DE','Nederland')],
+      ['badcode',jpeg('LocationCreated','Arnhem','ZZ','Nederland')],
+      ['missingcity',jpeg('LocationCreated','')],
+      ['malformed',jpeg('LocationCreated','<bad>')],
+      ['control',jpeg('LocationCreated','Arnhem&#x202E;')],
+      ['plain',new Blob([Uint8Array.from([255,216,255,217])],{type:'image/jpeg'})]
+    ]);
+    const library=window.TaleraLibraryFactory.create({
+      list:async()=>[],get:async()=>null,blob:async id=>rows.get(id)||null,mediaUrl:async()=>null
+    });
+    const output={};
+    for(const key of rows.keys())output[key]=await library.capturePlace(key);
+    return output;
+  });
+  assert.deepEqual(capturePlaceResults.created,{
+    countryCode:'NL',country:'Nederland',city:'Arnhem',source:'iptc-location-created'
+  });
+  for(const key of ['shown','conflicting','badcode','missingcity','malformed','control','plain'])
+    assert.equal(capturePlaceResults[key],null,key);
+  console.log('TALERA_CAPTURE_PLACE_EXPLICIT_IPTC_BROWSER_PASS');
   const initial=await page.evaluate(()=>({
     memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,
     demoImages:[...document.querySelectorAll('img')].map(img=>img.currentSrc||img.src||'')

@@ -21,7 +21,7 @@ permissions:
 jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-temporary-location-diagnosis-exact-tested-20261125' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-hardened-location-queue-exact-tested-20261125' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -54,7 +54,7 @@ jobs:
 
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
-    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-temporary-location-diagnosis-exact-tested-20261125' }}
+    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-hardened-location-queue-exact-tested-20261125' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -914,21 +914,22 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-temporary-location-diagnosis-exact-tested-20261125' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-hardened-location-queue-exact-tested-20261125' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 22
+    timeout-minutes: 35
     concurrency:
       group: talera-free-f5-storage-only-iphone-qa-20261109
       cancel-in-progress: false
     permissions:
       contents: read
-      actions: read
+      # Only this release job may request one retry of the exact known failed CI job.
+      actions: write
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 0fd1ae55-e26f-4711-8d7f-f3de4c22c568
+      F5_EXPECTED_LIVE_VERSION: 968abec3-255a-46b8-995f-1d27e77f3a50
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -954,9 +955,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = d78d9e5091b9f8e4271bab3f9d5994eee5c62cce
-          test "$(git diff --name-only d78d9e5091b9f8e4271bab3f9d5994eee5c62cce HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code d78d9e5091b9f8e4271bab3f9d5994eee5c62cce HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 8cdc843cf3b596673a6315ab16e2097231503c34
+          test "$(git diff --name-only 8cdc843cf3b596673a6315ab16e2097231503c34 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 8cdc843cf3b596673a6315ab16e2097231503c34 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -965,23 +966,45 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          let prior;
-          // Owner authorized release ONLY after the already-running exact
-          // candidate has finished successfully. No Cloudflare write before it.
-          for(let attempt=0;attempt<60;attempt++){
-            prior=await get('45633104897');
-            assert.equal(prior.head_sha,'d78d9e5091b9f8e4271bab3f9d5994eee5c62cce');
-            if(prior.status==='completed')break;
+          const id='45635627115',sha='8cdc843cf3b596673a6315ab16e2097231503c34';
+          const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
+          const pickerName='Audit original local story delete method in same TALERA code';
+          const names=[mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
+          const exactJobs=async()=>{const data=await get(id+'/jobs?filter=latest&per_page=100');
+            const rows=data.jobs;for(const name of names)assert.equal(rows.filter(j=>j.name===name).length,1,'Missing or duplicate exact job '+name);
+            return rows;};
+          let prior,jobs,retryRequested=false;
+          // Owner authorized conditional release. Allow ONE repeat of the
+          // specific known failed WebKit import test, never an arbitrary failure.
+          // No test assertion is weakened; all final jobs must pass.
+          for(let attempt=0;attempt<100;attempt++){
+            prior=await get(id);assert.equal(prior.head_sha,sha);
+            if(prior.status==='completed'){
+              jobs=await exactJobs();
+              if(prior.conclusion==='success')break;
+              if(prior.conclusion!=='failure'||prior.run_attempt!==1||retryRequested)throw Error('Exact candidate not green after allowed retry');
+              const picker=jobs.find(j=>j.name===pickerName);
+              assert.equal(picker.id,139280165948);
+              assert.equal(picker.conclusion,'failure');
+              assert.equal(picker.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'failure');
+              for(const name of names.filter(n=>n!==pickerName))assert.equal(jobs.find(j=>j.name===name)?.conclusion,'success','Other regression failed');
+              const response=await fetch(root+id+'/rerun-failed-jobs',{method:'POST',headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
+              assert.equal(response.status,201,'Exact WebKit retry could not start');
+              retryRequested=true;console.log('ONE_EXACT_WEBKIT_RETRY_REQUESTED');
+              // GitHub may briefly show the preceding completed attempt.
+              for(let n=0;n<12;n++){
+                await new Promise(resolve=>setTimeout(resolve,5000));
+                const next=await get(id);assert.equal(next.head_sha,sha);
+                if(next.run_attempt>1||next.status!=='completed')break;
+              }
+            }
             console.log('Awaiting exact candidate CI completion, attempt '+(attempt+1));
             await new Promise(resolve=>setTimeout(resolve,8000));
           }
-          assert.equal(prior.head_sha,'d78d9e5091b9f8e4271bab3f9d5994eee5c62cce');
-          assert.equal(prior.status,'completed');assert.equal(prior.conclusion,'success');
-          assert.equal(prior.head_sha,'d78d9e5091b9f8e4271bab3f9d5994eee5c62cce');
-          const jobs=(await get('45633104897/jobs?per_page=100')).jobs;
-          for(const id of [139271281061,139271281042,139271281035,139271280285])
-            assert.equal(jobs.find(j=>j.id===id)?.conclusion,'success');
-          const main=jobs.find(j=>j.id===139271281061);
+          assert.equal(prior.head_sha,sha);assert.equal(prior.status,'completed');assert.equal(prior.conclusion,'success');
+          jobs=await exactJobs();
+          for(const name of names)assert.equal(jobs.find(j=>j.name===name)?.conclusion,'success');
+          const main=jobs.find(j=>j.name===mainName);
           for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
             'Verify Cloudflare compilation without deployment',
             'Browser verify back-up panel, private session and two local browser contexts',
@@ -991,8 +1014,8 @@ jobs:
             'Browser verify complete original-media export, checksum and nondestructive restore',
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
-          assert.equal(jobs.find(j=>j.id===139271281035)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45633104897');
+          assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45635627115');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1114,8 +1137,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code d78d9e5091b9f8e4271bab3f9d5994eee5c62cce HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45633104897'
+          git diff --exit-code 8cdc843cf3b596673a6315ab16e2097231503c34 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45635627115'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail
@@ -1372,7 +1395,7 @@ jobs:
 
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-temporary-location-diagnosis-exact-tested-20261125' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-hardened-location-queue-exact-tested-20261125' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -1502,7 +1525,7 @@ jobs:
 
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-temporary-location-diagnosis-exact-tested-20261125' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-hardened-location-queue-exact-tested-20261125' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:

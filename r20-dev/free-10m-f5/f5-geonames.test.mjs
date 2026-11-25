@@ -5,7 +5,7 @@ assert.deepEqual(selectNearbyPlace({geonames:[place]}),{countryCode:'NL',country
 for(const data of [{status:{value:19}},{geonames:[]},{geonames:[{...place,distance:3}]},{geonames:[{...place,countryCode:'ZZ'}]},{geonames:[{...place,name:'<bad>\u0000'}]},{geonames:[place,{...place,name:'Another',distance:'0.4'}]}])assert.equal(selectNearbyPlace(data),null);
 let calls=0,allowed=true,actor={id:'account-id'},hits=[];
 const scope='a'.repeat(32);
-const env={GEONAMES_USERNAME:'talera_test',AUTH_RATES:{idFromName:x=>x,get:key=>({hit:async opts=>{hits.push({key,...opts});return allowed}})}};
+const env={AUTH_STORAGE_JURISDICTION:'local-test',GEONAMES_USERNAME:'talera_test',AUTH_RATES:{idFromName:x=>x,get:key=>({hit:async opts=>{hits.push({key,...opts});return allowed}})}};
 const deps={getAccount:async()=>actor,getScope:async()=>scope,fetcher:async(url,opts)=>{
  calls++;assert.equal(url.origin,'https://secure.geonames.org');assert.equal(url.pathname,'/findNearbyPlaceNameJSON');assert.equal(url.searchParams.get('lat'),'51.622');assert.equal(url.searchParams.get('lng'),'5.432');assert.equal(url.searchParams.get('localCountry'),'true');assert.equal(url.searchParams.get('username'),'talera_test');assert.equal(opts.redirect,'error');assert.ok(!url.href.includes(actor.id));return Response.json({geonames:[place]})
 }};
@@ -124,3 +124,17 @@ const failedScan=await enrichCapturePlaces(queueOptions);assert.equal(failedScan
 clock+=60000;await enrichCapturePlaces(queueOptions);assert.deepEqual(attempts,[1,2]);assert.deepEqual(catalog[1].items[0].capturePlace,resolved);assert.equal(catalog[0].items[0].capturePlaceChecked,undefined);
 clock+=60000;await enrichCapturePlaces(queueOptions);assert.deepEqual(attempts,[1,2,1]);
 console.log('TALERA_LIBRARY_FAILED_ORIGINAL_DOES_NOT_MONOPOLISE_RETRY_QUEUE_PASS');
+
+// Invalid historical row and optional IPTC failure cannot stop intact GPS.
+catalog=[{id:'broken',source:'pwa-local',items:[null]}, {id:'malformed',source:'pwa-local',items:{}},structuredClone(record)];
+await enrichCapturePlaces({...options,readPlace:async()=>{throw Error('bad optional XMP')}});
+assert.deepEqual(catalog[2].items[0].capturePlace,resolved);
+await assert.rejects(enrichCapturePlaces({...options,list:async()=>null}),/CAPTURE_INVALID_CATALOG_LIST/);
+// Production uses the EU rate namespace; the mock must prove it is selected.
+allowed=true;let eu=0;const euEnv={...env,AUTH_STORAGE_JURISDICTION:'eu',AUTH_RATES:{...env.AUTH_RATES,jurisdiction:region=>{assert.equal(region,'eu');eu++;return env.AUTH_RATES}}};
+const euResult=await capturePlaceApi(req(),euEnv,deps);assert.equal(euResult.status,200);assert.equal(eu,1);
+const noRegion=await capturePlaceApi(req(),{...env,AUTH_STORAGE_JURISDICTION:'eu'},deps);assert.equal(noRegion.status,503);assert.equal((await noRegion.json()).diagnostic,'api-limiet-opslag');
+for(const [fetcher,code] of [[async()=>new Response('',{status:502}),'api-provider-http'],[async()=>Response.json({status:{value:10}}),'api-provider-status'],[async()=>Response.json({unexpected:true}),'api-provider-antwoord'],[async()=>{throw Error('private upstream message')},'api-provider-netwerk']]){
+ const response=await capturePlaceApi(req(),euEnv,{...deps,fetcher});assert.equal(response.status,503);assert.deepEqual(await response.json(),{place:null,diagnostic:code});
+}
+console.log('TALERA_LOCATION_MALFORMED_ROW_IPTC_AND_EU_PROVIDER_FAILURE_CONTRACT_PASS');

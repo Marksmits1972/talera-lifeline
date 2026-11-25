@@ -4,11 +4,11 @@
 const checkedVersion=item=>/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(item?.mime||'')||/\.(?:heic|heif)$/i.test(item?.name||'')?'v2':'v1';
 export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{},retryItems=null,now=Date.now}){
  const stories=await list();
- if(!Array.isArray(stories))return {more:false,blocked:true};
+ if(!Array.isArray(stories))throw Error('CAPTURE_INVALID_CATALOG_LIST');
  const known=new Map();
  const keyOf=item=>JSON.stringify([item.key,item.kind,item.size,item.mime,item.name]);
- for(const story of stories)if(story?.source==='pwa-local')for(const item of story.items||[]){
-  if(item.capturePlace)known.set(keyOf(item),item.capturePlace);
+ for(const story of stories)if(story?.source==='pwa-local'&&Array.isArray(story.items))for(const item of story.items){
+  if(item&&typeof item.key==='string'&&item.capturePlace)known.set(keyOf(item),item.capturePlace);
  }
  let count=0,nextRetry=Infinity;
  for(const initial of stories){
@@ -38,7 +38,8 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
      if(!(original instanceof Blob)||!original.size||original.size!==item.size||original.type!==item.mime){
       diagnose(item.key,'bestand-afwijkend');unreadable.add(keyOf(item));continue;
      }
-     if(item.kind==='photo')place=await readPlace(original);
+     // A malformed optional IPTC/XMP packet may not prevent independent GPS extraction.
+     if(item.kind==='photo')try{place=await readPlace(original)}catch(_){diagnose(item.key,'iptc-leesfout')}
      if(!place){
       // Offline or before provider configuration, only explicit metadata
       // is needed. Do not scan GPS or persist negative results yet.
@@ -79,7 +80,7 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
 export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,enabled}){
  if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(dbName)||!['/mijn-leven','/meldingen','/present','/tell'].includes(location.pathname)||window.top!==window)return;
  const scope=dbName.slice('talera-free-local-'.length,-3);
- let running=false,timer=null,departing=false,pendingDelay=null,blockedUntil=0;
+ let running=false,timer=null,timerDue=Infinity,departing=false,pendingDelay=null,blockedUntil=0;
  const available=()=>!departing&&!document.hidden;
  const canLookup=()=>enabled&&available()&&navigator.onLine!==false;
  const deferred=new Set(),unreadable=new Set();
@@ -105,7 +106,11 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
     const response=await fetch('/api/capture-place',{method:'POST',credentials:'same-origin',cache:'no-store',
      headers:{'content-type':'application/json','x-talera-local-scope':scope},
      body:JSON.stringify({latitude:gps.latitude,longitude:gps.longitude}),signal:controller.signal});
-    if(!response.ok)return {ok:false,retryAfterMs:response.status===429?3600000:60000,diagnostic:({401:'api-401',403:'api-403',429:'api-429',503:'api-503',400:'api-400'})[response.status]||'api-overige-fout'};
+    if(!response.ok){
+     let reason=null;try{reason=(await response.json()).diagnostic}catch(_){}
+     const safeReasons=['api-configuratie','api-limiet-opslag','api-provider-http','api-provider-status','api-provider-netwerk','api-provider-antwoord'];
+     return {ok:false,retryAfterMs:response.status===429?3600000:60000,diagnostic:safeReasons.includes(reason)?reason:({401:'api-401',403:'api-403',429:'api-429',503:'api-503',400:'api-400'})[response.status]||'api-overige-fout'};
+    }
     const result=await response.json();
     if(result.place===null)return {ok:true,place:null};
     return valid(result.place)?{ok:true,place:result.place}:{ok:false,diagnostic:'api-antwoord-ongeldig'};
@@ -146,7 +151,9 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  }});
  const commit=async(expected,index,place)=>{
   if(!available())return null;
-  const db=await open(),tx=db.transaction('stories','readwrite'),finished=done(tx);
+  const db=await bounded(()=>open()),tx=db.transaction('stories','readwrite'),finished=done(tx);
+  // Abort only this optional metadata transaction, never an editor transaction.
+  const timeout=setTimeout(()=>{try{tx.abort()}catch(_){}},12000);
   let updated=null;
   const rows=tx.objectStore('stories'),req=rows.get(expected.id);
   req.onsuccess=()=>{
@@ -158,17 +165,19 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    else item.capturePlaceChecked=checkedVersion(item);
    rows.put(current);updated=current;
   };
-  await finished;
+  try{await finished}finally{clearTimeout(timeout)}
   // Notify passive readers only AFTER the existing catalog transaction commits.
   if(updated&&place)window.dispatchEvent(new Event('talera-capture-place-updated'));
   return updated;
  };
  const run=async()=>{
-  timer=null;if(running||!available())return;
+  timer=null;timerDue=Infinity;if(running||!available())return;
   running=true;queueStatus('wachtrij-bibliotheek-lezen');
   try{
    const result=await enrichCapturePlaces({list:async()=>{const rows=await bounded(()=>store.list());queueStatus('wachtrij-bestanden');return rows},blob:id=>bounded(()=>store.blob(id)),readPlace:blob=>bounded(()=>readPlace(blob)),readGps:blob=>bounded(()=>readGps(blob)),lookup,commit,available,canLookup,deferred,unreadable,diagnose,retryItems});
    if(!result.more)unreadable.clear();
+   // Old entries cannot grow without bound during long active sessions.
+   for(const [key,at] of retryItems)if(at<Date.now()-3600000)retryItems.delete(key);
    if(result.retryAfterMs&&!result.itemRetryOnly){blockedUntil=Date.now()+result.retryAfterMs;queueStatus(result.diagnostic||'wachtrij-pauze')}
    else queueStatus(result.more?'wachtrij-vervolg':'wachtrij-klaar');
    if(result.more&&available()){
@@ -183,8 +192,11 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  function schedule(ms=250){
   if(!available())return;
   if(running){pendingDelay=pendingDelay===null?ms:Math.min(ms,pendingDelay);return}
-  if(timer!==null)return;
-  timer=setTimeout(run,Math.max(ms,blockedUntil-Date.now(),0));
+  const delay=Math.max(ms,blockedUntil-Date.now(),0),due=Date.now()+delay;
+  // A later scheduled retry may not suppress an earlier save/online wake-up.
+  // The provider's global cooldown is still an absolute lower bound.
+  if(timer!==null){if(timerDue<=due)return;clearTimeout(timer)}
+  timerDue=due;timer=setTimeout(run,delay);
  }
  // Wake on a successfully saved original, even when the editor stays open.
  // A direct navigation after save is covered by the next screen's mount.
@@ -197,9 +209,13 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   };
  }
  window.addEventListener('online',()=>{probes.clear();window.dispatchEvent(new Event('talera-location-diagnosis'));schedule()});
- window.addEventListener('pagehide',()=>{departing=true;if(timer!==null){clearTimeout(timer);timer=null}});
+ window.addEventListener('pagehide',()=>{departing=true;if(timer!==null){clearTimeout(timer);timer=null;timerDue=Infinity}});
  window.addEventListener('pageshow',()=>{departing=false;schedule()});
  window.addEventListener('focus',()=>schedule());
+ // Recovery for missed browser wake-up events, only on a visible active page.
+ // No provider polling for already resolved originals; the pass reads the
+ // local catalog and retains the existing backoff and checked markers.
+ window.addEventListener('pageshow',()=>{if(available())probes.clear()});
  document.addEventListener('visibilitychange',()=>{if(available())schedule()});
  schedule();
 }

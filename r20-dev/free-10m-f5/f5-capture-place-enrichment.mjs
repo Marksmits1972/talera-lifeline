@@ -63,9 +63,9 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
  return {more:false,blocked:false};
 }
 export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,enabled}){
- if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(dbName)||location.pathname!=='/mijn-leven')return;
+ if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(dbName)||!['/mijn-leven','/meldingen','/present','/tell'].includes(location.pathname)||window.top!==window)return;
  const scope=dbName.slice('talera-free-local-'.length,-3);
- let running=false,timer=null,departing=false;
+ let running=false,timer=null,departing=false,pendingDelay=null,blockedUntil=0;
  const available=()=>!departing&&!document.hidden;
  const canLookup=()=>enabled&&available()&&navigator.onLine!==false;
  const deferred=new Set(),unreadable=new Set();
@@ -106,6 +106,8 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    rows.put(current);updated=current;
   };
   await finished;
+  // Notify passive readers only AFTER the existing catalog transaction commits.
+  if(updated&&place)window.dispatchEvent(new Event('talera-capture-place-updated'));
   return updated;
  };
  const run=async()=>{
@@ -114,13 +116,32 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   try{
    const result=await enrichCapturePlaces({list:()=>store.list(),blob:id=>store.blob(id),readPlace,readGps,lookup,commit,available,canLookup,deferred,unreadable});
    if(!result.more)unreadable.clear();
+   if(result.retryAfterMs)blockedUntil=Date.now()+result.retryAfterMs;
    if(result.more&&available()){
     if(!result.blocked)schedule(30000);
     else if(result.retryAfterMs&&canLookup())schedule(result.retryAfterMs);
    }
-  }catch(_){}finally{running=false}
+  }catch(_){}finally{
+   running=false;
+   if(pendingDelay!==null){const delay=pendingDelay;pendingDelay=null;schedule(delay)}
+  }
  };
- function schedule(ms=250){if(timer!==null||!available())return;timer=setTimeout(run,ms)}
+ function schedule(ms=250){
+  if(!available())return;
+  if(running){pendingDelay=pendingDelay===null?ms:Math.min(ms,pendingDelay);return}
+  if(timer!==null)return;
+  timer=setTimeout(run,Math.max(ms,blockedUntil-Date.now(),0));
+ }
+ // Wake on a successfully saved original, even when the editor stays open.
+ // A direct navigation after save is covered by the next screen's mount.
+ // Do not await geocoding in the save path or delay the existing UI.
+ if(typeof store.save==='function'){
+  const originalSave=store.save;
+  store.save=async function(...args){
+   const saved=await originalSave.apply(this,args);
+   schedule();return saved;
+  };
+ }
  window.addEventListener('online',()=>schedule());
  window.addEventListener('pagehide',()=>{departing=true;if(timer!==null){clearTimeout(timer);timer=null}});
  window.addEventListener('pageshow',()=>{departing=false;schedule()});

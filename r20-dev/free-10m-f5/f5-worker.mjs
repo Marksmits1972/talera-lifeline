@@ -1102,7 +1102,7 @@ async function publicPage(request,env){
     let scoped=scopeLocalMemories(privateHtml,await privateAccountScope(actor.id));
     // Only an explicitly configured existing Worker enables online enrichment.
     // The browser receives a boolean, never the provider username.
-    if(pathname==='/mijn-leven'&&typeof env.GEONAMES_USERNAME==='string'&&
+    if(['/mijn-leven','/meldingen','/present','/tell'].includes(pathname)&&typeof env.GEONAMES_USERNAME==='string'&&
        /^[A-Za-z0-9_.-]{1,80}$/.test(env.GEONAMES_USERNAME)&&env.GEONAMES_USERNAME.toLowerCase()!=='demo'){
       const marker='/*TALERA_GEONAMES_ENABLED*/false';
       if(scoped.split(marker).length===2)scoped=scoped.replace(marker,'/*TALERA_GEONAMES_ENABLED*/true');

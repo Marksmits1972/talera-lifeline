@@ -95,7 +95,12 @@ function mountTaleraCapturePlace(flagPositions){
  if(dots)observer.observe(dots,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
  stage.addEventListener('load',schedule,true);stage.addEventListener('error',schedule,true);
  runtime.subscribe?.(schedule);
- document.addEventListener('visibilitychange',schedule);
- window.addEventListener('pageshow',schedule);
+ // The independent library may finish while this same photo is on screen.
+ // Drop stale negative reads as well as resolved cache entries. No GPS/API call
+ // or playback changes here; only a new read of the existing catalog.
+ function catalogChanged(){cache.clear();active=null;serial++;schedule()}
+ window.addEventListener('talera-capture-place-updated',catalogChanged);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)catalogChanged();else schedule()});
+ window.addEventListener('pageshow',catalogChanged);
  schedule();
 }

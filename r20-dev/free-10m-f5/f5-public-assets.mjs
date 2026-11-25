@@ -1289,8 +1289,8 @@ function installCapturePlaceCatalog(html,route){
   "   const capturePlace=await readJpegCapturePlace(f);\n"+
   "   if(capturePlace)files[files.length-1].capturePlace=capturePlace;\n"+
   "  }catch(_){ /* Optional metadata must never prevent posting. */ }\n");
- if(route!=='/mijn-leven')return html;
- // Use the original local store closure, never a second IndexedDB owner.
+ // Mount one library-owned enrichment process on every authenticated main
+ // screen, using the original local store closure, never a second IndexedDB owner.
  const gpsStart=raw.indexOf(' function parseExifCaptureGps('),gpsEnd=raw.indexOf(' function create(store){');
  assert.ok(gpsStart>=0&&gpsEnd>end,'CAPTURE_GPS_READER_SOURCE_DRIFT');
  const gpsReaders=raw.slice(gpsStart,start)+raw.slice(end,gpsEnd);

@@ -749,9 +749,17 @@ backupRegression: try{
   try{
     await geoCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
       path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+    // Disable networking for the library on EVERY main page before the
+    // first actual picker import. No dependency on the Home screen.
+    await geoCtx.addInitScript(()=>{
+      Object.defineProperty(AbortSignal,'timeout',{configurable:true,value:undefined});
+      window.__taleraGeoOnline=false;
+      Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
+    });
     const geoPage=await geoCtx.newPage(),geoErrors=[];
     geoPage.on('pageerror',error=>geoErrors.push(error.message));
-    await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    const editor=await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    assert.ok((await editor.text()).includes('/*TALERA_GEONAMES_ENABLED*/true'),'Authenticated editor must enable the same library service');
     await geoPage.waitForFunction(()=>!!window.TaleraMemories?.save);
     const fixtureBytes=await geoPage.evaluate(async()=>{
       const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
@@ -795,7 +803,7 @@ backupRegression: try{
       const mem=window.TaleraMemories;
       const d=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
       const original=d.originals.find(([,v])=>v instanceof Blob)?.[1];
-      const row=await mem.save({title:'Synthetic GPS',date:'2026-11-10',text:'GPS contract'},[original]);
+      const row=await mem.save({title:'',date:'2026-11-10',text:''},[original]);
       const persisted=await mem.blob(row.items[0].key);
       return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await persisted.arrayBuffer())]};
     });
@@ -816,27 +824,17 @@ backupRegression: try{
         countryCode:'NL',country:'Nederland',city,source:'geonames-nearby-place'
       }})});
     });
-    // No replacement of window.fetch. Only the provider HTTP response is simulated.
-    await geoCtx.addInitScript(()=>{
-      if(location.pathname!=='/mijn-leven')return;
-      // Simulate earlier Safari versions lacking AbortSignal.timeout.
-      Object.defineProperty(AbortSignal,'timeout',{configurable:true,value:undefined});
-      window.__taleraGeoOnline=false;
-      Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
-    });
-    // Even with the provider enabled, opening presentation BEFORE the
-    // library pass must not perform a lookup or fabricate a catalog entry.
-    await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
+    // Direct presentation entry, without ever visiting Mijn leven. The
+    // independent library is offline, so no GPS network call is permitted.
+    const direct=await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
+    assert.ok((await direct.text()).includes('/*TALERA_GEONAMES_ENABLED*/true'),'Authenticated presentation must mount the library service');
     await geoPage.waitForFunction(id=>{
       const m=window.__taleraTimelineRuntime?.currentMemory?.();
       return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===1;
     },saved.id,{timeout:20000});
     assert.equal(await geoPage.evaluate(()=>document.getElementById('talera-capture-place')?.hidden),true);
     assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
-    assert.equal(observed.length,0,'Opening presentation before library enrichment must never call GeoNames');
-    const home=await geoPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
-    assert.equal(home.status(),200);
-    assert.ok((await home.text()).includes('/*TALERA_GEONAMES_ENABLED*/true'),'Actual Worker did not enable enrichment');
+    assert.equal(observed.length,0,'Offline library must never call GeoNames');
     await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
     await geoPage.waitForTimeout(2500);
     assert.equal(sent.length,0,'No geocoding while offline');
@@ -891,13 +889,38 @@ backupRegression: try{
     await geoPage.waitForTimeout(2500);
     assert.equal(sent.length,1,'Persisted metadata never requests the same media again');
     assert.equal(observed.length,1);
-    await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
-    await geoPage.waitForFunction(expected=>document.getElementById('talera-capture-place')?.textContent.includes('Nederland · omgeving '+expected+' (GeoNames)'),city,{timeout:20000});
-    assert.equal(sent.length,1,'Presentation performs no geocoding');
+    // The untitled photo is still on screen. Do not navigate or reload:
+    // a completed library transaction must refresh the passive decoration.
+    await geoPage.waitForFunction(expected=>{
+      const row=document.getElementById('talera-capture-place');
+      return row&&!row.hidden&&row.getClientRects().length>0&&
+        row.textContent.includes('Nederland · omgeving '+expected+' (GeoNames)');
+    },city,{timeout:20000});
+    assert.equal(sent.length,1,'Passive presentation must not issue an additional geocode');
     assert.equal(observed.length,1);
     await geoPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
+    // Stay on the editor and save a second original after the initial scan.
+    // The successful save wakes the same service without navigating to Home.
+    await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
+    await geoPage.waitForTimeout(1000);
+    const editorId=await geoPage.evaluate(async bytes=>{
+      const file=new File([Uint8Array.from(bytes)],'second-gps.jpg',{type:'image/jpeg'});
+      return (await window.TaleraMemories.save({title:'',date:'2026-11-10',text:''},[file])).id;
+    },fixtureBytes);
+    let editorPlace=null;
+    for(let attempt=0;attempt<75;attempt++){
+      editorPlace=await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id))?.items?.[0]?.capturePlace??null,editorId);
+      if(editorPlace?.city===city)break;
+      await geoPage.waitForTimeout(200);
+    }
+    assert.equal(editorPlace?.city,city,'Save in editor must wake independent library');
+    assert.equal(sent.length,2,'Exactly one lookup per distinct saved original in this scenario');
+    assert.equal(new URL(geoPage.url()).pathname,'/tell');
+    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),editorId);
     assert.deepEqual(geoErrors,[]);
-    console.log('TALERA_GEONAMES_ACTUAL_HOME_OFFLINE_RECONNECT_CATALOG_PRESENT_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',realWorkerAuthScopeValidated:true,providerResponseSimulated:true,physicalIphoneAccepted:false}));
+    console.log('TALERA_GEONAMES_LIBRARY_ALL_MAIN_SCREENS_SAVE_RECONNECT_LIVE_LABEL_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',realWorkerAuthScopeValidated:true,providerResponseSimulated:true,physicalIphoneAccepted:false,homeVisitRequired:false}));
   }finally{await geoCtx.close();await restartGeoWorker(false)}
   }
   await testGeoNamesCatalog();

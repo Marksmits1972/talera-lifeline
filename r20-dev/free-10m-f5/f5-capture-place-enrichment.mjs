@@ -26,6 +26,9 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
      if(!(original instanceof Blob)||!original.size||original.size!==item.size||original.type!==item.mime)continue;
      if(item.kind==='photo')place=await readPlace(original);
      if(!place){
+      // Offline or before provider configuration, only explicit metadata
+      // is needed. Do not scan GPS or persist negative results yet.
+      if(!canLookup()){deferred.add(keyOf(item));continue}
       const gps=await readGps(original);
       if(gps){
        if(!available())return {more:true,blocked:true};

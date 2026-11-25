@@ -165,7 +165,14 @@ backupRegression: try{
         }
       });
       const pickerPage=await pickerCtx.newPage(),pickerErrors=[];
-      pickerPage.on('pageerror',e=>pickerErrors.push(e.message));
+      pickerPage.on('pageerror',e=>{
+        pickerErrors.push(e.message);
+        console.log('TALERA_PICKER_PAGE_ERROR_DETAIL',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),route:new URL(pickerPage.url()).pathname,message:e.message,stack:e.stack}));
+      });
+      pickerPage.on('requestfailed',request=>{
+        const url=request.url();
+        if(url.startsWith('blob:'))console.log('TALERA_PICKER_BLOB_REQUEST_FAILED',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),route:new URL(pickerPage.url()).pathname,failure:request.failure()}));
+      });
       pickerPage.on('console',m=>{if(m.type()==='warning'&&m.text().includes('TALERA_'))console.log('TALERA_PICKER_BROWSER_WARNING',m.text())});
       await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
       await pickerPage.waitForFunction(()=>typeof window.TaleraMemories?.draftWriteRows==='function'&&!!document.getElementById('photoInput'),null,{timeout:15000});
@@ -414,7 +421,17 @@ async function testTimelineLoupe(){
   assert.equal(geometry.labels.length,7);assert.ok(geometry.labels.every(Boolean));
   assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe: '+JSON.stringify(geometry));
   assert.ok(geometry.panelTop>=geometry.rulerTop-1,'Loupe must stay inside existing upper ruler: '+JSON.stringify(geometry));
-  const seen=await lp.evaluate(()=>{window.__loupeTestVisited=[];window.__taleraTimelineRuntime.subscribe(m=>window.__loupeTestVisited.push(m.storyId));return window.__loupeTestVisited});
+  // The unchanged local-media hydrator deliberately writes the currently
+  // selected memory a second time when its photo becomes available. Record
+  // both events with their loading state; assert actual identity transitions
+  // separately, never ignore a transition to a different memory.
+  const seen=await lp.evaluate(()=>{
+   window.__loupeTestVisited=[];
+   window.__taleraTimelineRuntime.subscribe(m=>window.__loupeTestVisited.push({
+    id:m.storyId,loading:!!m._photoLoading,active:window.__taleraTimelineRuntime.currentMemory()?.storyId
+   }));
+   return window.__loupeTestVisited;
+  });
   assert.deepEqual(seen,[]);
   // One controlled continuous drag, including two memories at the same instant.
   await lp.mouse.move(x,y);await lp.mouse.down();
@@ -434,7 +451,16 @@ async function testTimelineLoupe(){
   }
   await lp.waitForTimeout(180);await lp.mouse.up();
   const visited=await lp.evaluate(()=>window.__loupeTestVisited);
-  assert.deepEqual(visited,expected.slice(1).map(m=>m.id).concat(expected.slice(0,3).reverse().map(m=>m.id)));
+  const transitions=[];
+  for(let i=0;i<visited.length;i++){
+   const event=visited[i],previous=visited[i-1];
+   assert.equal(event.active,event.id,'Timeline emitted a non-current memory');
+   if(previous?.id===event.id){
+    assert.ok(previous.loading&&!event.loading,'Unexpected repeated selection (not an existing photo-hydration refresh): '+JSON.stringify(visited));
+   }else transitions.push(event.id);
+  }
+  assert.deepEqual(transitions,expected.slice(1).map(m=>m.id).concat(expected.slice(0,3).reverse().map(m=>m.id)));
+  console.log('TALERA_LOUPE_EXACT_IDENTITY_TRANSITIONS_PASS',JSON.stringify({transitions:transitions.length,existingHydrationRefreshes:visited.length-transitions.length}));
   // Fast flick has bounded adjacent motion. A fresh touch cancels the tail.
   await lp.mouse.move(x,y);await lp.mouse.down();await lp.mouse.move(x-160,y);await lp.mouse.up();
   await lp.mouse.move(x,y);await lp.mouse.down();

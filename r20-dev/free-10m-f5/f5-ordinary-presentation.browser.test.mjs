@@ -718,6 +718,93 @@ backupRegression: try{
     console.log('TALERA_CAPTURE_PLACE_ACCOUNT_CATALOG_REOPEN_PASS');
   }finally{await metadataPage.close()}
 
+
+  // Exercise the actual generated Home catalog with its optional feature
+  // enabled in this disposable browser only. Intercept GeoNames at the
+  // same-origin gateway boundary; no external request or owner media.
+  const geoCtx=await browser.newContext({...devices['iPhone 13'],serviceWorkers:'block',
+    extraHTTPHeaders:{'x-talera-f5-key':gate}});
+  try{
+    await geoCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
+      path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+    const geoPage=await geoCtx.newPage(),geoErrors=[];
+    geoPage.on('pageerror',error=>geoErrors.push(error.message));
+    await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    const saved=await geoPage.evaluate(async()=>{
+      const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+      const paint=canvas.getContext('2d');paint.fillStyle='#39ad72';paint.fillRect(0,0,64,64);
+      const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+      const original=new Uint8Array(await jpeg.arrayBuffer());
+      // Same local EXIF GPS fixture as the library contract, with real JPEG pixels.
+      const t=new Uint8Array(130),v=new DataView(t.buffer);
+      const u16=(i,n)=>v.setUint16(i,n,true),u32=(i,n)=>v.setUint32(i,n,true);
+      v.setUint16(0,0x4949);u16(2,42);u32(4,8);u16(8,1);
+      u16(10,0x8825);u16(12,4);u32(14,1);u32(18,26);u16(26,4);
+      function entry(i,tag,type,count,val){
+        const p=28+i*12;u16(p,tag);u16(p+2,type);u32(p+4,count);
+        if(type===2)t[p+8]=val.charCodeAt(0);else u32(p+8,val);
+      }
+      entry(0,1,2,2,'N');entry(1,2,5,3,82);
+      entry(2,3,2,2,'E');entry(3,4,5,3,106);
+      [51,59,6,5,53,18].forEach((n,i)=>{u32(82+i*8,n);u32(86+i*8,1)});
+      const len=2+6+t.length,marker=Uint8Array.from([255,225,len>>8,len&255,69,120,105,102,0,0,...t]);
+      const file=new File([original.subarray(0,2),marker,original.subarray(2)],'synthetic-gps.jpg',{type:'image/jpeg'});
+      const row=await window.TaleraMemories.save({title:'Synthetic GPS',date:'2026-11-10',text:'GPS contract'},[file]);
+      return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await file.arrayBuffer())]};
+    });
+    await geoCtx.addInitScript(()=>{
+      if(location.pathname==='/mijn-leven'){
+        window.__taleraGeoOnline=false;
+        Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
+      }
+    });
+    let requests=0,homeHits=0;
+    await geoPage.route(origin+'/mijn-leven',async route=>{
+      const response=await route.fetch(),html=await response.text();
+      const marker='/*TALERA_GEONAMES_ENABLED*/false';
+      assert.equal(html.split(marker).length,2,'Actual generated Home feature marker');
+      homeHits++;
+      await route.fulfill({response,body:html.replace(marker,'/*TALERA_GEONAMES_ENABLED*/true')});
+    });
+    await geoPage.route('**/api/capture-place',async route=>{
+      requests++;
+      const request=route.request();
+      const body=request.postDataJSON();
+      assert.deepEqual(Object.keys(body).sort(),['latitude','longitude']);
+      assert.ok(Math.abs(body.latitude-51.985)<0.00001);
+      assert.ok(Math.abs(body.longitude-5.888333333333333)<0.00001);
+      assert.match(request.headers()['x-talera-local-scope'],/^[a-f0-9]{32}$/);
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({place:{
+        countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'
+      }})});
+    });
+    await geoPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
+    assert.equal(homeHits,1);
+    await geoPage.waitForTimeout(2500);
+    assert.equal(requests,0,'No geocoding while offline');
+    assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
+    await geoPage.waitForFunction(async id=>(await window.TaleraMemories.get(id))?.items[0]?.capturePlace?.city==='Arnhem',saved.id,{timeout:15000});
+    assert.equal(requests,1);
+    const stored=await geoPage.evaluate(async id=>{
+      const row=await window.TaleraMemories.get(id),item=row.items[0];
+      return {key:item.key,place:item.capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]};
+    },saved.id);
+    assert.equal(stored.key,saved.key);assert.deepEqual(stored.bytes,saved.bytes);
+    assert.deepEqual(stored.place,{countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'});
+    await geoPage.evaluate(()=>window.dispatchEvent(new Event('online')));
+    await geoPage.waitForTimeout(2500);
+    assert.equal(requests,1,'Persisted metadata never requests the same media again');
+    await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
+    await geoPage.waitForFunction(()=>document.getElementById('talera-capture-place')?.textContent.includes('Nederland · omgeving Arnhem (GeoNames)'),null,{timeout:20000});
+    assert.equal(requests,1,'Presentation performs no geocoding');
+    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
+    assert.deepEqual(geoErrors,[]);
+    console.log('TALERA_GEONAMES_ACTUAL_HOME_OFFLINE_RECONNECT_CATALOG_PRESENT_PASS');
+  }finally{await geoCtx.close()}
+
   const initial=await page.evaluate(()=>({
     memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,
     demoImages:[...document.querySelectorAll('img')].map(img=>img.currentSrc||img.src||'')

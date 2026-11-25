@@ -13,7 +13,8 @@ const story={
  items:[
   {key:'local-test:0',kind:'photo',mime:'image/heic',name:'originele-foto.heic',size:image.size,
    capturePlace:{countryCode:'NL',country:'Nederland',city:'Arnhem',source:'iptc-location-created'}},
-  {key:'local-test:1',kind:'video',mime:'video/quicktime',name:'originale-video.mov',size:movie.size},
+  {key:'local-test:1',kind:'video',mime:'video/quicktime',name:'originale-video.mov',size:movie.size,
+    capturePlace:{countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'}},
   {key:'local-test:2',kind:'audio',mime:'audio/wav',name:'originele-stem.wav',size:audio.size}
  ],
  narrationDurationMs:17000,
@@ -42,7 +43,8 @@ assert.deepEqual(JSON.parse(JSON.stringify(decoded.stories[0])),story);
 assert.deepEqual(decoded.stories[0].narrationCues,story.narrationCues);
 assert.deepEqual(decoded.stories[0].items.map(x=>x.key),story.items.map(x=>x.key));
 assert.deepEqual(decoded.stories[0].items[0].capturePlace,story.items[0].capturePlace);
-assert.equal(decoded.stories[0].items[1].capturePlace,undefined);
+assert.deepEqual(decoded.stories[0].items[1].capturePlace,story.items[1].capturePlace);
+ assert.equal(decoded.stories[0].items[2].capturePlace,undefined);
 assert.deepEqual(decoded.files.map(f=>f.key),files.map(f=>f.key));
 for(let i=0;i<files.length;i++){
  const want=files[i].blob,got=decoded.files[i].blob;

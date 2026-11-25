@@ -121,7 +121,7 @@ backupRegression: try{
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=96x96:d=1',
     '-c:v','libx264','-pix_fmt','yuv420p','-threads','1','-movflags','+faststart',videoPath],
     {timeout:20000,stdio:'ignore'});
-  for(const fixture of [{file:photoPath,broken:false},{file:videoPath,broken:false},{file:photoPath,broken:true},{file:videoPath,broken:true}]){
+  for(const fixture of [{file:photoPath,broken:false},{file:videoPath,broken:false},{file:photoPath,broken:true},{file:videoPath,broken:true},{file:photoPath,broken:true,deleteTest:true}]){
     const {file,broken}=fixture;
     const pickerCtx=await browser.newContext({...devices['iPhone 13'],
       extraHTTPHeaders:{'x-talera-f5-key':gate}});
@@ -213,7 +213,7 @@ backupRegression: try{
           if(!rejected)throw Error('Broken synthetic alias must remain strictly rejected');
         },seed.items[0].key);
       }
-      if(broken){
+      if(fixture.deleteTest){
         const targetId=seed.items[0].key.slice(0,seed.items[0].key.lastIndexOf(':'));
         const previous=await pickerPage.evaluate(async targetId=>{
           const mem=window.TaleraMemories,rows=await mem.list();

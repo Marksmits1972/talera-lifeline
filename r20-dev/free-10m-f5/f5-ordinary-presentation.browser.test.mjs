@@ -3177,12 +3177,20 @@ backupRegression: try{
   });
   await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
   try{
-    await page.waitForFunction(async ids=>{
-      const saved=await window.TaleraMemories?.list?.();
-      const slider=document.getElementById('v17-year-slider');
-      return Array.isArray(saved)&&ids.every(id=>saved.some(s=>s.id===id))&&
-        Number(slider?.max)>=2026;
-    },[yearHeroRecords.older,yearHeroRecords.newer],{timeout:20000});
+    let ready=false;
+    // Playwright may treat a pending Promise as a truthy waitForFunction result.
+    // Require an explicitly awaited catalog read before changing the year.
+    for(let attempt=0;attempt<100;attempt++){
+      ready=await page.evaluate(async ids=>{
+        const saved=await window.TaleraMemories?.list?.();
+        const slider=document.getElementById('v17-year-slider');
+        return Array.isArray(saved)&&ids.every(id=>saved.some(s=>s.id===id))&&
+          Number(slider?.max)>=2026;
+      },[yearHeroRecords.older,yearHeroRecords.newer]);
+      if(ready===true)break;
+      await new Promise(resolve=>setTimeout(resolve,200));
+    }
+    assert.equal(ready,true,'Year fixtures not readable before selecting the year');
   }catch(error){
     const state=await page.evaluate(async()=>{
       const saved=await window.TaleraMemories?.list?.()||[];
@@ -3238,13 +3246,29 @@ backupRegression: try{
       throw Error('OWNER_RANDOM_YEAR_HERO_DIAGNOSTIC '+JSON.stringify(diag)+
         ' PAGE_ERRORS='+JSON.stringify(errors.slice(-9))+' '+String(e));
     }
-    return page.evaluate(async()=>{
-      const image=document.getElementById('heroImage');
-      await image.decode();
-      const c=document.createElement('canvas');c.width=c.height=12;
-      c.getContext('2d').drawImage(image,0,0,12,12);
-      return [...c.getContext('2d').getImageData(6,6,1,1).data].slice(0,3);
-    });
+    // The hero href can be installed before its image finishes switching.
+    // Decode a stable, actually displayed frame, not a revoked transitional URL.
+    // Do not relax the existing pixel assertions or accept a missing image.
+    let last=null;
+    for(let attempt=0;attempt<90;attempt++){
+      last=await page.evaluate(async ([y,href])=>{
+        const image=document.getElementById('heroImage');
+        const matches=()=>document.getElementById('v17-selected-year')?.textContent===String(y)&&
+          document.getElementById('heroCaption')?.dataset.presentHref===href;
+        if(!matches()||!image?.getAttribute('src')||!image.complete||!image.naturalWidth)
+          return {ready:false,reason:'not-ready'};
+        const src=image.getAttribute('src');
+        try{await image.decode()}catch(e){return {ready:false,reason:e.name||'decode-error'}}
+        if(!matches()||image.getAttribute('src')!==src||!image.complete||!image.naturalWidth)
+          return {ready:false,reason:'source-changed'};
+        const c=document.createElement('canvas');c.width=c.height=12;
+        c.getContext('2d').drawImage(image,0,0,12,12);
+        return {ready:true,pixel:[...c.getContext('2d').getImageData(6,6,1,1).data].slice(0,3)};
+      },[year,'/present?memory='+encodeURIComponent(id)]);
+      if(last.ready)return last.pixel;
+      await new Promise(resolve=>setTimeout(resolve,200));
+    }
+    throw Error('OWNER_YEAR_HERO_DECODE_FAILED '+JSON.stringify({year,last}));
   };
   const greenYear=await chooseOriginalYear(2024,yearHeroRecords.older);
   assert.ok(greenYear[1]>greenYear[0]*1.5&&greenYear[1]>greenYear[2]*1.5,

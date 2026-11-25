@@ -79,3 +79,48 @@ console.log('TALERA_LIBRARY_READONLY_GATEWAY_CONTRACT_PASS',JSON.stringify({
  narrationCuesUnchanged:true,readOnlyPlayers:true,syntheticOnly:true,
  iPhoneAcceptance:false
 }));
+
+// Local capture metadata contract. Real media bytes are never rewritten.
+function fixture(le=true,latRef='N',lonRef='E'){
+ const t=new Uint8Array(128),v=new DataView(t.buffer);
+ const u16=(i,n)=>v.setUint16(i,n,le),u32=(i,n)=>v.setUint32(i,n,le);
+ v.setUint16(0,le?0x4949:0x4d4d);u16(2,42);u32(4,8);
+ u16(8,1);u16(10,0x8825);u16(12,4);u32(14,1);u32(18,26);
+ u16(26,4);
+ function entry(i,tag,type,count,val){
+  const p=28+i*12;u16(p,tag);u16(p+2,type);u32(p+4,count);
+  if(type===2)t[p+8]=val.charCodeAt(0);else u32(p+8,val);
+ }
+ entry(0,1,2,2,latRef);entry(1,2,5,3,82);entry(2,3,2,2,lonRef);entry(3,4,5,3,106);
+ // TIFF header + GPS IFD ends at 82. Reserve 48 bytes for 6 rationals.
+ const extended=new Uint8Array(130);extended.set(t);const e=new DataView(extended.buffer);
+ [51,59,6,5,53,18].forEach((n,i)=>{e.setUint32(82+i*8,n,le);e.setUint32(86+i*8,1,le)});
+ const len=2+6+extended.length;
+ return Uint8Array.from([255,216,255,225,len>>8,len&255,69,120,105,102,0,0,...extended,255,217]);
+}
+for(const le of [true,false]){
+ const data=fixture(le);
+ const id='gps-photo-'+le, original=new Blob([data],{type:'image/jpeg'});
+ files.set(id,original);
+ const gps=await library.captureGps(id);
+ assert.ok(gps);
+ assert.equal(gps.source,'jpeg-exif-gps');
+ assert.ok(Math.abs(gps.latitude-(51+59/60+6/3600))<1e-9);
+ assert.ok(Math.abs(gps.longitude-(5+53/60+18/3600))<1e-9);
+ assert.strictEqual(files.get(id),original);
+ assert.deepEqual([...new Uint8Array(await original.arrayBuffer())],[...data]);
+}
+files.set('gps-south-west',new Blob([fixture(false,'S','W')],{type:'image/jpeg'}));
+const southWest=await library.captureGps('gps-south-west');
+assert.ok(southWest.latitude<0&&southWest.longitude<0);
+files.set('gps-bad-reference',new Blob([fixture(true,'X','E')],{type:'image/jpeg'}));
+files.set('gps-truncated',new Blob([fixture().slice(0,-12)],{type:'image/jpeg'}));
+const badDenom=fixture();new DataView(badDenom.buffer).setUint32(12+86,0,true);
+files.set('gps-zero-denominator',new Blob([badDenom],{type:'image/jpeg'}));
+const complete=fixture(), duplicate=Uint8Array.from([255,216,...complete.slice(2,-2),...complete.slice(2)]);
+files.set('gps-duplicate',new Blob([duplicate],{type:'image/jpeg'}));
+for(const id of ['gps-bad-reference','gps-truncated','gps-zero-denominator','gps-duplicate','media-photo-1','media-video-1','missing']){
+ assert.equal(await library.captureGps(id),null,id);
+}
+await assert.rejects(()=>library.captureGps(''),/TALERA_LIBRARY_INVALID_MEDIA_ID/);
+console.log('TALERA_LOCAL_JPEG_CAPTURE_GPS_CONTRACT_PASS');

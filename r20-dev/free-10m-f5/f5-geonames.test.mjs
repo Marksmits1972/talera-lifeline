@@ -75,3 +75,18 @@ console.log('TALERA_LIBRARY_FIRST_LOCAL_METADATA_OFFLINE_AND_GPS_DEFERRED_PASS')
 // Rate limit does not mark an original as resolved and must back off for a full hour.
 catalog=[structuredClone(record)];const rateLimited=await enrichCapturePlaces({...options,lookup:async()=>({ok:false,retryAfterMs:3600000})});assert.deepEqual(rateLimited,{more:true,blocked:true,retryAfterMs:3600000});assert.equal(catalog[0].items[0].capturePlaceChecked,undefined);assert.equal(catalog[0].items[0].capturePlace,undefined);
 console.log('TALERA_GEONAMES_TRANSIENT_AND_QUOTA_BACKOFF_PASS');
+
+// Existing HEIF negatives are retried once after the parser correction, not
+// previously confirmed places or unrelated JPEG negatives. Simulated commit.
+const oldHeif={...record,id:'legacy-heif',items:[{...record.items[0],mime:'image/heif',name:'a.heic',capturePlaceChecked:'v1'}]};
+const oldJpeg={...record,id:'legacy-jpeg',items:[{...record.items[0],capturePlaceChecked:'v1'}]};
+const stillMissing={...oldHeif,id:'heif-v2',items:[{...oldHeif.items[0],capturePlaceChecked:'v2'}]};
+const alreadyResolved={...oldHeif,id:'heif-resolved',items:[{...oldHeif.items[0],capturePlace:resolved}]};
+catalog=[oldJpeg,oldHeif,stillMissing,alreadyResolved].map(x=>structuredClone(x));
+const heifOriginal=new Blob(['gps'],{type:'image/heif'});let retries=0;
+const retryOptions={...options,blob:async()=>heifOriginal,lookup:async()=>{retries++;return {ok:true,place:resolved}},commit:async(expected,index,value)=>{const current=catalog.find(x=>x.id===expected.id);assert.deepEqual(current,expected);if(value)current.items[index].capturePlace=value;else current.items[index].capturePlaceChecked='v2';return structuredClone(current)}};
+// Different physical key for confirmed item prevents shortcutting the lookup.
+catalog[3].items[0].key='other-heif';
+await enrichCapturePlaces(retryOptions);assert.equal(retries,1);assert.deepEqual(catalog[1].items[0].capturePlace,resolved);assert.equal(catalog[0].items[0].capturePlace,undefined);assert.equal(catalog[2].items[0].capturePlace,undefined);
+await enrichCapturePlaces(retryOptions);assert.equal(retries,1);
+console.log('TALERA_HEIF_PREVIOUS_NEGATIVE_RECHECK_ONCE_PASS');

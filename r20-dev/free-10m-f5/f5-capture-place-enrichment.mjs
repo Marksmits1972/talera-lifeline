@@ -1,5 +1,7 @@
 // Optional local catalog enrichment. No GPS persistence, no new store and no media uploads.
 // The caller supplies the existing account-local library and its transaction owner.
+// Recheck only previously unresolved HEIF originals once after the parser fix.
+const checkedVersion=item=>/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(item?.mime||'')||/\.(?:heic|heif)$/i.test(item?.name||'')?'v2':'v1';
 export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),limit=12}){
  const stories=await list();
  if(!Array.isArray(stories))return {more:false,blocked:true};
@@ -14,7 +16,7 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
   let story=initial;
   for(let i=0;i<story.items.length;i++){
    const item=story.items[i];
-   if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||item.capturePlace||item.capturePlaceChecked==='v1')continue;
+   if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||item.capturePlace||item.capturePlaceChecked===checkedVersion(item))continue;
    if(!available())return {more:true,blocked:true};
    if(!canLookup()&&deferred.has(keyOf(item)))continue;
    if(count>=limit)return {more:true,blocked:false};
@@ -90,9 +92,9 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    const current=req.result;
    if(!available()||!current||current.source!=='pwa-local'||JSON.stringify(current)!==JSON.stringify(expected))return;
    const item=current.items[index];
-   if(!item||item.capturePlace||item.capturePlaceChecked==='v1')return;
+   if(!item||item.capturePlace||item.capturePlaceChecked===checkedVersion(item))return;
    if(place)item.capturePlace=place;
-   else item.capturePlaceChecked='v1';
+   else item.capturePlaceChecked=checkedVersion(item);
    rows.put(current);updated=current;
   };
   await finished;

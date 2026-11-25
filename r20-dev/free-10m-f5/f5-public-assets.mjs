@@ -1247,6 +1247,29 @@ function stabilizeOriginalPhotoStorage(html){
 
 // Store only the verified, derived capture place inside the existing item
 // descriptor. The original bytes and the IndexedDB version stay unchanged.
+function installCapturePlacePresentation(html){
+ const flags=JSON.parse(readFileSync(path.join(here,'f5-capture-flags.json'),'utf8'));
+ const sprite=readFileSync(path.join(here,'f5-capture-flags.png')).toString('base64');
+ assert.ok(flags.positions.NL&&sprite.startsWith('iVBORw0KGgo'),'CAPTURE_FLAGS_INVALID');
+ const css='<style id="talera-capture-place-css">'+
+  '#talera-capture-place{display:flex;align-items:center;gap:5px;margin-top:3px;max-width:66%;'+
+  'font:500 12px/1.25 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#fff;'+
+  'text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none}'+
+  '#talera-capture-place[hidden],#memoryCaption.talera-v21-title-tracking #talera-capture-place,'+
+  'html.talera-direct-memory-entering #talera-capture-place,body.talera-v18-reading #talera-capture-place{display:none!important}'+
+  '.talera-capture-flag{display:block;flex:0 0 16px;width:16px;height:11px;'+
+  'background-repeat:no-repeat;background-image:url(data:image/png;base64,'+sprite+')}'+
+  '.talera-capture-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+  '</style>';
+ const source=readFileSync(path.join(here,'f5-capture-place-presentation.browser.js'),'utf8');
+ assert.ok(!source.includes('</script'),'CAPTURE_PLACE_UNSAFE_UI_SOURCE');
+ const script='<script id="talera-capture-place-script">'+source+
+  '\nmountTaleraCapturePlace('+JSON.stringify(flags.positions)+');</script>';
+ assert.equal(html.split('</head>').length,2,'CAPTURE_PLACE_HEAD_DRIFT');
+ assert.equal(html.split('</body>').length,2,'CAPTURE_PLACE_BODY_DRIFT');
+ return html.replace('</head>',()=>css+'</head>').replace('</body>',()=>script+'</body>');
+}
+
 function installCapturePlaceCatalog(html){
  const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
  const start=raw.indexOf(' async function readJpegCapturePlace(blob){');
@@ -1760,6 +1783,7 @@ for(const [route,filename] of Object.entries(routes)){
    readFileSync(path.join(delivery,'generated','reference-tell.html'),'utf8'));
  else html=installOriginalPayloadReader(html);
  html=installCapturePlaceCatalog(html);
+ if(route==='/present')html=installCapturePlacePresentation(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

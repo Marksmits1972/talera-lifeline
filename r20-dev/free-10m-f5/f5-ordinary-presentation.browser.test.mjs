@@ -686,6 +686,34 @@ backupRegression: try{
       return {place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,keys:row.items.map(x=>x.key)};
     },result.id);
     assert.deepEqual(reopened,{place:result.place,missing:null,keys:result.keys});
+    // Exercise the actual selected decoded photo on the SAME /present page.
+    await metadataPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===2;
+    },result.id,{timeout:20000});
+    await metadataPage.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      window.__taleraOrdinarySelectPhoto(m.id,0,true);
+    });
+    await metadataPage.waitForFunction(()=>{
+      const row=document.getElementById('talera-capture-place');
+      return row&&!row.hidden&&row.textContent==='Nederland · Arnhem'&&getComputedStyle(row).display!=='none';
+    },null,{timeout:10000});
+    const layout=await metadataPage.evaluate(()=>{
+      const row=document.getElementById('talera-capture-place'),title=document.getElementById('memoryStory');
+      const flag=row.querySelector('.talera-capture-flag').getBoundingClientRect();
+      return {belowTitle:row.previousElementSibling===title,flagWidth:flag.width,flagHeight:flag.height};
+    });
+    assert.deepEqual(layout,{belowTitle:true,flagWidth:16,flagHeight:11});
+    await metadataPage.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      window.__taleraOrdinarySelectPhoto(m.id,1,true);
+    });
+    await metadataPage.waitForFunction(()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      return m._photoIndex===1&&document.getElementById('talera-capture-place')?.hidden;
+    },null,{timeout:10000});
+    console.log('TALERA_CAPTURE_PLACE_ACTUAL_PRESENTATION_FRAME_PASS');
     await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),result.id);
     console.log('TALERA_CAPTURE_PLACE_ACCOUNT_CATALOG_REOPEN_PASS');
   }finally{await metadataPage.close()}

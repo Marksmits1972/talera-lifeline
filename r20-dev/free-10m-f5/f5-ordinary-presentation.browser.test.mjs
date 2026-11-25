@@ -340,7 +340,12 @@ backupRegression: try{
       assert.deepEqual(pickerErrors,[],'Picker JS error');
     }finally{await pickerCtx.close()}
   }
-  if(webkitPickerOnly)break backupRegression;
+  if(webkitPickerOnly){
+    // Reuse the actual same-account, same-origin GPS-to-catalog browser scenario
+    // with the WebKit engine before ending the existing picker-only run.
+    await testGeoNamesCatalog();
+    break backupRegression;
+  }
   // iPhone regression: real authenticated TALERA Worker, saved local image,
   // then same home-screen PWA routes offline. No second app or Worker.
   const offlineCtx=await browser.newContext({
@@ -733,6 +738,7 @@ backupRegression: try{
     });
     await start(enabled);
   }
+  async function testGeoNamesCatalog(){
   await restartGeoWorker(true);
   const geoCtx=await browser.newContext({...devices['iPhone 13'],serviceWorkers:'block',
     extraHTTPHeaders:{'x-talera-f5-key':gate}});
@@ -783,6 +789,8 @@ backupRegression: try{
     // No replacement of window.fetch. Only the provider HTTP response is simulated.
     await geoCtx.addInitScript(()=>{
       if(location.pathname!=='/mijn-leven')return;
+      // Simulate earlier Safari versions lacking AbortSignal.timeout.
+      Object.defineProperty(AbortSignal,'timeout',{configurable:true,value:undefined});
       window.__taleraGeoOnline=false;
       Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
     });
@@ -835,6 +843,14 @@ backupRegression: try{
     assert.ok(Math.abs(sent[0].body.longitude-5.888333333333333)<0.00001);
     assert.match(sent[0].scope,/^[a-f0-9]{32}$/);
     assert.equal(sent[0].method,'POST');
+    // Verify the real Worker authentication/scope path without consuming
+    // any provider credits. Invalid coordinates must reach validation, not
+    // fail auth/configuration. APIRequestContext bypasses the browser mock.
+    const actualBoundary=await geoCtx.request.post(origin+'/api/capture-place',{
+      headers:{origin,'content-type':'application/json','x-talera-local-scope':sent[0].scope},
+      data:{latitude:91,longitude:0}
+    });
+    assert.equal(actualBoundary.status(),400,'Real Worker must reach coordinate validation for this session/scope');
     const stored=await geoPage.evaluate(async id=>{
       const row=await window.TaleraMemories.get(id),item=row.items[0];
       return {key:item.key,place:item.capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]};
@@ -851,8 +867,10 @@ backupRegression: try{
     assert.equal(observed.length,1);
     await geoPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
     assert.deepEqual(geoErrors,[]);
-    console.log('TALERA_GEONAMES_ACTUAL_HOME_OFFLINE_RECONNECT_CATALOG_PRESENT_PASS');
+    console.log('TALERA_GEONAMES_ACTUAL_HOME_OFFLINE_RECONNECT_CATALOG_PRESENT_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',realWorkerAuthScopeValidated:true,providerResponseSimulated:true,physicalIphoneAccepted:false}));
   }finally{await geoCtx.close();await restartGeoWorker(false)}
+  }
+  await testGeoNamesCatalog();
 
   const initial=await page.evaluate(()=>({
     memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,

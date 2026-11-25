@@ -36,7 +36,7 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
        // mark unresolved GPS as checked or delay other local metadata.
        if(!canLookup()){deferred.add(keyOf(item));continue}
        const result=await lookup(gps);
-       if(!result?.ok)return {more:true,blocked:true};
+       if(!result?.ok)return {more:true,blocked:true,retryAfterMs:result?.retryAfterMs===3600000?3600000:60000};
        place=result.place;
       }
      }
@@ -67,13 +67,18 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  const lookup=async gps=>{
   try{
    if(!canLookup())return {ok:false};
-   const response=await fetch('/api/capture-place',{method:'POST',credentials:'same-origin',cache:'no-store',
-    headers:{'content-type':'application/json','x-talera-local-scope':scope},
-    body:JSON.stringify({latitude:gps.latitude,longitude:gps.longitude}),signal:AbortSignal.timeout(8000)});
-   if(!response.ok)return {ok:false};
-   const result=await response.json();
-   if(result.place===null)return {ok:true,place:null};
-   return valid(result.place)?{ok:true,place:result.place}:{ok:false};
+   // Standard AbortController also works on WebKit versions that do not
+   // expose AbortSignal.timeout. Never leave a request hanging indefinitely.
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
+   try{
+    const response=await fetch('/api/capture-place',{method:'POST',credentials:'same-origin',cache:'no-store',
+     headers:{'content-type':'application/json','x-talera-local-scope':scope},
+     body:JSON.stringify({latitude:gps.latitude,longitude:gps.longitude}),signal:controller.signal});
+    if(!response.ok)return {ok:false,retryAfterMs:response.status===429?3600000:60000};
+    const result=await response.json();
+    if(result.place===null)return {ok:true,place:null};
+    return valid(result.place)?{ok:true,place:result.place}:{ok:false};
+   }finally{clearTimeout(timeout)}
   }catch(_){return {ok:false}}
  };
  const commit=async(expected,index,place)=>{
@@ -98,10 +103,13 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   running=true;
   try{
    const result=await enrichCapturePlaces({list:()=>store.list(),blob:id=>store.blob(id),readPlace,readGps,lookup,commit,available,canLookup,deferred});
-   if(result.more&&!result.blocked&&available())schedule(30000);
+   if(result.more&&available()){
+    if(!result.blocked)schedule(30000);
+    else if(result.retryAfterMs&&canLookup())schedule(result.retryAfterMs);
+   }
   }catch(_){}finally{running=false}
  };
- function schedule(ms=2000){if(timer!==null||!available())return;timer=setTimeout(run,ms)}
+ function schedule(ms=250){if(timer!==null||!available())return;timer=setTimeout(run,ms)}
  window.addEventListener('online',()=>schedule());
  window.addEventListener('pagehide',()=>{departing=true;if(timer!==null){clearTimeout(timer);timer=null}});
  window.addEventListener('pageshow',()=>{departing=false;schedule()});

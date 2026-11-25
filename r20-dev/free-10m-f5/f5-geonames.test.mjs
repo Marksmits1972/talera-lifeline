@@ -40,7 +40,7 @@ const options={list:async()=>structuredClone(catalog),blob:async()=>original,
   return structuredClone(current);
  }};
 await enrichCapturePlaces(options);assert.equal(requests,0);assert.equal(writes,0);
-online=true;fail=true;await enrichCapturePlaces(options);assert.equal(requests,1);assert.equal(writes,0);
+online=true;fail=true;const temporary=await enrichCapturePlaces(options);assert.deepEqual(temporary,{more:true,blocked:true,retryAfterMs:60000});assert.equal(requests,1);assert.equal(writes,0);
 fail=false;await enrichCapturePlaces(options);assert.equal(requests,2);assert.equal(writes,2);
 assert.deepEqual(catalog[0].items[0].capturePlace,resolved);
 assert.deepEqual(catalog[1].items[0].capturePlace,resolved);
@@ -71,3 +71,7 @@ await enrichCapturePlaces({...localOptions,canLookup:()=>true});
 assert.deepEqual(catalog[0].items[0].capturePlace,resolved);
 assert.equal(offlineLookups,1);
 console.log('TALERA_LIBRARY_FIRST_LOCAL_METADATA_OFFLINE_AND_GPS_DEFERRED_PASS');
+
+// Rate limit does not mark an original as resolved and must back off for a full hour.
+catalog=[structuredClone(record)];const rateLimited=await enrichCapturePlaces({...options,lookup:async()=>({ok:false,retryAfterMs:3600000})});assert.deepEqual(rateLimited,{more:true,blocked:true,retryAfterMs:3600000});assert.equal(catalog[0].items[0].capturePlaceChecked,undefined);assert.equal(catalog[0].items[0].capturePlace,undefined);
+console.log('TALERA_GEONAMES_TRANSIENT_AND_QUOTA_BACKOFF_PASS');

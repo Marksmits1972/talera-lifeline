@@ -213,6 +213,65 @@ backupRegression: try{
           if(!rejected)throw Error('Broken synthetic alias must remain strictly rejected');
         },seed.items[0].key);
       }
+      if(broken){
+        const targetId=seed.items[0].key.slice(0,seed.items[0].key.lastIndexOf(':'));
+        const previous=await pickerPage.evaluate(async targetId=>{
+          const mem=window.TaleraMemories,rows=await mem.list();
+          const survivor=rows.find(row=>row.id!==targetId);
+          const dbName=document.getElementById('talera-memory-store-v1').textContent.match(/var DB_NAME='([^']+)'/)[1];
+          const db=await new Promise((ok,bad)=>{const q=indexedDB.open(dbName,1);q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
+          // Add a separate unreadable historical alias; keep the healthy
+          // survivor's real original intact.
+          const extra=await mem.save({title:'Independent damaged link',date:'2026-11-23',text:'synthetic'},[new File([new Uint8Array([1,2,3])],'unrelated.mp4',{type:'video/mp4'})]);
+          try{
+            await new Promise((ok,bad)=>{
+              const tx=db.transaction('files','readwrite'),store=tx.objectStore('files');
+              tx.oncomplete=ok;tx.onabort=()=>bad(tx.error);tx.onerror=()=>bad(tx.error);
+              const q=store.get(extra.items[0].key);
+              q.onsuccess=()=>store.put({...q.result,payloadKey:'talera-original-payload-v1:'+'f'.repeat(64)});
+            });
+          }finally{db.close()}
+          const bytes=new Uint8Array(await (await mem.blob(survivor.items[0].key)).arrayBuffer());
+          return {id:survivor.id,key:survivor.items[0].key,bytes:[...bytes],extraId:extra.id,extraKey:extra.items[0].key};
+        },targetId);
+        // Never mount deletion on an ordinary fresh editor, even with a bad
+        // library row. Load the exact failing edit route instead.
+        await pickerPage.goto(origin+'/tell?edit='+encodeURIComponent(targetId),{waitUntil:'domcontentloaded'});
+        try{
+          await pickerPage.locator('.talera-failed-edit-delete .talera-editor-memory-options-toggle').waitFor({state:'visible',timeout:18000});
+        }catch(error){
+          console.log('TALERA_BROKEN_EDIT_DELETE_UI_FAILURE',JSON.stringify({webkit:webkitPickerOnly,body:(await pickerPage.locator('body').innerText()).slice(0,2500),url:pickerPage.url()}));throw error;
+        }
+        const fallback=pickerPage.locator('.talera-failed-edit-delete');
+        assert.ok((await fallback.innerText()).includes('Previous'),'Wrong selected memory displayed');
+        let confirms=0;
+        const dismiss=dialog=>{confirms++;return dialog.dismiss()};
+        pickerPage.once('dialog',dismiss);
+        await fallback.locator('.talera-editor-memory-options-toggle').click();
+        await fallback.locator('.talera-delete-published-memory').click();
+        await pickerPage.waitForFunction(()=>!document.querySelector('.talera-failed-edit-delete .talera-delete-published-memory')?.disabled);
+        assert.equal(confirms,1);
+        assert.ok(await pickerPage.evaluate(id=>window.TaleraMemories.get(id),targetId),'Cancel deleted the target');
+        pickerPage.once('dialog',dialog=>{assert.equal(dialog.type(),'confirm');return dialog.accept()});
+        await fallback.locator('.talera-editor-memory-options-toggle').click();
+        await fallback.locator('.talera-delete-published-memory').click();
+        await pickerPage.waitForURL('**/mijn-leven',{timeout:18000});
+        await pickerPage.waitForFunction(()=>!!window.TaleraMemories?.get);
+        const proof=await pickerPage.evaluate(async ({targetId,previous})=>{
+          const mem=window.TaleraMemories,b=await mem.blob(previous.key);
+          const bytes=[...new Uint8Array(await b.arrayBuffer())];
+          let badStillRejected=false;
+          try{await mem.blob(previous.extraKey)}catch(e){badStillRejected=e.reason==='missing-payload'}
+          return {targetAbsent:!(await mem.get(targetId)),healthyRetained:!!await mem.get(previous.id),
+            originalBytesIdentical:JSON.stringify(bytes)===JSON.stringify(previous.bytes),
+            unrelatedBadRetained:!!await mem.get(previous.extraId)&&badStillRejected};
+        },{targetId,previous});
+        assert.ok(Object.values(proof).every(Boolean),'Deletion changed another memory: '+JSON.stringify(proof));
+        console.log('TALERA_BROKEN_EDIT_CONFIRMED_DELETE_PASS',JSON.stringify({webkit:webkitPickerOnly,...proof}));
+        // Existing picker regression below still needs the original broken
+        // alias. This separate fixture is complete after deletion.
+        continue;
+      }
       await pickerPage.reload({waitUntil:'domcontentloaded'});
       await pickerPage.waitForFunction(()=>!!document.getElementById('photoInput')&&!!window.TaleraMemories?.draftReadPayload,null,{timeout:15000});
       await pickerPage.locator('#photoInput').setInputFiles(file);

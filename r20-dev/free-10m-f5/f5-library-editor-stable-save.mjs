@@ -178,10 +178,9 @@ export function exposeCompleteMemoryDelete(html){
  if(section.split(anchor).length!==2||html.includes('talera-delete-published-memory'))
   throw Error('TALERA_EDITOR_DELETE_UI_ANCHOR_DRIFT');
  const action=String.raw`
- // Only a genuinely published memory in this editor gets a destructive action.
- (()=> {
-  const id=g.existing;
-  if(typeof id!=='string'||!/^local-[a-z0-9-]+$/i.test(id))return;
+ // The same existing menu is available on a failed explicit edit load.
+ function taleraMountPublishedDelete(id,box,isCurrent,fallback=false){
+  if(typeof id!=='string'||!/^local-[a-z0-9-]+$/i.test(id)||!isCurrent())return;
   const requested=new URLSearchParams(location.search).get('edit');
   if(requested&&requested!==id)return;
   const strings={
@@ -232,7 +231,7 @@ export function exposeCompleteMemoryDelete(html){
   });
   button.addEventListener('click',async event=>{
    event.preventDefault();event.stopPropagation();
-   if(busy||panel.hidden||!button.isConnected||g.existing!==id)return;
+   if(busy||panel.hidden||!button.isConnected||!isCurrent())return;
    closeMenu();
    const store=window.TaleraMemories,remove=window.__taleraV9FullDelete;
    if(typeof store?.get!=='function'||typeof remove!=='function'){
@@ -243,7 +242,7 @@ export function exposeCompleteMemoryDelete(html){
    let locked=false;
    try{
     const row=await store.get(id);
-    if(!button.isConnected||g.existing!==id||!row||row.id!==id||row.source!=='pwa-local')
+    if(!button.isConnected||!isCurrent()||!row||row.id!==id||row.source!=='pwa-local')
      throw Error('TALERA_DELETE_TARGET_NOT_CURRENT');
     if(!window.confirm(labels[1]))return;
     if(work){work.inert=true;locked=true;}
@@ -257,11 +256,17 @@ export function exposeCompleteMemoryDelete(html){
     busy=false;button.disabled=false;toggle.disabled=false;
    }
   });
+  if(fallback){
+   if(!box.isConnected||!isCurrent()||document.querySelector('.talera-editor-memory-options'))return;
+   menu.style.cssText='position:relative;margin:12px 0 0 auto;width:44px;height:44px;z-index:30;';
+   box.append(menu);
+   return;
+  }
   requestAnimationFrame(()=>{
    const work=box.closest('.work.talera-r16-editor');
    const heading=work?.querySelector('.talera-v14-heading');
    const title=heading?.querySelector('#title');
-   if(!box.isConnected||!work||!heading||!title||g.existing!==id||
+   if(!box.isConnected||!work||!heading||!title||!isCurrent()||
       work.querySelector('.talera-editor-memory-options'))return;
    // Absolute overlay uses the previously blank upper-right corner, never
    // another flex row. Reserve only horizontal room within the original title.
@@ -270,9 +275,47 @@ export function exposeCompleteMemoryDelete(html){
    title.style.setProperty('padding-right','48px','important');
    heading.append(menu);
   });
- })();
+ }
+ // Run only on an explicitly selected saved-memory edit route. Never mount
+ // on the new-memory screen, and never select a memory by date or title.
+ function taleraFailedEditDeletion(){
+  const id=new URLSearchParams(location.search).get('edit');
+  if(!id||!/^local-[a-z0-9-]+$/i.test(id))return;
+  let pending=false,host=null;
+  const failureText='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL';
+  const findError=()=>[...document.querySelectorAll('body *')].find(el=>
+   !['SCRIPT','STYLE','TEXTAREA'].includes(el.tagName)&&el.getClientRects().length&&
+   el.textContent.includes(failureText)&&
+   ![...el.children].some(child=>child.textContent.includes(failureText)));
+  const current=()=>new URLSearchParams(location.search).get('edit')===id&&
+    !!findError()&&!document.querySelector('.work.talera-r16-editor .talera-editor-memory-options');
+  const refresh=async()=>{
+   if(!current()){if(host){host.remove();host=null}return}
+   if(pending||host?.isConnected||document.querySelector('.talera-editor-memory-options'))return;
+   pending=true;
+   try{
+    const row=await window.TaleraMemories?.get(id);
+    const error=findError();
+    if(!row||row.id!==id||row.source!=='pwa-local'||!error||!current())return;
+    host=document.createElement('div');host.className='talera-failed-edit-delete';
+    host.style.cssText='margin:12px 0;padding:12px;border:1px solid #dbe4ef;border-radius:12px;';
+    const note=document.createElement('div');
+    note.textContent=(row.title||'Herinnering')+' · '+(row.date||'');
+    note.style.cssText='font-weight:600;overflow-wrap:anywhere;';
+    host.append(note);
+    error.after(host);
+    taleraMountPublishedDelete(id,host,current,true);
+   }catch(error){console.warn('TALERA_EDIT_DELETE_TARGET_UNAVAILABLE',error?.name||'Error')}
+   finally{pending=false}
+  };
+  const observer=new MutationObserver(()=>{void refresh()});
+  const watch=()=>{observer.observe(document.body,{childList:true,subtree:true,characterData:true});void refresh()};
+  if(document.body)watch();else document.addEventListener('DOMContentLoaded',watch,{once:true});
+  window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
+ }
+ taleraFailedEditDeletion();
  `;
- return html.slice(0,start)+section.replace(anchor,anchor+action)+html.slice(end+1);
+ return html.slice(0,start)+action+'\n'+section.replace(anchor,anchor+"\n taleraMountPublishedDelete(g.existing,box,(()=>{const id=g.existing;return()=>g.existing===id})());")+html.slice(end+1);
 }
 export function completePublishedRemovalOnOtherPage(html,editorHtml){
  const startTag='<script id="talera-v9-complete-delete">';

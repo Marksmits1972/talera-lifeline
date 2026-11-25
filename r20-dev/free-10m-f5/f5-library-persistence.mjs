@@ -246,13 +246,21 @@ export function createOriginalPayloadStorage(){
   q.onsuccess=()=>{
    try{
     const rows=q.result||[],keys=new Set(rows.map(row=>row.key)),used=new Set();
+    let uncertain=false;
     for(const row of rows){
      if(!link(row))continue;
-     if(!payloadKey(row.payloadKey)||!keys.has(row.payloadKey))failFormat();
+     if(!payloadKey(row.payloadKey)){uncertain=true;continue}
      used.add(row.payloadKey);
+     if(!keys.has(row.payloadKey))uncertain=true;
     }
+    // A corrupt unrelated link is not permission to delete any ambiguous
+    // payload and must not prevent deletion of a verified story ID.
+    if(uncertain)return;
     for(const row of rows)if(payloadKey(row.key)&&!used.has(row.key)){
-     payloadParts(row);
+     try{payloadParts(row)}catch(error){
+      if(error?.message==='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL')continue;
+      throw error;
+     }
      store.delete(row.key);
     }
    }catch(e){fail(e)}

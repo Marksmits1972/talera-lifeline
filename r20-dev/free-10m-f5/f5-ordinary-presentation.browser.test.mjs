@@ -268,9 +268,19 @@ backupRegression: try{
         },{targetId,previous});
         assert.ok(Object.values(proof).every(Boolean),'Deletion changed another memory: '+JSON.stringify(proof));
         console.log('TALERA_BROKEN_EDIT_CONFIRMED_DELETE_PASS',JSON.stringify({webkit:webkitPickerOnly,...proof}));
-        // Existing picker regression below still needs the original broken
-        // alias. This separate fixture is complete after deletion.
-        continue;
+        // In this isolated synthetic fixture only, remove the second known
+        // bad story using the same account-local library deletion contract.
+        // A subsequent real picker import must have no advisory warning at all.
+        const clean=await pickerPage.evaluate(async previous=>{
+          const mem=window.TaleraMemories;
+          await mem.remove(previous.extraId);
+          const survivor=await mem.get(previous.id);
+          const bytes=[...new Uint8Array(await (await mem.blob(previous.key)).arrayBuffer())];
+          return {extraAbsent:!(await mem.get(previous.extraId)),survivorRetained:!!survivor,
+            bytesIdentical:JSON.stringify(bytes)===JSON.stringify(previous.bytes)};
+        },previous);
+        assert.ok(Object.values(clean).every(Boolean),'Last damaged story removal changed healthy data: '+JSON.stringify(clean));
+        await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
       }
       await pickerPage.reload({waitUntil:'domcontentloaded'});
       await pickerPage.waitForFunction(()=>!!document.getElementById('photoInput')&&!!window.TaleraMemories?.draftReadPayload,null,{timeout:15000});
@@ -301,6 +311,13 @@ backupRegression: try{
           body:(await pickerPage.locator('body').innerText()).slice(0,1800),pickerErrors}));
         throw error;
       }
+      if(fixture.deleteTest){
+        // The persisted draft and completion callbacks must have settled.
+        await pickerPage.waitForFunction(()=>!document.body.innerText.includes('Import nog niet klaar'));
+        assert.ok(!(await pickerPage.locator('body').innerText()).includes('Een eerder mediabestand kon niet worden gecontroleerd op dubbelingen'),
+          'Warning persisted after every known broken synthetic reference was removed');
+        console.log('TALERA_LAST_DAMAGED_STORY_REMOVED_NO_DUPLICATE_WARNING_PASS',JSON.stringify({webkit:webkitPickerOnly}));
+      }
       const published=await pickerPage.evaluate(async ({brokenKey,originalSize})=>{
         const mem=window.TaleraMemories;
         const draft=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
@@ -316,7 +333,7 @@ backupRegression: try{
         }
         return {bytesIdentical:bytes.length===input.length&&bytes.length===originalSize&&bytes.every((v,i)=>v===input[i]),
           priorInvalidPreserved,priorMemoryRetained:(await mem.list()).length>=2};
-      },{brokenKey:broken?seed.items[0].key:null,originalSize:readFileSync(file).length});
+      },{brokenKey:broken&&!fixture.deleteTest?seed.items[0].key:null,originalSize:readFileSync(file).length});
       assert.ok(published.bytesIdentical&&published.priorInvalidPreserved&&published.priorMemoryRetained,'Picker original or historical alias altered: '+JSON.stringify(published));
       console.log('TALERA_ACTUAL_PICKER_IMPORT_PASS',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),originalBytesIdentical:true,priorSharedOriginals:true,brokenPriorAlias:broken,...published}));
       assert.deepEqual(pickerErrors,[],'Picker JS error');

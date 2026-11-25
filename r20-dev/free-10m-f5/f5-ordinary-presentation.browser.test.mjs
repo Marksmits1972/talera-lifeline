@@ -498,6 +498,78 @@ async function testTimelineLoupe(){
   await lp.mouse.click(clickX,clickY);
   assert.equal(await lp.evaluate(()=>window.__loupeOutsideClicks),1,'Next distinct tap must reach existing story');
   assert.ok(await lp.evaluate(async ids=>{for(const id of ids)if(!(await window.TaleraMemories.get(id)))return false;return true},ids));
+  // Touch input, not a mouse disguised by a mobile viewport. Chromium CDP
+  // provides trusted touch events; WebKit can exercise the separate tap path.
+  await load(lp,expected[0].id,1);
+  await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
+  const touchBox=await lp.locator('#surface').boundingBox();
+  const tx=touchBox.x+touchBox.width*.65,ty=touchBox.y+touchBox.height-64;
+  if(!webkitPickerOnly){
+   const session=await lp.context().newCDPSession(lp);
+   try{
+    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tx,y:ty,id:51}]});
+    await panel.waitFor({state:'visible',timeout:4000});
+    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    assert.equal((await state()).open,true);
+    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tx,y:ty,id:52}]});
+    await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:tx-40,y:ty,id:52}]});
+    await lp.waitForTimeout(350);
+    assert.equal((await state()).id,expected[1].id,'Trusted touch must select the next individual memory');
+    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   }finally{await session.detach()}
+  }else{
+   await lp.mouse.move(tx,ty);await lp.mouse.down();
+   await panel.waitFor({state:'visible',timeout:4000});await lp.mouse.up();
+  }
+  const touchSaved=await state(),touchStory=await lp.locator('#memoryStoryScroll').boundingBox();
+  const tapX=touchStory.x+touchStory.width*.45,tapY=touchStory.y+touchStory.height*.48;
+  await lp.evaluate(()=>{window.__loupeTouchOutsideClicks=0;document.getElementById('memoryStoryScroll').addEventListener('click',()=>window.__loupeTouchOutsideClicks++)});
+  await lp.touchscreen.tap(tapX,tapY);
+  await panel.waitFor({state:'hidden',timeout:4000});
+  assert.equal((await state()).id,touchSaved.id);
+  assert.equal(await lp.evaluate(()=>window.__loupeTouchOutsideClicks),0);
+  await lp.touchscreen.tap(tapX,tapY);
+  assert.equal(await lp.evaluate(()=>window.__loupeTouchOutsideClicks),1);
+  console.log('TALERA_LOUPE_TOUCH_REGRESSION_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',trustedTouchDrag:!webkitPickerOnly,trustedOutsideTap:true,physicalIphoneAccepted:false}));
+  // Add one narrated memory through the existing library writer, without
+  // modifying the original player or the previously verified photo fixture.
+  await lp.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+  await lp.waitForFunction(()=>typeof window.TaleraMemories?.updateCues==='function');
+  const mixed=await lp.evaluate(async()=>{
+   const c=document.createElement('canvas');c.width=48;c.height=48;
+   const ctx=c.getContext('2d');ctx.fillStyle='#8844bb';ctx.fillRect(0,0,48,48);
+   const photo=new File([await new Promise(ok=>c.toBlob(ok,'image/png'))],'loupe-voice-photo.png',{type:'image/png'});
+   const rate=8000,n=rate*4,buffer=new ArrayBuffer(44+n*2),v=new DataView(buffer);
+   const ascii=(p,s)=>{for(let i=0;i<s.length;i++)v.setUint8(p+i,s.charCodeAt(i))};
+   ascii(0,'RIFF');v.setUint32(4,36+n*2,true);ascii(8,'WAVE');ascii(12,'fmt ');
+   v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+   v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+   ascii(36,'data');v.setUint32(40,n*2,true);
+   for(let i=0;i<n;i++)v.setInt16(44+i*2,Math.round(900*Math.sin(i*2*Math.PI*330/rate)),true);
+   const voice=new File([buffer],'loupe-voice.wav',{type:'audio/wav'});
+   const row=await window.TaleraMemories.save({title:'Loupe narrated',date:'2003-02-19',time:'12:00:00',text:'Synthetic narrated memory',narrationCues:[],narrationDurationMs:4000},[photo,voice]);
+   const image=row.items.find(m=>m.kind==='photo'),audio=row.items.find(m=>m.kind==='audio');
+   if(!image||!audio)throw Error('Existing library lost narrated media');
+   await window.TaleraMemories.updateCues(row.id,[{t:0,index:0,mediaId:image.key}]);
+   return {id:row.id,photoId:image.key,audioId:audio.key};
+  });
+  await load(lp,expected[3].id,1);
+  await lp.waitForFunction(id=>window.__taleraPhotoBook.list().some(m=>m.storyId===id),mixed.id);
+  await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
+  const mb=await lp.locator('#surface').boundingBox(),mx=mb.x+mb.width*.65,my=mb.y+mb.height-64;
+  await lp.mouse.move(mx,my);await lp.mouse.down();await panel.waitFor({state:'visible',timeout:4000});await lp.mouse.up();
+  await lp.mouse.move(mx,my);await lp.mouse.down();await lp.mouse.move(mx-40,my);await lp.waitForTimeout(350);await lp.mouse.up();
+  assert.equal((await state()).id,mixed.id,'Loupe must pass narrated memory ID to original engine');
+  await lp.locator('.talera-independent-narrator-layer audio').waitFor({state:'attached',timeout:10000});
+  await lp.mouse.move(mx,my);await lp.mouse.down();await lp.mouse.move(mx+40,my);await lp.waitForTimeout(350);await lp.mouse.up();
+  assert.equal((await state()).id,expected[3].id,'Loupe must return to ordinary memory');
+  await lp.locator('.talera-independent-narrator-layer audio').waitFor({state:'detached',timeout:10000});
+  assert.ok(await lp.evaluate(async m=>{
+   const row=await window.TaleraMemories.get(m.id);
+   return row?.items.some(x=>x.key===m.photoId)&&row.items.some(x=>x.key===m.audioId)&&row.narrationCues?.[0]?.mediaId===m.photoId;
+  },mixed));
+  console.log('TALERA_LOUPE_MIXED_MOTOR_SELECTION_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',ordinaryToNarratedToOrdinary:true,originalIdsAndCuesPreserved:true,physicalIphoneAccepted:false}));
+
   assert.deepEqual(errs,[]);
   console.log('TALERA_SHARED_TIMELINE_LOUPE_BROWSER_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',sameTimestamp:true,weekBoundary:true,originalOrder:true,closedTapConsumed:true,physicalIphoneAccepted:false}));
  }finally{await loupeCtx.close()}

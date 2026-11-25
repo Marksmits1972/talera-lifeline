@@ -19,7 +19,7 @@ async function stop(){
   if(browser)await browser.close().catch(()=>{});
   if(worker&&!worker.killed)worker.kill('SIGTERM');
 }
-async function start(){
+async function start(geoEnabled=false){
   worker=spawn(path.resolve('node_modules/.bin/wrangler'),[
     'dev','--local','--ip','127.0.0.1','--port','8837',
     '--config',path.join(here,'wrangler.jsonc'),
@@ -29,6 +29,7 @@ async function start(){
     '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
     '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_TEST_KEY',
     '--var','DEMO_IDENTITY_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_SOCIAL_KEY',
+    ...(geoEnabled?['--var','GEONAMES_USERNAME:talera_synthetic_test']:[]),
     '--log-level','error'
   ],{env:{...process.env,CI:'true',BROWSER:'none'},stdio:['ignore','pipe','pipe']});
   for(const stream of [worker.stdout,worker.stderr])
@@ -719,9 +720,20 @@ backupRegression: try{
   }finally{await metadataPage.close()}
 
 
-  // Exercise the actual generated Home catalog with its optional feature
-  // enabled in this disposable browser only. Intercept GeoNames at the
-  // same-origin gateway boundary; no external request or owner media.
+  // Exercise the actual generated Home catalog using the same local Worker
+  // with its real feature flag enabled. Only the provider boundary is mocked.
+  // Restart the same process/origin/DO store, never deploy a second app.
+  async function restartGeoWorker(enabled){
+    const old=worker;
+    await new Promise((ok,bad)=>{
+      if(old.exitCode!==null)return ok();
+      const timer=setTimeout(()=>bad(Error('LOCAL_WORKER_SHUTDOWN_TIMEOUT')),9000);
+      old.once('exit',()=>{clearTimeout(timer);ok()});
+      if(!old.kill('SIGTERM')){clearTimeout(timer);bad(Error('LOCAL_WORKER_NOT_STOPPED'))}
+    });
+    await start(enabled);
+  }
+  await restartGeoWorker(true);
   const geoCtx=await browser.newContext({...devices['iPhone 13'],serviceWorkers:'block',
     extraHTTPHeaders:{'x-talera-f5-key':gate}});
   try{
@@ -754,40 +766,39 @@ backupRegression: try{
       return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await file.arrayBuffer())]};
     });
     await geoCtx.addInitScript(()=>{
-      if(location.pathname==='/mijn-leven'){
-        window.__taleraGeoOnline=false;
-        Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
-      }
+      if(location.pathname!=='/mijn-leven'&&location.pathname!=='/present')return;
+      window.__taleraGeoOnline=false;
+      Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
+      const nativeFetch=window.fetch.bind(window);
+      window.__taleraGeoRequests=[];
+      window.fetch=async (input,init)=>{
+        const url=new URL(typeof input==='string'?input:input.url,location.href);
+        if(url.origin!==location.origin||url.pathname!=='/api/capture-place')return nativeFetch(input,init);
+        const body=JSON.parse(init.body);
+        const headers=new Headers(init.headers);
+        window.__taleraGeoRequests.push({body,scope:headers.get('x-talera-local-scope'),method:init.method});
+        return new Response(JSON.stringify({place:{
+          countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'
+        }}),{status:200,headers:{'content-type':'application/json'}});
+      };
     });
-    let requests=0,homeHits=0;
-    await geoPage.route(origin+'/mijn-leven',async route=>{
-      const response=await route.fetch(),html=await response.text();
-      const marker='/*TALERA_GEONAMES_ENABLED*/false';
-      assert.equal(html.split(marker).length,2,'Actual generated Home feature marker');
-      homeHits++;
-      await route.fulfill({response,body:html.replace(marker,'/*TALERA_GEONAMES_ENABLED*/true')});
-    });
-    await geoPage.route('**/api/capture-place',async route=>{
-      requests++;
-      const request=route.request();
-      const body=request.postDataJSON();
-      assert.deepEqual(Object.keys(body).sort(),['latitude','longitude']);
-      assert.ok(Math.abs(body.latitude-51.985)<0.00001);
-      assert.ok(Math.abs(body.longitude-5.888333333333333)<0.00001);
-      assert.match(request.headers()['x-talera-local-scope'],/^[a-f0-9]{32}$/);
-      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({place:{
-        countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'
-      }})});
-    });
-    await geoPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+    const home=await geoPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+    assert.equal(home.status(),200);
+    assert.ok((await home.text()).includes('/*TALERA_GEONAMES_ENABLED*/true'),'Actual Worker did not enable enrichment');
     await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
-    assert.equal(homeHits,1);
+    const requests=()=>geoPage.evaluate(()=>window.__taleraGeoRequests);
     await geoPage.waitForTimeout(2500);
-    assert.equal(requests,0,'No geocoding while offline');
+    assert.equal((await requests()).length,0,'No geocoding while offline');
     assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
     await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
     await geoPage.waitForFunction(async id=>(await window.TaleraMemories.get(id))?.items[0]?.capturePlace?.city==='Arnhem',saved.id,{timeout:15000});
-    assert.equal(requests,1);
+    const sent=await requests();
+    assert.equal(sent.length,1);
+    assert.deepEqual(Object.keys(sent[0].body).sort(),['latitude','longitude']);
+    assert.ok(Math.abs(sent[0].body.latitude-51.985)<0.00001);
+    assert.ok(Math.abs(sent[0].body.longitude-5.888333333333333)<0.00001);
+    assert.match(sent[0].scope,/^[a-f0-9]{32}$/);
+    assert.equal(sent[0].method,'POST');
     const stored=await geoPage.evaluate(async id=>{
       const row=await window.TaleraMemories.get(id),item=row.items[0];
       return {key:item.key,place:item.capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]};
@@ -796,14 +807,14 @@ backupRegression: try{
     assert.deepEqual(stored.place,{countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'});
     await geoPage.evaluate(()=>window.dispatchEvent(new Event('online')));
     await geoPage.waitForTimeout(2500);
-    assert.equal(requests,1,'Persisted metadata never requests the same media again');
+    assert.equal((await requests()).length,1,'Persisted metadata never requests the same media again');
     await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
     await geoPage.waitForFunction(()=>document.getElementById('talera-capture-place')?.textContent.includes('Nederland · omgeving Arnhem (GeoNames)'),null,{timeout:20000});
-    assert.equal(requests,1,'Presentation performs no geocoding');
+    assert.equal((await requests()).length,0,'Presentation performs no geocoding');
     await geoPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
     assert.deepEqual(geoErrors,[]);
     console.log('TALERA_GEONAMES_ACTUAL_HOME_OFFLINE_RECONNECT_CATALOG_PRESENT_PASS');
-  }finally{await geoCtx.close()}
+  }finally{await geoCtx.close();await restartGeoWorker(false)}
 
   const initial=await page.evaluate(()=>({
     memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,

@@ -61,9 +61,9 @@ function mountTaleraCapturePlace(flagPositions){
   const story=await library.readStory(selection.storyId);
   const item=story.items?.find(x=>x.key===selection.key&&x.kind==='photo');
   if(!item)return null;
-  // Old records can still read the original locally; never write from
-  // presentation or guess from a nearby coordinate.
-  return valid(item.capturePlace??await library.capturePlace(selection.key));
+  // The catalog is the only authority. Even older original files must be
+  // enriched by the library, never inspected for location by presentation.
+  return valid(item.capturePlace);
  }
  function refresh(){
   queued=false;const current=selected();

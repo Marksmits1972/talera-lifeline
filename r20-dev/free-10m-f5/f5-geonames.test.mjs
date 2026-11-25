@@ -50,3 +50,24 @@ deleted=false;catalog=[structuredClone(record)];await enrichCapturePlaces({...op
 assert.equal(catalog[0].items[0].capturePlaceChecked,'v1');
 const before=requests;await enrichCapturePlaces(options);assert.equal(requests,before);
 console.log('TALERA_GEONAMES_LOCAL_ENRICHMENT_OFFLINE_RETRY_DEDUP_PASS');
+
+// A legacy original may contain a reliable explicit place while offline.
+// Only the library enriches it; GPS remains pending until networking is enabled.
+const legacyPhoto={...record,id:'legacy-iptc',items:[{...record.items[0],key:'iptc-photo'}]};
+const pendingGps={...record,id:'pending-gps',items:[{...record.items[0],key:'gps-photo'}]};
+const iptc={...resolved,source:'iptc-location-created'};
+const iptcBlob=new Blob(['ipt'],{type:'image/jpeg'});
+catalog=[structuredClone(pendingGps),structuredClone(legacyPhoto)];
+const deferred=new Set();let offlineLookups=0;
+const localOptions={...options,available:()=>true,canLookup:()=>false,deferred,limit:1,
+ blob:async id=>id==='iptc-photo'?iptcBlob:original,readPlace:async blob=>blob===iptcBlob?iptc:null,
+ lookup:async()=>{offlineLookups++;return {ok:true,place:resolved}}};
+assert.equal((await enrichCapturePlaces(localOptions)).more,true);
+assert.equal(catalog[0].items[0].capturePlaceChecked,undefined);
+assert.equal((await enrichCapturePlaces(localOptions)).more,false);
+assert.deepEqual(catalog[1].items[0].capturePlace,iptc);
+assert.equal(offlineLookups,0);
+await enrichCapturePlaces({...localOptions,canLookup:()=>true});
+assert.deepEqual(catalog[0].items[0].capturePlace,resolved);
+assert.equal(offlineLookups,1);
+console.log('TALERA_LIBRARY_FIRST_LOCAL_METADATA_OFFLINE_AND_GPS_DEFERRED_PASS');

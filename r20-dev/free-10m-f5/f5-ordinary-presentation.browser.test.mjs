@@ -786,6 +786,16 @@ backupRegression: try{
       window.__taleraGeoOnline=false;
       Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
     });
+    // Even with the provider enabled, opening presentation BEFORE the
+    // library pass must not perform a lookup or fabricate a catalog entry.
+    await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
+    await geoPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===1;
+    },saved.id,{timeout:20000});
+    assert.equal(await geoPage.evaluate(()=>document.getElementById('talera-capture-place')?.hidden),true);
+    assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
+    assert.equal(observed.length,0,'Opening presentation before library enrichment must never call GeoNames');
     const home=await geoPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
     assert.equal(home.status(),200);
     assert.ok((await home.text()).includes('/*TALERA_GEONAMES_ENABLED*/true'),'Actual Worker did not enable enrichment');

@@ -3,6 +3,7 @@
 // code, temporary browser gate, or automatic account creation is required.
 // There is intentionally NO TALERA_BASE, D1, R2 or existing customer binding.
 import authPilot from '../free-10m-auth-pilot/auth-pilot-worker.mjs';
+import {capturePlaceApi} from './f5-geonames.mjs';
 import {passwordResetPage} from './f5-password-reset-page.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
@@ -1302,6 +1303,7 @@ export default {
       // Original app periodically asks for its own version. Answer on this
       // isolated origin; never proxy to the old customer/production Worker.
       if(p==='/api/version'&&m==='GET')return json({version:APPROVED_UI_VERSION});
+      if(p==='/api/capture-place')return capturePlaceApi(request,env,{getAccount:()=>sessionAccount(request,env),getScope:privateAccountScope});
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);
       if(p==='/api/discovery')return discoveryApi(request,env);

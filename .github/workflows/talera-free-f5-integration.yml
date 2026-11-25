@@ -76,6 +76,7 @@ jobs:
       - name: Verify read-only TALERA library gateway preserves original IDs and bytes
         run: |
           node r20-dev/free-10m-f5/f5-library-access.test.mjs
+          node r20-dev/free-10m-f5/f5-geonames.test.mjs
           node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
       - name: Test account password recovery on same underlying Durable Objects with fake local mail
         run: |
@@ -812,6 +813,7 @@ jobs:
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
           node r20-dev/free-10m-f5/f5-library-access.test.mjs
+          node r20-dev/free-10m-f5/f5-geonames.test.mjs
           node r20-dev/free-10m-f5/f5-library-integrity.test.mjs
           node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
           node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
@@ -1033,6 +1035,7 @@ jobs:
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
           node r20-dev/free-10m-f5/f5-library-access.test.mjs
+          node r20-dev/free-10m-f5/f5-geonames.test.mjs
           node r20-dev/free-10m-f5/f5-library-integrity.test.mjs
           node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
           node r20-dev/free-10m-f5/f5-account-switch-regression.mjs

@@ -19,7 +19,7 @@ async function stop(){
   if(browser)await browser.close().catch(()=>{});
   if(worker&&!worker.killed)worker.kill('SIGTERM');
 }
-async function start(){
+async function start(geoEnabled=false){
   worker=spawn(path.resolve('node_modules/.bin/wrangler'),[
     'dev','--local','--ip','127.0.0.1','--port','8837',
     '--config',path.join(here,'wrangler.jsonc'),
@@ -29,6 +29,7 @@ async function start(){
     '--var','STAGING_SOCIAL_KEY:'+'3'.repeat(64),
     '--var','AUTH_NAMESPACE_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_TEST_KEY',
     '--var','DEMO_IDENTITY_KEY:SYNTHETIC_F5_PRESENTATION_ONLY_LOCAL_SOCIAL_KEY',
+    ...(geoEnabled?['--var','GEONAMES_USERNAME:talera_synthetic_test']:[]),
     '--log-level','error'
   ],{env:{...process.env,CI:'true',BROWSER:'none'},stdio:['ignore','pipe','pipe']});
   for(const stream of [worker.stdout,worker.stderr])
@@ -268,9 +269,19 @@ backupRegression: try{
         },{targetId,previous});
         assert.ok(Object.values(proof).every(Boolean),'Deletion changed another memory: '+JSON.stringify(proof));
         console.log('TALERA_BROKEN_EDIT_CONFIRMED_DELETE_PASS',JSON.stringify({webkit:webkitPickerOnly,...proof}));
-        // Existing picker regression below still needs the original broken
-        // alias. This separate fixture is complete after deletion.
-        continue;
+        // In this isolated synthetic fixture only, remove the second known
+        // bad story using the same account-local library deletion contract.
+        // A subsequent real picker import must have no advisory warning at all.
+        const clean=await pickerPage.evaluate(async previous=>{
+          const mem=window.TaleraMemories;
+          await mem.remove(previous.extraId);
+          const survivor=await mem.get(previous.id);
+          const bytes=[...new Uint8Array(await (await mem.blob(previous.key)).arrayBuffer())];
+          return {extraAbsent:!(await mem.get(previous.extraId)),survivorRetained:!!survivor,
+            bytesIdentical:JSON.stringify(bytes)===JSON.stringify(previous.bytes)};
+        },previous);
+        assert.ok(Object.values(clean).every(Boolean),'Last damaged story removal changed healthy data: '+JSON.stringify(clean));
+        await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
       }
       await pickerPage.reload({waitUntil:'domcontentloaded'});
       await pickerPage.waitForFunction(()=>!!document.getElementById('photoInput')&&!!window.TaleraMemories?.draftReadPayload,null,{timeout:15000});
@@ -301,6 +312,17 @@ backupRegression: try{
           body:(await pickerPage.locator('body').innerText()).slice(0,1800),pickerErrors}));
         throw error;
       }
+      if(broken&&!fixture.deleteTest){
+        await pickerPage.waitForFunction(()=>document.body.innerText.includes('Tijdelijke diagnose: logical-metadata.'),null,{timeout:12000});
+        console.log('TALERA_EXISTING_WARNING_SAFE_REASON_ONLY_PASS');
+      }
+      if(fixture.deleteTest){
+        // The persisted draft and completion callbacks must have settled.
+        await pickerPage.waitForFunction(()=>!document.body.innerText.includes('Import nog niet klaar'));
+        assert.ok(!(await pickerPage.locator('body').innerText()).includes('Een eerder mediabestand kon niet worden gecontroleerd op dubbelingen'),
+          'Warning persisted after every known broken synthetic reference was removed');
+        console.log('TALERA_LAST_DAMAGED_STORY_REMOVED_NO_DUPLICATE_WARNING_PASS',JSON.stringify({webkit:webkitPickerOnly}));
+      }
       const published=await pickerPage.evaluate(async ({brokenKey,originalSize})=>{
         const mem=window.TaleraMemories;
         const draft=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
@@ -316,13 +338,18 @@ backupRegression: try{
         }
         return {bytesIdentical:bytes.length===input.length&&bytes.length===originalSize&&bytes.every((v,i)=>v===input[i]),
           priorInvalidPreserved,priorMemoryRetained:(await mem.list()).length>=2};
-      },{brokenKey:broken?seed.items[0].key:null,originalSize:readFileSync(file).length});
+      },{brokenKey:broken&&!fixture.deleteTest?seed.items[0].key:null,originalSize:readFileSync(file).length});
       assert.ok(published.bytesIdentical&&published.priorInvalidPreserved&&published.priorMemoryRetained,'Picker original or historical alias altered: '+JSON.stringify(published));
       console.log('TALERA_ACTUAL_PICKER_IMPORT_PASS',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),originalBytesIdentical:true,priorSharedOriginals:true,brokenPriorAlias:broken,...published}));
       assert.deepEqual(pickerErrors,[],'Picker JS error');
     }finally{await pickerCtx.close()}
   }
-  if(webkitPickerOnly)break backupRegression;
+  if(webkitPickerOnly){
+    // Reuse the actual same-account, same-origin GPS-to-catalog browser scenario
+    // with the WebKit engine before ending the existing picker-only run.
+    await testGeoNamesCatalog();
+    break backupRegression;
+  }
   // iPhone regression: real authenticated TALERA Worker, saved local image,
   // then same home-screen PWA routes offline. No second app or Worker.
   const offlineCtx=await browser.newContext({
@@ -601,6 +628,323 @@ backupRegression: try{
   await page.waitForFunction(()=>!!window.TaleraMemories?.save,null,{timeout:15000});
   // With zero saved memories the original presentation must start empty:
   // neither the 50 fixed examples nor the 450 generated examples can appear.
+  // Test the production metadata reader inside this exact generated /present.
+  // Use only synthetic bytes, never an owner photo or a second app.
+  const capturePlaceResults=await page.evaluate(async()=>{
+    const ns='http://iptc.org/std/Iptc4xmpExt/2008-02-29/';
+    const xmp=(field='LocationCreated',city='Arnhem',code='NL',country='Nederland')=>'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:i="'+ns+'"><i:'+field+'><rdf:Bag><rdf:li rdf:parseType="Resource"><i:City>'+city+'</i:City><i:CountryCode>'+code+'</i:CountryCode><i:CountryName>'+country+'</i:CountryName></rdf:li></rdf:Bag></i:'+field+'></rdf:Description></rdf:RDF></x:xmpmeta>';
+    const jpeg=(...args)=>{
+      const packet=xmp(...args);
+      const data=new TextEncoder().encode('http://ns.adobe.com/xap/1.0/\0'+packet);
+      const size=data.length+2;
+      return new Blob([Uint8Array.from([255,216,255,225,size>>8,size&255]),data,Uint8Array.from([255,217])],{type:'image/jpeg'});
+    };
+    // ISO BMFF metadata item explicitly associated with the primary image.
+    // No compressed picture payload is needed for this parser contract.
+    const heif=(packet,link=1,contentType='application/rdf+xml')=>{
+      const word=(n,w=4)=>Uint8Array.from(Array.from({length:w},(_,i)=>Math.floor(n/256**(w-i-1))&255));
+      const str=t=>new TextEncoder().encode(t);
+      const cat=(...parts)=>Uint8Array.from(parts.flatMap(x=>[...x]));
+      const box=(name,...parts)=>{const body=cat(...parts);return cat(word(body.length+8),str(name),body)};
+      const body=str(packet);
+      const info=(id,type,...extra)=>box('infe',word(2<<24),word(id,2),word(0,2),str(type),word(0,1),...extra);
+      const meta=box('meta',word(0),box('pitm',word(0),word(1,2)),
+        box('iinf',word(0),word(2,2),info(1,'hvc1'),info(2,'mime',str(contentType),word(0,1),word(0,1))),
+        box('iref',word(0),box('cdsc',word(2,2),word(1,2),word(link,2))),
+        box('iloc',word(1<<24),word(0x4400,2),word(1,2),word(2,2),word(1,2),word(0,2),word(1,2),word(0),word(body.length)),
+        box('idat',body));
+      return new Blob([box('ftyp',str('heic'),word(0),str('mif1')),meta],{type:'image/heic'});
+    };
+    const rows=new Map([
+      ['created',jpeg()],['heif-created',heif(xmp())],['heif-unlinked',heif(xmp(),3)],
+      ['heif-shown',heif(xmp('LocationShown'))],['heif-wrong-type',heif(xmp(),1,'text/plain')],['shown',jpeg('LocationShown')],
+      ['conflicting',jpeg('LocationCreated','Arnhem','DE','Nederland')],
+      ['badcode',jpeg('LocationCreated','Arnhem','ZZ','Nederland')],
+      ['missingcity',jpeg('LocationCreated','')],
+      ['malformed',jpeg('LocationCreated','<bad>')],
+      ['control',jpeg('LocationCreated','Arnhem&#x202E;')],
+      ['plain',new Blob([Uint8Array.from([255,216,255,217])],{type:'image/jpeg'})]
+    ]);
+    const library=window.TaleraLibraryFactory.create({
+      list:async()=>[],get:async()=>null,blob:async id=>rows.get(id)||null,mediaUrl:async()=>null
+    });
+    const output={};
+    for(const key of rows.keys())output[key]=await library.capturePlace(key);
+    return output;
+  });
+  assert.deepEqual(capturePlaceResults.created,{
+    countryCode:'NL',country:'Nederland',city:'Arnhem',source:'iptc-location-created'
+  });
+  assert.deepEqual(capturePlaceResults['heif-created'],capturePlaceResults.created);
+  for(const key of ['heif-unlinked','heif-shown','heif-wrong-type','shown','conflicting','badcode','missingcity','malformed','control','plain'])
+    assert.equal(capturePlaceResults[key],null,key);
+  console.log('TALERA_CAPTURE_PLACE_EXPLICIT_IPTC_BROWSER_PASS');
+
+  // Save a decodable JPEG through the real /tell editor's existing account
+  // library, reopen /present and read the same persisted item and bytes.
+  // No new app or permanent synthetic memory: remove this test story.
+  const metadataPage=await ctx.newPage();
+  try{
+    const editResponse=await metadataPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    assert.equal(editResponse.status(),200);
+    await metadataPage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    const result=await metadataPage.evaluate(async()=>{
+      const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+      const paint=canvas.getContext('2d');paint.fillStyle='#db3520';paint.fillRect(0,0,64,64);
+      const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+      const original=new Uint8Array(await jpeg.arrayBuffer());
+      const packet='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:i="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><i:LocationCreated><rdf:Bag><rdf:li rdf:parseType="Resource"><i:City>Arnhem</i:City><i:CountryCode>NL</i:CountryCode><i:CountryName>Nederland</i:CountryName></rdf:li></rdf:Bag></i:LocationCreated></rdf:Description></rdf:RDF></x:xmpmeta>';
+      const xmp=new TextEncoder().encode('http://ns.adobe.com/xap/1.0/\0'+packet),length=xmp.length+2;
+      const tagged=new File([original.subarray(0,2),Uint8Array.of(255,225,length>>8,length&255),xmp,original.subarray(2)],'capture.jpg',{type:'image/jpeg'});
+      const plain=new File([original],'no-location.jpg',{type:'image/jpeg'});
+      const saved=await window.TaleraMemories.save({title:'Synthetic capture place',date:'2026-11-10',text:'Synthetic metadata test'},[tagged,plain]);
+      const row=await window.TaleraMemories.get(saved.id);
+      const read=await window.TaleraMemories.blob(row.items[0].key);
+      const bytes=new Uint8Array(await read.arrayBuffer()),expected=new Uint8Array(await tagged.arrayBuffer());
+      return {id:saved.id,place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,
+        keys:row.items.map(x=>x.key),sameBytes:bytes.length===expected.length&&bytes.every((x,i)=>x===expected[i])};
+    });
+    assert.deepEqual(result.place,capturePlaceResults.created);
+    assert.equal(result.missing,null);
+    assert.equal(result.sameBytes,true);
+    const presentResponse=await metadataPage.goto(origin+'/present?memory='+encodeURIComponent(result.id),{waitUntil:'domcontentloaded'});
+    assert.equal(presentResponse.status(),200);
+    await metadataPage.waitForFunction(()=>!!window.TaleraLibrary?.readStory);
+    const reopened=await metadataPage.evaluate(async id=>{
+      const row=await window.TaleraLibrary.readStory(id);
+      return {place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,keys:row.items.map(x=>x.key)};
+    },result.id);
+    assert.deepEqual(reopened,{place:result.place,missing:null,keys:result.keys});
+    // Exercise the actual selected decoded photo on the SAME /present page.
+    await metadataPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===2;
+    },result.id,{timeout:20000});
+    await metadataPage.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      window.__taleraOrdinarySelectPhoto(m.id,0,true);
+    });
+    await metadataPage.waitForFunction(()=>{
+      const row=document.getElementById('talera-capture-place');
+      return row&&!row.hidden&&row.textContent==='Nederland · Arnhem'&&getComputedStyle(row).display!=='none';
+    },null,{timeout:10000});
+    const layout=await metadataPage.evaluate(()=>{
+      const row=document.getElementById('talera-capture-place'),title=document.getElementById('memoryStory');
+      const flag=row.querySelector('.talera-capture-flag').getBoundingClientRect();
+      return {belowTitle:row.previousElementSibling===title,flagWidth:flag.width,flagHeight:flag.height};
+    });
+    assert.deepEqual(layout,{belowTitle:true,flagWidth:16,flagHeight:11});
+    await metadataPage.evaluate(()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      window.__taleraOrdinarySelectPhoto(m.id,1,true);
+    });
+    await metadataPage.waitForFunction(()=>{
+      const m=window.__taleraTimelineRuntime.currentMemory();
+      return m._photoIndex===1&&document.getElementById('talera-capture-place')?.hidden===true;
+    },null,{timeout:10000});
+    console.log('TALERA_CAPTURE_PLACE_ACTUAL_PRESENTATION_FRAME_PASS');
+    await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),result.id);
+    console.log('TALERA_CAPTURE_PLACE_ACCOUNT_CATALOG_REOPEN_PASS');
+  }finally{await metadataPage.close()}
+
+
+  // Exercise the actual generated Home catalog using the same local Worker
+  // with its real feature flag enabled. Only the provider boundary is mocked.
+  // Restart the same process/origin/DO store, never deploy a second app.
+  async function restartGeoWorker(enabled){
+    const old=worker;
+    await new Promise((ok,bad)=>{
+      if(old.exitCode!==null)return ok();
+      const timer=setTimeout(()=>bad(Error('LOCAL_WORKER_SHUTDOWN_TIMEOUT')),9000);
+      old.once('exit',()=>{clearTimeout(timer);ok()});
+      if(!old.kill('SIGTERM')){clearTimeout(timer);bad(Error('LOCAL_WORKER_NOT_STOPPED'))}
+    });
+    await start(enabled);
+  }
+  async function testGeoNamesCatalog(){
+  await restartGeoWorker(true);
+  const geoCtx=await browser.newContext({...devices['iPhone 13'],serviceWorkers:'block',
+    extraHTTPHeaders:{'x-talera-f5-key':gate}});
+  try{
+    await geoCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
+      path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+    // Disable networking for the library on EVERY main page before the
+    // first actual picker import. No dependency on the Home screen.
+    await geoCtx.addInitScript(()=>{
+      Object.defineProperty(AbortSignal,'timeout',{configurable:true,value:undefined});
+      window.__taleraGeoOnline=false;
+      Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
+    });
+    const geoPage=await geoCtx.newPage(),geoErrors=[];
+    geoPage.on('pageerror',error=>geoErrors.push(error.message));
+    const editor=await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    assert.ok((await editor.text()).includes('/*TALERA_GEONAMES_ENABLED*/true'),'Authenticated editor must enable the same library service');
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    const fixtureBytes=await geoPage.evaluate(async()=>{
+      const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+      const paint=canvas.getContext('2d');paint.fillStyle='#39ad72';paint.fillRect(0,0,64,64);
+      const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+      const original=new Uint8Array(await jpeg.arrayBuffer());
+      // Same local EXIF GPS fixture as the library contract, with real JPEG pixels.
+      const t=new Uint8Array(130),v=new DataView(t.buffer);
+      const u16=(i,n)=>v.setUint16(i,n,true),u32=(i,n)=>v.setUint32(i,n,true);
+      v.setUint16(0,0x4949);u16(2,42);u32(4,8);u16(8,1);
+      u16(10,0x8825);u16(12,4);u32(14,1);u32(18,26);u16(26,4);
+      function entry(i,tag,type,count,val){
+        const p=28+i*12;u16(p,tag);u16(p+2,type);u32(p+4,count);
+        if(type===2)t[p+8]=val.charCodeAt(0);else u32(p+8,val);
+      }
+      entry(0,1,2,2,'N');entry(1,2,5,3,82);
+      entry(2,3,2,2,'E');entry(3,4,5,3,106);
+      [51,59,6,5,53,18].forEach((n,i)=>{u32(82+i*8,n);u32(86+i*8,1)});
+      const len=2+6+t.length,marker=Uint8Array.from([255,225,len>>8,len&255,69,120,105,102,0,0,...t]);
+      const file=new File([original.subarray(0,2),marker,original.subarray(2)],'synthetic-gps.jpg',{type:'image/jpeg'});
+      return [...new Uint8Array(await file.arrayBuffer())];
+    });
+    // Import through the real picker and existing draft library, not direct
+    // injection into the final catalog. Test the exact original bytes first.
+    await geoPage.locator('#photoInput').setInputFiles({name:'synthetic-gps.jpg',mimeType:'image/jpeg',buffer:Buffer.from(fixtureBytes)});
+    let draftReady=false;
+    for(let attempt=0;attempt<150;attempt++){
+      draftReady=await geoPage.evaluate(async expected=>{
+        const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+        const original=d.originals.find(([,v])=>v instanceof Blob)?.[1];
+        if(!original)return false;
+        const bytes=new Uint8Array(await original.arrayBuffer());
+        return bytes.length===expected.length&&bytes.every((v,i)=>v===expected[i])&&
+          d.catalog.some(g=>g.media?.length===1)&&!document.getElementById('photoInput');
+      },fixtureBytes);
+      if(draftReady)break;
+      await geoPage.waitForTimeout(150);
+    }
+    assert.equal(draftReady,true,'Actual picker must retain every original GPS-bearing byte');
+    const saved=await geoPage.evaluate(async()=>{
+      const mem=window.TaleraMemories;
+      const d=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+      const original=d.originals.find(([,v])=>v instanceof Blob)?.[1];
+      const row=await mem.save({title:'',date:'2026-11-10',text:''},[original]);
+      const persisted=await mem.blob(row.items[0].key);
+      return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await persisted.arrayBuffer())]};
+    });
+    assert.deepEqual(saved.bytes,fixtureBytes,'GPS bytes unchanged after real picker and durable save');
+    console.log('TALERA_GEONAMES_REAL_PICKER_ORIGINAL_GPS_BYTES_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',physicalIphoneAccepted:false}));
+    // Observe real same-origin HTTP requests at the browser context boundary.
+    // Unique response prevents a pre-existing catalog value passing this test.
+    const city='Testplaats-'+randomUUID().slice(0,8);
+    const sent=[],observed=[];
+    const isGeo=url=>{const u=new URL(url);return u.origin===origin&&u.pathname==='/api/capture-place'};
+    geoCtx.on('request',request=>{
+      if(isGeo(request.url()))observed.push(request.method());
+    });
+    await geoCtx.route(url=>isGeo(url.href),async route=>{
+      const request=route.request();
+      sent.push({body:request.postDataJSON(),scope:request.headers()['x-talera-local-scope'],method:request.method()});
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({place:{
+        countryCode:'NL',country:'Nederland',city,source:'geonames-locality-v2'
+      }})});
+    });
+    // Direct presentation entry, without ever visiting Mijn leven. The
+    // independent library is offline, so no GPS network call is permitted.
+    const direct=await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
+    assert.ok((await direct.text()).includes('/*TALERA_GEONAMES_ENABLED*/true'),'Authenticated presentation must mount the library service');
+    await geoPage.waitForFunction(id=>{
+      const m=window.__taleraTimelineRuntime?.currentMemory?.();
+      return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===1;
+    },saved.id,{timeout:20000});
+    await geoPage.waitForFunction(()=>document.getElementById('talera-capture-place')?.hidden===true,undefined,{timeout:20000});
+    assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
+    assert.equal(observed.length,0,'Offline library must never call GeoNames');
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
+    await geoPage.waitForTimeout(2500);
+    assert.equal(sent.length,0,'No geocoding while offline');
+    assert.equal(observed.length,0,'No HTTP geocoding attempt while offline');
+    assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
+    try{
+      // Explicitly await the IDB read before deciding whether to keep polling.
+      // A Promise returned by a page predicate can otherwise be mistaken for
+      // a truthy result before the actual boolean is resolved.
+      const deadline=Date.now()+15000;
+      let storedPlace=null;
+      do{
+        storedPlace=await geoPage.evaluate(async id=>
+          (await window.TaleraMemories.get(id))?.items?.[0]?.capturePlace??null,saved.id);
+        if(storedPlace?.city===city)break;
+        await geoPage.waitForTimeout(200);
+      }while(Date.now()<deadline);
+      assert.equal(storedPlace?.city,city,'Unique provider response must really be persisted in IndexedDB');
+    }catch(error){
+      const state=await geoPage.evaluate(async id=>{
+        const row=await window.TaleraMemories.get(id);
+        const item=row?.items?.[0];
+        return {path:location.pathname,online:navigator.onLine,hidden:document.hidden,place:item?.capturePlace??null,
+          checked:item?.capturePlaceChecked??null,size:item?.size,kind:item?.kind,mime:item?.mime};
+      },saved.id);
+      console.log('TALERA_GEONAMES_ACTUAL_REQUEST_DIAGNOSTIC',JSON.stringify({state,sent:sent.length,observed:observed.length,geoErrors}));
+      throw error;
+    }
+    assert.equal(sent.length,1,'Exactly one intercepted HTTP request');
+    assert.deepEqual(observed,['POST'],'Exactly one browser HTTP request');
+    assert.deepEqual(Object.keys(sent[0].body).sort(),['latitude','longitude']);
+    assert.ok(Math.abs(sent[0].body.latitude-51.985)<0.00001);
+    assert.ok(Math.abs(sent[0].body.longitude-5.888333333333333)<0.00001);
+    assert.match(sent[0].scope,/^[a-f0-9]{32}$/);
+    assert.equal(sent[0].method,'POST');
+    // Verify the real Worker authentication/scope path without consuming
+    // any provider credits. Invalid coordinates must reach validation, not
+    // fail auth/configuration. APIRequestContext bypasses the browser mock.
+    const actualBoundary=await geoCtx.request.post(origin+'/api/capture-place',{
+      headers:{origin,'content-type':'application/json','x-talera-local-scope':sent[0].scope},
+      data:{latitude:91,longitude:0}
+    });
+    assert.equal(actualBoundary.status(),400,'Real Worker must reach coordinate validation for this session/scope');
+    const stored=await geoPage.evaluate(async id=>{
+      const row=await window.TaleraMemories.get(id),item=row.items[0];
+      return {key:item.key,place:item.capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]};
+    },saved.id);
+    assert.equal(stored.key,saved.key);assert.deepEqual(stored.bytes,saved.bytes);
+    assert.deepEqual(stored.place,{countryCode:'NL',country:'Nederland',city,source:'geonames-locality-v2'});
+    await geoPage.evaluate(()=>window.dispatchEvent(new Event('online')));
+    await geoPage.waitForTimeout(2500);
+    assert.equal(sent.length,1,'Persisted metadata never requests the same media again');
+    assert.equal(observed.length,1);
+    // The untitled photo is still on screen. Do not navigate or reload:
+    // a completed library transaction must refresh the passive decoration.
+    await geoPage.waitForFunction(expected=>{
+      const row=document.getElementById('talera-capture-place');
+      return row&&!row.hidden&&row.getClientRects().length>0&&
+        row.textContent.includes('Nederland · omgeving '+expected+' (GeoNames)');
+    },city,{timeout:20000});
+    assert.equal(await geoPage.evaluate(()=>document.getElementById('talera-capture-place').hasAttribute('data-location-diagnosis')),false,'Real place supersedes diagnostic');
+    assert.equal(sent.length,1,'Passive presentation must not issue an additional geocode');
+    assert.equal(observed.length,1);
+    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
+    // Stay on the editor and save a second original after the initial scan.
+    // The successful save wakes the same service without navigating to Home.
+    await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
+    await geoPage.waitForTimeout(1000);
+    const editorId=await geoPage.evaluate(async bytes=>{
+      const file=new File([Uint8Array.from(bytes)],'second-gps.jpg',{type:'image/jpeg'});
+      return (await window.TaleraMemories.save({title:'',date:'2026-11-10',text:''},[file])).id;
+    },fixtureBytes);
+    let editorPlace=null;
+    for(let attempt=0;attempt<75;attempt++){
+      editorPlace=await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id))?.items?.[0]?.capturePlace??null,editorId);
+      if(editorPlace?.city===city)break;
+      await geoPage.waitForTimeout(200);
+    }
+    assert.equal(editorPlace?.city,city,'Save in editor must wake independent library');
+    assert.equal(sent.length,2,'Exactly one lookup per distinct saved original in this scenario');
+    assert.equal(new URL(geoPage.url()).pathname,'/tell');
+    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),editorId);
+    assert.deepEqual(geoErrors,[]);
+    console.log('TALERA_GEONAMES_LIBRARY_ALL_MAIN_SCREENS_SAVE_RECONNECT_LIVE_LABEL_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',realWorkerAuthScopeValidated:true,providerResponseSimulated:true,physicalIphoneAccepted:false,homeVisitRequired:false}));
+  }finally{await geoCtx.close();await restartGeoWorker(false)}
+  }
+  await testGeoNamesCatalog();
+
   const initial=await page.evaluate(()=>({
     memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,
     demoImages:[...document.querySelectorAll('img')].map(img=>img.currentSrc||img.src||'')
@@ -2488,6 +2832,23 @@ backupRegression: try{
   console.log('TALERA_NATIVE_VIDEO_FIRST_FRAME_HANDOFF_PASS',
     JSON.stringify({...exactHandoff,iPhoneAccepted:false}));
 
+  // Same original ordinary video and shared audible node: backgrounding
+  // must stop BOTH and invalidate a pending ordinary autoplay.
+  const backgroundVideo=await page.evaluate(async()=>{
+    const video=document.querySelector('video.talera-v61-inline-video');
+    const audio=document.getElementById('talera-f5-shared-audio');
+    if(!video||video.paused||!audio)throw Error('Ordinary video not active before background check');
+    Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});
+    try{
+      document.dispatchEvent(new Event('visibilitychange'));
+      await new Promise(resolve=>setTimeout(resolve,300));
+      return {videoPaused:video.paused,audioPaused:audio.paused,audioSource:audio.getAttribute('src'),
+        activeVideos:[...document.querySelectorAll('video.talera-v61-inline-video')].filter(v=>!v.paused).length};
+    }finally{delete document.hidden}
+  });
+  assert.deepEqual(backgroundVideo,{videoPaused:true,audioPaused:true,audioSource:null,activeVideos:0});
+  console.log('TALERA_ORDINARY_VIDEO_AND_SOUND_BACKGROUND_STOP_PASS');
+
   // Swipe FROM another photo memory. During the movement, the native RH19
   // strip must show that same first video still; after landing its video plays.
   await load(page,plain,3);
@@ -2876,12 +3237,20 @@ backupRegression: try{
   });
   await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
   try{
-    await page.waitForFunction(async ids=>{
-      const saved=await window.TaleraMemories?.list?.();
-      const slider=document.getElementById('v17-year-slider');
-      return Array.isArray(saved)&&ids.every(id=>saved.some(s=>s.id===id))&&
-        Number(slider?.max)>=2026;
-    },[yearHeroRecords.older,yearHeroRecords.newer],{timeout:20000});
+    let ready=false;
+    // Playwright may treat a pending Promise as a truthy waitForFunction result.
+    // Require an explicitly awaited catalog read before changing the year.
+    for(let attempt=0;attempt<100;attempt++){
+      ready=await page.evaluate(async ids=>{
+        const saved=await window.TaleraMemories?.list?.();
+        const slider=document.getElementById('v17-year-slider');
+        return Array.isArray(saved)&&ids.every(id=>saved.some(s=>s.id===id))&&
+          Number(slider?.max)>=2026;
+      },[yearHeroRecords.older,yearHeroRecords.newer]);
+      if(ready===true)break;
+      await new Promise(resolve=>setTimeout(resolve,200));
+    }
+    assert.equal(ready,true,'Year fixtures not readable before selecting the year');
   }catch(error){
     const state=await page.evaluate(async()=>{
       const saved=await window.TaleraMemories?.list?.()||[];
@@ -2937,13 +3306,29 @@ backupRegression: try{
       throw Error('OWNER_RANDOM_YEAR_HERO_DIAGNOSTIC '+JSON.stringify(diag)+
         ' PAGE_ERRORS='+JSON.stringify(errors.slice(-9))+' '+String(e));
     }
-    return page.evaluate(async()=>{
-      const image=document.getElementById('heroImage');
-      await image.decode();
-      const c=document.createElement('canvas');c.width=c.height=12;
-      c.getContext('2d').drawImage(image,0,0,12,12);
-      return [...c.getContext('2d').getImageData(6,6,1,1).data].slice(0,3);
-    });
+    // The hero href can be installed before its image finishes switching.
+    // Decode a stable, actually displayed frame, not a revoked transitional URL.
+    // Do not relax the existing pixel assertions or accept a missing image.
+    let last=null;
+    for(let attempt=0;attempt<90;attempt++){
+      last=await page.evaluate(async ([y,href])=>{
+        const image=document.getElementById('heroImage');
+        const matches=()=>document.getElementById('v17-selected-year')?.textContent===String(y)&&
+          document.getElementById('heroCaption')?.dataset.presentHref===href;
+        if(!matches()||!image?.getAttribute('src')||!image.complete||!image.naturalWidth)
+          return {ready:false,reason:'not-ready'};
+        const src=image.getAttribute('src');
+        try{await image.decode()}catch(e){return {ready:false,reason:e.name||'decode-error'}}
+        if(!matches()||image.getAttribute('src')!==src||!image.complete||!image.naturalWidth)
+          return {ready:false,reason:'source-changed'};
+        const c=document.createElement('canvas');c.width=c.height=12;
+        c.getContext('2d').drawImage(image,0,0,12,12);
+        return {ready:true,pixel:[...c.getContext('2d').getImageData(6,6,1,1).data].slice(0,3)};
+      },[year,'/present?memory='+encodeURIComponent(id)]);
+      if(last.ready)return last.pixel;
+      await new Promise(resolve=>setTimeout(resolve,200));
+    }
+    throw Error('OWNER_YEAR_HERO_DECODE_FAILED '+JSON.stringify({year,last}));
   };
   const greenYear=await chooseOriginalYear(2024,yearHeroRecords.older);
   assert.ok(greenYear[1]>greenYear[0]*1.5&&greenYear[1]>greenYear[2]*1.5,

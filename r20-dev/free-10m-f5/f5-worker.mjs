@@ -3,6 +3,7 @@
 // code, temporary browser gate, or automatic account creation is required.
 // There is intentionally NO TALERA_BASE, D1, R2 or existing customer binding.
 import authPilot from '../free-10m-auth-pilot/auth-pilot-worker.mjs';
+import {capturePlaceApi} from './f5-geonames.mjs';
 import {passwordResetPage} from './f5-password-reset-page.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
@@ -1098,7 +1099,14 @@ async function publicPage(request,env){
     // Isolate *local* originals, audio, video, photo and cue records by
     // verified account, without changing recorder, swipe or presentation logic.
     // If the upstream memory-store script ever changes, fail closed.
-    const scoped=scopeLocalMemories(privateHtml,await privateAccountScope(actor.id));
+    let scoped=scopeLocalMemories(privateHtml,await privateAccountScope(actor.id));
+    // Only an explicitly configured existing Worker enables online enrichment.
+    // The browser receives a boolean, never the provider username.
+    if(['/mijn-leven','/meldingen','/present','/tell'].includes(pathname)&&typeof env.GEONAMES_USERNAME==='string'&&
+       /^[A-Za-z0-9_.-]{1,80}$/.test(env.GEONAMES_USERNAME)&&env.GEONAMES_USERNAME.toLowerCase()!=='demo'){
+      const marker='/*TALERA_GEONAMES_ENABLED*/false';
+      if(scoped.split(marker).length===2)scoped=scoped.replace(marker,'/*TALERA_GEONAMES_ENABLED*/true');
+    }
     // Locked WhatsApp design-cleanup baseline: no visible UI or presentation
     // amendments. Only server-verified private local storage and saved cue
     // media-ID reconciliation may rewrite the original approved markup.
@@ -1302,6 +1310,7 @@ export default {
       // Original app periodically asks for its own version. Answer on this
       // isolated origin; never proxy to the old customer/production Worker.
       if(p==='/api/version'&&m==='GET')return json({version:APPROVED_UI_VERSION});
+      if(p==='/api/capture-place')return capturePlaceApi(request,env,{getAccount:()=>sessionAccount(request,env),getScope:privateAccountScope});
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);
       if(p==='/api/discovery')return discoveryApi(request,env);

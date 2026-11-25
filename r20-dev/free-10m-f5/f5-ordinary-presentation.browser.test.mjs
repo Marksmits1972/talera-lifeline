@@ -6,7 +6,7 @@ import {spawn,execFileSync} from 'node:child_process';
 import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {chromium,devices} from 'playwright';
+import {chromium,webkit,devices} from 'playwright';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 // Each CI execution gets its own synthetic originals + local Wrangler DO store.
@@ -102,7 +102,8 @@ backupRegression: try{
   assert.equal(signed.status,200,'No local account: '+(await signed.text()).slice(0,450));
   const sid=/talera_sid=([a-f0-9]{64})/.exec(signed.headers.get('set-cookie')||'')?.[1];
   assert.ok(sid,'Session cookie not returned');
-  browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
+  const webkitPickerOnly=process.env.TALERA_WEBKIT_PICKER_ONLY==='1';
+  browser=webkitPickerOnly?await webkit.launch({headless:true}):await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
   const ctx=await browser.newContext({
     ...devices['iPhone 13'],acceptDownloads:true,
     extraHTTPHeaders:{'x-talera-f5-key':gate}
@@ -111,56 +112,72 @@ backupRegression: try{
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
-  // Actual native-file input change regression. The previous tests invoked
-  // mem.save directly, which missed the owner's real import path.
-  const pickerPage=await ctx.newPage();
-  try{
-    const pickerErrors=[];
-    pickerPage.on('pageerror',e=>pickerErrors.push(e.message));
-    pickerPage.on('console',m=>{if(m.type()==='error')pickerErrors.push(m.text().slice(0,400))});
-    await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
-    await pickerPage.waitForFunction(()=>typeof window.TaleraMemories?.draftWriteRows==='function',null,{timeout:15000});
-    const src=await pickerPage.evaluate(()=>{
-      const scripts=[...document.scripts].map(s=>s.textContent||'');
-      const script=scripts.find(s=>s.includes('async function importPhotos('))||'';
-      const at=script.indexOf('async function importPhotos(');
-      return {importSource:at<0?'not found':script.slice(at,at+6500),
-        inputs:[...document.querySelectorAll('input[type=file]')].map(e=>({id:e.id,accept:e.accept,hidden:e.hidden})),
-        body:document.body.innerText.slice(0,400)};
-    });
-    console.log('TALERA_ACTUAL_PICKER_SOURCE_DIAGNOSTIC',JSON.stringify(src));
-    // Valid real JPEG and QuickTime input via the original file picker.
-    const photoPath=path.join(generated,'picker-photo.jpg');
-    const videoPath=path.join(generated,'picker-video.mov');
-    execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=red:s=96x96:d=1',
-      '-frames:v','1','-threads','1',photoPath],{timeout:20000,stdio:'ignore'});
-    execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=96x96:d=1',
-      '-c:v','libx264','-pix_fmt','yuv420p','-threads','1','-movflags','+faststart',videoPath],
-      {timeout:20000,stdio:'ignore'});
-    for(const file of [photoPath,videoPath]){
+  // Actual picker import on the real authenticated Worker, with a private
+  // synthetic browser context containing previous memories. No live data.
+  const photoPath=path.join(generated,'picker-photo.jpg');
+  const videoPath=path.join(generated,'picker-video.mov');
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=red:s=96x96:d=1',
+    '-frames:v','1','-threads','1',photoPath],{timeout:20000,stdio:'ignore'});
+  execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=96x96:d=1',
+    '-c:v','libx264','-pix_fmt','yuv420p','-threads','1','-movflags','+faststart',videoPath],
+    {timeout:20000,stdio:'ignore'});
+  for(const file of [photoPath,videoPath]){
+    const pickerCtx=await browser.newContext({...devices['iPhone 13'],
+      extraHTTPHeaders:{'x-talera-f5-key':gate}});
+    try{
+      await pickerCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
+        path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+      const pickerPage=await pickerCtx.newPage(),pickerErrors=[];
+      pickerPage.on('pageerror',e=>pickerErrors.push(e.message));
       await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
-      await pickerPage.waitForFunction(()=>!!window.TaleraMemories?.save&&document.querySelector('input[type=file]'),null,{timeout:15000});
-      const input=pickerPage.locator('input[type=file]').first();
-      await input.setInputFiles(file);
+      await pickerPage.waitForFunction(()=>typeof window.TaleraMemories?.draftWriteRows==='function'&&!!document.getElementById('photoInput'),null,{timeout:15000});
+      const seed=await pickerPage.evaluate(async()=>{
+        const mem=window.TaleraMemories;
+        const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+        const c=canvas.getContext('2d');c.fillStyle='#00aa33';c.fillRect(0,0,64,64);
+        const png=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
+        const photo=new File([png],'previous.png',{type:'image/png',lastModified:1700000000123});
+        const second=new File([png],'previous-other.png',{type:'image/png',lastModified:1700000000456});
+        const firstStory=await mem.save({title:'Previous',date:'2026-11-23',text:'synthetic'},[photo,second]);
+        const dbName=document.getElementById('talera-memory-store-v1').textContent.match(/var DB_NAME='([^']+)'/)[1];
+        const db=await new Promise((ok,bad)=>{const q=indexedDB.open(dbName,1);q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
+        const raw=await new Promise((ok,bad)=>{const q=db.transaction('files','readonly').objectStore('files').getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
+        db.close();
+        const reads=[];
+        for(const item of firstStory.items){
+          try{const v=await mem.blob(item.key);reads.push({ok:true,size:v?.size,name:v?.name,lastModified:v?.lastModified})}
+          catch(e){reads.push({ok:false,error:e.message})}
+        }
+        return {items:firstStory.items,reads,rows:raw.map(x=>({keys:Object.keys(x),key:x.key,
+          payloadKey:x.payloadKey,metadata:x.metadata,blob:x.blob instanceof Blob?{size:x.blob.size,type:x.blob.type,kind:Object.prototype.toString.call(x.blob)}:null}))};
+      });
+      console.log('TALERA_PICKER_PREVIOUS_SHARED_ORIGINALS',JSON.stringify({webkit:webkitPickerOnly,seed}));
+      assert.ok(seed.reads.every(x=>x.ok),'Existing original read failed before picker: '+JSON.stringify(seed));
+      await pickerPage.reload({waitUntil:'domcontentloaded'});
+      await pickerPage.waitForFunction(()=>!!document.getElementById('photoInput')&&!!window.TaleraMemories?.draftReadPayload,null,{timeout:15000});
+      await pickerPage.locator('#photoInput').setInputFiles(file);
+      const expectedBytes=readFileSync(file).toString('base64');
       try{
-        await pickerPage.waitForFunction(()=>document.querySelector('#talera-f5-media-status')||
-          document.body.innerText.includes('Import nog niet klaar:'),null,{timeout:25000});
+        await pickerPage.waitForFunction(async expected=>{
+          if(document.body.innerText.includes('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL'))throw Error(document.body.innerText);
+          const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+          const b=d.originals.find(([,v])=>v instanceof Blob)?.[1];
+          if(!b)return false;
+          const x=new Uint8Array(await b.arrayBuffer());
+          const y=Uint8Array.from(atob(expected),c=>c.charCodeAt(0));
+          return x.length===y.length&&x.every((v,i)=>v===y[i])&&
+            d.catalog.some(g=>g.media?.length===1)&&!document.getElementById('photoInput');
+        },expectedBytes,{timeout:25000});
       }catch(error){
-        console.log('TALERA_PICKER_WAIT_FAILURE',JSON.stringify({file:path.basename(file),
+        console.log('TALERA_PICKER_IMPORT_FAILURE',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),
           body:(await pickerPage.locator('body').innerText()).slice(0,1800),pickerErrors}));
         throw error;
       }
-      const state=await pickerPage.evaluate(()=>({
-        count:window.__taleraF5PickerCounts,
-        status:document.querySelector('#talera-f5-media-status')?.textContent,
-        body:document.body.innerText.slice(0,1800)}));
-      console.log('TALERA_ACTUAL_PICKER_RESULT',JSON.stringify({file:path.basename(file),...state,pickerErrors}));
-      assert.ok(!state.body.includes('Import nog niet klaar:'),'Actual picker import failed: '+state.body);
-      assert.ok(state.status&&state.count?.count===1,'Real picker did not create a media editor');
-      assert.equal(state.count.videos,file.endsWith('.mov')?1:0);
-    }
-    console.log('TALERA_ACTUAL_PHOTO_AND_VIDEO_PICKER_IMPORT_PASS');
-  }finally{await pickerPage.close()}
+      console.log('TALERA_ACTUAL_PICKER_IMPORT_PASS',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),originalBytesIdentical:true,priorSharedOriginals:true}));
+      assert.deepEqual(pickerErrors,[],'Picker JS error');
+    }finally{await pickerCtx.close()}
+  }
+  if(webkitPickerOnly)break backupRegression;
   // iPhone regression: real authenticated TALERA Worker, saved local image,
   // then same home-screen PWA routes offline. No second app or Worker.
   const offlineCtx=await browser.newContext({

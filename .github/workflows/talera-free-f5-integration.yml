@@ -249,6 +249,7 @@ jobs:
           # This is a second engine for the SAME local-origin Worker code, not an app.
           npx --no-install playwright install --with-deps webkit
           TALERA_OFFLINE_BROWSER=webkit node r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs
+          TALERA_WEBKIT_PICKER_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs
@@ -1375,6 +1376,11 @@ jobs:
           const p=html.indexOf('async function remove(')>=0?html.indexOf('async function remove('):html.indexOf('function remove(');
           assert.ok(p>=0,'Original memory deletion source missing');
           console.log('TALERA_ORIGINAL_REMOVE_SOURCE',html.slice(p,p+2100));
+          const tell=fs.readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
+          for(const token of ['async function duplicateIndex(', 'async function loadDuplicateCache(', 'function normalize(', 'function signature(']){
+            const at=tell.indexOf(token);
+            if(at>=0)console.log('TALERA_PICKER_SOURCE '+token+'\n'+tell.slice(at,at+3500));
+          }
           assert.ok(html.includes('talera-owner-delete-on-request'),'Owner clear path must be in same signed-in Home');
           // Read ONLY generated anonymous program source. No account records.
           for(const route of ['/tell','/mijn-leven','/present']){

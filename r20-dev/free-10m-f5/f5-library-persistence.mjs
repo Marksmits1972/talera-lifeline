@@ -49,16 +49,16 @@ export function createOriginalPayloadStorage(){
  const payloadKey=value=>typeof value==='string'&&
   /^talera-original-payload-v1:[a-f0-9]{64}$/.test(value);
  const link=row=>row&&Object.hasOwn(row,'payloadKey');
- const failFormat=()=>{throw Error('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL')};
+ const failFormat=(reason='invalid-format')=>{const error=Error('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL');error.reason=reason;throw error};
  const chunk=4*1024*1024;
  const hex=bytes=>Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('');
  async function prepare(key,original){
-  if(typeof key!=='string'||!key||key.startsWith(prefix)||!(original instanceof Blob)||!original.size)failFormat();
+  if(typeof key!=='string'||!key||key.startsWith(prefix)||!(original instanceof Blob)||!original.size)failFormat('prepare-original');
   const hashes=[];
   for(let offset=0;offset<original.size;offset+=chunk){
    const end=Math.min(offset+chunk,original.size);
    const bytes=await original.slice(offset,end).arrayBuffer();
-   if(bytes.byteLength!==end-offset)failFormat();
+   if(bytes.byteLength!==end-offset)failFormat('prepare-incomplete-bytes');
    hashes.push(hex(await crypto.subtle.digest('SHA-256',bytes)));
   }
   const hash=hex(await crypto.subtle.digest('SHA-256',
@@ -71,17 +71,18 @@ export function createOriginalPayloadStorage(){
  function materialize(row,payload){
   if(!link(row))return row;
   if(Object.keys(row).sort().join(',')!=='key,metadata,payloadKey'||
-     !payloadKey(row.payloadKey)||!payload||payload.key!==row.payloadKey||
-     Object.keys(payload).sort().join(',')!=='blob,key'||!(payload.blob instanceof Blob))failFormat();
+     !payloadKey(row.payloadKey))failFormat('logical-link-shape');
+  if(!payload||payload.key!==row.payloadKey)failFormat('missing-payload');
+  if(Object.keys(payload).sort().join(',')!=='blob,key'||!(payload.blob instanceof Blob))failFormat('payload-shape');
   const m=row.metadata;
   if(!m||Object.keys(m).sort().join(',')!=='lastModified,length,name,type'||
      !Number.isSafeInteger(m.length)||m.length<=0||payload.blob.size!==m.length||
      typeof m.type!=='string'||!(m.name===null&&m.lastModified===null||
-      typeof m.name==='string'&&Number.isFinite(m.lastModified)))failFormat();
+      typeof m.name==='string'&&Number.isFinite(m.lastModified)))failFormat('logical-metadata');
   const blob=m.name===null?payload.blob.slice(0,m.length,m.type):
    new File([payload.blob],m.name,{type:m.type,lastModified:m.lastModified});
   if(blob.size!==m.length||blob.type!==m.type||
-     (m.name!==null&&(blob.name!==m.name||blob.lastModified!==m.lastModified)))failFormat();
+     (m.name!==null&&(blob.name!==m.name||blob.lastModified!==m.lastModified)))failFormat('materialized-file-metadata');
   return {key:row.key,blob};
  }
  function logicalRows(rows){
@@ -98,7 +99,7 @@ export function createOriginalPayloadStorage(){
    try{
     const row=q.result;
     if(!link(row)){ok(row);return}
-    if(!payloadKey(row.payloadKey))failFormat();
+    if(!payloadKey(row.payloadKey))failFormat('logical-link-key');
     const p=store.get(row.payloadKey);
     p.onerror=()=>fail(p.error||Error('TALERA_LIBRARY_PAYLOAD_READ'));
     p.onsuccess=()=>{try{ok(materialize(row,p.result))}catch(e){fail(e)}};

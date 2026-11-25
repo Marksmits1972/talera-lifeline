@@ -121,7 +121,8 @@ backupRegression: try{
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=96x96:d=1',
     '-c:v','libx264','-pix_fmt','yuv420p','-threads','1','-movflags','+faststart',videoPath],
     {timeout:20000,stdio:'ignore'});
-  for(const file of [photoPath,videoPath]){
+  for(const fixture of [{file:photoPath,broken:false},{file:videoPath,broken:false},{file:photoPath,broken:true},{file:videoPath,broken:true}]){
+    const {file,broken}=fixture;
     const pickerCtx=await browser.newContext({...devices['iPhone 13'],
       extraHTTPHeaders:{'x-talera-f5-key':gate}});
     try{
@@ -153,6 +154,23 @@ backupRegression: try{
       });
       console.log('TALERA_PICKER_PREVIOUS_SHARED_ORIGINALS',JSON.stringify({webkit:webkitPickerOnly,seed}));
       assert.ok(seed.reads.every(x=>x.ok),'Existing original read failed before picker: '+JSON.stringify(seed));
+      if(broken){
+        await pickerPage.evaluate(async key=>{
+          const dbName=document.getElementById('talera-memory-store-v1').textContent.match(/var DB_NAME='([^']+)'/)[1];
+          const db=await new Promise((ok,bad)=>{const q=indexedDB.open(dbName,1);q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
+          try{
+            await new Promise((ok,bad)=>{
+              const tx=db.transaction('files','readwrite'),store=tx.objectStore('files');
+              tx.oncomplete=ok;tx.onabort=()=>bad(tx.error);tx.onerror=()=>bad(tx.error);
+              const q=store.get(key);
+              q.onsuccess=()=>{const r=q.result;store.put({...r,metadata:{...r.metadata,length:r.metadata.length+1}})};
+            });
+          }finally{db.close()}
+          let rejected=false;
+          try{await window.TaleraMemories.blob(key)}catch(e){rejected=e.message==='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL'&&e.reason==='logical-metadata'}
+          if(!rejected)throw Error('Broken synthetic alias must remain strictly rejected');
+        },seed.items[0].key);
+      }
       await pickerPage.reload({waitUntil:'domcontentloaded'});
       await pickerPage.waitForFunction(()=>!!document.getElementById('photoInput')&&!!window.TaleraMemories?.draftReadPayload,null,{timeout:15000});
       await pickerPage.locator('#photoInput').setInputFiles(file);
@@ -173,7 +191,23 @@ backupRegression: try{
           body:(await pickerPage.locator('body').innerText()).slice(0,1800),pickerErrors}));
         throw error;
       }
-      console.log('TALERA_ACTUAL_PICKER_IMPORT_PASS',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),originalBytesIdentical:true,priorSharedOriginals:true}));
+      const published=await pickerPage.evaluate(async ({brokenKey,originalSize})=>{
+        const mem=window.TaleraMemories;
+        const draft=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+        const b=draft.originals.find(([,v])=>v instanceof Blob)?.[1];
+        const saved=await mem.save({title:'Picker test',date:'2026-11-23',text:'synthetic'},[b]);
+        const result=await mem.blob(saved.items[0].key);
+        const bytes=new Uint8Array(await result.arrayBuffer());
+        const input=new Uint8Array(await b.arrayBuffer());
+        let priorInvalidPreserved=!brokenKey;
+        if(brokenKey){
+          try{await mem.blob(brokenKey)}catch(e){priorInvalidPreserved=e.message==='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL'&&e.reason==='logical-metadata'}
+        }
+        return {bytesIdentical:bytes.length===input.length&&bytes.length===originalSize&&bytes.every((v,i)=>v===input[i]),
+          priorInvalidPreserved,priorMemoryRetained:(await mem.list()).length>=2};
+      },{brokenKey:broken?seed.items[0].key:null,originalSize:readFileSync(file).length});
+      assert.ok(published.bytesIdentical&&published.priorInvalidPreserved&&published.priorMemoryRetained,'Picker original or historical alias altered: '+JSON.stringify(published));
+      console.log('TALERA_ACTUAL_PICKER_IMPORT_PASS',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),originalBytesIdentical:true,priorSharedOriginals:true,brokenPriorAlias:broken,...published}));
       assert.deepEqual(pickerErrors,[],'Picker JS error');
     }finally{await pickerCtx.close()}
   }

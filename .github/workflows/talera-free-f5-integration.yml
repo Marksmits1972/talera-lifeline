@@ -21,7 +21,7 @@ permissions:
 jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' && github.event.head_commit.message != 'Inspect exact shared timeline interface before approved loupe build (no deploy)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -54,7 +54,7 @@ jobs:
 
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
-    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' }}
+    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' && github.event.head_commit.message != 'Inspect exact shared timeline interface before approved loupe build (no deploy)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -703,7 +703,7 @@ jobs:
 
   f5_story_swipe_source_inspection:
     name: Inspect original narration swipe wheel on SAME existing PWA source
-    if: ${{ github.ref_name == 'feature/free-f5-narrator-story-swipe-20261113' }}
+    if: ${{ github.ref_name == 'feature/free-f5-narrator-story-swipe-20261113' || github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'Inspect exact shared timeline interface before approved loupe build (no deploy)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:
@@ -715,6 +715,26 @@ jobs:
       - run: node r20-dev/free-10m-delivery/build.mjs
       - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
       - run: node r20-dev/free-10m-f5/f5-actual-present-diagnostic.mjs
+      - name: Read exact timeline and selection boundaries only
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {referencePages} from './r20-dev/free-10m-f5/generated/public-template-map.mjs';
+          const s=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages['/present'],'utf8');
+          for(const [marker,before,after] of [
+            ['id="surface"',1600,1600],['function bounds(',1600,1800],
+            ['function drawScale(',1000,4500],['function draw()',300,4200],
+            ['function keepCenterValid(',1600,1400],['surface.addEventListener("pointerdown"',1000,6500],
+            ['surface.addEventListener("pointermove"',300,5000],['window.__taleraPhotoBook =',0,2900],
+            ['window.__taleraTimelineRuntime=',0,4200],['state.timelineTracking=true',300,4500],
+            ['function endTimeline',500,2500],['function positionForTimestamp',100,2200],
+            ['const surface =',200,1500],['const surface=',200,1500],['.timeline{',200,2000],
+            ['function tick(',0,1800],['const LEVELS',400,2400],['function setLevel',400,2200]
+          ]){
+            const i=s.indexOf(marker);
+            console.log('TALERA_LOUPE_SOURCE '+JSON.stringify({marker,i,sample:i<0?'':s.slice(Math.max(0,i-before),i+after)}));
+          }
+          NODE
 # Existing same-origin F5 QA: verified birth-year to current-year visual ruler only.
 # Same existing TALERA QA PWA: restore native finger-release date; keep exact age-54 scale.
 # Same original F5 acceptance origin: event IDs and timestamps, no new stores or players.
@@ -1371,7 +1391,7 @@ jobs:
 
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' && github.event.head_commit.message != 'Inspect exact shared timeline interface before approved loupe build (no deploy)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -1501,7 +1521,7 @@ jobs:
 
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-locality-v2-exact-tested-20261125' && github.event.head_commit.message != 'Inspect exact shared timeline interface before approved loupe build (no deploy)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:

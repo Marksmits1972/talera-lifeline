@@ -124,3 +124,46 @@ for(const id of ['gps-bad-reference','gps-truncated','gps-zero-denominator','gps
 }
 await assert.rejects(()=>library.captureGps(''),/TALERA_LIBRARY_INVALID_MEDIA_ID/);
 console.log('TALERA_LOCAL_JPEG_CAPTURE_GPS_CONTRACT_PASS');
+
+function movieFixture(value='+51.9850+005.8883+012.0/',full=true,legacy=null){
+ const bytes=s=>Uint8Array.from(s,c=>c.charCodeAt(0));
+ const word=n=>Uint8Array.from([n>>>24,n>>>16&255,n>>>8&255,n&255]);
+ const concat=(...parts)=>Uint8Array.from(parts.flatMap(x=>[...x]));
+ const box=(type,...parts)=>{const b=concat(...parts);return concat(word(b.length+8),typeof type==='number'?word(type):bytes(type),b)};
+ const name=bytes('com.apple.quicktime.location.ISO6709');
+ const keys=box('keys',word(0),word(1),word(name.length+8),bytes('mdta'),name);
+ const hdlr=box('hdlr',word(0),word(0),bytes('mdta'),word(0),word(0),word(0));
+ const item=box('ilst',box(1,box('data',word(1),word(0),bytes(value))));
+ const meta=box('meta',...(full?[word(0)]:[]),hdlr,keys,item);
+ const old=legacy===null?[]:[box('\xa9xyz',Uint8Array.from([legacy.length>>8,legacy.length&255,0,0]),bytes(legacy))];
+ return concat(box('ftyp',bytes('qt  '),word(0)),box('mdat',new Uint8Array(20)),box('moov',box('udta',meta,...old)));
+}
+for(const full of [true,false]){
+ const data=movieFixture(undefined,full),id='gps-movie-'+full;
+ const original=new Blob([data],{type:'video/quicktime'});files.set(id,original);
+ const gps=await library.captureGps(id);
+ assert.equal(gps?.latitude,51.985);
+ assert.equal(gps?.longitude,5.8883);
+ assert.equal(gps?.source,'quicktime-iso6709');
+ assert.deepEqual([...new Uint8Array(await original.arrayBuffer())],[...data]);
+}
+for(const [id,data] of [
+ ['bad-movie',movieFixture('+99.0000+005.8883/')],
+ ['bad-iso',movieFixture('Arnhem')],
+ ['conflicting-movie',movieFixture(undefined,true,'+50.0000+005.8883/')],
+ ['truncated-movie',movieFixture().slice(0,-3)]
+]){
+ files.set(id,new Blob([data],{type:'video/mp4'}));
+ assert.equal(await library.captureGps(id),null,id);
+}
+// Large movie payload is skipped; the reader must not copy the media data.
+const fixtureMovie=movieFixture();
+const tail=fixtureMovie.slice(44);
+const header=Uint8Array.from([0,0,0,16,102,116,121,112,113,116,32,32,0,0,0,0]);
+const payloadSize=8*1024*1024;
+const len=payloadSize+8;
+const mdat=Uint8Array.from([len>>>24,len>>>16&255,len>>>8&255,len&255,109,100,97,116]);
+const large=new Blob([header,mdat,new Uint8Array(payloadSize),tail],{type:'video/mp4'});
+files.set('large-movie',large);
+assert.equal((await library.captureGps('large-movie'))?.latitude,51.985);
+console.log('TALERA_LOCAL_QUICKTIME_CAPTURE_GPS_CONTRACT_PASS');

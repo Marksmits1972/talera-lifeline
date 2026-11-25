@@ -128,6 +128,41 @@ backupRegression: try{
     try{
       await pickerCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
         path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+      // Test-only transaction diagnostics on the real application database.
+      // Capture request error names and operation order, never media bytes.
+      await pickerCtx.addInitScript(()=>{
+        const trace=[];window.__taleraIdbTestTrace=trace;
+        const note=(entry)=>{trace.push(entry);if(trace.length>200)trace.shift()};
+        const errorInfo=e=>({name:e?.name||'',message:e?.message||'',reason:e?.reason||''});
+        const ids=new WeakMap();let sequence=0;
+        const originalTransaction=IDBDatabase.prototype.transaction;
+        IDBDatabase.prototype.transaction=function(...args){
+          const tx=originalTransaction.apply(this,args),id=++sequence;
+          ids.set(tx,id);note({op:'transaction',id,stores:args[0],mode:args[1]});
+          tx.addEventListener('complete',()=>note({op:'complete',id}));
+          tx.addEventListener('abort',()=>note({op:'abort',id,error:errorInfo(tx.error)}));
+          tx.addEventListener('error',e=>note({op:'transaction-error',id,error:errorInfo(e.target?.error)}));
+          return tx;
+        };
+        const originalAbort=IDBTransaction.prototype.abort;
+        IDBTransaction.prototype.abort=function(...args){
+          note({op:'explicit-abort',id:ids.get(this),stack:new Error().stack?.slice(0,600)});
+          return originalAbort.apply(this,args);
+        };
+        for(const op of ['get','getAll','getKey','add','put','delete']){
+          const original=IDBObjectStore.prototype[op];
+          IDBObjectStore.prototype[op]=function(...args){
+            const id=ids.get(this.transaction),key=typeof args[0]==='string'?args[0]:args[0]?.key||args[0]?.id;
+            const entry={op,id,store:this.name,key};
+            let q;
+            try{q=original.apply(this,args)}catch(e){note({...entry,phase:'throw',error:errorInfo(e)});throw e}
+            note({...entry,phase:'request'});
+            q.addEventListener('error',()=>note({...entry,phase:'error',error:errorInfo(q.error)}));
+            if(op==='get')q.addEventListener('success',()=>note({...entry,phase:'success',found:q.result!==undefined,kind:Object.prototype.toString.call(q.result),size:q.result?.blob?.size,keys:q.result?Object.keys(q.result):[]}));
+            return q;
+          };
+        }
+      });
       const pickerPage=await pickerCtx.newPage(),pickerErrors=[];
       pickerPage.on('pageerror',e=>pickerErrors.push(e.message));
       pickerPage.on('console',m=>{if(m.type()==='warning'&&m.text().includes('TALERA_'))console.log('TALERA_PICKER_BROWSER_WARNING',m.text())});
@@ -142,11 +177,11 @@ backupRegression: try{
         const second=new File([png],'previous-other.png',{type:'image/png',lastModified:1700000000456});
         let firstStory;
         try{firstStory=await mem.save({title:'Previous',date:'2026-11-23',text:'synthetic'},[photo,second])}
-        catch(error){throw Error('Initial shared batch save: '+error.message+' '+(error.reason||''))}
+        catch(error){throw Error('Initial shared batch save: '+error.message+' '+(error.reason||'')+' TRACE '+JSON.stringify(window.__taleraIdbTestTrace.slice(-65)))}
         // Verify the same physical original is reused across a separate save too.
         const third=new File([png],'third-original.png',{type:'image/png',lastModified:1700000000789});
         try{await mem.save({title:'Separate prior memory',date:'2026-11-23',text:'synthetic'},[third])}
-        catch(error){throw Error('Separate shared payload save: '+error.message+' '+(error.reason||''))}
+        catch(error){throw Error('Separate shared payload save: '+error.message+' '+(error.reason||'')+' TRACE '+JSON.stringify(window.__taleraIdbTestTrace.slice(-65)))}
         const dbName=document.getElementById('talera-memory-store-v1').textContent.match(/var DB_NAME='([^']+)'/)[1];
         const db=await new Promise((ok,bad)=>{const q=indexedDB.open(dbName,1);q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
         const raw=await new Promise((ok,bad)=>{const q=db.transaction('files','readonly').objectStore('files').getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});

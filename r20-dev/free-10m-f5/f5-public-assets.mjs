@@ -1245,6 +1245,29 @@ function stabilizeOriginalPhotoStorage(html){
   "for(var j=0;j<files.length;j++)tx.objectStore('files').put({key:files[j].key,blob:taleraOwnedPhotoUploads[j]});");
 }
 
+// Store only the verified, derived capture place inside the existing item
+// descriptor. The original bytes and the IndexedDB version stay unchanged.
+function installCapturePlaceCatalog(html){
+ const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
+ const start=raw.indexOf(' async function readJpegCapturePlace(blob){');
+ const end=raw.indexOf(' async function readHeifCaptureGps(blob){');
+ assert.ok(start>=0&&end>start,'CAPTURE_PLACE_READER_SOURCE_DRIFT');
+ const reader=raw.slice(start,end);
+ assert.ok(!reader.includes('</script'),'CAPTURE_PLACE_UNSAFE_SOURCE');
+ const save='async function save(input,uploads,editId){';
+ const item="files.push({key:id+':'+i,kind:kind,name:safeName(f.name||kind),mime:f.type||'',size:f.size});";
+ assert.equal(html.split(save).length,2,'CAPTURE_PLACE_SAVE_SOURCE_DRIFT');
+ assert.equal(html.split(item).length,2,'CAPTURE_PLACE_ITEM_SOURCE_DRIFT');
+ html=html.replace(save,()=>reader+'\n'+save);
+ // The later private editor patch still recognises its original item line.
+ // No independent transaction, media copy, geocoder or network request.
+ return html.replace(item,()=>item+
+  "\n  if(kind==='photo')try{\n"+
+  "   const capturePlace=await readJpegCapturePlace(f);\n"+
+  "   if(capturePlace)files[files.length-1].capturePlace=capturePlace;\n"+
+  "  }catch(_){ /* Optional metadata must never prevent posting. */ }\n");
+}
+
 function installReadOnlyLibraryGateway(html){
  const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
  assert.ok(raw.includes('TaleraLibraryFactory')&&!raw.includes('</script'),
@@ -1736,6 +1759,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route!=='/tell')html=completePublishedRemovalOnOtherPage(html,
    readFileSync(path.join(delivery,'generated','reference-tell.html'),'utf8'));
  else html=installOriginalPayloadReader(html);
+ html=installCapturePlaceCatalog(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');

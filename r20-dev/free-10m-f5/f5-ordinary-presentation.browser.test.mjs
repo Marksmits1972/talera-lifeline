@@ -650,6 +650,46 @@ backupRegression: try{
   for(const key of ['shown','conflicting','badcode','missingcity','malformed','control','plain'])
     assert.equal(capturePlaceResults[key],null,key);
   console.log('TALERA_CAPTURE_PLACE_EXPLICIT_IPTC_BROWSER_PASS');
+
+  // Save a decodable JPEG through the real /tell editor's existing account
+  // library, reopen /present and read the same persisted item and bytes.
+  // No new app or permanent synthetic memory: remove this test story.
+  const metadataPage=await ctx.newPage();
+  try{
+    const editResponse=await metadataPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    assert.equal(editResponse.status(),200);
+    await metadataPage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    const result=await metadataPage.evaluate(async()=>{
+      const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+      const paint=canvas.getContext('2d');paint.fillStyle='#db3520';paint.fillRect(0,0,64,64);
+      const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+      const original=new Uint8Array(await jpeg.arrayBuffer());
+      const packet='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:i="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><i:LocationCreated><rdf:Bag><rdf:li rdf:parseType="Resource"><i:City>Arnhem</i:City><i:CountryCode>NL</i:CountryCode><i:CountryName>Nederland</i:CountryName></rdf:li></rdf:Bag></i:LocationCreated></rdf:Description></rdf:RDF></x:xmpmeta>';
+      const xmp=new TextEncoder().encode('http://ns.adobe.com/xap/1.0/\0'+packet),length=xmp.length+2;
+      const tagged=new File([original.subarray(0,2),Uint8Array.of(255,225,length>>8,length&255),xmp,original.subarray(2)],'capture.jpg',{type:'image/jpeg'});
+      const plain=new File([original],'no-location.jpg',{type:'image/jpeg'});
+      const saved=await window.TaleraMemories.save({title:'Synthetic capture place',date:'2026-11-10',text:'Synthetic metadata test'},[tagged,plain]);
+      const row=await window.TaleraMemories.get(saved.id);
+      const read=await window.TaleraMemories.blob(row.items[0].key);
+      const bytes=new Uint8Array(await read.arrayBuffer()),expected=new Uint8Array(await tagged.arrayBuffer());
+      return {id:saved.id,place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,
+        keys:row.items.map(x=>x.key),sameBytes:bytes.length===expected.length&&bytes.every((x,i)=>x===expected[i])};
+    });
+    assert.deepEqual(result.place,capturePlaceResults.created);
+    assert.equal(result.missing,null);
+    assert.equal(result.sameBytes,true);
+    const presentResponse=await metadataPage.goto(origin+'/present?memory='+encodeURIComponent(result.id),{waitUntil:'domcontentloaded'});
+    assert.equal(presentResponse.status(),200);
+    await metadataPage.waitForFunction(()=>!!window.TaleraLibrary?.readStory);
+    const reopened=await metadataPage.evaluate(async id=>{
+      const row=await window.TaleraLibrary.readStory(id);
+      return {place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,keys:row.items.map(x=>x.key)};
+    },result.id);
+    assert.deepEqual(reopened,{place:result.place,missing:null,keys:result.keys});
+    await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),result.id);
+    console.log('TALERA_CAPTURE_PLACE_ACCOUNT_CATALOG_REOPEN_PASS');
+  }finally{await metadataPage.close()}
+
   const initial=await page.evaluate(()=>({
     memory:window.__taleraTimelineRuntime?.currentMemory?.()?.id??null,
     demoImages:[...document.querySelectorAll('img')].map(img=>img.currentSrc||img.src||'')

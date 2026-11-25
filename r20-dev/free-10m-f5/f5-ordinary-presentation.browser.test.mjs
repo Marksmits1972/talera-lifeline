@@ -130,6 +130,7 @@ backupRegression: try{
         path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
       const pickerPage=await pickerCtx.newPage(),pickerErrors=[];
       pickerPage.on('pageerror',e=>pickerErrors.push(e.message));
+      pickerPage.on('console',m=>{if(m.type()==='warning'&&m.text().includes('TALERA_'))console.log('TALERA_PICKER_BROWSER_WARNING',m.text())});
       await pickerPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
       await pickerPage.waitForFunction(()=>typeof window.TaleraMemories?.draftWriteRows==='function'&&!!document.getElementById('photoInput'),null,{timeout:15000});
       const seed=await pickerPage.evaluate(async()=>{
@@ -139,7 +140,13 @@ backupRegression: try{
         const png=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
         const photo=new File([png],'previous.png',{type:'image/png',lastModified:1700000000123});
         const second=new File([png],'previous-other.png',{type:'image/png',lastModified:1700000000456});
-        const firstStory=await mem.save({title:'Previous',date:'2026-11-23',text:'synthetic'},[photo,second]);
+        let firstStory;
+        try{firstStory=await mem.save({title:'Previous',date:'2026-11-23',text:'synthetic'},[photo,second])}
+        catch(error){throw Error('Initial shared batch save: '+error.message+' '+(error.reason||''))}
+        // Verify the same physical original is reused across a separate save too.
+        const third=new File([png],'third-original.png',{type:'image/png',lastModified:1700000000789});
+        try{await mem.save({title:'Separate prior memory',date:'2026-11-23',text:'synthetic'},[third])}
+        catch(error){throw Error('Separate shared payload save: '+error.message+' '+(error.reason||''))}
         const dbName=document.getElementById('talera-memory-store-v1').textContent.match(/var DB_NAME='([^']+)'/)[1];
         const db=await new Promise((ok,bad)=>{const q=indexedDB.open(dbName,1);q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
         const raw=await new Promise((ok,bad)=>{const q=db.transaction('files','readonly').objectStore('files').getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>bad(q.error)});
@@ -147,7 +154,7 @@ backupRegression: try{
         const reads=[];
         for(const item of firstStory.items){
           try{const v=await mem.blob(item.key);reads.push({ok:true,size:v?.size,name:v?.name,lastModified:v?.lastModified})}
-          catch(e){reads.push({ok:false,error:e.message})}
+          catch(e){reads.push({ok:false,error:e.message,reason:e.reason})}
         }
         return {items:firstStory.items,reads,rows:raw.map(x=>({keys:Object.keys(x),key:x.key,
           payloadKey:x.payloadKey,metadata:x.metadata,blob:x.blob instanceof Blob?{size:x.blob.size,type:x.blob.type,kind:Object.prototype.toString.call(x.blob)}:null}))};

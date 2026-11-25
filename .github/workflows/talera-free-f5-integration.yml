@@ -249,7 +249,6 @@ jobs:
           # This is a second engine for the SAME local-origin Worker code, not an app.
           npx --no-install playwright install --with-deps webkit
           TALERA_OFFLINE_BROWSER=webkit node r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs
-          TALERA_WEBKIT_PICKER_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs
@@ -1356,7 +1355,7 @@ jobs:
     name: Audit original local story delete method in same TALERA code
     if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 6
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -1402,6 +1401,11 @@ jobs:
             }
           }
           NODE
+      - name: Real WebKit photo and video picker with prior shared originals
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps webkit
+          TALERA_WEBKIT_PICKER_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
 
   audit_existing_live_version_20261119:
     name: Read-only verify unexpectedly changed SAME TALERA version

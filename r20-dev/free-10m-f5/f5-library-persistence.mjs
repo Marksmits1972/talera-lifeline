@@ -117,29 +117,52 @@ export function createOriginalPayloadStorage(){
   }
   return true;
  }
+ // Prevalidate byte equality within a batch BEFORE IndexedDB opens its write
+ // transaction. WebKit cannot reliably read a newly inserted, uncommitted
+ // File through a second get() in the same transaction.
+ const verifiedPlanGroups=new WeakMap(),verifiedTransactionGroups=new WeakMap();
+ async function verifyBatch(plans){
+  const groups=new Map();
+  for(const p of plans){
+   if(!p||!payloadKey(p.payloadKey)||!(p.blob instanceof Blob))failFormat('batch-plan');
+   let g=groups.get(p.payloadKey);
+   if(!g){g={blob:p.blob};groups.set(p.payloadKey,g)}
+   else if(!await sameBytes(g.blob,p.blob))failFormat('batch-digest-collision');
+   verifiedPlanGroups.set(p,g);
+  }
+ }
  // The caller owns the existing readwrite transaction and aborts on failure.
- // Request chaining, including during bounded comparison, keeps it active.
+ // A previously committed payload is still checked byte-for-byte before reuse.
+ // Never reread a freshly inserted File before WebKit commits it.
  function writePlans(store,plans,ok,fail,{replace=false}={}){
+  let checked=verifiedTransactionGroups.get(store.transaction);
+  if(!checked){checked=new Map();verifiedTransactionGroups.set(store.transaction,checked)}
   let index=0;
   const next=()=>{
    try{
     if(index===plans.length){ok();return}
     const p=plans[index++];
-    if(!p||!payloadKey(p.payloadKey))failFormat();
+    if(!p||!payloadKey(p.payloadKey))failFormat('write-plan');
+    const group=verifiedPlanGroups.get(p);
+    const addLink=()=>{
+     const row={key:p.key,payloadKey:p.payloadKey,metadata:p.metadata};
+     const linkRequest=replace?store.put(row):store.add(row);
+     linkRequest.onerror=()=>fail(linkRequest.error||Error('TALERA_LIBRARY_LINK_WRITE'));
+     if(group)checked.set(p.payloadKey,group);
+     next();
+    };
+    if(group&&checked.get(p.payloadKey)===group){addLink();return}
     const q=store.get(p.payloadKey);
     q.onerror=()=>fail(q.error||Error('TALERA_LIBRARY_PAYLOAD_READ'));
     q.onsuccess=()=>{
      try{
-      const addLink=()=>{
-       const row={key:p.key,payloadKey:p.payloadKey,metadata:p.metadata};
-       if(replace)store.put(row);else store.add(row);
-       next();
-      };
       if(q.result===undefined){
-       store.add({key:p.payloadKey,blob:p.blob});addLink();return;
+       const payloadRequest=store.add({key:p.payloadKey,blob:p.blob});
+       payloadRequest.onerror=()=>fail(payloadRequest.error||Error('TALERA_LIBRARY_PAYLOAD_WRITE'));
+       addLink();return;
       }
       if(Object.keys(q.result).sort().join(',')!=='blob,key'||
-         !(q.result.blob instanceof Blob)||q.result.blob.size!==p.blob.size)failFormat();
+         !(q.result.blob instanceof Blob)||q.result.blob.size!==p.blob.size)failFormat('existing-payload-shape');
       let settled=false,equal=false,error=null;
       sameBytes(q.result.blob,p.blob).then(v=>{equal=v;settled=true},
        e=>{error=e;settled=true});
@@ -150,7 +173,7 @@ export function createOriginalPayloadStorage(){
         try{
          if(!settled){pulse();return}
          if(error)throw error;
-         if(!equal||check.result!==p.payloadKey)failFormat();
+         if(!equal||check.result!==p.payloadKey)failFormat('existing-payload-bytes');
          addLink();
         }catch(e){fail(e)}
        };
@@ -182,7 +205,7 @@ export function createOriginalPayloadStorage(){
    }catch(e){fail(e)}
   };
  }
- return Object.freeze({prepare,read,writePlans,logicalRows,collectUnreferenced,
+ return Object.freeze({prepare,verifyBatch,read,writePlans,logicalRows,collectUnreferenced,
   isPayloadKey:payloadKey,isLink:link});
 }
 
@@ -367,6 +390,7 @@ export async function restoreRowsAtomic(db,decoded){
    if(Object.keys(row).sort().join(',')!=='blob,key')throw Error('TALERA_RESTORE_INVALID_ORIGINAL_ROW');
    plans.set(row.key,await originalPayloadStorage.prepare(row.key,row.blob));
   }
+  await originalPayloadStorage.verifyBatch([...plans.values()]);
   // One atomic IndexedDB transaction for both stores: fail/QuotaExceeded
   // aborts the WHOLE import, never deletes or replaces existing media/stories.
   await new Promise((resolve,reject)=>{

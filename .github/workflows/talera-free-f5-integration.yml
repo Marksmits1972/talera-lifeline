@@ -928,7 +928,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
+      F5_EXPECTED_LIVE_VERSION: 577b09e4-1e74-46dd-ac8f-0b9d7d182a77
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -954,9 +954,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 19add4ab8f879f772b97808edb21cb786694eed0
-          test "$(git diff --name-only 19add4ab8f879f772b97808edb21cb786694eed0 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 19add4ab8f879f772b97808edb21cb786694eed0 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 4220884c60c132a659f0dba506374104e8dd9f98
+          test "$(git diff --name-only 4220884c60c132a659f0dba506374104e8dd9f98 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 4220884c60c132a659f0dba506374104e8dd9f98 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -965,13 +965,14 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const prior=await get('45592989352');
-          assert.equal(prior.head_sha,'19add4ab8f879f772b97808edb21cb786694eed0');
+          const prior=await get('45617056979');
+          assert.equal(prior.head_sha,'4220884c60c132a659f0dba506374104e8dd9f98');
           assert.equal(prior.status,'completed');assert.equal(prior.conclusion,'success');
-          const jobs=(await get('45592989352/jobs?per_page=100')).jobs;
-          for(const id of [139131721268,139131721309,139131720749,139131721321])
+          assert.equal(prior.head_sha,'4220884c60c132a659f0dba506374104e8dd9f98');
+          const jobs=(await get('45617056979/jobs?per_page=100')).jobs;
+          for(const id of [139215056887,139215058250,139215057553,139215057324])
             assert.equal(jobs.find(j=>j.id===id)?.conclusion,'success');
-          const main=jobs.find(j=>j.id===139131721268);
+          const main=jobs.find(j=>j.id===139215056887);
           for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
             'Verify Cloudflare compilation without deployment',
             'Browser verify back-up panel, private session and two local browser contexts',
@@ -981,8 +982,8 @@ jobs:
             'Browser verify complete original-media export, checksum and nondestructive restore',
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
-          assert.equal(jobs.find(j=>j.id===139131720749)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45592989352');
+          assert.equal(jobs.find(j=>j.id===139215057553)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45617056979');
           NODE
       - name: Verify existing 17 account and media bindings, exact live version, official recovery
         run: |
@@ -1103,8 +1104,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code 19add4ab8f879f772b97808edb21cb786694eed0 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45592989352'
+          git diff --exit-code 4220884c60c132a659f0dba506374104e8dd9f98 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45617056979'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail
@@ -1357,7 +1358,7 @@ jobs:
           NODE
       - name: Restore previous TALERA version if deploy or postdeploy verification fails
         if: ${{ failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure') }}
-        run: npx --no-install wrangler rollback --name "$F5_STAGE_NAME" --message "Restore previous TALERA QA after failed no-example release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
+        run: npx --no-install wrangler rollback "$F5_EXPECTED_LIVE_VERSION" --name "$F5_STAGE_NAME" --message "Restore exact previous TALERA QA after failed location release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
 
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code

@@ -421,14 +421,21 @@ async function testTimelineLoupe(){
   assert.equal(geometry.labels.length,7);assert.ok(geometry.labels.every(Boolean));
   assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe: '+JSON.stringify(geometry));
   assert.ok(geometry.panelTop>=geometry.rulerTop-1,'Loupe must stay inside existing upper ruler: '+JSON.stringify(geometry));
-  // The unchanged local-media hydrator deliberately writes the currently
-  // selected memory a second time when its photo becomes available. Record
-  // both events with their loading state; assert actual identity transitions
-  // separately, never ignore a transition to a different memory.
+  // Count calls to the actual existing adjacent-selection bridge separately
+  // from runtime notifications (which also refresh the current media).
   const seen=await lp.evaluate(()=>{
    window.__loupeTestVisited=[];
-   window.__taleraTimelineRuntime.subscribe(m=>window.__loupeTestVisited.push({
-    id:m.storyId,loading:!!m._photoLoading,active:window.__taleraTimelineRuntime.currentMemory()?.storyId
+   window.__loupeTestSteps=[];
+   const book=window.__taleraPhotoBook,runtime=window.__taleraTimelineRuntime;
+   const original=book.step;
+   book.step=function(direction){
+    const before=runtime.currentMemory()?.storyId;
+    const accepted=original.call(this,direction);
+    window.__loupeTestSteps.push({direction,before,after:runtime.currentMemory()?.storyId,accepted});
+    return accepted;
+   };
+   runtime.subscribe(m=>window.__loupeTestVisited.push({
+    id:m.storyId,active:runtime.currentMemory()?.storyId,stack:String(new Error().stack)
    }));
    return window.__loupeTestVisited;
   });
@@ -450,17 +457,20 @@ async function testTimelineLoupe(){
    const v=await state();assert.equal(v.id,expected[3-i].id);assert.equal(v.center,expected[3-i].ms);
   }
   await lp.waitForTimeout(180);await lp.mouse.up();
-  const visited=await lp.evaluate(()=>window.__loupeTestVisited);
+  const {visited,steps}=await lp.evaluate(()=>({visited:window.__loupeTestVisited,steps:window.__loupeTestSteps}));
+  const expectedIds=expected.slice(1).map(m=>m.id).concat(expected.slice(0,3).reverse().map(m=>m.id));
+  assert.deepEqual(steps.map(m=>m.after),expectedIds,'Actual selection bridge must be called exactly once for each adjacent memory');
+  assert.deepEqual(steps.map(m=>m.direction),[1,1,1,-1,-1,-1]);
+  assert.deepEqual(steps.map(m=>m.before),[expected[0].id,...expectedIds.slice(0,-1)]);
+  assert.ok(steps.every(m=>m.accepted===true&&m.before!==m.after));
   const transitions=[];
-  for(let i=0;i<visited.length;i++){
-   const event=visited[i],previous=visited[i-1];
+  for(const event of visited){
    assert.equal(event.active,event.id,'Timeline emitted a non-current memory');
-   if(previous?.id===event.id){
-    assert.ok(previous.loading&&!event.loading,'Unexpected repeated selection (not an existing photo-hydration refresh): '+JSON.stringify(visited));
-   }else transitions.push(event.id);
+   if(transitions.at(-1)!==event.id)transitions.push(event.id);
   }
-  assert.deepEqual(transitions,expected.slice(1).map(m=>m.id).concat(expected.slice(0,3).reverse().map(m=>m.id)));
-  console.log('TALERA_LOUPE_EXACT_IDENTITY_TRANSITIONS_PASS',JSON.stringify({transitions:transitions.length,existingHydrationRefreshes:visited.length-transitions.length}));
+  assert.deepEqual(transitions,expectedIds,'No extra identity changes or skipped memories');
+  console.log('TALERA_LOUPE_EXACT_IDENTITY_TRANSITIONS_PASS',JSON.stringify({transitions:transitions.length,selectionBridgeCalls:steps.length,additionalSameIdNotifications:visited.length-transitions.length,
+   repeatedNotificationStacks:visited.filter((m,i)=>i>0&&visited[i-1].id===m.id).map(m=>m.stack)}));
   // Fast flick has bounded adjacent motion. A fresh touch cancels the tail.
   await lp.mouse.move(x,y);await lp.mouse.down();await lp.mouse.move(x-160,y);await lp.mouse.up();
   await lp.mouse.move(x,y);await lp.mouse.down();

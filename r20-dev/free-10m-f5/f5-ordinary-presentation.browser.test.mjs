@@ -796,7 +796,18 @@ backupRegression: try{
     assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
     await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
     try{
-      await geoPage.waitForFunction(async ([id,expected])=>(await window.TaleraMemories.get(id))?.items[0]?.capturePlace?.city===expected,[saved.id,city],{timeout:15000});
+      // Explicitly await the IDB read before deciding whether to keep polling.
+      // A Promise returned by a page predicate can otherwise be mistaken for
+      // a truthy result before the actual boolean is resolved.
+      const deadline=Date.now()+15000;
+      let storedPlace=null;
+      do{
+        storedPlace=await geoPage.evaluate(async id=>
+          (await window.TaleraMemories.get(id))?.items?.[0]?.capturePlace??null,saved.id);
+        if(storedPlace?.city===city)break;
+        await geoPage.waitForTimeout(200);
+      }while(Date.now()<deadline);
+      assert.equal(storedPlace?.city,city,'Unique provider response must really be persisted in IndexedDB');
     }catch(error){
       const state=await geoPage.evaluate(async id=>{
         const row=await window.TaleraMemories.get(id);

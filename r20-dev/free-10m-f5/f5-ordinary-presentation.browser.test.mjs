@@ -721,7 +721,7 @@ backupRegression: try{
     });
     await metadataPage.waitForFunction(()=>{
       const m=window.__taleraTimelineRuntime.currentMemory();
-      return m._photoIndex===1&&document.getElementById('talera-capture-place')?.hidden;
+      return m._photoIndex===1&&document.getElementById('talera-capture-place')?.dataset.locationDiagnosis==='gps-niet-herkend';
     },null,{timeout:10000});
     console.log('TALERA_CAPTURE_PLACE_ACTUAL_PRESENTATION_FRAME_PASS');
     await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),result.id);
@@ -832,7 +832,7 @@ backupRegression: try{
       const m=window.__taleraTimelineRuntime?.currentMemory?.();
       return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===1;
     },saved.id,{timeout:20000});
-    assert.equal(await geoPage.evaluate(()=>document.getElementById('talera-capture-place')?.hidden),true);
+    await geoPage.waitForFunction(()=>document.getElementById('talera-capture-place')?.dataset.locationDiagnosis==='gps-wacht-internet',undefined,{timeout:20000});
     assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
     assert.equal(observed.length,0,'Offline library must never call GeoNames');
     await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
@@ -896,6 +896,7 @@ backupRegression: try{
       return row&&!row.hidden&&row.getClientRects().length>0&&
         row.textContent.includes('Nederland · omgeving '+expected+' (GeoNames)');
     },city,{timeout:20000});
+    assert.equal(await geoPage.evaluate(()=>document.getElementById('talera-capture-place').hasAttribute('data-location-diagnosis')),false,'Real place supersedes diagnostic');
     assert.equal(sent.length,1,'Passive presentation must not issue an additional geocode');
     assert.equal(observed.length,1);
     await geoPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);

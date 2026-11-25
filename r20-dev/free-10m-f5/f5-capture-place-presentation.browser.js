@@ -4,7 +4,7 @@ function mountTaleraCapturePlace(flagPositions){
  const title=document.getElementById('memoryStory'),caption=document.getElementById('memoryCaption');
  const stage=document.getElementById('photoStage'),runtime=window.__taleraTimelineRuntime;
  const library=window.TaleraLibrary;
- if(!title||!caption||!stage||!runtime?.currentMemory||!library?.readStory||
+ if(!title||!caption||!stage||
     document.getElementById('talera-capture-place'))return;
  const row=document.createElement('div');row.id='talera-capture-place';row.hidden=true;
  const flag=document.createElement('span');flag.className='talera-capture-flag';flag.setAttribute('aria-hidden','true');
@@ -12,19 +12,23 @@ function mountTaleraCapturePlace(flagPositions){
  row.append(flag,label);title.after(row);
  let active='',serial=0,queued=false;
  const cache=new Map();
- const hidden=()=>{row.hidden=true;label.textContent='';flag.style.removeProperty('background-position')};
+ const hidden=()=>{row.hidden=true;row.removeAttribute('data-location-diagnosis');label.textContent='';flag.hidden=false;flag.style.removeProperty('background-position')};
+ // TEMPORARY: only fixed codes at the approved location, never raw metadata.
+ const codes=new Set(['bibliotheek-niet-actief','presentatie-niet-actief','foto-niet-gekoppeld','foto-niet-zichtbaar','catalogus-item-ontbreekt','catalogus-leesfout','plaats-ongeldig','plaats-opgeslagen','bestand-lezen','bestand-onleesbaar','bestand-afwijkend','wacht-internet-of-configuratie','gps-gevonden','gps-niet-herkend','geonames-aanvraag','geonames-plaats','geonames-geen-plaats','geonames-fout','api-401','api-403','api-429','api-503','api-400','api-overige-fout','api-antwoord-ongeldig','api-netwerk-fout','catalogus-conflict','verwerking-fout','gps-api-uitgeschakeld','gps-wacht-internet','gps-wacht-verwerking','gps-eerder-gecontroleerd','api-plaats-niet-opgeslagen','diagnose-fout']);
+ function showDiagnosis(code){if(!codes.has(code))code='diagnose-fout';row.dataset.locationDiagnosis=code;flag.hidden=true;label.textContent='Locatiecontrole: '+code;row.hidden=false}
  const visibleImage=(image,urls)=>image&&!image.closest('[hidden]')&&
   image.complete&&image.naturalWidth>0&&image.getClientRects().length>0&&
   getComputedStyle(image).visibility!=='hidden'&&
   urls.some(url=>url&&(image.src===url||image.currentSrc===url));
  function selected(){
+  if(!runtime?.currentMemory)return {guard:'presentatie-niet-actief',identity:'guard:runtime'};
   const memory=runtime.currentMemory();
   if(!memory?._taleraLocal||!memory.storyId||memory._photoLoading||
     runtime.isMoving?.()||window.__taleraBandRolling||
     document.hidden||document.documentElement.classList.contains('talera-direct-memory-entering')||
     caption.classList.contains('talera-v21-title-tracking')||
     document.body.classList.contains('talera-v18-reading'))return null;
-  const frames=memory._zeroFrames;if(!Array.isArray(frames)||!frames.length)return null;
+  const frames=memory._zeroFrames;if(!Array.isArray(frames)||!frames.length)return {guard:'foto-niet-gekoppeld',identity:'guard:frames'};
   const voiced=memory._zeroItems?.some(item=>item.kind==='audio');
   let index=Number(memory._photoIndex)||0;
   if(voiced){
@@ -43,8 +47,8 @@ function mountTaleraCapturePlace(flagPositions){
   const urls=[frame.url,memory.photos?.[index]].filter(x=>typeof x==='string');
   const images=voiced?stage.querySelectorAll('.talera-independent-narrator-photo'):
    stage.querySelectorAll('.talera-story-synced-sharp,.photo-layer.is-front .example-photo');
-  if(!Array.from(images).some(image=>visibleImage(image,urls)))return null;
-  return {storyId:memory.storyId,key:frame.key,identity:JSON.stringify([memory.storyId,frame.key])};
+  const guard=Array.from(images).some(image=>visibleImage(image,urls))?null:'foto-niet-zichtbaar';
+  return {storyId:memory.storyId,key:frame.key,guard,identity:JSON.stringify([memory.storyId,frame.key,guard])};
  }
  function valid(place){
   if(!place||!['iptc-location-created','geonames-nearby-place'].includes(place.source)||!Object.hasOwn(flagPositions,place.countryCode))return null;
@@ -58,12 +62,16 @@ function mountTaleraCapturePlace(flagPositions){
   return place;
  }
  async function lookup(selection){
+  if(!library?.readStory)return {code:'bibliotheek-niet-actief'};
   const story=await library.readStory(selection.storyId);
-  const item=story.items?.find(x=>x.key===selection.key&&x.kind==='photo');
-  if(!item)return null;
+  const item=story?.items?.find(x=>x.key===selection.key&&x.kind==='photo');
+  if(!item)return {code:'catalogus-item-ontbreekt'};
   // The catalog is the only authority. Even older original files must be
   // enriched by the library, never inspected for location by presentation.
-  return valid(item.capturePlace);
+  const place=valid(item.capturePlace);
+  if(place)return {place};
+  if(item.capturePlace)return {code:'plaats-ongeldig'};
+  return {code:await window.TaleraLocationDiagnosis?.read(selection.storyId,selection.key)||'bibliotheek-niet-actief'};
  }
  function refresh(){
   queued=false;const current=selected();
@@ -71,13 +79,17 @@ function mountTaleraCapturePlace(flagPositions){
   if(active===next)return;
   active=next;const own=++serial;hidden();
   if(!current)return;
+  if(current.guard&&!current.key){showDiagnosis(current.guard);return}
   let work=cache.get(next);
   if(!work){
-   work=lookup(current).catch(()=>null);cache.set(next,work);
+   work=lookup(current).catch(()=>({code:'catalogus-leesfout'}));cache.set(next,work);
    if(cache.size>64)cache.delete(cache.keys().next().value);
   }
-  void work.then(place=>{
-   if(!place||own!==serial||selected()?.identity!==next)return;
+  void work.then(result=>{
+   if(own!==serial||selected()?.identity!==next)return;
+   if(current.guard){showDiagnosis(result.place?'foto-niet-zichtbaar':result.code||current.guard);return}
+   if(!result.place){showDiagnosis(result.code);return}
+   const place=result.place;
    const [x,y]=flagPositions[place.countryCode];
    flag.style.backgroundPosition=x+'px '+y+'px';
    label.textContent=place.country+' · '+(place.source==='geonames-nearby-place'?'omgeving '+place.city+' (GeoNames)':place.city);row.hidden=false;
@@ -94,12 +106,13 @@ function mountTaleraCapturePlace(flagPositions){
  const dots=document.querySelector('.talera-photo-dot')?.parentElement;
  if(dots)observer.observe(dots,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
  stage.addEventListener('load',schedule,true);stage.addEventListener('error',schedule,true);
- runtime.subscribe?.(schedule);
+ runtime?.subscribe?.(schedule);
  // The independent library may finish while this same photo is on screen.
  // Drop stale negative reads as well as resolved cache entries. No GPS/API call
  // or playback changes here; only a new read of the existing catalog.
  function catalogChanged(){cache.clear();active=null;serial++;schedule()}
  window.addEventListener('talera-capture-place-updated',catalogChanged);
+ window.addEventListener('talera-location-diagnosis',catalogChanged);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)catalogChanged();else schedule()});
  window.addEventListener('pageshow',catalogChanged);
  schedule();

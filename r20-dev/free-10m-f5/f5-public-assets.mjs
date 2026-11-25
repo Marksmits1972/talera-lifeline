@@ -1257,6 +1257,9 @@ function installCapturePlacePresentation(html){
   'text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none}'+
   '#talera-capture-place[hidden],#memoryCaption.talera-v21-title-tracking #talera-capture-place,'+
   'html.talera-direct-memory-entering #talera-capture-place,body.talera-v18-reading #talera-capture-place{display:none!important}'+
+  '#talera-capture-place[data-location-diagnosis]{max-width:90%;color:#fff}'+
+  '#talera-capture-place[data-location-diagnosis] .talera-capture-label{white-space:normal;overflow:visible}'+
+  '#talera-capture-place .talera-capture-flag[hidden]{display:none!important}'+
   '.talera-capture-flag{display:block;flex:0 0 16px;width:16px;height:11px;'+
   'background-repeat:no-repeat;background-image:url(data:image/png;base64,'+sprite+')}'+
   '.talera-capture-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+

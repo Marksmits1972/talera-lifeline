@@ -103,3 +103,14 @@ assert.equal(goodLookups,1);
 assert.deepEqual(catalog[1].items[0].capturePlace,resolved);
 assert.ok(catalog[0].items.every(x=>!x.capturePlace&&!x.capturePlaceChecked));
 console.log('TALERA_UNREADABLE_HISTORICAL_MEDIA_DO_NOT_STARVE_LATER_GPS_PASS');
+
+// TEMPORARY diagnostic contracts: codes only; failed lookups do not mark/write.
+catalog=[structuredClone(record)];const diagnosticCodes=[];
+await enrichCapturePlaces({...options,diagnose:(key,code)=>diagnosticCodes.push(code),lookup:async()=>({ok:false,diagnostic:'api-503'})});
+assert.deepEqual(diagnosticCodes,['bestand-lezen','gps-gevonden','geonames-aanvraag','api-503']);
+assert.equal(catalog[0].items[0].capturePlace,undefined);
+assert.equal(catalog[0].items[0].capturePlaceChecked,undefined);
+catalog=[structuredClone(record)];diagnosticCodes.length=0;
+await enrichCapturePlaces({...options,diagnose:(key,code)=>diagnosticCodes.push(code),readGps:async()=>null});
+assert.deepEqual(diagnosticCodes,['bestand-lezen','gps-niet-herkend']);
+console.log('TALERA_LOCATION_TEMPORARY_SAFE_DIAGNOSTIC_CODES_PASS');

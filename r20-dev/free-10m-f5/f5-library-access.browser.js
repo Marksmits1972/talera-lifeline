@@ -248,6 +248,114 @@
  if(!names.some(x=>norm(x)===norm(country)))return null;
  return Object.freeze({countryCode,country:names[0],city,source:'iptc-location-created'});
 }
+ async function readHeifCaptureGps(blob){
+ // Only Exif explicitly describing the primary image. Ignore thumbnails,
+ // other images, motion tracks and unlinked metadata. Bounded slice reads.
+ let budget=2*1024*1024, count=0;
+ const read=async(p,n)=>{
+  if(!Number.isSafeInteger(p)||!Number.isSafeInteger(n)||p<0||n<0||p>blob.size-n||n>budget)throw Error('HEIF read bounds');
+  budget-=n;const b=new Uint8Array(await blob.slice(p,p+n).arrayBuffer());
+  if(b.length!==n)throw Error('HEIF short read');return b;
+ };
+ const string=b=>String.fromCharCode(...b);
+ const cursor=b=>{
+  let p=0;
+  return {take(n){if(!Number.isInteger(n)||n<0||p>b.length-n)throw Error('HEIF field bounds');const r=b.subarray(p,p+n);p+=n;return r},
+   int(n){if(n>8)throw Error('HEIF integer width');let v=0;for(const x of this.take(n))v=v*256+x;if(!Number.isSafeInteger(v))throw Error('HEIF integer overflow');return v},
+   left(){return b.length-p}};
+ };
+ async function boxes(start,end){
+  const result=[];
+  for(let p=start;p<end;){
+   if(++count>2048||end-p<8)throw Error('HEIF box bounds');
+   const c=cursor(await read(p,8));let size=c.int(4),type=string(c.take(4)),header=8;
+   if(size===1){if(end-p<16)throw Error('HEIF extended box');size=cursor(await read(p+8,8)).int(8);header=16}
+   if(size===0)size=end-p;
+   if(size<header||size>end-p)throw Error('HEIF box size');
+   result.push({type,start:p+header,end:p+size});p+=size;
+  }
+  return result;
+ }
+ const one=(list,type)=>{const a=list.filter(x=>x.type===type);if(a.length>1)throw Error('HEIF duplicate box');return a[0]};
+ const payload=async(a,max=262144)=>{if(!a||a.end-a.start>max)throw Error('HEIF metadata size');return cursor(await read(a.start,a.end-a.start))};
+ const full=c=>{const v=c.int(1);if(c.int(3)!==0)throw Error('HEIF flags');return v};
+ const top=await boxes(0,blob.size);
+ const ftyp=await payload(one(top,'ftyp'),1024);
+ const brands=[];brands.push(string(ftyp.take(4)));ftyp.int(4);
+ while(ftyp.left())brands.push(string(ftyp.take(4)));
+ if(!brands.some(b=>['heic','heix','hevc','hevx','mif1','msf1'].includes(b)))return null;
+ const meta=one(top,'meta');if(!meta||meta.end-meta.start<4)return null;
+ if(full(cursor(await read(meta.start,4)))!==0)return null;
+ const children=await boxes(meta.start+4,meta.end);
+ const pitm=await payload(one(children,'pitm'),16),pv=full(pitm);
+ if(pv>1)return null;
+ const primary=pitm.int(pv?4:2);if(!primary||pitm.left())return null;
+ const iinf=one(children,'iinf');if(!iinf||iinf.end-iinf.start<6)return null;
+ const ih=cursor(await read(iinf.start,4)),iv=full(ih);
+ if(iv>1)return null;
+ const width=iv?4:2,entries=cursor(await read(iinf.start+4,width)).int(width);
+ if(entries>1024)return null;
+ const infos=await boxes(iinf.start+4+width,iinf.end);
+ if(infos.length!==entries)return null;
+ const exifs=new Set(),seen=new Set();
+ for(const info of infos){
+  if(info.type!=='infe')return null;
+  const c=await payload(info,4096),v=full(c);
+  if(v!==2&&v!==3)return null;
+  const id=c.int(v===3?4:2),protection=c.int(2),type=string(c.take(4));
+  if(seen.has(id))return null;seen.add(id);
+  if(type==='Exif'&&!protection)exifs.add(id);
+ }
+ if(!seen.has(primary)||!exifs.size)return null;
+ const iref=one(children,'iref');if(!iref||iref.end-iref.start<4)return null;
+ const rv=full(cursor(await read(iref.start,4)));if(rv>1)return null;
+ const rw=rv?4:2,linked=[];
+ for(const entry of await boxes(iref.start+4,iref.end)){
+  if(entry.type!=='cdsc')continue;
+  const c=await payload(entry,16384),from=c.int(rw),n=c.int(2);
+  if(n>1024||c.left()!==n*rw)return null;
+  const targets=[];for(let i=0;i<n;i++)targets.push(c.int(rw));
+  if(exifs.has(from)&&targets.includes(primary)){
+   // A shared Exif record is not an unambiguous primary capture location.
+   if(n!==1)return null;linked.push(from);
+  }
+ }
+ if(linked.length!==1)return null;
+ const iloc=await payload(one(children,'iloc')),lv=full(iloc);
+ if(lv>2)return null;
+ const a=iloc.int(1),b=iloc.int(1),os=a>>4,ls=a&15,bs=b>>4,is=lv?b&15:0;
+ if([os,ls,bs,is].some(n=>n>8)||!ls||(!lv&&(b&15)))return null;
+ const iw=lv===2?4:2,n=iloc.int(iw);
+ if(n>1024)return null;
+ let match=null;const ids=new Set();
+ for(let i=0;i<n;i++){
+  const id=iloc.int(iw),method=lv?iloc.int(2):0,ref=iloc.int(2),base=iloc.int(bs),extCount=iloc.int(2);
+  if(ids.has(id)||extCount>1024)return null;ids.add(id);
+  const ext=[];
+  for(let j=0;j<extCount;j++){
+   const idx=iloc.int(is),offset=iloc.int(os),length=iloc.int(ls);
+   if(id===linked[0])ext.push({idx,offset,length});
+  }
+  if(id===linked[0])match={method,ref,base,ext};
+ }
+ if(iloc.left()||!match||match.ref||![0,1].includes(match.method)||!match.ext.length||match.ext.length>16)return null;
+ const idat=match.method===1?one(children,'idat'):null;
+ if(match.method===1&&!idat)return null;
+ const parts=[];let total=0;
+ for(const e of match.ext){
+  const start=(idat?.start||0)+match.base+e.offset;
+  if(e.idx||!e.length||!Number.isSafeInteger(start)||start<0||start>blob.size-e.length)return null;
+  if(idat&&(start<idat.start||start>idat.end-e.length))return null;
+  total+=e.length;if(total>512*1024)return null;
+  parts.push(await read(start,e.length));
+ }
+ const data=new Uint8Array(total);let pos=0;for(const p of parts){data.set(p,pos);pos+=p.length}
+ if(data.length<12)return null;
+ const offset=4+cursor(data).int(4);
+ if(offset>data.length-8)return null;
+ const gps=parseExifCaptureGps(data,offset,data.length);
+ return gps?Object.freeze({...gps,source:'heif-exif-gps'}):null;
+}
  function create(store){
   if(!store||typeof store.list!=='function'||typeof store.get!=='function'||
      typeof store.blob!=='function'||typeof store.mediaUrl!=='function')
@@ -316,6 +424,7 @@
     try{
      const original=await originalBlob(id);
      if(/^video\/(?:quicktime|mp4|x-m4v)$/i.test(original.type))return await readQuickTimeCaptureGps(original);
+     if(/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(original.type)||/\.(?:heic|heif)$/i.test(original.name||''))return await readHeifCaptureGps(original);
      return await readJpegCaptureGps(original);
     }
     catch(_){return null} // Optional metadata never blocks existing playback.

@@ -312,6 +312,10 @@ backupRegression: try{
           body:(await pickerPage.locator('body').innerText()).slice(0,1800),pickerErrors}));
         throw error;
       }
+      if(broken&&!fixture.deleteTest){
+        await pickerPage.waitForFunction(()=>document.body.innerText.includes('Tijdelijke diagnose: logical-metadata.'),null,{timeout:12000});
+        console.log('TALERA_EXISTING_WARNING_SAFE_REASON_ONLY_PASS');
+      }
       if(fixture.deleteTest){
         // The persisted draft and completion callbacks must have settled.
         await pickerPage.waitForFunction(()=>!document.body.innerText.includes('Import nog niet klaar'));

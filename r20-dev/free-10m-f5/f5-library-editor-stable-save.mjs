@@ -84,19 +84,21 @@ export function preserveOriginalMediaIdsOnEdit(html){
  exact("window.TaleraMemories={save:save,","async function setNarrationCuesForStory(storyId,cues){\n const story=await get(storyId);\n if(!story||story.source!=='pwa-local'||!Array.isArray(cues))\n  throw Error('Het vertelplan kan niet veilig aan deze herinnering worden gekoppeld.');\n const updated={...story,narrationCues:cues,narrationSchema:'media-id-v1'};\n const db=await open(),tx=db.transaction('stories','readwrite'),finished=done(tx);\n tx.objectStore('stories').put(updated);\n await finished;\n return updated;\n}\nwindow.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,","CUE_WRITER_LIBRARY_OWNER");
  exact("const updated={...persisted,narrationCues:mapped,narrationSchema:'media-id-v1'};\n  const db=await dbOpen();\n  try{\n    const tx=db.transaction('stories','readwrite'),complete=done(tx);\n    tx.objectStore('stories').put(updated);\n    await complete;\n  }finally{db.close()}","await mem.updateCues(persisted.id,mapped);","CUE_EDITOR_WRITES_THROUGH_LIBRARY");
  // An unreadable earlier alias must not make an independent picker unusable.
+ // Temporary acceptance diagnosis only: allowlisted reason codes in the existing warning,
+ // no IDs, filenames, GPS or media. Remove the suffix after the actual device cause is resolved.
  // Duplicate review is advisory. Strict original reads, actual content-
  // addressed writes and backup remain fail closed; earlier records stay intact.
  exact("async function duplicateIndex(){\n const known=new Map();",
-  "async function duplicateIndex(){\n const known=new Map();\n known.unreadableOriginals=0;",
+  "async function duplicateIndex(){\n const known=new Map();\n known.unreadableOriginals=0;known.unreadableReasons=new Set();",
   "DUPLICATE_REVIEW_INCOMPLETE_COUNTER");
  exact("if(!hash){\n    const blob=await mem.blob(item.key);\n    if(!blob)continue;",
   "if(!hash){\n    let blob;\n    try{blob=await mem.blob(item.key)}catch(error){\n"+
   "     if(error?.message!=='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL')throw error;\n"+
-  "     known.unreadableOriginals++;console.warn('TALERA_EERDER_ORIGINEEL_NIET_LEESBAAR',error.reason||'invalid-link');continue;\n"+
+  "     known.unreadableOriginals++;const reason=['invalid-format','binary-parts-shape','binary-length','logical-metadata','materialized-file-metadata','inline-row-shape','payload-shape','logical-link-shape','missing-payload','logical-link-key'].includes(error.reason)?error.reason:'invalid-link';known.unreadableReasons.add(reason);console.warn('TALERA_EERDER_ORIGINEEL_NIET_LEESBAAR',reason);continue;\n"+
   "    }\n    if(!blob)continue;",
   "DUPLICATE_REVIEW_INDEPENDENT_NEW_MEDIA");
  exact("const existing=await duplicateIndex();",
-  "const existing=await duplicateIndex();\n  const reportIncompleteReview=()=>{if(existing.unreadableOriginals)showError('De nieuwe beelden zijn als concept opgeslagen. Een eerder mediabestand kon niet worden gecontroleerd op dubbelingen. Dat bestand is niet gewijzigd.');};",
+  "const existing=await duplicateIndex();\n  const reportIncompleteReview=()=>{if(existing.unreadableOriginals)showError('De nieuwe beelden zijn als concept opgeslagen. Een eerder mediabestand kon niet worden gecontroleerd op dubbelingen. Dat bestand is niet gewijzigd. Tijdelijke diagnose: '+[...existing.unreadableReasons].sort().join(', ')+'.');};",
   "DUPLICATE_REVIEW_EXISTING_WARNING");
  const completedImport="saved.then(()=>{importsPending=Math.max(0,importsPending-1);notifyImportStatus()})";
  const completedCount=html.split(completedImport).length-1;

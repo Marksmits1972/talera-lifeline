@@ -52,7 +52,11 @@ export async function capturePlaceApi(request,env,{getAccount,getScope,fetcher=f
   url.search=new URLSearchParams({lat:latitude.toFixed(3),lng:longitude.toFixed(3),username:user,lang:'nl',radius:'2',maxRows:'3',style:'MEDIUM',localCountry:'true'});
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6000);
   try{
-   const response=await fetcher(url,{method:'GET',redirect:'error',signal:controller.signal,headers:{accept:'application/json'}});
+   // workerd rejects redirect:'error' BEFORE any network request. Manual
+   // redirects preserve fail-closed behaviour; never forward GPS or username
+   // to a Location destination. Use the supported Request mode explicitly.
+   const response=await fetcher(url,{method:'GET',redirect:'manual',signal:controller.signal,headers:{accept:'application/json'}});
+   if(response.status>=300&&response.status<400)return unavailable('api-provider-http');
    if(!response.ok)return unavailable('api-provider-http');
    let data;try{data=await response.json()}catch(_){return unavailable('api-provider-antwoord')}
    if(data?.status)return unavailable('api-provider-status');

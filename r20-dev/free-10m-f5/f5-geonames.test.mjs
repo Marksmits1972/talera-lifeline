@@ -7,7 +7,7 @@ let calls=0,allowed=true,actor={id:'account-id'},hits=[];
 const scope='a'.repeat(32);
 const env={AUTH_STORAGE_JURISDICTION:'local-test',GEONAMES_USERNAME:'talera_test',AUTH_RATES:{idFromName:x=>x,get:key=>({hit:async opts=>{hits.push({key,...opts});return allowed}})}};
 const deps={getAccount:async()=>actor,getScope:async()=>scope,fetcher:async(url,opts)=>{
- calls++;assert.equal(url.origin,'https://secure.geonames.org');assert.equal(url.pathname,'/findNearbyPlaceNameJSON');assert.equal(url.searchParams.get('lat'),'51.622');assert.equal(url.searchParams.get('lng'),'5.432');assert.equal(url.searchParams.get('localCountry'),'true');assert.equal(url.searchParams.get('username'),'talera_test');assert.equal(opts.redirect,'error');assert.ok(!url.href.includes(actor.id));return Response.json({geonames:[place]})
+ calls++;assert.equal(url.origin,'https://secure.geonames.org');assert.equal(url.pathname,'/findNearbyPlaceNameJSON');assert.equal(url.searchParams.get('lat'),'51.622');assert.equal(url.searchParams.get('lng'),'5.432');assert.equal(url.searchParams.get('localCountry'),'true');assert.equal(url.searchParams.get('username'),'talera_test');assert.equal(opts.redirect,'manual');assert.ok(!url.href.includes(actor.id));return Response.json({geonames:[place]})
 }};
 const req=(input={latitude:51.62172,longitude:5.4322},origin='https://talera.example',localScope=scope)=>new Request('https://talera.example/api/capture-place',{method:'POST',headers:{origin,'content-type':'application/json','x-talera-local-scope':localScope},body:JSON.stringify(input)});
 assert.equal((await capturePlaceApi(req(),{},deps)).status,503);
@@ -138,3 +138,8 @@ for(const [fetcher,code] of [[async()=>new Response('',{status:502}),'api-provid
  const response=await capturePlaceApi(req(),euEnv,{...deps,fetcher});assert.equal(response.status,503);assert.deepEqual(await response.json(),{place:null,diagnostic:code});
 }
 console.log('TALERA_LOCATION_MALFORMED_ROW_IPTC_AND_EU_PROVIDER_FAILURE_CONTRACT_PASS');
+
+// Reject redirections without forwarding the provider credential or GPS.
+let redirects=0;const redirected=await capturePlaceApi(req(),euEnv,{...deps,fetcher:async(url,opts)=>{redirects++;assert.equal(opts.redirect,'manual');return new Response(null,{status:302,headers:{location:'https://untrusted.example/'}})}});
+assert.equal(redirected.status,503);assert.equal((await redirected.json()).diagnostic,'api-provider-http');assert.equal(redirects,1);
+console.log('TALERA_GEONAMES_WORKER_COMPATIBLE_MANUAL_REDIRECT_FAIL_CLOSED_PASS');

@@ -23,7 +23,13 @@ export function installOriginalPayloadReader(html){
  const auditOld="var rec=await request(db.transaction('files','readonly').objectStore('files').get(item.key));\n   if(!rec||!rec.blob){missing.push({id:story.id,key:item.key});continue}\n   bytes+=Number(rec.blob.size)||0;";
  const auditNew="var original=await blob(item.key);\n   if(!original){missing.push({id:story.id,key:item.key});continue}\n   bytes+=Number(original.size)||0;";
  if(html.split(auditOld).length!==2)throw Error('TALERA_PAYLOAD_AUDIT_SOURCE_DRIFT');
- return html.replace(auditOld,()=>auditNew);
+ html=html.replace(auditOld,()=>auditNew);
+ const previewStart="var imageTx=db.transaction('files','readwrite'),imageFinish=done(imageTx);";
+ const previewWrite="imageTx.objectStore('files').put({key:files[k].key+PHONE_VARIANT,blob:phoneCopies[k]});";
+ if(html.split(previewStart).length!==2||html.split(previewWrite).length!==2)
+  throw Error('TALERA_BINARY_PHONE_PREVIEW_SOURCE_DRIFT');
+ html=html.replace(previewStart,()=>"const encodedPreview=await taleraPayload.encodeInline({key:files[k].key+PHONE_VARIANT,blob:phoneCopies[k]});\n   "+previewStart);
+ return html.replace(previewWrite,()=>"imageTx.objectStore('files').put(encodedPreview);");
 }
 function appendPayloadCleanup(html){
  const blocks=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
@@ -103,8 +109,10 @@ export function preserveOriginalMediaIdsOnEdit(html){
    " if(!Array.isArray(rows)||rows.some(x=>!Array.isArray(x)||x.length!==2||typeof x[0]!=='string'||!x[0]))\n"+
    "  throw Error('Ongeldige conceptbestanden voor de bibliotheek.');\n"+
    " if(!rows.length)return;\n"+
+   " const encoded=[];\n"+
+   " for(const [key,value] of rows)encoded.push(await taleraPayload.encodeInline({key,blob:value}));\n"+
    " const db=await open(),tx=db.transaction('files','readwrite'),finished=done(tx);\n"+
-   " for(const [key,value] of rows)tx.objectStore('files').put({key,blob:value});\n"+
+   " for(const row of encoded)tx.objectStore('files').put(row);\n"+
    " await finished;\n"+
    "}\n"+
    "async function deleteDraftKeys(keys){\n"+
@@ -136,7 +144,7 @@ export function preserveOriginalMediaIdsOnEdit(html){
    "   return Promise.all(ids.map(id=>new Promise(resolve=>{\n"+
    "    const key=prefix+(preview?'preview:':'')+id;\n"+
    "    const q=objectStore.get(key);\n"+
-   "    q.onsuccess=()=>resolve([id,q.result&&q.result.blob]);\n"+
+   "    q.onsuccess=()=>{try{resolve([id,taleraPayload.decodeInline(q.result)?.blob])}catch(e){resolve([id,null])}};\n"+
    "    q.onerror=()=>resolve([id,null]);\n"+
    "   })));\n"+
    "  };\n"+

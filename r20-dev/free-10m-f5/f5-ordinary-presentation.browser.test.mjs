@@ -192,7 +192,7 @@ backupRegression: try{
           catch(e){reads.push({ok:false,error:e.message,reason:e.reason})}
         }
         return {items:firstStory.items,reads,rows:raw.map(x=>({keys:Object.keys(x),key:x.key,
-          payloadKey:x.payloadKey,metadata:x.metadata,blob:x.blob instanceof Blob?{size:x.blob.size,type:x.blob.type,kind:Object.prototype.toString.call(x.blob)}:null}))};
+          payloadKey:x.payloadKey,metadata:x.metadata,binaryBytes:x.binaryParts?.reduce((n,b)=>n+b.byteLength,0),blob:x.blob instanceof Blob?{size:x.blob.size,type:x.blob.type,kind:Object.prototype.toString.call(x.blob)}:null}))};
       });
       console.log('TALERA_PICKER_PREVIOUS_SHARED_ORIGINALS',JSON.stringify({webkit:webkitPickerOnly,seed}));
       assert.ok(seed.reads.every(x=>x.ok),'Existing original read failed before picker: '+JSON.stringify(seed));

@@ -332,7 +332,7 @@ try{
   if(links.some(row=>!row?.payloadKey||row.blob!==undefined)||new Set(links.map(row=>row.payloadKey)).size!==1)
    throw Error('Different media IDs and File metadata did not share one physical original');
   const payloadId=links[0].payloadKey;
-  if(raw.filter(row=>row.key===payloadId&&row.blob instanceof Blob&&row.blob.size===originalVideo.size).length!==1)
+  if(raw.filter(row=>row.key===payloadId&&row.blob===undefined&&Array.isArray(row.binaryParts)&&row.binaryParts.reduce((n,b)=>n+b.byteLength,0)===originalVideo.size).length!==1)
    throw Error('One physical payload was not stored exactly once');
   // Use the real archive and restore code for distinct IDs sharing the same
   // original bytes, not merely a direct storage-helper roundtrip.
@@ -358,7 +358,7 @@ try{
   const restoredLinks=restoredRaw.filter(row=>selectedKeys.has(row.key));
   if(restoredLinks.length!==selectedKeys.size||
      restoredLinks.some(row=>row.payloadKey!==payloadId||row.blob!==undefined)||
-     restoredRaw.filter(row=>row.key===payloadId&&row.blob instanceof Blob).length!==1)
+     restoredRaw.filter(row=>row.key===payloadId&&row.blob===undefined&&Array.isArray(row.binaryParts)&&row.binaryParts.reduce((n,b)=>n+b.byteLength,0)===originalVideo.size).length!==1)
    throw Error('Restore recreated duplicate physical original payloads');
   await persistence.verifyRestoredLibraryReadback({stories:selectedStories,files:selectedFiles},restoredLogical);
   console.log('TALERA_SHARED_ORIGINAL_COMPACT_BACKUP_AND_RESTORE_PHYSICAL_RECORDS_PASS');

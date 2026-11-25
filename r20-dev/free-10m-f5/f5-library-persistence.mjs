@@ -52,37 +52,80 @@ export function createOriginalPayloadStorage(){
  const failFormat=(reason='invalid-format')=>{const error=Error('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL');error.reason=reason;throw error};
  const chunk=4*1024*1024;
  const hex=bytes=>Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('');
+ const originalMetadata=original=>{
+  const isFile=typeof File==='function'&&original instanceof File;
+  return {length:original.size,type:original.type,name:isFile?original.name:null,
+   lastModified:isFile?original.lastModified:null};
+ };
+ function binaryLength(parts){
+  if(!Array.isArray(parts)||parts.some((part,i)=>!(part instanceof ArrayBuffer)||
+    part.byteLength<=0||part.byteLength>chunk||(i<parts.length-1&&part.byteLength!==chunk)))
+   failFormat('binary-parts-shape');
+  const length=parts.reduce((sum,part)=>sum+part.byteLength,0);
+  if(!Number.isSafeInteger(length))failFormat('binary-length');
+  return length;
+ }
+ function fileFromParts(parts,m,length){
+  if(!m||Object.keys(m).sort().join(',')!=='lastModified,length,name,type'||
+     !Number.isSafeInteger(m.length)||m.length<0||length!==m.length||
+     typeof m.type!=='string'||!(m.name===null&&m.lastModified===null||
+      typeof m.name==='string'&&Number.isFinite(m.lastModified)))failFormat('logical-metadata');
+  const blob=m.name===null?new Blob(parts,{type:m.type}):
+   new File(parts,m.name,{type:m.type,lastModified:m.lastModified});
+  if(blob.size!==m.length||blob.type!==m.type||
+     (m.name!==null&&(blob.name!==m.name||blob.lastModified!==m.lastModified)))failFormat('materialized-file-metadata');
+  return blob;
+ }
+ // Technical draft/preview Blob values use the same binary compatibility
+ // adapter; non-media manifest/cache objects retain their original shape.
+ async function encodeInline(row){
+  if(!(row?.blob instanceof Blob))return row;
+  if(Object.keys(row).sort().join(',')!=='blob,key')failFormat('inline-row-shape');
+  const parts=[];
+  for(let offset=0;offset<row.blob.size;offset+=chunk){
+   const end=Math.min(offset+chunk,row.blob.size);
+   const bytes=await row.blob.slice(offset,end).arrayBuffer();
+   if(bytes.byteLength!==end-offset)failFormat('inline-incomplete-bytes');
+   parts.push(bytes);
+  }
+  return {key:row.key,binaryParts:parts,metadata:originalMetadata(row.blob)};
+ }
+ function decodeInline(row){
+  if(!row||!Object.hasOwn(row,'binaryParts'))return row;
+  if(Object.keys(row).sort().join(',')!=='binaryParts,key,metadata')failFormat('inline-row-shape');
+  return {key:row.key,blob:fileFromParts(row.binaryParts,row.metadata,binaryLength(row.binaryParts))};
+ }
+ function payloadParts(row){
+  if(Object.keys(row).sort().join(',')==='blob,key'&&row.blob instanceof Blob)
+   return {parts:[row.blob],length:row.blob.size};
+  if(Object.keys(row).sort().join(',')==='binaryParts,key'){
+   return {parts:row.binaryParts,length:binaryLength(row.binaryParts)};
+  }
+  failFormat('payload-shape');
+ }
  async function prepare(key,original){
   if(typeof key!=='string'||!key||key.startsWith(prefix)||!(original instanceof Blob)||!original.size)failFormat('prepare-original');
-  const hashes=[];
+  const hashes=[],binaryParts=[];
   for(let offset=0;offset<original.size;offset+=chunk){
    const end=Math.min(offset+chunk,original.size);
    const bytes=await original.slice(offset,end).arrayBuffer();
    if(bytes.byteLength!==end-offset)failFormat('prepare-incomplete-bytes');
    hashes.push(hex(await crypto.subtle.digest('SHA-256',bytes)));
+   binaryParts.push(bytes);
   }
   const hash=hex(await crypto.subtle.digest('SHA-256',
    new TextEncoder().encode(original.size+':'+hashes.join(':'))));
-  const isFile=typeof File==='function'&&original instanceof File;
-  return {key,payloadKey:prefix+hash,blob:original,
-   metadata:{length:original.size,type:original.type,
-    name:isFile?original.name:null,lastModified:isFile?original.lastModified:null}};
+  return {key,payloadKey:prefix+hash,blob:original,binaryParts,
+   metadata:originalMetadata(original)};
  }
  function materialize(row,payload){
   if(!link(row))return row;
   if(Object.keys(row).sort().join(',')!=='key,metadata,payloadKey'||
      !payloadKey(row.payloadKey))failFormat('logical-link-shape');
   if(!payload||payload.key!==row.payloadKey)failFormat('missing-payload');
-  if(Object.keys(payload).sort().join(',')!=='blob,key'||!(payload.blob instanceof Blob))failFormat('payload-shape');
-  const m=row.metadata;
-  if(!m||Object.keys(m).sort().join(',')!=='lastModified,length,name,type'||
-     !Number.isSafeInteger(m.length)||m.length<=0||payload.blob.size!==m.length||
-     typeof m.type!=='string'||!(m.name===null&&m.lastModified===null||
-      typeof m.name==='string'&&Number.isFinite(m.lastModified)))failFormat('logical-metadata');
-  const blob=m.name===null?payload.blob.slice(0,m.length,m.type):
-   new File([payload.blob],m.name,{type:m.type,lastModified:m.lastModified});
-  if(blob.size!==m.length||blob.type!==m.type||
-     (m.name!==null&&(blob.name!==m.name||blob.lastModified!==m.lastModified)))failFormat('materialized-file-metadata');
+  const physical=payloadParts(payload);
+  if(!row.metadata?.length)failFormat('logical-metadata');
+  const blob=fileFromParts(physical.parts,row.metadata,physical.length);
   return {key:row.key,blob};
  }
  function logicalRows(rows){
@@ -90,7 +133,7 @@ export function createOriginalPayloadStorage(){
   const map=new Map(rows.map(row=>[row.key,row]));
   if(map.size!==rows.length)failFormat();
   return rows.filter(row=>!payloadKey(row.key)).map(row=>
-   link(row)?materialize(row,map.get(row.payloadKey)):row);
+   link(row)?materialize(row,map.get(row.payloadKey)):decodeInline(row));
  }
  function read(store,key,ok,fail){
   const q=store.get(key);
@@ -98,7 +141,7 @@ export function createOriginalPayloadStorage(){
   q.onsuccess=()=>{
    try{
     const row=q.result;
-    if(!link(row)){ok(row);return}
+    if(!link(row)){ok(decodeInline(row));return}
     if(!payloadKey(row.payloadKey))failFormat('logical-link-key');
     const p=store.get(row.payloadKey);
     p.onerror=()=>fail(p.error||Error('TALERA_LIBRARY_PAYLOAD_READ'));
@@ -124,7 +167,8 @@ export function createOriginalPayloadStorage(){
  async function verifyBatch(plans){
   const groups=new Map();
   for(const p of plans){
-   if(!p||!payloadKey(p.payloadKey)||!(p.blob instanceof Blob))failFormat('batch-plan');
+   if(!p||!payloadKey(p.payloadKey)||!(p.blob instanceof Blob)||
+      binaryLength(p.binaryParts)!==p.blob.size)failFormat('batch-plan');
    let g=groups.get(p.payloadKey);
    if(!g){g={blob:p.blob};groups.set(p.payloadKey,g)}
    else if(!await sameBytes(g.blob,p.blob))failFormat('batch-digest-collision');
@@ -157,12 +201,21 @@ export function createOriginalPayloadStorage(){
     q.onsuccess=()=>{
      try{
       if(q.result===undefined){
-       const payloadRequest=store.add({key:p.payloadKey,blob:p.blob});
+       const payloadRequest=store.add({key:p.payloadKey,binaryParts:p.binaryParts});
        payloadRequest.onerror=()=>fail(payloadRequest.error||Error('TALERA_LIBRARY_PAYLOAD_WRITE'));
        addLink();return;
       }
-      if(Object.keys(q.result).sort().join(',')!=='blob,key'||
-         !(q.result.blob instanceof Blob)||q.result.blob.size!==p.blob.size)failFormat('existing-payload-shape');
+      const physical=payloadParts(q.result);
+      if(physical.length!==p.blob.size)failFormat('existing-payload-shape');
+      if(q.result.binaryParts){
+       if(physical.parts.length!==p.binaryParts.length)failFormat('existing-payload-bytes');
+       for(let j=0;j<p.binaryParts.length;j++){
+        const a=new Uint8Array(physical.parts[j]),b=new Uint8Array(p.binaryParts[j]);
+        if(a.length!==b.length)failFormat('existing-payload-bytes');
+        for(let i=0;i<a.length;i++)if(a[i]!==b[i])failFormat('existing-payload-bytes');
+       }
+       addLink();return;
+      }
       let settled=false,equal=false,error=null;
       sameBytes(q.result.blob,p.blob).then(v=>{equal=v;settled=true},
        e=>{error=e;settled=true});
@@ -199,13 +252,13 @@ export function createOriginalPayloadStorage(){
      used.add(row.payloadKey);
     }
     for(const row of rows)if(payloadKey(row.key)&&!used.has(row.key)){
-     if(Object.keys(row).sort().join(',')!=='blob,key'||!(row.blob instanceof Blob))failFormat();
+     payloadParts(row);
      store.delete(row.key);
     }
    }catch(e){fail(e)}
   };
  }
- return Object.freeze({prepare,verifyBatch,read,writePlans,logicalRows,collectUnreferenced,
+ return Object.freeze({prepare,verifyBatch,encodeInline,decodeInline,read,writePlans,logicalRows,collectUnreferenced,
   isPayloadKey:payloadKey,isLink:link});
 }
 
@@ -391,6 +444,9 @@ export async function restoreRowsAtomic(db,decoded){
    plans.set(row.key,await originalPayloadStorage.prepare(row.key,row.blob));
   }
   await originalPayloadStorage.verifyBatch([...plans.values()]);
+  const technical=new Map();
+  for(const row of ownedFiles)if(!plans.has(row.key))
+   technical.set(row.key,await originalPayloadStorage.encodeInline(row));
   // One atomic IndexedDB transaction for both stores: fail/QuotaExceeded
   // aborts the WHOLE import, never deletes or replaces existing media/stories.
   await new Promise((resolve,reject)=>{
@@ -420,7 +476,7 @@ export async function restoreRowsAtomic(db,decoded){
        if(existing===undefined){
         const plan=plans.get(row.key);
         if(plan)originalPayloadStorage.writePlans(f,[plan],next,abort);
-        else{f.add(row);next()}
+        else{f.add(technical.get(row.key));next()}
         return;
        }
        let settled=false,equal=false,failed=null;

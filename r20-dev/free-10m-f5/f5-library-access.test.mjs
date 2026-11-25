@@ -168,18 +168,18 @@ files.set('large-movie',large);
 assert.equal((await library.captureGps('large-movie'))?.latitude,51.985);
 console.log('TALERA_LOCAL_QUICKTIME_CAPTURE_GPS_CONTRACT_PASS');
 
-function heifFixture(jpeg,{link=1,method=1,offset=0}={}){
+function heifFixture(jpeg,{link=1,method=1,offset=0,tileFlags=null,primaryFlags=0}={}){
  const word=(n,w=4)=>Uint8Array.from(Array.from({length:w},(_,i)=>Math.floor(n/256**(w-i-1))&255));
  const str=s=>Uint8Array.from(s,c=>c.charCodeAt(0));
  const cat=(...parts)=>Uint8Array.from(parts.flatMap(x=>[...x]));
  const box=(name,...parts)=>{const b=cat(...parts);return cat(word(b.length+8),str(name),b)};
  const full=(v=0)=>word(v<<24);
- const infe=(id,type)=>box('infe',full(2),word(id,2),word(0,2),str(type),word(0,1));
+ const infe=(id,type,flags=0)=>box('infe',word((2<<24)|flags),word(id,2),word(0,2),str(type),word(0,1));
  const exif=cat(word(0),jpeg.slice(12,-2));
  const ftyp=box('ftyp',str('heic'),word(0),str('mif1'));
  const build=absolute=>box('meta',full(),box('pitm',full(),word(1,2)),
-  box('iinf',full(),word(2,2),infe(1,'hvc1'),infe(2,'Exif')),
-  box('iref',full(),box('cdsc',word(2,2),word(1,2),word(link,2))),
+  box('iinf',full(),word(tileFlags===null?2:3,2),infe(1,tileFlags===null?'hvc1':'grid',primaryFlags),infe(2,'Exif'),...(tileFlags===null?[]:[infe(3,'hvc1',tileFlags)])),
+  box('iref',full(),box('cdsc',word(2,2),word(1,2),word(link,2)),...(tileFlags===null?[]:[box('dimg',word(1,2),word(1,2),word(3,2))])),
   box('iloc',full(1),word(0x4400,2),word(1,2),word(2,2),word(method,2),
       word(0,2),word(1,2),word(absolute+offset),word(exif.length)),
   ...(method===1?[box('idat',exif)]:[]));
@@ -204,3 +204,17 @@ for(const [id,data] of [
  assert.equal(await library.captureGps(id),null,id);
 }
 console.log('TALERA_LOCAL_HEIF_CAPTURE_GPS_CONTRACT_PASS');
+ // A primary grid with hidden coded tiles must not lose its own GPS metadata.
+ for(const method of [0,1]){
+  const data=heifFixture(fixture(),{method,tileFlags:1}),id='gps-grid-heif-'+method;
+  const original=new Blob([data],{type:'image/heif'});files.set(id,original);
+  const gps=await library.captureGps(id);
+  assert.equal(gps?.source,'heif-exif-gps');
+  assert.ok(Math.abs(gps.latitude-(51+59/60+6/3600))<1e-9);
+  assert.deepEqual([...new Uint8Array(await original.arrayBuffer())],[...data]);
+ }
+ for(const [id,opts] of [['reserved-infe-flags',{tileFlags:2}],['hidden-primary',{tileFlags:1,primaryFlags:1}],['tile-only-exif',{tileFlags:1,link:3}]]){
+  files.set(id,new Blob([heifFixture(fixture(),opts)],{type:'image/heif'}));
+  assert.equal(await library.captureGps(id),null,id);
+ }
+ console.log('TALERA_HEIF_HIDDEN_GRID_TILE_PRIMARY_GPS_PASS');

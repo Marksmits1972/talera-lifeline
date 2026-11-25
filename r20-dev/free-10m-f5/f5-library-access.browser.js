@@ -300,10 +300,12 @@
  const exifs=new Set(),seen=new Set();
  for(const info of infos){
   if(info.type!=='infe')return null;
-  const c=await payload(info,4096),v=full(c);
-  if(v!==2&&v!==3)return null;
+  const c=await payload(info,4096),v=c.int(1),flags=c.int(3);
+  // ItemInfoEntry bit 0 denotes a hidden item (e.g. a HEIF grid tile).
+  // It does not invalidate the primary image's separately linked Exif.
+  if((flags&~1)!==0||v!==2&&v!==3)return null;
   const id=c.int(v===3?4:2),protection=c.int(2),type=string(c.take(4));
-  if(seen.has(id))return null;seen.add(id);
+  if(seen.has(id)||(id===primary&&(flags&1)))return null;seen.add(id);
   if(type==='Exif'&&!protection)exifs.add(id);
  }
  if(!seen.has(primary)||!exifs.size)return null;

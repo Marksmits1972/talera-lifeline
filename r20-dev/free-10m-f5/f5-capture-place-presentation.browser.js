@@ -47,7 +47,7 @@ function mountTaleraCapturePlace(flagPositions){
   return {storyId:memory.storyId,key:frame.key,identity:JSON.stringify([memory.storyId,frame.key])};
  }
  function valid(place){
-  if(!place||place.source!=='iptc-location-created'||!Object.hasOwn(flagPositions,place.countryCode))return null;
+  if(!place||!['iptc-location-created','geonames-nearby-place'].includes(place.source)||!Object.hasOwn(flagPositions,place.countryCode))return null;
   const safe=x=>typeof x==='string'&&x.length>0&&x.length<=120&&
    !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(x);
   if(!safe(place.city)||!safe(place.country))return null;
@@ -80,7 +80,7 @@ function mountTaleraCapturePlace(flagPositions){
    if(!place||own!==serial||selected()?.identity!==next)return;
    const [x,y]=flagPositions[place.countryCode];
    flag.style.backgroundPosition=x+'px '+y+'px';
-   label.textContent=place.country+' · '+place.city;row.hidden=false;
+   label.textContent=place.country+' · '+(place.source==='geonames-nearby-place'?'omgeving '+place.city+' (GeoNames)':place.city);row.hidden=false;
   });
  }
  function schedule(){if(!queued){queued=true;queueMicrotask(refresh)}}

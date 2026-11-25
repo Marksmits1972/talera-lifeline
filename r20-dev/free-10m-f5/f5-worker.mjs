@@ -1099,7 +1099,14 @@ async function publicPage(request,env){
     // Isolate *local* originals, audio, video, photo and cue records by
     // verified account, without changing recorder, swipe or presentation logic.
     // If the upstream memory-store script ever changes, fail closed.
-    const scoped=scopeLocalMemories(privateHtml,await privateAccountScope(actor.id));
+    let scoped=scopeLocalMemories(privateHtml,await privateAccountScope(actor.id));
+    // Only an explicitly configured existing Worker enables online enrichment.
+    // The browser receives a boolean, never the provider username.
+    if(pathname==='/mijn-leven'&&typeof env.GEONAMES_USERNAME==='string'&&
+       /^[A-Za-z0-9_.-]{1,80}$/.test(env.GEONAMES_USERNAME)&&env.GEONAMES_USERNAME.toLowerCase()!=='demo'){
+      const marker='/*TALERA_GEONAMES_ENABLED*/false';
+      if(scoped.split(marker).length===2)scoped=scoped.replace(marker,'/*TALERA_GEONAMES_ENABLED*/true');
+    }
     // Locked WhatsApp design-cleanup baseline: no visible UI or presentation
     // amendments. Only server-verified private local storage and saved cue
     // media-ID reconciliation may rewrite the original approved markup.

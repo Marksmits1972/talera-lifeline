@@ -22,3 +22,31 @@ assert.equal(result.status,200);assert.equal((await result.json()).place.city,'S
 assert.equal(hits[0].limit,24);assert.equal(hits[1].limit,120);
 allowed=false;assert.equal((await capturePlaceApi(req(),env,deps)).status,429);assert.equal(calls,1);
 console.log('TALERA_GEONAMES_AUTH_SCOPE_LIMIT_PRIVACY_CONTRACT_PASS');
+
+import {enrichCapturePlaces} from './f5-capture-place-enrichment.mjs';
+const original=new Blob(['gps'],{type:'image/jpeg'});
+const record={id:'story-a',source:'pwa-local',items:[{key:'photo-a',kind:'photo',mime:'image/jpeg',size:3,name:'a.jpg'}]};
+const duplicate={...record,id:'story-b',items:[{...record.items[0]}]};
+let catalog=[structuredClone(record),structuredClone(duplicate)],requests=0,writes=0,online=false,fail=false,deleted=false;
+const resolved={countryCode:'NL',country:'Nederland',city:'Schijndel',source:'geonames-nearby-place'};
+const options={list:async()=>structuredClone(catalog),blob:async()=>original,
+ readPlace:async()=>null,readGps:async()=>({latitude:51.62,longitude:5.43}),
+ available:()=>online,lookup:async()=>{requests++;return fail?{ok:false}:{ok:true,place:resolved}},
+ commit:async(expected,index,value)=>{
+  if(deleted)return null;
+  const current=catalog.find(x=>x.id===expected.id);
+  assert.deepEqual(current,expected);writes++;
+  if(value)current.items[index].capturePlace=value;else current.items[index].capturePlaceChecked='v1';
+  return structuredClone(current);
+ }};
+await enrichCapturePlaces(options);assert.equal(requests,0);assert.equal(writes,0);
+online=true;fail=true;await enrichCapturePlaces(options);assert.equal(requests,1);assert.equal(writes,0);
+fail=false;await enrichCapturePlaces(options);assert.equal(requests,2);assert.equal(writes,2);
+assert.deepEqual(catalog[0].items[0].capturePlace,resolved);
+assert.deepEqual(catalog[1].items[0].capturePlace,resolved);
+await enrichCapturePlaces(options);assert.equal(requests,2);assert.equal(writes,2);
+catalog=[structuredClone(record)];deleted=true;await enrichCapturePlaces(options);assert.equal(writes,2);assert.equal(catalog[0].items[0].capturePlace,undefined);
+deleted=false;catalog=[structuredClone(record)];await enrichCapturePlaces({...options,readGps:async()=>null});
+assert.equal(catalog[0].items[0].capturePlaceChecked,'v1');
+const before=requests;await enrichCapturePlaces(options);assert.equal(requests,before);
+console.log('TALERA_GEONAMES_LOCAL_ENRICHMENT_OFFLINE_RETRY_DEDUP_PASS');

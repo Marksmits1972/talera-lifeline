@@ -1270,7 +1270,7 @@ function installCapturePlacePresentation(html){
  return html.replace('</head>',()=>css+'</head>').replace('</body>',()=>script+'</body>');
 }
 
-function installCapturePlaceCatalog(html){
+function installCapturePlaceCatalog(html,route){
  const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
  const start=raw.indexOf(' async function readJpegCapturePlace(blob){');
  const end=raw.indexOf(' async function readHeifCaptureGps(blob){');
@@ -1284,11 +1284,27 @@ function installCapturePlaceCatalog(html){
  html=html.replace(save,()=>reader+'\n'+save);
  // The later private editor patch still recognises its original item line.
  // No independent transaction, media copy, geocoder or network request.
- return html.replace(item,()=>item+
+ html=html.replace(item,()=>item+
   "\n  if(kind==='photo')try{\n"+
   "   const capturePlace=await readJpegCapturePlace(f);\n"+
   "   if(capturePlace)files[files.length-1].capturePlace=capturePlace;\n"+
   "  }catch(_){ /* Optional metadata must never prevent posting. */ }\n");
+ if(route!=='/mijn-leven')return html;
+ // Use the original local store closure, never a second IndexedDB owner.
+ const gpsStart=raw.indexOf(' function parseExifCaptureGps('),gpsEnd=raw.indexOf(' function create(store){');
+ assert.ok(gpsStart>=0&&gpsEnd>end,'CAPTURE_GPS_READER_SOURCE_DRIFT');
+ const gpsReaders=raw.slice(gpsStart,start)+raw.slice(end,gpsEnd);
+ const enrichment=readFileSync(path.join(here,'f5-capture-place-enrichment.mjs'),'utf8').replaceAll('export ','');
+ assert.ok(!gpsReaders.includes('</script')&&!enrichment.includes('</script'),'CAPTURE_ENRICHMENT_UNSAFE_SOURCE');
+ const matches=[...html.matchAll(/window\.TaleraMemories=\{[^\n;]*localOnly:true\};/g)];
+ assert.equal(matches.length,1,'CAPTURE_ENRICHMENT_STORE_MARKER_DRIFT');
+ const mount=matches[0],at=mount.index+mount[0].length;
+ const install='\n'+gpsReaders+'\n'+enrichment+'\n'+
+  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readJpegCapturePlace,readGps:async original=>{"+
+  "if(/^video\\/(?:quicktime|mp4|x-m4v)$/i.test(original.type))return readQuickTimeCaptureGps(original);"+
+  "if(/^image\\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(original.type)||/\\.(?:heic|heif)$/i.test(original.name||''))return readHeifCaptureGps(original);"+
+  "return readJpegCaptureGps(original)},enabled:/*TALERA_GEONAMES_ENABLED*/false});\n";
+ return html.slice(0,at)+install+html.slice(at);
 }
 
 function installReadOnlyLibraryGateway(html){
@@ -1782,7 +1798,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route!=='/tell')html=completePublishedRemovalOnOtherPage(html,
    readFileSync(path.join(delivery,'generated','reference-tell.html'),'utf8'));
  else html=installOriginalPayloadReader(html);
- html=installCapturePlaceCatalog(html);
+ html=installCapturePlaceCatalog(html,route);
  if(route==='/present')html=installCapturePlacePresentation(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);

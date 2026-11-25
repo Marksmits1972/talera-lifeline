@@ -183,16 +183,25 @@ backupRegression: try{
       await pickerPage.locator('#photoInput').setInputFiles(file);
       const expectedBytes=readFileSync(file).toString('base64');
       try{
-        await pickerPage.waitForFunction(async expected=>{
-          if(document.body.innerText.includes('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL'))throw Error(document.body.innerText);
-          const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
-          const b=d.originals.find(([,v])=>v instanceof Blob)?.[1];
-          if(!b)return false;
-          const x=new Uint8Array(await b.arrayBuffer());
-          const y=Uint8Array.from(atob(expected),c=>c.charCodeAt(0));
-          return x.length===y.length&&x.every((v,i)=>v===y[i])&&
-            d.catalog.some(g=>g.media?.length===1)&&!document.getElementById('photoInput');
-        },expectedBytes,{timeout:25000});
+        // Explicit Node-side polling: an asynchronous waitForFunction
+        // predicate can resolve a false Promise value before the IDB draft
+        // transaction is complete. Require an actual true readback.
+        let ready=false;
+        for(let attempt=0;attempt<150;attempt++){
+          const state=await pickerPage.evaluate(async expected=>{
+            if(document.body.innerText.includes('TALERA_LIBRARY_INVALID_SHARED_ORIGINAL'))throw Error(document.body.innerText);
+            const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+            const b=d.originals.find(([,v])=>v instanceof Blob)?.[1];
+            if(!b)return false;
+            const x=new Uint8Array(await b.arrayBuffer());
+            const y=Uint8Array.from(atob(expected),c=>c.charCodeAt(0));
+            return x.length===y.length&&x.every((v,i)=>v===y[i])&&
+              d.catalog.some(g=>g.media?.length===1)&&!document.getElementById('photoInput');
+          },expectedBytes);
+          if(state===true){ready=true;break}
+          await new Promise(resolve=>setTimeout(resolve,150));
+        }
+        assert.ok(ready,'Picker draft never became durably readable');
       }catch(error){
         console.log('TALERA_PICKER_IMPORT_FAILURE',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),
           body:(await pickerPage.locator('body').innerText()).slice(0,1800),pickerErrors}));
@@ -202,6 +211,7 @@ backupRegression: try{
         const mem=window.TaleraMemories;
         const draft=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
         const b=draft.originals.find(([,v])=>v instanceof Blob)?.[1];
+        if(!b)throw Error('Picker draft original missing at second readback');
         const saved=await mem.save({title:'Picker test',date:'2026-11-23',text:'synthetic'},[b]);
         const result=await mem.blob(saved.items[0].key);
         const bytes=new Uint8Array(await result.arrayBuffer());

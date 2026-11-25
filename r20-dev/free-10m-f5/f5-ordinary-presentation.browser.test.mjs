@@ -765,29 +765,26 @@ backupRegression: try{
       const row=await window.TaleraMemories.save({title:'Synthetic GPS',date:'2026-11-10',text:'GPS contract'},[file]);
       return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await file.arrayBuffer())]};
     });
-    // Count outside the document: app navigation/reload can reset a window
-    // array, but must never reset the observed network-request count.
-    const sent=[];
-    await geoCtx.exposeBinding('__taleraGeoRecordRequest',({page},entry)=>{
-      assert.equal(page,geoPage);
-      sent.push(entry);
-      return {place:{countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'}};
+    // Observe real same-origin HTTP requests at the browser context boundary.
+    // Unique response prevents a pre-existing catalog value passing this test.
+    const city='Testplaats-'+randomUUID().slice(0,8);
+    const sent=[],observed=[];
+    const isGeo=url=>{const u=new URL(url);return u.origin===origin&&u.pathname==='/api/capture-place'};
+    geoCtx.on('request',request=>{
+      if(isGeo(request.url()))observed.push(request.method());
     });
+    await geoCtx.route(url=>isGeo(url.href),async route=>{
+      const request=route.request();
+      sent.push({body:request.postDataJSON(),scope:request.headers()['x-talera-local-scope'],method:request.method()});
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({place:{
+        countryCode:'NL',country:'Nederland',city,source:'geonames-nearby-place'
+      }})});
+    });
+    // No replacement of window.fetch. Only the provider HTTP response is simulated.
     await geoCtx.addInitScript(()=>{
-      if(location.pathname!=='/mijn-leven'&&location.pathname!=='/present')return;
+      if(location.pathname!=='/mijn-leven')return;
       window.__taleraGeoOnline=false;
       Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
-      const nativeFetch=window.fetch.bind(window);
-      window.fetch=async (input,init)=>{
-        const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,location.href);
-        if(url.origin!==location.origin||url.pathname!=='/api/capture-place')return nativeFetch(input,init);
-        const body=JSON.parse(init.body);
-        const headers=new Headers(init.headers);
-        const response=await window.__taleraGeoRecordRequest({
-          body,scope:headers.get('x-talera-local-scope'),method:init.method,path:location.pathname
-        });
-        return new Response(JSON.stringify(response),{status:200,headers:{'content-type':'application/json'}});
-      };
     });
     const home=await geoPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
     assert.equal(home.status(),200);
@@ -795,11 +792,23 @@ backupRegression: try{
     await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
     await geoPage.waitForTimeout(2500);
     assert.equal(sent.length,0,'No geocoding while offline');
+    assert.equal(observed.length,0,'No HTTP geocoding attempt while offline');
     assert.equal(await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].capturePlace??null,saved.id),null);
     await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
-    await geoPage.waitForFunction(async id=>(await window.TaleraMemories.get(id))?.items[0]?.capturePlace?.city==='Arnhem',saved.id,{timeout:15000});
-    assert.equal(sent.length,1,'Exactly one provider request recorded across any page reload');
-    assert.equal(sent[0].path,'/mijn-leven');
+    try{
+      await geoPage.waitForFunction(async ([id,expected])=>(await window.TaleraMemories.get(id))?.items[0]?.capturePlace?.city===expected,[saved.id,city],{timeout:15000});
+    }catch(error){
+      const state=await geoPage.evaluate(async id=>{
+        const row=await window.TaleraMemories.get(id);
+        const item=row?.items?.[0];
+        return {path:location.pathname,online:navigator.onLine,hidden:document.hidden,place:item?.capturePlace??null,
+          checked:item?.capturePlaceChecked??null,size:item?.size,kind:item?.kind,mime:item?.mime};
+      },saved.id);
+      console.log('TALERA_GEONAMES_ACTUAL_REQUEST_DIAGNOSTIC',JSON.stringify({state,sent:sent.length,observed:observed.length,geoErrors}));
+      throw error;
+    }
+    assert.equal(sent.length,1,'Exactly one intercepted HTTP request');
+    assert.deepEqual(observed,['POST'],'Exactly one browser HTTP request');
     assert.deepEqual(Object.keys(sent[0].body).sort(),['latitude','longitude']);
     assert.ok(Math.abs(sent[0].body.latitude-51.985)<0.00001);
     assert.ok(Math.abs(sent[0].body.longitude-5.888333333333333)<0.00001);
@@ -810,13 +819,15 @@ backupRegression: try{
       return {key:item.key,place:item.capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]};
     },saved.id);
     assert.equal(stored.key,saved.key);assert.deepEqual(stored.bytes,saved.bytes);
-    assert.deepEqual(stored.place,{countryCode:'NL',country:'Nederland',city:'Arnhem',source:'geonames-nearby-place'});
+    assert.deepEqual(stored.place,{countryCode:'NL',country:'Nederland',city,source:'geonames-nearby-place'});
     await geoPage.evaluate(()=>window.dispatchEvent(new Event('online')));
     await geoPage.waitForTimeout(2500);
     assert.equal(sent.length,1,'Persisted metadata never requests the same media again');
+    assert.equal(observed.length,1);
     await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
-    await geoPage.waitForFunction(()=>document.getElementById('talera-capture-place')?.textContent.includes('Nederland · omgeving Arnhem (GeoNames)'),null,{timeout:20000});
+    await geoPage.waitForFunction(expected=>document.getElementById('talera-capture-place')?.textContent.includes('Nederland · omgeving '+expected+' (GeoNames)'),city,{timeout:20000});
     assert.equal(sent.length,1,'Presentation performs no geocoding');
+    assert.equal(observed.length,1);
     await geoPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
     assert.deepEqual(geoErrors,[]);
     console.log('TALERA_GEONAMES_ACTUAL_HOME_OFFLINE_RECONNECT_CATALOG_PRESENT_PASS');

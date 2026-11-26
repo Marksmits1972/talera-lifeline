@@ -5,7 +5,7 @@ const DAY=86400000,start=Date.UTC(2000,0,1),end=start+100*DAY;
 const memories=[{id:'a',ms:start+10*DAY},{id:'b',ms:start+10*DAY},{id:'c',ms:start+11*DAY},{id:'d',ms:start+19*DAY}];
 const scale=createLoupeScale(memories,start,end);
 const [a,b,c,d]=scale.stops;
-assert.ok(LOUPE_HOLD_MS<500&&LOUPE_SLOP_PX>=12);
+assert.equal(LOUPE_HOLD_MS,2000);assert.ok(LOUPE_SLOP_PX>=12);
 assert.equal(LOUPE_VISUAL_SCALE,1.10);assert.equal(LOUPE_PANEL_SCALE,2/3);assert.equal(LOUPE_TOUCH_ZONE,1/3);assert.ok(Math.abs(LOUPE_VISIBLE_DAYS*LOUPE_VISUAL_SCALE-6)<1e-9);
 // Prefer exact original baseline; preserve the date gap using the smallest
 // necessary upward displacement when the available height is restricted.
@@ -90,3 +90,6 @@ assert.equal(closestStop(d.position,null)?.id,'d');
 assert.equal(closestStop(70,'d'),null);
 assert.equal(nearestVisibleMemory([],mid,wideStart,wideEnd,null),null);
 console.log('TALERA_TIMELINE_WINDOW_THREE_SCALES_SPARSE_BOUNDARIES_PASS');
+
+// Exercise the exact generated native ruler, not a duplicate motion formula.
+await import('./f5-native-timeline-grip.test.mjs');

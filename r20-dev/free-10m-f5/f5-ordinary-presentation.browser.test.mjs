@@ -9,7 +9,7 @@ import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
 import {verifyDesktopLayout} from './f5-desktop-layout.browser-test.mjs';
 import {verifyEditReturn} from './f5-edit-return.browser-test.mjs';
-import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_DATE_GAP} from './f5-timeline-loupe.mjs';
+import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_DATE_GAP,LOUPE_HOLD_MS} from './f5-timeline-loupe.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 // Each CI execution gets its own synthetic originals + local Wrangler DO store.
@@ -422,9 +422,13 @@ async function testTimelineLoupe(){
    position:Number(document.getElementById('talera-timeline-loupe').dataset.position),
    center:window.__taleraTimelineRuntime.centerMs(),date:document.getElementById('focusText').textContent
   }));
+  // A short tap NEVER opens the loupe. Releasing/cancelling the pending
+  // hold disarms its timer. A real drag still cannot open it after 2s.
+  await lp.mouse.click(x,y);await lp.waitForTimeout(LOUPE_HOLD_MS+100);
+  assert.equal((await state()).open,false,'A tap must not open the loupe');
   // An intentional drag, followed by a pause, can never open the loupe.
   await lp.mouse.move(x,y);await lp.mouse.down();
-  await lp.mouse.move(x-45,y,{steps:2});await lp.waitForTimeout(500);
+  await lp.mouse.move(x-45,y,{steps:2});await lp.waitForTimeout(LOUPE_HOLD_MS+100);
   assert.equal((await state()).open,false);await lp.mouse.up();
   await load(lp,expected[0].id,1);
   await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
@@ -586,7 +590,7 @@ async function testTimelineLoupe(){
   // dismissing the calendar; its needle follows the new exact story ID.
   await load(lp,expected[0].id,1);
   await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
-  await lp.mouse.click(x,y);await panel.waitFor({state:'visible',timeout:4000});
+  await lp.mouse.move(x,y);await lp.mouse.down();await panel.waitFor({state:'visible',timeout:4000});await lp.mouse.up();
   const lower=await lp.locator('#memoryStoryScroll').boundingBox();
   const lowerY=lower.y+lower.height*.55;
   await lp.evaluate(()=>{
@@ -651,7 +655,12 @@ async function testTimelineLoupe(){
     const lowerTouch=await state();assert.equal(lowerTouch.open,true);assert.equal(lowerTouch.runtimeId,lowerTouch.loupeId);
    }finally{await session.detach()}
   }else{
-   await lp.touchscreen.tap(tx,ty);await panel.waitFor({state:'visible',timeout:4000});
+   await lp.touchscreen.tap(tx,ty);await lp.waitForTimeout(LOUPE_HOLD_MS+100);
+   assert.equal((await state()).open,false,'A trusted WebKit short touch must not open the loupe');
+   // Playwright WebKit exposes a trusted touch tap, not a touch hold.
+   // Open by the existing trusted mouse hold, then test the real touch close.
+   await lp.mouse.move(tx,ty);await lp.mouse.down();
+   await panel.waitFor({state:'visible',timeout:4000});await lp.mouse.up();
   }
   const touchSaved=await state(),touchStory=await lp.locator('#memoryStoryScroll').boundingBox();
   const tapX=touchStory.x+touchStory.width*.45,tapY=touchStory.y+touchStory.height*.48;

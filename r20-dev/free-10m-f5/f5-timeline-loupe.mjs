@@ -1,6 +1,6 @@
 // The enlarged ruler uses the existing timeline canvas, calendar and photo book.
 // No second memory order, media, storage, playback or network.
-export const LOUPE_HOLD_MS=350;
+export const LOUPE_HOLD_MS=2000;
 export const LOUPE_SLOP_PX=16;
 export const LOUPE_VISUAL_SCALE=1.10;
 export const LOUPE_PANEL_SCALE=2/3;
@@ -157,11 +157,11 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
   target=clampLoupe(target+dx/pxPerUnit(),Math.max(0,position-2),Math.min(scale.end,position+2));
   if(!frame)pump(now());
  }
- function open(p,held){
+ function open(p){
   clearPending();
   if(!p||!openNative(p.id))return false;
   refresh();opened=true;surface.dataset.taleraLoupe='open';panel.hidden=false;
-  active=held?p.id:null;previousX=p.lastX;render();return true;
+  active=p.id;previousX=p.lastX;render();return true;
  }
  function close(){
   if(!opened)return;
@@ -260,17 +260,11 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
    if(e.button!==0||e.isPrimary===false)return false;
    if(e.cancelable)e.preventDefault();
    const p={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,timer:0};
-   pending=p;p.timer=setTimeout(()=>open(p,true),LOUPE_HOLD_MS);return true;
+   pending=p;p.timer=setTimeout(()=>open(p),LOUPE_HOLD_MS);return true;
   },
   cancelPending(id){
    if(!pending||(id!==undefined&&pending.id!==id))return false;
    clearPending();return true;
-  },
-  releasePending(e){
-   if(!pending||pending.id!==e.pointerId)return false;
-   const p=pending;clearPending();
-   if(e.type==='pointerup')return open(p,false);
-   return false;
   },
   waiting(e){
    if(!pending||pending.id!==e.pointerId)return false;

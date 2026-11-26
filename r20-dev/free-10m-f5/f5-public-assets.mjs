@@ -1529,6 +1529,22 @@ function installTimelineLoupe(html){
  const source=readFileSync(path.join(here,'f5-timeline-loupe.mjs'),'utf8').replaceAll('export ','');
  assert.ok(!source.includes('</script>'));
  one('let zoomPos=0;','let zoomPos=0;\nlet taleraLoupeHoldId=null,taleraLoupeHoldMs=null;','HOLD_ID');
+ // Closing the loupe deliberately leaves the native zoom at level 1. The
+ // speed-sensitive visual ruler can subsequently return to level 0 without
+ // changing that native value. At both the initial grip and a settled gear
+ // change, anchor to the actual painted ruler (not that hidden zoom value).
+ one(`function dragSpanForCurrentVisual() {
+  // At month scale (and explicit deeper pinch scales) the timeline itself
+  // becomes the ruler: one screen-pixel of finger motion equals one
+  // screen-pixel of timeline motion. Overview keeps the proven life span.
+  return visualZoomPos>=.82?spanForZoom(visualZoomPos):spanForZoom(zoomPos);
+}`,`function dragSpanForCurrentVisual() {
+  // One pixel of movement equals one pixel on the actual visible ruler.
+  return spanForZoom(visualZoomPos);
+}`,'VISIBLE_GRIP_SPAN');
+ one('        const span=target>=.82?spanForZoom(target):spanForZoom(zoomPos);',
+  '        const span=spanForZoom(target);','VISIBLE_GEAR_REANCHOR');
+
  one('  centerMs=clamp(centerMs,minCenter,LIFE_END);',
   '  centerMs=clamp(centerMs,(surface.dataset.taleraLoupe==="open"||taleraLoupeHoldMs!==null&&centerMs===taleraLoupeHoldMs)?LIFE_START:minCenter,LIFE_END);','LIFE_LIMIT');
  one('  if (!window.__taleraBandRolling) {\n    if (userIsMoving) renderJourneyPreview();',
@@ -1641,7 +1657,7 @@ function taleraNativeTimelineStart(){
  one('surface.addEventListener("pointermove",e=>{\n  if(!pointers.has(e.pointerId)) return;',
   'surface.addEventListener("pointermove",e=>{\n  if(taleraLoupe.move(e))return;\n  if(!pointers.has(e.pointerId)) return;\n  if(taleraLoupe.waiting(e))return;\n  if(!userIsMoving)taleraNativeTimelineStart();','MOVE');
  one('function pointerEnd(e) {\n  if(pointers.has(e.pointerId)) pointers.delete(e.pointerId);',
-  'function pointerEnd(e) {\n  if(taleraLoupe.end(e))return;\n  if(taleraLoupe.releasePending(e))return;\n  if(taleraLoupe.cancelPending(e.pointerId)){pointers.delete(e.pointerId);userIsMoving=false;return}\n  if(!pointers.has(e.pointerId))return;\n  pointers.delete(e.pointerId);','END');
+  'function pointerEnd(e) {\n  if(taleraLoupe.end(e))return;\n  if(taleraLoupe.cancelPending(e.pointerId)){pointers.delete(e.pointerId);userIsMoving=false;return}\n  if(!pointers.has(e.pointerId))return;\n  pointers.delete(e.pointerId);','END');
  one('surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  userIsMoving = true;',
   'surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  if(taleraLoupe.wheel(e))return;\n  taleraLoupeHoldId=null;taleraLoupeHoldMs=null;\n  userIsMoving = true;','WHEEL');
  const css='<style id="talera-timeline-loupe-style">'+

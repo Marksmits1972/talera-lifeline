@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {TransferSignaling} from './f5-transfer-signal.mjs';
 import {inventory,planTransfer,makeTransfer,reviewTransfer} from './f5-transfer-library.mjs';
-import {sendFrame,frameReceiver} from './f5-transfer-transport.mjs';
+import {sendFrame,frameReceiver,pairingVerificationCode} from './f5-transfer-transport.mjs';
 const code='a'.repeat(32),sid='a'.repeat(64),other='b'.repeat(64),proof='c'.repeat(64);
 const sdp='v=0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n';
 test('pairing bound to separate sessions, one join, expiry and cancel',()=>{
@@ -24,6 +24,38 @@ test('pairing rejects media SDP and oversized messages',()=>{
  const s=new TransferSignaling();
  assert.throws(()=>s.handle(sid,{action:'create',code,proof,sdp:sdp+'m=video 9 UDP\r\n'}));
  assert.throws(()=>s.handle(sid,{action:'create',code,proof,sdp:sdp+'x'.repeat(12000)}));
+});
+test('automatic discovery is temporary, account-local, invisible to its owner and after joining',()=>{
+ let now=0;const signal=new TransferSignaling(()=>now),unrelatedAccount=new TransferSignaling(()=>now);
+ const secret='f'.repeat(20),invitation={code,secret},search={action:'discover'};
+ assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
+ assert.throws(()=>signal.handle(sid,{action:'create',code,sdp,proof,secret:[secret]}));
+ assert.throws(()=>signal.handle(sid,{action:'create',code,sdp,proof,secret:'invalid'}));
+ signal.handle(sid,{action:'create',code,sdp,proof,secret});
+ assert.deepEqual(signal.handle(sid,search),{ok:true,invitation:null});
+ assert.deepEqual(signal.handle(other,search),{ok:true,invitation});
+ assert.deepEqual(unrelatedAccount.handle(other,search),{ok:true,invitation:null});
+ assert.throws(()=>signal.handle(other,{action:'discover',code}));
+ assert.throws(()=>signal.handle(other,{action:'cancel',code}));
+ signal.handle(other,{action:'join',code,sdp,proof});
+ assert.deepEqual(signal.handle('d'.repeat(64),search),{ok:true,invitation:null});
+ assert.equal(signal.state.secret,null);
+ signal.handle(sid,{action:'cancel',code});
+ assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
+ now=4000;signal.handle(sid,{action:'create',code,sdp,proof,secret});
+ now+=120000;assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
+ now+=4000;signal.handle(sid,{action:'create',code,sdp,proof});
+ assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
+ assert.deepEqual(signal.offer(other,code).offer,{sdp,proof});
+});
+test('confirmation code binds both SDP messages and locator',async()=>{
+ const a=await pairingVerificationCode(code,sdp,sdp+'answer');
+ assert.match(a,/^\d{4} \d{4}$/);
+ assert.equal(a,await pairingVerificationCode(code,sdp,sdp+'answer'));
+ assert.notEqual(a,await pairingVerificationCode(code,sdp+'changed',sdp+'answer'));
+ assert.notEqual(a,await pairingVerificationCode(code,sdp,sdp+'changed'));
+ assert.notEqual(a,await pairingVerificationCode('b'.repeat(32),sdp,sdp+'answer'));
+ await assert.rejects(pairingVerificationCode('',sdp,sdp));
 });
 const scope='talera-free-local-'+('a'.repeat(32))+'-v1',origin='https://example.test';
 const photo={key:'local-test:0',blob:new File([new Uint8Array([0,1,2,3])],'a.jpg',{type:'image/jpeg',lastModified:10})};

@@ -1327,6 +1327,13 @@ export default {
         try{
           const command=await body(request);
           if(command?.action==='offer'&&Object.keys(command).sort().join()!=='action,code')return deny(400,'Verbinding niet beschikbaar');
+          // Account-discoverable invitations use an ephemeral secret only in
+          // authenticated JSON (never URL/query/logs); bind it to the locator.
+          if(command?.action==='create'&&Object.hasOwn(command,'secret')){
+            if(typeof command.secret!=='string'||!/^[a-f0-9]{20}$/.test(command.secret)||
+               command.code!==(await shaHex('talera-transfer-v1:'+command.secret)).slice(0,32))
+              return deny(400,'Verbinding niet beschikbaar');
+          }
           const sid=await shaHex(readSessionCookie(request));
           return json(await accountHome(env,actor.id).transferSignal(sid,command));
         }catch{return deny(409,'Verbinding niet beschikbaar');}

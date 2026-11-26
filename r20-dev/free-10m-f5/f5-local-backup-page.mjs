@@ -33,13 +33,20 @@ details{margin-top:14px}summary{cursor:pointer;color:#23497e;font-weight:600}det
 <p>Je herinneringen blijven in deze app. Een back-upbestand bewaar je zelf.</p>
 <p class="note">Een back-up bevat je foto's, video's en geluid. Het bestand is niet versleuteld: bewaar het privé.</p>
 <section id="device-transfer"><h2>Verbind apparaten</h2>
-<p>Open dit onderdeel op beide apparaten met hetzelfde account. Houd beide schermen open, liefst op hetzelfde wifi-netwerk.</p>
+<p>Open TALERA op beide apparaten met hetzelfde account. Houd beide schermen open, liefst op hetzelfde wifi-netwerk.</p>
 <button type="button" id="transfer-receive">Ontvangen op dit apparaat</button>
 <button type="button" id="transfer-send">Versturen vanaf dit apparaat</button>
-<div id="transfer-pair" hidden><p>Scan de QR-code vanuit TALERA op het andere apparaat of voer deze code in:</p><canvas id="transfer-qr" role="img" aria-label="Tijdelijke TALERA-verbindingscode" hidden></canvas><output id="transfer-code"></output></div>
-<div id="transfer-join" hidden><button type="button" id="transfer-scan">Scan QR-code</button> <button type="button" id="transfer-scan-stop" hidden>Camera sluiten</button><video id="transfer-camera" autoplay muted playsinline hidden></video><label>Verbindingscode<input id="transfer-input" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="25"></label><button type="button" id="transfer-connect">Verbinden</button></div>
+<details id="transfer-manual-receive"><summary>Handmatig verbinden als alternatief</summary>
+<button type="button" id="transfer-receive-manual">Ontvangen met een verbindingscode</button></details>
+<div id="transfer-pair" hidden><p id="transfer-waiting">Wachten op je andere apparaat. Open TALERA daar en kies Versturen vanaf dit apparaat.</p>
+<div id="transfer-pair-manual" hidden><p>Scan de QR-code vanuit TALERA op het andere apparaat of voer deze code in:</p><canvas id="transfer-qr" role="img" aria-label="Tijdelijke TALERA-verbindingscode" hidden></canvas><output id="transfer-code"></output></div></div>
+<div id="transfer-join" hidden>
+<div id="transfer-found" hidden><p>Ontvangend apparaat gevonden op jouw account.</p><button type="button" id="transfer-connect-found">Verbinden</button></div>
+<button type="button" id="transfer-search">Opnieuw zoeken</button>
+<details id="transfer-manual-send"><summary>Handmatig verbinden als alternatief</summary><button type="button" id="transfer-scan">Scan QR-code</button> <button type="button" id="transfer-scan-stop" hidden>Camera sluiten</button><video id="transfer-camera" autoplay muted playsinline hidden></video><label>Verbindingscode<input id="transfer-input" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="25"></label><button type="button" id="transfer-connect">Verbinden met code</button></details></div>
 <output id="transfer-status" role="status" aria-live="polite"></output>
-<button type="button" id="transfer-approve" hidden>Bevestig verbinding</button>
+<div id="transfer-verify" hidden><p>Controleer of dezelfde beveiligingscode op beide schermen staat.</p><output id="transfer-verify-code" style="font-size:1.55rem;font-weight:700;letter-spacing:.1em;text-align:center"></output></div>
+<button type="button" id="transfer-approve" hidden>Codes zijn gelijk — bevestig verbinding</button>
 <button type="button" id="transfer-import" hidden>Herinneringen toevoegen</button>
 <button type="button" id="transfer-cancel" hidden>Stoppen</button>
 <p class="note">Lukt verbinden niet? Gebruik de bestaande back-up hieronder. Er wordt niets overschreven.</p>

@@ -6,6 +6,12 @@ const MEMORY_LIMIT=64*1024*1024;
 const types=new Set(['ready','inventory','plan','archive','done','error']);
 const fail=()=>Error('TALERA_TRANSFER_PROTOCOL');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+// A short human comparison of the exact local signaling transcript.
+export async function pairingVerificationCode(locator,offer,answer){
+ if(typeof locator!=='string'||!/^[a-f0-9]{32}$/.test(locator)||typeof offer!=='string'||typeof answer!=='string'||!offer||!answer)throw fail();
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(['talera-transfer-verify-v1',locator,offer,answer])));
+ return String(new DataView(bytes).getUint32(0)%100000000).padStart(8,'0').replace(/^(....)(....)$/,'$1 $2');
+}
 export async function gather(peer,description){
  await peer.setLocalDescription(description);
  const until=Date.now()+12000;

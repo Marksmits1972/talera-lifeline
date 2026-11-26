@@ -1,6 +1,7 @@
 // Temporary, per-account, non-persistent signaling. No media or library data.
 const CODE=/^[a-f0-9]{32}$/;
 const HASH=/^[a-f0-9]{64}$/;
+const SECRET=/^[a-f0-9]{20}$/;
 const TTL=120000;
 const err=()=>{throw Error('TALERA_PAIR_UNAVAILABLE')};
 const validSDP=(s,type)=>typeof s==='string'&&s.length<=12000&&s.startsWith('v=0')&&
@@ -11,22 +12,34 @@ export class TransferSignaling {
  constructor(now=()=>Date.now()){this.now=now;this.state=null;this.nextCreate=0}
  handle(session,command){
   if(!HASH.test(session)||!command||typeof command!=='object'||Array.isArray(command))err();
-  const {action,code,sdp,proof}=command;
-  const fields={create:['action','code','sdp','proof'],join:['action','code','sdp','proof'],poll:['action','code'],cancel:['action','code']};
-  if(!Object.hasOwn(fields,action)||Object.keys(command).sort().join()!==fields[action].sort().join()||!CODE.test(code))err();
+  const {action,code,sdp,proof,secret}=command;
   const now=this.now();
   if(this.state&&this.state.expires<=now)this.state=null;
+  if(action==='discover'){
+   if(Object.keys(command).join()!=='action')err();
+   const st=this.state;
+   if(!st||st.owner===session||st.joiner||!st.secret)return {ok:true,invitation:null};
+   // The authenticated account boundary is enforced by the calling Worker/DO.
+   // No device ID, account data, SDP or media is included in this discovery.
+   return {ok:true,invitation:{code:st.code,secret:st.secret}};
+  }
+  const fields={create:['action','code','sdp','proof'],join:['action','code','sdp','proof'],poll:['action','code'],cancel:['action','code']};
+  if(action==='create'&&Object.hasOwn(command,'secret')){
+   if(typeof secret!=='string'||!SECRET.test(secret))err();
+   fields.create.push('secret');
+  }
+  if(!Object.hasOwn(fields,action)||Object.keys(command).sort().join()!==fields[action].sort().join()||!CODE.test(code))err();
   if(action==='create'){
    if(this.state||now<this.nextCreate||!validSDP(sdp,'offer')||!HASH.test(proof))err();
    this.nextCreate=now+3000;
-   this.state={code,owner:session,offer:{sdp,proof},expires:now+TTL,joiner:null,answer:null};
+   this.state={code,owner:session,offer:{sdp,proof},expires:now+TTL,joiner:null,answer:null,secret:secret||null};
    return {ok:true};
   }
   const st=this.state;
   if(!st||code!==st.code)err();
   if(action==='join'){
    if(st.owner===session||st.joiner||!validSDP(sdp,'answer')||!HASH.test(proof))err();
-   st.joiner=session;st.answer={sdp,proof};return {ok:true};
+   st.joiner=session;st.answer={sdp,proof};st.secret=null;return {ok:true};
   }
   if(action==='poll'){
    if(st.owner!==session)err();

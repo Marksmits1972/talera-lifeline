@@ -1,13 +1,15 @@
 // User-triggered transfer on the EXISTING private backup page only.
 import {readTransferLibrary,inventory,makeTransfer,reviewTransfer,commitTransfer} from './f5-transfer-library.mjs';
-import {newDirectPeer,gather,sendFrame,frameReceiver,jsonBlob,readJSON} from './f5-transfer-transport.mjs';
+import {newDirectPeer,gather,sendFrame,frameReceiver,jsonBlob,readJSON,pairingVerificationCode} from './f5-transfer-transport.mjs';
 import {drawPairingQR} from './f5-transfer-qr.mjs';
 import {pairingScanner} from './f5-transfer-scan.mjs';
 const el=id=>document.getElementById(id),scope=el('talera-free-backup')?.dataset.database;
 const status=el('transfer-status'),receive=el('transfer-receive'),send=el('transfer-send');
 const pair=el('transfer-pair'),join=el('transfer-join'),approve=el('transfer-approve'),apply=el('transfer-import'),stop=el('transfer-cancel');
 const input=el('transfer-input'),encoder=new TextEncoder(),hex=v=>Array.from(new Uint8Array(v),b=>b.toString(16).padStart(2,'0')).join('');
-let active=null,flow=0,connecting=false;
+const receiveManual=el('transfer-receive-manual'),found=el('transfer-found'),search=el('transfer-search'),connectFound=el('transfer-connect-found');
+const verify=el('transfer-verify'),verifyCode=el('transfer-verify-code'),pairManual=el('transfer-pair-manual'),waiting=el('transfer-waiting');
+let active=null,flow=0,connecting=false,discovered=null;
 const say=text=>{status.textContent=text};
 const qr=el('transfer-qr'),scanButton=el('transfer-scan'),scanStop=el('transfer-scan-stop');
 const scan=pairingScanner({video:el('transfer-camera'),report:msg=>{say(msg);if(el('transfer-camera').hidden){scanButton.disabled=false;scanStop.hidden=true}},onCode:code=>{
@@ -41,7 +43,9 @@ async function api(action,locator,extra={}){
 function live(s){if(active!==s||s.closed)throw Error('STOPPED')}
 function reset(){
  flow++;connecting=false;el('transfer-connect').disabled=false;closeCamera();clearQR();
- receive.disabled=send.disabled=false;pair.hidden=join.hidden=approve.hidden=apply.hidden=stop.hidden=true;
+ receive.disabled=send.disabled=receiveManual.disabled=false;pair.hidden=join.hidden=approve.hidden=apply.hidden=stop.hidden=true;
+ found.hidden=verify.hidden=pairManual.hidden=true;waiting.hidden=false;search.disabled=connectFound.disabled=false;
+ discovered=null;verifyCode.textContent='';el('transfer-manual-receive').open=el('transfer-manual-send').open=false;
  el('transfer-code').textContent='';input.value='';
 }
 async function finish(s,message,{signal=true}={}){
@@ -69,7 +73,7 @@ function timeout(s,ms){
 function newSession(role){
  if(active)throw Error('BUSY');
  const s={role,peer:newDirectPeer(),closed:false,approved:false,otherReady:false,started:false,plan:null,archive:null};
- active=s;receive.disabled=send.disabled=true;stop.hidden=false;timeout(s,140000);
+ active=s;receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;timeout(s,140000);
  s.peer.addEventListener('connectionstatechange',()=>{if(['failed','closed'].includes(s.peer.connectionState)&&active===s&&!s.committing)failure(s,Error('NETWORK'))});
  return s;
 }
@@ -151,10 +155,14 @@ function attach(s,channel){
   if(kind==='done')return s.role==='send'&&s.phase==='done'&&bytes<=100;
   return false;
  });
- channel.addEventListener('open',()=>{
+ channel.addEventListener('open',async()=>{
   if(active!==s)return;clearQR();closeCamera();pair.hidden=join.hidden=true;el('transfer-code').textContent='';input.value='';
-  say('Beide apparaten zijn verbonden. Bevestig de verbinding op beide apparaten.');approve.hidden=false;approve.disabled=false;
-  if(s.locator)api('cancel',s.locator).catch(()=>{});
+  try{
+   s.verification=await pairingVerificationCode(s.locator,s.offer,s.answer);live(s);
+   verifyCode.textContent=s.verification;verify.hidden=false;
+   say('Vergelijk de beveiligingscodes en bevestig op beide apparaten.');approve.hidden=false;approve.disabled=false;
+   if(s.locator)api('cancel',s.locator).catch(()=>{});
+  }catch(e){failure(s,e)}
  });
  channel.addEventListener('close',()=>{
   if(active!==s)return;
@@ -163,57 +171,84 @@ function attach(s,channel){
   else failure(s,Error('NETWORK'));
  });
 }
-receive.addEventListener('click',async()=>{
+async function startReceive(automatic){
  if(active||connecting)return;
- const run=++flow;connecting=true;receive.disabled=send.disabled=true;stop.hidden=false;
+ const run=++flow;connecting=true;receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;
  let s;
  try{
   await account();if(run!==flow)return;connecting=false;s=newSession('receive');say('Verbinding voorbereiden…');
   attach(s,s.peer.createDataChannel('talera-transfer-v1',{ordered:true}));
   const code=hex(crypto.getRandomValues(new Uint8Array(10)));
-  s.locator=(await codeHash(code)).slice(0,32);
-  const offer=await gather(s.peer,await s.peer.createOffer());live(s);
-  await api('create',s.locator,{sdp:offer,proof:await proof(code,'offer',offer)});live(s);
-  el('transfer-code').textContent=code.match(/.{1,5}/g).join('-').toUpperCase();pair.hidden=false;
-  try{drawPairingQR(qr,code);qr.hidden=false}catch{clearQR()}
-  say('Verbindingscode is twee minuten geldig.');
+  s.locator=(await codeHash(code)).slice(0,32);live(s);
+  const offer=await gather(s.peer,await s.peer.createOffer());live(s);s.offer=offer;
+  const signature=await proof(code,'offer',offer);live(s);
+  await api('create',s.locator,{sdp:offer,proof:signature,...(automatic?{secret:code}:{})});
+  if(active!==s){void api('cancel',s.locator).catch(()=>{});return}
+  pairManual.hidden=automatic;waiting.hidden=!automatic;pair.hidden=false;
+  if(!automatic){
+   el('transfer-code').textContent=code.match(/.{1,5}/g).join('-').toUpperCase();
+   try{drawPairingQR(qr,code);qr.hidden=false}catch{clearQR()}
+  }
+  say(automatic?'Je andere apparaat kan je nu vinden. Twee minuten geldig.':'Verbindingscode is twee minuten geldig.');
   const until=Date.now()+120000;
   while(Date.now()<until){
    await wait(2000);live(s);const r=await api('poll',s.locator);live(s);
    if(!r.answer)continue;
    if(r.answer.proof!==await proof(code,'answer',r.answer.sdp))throw Error('PAIR');
-   await s.peer.setRemoteDescription({type:'answer',sdp:r.answer.sdp});return;
+   live(s);s.answer=r.answer.sdp;
+   await s.peer.setRemoteDescription({type:'answer',sdp:s.answer});return;
   }
   throw Error('TIMEOUT');
  }catch(e){if(s)failure(s,e);else if(run===flow){reset();say('Verbinding niet beschikbaar. Open TALERA met je eigen account.')}}
-});
+}
+receive.addEventListener('click',()=>void startReceive(true));
+receiveManual.addEventListener('click',()=>void startReceive(false));
+async function discover(){
+ if(active||connecting||join.hidden)return;
+ const run=++flow;connecting=true;search.disabled=true;discovered=null;found.hidden=true;
+ closeCamera();say('Zoeken naar je ontvangende apparaat…');
+ try{
+  await account();if(run!==flow)return;
+  const r=await api('discover');if(run!==flow)return;
+  const invitation=r.invitation;
+  if(invitation===null){say('Nog geen apparaat gevonden. Kies eerst Ontvangen op het andere apparaat en tik op Opnieuw zoeken.');return}
+  if(!invitation||Object.keys(invitation).sort().join()!=='code,secret'||typeof invitation.code!=='string'||typeof invitation.secret!=='string'||!/^[a-f0-9]{32}$/.test(invitation.code)||!/^[a-f0-9]{20}$/.test(invitation.secret)||(await codeHash(invitation.secret)).slice(0,32)!==invitation.code)throw Error('PAIR');
+  if(run!==flow)return;discovered=invitation;found.hidden=false;say('Ontvangend apparaat gevonden. Tik op Verbinden.');
+ }catch(e){if(run===flow)say('Zoeken is niet gelukt. Probeer opnieuw met hetzelfde account of verbind handmatig.')}
+ finally{if(run===flow){connecting=false;search.disabled=false}}
+}
 send.addEventListener('click',()=>{
- if(active||connecting)return;join.hidden=false;stop.hidden=false;receive.disabled=true;send.disabled=true;input.focus();say('Voer de code van het ontvangende apparaat in.');
+ if(active||connecting)return;join.hidden=false;stop.hidden=false;receive.disabled=send.disabled=receiveManual.disabled=true;void discover();
 });
+search.addEventListener('click',()=>void discover());
 scanButton.addEventListener('click',()=>{
  if(active||connecting||join.hidden)return;
  scanButton.disabled=true;scanStop.hidden=false;void scan.start();
 });
 scanStop.addEventListener('click',()=>{closeCamera();say('Camera gesloten. Je kunt de code ook typen.')});
-el('transfer-connect').addEventListener('click',async()=>{
+async function connect(code,expectedLocator=null){
  if(active||connecting||join.hidden)return;
+ if(!/^[a-f0-9]{20}$/.test(code)){say('Voer de volledige verbindingscode in.');return}
  let s;const run=++flow;
  try{
-  const code=input.value.trim().replace(/-/g,'').toLowerCase();
-  if(!/^[a-f0-9]{20}$/.test(code)){say('Voer de volledige verbindingscode in.');return}
-  connecting=true;el('transfer-connect').disabled=true;closeCamera();
+  connecting=true;discovered=null;el('transfer-connect').disabled=connectFound.disabled=search.disabled=true;closeCamera();
   await account();if(run!==flow)return;connecting=false;s=newSession('send');join.hidden=true;say('Verbinding maken…');
-  s.locator=(await codeHash(code)).slice(0,32);
+  s.locator=(await codeHash(code)).slice(0,32);live(s);
+  if(expectedLocator&&expectedLocator!==s.locator)throw Error('PAIR');
   const r=await api('offer',s.locator);live(s);
-  if(r.offer?.proof!==await proof(code,'offer',r.offer.sdp))throw Error('PAIR');
+  if(!r.offer||r.offer.proof!==await proof(code,'offer',r.offer.sdp))throw Error('PAIR');
+  live(s);s.offer=r.offer.sdp;
   s.peer.addEventListener('datachannel',event=>{try{if(event.channel.label!=='talera-transfer-v1')throw Error('PROTOCOL');attach(s,event.channel)}catch(e){failure(s,e)}});
-  await s.peer.setRemoteDescription({type:'offer',sdp:r.offer.sdp});
-  const answer=await gather(s.peer,await s.peer.createAnswer());live(s);
-  await api('join',s.locator,{sdp:answer,proof:await proof(code,'answer',answer)});
+  await s.peer.setRemoteDescription({type:'offer',sdp:s.offer});
+  const answer=await gather(s.peer,await s.peer.createAnswer());live(s);s.answer=answer;
+  const signature=await proof(code,'answer',answer);live(s);
+  await api('join',s.locator,{sdp:answer,proof:signature});
  }catch(e){if(s)failure(s,e);else if(run===flow){reset();say('Verbinding niet beschikbaar. Probeer opnieuw.')}}
-});
+}
+el('transfer-connect').addEventListener('click',()=>void connect(input.value.trim().replace(/-/g,'').toLowerCase()));
+connectFound.addEventListener('click',()=>{if(discovered)void connect(discovered.secret,discovered.code)});
 approve.addEventListener('click',async()=>{
- const s=active;if(!s||s.approved)return;approve.disabled=true;
+ const s=active;if(!s||s.approved||!s.verification)return;approve.disabled=true;
  try{await account();live(s);s.approved=true;if(s.role==='send'&&s.otherReady)s.phase='inventory';
   await sendJSON(s,'ready',{ready:true});say('Wachten op bevestiging van beide apparaten…');await maybeStart(s);
  }catch(e){failure(s,e)}

@@ -93,12 +93,14 @@ try{
    for(const [role,page] of [['sender',sender],['receiver',receiver]]){page.setDefaultTimeout(15000);page.on('pageerror',e=>console.error('TALERA_TRANSFER_BROWSER_PAGE_ERROR',name,role,e.message));}
    await bounded(name+' sender goto',()=>sender.goto(url+'/__f5/backup'));await bounded(name+' receiver goto',()=>receiver.goto(url+'/__f5/backup'));
    await bounded(name+' seed first existing story',()=>seed(sender,'local-one'));await bounded(name+' seed empty receiving library',()=>seed(receiver,null));
-   async function once(count,before){
+   async function once(count,before,manual=false){
     // Pairing server throttles consecutive starts for 3 seconds.
     const step=name+' transfer '+before+'/'+count;
     mark(step+' begin');
     await receiver.waitForTimeout(3100);
-    await receiver.locator('#transfer-receive').click();
+    if(manual){
+    await receiver.locator('#transfer-manual-receive summary').click();
+    await receiver.locator('#transfer-receive-manual').click();
     mark(step+' receive pairing code');
     await receiver.locator('#transfer-code').waitFor({state:'visible',timeout:25000});
     const code=await receiver.locator('#transfer-code').innerText();
@@ -112,12 +114,31 @@ try{
     assert.equal(scanned,code.replace(/-/g,'').toLowerCase());
     mark(step+' connect');
     await sender.locator('#transfer-send').click();
+    await sender.waitForFunction(()=>!document.getElementById('transfer-search').disabled);
+    assert.equal(await sender.locator('#transfer-found').isVisible(),false);
+    await sender.locator('#transfer-manual-send summary').click();
     await sender.locator('#transfer-input').fill(code);await sender.locator('#transfer-connect').click();
+    }else{
+     await receiver.locator('#transfer-receive').click();
+     await receiver.locator('#transfer-pair').waitFor({state:'visible',timeout:25000});
+     assert.equal(await receiver.locator('#transfer-qr').isVisible(),false);
+     assert.equal(await receiver.locator('#transfer-code').textContent(),'');
+     await sender.locator('#transfer-send').click();
+     await sender.locator('#transfer-found').waitFor({state:'visible'});
+     assert.equal(await sender.locator('#transfer-camera').isVisible(),false);
+     await sender.locator('#transfer-connect-found').click();
+    }
     try{
      mark(step+' wait for direct channel');
      await Promise.all([sender.locator('#transfer-approve').waitFor({state:'visible',timeout:25000}),receiver.locator('#transfer-approve').waitFor({state:'visible',timeout:25000})]);
+     const receiverCode=await receiver.locator('#transfer-verify-code').innerText();
+     assert.match(receiverCode,/^\d{4} \d{4}$/);
+     assert.equal(receiverCode,await sender.locator('#transfer-verify-code').innerText());
      mark(step+' approve both');
-     await sender.locator('#transfer-approve').click();await receiver.locator('#transfer-approve').click();
+     await sender.locator('#transfer-approve').click();
+     assert.equal(await receiver.locator('#transfer-import').isVisible(),false);
+     assert.equal((await bounded(step+' inspect before both approvals',()=>inspect(receiver))).stories.length,before);
+     await receiver.locator('#transfer-approve').click();
      if(count){
       await receiver.locator('#transfer-import').waitFor({state:'visible',timeout:30000});
       assert.equal((await bounded(step+' inspect before commit',()=>inspect(receiver))).stories.length,before);
@@ -130,8 +151,8 @@ try{
      assert.deepEqual(await bounded(step+' inspect receiver',()=>inspect(receiver)),await bounded(step+' inspect sender',()=>inspect(sender)));
     }catch(e){console.error('TALERA_TRANSFER_BROWSER_FAILURE',checkpoint,e.message);for(const [role,page] of [['sender',sender],['receiver',receiver]]){try{console.error(role,await bounded(step+' '+role+' status',()=>page.locator('#transfer-status').textContent({timeout:2000}),3000))}catch{}}throw e}
    }
-   await once(1,0);await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2);
-   console.log('TALERA_DIRECT_TRANSFER_BROWSER_PASS',engine.name(),{networkPosts,firstCopy:true,repeatOnlyNew:true,identicalBytes:true,explicitConfirmation:true});
+   await once(1,0);await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2,true);
+   console.log('TALERA_DIRECT_TRANSFER_BROWSER_PASS',engine.name(),{networkPosts,firstCopy:true,repeatOnlyNew:true,identicalBytes:true,explicitConfirmation:true,automaticDiscovery:true,manualFallback:true});
   }finally{await bounded(name+' browser close',()=>browser.close(),15000)}
   mark(name+' complete including cleanup');
  }

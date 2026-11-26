@@ -1056,9 +1056,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 3fbf27fbf9cf9b545f2c7db52ccffb0f50501159
-          test "$(git diff --name-only 3fbf27fbf9cf9b545f2c7db52ccffb0f50501159 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 3fbf27fbf9cf9b545f2c7db52ccffb0f50501159 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 0a8e6820d2be298e8b5da8205c4d222e22c34c86
+          test "$(git diff --name-only 0a8e6820d2be298e8b5da8205c4d222e22c34c86 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 0a8e6820d2be298e8b5da8205c4d222e22c34c86 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -1067,7 +1067,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45858529010',sha='3fbf27fbf9cf9b545f2c7db52ccffb0f50501159';
+          const id='45860028373',sha='0a8e6820d2be298e8b5da8205c4d222e22c34c86';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const packageName='Build and archive the exact TALERA Free candidate once';
@@ -1096,7 +1096,7 @@ jobs:
           const artifacts=await get(id+'/artifacts?name=talera-free-f5-candidate-package&per_page=100');
           assert.equal(artifacts.artifacts.length,1);
           const artifact=artifacts.artifacts[0];
-          assert.equal(String(artifact.id),'15135844742');assert.equal(artifact.digest,'sha256:891eab3aaf8c8ae3b30abed2c19499404dc25b1d88c66daedf42f7165e231c09');assert.equal(artifact.expired,false);
+          assert.equal(String(artifact.id),'15138790585');assert.equal(artifact.digest,'sha256:5510a91f377c0dafae141ca0c5b0e6d95a78932957226cc1937df730c7864bbc');assert.equal(artifact.expired,false);
           assert.equal(artifact.workflow_run?.head_sha,sha);assert.equal(String(artifact.workflow_run?.id),id);
           const main=jobs.find(j=>j.name===mainName);
           for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
@@ -1111,7 +1111,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45858529010');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45860028373');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1163,17 +1163,17 @@ jobs:
         with:
           name: talera-free-f5-candidate-package
           github-token: ${{ github.token }}
-          run-id: 45858529010
+          run-id: 45860028373
           path: ${{ runner.temp }}/talera-candidate-package
       - name: Verify source and tested SHA256 before unpacking for release
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(cat "$out/source.sha")" = "3fbf27fbf9cf9b545f2c7db52ccffb0f50501159"
-          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "df0a4f3fa5111b6daed83d91d7c90c2a2f709ccff25daebc62a445e18eec0f00"
+          test "$(cat "$out/source.sha")" = "0a8e6820d2be298e8b5da8205c4d222e22c34c86"
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "b38f632f28c19d5610a611310584368e535bc918ab64e7ed30c2dee0d1e1ff27"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=df0a4f3fa5111b6daed83d91d7c90c2a2f709ccff25daebc62a445e18eec0f00"
+          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=b38f632f28c19d5610a611310584368e535bc918ab64e7ed30c2dee0d1e1ff27"
       - name: Verify same tested TALERA with no examples and verify account and personal media contracts
         run: |
           set -euo pipefail
@@ -1267,8 +1267,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code 3fbf27fbf9cf9b545f2c7db52ccffb0f50501159 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45858529010'
+          git diff --exit-code 0a8e6820d2be298e8b5da8205c4d222e22c34c86 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45860028373'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail

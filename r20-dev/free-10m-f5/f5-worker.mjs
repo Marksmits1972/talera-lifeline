@@ -1036,33 +1036,35 @@ async function publicWhatsAppMemory(request,env){
 // One revocable token, one existing social Durable Object, no separate account
 // or outside destination. Social actions cannot query another memory.
 async function publicGuestFeedback(request,env){
+ const lang=chooseLanguage(request.headers.get('x-talera-language'),[requestLanguage(request)]);
+ const guestDeny=(status,key)=>json({ok:false,error:translate(lang,key),messageKey:key},status);
  const u=new URL(request.url),path=u.pathname,method=request.method;
  const route=/^\/(s\/[A-Za-z0-9_-]{43}|__social\/shared\/[a-f0-9]{64})\/(feedback|heart|comment)$/.exec(path);
- if(!route||u.search)return deny(404,'Niet gevonden');
+ if(!route||u.search)return guestDeny(404,'guest.api.route');
  const action=route[2];
  if(method!==(action==='feedback'?'GET':'POST'))
-  return deny(405,'Methode niet toegestaan');
+  return guestDeny(405,'guest.api.method');
  const encoded=route[1].split('/')[1];
  const token=route[1].startsWith('s/')?expandWhatsAppToken(encoded):encoded;
- if(!token)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ if(!token)return guestDeny(404,'guest.api.token');
  if(action!=='feedback'&&
     (!sameOrigin(request)||!(request.headers.get('content-type')||'').toLowerCase().startsWith('application/json')))
-  return deny(403,'Ongeldige aanvraag');
+  return guestDeny(403,'guest.api.origin');
  const forwarded=new URL('/__social/shared/'+token,u);
  const lookup=await socialApi(new Request(forwarded,{method:'GET',headers:request.headers}),env);
- if(!lookup.ok)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ if(!lookup.ok)return guestDeny(404,'guest.api.lookup');
  const data=await lookup.json();
  if(!data.ok||!FREE_SHARE_ID.test(data.storyId||''))
-  return deny(404,'Deze deellink is verlopen of ingetrokken');
+  return guestDeny(404,'guest.api.story');
  const hash=await shaHex(token);
  let payload={};
  if(action!=='feedback'){
-  if(Number(request.headers.get('content-length')||0)>2400)return deny(413,'Reactie te groot');
+  if(Number(request.headers.get('content-length')||0)>2400)return guestDeny(413,'guest.api.headerTooLarge');
   const raw=await request.text();
-  if(raw.length>2400)return deny(413,'Reactie te groot');
-  try{payload=JSON.parse(raw)}catch{return deny(400,'Ongeldige reactie')}
+  if(raw.length>2400)return guestDeny(413,'guest.api.bodyTooLarge');
+  try{payload=JSON.parse(raw)}catch{return guestDeny(400,'guest.api.invalidJson')}
   if(!payload||typeof payload!=='object'||Array.isArray(payload))
-   return deny(400,'Ongeldige reactie');
+   return guestDeny(400,'guest.api.invalidObject');
  }
  const actor=await sessionAccount(request,env);
  const guestId=action==='feedback'?request.headers.get('x-talera-guest-id'):payload.guestId;
@@ -1074,11 +1076,11 @@ async function publicGuestFeedback(request,env){
   return json(result);
  }catch(e){
   const code=String(e?.message||'');
-  if(code.startsWith('INVALID_'))return deny(400,'Controleer jouw voornaam en reactie');
-  if(code==='GUEST_RATE_LIMIT')return deny(429,'Er zijn te snel reacties geplaatst. Probeer later opnieuw.');
-  if(code==='GUEST_FEEDBACK_FULL')return deny(429,'Deze herinnering kan momenteel geen nieuwe reacties ontvangen.');
-  if(code==='ACCESS_DENIED')return deny(404,'Deze deellink is verlopen of ingetrokken');
-  return deny(503,'Reacties tijdelijk niet beschikbaar');
+  if(code.startsWith('INVALID_'))return guestDeny(400,'guest.api.invalidInput');
+  if(code==='GUEST_RATE_LIMIT')return guestDeny(429,'guest.api.rate');
+  if(code==='GUEST_FEEDBACK_FULL')return guestDeny(429,'guest.api.full');
+  if(code==='ACCESS_DENIED')return guestDeny(404,'guest.api.denied');
+  return guestDeny(503,'guest.api.unavailable');
  }
 }
 async function publicPage(request,env){

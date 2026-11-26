@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu,keepOnlyFunctionalFreeMenu} from './f5-account-switch-guard.mjs';
+import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
 const source=readFileSync('r20-dev/free-10m-f5/generated/approved-menu-original.mjs','utf8');
 const {verifiedPublicScripts}=await import('./generated/public-template-map.mjs');
 const scriptPath=verifiedPublicScripts['/__clean/menu-integration.mjs'];
 assert.match(scriptPath||'',/^\/__talera_free\/f5scripts\/[a-f0-9]{64}\.mjs$/);
 const served=readFileSync(path.join('r20-dev/free-10m-delivery/public',scriptPath.slice(1)),'utf8');
-assert.equal(served,keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(source))))),
+assert.equal(served,localizeApprovedMenu(keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(source)))))),
  'Original menu must preserve auth, backup and controls while hiding only unimplemented or redundant options');
 assert.ok(source.includes("option('accessibility'")&&source.includes("case 'accessibility':"),'Original menu source still has placeholder; verify minimal change');
 assert.ok(!served.includes("option('accessibility'")&&!served.includes("case 'accessibility':")&&!served.includes("accessibility:'Toegankelijkheid'")&&!served.includes("'accessibility','display'"),'No Accessibility menu, screen, heading or deep-link remains');
@@ -26,10 +27,10 @@ assert.ok(served.includes("if(active==='help')")&&
  'Help keeps introduction link but loses redundant privacy entry');
 assert.equal((served.match(/https:\/\/talera-website\.pages\.dev\/welkom\//g)||[]).length,1,
  'One original, functioning Ontdek TALERA website URL must be preserved');
-for(const keep of ["option('mine','▣','Door mij gedeeld'",
- "option('language','NL','Taal'",
- "option('storage','▤','Opslag en back-up'",
- "option('help','?','Hulp en over TALERA'",
+for(const keep of ["option('mine','▣',t(\"menu.hub.sent1\")",
+ "option('language',window.TaleraI18n.language.toUpperCase()",
+ "option('storage','▤',t(\"menu.settings.storage1\")",
+ "option('help','?',t(\"menu.hub.Hulp_en_over_TALERA1\")",
  "data-action=\"enable-listening\"","data-action=\"disable-listening\""]){
  if(keep.startsWith('data-action='))continue; // dynamic action varies with current audio state
  assert.ok(served.includes(keep),'Existing functional Free control disappeared: '+keep);

@@ -247,12 +247,13 @@ export default {
    if(m==='POST'&&p==='/api/logout')return logout(req,env);
    if(m==='GET'&&p==='/api/me')return me(req,env);
    if(m==='POST'&&p==='/api/profile')return profile(req,env);
-   if(m==='POST'&&p==='/api/password-reset/request')return requestPasswordReset(req,env);
-   if(m==='POST'&&p==='/api/password-reset/confirm')return confirmPasswordReset(req,env);
+   if(m==='POST'&&p==='/api/password-reset/request')return await requestPasswordReset(req,env);
+   if(m==='POST'&&p==='/api/password-reset/confirm')return await confirmPasswordReset(req,env);
    return err(405,'Methode niet toegestaan');
   }catch(error){
    // No user input, credentials, cookies, salts or hashes in logs.
    console.error('FREE_AUTH_PILOT_INTERNAL_ERROR',error?.message==='TRUSTED_IP_MISSING'?'TRUSTED_IP_MISSING':'INTERNAL');
+   if(RESET_PATHS.includes(p))return resetResponse(req,503,'reset.api.unavailable');
    return err(503,'De test-accountservice is tijdelijk niet beschikbaar');
   }
  }

@@ -102,10 +102,11 @@ ${hasVideo?'<section class="video-layer" id="guestVideoLayer" hidden aria-label=
 export function renderTaleraLanding(){
  return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title data-talera-text="guest.landing.title">${languageText('guest.landing.title')}</title><style>${landingCSS}</style><script defer src="/__f5/guest-ui.js"></script></head><body data-talera-page="landing"><div class="wrap"><nav><a class="logo" href="/mijn-leven"><img src="/pwa-192.png" alt="">TALERA</a></nav><main><div class="hero"><section><h1>${languageSpan('guest.landing.heading')}</h1><p class="lead">${languageSpan('guest.landing.lead')}</p><div class="guest-landing-actions"><a class="return" id="returnGuestStory" href="/mijn-leven" hidden>${languageSpan('guest.landing.back')}</a><a class="cta" href="/mijn-leven">${languageSpan('guest.landing.cta')}</a></div></section><div class="visual" aria-hidden="true"><span class="pill">${languageSpan('guest.landing.pill')}</span><div class="vision">${languageSpan('guest.landing.visionMoments')}<br>${languageSpan('guest.landing.visionVoice')}<br>${languageSpan('guest.landing.visionStory')}</div><div class="life-line"></div><span>${languageSpan('guest.landing.memories')}</span></div></div><section class="features" data-talera-aria-label="guest.landing.featuresAria" aria-label="${languageText('guest.landing.featuresAria')}"><article><h2>${languageSpan('guest.landing.featurePhotos')}</h2><p>${languageSpan('guest.landing.featurePhotosText')}</p></article><article><h2>${languageSpan('guest.landing.featureVoice')}</h2><p>${languageSpan('guest.landing.featureVoiceText')}</p></article><article><h2>${languageSpan('guest.landing.featureShare')}</h2><p>${languageSpan('guest.landing.featureShareText')}</p></article></section></main><footer>${languageSpan('guest.landing.footer')}</footer></div></body></html>`;
 }
-export const guestClientScript=languageBootstrap(['guest.landing.'])+String.raw`(()=>{
+export const guestClientScript=languageBootstrap(['guest.landing.','guest.fallback.','guest.api.'])+String.raw`(()=>{
 'use strict';
 const $=id=>document.getElementById(id);
 const page=document.body.dataset.taleraPage;
+const t=(key,params)=>window.TaleraLanguage.t(key,params);
 if(page==='landing'){
  const target=location.hash.slice(1);
  if(/^(?:s\/[A-Za-z0-9_-]{43}|__social\/shared\/[a-f0-9]{64})$/.test(target)){
@@ -178,11 +179,11 @@ if(videoLayer){
  $('closeGuestVideo').addEventListener('click',()=>{video.pause();unfinishedMedia.delete(video);videoLayer.hidden=true;popupCheck()});
 }
 async function api(path,method='GET',data){
- const opts={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json','x-talera-guest-id':guestId}};
+ const opts={method,credentials:'same-origin',cache:'no-store',headers:{accept:'application/json','x-talera-guest-id':guestId,'x-talera-language':window.TaleraLanguage.language}};
  if(data){opts.headers['content-type']='application/json';opts.body=JSON.stringify(data)}
  const res=await fetch(base+'/'+path,opts);
  const result=await res.json().catch(()=>({}));
- if(!res.ok||result.ok===false)throw Error(result.error||'De reactie is niet gelukt.');
+ if(!res.ok||result.ok===false)throw Error(typeof result.messageKey==='string'&&result.messageKey.startsWith('guest.api.')?t(result.messageKey):t('guest.fallback.feedbackError'));
  return result;
 }
 function renderFeedback(){
@@ -191,10 +192,10 @@ function renderFeedback(){
  $('guestHeart').setAttribute('aria-pressed',String(!!feedback.liked));
  const list=$('guestComments');list.replaceChildren();
  const items=Array.isArray(feedback.comments)?feedback.comments:[];
- if(!items.length){const p=document.createElement('p');p.className='muted';p.textContent='Er zijn nog geen reacties.';list.append(p)}
+ if(!items.length){const p=document.createElement('p');p.className='muted';p.textContent=t('guest.fallback.emptyFeedback');list.append(p)}
  for(const item of items){
   const wrap=document.createElement('div');wrap.className='comment';
-  const name=document.createElement('strong');name.textContent=item.name||'TALERA-gebruiker';
+  const name=document.createElement('strong');name.textContent=item.name||t('guest.fallback.anonymousName');
   const body=document.createElement('p');body.textContent=item.body||'';
   wrap.append(name,body);list.append(wrap);
  }
@@ -221,7 +222,7 @@ $('guestCommentForm').addEventListener('submit',async e=>{
   feedback=await api('comment','POST',{guestId,
    firstName:$('guestName').value,body:$('guestMessage').value});
   $('guestMessage').value='';
-  renderFeedback();$('guestStatus').textContent='Je reactie is geplaatst.';
+  renderFeedback();$('guestStatus').textContent=t('guest.fallback.commentSent');
  }catch(error){$('guestStatus').textContent=error.message}
  finally{button.disabled=false}
 });
@@ -290,7 +291,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   ';(function(){',
   "'use strict';",
   'const row=__GUEST_ROW__,items=__GUEST_MEDIA__,cache=new Map(),objectUrls=new Set();',
-  "const deny=async()=>{throw Error('Alleen lezen: deze herinnering is persoonlijk gedeeld.')};",
+  "const deny=async()=>{throw Error(window.TaleraI18n.t('guest.native.readOnly'))};",
   "const list=async()=>[{...row,items:row.items.map(x=>({...x}))}];",
   "const get=async id=>id===row.id?(await list())[0]:null;",
   'const blob=async key=>{',
@@ -353,15 +354,17 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  '#taleraNativeInvite button{background:#304653;color:white;border:0;border-radius:12px;padding:12px 15px}',
  '#taleraNativeInvite a{color:#304653;font-weight:750}',
  '</style>',
- '<section id="taleraNativeInvite" hidden><div class="inner"><h2>Ontdek TALERA</h2>',
- '<p>Bewaar ook jouw persoonlijke herinneringen.</p>',
- '<p><a id="taleraNativeIntroLink" href="/ontdek-talera#'+escapeHtml(pagePath.slice(1))+'">Ontdek TALERA</a></p>',
- '<button id="taleraNativeInviteClose" type="button">Niet nu</button></div></section>'
+ '<section id="taleraNativeInvite" hidden><div class="inner"><h2 data-i18n="guest.native.inviteHeading">'+languageText('guest.native.inviteHeading')+'</h2>',
+ '<p data-i18n="guest.native.inviteMessage">'+languageText('guest.native.inviteMessage')+'</p>',
+ '<p><a id="taleraNativeIntroLink" href="/ontdek-talera#'+escapeHtml(pagePath.slice(1))+'" data-i18n="guest.native.inviteLink">'+languageText('guest.native.inviteLink')+'</a></p>',
+ '<button id="taleraNativeInviteClose" type="button" data-i18n="guest.native.inviteDismiss">'+languageText('guest.native.inviteDismiss')+'</button></div></section>'
  ].join('');
  const social=[
   ";(function(){",
   "'use strict';",
   "const $=id=>document.getElementById(id),base=location.pathname;",
+  "const t=(key,params)=>window.TaleraI18n.t(key,params);",
+  "const e=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');",
   "let initialized=false;",
   "function start(){",
   "if(initialized)return;",
@@ -377,10 +380,10 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "}catch{guestId=crypto.randomUUID()}",
   "const req=async(action,method='GET',payload)=>{",
   " const opt={method,credentials:'omit',cache:'no-store',headers:{",
-  "  accept:'application/json','x-talera-guest-id':guestId}};",
+  "  accept:'application/json','x-talera-guest-id':guestId,'x-talera-language':window.TaleraI18n.language}};",
   " if(payload){opt.headers['content-type']='application/json';opt.body=JSON.stringify(payload)}",
   " const r=await fetch(base+'/'+action,opt),data=await r.json().catch(()=>({}));",
-  " if(!r.ok||data.ok===false)throw Error(data.error||'Reactie mislukt');",
+  " if(!r.ok||data.ok===false)throw Error(typeof data.messageKey==='string'&&data.messageKey.startsWith('guest.api.')?t(data.messageKey):t('guest.native.feedbackError'));",
   " return data;",
   "};",
   "const status=()=>{syncNodes();return panel?.querySelector('[data-guest-status]')};",
@@ -392,10 +395,10 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "  heart.setAttribute('aria-pressed',String(!!data.liked))}",
   " if(comments){const n=comments.querySelector('.count');if(n)n.textContent=String(data.commentCount||0)}",
   " const list=$('taleraNativeCommentList');if(!list)return;list.replaceChildren();",
-  " if(!data.comments?.length){const p=document.createElement('p');p.textContent='Nog geen berichten.';list.append(p)}",
+  " if(!data.comments?.length){const p=document.createElement('p');p.textContent=t('guest.native.emptyFeedback');list.append(p)}",
   " for(const c of data.comments||[]){",
   "  const entry=document.createElement('div'),name=document.createElement('strong'),body=document.createElement('p');",
-  "  entry.className='comment';name.textContent=c.name||'Gebruiker';body.textContent=c.body||'';",
+  "  entry.className='comment';name.textContent=c.name||t('guest.native.anonymousName');body.textContent=c.body||'';",
   "  entry.append(name,body);list.append(entry);",
   " }",
   " const field=$('taleraGuestFirstName');",
@@ -409,18 +412,18 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   " if(!overlay.hidden&&$('taleraGuestFirstName'))return;",
   " // The exact original TALERA overlay, paper, header, close icon and form.",
   " // One extra first-name field is required for the anonymous recipient.",
-  " panel.innerHTML=[",
-  "  '<button type=\"button\" class=\"close\" data-action=\"close\" aria-label=\"Sluiten\">×</button>',",
-  "  '<h2>Berichten</h2>',",
+  " panel.dataset.taleraExplicitLanguage='true';panel.innerHTML=[",
+  "  '<button type=\"button\" class=\"close\" data-action=\"close\" aria-label=\"'+e(t('guest.native.commentClose'))+'\">×</button>',",
+  "  '<h2>'+e(t('guest.native.commentHeading'))+'</h2>',",
   "  '<p class=\"status\" data-guest-feedback-status></p>',",
-  "  '<div id=\"taleraNativeCommentList\"><p>Nog geen berichten.</p></div>',",
+  "  '<div id=\"taleraNativeCommentList\"><p>'+e(t('guest.native.commentInitial'))+'</p></div>',",
   "  '<p class=\"status\" id=\"taleraGuestResponseStatus\" data-guest-status></p>',",
   "  '<form id=\"talera-clean-comment-form\">',",
-  "  '<label for=\"taleraGuestFirstName\">Voornaam</label>',",
+  "  '<label for=\"taleraGuestFirstName\">'+e(t('guest.native.firstName'))+'</label>',",
   "  '<input id=\"taleraGuestFirstName\" maxlength=\"32\" autocomplete=\"given-name\" required>',",
-  "  '<label for=\"clean-comment\">Reageren</label>',",
+  "  '<label for=\"clean-comment\">'+e(t('guest.native.reply'))+'</label>',",
   "  '<textarea id=\"clean-comment\" rows=\"2\" maxlength=\"1000\" required></textarea>',",
-  "  '<button class=\"primary\" type=\"submit\">Versturen</button>',",
+  "  '<button class=\"primary\" type=\"submit\">'+e(t('guest.native.send'))+'</button>',",
   "  '</form>'",
   " ].join('');",
   " overlay.hidden=false;social.hidden=true;panel.focus();void load();",
@@ -522,7 +525,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   " a.style.setProperty('z-index','2147480190','important');",
   " const href='/ontdek-talera#'+base.slice(1);",
   " if(a.getAttribute('href')!==href)a.setAttribute('href',href);",
-  " a.setAttribute('aria-label','Ontdek TALERA');",
+  " a.setAttribute('data-i18n-aria-label','guest.native.logoAria');a.setAttribute('aria-label',t('guest.native.logoAria'));",
   "};",
   "nativeLogo();",
   "document.addEventListener('DOMContentLoaded',nativeLogo,{once:true});",
@@ -554,7 +557,7 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   " tell('');",
   " try{show(await req('comment','POST',{guestId,",
   "  firstName:$('taleraGuestFirstName')?.value||'',body:$('clean-comment')?.value||''}));",
-  "  $('clean-comment').value='';tell('Je reactie is geplaatst.')",
+  "  $('clean-comment').value='';tell(t('guest.native.commentSent'))",
   " }catch(error){tell(error.message)}finally{if(button)button.disabled=false}",
   "},true);",
   "const promo=$('taleraNativeInvite');let promoDue=false;",

@@ -8,6 +8,7 @@ import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium,devices} from 'playwright';
+import {languageCatalog} from './f5-language-catalog.mjs';
 import {guestClientScript} from './f5-guest-experience.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -138,7 +139,10 @@ async function login(page,user){
    assert.equal(opening.status(),200);
    assert.match(await tab.title(),/Wachtwoord vergeten/);
    await tab.locator('input[name="email"]').fill(user.email);
-   await tab.locator('form button[type="submit"]').click();
+   const [resetResponse]=await Promise.all([tab.waitForResponse(r=>new URL(r.url()).pathname==='/api/password-reset/request'&&r.request().method()==='POST'),tab.locator('form button[type="submit"]').click()]);
+   const resetResult=await resetResponse.json();
+   console.log('TALERA_RESET_UI_STATUS',JSON.stringify({httpStatus:resetResponse.status(),key:resetResult.messageKey||null,language:await tab.locator('html').getAttribute('lang')}));
+   assert.ok([200,503].includes(resetResponse.status()),'Password recovery returned unexpected status '+resetResponse.status());
    // A native local send-email binding may be present even when real sender
    // verification is NOT proven. Both safe responses are allowed: explicit
    // service unavailable or non-enumerating conditional acknowledgement.
@@ -412,6 +416,27 @@ try{
  });
  const registrationPage=await registrationContext.newPage();
  try{
+   // Exact same candidate/origin: test all five contextual menu positions,
+   // then restore Dutch for the existing detailed workflow regressions.
+   await registrationPage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+   await registrationPage.waitForFunction(()=>window.__taleraMoreMenu?.ready&&document.getElementById('talera-v23-language'));
+   for(const lang of ['nl','en','de','fr','es']){
+     const pack=languageCatalog[lang];
+     await registrationPage.locator('#talera-v23-language').selectOption(lang);
+     await registrationPage.locator('#navMore').click();
+     const hub=registrationPage.locator('#talera-more-menu');
+     assert.equal(await hub.locator('header strong').innerText(),pack['menu.header.title1']);
+     assert.equal(await hub.locator('[data-view="mine"] strong').innerText(),pack['menu.hub.sent1']);
+     assert.equal(await hub.locator('[data-view="help"] strong').innerText(),pack['menu.hub.Hulp_en_over_TALERA1']);
+     await hub.locator('[data-view="account"]').click();
+     await hub.locator('[data-view="login"]').click();
+     assert.equal(await hub.locator('form[data-form="login"] button[type="submit"]').innerText(),pack['menu.login.signIn2']);
+     assert.equal(await hub.locator('a[href="/wachtwoord-vergeten"]').innerText(),pack['menu.cleanHub.forgot1']);
+     await hub.locator('[data-action="close"]').click();
+   }
+   await registrationPage.locator('#talera-v23-language').selectOption('nl');
+   console.log('TALERA_FIVE_CONTEXTUAL_MENU_LANGUAGES_PASS');
+
    const route=await registrationPage.goto(origin+'/present?talera_menu=hub',
      {waitUntil:'domcontentloaded'});
    assert.equal(route.status(),200,'Existing account menu route unavailable');

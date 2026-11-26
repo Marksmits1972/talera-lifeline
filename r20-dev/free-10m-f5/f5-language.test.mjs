@@ -6,8 +6,11 @@ import {languageCatalog} from './f5-language-catalog.mjs';
 import {chooseLanguage,translate,languageBootstrap} from './f5-language.mjs';
 import {localBackupPage} from './f5-local-backup-page.mjs';
 import {passwordResetPage} from './f5-password-reset-page.mjs';
-import {renderTaleraLanding,guestClientScript} from './f5-guest-experience.mjs';
+import {renderOriginalTaleraShare,renderTaleraLanding,guestClientScript} from './f5-guest-experience.mjs';
 
+import {referencePages,guestPages,verifiedPublicScripts} from './generated/public-template-map.mjs';
+import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
+import {keepOnlyFunctionalFreeMenu,removeInactiveDisplayMenu,removeInactiveAccessibilityMenu,connectExistingStorageBackup,secureAccountMenuTransitions} from './f5-account-switch-guard.mjs';
 const langs=['nl','en','de','fr','es'];
 const fields=x=>[...String(x).matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g)].map(m=>m[1]).sort();
 test('five complete central dictionaries preserve placeholders and independent contexts',()=>{
@@ -74,4 +77,51 @@ test('guest landing uses dedicated catalog and existing same-origin script',()=>
  assert.ok(html.includes('data-talera-text="guest.landing.heading"'));
  assert.ok(html.includes('src="/__f5/guest-ui.js"'));
  new vm.Script(guestClientScript);
+});
+
+test('password reset executes submit handler for every language with safe keyed or unavailable feedback',async()=>{
+ const response=passwordResetPage('request');
+ const code=/<script nonce="[^"]+">([\s\S]*?)<\/script>/.exec(await response.text())[1];
+ for(const lang of langs){
+  for(const [http,result,expected] of [[200,{messageKey:'reset.api.requestAck'},'reset.api.requestAck'],[503,{},'reset.api.unavailable']]){
+   let submitHandler;
+   const button={disabled:false};
+   const form={hidden:false,elements:{email:{value:'synthetic@example.invalid'}},querySelector:()=>button,addEventListener:(event,handler)=>{assert.equal(event,'submit');submitHandler=handler}};
+   const status={textContent:''};
+   const context={window:{},navigator:{languages:['en-US']},localStorage:{getItem:()=>lang},document:{body:{dataset:{mode:'request'}},documentElement:{lang:'nl'},querySelectorAll:()=>[],querySelector:()=>form,getElementById:()=>status},fetch:async(route,options)=>{
+    assert.equal(route,'/api/password-reset/request');assert.equal(options.headers['x-talera-language'],lang);return {status:http,ok:http===200,json:async()=>result};
+   }};
+   vm.runInNewContext(code,context);
+   assert.equal(typeof submitHandler,'function');
+   await submitHandler({preventDefault(){}});
+   assert.equal(status.textContent,translate(lang,expected));
+   assert.equal(button.disabled,false);assert.equal(form.hidden,http===200);
+  }
+ }
+});
+
+test('specific menu texts are compiled from the exact original, never from personal strings',()=>{
+ const original=fs.readFileSync(new URL('./generated/approved-menu-original.mjs',import.meta.url),'utf8');
+ const approved=keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(original)))));
+ const output=localizeApprovedMenu(approved);
+ assert.equal(output,fs.readFileSync('r20-dev/free-10m-delivery/public'+verifiedPublicScripts['/__clean/menu-integration.mjs'],'utf8'));
+ new vm.Script(output);
+ assert.throws(()=>localizeApprovedMenu(approved+' '),/TALERA_MENU_LANGUAGE_SOURCE_DRIFT/);
+ assert.ok(output.includes('dataset.taleraExplicitLanguage'));
+ assert.ok(!output.includes("label.textContent.trim()==="));
+ assert.ok(output.includes("date.toLocaleDateString(window.TaleraI18n.locale)"));
+ assert.ok(output.includes('menu.password.login.show')&&output.includes('menu.password.registration.show')&&output.includes('menu.password.repeat.show'));
+ for(const key of new Set([...output.matchAll(/menu\.[a-zA-Z0-9_.]+/g)].map(m=>m[0])))assert.ok(languageCatalog.nl[key],key);
+});
+test('actual recipient adapter retains one original presentation, localized comment controls and escaped personal data',()=>{
+ const original=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages['/present'],'utf8');
+ const share={title:'<Keep title>',storyText:'Opslaan',eventDate:'1990-01-01',hasPhoto:false,hasVideo:false,hasAudio:false};
+ const html=renderOriginalTaleraShare(original,share,'/s/'+'A'.repeat(43),'a'.repeat(64));
+ assert.ok(html.includes('data-i18n="guest.native.inviteHeading"'));
+ assert.ok(html.includes('window.TaleraGuestOneMemory={list,get}'));
+ const script=/<script id="talera-native-guest-social">([\s\S]*?)<\/script>/.exec(html)[1];
+ new vm.Script(script);
+ assert.ok(script.includes('guest.native.commentInitial')&&script.includes('guest.native.emptyFeedback'));
+ assert.ok(script.includes('panel.dataset.taleraExplicitLanguage'));
+ assert.ok(script.includes("body.textContent=c.body||''"));
 });

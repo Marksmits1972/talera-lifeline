@@ -47,7 +47,7 @@ export function passwordResetPage(mode){
     headers:{'content-type':'application/json','accept':'application/json','x-talera-language':window.TaleraLanguage.language},
     credentials:'same-origin',cache:'no-store',body:JSON.stringify(payload)});
    const result=await response.json();
-   status.textContent=typeof result.messageKey==='string'&&/^reset\.api\./.test(result.messageKey)?t(result.messageKey):t('reset.status.generic');
+   status.textContent=typeof result.messageKey==='string'&&/^reset\.api\./.test(result.messageKey)?t(result.messageKey):t(response.status===503?'reset.api.unavailable':'reset.status.generic');
    if(response.ok){
     form.hidden=true;
     if(mode==='confirm')status.textContent+=' '+t('reset.status.done');

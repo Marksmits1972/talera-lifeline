@@ -1,4 +1,5 @@
 import {centralizeCoreLanguage} from './f5-core-language-build.mjs';
+import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
@@ -2045,7 +2046,7 @@ for(const name of paths){
  let shipped=first.body;
  if(name==='/__clean/menu-integration.mjs'){
    writeFileSync(path.join(generated,'approved-menu-original.mjs'),first.body);
-   shipped=keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body)))));
+   shipped=localizeApprovedMenu(keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body))))));
  }
  if(name==='/__clean/ui-integration.mjs'){
    // The original author-owned WhatsApp action treats a missing previous

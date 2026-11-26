@@ -109,7 +109,7 @@ backupRegression: try{
   const webkitPickerOnly=process.env.TALERA_WEBKIT_PICKER_ONLY==='1';
   browser=webkitPickerOnly?await webkit.launch({headless:true}):await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
   const ctx=await browser.newContext({
-    ...devices['iPhone 13'],acceptDownloads:true,
+    ...devices['iPhone 13'],locale:'nl-NL',acceptDownloads:true,
     extraHTTPHeaders:{'x-talera-f5-key':gate}
   });
   await ctx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
@@ -1210,7 +1210,7 @@ async function testTimelineLoupe(){
   }
   async function testGeoNamesCatalog(){
   await restartGeoWorker(true);
-  const geoCtx=await browser.newContext({...devices['iPhone 13'],serviceWorkers:'block',
+  const geoCtx=await browser.newContext({...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'block',
     extraHTTPHeaders:{'x-talera-f5-key':gate}});
   try{
     await geoCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',

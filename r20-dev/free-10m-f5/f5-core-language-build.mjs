@@ -314,7 +314,7 @@ export function centralizeCoreLanguage(html,route){
  assert.equal(sourceHash(engine),originalSha,'TALERA_LANGUAGE_ENGINE_SOURCE_DRIFT');
  const lines=engine.split('\n');
  assert.ok(lines[2].startsWith('const PACKS=')&&lines[3].startsWith('const TALERA_AUDIT_EXTRA_PACKS='),'TALERA_LANGUAGE_PACK_SOURCE_DRIFT');
- const packs=Object.fromEntries(Object.entries(languageCatalog).map(([lang,pack])=>[lang,Object.fromEntries(Object.entries(pack).filter(([key])=>originalKeys.includes(key)||key.startsWith('core.')||key.startsWith('pwa.')))]));
+ const packs=Object.fromEntries(Object.entries(languageCatalog).map(([lang,pack])=>[lang,Object.fromEntries(Object.entries(pack).filter(([key])=>originalKeys.includes(key)||key.startsWith('core.')||key.startsWith('pwa.')||key.startsWith('menu.')||key.startsWith('guest.native.')||key.startsWith('guest.api.')))]));
  lines.splice(2,3,'const PACKS='+JSON.stringify(packs).replace(/</g,'\\u003c')+';');
  let next=lines.join('\n');
  const replace=(old,value)=>{assert.equal(next.split(old).length,2,'TALERA_LANGUAGE_RUNTIME_SOURCE_DRIFT: '+old);next=next.replace(old,value)};
@@ -322,6 +322,8 @@ export function centralizeCoreLanguage(html,route){
  replace("const browser=(navigator.languages?.[0]||navigator.language||'nl').slice(0,2).toLowerCase();return LANGS.includes(browser)?browser:'nl'","const browser=(navigator.languages?.length?navigator.languages:[navigator.language]).map(x=>String(x).slice(0,2).toLowerCase());return browser.find(l=>LANGS.includes(l))||'en'");
  replace("for(const [key,val] of Object.entries(PACKS.nl)){if(!sourceToKey.has(val))sourceToKey.set(val,key)}","for(const key of "+JSON.stringify(originalKeys)+"){const val=PACKS.nl[key];if(!sourceToKey.has(val))sourceToKey.set(val,key)}");
  replace("const localized=(key)=>PACKS[lang]?.[key]||PACKS.nl[key]||key;","const localized=(key,params={})=>(PACKS[lang]?.[key]||PACKS.en[key]||key).replace(/\\{([a-zA-Z][a-zA-Z0-9_]*)\\}/g,(whole,name)=>Object.prototype.hasOwnProperty.call(params,name)?String(params[name]):whole);");
+ replace("if(!node?.parentElement||isUserContent(node))return;","if(!node?.parentElement||node.parentElement.closest('[data-talera-explicit-language]')||isUserContent(node))return;");
+ replace("function renderAttrs(el){","function renderAttrs(el){if(el.closest('[data-talera-explicit-language]'))return;");
  replace("const ATTRIBUTE_NAMES=['aria-label','placeholder','title'];","const ATTRIBUTE_NAMES=['aria-label','placeholder','title','alt'];");
  replace("[aria-label],[title],[placeholder]","[aria-label],[title],[placeholder],[alt]");
  replace("document.documentElement.setAttribute('lang',lang);","document.documentElement.setAttribute('lang',lang); const manifest=document.querySelector('link[rel=manifest]'); if(manifest){const url=new URL(manifest.href,location.href); if(url.origin===location.origin&&url.pathname==='/manifest.webmanifest'&&url.searchParams.get('lang')!==lang){url.searchParams.set('lang',lang);manifest.href=url.pathname+url.search}}");

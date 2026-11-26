@@ -106,4 +106,10 @@ test('refuse original source drift and keep layout style editor scoped',()=>{
  assert.match(html,/id="talera-editor-clean-layout-v1"/);
  assert.match(html,/body:has\(#app #main .work.talera-r16-editor\) #app>header.top>strong/);
  assert.match(html,/aria-pressed="true"/);
+ assert.match(html,/grid-auto-rows:44px!important/);
+ assert.match(html,/max-height:var\(--talera-tag-visible-height,88px\)!important/);
+ assert.match(html,/scroll-snap-type:y mandatory!important/);
+ assert.match(html,/data:image\/svg\+xml/);
+ assert.match(html,/#talera-f5-edit-return-eye>svg\{position:absolute!important/);
+
 });

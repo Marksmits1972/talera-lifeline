@@ -99,6 +99,33 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    assert.equal(geometry.border,'0px','No circle outline');
    assert.equal(geometry.shadow,'none','No shadow');
    assert.equal(geometry.color,geometry.dotsColor,'Same icon color as options');
+   // Inspect ACTUAL painted glyph pixels instead of merely comparing
+   // clickable rectangles. A grid text node displaced the chevron despite
+   // passing the earlier rectangle-only test. No screenshot leaves this
+   // disposable synthetic browser context; report only measured geometry.
+   const screenshot=await page.screenshot({scale:'css'});
+   const glyphs=await page.evaluate(async({data,backBox,box})=>{
+    const image=new Image();image.src='data:image/png;base64,'+data;await image.decode();
+    const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+    const c=canvas.getContext('2d');c.drawImage(image,0,0);
+    const rgba=c.getImageData(0,0,canvas.width,canvas.height).data;
+    const measure=rect=>{
+     let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,count=0;
+     for(let y=Math.max(0,Math.floor(rect.y));y<Math.min(canvas.height,Math.ceil(rect.y+rect.height));y++)
+      for(let x=Math.max(0,Math.floor(rect.x));x<Math.min(canvas.width,Math.ceil(rect.x+rect.width));x++){
+       const k=(y*canvas.width+x)*4;
+       if(rgba[k+3]>200&&rgba[k]<145&&rgba[k+1]<165&&rgba[k+2]<185){
+        count++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+       }
+      }
+     return {count,width:maxX-minX+1,height:maxY-minY+1,centerY:(minY+maxY+1)/2};
+    };
+    return {back:measure(backBox),eye:measure(box)};
+   },{data:screenshot.toString('base64'),backBox,box});
+   assert.ok(glyphs.back.count>15&&glyphs.eye.count>20,'Both visible icons must paint: '+JSON.stringify(glyphs));
+   assert.ok(glyphs.back.height>=14&&glyphs.eye.width>=20,'Clear reference-sized symbols: '+JSON.stringify(glyphs));
+   assert.ok(Math.abs(glyphs.back.centerY-glyphs.eye.centerY)<=1.5,'Actual visible back and eye glyphs must share a centerline: '+JSON.stringify(glyphs));
+   console.log('TALERA_EDITOR_PAINTED_HEADER_GLYPHS_ALIGNED',JSON.stringify(glyphs));
    const saveLabel=await page.evaluate(()=>{
     const lang=String(window.TaleraI18n?.language||document.documentElement.lang||'nl').slice(0,2);
     return {actual:document.getElementById('publish').textContent.trim(),expected:({nl:'Opslaan',en:'Save',de:'Speichern',fr:'Enregistrer',es:'Guardar'})[lang]||'Opslaan'};
@@ -117,12 +144,42 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
     assert.ok(Math.abs(before.y-afterBox.y)<=4,'Opening characteristics must not move the footer: '+JSON.stringify({before,afterBox}));
     assert.equal(await page.locator('.talera-tags-own-input,.talera-tag-apply,.talera-tag-cancel').count(),0);
     assert.equal(await page.locator('.talera-tags-selected').isVisible(),false,'No duplicate selected chips in open panel');
+    const visible=await page.locator('.talera-tags-choices').evaluate(choices=>{
+     const viewport=choices.getBoundingClientRect(),rows=[...choices.querySelectorAll('.talera-tag-choice')].map(b=>b.getBoundingClientRect());
+     const whole=rows.filter(r=>r.top>=viewport.top-1&&r.bottom<=viewport.bottom+1).length;
+     const partial=rows.filter(r=>r.top<viewport.bottom-1&&r.bottom>viewport.top+1&&!(r.top>=viewport.top-1&&r.bottom<=viewport.bottom+1)).length;
+     return {count:rows.length,whole,partial,height:viewport.height};
+    });
+    assert.equal(visible.whole,Math.min(6,visible.count),'Two complete characteristic rows on the actual six-photo editor: '+JSON.stringify(visible));
+    assert.equal(visible.partial,0,'No third partial row; '+JSON.stringify(visible));
+    console.log('TALERA_EDITOR_REFERENCE_TWO_COMPLETE_ROWS_PASS',JSON.stringify(visible));
     const choiceIndex=await page.locator('.talera-tag-choice').evaluateAll(nodes=>nodes.findIndex(n=>n.getAttribute('aria-pressed')==='false'));
     assert.ok(choiceIndex>=0,'Need an unselected existing characteristic');
     const option=page.locator('.talera-tag-choice').nth(choiceIndex);
     await option.click();assert.equal(await option.getAttribute('aria-pressed'),'true');
     await option.click();assert.equal(await option.getAttribute('aria-pressed'),'false');
     await toggle.click();await panel.waitFor({state:'hidden'});
+    // Capture the actual integrated app with six synthetic photos at the
+    // owner's tall-phone geometry, both states, without touching any live
+    // data or introducing another app. Only diagnostic test output, never
+    // part of the public software artifact.
+    if(browser.browserType().name()==='chromium'){
+     const originalViewport=page.viewportSize();
+     await page.setViewportSize({width:390,height:844});
+     const capture=async label=>{
+      await settleImages();
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const png=await page.screenshot({type:'jpeg',quality:72,scale:'css'});
+      const b64=png.toString('base64'),chunks=b64.match(/.{1,5000}/g);
+      chunks.forEach((part,n)=>console.log('TALERA_VISUAL_QA_'+label+'_'+n+'_'+chunks.length+' '+part));
+     };
+     await capture('CLOSED');
+     await toggle.click();await panel.waitFor({state:'visible'});
+     await capture('OPEN');
+     await toggle.click();await panel.waitFor({state:'hidden'});
+     if(originalViewport)await page.setViewportSize(originalViewport);
+     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    }
    }
    await settleImages();
    const opened=await read();

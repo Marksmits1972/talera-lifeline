@@ -1420,16 +1420,24 @@ try{
          Math.abs((beforeSize.viewport.scale||1)-(afterSize.viewport.scale||1))<.01,
          'Editor must not change width or visual zoom on characteristics expansion: '+
            JSON.stringify({beforeSize,afterSize}));
-       const scroller=await follower.evaluate(()=>{
-         const panel=document.querySelector('.talera-tags-panel');
+       const scroller=await follower.evaluate(async()=>{
+         const panel=document.querySelector('.talera-tags-choices');
+         const buttons=[...panel.querySelectorAll('.talera-tag-choice')];
          const toolbar=document.querySelector('.work.talera-r16-editor .work-tools.talera-r16-toolbar');
-         const before=panel.scrollTop;
+         panel.scrollTop=0;
+         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+         const before=panel.scrollTop, viewportRect=panel.getBoundingClientRect();
+         const rows=buttons.map(b=>b.getBoundingClientRect());
+         const full=rows.filter(r=>r.top>=viewportRect.top-1&&r.bottom<=viewportRect.bottom+1).length;
+         const partial=rows.filter(r=>r.top<viewportRect.bottom-1&&r.bottom>viewportRect.top+1&&!(r.top>=viewportRect.top-1&&r.bottom<=viewportRect.bottom+1)).length;
          const toolbarBeforeScroll=toolbar?.getBoundingClientRect().bottom;
          const pageBeforeScroll=document.scrollingElement?.scrollTop||0;
          panel.scrollTop=panel.scrollHeight;
-         const after=panel.scrollTop;
+         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+         const after=panel.scrollTop,last=buttons.at(-1).getBoundingClientRect();
          return {
            before,after,scrollHeight:panel.scrollHeight,clientHeight:panel.clientHeight,
+           count:buttons.length,full,partial,lastFullyVisible:last.top>=viewportRect.top-1&&last.bottom<=viewportRect.bottom+1,
            overflow:getComputedStyle(panel).overflowY,
            toolbarBottom:toolbar?.getBoundingClientRect().bottom,
            toolbarBeforeScroll,
@@ -1440,7 +1448,10 @@ try{
          };
        });
        assert.equal(scroller.fakeTiles,4,'Five-photo visual test missing tiles');
-       assert.equal(scroller.overflow,'auto','Topic panel must independently scroll');
+       assert.equal(scroller.overflow,'auto','Topic choices must independently scroll');
+       assert.equal(scroller.full,Math.min(6,scroller.count),'Reference layout must show TWO full rows on the short iPhone');
+       assert.equal(scroller.partial,0,'Never show a clipped third row');
+       assert.ok(scroller.lastFullyVisible,'Last setting-defined characteristic must scroll fully into view');
        assert.ok(scroller.scrollHeight>scroller.clientHeight+15,
          'Long topic options must be bounded: '+JSON.stringify(scroller));
        assert.ok(scroller.after>scroller.before+15,
@@ -1463,9 +1474,8 @@ try{
          'Opening characteristics must not shift photos upward: '+JSON.stringify(expanded));
        await follower.locator('.talera-tags-toggle').click();
        assert.equal(await follower.locator('.talera-tags-toggle').getAttribute('aria-expanded'),'false');
-       // The owner's larger iPhone has substantially more unused space.
-       // On that viewport the choices must grow into the free region, while
-       // the unchanged, original bottom action bar stays pinned in layout.
+       // Owner-approved reference: two complete rows even on the taller
+       // iPhone, more calm white space, and the lowered stationary footer.
        await follower.setViewportSize({width:390,height:844});
        await follower.waitForTimeout(120);
        const tallBefore=await follower.evaluate(()=>{
@@ -1485,6 +1495,11 @@ try{
        const tallAfter=await follower.evaluate(()=>{
          const bounds=s=>document.querySelector(s)?.getBoundingClientRect();
          const panel=document.querySelector('.talera-tags-panel');
+         const choices=panel.querySelector('.talera-tags-choices');
+         const boundsChoices=choices.getBoundingClientRect();
+         const rows=[...choices.querySelectorAll('.talera-tag-choice')].map(b=>b.getBoundingClientRect());
+         const whole=rows.filter(r=>r.top>=boundsChoices.top-1&&r.bottom<=boundsChoices.bottom+1).length;
+         const partial=rows.filter(r=>r.top<boundsChoices.bottom-1&&r.bottom>boundsChoices.top+1&&!(r.top>=boundsChoices.top-1&&r.bottom<=boundsChoices.bottom+1)).length;
          const publish=document.querySelector('#publish');
          const rect=publish?.getBoundingClientRect();
          const bottom=window.visualViewport?.height||innerHeight;
@@ -1494,8 +1509,10 @@ try{
            photoTop:bounds('.talera-work-tiles')?.top,
            photoWidth:bounds('.talera-work-tiles')?.width,
            panelHeight:panel?.getBoundingClientRect().height,
-           panelClientHeight:panel?.clientHeight,
-           panelScrollHeight:panel?.scrollHeight,
+           panelClientHeight:choices?.clientHeight,
+           panelScrollHeight:choices?.scrollHeight,
+           choiceCount:rows.length,whole,partial,
+           footerGap:bottom-bounds('.work-tools.talera-r16-toolbar')?.bottom,
            publishTouchable:!!rect&&rect.top>=0&&rect.bottom<=bottom-8&&
              document.elementFromPoint(rect.left+rect.width*.5,
                rect.top+rect.height*.5)?.closest('#publish')===publish
@@ -1503,10 +1520,16 @@ try{
        });
        console.log('TALERA_FREE_TELL_TALL_GAP_USE',
          JSON.stringify({before:tallBefore,after:tallAfter}));
-       assert.ok(tallAfter.panelHeight>=120&&
+       assert.ok(tallAfter.panelHeight>=88&&tallAfter.panelHeight<=104&&
          tallAfter.panelScrollHeight>tallAfter.panelClientHeight+12,
-         'Tall iPhone must use the otherwise empty gap for scrollable topics: '+
+         'Reference compact two-row panel must be independently scrollable: '+
            JSON.stringify({tallBefore,tallAfter}));
+       assert.equal(tallAfter.whole,Math.min(6,tallAfter.choiceCount),'Exactly two full rows on tall iPhone');
+       assert.equal(tallAfter.partial,0,'No cut-off row on tall iPhone');
+       assert.ok(tallBefore.titleTop<=58&&tallBefore.dateTop<=103&&tallBefore.photoTop<=153,
+         'Title, date and photos must be raised towards the approved design: '+JSON.stringify(tallBefore));
+       assert.ok(tallAfter.footerGap>=8&&tallAfter.footerGap<=20,
+         'Lower the original action bar but retain the safe bottom margin: '+JSON.stringify(tallAfter));
        assert.ok(Math.abs(tallBefore.toolbarTop-tallAfter.toolbarTop)<2 &&
          Math.abs(tallBefore.toolbarBottom-tallAfter.toolbarBottom)<2 &&
          Math.abs(tallBefore.photoTop-tallAfter.photoTop)<2 &&

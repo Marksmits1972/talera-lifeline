@@ -64,22 +64,42 @@ export function simplifyTellMemoryEditor(html){
  // Work-view only, including the signed-out rendering of the same editor.
  // Keep all original grid/toolbar geometry, semantics, and handlers.
  const css=`<style id="talera-editor-clean-layout-v1">
-body:has(#app #main .work.talera-r16-editor) #app>header.top{background:#fff!important;padding-inline:16px!important;}
+body:has(#app #main .work.talera-r16-editor) #app>header.top{background:#fff!important;padding-inline:8px 16px!important;}
 body:has(#app #main .work.talera-r16-editor) #app>header.top>strong{visibility:hidden!important;}
-body:has(#app #main .work.talera-r16-editor) #app>header.top #back{width:45px!important;height:45px!important;min-width:45px!important;max-width:45px!important;min-height:45px!important;padding:0!important;display:grid!important;place-items:center!important;background:transparent!important;}
-body:has(#app #main .work.talera-r16-editor) #app>header.top #back::after{content:""!important;display:block!important;width:10px!important;height:10px!important;border-left:2.5px solid #476376!important;border-bottom:2.5px solid #476376!important;transform:rotate(45deg)!important;box-sizing:border-box!important;}
+/* A real centered glyph, independent of the original text node and grid
+   track layout. The back button keeps its original accessible action. */
+body:has(#app #main .work.talera-r16-editor) #app>header.top #back{width:45px!important;height:45px!important;min-width:45px!important;max-width:45px!important;min-height:45px!important;padding:0!important;display:grid!important;place-items:center!important;color:transparent!important;font-size:0!important;line-height:0!important;text-shadow:none!important;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M16 4 8 12 16 20' stroke='%23476376' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 24px 24px no-repeat!important;}
+body:has(#app #main .work.talera-r16-editor) #app>header.top #back::before,body:has(#app #main .work.talera-r16-editor) #app>header.top #back::after{content:none!important;display:none!important;}
+body:has(#app #main .work.talera-r16-editor) #app>header.top #back>*{opacity:0!important;}
+body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{position:absolute!important;display:block!important;left:50%!important;top:50%!important;width:27px!important;height:27px!important;transform:translate(-50%,-50%)!important;margin:0!important;filter:none!important;}
+/* Reference phone composition: raise title/date/grid together; place the
+   original footer lower, identically in collapsed and expanded states. */
+@media (max-width:767px){
+ body:has(#app #main .work.talera-r16-editor) #app #main{padding-top:3px!important;padding-bottom:0!important;}
+ #app #main .work.talera-compact-work.talera-r16-editor{padding-bottom:0!important;}
+}
+@media (max-width:767px) and (min-height:760px){
+ #app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading{gap:5px!important;}
+ #app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{padding:3px 0!important;}
+ #app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #dateToggle{padding:4px 0!important;}
+}
 #app #main .work.talera-r16-editor #details #title{color:#0b1b3c!important;font-size:clamp(21px,5.9vw,24px)!important;font-weight:740!important;letter-spacing:-.035em!important;}
-#app #main .work.talera-r16-editor #details #dateToggle{color:#476376!important;font-weight:600!important;}
+#app #main .work.talera-r16-editor #details #dateToggle{color:#224d7c!important;font-weight:600!important;}
 #app #main .work.talera-compact-work.talera-r16-editor .talera-v9-remove-media{width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;border:0!important;border-radius:50%!important;margin:2px!important;background:radial-gradient(circle at center,rgba(255,255,255,.96) 0 12px,transparent 12.5px)!important;color:#0b1b3c!important;box-shadow:none!important;text-shadow:none!important;font:500 21px/1 system-ui!important;display:grid!important;place-items:center!important;padding:0!important;}
 #app #main .work.talera-r16-editor .talera-tags-v20{border-radius:15px!important;}
 #app #main .work.talera-r16-editor .talera-tags-toggle{font-weight:600!important;white-space:nowrap!important;gap:6px!important;}
 #app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]{border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;}
 #app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]+.talera-tags-selected{display:none!important;}
-#app #main .work.talera-r16-editor .talera-tags-panel:not([hidden]){margin:0!important;padding:8px!important;border:1px solid #dbe4ef!important;border-top:0!important;border-radius:0 0 15px 15px!important;background:#fff!important;scrollbar-width:thin!important;scrollbar-color:#a9b9ca transparent!important;}
+/* Two whole rows, including for long translated labels. Only the
+   existing choices grid scrolls; padded panel edges never reveal a third
+   clipped pill. 44px interaction rows, smaller visual pills. */
+#app #main .work.talera-r16-editor .talera-tags-panel:not([hidden]){margin:0!important;padding:6px 8px!important;border:1px solid #dbe4ef!important;border-top:0!important;border-radius:0 0 15px 15px!important;background:#fff!important;box-sizing:border-box!important;max-height:none!important;overflow:hidden!important;}
 #app #main .work.talera-r16-editor .talera-tags-panel[hidden]{display:none!important;}
-#app #main .work.talera-r16-editor .talera-tags-choices{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;align-content:start!important;max-height:none!important;overflow:visible!important;}
-#app #main .work.talera-r16-editor .talera-tag-choice{min-width:0!important;min-height:42px!important;border-radius:24px!important;border:1px solid #849bb4!important;background:#fff!important;color:#234369!important;font:500 14px/1.25 system-ui!important;padding:7px 11px!important;max-width:100%!important;white-space:normal!important;}
-#app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]{background:#dbe6f5!important;border-color:#dbe6f5!important;color:#234369!important;font-weight:650!important;}
+#app #main .work.talera-r16-editor .talera-tags-choices{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-rows:44px!important;gap:0 6px!important;align-content:start!important;box-sizing:border-box!important;margin:0!important;padding:0!important;max-height:var(--talera-tag-visible-height,88px)!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;scroll-snap-type:y mandatory!important;scrollbar-width:thin!important;scrollbar-color:#a9b9ca transparent!important;}
+#app #main .work.talera-r16-editor .talera-tag-choice{position:relative!important;isolation:isolate!important;display:flex!important;align-items:center!important;justify-content:center!important;min-width:0!important;min-height:44px!important;height:44px!important;box-sizing:border-box!important;border-radius:24px!important;border:0!important;background:transparent!important;color:#0b1b3c!important;font:500 13px/1.12 system-ui!important;padding:4px 8px!important;max-width:100%!important;white-space:normal!important;scroll-snap-align:start!important;}
+#app #main .work.talera-r16-editor .talera-tag-choice::before{content:""!important;position:absolute!important;inset:4px 0!important;border:1px solid #849bb4!important;border-radius:24px!important;background:#fff!important;z-index:-1!important;pointer-events:none!important;}
+#app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]{background:transparent!important;color:#234369!important;font-weight:650!important;}
+#app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]::before{background:#dbe6f5!important;border-color:#dbe6f5!important;}
 #app #main .work.talera-r16-editor .talera-tag-choice:focus-visible{outline:2px solid #224d7c!important;outline-offset:-3px!important;}
 #app #main .work.talera-r16-editor .talera-tag-choice:disabled{opacity:.52!important;}
 </style>`;

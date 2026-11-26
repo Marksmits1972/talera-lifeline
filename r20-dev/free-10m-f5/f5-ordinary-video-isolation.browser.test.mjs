@@ -58,9 +58,10 @@ try{
   const built=readFileSync(path.join(home,'../free-10m-delivery/public'+
     referencePages['/present']),'utf8');
   const oldMedia=built.indexOf('function taleraInlinePlayMedia(s,frame,muted,finished){');
-  const oldButton=built.indexOf("button.textContent='▶ Beluister'",oldMedia);
-  assert.ok(oldMedia>0&&oldButton>oldMedia,
-    'Keep original historical media player source unchanged for regression');
+  const oldButton=built.indexOf("window.TaleraI18n.setText(button,'core.present.legacyListenButton')",oldMedia);
+  const oldHint=built.indexOf("window.TaleraI18n.setText(hint,'core.present.legacyListenHint')");
+  assert.ok(oldMedia>0&&oldButton>oldMedia&&oldHint>0,
+    'Keep historical media player and its two independently localized controls for regression');
   const startPresent=built.indexOf('async function present(memory){');
   const independentVoice=built.indexOf("if(memory._zeroItems?.some(item=>item.kind==='audio'))",startPresent);
   const ordinaryGuard=built.indexOf('if(memory._taleraLocal){',independentVoice);

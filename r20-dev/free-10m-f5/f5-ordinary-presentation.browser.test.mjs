@@ -7,7 +7,7 @@ import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
-import {createLoupeScale,LOUPE_VISIBLE_DAYS} from './f5-timeline-loupe.mjs';
+import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE} from './f5-timeline-loupe.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 // Each CI execution gets its own synthetic originals + local Wrangler DO store.
@@ -438,7 +438,7 @@ async function testTimelineLoupe(){
    const d=document.getElementById('focusText').getBoundingClientRect();
    const needle=document.querySelector('#surface>.center-needle').getBoundingClientRect();
    return {width:p.width/r.width,center:Math.abs((p.left+p.right-r.left-r.right)/2),
-     height:p.height,corner:panelStyle.borderTopLeftRadius,socialCorner:socialStyle.borderTopLeftRadius,
+     height:p.height,oldHeight:r.height-50,needleBottom:needle.bottom,corner:panelStyle.borderTopLeftRadius,socialCorner:socialStyle.borderTopLeftRadius,
      panelColor:panelStyle.backgroundColor,dateColor:getComputedStyle(document.getElementById('focusText')).backgroundColor,
      canvasCount:document.querySelectorAll('#surface canvas').length,
      canvasOpacity:getComputedStyle(document.getElementById('timelineCanvas')).opacity,
@@ -446,8 +446,10 @@ async function testTimelineLoupe(){
      dateSeparate:p.bottom<=d.top+2,needleVisible:needle.height>10,
      panelTop:p.top,panelBottom:p.bottom,dateTop:d.top,rulerTop:r.top,rulerBottom:r.bottom};
   });
-  assert.ok(geometry.width>.94&&geometry.height>=90&&geometry.center<2&&geometry.needleVisible,JSON.stringify(geometry));
-  assert.equal(geometry.corner,geometry.socialCorner,'Same rounded shape as the social toolbar');
+  assert.ok(Math.abs(geometry.width-LOUPE_PANEL_SCALE)<.015&&geometry.center<2&&geometry.needleVisible,JSON.stringify(geometry));
+  assert.ok(Math.abs(geometry.height/geometry.oldHeight-LOUPE_PANEL_SCALE)<.015,'Same proportional reduction in height: '+JSON.stringify(geometry));
+  assert.ok(Math.abs(parseFloat(geometry.corner)-parseFloat(geometry.socialCorner)*LOUPE_PANEL_SCALE)<1,'Same rounded shape, proportionally smaller');
+  assert.ok(geometry.needleBottom<=geometry.panelBottom+1,'Needle stays within the reduced card');
   assert.match(geometry.panelColor,/255, 254, 252/,'Warm white from the date field');
   assert.ok(geometry.panelTop>=0,'No clipped upper corners: '+JSON.stringify(geometry));
   assert.equal(geometry.canvasCount,1);assert.equal(geometry.canvasOpacity,'1');assert.equal(geometry.userSelect,'none');
@@ -486,7 +488,7 @@ async function testTimelineLoupe(){
       if(current.id===id&&Math.abs(delta)<.12)break;
       const b=await lp.locator('#surface').boundingBox(),direction=Math.sign(delta)||1;
       const sx=b.x+b.width*(direction>0?.8:.2),sy=b.y+b.height*.64;
-      const distance=Math.min(110,Math.max(5,Math.abs(delta)*b.width/LOUPE_VISIBLE_DAYS+3));
+      const distance=Math.min(110,Math.max(5,Math.abs(delta)*b.width*LOUPE_PANEL_SCALE/LOUPE_VISIBLE_DAYS+3));
       await lp.mouse.move(sx,sy);await lp.mouse.down();
       await lp.mouse.move(sx-direction*distance,sy,{steps:4});
       await lp.waitForTimeout(260);await lp.mouse.up();
@@ -502,7 +504,7 @@ async function testTimelineLoupe(){
   const beforeBlank=await state();
   const needleBefore=await lp.locator('#surface>.center-needle').boundingBox();
   await lp.mouse.move(x,y);await lp.mouse.down();
-  await lp.mouse.move(x-box.width/LOUPE_VISIBLE_DAYS*.65,y,{steps:5});
+  await lp.mouse.move(x-box.width*LOUPE_PANEL_SCALE/LOUPE_VISIBLE_DAYS*.65,y,{steps:5});
   await lp.waitForTimeout(250);await lp.mouse.up();
   const blank=await state();assert.equal(blank.id,beforeBlank.id);
   assert.ok(blank.center>beforeBlank.center+0.5*86400000);

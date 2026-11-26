@@ -3,6 +3,7 @@
 export const LOUPE_HOLD_MS=350;
 export const LOUPE_SLOP_PX=16;
 export const LOUPE_VISUAL_SCALE=1.10;
+export const LOUPE_PANEL_SCALE=2/3;
 export const LOUPE_VISIBLE_DAYS=6/LOUPE_VISUAL_SCALE;
 const LOUPE_MS_DAY=86400000;
 const clampLoupe=(x,min,max)=>Math.max(min,Math.min(max,x));
@@ -65,7 +66,7 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
  let pending=null,active=null,opened=false,frame=0,outside=null,swallowClick=false;
  let scale=null,position=0,target=0,previousX=0,readyAt=0;
  const now=()=>performance.now();
- const pxPerUnit=()=>Math.max(1,surface.clientWidth)/LOUPE_VISIBLE_DAYS;
+ const pxPerUnit=()=>Math.max(1,surface.clientWidth)*LOUPE_PANEL_SCALE/LOUPE_VISIBLE_DAYS;
  const clearPending=()=>{if(!pending)return;clearTimeout(pending.timer);pending=null};
  function render(){
   if(!opened)return;
@@ -215,12 +216,17 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
    const sx=w/Math.max(1,canvasRect.width),sy=h/Math.max(1,canvasRect.height);
    const cx=(card.left-canvasRect.left+1)*sx,cy=(card.top-canvasRect.top+1)*sy;
    const cw=Math.max(0,(card.width-2)*sx),ch=Math.max(0,(card.height-2)*sy);
-   const radius=Math.min(21*sx,cw/2,ch/2);
+   const radius=Math.min(14*sx,cw/2,ch/2);
    ctx.save();ctx.beginPath();
    ctx.moveTo(cx+radius,cy);ctx.arcTo(cx+cw,cy,cx+cw,cy+ch,radius);
    ctx.arcTo(cx+cw,cy+ch,cx,cy+ch,radius);ctx.arcTo(cx,cy+ch,cx,cy,radius);
    ctx.arcTo(cx,cy,cx+cw,cy,radius);ctx.closePath();ctx.clip();
-   ctx.translate(w/2,axisY);ctx.scale(LOUPE_VISUAL_SCALE,LOUPE_VISUAL_SCALE);ctx.translate(-w/2,-axisY);
+   // Scale the entire ruler, including labels, around the upper panel edge;
+   // keep calendar movement and visible width in the identical ratio.
+   const top=(card.top-canvasRect.top)*sy;
+   const compactAxis=top+(axisY-top)*LOUPE_PANEL_SCALE;
+   const zoom=LOUPE_VISUAL_SCALE*LOUPE_PANEL_SCALE;
+   ctx.translate(w/2,compactAxis);ctx.scale(zoom,zoom);ctx.translate(-w/2,-axisY);
    ctx.beginPath();ctx.rect(left,0,Math.max(0,right-left),h);ctx.clip();
    if(to>from)drawDensity(3,from,to,w,axisY,project);
    drawMemoryBeacons(3,from,to,w,axisY,m=>x(scale.byId.get(m.id)?.position??scale.positionAt(m.ms)));

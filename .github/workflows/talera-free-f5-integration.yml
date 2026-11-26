@@ -21,7 +21,7 @@ permissions:
 jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-calendar-wheel-exact-tested-20261126' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-desktop-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -54,7 +54,7 @@ jobs:
 
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
-    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-calendar-wheel-exact-tested-20261126' }}
+    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-desktop-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -916,7 +916,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-calendar-wheel-exact-tested-20261126' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-desktop-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     concurrency:
@@ -930,7 +930,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: d4292c53-de46-4c37-8e00-04366a271325
+      F5_EXPECTED_LIVE_VERSION: eb1c23cb-522c-4a45-99c2-d8b61bd69f76
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -956,9 +956,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 5fe5cc03e7209da7067cce8932a3e57eca9c0411
-          test "$(git diff --name-only 5fe5cc03e7209da7067cce8932a3e57eca9c0411 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 5fe5cc03e7209da7067cce8932a3e57eca9c0411 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = d4686a5302537960f8ca71bd480fcc8325877f57
+          test "$(git diff --name-only d4686a5302537960f8ca71bd480fcc8325877f57 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code d4686a5302537960f8ca71bd480fcc8325877f57 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -967,7 +967,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45791918357',sha='5fe5cc03e7209da7067cce8932a3e57eca9c0411';
+          const id='45797154990',sha='d4686a5302537960f8ca71bd480fcc8325877f57';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const names=[mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
@@ -998,7 +998,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45791918357');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45797154990');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1132,8 +1132,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code 5fe5cc03e7209da7067cce8932a3e57eca9c0411 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45791918357'
+          git diff --exit-code d4686a5302537960f8ca71bd480fcc8325877f57 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45797154990'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail
@@ -1198,6 +1198,8 @@ jobs:
           NODE
       - name: Confirm unchanged live QA version immediately before update
         run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)" = "$GITHUB_SHA"
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const accountId=process.env.CLOUDFLARE_ACCOUNT_ID.replace(/[^a-fA-F0-9]/g,'');
@@ -1294,6 +1296,13 @@ jobs:
             assert.ok(!guest.includes(marker),'Unexpected personal controller on guest Home');
           }
           const signedPresent=fs.readFileSync(root+referencePages['/present'],'utf8');
+          const guestPresent=fs.readFileSync(root+guestPages['/present'],'utf8');
+          for(const html of [signedIn.toString('utf8'),guest]){
+            assert.ok(html.includes('id="talera-f5-desktop-home-layout"')&&html.includes('id="talera-f5-desktop-memory-transition"'),'Desktop Home styling or transition missing');
+          }
+          for(const html of [signedPresent,guestPresent]){
+            assert.ok(html.includes('id="talera-f5-desktop-presentation-layout"')&&html.includes('id="talera-f5-desktop-memory-transition"'),'Desktop presentation styling or transition missing');
+          }
           assert.ok(signedPresent.includes('LOUPE_VISUAL_SCALE=1.10'), 'Missing the new exact 10 percent visual zoom');
           assert.ok(signedPresent.includes('width:66.666667%;height:calc((100% - 50px) * .66666667)')&&signedPresent.includes('LOUPE_PANEL_SCALE=2/3'), 'Missing the new proportionally reduced white loupe');
           assert.ok(signedPresent.includes('LOUPE_TOUCH_ZONE=1/3')&&!signedPresent.includes('if(to>from)drawDensity(3,from,to,w,axisY,project)'), 'Missing independent upper photo gesture zone or individual story markers');
@@ -1317,7 +1326,8 @@ jobs:
             sleep 3
           done
           test "$verified" = 1
-          curl -fsS --max-time 25 -D /tmp/talera-live-home-headers.txt "https://$F5_STAGE_HOST/mijn-leven" -o /tmp/talera-empty-home.html
+          curl -fsS --max-time 25 -H 'Cache-Control: no-cache' -D /tmp/talera-live-home-headers.txt "https://$F5_STAGE_HOST/mijn-leven" -o /tmp/talera-empty-home.html
+          curl -fsS --max-time 25 -H 'Cache-Control: no-cache' "https://$F5_STAGE_HOST/present" -o /tmp/talera-empty-present.html
           grep -Eiq '^x-talera-free-f5:[[:space:]]*anonymous-snapshot-only' /tmp/talera-live-home-headers.txt
           if grep -Fq 'randomHomeYearPhoto' /tmp/talera-empty-home.html; then exit 1; fi
           echo 'TALERA_LIVE_EXACT_ACCOUNT_HOME_PACKAGE_DIGEST_AND_GUEST_BOUNDARY_PASS'
@@ -1348,6 +1358,9 @@ jobs:
           assert.ok(home.includes('talera-untagged-memory-cards'),
             'Same TALERA Home lost the already-tested no-topic memory visibility patch');
           const present=fs.readFileSync('/tmp/talera-empty-present.html','utf8');
+          assert.ok(home.includes('id="talera-f5-desktop-home-layout"')&&home.includes('id="talera-f5-desktop-memory-transition"'),'Desktop Home is not live on same origin');
+          assert.ok(present.includes('id="talera-f5-desktop-presentation-layout"')&&present.includes('id="talera-f5-desktop-memory-transition"'),'Desktop presentation is not live on same origin');
+          console.log('TALERA_LIVE_EXACT_DESKTOP_STYLES_SAME_ORIGIN_PASS');
           assert.ok(home.includes('window.__taleraReferenceMemories=[];')&&present.includes('const MEMORIES = [];'));
           assert.ok(present.includes('const rows=[]; // Login required: no local media read.'));
           for(const html of [home,present]){
@@ -1396,11 +1409,11 @@ jobs:
           NODE
       - name: Restore previous TALERA version if deploy or postdeploy verification fails
         if: ${{ failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure') }}
-        run: npx --no-install wrangler rollback "$F5_EXPECTED_LIVE_VERSION" --name "$F5_STAGE_NAME" --message "Restore exact previous TALERA QA after failed timeline loupe and capture-reader release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
+        run: npx --no-install wrangler rollback "$F5_EXPECTED_LIVE_VERSION" --name "$F5_STAGE_NAME" --message "Restore exact previous TALERA QA after failed desktop release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
 
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-calendar-wheel-exact-tested-20261126' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-desktop-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -1547,7 +1560,7 @@ jobs:
 
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-calendar-wheel-exact-tested-20261126' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-desktop-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:

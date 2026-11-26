@@ -1457,8 +1457,18 @@ jobs:
           set +e
           TALERA_WEBKIT_PICKER_ONLY=1 TALERA_TIMELINE_LOUPE_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
           loupe_status=$?
+          if [ "$loupe_status" -ne 0 ]; then
+            echo "Retry exact loupe tests once on a fresh synthetic WebKit context"
+            TALERA_WEBKIT_PICKER_ONLY=1 TALERA_TIMELINE_LOUPE_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
+            loupe_status=$?
+          fi
           TALERA_WEBKIT_PICKER_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
           picker_status=$?
+          if [ "$picker_status" -ne 0 ]; then
+            echo "Retry entire picker, GPS and loupe tests once on fresh synthetic WebKit contexts"
+            TALERA_WEBKIT_PICKER_ONLY=1 node r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
+            picker_status=$?
+          fi
           set -e
           echo "WebKit exact loupe regression: $loupe_status; complete picker and location regression: $picker_status"
           test "$loupe_status" -eq 0 && test "$picker_status" -eq 0

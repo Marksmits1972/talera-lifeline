@@ -438,7 +438,7 @@ async function testTimelineLoupe(){
    return {width:p.width/r.width,center:Math.abs((p.left+p.right-r.left-r.right)/2),
      height:p.height,canvasCount:document.querySelectorAll('#surface canvas').length,
      canvasOpacity:getComputedStyle(document.getElementById('timelineCanvas')).opacity,
-     userSelect:getComputedStyle(document.getElementById('surface')).userSelect,
+     userSelect:getComputedStyle(document.getElementById('surface')).getPropertyValue('user-select')||getComputedStyle(document.getElementById('surface')).getPropertyValue('-webkit-user-select'),
      dateSeparate:p.bottom<=d.top+2,needleVisible:needle.height>10,
      panelTop:p.top,panelBottom:p.bottom,dateTop:d.top,rulerTop:r.top,rulerBottom:r.bottom};
   });

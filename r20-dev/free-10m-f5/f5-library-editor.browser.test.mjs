@@ -9,12 +9,13 @@ import {scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit,completePublishedRemovalOnOtherPage} from './f5-library-editor-stable-save.mjs';
+import {patchLibraryAtomicCleanup} from './f5-edit-return.mjs';
 
 const original=readFileSync('r20-dev/free-10m-delivery/generated/reference-tell.html','utf8');
 const accountHash='b'.repeat(64);
 const scoped=scopeLocalMemories(original,accountHash);
 const mapped=retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped));
-const edited=preserveOriginalMediaIdsOnEdit(mapped);
+const edited=patchLibraryAtomicCleanup(preserveOriginalMediaIdsOnEdit(mapped));
 const scripts=[...edited.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
 const storage=scripts.find(m=>m[1].includes('talera-memory-store-v1'))?.[2];
 const deletion=scripts.find(m=>m[1].includes('talera-v9-complete-delete'))?.[2];
@@ -28,8 +29,8 @@ assert.ok(storage&&storage.includes('async function save(input,uploads,editId,ca
 assert.ok(storage.includes('if(existing&&canonicalIds===undefined)for('));
 assert.ok(storage.includes("taleraPayload.writePlans(tx.objectStore('files'),fresh"));
 assert.ok(edited.includes("draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,"));
-assert.ok(edited.includes("async function writeFiles(entries){return mem.draftWriteRows("));
-assert.ok(edited.includes("async function deleteFiles(ids){return mem.draftDeleteKeys("));
+assert.ok(edited.includes("async function writeFiles(entries){if(!taleraDraftCatalogReadable)")&&edited.includes("return mem.draftWriteRows(entries.map("));
+assert.ok(edited.includes("async function deleteFiles(ids){if(!taleraDraftCatalogReadable)")&&edited.includes("return mem.draftDeleteKeys(ids.map("));
 assert.ok(!edited.includes("async function writeFiles(entries){const db=await dbOpen()"));
 assert.ok(edited.includes("draftReadPayload:readDraftPayload,"));
 assert.ok(edited.includes("const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);"));
@@ -99,6 +100,12 @@ try{
      recovered.originals[0][1]?.size!==first.size||
      recovered.previews.length!==1||recovered.previews[0][1]?.size!==second.size)
    throw Error('Editor draft library did not read original, manifest and preview intact');
+  await mem.draftDeleteKeys([namespace+conceptId]);
+  let incompleteRejected=false;
+  try{await mem.draftReadPayload(manifestKey,namespace)}catch(e){incompleteRejected=e.message==='TALERA_DRAFT_ORIGINAL_INCOMPLETE'}
+  if(!incompleteRejected||!(await mem.blob(manifestKey))?.some(g=>g.media.includes(conceptId)))
+   throw Error('Missing draft original was treated as an empty concept');
+  await mem.draftWriteRows([[namespace+conceptId,first]]);
   const duplicateKey=namespace+'duplicate-index-v7';
   const duplicates={'test-hash':{signature:'synthetic',size:first.size}};
   await mem.draftWriteRows([[duplicateKey,duplicates]]);
@@ -381,6 +388,61 @@ try{
   if((await rawFiles()).some(row=>row.key===payloadId))
    throw Error('Last reference deletion left the physical payload');
   console.log('TALERA_NEW_SHARED_ORIGINALS_AND_REFERENCE_DELETE_PASS');
+  // The new completion receipt is part of the same existing mem.save
+  // transaction. Simulate losing the page immediately after it succeeds.
+  const manifest='talera-v4-work:manifest',prefix='talera-v4-work:';
+  const newDraft={id:'completion-proof-draft',existing:'',title:'Completion proof',
+   text:'Synthetic completed draft',date:'2026-11-25',tags:[],media:['completion-proof-photo'],
+   voice:'',voiceDurationMs:0,voiceCues:[],canonicalByDraft:null};
+  const pending={...newDraft,id:'pending-proof-draft',title:'Still editing',media:['pending-proof-photo']};
+  const originalManifest=await mem.blob(manifest)||[];
+  await mem.draftWriteRows([[manifest,[...originalManifest,newDraft,pending]],
+   [prefix+newDraft.media[0],first],[prefix+pending.media[0],second]]);
+  const completion=await mem.save({title:newDraft.title,text:newDraft.text,date:newDraft.date,tags:[]},
+   [first],undefined,undefined,newDraft);
+  const afterCommit=await mem.blob(manifest);
+  const linkedDraft=afterCommit.find(g=>g.id===newDraft.id);
+  if(linkedDraft?.existing!==completion.id||linkedDraft.canonicalByDraft?.[newDraft.media[0]]!==completion.items[0].key)
+   throw Error('Placement did not atomically record its exact draft-to-story receipt');
+  if(await mem.draftDiscardCompletedEdit({...linkedDraft,text:'Unsaved edit'}))
+   throw Error('A changed concept must never be discarded');
+  // Exercise the real read path, including malformed redundant length and
+  // independent catalog evidence, against the actual existing files store.
+  const proofKey=completion.items[0].key;
+  const proofLink=(await rawFiles()).find(row=>row.key===proofKey);
+  const proofDb=await persistence.openExisting(payloadDb,false);
+  const writeProof=async row=>{
+   const tx=proofDb.transaction('files','readwrite');
+   tx.objectStore('files').put(row);
+   await new Promise((ok,bad)=>{tx.oncomplete=ok;tx.onabort=()=>bad(tx.error)});
+  };
+  try{
+   await writeProof({...proofLink,metadata:{...proofLink.metadata,length:0}});
+   const recovered=await mem.blob(proofKey);
+   if(recovered.size!==first.size||recovered.type!==first.type||
+      JSON.stringify([...new Uint8Array(await recovered.arrayBuffer())])!==JSON.stringify([...new Uint8Array(await first.arrayBuffer())]))
+    throw Error('Verified original length recovery changed or lost bytes');
+   if((await rawFiles()).find(row=>row.key===proofKey)?.metadata.length!==0)
+    throw Error('Read recovery must not write the original record');
+   const snapshot=await persistence.readAll(proofDb);
+   if(!snapshot.files.some(row=>row.key===proofKey&&row.blob?.size===first.size))
+    throw Error('Backup read lost a verified recoverable original');
+   // Also test actual same-transaction comparison and redundant-only cleanup.
+   if(!await mem.draftDiscardCompletedEdit(linkedDraft))
+    throw Error('A fully verified placed concept remained in the pending overview');
+   const remaining=await mem.blob(manifest);
+   if(remaining.some(g=>g.id===newDraft.id)||!remaining.some(g=>g.id===pending.id)||
+      await mem.blob(prefix+newDraft.media[0])||!(await mem.blob(prefix+pending.media[0]))||
+      !(await mem.get(completion.id))||!(await mem.blob(proofKey)))
+    throw Error('Draft cleanup touched a pending draft or a published original');
+  }finally{
+   await writeProof(proofLink);proofDb.close();
+   await mem.draftWriteRows([[manifest,originalManifest]]);
+   await mem.draftDeleteKeys([prefix+pending.media[0]]);
+   await mem.removePublishedStory(completion.id);
+  }
+  console.log('TALERA_ACTUAL_LIBRARY_RECOVERABLE_LENGTH_AND_COMPLETED_DRAFT_ATOMIC_PASS');
+
   const privateDb='talera-free-local-'+('b'.repeat(32))+'-v1';
   const shareId='local-shared-synthetic-media';
   const req=indexedDB.open(privateDb,1);

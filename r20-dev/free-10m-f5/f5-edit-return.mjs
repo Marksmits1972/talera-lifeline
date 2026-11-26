@@ -179,12 +179,70 @@ export function pristineDraftRemovalPlan(catalog,expected){
  return {survivors,keys:ids.filter(id=>!shared.has(id)).flatMap(id=>[PREFIX+id,PREFIX+'preview:'+id])};
 }
 
+// Compare all known editable fields with the exact linked published memory.
+// A resemblance in title/date/photos, missing attachment or unknown field
+// is never sufficient. Unlinked older drafts remain editable.
+export function publishedDraftPairs(draft,story){
+ const allowed=new Set(['id','title','text','date','media','voice','voiceCues','tags','voiceDurationMs','existing','canonicalByDraft']);
+ if(!draft||!story||story.id!==draft.existing||story.source!=='pwa-local'||
+    Object.keys(draft).some(k=>!allowed.has(k))||
+    typeof draft.title!=='string'||typeof draft.text!=='string'||typeof draft.date!=='string'||
+    draft.title!==story.title||draft.text!==story.text||draft.date!==story.date||
+    !Array.isArray(draft.tags)||!Array.isArray(draft.media)||!Array.isArray(story.items)||
+    !same(draft.tags,story.tags??[])||!draft.canonicalByDraft||
+    typeof draft.canonicalByDraft!=='object'||Array.isArray(draft.canonicalByDraft)||
+    typeof draft.voice!=='string'||!Array.isArray(draft.voiceCues)||
+    !Number.isSafeInteger(draft.voiceDurationMs)||draft.voiceDurationMs<0)return null;
+ const ids=[...draft.media,...(draft.voice?[draft.voice]:[])];
+ if(ids.length!==story.items.length||new Set(ids).size!==ids.length||
+    Object.keys(draft.canonicalByDraft).length!==ids.length)return null;
+ const pairs=[];
+ for(let i=0;i<ids.length;i++){
+  const item=story.items[i],draftId=ids[i];
+  if(!DRAFT_ID.test(draftId||'')||!item||draft.canonicalByDraft[draftId]!==item.key||
+     typeof item.key!=='string'||!Number.isSafeInteger(item.size)||item.size<1||
+     typeof item.mime!=='string'||(i<draft.media.length?!['photo','video'].includes(item.kind):item.kind!=='audio'))return null;
+  pairs.push({draft:PREFIX+draftId,original:item.key,size:item.size,mime:item.mime});
+ }
+ if(draft.voiceDurationMs!==(story.narrationDurationMs??0))return null;
+ const mapped=[];
+ for(const cue of draft.voiceCues){
+  if(!cue||!Number.isSafeInteger(cue.index)||cue.index<0||cue.index>=draft.media.length||
+     !Number.isSafeInteger(cue.t)||cue.mediaId!==draft.media[cue.index])return null;
+  mapped.push({...cue,mediaId:draft.canonicalByDraft[cue.mediaId]});
+ }
+ if(!same(mapped,story.narrationCues??[]))return null;
+ return pairs;
+}
+
+export async function verifyPublishedDraftBytes(pairs,read){
+ if(!pairs)return false;
+ for(const pair of pairs){
+  try{
+   const [a,b]=await Promise.all([read(pair.draft),read(pair.original)]);
+   if(!(a instanceof Blob)||!(b instanceof Blob)||
+      a.size!==pair.size||b.size!==pair.size||a.type!==pair.mime||b.type!==pair.mime)return false;
+   const af=a instanceof File,bf=b instanceof File;
+   if(af!==bf||(af&&(a.name!==b.name||a.lastModified!==b.lastModified)))return false;
+   const chunk=4*1024*1024;
+   for(let offset=0;offset<a.size;offset+=chunk){
+    const end=Math.min(offset+chunk,a.size);
+    const x=new Uint8Array(await a.slice(offset,end).arrayBuffer());
+    const y=new Uint8Array(await b.slice(offset,end).arrayBuffer());
+    if(x.length!==end-offset||x.length!==y.length)return false;
+    for(let i=0;i<x.length;i++)if(x[i]!==y[i])return false;
+   }
+  }catch{return false}
+ }
+ return true;
+}
+
 // The original editor writes this exact non-Blob manifest shape through
 // TaleraMemories.draftWriteRows. The original encodeInline() returns a
 // non-Blob row unchanged, so no new codec/database/schema is introduced.
 // Lock files AND stories together while reading, but never write stories.
 // All actual writes occur inside the same IDB callback/transaction.
-export function discardPristineDraftAtomically(db,expected){
+export function discardPristineDraftAtomically(db,expected,readLogical){
  return new Promise((resolve,reject)=>{
   const tx=db.transaction(['stories','files'],'readwrite');
   const files=tx.objectStore('files'),stories=tx.objectStore('stories');
@@ -209,9 +267,37 @@ export function discardPristineDraftAtomically(db,expected){
     // A malformed legacy record that points into a draft namespace cannot
     // make this action delete the published media it references.
     if(plan.keys.some(key=>claimed.has(key)))return;
-    files.put({key:MANIFEST,blob:plan.survivors});
-    for(const key of plan.keys)files.delete(key);
-    removed=true;
+    const remove=()=>{
+     files.put({key:MANIFEST,blob:plan.survivors});
+     for(const key of plan.keys)files.delete(key);
+     removed=true;
+    };
+    if(!readLogical){remove();return}
+    // Historical drafts require exact published content, including bytes.
+    // The same transaction protects the manifest and all compared originals.
+    const pairs=publishedDraftPairs(expected,original);
+    if(!pairs)return;
+    const read=key=>new Promise((resolve,reject)=>readLogical(files,key,row=>resolve(row?.blob),reject));
+    let index=0;
+    // Schedule each new pair from a native IDB callback, not from an async
+    // continuation where WebKit might mark the transaction inactive.
+    const checkNext=()=>{
+     if(index===pairs.length){remove();return}
+     let settled=false,equal=false;
+     verifyPublishedDraftBytes([pairs[index++]],read).then(v=>{equal=v;settled=true},()=>{settled=true});
+     const pulse=()=>{
+      const ping=files.getKey(MANIFEST);
+      ping.onerror=()=>fail(ping.error||Error('Draft comparison interrupted'));
+      ping.onsuccess=()=>{
+       try{
+        if(!settled){pulse();return}
+        if(equal&&ping.result===MANIFEST)checkNext();
+       }catch(e){fail(e)}
+      };
+     };
+     pulse();
+    };
+    checkNext();
    }catch(e){fail(e)}
   };
   try{
@@ -235,7 +321,7 @@ export function patchLibraryAtomicCleanup(html,serialized=buildEditReturnBrowser
  const api='draftReadPayload:readDraftPayload,';
  if(source.split(anchor).length!==2||source.split(api).length!==2||!source.includes('async function readDraftPayload(manifestKey,prefix)')||source.includes('draftDiscardPristineEdit:'))throw Error('EDIT_RETURN_LIBRARY_ANCHOR_DRIFT');
  const cleanupSource=serialized.cleanup;
- const next=source.replace(anchor,()=>cleanupSource+anchor).replace(api,()=>api+'draftDiscardPristineEdit:discardFreshEditConcept,');
+ const next=source.replace(anchor,()=>cleanupSource+anchor).replace(api,()=>api+'draftDiscardPristineEdit:discardFreshEditConcept,draftDiscardCompletedEdit:discardCompletedEditConcept,');
  return html.slice(0,block.index)+block[0].replace(source,()=>next)+html.slice(block.index+block[0].length);
 }
 
@@ -283,7 +369,7 @@ function browserReturnCore(editor){
 // Worker; all browser declarations then arrive as immutable strings, so a
 // bundler's variable renaming cannot break lexical dependencies.
 export function buildEditReturnBrowserSources(){
- const cleanup=`async function discardFreshEditConcept(expected){const db=await open();return (function(){const EDIT_RETURN_ID=${EDIT_RETURN_ID},DRAFT_ID=${DRAFT_ID},PREFIX=${JSON.stringify(PREFIX)},MANIFEST=${JSON.stringify(MANIFEST)};const same=${same.toString()};${pristineDraftRemovalPlan.toString()}\n${discardPristineDraftAtomically.toString()}\nreturn discardPristineDraftAtomically(db,expected);})();}\n`;
+ const cleanup=`async function discardFreshEditConcept(expected){return discardEditConcept(expected,false);}\nasync function discardCompletedEditConcept(expected){return discardEditConcept(expected,true);}\nasync function discardEditConcept(expected,verify){const db=await open();return (function(){const EDIT_RETURN_ID=${EDIT_RETURN_ID},DRAFT_ID=${DRAFT_ID},PREFIX=${JSON.stringify(PREFIX)},MANIFEST=${JSON.stringify(MANIFEST)};const same=${same.toString()};${pristineDraftRemovalPlan.toString()}\n${publishedDraftPairs.toString()}\n${verifyPublishedDraftBytes.toString()}\n${discardPristineDraftAtomically.toString()}\nreturn discardPristineDraftAtomically(db,expected,verify?taleraPayload.read:null);})();}\n`;
  return Object.freeze({capture:captureReturnContext.toString(),cleanup,editor:browserReturnCore(true),presentation:browserReturnCore(false)});
 }
 

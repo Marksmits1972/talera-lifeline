@@ -18,7 +18,7 @@ import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
-import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
+import {muteEditorOnlyVideo,restoreEditorVideoCover} from './f5-editor-video-mute-guard.mjs';
 import {patchAuthenticatedEditReturn} from './f5-edit-return.mjs';
 import {editReturnBrowserSources} from './generated/f5-edit-return-browser.mjs';
 import {localBackupPage} from './f5-local-backup-page.mjs';
@@ -1123,7 +1123,7 @@ async function publicPage(request,env){
     // Keep the editor's preview silent from the FIRST frame, even before
     // the record panel is visible. The original present/player video round
     // with sound after narration is untouched.
-    const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;
+    const silenced=pathname==='/tell'?restoreEditorVideoCover(muteEditorOnlyVideo(stableEditedCues)):stableEditedCues;
     const editReturnHtml=patchAuthenticatedEditReturn(silenced,pathname,editReturnAccountScope,editReturnBrowserSources);
     const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(editReturnHtml):editReturnHtml;
     const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));

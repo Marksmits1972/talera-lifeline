@@ -128,12 +128,71 @@ export function createOriginalPayloadStorage(){
   const blob=fileFromParts(physical.parts,row.metadata,physical.length);
   return {key:row.key,blob};
  }
+ // Redundant length/type can be missing in older records. Reconstruct only
+ // independently known fields; never infer a filename, date or arbitrary
+ // MIME from a physical payload shared with other media IDs.
+ async function recoverVerifiedMetadata(row,payload,stories){
+  if(!row||Object.keys(row).sort().join(',')!=='key,metadata,payloadKey'||
+     !payloadKey(row.payloadKey)||!payload||payload.key!==row.payloadKey||
+     !Array.isArray(stories)||!row.metadata||
+     !Object.hasOwn(row.metadata,'name')||!Object.hasOwn(row.metadata,'lastModified')||
+     Object.keys(row.metadata).some(k=>!['lastModified','length','name','type'].includes(k)))
+   failFormat('logical-metadata');
+  const physical=payloadParts(payload),m=row.metadata;
+  if(!physical.length)failFormat('logical-metadata');
+  let references=0,mime;
+  for(const story of stories){
+   if(!story||!Array.isArray(story.items))failFormat('unverified-catalog');
+   for(const item of story.items){
+    if(item?.key!==row.key)continue;
+    if(story.source!=='pwa-local'||item.size!==physical.length||
+       typeof item.mime!=='string'||new Blob([],{type:item.mime}).type!==item.mime||
+       (references&&mime!==item.mime))failFormat('unverified-catalog');
+    mime=item.mime;references++;
+   }
+  }
+  if(!references)failFormat('unverified-catalog');
+  // Do not overwrite a contradictory, otherwise valid MIME field.
+  if(typeof m.type==='string'){
+   const normalized=new Blob([],{type:m.type}).type;
+   if((normalized||m.type==='')&&normalized!==mime)failFormat('unverified-catalog');
+  }
+  if(m.length===physical.length&&m.type===mime)failFormat('logical-metadata');
+  const blob=fileFromParts(physical.parts,{length:physical.length,type:mime,name:m.name,lastModified:m.lastModified},physical.length);
+  const hashes=[];
+  for(let offset=0;offset<blob.size;offset+=chunk){
+   const end=Math.min(offset+chunk,blob.size),bytes=await blob.slice(offset,end).arrayBuffer();
+   if(bytes.byteLength!==end-offset)failFormat('unverified-payload');
+   hashes.push(hex(await crypto.subtle.digest('SHA-256',bytes)));
+  }
+  const hash=hex(await crypto.subtle.digest('SHA-256',
+   new TextEncoder().encode(blob.size+':'+hashes.join(':'))));
+  if(prefix+hash!==row.payloadKey)failFormat('unverified-payload');
+  return {key:row.key,blob};
+ }
  function logicalRows(rows){
   if(!Array.isArray(rows))failFormat();
   const map=new Map(rows.map(row=>[row.key,row]));
   if(map.size!==rows.length)failFormat();
   return rows.filter(row=>!payloadKey(row.key)).map(row=>
    link(row)?materialize(row,map.get(row.payloadKey)):decodeInline(row));
+ }
+ async function logicalRowsVerified(rows,stories){
+  if(!Array.isArray(rows))failFormat();
+  const map=new Map(rows.map(row=>[row.key,row]));
+  if(map.size!==rows.length)failFormat();
+  const result=[];
+  for(const row of rows){
+   if(payloadKey(row.key))continue;
+   if(!link(row)){result.push(decodeInline(row));continue}
+   const payload=map.get(row.payloadKey);
+   try{result.push(materialize(row,payload))}
+   catch(error){
+    if(!['logical-metadata','materialized-file-metadata'].includes(error?.reason))throw error;
+    result.push(await recoverVerifiedMetadata(row,payload,stories));
+   }
+  }
+  return result;
  }
  function read(store,key,ok,fail){
   const q=store.get(key);
@@ -145,7 +204,34 @@ export function createOriginalPayloadStorage(){
     if(!payloadKey(row.payloadKey))failFormat('logical-link-key');
     const p=store.get(row.payloadKey);
     p.onerror=()=>fail(p.error||Error('TALERA_LIBRARY_PAYLOAD_READ'));
-    p.onsuccess=()=>{try{ok(materialize(row,p.result))}catch(e){fail(e)}};
+    p.onsuccess=()=>{
+     try{ok(materialize(row,p.result))}
+     catch(error){
+      if(!['logical-metadata','materialized-file-metadata'].includes(error?.reason)||!store.transaction.objectStoreNames.contains('stories')){
+       fail(error);return;
+      }
+      const catalog=store.transaction.objectStore('stories').getAll();
+      catalog.onerror=()=>fail(catalog.error||error);
+      catalog.onsuccess=()=>{
+       let settled=false,result=null,problem=null;
+       recoverVerifiedMetadata(row,p.result,catalog.result).then(
+        value=>{result=value;settled=true},e=>{problem=e;settled=true});
+       // The read may be inside an existing write transaction. Keep it alive,
+       // so its caller can continue atomically after hashing the original.
+       const pulse=()=>{
+        const ping=store.getKey(key);
+        ping.onerror=()=>fail(ping.error||error);
+        ping.onsuccess=()=>{
+         if(!settled){pulse();return}
+         if(problem){fail(problem);return}
+         if(ping.result!==key){fail(error);return}
+         ok(result);
+        };
+       };
+       pulse();
+      };
+     }
+    };
    }catch(e){fail(e)}
   };
  }
@@ -266,7 +352,7 @@ export function createOriginalPayloadStorage(){
    }catch(e){fail(e)}
   };
  }
- return Object.freeze({prepare,verifyBatch,encodeInline,decodeInline,read,writePlans,logicalRows,collectUnreferenced,
+ return Object.freeze({prepare,verifyBatch,encodeInline,decodeInline,read,writePlans,logicalRows,logicalRowsVerified,collectUnreferenced,
   isPayloadKey:payloadKey,isLink:link});
 }
 
@@ -275,7 +361,8 @@ export async function readAll(db){
  const tx=db.transaction(['stories','files'],'readonly');
  const stories=requestResult(tx.objectStore('stories').getAll());
  const files=requestResult(tx.objectStore('files').getAll());
- return {stories:await stories,files:originalPayloadStorage.logicalRows(await files)};
+ const catalog=await stories;
+ return {stories:catalog,files:await originalPayloadStorage.logicalRowsVerified(await files,catalog)};
 }
 
 // Fail-closed relationship check for the ORIGINAL media within the single

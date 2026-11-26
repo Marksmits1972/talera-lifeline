@@ -202,3 +202,207 @@ test('base build produces stable lexical browser code before Worker bundling',()
  const assets="import {buildF5OfflineServiceWorker} from './f5-offline-sw.mjs';\n[readFileSync(path.join(here,'f5-worker.mjs')),];\nwriteFileSync(path.join(generated,'public-template-map.mjs'),'x');";
  const patched=patchPublicAssetsSource(assets);assert.match(patched,/f5-edit-return-browser\.mjs/);assert.match(patched,/JSON.stringify\(buildEditReturnBrowserSources\(\)\)/);assert.match(patched,/readFileSync\(path.join\(here,'f5-edit-return.mjs'\)\)/);assert.throws(()=>patchPublicAssetsSource(assets.replace('public-template-map','other')));
 });
+
+import {publishedDraftPairs,verifyPublishedDraftBytes} from './f5-edit-return.mjs';
+import {savedDraftReceipt,writeSavedDraftReceipt,readEditorDraftPayload} from './f5-library-editor-stable-save.mjs';
+import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
+import {restoreEditorVideoCover} from './f5-editor-video-mute-guard.mjs';
+
+const completedDraft={...draft,voiceDurationMs:2000};
+const completedStory={id,source:'pwa-local',title:draft.title,text:draft.text,date:draft.date,tags:draft.tags,
+ items:[{key:'original-a',kind:'photo',mime:'image/png',size:3},{key:'original-b',kind:'video',mime:'video/mp4',size:3},
+ {key:'original-audio',kind:'audio',mime:'audio/wav',size:3}],
+ narrationCues:[{t:0,index:0,mediaId:'original-a'}],narrationDurationMs:2000};
+test('completed draft proof compares all editable fields, exact ID order and canonical cue IDs',()=>{
+ const pairs=publishedDraftPairs(completedDraft,completedStory);
+ assert.equal(pairs.length,3);
+ for(const change of [
+  {existing:''},{existing:id2},{title:'unsaved title'},{text:'unsaved text'},
+  {date:'2025-02-01'},{tags:[]},{media:[...draft.media].reverse()},{voice:''},
+  {voiceCues:[]},{voiceDurationMs:1999},{canonicalByDraft:null},{futureEditableField:'unknown'}
+ ])assert.equal(publishedDraftPairs({...completedDraft,...change},completedStory),null);
+ assert.equal(publishedDraftPairs(completedDraft,{...completedStory,narrationCues:[{t:1,index:0,mediaId:'original-a'}]}),null);
+});
+test('verified content compares full bytes and metadata; absent or changed media keeps concept',async()=>{
+ const pairs=publishedDraftPairs(completedDraft,completedStory);
+ const rows=new Map();
+ for(const pair of pairs){
+  const f=new File([Uint8Array.of(1,2,3)],pair.original,{type:pair.mime,lastModified:123});
+  rows.set(pair.draft,f);rows.set(pair.original,f);
+ }
+ assert.equal(await verifyPublishedDraftBytes(pairs,k=>rows.get(k)),true);
+ const key=pairs[1].draft,original=rows.get(key);
+ for(const changed of [
+  undefined,new File([Uint8Array.of(1,2,4)],original.name,{type:original.type,lastModified:original.lastModified}),
+  new File([original],'different-name',{type:original.type,lastModified:original.lastModified})
+ ]){rows.set(key,changed);assert.equal(await verifyPublishedDraftBytes(pairs,k=>rows.get(k)),false)}
+});
+test('saved-draft receipt binds a newly placed draft to the real stored story without deleting metadata or other concepts',()=>{
+ const fresh={...completedDraft,existing:'',canonicalByDraft:null};
+ const other={id:'draft-other-123456',existing:'',media:[]};
+ const catalog=[fresh,other],result=savedDraftReceipt(catalog,fresh,completedStory,completedStory.items);
+ assert.deepEqual(result,[completedDraft,other]);
+ assert.equal(catalog[0].existing,'');
+ assert.equal(savedDraftReceipt([{...fresh,title:'concurrent edit'},other],fresh,completedStory,completedStory.items),null);
+ assert.equal(savedDraftReceipt(catalog,fresh,completedStory,[...completedStory.items].reverse()),null);
+ assert.equal(savedDraftReceipt(catalog,fresh,completedStory,completedStory.items.slice(0,2)),null);
+});
+test('reopening mixed photo/video uses the existing poster under the exact canonical video ID',async()=>{
+ const source=`talera-memory-store-v1
+if(entries.length)await writeFiles(entries);entries.forEach(([id,f])=>assets.set(id,f));
+voiceDurationMs:g.voiceDurationMs||0,existing:g.existing||''}))`;
+ const changed=retainEditorCanonicalMediaIds(source);
+ const injected=changed.slice(changed.indexOf('if(g.existing)'),changed.indexOf('voiceDurationMs:'));
+ const run=new Function('g','row','entries','writeFiles','assets','mem','previewBlobs','Image','return (async()=>{'+injected+'})()');
+ const photo=new File(['photo'],'photo.png',{type:'image/png',lastModified:1});
+ const video=new File(['video'],'video.mp4',{type:'video/mp4',lastModified:1});
+ const poster=new Blob(['thumbnail'],{type:'image/jpeg'}),entries=[['draft-photo',photo],['draft-video',video]];
+ const row={items:[{key:'original-photo',kind:'photo'},{key:'original-video',kind:'video'}]};
+ const broken=new Blob(['invalid'],{type:'image/jpeg'});
+ for(const derived of [poster,null,new Blob(['invalid'],{type:'video/mp4'}),broken]){
+  const g={existing:id},previews=new Map(),assets=new Map(),reads=[],writes=[];
+  class ImageDouble{removeAttribute(){}set src(v){queueMicrotask(()=>{if(derived===poster){this.naturalWidth=128;this.naturalHeight=96;this.onload?.()}else this.onerror?.()})}}
+  await run(g,row,entries,async rows=>writes.push(rows),assets,{blob:async k=>{reads.push(k);return derived}},previews,ImageDouble);
+  assert.deepEqual(reads,['original-video:phone-v1']);
+  assert.deepEqual(g.canonicalByDraft,{'draft-photo':'original-photo','draft-video':'original-video'});
+  assert.strictEqual(assets.get('draft-video'),video);
+  assert.strictEqual(assets.get('draft-photo'),photo);
+  assert.equal(previews.has('draft-video'),derived===poster);
+  assert.equal(writes.length,derived===poster?2:1);
+  if(derived===poster)assert.deepEqual(writes[1],[['preview:draft-video',poster]]);
+ }
+ assert.throws(()=>retainEditorCanonicalMediaIds(source.replace('entries.length','other.length')));
+});
+test('video native-cover correction is scoped to the existing editor anchors and fails on source drift',()=>{
+ const source=` tiles.querySelectorAll('.tile').forEach(enableDrag);taleraV9EditorMediaControls(g);
+main.querySelectorAll('.tile').forEach(enableDrag);$('addMore').onclick=
+void v.play().then(()=>setTimeout(()=>{if(v.isConnected){v.pause();void capture()}},250)).catch(()=>{});
+      pending=true;v.style.opacity='1';v.pause();
+      try{
+        const image=await drawnPreview(v,v.videoWidth,v.videoHeight);
+    for(const e of ['loadeddata','seeked','canplay','timeupdate'])v.addEventListener(e,()=>void capture());`;
+ const changed=restoreEditorVideoCover(source);
+ assert.equal(changed.split('taleraV61AttachNativeCovers()').length-1,2);
+ assert.match(changed,/if\(v.isConnected&&v.readyState>=2\)void capture/);
+ assert.match(changed,/requestAnimationFrame/);
+ assert.throws(()=>restoreEditorVideoCover(source.replace('v.play()','v.other()')));
+});
+
+// Callback transaction simulator: all staged writes roll back on abort.
+// Uses setImmediate so async byte reads can settle between key-only pings.
+// This executes product functions, not a claim about Safari itself.
+function atomicStoreDouble(fileEntries,storyRows=[],failRead=null){
+ const files=new Map(fileEntries),stories=new Map(storyRows.map(row=>[row.id,row]));
+ let active=0,commits=0,aborts=0;
+ const db={transaction(names,mode){
+  active++;
+  const stage={files:new Map(files),stories:new Map(stories)};
+  let pending=0,aborted=false,finished=false;
+  const tx={abort(){if(aborted||finished)return;aborted=true;aborts++;setImmediate(()=>tx.onabort?.())},
+   objectStore(name){
+    assert.ok([].concat(names).includes(name));const map=stage[name];
+    function request(fn,key=null){
+     const q={};pending++;
+     setImmediate(()=>{
+      if(aborted||finished)return;
+      try{
+       if(failRead!==null&&key===failRead)throw Error('simulated read failure');
+       q.result=fn();q.onsuccess?.();
+      }catch(e){q.error=e;tx.error=e;q.onerror?.();tx.abort()}
+      finally{
+       if(!--pending&&!aborted&&!finished){
+        finished=true;commits++;
+        if(mode==='readwrite'){files.clear();for(const [k,v] of stage.files)files.set(k,v);stories.clear();for(const [k,v] of stage.stories)stories.set(k,v)}
+        tx.oncomplete?.();
+       }
+      }
+     });
+     return q;
+    }
+    return {get:key=>request(()=>map.get(key),key),
+     getKey:key=>request(()=>map.has(key)?key:undefined,key),
+     getAll:()=>request(()=>[...map.values()]),
+     put:row=>request(()=>{assert.equal(mode,'readwrite');map.set(name==='files'?row.key:row.id,row)}),
+     delete:key=>request(()=>{assert.equal(mode,'readwrite');map.delete(key)})};
+   }};
+  return tx;
+ }};
+ return {db,files,stories,get active(){return active},get commits(){return commits},get aborts(){return aborts}};
+}
+test('draft loader reads a coherent manifest and all original IDs, optional missing/corrupt previews do not erase media',async()=>{
+ const manifest='talera-v4-work:manifest',prefix='talera-v4-work:';
+ const g={id:'valid-draft',media:['file-1','file-2'],voice:'voice-1'};
+ const photo=new File(['photo'],'same.png',{type:'image/png',lastModified:3});
+ const video=new File(['video'],'same.mp4',{type:'video/mp4',lastModified:3});
+ const voice=new Blob(['voice'],{type:'audio/mp4'});
+ const records=[[manifest,{key:manifest,blob:[g]}],
+  [prefix+'file-1',{key:prefix+'file-1',blob:photo}],
+  [prefix+'file-2',{key:prefix+'file-2',blob:video}],
+  [prefix+'voice-1',{key:prefix+'voice-1',blob:voice}],
+  [prefix+'preview:file-2',{key:prefix+'preview:file-2',broken:true}]];
+ const decode=row=>{if(row?.broken)throw Error('bad preview');return row};
+ const lib=atomicStoreDouble(records);
+ const result=await readEditorDraftPayload(lib.db,manifest,prefix,decode);
+ assert.deepEqual(result.catalog,[g]);assert.deepEqual(result.originals,[['file-1',photo],['file-2',video],['voice-1',voice]]);
+ assert.equal(lib.active,1);assert.equal(lib.commits,1);assert.equal(result.previews.every(([,p])=>p===null),true);
+ assert.deepEqual([...lib.files],records);
+});
+test('draft loader rejects missing originals, read errors and malformed manifests without replacing the manifest',async()=>{
+ const manifest='talera-v4-work:manifest',prefix='talera-v4-work:';
+ const group={id:'valid-draft',media:['file-1'],voice:''};
+ for(const [rows,fail] of [
+  [[[manifest,{key:manifest,blob:[group]}]],null],
+  [[[manifest,{key:manifest,blob:{unknown:true}}]],null],
+  [[[manifest,{key:manifest,blob:[group,group]}]],null],
+  [[[manifest,{key:manifest,blob:[group]}],[prefix+'file-1',{key:prefix+'file-1',blob:new Blob([])}]],null],
+  [[[manifest,{key:manifest,blob:[group]}]],manifest]
+ ]){
+  const lib=atomicStoreDouble(rows,[],fail);
+  await assert.rejects(readEditorDraftPayload(lib.db,manifest,prefix,row=>row));
+  assert.deepEqual([...lib.files],rows);assert.equal(lib.commits,0);
+ }
+ const empty=atomicStoreDouble([]);
+ assert.deepEqual(await readEditorDraftPayload(empty.db,manifest,prefix,row=>row),{catalog:[],originals:[],previews:[]});
+});
+test('placement receipt aborts the whole story/media transaction on concurrently changed or missing draft metadata',async()=>{
+ const manifest='talera-v4-work:manifest',fresh={...completedDraft,existing:'',canonicalByDraft:null};
+ for(const row of [undefined,{key:manifest,blob:[{...fresh,title:'concurrent edit'}]}]){
+  const lib=atomicStoreDouble(row?[[manifest,row]]:[]);
+  const tx=lib.db.transaction(['stories','files'],'readwrite');
+  const stop=new Promise(resolve=>{tx.onabort=resolve});
+  tx.objectStore('stories').put(completedStory);
+  tx.objectStore('files').put({key:'new-original',blob:new Blob(['new'])});
+  await assert.rejects(writeSavedDraftReceipt(tx,fresh,completedStory,completedStory.items),/Concept is gewijzigd/);
+  await stop;
+  assert.equal(lib.aborts,1);assert.equal(lib.commits,0);
+  assert.equal(lib.stories.size,0);assert.equal(lib.files.has('new-original'),false);
+  assert.deepEqual(lib.files.get(manifest),row);
+ }
+ const row={key:manifest,blob:[fresh,{id:'unrelated',media:[],voice:''}]};
+ const lib=atomicStoreDouble([[manifest,row]]);
+ const tx=lib.db.transaction(['stories','files'],'readwrite');
+ const done=new Promise(resolve=>{tx.oncomplete=resolve});
+ tx.objectStore('stories').put(completedStory);
+ await writeSavedDraftReceipt(tx,fresh,completedStory,completedStory.items);
+ await done;
+ assert.deepEqual(lib.files.get(manifest).blob,[completedDraft,row.blob[1]]);
+ assert.deepEqual(lib.stories.get(id),completedStory);assert.equal(lib.commits,1);
+});
+test('completed draft cleanup runs actual byte checks inside one transaction and preserves changed/missing copies',async()=>{
+ const manifest='talera-v4-work:manifest',pairs=publishedDraftPairs(completedDraft,completedStory);
+ const keep={id:'unrelated',media:[],voice:''};
+ for(const damaged of [false,true]){
+  const rows=[[manifest,{key:manifest,blob:[completedDraft,keep]}]];
+  for(const pair of pairs){
+   const f=new File([Uint8Array.of(1,2,3)],pair.original,{type:pair.mime,lastModified:1});
+   rows.push([pair.original,{key:pair.original,blob:f}],
+    [pair.draft,{key:pair.draft,blob:damaged&&pair===pairs[1]?new File([Uint8Array.of(1,2,4)],f.name,{type:f.type,lastModified:1}):f}]);
+  }
+  const lib=atomicStoreDouble(rows,[completedStory]);
+  const read=(store,key,ok,fail)=>{const q=store.get(key);q.onsuccess=()=>ok(q.result);q.onerror=()=>fail(q.error)};
+  assert.equal(await discardPristineDraftAtomically(lib.db,completedDraft,read),!damaged);
+  assert.deepEqual(lib.files.get(manifest).blob,damaged?[completedDraft,keep]:[keep]);
+  for(const pair of pairs){assert.equal(lib.files.has(pair.original),true);assert.equal(lib.files.has(pair.draft),damaged)}
+  assert.equal(lib.stories.get(id),completedStory);
+ }
+});

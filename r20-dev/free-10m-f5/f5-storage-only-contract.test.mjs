@@ -10,7 +10,7 @@ import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
 import {patchAuthenticatedEditReturn} from './f5-edit-return.mjs';
 import {editReturnBrowserSources} from './generated/f5-edit-return-browser.mjs';
-import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
+import {muteEditorOnlyVideo,restoreEditorVideoCover} from './f5-editor-video-mute-guard.mjs';
 
 const root='r20-dev/';
 const base='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
@@ -32,7 +32,7 @@ assert.ok(gateway.includes('const editReturnAccountScope=await privateAccountSco
   'Private local media must be bound to verified session identity');
 assert.ok(gateway.includes("pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped))):scoped"),
   'Only recording media-ID integrity is allowed as an editor storage correction');
-assert.ok(gateway.includes("const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;")&&
+assert.ok(gateway.includes("const silenced=pathname==='/tell'?restoreEditorVideoCover(muteEditorOnlyVideo(stableEditedCues)):stableEditedCues;")&&
   gateway.includes('const editReturnHtml=patchAuthenticatedEditReturn(silenced,pathname,editReturnAccountScope,editReturnBrowserSources);')&&
   gateway.includes('const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(editReturnHtml):editReturnHtml;')&&
   gateway.includes('assetizeHtml(threeTabHome,new Set(approvedAssets))'),
@@ -120,8 +120,13 @@ assert.ok(!privateTell.includes('blob:uploads[j]'),
 console.log('TALERA_F5_PACKAGED_TELL_PHOTO_COPY_EDITOR_COMPOSITION_PASS');
 // Check the exact authenticated worker composition of the real built editor
 // and present, not just the test fixture's source strings.
-const editorHtml=patchAuthenticatedEditReturn(muteEditorOnlyVideo(privateTell),'/tell',s1,editReturnBrowserSources);
+const editorHtml=patchAuthenticatedEditReturn(restoreEditorVideoCover(muteEditorOnlyVideo(privateTell)),'/tell',s1,editReturnBrowserSources);
 assert.ok(editorHtml.includes('draftDiscardPristineEdit:discardFreshEditConcept')&&editorHtml.includes('talera-f5-edit-return-eye'));
+assert.ok(editorHtml.includes('draftDiscardCompletedEdit:discardCompletedEditConcept')&&
+ editorHtml.includes('taleraRememberSavedDraft(tx,editorDraft,meta,files)')&&
+ editorHtml.includes("await mem.blob(item.key+':phone-v1')"),
+ 'The same private editor contains all three focused media/draft corrections');
+
 const packagedPresent=readFileSync('r20-dev/free-10m-delivery/public'+referencePages['/present'],'utf8');
 const presentHtml=patchAuthenticatedEditReturn(scopeLocalMemories(packagedPresent,s1),'/present',s1,editReturnBrowserSources);
 assert.ok(presentHtml.includes('id="talera-f5-edit-return-frame"')&&presentHtml.includes('talera-free-edit-return-'+s1.slice(0,32)));

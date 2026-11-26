@@ -1,7 +1,101 @@
 import {createOriginalPayloadStorage} from './f5-library-persistence.mjs';
+import {isDecodableEditorPoster} from './f5-editor-canonical-refs.mjs';
 // TALERA Free: permanent published media IDs, independent of visual order.
 // Patch only the ORIGINAL private-account TaleraMemories save and editor call.
 // No migration, secondary database or Worker. Existing full-delete is exposed in the editor.
+
+// Turn a successfully stored editor draft into an exact linked edit draft.
+// This is only a private completion receipt in the existing manifest.
+// It must not replace a concurrent change or touch any other draft.
+export function savedDraftReceipt(catalog,expected,story,items){
+ if(!Array.isArray(catalog)||catalog.some(g=>!g||typeof g.id!=='string')||!expected||!story||story.source!=='pwa-local'||
+    !/^local-[a-z0-9-]+$/i.test(story.id||'')||
+    !/^[a-z0-9-]{8,100}$/i.test(expected.id||'')||
+    (expected.existing&&expected.existing!==story.id)||
+    !Array.isArray(expected.media)||!Array.isArray(items))return null;
+ const matches=catalog.filter(g=>g?.id===expected.id);
+ if(matches.length!==1||JSON.stringify(matches[0])!==JSON.stringify(expected))return null;
+ const ids=[...expected.media,...(expected.voice?[expected.voice]:[])];
+ if(ids.length!==items.length||new Set(ids).size!==ids.length||
+    ids.some(id=>typeof id!=='string'||!/^[a-z0-9-]{8,100}$/i.test(id))||
+    items.some((item,i)=>typeof item?.key!=='string'||!item.key||
+     (i<expected.media.length?!['photo','video'].includes(item.kind):item.kind!=='audio'))||
+    new Set(items.map(item=>item.key)).size!==items.length)return null;
+ const canonicalByDraft=Object.fromEntries(ids.map((id,i)=>[id,items[i].key]));
+ return catalog.map(g=>g.id===expected.id?{...g,existing:story.id,canonicalByDraft}:g);
+}
+
+export function writeSavedDraftReceipt(tx,expected,meta,items,makeReceipt=savedDraftReceipt){
+ if(!expected)return Promise.resolve();
+ return new Promise((resolve,reject)=>{
+  const store=tx.objectStore('files'),key='talera-v4-work:manifest',q=store.get(key);
+  q.onerror=()=>reject(q.error);
+  q.onsuccess=()=>{
+   try{
+    const row=q.result;
+    if(!row||row.key!==key||Object.keys(row).sort().join(',')!=='blob,key')throw Error('Concept is gewijzigd of niet volledig opgeslagen. De herinnering blijft intact.');
+    const updated=makeReceipt(row.blob,expected,meta,items);
+    if(!updated)throw Error('Concept is gewijzigd of niet volledig opgeslagen. De herinnering blijft intact.');
+    const p=store.put({key,blob:updated});
+    p.onsuccess=()=>resolve();p.onerror=()=>reject(p.error);
+   }catch(e){try{tx.abort()}catch(_){}reject(e)}
+  };
+ });
+}
+
+// Read one coherent catalog + all referenced draft originals from the same
+// existing readonly transaction. A missing preview is harmless; a missing
+// original/manifest read error must never be interpreted as an empty draft.
+export function readEditorDraftPayload(db,manifestKey,prefix,decodeInline){
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction('files','readonly'),store=tx.objectStore('files');
+  const invalid=()=>Error('TALERA_DRAFT_ORIGINAL_INCOMPLETE');
+  let catalog=[],originals=[],previews=[],ready=false;
+  tx.onabort=()=>reject(tx.error||invalid());
+  tx.oncomplete=()=>ready?resolve({catalog,originals,previews}):reject(invalid());
+  const fail=error=>{reject(error||invalid());try{tx.abort()}catch(_){}};
+  try{
+   const q=store.get(manifestKey);
+   q.onerror=()=>fail(q.error);
+   q.onsuccess=()=>{
+    try{
+     const row=q.result;
+     if(row!==undefined&&(!row||row.key!==manifestKey||!Array.isArray(row.blob)))throw invalid();
+     catalog=row?.blob||[];
+     const groups=new Set(),ids=new Set();
+     for(const g of catalog){
+      if(!g||typeof g.id!=='string'||!g.id||groups.has(g.id)||!Array.isArray(g.media)||
+         (g.voice!=null&&typeof g.voice!=='string'))throw invalid();
+      groups.add(g.id);
+      for(const id of [...g.media,...(g.voice?[g.voice]:[])]){
+       if(typeof id!=='string'||!id)throw invalid();
+       ids.add(id);
+      }
+     }
+     for(const id of ids){
+      const original=store.get(prefix+id),preview=store.get(prefix+'preview:'+id);
+      original.onerror=()=>fail(original.error);
+      original.onsuccess=()=>{
+       try{
+        const file=decodeInline(original.result)?.blob;
+        if(!(file instanceof Blob)||!file.size)throw invalid();
+        originals.push([id,file]);
+       }catch(error){fail(error)}
+      };
+      preview.onerror=()=>fail(preview.error);
+      preview.onsuccess=()=>{
+       // Optional derivatives can be regenerated from the real original.
+       let image=null;
+       try{image=decodeInline(preview.result)?.blob||null}catch(_){}
+       previews.push([id,image]);
+      };
+     }
+     ready=true;
+    }catch(error){fail(error)}
+   };
+  }catch(error){fail(error)}
+ });
+}
 
 export function installOriginalPayloadReader(html){
  // The packaged /tell source receives this self-contained browser function
@@ -17,7 +111,7 @@ export function installOriginalPayloadReader(html){
  if(html.split(old).length!==2)throw Error('TALERA_PAYLOAD_READER_SOURCE_DRIFT');
  const source="const taleraPayload=("+createOriginalPayloadStorage.toString()+")();\n"+
   "async function blob(key){const db=await open();return new Promise((resolve,reject)=>{"+
-  "taleraPayload.read(db.transaction('files','readonly').objectStore('files'),String(key||''),"+
+  "taleraPayload.read(db.transaction(['stories','files'],'readonly').objectStore('files'),String(key||''),"+
   "row=>resolve(row?.blob||null),reject)});}";
  html=html.replace(old,()=>source);
  const auditOld="var rec=await request(db.transaction('files','readonly').objectStore('files').get(item.key));\n   if(!rec||!rec.blob){missing.push({id:story.id,key:item.key});continue}\n   bytes+=Number(rec.blob.size)||0;";
@@ -52,7 +146,10 @@ export function preserveOriginalMediaIdsOnEdit(html){
   html=html.replace(a,b);
  };
  const reuseSource="\n// The existing account-private catalog and files store own this operation.\n// Match exact bytes AND original File metadata; never merge by name or size.\n// A new occurrence gets a distinct ID within the same story, because the\n// approved narration model uses media IDs to distinguish its frame positions.\nfunction taleraReuseNewOriginals(tx,files,uploads,existing,canonicalIds,phoneCopies,write){\n const reused=new Set(),store=tx.objectStore('files'),stories=tx.objectStore('stories');\n const reserved=new Set(files.map(item=>item.key));\n for(const item of existing?.items||[])reserved.add(item.key);\n const pending=files.map((item,index)=>({item,index})).filter(({index})=>\n  !(existing&&canonicalIds!==undefined&&canonicalIds[index]));\n return new Promise((resolve,reject)=>{\n  let ended=false;\n  const fail=error=>{\n   if(ended)return;ended=true;\n   reject(error);\n   try{tx.abort()}catch(_){} \n  };\n  const done=()=>{\n   if(ended)return;\n   try{Promise.resolve(write(reused)).then(()=>{if(!ended){ended=true;resolve()}},fail)}catch(error){fail(error)}\n  };\n  const safeKind=value=>value==='photo'||value==='video'||value==='audio';\n  const sameMetadata=(a,b)=>{\n   if(!(a instanceof Blob)||!(b instanceof Blob)||a.size!==b.size||a.type!==b.type)return false;\n   const af=typeof File==='function'&&a instanceof File,bf=typeof File==='function'&&b instanceof File;\n   return af===bf&&(!af||(a.name===b.name&&a.lastModified===b.lastModified));\n  };\n  const sameBytes=async(a,b)=>{\n   if(!sameMetadata(a,b))return false;\n   const chunk=4*1024*1024;\n   for(let start=0;start<a.size;start+=chunk){\n    const end=Math.min(a.size,start+chunk);\n    const x=new Uint8Array(await a.slice(start,end).arrayBuffer());\n    const y=new Uint8Array(await b.slice(start,end).arrayBuffer());\n    if(x.length!==end-start||y.length!==x.length)return false;\n    for(let i=0;i<x.length;i++)if(x[i]!==y[i])return false;\n   }\n   return true;\n  };\n  // Every read, reference choice and new story write occurs in the same\n  // readwrite transaction. A concurrent delete/save cannot invalidate it.\n  const req=stories.getAll();\n  req.onerror=()=>fail(req.error||Error('De bibliotheek is niet bereikbaar.'));\n  req.onsuccess=()=>{\n   try{\n    const rows=req.result||[];\n    // An earlier async preflight is not a transaction lock. Never resurrect\n    // a concurrently deleted story or publish an obsolete media selection.\n    if(existing){\n     const current=rows.find(row=>row.id===existing.id);\n     if(!current||JSON.stringify(current)!==JSON.stringify(existing))\n      throw Error('De herinnering is intussen gewijzigd. Open de herinnering opnieuw.');\n    }\n    const candidates=new Map();\n    for(const story of rows){\n     if(story.source!=='pwa-local'||story.id===existing?.id)continue;\n     for(const item of story.items||[]){\n      if(typeof item.key!=='string'||!safeKind(item.kind))continue;\n      const signature=JSON.stringify([item.kind,item.size,item.mime,item.name]);\n      if(!candidates.has(signature))candidates.set(signature,new Set());\n      candidates.get(signature).add(item.key);\n     }\n    }\n    let position=0;\n    const next=()=>{\n     if(ended)return;\n     if(position>=pending.length)return done();\n     const {item,index}=pending[position++];\n     const matching=[...(candidates.get(JSON.stringify([item.kind,item.size,item.mime,item.name]))||[])];\n     let cursor=0;\n     const tryCandidate=()=>{\n      while(cursor<matching.length&&reserved.has(matching[cursor]))cursor++;\n      if(cursor>=matching.length)return next();\n      const key=matching[cursor++];\n      taleraPayload.read(store,key,row=>{\n       try{\n        if(!row||Object.keys(row).sort().join(',')!=='blob,key'||\n           !sameMetadata(row.blob,uploads[index]))return tryCandidate();\n        let settled=false,equal=false;\n        sameBytes(row.blob,uploads[index]).then(v=>{equal=v;settled=true},\n         ()=>{settled=true;equal=false});\n        // Keep the transaction alive while checking bounded Blob slices.\n        // Only key-only requests, no repeated large media retrieval.\n        const pulse=()=>{\n         const ping=store.getKey(key);\n         ping.onerror=()=>fail(ping.error||Error('Bibliotheekcontrole onderbroken.'));\n         ping.onsuccess=()=>{\n          try{\n           if(!settled)return pulse();\n           if(!equal||ping.result!==key)return tryCandidate();\n           item.key=key;reserved.add(key);reused.add(index);phoneCopies[index]=null;\n           next();\n          }catch(error){fail(error)}\n         };\n        };\n        pulse();\n       }catch(error){fail(error)}\n      },error=>{\n       if(error?.message==='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL'){\n        console.warn('TALERA_EERDER_ORIGINEEL_NIET_LEESBAAR',error.reason||'invalid-link');tryCandidate();return;\n       }\n       fail(error);\n      });\n     };\n     tryCandidate();\n    };\n    // Verify the existing links again inside the same write transaction.\n    // These requests finish before any new story/file record is written.\n    const retained=files.filter((item,index)=>existing&&canonicalIds!==undefined&&canonicalIds[index]);\n    let checked=0;\n    const checkRetained=()=>{\n     if(checked===retained.length)return next();\n     const item=retained[checked++];\n     taleraPayload.read(store,item.key,row=>{\n      try{\n       const blob=row?.blob;\n       if(!(blob instanceof Blob)||!blob.size||blob.size!==item.size||blob.type!==item.mime)\n        throw Error('Een oorspronkelijk mediabestand is intussen gewijzigd of ontbreekt.');\n       checkRetained();\n      }catch(error){fail(error)}\n     },fail);\n    };\n    checkRetained();\n   }catch(error){fail(error)}\n  };\n });\n}\n";
- exact("async function save(input,uploads,editId){",reuseSource+"\nasync function save(input,uploads,editId,canonicalIds){","SAVE_ARG");
+ const receiptSource="\nconst savedDraftReceipt=("+savedDraftReceipt.toString()+");\n"+`
+const taleraRememberSavedDraft=(tx,expected,meta,items)=>(${writeSavedDraftReceipt.toString()})(tx,expected,meta,items,savedDraftReceipt);
+`;
+ exact("async function save(input,uploads,editId){",reuseSource+receiptSource+"\nasync function save(input,uploads,editId,canonicalIds){\nconst editorDraft=arguments[4];","SAVE_ARG");
  exact("if(editId&&(!existing||existing.source!=='pwa-local'))throw Error('Deze herinnering kan niet worden bewerkt.');","if(editId&&(!existing||existing.source!=='pwa-local'))throw Error('Deze herinnering kan niet worden bewerkt.');\n if(existing&&uploads.length&&canonicalIds===undefined)\n  throw Error('De oorspronkelijke media-ID-koppeling ontbreekt. De bestaande herinnering blijft intact.');\n if(existing&&canonicalIds!==undefined){\n  if(!Array.isArray(canonicalIds)||canonicalIds.length!==uploads.length)\n   throw Error('Het oorspronkelijke media-overzicht is onvolledig.');\n  const originals=new Map((existing.items||[]).map(item=>[item.key,item]));\n  const used=new Set();\n  for(let n=0;n<uploads.length;n++){\n   const key=canonicalIds[n];\n   if(key===null||key===undefined)continue;\n   if(typeof key!=='string'||!originals.has(key)||used.has(key))\n    throw Error('Een oorspronkelijk media-ID kan niet veilig worden teruggevonden.');\n   const item=originals.get(key),original=await blob(key);\n   if(item.kind!==typeOf(uploads[n])||item.size!==uploads[n].size||\n      !(original instanceof Blob)||!original.size)\n    throw Error('Het oorspronkelijke mediabestand is niet meer hetzelfde. De herinnering blijft behouden.');\n   used.add(key);\n  }\n }\n","PREFLIGHT_ORIGINAL");
  exact("files.push({key:id+':'+i,kind:kind,name:safeName(f.name||kind),mime:f.type||'',size:f.size});","const mediaKey=existing&&canonicalIds!==undefined?\n   (canonicalIds[i]||id+':new-'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2))):\n   id+':'+i;\n  files.push({key:mediaKey,kind:kind,name:safeName(f.name||kind),mime:f.type||'',size:f.size});\n  const retainedPlace=existing?.items?.find(x=>x.key===mediaKey);\n  if(retainedPlace?.capturePlace)files[files.length-1].capturePlace=retainedPlace.capturePlace;\n  if(['v1','v2','v3'].includes(retainedPlace?.capturePlaceChecked))files[files.length-1].capturePlaceChecked=retainedPlace.capturePlaceChecked;","STABLE_KEYS");
  exact("birthYear:Number(input.birthYear)||null,source:'pwa-local'};","birthYear:Number(input.birthYear)||(existing?.birthYear||null),source:'pwa-local'};","PRESERVE_YEAR");
@@ -75,12 +172,12 @@ export function preserveOriginalMediaIdsOnEdit(html){
  // Apply only to the actual original editor transaction, with all existing
  // ID-preservation checks and the existing atomic write callback intact.
  const currentWriter="tx.objectStore('stories').put(meta);\n // Original files are saved atomically, independently of optional renditions.\n for(var j=0;j<files.length;j++){\n   if(existing&&canonicalIds!==undefined&&canonicalIds[j])continue;\n   const row={key:files[j].key,blob:"+blobArray+"[j]};\n   if(existing&&canonicalIds!==undefined)tx.objectStore('files').add(row);\n   else tx.objectStore('files').put(row);\n  }\n await finish;";
- const sharedWriter="await Promise.all([finish,taleraReuseNewOriginals(tx,files,"+blobArray+",existing,canonicalIds,phoneCopies,reused=>{\n tx.objectStore('stories').put(meta);\n const fresh=payloadPlans.filter((plan,j)=>plan&&!reused.has(j));\n return new Promise((resolve,reject)=>taleraPayload.writePlans(tx.objectStore('files'),fresh,resolve,reject));\n })]);";
+ const sharedWriter="await Promise.all([finish,taleraReuseNewOriginals(tx,files,"+blobArray+",existing,canonicalIds,phoneCopies,reused=>{\n tx.objectStore('stories').put(meta);\n const fresh=payloadPlans.filter((plan,j)=>plan&&!reused.has(j));\n return Promise.all([new Promise((resolve,reject)=>taleraPayload.writePlans(tx.objectStore('files'),fresh,resolve,reject)),taleraRememberSavedDraft(tx,editorDraft,meta,files)]);\n })]);";
  exact(currentWriter,sharedWriter,"ATOMIC_NEW_SHARED_ORIGINALS");
  const transactionStart="var db=await open(),tx=db.transaction(['stories','files'],'readwrite'),finish=done(tx);";
  exact(transactionStart,"const payloadPlans=[];\n for(let j=0;j<files.length;j++){\n  payloadPlans.push(existing&&canonicalIds!==undefined&&canonicalIds[j]?null:await taleraPayload.prepare(files[j].key,"+blobArray+"[j]));\n }\n await taleraPayload.verifyBatch(payloadPlans.filter(Boolean));\n"+transactionStart,"PREPARE_SHARED_BYTES_BEFORE_TRANSACTION");
- exact("const title=g.title.trim();const row=await mem.save(","const title=g.title.trim();\n const canonicalIds=g.existing?(()=>{\n  if(!g.canonicalByDraft||typeof g.canonicalByDraft!=='object')\n   throw Error('Deze oudere conceptbewerking bevat geen veilige media-ID-koppelingen. De bestaande herinnering blijft intact.');\n  return [...g.media,...(g.voice?[g.voice]:[])].map(id=>g.canonicalByDraft[id]||null);\n })():undefined;\n const row=await mem.save(","EDITOR_IDS");
- exact("},uploads,g.existing||undefined);const persisted=await mem.get(row.id);","},uploads,g.existing||undefined,canonicalIds);const persisted=await mem.get(row.id);","EDITOR_SAVE_FOURTH_ARG");
+ exact("const title=g.title.trim();const row=await mem.save(","if(!taleraDraftCatalogReadable)throw Error('Concepten konden niet veilig worden geladen. Bestaande concepten blijven behouden.');\n if(g.taleraSavedReceipt){g.existing=g.taleraSavedReceipt.existing;g.canonicalByDraft=g.taleraSavedReceipt.canonicalByDraft;await saveDraft()}\n const title=g.title.trim();\n await queue;\n const editorDraft=snapshot().find(d=>d.id===g.id);\n if(!editorDraft)throw Error('Concept is niet volledig opgeslagen. De herinnering blijft intact.');\n const canonicalIds=g.existing?(()=>{\n  if(!g.canonicalByDraft||typeof g.canonicalByDraft!=='object')\n   throw Error('Deze oudere conceptbewerking bevat geen veilige media-ID-koppelingen. De bestaande herinnering blijft intact.');\n  return [...g.media,...(g.voice?[g.voice]:[])].map(id=>g.canonicalByDraft[id]||null);\n })():undefined;\n const row=await mem.save(","EDITOR_IDS");
+ exact("},uploads,g.existing||undefined);const persisted=await mem.get(row.id);","},uploads,g.existing||undefined,canonicalIds,editorDraft);\n if(row?.items?.length===[...g.media,...(g.voice?[g.voice]:[])].length){\n  const ids=[...g.media,...(g.voice?[g.voice]:[])];\n  Object.defineProperty(g,'taleraSavedReceipt',{configurable:true,writable:true,value:{existing:row.id,canonicalByDraft:Object.fromEntries(ids.map((id,i)=>[id,row.items[i].key]))}});\n }\n const persisted=await mem.get(row.id);","EDITOR_SAVE_FOURTH_ARG");
  exact("window.TaleraMemories={save:save,","async function setNarrationCuesForStory(storyId,cues){\n const story=await get(storyId);\n if(!story||story.source!=='pwa-local'||!Array.isArray(cues))\n  throw Error('Het vertelplan kan niet veilig aan deze herinnering worden gekoppeld.');\n const updated={...story,narrationCues:cues,narrationSchema:'media-id-v1'};\n const db=await open(),tx=db.transaction('stories','readwrite'),finished=done(tx);\n tx.objectStore('stories').put(updated);\n await finished;\n return updated;\n}\nwindow.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,","CUE_WRITER_LIBRARY_OWNER");
  exact("const updated={...persisted,narrationCues:mapped,narrationSchema:'media-id-v1'};\n  const db=await dbOpen();\n  try{\n    const tx=db.transaction('stories','readwrite'),complete=done(tx);\n    tx.objectStore('stories').put(updated);\n    await complete;\n  }finally{db.close()}","await mem.updateCues(persisted.id,mapped);","CUE_EDITOR_WRITES_THROUGH_LIBRARY");
  // An unreadable earlier alias must not make an independent picker unusable.
@@ -94,7 +191,7 @@ export function preserveOriginalMediaIdsOnEdit(html){
  exact("if(!hash){\n    const blob=await mem.blob(item.key);\n    if(!blob)continue;",
   "if(!hash){\n    let blob;\n    try{blob=await mem.blob(item.key)}catch(error){\n"+
   "     if(error?.message!=='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL')throw error;\n"+
-  "     known.unreadableOriginals++;const reason=['invalid-format','binary-parts-shape','binary-length','logical-metadata','materialized-file-metadata','inline-row-shape','payload-shape','logical-link-shape','missing-payload','logical-link-key'].includes(error.reason)?error.reason:'invalid-link';known.unreadableReasons.add(reason);console.warn('TALERA_EERDER_ORIGINEEL_NIET_LEESBAAR',reason);continue;\n"+
+  "     known.unreadableOriginals++;const reason=['invalid-format','binary-parts-shape','binary-length','logical-metadata','materialized-file-metadata','inline-row-shape','payload-shape','logical-link-shape','missing-payload','logical-link-key','unverified-catalog','unverified-payload'].includes(error.reason)?error.reason:'invalid-link';known.unreadableReasons.add(reason);console.warn('TALERA_EERDER_ORIGINEEL_NIET_LEESBAAR',reason);continue;\n"+
   "    }\n    if(!blob)continue;",
   "DUPLICATE_REVIEW_INDEPENDENT_NEW_MEDIA");
  exact("const existing=await duplicateIndex();",
@@ -125,45 +222,21 @@ export function preserveOriginalMediaIdsOnEdit(html){
    " for(const key of keys)tx.objectStore('files').delete(key);\n"+
    " await finished;\n"+
    "}\n"+
+   "const taleraReadEditorDraftPayload=("+readEditorDraftPayload.toString()+");\n"+
    "async function readDraftPayload(manifestKey,prefix){\n"+
-   " if(typeof manifestKey!=='string'||!manifestKey||\n"+
-   "    typeof prefix!=='string'||!prefix)\n"+
-   "  throw Error('Ongeldige conceptverwijzing voor de bibliotheek.');\n"+
-   " const db=await open();\n"+
-   " const store=db.transaction('files','readonly').objectStore('files');\n"+
-   "  const manifest=await new Promise(resolve=>{\n"+
-   "   const q=store.get(manifestKey);\n"+
-   "   q.onsuccess=()=>resolve(q.result);\n"+
-   "   q.onerror=()=>resolve(null);\n"+
-   "  });\n"+
-   "  const catalog=Array.isArray(manifest&&manifest.blob)?manifest.blob:[];\n"+
-   "  const ids=[...new Set(catalog.flatMap(g=>[\n"+
-   "   ...(g.media||[]),...(g.voice?[g.voice]:[])\n"+
-   "  ]))];\n"+
-   "  const fetchRows=async preview=>{\n"+
-   "   if(!ids.length)return[];\n"+
-   "   const objectStore=db.transaction('files','readonly').objectStore('files');\n"+
-   "   return Promise.all(ids.map(id=>new Promise(resolve=>{\n"+
-   "    const key=prefix+(preview?'preview:':'')+id;\n"+
-   "    const q=objectStore.get(key);\n"+
-   "    q.onsuccess=()=>{try{resolve([id,taleraPayload.decodeInline(q.result)?.blob])}catch(e){resolve([id,null])}};\n"+
-   "    q.onerror=()=>resolve([id,null]);\n"+
-   "   })));\n"+
-   "  };\n"+
-   "  const originals=await fetchRows(false);\n"+
-   "  const previews=await fetchRows(true);\n"+
-   "  return {catalog,originals,previews};\n"+
+   " if(typeof manifestKey!=='string'||!manifestKey||typeof prefix!=='string'||!prefix)throw Error('Ongeldige conceptverwijzing voor de bibliotheek.');\n"+
+   " return taleraReadEditorDraftPayload(await open(),manifestKey,prefix,taleraPayload.decodeInline);\n"+
    "}\n"+
    "window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,"+
    "draftWriteRows:writeDraftRows,draftDeleteKeys:deleteDraftKeys,draftReadPayload:readDraftPayload,",
    "DRAFT_LIBRARY_OWNER");
  exact("async function writeFiles(entries){const db=await dbOpen();try{const t=db.transaction('files','readwrite'),d=done(t);for(const [id,file] of entries)t.objectStore('files').put({key:PREFIX+id,blob:file});await d}finally{db.close()}}",
-   "async function writeFiles(entries){return mem.draftWriteRows(entries.map(([id,file])=>[PREFIX+id,file]))}",
+   "let taleraDraftCatalogReadable=false;\nasync function writeFiles(entries){if(!taleraDraftCatalogReadable)throw Error('Concepten konden niet veilig worden geladen. Bestaande concepten blijven behouden.');return mem.draftWriteRows(entries.map(([id,file])=>[PREFIX+id,file]))}",
    "DRAFT_WRITE_GATEWAY");
  exact("async function deleteFiles(ids){if(!ids.length)return;const db=await dbOpen();try{const t=db.transaction('files','readwrite'),d=done(t);ids.forEach(id=>t.objectStore('files').delete(PREFIX+id));await d}finally{db.close()}}",
-   "async function deleteFiles(ids){return mem.draftDeleteKeys(ids.map(id=>PREFIX+id))}",
+   "async function deleteFiles(ids){if(!taleraDraftCatalogReadable)throw Error('Concepten konden niet veilig worden geladen. Bestaande concepten blijven behouden.');return mem.draftDeleteKeys(ids.map(id=>PREFIX+id))}",
    "DRAFT_DELETE_GATEWAY");
- exact("async function readDraft(){const db=await dbOpen();try{const t=db.transaction('files','readonly'),s=t.objectStore('files');const m=await new Promise(res=>{const r=s.get(MANIFEST);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)});const a=Array.isArray(m&&m.blob)?m.blob:[];const ids=[...new Set(a.flatMap(g=>[...(g.media||[]),...(g.voice?[g.voice]:[])]))];const t2=db.transaction('files','readonly'),s2=t2.objectStore('files');const r=await Promise.all(ids.map(id=>new Promise(res=>{const q=s2.get(PREFIX+id);q.onsuccess=()=>res([id,q.result&&q.result.blob]);q.onerror=()=>res([id,null])})));r.forEach(([id,f])=>{if(f)assets.set(id,f)});const thumbTx=db.transaction('files','readonly'),thumbStore=thumbTx.objectStore('files');const found=await Promise.all(ids.map(id=>new Promise(res=>{const r=thumbStore.get(PREFIX+'preview:'+id);r.onsuccess=()=>res([id,r.result?.blob]);r.onerror=()=>res([id,null])})));found.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});groups=a.map(g=>({...g,media:(g.media||[]).filter(id=>assets.has(id)),voice:assets.has(g.voice)?g.voice:''})).filter(g=>g&&g.id)}finally{db.close()}}","async function readDraft(){\n const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);\n originals.forEach(([id,f])=>{if(f)assets.set(id,f)});\n previews.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});\n groups=catalog.map(g=>({...g,\n  media:(g.media||[]).filter(id=>assets.has(id)),\n  voice:assets.has(g.voice)?g.voice:''\n })).filter(g=>g&&g.id);\n}","DRAFT_READ_GATEWAY");
+ exact("async function readDraft(){const db=await dbOpen();try{const t=db.transaction('files','readonly'),s=t.objectStore('files');const m=await new Promise(res=>{const r=s.get(MANIFEST);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)});const a=Array.isArray(m&&m.blob)?m.blob:[];const ids=[...new Set(a.flatMap(g=>[...(g.media||[]),...(g.voice?[g.voice]:[])]))];const t2=db.transaction('files','readonly'),s2=t2.objectStore('files');const r=await Promise.all(ids.map(id=>new Promise(res=>{const q=s2.get(PREFIX+id);q.onsuccess=()=>res([id,q.result&&q.result.blob]);q.onerror=()=>res([id,null])})));r.forEach(([id,f])=>{if(f)assets.set(id,f)});const thumbTx=db.transaction('files','readonly'),thumbStore=thumbTx.objectStore('files');const found=await Promise.all(ids.map(id=>new Promise(res=>{const r=thumbStore.get(PREFIX+'preview:'+id);r.onsuccess=()=>res([id,r.result?.blob]);r.onerror=()=>res([id,null])})));found.forEach(([id,f])=>{if(f)previewBlobs.set(id,f)});groups=a.map(g=>({...g,media:(g.media||[]).filter(id=>assets.has(id)),voice:assets.has(g.voice)?g.voice:''})).filter(g=>g&&g.id)}finally{db.close()}}","async function readDraft(){\n taleraDraftCatalogReadable=false;\n const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);\n const completed=new Set();\n if(!new URLSearchParams(location.search).has('edit')&&typeof mem.draftDiscardCompletedEdit==='function'){\n  for(const draft of catalog){\n   if(!draft?.existing||!draft.canonicalByDraft)continue;\n   try{if(await mem.draftDiscardCompletedEdit(draft))completed.add(draft.id)}catch(_){}\n  }\n }\n originals.forEach(([id,f])=>{if(f)assets.set(id,f)});\n const taleraValidPoster=("+isDecodableEditorPoster.toString()+");\n await Promise.all(previews.map(async ([id,f])=>{const original=assets.get(id);const video=original&&(String(original.type).startsWith('video/')||/\\.(mp4|mov|m4v|webm|avi|3gp)$/i.test(original.name||''));if(f&&(!video||await taleraValidPoster(f)))previewBlobs.set(id,f)}));\n groups=catalog.filter(g=>!completed.has(g.id)).map(g=>({...g,media:[...g.media],voice:g.voice||''}));\n taleraDraftCatalogReadable=true;\n}","DRAFT_READ_GATEWAY");
  exact("async function loadDuplicateCache(){\n if(taleraDuplicateCache)return taleraDuplicateCache;\n const db=await dbOpen();\n try{const req=db.transaction('files','readonly').objectStore('files').get(PREFIX+'duplicate-index-v7');\n const row=await new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});\n taleraDuplicateCache=row&&typeof row.blob==='object'&&!Array.isArray(row.blob)?row.blob:{};return taleraDuplicateCache;\n }finally{db.close()}\n}","async function loadDuplicateCache(){\n if(taleraDuplicateCache)return taleraDuplicateCache;\n const cached=await mem.blob(PREFIX+'duplicate-index-v7');\n taleraDuplicateCache=cached&&typeof cached==='object'&&!Array.isArray(cached)?cached:{};\n return taleraDuplicateCache;\n}","DUPLICATE_INDEX_READ_GATEWAY");
 
  // Expose the existing complete-delete action in the original signed-in editor.

@@ -113,3 +113,73 @@ console.log('TALERA_LIBRARY_ORIGINAL_AND_VOICE_REFERENCES_PASS',JSON.stringify({
  indexOnlyLegacyCompatible:true,indexOnlyCueValidated:true,
   idTakesPrecedence:true,syntheticOnly:true,realIPhoneAccepted:false
 }));
+
+// A redundant length is recoverable only from independently verified bytes
+// and catalog evidence. The actual failing iPhone row is not part of CI.
+const staleLink={...rowFor(planA),metadata:{...planA.metadata,length:0}};
+const recoveryCatalog=[{id:'local-length-proof',source:'pwa-local',items:[{
+ key:planA.key,kind:'photo',mime:photo.type,size:photo.size
+}]}];
+for(const payload of [physical,binaryPhysical]){
+ const restored=await pool.logicalRowsVerified([staleLink,payload],recoveryCatalog);
+ assert.equal(restored.length,1);
+ assert.equal(restored[0].key,planA.key);
+ assert.equal(restored[0].blob.name,photo.name);
+ assert.equal(restored[0].blob.lastModified,photo.lastModified);
+ assert.equal(restored[0].blob.type,photo.type);
+ assert.deepEqual(new Uint8Array(await restored[0].blob.arrayBuffer()),new Uint8Array(await photo.arrayBuffer()));
+}
+assert.equal(staleLink.metadata.length,0,'Read recovery never rewrites the stored row');
+for(const [rows,catalog] of [
+ [[staleLink],recoveryCatalog],
+ [[staleLink,{key:planA.payloadKey,binaryParts:[Uint8Array.of(1,2,4).buffer]}],recoveryCatalog],
+ [[staleLink,binaryPhysical],[]],
+ [[staleLink,binaryPhysical],[{...recoveryCatalog[0],items:[{...recoveryCatalog[0].items[0],size:2}]}]],
+ [[staleLink,binaryPhysical],[{...recoveryCatalog[0],items:[{...recoveryCatalog[0].items[0],mime:'image/png'}]}]],
+ [[staleLink,binaryPhysical],[...recoveryCatalog,{source:'pwa-local',items:[{...recoveryCatalog[0].items[0],size:2}]}]],
+ [[{...staleLink,metadata:{...staleLink.metadata,lastModified:null}},binaryPhysical],recoveryCatalog],
+ [[{...staleLink,metadata:{...staleLink.metadata,name:undefined}},binaryPhysical],recoveryCatalog]
+])await assert.rejects(pool.logicalRowsVerified(rows,catalog),/TALERA_LIBRARY_INVALID_SHARED_ORIGINAL/);
+console.log('TALERA_VERIFIED_LENGTH_ONLY_RECOVERY_PASS');
+
+// Missing redundant fields and invalid MIME representation are recoverable
+// only when all published references independently agree and hash verifies.
+const metadataVariants=[
+ {name:photo.name,lastModified:photo.lastModified,type:photo.type},
+ {name:photo.name,lastModified:photo.lastModified,length:photo.size},
+ {...planA.metadata,type:null},
+ {...planA.metadata,type:'IMAGE/HEIC'}
+];
+for(const metadata of metadataVariants){
+ const row={...rowFor(planA),metadata};
+ const [restored]=await pool.logicalRowsVerified([row,binaryPhysical],recoveryCatalog);
+ assert.equal(restored.blob.type,photo.type);
+ assert.equal(restored.blob.size,photo.size);
+ assert.equal(restored.blob.name,photo.name);
+ assert.equal(restored.blob.lastModified,photo.lastModified);
+ assert.deepEqual(await restored.blob.arrayBuffer(),await photo.arrayBuffer());
+}
+for(const metadata of [
+ {...planA.metadata,length:0,type:'IMAGE/PNG'},
+ {...planA.metadata,length:0,type:'image/png'},
+ {type:photo.type,length:0,lastModified:photo.lastModified},
+ {...planA.metadata,length:0,lastModified:undefined}
+])await assert.rejects(pool.logicalRowsVerified([{...rowFor(planA),metadata},binaryPhysical],recoveryCatalog),/TALERA_LIBRARY_INVALID_SHARED_ORIGINAL/);
+
+// This executes the exact live asynchronous reader with a request-callback
+// test double; the browser's transaction semantics still require browser CI.
+async function readByCallback(row,payload,stories){
+ const records=new Map([[row.key,row],[payload.key,payload]]);
+ const request=fn=>{const q={};setImmediate(()=>{q.result=fn();q.onsuccess?.()});return q};
+ const store={get:key=>request(()=>records.get(key)),
+  getKey:key=>request(()=>records.has(key)?key:undefined),
+  transaction:{objectStoreNames:{contains:v=>v==='stories'},objectStore:name=>{
+   assert.equal(name,'stories');return {getAll:()=>request(()=>stories)};
+  }}};
+ return new Promise((resolve,reject)=>pool.read(store,row.key,resolve,reject));
+}
+const callbackRecovery=await readByCallback({...rowFor(planA),metadata:metadataVariants[1]},binaryPhysical,recoveryCatalog);
+assert.equal(callbackRecovery.blob.type,photo.type);
+assert.deepEqual(await callbackRecovery.blob.arrayBuffer(),await photo.arrayBuffer());
+await assert.rejects(readByCallback(staleLink,{...binaryPhysical,binaryParts:[Uint8Array.of(3,2,1).buffer]},recoveryCatalog),/TALERA_LIBRARY_INVALID_SHARED_ORIGINAL/);
+console.log('TALERA_VERIFIED_REDUNDANT_METADATA_AND_CALLBACK_READ_PASS');

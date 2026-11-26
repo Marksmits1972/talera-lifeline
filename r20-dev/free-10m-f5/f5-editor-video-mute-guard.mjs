@@ -23,3 +23,27 @@ export function undoEditorOnlyMute(html){
   .replace(silentVideoTag,originalVideoTag)
   .replace(visibleNativeOpacity,originalNativeOpacity);
 }
+
+
+// Reattach the already existing native cover on the first workbench render.
+// A rejected autoplay promise on iPhone must not prevent a decoded frame
+// from being captured. No presentation/player code is changed.
+export function restoreEditorVideoCover(html){
+ const anchors=[
+  [" tiles.querySelectorAll('.tile').forEach(enableDrag);taleraV9EditorMediaControls(g);",
+   " tiles.querySelectorAll('.tile').forEach(enableDrag);taleraV9EditorMediaControls(g);taleraV61AttachNativeCovers();"],
+  ["main.querySelectorAll('.tile').forEach(enableDrag);$('addMore').onclick=",
+   "main.querySelectorAll('.tile').forEach(enableDrag);taleraV61AttachNativeCovers();$('addMore').onclick="],
+  ["void v.play().then(()=>setTimeout(()=>{if(v.isConnected){v.pause();void capture()}},250)).catch(()=>{});",
+   "void v.play().then(()=>setTimeout(()=>{if(v.isConnected){v.pause();void capture()}},250)).catch(()=>{if(v.isConnected&&v.readyState>=2)void capture()});"],
+  ["      pending=true;v.style.opacity='1';v.pause();\n      try{\n        const image=await drawnPreview(v,v.videoWidth,v.videoHeight);",
+   "      pending=true;v.style.opacity='1';v.pause();\n      try{\n        await new Promise(done=>requestAnimationFrame(()=>done()));\n        if(!v.isConnected||!assets.has(id)||previewBlobs.has(id))return;\n        const image=await drawnPreview(v,v.videoWidth,v.videoHeight);"],
+  ["    for(const e of ['loadeddata','seeked','canplay','timeupdate'])v.addEventListener(e,()=>void capture());",
+   "    for(const e of ['loadeddata','seeked','canplay','timeupdate'])v.addEventListener(e,()=>{if(v.readyState>=2&&v.isConnected&&v.videoWidth&&v.videoHeight){v.pause();v.style.opacity='1';void capture()}});"]
+ ];
+ for(const [before,after] of anchors){
+  if(html.split(before).length!==2)throw Error('F5_EDITOR_VIDEO_COVER_SOURCE_CHANGED');
+  html=html.replace(before,()=>after);
+ }
+ return html;
+}

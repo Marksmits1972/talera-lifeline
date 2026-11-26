@@ -1,6 +1,7 @@
 // Exercise the actual existing authenticated editor and presentation, in the
 // existing regression runner's disposable Chromium or WebKit context.
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 
 export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
  const ctx=await browser.newContext({...mobileDevice,serviceWorkers:'block',
@@ -251,7 +252,58 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
   assert.equal(saved.stories.length,baseline.stories.length,'Save does not create a new memory');
   const expectedStories=structuredClone(baseline.stories);expectedStories.find(x=>x.id===target).tags=expected;
   assert.deepEqual(saved.stories,expectedStories,'Saving just characteristics preserves all original media, IDs and other stories');
+  // Existing mixed photo/video story: presentation's genuine cached first
+  // frame must also appear in the actual editor, never a blank media tile.
+  // Test the uncached path separately with an actual decodable synthetic MP4.
   await go('/tell');
+  const videoBytes=execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-nostdin',
+   '-f','lavfi','-i','color=c=blue:s=128x96:r=12','-t','1.2','-c:v','libx264',
+   '-preset','ultrafast','-pix_fmt','yuv420p','-movflags','frag_keyframe+empty_moov',
+   '-f','mp4','pipe:1'],{timeout:20000}).toString('base64');
+  for(const cached of [true,false,'invalid']){
+   const mixed=await page.evaluate(async ({videoBytes,cached})=>{
+    const mem=window.TaleraMemories,canvas=document.createElement('canvas');
+    canvas.width=128;canvas.height=96;const context=canvas.getContext('2d');
+    context.fillStyle='red';context.fillRect(0,0,128,96);
+    const photo=new File([await new Promise(ok=>canvas.toBlob(ok,'image/png'))],
+     'mixed-photo-'+cached+'.png',{type:'image/png'});
+    context.fillStyle='blue';context.fillRect(0,0,128,96);
+    const poster=await new Promise(ok=>canvas.toBlob(ok,'image/jpeg'));
+    const video=new File([Uint8Array.from(atob(videoBytes),ch=>ch.charCodeAt(0))],
+     'mixed-video-'+cached+'.mp4',{type:'video/mp4'});
+    const story=await mem.save({title:'Mixed image and video '+cached,date:'2026-11-25',text:'Synthetic'},[photo,video]);
+    const videoKey=story.items[1].key;
+    if(cached)await mem.draftWriteRows([[videoKey+':phone-v1',cached==='invalid'?new Blob(['broken'],{type:'image/jpeg'}):poster]]);
+    return {id:story.id,videoKey,cached};
+   },{videoBytes,cached});
+   await go('/tell?edit='+encodeURIComponent(mixed.id));
+   await page.locator('#publish').waitFor({state:'visible',timeout:20000});
+   await page.waitForFunction(({cached})=>{
+    const tiles=[...document.querySelectorAll('.talera-work-tiles .tile')];
+    const tile=tiles[1];if(!tile)return false;
+    const image=tile.querySelector('img');
+    if(image?.complete&&image.naturalWidth>0)return true;
+    const v=tile.querySelector('video');
+    return cached!==true&&!!v&&v.muted&&v.readyState>=2&&v.videoWidth>0&&
+     getComputedStyle(v).opacity!=='0';
+   },{cached},{timeout:20000});
+   const linked=await page.evaluate(async ({id,key})=>{
+    const mem=window.TaleraMemories,manifest=await mem.blob('talera-v4-work:manifest');
+    const draft=manifest.find(g=>g.existing===id);
+    const original=await mem.blob(key);
+    const draftVideo=draft?.media?.[1];
+    return {link:draft?.canonicalByDraft?.[draftVideo],size:original?.size,
+     poster:draftVideo?!!(await mem.blob('talera-v4-work:preview:'+draftVideo)):false};
+   },{id:mixed.id,key:mixed.videoKey});
+   assert.equal(linked.link,mixed.videoKey);
+   assert.ok(linked.size>0,'Original video is still in the library');
+   if(cached===true)assert.equal(linked.poster,true,'Existing poster is reused in the draft cache');
+   await page.locator('#publish').click();
+   await pollDb(async id=>!(await window.TaleraMemories.blob('talera-v4-work:manifest')||[]).some(g=>g.existing===id),
+    mixed.id,20000,'Actual normal Save left the mixed memory in the pending queue');
+   await go('/tell');
+  }
+  console.log('TALERA_EDITOR_ACTUAL_MIXED_VIDEO_CACHED_AND_NATIVE_PREVIEW_PASS');
   await page.locator('#without').click();
   await page.locator('#publish').waitFor({state:'visible'});
   assert.equal(await eye.count(),0,'No eye on new memory');

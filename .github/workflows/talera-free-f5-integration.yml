@@ -957,9 +957,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 0531066abfd89dbdbdf66cc877f5d59d1b183df9
-          test "$(git diff --name-only 0531066abfd89dbdbdf66cc877f5d59d1b183df9 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code 0531066abfd89dbdbdf66cc877f5d59d1b183df9 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 97c2e39311cfe9b4da26b5939da35b5030fc60d2
+          test "$(git diff --name-only 97c2e39311cfe9b4da26b5939da35b5030fc60d2 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 97c2e39311cfe9b4da26b5939da35b5030fc60d2 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -968,7 +968,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45803652053',sha='0531066abfd89dbdbdf66cc877f5d59d1b183df9';
+          const id='45804201438',sha='97c2e39311cfe9b4da26b5939da35b5030fc60d2';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const names=[mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
@@ -999,7 +999,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45803652053');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45804201438');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1135,8 +1135,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code 0531066abfd89dbdbdf66cc877f5d59d1b183df9 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45803652053'
+          git diff --exit-code 97c2e39311cfe9b4da26b5939da35b5030fc60d2 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45804201438'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail

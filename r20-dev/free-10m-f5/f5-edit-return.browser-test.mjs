@@ -20,19 +20,19 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
   assert.equal(await eye.count(),0,'No eye on ordinary editor entry');
   const ids=await page.evaluate(async()=>{
    const mem=window.TaleraMemories;
-   const photos=await Promise.all(['red','blue','green'].map(async(color,i)=>{
+   const photos=await Promise.all(['red','blue','green','orange','purple','teal','yellow'].map(async(color,i)=>{
     const canvas=document.createElement('canvas');canvas.width=80;canvas.height=80;
     const draw=canvas.getContext('2d');draw.fillStyle=color;draw.fillRect(0,0,80,80);
     const blob=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
     return new File([blob],'edit-return-'+i+'.png',{type:'image/png'});
    }));
-   const a=await mem.save({title:'Edit return first',date:'2026-11-23',time:'12:00:00',text:'Original first'},photos.slice(0,2));
-   const b=await mem.save({title:'Edit return second, same day',date:'2026-11-23',time:'13:00:00',text:'Original second'},photos.slice(2));
+   const a=await mem.save({title:'Edit return first',date:'2026-11-23',time:'12:00:00',text:'Original first',tags:['Familie','Eigen aangehecht']},photos.slice(0,6));
+   const b=await mem.save({title:'Edit return second, same day',date:'2026-11-23',time:'13:00:00',text:'Original second'},photos.slice(6));
    return [a.id,b.id];
   });
   const read=()=>page.evaluate(async()=>{
    const mem=window.TaleraMemories,rows=await mem.list();
-   const stories=await Promise.all(rows.map(async r=>({id:r.id,title:r.title,text:r.text,
+   const stories=await Promise.all(rows.map(async r=>({id:r.id,title:r.title,text:r.text,tags:r.tags??[],
     items:await Promise.all(r.items.map(async item=>({key:item.key,bytes:[...new Uint8Array(await (await mem.blob(item.key)).arrayBuffer())]}))),
     cues:r.narrationCues??null})));
    const name=document.getElementById('talera-memory-store-v1').textContent.match(/var DB_NAME='([^']+)'/)[1];
@@ -95,6 +95,31 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    assert.equal(geometry.border,'0px','No circle outline');
    assert.equal(geometry.shadow,'none','No shadow');
    assert.equal(geometry.color,geometry.dotsColor,'Same icon color as options');
+   const saveLabel=await page.evaluate(()=>{
+    const lang=String(window.TaleraI18n?.language||document.documentElement.lang||'nl').slice(0,2);
+    return {actual:document.getElementById('publish').textContent.trim(),expected:({nl:'Opslaan',en:'Save',de:'Speichern',fr:'Enregistrer',es:'Guardar'})[lang]||'Opslaan'};
+   });
+   assert.equal(saveLabel.actual,saveLabel.expected,'Existing pencil edit must say Save in the current language');
+   assert.equal(await page.locator('#app header.top strong').isVisible(),false,'Work editor has no logo');
+   assert.equal(await page.locator('.talera-tags-own-input,.talera-tag-apply,.talera-tag-cancel').count(),0,'No create/apply/cancel controls in the editor');
+   if(i===0){
+    const toggle=page.locator('.talera-tags-toggle'),panel=page.locator('.talera-tags-panel'),publish=page.locator('#publish');
+    assert.equal(await page.locator('.talera-work-tiles .talera-v9-remove-media').count(),6);
+    const before=await publish.boundingBox(),gridBefore=await page.locator('.talera-work-tiles').boundingBox();
+    await toggle.click();await panel.waitFor({state:'visible'});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const afterBox=await publish.boundingBox(),gridAfter=await page.locator('.talera-work-tiles').boundingBox();
+    assert.ok(Math.abs(gridBefore.y-gridAfter.y)<=2&&Math.abs(gridBefore.height-gridAfter.height)<=2,'Opening characteristics must not move photos');
+    assert.ok(Math.abs(before.y-afterBox.y)<=4,'Opening characteristics must not move the footer: '+JSON.stringify({before,afterBox}));
+    assert.equal(await page.locator('.talera-tags-own-input,.talera-tag-apply,.talera-tag-cancel').count(),0);
+    assert.equal(await page.locator('.talera-tags-selected').isVisible(),false,'No duplicate selected chips in open panel');
+    const choiceIndex=await page.locator('.talera-tag-choice').evaluateAll(nodes=>nodes.findIndex(n=>n.getAttribute('aria-pressed')==='false'));
+    assert.ok(choiceIndex>=0,'Need an unselected existing characteristic');
+    const option=page.locator('.talera-tag-choice').nth(choiceIndex);
+    await option.click();assert.equal(await option.getAttribute('aria-pressed'),'true');
+    await option.click();assert.equal(await option.getAttribute('aria-pressed'),'false');
+    await toggle.click();await panel.waitFor({state:'hidden'});
+   }
    const opened=await read();
    assert.equal(opened.catalog.filter(x=>x.existing===id).length,1,'One existing edit draft');
    await eye.click();
@@ -107,6 +132,48 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    const after=await read();
    assert.deepEqual(after,baseline,'No new draft, new story, lost original bytes, cue or other same-day memory');
   }
+  // Test the approved direct selection and normal Save against the actual
+  // same account-local library; the previously published story and bytes
+  // must remain intact until Save, and a new memory still says Place.
+  const target=ids[0];
+  await go('/present?memory='+encodeURIComponent(target));await selected(target);
+  await pencil.click();await page.waitForURL('**/tell?edit='+encodeURIComponent(target));
+  await eye.waitFor({state:'visible'});
+  await page.locator('.talera-tags-toggle').click();
+  const choiceIndex=await page.locator('.talera-tag-choice').evaluateAll(nodes=>nodes.findIndex(n=>n.getAttribute('aria-pressed')==='false'));
+    assert.ok(choiceIndex>=0,'Need an unselected existing characteristic');
+    const option=page.locator('.talera-tag-choice').nth(choiceIndex);
+  await option.click();assert.equal(await option.getAttribute('aria-pressed'),'true');
+  const edited=await page.evaluate(async target=>{
+   const story=await window.TaleraMemories.get(target);
+   const draft=await window.TaleraMemories.blob('talera-v4-work:manifest');
+   return {storyTags:story.tags??[],draftTags:draft?.find(x=>x.existing===target)?.tags??null};
+  },target);
+  assert.deepEqual(edited.storyTags,baseline.stories.find(x=>x.id===target).tags,'Tag selection is not a published change');
+  // Wait for the original async draft queue via the same manifest.
+  await page.waitForFunction(async target=>{
+   const draft=await window.TaleraMemories.blob('talera-v4-work:manifest');
+   const story=await window.TaleraMemories.get(target);
+   const tags=draft?.find(x=>x.existing===target)?.tags;
+   return tags&&tags.length===(story.tags??[]).length+1;
+  },target,{timeout:10000});
+  const expected=await page.evaluate(async target=>(await window.TaleraMemories.blob('talera-v4-work:manifest')).find(x=>x.existing===target).tags,target);
+  await page.locator('#publish').click();
+  await page.waitForFunction(async ({target,expected})=>{
+   const row=await window.TaleraMemories?.get?.(target);
+   return row&&JSON.stringify(row.tags??[])===JSON.stringify(expected);
+  },{target,expected},{timeout:20000});
+  const saved=await read();
+  assert.equal(saved.stories.length,baseline.stories.length,'Save does not create a new memory');
+  const expectedStories=structuredClone(baseline.stories);expectedStories.find(x=>x.id===target).tags=expected;
+  assert.deepEqual(saved.stories,expectedStories,'Saving just characteristics preserves all original media, IDs and other stories');
+  await go('/tell');
+  await page.locator('#without').click();
+  await page.locator('#publish').waitFor({state:'visible'});
+  assert.equal(await eye.count(),0,'No eye on new memory');
+  const label=await page.locator('#publish').textContent();
+  assert.ok(!['Opslaan','Save','Speichern','Enregistrer','Guardar'].includes(label.trim()),'New memory must use Place, not Save: '+label);
+  console.log('TALERA_EDITOR_CLEAN_LAYOUT_DIRECT_TAG_SELECTION_EXISTING_SAVE_NEW_PLACE_PASS',JSON.stringify({browser:browser.browserType().name(),realAccountLocalLibrary:true}));
   assert.deepEqual(errors,[],'No actual script errors');
   console.log('TALERA_EDIT_RETURN_ACTUAL_PENCIL_EYE_SAME_ID_POSITION_ORIGINAL_BYTES_AND_DRAFT_PASS',JSON.stringify({browser:browser.browserType().name(),twoSameDayStories:true,headerEye:true,transparentBackground:true}));
  }finally{await ctx.close()}

@@ -6,6 +6,7 @@ import {installDesktopPresentationLayout} from './f5-desktop-presentation-layout
 import {installDesktopMemoryTransition} from './f5-desktop-memory-transition.mjs';
 import {buildF5OfflineServiceWorker} from './f5-offline-sw.mjs';
 import {buildEditReturnBrowserSources} from './f5-edit-return.mjs';
+import {simplifyTellMemoryEditor} from './f5-editor-clean-layout.mjs';
 import {completePublishedRemovalOnOtherPage,installOriginalPayloadReader} from './f5-library-editor-stable-save.mjs';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu,keepOnlyFunctionalFreeMenu} from './f5-account-switch-guard.mjs';
@@ -694,46 +695,6 @@ function showOwnedStoriesOnly(html){
   'Only eight owned topic tiles can be visible');
  return html;
 }
-function shapeOwnStoryTopics(html){
- const exact=(oldValue,newValue,label)=>{
-  assert.equal(html.split(oldValue).length,2,'F5_TOPIC_EDITOR_SOURCE_DRIFT_'+label);
-  html=html.replace(oldValue,newValue);
- };
- const start=html.indexOf('function setupV20Tags(g,details){');
- const end=html.indexOf('}function setupV10(',start);
- assert.ok(start>0&&end>start,'F5_TOPIC_EDITOR_SOURCE_MOVED');
- let editor=html.slice(start,end+1);
- const editExact=(before,after,label)=>{
-  assert.equal(editor.split(before).length,2,'F5_TOPIC_EDITOR_SOURCE_DRIFT_'+label);
-  editor=editor.replace(before,after);
- };
- const custom= " const customRow=document.createElement('div');customRow.className='talera-tags-own-input';\n const customName=document.createElement('input');customName.type='text';customName.maxLength=36;\n customName.placeholder='Familie, Sport, Werk…';\n customName.setAttribute('aria-label','Voeg je eigen onderwerp toe');\n const addCustom=document.createElement('button');addCustom.type='button';\n addCustom.textContent='Toevoegen';\n customRow.append(customName,addCustom);\n choices.insertAdjacentElement('afterend',customRow);\n const addOwnName=()=>{\n   const name=clean([customName.value])[0];\n   if(!name)return;\n   if(!openFavorites.some(x=>id(x)===id(name)))openFavorites.push(name);\n   pending.add(id(name));customName.value='';paintChoices();\n };\n addCustom.onclick=addOwnName;\n customName.addEventListener('keydown',e=>{\n   if(e.key==='Enter'){e.preventDefault();addOwnName()}\n });\n";
- editExact(" let pending=new Set(),openFavorites=[];",
-  " let pending=new Set(),openFavorites=[];\n"+custom,'CUSTOM_TOPIC_ENTRY');
- editExact("choices.setAttribute('aria-label',text('tag.selected','Mijn favoriete kenmerken'));",
-  "choices.setAttribute('aria-label','Mijn onderwerpen');",'HUMAN_CHOICES_LABEL');
- const labelStart=editor.indexOf("  toggle.textContent=");
- const labelEnd=editor.indexOf('\n',labelStart);
- assert.ok(labelStart>0&&labelEnd>labelStart&&editor.slice(labelStart,labelEnd).includes('Kenmerk toevoegen'),
-  'F5_TOPIC_EDITOR_SOURCE_DRIFT_HUMAN_PROMPT');
- const humanPrompt="  const lang=String(window.TaleraI18n?.language||'nl').slice(0,2);\n"+
-  "  const names={nl:'Waar gaat deze herinnering over?',en:'What is this memory about?',\n"+
-  "    de:'Worum geht es in dieser Erinnerung?',fr:'De quoi parle ce souvenir ?',\n"+
-  "    es:'¿De qué trata este recuerdo?'};\n"+
-  "  toggle.textContent='＋ '+(names[lang]||names.nl);";
- editor=editor.slice(0,labelStart)+humanPrompt+editor.slice(labelEnd);
- editExact('openFavorites=favorites();pending=new Set(',
-  'openFavorites=clean([...favorites(),...g.tags]);pending=new Set(','KEEP_EXISTING_TAGS');
- html=html.slice(0,start)+editor+html.slice(end+1);
- const style='<style id="talera-free-own-story-topics-style">'+
-  '.talera-tags-v20 .talera-tags-own-input{display:flex;gap:8px;padding:10px 0;align-items:stretch}'+
-  '.talera-tags-v20 .talera-tags-own-input input{min-width:0;flex:1;border:1px solid #d1dfe4;border-radius:12px;padding:10px;color:#173550;background:#fff;font-size:15px}'+
-  '.talera-tags-v20 .talera-tags-own-input button{border:1px solid #173550;border-radius:12px;padding:10px;color:white;background:#173550;font-size:14px;font-weight:700}'+
-  '</style>';
- exact('</head>',style+'</head>','SAME_EDITOR_HEAD');
- assert.ok(html.includes('talera-tags-own-input'),'Editor input must remain within original work screen');
- return html;
-}
 // TALERA Free /tell: approved spacing and visual hierarchy ONLY.
 // Keep the original tag editor instance and every existing click/save handler;
 // move its existing DOM node below the already-present native photo tiles.
@@ -846,7 +807,7 @@ function polishTellEditorLayout(html){
   '  const toolbarHeight=toolbar?.getBoundingClientRect().height||80;',
   '  const available=Math.floor(bottom-top-toolbarHeight-30);',
   '  const h=vv?.height||window.innerHeight;',
-  '  const cap=Math.min(210,Math.floor(80+Math.max(0,h-664)*.62));',
+  '  const cap=Math.min(108,Math.floor(80+Math.max(0,h-664)*.62));',
   '  p.style.setProperty("max-height",Math.max(72,Math.min(cap,available))+"px","important");',
   ' }',
   ' document.addEventListener("click",function(e){',
@@ -1880,7 +1841,7 @@ for(const [route,filename] of Object.entries(routes)){
  }
  // Guest and authenticated /tell are TWO variants of the SAME original editor.
  // Apply the SAME layout styling to both; leave account/library gates untouched.
- if(route==='/tell')guest=removeLegacyTellSampleImporter(polishTellEditorLayout(guest));
+ if(route==='/tell')guest=removeLegacyTellSampleImporter(simplifyTellMemoryEditor(polishTellEditorLayout(guest)));
  if(route==='/present')guest=enableOriginalWhatsAppTouchScroll(guest);
  guest=closeAnonymousPersonalLibrary(guest);
  guest=stripBundledExamplePhotoLinks(guest);
@@ -1929,7 +1890,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=removeAllBuiltInHomeExamples(html);
  if(route==='/mijn-leven')html=randomPhotoFromSelectedHomeYear(html);
  if(route==='/mijn-leven')html=installOwnerRequestedClearAllStories(html);
- if(route==='/tell')html=removeLegacyTellSampleImporter(polishTellEditorLayout(shapeOwnStoryTopics(html)));
+ if(route==='/tell')html=removeLegacyTellSampleImporter(simplifyTellMemoryEditor(polishTellEditorLayout(html)));
  if(route==='/present')html=enableOriginalWhatsAppTouchScroll(html);
  html=stripBundledExamplePhotoLinks(html);
  // The ONLY new persistent-data change is the original photo File's
@@ -2515,6 +2476,7 @@ for(const name of supportNames){
    Buffer.from(JSON.stringify({referencePages:refs,scripts})),
    readFileSync(path.join(here,'f5-worker.mjs')),
    readFileSync(path.join(here,'f5-edit-return.mjs')) ,
+   readFileSync(path.join(here,'f5-editor-clean-layout.mjs')),
    readFileSync(path.join(here,'f5-offline-sw.mjs'))
   ])).slice(0,32);
   a=Buffer.from(buildF5OfflineServiceWorker(a.toString('utf8'),offlinePackageVersion),'utf8');

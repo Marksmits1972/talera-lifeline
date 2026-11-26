@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {scopeLocalMemories,privateAccountScope} from './f5-local-scope.mjs';
-import {referencePages} from './generated/public-template-map.mjs';
+import {referencePages,guestPages} from './generated/public-template-map.mjs';
+import './f5-editor-clean-layout.test.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
@@ -91,6 +92,15 @@ assert.equal(packagedTell.split('blob:taleraOwnedPhotoUploads[j]').length,2,
  'Current /tell must store owned original photo bytes');
 assert.ok(!packagedTell.includes('blob:uploads[j]'),
  'No original photo picker-backed File may be persisted in /tell');
+// Both real generated variants keep the same editor patch, not a second UI.
+for(const page of [packagedTell,readFileSync('r20-dev/free-10m-delivery/public'+guestPages['/tell'],'utf8')]){
+ const start=page.indexOf('function setupV20Tags(g,details){'),end=page.indexOf('}function setupV10(',start);
+ assert.ok(start>0&&end>start);
+ const owner=page.slice(start,end);
+ assert.ok(page.includes('id="talera-editor-clean-layout-v1"')&&owner.includes('saveDraft();paintChips()'));
+ assert.ok(owner.includes('openFavorites=clean([...favorites(),...g.tags])')&&!/talera-tag-apply|talera-tag-cancel|talera-tags-own-input/.test(owner));
+ assert.ok(page.includes("new URLSearchParams(location.search).get('edit')===g.existing"));
+}
 const privateTell=preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(
  alignEditedNarrationCueRefs(scopeLocalMemories(packagedTell,s1))));
 assert.ok(privateTell.includes('await taleraPayload.prepare(files[j].key,taleraOwnedPhotoUploads[j])'),

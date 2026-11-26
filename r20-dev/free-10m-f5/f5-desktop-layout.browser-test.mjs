@@ -82,7 +82,13 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   console.log('TALERA_DESKTOP_GEOMETRY_AND_MEMORY_PASS',JSON.stringify({sizes:sizes.map(s=>[s.width,s.height,s.sheet.width]),presentations:presentations.map(g=>g.surface.width),sameMemoryId:true}));
   // Preserve the original back link, route, account and data. Trace only the
   // disposable synthetic navigation, so a failed return is diagnosable.
-  const back=page.getByRole('link',{name:'Terug naar Mijn leven'});
+  // The default CI locale is not necessarily Dutch. Use the actual original
+  // Home destination rather than an exact localized accessible-name string.
+  const back=page.locator('a[href="/"]:visible, a[href="/mijn-leven"]:visible');
+  const links=await page.locator('a:visible').evaluateAll(nodes=>nodes.map(e=>({
+   href:e.getAttribute('href'),label:e.getAttribute('aria-label'),title:e.getAttribute('title')
+  })));
+  assert.equal(await back.count(),1,'Exactly one original visible Home return link: '+JSON.stringify(links));
   const backBefore=await back.evaluate(e=>{
    const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
    return {href:e.getAttribute('href'),resolved:e.href,rect:[r.x,r.y,r.width,r.height],hit:hit?.outerHTML?.slice(0,300)};

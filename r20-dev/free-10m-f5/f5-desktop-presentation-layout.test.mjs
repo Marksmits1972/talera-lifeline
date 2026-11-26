@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {DESKTOP_HOME_MEDIA} from './f5-desktop-home-layout.mjs';
+import {desktopPresentationStyle, installDesktopPresentationLayout} from './f5-desktop-presentation-layout.mjs';
+const original='<html><head><title>TALERA</title></head><body><section id="surface" class="timeline"><canvas id="timelineCanvas"></canvas><div class="center-needle"></div><div id="focusText"></div><div class="talera-photo-dots"></div></section><div id="photoStage"></div><script>/* original player and timeline */</script></body></html>';
+const result=installDesktopPresentationLayout(original,'/present');
+assert.equal(result.replace(desktopPresentationStyle,''),original,'Only a responsive style block may be added');
+assert.ok(desktopPresentationStyle.includes('@media '+DESKTOP_HOME_MEDIA));
+assert.ok(desktopPresentationStyle.includes('width: min(62vw, 960px)'));
+assert.ok(!desktopPresentationStyle.includes('#photoStage'), 'Photo stage must remain unchanged');
+assert.ok(!desktopPresentationStyle.includes('#focusText'), 'Original date position must remain unchanged');
+assert.ok(!desktopPresentationStyle.includes('.talera-photo-dots'), 'Original dots position must remain unchanged');
+assert.equal(installDesktopPresentationLayout(original,'/mijn-leven'),original);
+assert.equal(installDesktopPresentationLayout(original,'/tell'),original);
+assert.throws(()=>installDesktopPresentationLayout(result,'/present'),/DUPLICATE/);
+assert.throws(()=>installDesktopPresentationLayout(original.replace('id="focusText"','id="changed"'),'/present'),/SOURCE_DRIFT/);
+console.log('TALERA_DESKTOP_PRESENT_STYLE_CONTRACT_PASS');

@@ -807,7 +807,7 @@ function polishTellEditorLayout(html){
   '  const toolbarHeight=toolbar?.getBoundingClientRect().height||80;',
   '  const available=Math.floor(bottom-top-toolbarHeight-30);',
   '  const h=vv?.height||window.innerHeight;',
-  '  const cap=Math.min(108,Math.floor(80+Math.max(0,h-664)*.62));',
+  '  const cap=Math.floor(80+Math.max(0,h-664)*.62);',
   '  p.style.setProperty("max-height",Math.max(72,Math.min(cap,available))+"px","important");',
   ' }',
   ' document.addEventListener("click",function(e){',

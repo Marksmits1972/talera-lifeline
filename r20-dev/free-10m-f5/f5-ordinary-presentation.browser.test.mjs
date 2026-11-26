@@ -1201,7 +1201,8 @@ async function testTimelineLoupe(){
     assert.equal(await metadataPage.evaluate(async id=>(await window.TaleraMemories.get(id)).manualLocation??null,result.id),null);
     await metadataPage.locator('#talera-memory-city').fill('Nijmegen');
     await metadataPage.locator('#publish').click();
-    await metadataPage.waitForFunction(async id=>(await window.TaleraMemories?.get?.(id))?.manualLocation?.city==='Nijmegen',result.id,{timeout:25000});
+    try{await metadataPage.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.get('published')===result.id,{timeout:25000})}
+    catch(error){console.error('TALERA_LOCATION_CORRECTION_SAVE_DIAGNOSTIC',JSON.stringify({url:metadataPage.url(),error:await metadataPage.locator('#error').textContent({timeout:1000}).catch(()=>null),busy:await metadataPage.locator('#busy').isVisible().catch(()=>false)}));throw error}
     await metadataPage.goto(origin+'/present?memory='+encodeURIComponent(result.id),{waitUntil:'domcontentloaded'});
     await metadataPage.waitForFunction(id=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===2},result.id,{timeout:20000});
     await metadataPage.evaluate(()=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,1,true)});

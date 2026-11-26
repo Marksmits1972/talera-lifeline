@@ -36,6 +36,10 @@ export function installMemoryLocationEditor(html){
  const css=`<style id="talera-memory-location-css">
 #app #main .work .talera-memory-location{margin:5px 0 8px;min-width:0;flex:none;background:#f5f8fc;color:#173b64;border:1px solid #dbe4ef;border-radius:15px;box-sizing:border-box}
 .talera-memory-location [hidden]{display:none!important}
+/* A compact two-row photo grid has limited space. Opening the existing
+   characteristics keeps its approved two visible rows and footer geometry.
+   The optional location section reappears immediately when it is closed. */
+@media(max-height:760px){#app #main .work:has(.talera-work-tiles .tile:nth-child(4)):has(.talera-tags-toggle[aria-expanded="true"]) .talera-memory-location{display:none!important}}
 #app #main .work .talera-location-toggle{display:flex;align-items:center;width:100%;gap:9px;min-height:48px;background:transparent;border:0;padding:10px 12px;color:#224d7c;border-radius:15px;font:700 clamp(13px,3.85vw,15px)/1.32 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;text-align:left;cursor:pointer}
 .talera-location-pin{width:22px;height:22px;display:block;flex:none}.talera-location-pin svg{display:block;width:100%;height:100%}
 .talera-location-title{flex:1;min-width:0}

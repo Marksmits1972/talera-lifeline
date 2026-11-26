@@ -1086,7 +1086,8 @@ try{
   }finally{await locationEdit.context().setOffline(false)}
   assert.equal(await page.evaluate(async id=>(await window.TaleraMemories.get(id)).manualLocation??null,tagged.id),null,'Draft must not publish automatically');
   await locationEdit.locator('#publish').click();
-  await page.waitForFunction(async id=>(await window.TaleraMemories.get(id))?.manualLocation?.city==='Parijs',tagged.id,{timeout:25000});
+  try{await locationEdit.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.get('published')===tagged.id,{timeout:25000})}
+  catch(error){console.error('TALERA_LOCATION_SAVE_DIAGNOSTIC',JSON.stringify({url:locationEdit.url(),error:await locationEdit.locator('#error').textContent({timeout:1000}).catch(()=>null),busy:await locationEdit.locator('#busy').isVisible().catch(()=>false)}));throw error}
   const after=await page.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {manualLocation:row.manualLocation,keys:row.items.map(x=>x.key),bytes:Array.from(new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer()))}},tagged.id);
   assert.deepEqual(after,{...before,manualLocation:{countryCode:'FR',city:'Parijs'}});
   await locationEdit.goto(origin+'/tell?edit='+encodeURIComponent(tagged.id),{waitUntil:'domcontentloaded'});

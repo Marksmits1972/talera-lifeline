@@ -157,10 +157,14 @@ async function login(page,user){
  }
  await form.locator('[name="email"]').fill(user.email);
  await form.locator('[name="login-password"]').fill(user.password);
- await Promise.all([
+ const [loginResponse]=await Promise.all([
+   page.waitForResponse(response=>new URL(response.url()).origin===origin&&
+     new URL(response.url()).pathname==='/api/login'&&response.request().method()==='POST',
+     {timeout:18000}),
    page.waitForEvent('load',{timeout:18000}),
    form.locator('button[type="submit"]').click()
  ]);
+ assert.equal(loginResponse.status(),200,'The actual login request must succeed');
  await waitForLibrary(page);
  const own=await page.evaluate(async()=>{
    const r=await fetch('/api/me',{credentials:'same-origin'});

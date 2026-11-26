@@ -43,6 +43,9 @@ export function installBoundedTimelineSelection(html){
  one('function formatMemoryDate(memory) {',[
   nearestVisibleMemory.toString(),selectionBounds.toString(),
   `function timelineWindowMemory(ms=centerMs,preferred=activeMemoryId){
+    // A consented read-only share opens one explicitly chosen memory. This
+    // is not a search of the private timeline and must never borrow from it.
+    if(window.TaleraGuestOneMemory&&MEMORIES.length===1)return MEMORIES[0];
     const [from,to]=bounds(),shift=ms-centerMs;
     const [start,end]=selectionBounds(ms,from+shift,to+shift,visualZoomPos,LIFE_START,LIFE_END);
     return nearestVisibleMemory(MEMORIES,ms,start,end,preferred);
@@ -117,6 +120,11 @@ export function installBoundedTimelineSelection(html){
  one('const memory=rt.nearestMemory(clamped);','const memory=rt.windowMemory(clamped);','YEAR_ENTRY');
  one('     const visible=runtime.currentMemory();\n     if(visible?._taleraLocal)await hydrate(visible);',
      '     runtime.draw();\n     const visible=runtime.currentMemory();\n     if(visible?._taleraLocal)await hydrate(visible);','POST_HYDRATION_SELECTION');
+ // The existing capability adapter exposes exactly one read-only record and
+ // no ?memory parameter; open it at its date with the existing direct-entry
+ // renderer. The private account's unrestricted default route stays blank.
+ one("   const selected=isLocalId(wanted)?map.get('pwa:'+wanted):null;",
+     "   const selected=isLocalId(wanted)?map.get('pwa:'+wanted):\n     (window.TaleraGuestOneMemory&&memories.length===1?memories[0]:null);",'EXPLICIT_SHARED_MEMORY');
  // Sample local photos already decoded in the existing visible element.
  // A fresh blob fetch can race with pagehide's URL revocation in WebKit;
  // neither a hidden stale photo nor an unloaded blob should drive contrast.

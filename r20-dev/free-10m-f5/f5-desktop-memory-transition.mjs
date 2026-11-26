@@ -26,17 +26,27 @@ export function installDesktopMemoryTransitionEvents(win,doc,route,media,chooseD
  }
  function run(event,activation,outgoing){
   const transition=event.viewTransition;if(!transition)return;
+  // WebKit rejects ready when an intentionally skipped cross-document
+  // transition never becomes ready. Handle that expected native abort;
+  // leave other exceptions visible to the normal browser error handler.
+  const handleAbort=error=>{if(error?.name!=='AbortError')throw error};
+  transition.ready?.catch(handleAbort);
+  const skip=()=>{
+   transition.finished?.catch(handleAbort);
+   transition.updateCallbackDone?.catch(handleAbort);
+   transition.skipTransition();
+  };
   const from=activation?.from?.url,to=activation?.entry?.url;
   const direction=chooseDirection(from,to);
   if(!win.matchMedia(media+' and (prefers-reduced-motion: no-preference)').matches||!direction){
-   transition.skipTransition();return;
+   skip();return;
   }
   const expectHome=direction==='forward'?outgoing:!outgoing;
-  if(expectHome!==(route==='/mijn-leven')){transition.skipTransition();return}
+  if(expectHome!==(route==='/mijn-leven')){skip();return}
   const element=expectHome?doc.querySelector('.hero'):doc.getElementById('photoStage');
   // Never animate a blank Home hero or a click directed to a different memory.
   if(!element||(expectHome&&(!readyHome()||(outgoing&&!matchHero(to))))){
-   transition.skipTransition();return;
+   skip();return;
   }
   const name='view-transition-name',prev=element.style.getPropertyValue(name),priority=element.style.getPropertyPriority(name);
   element.style.setProperty(name,'talera-desktop-memory');

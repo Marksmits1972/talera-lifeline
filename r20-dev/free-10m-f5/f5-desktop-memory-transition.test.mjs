@@ -25,6 +25,20 @@ desktop=false;swap(home,present);assert.equal(skips,1);
 desktop=true;loaded=false;swap(home,present);assert.equal(skips,2);
 loaded=true;heroHref='/present?memory=B';swap(home,present);assert.equal(skips,3);
 heroHref='/present?memory=A';swap(home,origin+'/tell');assert.equal(skips,4);
+// Reproduce WebKit's native ready rejection when a visual enhancement is
+// deliberately skipped. No unhandled rejection and no altered navigation.
+let rejectReady,rejectFinished,rejectUpdate;
+const ready=new Promise((_,reject)=>{rejectReady=reject});
+const finished=new Promise((_,reject)=>{rejectFinished=reject});
+const updateCallbackDone=new Promise((_,reject)=>{rejectUpdate=reject});
+const abort=Object.assign(new Error('Skipping view transition because skipTransition() was called.'),{name:'AbortError'});
+handlers.pageswap({activation:{from:{url:home},entry:{url:origin+'/tell'}},viewTransition:{ready,finished,updateCallbackDone,skipTransition(){
+ skips++;rejectReady(abort);rejectFinished(abort);rejectUpdate(abort);
+}}});
+await new Promise(ok=>setTimeout(ok,0));
+assert.equal(skips,5);
+assert.equal(properties.has('view-transition-name'),false);
+console.log('TALERA_DESKTOP_EXPECTED_WEBKIT_SKIP_ABORT_HANDLED_PASS');
 console.log('TALERA_DESKTOP_MEMORY_TRANSITION_CONTRACT_PASS');
 // The presentation builds the reverse transition from the same route, without
 // replacing the existing back link, and never participates on unrelated routes.

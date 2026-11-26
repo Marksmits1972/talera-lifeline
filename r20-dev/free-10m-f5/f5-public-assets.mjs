@@ -1646,10 +1646,10 @@ function taleraNativeTimelineStart(){
   'surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  if(taleraLoupe.wheel(e))return;\n  taleraLoupeHoldId=null;taleraLoupeHoldMs=null;\n  userIsMoving = true;','WHEEL');
  const css='<style id="talera-timeline-loupe-style">'+
  '#surface,#surface *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;touch-action:none!important}'+
- '#talera-timeline-loupe{position:absolute;inset:0 4px 44px;box-sizing:border-box;border-radius:22px;border:1px solid rgba(255,255,255,.7);background:rgba(225,237,248,.9);z-index:1;pointer-events:none;overflow:hidden;box-shadow:0 2px 9px rgba(15,39,71,.12)}'+
+ '#talera-timeline-loupe{position:absolute;inset:6px 4px 44px;box-sizing:border-box;border-radius:22px;border:1px solid #ffffffb8;background:rgba(255,254,252,.97);z-index:1;pointer-events:none;overflow:hidden;box-shadow:0 5px 22px #0003}'+
  '#talera-timeline-loupe[hidden]{display:none!important}'+
  '#surface[data-talera-loupe="open"]>#timelineCanvas{opacity:1!important;filter:none!important;transition:none!important}'+
- '#surface[data-talera-loupe="open"]>.center-needle{z-index:4!important;opacity:1!important}'+
+ '#surface[data-talera-loupe="open"]>.center-needle{z-index:4!important;opacity:1!important;top:18px!important;margin-top:0!important;bottom:44px!important}'+
  '</style>';
  one('</head>',css+'</head>','STYLE');
  return html;

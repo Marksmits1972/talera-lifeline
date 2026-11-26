@@ -432,17 +432,24 @@ async function testTimelineLoupe(){
   assert.equal(opened.center,expected[0].ms);
   const geometry=await lp.evaluate(()=>{
    const r=document.getElementById('surface').getBoundingClientRect();
-   const p=document.getElementById('talera-timeline-loupe').getBoundingClientRect();
+   const panel=document.getElementById('talera-timeline-loupe');
+   const p=panel.getBoundingClientRect();
+   const panelStyle=getComputedStyle(panel),socialStyle=getComputedStyle(document.getElementById('talera-clean-social'));
    const d=document.getElementById('focusText').getBoundingClientRect();
    const needle=document.querySelector('#surface>.center-needle').getBoundingClientRect();
    return {width:p.width/r.width,center:Math.abs((p.left+p.right-r.left-r.right)/2),
-     height:p.height,canvasCount:document.querySelectorAll('#surface canvas').length,
+     height:p.height,corner:panelStyle.borderTopLeftRadius,socialCorner:socialStyle.borderTopLeftRadius,
+     panelColor:panelStyle.backgroundColor,dateColor:getComputedStyle(document.getElementById('focusText')).backgroundColor,
+     canvasCount:document.querySelectorAll('#surface canvas').length,
      canvasOpacity:getComputedStyle(document.getElementById('timelineCanvas')).opacity,
      userSelect:getComputedStyle(document.getElementById('surface')).getPropertyValue('user-select')||getComputedStyle(document.getElementById('surface')).getPropertyValue('-webkit-user-select'),
      dateSeparate:p.bottom<=d.top+2,needleVisible:needle.height>10,
      panelTop:p.top,panelBottom:p.bottom,dateTop:d.top,rulerTop:r.top,rulerBottom:r.bottom};
   });
   assert.ok(geometry.width>.94&&geometry.height>=90&&geometry.center<2&&geometry.needleVisible,JSON.stringify(geometry));
+  assert.equal(geometry.corner,geometry.socialCorner,'Same rounded shape as the social toolbar');
+  assert.match(geometry.panelColor,/255, 254, 252/,'Warm white from the date field');
+  assert.ok(geometry.panelTop>=0,'No clipped upper corners: '+JSON.stringify(geometry));
   assert.equal(geometry.canvasCount,1);assert.equal(geometry.canvasOpacity,'1');assert.equal(geometry.userSelect,'none');
   assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe: '+JSON.stringify(geometry));
   assert.ok(geometry.panelTop>=geometry.rulerTop-1,'Loupe must stay inside existing upper ruler: '+JSON.stringify(geometry));

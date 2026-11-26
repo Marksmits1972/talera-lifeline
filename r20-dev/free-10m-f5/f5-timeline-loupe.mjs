@@ -2,7 +2,8 @@
 // No second memory order, media, storage, playback or network.
 export const LOUPE_HOLD_MS=350;
 export const LOUPE_SLOP_PX=16;
-export const LOUPE_VISIBLE_DAYS=6;
+export const LOUPE_VISUAL_SCALE=1.10;
+export const LOUPE_VISIBLE_DAYS=6/LOUPE_VISUAL_SCALE;
 const LOUPE_MS_DAY=86400000;
 const clampLoupe=(x,min,max)=>Math.max(min,Math.min(max,x));
 
@@ -202,11 +203,25 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
   // The same native ruler drawing functions are supplied by its closure.
   paint({ctx,w,h,axisY,drawDensity,drawMemoryBeacons,tick}){
    if(!opened||!scale)return;
-   const unit=w/LOUPE_VISIBLE_DAYS,x=p=>w/2+(p-position)*unit;
+   // Scale the original renderer around the fixed needle and baseline.
+   // Pointer distance uses the identical enlarged calendar scale.
+   const unit=w/(LOUPE_VISIBLE_DAYS*LOUPE_VISUAL_SCALE),x=p=>w/2+(p-position)*unit;
    const from=scale.msAt(position-LOUPE_VISIBLE_DAYS/2),to=scale.msAt(position+LOUPE_VISIBLE_DAYS/2);
    const project=ms=>x(scale.positionAt(ms));
    const left=Math.max(0,x(0)),right=Math.min(w,x(scale.end));
-   ctx.save();ctx.beginPath();ctx.rect(left,0,Math.max(0,right-left),h);ctx.clip();
+   // Clip the paint to the actual rounded white panel, not the full-width
+   // canvas behind it. This also respects any native mobile canvas offset.
+   const card=panel.getBoundingClientRect(),canvasRect=ctx.canvas.getBoundingClientRect();
+   const sx=w/Math.max(1,canvasRect.width),sy=h/Math.max(1,canvasRect.height);
+   const cx=(card.left-canvasRect.left+1)*sx,cy=(card.top-canvasRect.top+1)*sy;
+   const cw=Math.max(0,(card.width-2)*sx),ch=Math.max(0,(card.height-2)*sy);
+   const radius=Math.min(21*sx,cw/2,ch/2);
+   ctx.save();ctx.beginPath();
+   ctx.moveTo(cx+radius,cy);ctx.arcTo(cx+cw,cy,cx+cw,cy+ch,radius);
+   ctx.arcTo(cx+cw,cy+ch,cx,cy+ch,radius);ctx.arcTo(cx,cy+ch,cx,cy,radius);
+   ctx.arcTo(cx,cy,cx+cw,cy,radius);ctx.closePath();ctx.clip();
+   ctx.translate(w/2,axisY);ctx.scale(LOUPE_VISUAL_SCALE,LOUPE_VISUAL_SCALE);ctx.translate(-w/2,-axisY);
+   ctx.beginPath();ctx.rect(left,0,Math.max(0,right-left),h);ctx.clip();
    if(to>from)drawDensity(3,from,to,w,axisY,project);
    drawMemoryBeacons(3,from,to,w,axisY,m=>x(scale.byId.get(m.id)?.position??scale.positionAt(m.ms)));
    ctx.strokeStyle='rgba(91,143,185,.44)';ctx.lineWidth=1.2;

@@ -1025,7 +1025,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 55b5678d-afe9-48ef-8a9f-2fd3cd94c883
+      F5_EXPECTED_LIVE_VERSION: db9e92d7-1be0-42fa-b668-8b4fbdd10529
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -1051,9 +1051,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = f4c8507753671031461dfafc08ff23a4b968842a
-          test "$(git diff --name-only f4c8507753671031461dfafc08ff23a4b968842a HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code f4c8507753671031461dfafc08ff23a4b968842a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 45f94f0807b307d7abb02e49c87e827898e1d493
+          test "$(git diff --name-only 45f94f0807b307d7abb02e49c87e827898e1d493 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 45f94f0807b307d7abb02e49c87e827898e1d493 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -1062,10 +1062,11 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45808130930',sha='f4c8507753671031461dfafc08ff23a4b968842a';
+          const id='45814790273',sha='45f94f0807b307d7abb02e49c87e827898e1d493';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
-          const names=[mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
+          const packageName='Build and archive the exact TALERA Free candidate once';
+          const names=[packageName,mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
           const exactJobs=async()=>{const data=await get(id+'/jobs?filter=latest&per_page=100');
             const rows=data.jobs;for(const name of names)assert.equal(rows.filter(j=>j.name===name).length,1,'Missing or duplicate exact job '+name);
             return rows;};
@@ -1078,9 +1079,20 @@ jobs:
             if(prior.status==='completed')break;
             await new Promise(resolve=>setTimeout(resolve,15000));
           }
-          assert.equal(prior.head_sha,sha);assert.equal(prior.status,'completed');assert.equal(prior.conclusion,'success');
+          assert.equal(prior.head_sha,sha);assert.equal(prior.head_branch,'feature/free-f5-library-boundary-20261117');assert.equal(prior.event,'push');assert.equal(prior.status,'completed');assert.equal(prior.conclusion,'success');
+          assert.equal(prior.name,'TALERA Free F5 - isolated single-origin integration tests');
           const jobs=await exactJobs();
           for(const name of names)assert.equal(jobs.find(j=>j.name===name)?.conclusion,'success');
+          const packageJob=jobs.find(j=>j.name===packageName);
+          for(const name of ['Install locked dependencies and build public TALERA once','Archive allowlisted anonymous software outputs and bind to exact commit','Retain immutable exact candidate for independent tests and explicit release'])
+            assert.equal(packageJob.steps.find(s=>s.name===name)?.conclusion,'success');
+          for(const name of names.filter(n=>n!==packageName))
+            assert.equal(jobs.find(j=>j.name===name)?.steps.find(s=>s.name==='Verify exact commit and package SHA256 before independent tests')?.conclusion,'success');
+          const artifacts=await get(id+'/artifacts?name=talera-free-f5-candidate-package&per_page=100');
+          assert.equal(artifacts.artifacts.length,1);
+          const artifact=artifacts.artifacts[0];
+          assert.equal(String(artifact.id),'15114951271');assert.equal(artifact.digest,'sha256:96f6c4890625a58e61794279dc9419245037f58dbece93edf7ec071cdeabbd8c');assert.equal(artifact.expired,false);
+          assert.equal(artifact.workflow_run?.head_sha,sha);assert.equal(String(artifact.workflow_run?.id),id);
           const main=jobs.find(j=>j.name===mainName);
           for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
             'Verify Cloudflare compilation without deployment',
@@ -1093,7 +1105,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45808130930');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45814790273');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1140,12 +1152,26 @@ jobs:
           }));
           console.log('SAME_EXISTING_APP_APPROVED_RESTORE_AND_18_IDENTICAL_BINDINGS_GUARDED');
           NODE
-      - name: Build same TALERA with no examples and verify account and personal media contracts
+      - name: Download only the exact previously tested TALERA software package
+        uses: actions/download-artifact@v4
+        with:
+          name: talera-free-f5-candidate-package
+          github-token: ${{ github.token }}
+          run-id: 45814790273
+          path: ${{ runner.temp }}/talera-candidate-package
+      - name: Verify source and tested SHA256 before unpacking for release
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/talera-candidate-package"
+          test "$(cat "$out/source.sha")" = "45f94f0807b307d7abb02e49c87e827898e1d493"
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "4e3937ff3a2c584399a59cce635ca1e271be203fc90ee2ff207354236b17fdc4"
+          (cd "$out" && sha256sum -c archive.sha256)
+          tar -xzf "$out/candidate.tar.gz"
+          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=4e3937ff3a2c584399a59cce635ca1e271be203fc90ee2ff207354236b17fdc4"
+      - name: Verify same tested TALERA with no examples and verify account and personal media contracts
         run: |
           set -euo pipefail
           npm ci
-          node r20-dev/free-10m-delivery/build.mjs
-          node r20-dev/free-10m-f5/f5-public-assets.mjs
           node r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs
           node --test r20-dev/free-10m-f5/f5-edit-return.test.mjs
           node r20-dev/free-10m-f5/f5-desktop-memory-transition.test.mjs
@@ -1175,6 +1201,10 @@ jobs:
                   'Exact tested location-reader cancellation missing: '+route);
               }
               if(route==='/tell'){
+                assert.ok(html.includes('id="talera-editor-clean-layout-v1"')&&html.includes('talera:tag-selection'),
+                  'The exact approved clean memory editor is missing');
+                assert.ok(!html.includes('class="talera-tag-apply"')&&!html.includes('class="talera-tag-cancel"'),
+                  'Unexpected duplicate characteristic confirmation controls');
                 for(const matcher of [/Test 081/ig,/talera-500-fotoband-/ig,/TALERA_STRESS_MEMORIES/ig]){
                   const hit=matcher.exec(html);
                   if(hit)console.log('UNREMOVED_TELL_EXAMPLE_SOURCE',JSON.stringify({
@@ -1230,8 +1260,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code f4c8507753671031461dfafc08ff23a4b968842a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45808130930'
+          git diff --exit-code 45f94f0807b307d7abb02e49c87e827898e1d493 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45814790273'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail
@@ -1407,6 +1437,10 @@ jobs:
           assert.ok(signedPresent.includes('TALERA_TIMELINE_CONTRAST_DECODED_LOCAL_IMAGE'), 'Missing timeline contrast sampling from decoded local photos');
           assert.ok(signedPresent.includes('alignLoupeToNativeAxis(nativeAxis,panel.getBoundingClientRect().height,dateTop)')&&signedPresent.includes('top:var(--talera-loupe-top,6px)')&&signedPresent.includes('LOUPE_DATE_GAP=12'), 'Missing native axis alignment and independent date window');
           assert.equal(hash(signedPresent)+'.html',referencePages['/present'].split('/').pop());
+          const signedTell=fs.readFileSync(root+referencePages['/tell'],'utf8');
+          assert.equal(hash(Buffer.from(signedTell))+'.html',referencePages['/tell'].split('/').pop());
+          assert.ok(signedTell.includes('id="talera-editor-clean-layout-v1"')&&signedTell.includes('Wijzigingen opslaan')&&signedTell.includes('talera:tag-selection'));
+          console.log('TALERA_APPROVED_EDITOR_EXACT_SOURCE_AND_DIGEST_PASS');
           const localSW=fs.readFileSync(root+verifiedPublicSupport['/sw.js']);
           assert.equal(hash(localSW)+'.js',verifiedPublicSupport['/sw.js'].split('/').pop());
           fs.writeFileSync('/tmp/talera-expected-release-sw.js',localSW);
@@ -1442,7 +1476,9 @@ jobs:
                grep -Fq 'topicsBelowPhotos' /tmp/talera-layout-guest.html &&
                grep -Fq 'Waar gaat deze herinnering over?' /tmp/talera-layout-guest.html &&
                grep -Fq 'id="talera-free-tell-topic-scroll-only"' /tmp/talera-layout-guest.html &&
-               grep -Fq 'overflow-y:auto!important' /tmp/talera-layout-guest.html; then
+               grep -Fq 'overflow-y:auto!important' /tmp/talera-layout-guest.html &&
+               grep -Fq 'id="talera-editor-clean-layout-v1"' /tmp/talera-layout-guest.html &&
+               grep -Fq 'talera:tag-selection' /tmp/talera-layout-guest.html; then
               guest_layout_visible=1
               echo "TALERA_GUEST_EDITOR_PHOTOS_BEFORE_CHARACTERISTICS_LIVE_PASS"
               break

@@ -24,7 +24,7 @@ assert.equal(hits[0].limit,24);assert.equal(hits[1].limit,72);
 allowed=false;assert.equal((await capturePlaceApi(req(),env,deps)).status,429);assert.equal(calls,2);
 console.log('TALERA_GEONAMES_AUTH_SCOPE_LIMIT_PRIVACY_CONTRACT_PASS');
 
-import {enrichCapturePlaces} from './f5-capture-place-enrichment.mjs';
+import {enrichCapturePlaces,mountCapturePlaceEnrichment} from './f5-capture-place-enrichment.mjs';
 const original=new Blob(['gps'],{type:'image/jpeg'});
 const record={id:'story-a',source:'pwa-local',items:[{key:'photo-a',kind:'photo',mime:'image/jpeg',size:3,name:'a.jpg'}]};
 const duplicate={...record,id:'story-b',items:[{...record.items[0]}]};
@@ -159,3 +159,71 @@ assert.equal(choose([breukelen,boxtel],[]),null);
 assert.equal(choose([populated('Accra',0.1,'PPLC','GH')],[])?.city,'Accra');
 assert.equal(choose([populated('Other',0.05,'PPL','GH'),populated('Accra',0.1,'PPLC','GH')],[]),null);
 console.log('TALERA_LOCALITY_POSTAL_CORROBORATION_AND_SMALL_VILLAGE_PASS');
+
+
+// Navigation while any optional step is awaiting: abandon this scan, not the
+// original, do not mark negative metadata, and allow the next page to retry.
+for(const phase of ['blob','readPlace','readGps','lookup']){
+ catalog=[structuredClone(record)];
+ let visible=true,after=0;
+ const retryItems=new Map(),deferred=new Set(),unreadable=new Set();
+ const callbacks={
+  blob:async()=>{if(phase==='blob')visible=false;return original},
+  readPlace:async()=>{if(phase==='readPlace'){visible=false;throw Error('CAPTURE_READ_ABORTED')}return null},
+  readGps:async()=>{if(phase==='readGps'){visible=false;throw Error('CAPTURE_READ_ABORTED')}return {latitude:51.62,longitude:5.43}},
+  lookup:async()=>{if(phase==='lookup')visible=false;return {ok:true,place:resolved}},
+  commit:async()=>{after++;throw Error('must not commit after navigation')}
+ };
+ const paused=await enrichCapturePlaces({...options,...callbacks,available:()=>visible,canLookup:()=>visible,retryItems,deferred,unreadable});
+ assert.deepEqual(paused,{more:true,blocked:true},phase);
+ assert.equal(after,0,phase);assert.equal(retryItems.size,0,phase);
+ assert.equal(deferred.size,0,phase);assert.equal(unreadable.size,0,phase);
+ assert.deepEqual(catalog,[structuredClone(record)],phase);
+ visible=true;
+ await enrichCapturePlaces({...options,available:()=>visible,canLookup:()=>visible,retryItems,deferred,unreadable});
+ assert.deepEqual(catalog[0].items[0].capturePlace,resolved,phase);
+}
+console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
+
+ // Exercise the actual mounting lifecycle, including a restored page. No
+ // browser test error filter, no navigation delay and no original replacement.
+ {
+  const names=['window','document','location'];
+  const originals=new Map(names.map(n=>[n,Object.getOwnPropertyDescriptor(globalThis,n)]));
+  const win=new EventTarget(),doc=new EventTarget();
+  win.top=win;doc.hidden=false;
+  for(const [n,v] of Object.entries({window:win,document:doc,location:{pathname:'/tell'}}))
+   Object.defineProperty(globalThis,n,{configurable:true,writable:true,value:v});
+  let firstResolve,secondResolve,firstSignal,secondSignal,reads=0,opened=0;
+  const first=new Promise(resolve=>{firstResolve=resolve});
+  const second=new Promise(resolve=>{secondResolve=resolve});
+  try{
+   mountCapturePlaceEnrichment({
+    dbName:'talera-free-local-'+'a'.repeat(32)+'-v1',enabled:false,
+    store:{list:async()=>[structuredClone(record)],blob:async()=>original},
+    open:async()=>{opened++;throw Error('no transaction during interrupted read')},
+    done:()=>{throw Error('unexpected transaction')},
+    readPlace:async(blob,signal)=>{
+     assert.strictEqual(blob,original);assert.equal(signal.aborted,false);
+     if(++reads===1){
+      firstSignal=signal;firstResolve();
+      return new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(Error('CAPTURE_READ_ABORTED')),{once:true}));
+     }
+     secondSignal=signal;secondResolve();return null;
+    },
+    readGps:async()=>{throw Error('no GPS while disabled')}
+   });
+   await first;
+   win.dispatchEvent(new Event('pagehide'));assert.equal(firstSignal.aborted,true);
+   win.dispatchEvent(new Event('pageshow'));
+   await second;
+   assert.notStrictEqual(secondSignal,firstSignal);
+   // The callback above proves the fresh signal was active when reading began.
+   assert.equal(reads,2);assert.equal(opened,0);
+   win.dispatchEvent(new Event('pagehide'));
+  }finally{
+   for(const [name,descriptor] of originals)
+    if(descriptor)Object.defineProperty(globalThis,name,descriptor);else delete globalThis[name];
+  }
+ }
+ console.log('TALERA_CAPTURE_MOUNT_PAGEHIDE_PAGESHOW_RETRY_PASS');

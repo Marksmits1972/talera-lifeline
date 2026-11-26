@@ -1273,8 +1273,8 @@ function installCapturePlacePresentation(html){
 
 function installCapturePlaceCatalog(html,route){
  const raw=readFileSync(path.join(here,'f5-library-access.browser.js'),'utf8');
- const start=raw.indexOf(' async function readJpegCapturePlace(blob){');
- const end=raw.indexOf(' async function readHeifCaptureGps(blob){');
+ const start=raw.indexOf(' async function readJpegCapturePlace(blob,signal){');
+ const end=raw.indexOf(' async function readHeifCaptureGps(blob,signal){');
  assert.ok(start>=0&&end>start,'CAPTURE_PLACE_READER_SOURCE_DRIFT');
  const reader=raw.slice(start,end);
  assert.ok(!reader.includes('</script'),'CAPTURE_PLACE_UNSAFE_SOURCE');
@@ -1301,10 +1301,10 @@ function installCapturePlaceCatalog(html,route){
  assert.equal(matches.length,1,'CAPTURE_ENRICHMENT_STORE_MARKER_DRIFT');
  const mount=matches[0],at=mount.index+mount[0].length;
  const install='\n'+gpsReaders+'\n'+enrichment+'\n'+
-  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:async original=>{"+
-  "if(/^video\\/(?:quicktime|mp4|x-m4v)$/i.test(original.type))return readQuickTimeCaptureGps(original);"+
-  "if(/^image\\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(original.type)||/\\.(?:heic|heif)$/i.test(original.name||''))return readHeifCaptureGps(original);"+
-  "return readJpegCaptureGps(original)},enabled:/*TALERA_GEONAMES_ENABLED*/false});\n";
+  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:async (original,signal)=>{"+
+  "if(/^video\\/(?:quicktime|mp4|x-m4v)$/i.test(original.type))return readQuickTimeCaptureGps(original,signal);"+
+  "if(/^image\\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(original.type)||/\\.(?:heic|heif)$/i.test(original.name||''))return readHeifCaptureGps(original,signal);"+
+  "return readJpegCaptureGps(original,signal)},enabled:/*TALERA_GEONAMES_ENABLED*/false});\n";
  return html.slice(0,at)+install+html.slice(at);
 }
 

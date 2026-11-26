@@ -63,9 +63,35 @@
  if(!latRef||!lonRef||lat===null||lon===null||(lat===0&&lon===0))return null;
  return Object.freeze({latitude:latRef==='S'?-lat:lat,longitude:lonRef==='W'?-lon:lon,source:'jpeg-exif-gps'});
 }
- async function readJpegCaptureGps(blob){
+ // Optional metadata only: FileReader gives the browser a cancellable read,
+ // unlike Blob.arrayBuffer(). A navigation must not leave a native blob read
+ // running in the old document. The Node contract test uses the same bytes.
+ function readCaptureMetadataSlice(blob,start,end,signal){
+  const aborted=()=>Error('CAPTURE_READ_ABORTED');
+  if(signal?.aborted)return Promise.reject(aborted());
+  if(typeof FileReader!=='function')return blob.slice(start,end).arrayBuffer();
+  return new Promise((resolve,reject)=>{
+   const reader=new FileReader();
+   const cleanup=()=>{
+    reader.onload=reader.onerror=reader.onabort=null;
+    signal?.removeEventListener('abort',cancel);
+   };
+   const cancel=()=>{
+    cleanup();
+    try{if(reader.readyState===1)reader.abort()}catch(_){}
+    reject(aborted());
+   };
+   reader.onload=()=>{const value=reader.result;cleanup();resolve(value)};
+   reader.onerror=()=>{const error=reader.error;cleanup();reject(error||Error('CAPTURE_READ_FAILED'))};
+   reader.onabort=()=>{cleanup();reject(aborted())};
+   signal?.addEventListener('abort',cancel,{once:true});
+   try{reader.readAsArrayBuffer(blob.slice(start,end))}
+   catch(error){cleanup();reject(error)}
+  });
+ }
+ async function readJpegCaptureGps(blob,signal){
  // Bounded original-header read only; never fetch or read a phone preview.
- const bytes=new Uint8Array(await blob.slice(0,2*1024*1024).arrayBuffer());
+ const bytes=new Uint8Array(await readCaptureMetadataSlice(blob,0,2*1024*1024,signal));
  if(bytes.length<4||bytes[0]!==0xff||bytes[1]!==0xd8)return null;
  let pos=2,seen=false,result=null;
  while(pos<bytes.length){
@@ -87,7 +113,7 @@
  }
  return null; // Header exceeded our safe read budget or was truncated.
 }
- async function readQuickTimeCaptureGps(blob){
+ async function readQuickTimeCaptureGps(blob,signal){
  // ISO-BMFF/QuickTime movie-level metadata only. Skip mdat without loading it.
  // No raw string search, track-location guessing, network, or file mutation.
  const limit=2*1024*1024;
@@ -95,7 +121,7 @@
  const read=async(p,n)=>{
   if(!Number.isSafeInteger(p)||!Number.isSafeInteger(n)||p<0||n<0||p>blob.size-n||n>budget)throw Error('metadata bounds');
   budget-=n;
-  const b=new Uint8Array(await blob.slice(p,p+n).arrayBuffer());
+  const b=new Uint8Array(await readCaptureMetadataSlice(blob,p,p+n,signal));
   if(b.length!==n)throw Error('short metadata read');
   return b;
  };
@@ -187,10 +213,10 @@
  if(found.some(x=>x.latitude!==found[0].latitude||x.longitude!==found[0].longitude))return null;
  return Object.freeze(found[0]);
 }
- async function readJpegCapturePlace(blob){
+ async function readJpegCapturePlace(blob,signal){
  // Only the explicit IPTC Extension LocationCreated structure, never
  // LocationShown, filename, current phone position or generic keywords.
- const bytes=new Uint8Array(await blob.slice(0,2*1024*1024).arrayBuffer());
+ const bytes=new Uint8Array(await readCaptureMetadataSlice(blob,0,2*1024*1024,signal));
  if(bytes.length<4||bytes[0]!==255||bytes[1]!==216)return null;
  const signature='http://ns.adobe.com/xap/1.0/\0';
  const extension='http://ns.adobe.com/xmp/extension/\0';
@@ -253,23 +279,23 @@
  if(!names.length||hasCountry&&!names.some(x=>norm(x)===norm(country)))return null;
  return Object.freeze({countryCode,country:names[0],city,source:'iptc-location-created'});
 }
- async function readCapturePlace(blob){
+ async function readCapturePlace(blob,signal){
  if(/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(blob.type)||/\.(?:heic|heif)$/i.test(blob.name||'')){
-  const packet=await readHeifCaptureMetadata(blob,'xmp');
+  const packet=await readHeifCaptureMetadata(blob,'xmp',signal);
   return packet?parseCapturePlacePacket(new TextDecoder('utf-8',{fatal:true}).decode(packet)):null;
  }
- return readJpegCapturePlace(blob);
+ return readJpegCapturePlace(blob,signal);
  }
- async function readHeifCaptureGps(blob){
- return readHeifCaptureMetadata(blob,'exif');
+ async function readHeifCaptureGps(blob,signal){
+ return readHeifCaptureMetadata(blob,'exif',signal);
  }
- async function readHeifCaptureMetadata(blob,kind){
+ async function readHeifCaptureMetadata(blob,kind,signal){
  // Only metadata explicitly describing the primary image. Ignore thumbnails,
  // other images, motion tracks and unlinked metadata. Bounded slice reads.
  let budget=2*1024*1024, count=0;
  const read=async(p,n)=>{
   if(!Number.isSafeInteger(p)||!Number.isSafeInteger(n)||p<0||n<0||p>blob.size-n||n>budget)throw Error('HEIF read bounds');
-  budget-=n;const b=new Uint8Array(await blob.slice(p,p+n).arrayBuffer());
+  budget-=n;const b=new Uint8Array(await readCaptureMetadataSlice(blob,p,p+n,signal));
   if(b.length!==n)throw Error('HEIF short read');return b;
  };
  const string=b=>String.fromCharCode(...b);

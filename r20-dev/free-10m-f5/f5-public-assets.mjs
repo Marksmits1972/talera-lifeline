@@ -1,6 +1,7 @@
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
+import {installBoundedTimelineSelection} from './f5-timeline-window.mjs';
 import {installDesktopHomeLayout} from './f5-desktop-home-layout.mjs';
 import {installDesktopPresentationLayout} from './f5-desktop-presentation-layout.mjs';
 import {installDesktopMemoryTransition} from './f5-desktop-memory-transition.mjs';
@@ -1880,6 +1881,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=keepNativeTimelineDateAfterPhotoLanding(html);
  if(route==='/present')html=stopOldPresentationWhenTimelineMoves(html);
  if(route==='/present')html=installTimelineLoupe(html);
+ if(route==='/present')html=installBoundedTimelineSelection(html);
  if(route==='/present')html=orderSameDateOwnerPostsAtReadBoundary(html);
  if(route==='/present')html=installReadOnlyLibraryGateway(html);
  if(route==='/present')html=pausePresentationDuringWhatsApp(html);

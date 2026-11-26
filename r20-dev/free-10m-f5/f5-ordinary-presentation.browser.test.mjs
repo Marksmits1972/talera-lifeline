@@ -539,8 +539,8 @@ async function testTimelineLoupe(){
   }
   await travelTo(expected[1].id);
   await travelTo(expected[2].id);
-  // The time ruler must change even between memories; no photo switch in
-  // an empty interval and the date and needle must remain synchronized.
+  // The time ruler must change between nearby memories; keep a photo only in
+  // the visible loupe window, with date and needle synchronized.
   const beforeBlank=await state();
   const needleBefore=await lp.locator('#surface>.center-needle').boundingBox();
   await lp.mouse.move(x,y);await lp.mouse.down();
@@ -709,6 +709,29 @@ async function testTimelineLoupe(){
    return row?.items.some(x=>x.key===m.photoId)&&row.items.some(x=>x.key===m.audioId)&&row.narrationCues?.[0]?.mediaId===m.photoId;
   },mixed));
   console.log('TALERA_LOUPE_MIXED_MOTOR_SELECTION_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',ordinaryToNarratedToOrdinary:true,originalIdsAndCuesPreserved:true,physicalIphoneAccepted:false}));
+
+  // Move into the real gap between the 6-Feb photo and 19-Feb narration.
+  const fromGap=await state();
+  for(let i=0;i<4;i++){
+   const box=await lp.locator('#surface').boundingBox();
+   const x=box.x+box.width*.8,y=box.y+box.height*.25;
+   await lp.mouse.move(x,y);await lp.mouse.down();
+   await lp.mouse.move(x-box.width*.20,y,{steps:5});await lp.mouse.up();
+  }
+  const gap=await lp.evaluate(()=>({
+   id:window.__taleraTimelineRuntime.currentMemory()?.id??null,
+   time:window.__taleraTimelineRuntime.centerMs(),
+   hidden:getComputedStyle(document.getElementById('photoStage')).visibility==='hidden',
+   title:getComputedStyle(document.getElementById('memoryCaption')).visibility==='hidden',
+   loep:!document.getElementById('talera-timeline-loupe').hidden,
+   narrator:!!document.querySelector('.talera-independent-narrator-layer')
+  }));
+  assert.equal(gap.id,null,JSON.stringify(gap));
+  assert.ok(gap.hidden&&gap.title&&gap.loep&&!gap.narrator&&gap.time>fromGap.center+3*86400000,JSON.stringify(gap));
+  await travelTo(expected[3].id);
+  assert.equal((await state()).id,expected[3].id);
+  await lp.waitForFunction(()=>getComputedStyle(document.getElementById('photoStage')).visibility==='visible');
+  console.log('TALERA_LOUPE_EMPTY_WINDOW_AND_RETURN_PASS');
 
   assert.deepEqual(errs,[]);
   console.log('TALERA_SHARED_TIMELINE_LOUPE_BROWSER_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',sameTimestamp:true,weekBoundary:true,originalOrder:true,closedTapConsumed:true,lowerSwipeKeepsLoupe:true,physicalIphoneAccepted:false}));
@@ -1585,8 +1608,8 @@ async function testTimelineLoupe(){
   await load(page,plain,3);
   // Native timeline regression: with only ONE real local memory near today,
   // releasing a finger drag must preserve the finger-selected historical year.
-  // The existing photo-book landing may choose that memory but must NOT
-  // reposition the independent timeline back to its event date.
+  // A photo outside the moving window must neither stay visible nor
+  // be reselected by the existing photo-book landing.
   const timelineBox=await page.locator('#surface').boundingBox();
   assert.ok(timelineBox?.width>180&&timelineBox?.height>90,
     'Original native timeline touch surface required');
@@ -1598,8 +1621,22 @@ async function testTimelineLoupe(){
   const heldCenter=await page.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
   assert.ok(heldCenter<firstCenter-4*365*86400000,
     'Timeline must follow finger back at least four years while held');
+  const emptyWindow=()=>page.evaluate(()=>({
+   id:window.__taleraTimelineRuntime.currentMemory()?.id??null,
+   eligible:window.__taleraTimelineRuntime.windowMemory()?.id??null,
+   photo:getComputedStyle(document.getElementById('photoStage')).visibility,
+   title:getComputedStyle(document.getElementById('memoryCaption')).visibility,
+   wheel:window.__taleraIntegratedBand.getState().active,
+   date:document.getElementById('focusText').textContent
+  }));
+  const heldEmpty=await emptyWindow();
+  assert.deepEqual([heldEmpty.id,heldEmpty.eligible,heldEmpty.photo,heldEmpty.title,heldEmpty.wheel],
+    [null,null,'hidden','hidden',false],JSON.stringify(heldEmpty));
   await page.mouse.up();
   await page.waitForTimeout(1150);
+  const releasedEmpty=await emptyWindow();
+  assert.deepEqual([releasedEmpty.id,releasedEmpty.eligible,releasedEmpty.photo,releasedEmpty.title,releasedEmpty.wheel],
+    [null,null,'hidden','hidden',false],JSON.stringify(releasedEmpty));
   const releasedCenter=await page.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
   assert.ok(Math.abs(releasedCenter-heldCenter)<.35*365.25*86400000,
     'Timeline returned to latest memory/today after finger release: '+
@@ -1608,6 +1645,10 @@ async function testTimelineLoupe(){
   console.log('TALERA_NATIVE_TIMELINE_RELEASE_STAYS_IN_PAST_PASS',
     JSON.stringify({previousNavigationIntact:true,fastSlowScaleUntouched:true,
       mediaNotMoved:true,iphoneAccepted:false}));
+  await page.evaluate(ms=>{const rt=window.__taleraTimelineRuntime;rt.setCenter(ms);rt.draw()},firstCenter);
+  await page.waitForFunction(id=>window.__taleraTimelineRuntime.currentMemory()?.storyId===id&&
+    getComputedStyle(document.getElementById('photoStage')).visibility==='visible',plain);
+  console.log('TALERA_NATIVE_EMPTY_WINDOW_AND_RETURN_PASS');
   await load(page,plain,3);
   assert.equal((await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex)),0);
   const first=await centerPixel(page);
@@ -3437,33 +3478,36 @@ async function testTimelineLoupe(){
       layer:!!document.querySelector('.talera-independent-narrator-layer'),
       voice:!!document.querySelector('.talera-independent-narrator-layer audio'),
       originalVideo:!!document.querySelector('.talera-independent-narrator-video'),
-      focusedDate:document.getElementById('focusText')?.textContent
+      focusedDate:document.getElementById('focusText')?.textContent,
+      eligible:runtime.windowMemory()?.id??null,
+      blank:getComputedStyle(document.getElementById('photoStage')).visibility==='hidden'
     };
   });
   assert.ok(navigation.center<timeBefore-4*365*86400000,
     'Timeline must keep original decade-swipe navigation');
   assert.equal(navigation.tracking,true);
-  assert.equal(navigation.wheelVisible,true,
-    'Existing eleven-image strip must follow a time swipe while held');
+  assert.equal(navigation.wheelVisible,navigation.eligible!==null,
+    'Existing photo strip is visible only for an eligible time-window memory');
+  assert.equal(navigation.blank,navigation.eligible===null);
   assert.equal(navigation.layer,false,
     'Timeline movement MUST stop and remove the playing narrator immediately: '+
       JSON.stringify(navigation));
   assert.ok(Number.isInteger(navigation.photoIndex),
     'Timeline must select the nearest REAL memory, not intermediate photo');
   await page.mouse.up();
-  await page.waitForFunction(ids=>ids.includes(
-    window.__taleraTimelineRuntime.currentMemory()?.storyId),
-    exactStories,{timeout:12000});
+  await page.waitForFunction(()=>!window.__taleraIntegratedBand.getState().timelineTracking&&
+    !window.__taleraIntegratedBand.getState().active,null,{timeout:12000});
   const settled=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();
     return {story:m?.storyId,date:m?.ms,
       narrator:!!document.querySelector('.talera-independent-narrator-layer'),
       currentAxis:window.__taleraTimelineRuntime.centerMs(),
-      originalVideo:!!document.querySelector('.talera-independent-narrator-video')};
+      originalVideo:!!document.querySelector('.talera-independent-narrator-video'),
+      expected:window.__taleraTimelineRuntime.windowMemory()?.storyId??null};
   });
   assert.equal(settled.narrator,false);
-  assert.ok(exactStories.includes(settled.story),
-    'Timeline must settle on one of the actual original 2017 events');
+  assert.equal(settled.story??null,settled.expected,
+    'Timeline must settle only on an original eligible record, or none');
   assert.ok(settled.currentAxis<timeBefore-4*365*86400000,
     'Photo selection must not rewrite finger-selected timeline date');
   console.log('TALERA_TIMELINE_NAVIGATION_DISMISSES_NARRATOR_AND_FOLLOWS_REAL_PHOTOS_PASS',

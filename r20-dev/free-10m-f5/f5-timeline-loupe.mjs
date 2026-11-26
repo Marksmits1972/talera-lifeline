@@ -101,7 +101,7 @@ export function paintLoupeWeekdayLabels({ctx,from,to,lifeStart,lifeEnd,locale,pr
  }
 }
 
-export function mountTimelineLoupe({surface,openNative,closeNative,selection,select,memories,lifeStart,lifeEnd,locale,redraw}){
+export function mountTimelineLoupe({surface,openNative,closeNative,selection,select,memories,lifeStart,lifeEnd,locale,redraw,nearest,clear}){
  const panel=document.createElement('div');
  panel.id='talera-timeline-loupe';panel.hidden=true;panel.setAttribute('aria-hidden','true');
  surface.insertBefore(panel,surface.firstChild);
@@ -113,6 +113,14 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
  const clearPending=()=>{if(!pending)return;clearTimeout(pending.timer);pending=null};
  function render(){
   if(!opened)return;
+  // Use the exact projected visible range, not a date-distance fallback.
+  // Dense same-time stories retain the independent stops and native IDs.
+  const candidate=nearest(scale,position,selection().id);
+  if(!candidate)clear();
+  else if(candidate.id!==selection().id){
+   selecting=true;
+   try{select(candidate.id)}finally{selecting=false}
+  }
   const current=selection();
   panel.dataset.memoryId=current.id==null?'':String(current.id);
   panel.dataset.position=String(position);

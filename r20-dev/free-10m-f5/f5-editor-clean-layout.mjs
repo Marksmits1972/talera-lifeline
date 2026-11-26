@@ -1,4 +1,3 @@
-import {languageCatalog} from './f5-language-catalog.mjs';
 import assert from 'node:assert/strict';
 
 // Approved TALERA editor redesign. Restrict all source edits to the original
@@ -50,10 +49,9 @@ export function simplifyTellMemoryEditor(html){
  let toolbar=html.slice(toolbarStart,toolbarEnd);
  toolbar=replace(toolbar,"  publish.textContent='Plaatsen';",
  `  const editExisting=typeof g.existing==='string'&&g.existing.length>0&&new URLSearchParams(location.search).get('edit')===g.existing;
-  const placeLabel=()=>{const lang=String(window.TaleraI18n?.language||document.documentElement.lang||'nl').slice(0,2);
-   const labels=${JSON.stringify(Object.fromEntries(Object.entries(languageCatalog).map(([l,p])=>[l,[p['core.editor.saveButton'],p['core.editor.saveAria'],p['core.editor.publishButton'],p['core.editor.publishAria']]])))};
-   if(editExisting){const pair=labels[lang]||labels.en;publish.textContent=pair[0];publish.setAttribute('aria-label',pair[1]);}
-   else{const pair=labels[lang]||labels.en;publish.textContent=pair[2];publish.setAttribute('aria-label',pair[3]);}
+  const placeLabel=()=>{
+   window.TaleraI18n.setText(publish,editExisting?'core.editor.saveButton':'core.editor.publishButton');
+   window.TaleraI18n.setTextAttribute(publish,'aria-label',editExisting?'core.editor.saveAria':'core.editor.publishAria');
   };
   placeLabel();
   if(editExisting){

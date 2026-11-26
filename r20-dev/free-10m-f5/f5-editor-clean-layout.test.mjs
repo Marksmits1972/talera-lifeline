@@ -1,3 +1,4 @@
+import {translate} from './f5-language.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {simplifyTellMemoryEditor} from './f5-editor-clean-layout.mjs';
@@ -64,7 +65,7 @@ function fixture({tags=['Niet meer favoriet'],edit='',existing=null,language='nl
   querySelectorAll(sel){return this.children.filter(x=>'.'+x.className===sel)},
   querySelector(sel){return this.parts?.[sel]}
  });
- const details=node(),publish=node(),window={TaleraI18n:{language}};
+ const details=node(),publish=node(),window={TaleraI18n:{language,setText(el,key){el.textContent=translate(language,key)},setTextAttribute(el,attr,key){el.setAttribute(attr,translate(language,key))}}};
  const parts=Object.fromEntries(['.talera-tags-toggle','.talera-tags-selected','.talera-tags-panel','.talera-tags-choices'].map(x=>[x,node()]));
  const document={publish,documentElement:{lang:language},createElement(){const n=node();n.parts=parts;return n},addEventListener(){},removeEventListener(){}};
  const group={tags:[...tags],existing},saved=[];

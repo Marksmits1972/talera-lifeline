@@ -497,11 +497,6 @@ const dynamicPositions={
    1
   ],
   [
-   "publish.textContent='Plaatsen'",
-   "window.TaleraI18n.setText(publish,'core.tell.publishPlain')",
-   1
-  ],
-  [
    "done.textContent='Klaar'",
    "window.TaleraI18n.setText(done,'core.tell.writerDone')",
    1

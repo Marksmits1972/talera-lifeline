@@ -208,6 +208,9 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   activeController?.abort();
   if(timer!==null){clearTimeout(timer);timer=null;timerDue=Infinity}
  };
+ // Stop optional work at the earliest document-navigation notification.
+ // Never prevent navigation or prompt the user; pagehide is the fallback.
+ window.addEventListener('beforeunload',suspend);
  window.addEventListener('pagehide',()=>{departing=true;suspend()});
  window.addEventListener('pageshow',()=>{departing=false;schedule()});
  window.addEventListener('focus',()=>schedule());

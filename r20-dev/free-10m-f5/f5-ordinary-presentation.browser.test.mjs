@@ -171,6 +171,13 @@ backupRegression: try{
         }
       });
       const pickerPage=await pickerCtx.newPage(),pickerErrors=[];
+      await pickerPage.addInitScript(()=>{
+        const report=event=>console.warn('TALERA_PICKER_LIFECYCLE '+event.type+' hidden='+document.hidden);
+        window.addEventListener('beforeunload',report);
+        window.addEventListener('pagehide',report);
+        window.addEventListener('pageshow',report);
+        document.addEventListener('visibilitychange',report);
+      });
       let pickerPhase='initial-navigation';
       const markPickerPhase=phase=>{pickerPhase=phase;console.log('TALERA_PICKER_PHASE',JSON.stringify({webkit:webkitPickerOnly,file:path.basename(file),broken,deleteTest:!!fixture.deleteTest,phase}))};
       pickerPage.on('framenavigated',frame=>{if(frame===pickerPage.mainFrame())console.log('TALERA_PICKER_NAVIGATION',JSON.stringify({phase:pickerPhase,route:new URL(frame.url()).pathname}))});

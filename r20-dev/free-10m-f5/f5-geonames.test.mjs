@@ -214,7 +214,8 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
     readGps:async()=>{throw Error('no GPS while disabled')}
    });
    await first;
-   win.dispatchEvent(new Event('pagehide'));assert.equal(firstSignal.aborted,true);
+   win.dispatchEvent(new Event('beforeunload'));assert.equal(firstSignal.aborted,true);
+   win.dispatchEvent(new Event('pagehide'));
    win.dispatchEvent(new Event('pageshow'));
    await second;
    assert.notStrictEqual(secondSignal,firstSignal);

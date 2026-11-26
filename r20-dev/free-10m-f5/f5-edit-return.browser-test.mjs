@@ -67,15 +67,34 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    await pencil.click();
    await page.waitForURL('**/tell?edit='+encodeURIComponent(id));
    await eye.waitFor({state:'visible',timeout:20000});
-   const box=await eye.boundingBox();
+   const back=page.locator('#app header.top #back'),dots=page.locator('#app .talera-editor-memory-options-toggle');
+   await back.waitFor({state:'visible'});await dots.waitFor({state:'visible'});
+   // Check the actual header controls, not CSS inputs or a simulated layout.
+   // The eye's visible icon must align with the back arrow's row and the
+   // existing deletion menu's column while keeping its own touch target.
+   await page.waitForFunction(()=>{
+    const e=document.getElementById('talera-f5-edit-return-eye'),b=document.querySelector('#app header.top #back'),d=document.querySelector('#app .talera-editor-memory-options-toggle');
+    if(!e||!b||!d)return false;
+    const er=e.getBoundingClientRect(),br=b.getBoundingClientRect(),dr=d.getBoundingClientRect();
+    return Math.abs(er.x+er.width/2-dr.x-dr.width/2)<=2&&Math.abs(er.y+er.height/2-br.y-br.height/2)<=2&&er.bottom<=dr.top;
+   },null,{timeout:5000});
+   const box=await eye.boundingBox(),backBox=await back.boundingBox(),dotsBox=await dots.boundingBox();
    const geometry=await page.evaluate(()=>{
     const hit=JSON.parse(sessionStorage.getItem('talera-ci-pencil-hit-rect')||'null');sessionStorage.removeItem('talera-ci-pencil-hit-rect');
     const button=document.getElementById('talera-f5-edit-return-eye'),style=getComputedStyle(button);
     const key=Object.keys(sessionStorage).find(k=>k.startsWith('talera-free-edit-return-'));
-    return {hit,context:key?JSON.parse(sessionStorage.getItem(key)):null,top:style.top,right:style.right,transform:style.transform,scrollY,innerHeight,viewportOffset:visualViewport?.offsetTop??null};
+    return {hit,context:key?JSON.parse(sessionStorage.getItem(key)):null,background:style.backgroundColor,border:style.borderTopWidth,shadow:style.boxShadow,color:style.color,dotsColor:getComputedStyle(document.querySelector('.talera-editor-memory-options-toggle')).color};
    });
    assert.ok(geometry.hit,'Actual trusted pointer-down position missing');
-   for(const k of ['x','y','width','height'])assert.ok(Math.abs(geometry.hit[k]-box[k])<=2,'Eye must occupy exact actual pencil target '+k+': '+JSON.stringify({pos,box,geometry}));
+   assert.equal(geometry.context.id,id,'Same exact captured memory ID');
+   assert.ok(Math.abs(box.x+box.width/2-(dotsBox.x+dotsBox.width/2))<=2,'Eye must be centered over dots: '+JSON.stringify({box,dotsBox}));
+   assert.ok(Math.abs(box.y+box.height/2-(backBox.y+backBox.height/2))<=2,'Eye must align with back-arrow row: '+JSON.stringify({box,backBox}));
+   assert.ok(box.y+box.height<=dotsBox.y,'Eye must be above and not cover options');
+   assert.ok(Math.abs(box.width-45)<=1&&Math.abs(box.height-45)<=1,'Accessible eye target');
+   assert.equal(geometry.background,'rgba(0, 0, 0, 0)','Eye inherits white screen background');
+   assert.equal(geometry.border,'0px','No circle outline');
+   assert.equal(geometry.shadow,'none','No shadow');
+   assert.equal(geometry.color,geometry.dotsColor,'Same icon color as options');
    const opened=await read();
    assert.equal(opened.catalog.filter(x=>x.existing===id).length,1,'One existing edit draft');
    await eye.click();
@@ -89,6 +108,6 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    assert.deepEqual(after,baseline,'No new draft, new story, lost original bytes, cue or other same-day memory');
   }
   assert.deepEqual(errors,[],'No actual script errors');
-  console.log('TALERA_EDIT_RETURN_ACTUAL_PENCIL_EYE_SAME_ID_POSITION_ORIGINAL_BYTES_AND_DRAFT_PASS',JSON.stringify({browser:browser.browserType().name(),twoSameDayStories:true}));
+  console.log('TALERA_EDIT_RETURN_ACTUAL_PENCIL_EYE_SAME_ID_POSITION_ORIGINAL_BYTES_AND_DRAFT_PASS',JSON.stringify({browser:browser.browserType().name(),twoSameDayStories:true,headerEye:true,transparentBackground:true}));
  }finally{await ctx.close()}
 }

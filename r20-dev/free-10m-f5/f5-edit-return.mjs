@@ -51,13 +51,17 @@ export function writeReturnContext(storage,scope,context){
  try{storage.setItem(returnStorageKey(scope),JSON.stringify(context));return true}catch{return false}
 }
 
-export function buttonPosition(context,viewport){
- // No movement at all on an unchanged viewport. Only keep a button on-screen
- // if the device rotated or the editor keyboard changed available height.
- const clamp=(v,min,max)=>Math.min(Math.max(v,min),Math.max(min,max));
- const width=context?.width??45,height=context?.height??45;
- return {width,height,top:clamp(context?.top??116,0,viewport.height-height),
-  right:clamp(context?.right??15,0,viewport.width-width)};
+// Position in the actual editor header, independently of the captured
+// presentation pencil's coordinates. Never cover the lower editing controls.
+export function buttonPosition(back,dots,viewport){
+ const size=45;
+ if(!back||!dots||![back.top,back.height,back.width,dots.left,dots.width,dots.top,
+    viewport.width,viewport.height].every(Number.isFinite)||
+    back.height<=0||back.width<=0||dots.width<=0)return null;
+ const top=back.top+(back.height-size)/2;
+ const right=viewport.width-(dots.left+dots.width/2)-size/2;
+ if(top<0||right<0||right+size>viewport.width||top+size>viewport.height||top+size>dots.top)return null;
+ return {width:size,height:size,top,right};
 }
 
 const LABELS={nl:'Terug naar dezelfde herinnering',en:'Return to the same memory',de:'Zurück zur selben Erinnerung',fr:'Revenir au même souvenir',es:'Volver al mismo recuerdo'};
@@ -72,27 +76,51 @@ export function mountReturnButton({document,window,context,language,onReturn}){
  const button=document.createElement('button');
  button.id=id;button.type='button';button.title=returnLabel(language);
  button.setAttribute('aria-label',button.title);
- // The icon is original line artwork, consistent with the existing TALERA
- // round 45px pencil target; no extra visible label or navigation row.
+ // The eye uses the same bare header treatment as the original options
+ // button. The transparent 45px hit area retains accessible touch/focus.
  button.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>';
- Object.assign(button.style,{position:'fixed',zIndex:'63',display:'grid',placeItems:'center',padding:'0',margin:'0',boxSizing:'border-box',transform:'none',borderRadius:'50%',border:'1px solid rgba(85,121,169,.48)',background:'#f7f5f0',color:'#071a3d',boxShadow:'0 4px 18px rgba(7,26,61,.15)',touchAction:'manipulation',cursor:'pointer'});
+ Object.assign(button.style,{position:'fixed',zIndex:'63',display:'grid',placeItems:'center',padding:'0',margin:'0',boxSizing:'border-box',transform:'none',borderRadius:'50%',border:'0',background:'transparent',color:'#476376',boxShadow:'none',touchAction:'manipulation',cursor:'pointer',visibility:'hidden'});
  const position=()=>{
-  const p=buttonPosition(context,{width:window.innerWidth,height:window.innerHeight});
+  const back=document.querySelector?.('#app header.top #back');
+  const dots=document.querySelector?.('#app .talera-editor-memory-options-toggle');
+  const p=buttonPosition(back?.getBoundingClientRect(),dots?.getBoundingClientRect(),{width:window.innerWidth,height:window.innerHeight});
+  if(!p){button.style.visibility='hidden';return}
   for(const [key,value] of Object.entries(p))button.style[key]=value+'px';
-  // The original editor and presentation have different viewport/body
-  // layout offsets (notably WebKit). Match the *rendered* visual target,
-  // not only the CSS top/right declarations.
+  // Match the rendered anchors even with editor-specific fixed-position
+  // viewport/body offsets (notably WebKit).
   const r=button.getBoundingClientRect?.();
   if(r&&Number.isFinite(r.top)&&Number.isFinite(r.right)&&r.width>0){
    button.style.top=(p.top+(p.top-r.top))+'px';
    button.style.right=(p.right+(r.right-(window.innerWidth-p.right)))+'px';
   }
+  button.style.visibility='visible';
  };
- window.addEventListener('resize',position,{passive:true});
+ // Header and options may reflow or be recreated by the existing editor.
+ // Observe only its original DOM; the eye itself is outside the app.
+ let frame=null;
+ const schedule=()=>{
+  if(frame!==null)return;
+  if(typeof window.requestAnimationFrame!=='function'){position();return}
+  frame=window.requestAnimationFrame(()=>{frame=null;position()});
+ };
+ const app=document.getElementById('app');
+ const mutations=app&&window.MutationObserver?new window.MutationObserver(schedule):null;
+ mutations?.observe(app,{childList:true,subtree:true});
+ const layout=app&&window.ResizeObserver?new window.ResizeObserver(schedule):null;
+ if(layout){layout.observe(app);const header=document.querySelector?.('#app header.top');if(header)layout.observe(header)}
+ window.addEventListener('resize',schedule,{passive:true});
+ window.addEventListener('scroll',schedule,{passive:true,capture:true});
+ window.visualViewport?.addEventListener('resize',schedule,{passive:true});
+ window.visualViewport?.addEventListener('scroll',schedule,{passive:true});
  let pending=false;
  button.addEventListener('click',async()=>{if(pending)return;pending=true;button.disabled=true;try{await onReturn()}finally{pending=false;button.disabled=false}});
  document.body.append(button);position();
- return {button,unmount(){window.removeEventListener('resize',position);button.remove()}};
+ return {button,unmount(){
+  window.removeEventListener('resize',schedule);window.removeEventListener('scroll',schedule,true);
+  window.visualViewport?.removeEventListener('resize',schedule);window.visualViewport?.removeEventListener('scroll',schedule);
+  mutations?.disconnect();layout?.disconnect();if(frame!==null)window.cancelAnimationFrame(frame);
+  button.remove();
+ }};
 }
 
 // Only a new draft explicitly created by *this* opening may be pristine.

@@ -13,9 +13,18 @@ test('same ID route, no new query parameter, no redirect supplied by the caller'
 });
 test('capture actual pencil position, exact memory and exact canonical photo',()=>{
  assert.equal(context.id,id);assert.equal(context.index,1);assert.equal(context.mediaKey,'original-two');assert.equal(context.centerMs,123456);
- assert.deepEqual(buttonPosition(context,{width:390,height:844}),{width:45,height:45,top:124,right:15});
  assert.equal(captureReturnContext({memory:{...memory,_taleraLocal:false},rect:{},viewport:{}}),null);
- assert.equal(buttonPosition(context,{width:390,height:130}).top,85);
+});
+const backRect={left:15,top:65,width:82,height:42},dotsRect={left:330,top:115,width:44,height:44};
+const viewport={width:390,height:844};
+const headerAnchor=(selector)=>selector.includes('#back')?{getBoundingClientRect:()=>backRect}:
+ selector.includes('options-toggle')?{getBoundingClientRect:()=>dotsRect}:null;
+test('editor eye uses actual header row and dots column, not the old pencil position',()=>{
+ assert.deepEqual(buttonPosition(backRect,dotsRect,viewport),{width:45,height:45,top:63.5,right:15.5});
+ assert.deepEqual(buttonPosition({...backRect,top:10},{...dotsRect,left:1040,top:80},{width:1200,height:800}),{width:45,height:45,top:8.5,right:115.5});
+ assert.equal(buttonPosition(null,dotsRect,viewport),null);assert.equal(buttonPosition(backRect,null,viewport),null);
+ assert.equal(buttonPosition(backRect,{...dotsRect,top:70},viewport),null);
+ assert.equal(buttonPosition({...backRect,top:-50},dotsRect,viewport),null);
 });
 test('transient state is account scoped, rejects wrong ID, malformed and stale values',()=>{
  const s=storage();assert(writeReturnContext(s,scope,context));assert.deepEqual(readReturnContext(s,scope,id,101),context);
@@ -109,20 +118,20 @@ test('never select wrong memory, unhydrated frame, narrator or video through ord
 test('five localized names, real eye button dimensions and one click until settled',async()=>{
  assert.equal(new Set(['nl','en','de','fr','es'].map(returnLabel)).size,5);
  const callbacks={};const el={style:{},setAttribute(k,v){this[k]=v},addEventListener(k,v){callbacks[k]=v},remove(){this.removed=true}};
- let mounted=null;const doc={getElementById(){return mounted},createElement(){return el},body:{append(n){mounted=n}}};
+ let mounted=null;const doc={getElementById(){return mounted},querySelector:headerAnchor,createElement(){return el},body:{append(n){mounted=n}}};
  const w={innerWidth:390,innerHeight:844,addEventListener(){},removeEventListener(){}};
  let release,count=0;const eye=mountReturnButton({document:doc,window:w,context,language:'nl',onReturn:()=>{count++;return new Promise(r=>release=r)}});
- assert.equal(el['aria-label'],returnLabel('nl'));assert.equal(el.style.top,'124px');assert.equal(el.style.right,'15px');assert.equal(el.style.width,'45px');assert.match(el.innerHTML,/<svg/);
+ assert.equal(el['aria-label'],returnLabel('nl'));assert.equal(el.style.top,'63.5px');assert.equal(el.style.right,'15.5px');assert.equal(el.style.background,'transparent');assert.equal(el.style.border,'0');assert.equal(el.style.boxShadow,'none');assert.equal(el.style.visibility,'visible');assert.equal(el.style.width,'45px');assert.match(el.innerHTML,/<svg/);
  const first=callbacks.click();await callbacks.click();assert.equal(count,1);release();await first;assert.equal(el.disabled,false);
  assert.throws(()=>mountReturnButton({document:doc,window:w,context,language:'nl',onReturn:()=>{}}));eye.unmount();assert.equal(el.removed,true);
 });
 test('measured eye position cancels the editor-specific WebKit viewport offset',()=>{
  const el={style:{},setAttribute(){},addEventListener(){},getBoundingClientRect(){return {top:parseFloat(this.style.top)-26.5,right:390-parseFloat(this.style.right),width:45}},remove(){}};
- const doc={getElementById(){return null},createElement(){return el},body:{append(){}}};
+ const doc={getElementById(){return null},querySelector:headerAnchor,createElement(){return el},body:{append(){}}};
  const w={innerWidth:390,innerHeight:844,addEventListener(){},removeEventListener(){}};
  mountReturnButton({document:doc,window:w,context,language:'nl',onReturn:()=>{}});
- assert.equal(el.getBoundingClientRect().top,124);
- assert.equal(el.getBoundingClientRect().right,375);
+ assert.equal(el.getBoundingClientRect().top,63.5);
+ assert.equal(el.getBoundingClientRect().right,374.5);
 });
 test('pencil preparation targets observed original click source and refuses drift',()=>{
  const original=`<script id="talera-v5-pencil-script">(()=>{const rt=window.__taleraTimelineRuntime;const pencil=document.createElement('button');pencil.id='talera-v5-editor-pencil';pencil.addEventListener('click',()=>{const current=rt.currentMemory();const recordId=current.storyId;if(!recordId)return;location.assign('/tell?edit='+encodeURIComponent(recordId));});})();</script>`;
@@ -155,7 +164,7 @@ window.boot=boot();window.editMock=title=>{active().title=title;saveDraft()};win
 async function runEditorFixture({prior=false,fromPencil=true,allow=true}={}){
  const source=patchEditorReturn(editorFixture,scope),s=storage(),nav=[],discard=[],errors=[],confirm=[];const buttons=new Map(),events={};
  const attrs=new Set();const app={hasAttribute:k=>attrs.has(k),setAttribute:k=>attrs.add(k),removeAttribute:k=>attrs.delete(k)};const busy={hidden:true};
- const doc={referrer:fromPencil?'https://talera.test/present':'https://talera.test/mijn-leven',documentElement:{lang:'nl'},getElementById:k=>k==='app'?app:k==='busy'?busy:buttons.get(k)||null,querySelectorAll:()=>[],createElement:()=>({style:{},setAttribute(k,v){this[k]=v},addEventListener(k,v){events[k]=v},remove(){buttons.delete(this.id)}}),body:{append(el){buttons.set(el.id,el)}}};
+ const doc={referrer:fromPencil?'https://talera.test/present':'https://talera.test/mijn-leven',documentElement:{lang:'nl'},getElementById:k=>k==='app'?app:k==='busy'?busy:buttons.get(k)||null,querySelector:headerAnchor,querySelectorAll:()=>[],createElement:()=>({style:{},setAttribute(k,v){this[k]=v},addEventListener(k,v){events[k]=v},remove(){buttons.delete(this.id)}}),body:{append(el){buttons.set(el.id,el)}}};
  const ctx={...context,at:Date.now()};if(fromPencil)writeReturnContext(s,scope,ctx);
  const window={sessionStorage:s,initialGroups:prior?[structuredClone(draft)]:[],original:structuredClone(draft),errors,innerWidth:390,innerHeight:844,addEventListener(){},removeEventListener(){},confirm:t=>{confirm.push(t);return allow},mem:{draftDiscardPristineEdit:async g=>{discard.push(g);return true}}};
  const location={search:'?edit='+id,origin:'https://talera.test',replace:path=>nav.push(path)};
@@ -164,7 +173,7 @@ async function runEditorFixture({prior=false,fromPencil=true,allow=true}={}){
  return {window,nav,discard,errors,confirm,buttons,events,attrs,s};
 }
 test('editor source binding mounts eye only for pencil entry; no-op exits directly and retains unrelated originals',async()=>{
- const f=await runEditorFixture();assert.equal(f.buttons.size,1);assert.equal(f.buttons.values().next().value.style.top,'124px');
+ const f=await runEditorFixture();assert.equal(f.buttons.size,1);assert.equal(f.buttons.values().next().value.style.top,'63.5px');
  await f.events.click();assert.deepEqual(f.nav,[returnPath(id)]);assert.equal(f.confirm.length,0);assert.equal(f.discard.length,1);assert.deepEqual(f.discard[0],draft);assert.equal(f.attrs.has('inert'),false);
  assert.equal(readReturnContext(f.s,scope,id)?.returning,true);
  const fromHome=await runEditorFixture({fromPencil:false});assert.equal(fromHome.buttons.size,0);assert.deepEqual(fromHome.nav,[]);

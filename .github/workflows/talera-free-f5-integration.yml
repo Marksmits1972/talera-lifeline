@@ -220,7 +220,7 @@ jobs:
             # the owner-requested ordered backup picker UI and controller are exact-blob guarded.
             # Archive codec, read/write adapter, owner data and presentation remain unchanged.
             if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "642ba9365b7d5a2bcc8e12770872ebc43077aa17"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "5efeb82eee734abb1607c94c07a376903f9a95ce"
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "ee5720f3766399404bf366c1b8eb3ce695973f09"
             elif [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"
@@ -234,6 +234,7 @@ jobs:
           fi
           node r20-dev/free-10m-f5/f5-account-switch-regression.mjs
           node r20-dev/free-10m-f5/f5-portable-archive.test.mjs
+          node --test r20-dev/free-10m-f5/f5-transfer.test.mjs r20-dev/free-10m-f5/f5-transfer-qr.test.mjs
       - name: Verify fixed iPhone publish path uses same account-private IndexedDB for all three media-ID writers
         run: node r20-dev/free-10m-f5/f5-db-publish-regression.mjs
       - name: Preserve saved narration media IDs and cue times when reopening an existing iPhone memory
@@ -331,6 +332,9 @@ jobs:
       - name: Browser verify back-up panel, private session and two local browser contexts
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-backup-ui.browser.test.mjs
+      - name: Browser verify direct device transfer on existing private backup view
+        if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
+        run: node r20-dev/free-10m-f5/f5-transfer.browser.test.mjs
       - name: Browser verify encrypted offline same-PWA start and offline logout
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: |

@@ -69,7 +69,7 @@ mkdirSync(path.join(publicDir,'__talera_free','f5scripts'),{recursive:true});
 // remain behind Worker-first gate. Never inject into approved TALERA pages.
 const backupAssets=path.join(publicDir,'__talera_free','f5backup');
 mkdirSync(backupAssets,{recursive:true});
-for(const name of ['f5-portable-idb.mjs','f5-portable-archive.mjs','f5-library-persistence.mjs','f5-backup-controller.mjs']){
+for(const name of ['f5-portable-idb.mjs','f5-portable-archive.mjs','f5-library-persistence.mjs','f5-backup-controller.mjs','f5-transfer-controller.mjs','f5-transfer-library.mjs','f5-transfer-transport.mjs','f5-transfer-qr.mjs','f5-transfer-scan.mjs','f5-transfer-jsqr.mjs']){
  copyFileSync(path.join(here,name),path.join(backupAssets,name));
 }
 // Restore the proven ordinary presentation click path for automatic local

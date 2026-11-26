@@ -264,7 +264,13 @@ const BACKUP_MODULES=Object.freeze({
  '/__f5/f5-portable-idb.mjs':'f5-portable-idb.mjs',
  '/__f5/f5-portable-archive.mjs':'f5-portable-archive.mjs',
  '/__f5/f5-library-persistence.mjs':'f5-library-persistence.mjs',
- '/__f5/backup-controller.mjs':'f5-backup-controller.mjs'
+ '/__f5/backup-controller.mjs':'f5-backup-controller.mjs',
+ '/__f5/f5-transfer-controller.mjs':'f5-transfer-controller.mjs',
+ '/__f5/f5-transfer-library.mjs':'f5-transfer-library.mjs',
+ '/__f5/f5-transfer-transport.mjs':'f5-transfer-transport.mjs',
+ '/__f5/f5-transfer-qr.mjs':'f5-transfer-qr.mjs',
+ '/__f5/f5-transfer-scan.mjs':'f5-transfer-scan.mjs',
+ '/__f5/f5-transfer-jsqr.mjs':'f5-transfer-jsqr.mjs'
 });
 const HEX64=/^[a-f0-9]{64}$/;
 const LOCAL_STORY_ID=/^local-[a-z0-9-]{8,90}$/i;
@@ -1314,6 +1320,17 @@ export default {
       // Original app periodically asks for its own version. Answer on this
       // isolated origin; never proxy to the old customer/production Worker.
       if(p==='/api/version'&&m==='GET')return json({version:APPROVED_UI_VERSION});
+      if(p==='/api/device-transfer'){
+        if(m!=='POST'||!sameOrigin(request)||!(request.headers.get('content-type')||'').startsWith('application/json'))return deny(403,'Ongeldige verbinding');
+        const actor=await sessionAccount(request,env);
+        if(!actor)return deny(401,'Aanmelden vereist');
+        try{
+          const command=await body(request);
+          if(command?.action==='offer'&&Object.keys(command).sort().join()!=='action,code')return deny(400,'Verbinding niet beschikbaar');
+          const sid=await shaHex(readSessionCookie(request));
+          return json(await accountHome(env,actor.id).transferSignal(sid,command));
+        }catch{return deny(409,'Verbinding niet beschikbaar');}
+      }
       if(p==='/api/capture-place')return capturePlaceApi(request,env,{getAccount:()=>sessionAccount(request,env),getScope:privateAccountScope});
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);

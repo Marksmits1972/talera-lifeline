@@ -23,12 +23,27 @@ label{display:block;margin:12px 0}
 .file-hint[data-selected="yes"]{font-weight:600;color:#23497e}
 h3{font-size:1.07rem;margin:18px 0 10px}
 details{margin-top:14px}summary{cursor:pointer;color:#23497e;font-weight:600}details output{font-size:.9rem;overflow-wrap:anywhere}.note{font-size:.93rem}output{display:block;white-space:pre-wrap;margin:12px 0;padding:12px;background:#eef2f7;border-radius:8px}output:empty{display:none}
+#transfer-qr{display:block;width:min(100%,260px);height:auto;margin:12px auto;image-rendering:pixelated;border:1px solid #b9c6d8}
+#transfer-camera{display:block;max-width:100%;max-height:300px;margin:12px auto;border-radius:9px;background:#111}
+#transfer-input{display:block;box-sizing:border-box;max-width:100%;font:inherit;padding:12px;margin-top:8px;border:1px solid #b9c6d8;border-radius:9px}
 </style></head>
 <body><main id="talera-free-backup" data-database="${dbName}">
 <a href="/mijn-leven">Terug naar Mijn leven</a>
 <h1>Back-ups</h1>
 <p>Je herinneringen blijven in deze app. Een back-upbestand bewaar je zelf.</p>
 <p class="note">Een back-up bevat je foto's, video's en geluid. Het bestand is niet versleuteld: bewaar het privé.</p>
+<section id="device-transfer"><h2>Verbind apparaten</h2>
+<p>Open dit onderdeel op beide apparaten met hetzelfde account. Houd beide schermen open, liefst op hetzelfde wifi-netwerk.</p>
+<button type="button" id="transfer-receive">Ontvangen op dit apparaat</button>
+<button type="button" id="transfer-send">Versturen vanaf dit apparaat</button>
+<div id="transfer-pair" hidden><p>Scan de QR-code vanuit TALERA op het andere apparaat of voer deze code in:</p><canvas id="transfer-qr" role="img" aria-label="Tijdelijke TALERA-verbindingscode" hidden></canvas><output id="transfer-code"></output></div>
+<div id="transfer-join" hidden><button type="button" id="transfer-scan">Scan QR-code</button> <button type="button" id="transfer-scan-stop" hidden>Camera sluiten</button><video id="transfer-camera" autoplay muted playsinline hidden></video><label>Verbindingscode<input id="transfer-input" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="25"></label><button type="button" id="transfer-connect">Verbinden</button></div>
+<output id="transfer-status" role="status" aria-live="polite"></output>
+<button type="button" id="transfer-approve" hidden>Bevestig verbinding</button>
+<button type="button" id="transfer-import" hidden>Herinneringen toevoegen</button>
+<button type="button" id="transfer-cancel" hidden>Stoppen</button>
+<p class="note">Lukt verbinden niet? Gebruik de bestaande back-up hieronder. Er wordt niets overschreven.</p>
+</section>
 <section><h2>Back-up maken</h2>
 <p>Maak een back-up en tik daarna op 'Bewaar bestand'. Bewaar <strong>TALERA-back-up.talera</strong> in dezelfde eigen map in Bestanden. Kies 'Vervang' als je telefoon dit vraagt.</p>
 <button type="button" id="make-backup" disabled>Back-up maken</button>
@@ -59,5 +74,6 @@ details{margin-top:14px}summary{cursor:pointer;color:#23497e;font-weight:600}det
 <p class="note">Bestaande herinneringen worden niet overschreven. Verwijder je oude app pas na controle van het herstel.</p>
 </main>
 <script type="module" src="/__f5/backup-controller.mjs"></script>
+<script type="module" src="/__f5/f5-transfer-controller.mjs"></script>
 </body></html>`;
 }

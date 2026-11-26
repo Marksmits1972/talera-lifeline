@@ -460,22 +460,27 @@ try{
        registrationTraffic.push({status:response.status(),method:response.request().method()});
    });
    const form=registrationPage.locator('#talera-more-menu form[data-form="register"]');
+   // DOB is injected after the legacy menu's first synchronous render.
+   // Wait for the complete stable registration form before filling it.
+   await form.locator('input[name="birthDate"]').waitFor({state:'visible',timeout:10000});
    await form.locator('input[name="displayName"]').fill(signupUser.displayName);
    await form.locator('input[name="username"]').fill(signupUser.username);
    await form.locator('input[name="email"]').fill(signupUser.email);
    await form.locator('input[name="register-password"]').fill(signupUser.password);
    await form.locator('input[name="register-confirm"]').fill(signupUser.password);
-   // DOB is injected after the legacy menu's first synchronous render.
-   // Wait for the real visible input just as the owner does on their iPhone.
-   await form.locator('input[name="birthDate"]').waitFor({state:'visible',timeout:10000});
    await form.locator('input[name="birthDate"]').fill('1974-04-02');
    const nativeValidity=await form.evaluate(form=>({
      valid:form.checkValidity(),
      invalid:[...form.elements].filter(e=>e.willValidate&&!e.checkValidity())
        .map(e=>({name:e.name,reason:e.validity?.valueMissing?'required':e.validity?.patternMismatch?'pattern':e.validationMessage.slice(0,130)}))
    }));
+   const registrationResponse=registrationPage.waitForResponse(res=>
+     new URL(res.url()).origin===origin&&new URL(res.url()).pathname==='/api/register'&&
+     res.request().method()==='POST',{timeout:17000});
    await form.locator('button[type="submit"]').first().click();
-   await registrationPage.waitForTimeout(1800);
+   await registrationResponse;
+   await registrationPage.waitForFunction(()=>!document.querySelector('form[data-form="register"]'),
+     null,{timeout:10000});
    const afterSubmit=await registrationPage.evaluate(()=>({
      url:location.pathname,menu:document.getElementById('talera-more-menu')?.innerText?.slice(-750),
      registered:document.documentElement.dataset.taleraAuth||'',
@@ -1207,6 +1212,19 @@ try{
          row.title==='synthetic ACCOUNT ISOLATION 1');
      },a.id,{timeout:20000});
      if(route==='/present'){
+       // The account's year-2000 record is outside today's five-year window.
+       // First prove it is registered but genuinely absent from the stage,
+       // then use the existing direct-entry route to prove the same media.
+       await follower.waitForFunction(id=>{
+         const runtime=window.__taleraTimelineRuntime;
+         return window.__taleraPhotoBook?.list().some(m=>m.storyId===id)&&
+           runtime?.windowMemory()===null&&runtime.currentMemory()===null&&
+           getComputedStyle(document.getElementById('photoStage')).visibility==='hidden';
+       },a.id,{timeout:20000});
+       console.log('TALERA_F5_DEFAULT_PRESENT_EXISTING_HISTORIC_RECORD_BUT_EMPTY_WINDOW_PASS');
+       const explicit=await follower.goto(origin+'/present?memory='+encodeURIComponent(a.id),
+         {waitUntil:'domcontentloaded'});
+       assert.equal(explicit.status(),200,'Existing direct historical memory route unavailable');
        await follower.waitForFunction(id=>{
          const memory=window.__taleraTimelineRuntime?.currentMemory?.();
          return memory?.storyId===id && memory._taleraLocal &&
@@ -1995,7 +2013,7 @@ try{
    }
  });
  try{
-   const route=await sharePage.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+   const route=await sharePage.goto(origin+'/present?memory='+encodeURIComponent(a.id),{waitUntil:'domcontentloaded'});
    assert.equal(route.status(),200);
    await sharePage.waitForFunction(id=>
      window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,a.id,

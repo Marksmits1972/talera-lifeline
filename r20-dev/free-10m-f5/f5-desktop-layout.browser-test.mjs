@@ -79,9 +79,23 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    assert.equal(g.id,id,'Resizing must not change selection');
    presentations.push(g);
   }
-  // Preserve the original back link, route, account and data.
-  await Promise.all([page.waitForURL(u=>u.pathname==='/'||u.pathname==='/mijn-leven',{timeout:20000}),
-   page.getByRole('link',{name:'Terug naar Mijn leven'}).click()]);
+  console.log('TALERA_DESKTOP_GEOMETRY_AND_MEMORY_PASS',JSON.stringify({sizes:sizes.map(s=>[s.width,s.height,s.sheet.width]),presentations:presentations.map(g=>g.surface.width),sameMemoryId:true}));
+  // Preserve the original back link, route, account and data. Trace only the
+  // disposable synthetic navigation, so a failed return is diagnosable.
+  const back=page.getByRole('link',{name:'Terug naar Mijn leven'});
+  const backBefore=await back.evaluate(e=>{
+   const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+   return {href:e.getAttribute('href'),resolved:e.href,rect:[r.x,r.y,r.width,r.height],hit:hit?.outerHTML?.slice(0,300)};
+  });
+  const returnEvents=[];
+  page.on('framenavigated',frame=>{if(frame===page.mainFrame())returnEvents.push(frame.url())});
+  await back.click();
+  try{
+   await page.waitForURL(u=>u.pathname==='/'||u.pathname==='/mijn-leven',{timeout:20000,waitUntil:'domcontentloaded'});
+  }catch(error){
+   console.log('TALERA_DESKTOP_BACK_DIAGNOSTIC',JSON.stringify({before:backBefore,after:page.url(),navigations:returnEvents,errors}));
+   throw error;
+  }
   await page.waitForFunction(async id=>!!window.TaleraMemories?.list&&
    (await window.TaleraMemories.list()).some(row=>row.id===id),id);
   assert.deepEqual(errors,[],'Desktop runtime errors');

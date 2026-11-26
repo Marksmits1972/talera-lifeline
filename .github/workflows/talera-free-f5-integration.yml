@@ -977,7 +977,7 @@ jobs:
           // Wait for the exact source candidate's independent full regression.
           // A red, canceled, timed-out or different candidate never deploys.
           let prior;
-          for(let attempt=0;attempt<80;attempt++){
+          for(let attempt=0;attempt<112;attempt++){
             prior=await get(id);
             assert.equal(prior.head_sha,sha);
             if(prior.status==='completed')break;
@@ -1399,7 +1399,7 @@ jobs:
     name: Audit original local story delete method in same TALERA code
     if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-calendar-wheel-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

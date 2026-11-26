@@ -541,6 +541,29 @@ async function testTimelineLoupe(){
   await lp.mouse.click(clickX,clickY);
   assert.equal(await lp.evaluate(()=>window.__loupeOutsideClicks),1,'Next distinct tap must reach existing story');
   assert.ok(await lp.evaluate(async ids=>{for(const id of ids)if(!(await window.TaleraMemories.get(id)))return false;return true},ids));
+  // Open the loupe again, then use the original photo band in the lower
+  // two thirds. A single swipe must switch the actual memory without
+  // dismissing the calendar; its needle follows the new exact story ID.
+  await load(lp,expected[0].id,1);
+  await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
+  await lp.mouse.click(x,y);await panel.waitFor({state:'visible',timeout:4000});
+  const lower=await lp.locator('#memoryStoryScroll').boundingBox();
+  const lowerY=lower.y+lower.height*.55;
+  await lp.mouse.move(lower.x+lower.width*.82,lowerY);await lp.mouse.down();
+  await lp.mouse.move(lower.x+lower.width*.18,lowerY,{steps:13});await lp.mouse.up();
+  await lp.waitForFunction(id=>window.__taleraTimelineRuntime.currentMemory()?.storyId===id,expected[1].id,{timeout:13000});
+  await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active,null,{timeout:13000});
+  const lowerSwiped=await state();assert.equal(lowerSwiped.open,true,'Lower photo swipe must keep loupe open');
+  assert.equal(lowerSwiped.id,expected[1].id);assert.equal(lowerSwiped.runtimeId,lowerSwiped.loupeId);
+  assert.equal(lowerSwiped.center,expected[1].ms);
+  const syncedScale=await model();
+  assert.ok(Math.abs(lowerSwiped.position-syncedScale.scale.byId.get(lowerSwiped.runtimeId).position)<.01,'Open calendar follows selected same-day photo');
+  // The upper third includes space beyond the visible ruler and still
+  // operates only the time wheel, while the original photo band is idle.
+  const topY=await lp.evaluate(()=>innerHeight*.28);
+  await lp.mouse.move(x,topY);await lp.mouse.down();await lp.mouse.move(x-22,topY,{steps:5});await lp.waitForTimeout(260);await lp.mouse.up();
+  assert.equal((await state()).open,true);assert.ok((await state()).position>lowerSwiped.position+.12);
+  console.log('TALERA_LOUPE_TWO_INDEPENDENT_GESTURE_ZONES_PASS');
   // Touch input, not a mouse disguised by a mobile viewport. Chromium CDP
   // provides trusted touch events; WebKit can exercise the separate tap path.
   await load(lp,expected[0].id,1);
@@ -559,6 +582,18 @@ async function testTimelineLoupe(){
     await lp.waitForTimeout(350);
     assert.equal((await state()).id,expected[1].id,'Trusted touch must select the next individual memory');
     await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    // Trusted lower touch swipe also reaches the original photo engine.
+    const lowBox=await lp.locator('#memoryStoryScroll').boundingBox(),lowY=lowBox.y+lowBox.height*.55;
+    const startX=lowBox.x+lowBox.width*.82,endX=lowBox.x+lowBox.width*.18;
+    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:startX,y:lowY,id:53}]});
+    for(let n=1;n<=12;n++){
+     await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:startX+(endX-startX)*n/12,y:lowY,id:53}]});
+     await lp.waitForTimeout(15);
+    }
+    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await lp.waitForFunction(id=>window.__taleraTimelineRuntime.currentMemory()?.storyId===id,expected[2].id,{timeout:13000});
+    await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active,null,{timeout:13000});
+    const lowerTouch=await state();assert.equal(lowerTouch.open,true);assert.equal(lowerTouch.runtimeId,lowerTouch.loupeId);
    }finally{await session.detach()}
   }else{
    await lp.touchscreen.tap(tx,ty);await panel.waitFor({state:'visible',timeout:4000});
@@ -572,7 +607,7 @@ async function testTimelineLoupe(){
   assert.equal(await lp.evaluate(()=>window.__loupeTouchOutsideClicks),0);
   await lp.touchscreen.tap(tapX,tapY);
   assert.equal(await lp.evaluate(()=>window.__loupeTouchOutsideClicks),1);
-  console.log('TALERA_LOUPE_TOUCH_REGRESSION_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',trustedTouchDrag:!webkitPickerOnly,trustedOutsideTap:true,physicalIphoneAccepted:false}));
+  console.log('TALERA_LOUPE_TOUCH_REGRESSION_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',trustedTouchDrag:!webkitPickerOnly,trustedOutsideTap:true,lowerSwipeKeepsLoupe:true,physicalIphoneAccepted:false}));
   // Add one narrated memory through the existing library writer, without
   // modifying the original player or the previously verified photo fixture.
   await lp.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
@@ -621,7 +656,7 @@ async function testTimelineLoupe(){
   console.log('TALERA_LOUPE_MIXED_MOTOR_SELECTION_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',ordinaryToNarratedToOrdinary:true,originalIdsAndCuesPreserved:true,physicalIphoneAccepted:false}));
 
   assert.deepEqual(errs,[]);
-  console.log('TALERA_SHARED_TIMELINE_LOUPE_BROWSER_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',sameTimestamp:true,weekBoundary:true,originalOrder:true,closedTapConsumed:true,physicalIphoneAccepted:false}));
+  console.log('TALERA_SHARED_TIMELINE_LOUPE_BROWSER_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',sameTimestamp:true,weekBoundary:true,originalOrder:true,closedTapConsumed:true,lowerSwipeKeepsLoupe:true,physicalIphoneAccepted:false}));
  }finally{await loupeCtx.close()}
 }
 

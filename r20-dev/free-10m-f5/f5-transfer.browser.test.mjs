@@ -56,7 +56,7 @@ const url='http://127.0.0.1:'+server.address().port;
 try{
  for(const engine of [chromium,webkit]){
   signal=new TransferSignaling();
-  const browser=await engine.launch();
+  const browser=engine===chromium?await chromium.launch():await webkit.launch();
   try{
    const a=await browser.newContext(),b=await browser.newContext();
    await a.addCookies([{name:'sid',value:'a',url}]);await b.addCookies([{name:'sid',value:'b',url}]);

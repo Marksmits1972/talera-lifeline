@@ -393,7 +393,7 @@ try{
   const manifest='talera-v4-work:manifest',prefix='talera-v4-work:';
   const newDraft={id:'completion-proof-draft',existing:'',title:'Completion proof',
    text:'Synthetic completed draft',date:'2026-11-25',tags:[],media:['completion-proof-photo'],
-   voice:'',voiceDurationMs:0,voiceCues:[],canonicalByDraft:null};
+   voice:'',voiceDurationMs:0,voiceCues:[],canonicalByDraft:null,precision:'exact',season:'',dateSource:'photo',dateConfirmed:true,voiceWave:[]};
   const pending={...newDraft,id:'pending-proof-draft',title:'Still editing',media:['pending-proof-photo']};
   const originalManifest=await mem.blob(manifest)||[];
   await mem.draftWriteRows([[manifest,[...originalManifest,newDraft,pending]],

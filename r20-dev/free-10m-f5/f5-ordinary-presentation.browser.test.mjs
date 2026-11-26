@@ -236,7 +236,9 @@ backupRegression: try{
               const tx=db.transaction('files','readwrite'),store=tx.objectStore('files');
               tx.oncomplete=ok;tx.onabort=()=>bad(tx.error);tx.onerror=()=>bad(tx.error);
               const q=store.get(key);
-              q.onsuccess=()=>{const r=q.result;store.put({...r,metadata:{...r.metadata,length:r.metadata.length+1}})};
+              // A wrong redundant byte length can now be recovered when catalog and SHA-256 prove it.
+              // Missing original File timestamp is not recoverable from another media ID.
+              q.onsuccess=()=>{const r=q.result;store.put({...r,metadata:{...r.metadata,lastModified:null}})};
             });
           }finally{db.close()}
           let rejected=false;

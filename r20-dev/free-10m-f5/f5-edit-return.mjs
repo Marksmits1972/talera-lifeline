@@ -184,7 +184,7 @@ export function pristineDraftRemovalPlan(catalog,expected){
 // A resemblance in title/date/photos, missing attachment or unknown field
 // is never sufficient. Unlinked older drafts remain editable.
 export function publishedDraftPairs(draft,story){
- const allowed=new Set(['id','title','text','date','media','voice','voiceCues','tags','voiceDurationMs','existing','canonicalByDraft']);
+ const allowed=new Set(['id','title','text','date','media','voice','voiceCues','tags','voiceDurationMs','existing','canonicalByDraft','precision','season','dateSource','dateConfirmed','voiceWave']);
  if(!draft||!story||story.id!==draft.existing||story.source!=='pwa-local'||
     Object.keys(draft).some(k=>!allowed.has(k))||
     typeof draft.title!=='string'||typeof draft.text!=='string'||typeof draft.date!=='string'||
@@ -194,6 +194,17 @@ export function publishedDraftPairs(draft,story){
     typeof draft.canonicalByDraft!=='object'||Array.isArray(draft.canonicalByDraft)||
     typeof draft.voice!=='string'||!Array.isArray(draft.voiceCues)||
     !Number.isSafeInteger(draft.voiceDurationMs)||draft.voiceDurationMs<0)return null;
+ // The real workbench snapshot also contains date precision and transient
+ // input/recording UI fields. Check all durable date semantics and refuse
+ // an unknown or nonempty waveform rather than deleting unique draft data.
+ if(Object.hasOwn(draft,'precision')?
+    !['exact','month','year','season'].includes(draft.precision)||story.datePrecision!==draft.precision:
+    story.datePrecision!=null)return null;
+ if(Object.hasOwn(draft,'season')?(typeof draft.season!=='string'||draft.season!==(story.seasonLabel||'')):
+    !!story.seasonLabel)return null;
+ if(Object.hasOwn(draft,'dateSource')&&typeof draft.dateSource!=='string')return null;
+ if(Object.hasOwn(draft,'dateConfirmed')&&typeof draft.dateConfirmed!=='boolean')return null;
+ if(Object.hasOwn(draft,'voiceWave')&&(!Array.isArray(draft.voiceWave)||draft.voiceWave.length!==0))return null;
  const ids=[...draft.media,...(draft.voice?[draft.voice]:[])];
  if(ids.length!==story.items.length||new Set(ids).size!==ids.length||
     Object.keys(draft.canonicalByDraft).length!==ids.length)return null;

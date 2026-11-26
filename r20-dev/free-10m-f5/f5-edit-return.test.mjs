@@ -208,8 +208,8 @@ import {savedDraftReceipt,writeSavedDraftReceipt,readEditorDraftPayload} from '.
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {restoreEditorVideoCover} from './f5-editor-video-mute-guard.mjs';
 
-const completedDraft={...draft,voiceDurationMs:2000};
-const completedStory={id,source:'pwa-local',title:draft.title,text:draft.text,date:draft.date,tags:draft.tags,
+const completedDraft={...draft,voiceDurationMs:2000,precision:'exact',season:'',dateSource:'photo',dateConfirmed:true,voiceWave:[]};
+const completedStory={id,source:'pwa-local',title:draft.title,text:draft.text,date:draft.date,tags:draft.tags,datePrecision:'exact',seasonLabel:null,
  items:[{key:'original-a',kind:'photo',mime:'image/png',size:3},{key:'original-b',kind:'video',mime:'video/mp4',size:3},
  {key:'original-audio',kind:'audio',mime:'audio/wav',size:3}],
  narrationCues:[{t:0,index:0,mediaId:'original-a'}],narrationDurationMs:2000};
@@ -219,7 +219,7 @@ test('completed draft proof compares all editable fields, exact ID order and can
  for(const change of [
   {existing:''},{existing:id2},{title:'unsaved title'},{text:'unsaved text'},
   {date:'2025-02-01'},{tags:[]},{media:[...draft.media].reverse()},{voice:''},
-  {voiceCues:[]},{voiceDurationMs:1999},{canonicalByDraft:null},{futureEditableField:'unknown'}
+  {voiceCues:[]},{precision:'year'},{season:'lente'},{dateConfirmed:'true'},{voiceWave:[.5]},{voiceDurationMs:1999},{canonicalByDraft:null},{futureEditableField:'unknown'}
  ])assert.equal(publishedDraftPairs({...completedDraft,...change},completedStory),null);
  assert.equal(publishedDraftPairs(completedDraft,{...completedStory,narrationCues:[{t:1,index:0,mediaId:'original-a'}]}),null);
 });
@@ -249,6 +249,7 @@ test('saved-draft receipt binds a newly placed draft to the real stored story wi
 });
 test('reopening mixed photo/video uses the existing poster under the exact canonical video ID',async()=>{
  const source=`talera-memory-store-v1
+const file=new File([f],it.name||'herinnering',{type:it.mime||f.type}),id=uid();
 if(entries.length)await writeFiles(entries);entries.forEach(([id,f])=>assets.set(id,f));
 voiceDurationMs:g.voiceDurationMs||0,existing:g.existing||''}))`;
  const changed=retainEditorCanonicalMediaIds(source);

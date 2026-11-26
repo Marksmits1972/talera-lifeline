@@ -33,6 +33,10 @@ export function retainEditorCanonicalMediaIds(html,serializedPoster=isDecodableE
   if(n!==1)throw Error('TALERA_EDITOR_LIBRARY_DRIFT_'+label+':'+n);
   html=html.replace(a,b);
  };
+ // Opening an editor must not create a different timestamp or filename
+ // for an original File. The existing bytes and stable canonical ID remain.
+ const rebuild="const file=new File([f],it.name||'herinnering',{type:it.mime||f.type}),id=uid();";
+ exact(rebuild,"const file=f instanceof File?f:new File([f],it.name||'herinnering',{type:it.mime||f.type}),id=uid();",'KEEP_ORIGINAL_FILE_METADATA');
  const original="if(entries.length)await writeFiles(entries);entries.forEach(([id,f])=>assets.set(id,f));";
  const mapping=`if(g.existing){
   const refs=(row.items||[]).map(item=>item?.key);

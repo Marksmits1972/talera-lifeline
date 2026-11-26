@@ -55,15 +55,25 @@ const fixtureJpeg='/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLD
 const seed=async (p,story)=>p.evaluate(async({scope,story,fixtureJpeg})=>{
  const db=await new Promise((res,rej)=>{const q=indexedDB.open(scope,1);
  q.onupgradeneeded=()=>{q.result.createObjectStore('stories',{keyPath:'id'});q.result.createObjectStore('files',{keyPath:'key'})};
- q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);q.onblocked=()=>rej(Error('FIXTURE_IDB_OPEN_BLOCKED'))});
- if(story){
-  const jpg=Uint8Array.from(atob(fixtureJpeg),c=>c.charCodeAt(0));
-  await new Promise((res,rej)=>{const tx=db.transaction(['stories','files'],'readwrite');
-   const key='local-media:'+story;
-   tx.objectStore('stories').add({id:story,title:story,items:[{key,kind:'photo'}],narrationCues:[{t:0,index:0}]});
-   tx.objectStore('files').add({key,blob:new File([jpg],story+'.jpg',{type:'image/jpeg',lastModified:12345})});
-   tx.oncomplete=res;tx.onabort=()=>rej(tx.error);tx.onerror=()=>rej(tx.error)});
- }db.close();
+ q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error||Error('FIXTURE_IDB_OPEN_FAILED'));q.onblocked=()=>rej(Error('FIXTURE_IDB_OPEN_BLOCKED'))});
+ try{
+  if(story){
+   // Seed via the actual TALERA WebKit-compatible byte-storage path. Direct
+   // File writes to an ephemeral WebKit IndexedDB are not a valid fixture.
+   const {restoreRowsAtomic,readAll}=await import('/__f5/f5-library-persistence.mjs');
+   const jpg=Uint8Array.from(atob(fixtureJpeg),c=>c.charCodeAt(0)),key='local-media:'+story;
+   await restoreRowsAtomic(db,{
+    stories:[{id:story,title:story,items:[{key,kind:'photo'}],narrationCues:[{t:0,index:0}]}],
+    files:[{key,blob:new File([jpg],story+'.jpg',{type:'image/jpeg',lastModified:12345})}]
+   });
+   const saved=await readAll(db),file=saved.files.find(r=>r.key===key)?.blob;
+   if(!saved.stories.some(r=>r.id===story)||!(file instanceof File)||
+      file.name!==story+'.jpg'||file.type!=='image/jpeg'||file.lastModified!==12345)
+    throw Error('FIXTURE_METADATA_READBACK_FAILED');
+   const bytes=new Uint8Array(await file.arrayBuffer());
+   if(bytes.length!==jpg.length||bytes.some((v,i)=>v!==jpg[i]))throw Error('FIXTURE_BYTES_READBACK_FAILED');
+  }
+ }finally{db.close()}
 },{scope,story,fixtureJpeg});
 const inspect=p=>p.evaluate(async scope=>{
  const m=await import('/__f5/f5-transfer-library.mjs'),s=await m.readTransferLibrary(scope);

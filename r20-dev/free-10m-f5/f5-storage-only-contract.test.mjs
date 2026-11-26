@@ -100,6 +100,13 @@ for(const page of [packagedTell,readFileSync('r20-dev/free-10m-delivery/public'+
  assert.ok(page.includes('id="talera-editor-clean-layout-v1"')&&owner.includes('saveDraft();paintChips()'));
  assert.ok(owner.includes('openFavorites=clean([...favorites(),...g.tags])')&&!/talera-tag-apply|talera-tag-cancel|talera-tags-own-input/.test(owner));
  assert.ok(page.includes("new URLSearchParams(location.search).get('edit')===g.existing"));
+ // Parse the real emitted classic script, not just the JS generator.
+ // A line comment in the join('') array must never break the delivered editor.
+ const topicScroll=page.match(/<script id="talera-free-tell-topic-scroll-only">([\s\S]*?)<\/script>/);
+ assert.ok(topicScroll,'Existing topic-scroll script must be packaged in both editors');
+ assert.doesNotThrow(()=>new Function(topicScroll[1]),'Generated editor height script must parse');
+ assert.ok(topicScroll[1].includes('--talera-tag-visible-height'),'Whole-row viewport bound must be delivered');
+
 }
 const privateTell=preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(
  alignEditedNarrationCueRefs(scopeLocalMemories(packagedTell,s1))));

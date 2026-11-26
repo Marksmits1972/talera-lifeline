@@ -738,7 +738,7 @@ function polishTellEditorLayout(html){
     "  const names={nl:'Waar gaat deze herinnering over?',en:'What is this memory about?',\n"+
     "    de:'Worum geht es in dieser Erinnerung?',fr:'De quoi parle ce souvenir ?',\n"+
     "    es:'¿De qué trata este recuerdo?'};\n"+
-    "  toggle.textContent='＋ '+(names[lang]||names.nl);";
+    "  toggle.textContent='+ '+(names[lang]||names.nl);";
   owner=owner.replace(legacyPrompt,humanPrompt);
  }
  html=html.slice(0,start)+owner+html.slice(end+1);
@@ -768,8 +768,8 @@ function polishTellEditorLayout(html){
   // expand/collapse logic, and selected tags; only its visual affordance changes.
   '#app #main .work.talera-r16-editor .talera-tags-v20{flex:none;margin:0 0 2px!important;padding:0!important;border:0!important;background:#fff!important;}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;width:100%!important;min-height:48px!important;padding:10px 12px!important;border:1px solid #dbe4ef!important;border-radius:15px!important;background:#f5f8fc!important;color:#224d7c!important;text-align:left!important;font-size:clamp(13px,3.85vw,15px)!important;font-weight:700!important;line-height:1.32!important;white-space:nowrap!important;cursor:pointer!important;}',
-  '#app #main .work.talera-r16-editor .talera-tags-toggle::after{content:"⌄";flex:none;font-size:24px;font-weight:400;line-height:1;transition:transform .16s ease;}',
-  '#app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]::after{transform:rotate(180deg);}',
+  '#app #main .work.talera-r16-editor .talera-tags-toggle::after{content:"";flex:none;width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;box-sizing:border-box;transform:rotate(45deg);transform-origin:center;transition:transform .16s ease;margin:0 2px 4px 0;}',
+  '#app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]::after{transform:rotate(225deg);margin-bottom:0;margin-top:4px;}',
   '#app #main .work.talera-r16-editor .talera-tags-toggle:focus-visible{outline:2px solid #224d7c!important;outline-offset:2px!important;}',
   // Only the expanded CHARACTERISTICS CHOICES scroll. Photo grid, toggle and
   // original recorder/writer/publish controls remain in their existing places.
@@ -806,8 +806,7 @@ function polishTellEditorLayout(html){
   '  const top=p.getBoundingClientRect().top;',
   '  const toolbarHeight=toolbar?.getBoundingClientRect().height||80;',
   '  const available=Math.floor(bottom-top-toolbarHeight-30);',
-  '  // Two complete 44px rows, never a partially clipped third row.',
-  '  // On genuinely short viewports reduce by a WHOLE row, not by pixels.',
+  // Two complete 44px rows; short viewports reduce by a whole row.
   '  const rows=Math.max(1,Math.min(2,Math.floor((available-13)/44)));',
   '  p.style.setProperty("--talera-tag-visible-height",(rows*44)+"px");',
   ' }',

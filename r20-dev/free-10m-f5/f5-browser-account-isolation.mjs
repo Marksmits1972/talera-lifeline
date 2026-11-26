@@ -1510,6 +1510,7 @@ try{
            photoWidth:bounds('.talera-work-tiles')?.width,
            panelHeight:panel?.getBoundingClientRect().height,
            panelClientHeight:choices?.clientHeight,
+           appliedRowBound:panel.style.getPropertyValue('--talera-tag-visible-height'),
            panelScrollHeight:choices?.scrollHeight,
            choiceCount:rows.length,whole,partial,
            footerGap:bottom-bounds('.work-tools.talera-r16-toolbar')?.bottom,
@@ -1524,6 +1525,7 @@ try{
          tallAfter.panelScrollHeight>tallAfter.panelClientHeight+12,
          'Reference compact two-row panel must be independently scrollable: '+
            JSON.stringify({tallBefore,tallAfter}));
+       assert.equal(tallAfter.appliedRowBound,'88px','Actual generated viewport script applies two-row bound');
        assert.equal(tallAfter.whole,Math.min(6,tallAfter.choiceCount),'Exactly two full rows on tall iPhone');
        assert.equal(tallAfter.partial,0,'No cut-off row on tall iPhone');
        assert.ok(tallBefore.titleTop<=58&&tallBefore.dateTop<=103&&tallBefore.photoTop<=153,

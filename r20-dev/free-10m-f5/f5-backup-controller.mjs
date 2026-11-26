@@ -89,8 +89,7 @@ function readOnlyPhotoLine(label,source){
  return t('backup.detail.photoList',{label,records:source.records.map(row=>{
    const date=row.date==='onbekende datum'?t('backup.detail.photoUnknownDate'):row.date;
    const type=row.type||t('backup.detail.photoUnknownType');
-   return t('backup.detail.photoRow',{date,original:row.original,type,signature:row.signature,mobile:row.mobile,
-    mismatch:row.typeMismatch?t('backup.detail.photoMismatch'):''});
+   return t(row.typeMismatch?'backup.detail.photoRowMismatch':'backup.detail.photoRowClean',{date,original:row.original,type,signature:row.signature,mobile:row.mobile});
   }).join('; ')});
 }
 function readOnlyPhotoText(result){
@@ -235,14 +234,16 @@ preview.addEventListener('click',async()=>{
   if(file!==chooser.files?.[0]||chosenCross!==cross.checked)return invalidate();
   const allPresent=result.alreadyPresentStories===result.storyCount&&result.storyCount>0&&
    result.identicalMediaEntries===result.mediaStoreEntries&&result.conflictingMediaEntries===0;
-  setDetails(restoreDetails,t('backup.detail.review',{current:result.currentStoryCount,present:result.alreadyPresentStories,
+  const blocked=Boolean(result.conflictingRecordKinds?.length);
+  const reviewKey=result.currentStoryCount===1?(blocked?'backup.detail.reviewOneBlocked':'backup.detail.reviewOne'):(blocked?'backup.detail.reviewManyBlocked':'backup.detail.reviewMany');
+  setDetails(restoreDetails,t(reviewKey,{current:result.currentStoryCount,present:result.alreadyPresentStories,
    conflicts:result.conflictingMediaEntries,identical:result.identicalMediaEntries,technical:result.ignoredTechnicalEntries,
-   block:result.conflictingRecordKinds?.length?t('backup.detail.blocked',{kinds:[...new Set(result.conflictingRecordKinds)].join(', ')}):''})+
+   kinds:blocked?[...new Set(result.conflictingRecordKinds)].join(', '):''})+
    analysis+readOnlyPhotoText(result));
   review=result;reviewFile=file;reviewCross=chosenCross;
   finalStep.hidden=false;confirm.disabled=!result.safeToRestore;restore.disabled=true;
   status.style.whiteSpace='pre-line';
-  message(status,t('backup.status.review',{count:result.storyCount,size:mb(file.size),conflicts:result.conflictingMediaEntries}));
+  message(status,t(result.storyCount===1?'backup.status.reviewOne':'backup.status.reviewMany',{count:result.storyCount,size:mb(file.size),conflicts:result.conflictingMediaEntries}));
   message(restoreHint,result.safeToRestore?t('backup.status.safe'):
    allPresent?t('backup.status.allPresent'):
    t('backup.status.conflict'));
@@ -258,7 +259,7 @@ restore.addEventListener('click',async()=>{
  try{
   await assertCurrentAccount();
   const result=await restoreFreeLibrary(file,db,{allowOtherOrigin:cross.checked,confirmed:true});
-  message(status,t('backup.status.restored',{count:result.restoredStories}));
+  message(status,t(result.restoredStories===1?'backup.status.restoredOne':'backup.status.restoredMany',{count:result.restoredStories}));
   review=null;confirm.checked=false;confirm.disabled=true;restore.disabled=true;
   message(restoreHint,t('backup.status.restoredHint'));
  }catch(e){

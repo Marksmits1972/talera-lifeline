@@ -93,7 +93,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     if(!s.button){
       const hint=document.createElement('div');
       hint.id='talera-f5-narrator-sound-hint';
-      hint.textContent='Tik één keer voor geluid';
+      window.TaleraI18n.setText(hint,'core.media.narratorSoundHint');
       hint.setAttribute('role','status');
       hint.style.cssText='position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);transform:translateX(-50%);z-index:40;padding:9px 15px;border-radius:20px;background:rgba(7,26,61,.80);color:white;font:500 14px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;max-width:calc(100vw - 32px);pointer-events:none;-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)';
       document.body.appendChild(hint);s.button=hint;

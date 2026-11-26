@@ -125,3 +125,65 @@ test('actual recipient adapter retains one original presentation, localized comm
  assert.ok(script.includes('panel.dataset.taleraExplicitLanguage'));
  assert.ok(script.includes("body.textContent=c.body||''"));
 });
+
+test('whole contextual phrases, singular and plural stay independently editable in all five languages',()=>{
+ const keys=['core.home.decadeTitle','core.home.decadeOwnOne','core.home.decadeOwnMany','core.home.yearOwnOne','core.home.yearOwnMany','core.home.heroYearOwn','core.home.heroYearExample','core.home.moreYearOne','core.home.moreYearMany','menu.messages.summaryOneUnreadOne','menu.messages.summaryOneUnreadMany','menu.messages.summaryManyUnreadMany','menu.storage.accountCountOne','menu.storage.receivedCountOne','backup.status.reviewOne','backup.status.reviewMany','backup.detail.reviewOneBlocked','backup.detail.reviewManyBlocked','embed.record.videoPosition','embed.present.videoPosition','reset.status.confirmComplete'];
+ const params={year:1990,count:1,unread:1,index:1,total:2,current:1,present:0,conflicts:0,identical:1,technical:0,kinds:'synthetic',size:'1 MB'};
+ for(const lang of langs)for(const key of keys){
+  const result=translate(lang,key,params);
+  assert.ok(result&&!/\{\w+\}/.test(result),lang+' '+key);
+ }
+ assert.equal(translate('en','core.home.decadeTitle',{year:1990}),'1990s');
+ assert.equal(translate('nl','core.home.decadeOwnOne',{count:1}),'1 eigen herinnering');
+ assert.equal(translate('nl','core.home.decadeOwnMany',{count:5}),'5 eigen herinneringen');
+ assert.equal(translate('fr','menu.messages.summaryOneUnreadMany',{unread:1,count:3}),'1 non lu · 3 messages');
+ assert.equal(translate('fr','menu.messages.summaryManyUnreadMany',{unread:2,count:3}),'2 non lus · 3 messages');
+ for(const lang of langs)for(const key of ['backup.status.reviewOne','backup.status.reviewMany','backup.status.restoredOne','backup.status.restoredMany']){
+  assert.ok(!/\(en\)|\(s\)/.test(translate(lang,key,params)));
+ }
+});
+test('same core translated element preserves whole phrase, parameters and live language switch',()=>{
+ const home=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages['/mijn-leven'],'utf8');
+ const src=/<script id="talera-v23-i18n">([\s\S]*?)<\/script>/.exec(home)[1];
+ const attrs=new Map(),node={textContent:'',setAttribute:(k,v)=>attrs.set(k,v),removeAttribute:k=>attrs.delete(k)};
+ const personal={textContent:'Opslaan'};
+ const doc={
+  readyState:'loading',documentElement:{setAttribute(){}},body:{},
+  addEventListener(){},dispatchEvent(){},querySelector:()=>null,getElementById:()=>null,
+  createTreeWalker(){return {nextNode:()=>null}},
+  querySelectorAll:s=>s==='[data-talera-bound-text]'&&attrs.has('data-talera-bound-text')?[node]:[]
+ };
+ const context={window:{},document:doc,navigator:{languages:['nl-NL']},localStorage:{getItem:()=>null,setItem(){}},location:{pathname:'/mijn-leven'},CustomEvent:class{},NodeFilter:{SHOW_TEXT:4}};
+ vm.runInNewContext(src,context);
+ const api=context.window.TaleraI18n;
+ api.setText(node,'core.home.decadeTitle',{year:1990});
+ assert.equal(node.textContent,'Jaren 1990');
+ for(const lang of langs){api.setLanguage(lang);assert.equal(node.textContent,translate(lang,'core.home.decadeTitle',{year:1990}));assert.equal(personal.textContent,'Opslaan')}
+ api.setText(node,'core.home.decadeOwnOne',{count:1});
+ api.setLanguage('nl');assert.equal(node.textContent,'1 eigen herinnering');
+ node.textContent='extern bijgewerkt';api.setLanguage('fr');assert.equal(node.textContent,'extern bijgewerkt');
+ assert.ok(!attrs.has('data-talera-bound-text'));
+ assert.ok(home.includes("window.TaleraI18n.setText(summary,own?"));
+ assert.ok(!home.includes("detail.textContent=ownCount?ownCount+' eigen herinneringen'"));
+});
+test('both existing independent embedded player sources use their own complete contextual keys',()=>{
+ for(const [mode,route] of [['present','/vertelmodus-embed'],['record','/vertelmodus-embed-record']]){
+  const html=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages[route],'utf8');
+  const prefix='embed.'+mode+'.';
+  assert.ok(html.includes('data-talera-text="'+prefix+'intro"'));
+  assert.ok(html.includes('data-talera-text="'+prefix+'pauseButton"'));
+  assert.ok(html.includes('data-talera-text="'+prefix+'playPauseButton"'));
+  assert.ok(html.includes('msg(t("noSound"),true)'));
+  assert.ok(html.includes('t("videoPosition",{index:taleraOriginalIndex+1,total:taleraOriginalQueue.length})'));
+  assert.ok(!html.includes('msg("Geen geluid opgenomen.",true)'));
+  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
+  assert.equal(scripts.length,2);
+  for(const script of scripts)new vm.Script(script);
+  for(const lang of langs){
+   const resolved=executeBootstrap(scripts[0],lang,['en-US'],prefix+'intro');
+   assert.equal(resolved.value,translate(lang,prefix+'intro'));
+   assert.equal(resolved.t(prefix+'videoPosition',{index:1,total:2}),translate(lang,prefix+'videoPosition',{index:1,total:2}));
+  }
+  for(const sub of ['pauseButton','playPauseButton','recordingStarted','recordingResumed'])assert.ok(languageCatalog.nl[prefix+sub]);
+ }
+});

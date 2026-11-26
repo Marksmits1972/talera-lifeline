@@ -134,10 +134,13 @@ async function login(page,user){
   assert.equal(await recovery.count(),1,'Recovery link should appear exactly once in login');
   assert.equal(await recovery.isVisible(),true,'Recovery link must be visible');
   const tab=await page.context().newPage();
+  tab.on('pageerror',e=>console.log('TALERA_RESET_PAGE_ERROR',String(e.message).slice(0,250)));
+  tab.on('console',m=>{if(m.type()==='error')console.log('TALERA_RESET_CONSOLE',m.text().slice(0,250))});
   try{
    const opening=await tab.goto(origin+(await recovery.getAttribute('href')));
    assert.equal(opening.status(),200);
    assert.match(await tab.title(),/Wachtwoord vergeten/);
+   assert.equal(await tab.evaluate(()=>typeof window.TaleraLanguage?.t),'function','Recovery language initialization must execute');
    await tab.locator('input[name="email"]').fill(user.email);
    const [resetResponse]=await Promise.all([tab.waitForResponse(r=>new URL(r.url()).pathname==='/api/password-reset/request'&&r.request().method()==='POST'),tab.locator('form button[type="submit"]').click()]);
    const resetResult=await resetResponse.json();

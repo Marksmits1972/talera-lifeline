@@ -1,6 +1,7 @@
 // TALERA F5 narrator isolation: source contract + actual synthetic state machine.
 // No separate app, no cloud media, no customer accounts or live publication.
 import assert from 'node:assert/strict';
+import {translate} from './f5-language.mjs';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {referencePages} from './generated/public-template-map.mjs';
@@ -151,7 +152,7 @@ const fakeDots=Array.from({length:memory._zeroFrames.length},()=>({
   active:false,classList:{toggle(name,on){assert.equal(name,'active');this.active=on}}
 }));
 const ctx={
- window:{__taleraAudioControls:{isEnabled:()=>false},__taleraF5SharedAudible:sharedAudible}, // Audio element shared, motor still independent.
+ window:{TaleraI18n:{setText(el,key,params){assert.equal(key,'core.media.narratorSoundHint');el.textContent=translate('nl',key,params)}},__taleraAudioControls:{isEnabled:()=>false},__taleraF5SharedAudible:sharedAudible}, // Audio element shared, motor still independent.
  navigator:{audioSession:{type:'ambient'}},
  document:{createElement(tag){const el=new FakeElement(tag);made.push(el);return el},
   getElementById(id){return id==='memoryStoryScroll'?tapSurface:null},

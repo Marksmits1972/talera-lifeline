@@ -305,6 +305,324 @@ const positions={
   ]
  ]
 };
+const dynamicPositions={
+ "/mijn-leven": [
+  [
+   "title.textContent='Jaren '+decade;",
+   "window.TaleraI18n.setText(title,'core.home.decadeTitle',{year:decade});"
+  ],
+  [
+   "summary.textContent=own?own+' eigen':example?example+' voorbeelden':'nog leeg';",
+   "window.TaleraI18n.setText(summary,own?(own===1?'core.home.yearOwnOne':'core.home.yearOwnMany'):example?(example===1?'core.home.yearExampleOne':'core.home.yearExampleMany'):'core.home.yearEmpty',{count:own||example});"
+  ],
+  [
+   "detail.textContent=ownCount?ownCount+' eigen herinneringen':memories.length+' voorbeelden';",
+   "window.TaleraI18n.setText(detail,ownCount?(ownCount===1?'core.home.decadeOwnOne':'core.home.decadeOwnMany'):(memories.length===1?'core.home.decadeExampleOne':'core.home.decadeExampleMany'),{count:ownCount||memories.length});"
+  ],
+  [
+   "$('myCount').textContent=own.length+' bewaard';",
+   "window.TaleraI18n.setText($('myCount'),own.length===1?'core.home.savedOne':'core.home.savedMany',{count:own.length});"
+  ],
+  [
+   "kind.textContent=m.demo?'Voorbeeldherinnering · '+m.year:'Mijn herinnering · '+m.year;",
+   "window.TaleraI18n.setText(kind,m.demo?'core.home.heroYearExample':'core.home.heroYearOwn',{year:m.year});"
+  ],
+  [
+   "<small id=\"myCount\">0 bewaard</small>",
+   "<small id=\"myCount\" data-i18n=\"core.home.savedInitial\">0 bewaard</small>"
+  ],
+  [
+   "<span id=\"v17-year-summary\">Kies een jaar",
+   "<span id=\"v17-year-summary\" data-i18n=\"core.home.yearSummaryInitial\">Kies een jaar"
+  ],
+  [
+   "<p class=\"v17-empty-year\">Kies een jaar om je herinneringen terug te vinden.",
+   "<p class=\"v17-empty-year\" data-i18n=\"core.home.yearEmptyInitial\">Kies een jaar om je herinneringen terug te vinden."
+  ],
+  [
+   "<div class=\"empty\"><strong data-i18n=\"core.home.sharedSoon\">Hier komt straks jullie gedeelde verhaal.</strong>Contacten, uitnodigingen en ontvangen herinneringen worden nog ontwikkeld. Deze eerste versie laat zien hoe je ze straks vanzelf terugvindt.",
+   "<div class=\"empty\" data-i18n=\"core.home.sharedEmptyDescription\"><strong data-i18n=\"core.home.sharedSoon\">Hier komt straks jullie gedeelde verhaal.</strong>Contacten, uitnodigingen en ontvangen herinneringen worden nog ontwikkeld. Deze eerste versie laat zien hoe je ze straks vanzelf terugvindt."
+  ],
+  [
+   "<div class=\"empty\"><strong data-i18n=\"core.home.notificationSoon\">Hier verschijnen straks je meldingen.</strong>Bijvoorbeeld wanneer iemand een herinnering met je deelt. Er worden in deze proefversie nog geen meldingen verzonden of opgeslagen.",
+   "<div class=\"empty\" data-i18n=\"core.home.notificationsEmptyDescription\"><strong data-i18n=\"core.home.notificationSoon\">Hier verschijnen straks je meldingen.</strong>Bijvoorbeeld wanneer iemand een herinnering met je deelt. Er worden in deze proefversie nog geen meldingen verzonden of opgeslagen."
+  ],
+  [
+   "<a id=\"navMore\" href=\"/present?talera_menu=hub\" aria-label=\"Meer\" data-i18n-aria-label=\"core.home.navMoreAria\">",
+   "<a id=\"navMore\" href=\"/present?talera_menu=hub\" aria-label=\"Meer\" data-i18n-aria-label=\"core.home.navMoreAria\" data-i18n=\"core.home.moreNavText\">"
+  ],
+  [
+   "p.textContent='Nog geen herinneringen uit '+current+'. Je kunt wel naar dit jaar reizen op de tijdlijn.'",
+   "window.TaleraI18n.setText(p,'core.home.emptyYearMessage',{year:current})",
+   1
+  ],
+  [
+   "p.textContent='En nog '+(matches.length-2)+' herinneringen uit dit jaar.'",
+   "window.TaleraI18n.setText(p,matches.length-2===1?'core.home.moreYearOne':'core.home.moreYearMany',{count:matches.length-2})",
+   1
+  ],
+  [
+   "$('myCards').textContent='Je eigen herinneringen konden niet worden geopend.'",
+   "window.TaleraI18n.setText($('myCards'),'core.home.loadError')",
+   1
+  ],
+  [
+   "p.textContent='Nog geen levensjaren om te bekijken.'",
+   "window.TaleraI18n.setText(p,'core.home.noLifeYears')",
+   1
+  ],
+  [
+   "msg.textContent='Verwijderen mislukt: '+err.message",
+   "window.TaleraI18n.setText(msg,'core.home.deleteFailure',{detail:err.message})",
+   1
+  ],
+  [
+   "action.textContent='Bezig…'",
+   "window.TaleraI18n.setText(action,'core.home.deleting')",
+   1
+  ],
+  [
+   "action.textContent='Verwijderen'",
+   "window.TaleraI18n.setText(action,'core.home.delete')",
+   1
+  ]
+ ],
+ "/present": [
+  [
+   "audioLabel.textContent='Pauze';",
+   "window.TaleraI18n.setText(audioLabel,'core.present.audioPaused');"
+  ],
+  [
+   "loadingBadge.textContent='Foto wordt geladen…'",
+   "window.TaleraI18n.setText(loadingBadge,'core.present.photoLoading')",
+   1
+  ],
+  [
+   "savedBadge.textContent='Je verhaal is veilig opgeslagen'",
+   "window.TaleraI18n.setText(savedBadge,'core.present.safeSaved')",
+   1
+  ],
+  [
+   "retry.textContent='Opnieuw proberen'",
+   "window.TaleraI18n.setText(retry,'core.present.retry')",
+   1
+  ],
+  [
+   "audioLabel.textContent='Opnieuw'",
+   "window.TaleraI18n.setText(audioLabel,'core.present.playRetry')",
+   1
+  ],
+  [
+   "button.textContent='▶ Beluister'",
+   "window.TaleraI18n.setText(button,'core.present.legacyListenButton')",
+   1
+  ],
+  [
+   "hint.textContent='▶ Beluister'",
+   "window.TaleraI18n.setText(hint,'core.present.legacyListenHint')",
+   1
+  ]
+ ],
+ "/tell": [
+  [
+   "playback.textContent=preview.paused?'▶ Terugluisteren':'Ⅱ Pauze'",
+   "window.TaleraI18n.setText(playback,preview.paused?'core.tell.previewReplay':'core.tell.previewPause')"
+  ],
+  [
+   "pause.textContent='Pauze';",
+   "window.TaleraI18n.setText(pause,'core.tell.recordPause');"
+  ],
+  [
+   "if(write)write.textContent='Schrijven';",
+   "if(write)window.TaleraI18n.setText(write,'core.tell.writeButton1');"
+  ],
+  [
+   "  write.textContent='Schrijven';",
+   "  window.TaleraI18n.setText(write,'core.tell.writeButton2');"
+  ],
+  [
+   "write.setAttribute('aria-label','Schrijven');",
+   "window.TaleraI18n.setTextAttribute(write,'aria-label','core.tell.writeAria');"
+  ],
+  [
+   "write.textContent='✎ Schrijven';",
+   "window.TaleraI18n.setText(write,'core.tell.writeButtonIcon');"
+  ],
+  [
+   "if(b)b.setAttribute('aria-label','Terug')",
+   "if(b)window.TaleraI18n.setTextAttribute(b,'aria-label','core.tell.backAriaDynamic')"
+  ],
+  [
+   "new Date(draft.date+'T12:00:00').toLocaleDateString('nl-NL',",
+   "new Date(draft.date+'T12:00:00').toLocaleDateString(window.TaleraI18n.locale,"
+  ],
+  [
+   "$('busyProgress').textContent='Origineel '+(i+1)+' van '+keys.length",
+   "window.TaleraI18n.setText($('busyProgress'),'core.tell.originalProgress',{index:i+1,total:keys.length})",
+   1
+  ],
+  [
+   "$('busyProgress').textContent='Bestaande herinneringen vergelijken · '+checked",
+   "window.TaleraI18n.setText($('busyProgress'),'core.tell.compareProgress',{count:checked})",
+   1
+  ],
+  [
+   "confirm.textContent='Bezig…'",
+   "window.TaleraI18n.setText(confirm,'core.tell.deleteBusy')",
+   1
+  ],
+  [
+   "confirm.textContent='Verwijderen'",
+   "window.TaleraI18n.setText(confirm,'core.tell.deleteConfirm')",
+   1
+  ],
+  [
+   "speak.textContent='Vertellen'",
+   "window.TaleraI18n.setText(speak,'core.tell.speakLabel1')",
+   2
+  ],
+  [
+   "speak.textContent='Vertellen'",
+   "window.TaleraI18n.setText(speak,'core.tell.speakLabel2')",
+   1
+  ],
+  [
+   "speak.textContent='🎙 Vertellen'",
+   "window.TaleraI18n.setText(speak,'core.tell.speakIcon')",
+   1
+  ],
+  [
+   "publish.textContent='Plaatsen op tijdlijn'",
+   "window.TaleraI18n.setText(publish,'core.tell.publishTimeline')",
+   1
+  ],
+  [
+   "publish.textContent='Plaatsen'",
+   "window.TaleraI18n.setText(publish,'core.tell.publishPlain')",
+   1
+  ],
+  [
+   "done.textContent='Klaar'",
+   "window.TaleraI18n.setText(done,'core.tell.writerDone')",
+   1
+  ],
+  [
+   "error.textContent='Kies een geldige dag, maand, seizoen of jaar.'",
+   "window.TaleraI18n.setText(error,'core.tell.dateValidation')",
+   1
+  ],
+  [
+   "$('publish').textContent='Op mijn tijdlijn plaatsen'",
+   "window.TaleraI18n.setText($('publish'),'core.tell.publishButton')",
+   1
+  ],
+  [
+   "status.textContent='Stop eerst je opname en wacht tot deze is bewaard.'",
+   "window.TaleraI18n.setText(status,'core.tell.recordWait')",
+   1
+  ],
+  [
+   "start.textContent='Opname bewaren…'",
+   "window.TaleraI18n.setText(start,'core.tell.recordSaving')",
+   1
+  ],
+  [
+   "start.textContent='■ Stoppen'",
+   "window.TaleraI18n.setText(start,'core.tell.recordStop1')",
+   2
+  ],
+  [
+   "start.textContent='■ Stoppen'",
+   "window.TaleraI18n.setText(start,'core.tell.recordStop2')",
+   1
+  ],
+  [
+   "status.textContent='Deze browser ondersteunt opnemen niet.'",
+   "window.TaleraI18n.setText(status,'core.tell.recordUnsupported')",
+   1
+  ],
+  [
+   "start.textContent='Microfoon openen…'",
+   "window.TaleraI18n.setText(start,'core.tell.micOpening')",
+   1
+  ],
+  [
+   "start.textContent='● Opnemen'",
+   "window.TaleraI18n.setText(start,'core.tell.recordStart1')",
+   4
+  ],
+  [
+   "start.textContent='● Opnemen'",
+   "window.TaleraI18n.setText(start,'core.tell.recordStart2')",
+   3
+  ],
+  [
+   "start.textContent='● Opnemen'",
+   "window.TaleraI18n.setText(start,'core.tell.recordStart3')",
+   2
+  ],
+  [
+   "start.textContent='● Opnemen'",
+   "window.TaleraI18n.setText(start,'core.tell.recordStart4')",
+   1
+  ],
+  [
+   "start.textContent='Opslaan…'",
+   "window.TaleraI18n.setText(start,'core.tell.recordSave')",
+   1
+  ],
+  [
+   "status.textContent='Bewaren niet gelukt: '+e.message+'. De vorige opname is behouden.'",
+   "window.TaleraI18n.setText(status,'core.tell.recordRestoreFailure',{detail:e.message})",
+   1
+  ],
+  [
+   "pause.textContent='Hervatten'",
+   "window.TaleraI18n.setText(pause,'core.tell.resume')",
+   1
+  ],
+  [
+   "status.textContent='Opname gepauzeerd.'",
+   "window.TaleraI18n.setText(status,'core.tell.pausedStatus')",
+   1
+  ],
+  [
+   "status.textContent='Opname hervat.'",
+   "window.TaleraI18n.setText(status,'core.tell.resumedStatus')",
+   1
+  ],
+  [
+   "approve.textContent='Je herinnering bewaren…'",
+   "window.TaleraI18n.setText(approve,'core.tell.savingMemory')",
+   1
+  ],
+  [
+   "approve.textContent='Op mijn tijdlijn plaatsen'",
+   "window.TaleraI18n.setText(approve,'core.tell.publishApprove1')",
+   2
+  ],
+  [
+   "approve.textContent='Op mijn tijdlijn plaatsen'",
+   "window.TaleraI18n.setText(approve,'core.tell.publishApprove2')",
+   1
+  ],
+  [
+   "$('v13Error').textContent='Kies een geldige datum.'",
+   "window.TaleraI18n.setText($('v13Error'),'core.tell.dateInvalid')",
+   1
+  ],
+  [
+   "$('v13Error').textContent='Datumveld niet beschikbaar.'",
+   "window.TaleraI18n.setText($('v13Error'),'core.tell.dateUnavailable')",
+   1
+  ],
+  [
+   "$('v13Error').textContent='Probeer opnieuw.'",
+   "window.TaleraI18n.setText($('v13Error'),'core.tell.dateTryAgain')",
+   1
+  ]
+ ]
+};
 const sourceHash=s=>createHash('sha256').update(s).digest('hex');
 export function centralizeCoreLanguage(html,route){
  const pattern=/<script id="talera-v23-i18n">([\s\S]*?)<\/script>/g;
@@ -328,6 +646,16 @@ export function centralizeCoreLanguage(html,route){
  replace("[aria-label],[title],[placeholder]","[aria-label],[title],[placeholder],[alt]");
  replace("document.documentElement.setAttribute('lang',lang);","document.documentElement.setAttribute('lang',lang); const manifest=document.querySelector('link[rel=manifest]'); if(manifest){const url=new URL(manifest.href,location.href); if(url.origin===location.origin&&url.pathname==='/manifest.webmanifest'&&url.searchParams.get('lang')!==lang){url.searchParams.set('lang',lang);manifest.href=url.pathname+url.search}}");
 
+ replace("function dynamic(source){\n let match;\n if((match=/^Jaren\\s+(\\d{4})$/i.exec(source)))return localized('home.era')+' '+match[1];\n if((match=/^(\\d+)\\s+eigen herinneringen$/i.exec(source)))return match[1]+' '+localized('home.ownedCount');\n if((match=/^(\\d+)\\s+voorbeelden$/i.exec(source)))return match[1]+' '+localized('home.examples').toLocaleLowerCase(LOCALES[lang]);\n if((match=/^(\\d+)\\s+eigen$/i.exec(source)))return match[1]+' '+localized('home.ownShort');\n if((match=/^(\\d+)\\s+bewaard$/i.exec(source)))return match[1]+' '+localized('home.saved');\n if((match=/^(Mijn herinnering|Voorbeeldherinnering)\\s+·\\s+(\\d{4})$/i.exec(source)))return localized(match[1]==='Mijn herinnering'?'home.myMemory':'home.example')+' · '+match[2];\n if((match=/^(\\d+)\\s+(voorbeelden|eigen)\\s*$/i.exec(source)))return match[1]+' '+localized(match[2]==='eigen'?'home.ownShort':'home.examples').toLocaleLowerCase(LOCALES[lang]);\n if((match=/^(←|↗|✎|●|■|🎙)\\s+(.+)$/u.exec(source))){\n  const key=sourceToKey.get(match[2]);\n  if(key)return match[1]+' '+localized(key);\n }\n const date=translateDate(source);if(date!==null)return date;\n return null;\n}\n","function dynamic(source){\n // Transitional fallback for older non-migrated positions: always translate complete phrases.\n let match;\n if((match=/^Jaren\\s+(\\d{4})$/i.exec(source)))return localized('core.home.decadeTitle',{year:match[1]});\n if((match=/^(\\d+)\\s+eigen herinnering(?:en)?$/i.exec(source)))return localized(Number(match[1])===1?'core.home.decadeOwnOne':'core.home.decadeOwnMany',{count:match[1]});\n if((match=/^(\\d+)\\s+voorbeeld(?:en)?$/i.exec(source)))return localized(Number(match[1])===1?'core.home.decadeExampleOne':'core.home.decadeExampleMany',{count:match[1]});\n if((match=/^(\\d+)\\s+eigen$/i.exec(source)))return localized(Number(match[1])===1?'core.home.yearOwnOne':'core.home.yearOwnMany',{count:match[1]});\n if((match=/^(\\d+)\\s+bewaard$/i.exec(source)))return localized(Number(match[1])===1?'core.home.savedOne':'core.home.savedMany',{count:match[1]});\n if((match=/^(Mijn herinnering|Voorbeeldherinnering)\\s+·\\s+(\\d{4})$/i.exec(source)))return localized(match[1]==='Mijn herinnering'?'core.home.heroYearOwn':'core.home.heroYearExample',{year:match[2]});\n if((match=/^(←|↗|✎|●|■|🎙)\\s+(.+)$/u.exec(source))){\n  const key=sourceToKey.get(match[2]);\n  if(key)return match[1]+' '+localized(key);\n }\n const date=translateDate(source);if(date!==null)return date;\n return null;\n}\n");
+ replace("const textInfo=new WeakMap(),attrInfo=new WeakMap();","const textInfo=new WeakMap(),attrInfo=new WeakMap(),boundText=new WeakMap();\nfunction setText(el,key,params={}){\n if(!el)return;\n const value=localized(key,params);\n el.removeAttribute('data-i18n');\n el.setAttribute('data-talera-bound-text','');\n boundText.set(el,{key,params,rendered:value});\n if(el.textContent!==value)el.textContent=value;\n}\nfunction setTextAttribute(el,attr,key){\n if(!el)return;\n el.setAttribute('data-i18n-'+attr,key);\n el.setAttribute(attr,localized(key));\n}\nfunction refreshBoundText(){\n for(const el of document.querySelectorAll('[data-talera-bound-text]')){\n  const old=boundText.get(el);\n  if(!old||el.textContent!==old.rendered){boundText.delete(el);el.removeAttribute('data-talera-bound-text');continue}\n  const value=localized(old.key,old.params);old.rendered=value;\n  if(el.textContent!==value)el.textContent=value;\n }\n}");
+ replace("if(!node?.parentElement||node.parentElement.closest('[data-talera-explicit-language]')||isUserContent(node))return;","if(!node?.parentElement||node.parentElement.closest('[data-talera-explicit-language],[data-talera-bound-text]')||isUserContent(node))return;");
+ replace(" if(!document.body)return;\n const walker="," if(!document.body)return;\n refreshBoundText();\n const walker=");
+ replace("t:localized,formatDate,setLanguage,refresh:schedule","t:localized,setText,setTextAttribute,formatDate,setLanguage,refresh:schedule");
+ replace("document.title='TALERA · '+(page.startsWith('/tell')?localized('tell.title'):page.startsWith('/present')?localized('present.title'):page.startsWith('/meldingen')?localized('home.notifications'):page.startsWith('/gedeeld')?localized('home.sharedTitle'):localized('home.myLife'));","document.title=localized(page.startsWith('/tell')?'core.document.tell':page.startsWith('/present')?'core.document.present':page.startsWith('/meldingen')?'core.document.notifications':page.startsWith('/gedeeld')?'core.document.shared':'core.document.home');");
+ replace("select.setAttribute('aria-label',localized('common.language'))}","select.setAttribute('aria-label',localized('core.picker.aria'));const label=document.querySelector('.talera-v23-language-label');if(label&&label.textContent!==localized('core.picker.label'))label.textContent=localized('core.picker.label')}");
+ replace("label.textContent=localized('common.language');","label.textContent=localized('core.picker.label'); label.setAttribute('data-i18n','core.picker.label');");
+ replace("select.setAttribute('aria-label',localized('common.language'));","select.setAttribute('data-i18n-aria-label','core.picker.aria');select.setAttribute('aria-label',localized('core.picker.aria'));");
+
  // Fixed position tags are inserted only into markup, never inline JS, user data, or media state.
  let output=html.replace(pattern,()=>'<script id="talera-v23-i18n">'+next+'</script>');
  const chunks=output.split(/(<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)\s*>)/gi);
@@ -341,5 +669,14 @@ export function centralizeCoreLanguage(html,route){
   const updated=existing.test(tag)?tag.replace(existing,' '+attr+'="'+key+'"'):tag.replace(/>$/,' '+attr+'="'+key+'">');
   chunks[index]=c.slice(0,at)+updated+(kind==='text'?text:'')+c.slice(at+search.length);
  }
- return {html:chunks.join(''),engine:next,asset:sourceHash(next)+'.js'};
+ return {html:applyContextualCore(chunks.join(''),route),engine:next,asset:sourceHash(next)+'.js'};
+}
+export function applyContextualCore(html,route){
+ let localizedHtml=html;
+ for(const [before,after,expected=1] of dynamicPositions[route]||[]){
+  const count=localizedHtml.split(before).length-1;
+  assert.equal(count,expected,'TALERA_DYNAMIC_LANGUAGE_POSITION_DRIFT '+route+' '+before);
+  localizedHtml=localizedHtml.replace(before,()=>after);
+ }
+ return localizedHtml;
 }

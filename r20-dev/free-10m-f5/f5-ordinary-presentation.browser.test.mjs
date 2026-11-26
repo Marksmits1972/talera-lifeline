@@ -2687,6 +2687,8 @@ async function testTimelineLoupe(){
   // -> original photo + voice presentation, all on the SAME Free Worker/origin.
   // All input is disposable synthetic data; real iPhone storage is untouched.
   const backupPage=await ctx.newPage();
+  backupPage.on('pageerror',e=>console.log('TALERA_BACKUP_PAGE_ERROR',String(e.message).slice(0,250)));
+  backupPage.on('console',m=>{if(m.type()==='error')console.log('TALERA_BACKUP_CONSOLE',m.text().slice(0,250))});
   let restoredContext;
   try{
     const backupResp=await backupPage.goto(origin+'/__f5/backup',

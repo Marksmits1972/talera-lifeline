@@ -50,7 +50,7 @@ export function passwordResetPage(mode){
    status.textContent=typeof result.messageKey==='string'&&/^reset\.api\./.test(result.messageKey)?t(result.messageKey):t(response.status===503?'reset.api.unavailable':'reset.status.generic');
    if(response.ok){
     form.hidden=true;
-    if(mode==='confirm')status.textContent+=' '+t('reset.status.done');
+    if(mode==='confirm')status.textContent=t('reset.status.confirmComplete');
    }
   }catch{status.textContent=t('reset.status.network')}
   finally{submit.disabled=false}

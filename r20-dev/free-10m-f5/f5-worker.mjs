@@ -1007,10 +1007,11 @@ async function publicWhatsAppMemory(request,env){
  const photo=content.hasPhoto?'<img src="'+u.pathname+'/photo" alt="Foto bij deze herinnering">':'';
  const video=content.hasVideo?'<video controls playsinline preload="none" src="'+u.pathname+'/video"></video>':'';
  const audio=content.hasAudio?'<audio controls preload="none" src="'+u.pathname+'/audio"></audio>':'';
+ const previewLanguage=requestLanguage(request);
  const previewMeta='<meta property="og:type" content="article">'+
   '<meta property="og:site_name" content="TALERA">'+
-  '<meta property="og:title" content="Een persoonlijke herinnering via TALERA">'+
-  '<meta property="og:description" content="Tik om deze herinnering te bekijken.">'+
+  '<meta property="og:title" content="'+safeShareHtml(translate(previewLanguage,'guest.preview.title'))+'">'+
+  '<meta property="og:description" content="'+safeShareHtml(translate(previewLanguage,'guest.preview.description'))+'">'+
   '<meta name="twitter:card" content="summary_large_image">'+
   '<meta property="og:url" content="'+safeShareHtml(u.href)+'">'+
   (content.hasPhoto?'<meta property="og:image" content="'+

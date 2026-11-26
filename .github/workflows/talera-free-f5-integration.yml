@@ -930,7 +930,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: f6db9718-b274-4506-98f6-4ce91e378865
+      F5_EXPECTED_LIVE_VERSION: 57167be3-49b8-4c94-bf61-ca1b0a04bc41
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -956,9 +956,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = e3a82404289752a9c3fcdc2008ac327fcf58a78e
-          test "$(git diff --name-only e3a82404289752a9c3fcdc2008ac327fcf58a78e HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code e3a82404289752a9c3fcdc2008ac327fcf58a78e HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 6ff1c386ae91a06580bb77620ab3eb849edf5df2
+          test "$(git diff --name-only 6ff1c386ae91a06580bb77620ab3eb849edf5df2 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 6ff1c386ae91a06580bb77620ab3eb849edf5df2 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -967,7 +967,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45773162594',sha='e3a82404289752a9c3fcdc2008ac327fcf58a78e';
+          const id='45774634337',sha='6ff1c386ae91a06580bb77620ab3eb849edf5df2';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const names=[mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
@@ -998,7 +998,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45773162594');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45774634337');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1132,8 +1132,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code e3a82404289752a9c3fcdc2008ac327fcf58a78e HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45773162594'
+          git diff --exit-code 6ff1c386ae91a06580bb77620ab3eb849edf5df2 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45774634337'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail
@@ -1295,7 +1295,7 @@ jobs:
           }
           const signedPresent=fs.readFileSync(root+referencePages['/present'],'utf8');
           assert.ok(signedPresent.includes('LOUPE_VISUAL_SCALE=1.10'), 'Missing the new exact 10 percent visual zoom');
-          assert.ok(signedPresent.includes('inset:6px 4px 44px'), 'Missing the newly positioned white rounded loupe');
+          assert.ok(signedPresent.includes('width:66.666667%;height:calc((100% - 50px) * .66666667)')&&signedPresent.includes('LOUPE_PANEL_SCALE=2/3'), 'Missing the new proportionally reduced white loupe');
           assert.equal(hash(signedPresent)+'.html',referencePages['/present'].split('/').pop());
           const localSW=fs.readFileSync(root+verifiedPublicSupport['/sw.js']);
           assert.equal(hash(localSW)+'.js',verifiedPublicSupport['/sw.js'].split('/').pop());

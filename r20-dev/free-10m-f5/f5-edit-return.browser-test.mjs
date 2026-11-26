@@ -55,6 +55,12 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    await pencil.waitFor({state:'visible'});
    const pos=await pencil.boundingBox();
    assert.ok(pos,'Existing pencil hit area');
+   // Locator.click may scroll/settle a mobile viewport first. The user
+   // touches the actual hit area at pointerdown, not the earlier rect.
+   await pencil.evaluate(el=>el.addEventListener('pointerdown',()=>{
+    const r=el.getBoundingClientRect();
+    sessionStorage.setItem('talera-ci-pencil-hit-rect',JSON.stringify({x:r.x,y:r.y,width:r.width,height:r.height}));
+   },{once:true,capture:true,passive:true}));
    const dialogs=[];
    const handle=d=>{dialogs.push(d.type());return d.dismiss()};
    page.on('dialog',handle);
@@ -62,7 +68,14 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    await page.waitForURL('**/tell?edit='+encodeURIComponent(id));
    await eye.waitFor({state:'visible',timeout:20000});
    const box=await eye.boundingBox();
-   for(const k of ['x','y','width','height'])assert.ok(Math.abs(pos[k]-box[k])<=2,'Eye must occupy exact pencil '+k+': '+JSON.stringify({pos,box}));
+   const geometry=await page.evaluate(()=>{
+    const hit=JSON.parse(sessionStorage.getItem('talera-ci-pencil-hit-rect')||'null');sessionStorage.removeItem('talera-ci-pencil-hit-rect');
+    const button=document.getElementById('talera-f5-edit-return-eye'),style=getComputedStyle(button);
+    const key=Object.keys(sessionStorage).find(k=>k.startsWith('talera-free-edit-return-'));
+    return {hit,context:key?JSON.parse(sessionStorage.getItem(key)):null,top:style.top,right:style.right,transform:style.transform,scrollY,innerHeight,viewportOffset:visualViewport?.offsetTop??null};
+   });
+   assert.ok(geometry.hit,'Actual trusted pointer-down position missing');
+   for(const k of ['x','y','width','height'])assert.ok(Math.abs(geometry.hit[k]-box[k])<=2,'Eye must occupy exact actual pencil target '+k+': '+JSON.stringify({pos,box,geometry}));
    const opened=await read();
    assert.equal(opened.catalog.filter(x=>x.existing===id).length,1,'One existing edit draft');
    await eye.click();

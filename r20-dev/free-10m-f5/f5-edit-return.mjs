@@ -75,12 +75,23 @@ export function mountReturnButton({document,window,context,language,onReturn}){
  // The icon is original line artwork, consistent with the existing TALERA
  // round 45px pencil target; no extra visible label or navigation row.
  button.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>';
- Object.assign(button.style,{position:'fixed',zIndex:'63',display:'grid',placeItems:'center',padding:'0',borderRadius:'50%',border:'1px solid rgba(85,121,169,.48)',background:'#f7f5f0',color:'#071a3d',boxShadow:'0 4px 18px rgba(7,26,61,.15)',touchAction:'manipulation',cursor:'pointer'});
- const position=()=>{const p=buttonPosition(context,{width:window.innerWidth,height:window.innerHeight});for(const [key,value] of Object.entries(p))button.style[key]=value+'px'};
- position();window.addEventListener('resize',position,{passive:true});
+ Object.assign(button.style,{position:'fixed',zIndex:'63',display:'grid',placeItems:'center',padding:'0',margin:'0',boxSizing:'border-box',transform:'none',borderRadius:'50%',border:'1px solid rgba(85,121,169,.48)',background:'#f7f5f0',color:'#071a3d',boxShadow:'0 4px 18px rgba(7,26,61,.15)',touchAction:'manipulation',cursor:'pointer'});
+ const position=()=>{
+  const p=buttonPosition(context,{width:window.innerWidth,height:window.innerHeight});
+  for(const [key,value] of Object.entries(p))button.style[key]=value+'px';
+  // The original editor and presentation have different viewport/body
+  // layout offsets (notably WebKit). Match the *rendered* visual target,
+  // not only the CSS top/right declarations.
+  const r=button.getBoundingClientRect?.();
+  if(r&&Number.isFinite(r.top)&&Number.isFinite(r.right)&&r.width>0){
+   button.style.top=(p.top+(p.top-r.top))+'px';
+   button.style.right=(p.right+(r.right-(window.innerWidth-p.right)))+'px';
+  }
+ };
+ window.addEventListener('resize',position,{passive:true});
  let pending=false;
  button.addEventListener('click',async()=>{if(pending)return;pending=true;button.disabled=true;try{await onReturn()}finally{pending=false;button.disabled=false}});
- document.body.append(button);
+ document.body.append(button);position();
  return {button,unmount(){window.removeEventListener('resize',position);button.remove()}};
 }
 
@@ -222,10 +233,12 @@ export function patchPencilCapture(html,scope,serialized=buildEditReturnBrowserS
  if(start<0||end<0||html.split(scriptStart).length!==2)throw Error('PENCIL_SOURCE_DRIFT');
  const script=html.slice(start,end);
  if(script.split(marker).length!==2||!script.includes("pencil.id='talera-v5-editor-pencil';")||!script.includes('rt.currentMemory()'))throw Error('PENCIL_SOURCE_DRIFT');
- const insertion=`try{const capture=(${serialized.capture})({memory:current,rect:pencil.getBoundingClientRect(),viewport:{width:window.innerWidth,height:window.innerHeight},centerMs:rt.centerMs?.()});if(capture)sessionStorage.setItem(${JSON.stringify(returnStorageKey(scope))},JSON.stringify(capture));}catch(_){}\n      `;
+ const init="pencil.id='talera-v5-editor-pencil';";
+ const touchCapture="let taleraEditTouch=null;pencil.addEventListener('pointerdown',()=>{taleraEditTouch={rect:pencil.getBoundingClientRect(),at:Date.now()};},{capture:true,passive:true});";
+ const insertion=`try{const rect=taleraEditTouch&&Date.now()-taleraEditTouch.at<1500?taleraEditTouch.rect:pencil.getBoundingClientRect();const capture=(${serialized.capture})({memory:current,rect,viewport:{width:window.innerWidth,height:window.innerHeight},centerMs:rt.centerMs?.()});if(capture)sessionStorage.setItem(${JSON.stringify(returnStorageKey(scope))},JSON.stringify(capture));}catch(_){}\n      `;
  // captureReturnContext uses only this lexical constant and its arguments.
- const bound=insertion.replace('try{const capture=','try{const EDIT_RETURN_ID='+EDIT_RETURN_ID.toString()+';const capture=');
- return html.slice(0,start)+script.replace(marker,bound+marker)+html.slice(end);
+ const bound=insertion.replace('try{const rect=','try{const EDIT_RETURN_ID='+EDIT_RETURN_ID.toString()+';const rect=');
+ return html.slice(0,start)+script.replace(init,init+touchCapture).replace(marker,bound+marker)+html.slice(end);
 }
 
 // Standalone lexical declarations for the browser script. Construct from

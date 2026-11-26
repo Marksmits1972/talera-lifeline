@@ -116,6 +116,14 @@ test('five localized names, real eye button dimensions and one click until settl
  const first=callbacks.click();await callbacks.click();assert.equal(count,1);release();await first;assert.equal(el.disabled,false);
  assert.throws(()=>mountReturnButton({document:doc,window:w,context,language:'nl',onReturn:()=>{}}));eye.unmount();assert.equal(el.removed,true);
 });
+test('measured eye position cancels the editor-specific WebKit viewport offset',()=>{
+ const el={style:{},setAttribute(){},addEventListener(){},getBoundingClientRect(){return {top:parseFloat(this.style.top)-26.5,right:390-parseFloat(this.style.right),width:45}},remove(){}};
+ const doc={getElementById(){return null},createElement(){return el},body:{append(){}}};
+ const w={innerWidth:390,innerHeight:844,addEventListener(){},removeEventListener(){}};
+ mountReturnButton({document:doc,window:w,context,language:'nl',onReturn:()=>{}});
+ assert.equal(el.getBoundingClientRect().top,124);
+ assert.equal(el.getBoundingClientRect().right,375);
+});
 test('pencil preparation targets observed original click source and refuses drift',()=>{
  const original=`<script id="talera-v5-pencil-script">(()=>{const rt=window.__taleraTimelineRuntime;const pencil=document.createElement('button');pencil.id='talera-v5-editor-pencil';pencil.addEventListener('click',()=>{const current=rt.currentMemory();const recordId=current.storyId;if(!recordId)return;location.assign('/tell?edit='+encodeURIComponent(recordId));});})();</script>`;
  const edited=patchPencilCapture(original,scope);

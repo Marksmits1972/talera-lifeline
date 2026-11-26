@@ -71,7 +71,13 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    page.on('dialog',handle);
    await pencil.click();
    await page.waitForURL('**/tell?edit='+encodeURIComponent(id));
-   await eye.waitFor({state:'visible',timeout:20000});
+   try{await eye.waitFor({state:'visible',timeout:20000})}
+   catch(e){
+    console.error('TALERA_EDIT_RETURN_BOOT_DIAGNOSTIC',JSON.stringify({errors,
+      banner:await page.locator('#error').first().textContent({timeout:1500}).catch(()=>null),
+      library:await page.evaluate(()=>typeof window.TaleraMemories?.draftReadPayload).catch(()=>null)}));
+    throw e;
+   }
    const back=page.locator('#app header.top #back'),dots=page.locator('#app .talera-editor-memory-options-toggle');
    await back.waitFor({state:'visible'});await dots.waitFor({state:'visible'});
    // Check the actual header controls, not CSS inputs or a simulated layout.

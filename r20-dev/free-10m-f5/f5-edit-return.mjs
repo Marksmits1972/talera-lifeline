@@ -1,3 +1,4 @@
+import {buildEditorLibraryBrowserSources} from './f5-library-editor-stable-save.mjs';
 // Local preparation for the existing TALERA Free edit-return feature.
 // No deployment, new route, second player, database or account transition.
 // The eventual integration must run after the desktop changes are stable.
@@ -370,7 +371,7 @@ function browserReturnCore(editor){
 // bundler's variable renaming cannot break lexical dependencies.
 export function buildEditReturnBrowserSources(){
  const cleanup=`async function discardFreshEditConcept(expected){return discardEditConcept(expected,false);}\nasync function discardCompletedEditConcept(expected){return discardEditConcept(expected,true);}\nasync function discardEditConcept(expected,verify){const db=await open();return (function(){const EDIT_RETURN_ID=${EDIT_RETURN_ID},DRAFT_ID=${DRAFT_ID},PREFIX=${JSON.stringify(PREFIX)},MANIFEST=${JSON.stringify(MANIFEST)};const same=${same.toString()};${pristineDraftRemovalPlan.toString()}\n${publishedDraftPairs.toString()}\n${verifyPublishedDraftBytes.toString()}\n${discardPristineDraftAtomically.toString()}\nreturn discardPristineDraftAtomically(db,expected,verify?taleraPayload.read:null);})();}\n`;
- return Object.freeze({capture:captureReturnContext.toString(),cleanup,editor:browserReturnCore(true),presentation:browserReturnCore(false)});
+ return Object.freeze({capture:captureReturnContext.toString(),cleanup,editor:browserReturnCore(true),presentation:browserReturnCore(false),editorLibrary:buildEditorLibraryBrowserSources()});
 }
 
 // Bind into the ORIGINAL /tell closure, not a second editor or event system.

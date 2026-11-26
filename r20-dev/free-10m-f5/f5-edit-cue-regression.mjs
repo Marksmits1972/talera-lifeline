@@ -54,7 +54,20 @@ assert.ok(editor,'The original edit boot script must contain the guarded patch')
 new vm.Script(editor,{filename:'f5-original-editor-verified.js'});
 // The original-to-draft association survives the SAME local draft manifest.
 const wired=retainEditorCanonicalMediaIds(patched);
-assert.ok(wired.includes('canonicalByDraft:g.canonicalByDraft?{...g.canonicalByDraft}:null'));
+// Validate both the unchanged draft mapping and new exact completion receipt
+// against the actual browser snapshot, rather than an obsolete textual match.
+const snapshotStart=wired.indexOf('function snapshot(){return groups.map(');
+const snapshotEnd=wired.indexOf('function saveDraft()',snapshotStart);
+assert.ok(snapshotStart>0&&snapshotEnd>snapshotStart);
+const mapA={'draft-0':'local-stable:0'},mapB={'draft-0':'local-saved:0'};
+const baseGroup={id:'draft',media:['draft-0'],existing:'local-stable',canonicalByDraft:mapA};
+for(const [group,id,mapping] of [[baseGroup,'local-stable',mapA],
+ [{...baseGroup,taleraSavedReceipt:{existing:'local-saved',canonicalByDraft:mapB}},'local-saved',mapB]]){
+ const result=vm.runInNewContext(wired.slice(snapshotStart,snapshotEnd)+';snapshot()', {groups:[group]});
+ assert.equal(result[0].existing,id);
+ assert.deepEqual({...result[0].canonicalByDraft},mapping);
+ assert.notEqual(result[0].canonicalByDraft,mapping);
+}
 assert.equal(wired.split('g.canonicalByDraft=Object.fromEntries(').length-1,1);
 const startMap=wired.indexOf('if(g.existing){',changedStart);
 const endMap=wired.indexOf(suffix,startMap);
@@ -86,7 +99,9 @@ assert.ok(stable.includes("if(existing&&canonicalIds===undefined)for(var k=0;"))
 assert.ok(stable.includes('payloadPlans.push(existing&&canonicalIds!==undefined&&canonicalIds[j]?null:'));
 assert.ok(stable.includes('payloadPlans.filter((plan,j)=>plan&&!reused.has(j))'));
 assert.ok(stable.includes("taleraPayload.writePlans(tx.objectStore('files'),fresh"));
-assert.ok(stable.includes('canonicalIds);const persisted=await mem.get(row.id);'));
+assert.ok(stable.includes('canonicalIds,editorDraft);'));
+assert.ok(stable.includes('const persisted=await mem.get(row.id);'));
+assert.ok(stable.includes('const editorDraft=snapshot()'));
 assert.ok(stable.includes('g.canonicalByDraft[id]||null'));
 assert.ok(stable.includes('window.TaleraMemories={save:save,updateCues:setNarrationCuesForStory,'));
 assert.ok(stable.includes('await mem.updateCues(persisted.id,mapped);'));
@@ -110,3 +125,4 @@ console.log('TALERA_F5_EDITED_NARRATION_ID_REBIND',JSON.stringify({
  cuesPreserveTimeAndOrder:true,noInvalidCrossAccountIds:true,
  editingUsesFreshDraftIds:true,noVoiceUnchanged:true,editorJsParses:true
 }));
+

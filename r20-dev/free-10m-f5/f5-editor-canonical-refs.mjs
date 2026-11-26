@@ -25,7 +25,7 @@ export function isDecodableEditorPoster(blob){
  });
 }
 
-export function retainEditorCanonicalMediaIds(html){
+export function retainEditorCanonicalMediaIds(html,serializedPoster=isDecodableEditorPoster.toString()){
  if(typeof html!=='string'||!html.includes('talera-memory-store-v1'))
   throw Error('TALERA_EDITOR_LIBRARY_SOURCE_MISSING');
  const exact=(a,b,label)=>{
@@ -45,7 +45,7 @@ export function retainEditorCanonicalMediaIds(html){
  // Published video posters are optional derivative images, not originals.
  // Use the exact original ID in the same account-local library.
  const videoPosters=[];
- const taleraValidPoster=(${isDecodableEditorPoster.toString()});
+ const taleraValidPoster=(${serializedPoster});
  await Promise.all(entries.map(async ([draftId],i)=>{
   const item=row.items[i];
   if(item?.kind!=='video')return;

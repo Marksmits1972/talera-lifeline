@@ -1119,7 +1119,7 @@ async function publicPage(request,env){
     // Locked WhatsApp design-cleanup baseline: no visible UI or presentation
     // amendments. Only server-verified private local storage and saved cue
     // media-ID reconciliation may rewrite the original approved markup.
-    const stableEditedCues=pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped))):scoped;
+    const stableEditedCues=pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped),editReturnBrowserSources.editorLibrary.poster),editReturnBrowserSources.editorLibrary):scoped;
     // Keep the editor's preview silent from the FIRST frame, even before
     // the record panel is visible. The original present/player video round
     // with sound after narration is untouched.

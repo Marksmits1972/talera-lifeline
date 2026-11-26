@@ -208,7 +208,8 @@ async function saveSyntheticPhoto(page,n){
 // Verify original UI controls and photo IDs are unchanged while the *existing*
 // tags box is rendered below the original photo grid, never cloned.
 async function verifyTellEditorLayout(page,storyId){
- const edit=await page.context().newPage();
+ const edit=await page.context().newPage(),editorErrors=[];
+ edit.on('pageerror',e=>editorErrors.push(String(e.message||e)));
  try{
   const response=await edit.goto(origin+'/tell?edit='+encodeURIComponent(storyId),
    {waitUntil:'domcontentloaded',timeout:25000});
@@ -217,9 +218,16 @@ async function verifyTellEditorLayout(page,storyId){
   try{await work.waitFor({state:'visible',timeout:11000})}
   catch(err){
    const opener=edit.locator('[data-open]').first();
-   if(!(await opener.count()))throw err;
-   await opener.click();
-   await work.waitFor({state:'visible',timeout:11000});
+   try{
+    if(!(await opener.count()))throw err;
+    await opener.click();
+    await work.waitFor({state:'visible',timeout:11000});
+   }catch(failure){
+    console.error('TALERA_EDITOR_BOOT_DIAGNOSTIC',JSON.stringify({errors:editorErrors,
+      banner:await edit.locator('#error').first().textContent({timeout:1500}).catch(()=>null),
+      hasLibrary:await edit.evaluate(()=>typeof window.TaleraMemories?.draftReadPayload).catch(()=>null)}));
+    throw failure;
+   }
   }
   await edit.locator('.talera-tags-toggle').waitFor({state:'visible',timeout:12000});
   const layout=await edit.evaluate(()=>{

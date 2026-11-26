@@ -30,7 +30,7 @@ for(const forbidden of [
 assert.ok(gateway.includes('const editReturnAccountScope=await privateAccountScope(actor.id);')&&
   gateway.includes('scopeLocalMemories(privateHtml,editReturnAccountScope)'),
   'Private local media must be bound to verified session identity');
-assert.ok(gateway.includes("pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped))):scoped"),
+assert.ok(gateway.includes("pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped),editReturnBrowserSources.editorLibrary.poster),editReturnBrowserSources.editorLibrary):scoped"),
   'Only recording media-ID integrity is allowed as an editor storage correction');
 assert.ok(gateway.includes("const silenced=pathname==='/tell'?restoreEditorVideoCover(muteEditorOnlyVideo(stableEditedCues)):stableEditedCues;")&&
   gateway.includes('const editReturnHtml=patchAuthenticatedEditReturn(silenced,pathname,editReturnAccountScope,editReturnBrowserSources);')&&
@@ -108,8 +108,12 @@ for(const page of [packagedTell,readFileSync('r20-dev/free-10m-delivery/public'+
  assert.ok(topicScroll[1].includes('--talera-tag-visible-height'),'Whole-row viewport bound must be delivered');
 
 }
+const editorSources=editReturnBrowserSources.editorLibrary;
+assert.ok(editorSources&&['poster','receipt','writeReceipt','readDraft','payload'].every(k=>
+ typeof editorSources[k]==='string'&&!editorSources[k].includes('__name(')));
+for(const k of ['poster','receipt','writeReceipt','readDraft','payload'])assert.doesNotThrow(()=>new Function('return ('+editorSources[k]+')'));
 const privateTell=preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(
- alignEditedNarrationCueRefs(scopeLocalMemories(packagedTell,s1))));
+ alignEditedNarrationCueRefs(scopeLocalMemories(packagedTell,s1)),editorSources.poster),editorSources);
 assert.ok(privateTell.includes('await taleraPayload.prepare(files[j].key,taleraOwnedPhotoUploads[j])'),
  'Private editor must store the SAME byte-owned originals in the shared payload');
 assert.ok(privateTell.includes('payloadPlans.push(existing&&canonicalIds!==undefined&&canonicalIds[j]?null:')&&

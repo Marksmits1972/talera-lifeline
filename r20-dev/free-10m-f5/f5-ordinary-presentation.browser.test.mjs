@@ -7,7 +7,7 @@ import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
-import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE} from './f5-timeline-loupe.mjs';
+import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_DATE_GAP} from './f5-timeline-loupe.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 // Each CI execution gets its own synthetic originals + local Wrangler DO store.
@@ -455,6 +455,42 @@ async function testTimelineLoupe(){
   assert.equal(geometry.canvasCount,1);assert.equal(geometry.canvasOpacity,'1');assert.equal(geometry.userSelect,'none');
   assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe: '+JSON.stringify(geometry));
   assert.ok(geometry.panelTop>=geometry.rulerTop-1,'Loupe must stay inside existing upper ruler: '+JSON.stringify(geometry));
+  // Measure the actually painted horizontal line on the existing canvas,
+  // not just the CSS panel. Check normal, shorter and larger phone views.
+  const measureAlignment=()=>lp.evaluate(()=>{
+   const surface=document.getElementById('surface').getBoundingClientRect();
+   const panel=document.getElementById('talera-timeline-loupe').getBoundingClientRect();
+   const date=document.getElementById('focusText').getBoundingClientRect();
+   const needle=document.querySelector('#surface>.center-needle').getBoundingClientRect();
+   const canvas=document.getElementById('timelineCanvas'),c=canvas.getBoundingClientRect();
+   const raw=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+   let winner=0,max=0;
+   for(let y=0;y<canvas.height;y++){
+    let count=0;for(let x=0;x<canvas.width;x++)if(raw[(y*canvas.width+x)*4+3]>24)count++;
+    if(count>max){winner=y;max=count}
+   }
+   const nativeAxis=c.top+(canvas.clientHeight-64)*c.height/canvas.clientHeight;
+   return {nativeAxis,paintedAxis:c.top+(winner+.5)*c.height/canvas.height,
+    lineCoverage:max/canvas.width,panelTop:panel.top-surface.top,panelHeight:panel.height,
+    dateTop:date.top-surface.top,gap:date.top-panel.bottom,needleTop:needle.top-panel.top,
+    needleBottom:panel.bottom-needle.bottom};
+  });
+  const measureAndCheck=async()=>{
+   const a=await measureAlignment();
+   assert.ok(a.lineCoverage>.58,'Full horizontal ruler line expected: '+JSON.stringify(a));
+   assert.ok(Math.abs(a.paintedAxis-a.nativeAxis)<=1.5,'Loupe axis matches original timeline: '+JSON.stringify(a));
+   assert.ok(a.gap>=LOUPE_DATE_GAP-.25,'Date stays an isolated free-standing window: '+JSON.stringify(a));
+   assert.ok(a.panelTop>6&&Math.abs(a.needleTop-8)<1&&a.needleBottom>=-1,'Needle and panel move down together: '+JSON.stringify(a));
+   return a;
+  };
+  const measured=[await measureAndCheck()],originalViewport=lp.viewportSize();
+  if(process.env.TALERA_LOUPE_LAYOUT_SCREENSHOT)await lp.screenshot({path:process.env.TALERA_LOUPE_LAYOUT_SCREENSHOT});
+  for(const viewport of [{width:375,height:600},{width:430,height:932},originalViewport]){
+   await lp.setViewportSize(viewport);
+   await lp.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   measured.push(await measureAndCheck());
+  }
+  console.log('TALERA_LOUPE_NATIVE_AXIS_AND_DATE_GAP_PASS',JSON.stringify(measured));
   // Count calls to the actual existing adjacent-selection bridge separately
   // from runtime notifications (which also refresh the current media).
   const seen=await lp.evaluate(()=>{

@@ -6,8 +6,20 @@ export const LOUPE_VISUAL_SCALE=1.10;
 export const LOUPE_PANEL_SCALE=2/3;
 export const LOUPE_TOUCH_ZONE=1/3;
 export const LOUPE_VISIBLE_DAYS=6/LOUPE_VISUAL_SCALE;
+export const LOUPE_DATE_GAP=12;
+const LOUPE_INITIAL_TOP=6;
 const LOUPE_MS_DAY=86400000;
 const clampLoupe=(x,min,max)=>Math.max(min,Math.min(max,x));
+
+// Coordinates in CSS pixels, relative to the existing ruler. Keep the
+// panel's internal proportions, but place its axis at the original axis.
+// Only shift upward if necessary to leave the separate date badge free.
+export function alignLoupeToNativeAxis(nativeAxis,panelHeight,dateTop){
+ const axisOffset=(nativeAxis-LOUPE_INITIAL_TOP)*LOUPE_PANEL_SCALE;
+ const desiredTop=nativeAxis-axisOffset;
+ const top=Math.max(LOUPE_INITIAL_TOP,Math.min(desiredTop,dateTop-panelHeight-LOUPE_DATE_GAP));
+ return {top,axis:top+axisOffset};
+}
 
 // Normally one wheel unit is one day. Only very close/coincident memories
 // receive extra room, so each original ID has its own reachable stop.
@@ -256,8 +268,14 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
    const left=Math.max(0,x(0)),right=Math.min(w,x(scale.end));
    // Clip the paint to the actual rounded white panel, not the full-width
    // canvas behind it. This also respects any native mobile canvas offset.
-   const card=panel.getBoundingClientRect(),canvasRect=ctx.canvas.getBoundingClientRect();
+   const canvasRect=ctx.canvas.getBoundingClientRect(),surfaceRect=surface.getBoundingClientRect();
    const sx=w/Math.max(1,canvasRect.width),sy=h/Math.max(1,canvasRect.height);
+   const nativeAxis=canvasRect.top+axisY/sy-surfaceRect.top;
+   const dateTop=surface.querySelector('#focusText').getBoundingClientRect().top-surfaceRect.top;
+   const layout=alignLoupeToNativeAxis(nativeAxis,panel.getBoundingClientRect().height,dateTop);
+   const topValue=layout.top+'px';
+   if(surface.style.getPropertyValue('--talera-loupe-top')!==topValue)surface.style.setProperty('--talera-loupe-top',topValue);
+   const card=panel.getBoundingClientRect();
    const cx=(card.left-canvasRect.left+1)*sx,cy=(card.top-canvasRect.top+1)*sy;
    const cw=Math.max(0,(card.width-2)*sx),ch=Math.max(0,(card.height-2)*sy);
    const radius=Math.min(14*sx,cw/2,ch/2);
@@ -265,10 +283,9 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
    ctx.moveTo(cx+radius,cy);ctx.arcTo(cx+cw,cy,cx+cw,cy+ch,radius);
    ctx.arcTo(cx+cw,cy+ch,cx,cy+ch,radius);ctx.arcTo(cx,cy+ch,cx,cy,radius);
    ctx.arcTo(cx,cy,cx+cw,cy,radius);ctx.closePath();ctx.clip();
-   // Scale the entire ruler, including labels, around the upper panel edge;
-   // keep calendar movement and visible width in the identical ratio.
-   const top=(card.top-canvasRect.top)*sy;
-   const compactAxis=top+(axisY-top)*LOUPE_PANEL_SCALE;
+   // The white panel, ticks and needle move together, preserving the
+   // previously approved dimensions and calendar scale.
+   const compactAxis=(surfaceRect.top+layout.axis-canvasRect.top)*sy;
    const zoom=LOUPE_VISUAL_SCALE*LOUPE_PANEL_SCALE;
    ctx.translate(w/2,compactAxis);ctx.scale(zoom,zoom);ctx.translate(-w/2,-axisY);
    ctx.beginPath();ctx.rect(left,0,Math.max(0,right-left),h);ctx.clip();

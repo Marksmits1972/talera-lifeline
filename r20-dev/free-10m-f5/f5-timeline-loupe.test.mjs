@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
-import {createLoupeScale,nextLoupeMove,LOUPE_HOLD_MS,LOUPE_SLOP_PX,LOUPE_VISUAL_SCALE,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_TOUCH_ZONE} from './f5-timeline-loupe.mjs';
+import {createLoupeScale,nextLoupeMove,alignLoupeToNativeAxis,LOUPE_DATE_GAP,LOUPE_HOLD_MS,LOUPE_SLOP_PX,LOUPE_VISUAL_SCALE,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_TOUCH_ZONE} from './f5-timeline-loupe.mjs';
 const DAY=86400000,start=Date.UTC(2000,0,1),end=start+100*DAY;
 const memories=[{id:'a',ms:start+10*DAY},{id:'b',ms:start+10*DAY},{id:'c',ms:start+11*DAY},{id:'d',ms:start+19*DAY}];
 const scale=createLoupeScale(memories,start,end);
 const [a,b,c,d]=scale.stops;
 assert.ok(LOUPE_HOLD_MS<500&&LOUPE_SLOP_PX>=12);
 assert.equal(LOUPE_VISUAL_SCALE,1.10);assert.equal(LOUPE_PANEL_SCALE,2/3);assert.equal(LOUPE_TOUCH_ZONE,1/3);assert.ok(Math.abs(LOUPE_VISIBLE_DAYS*LOUPE_VISUAL_SCALE-6)<1e-9);
+// Prefer exact original baseline; preserve the date gap using the smallest
+// necessary upward displacement when the available height is restricted.
+assert.deepEqual(alignLoupeToNativeAxis(66,72,116),{top:26,axis:66});
+assert.deepEqual(alignLoupeToNativeAxis(66,72,104),{top:20,axis:60});
+assert.equal(104-(alignLoupeToNativeAxis(66,72,104).top+72),LOUPE_DATE_GAP);
 assert.equal(a.position,10);
 assert.ok(b.position>a.position);
 assert.equal(scale.msAt(a.position),memories[0].ms);

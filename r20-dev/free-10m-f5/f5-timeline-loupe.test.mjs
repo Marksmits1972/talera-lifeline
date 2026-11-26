@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createLoupeScale,nextLoupeMove,alignLoupeToNativeAxis,LOUPE_DATE_GAP,LOUPE_HOLD_MS,LOUPE_SLOP_PX,LOUPE_VISUAL_SCALE,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_TOUCH_ZONE} from './f5-timeline-loupe.mjs';
+import {paintLoupeWeekdayLabels,createLoupeScale,nextLoupeMove,alignLoupeToNativeAxis,LOUPE_DATE_GAP,LOUPE_HOLD_MS,LOUPE_SLOP_PX,LOUPE_VISUAL_SCALE,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_TOUCH_ZONE} from './f5-timeline-loupe.mjs';
 const DAY=86400000,start=Date.UTC(2000,0,1),end=start+100*DAY;
 const memories=[{id:'a',ms:start+10*DAY},{id:'b',ms:start+10*DAY},{id:'c',ms:start+11*DAY},{id:'d',ms:start+19*DAY}];
 const scale=createLoupeScale(memories,start,end);
@@ -34,3 +34,21 @@ assert.equal(empty.msAt(42),start+42*DAY);
 assert.deepEqual(nextLoupeMove(empty,42,-1,null),{position:0});
 assert.deepEqual(nextLoupeMove(empty,42,200,null),{position:100});
 console.log('TALERA_TIMELINE_LOUPE_CONTINUOUS_CALENDAR_DISTINCT_STOPS_PASS');
+
+// The new visual row must preserve every native tick and remove the dates.
+// All five TALERA languages are exercised using the existing local calendar.
+for(const locale of ['nl-NL','en-GB','de-DE','fr-FR','es-ES']){
+ const labels=[],ticks=[];
+ const ctx={save(){},restore(){},fillText(text,x,y,maxWidth){labels.push({text,x,y,maxWidth,font:this.font});}};
+ const first=new Date(2026,10,20).getTime(),last=new Date(2026,10,26).getTime();
+ paintLoupeWeekdayLabels({ctx,from:first,to:last,lifeStart:first,lifeEnd:last,locale,
+  project:ms=>(ms-first)/DAY*60,axisY:50,availableHeight:40,dayWidth:60,
+  tick:(...args)=>ticks.push(args)});
+ assert.equal(ticks.length,7);assert.equal(labels.length,7);
+ assert.ok(ticks.every(([,y,major,label,sub])=>y===50&&major&&label===''&&sub===''));
+ assert.ok(labels.every(l=>l.font.startsWith('700 24px')&&l.maxWidth>0&&l.y>50));
+ const expected=Array.from({length:7},(_,i)=>new Intl.DateTimeFormat(locale,{weekday:'short'}).format(new Date(2026,10,20+i)).replace(/\.$/,''));
+ assert.deepEqual(labels.map(l=>l.text),expected);
+ assert.ok(labels.every(l=>!/[0-9]/.test(l.text)));
+}
+console.log('TALERA_LOUPE_LARGE_WEEKDAYS_NO_DUPLICATE_DATE_PASS');

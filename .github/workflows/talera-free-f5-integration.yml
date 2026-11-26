@@ -932,7 +932,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: eb1c23cb-522c-4a45-99c2-d8b61bd69f76
+      F5_EXPECTED_LIVE_VERSION: 55b5678d-afe9-48ef-8a9f-2fd3cd94c883
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -958,9 +958,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = ffee1d6e63dfedba96dc6a3b6149accc8d84a694
-          test "$(git diff --name-only ffee1d6e63dfedba96dc6a3b6149accc8d84a694 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code ffee1d6e63dfedba96dc6a3b6149accc8d84a694 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = f4c8507753671031461dfafc08ff23a4b968842a
+          test "$(git diff --name-only f4c8507753671031461dfafc08ff23a4b968842a HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code f4c8507753671031461dfafc08ff23a4b968842a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -969,7 +969,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45804734875',sha='ffee1d6e63dfedba96dc6a3b6149accc8d84a694';
+          const id='45808130930',sha='f4c8507753671031461dfafc08ff23a4b968842a';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const names=[mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
@@ -1000,7 +1000,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45804734875');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45808130930');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1137,8 +1137,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code ffee1d6e63dfedba96dc6a3b6149accc8d84a694 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45804734875'
+          git diff --exit-code f4c8507753671031461dfafc08ff23a4b968842a HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45808130930'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail

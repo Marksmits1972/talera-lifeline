@@ -33,6 +33,13 @@ export function installBoundedTimelineSelection(html){
  // This hook runs AFTER the existing timeline/loep and motion bridges.
  one('let activeMemoryId = 50;        // HTML fallback is memory 50.',
      'let activeMemoryId = null; // No active memory in an empty time window.','INITIAL_ID');
+ // The former half-ruler padding could force a real childhood memory several
+ // years away from the date needle. Keep the center on the actual life line;
+ // clip the paint before birth in the same way it is clipped after today.
+ one('  const span=spanForZoom(zoomPos);\n  const half=span*MS_DAY/2;\n  const minCenter=LIFE_START+Math.min(half,(LIFE_END-LIFE_START)/2);\n  centerMs=clamp(centerMs,(surface.dataset.taleraLoupe==="open"||taleraLoupeHoldMs!==null&&centerMs===taleraLoupeHoldMs)?LIFE_START:minCenter,LIFE_END);',
+     '  centerMs=clamp(centerMs,LIFE_START,LIFE_END);','ACTUAL_LIFE_CENTER');
+ one('  ctx.save();ctx.beginPath();ctx.rect(0,0,endX,h);ctx.clip();',
+     '  const startX=Math.max(0,Math.min(w,((LIFE_START-startMs)/(endMs-startMs))*w));\n  ctx.save();ctx.beginPath();ctx.rect(startX,0,Math.max(0,endX-startX),h);ctx.clip();','CLIP_BEFORE_BIRTH');
  one('function formatMemoryDate(memory) {',[
   nearestVisibleMemory.toString(),selectionBounds.toString(),
   `function timelineWindowMemory(ms=centerMs,preferred=activeMemoryId){
@@ -95,6 +102,12 @@ export function installBoundedTimelineSelection(html){
     if(memory.id!==activeMemoryId)clearTimelineSelection("preview");
     else timelineDisplay(null);
   },`,'RUNTIME_WINDOW');
+ one('    const memory=nearestMemory(centerMs);\n    if(memory)settlePhoto(memory);\n    return memory;',
+     '    const memory=MEMORIES.find(m=>m.id===activeMemoryId)||null;\n    if(memory)settlePhoto(memory);\n    return memory;','SETTLE_ONLY_ACTIVE');
+ // An empty selection has no audio owner, but retain the one paused native
+ // node so the approved iOS sound permission survives the next selection.
+ one("      closeOrdinaryVideo(!!memory&&!memory._zeroItems?.some(x=>x.kind==='audio'));",
+     "      closeOrdinaryVideo(!memory||!memory._zeroItems?.some(x=>x.kind==='audio'));",'PAUSED_NATIVE_VIDEO_RETAINED');
  one('const firstOwnMemory=nearestMemory(centerMs);\nif(firstOwnMemory)writeMemory(firstOwnMemory);',
      'const firstOwnMemory=timelineWindowMemory();\nif(firstOwnMemory)writeMemory(firstOwnMemory);else clearTimelineSelection();','EMPTY_BOOT');
  one('if(item.id!==activeMemoryId)writeMemory(item);else settlePhoto(item);',
@@ -104,6 +117,15 @@ export function installBoundedTimelineSelection(html){
  one('const memory=rt.nearestMemory(clamped);','const memory=rt.windowMemory(clamped);','YEAR_ENTRY');
  one('     const visible=runtime.currentMemory();\n     if(visible?._taleraLocal)await hydrate(visible);',
      '     runtime.draw();\n     const visible=runtime.currentMemory();\n     if(visible?._taleraLocal)await hydrate(visible);','POST_HYDRATION_SELECTION');
+ // Sample local photos already decoded in the existing visible element.
+ // A fresh blob fetch can race with pagehide's URL revocation in WebKit;
+ // neither a hidden stale photo nor an unloaded blob should drive contrast.
+ one("    const layers=[...stage.querySelectorAll('.photo-layer')]",
+     "    if(getComputedStyle(stage).visibility==='hidden')return null;\n    const layers=[...stage.querySelectorAll('.photo-layer')]",'NO_HIDDEN_CONTRAST');
+ one("      const response=await fetch(src,{mode:'cors',cache:'force-cache'});\n      if(!response.ok)throw Error('Photo unavailable for contrast');\n      const blob=await response.blob();\n      if(blob.size>25000000)throw Error('Photo too large for contrast scan');\n      try{bitmap=await createImageBitmap(blob,{resizeWidth:220,resizeQuality:'low'});}\n      catch{bitmap=await createImageBitmap(blob);}",
+     "      if(src.startsWith('blob:')){\n        if(!media.complete||!media.naturalWidth)throw Error('Photo unavailable for contrast');\n        try{bitmap=await createImageBitmap(media,{resizeWidth:220,resizeQuality:'low'});}\n        catch{bitmap=media;}\n      }else{\n        const response=await fetch(src,{mode:'cors',cache:'force-cache'});\n        if(!response.ok)throw Error('Photo unavailable for contrast');\n        const blob=await response.blob();\n        if(blob.size>25000000)throw Error('Photo too large for contrast scan');\n        try{bitmap=await createImageBitmap(blob,{resizeWidth:220,resizeQuality:'low'});}\n        catch{bitmap=await createImageBitmap(blob);}\n      }",'LOCAL_CONTRAST_DECODED_PHOTO');
+ one('      const width=isVideo?media.videoWidth:bitmap.width;\n      const height=isVideo?media.videoHeight:bitmap.height;',
+     '      const width=isVideo?media.videoWidth:bitmap===media?media.naturalWidth:bitmap.width;\n      const height=isVideo?media.videoHeight:bitmap===media?media.naturalHeight:bitmap.height;','CONTRAST_ORIGINAL_DIMENSIONS');
  // Don't open the wheel with its last index before a time lookup has run.
  one("    open();\n  }\n  function followTimeline(ms){","  }\n  function followTimeline(ms){",'NO_STALE_FIRST_FRAME');
  one('    const now=performance.now(),pos=positionForTimestamp(ms);',`    const items=all(),preferred=items[Math.round(state.p)]?.id;

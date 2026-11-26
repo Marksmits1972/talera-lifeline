@@ -3566,7 +3566,8 @@ async function testTimelineLoupe(){
     const video=document.querySelector('video.talera-v61-inline-video');
     return {retainedPlayer:!!video,paused:video?.paused,
       hidden:video?.style.display==='none',
-      wheel:document.querySelector('#photoStage .talera-wheel-strip')?.classList.contains('is-visible')};
+      wheel:document.querySelector('#photoStage .talera-wheel-strip')?.classList.contains('is-visible'),
+      eligible:window.__taleraTimelineRuntime.windowMemory()?.id??null};
   });
   await page.mouse.up();
   assert.equal(ordinaryWhileMoving.retainedPlayer,true,
@@ -3577,7 +3578,8 @@ async function testTimelineLoupe(){
     'The old ordinary video must disappear while the native timeline strip moves');
   assert.equal(await page.locator('#talera-f5-ordinary-video-mask').count(),0,
     'Swiping toward another memory may not paint a blue video mask');
-  assert.equal(ordinaryWhileMoving.wheel,true);
+  assert.equal(ordinaryWhileMoving.wheel,ordinaryWhileMoving.eligible!==null,
+    'An empty timeline window must not display the previous video or photo strip');
   console.log('TALERA_TIMELINE_NAVIGATION_STOPS_ORDINARY_VIDEO_PASS',
     JSON.stringify({originalVideoStopped:true,originalVideoHidden:true,
       nativeNodeRetained:true,noNewPlayer:true,iphoneAccepted:false}));

@@ -1,3 +1,4 @@
+import {chooseLanguage,requestLanguage,translate} from '../free-10m-f5/f5-language.mjs';
 // TALERA FREE ACCOUNT/AUTH pilot — ISOLATED, NO CUSTOMER MIGRATION.
 // The existing TALERA login and D1 remain the source of truth until explicit
 // verified migration/cutover. Do NOT proxy real requests into this pilot.
@@ -131,50 +132,49 @@ async function signin(req,env){
  return issueSession(env,{...publicProfile,username:publicProfile.publicHandle});
 }
 // Public response never confirms whether the e-mail address has an account.
-const resetAcknowledgment=()=>json({ok:true,
- message:'Als dit e-mailadres bij een TALERA-account hoort en verzending mogelijk is, ontvang je een herstellink.'},200);
+const resetLanguage=req=>chooseLanguage(req.headers.get('x-talera-language'),[requestLanguage(req)]);
+const resetResponse=(req,status,key,ok=false)=>json({...(ok?{ok:true,message:translate(resetLanguage(req),key)}:{error:translate(resetLanguage(req),key)}),messageKey:key},status);
+const resetAcknowledgment=req=>resetResponse(req,200,'reset.api.requestAck',true);
 async function requestPasswordReset(req,env){
- if(!sameOrigin(req))return err(403,'Ongeldige herkomst');
+ if(!sameOrigin(req))return resetResponse(req,403,'reset.api.requestOrigin');
  // A verified sender is essential. Never claim a mail was sent without it.
  if(typeof env.EMAIL?.send!=='function'||typeof env.TALERA_RESET_FROM!=='string')
-  return err(503,'Wachtwoordherstel is tijdelijk niet beschikbaar');
+  return resetResponse(req,503,'reset.api.unavailable');
  let from;
  try{from=validEmail(env.TALERA_RESET_FROM)}
- catch{return err(503,'Wachtwoordherstel is tijdelijk niet beschikbaar')}
- if(!await limit(env,req,'reset-request-ip',5))return err(429,'Probeer later opnieuw');
+ catch{return resetResponse(req,503,'reset.api.unavailable')}
+ if(!await limit(env,req,'reset-request-ip',5))return resetResponse(req,429,'reset.api.requestLimitIp');
  let payload,email;
  try{payload=await body(req);email=validEmail(payload.email)}
- catch{return err(400,'Vul een geldig e-mailadres in')}
+ catch{return resetResponse(req,400,'reset.api.invalidEmail')}
  if(!await limit(env,req,'reset-request-email',3,email))
-  return err(429,'Probeer later opnieuw');
+  return resetResponse(req,429,'reset.api.requestLimitEmail');
  const address=await accountForEmail(env,email);
  const id=await address.index.owner();
- if(!id)return resetAcknowledgment();
+ if(!id)return resetAcknowledgment(req);
  const home=accountStub(env,id);
  const profile=await home.getProfile();
  if(!profile||profile.status!=='active'||profile.email!==email)
-  return resetAcknowledgment();
+  return resetAcknowledgment(req);
  const token=freshToken(),tokenHash=await shaHex(token);
  if(!await home.beginPasswordReset(tokenHash,Date.now()+RESET_EXPIRES_MS))
-  return resetAcknowledgment();
+  return resetAcknowledgment(req);
  const destination=new URL('/wachtwoord-instellen',new URL(req.url).origin);
  // Fragment never goes to the Worker or a proxy in an HTTP request.
  destination.hash='e='+encodeURIComponent(email)+'&t='+token;
  try{
-  await env.EMAIL.send({from,to:email,subject:'TALERA — wachtwoord herstellen',
-   text:'Je hebt een nieuw wachtwoord voor TALERA aangevraagd.\n\n'+
-    'Open deze persoonlijke link (15 minuten geldig, eenmalig):\n'+destination.href+
-    '\n\nNiet aangevraagd? Negeer dan deze e-mail. Je huidige wachtwoord blijft werken.'});
+  await env.EMAIL.send({from,to:email,subject:translate(resetLanguage(req),'reset.mail.subject'),
+   text:translate(resetLanguage(req),'reset.mail.body',{link:destination.href})});
  }catch{
   await home.cancelPasswordReset(tokenHash);
   // Same generic response for existing and absent account: no enumeration.
-  return resetAcknowledgment();
+  return resetAcknowledgment(req);
  }
- return resetAcknowledgment();
+ return resetAcknowledgment(req);
 }
 async function confirmPasswordReset(req,env){
- if(!sameOrigin(req))return err(403,'Ongeldige herkomst');
- if(!await limit(env,req,'reset-confirm-ip',10))return err(429,'Probeer later opnieuw');
+ if(!sameOrigin(req))return resetResponse(req,403,'reset.api.confirmOrigin');
+ if(!await limit(env,req,'reset-confirm-ip',10))return resetResponse(req,429,'reset.api.confirmLimitIp');
  let input,email,password,token;
  try{
   input=await body(req);
@@ -183,16 +183,16 @@ async function confirmPasswordReset(req,env){
   token=input.token;
   if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))
    throw Error('INVALID_TOKEN');
- }catch{return err(400,'Ongeldige of onvolledige herstelgegevens')}
+ }catch{return resetResponse(req,400,'reset.api.invalidData')}
  if(!await limit(env,req,'reset-confirm-email',10,email))
-  return err(429,'Probeer later opnieuw');
+  return resetResponse(req,429,'reset.api.confirmLimitEmail');
  const index=await accountForEmail(env,email),id=await index.index.owner();
- if(!id)return err(400,'Deze herstellink is ongeldig of verlopen');
+ if(!id)return resetResponse(req,400,'reset.api.invalidLink');
  const salt=freshToken(),hash=await passwordHash(password,salt);
  const success=await accountStub(env,id).completePasswordReset(await shaHex(token),salt,hash);
- if(!success)return err(400,'Deze herstellink is ongeldig of verlopen');
+ if(!success)return resetResponse(req,400,'reset.api.invalidLink');
  // Epoch bump in the account DO invalidates ALL prior login sessions.
- return json({ok:true,message:'Je wachtwoord is gewijzigd. Meld je opnieuw aan.'});
+ return resetResponse(req,200,'reset.api.confirmDone',true);
 }
 async function me(req,env){
  const session=await sessionForRequest(env,req);

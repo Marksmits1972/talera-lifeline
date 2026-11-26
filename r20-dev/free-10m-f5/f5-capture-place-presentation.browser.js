@@ -87,7 +87,11 @@ function mountTaleraCapturePlace(flagPositions){
    const place=result.place;
    const [x,y]=flagPositions[place.countryCode];
    flag.style.backgroundPosition=x+'px '+y+'px';
-   label.textContent=place.country+' · '+(place.source==='geonames-locality-v2'?'omgeving '+place.city+' (GeoNames)':place.city);row.hidden=false;
+   const locale=window.TaleraI18n?.locale||document.documentElement.lang||'en';
+   let localizedCountry=place.country;try{localizedCountry=new Intl.DisplayNames([locale],{type:'region',fallback:'none'}).of(place.countryCode)||place.country}catch{}
+   const locationLabel=place.source==='geonames-locality-v2'
+    ?window.TaleraI18n.t('core.present.captureNear',{city:place.city}):place.city;
+   label.textContent=localizedCountry+' · '+locationLabel;row.hidden=false;
   });
  }
  function schedule(){if(!queued){queued=true;queueMicrotask(refresh)}}
@@ -109,5 +113,6 @@ function mountTaleraCapturePlace(flagPositions){
  window.addEventListener('talera-capture-place-updated',catalogChanged);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)catalogChanged();else schedule()});
  window.addEventListener('pageshow',catalogChanged);
+ document.addEventListener('talera:languagechange',catalogChanged);
  schedule();
 }

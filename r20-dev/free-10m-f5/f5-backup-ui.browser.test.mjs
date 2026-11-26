@@ -91,7 +91,7 @@ const seed=async(page,db,present)=>{
 try{
  [serverA,serverB]=await Promise.all([serve(8865,dbA),serve(8866,dbB)]);
  browser=await chromium.launch();
- const context=await browser.newContext({acceptDownloads:true,viewport:{width:390,height:844}});
+ const context=await browser.newContext({locale:'nl-NL',acceptDownloads:true,viewport:{width:390,height:844}});
  const a=await context.newPage(),b=await context.newPage();
  const errors=[];a.on('pageerror',e=>errors.push('A '+e.message));b.on('pageerror',e=>errors.push('B '+e.message));
  await a.goto(originA+'/__f5/backup');
@@ -214,7 +214,7 @@ try{
  // existing TALERA backup page + same origin in a fresh browser storage
  // context. This is disposable CI state, NOT a second app/Worker/user URL.
  // The owner's iPhone IndexedDB, account and real media remain untouched.
- const emptyContext=await browser.newContext({acceptDownloads:true,
+ const emptyContext=await browser.newContext({locale:'nl-NL',acceptDownloads:true,
   viewport:{width:390,height:844}});
  try{
   const empty=await emptyContext.newPage();

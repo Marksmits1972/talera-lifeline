@@ -1,3 +1,4 @@
+const t=(key,params)=>window.TaleraLanguage.t(key,params);
 // User-triggered transfer on the EXISTING private backup page only.
 import {readTransferLibrary,inventory,makeTransfer,reviewTransfer,commitTransfer} from './f5-transfer-library.mjs';
 import {newDirectPeer,gather,sendFrame,frameReceiver,jsonBlob,readJSON,pairingVerificationCode} from './f5-transfer-transport.mjs';
@@ -15,9 +16,9 @@ const diagEnable=el('transfer-diagnostic-enable'),diagPanel=el('transfer-diagnos
 let diag=null;
 function renderDiagnostic(d){
  if(diag!==d)return;
- const format=events=>events.length?events.map(([ms,phase,detail])=>(ms/1000).toFixed(3)+'s  '+phase+(detail?' '+detail:'')).join('\n'):'Nog geen gegevens';
+ const format=events=>events.length?events.map(([ms,phase,detail])=>(ms/1000).toFixed(3)+'s  '+phase+(detail?' '+detail:'')).join('\n'):t('transfer.status.diagEmpty');
  const own=d.events,other=d.remote?.[d.role==='receive'?'send':'receive']||[];
- diagReport.textContent='TALERA diagnose v1 — '+d.role+'\nEIGEN APPARAAT\n'+format(own)+'\n\nANDER APPARAAT\n'+format(other);
+ diagReport.textContent=t('transfer.status.diagReport',{role:d.role,own:format(own),other:format(other)});
 }
 async function syncDiagnostic(d,manual=false){
  if(diag!==d||!diagEnable.checked||!d.locator||d.busy||(!manual&&d.sends>=12))return;
@@ -30,8 +31,8 @@ async function syncDiagnostic(d,manual=false){
   if(!r.ok)throw Error('DIAG');
   const result=await r.json();if(diag!==d)return;
   if(!result.reports||!validDiagnosticEvents(result.reports.receive)||!validDiagnosticEvents(result.reports.send))throw Error('DIAG');
-  d.remote=result.reports;diagStatus.textContent='Technische diagnose bijgewerkt.';renderDiagnostic(d);
- }catch{if(diag===d)diagStatus.textContent='Andere apparaat nog niet bereikbaar voor diagnose. Eigen diagnose blijft beschikbaar.'}
+  d.remote=result.reports;diagStatus.textContent=t('transfer.status.diagUpdated');renderDiagnostic(d);
+ }catch{if(diag===d)diagStatus.textContent=t('transfer.status.diagUnavailable')}
  finally{clearTimeout(timer);d.busy=false;if(diag===d&&d.dirty){d.dirty=false;scheduleDiagnostic(d)}}
 }
 function scheduleDiagnostic(d){
@@ -64,19 +65,19 @@ function observePeer(s){
  peer.addEventListener('icecandidate',e=>{for(const kind of safeCandidateKinds(e.candidate))emit(kind)});
  snapshot();
 }
-diagEnable.addEventListener('change',()=>{if(diag?.timer)clearTimeout(diag.timer);diag=null;diagPanel.hidden=!diagEnable.checked;diagReport.textContent='';diagStatus.textContent=diagEnable.checked?'Start nu een verbinding.':''});
+diagEnable.addEventListener('change',()=>{if(diag?.timer)clearTimeout(diag.timer);diag=null;diagPanel.hidden=!diagEnable.checked;diagReport.textContent='';diagStatus.textContent=diagEnable.checked?t('transfer.status.diagStart'):''});
 el('transfer-diagnostic-refresh').addEventListener('click',()=>{if(diag)void syncDiagnostic(diag,true)});
 el('transfer-diagnostic-copy').addEventListener('click',async()=>{
- if(!diag)return;try{await navigator.clipboard.writeText(diagReport.textContent);diagStatus.textContent='Diagnose gekopieerd.'}
- catch{diagStatus.textContent='Kopiëren niet beschikbaar; selecteer de technische tekst hieronder.'}
+ if(!diag)return;try{await navigator.clipboard.writeText(diagReport.textContent);diagStatus.textContent=t('transfer.status.diagCopied')}
+ catch{diagStatus.textContent=t('transfer.status.diagCopyFail')}
 });
 const say=text=>{status.textContent=text};
 const qr=el('transfer-qr'),scanButton=el('transfer-scan'),scanStop=el('transfer-scan-stop');
-const scan=pairingScanner({video:el('transfer-camera'),report:msg=>{say(msg);if(el('transfer-camera').hidden){scanButton.disabled=false;scanStop.hidden=true}},onCode:code=>{
+const scan=pairingScanner({translate:t,video:el('transfer-camera'),report:msg=>{say(msg);if(el('transfer-camera').hidden){scanButton.disabled=false;scanStop.hidden=true}},onCode:code=>{
  if(join.hidden||active)return;
  scanButton.disabled=false;scanStop.hidden=true;
  input.value=code.match(/.{1,5}/g).join('-').toUpperCase();
- say('QR-code gelezen. Tik op Verbinden.');el('transfer-connect').focus();
+ say(t('transfer.status.qrRead'));el('transfer-connect').focus();
 }});
 function closeCamera(){scan.stop();scanButton.disabled=false;scanStop.hidden=true}
 function clearQR(){qr.hidden=true;qr.width=qr.height=1}
@@ -128,11 +129,11 @@ function failure(s,error){
  markDiagnostic(diagnosticError(error));
  const raw=String(error?.message||'');
  const message=/CONFLICT|EXISTING_CONTENT|DUPLICATE/.test(raw)?
-  'Er is een verschil met een bestaande herinnering. De overdracht is gestopt; niets wordt overschreven.':
-  /ACCOUNT/.test(raw)?'Je account is gewijzigd. Open dit onderdeel opnieuw.':
-  /STORAGE|Quota|MEMORY/.test(raw)?'Niet genoeg beschikbare opslag of geheugen. Gebruik de bestaande back-up.':
-  s.committing?'De opslag kon niet volledig worden bevestigd. Controleer Mijn leven; probeer niet blind opnieuw.':
-  'De verbinding of overdracht is niet gelukt. Houd beide apps open op hetzelfde wifi-netwerk of gebruik de bestaande back-up.';
+  t('transfer.status.conflict'):
+  /ACCOUNT/.test(raw)?t('transfer.status.accountChanged'):
+  /STORAGE|Quota|MEMORY/.test(raw)?t('transfer.status.storage'):
+  s.committing?t('transfer.status.commitUnconfirmed'):
+  t('transfer.status.failed');
  void finish(s,message);
 }
 function timeout(s,ms){
@@ -154,10 +155,10 @@ async function maybeStart(s){
  if(s.started||!s.approved||!s.otherReady)return;
  markDiagnostic('TRANSFER_START');s.started=true;s.phase=s.role==='receive'?'plan':'inventory';timeout(s,30*60*1000);await account();live(s);
  if(s.role==='receive'){
-  say('Lokale bibliotheek controleren…');
+  say(t('transfer.status.checkLibrary'));
   const own=await inventory(await readTransferLibrary(scope));live(s);
   s.phase='plan';await sendJSON(s,'inventory',own);
- }else if(s.phase==='inventory'){say('Wachten op controle van het andere apparaat…')}
+ }else if(s.phase==='inventory'){say(t('transfer.status.waitOtherCheck'))}
 }
 async function handleFrame(s,kind,blob){
  live(s);
@@ -169,13 +170,13 @@ async function handleFrame(s,kind,blob){
  if(!s.started)throw Error('PROTOCOL');
  if(kind==='error')throw Error('CONFLICT');
  if(s.role==='send'&&kind==='inventory'&&s.phase==='inventory'){
-  s.phase='preparing';say('Nieuwe herinneringen bepalen…');
+  s.phase='preparing';say(t('transfer.status.determineNew'));
   await account();live(s);
   const result=await makeTransfer(await readTransferLibrary(scope),await readJSON(blob),scope,location.origin);live(s);
   s.phase='done';s.expected=result.count;
   await sendJSON(s,'plan',{count:result.count,duplicates:result.duplicates,reuse:result.reuse});
-  if(result.archive){say('Herinneringen versturen…');await queueFrame(s,'archive',result.archive,(n,total)=>say('Versturen: '+Math.floor(100*n/total)+'%'));}
-  else say('Geen nieuwe herinneringen gevonden.');
+  if(result.archive){say(t('transfer.status.sending'));await queueFrame(s,'archive',result.archive,(n,total)=>say(t('transfer.status.sendProgress',{percent:Math.floor(100*n/total)})));}
+  else say(t('transfer.status.noneFound'));
   return;
  }
  if(s.role==='receive'&&kind==='plan'&&s.phase==='plan'){
@@ -184,25 +185,25 @@ async function handleFrame(s,kind,blob){
      !Number.isSafeInteger(plan.duplicates)||plan.duplicates<0||!Array.isArray(plan.reuse))throw Error('PROTOCOL');
   s.plan=plan;
   if(!plan.count){
-   s.phase='complete';s.resultMessage='Geen nieuwe herinneringen. Beide bibliotheken blijven ongewijzigd.';say(s.resultMessage);
+   s.phase='complete';s.resultMessage=t('transfer.status.noneBoth');say(s.resultMessage);
    await sendJSON(s,'done',{count:0});return;
   }
-  s.phase='archive';say(plan.count+' nieuwe herinneringen ontvangen…');return;
+  s.phase='archive';say(t('transfer.status.receivingCount',{count:plan.count}));return;
  }
  if(s.role==='receive'&&kind==='archive'&&s.phase==='archive'){
-  s.phase='review';say('Bestanden en originele media controleren…');
+  s.phase='review';say(t('transfer.status.checkMedia'));
   await account();live(s);
   const result=await reviewTransfer(blob,s.plan.reuse,await readTransferLibrary(scope),scope,location.origin);live(s);
   if(result.stories.length!==s.plan.count)throw Error('PROTOCOL');
   s.archive=blob;s.phase='confirm';
-  say(result.stories.length+' nieuwe herinneringen gecontroleerd. '+s.plan.duplicates+' bestaande herinneringen blijven ongewijzigd.');
+  say(t('transfer.status.review',{count:result.stories.length,duplicates:s.plan.duplicates}));
   apply.hidden=false;apply.disabled=false;return;
  }
  if(s.role==='send'&&kind==='done'&&s.phase==='done'){
   const result=await readJSON(blob);
   if(!Number.isSafeInteger(result.count)||result.count!==s.expected)throw Error('PROTOCOL');
   s.phase='complete';
-  await finish(s,result.count+' herinneringen toegevoegd en gecontroleerd op het andere apparaat. Je eigen herinneringen blijven behouden.');return;
+  await finish(s,t('transfer.status.doneOther',{count:result.count}));return;
  }
  throw Error('PROTOCOL');
 }
@@ -210,7 +211,7 @@ function attach(s,channel){
  if(s.channel)throw Error('PROTOCOL');
  s.channel=channel;markDiagnostic('CHANNEL_CREATED');
  s.receiver=frameReceiver(channel,(kind,blob)=>handleFrame(s,kind,blob),error=>{if(!s.committing)failure(s,error)},(kind,n,total)=>{
-  if(kind==='archive')say('Ontvangen: '+Math.floor(n*100/total)+'%');
+  if(kind==='archive')say(t('transfer.status.receiveProgress',{percent:Math.floor(n*100/total)}));
  },(kind,bytes)=>{
   // Reject unexpected frames BEFORE allocating memory or OPFS. The
   // prior queued frame has completed protocol validation at this point.
@@ -228,14 +229,14 @@ function attach(s,channel){
   try{
    s.verification=await pairingVerificationCode(s.locator,s.offer,s.answer);live(s);
    markDiagnostic('VERIFICATION_READY');verifyCode.textContent=s.verification;verify.hidden=false;
-   say('Vergelijk de beveiligingscodes en bevestig op beide apparaten.');approve.hidden=false;approve.disabled=false;
+   say(t('transfer.status.verify'));approve.hidden=false;approve.disabled=false;
    if(s.locator)api('cancel',s.locator).catch(()=>{});
   }catch(e){failure(s,e)}
  });
  channel.addEventListener('close',()=>{
   if(active!==s)return;markDiagnostic('CHANNEL_CLOSE');
   if(s.committing&&s.phase!=='complete')return;
-  if(s.phase==='complete')void finish(s,s.resultMessage||'Overdracht voltooid.');
+  if(s.phase==='complete')void finish(s,s.resultMessage||t('transfer.status.complete'));
   else failure(s,Error('NETWORK'));
  });
 }
@@ -244,7 +245,7 @@ async function startReceive(automatic){
  const run=++flow;connecting=true;receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;
  let s;
  try{
-  await account();if(run!==flow)return;connecting=false;s=newSession('receive');say('Verbinding voorbereiden…');
+  await account();if(run!==flow)return;connecting=false;s=newSession('receive');say(t('transfer.status.prepare'));
   attach(s,s.peer.createDataChannel('talera-transfer-v1',{ordered:true}));
   const code=hex(crypto.getRandomValues(new Uint8Array(10)));
   s.locator=(await codeHash(code)).slice(0,32);live(s);
@@ -258,7 +259,7 @@ async function startReceive(automatic){
    el('transfer-code').textContent=code.match(/.{1,5}/g).join('-').toUpperCase();
    try{drawPairingQR(qr,code);qr.hidden=false}catch{clearQR()}
   }
-  say(automatic?'Je andere apparaat kan je nu vinden. Twee minuten geldig.':'Verbindingscode is twee minuten geldig.');
+  say(automatic?t('transfer.status.autoReady'):t('transfer.status.codeReady'));
   const until=Date.now()+120000;
   while(Date.now()<until){
    await wait(2000);live(s);const r=await api('poll',s.locator);live(s);
@@ -268,22 +269,22 @@ async function startReceive(automatic){
    markDiagnostic('REMOTE_ANSWER_BEGIN');await s.peer.setRemoteDescription({type:'answer',sdp:s.answer});live(s);markDiagnostic('REMOTE_ANSWER_OK');return;
   }
   throw Error('TIMEOUT');
- }catch(e){if(s)failure(s,e);else if(run===flow){markDiagnostic(diagnosticError(e));reset();say('Verbinding niet beschikbaar. Open TALERA met je eigen account.')}}
+ }catch(e){if(s)failure(s,e);else if(run===flow){markDiagnostic(diagnosticError(e));reset();say(t('transfer.status.noAccount'))}}
 }
 receive.addEventListener('click',()=>void startReceive(true));
 receiveManual.addEventListener('click',()=>void startReceive(false));
 async function discover(){
  if(active||connecting||join.hidden)return;
  const run=++flow;connecting=true;search.disabled=true;discovered=null;found.hidden=true;
- closeCamera();say('Zoeken naar je ontvangende apparaat…');
+ closeCamera();say(t('transfer.status.search'));
  try{
   await account();if(run!==flow)return;
   const r=await api('discover');if(run!==flow)return;
   const invitation=r.invitation;
-  if(invitation===null){markDiagnostic('DISCOVER_EMPTY');say('Nog geen apparaat gevonden. Kies eerst Ontvangen op het andere apparaat en tik op Opnieuw zoeken.');return}
+  if(invitation===null){markDiagnostic('DISCOVER_EMPTY');say(t('transfer.status.notFound'));return}
   if(!invitation||Object.keys(invitation).sort().join()!=='code,secret'||typeof invitation.code!=='string'||typeof invitation.secret!=='string'||!/^[a-f0-9]{32}$/.test(invitation.code)||!/^[a-f0-9]{20}$/.test(invitation.secret)||(await codeHash(invitation.secret)).slice(0,32)!==invitation.code)throw Error('PAIR');
-  if(run!==flow)return;discovered=invitation;diagnosticLocator(invitation.code);markDiagnostic('DISCOVER_FOUND');found.hidden=false;say('Ontvangend apparaat gevonden. Tik op Verbinden.');
- }catch(e){if(run===flow){markDiagnostic('DISCOVER_ERROR');say('Zoeken is niet gelukt. Probeer opnieuw met hetzelfde account of verbind handmatig.')}}
+  if(run!==flow)return;discovered=invitation;diagnosticLocator(invitation.code);markDiagnostic('DISCOVER_FOUND');found.hidden=false;say(t('transfer.status.found'));
+ }catch(e){if(run===flow){markDiagnostic('DISCOVER_ERROR');say(t('transfer.status.searchFailed'))}}
  finally{if(run===flow){connecting=false;search.disabled=false}}
 }
 send.addEventListener('click',()=>{
@@ -294,14 +295,14 @@ scanButton.addEventListener('click',()=>{
  if(active||connecting||join.hidden)return;
  scanButton.disabled=true;scanStop.hidden=false;void scan.start();
 });
-scanStop.addEventListener('click',()=>{closeCamera();say('Camera gesloten. Je kunt de code ook typen.')});
+scanStop.addEventListener('click',()=>{closeCamera();say(t('transfer.status.cameraClosed'))});
 async function connect(code,expectedLocator=null){
  if(active||connecting||join.hidden)return;
- if(!/^[a-f0-9]{20}$/.test(code)){say('Voer de volledige verbindingscode in.');return}
+ if(!/^[a-f0-9]{20}$/.test(code)){say(t('transfer.status.codeIncomplete'));return}
  let s;const run=++flow;
  try{
   connecting=true;discovered=null;el('transfer-connect').disabled=connectFound.disabled=search.disabled=true;closeCamera();
-  await account();if(run!==flow)return;connecting=false;s=newSession('send');join.hidden=true;say('Verbinding maken…');
+  await account();if(run!==flow)return;connecting=false;s=newSession('send');join.hidden=true;say(t('transfer.status.connecting'));
   s.locator=(await codeHash(code)).slice(0,32);live(s);
   if(expectedLocator&&expectedLocator!==s.locator)throw Error('PAIR');
   const r=await api('offer',s.locator);live(s);
@@ -312,27 +313,27 @@ async function connect(code,expectedLocator=null){
   markDiagnostic('LOCAL_ANSWER_BEGIN');const answer=await gather(s.peer,await s.peer.createAnswer());live(s);s.answer=answer;markDiagnostic('LOCAL_ANSWER_OK');
   const signature=await proof(code,'answer',answer);live(s);
   await api('join',s.locator,{sdp:answer,proof:signature});live(s);markDiagnostic('JOIN_OK');
- }catch(e){if(s)failure(s,e);else if(run===flow){markDiagnostic(diagnosticError(e));reset();say('Verbinding niet beschikbaar. Probeer opnieuw.')}}
+ }catch(e){if(s)failure(s,e);else if(run===flow){markDiagnostic(diagnosticError(e));reset();say(t('transfer.status.connectFailed'))}}
 }
 el('transfer-connect').addEventListener('click',()=>void connect(input.value.trim().replace(/-/g,'').toLowerCase()));
 connectFound.addEventListener('click',()=>{if(discovered)void connect(discovered.secret,discovered.code)});
 approve.addEventListener('click',async()=>{
  const s=active;if(!s||s.approved||!s.verification)return;approve.disabled=true;
  try{await account();live(s);s.approved=true;markDiagnostic('APPROVED');if(s.role==='send'&&s.otherReady)s.phase='inventory';
-  await sendJSON(s,'ready',{ready:true});say('Wachten op bevestiging van beide apparaten…');await maybeStart(s);
+  await sendJSON(s,'ready',{ready:true});say(t('transfer.status.waitConfirm'));await maybeStart(s);
  }catch(e){failure(s,e)}
 });
 apply.addEventListener('click',async()=>{
  const s=active;if(!s||s.phase!=='confirm')return;
  apply.disabled=true;stop.disabled=true;s.committing=true;clearTimeout(s.timer);
  try{
-  await account();live(s);say('Herinneringen veilig toevoegen…');
+  await account();live(s);say(t('transfer.status.committing'));
   const result=await commitTransfer(s.archive,s.plan.reuse,scope,location.origin,{confirmed:true});
-  s.phase='complete';s.resultMessage=result.count+' herinneringen toegevoegd en gecontroleerd.';
+  s.phase='complete';s.resultMessage=t('transfer.status.doneLocal',{count:result.count});
   say(s.resultMessage);apply.hidden=true;
   await sendJSON(s,'done',{count:result.count});
  }catch(e){failure(s,e)}finally{stop.disabled=false}
 });
-stop.addEventListener('click',()=>{markDiagnostic('STOPPED');if(active&&!active.committing)void finish(active,'Overdracht gestopt. Geen herinneringen verwijderd.');else if(!active){reset();say('Verbinding gestopt.')}});
+stop.addEventListener('click',()=>{markDiagnostic('STOPPED');if(active&&!active.committing)void finish(active,t('transfer.status.stopped'));else if(!active){reset();say(t('transfer.status.connectionStopped'))}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)closeCamera()});
-window.addEventListener('pagehide',()=>{closeCamera();clearQR();if(active&&!active.committing)void finish(active,'Overdracht gestopt.');else if(!active)reset()});
+window.addEventListener('pagehide',()=>{closeCamera();clearQR();if(active&&!active.committing)void finish(active,t('transfer.status.pageExit'));else if(!active)reset()});

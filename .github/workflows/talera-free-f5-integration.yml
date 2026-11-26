@@ -44,6 +44,7 @@ jobs:
           npm ci
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
+          node --test r20-dev/free-10m-f5/f5-language.test.mjs
       - name: Archive allowlisted anonymous software outputs and bind to exact commit
         id: package
         run: |
@@ -220,8 +221,8 @@ jobs:
             # the owner-requested ordered backup picker UI and controller are exact-blob guarded.
             # Archive codec, read/write adapter, owner data and presentation remain unchanged.
             if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "f5ad3899943cad773c467e3659bcff215f464110"
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "ee5720f3766399404bf366c1b8eb3ce695973f09"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "fc73ad52303abc296d74e405bde5f014a42d0828"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "d48e4b928237ab231def73b9edc476c516a8c36c"
             elif [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "e01dc1b7bab00fc38125fc525f65a357a931c061"

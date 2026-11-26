@@ -1,3 +1,4 @@
+import {languageCatalog} from './f5-language-catalog.mjs';
 import {createOriginalPayloadStorage} from './f5-library-persistence.mjs';
 import {isDecodableEditorPoster} from './f5-editor-canonical-refs.mjs';
 // TALERA Free: permanent published media IDs, independent of visual order.
@@ -270,18 +271,10 @@ export function exposeCompleteMemoryDelete(html){
   if(typeof id!=='string'||!/^local-[a-z0-9-]+$/i.test(id)||!isCurrent())return;
   const requested=new URLSearchParams(location.search).get('edit');
   if(requested&&requested!==id)return;
-  const strings={
-   nl:['Herinnering verwijderen','Wil je deze complete herinnering definitief verwijderen? Ook de bijbehorende foto’s, video’s en opname worden verwijderd. Dit kan niet ongedaan worden gemaakt zonder back-up.','Verwijderen is niet bevestigd. Controleer Mijn leven voordat je het opnieuw probeert.'],
-   en:['Delete memory','Permanently delete this entire memory, including its photos, videos and recording? This cannot be undone without a backup.','Deletion was not confirmed. Check My Life before trying again.'],
-   de:['Erinnerung löschen','Diese gesamte Erinnerung samt Fotos, Videos und Aufnahme endgültig löschen? Ohne Sicherung kann dies nicht rückgängig gemacht werden.','Löschen nicht bestätigt. Prüfe Mein Leben, bevor du es erneut versuchst.'],
-   fr:['Supprimer le souvenir','Supprimer définitivement ce souvenir, ses photos, vidéos et enregistrement ? Sans sauvegarde, cette action est irréversible.','Suppression non confirmée. Vérifiez Ma vie avant de réessayer.'],
-   es:['Eliminar recuerdo','¿Eliminar definitivamente este recuerdo, sus fotos, vídeos y grabación? No se puede deshacer sin una copia de seguridad.','No se ha confirmado la eliminación. Revisa Mi vida antes de volver a intentarlo.']
-  };
+  const strings=${JSON.stringify(Object.fromEntries(Object.entries(languageCatalog).map(([l,p])=>[l,[p['core.editor.deleteButton'],p['core.editor.deleteConfirm'],p['core.editor.deleteFailure']]])))};
   const lang=String(window.TaleraI18n?.language||document.documentElement.lang||'nl').slice(0,2);
   const labels=strings[lang]||strings.en;
-  const optionsLabels={nl:'Meer opties voor deze herinnering',en:'More options for this memory',
-   de:'Weitere Optionen für diese Erinnerung',fr:'Plus d’options pour ce souvenir',
-   es:'Más opciones para este recuerdo'};
+  const optionsLabels=${JSON.stringify(Object.fromEntries(Object.entries(languageCatalog).map(([l,p])=>[l,p['core.editor.optionsAria']])))};
   const menu=document.createElement('div');
   menu.className='talera-editor-memory-options';
   menu.style.cssText='position:absolute;right:0;top:0;z-index:30;width:44px;height:44px;';

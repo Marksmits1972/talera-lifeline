@@ -1,3 +1,4 @@
+import {languageCatalog} from './f5-language-catalog.mjs';
 import assert from 'node:assert/strict';
 
 // Approved TALERA editor redesign. Restrict all source edits to the original
@@ -50,9 +51,9 @@ export function simplifyTellMemoryEditor(html){
  toolbar=replace(toolbar,"  publish.textContent='Plaatsen';",
  `  const editExisting=typeof g.existing==='string'&&g.existing.length>0&&new URLSearchParams(location.search).get('edit')===g.existing;
   const placeLabel=()=>{const lang=String(window.TaleraI18n?.language||document.documentElement.lang||'nl').slice(0,2);
-   const labels={nl:['Opslaan','Wijzigingen opslaan'],en:['Save','Save changes'],de:['Speichern','Änderungen speichern'],fr:['Enregistrer','Enregistrer les modifications'],es:['Guardar','Guardar cambios']};
-   if(editExisting){const pair=labels[lang]||labels.nl;publish.textContent=pair[0];publish.setAttribute('aria-label',pair[1]);}
-   else{publish.textContent='Plaatsen';publish.setAttribute('aria-label','Plaatsen op tijdlijn');}
+   const labels=${JSON.stringify(Object.fromEntries(Object.entries(languageCatalog).map(([l,p])=>[l,[p['core.editor.saveButton'],p['core.editor.saveAria'],p['core.editor.publishButton'],p['core.editor.publishAria']]])))};
+   if(editExisting){const pair=labels[lang]||labels.en;publish.textContent=pair[0];publish.setAttribute('aria-label',pair[1]);}
+   else{const pair=labels[lang]||labels.en;publish.textContent=pair[2];publish.setAttribute('aria-label',pair[3]);}
   };
   placeLabel();
   if(editExisting){

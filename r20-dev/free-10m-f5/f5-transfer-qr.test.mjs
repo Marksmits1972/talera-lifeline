@@ -1,3 +1,4 @@
+import {translate} from './f5-language.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pairingMatrix,pairingPayload,readPairingPayload} from './f5-transfer-qr.mjs';
@@ -38,7 +39,7 @@ function stream(){
 }
 test('camera permission resolving after cancellation immediately stops the stream, no frame or code',async()=>{
  const video=fakeVideo(),camera=stream();let resolve;
- const scanner=pairingScanner({video,getMedia:()=>new Promise(r=>{resolve=r}),decoder:async()=>()=>assert.fail('must not decode'),
+ const scanner=pairingScanner({translate:(key,params)=>translate('nl',key,params),video,getMedia:()=>new Promise(r=>{resolve=r}),decoder:async()=>()=>assert.fail('must not decode'),
   report:()=>assert.fail('must not report late result'),onCode:()=>assert.fail('must not join')});
  const running=scanner.start();scanner.stop();resolve(camera);await running;
  assert.equal(camera.state.stops,1);assert.equal(video.srcObject,null);assert.equal(video.hidden,true);
@@ -47,7 +48,7 @@ test('scanner ignores unrelated QR, recognizes only app pairing code and stops c
  const video=fakeVideo(),camera=stream(),jobs=[],codes=[];
  let attempts=0;
  const fakeCanvas={getContext:()=>({drawImage(){},getImageData:()=>({data:new Uint8ClampedArray(4),width:1,height:1})})};
- const scanner=pairingScanner({video,getMedia:async()=>camera,decoder:async()=>()=>({data:attempts++===0?'https://example.test':pairingPayload(fixture(4))}),
+ const scanner=pairingScanner({translate:(key,params)=>translate('nl',key,params),video,getMedia:async()=>camera,decoder:async()=>()=>({data:attempts++===0?'https://example.test':pairingPayload(fixture(4))}),
  makeCanvas:()=>fakeCanvas,schedule:fn=>{jobs.push(fn);return jobs.length},cancel:()=>{},
  report:()=>{},onCode:code=>{assert.equal(camera.state.stops,1);assert.equal(video.srcObject,null);codes.push(code)}});
  await scanner.start();assert.deepEqual(codes,[]);jobs.shift()();
@@ -56,7 +57,7 @@ test('scanner ignores unrelated QR, recognizes only app pairing code and stops c
 test('camera denied and decoder failure safely fall back without retaining tracks',async()=>{
  for(const mode of ['denied','decoder']){
   const video=fakeVideo(),camera=stream(),messages=[];
-  const scanner=pairingScanner({video,getMedia:async()=>{if(mode==='denied')throw Error('denied');return camera},
+  const scanner=pairingScanner({translate:(key,params)=>translate('nl',key,params),video,getMedia:async()=>{if(mode==='denied')throw Error('denied');return camera},
     decoder:async()=>{if(mode==='decoder')throw Error('decoder');return ()=>null},
     report:m=>messages.push(m),onCode:()=>assert.fail('must not connect')});
   await scanner.start();assert.equal(video.hidden,true);assert.equal(video.srcObject,null);

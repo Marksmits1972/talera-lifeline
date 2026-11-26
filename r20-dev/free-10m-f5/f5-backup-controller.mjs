@@ -1,3 +1,4 @@
+const t=(key,params)=>window.TaleraLanguage.t(key,params);
 // Browser-only voluntary Free backup UI. Only GET /api/me checks the session;
 // archives and original media never leave local IndexedDB or reach a server.
 // This module runs only on the separately authenticated /__f5/backup route.
@@ -66,17 +67,17 @@ function storageSummary(summary,totalBytes){
   }
  }
  return [
-  'Herinneringen: '+p.stories.length+'; mediakoppelingen: '+links+'; unieke originele media-ID’s: '+originals.size+'.',
-  'Originele foto’s: '+counts.photo+' ('+mb(bytes.photo)+')',
-  'Originele video’s: '+counts.video+' ('+mb(bytes.video)+')',
-  'Originele geluidsbestanden: '+counts.audio+' ('+mb(bytes.audio)+')',
-  'Mobiele versies: '+counts.mobile+' ('+mb(bytes.mobile)+')',
-  'Editorrecords: '+counts.editor+' ('+mb(bytes.editor)+')',
-  'Niet direct gekoppelde bestandsrecords: '+counts.unlinked+' ('+mb(bytes.unlinked)+')',
-  'Overige binaire gegevens: '+mb(bytes.other)+'; bestandsadministratie: '+mb(totalBytes-summary.binaryBytes),
-  'Extra binaire kopieën met identieke inhoud: '+copies+' ('+mb(duplicateBytes)+').',
-  'Verliesvrij bespaard in deze back-up: '+mb(summary.savedBytes||0)+' ('+(summary.sharedEntries||0)+' gedeelde inhoudsverwijzingen).',
-  'De media-omvang hierboven telt alle oorspronkelijke verwijzingen; het back-upbestand bevat gedeelde bytes slechts eenmaal. Dit is geen meting van fysieke iPhone-opslag. Niets wordt verwijderd.'
+  t('backup.detail.summary',{count:p.stories.length,links,originals:originals.size}),
+  t('backup.detail.photos',{count:counts.photo,size:mb(bytes.photo)}),
+  t('backup.detail.videos',{count:counts.video,size:mb(bytes.video)}),
+  t('backup.detail.audio',{count:counts.audio,size:mb(bytes.audio)}),
+  t('backup.detail.mobile',{count:counts.mobile,size:mb(bytes.mobile)}),
+  t('backup.detail.editor',{count:counts.editor,size:mb(bytes.editor)}),
+  t('backup.detail.unlinked',{count:counts.unlinked,size:mb(bytes.unlinked)}),
+  t('backup.detail.other',{size:mb(bytes.other),metadata:mb(totalBytes-summary.binaryBytes)}),
+  t('backup.detail.copies',{count:copies,size:mb(duplicateBytes)}),
+  t('backup.detail.saved',{size:mb(summary.savedBytes||0),count:summary.sharedEntries||0}),
+  t('backup.detail.explanation',{})
  ].join('\n');
 }
 let downloadUrl=null,preparedFile=null,shareUnavailable=false,review=null,reviewFile=null,reviewCross=null;
@@ -84,52 +85,47 @@ const message=(element,text)=>{element.textContent=text;};
 // Read-only browser diagnosis on the EXISTING status area. No new button,
 // screen, media fixture, permanent state, or upload. First photo per memory.
 function readOnlyPhotoLine(label,source){
- if(!source?.checked)return label+": geen eerste foto's gecontroleerd.";
- return label+' — eerste foto per herinnering: '+
-  source.records.map(row=>{
-   const date=row.date==='onbekende datum'?'onbekende datum':row.date;
-   const types=row.type||'onbekend type';
-   return date+': origineel '+row.original+' ('+types+
-    ', inhoud '+row.signature+'), mobiele foto '+row.mobile+
-    (row.typeMismatch?' [bestandstype wijkt af van inhoud]':'');
-  }).join('; ')+'.';
+ if(!source?.checked)return t('backup.detail.photoNone',{label});
+ return t('backup.detail.photoList',{label,records:source.records.map(row=>{
+   const date=row.date==='onbekende datum'?t('backup.detail.photoUnknownDate'):row.date;
+   const type=row.type||t('backup.detail.photoUnknownType');
+   return t('backup.detail.photoRow',{date,original:row.original,type,signature:row.signature,mobile:row.mobile,
+    mismatch:row.typeMismatch?t('backup.detail.photoMismatch'):''});
+  }).join('; ')});
 }
 function readOnlyPhotoText(result){
  if(result?.photoAudit){
   const checked=result.photoAudit;
-  return '\nAlleen lokaal onderzocht, NIETS teruggezet. '+
-    readOnlyPhotoLine('Back-upbestand',checked.archive)+'\n'+
-    readOnlyPhotoLine('Huidige bibliotheek',checked.library);
+  return '\n'+t('backup.detail.photoLocal',{archive:readOnlyPhotoLine(t('backup.detail.archiveLabel'),checked.archive),
+    library:readOnlyPhotoLine(t('backup.detail.libraryLabel'),checked.library)});
  }
- if(result?.photoAuditUnavailable)
-  return '\nDe aanvullende lokale fotocontrole kon niet worden uitgevoerd; niets gewijzigd.';
+ if(result?.photoAuditUnavailable)return '\n'+t('backup.detail.photoUnavailable');
  return '';
 }
 
 const failText=e=>{
  const raw=e instanceof Error?e.message:String(e);
  if(/ACCOUNT_CHANGED|SESSION_EXPIRED|SESSION_UNVERIFIED/.test(raw))
-  return 'Je account is gewijzigd. Open Back-ups opnieuw.';
+  return t('backup.status.accountChanged');
  if(/EXPLICIT_CONSENT|DIFFERENT_ORIGIN/.test(raw))
-  return 'Vink eerst aan dat de back-up uit een andere TALERA-versie mag komen.';
+  return t('backup.status.consent');
  // The iPhone may fail at the manifest, a media checksum, or Files I/O.
  // Display ONLY bounded invariant codes from the archive implementation:
  // never expose story titles, account hashes, media IDs, paths, or file bytes.
  // The actual archive/IndexedDB stays read-only during this inspection.
  if(/^TALERA_ARCHIVE_[A-Z0-9_]{3,60}$/.test(raw))
-  return 'Bestand beschadigd of ongeldig (controlecode: '+
-   raw.slice('TALERA_ARCHIVE_'.length)+'). Er is niets gewijzigd.';
+  return t('backup.status.archiveFailure',{code:raw.slice('TALERA_ARCHIVE_'.length)});
  if(e?.name==='NotReadableError'||e?.name==='NotFoundError'||e?.name==='AbortError')
-  return 'Safari kon het gekozen bestand niet volledig lezen (controlecode: BESTAND_LEZEN). Er is niets gewijzigd.';
+  return t('backup.status.safariRead');
  if(e?.name==='QuotaExceededError'||e?.name==='RangeError')
-  return 'De bestandscontrole liep tegen een geheugenlimiet aan (controlecode: GEHEUGEN). Er is niets gewijzigd.';
+  return t('backup.status.memoryLimit');
  if(/CHECKSUM|INVALID_MANIFEST|INVALID_ORIGIN/.test(raw))
-  return 'Bestand beschadigd of ongeldig (controlecode: ANDERE_CONTROLE). Er is niets gewijzigd.';
+  return t('backup.status.otherCheck');
  if(/DATABASE_NOT_FOUND|NO_INDEXEDDB|NO_STORIES_FOUND/.test(raw))
-  return 'Geen lokale herinneringen gevonden. Open eerst Mijn leven.';
+  return t('backup.status.noMemory');
  if(/EXISTING_CONTENT|DUPLICATE/.test(raw))
-  return 'Er zijn bestaande herinneringen of afwijkende bestandsrecords. Er is niets overschreven.';
- return 'Controleer het bestand en probeer opnieuw.';
+  return t('backup.status.existing');
+ return t('backup.status.retry');
 };
 // The backup page may stay open while the user switches accounts in another tab.
 // Revalidate the currently signed-in server identity before any local file read
@@ -153,11 +149,11 @@ function invalidate(){
  review=null;reviewFile=null;reviewCross=null;restore.disabled=true;
  confirm.checked=false;confirm.disabled=true;finalStep.hidden=true;
  message(restoreHint,'');setDetails(restoreDetails,'');
- message(status,chooser.files?.[0]?'Keuze gewijzigd. Controleer het bestand opnieuw.':'');
+ message(status,chooser.files?.[0]?t('backup.status.selectionChanged'):'');
 }
 function showFileSelection(){
  const file=chooser.files?.[0];
- selected.textContent=file?'Gekozen bestand: '+file.name:'Nog geen back-upbestand gekozen.';
+ selected.textContent=file?t('backup.status.fileSelected',{filename:file.name}):t('backup.status.noFile');
  selected.dataset.selected=file?'yes':'no';
  checkStep.hidden=!file;
  preview.disabled=!file;
@@ -175,7 +171,7 @@ make.addEventListener('click',async()=>{
  make.disabled=true;
  if(downloadUrl){URL.revokeObjectURL(downloadUrl);downloadUrl=null}
  save.hidden=true;save.removeAttribute('href');preparedFile=null;shareUnavailable=false;setDetails(exportDetails,'');
- message(exportStatus,'Back-up maken…');
+ message(exportStatus,t('backup.status.creating'));
  try{
   await assertCurrentAccount();
   const archive=await exportExistingFreeLibrary(db);
@@ -190,9 +186,8 @@ make.addEventListener('click',async()=>{
   save.href=downloadUrl;
   save.download=backupName;
   save.hidden=false;
-  message(exportStatus,'Back-up klaar ('+(archive.size/1048576).toFixed(1)+
-   ' MB). Tik op "Bewaar bestand". Kies in Bestanden dezelfde eigen map en bevestig Vervang als je al een TALERA-back-up hebt.');
- }catch(e){message(exportStatus,'Back-up niet gemaakt: '+failText(e))}
+  message(exportStatus,t('backup.status.ready',{size:(archive.size/1048576).toFixed(1)}));
+ }catch(e){message(exportStatus,t('backup.status.createFailed',{reason:failText(e)}))}
  finally{make.disabled=false}
 });
 // iPhone PWA cannot silently write into the external Files app. Prefer the
@@ -207,56 +202,51 @@ save.addEventListener('click',async event=>{
    typeof navigator.canShare==='function'&&navigator.canShare(payload);
  }catch(_){}
  if(!supported){
-  message(exportStatus,'Download aangeboden als '+backupName+
-   '. De browser kan een extra kopie maken. Controleer Bestanden; vervang de vorige back-up pas als het nieuwe bestand veilig is bewaard.');
+  message(exportStatus,t('backup.status.download',{filename:backupName}));
   return;
  }
  event.preventDefault();
  try{
   await navigator.share(payload);
-  message(exportStatus,'Bewaar de back-up in je eigen map in Bestanden. Controleer of '+backupName+' daar is bijgewerkt. TALERA kan dit niet zelfstandig controleren.');
+  message(exportStatus,t('backup.status.checkSaved',{filename:backupName}));
  }catch(e){
   if(e?.name==='AbortError'){
-   message(exportStatus,'Bewaren geannuleerd. De bestaande back-up is niet door TALERA gewijzigd. Tik opnieuw op "Bewaar bestand".');
+   message(exportStatus,t('backup.status.cancelled'));
    return;
   }
   shareUnavailable=true;
-  message(exportStatus,'Opslaan via het deelvenster is niet beschikbaar. Tik opnieuw op "Bewaar bestand" voor een download. Controleer daarna Bestanden.');
+  message(exportStatus,t('backup.status.shareUnavailable'));
  }
 });
 preview.addEventListener('click',async()=>{
  invalidate();confirm.checked=false;
  const file=chooser.files?.[0];
- if(!file){message(status,'Kies een back-upbestand.');return}
+ if(!file){message(status,t('backup.status.chooseFile'));return}
  preview.disabled=true;
- message(status,'Bestand controleren…');
+ message(status,t('backup.status.checking'));
  try{
   await assertCurrentAccount();
   const chosenCross=cross.checked;
   const result=await previewFreeLibraryRestore(file,db,{allowOtherOrigin:chosenCross,inspectPhotos:true});
   let analysis='';
   try{analysis='\n\n'+storageSummary(await inspectFreeArchive(file),file.size);}
-  catch(_){analysis='\n\nOpslagoverzicht niet beschikbaar.'}
+  catch(_){analysis='\n\n'+t('backup.status.summaryUnavailable')}
   // A changed selection invalidates the old result, even during a slow check.
   if(file!==chooser.files?.[0]||chosenCross!==cross.checked)return invalidate();
   const allPresent=result.alreadyPresentStories===result.storyCount&&result.storyCount>0&&
    result.identicalMediaEntries===result.mediaStoreEntries&&result.conflictingMediaEntries===0;
-  setDetails(restoreDetails,'Huidige bibliotheek: '+result.currentStoryCount+' herinnering(en).\n'+
-   'Bestaande herinneringen: '+result.alreadyPresentStories+'\n'+
-   'Afwijkende bestandsrecords: '+result.conflictingMediaEntries+'\n'+
-   'Identieke bestandsrecords veilig herbruikbaar: '+result.identicalMediaEntries+'\n'+
-   'Technische editorrecords zonder herinneringen of conceptinhoud: '+result.ignoredTechnicalEntries+
-   (result.conflictingRecordKinds?.length?'\nTerugzetten is geblokkeerd door: '+[...new Set(result.conflictingRecordKinds)].join(', ')+'.':'')+
-   '\nEr is niets gewijzigd of teruggezet.'+analysis+readOnlyPhotoText(result));
+  setDetails(restoreDetails,t('backup.detail.review',{current:result.currentStoryCount,present:result.alreadyPresentStories,
+   conflicts:result.conflictingMediaEntries,identical:result.identicalMediaEntries,technical:result.ignoredTechnicalEntries,
+   block:result.conflictingRecordKinds?.length?t('backup.detail.blocked',{kinds:[...new Set(result.conflictingRecordKinds)].join(', ')}):''})+
+   analysis+readOnlyPhotoText(result));
   review=result;reviewFile=file;reviewCross=chosenCross;
   finalStep.hidden=false;confirm.disabled=!result.safeToRestore;restore.disabled=true;
   status.style.whiteSpace='pre-line';
-  message(status,'Bestand is in orde.\nGecontroleerd: '+result.storyCount+' herinnering(en).\n'+
-   'Bestandsgrootte: '+mb(file.size)+'\nBestandsafwijkingen: '+result.conflictingMediaEntries);
-  message(restoreHint,result.safeToRestore?'Geen dubbele gegevens. Bevestig hieronder om terug te zetten.':
-   allPresent?'Alle herinneringen uit deze back-up zijn al aanwezig. Terugzetten is niet nodig.':
-   'Conflict met bestaande gegevens. Terugzetten is geblokkeerd om je herinneringen te beschermen.');
- }catch(e){message(status,'Controle gestopt (niets gewijzigd): '+failText(e))}
+  message(status,t('backup.status.review',{count:result.storyCount,size:mb(file.size),conflicts:result.conflictingMediaEntries}));
+  message(restoreHint,result.safeToRestore?t('backup.status.safe'):
+   allPresent?t('backup.status.allPresent'):
+   t('backup.status.conflict'));
+ }catch(e){message(status,t('backup.status.checkStopped',{reason:failText(e)}))}
  finally{preview.disabled=!chooser.files?.[0]}
 });
 restore.addEventListener('click',async()=>{
@@ -264,15 +254,15 @@ restore.addEventListener('click',async()=>{
  if(!review?.safeToRestore||!confirm.checked||file!==reviewFile||cross.checked!==reviewCross)
   return invalidate();
  restore.disabled=true;confirm.disabled=true;preview.disabled=true;
- message(status,'Herinneringen worden teruggezet. Wacht tot dit klaar is.');
+ message(status,t('backup.status.restoring'));
  try{
   await assertCurrentAccount();
   const result=await restoreFreeLibrary(file,db,{allowOtherOrigin:cross.checked,confirmed:true});
-  message(status,'Herstel voltooid: '+result.restoredStories+' herinnering(en) toegevoegd. Controleer ze bij Mijn leven.');
+  message(status,t('backup.status.restored',{count:result.restoredStories}));
   review=null;confirm.checked=false;confirm.disabled=true;restore.disabled=true;
-  message(restoreHint,'Herstel voltooid. Controleer je herinneringen bij Mijn leven.');
+  message(restoreHint,t('backup.status.restoredHint'));
  }catch(e){
-  message(status,'Terugzetten gestopt. Bestaande herinneringen blijven staan. '+failText(e));
+  message(status,t('backup.status.restoreStopped',{reason:failText(e)}));
   review=null;finalStep.hidden=true;confirm.checked=false;
  }finally{confirm.disabled=!review?.safeToRestore;preview.disabled=!chooser.files?.[0]}
 });

@@ -2,7 +2,7 @@
 // Decoder loaded on demand and only from this authenticated app origin.
 import {readPairingPayload} from './f5-transfer-qr.mjs';
 const stopTracks=stream=>{for(const track of stream?.getTracks?.()||[])track.stop()};
-export function pairingScanner({video,report,onCode,
+export function pairingScanner({video,report,onCode,translate,
  getMedia=()=>navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:720},height:{ideal:720}},audio:false}),
  decoder=()=>import('./f5-transfer-jsqr.mjs').then(m=>m.default),
  makeCanvas=()=>document.createElement('canvas'),schedule=fn=>setTimeout(fn,120),cancel=clearTimeout}){
@@ -42,12 +42,12 @@ export function pairingScanner({video,report,onCode,
       if(code){stop();onCode(code);return}
      }
      timer=schedule(scan);
-    }catch{stop();report('De QR-code kon niet worden gelezen. Gebruik de verbindingscode.')}
+    }catch{stop();report(translate('transfer.scan.readFailed'))}
    };
-   report('Richt de camera op de TALERA QR-code.');scan();
+   report(translate('transfer.scan.aim'));scan();
   }catch{
    if(run!==epoch)return;
-   stop();report('Camera niet beschikbaar. Gebruik de verbindingscode.');
+   stop();report(translate('transfer.scan.unavailable'));
   }
  }
  return {start,stop};

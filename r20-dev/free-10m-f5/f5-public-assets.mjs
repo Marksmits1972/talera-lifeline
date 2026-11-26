@@ -1,3 +1,4 @@
+import {centralizeCoreLanguage} from './f5-core-language-build.mjs';
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
@@ -1868,6 +1869,8 @@ function closeAnonymousPersonalLibrary(html){
 // The old immutable 7-Nov shell held 500 demonstrations and could reappear
 // whenever an iPhone session expired. NEVER serve that snapshot as a fallback.
 const guestPages={};
+const languageAssets=new Set();
+function localizeCore(html,route){const result=centralizeCoreLanguage(html,route);writeFileSync(path.join(publicDir,'__talera_free','assets',result.asset),result.engine,'utf8');languageAssets.add(result.asset);return result.html;}
 for(const [route,filename] of Object.entries(routes)){
  const raw=readFileSync(path.join(delivery,'generated','reference-'+filename+'.html'),'utf8');
  let guest=raw;
@@ -1916,6 +1919,7 @@ for(const [route,filename] of Object.entries(routes)){
    (route!=='/present'||guest.includes('id="photoStage"')),
    'GUEST_ORIGINAL_ENTRY_DOM_MISSING');
  guest=installDesktopMemoryTransition(installDesktopPresentationLayout(installDesktopHomeLayout(guest,route),route),route);
+ guest=localizeCore(guest,route);
  const guestFile=sha(guest)+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',guestFile),guest,'utf8');
  guestPages[route]='/__talera_free/f5references/'+guestFile;
@@ -1963,6 +1967,7 @@ for(const [route,filename] of Object.entries(routes)){
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  html=installDesktopMemoryTransition(installDesktopPresentationLayout(installDesktopHomeLayout(html,route),route),route);
+ html=localizeCore(html,route);
  const hash=sha(html),file=hash+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;
@@ -2533,7 +2538,13 @@ for(const name of supportNames){
    readFileSync(path.join(here,'f5-worker.mjs')),
    readFileSync(path.join(here,'f5-edit-return.mjs')) ,
    readFileSync(path.join(here,'f5-editor-clean-layout.mjs')),
-   readFileSync(path.join(here,'f5-offline-sw.mjs'))
+   readFileSync(path.join(here,'f5-offline-sw.mjs')),
+   readFileSync(path.join(here,'f5-language-catalog.mjs')),
+   readFileSync(path.join(here,'f5-language.mjs')),
+   readFileSync(path.join(here,'f5-local-backup-page.mjs')),
+   readFileSync(path.join(here,'f5-backup-controller.mjs')),
+   readFileSync(path.join(here,'f5-transfer-controller.mjs')),
+   readFileSync(path.join(here,'f5-transfer-scan.mjs'))
   ])).slice(0,32);
   a=Buffer.from(buildF5OfflineServiceWorker(a.toString('utf8'),offlinePackageVersion),'utf8');
  }
@@ -2560,7 +2571,8 @@ writeFileSync(path.join(generated,'public-template-map.mjs'),
   'export const referencePages = Object.freeze('+JSON.stringify(refs,null,2)+');\n'+
  'export const guestPages = Object.freeze('+JSON.stringify(guestPages,null,2)+');\n'+
   'export const verifiedPublicScripts = Object.freeze('+JSON.stringify(scripts,null,2)+');\n'+
-  'export const verifiedPublicSupport = Object.freeze('+JSON.stringify(support,null,2)+');\n');
+  'export const verifiedPublicSupport = Object.freeze('+JSON.stringify(support,null,2)+');\n'+
+ 'export const languageAssets = Object.freeze('+JSON.stringify([...languageAssets])+');\n');
 const report={result:'BUILT (not browser-certified)',source:origin,
   privateDataRequested:false,customerDatabaseTouched:false,
   referencePages:Object.keys(refs),verifiedScriptRoutes:Object.keys(scripts),

@@ -1,3 +1,4 @@
+import {languageCatalog} from './f5-language-catalog.mjs';
 import {buildEditorLibraryBrowserSources} from './f5-library-editor-stable-save.mjs';
 // Local preparation for the existing TALERA Free edit-return feature.
 // No deployment, new route, second player, database or account transition.
@@ -65,8 +66,9 @@ export function buttonPosition(back,dots,viewport){
  return {width:size,height:size,top,right};
 }
 
-const LABELS={nl:'Terug naar dezelfde herinnering',en:'Return to the same memory',de:'Zurück zur selben Erinnerung',fr:'Revenir au même souvenir',es:'Volver al mismo recuerdo'};
-export function returnLabel(language){return LABELS[String(language||'nl').toLowerCase().split('-')[0]]||LABELS.nl}
+const LABELS=Object.fromEntries(Object.entries(languageCatalog).map(([l,p])=>[l,p['core.editor.returnTitle']]));
+const ARIA_LABELS=Object.fromEntries(Object.entries(languageCatalog).map(([l,p])=>[l,p['core.editor.returnAria']]));
+export function returnLabel(language){return LABELS[String(language||'nl').toLowerCase().split('-')[0]]||LABELS.en}
 
 // Build a single accessible eye button. The integration owns the activation
 // gate: mount only in the existing work view for the exact pencil-opened ID.
@@ -76,7 +78,7 @@ export function mountReturnButton({document,window,context,language,onReturn}){
  if(document.getElementById(id))throw Error('Duplicate edit return button');
  const button=document.createElement('button');
  button.id=id;button.type='button';button.title=returnLabel(language);
- button.setAttribute('aria-label',button.title);
+ button.setAttribute('aria-label',ARIA_LABELS[String(language||'nl').toLowerCase().split('-')[0]]||ARIA_LABELS.en);
  // The eye uses the same bare header treatment as the original options
  // button. The transparent 45px hit area retains accessible touch/focus.
  button.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>';
@@ -373,7 +375,7 @@ export function patchPencilCapture(html,scope,serialized=buildEditReturnBrowserS
 function browserReturnCore(editor){
  const shared=`const EDIT_RETURN_ID=${EDIT_RETURN_ID},SCOPE=${SCOPE},MAX_AGE=${MAX_AGE};\n`+[returnStorageKey,readReturnContext].map(fn=>fn.toString()).join('\n')+'\n';
  if(!editor)return shared+ordinaryReturnFrame.toString();
- return shared+`const same=${same.toString()},LABELS=${JSON.stringify(LABELS)};\n`+
+ return shared+`const same=${same.toString()},LABELS=${JSON.stringify(LABELS)},ARIA_LABELS=${JSON.stringify(ARIA_LABELS)};\n`+
  [returnPath,writeReturnContext,buttonPosition,returnLabel,mountReturnButton,decideEditExit,executeEditReturn].map(fn=>fn.toString()).join('\n');
 }
 

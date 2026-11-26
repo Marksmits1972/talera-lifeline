@@ -1,3 +1,4 @@
+import {chooseLanguage,requestLanguage,translate} from './f5-language.mjs';
 // TALERA Free F5 - ONE continuous Free acceptance candidate, not a public release approval.
 // Normal user registration and login control all personal data; no invitation
 // code, temporary browser gate, or automatic account creation is required.
@@ -13,7 +14,7 @@ import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 import {approvedAssets,anonymousShells} from '../free-10m-delivery/generated/approved-assets.mjs';
 import {assetizeHtml} from '../free-10m-delivery/rewrite.mjs';
 import {personalizeHome,personalizePresent} from '../free-10m-delivery/free-birthdate-worker.mjs';
-import {referencePages,guestPages,verifiedPublicScripts,verifiedPublicSupport} from './generated/public-template-map.mjs';
+import {referencePages,guestPages,verifiedPublicScripts,verifiedPublicSupport,languageAssets} from './generated/public-template-map.mjs';
 import {privateAccountScope,scopeLocalMemories} from './f5-local-scope.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
@@ -1022,7 +1023,7 @@ async function publicWhatsAppMemory(request,env){
  const original=await env.ASSETS.fetch(new Request(new URL(asset,u.origin)));
  if(!original.ok)return deny(503,'Originele TALERA-presentatie niet bereikbaar');
  const guest=renderOriginalTaleraShare(await original.text(),content,u.pathname,m[1],previewMeta);
- const prepared=await assetizeHtml(guest,new Set(approvedAssets));
+ const prepared=await assetizeHtml(guest,new Set([...approvedAssets,...languageAssets]));
  return new Response(prepared.html,{status:200,headers:{
   'content-type':'text/html; charset=utf-8',
   'cache-control':'private, no-store','referrer-policy':'no-referrer',
@@ -1127,7 +1128,7 @@ async function publicPage(request,env){
     const silenced=pathname==='/tell'?restoreEditorVideoCover(muteEditorOnlyVideo(stableEditedCues)):stableEditedCues;
     const editReturnHtml=patchAuthenticatedEditReturn(silenced,pathname,editReturnAccountScope,editReturnBrowserSources);
     const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(editReturnHtml):editReturnHtml;
-    const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));
+    const converted=await assetizeHtml(threeTabHome,new Set([...approvedAssets,...languageAssets]));
     const storyEntryHtml=hideUnselectedEntryPhoto(converted.html,request.url);
     const menuEntryHtml=preventHomeMenuPresentationFlash(storyEntryHtml,request.url);
     const outgoingHomeHtml=shieldHomeWhileOpeningExistingMenu(menuEntryHtml,request.url);
@@ -1242,6 +1243,15 @@ async function publicPwaSupport(request,env){
    'x-content-type-options':'nosniff'
  });
  if(pathname==='/sw.js')headers.set('service-worker-allowed','/');
+ if(pathname==='/manifest.webmanifest'){
+  const manifest=await source.json();
+  const language=chooseLanguage(new URL(request.url).searchParams.get('lang'),[requestLanguage(request)]);
+  manifest.name=translate(language,'pwa.manifest.name');
+  manifest.description=translate(language,'pwa.manifest.description');
+  manifest.lang=language;
+  headers.set('vary','Accept-Language');
+  return new Response(JSON.stringify(manifest),{status:200,headers});
+ }
  return new Response(source.body,{status:200,headers});
 }
 async function publicScript(request,env){

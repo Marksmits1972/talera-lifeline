@@ -1,3 +1,4 @@
+import {translate} from './f5-language.mjs';
 // Technical browser regression of the EXACT generated existing TALERA /sw.js.
 // Local loopback fixtures only: never deploy a second app or read owner's media.
 import assert from 'node:assert/strict';
@@ -18,6 +19,7 @@ import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
  const calls=[];
  let accountReady=false,pendingLogout=false,serverAllowed=true,online=true;
  const scope={
+  offlineT:key=>translate('nl',key),
   moduleRoute:u=>u.pathname==='/__f5/f5-portable-idb.mjs',
   read:async key=>key==='grant'?(accountReady?{id:'synthetic-account'}:null):
     key==='pending-logout'?pendingLogout:null,
@@ -60,7 +62,7 @@ import {OFFLINE_RUNTIME} from './f5-offline-sw.mjs';
   constructor(body,opts={}){this.status=opts.status||200;this.body=body}
  };
  const state={epoch:0,grant:{id:'old-account'},locks:0};
- const scope={...state,Response,
+ const scope={...state,Response,offlineT:key=>translate('nl',key),
   finishLogout:async()=>{entered();await paused;return true},
   // Mirror the actual SW's account-store read used by stale response mapping.
   read:async key=>scope[key],

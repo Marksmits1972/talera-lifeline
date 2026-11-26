@@ -94,7 +94,7 @@ try{
   const receivingBrowser=mixed?retainedChromium:browser;
   assert.ok(receivingBrowser,'Previously launched Chromium is required for the mixed-engine test');
   try{
-   const a=await bounded(name+' sender context',()=>browser.newContext()),b=await bounded(name+' receiver context',()=>receivingBrowser.newContext());
+   const a=await bounded(name+' sender context',()=>browser.newContext({locale:'nl-NL'})),b=await bounded(name+' receiver context',()=>receivingBrowser.newContext({locale:'nl-NL'}));
    await a.addCookies([{name:'sid',value:'a',url}]);await b.addCookies([{name:'sid',value:'b',url}]);
    const sender=await bounded(name+' sender page',()=>a.newPage()),receiver=await bounded(name+' receiver page',()=>b.newPage());
    for(const [role,page] of [['sender',sender],['receiver',receiver]]){page.setDefaultTimeout(15000);page.on('pageerror',e=>console.error('TALERA_TRANSFER_BROWSER_PAGE_ERROR',name,role,e.message));}

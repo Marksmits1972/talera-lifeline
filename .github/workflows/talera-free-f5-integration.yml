@@ -930,7 +930,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 57167be3-49b8-4c94-bf61-ca1b0a04bc41
+      F5_EXPECTED_LIVE_VERSION: 1d8787a3-da3b-418c-935f-9ac737b9bdc0
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -956,9 +956,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = eebca1752850d786cbee9856aa6aa004378b975d
-          test "$(git diff --name-only eebca1752850d786cbee9856aa6aa004378b975d HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code eebca1752850d786cbee9856aa6aa004378b975d HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = 3370a9b01a4906c6d848ec39e3fd16cd55fb201e
+          test "$(git diff --name-only 3370a9b01a4906c6d848ec39e3fd16cd55fb201e HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code 3370a9b01a4906c6d848ec39e3fd16cd55fb201e HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -967,7 +967,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45780947466',sha='eebca1752850d786cbee9856aa6aa004378b975d';
+          const id='45785305533',sha='3370a9b01a4906c6d848ec39e3fd16cd55fb201e';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const names=[mainName,pickerName,'Verify in-app deletion on exact generated TALERA Home, no other app','Diagnose real TALERA account confirmation button in SAME app'];
@@ -998,7 +998,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45780947466');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45785305533');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1132,8 +1132,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code eebca1752850d786cbee9856aa6aa004378b975d HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45780947466'
+          git diff --exit-code 3370a9b01a4906c6d848ec39e3fd16cd55fb201e HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45785305533'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail
@@ -1298,6 +1298,7 @@ jobs:
           assert.ok(signedPresent.includes('width:66.666667%;height:calc((100% - 50px) * .66666667)')&&signedPresent.includes('LOUPE_PANEL_SCALE=2/3'), 'Missing the new proportionally reduced white loupe');
           assert.ok(signedPresent.includes('LOUPE_TOUCH_ZONE=1/3')&&!signedPresent.includes('if(to>from)drawDensity(3,from,to,w,axisY,project)'), 'Missing independent upper photo gesture zone or individual story markers');
           assert.ok(signedPresent.includes('TALERA_TIMELINE_CONTRAST_DECODED_LOCAL_IMAGE'), 'Missing timeline contrast sampling from decoded local photos');
+          assert.ok(signedPresent.includes('alignLoupeToNativeAxis(nativeAxis,panel.getBoundingClientRect().height,dateTop)')&&signedPresent.includes('top:var(--talera-loupe-top,6px)')&&signedPresent.includes('LOUPE_DATE_GAP=12'), 'Missing native axis alignment and independent date window');
           assert.equal(hash(signedPresent)+'.html',referencePages['/present'].split('/').pop());
           const localSW=fs.readFileSync(root+verifiedPublicSupport['/sw.js']);
           assert.equal(hash(localSW)+'.js',verifiedPublicSupport['/sw.js'].split('/').pop());

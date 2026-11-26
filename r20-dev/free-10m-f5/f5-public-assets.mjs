@@ -1567,6 +1567,40 @@ function installTimelineLoupe(html){
   '  centerMs=clamp(centerMs,(surface.dataset.taleraLoupe==="open"||taleraLoupeHoldMs!==null&&centerMs===taleraLoupeHoldMs)?LIFE_START:minCenter,LIFE_END);','LIFE_LIMIT');
  one('  if (!window.__taleraBandRolling) {\n    if (userIsMoving) renderJourneyPreview();',
   '  if (!window.__taleraBandRolling && surface.dataset.taleraLoupe!=="open" && !(taleraLoupeHoldMs!==null&&centerMs===taleraLoupeHoldMs)) {\n    if (userIsMoving) renderJourneyPreview();','EXACT_SELECTION');
+ // The existing timeline contrast analyser must never refetch a transient
+ // object URL behind an already displayed photo. During rapid swiping or
+ // navigation WebKit can release that URL while the analyser is fetching it.
+ // Sample the decoded local image directly; retain the original CORS path
+ // for remote imagery and the original luminance thresholds/fallback.
+ one(`      const response=await fetch(src,{mode:'cors',cache:'force-cache'});
+      if(!response.ok)throw new Error('image fetch');
+      const blob=await response.blob();
+      const bitmap=await createImageBitmap(blob);
+      if(token!==runToken){bitmap.close();return;}`,`      // TALERA_TIMELINE_CONTRAST_DECODED_LOCAL_IMAGE
+      const local=/^(blob:|data:)/i.test(src);
+      let bitmap;
+      if(local){
+        if(!img.complete||!img.naturalWidth||!img.naturalHeight)return;
+        bitmap=img;
+      }else{
+        const response=await fetch(src,{mode:'cors',cache:'force-cache'});
+        if(!response.ok)throw new Error('image fetch');
+        const blob=await response.blob();
+        bitmap=await createImageBitmap(blob);
+      }
+      if(token!==runToken){if(!local)bitmap.close();return;}`,'CONTRAST_LOCAL_DECODED');
+ one(`      if(!ctx){bitmap.close();return;}
+
+      /* Only the upper photographic zone behind the ruler matters. */
+      const sourceH=Math.max(1,Math.round(bitmap.height*.24));
+      ctx.drawImage(bitmap,0,0,bitmap.width,sourceH,0,0,sw,sh);
+      bitmap.close();`,`      if(!ctx){if(!local)bitmap.close();return;}
+
+      /* Only the upper photographic zone behind the ruler matters. */
+      const sourceW=local?img.naturalWidth:bitmap.width;
+      const sourceH=Math.max(1,Math.round((local?img.naturalHeight:bitmap.height)*.24));
+      ctx.drawImage(bitmap,0,0,sourceW,sourceH,0,0,sw,sh);
+      if(!local)bitmap.close();`,'CONTRAST_LOCAL_SAMPLE');
  // Share the original canvas, density-beacons, tick appearance and date badge.
  one('function drawDensity(level,startMs,endMs,w,axisY) {',
   'function drawDensity(level,startMs,endMs,w,axisY,project=null) {','DENSITY_PROJECTION');

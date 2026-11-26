@@ -27,7 +27,9 @@ export function languageSpan(key,params={},boldParam){
 export function languageBootstrap(prefixes){
  const packs=Object.fromEntries(languages.map(l=>[l,Object.fromEntries(Object.entries(languageCatalog[l]).filter(([key])=>prefixes.some(p=>key.startsWith(p))))]));
  const safe=JSON.stringify(packs).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
- return "("+function(packs,prefKey){
+ // Keep browser code as a literal: Worker bundlers may inject server-only helper
+ // names into Function.toString() (for example __name). Those do not exist in the browser.
+ return String.raw`(function(packs,prefKey){
   const has=l=>typeof l==='string'&&Object.prototype.hasOwnProperty.call(packs,l);
   let saved;try{saved=localStorage.getItem(prefKey)}catch{}
   const browser=(navigator.languages?.length?navigator.languages:[navigator.language]).map(x=>String(x).toLowerCase().split('-')[0]);
@@ -50,5 +52,5 @@ export function languageBootstrap(prefixes){
   for(const attr of ['aria-label','title','placeholder','alt']){
    for(const el of document.querySelectorAll('[data-talera-'+attr+']'))el.setAttribute(attr,t(el.getAttribute('data-talera-'+attr)));
   }
- }.toString()+")("+safe+","+JSON.stringify(preferenceKey)+");";
+ })`+"("+safe+","+JSON.stringify(preferenceKey)+");";
 }

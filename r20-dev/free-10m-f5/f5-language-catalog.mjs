@@ -1262,7 +1262,19 @@ export const languageCatalog=Object.freeze({
   "backup.detail.reviewMany": "Huidige bibliotheek: {current} herinneringen.\nBestaande herinneringen: {present}\nAfwijkende bestandsrecords: {conflicts}\nIdentieke bestandsrecords veilig herbruikbaar: {identical}\nTechnische editorrecords zonder herinneringen of conceptinhoud: {technical}\nEr is niets gewijzigd of teruggezet.",
   "backup.detail.reviewManyBlocked": "Huidige bibliotheek: {current} herinneringen.\nBestaande herinneringen: {present}\nAfwijkende bestandsrecords: {conflicts}\nIdentieke bestandsrecords veilig herbruikbaar: {identical}\nTechnische editorrecords zonder herinneringen of conceptinhoud: {technical}\nTerugzetten is geblokkeerd door: {kinds}.\nEr is niets gewijzigd of teruggezet.",
   "core.media.narratorSoundHint": "Tik één keer voor geluid",
-  "core.media.ordinarySoundHint": "Tik één keer voor geluid"
+  "core.media.ordinarySoundHint": "Tik één keer voor geluid",
+  "core.present.managePhotosAction": "Foto’s beheren",
+  "core.tell.workBack": "← Herinneringen",
+  "core.tell.overviewBack": "← Terug",
+  "core.tell.startBack": "← Terug",
+  "core.tell.storyPlaceholder": "Wat wil je over dit moment vertellen?",
+  "core.tell.favoriteChoicesAria": "Mijn favoriete kenmerken",
+  "core.tell.recorderPauseInitial": "Pauze",
+  "core.tell.shareRecipientPause": "Pauze",
+  "core.tell.shareRecipientListen": "Luisteren",
+  "core.tell.legacySettingsLanguage": "Taal",
+  "core.tell.shareBackAria": "Terug",
+  "core.tell.sharePreviewBack": "Terug"
  },
  "en": {
   "common.back": "Back",
@@ -2525,7 +2537,19 @@ export const languageCatalog=Object.freeze({
   "backup.detail.reviewMany": "Current library: {current} memories.\nExisting memories: {present}\nDiffering file records: {conflicts}\nIdentical file records safely reusable: {identical}\nTechnical editor records without memories or draft content: {technical}\nNothing changed or restored.",
   "backup.detail.reviewManyBlocked": "Current library: {current} memories.\nExisting memories: {present}\nDiffering file records: {conflicts}\nIdentical file records safely reusable: {identical}\nTechnical editor records without memories or draft content: {technical}\nRestoration is blocked by: {kinds}.\nNothing changed or restored.",
   "core.media.narratorSoundHint": "Tap once for sound",
-  "core.media.ordinarySoundHint": "Tap once for sound"
+  "core.media.ordinarySoundHint": "Tap once for sound",
+  "core.present.managePhotosAction": "Manage photos",
+  "core.tell.workBack": "← Memories",
+  "core.tell.overviewBack": "← Back",
+  "core.tell.startBack": "← Back",
+  "core.tell.storyPlaceholder": "What would you like to say about this moment?",
+  "core.tell.favoriteChoicesAria": "My favourite tags",
+  "core.tell.recorderPauseInitial": "Pause",
+  "core.tell.shareRecipientPause": "Pause",
+  "core.tell.shareRecipientListen": "Listen",
+  "core.tell.legacySettingsLanguage": "Language",
+  "core.tell.shareBackAria": "Back",
+  "core.tell.sharePreviewBack": "Back"
  },
  "de": {
   "common.back": "Zurück",
@@ -3788,7 +3812,19 @@ export const languageCatalog=Object.freeze({
   "backup.detail.reviewMany": "Aktuelle Bibliothek: {current} Erinnerungen.\nVorhandene Erinnerungen: {present}\nAbweichende Dateieinträge: {conflicts}\nSicher wiederverwendbare identische Dateieinträge: {identical}\nTechnische Editor-Einträge ohne Erinnerungen oder Entwurfsinhalt: {technical}\nNichts geändert oder wiederhergestellt.",
   "backup.detail.reviewManyBlocked": "Aktuelle Bibliothek: {current} Erinnerungen.\nVorhandene Erinnerungen: {present}\nAbweichende Dateieinträge: {conflicts}\nSicher wiederverwendbare identische Dateieinträge: {identical}\nTechnische Editor-Einträge ohne Erinnerungen oder Entwurfsinhalt: {technical}\nWiederherstellung blockiert durch: {kinds}.\nNichts geändert oder wiederhergestellt.",
   "core.media.narratorSoundHint": "Einmal tippen für Ton",
-  "core.media.ordinarySoundHint": "Einmal tippen für Ton"
+  "core.media.ordinarySoundHint": "Einmal tippen für Ton",
+  "core.present.managePhotosAction": "Fotos verwalten",
+  "core.tell.workBack": "← Erinnerungen",
+  "core.tell.overviewBack": "← Zurück",
+  "core.tell.startBack": "← Zurück",
+  "core.tell.storyPlaceholder": "Was möchtest du über diesen Moment erzählen?",
+  "core.tell.favoriteChoicesAria": "Meine bevorzugten Merkmale",
+  "core.tell.recorderPauseInitial": "Pause",
+  "core.tell.shareRecipientPause": "Pause",
+  "core.tell.shareRecipientListen": "Anhören",
+  "core.tell.legacySettingsLanguage": "Sprache",
+  "core.tell.shareBackAria": "Zurück",
+  "core.tell.sharePreviewBack": "Zurück"
  },
  "fr": {
   "common.back": "Retour",
@@ -5051,7 +5087,19 @@ export const languageCatalog=Object.freeze({
   "backup.detail.reviewMany": "Bibliothèque actuelle : {current} souvenirs.\nSouvenirs existants : {present}\nEnregistrements de fichiers différents : {conflicts}\nEnregistrements identiques réutilisables en sécurité : {identical}\nEnregistrements techniques de l'éditeur sans souvenirs ou brouillons : {technical}\nRien n'a été modifié ou restauré.",
   "backup.detail.reviewManyBlocked": "Bibliothèque actuelle : {current} souvenirs.\nSouvenirs existants : {present}\nEnregistrements de fichiers différents : {conflicts}\nEnregistrements identiques réutilisables en sécurité : {identical}\nEnregistrements techniques de l'éditeur sans souvenirs ou brouillons : {technical}\nRestauration bloquée par : {kinds}.\nRien n'a été modifié ou restauré.",
   "core.media.narratorSoundHint": "Appuie une fois pour le son",
-  "core.media.ordinarySoundHint": "Appuie une fois pour le son"
+  "core.media.ordinarySoundHint": "Appuie une fois pour le son",
+  "core.present.managePhotosAction": "Gérer les photos",
+  "core.tell.workBack": "← Souvenirs",
+  "core.tell.overviewBack": "← Retour",
+  "core.tell.startBack": "← Retour",
+  "core.tell.storyPlaceholder": "Que souhaitez-vous raconter sur ce moment ?",
+  "core.tell.favoriteChoicesAria": "Mes thèmes favoris",
+  "core.tell.recorderPauseInitial": "Pause",
+  "core.tell.shareRecipientPause": "Pause",
+  "core.tell.shareRecipientListen": "Écouter",
+  "core.tell.legacySettingsLanguage": "Langue",
+  "core.tell.shareBackAria": "Retour",
+  "core.tell.sharePreviewBack": "Retour"
  },
  "es": {
   "common.back": "Volver",
@@ -6314,6 +6362,18 @@ export const languageCatalog=Object.freeze({
   "backup.detail.reviewMany": "Biblioteca actual: {current} recuerdos.\nRecuerdos existentes: {present}\nRegistros de archivos diferentes: {conflicts}\nRegistros idénticos reutilizables de forma segura: {identical}\nRegistros técnicos del editor sin recuerdos ni borradores: {technical}\nNo se modificó ni restauró nada.",
   "backup.detail.reviewManyBlocked": "Biblioteca actual: {current} recuerdos.\nRecuerdos existentes: {present}\nRegistros de archivos diferentes: {conflicts}\nRegistros idénticos reutilizables de forma segura: {identical}\nRegistros técnicos del editor sin recuerdos ni borradores: {technical}\nRestauración bloqueada por: {kinds}.\nNo se modificó ni restauró nada.",
   "core.media.narratorSoundHint": "Toca una vez para activar el sonido",
-  "core.media.ordinarySoundHint": "Toca una vez para activar el sonido"
+  "core.media.ordinarySoundHint": "Toca una vez para activar el sonido",
+  "core.present.managePhotosAction": "Gestionar fotos",
+  "core.tell.workBack": "← Recuerdos",
+  "core.tell.overviewBack": "← Volver",
+  "core.tell.startBack": "← Volver",
+  "core.tell.storyPlaceholder": "¿Qué te gustaría contar sobre este momento?",
+  "core.tell.favoriteChoicesAria": "Mis etiquetas favoritas",
+  "core.tell.recorderPauseInitial": "Pausa",
+  "core.tell.shareRecipientPause": "Pausa",
+  "core.tell.shareRecipientListen": "Escuchar",
+  "core.tell.legacySettingsLanguage": "Idioma",
+  "core.tell.shareBackAria": "Volver",
+  "core.tell.sharePreviewBack": "Volver"
  }
 });

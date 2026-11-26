@@ -41,6 +41,8 @@ function executeBootstrap(source,preferred,device,key='backup.page.heading'){
  return {language:doc.documentElement.lang,value:el.textContent,userContent:userContent.textContent,t:context.window.TaleraLanguage.t};
 }
 test('same standalone page picks stored language and does not scan personal text',()=>{
+ assert.ok(!languageBootstrap(['backup.']).includes('__name('),'Bundler-only helpers must never enter browser code');
+ assert.ok(!fs.readFileSync(new URL('./f5-language.mjs',import.meta.url),'utf8').includes('}.toString()'),'Browser bootstrap must not serialize a bundled function');
  for(const lang of langs){
   const result=executeBootstrap(languageBootstrap(['backup.','transfer.']),lang,['nl-NL']);
   assert.equal(result.language,lang);assert.equal(result.value,translate(lang,'backup.page.heading'));

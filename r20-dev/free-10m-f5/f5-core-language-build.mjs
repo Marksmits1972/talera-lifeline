@@ -421,6 +421,10 @@ const dynamicPositions={
    "hint.textContent='▶ Beluister'",
    "window.TaleraI18n.setText(hint,'core.present.legacyListenHint')",
    1
+  ],
+  [
+   "<span>Foto’s beheren</span><span>›</span></button>",
+   "<span data-i18n=\"core.present.managePhotosAction\">Foto’s beheren</span><span>›</span></button>"
   ]
  ],
  "/tell": [
@@ -615,6 +619,38 @@ const dynamicPositions={
    "$('v13Error').textContent='Probeer opnieuw.'",
    "window.TaleraI18n.setText($('v13Error'),'core.tell.dateTryAgain')",
    1
+  ],
+  [
+   "$('back').textContent=view==='work'?'← Herinneringen':view==='overview'?'← Terug':'← Terug'",
+   "window.TaleraI18n.setText($('back'),view==='work'?'core.tell.workBack':view==='overview'?'core.tell.overviewBack':'core.tell.startBack')"
+  ],
+  [
+   "<textarea id=\"story\" placeholder=\"Wat wil je over dit moment vertellen?\">",
+   "<textarea id=\"story\" data-i18n-placeholder=\"core.tell.storyPlaceholder\" placeholder=\"Wat wil je over dit moment vertellen?\">"
+  ],
+  [
+   "choices.setAttribute('aria-label',text('tag.selected','Mijn favoriete kenmerken'))",
+   "window.TaleraI18n.setTextAttribute(choices,'aria-label','core.tell.favoriteChoicesAria')"
+  ],
+  [
+   "id=\"taleraV61RecPause\" hidden>Pauze</button>",
+   "id=\"taleraV61RecPause\" data-i18n=\"core.tell.recorderPauseInitial\" hidden>Pauze</button>"
+  ],
+  [
+   "state.recipientListening?'Pauze':'Luisteren'",
+   "window.TaleraI18n.t(state.recipientListening?'core.tell.shareRecipientPause':'core.tell.shareRecipientListen')"
+  ],
+  [
+   "buttonAction('prototype-setting','NL','Taal','Nederlands')",
+   "buttonAction('prototype-setting','NL',window.TaleraI18n.t('core.tell.legacySettingsLanguage'),'Nederlands')"
+  ],
+  [
+   "class=\"talera-share-back\" type=\"button\" data-action=\"back\" aria-label=\"Terug\"",
+   "class=\"talera-share-back\" type=\"button\" data-action=\"back\" data-i18n-aria-label=\"core.tell.shareBackAria\" aria-label=\"Terug\""
+  ],
+  [
+   "class=\"talera-share-secondary\" type=\"button\" data-action=\"back\">Terug</button>",
+   "class=\"talera-share-secondary\" type=\"button\" data-action=\"back\" data-i18n=\"core.tell.sharePreviewBack\">Terug</button>"
   ]
  ]
 };

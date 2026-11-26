@@ -305,8 +305,10 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    assert.ok(linked.size>0,'Original video is still in the library');
    if(cached===true)assert.equal(linked.poster,true,'Existing poster is reused in the draft cache');
    await page.locator('#publish').click();
-   await pollDb(async id=>!(await window.TaleraMemories.blob('talera-v4-work:manifest')||[]).some(g=>g.existing===id),
-    mixed.id,20000,'Actual normal Save left the mixed memory in the pending queue');
+   await pollDb(async id=>{
+    const mem=window.TaleraMemories;if(!mem?.blob)return false;
+    return !(await mem.blob('talera-v4-work:manifest')||[]).some(g=>g.existing===id);
+   },mixed.id,20000,'Actual normal Save left the mixed memory in the pending queue');
    await go('/tell');
   }
   console.log('TALERA_EDITOR_ACTUAL_MIXED_VIDEO_CACHED_AND_NATIVE_PREVIEW_PASS');

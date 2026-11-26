@@ -83,15 +83,17 @@ const inspect=p=>p.evaluate(async scope=>{
 },scope);
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const url='http://127.0.0.1:'+server.address().port;
+let retainedChromium=null;
 try{
  for(const [engine,receivingEngine] of [[chromium,chromium],[webkit,webkit],[webkit,chromium]]){
   signal=new TransferSignaling();
   const diagBefore=diagnosticPosts;
   const mixed=engine!==receivingEngine,name=mixed?engine.name()+'-to-'+receivingEngine.name():engine.name();
   const browser=await bounded(name+' launch',()=>engine===chromium?chromium.launch():webkit.launch(),35000);
-  let receivingBrowser=browser;
+  if(engine===chromium)retainedChromium=browser;
+  const receivingBrowser=mixed?retainedChromium:browser;
+  assert.ok(receivingBrowser,'Previously launched Chromium is required for the mixed-engine test');
   try{
-   if(mixed)receivingBrowser=await bounded(name+' receiving engine launch',()=>receivingEngine.launch(),35000);
    const a=await bounded(name+' sender context',()=>browser.newContext()),b=await bounded(name+' receiver context',()=>receivingBrowser.newContext());
    await a.addCookies([{name:'sid',value:'a',url}]);await b.addCookies([{name:'sid',value:'b',url}]);
    const sender=await bounded(name+' sender page',()=>a.newPage()),receiver=await bounded(name+' receiver page',()=>b.newPage());
@@ -192,10 +194,12 @@ try{
    await once(1,0);if(!mixed){await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2,true);}
    assert.equal(mixed?diagnosticPosts>diagBefore:diagnosticPosts===diagBefore,true,'diagnostics must be opt-in');
    console.log('TALERA_DIRECT_TRANSFER_BROWSER_PASS',name,{networkPosts,firstCopy:true,repeatOnlyNew:true,identicalBytes:true,explicitConfirmation:true,automaticDiscovery:true,manualFallback:!mixed,crossEngine:mixed,diagnosticsEnabled:mixed});
-  }finally{if(receivingBrowser!==browser)await bounded(name+' receiving browser close',()=>receivingBrowser.close(),15000);await bounded(name+' browser close',()=>browser.close(),15000)}
+   if(engine===chromium){await bounded(name+' sender context close',()=>a.close());await bounded(name+' receiver context close',()=>b.close())}
+  }finally{if(browser!==retainedChromium)await bounded(name+' browser close',()=>browser.close(),15000)}
   mark(name+' complete including cleanup');
  }
 }finally{
+ if(retainedChromium)await bounded('retained Chromium close',()=>retainedChromium.close(),15000);
  await bounded('fixture server close',()=>new Promise(r=>{server.close(r);server.closeAllConnections()}),5000);
  clearTimeout(watchdog);
 }

@@ -83,7 +83,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
     const rect=(selector)=>{const r=document.querySelector(selector)?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}:null};
     return {surface:rect('#surface'),canvas:rect('#timelineCanvas'),date:rect('#focusText'),
       dots:rect('.talera-photo-dots'),stage:rect('#photoStage'),id:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
-      controlColors:Object.fromEntries(['#talera-flow-home','#talera-v5-editor-pencil'].map(s=>{const e=document.querySelector(s);return [s,e?{background:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color}:null]}))};
+      controlColors:Object.fromEntries(['#talera-flow-home','#talera-v5-editor-pencil'].map(s=>{const e=document.querySelector(s);return [s,e?{background:getComputedStyle(e,'::after').backgroundColor,hitBackground:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,paintWidth:getComputedStyle(e,'::after').width,hitWidth:getComputedStyle(e).width}:null]}))};
    });
    assert.ok(close(g.surface.width,expected)&&close((g.surface.left+g.surface.right)/2,width/2),'Centered shorter ruler '+JSON.stringify(g));
    assert.ok(close(g.canvas.width,g.surface.width),'Canvas must match native hit area');
@@ -93,6 +93,9 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    for(const [selector,style] of Object.entries(g.controlColors)){
     assert.equal(style?.background,'rgba(11, 30, 57, 0.88)','Desktop contrast '+selector);
     assert.equal(style?.color,'rgb(255, 255, 255)','Desktop foreground '+selector);
+    assert.equal(style?.hitBackground,'rgba(0, 0, 0, 0)','Original transparent hit area '+selector);
+    assert.equal(style?.paintWidth,'34px','Original visible circle '+selector);
+    assert.equal(style?.hitWidth,'45px','Original hit area '+selector);
    }
    presentations.push(g);
   }

@@ -12,6 +12,9 @@ assert.ok(!desktopPresentationStyle.includes('.talera-photo-dots'), 'Original do
 assert.ok(desktopPresentationStyle.includes('#talera-flow-home'));
 assert.ok(desktopPresentationStyle.includes('#talera-v5-editor-pencil'));
 assert.ok(desktopPresentationStyle.includes('rgba(11, 30, 57, .88)'));
+assert.ok(desktopPresentationStyle.includes('::after'));
+assert.ok(desktopPresentationStyle.includes(':not(.talera-recipient-presentation):not(.talera-v18-reading)'));
+assert.ok(desktopPresentationStyle.includes('::before'));
 for (const id of ['memoryPhotoA','memoryPhotoB'])
  assert.ok(desktopPresentationStyle.includes('img#'+id+':is(:not([src]),[src=""]):is(:not([srcset]),[srcset=""])'), 'Only source-less native photo elements may be hidden');
 assert.equal(installDesktopPresentationLayout(original,'/mijn-leven'),original);

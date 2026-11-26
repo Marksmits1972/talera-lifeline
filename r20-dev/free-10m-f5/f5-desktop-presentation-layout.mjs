@@ -12,12 +12,21 @@ export const desktopPresentationStyle = `<style id="talera-f5-desktop-presentati
     transform: translateX(-50%) !important;
   }
   #surface #timelineCanvas { width: 100% !important; }
-  /* Preserve existing hit areas and icon artwork on light and dark photos. */
-  #talera-flow-home,
-  #talera-v5-editor-pencil {
+  /* The visible 34px circle is the native ::after layer, not the transparent
+     45px hit area. Keep reading and shared presentation modes untouched. */
+  html body:not(.talera-recipient-presentation):not(.talera-v18-reading)
+    :is(#talera-flow-home,#talera-v5-editor-pencil):is([data-talera-photo-contrast],:not([data-talera-photo-contrast]))::after {
     background-color: rgba(11, 30, 57, .88) !important;
     border-color: rgba(255, 255, 255, .82) !important;
+  }
+  html body:not(.talera-recipient-presentation):not(.talera-v18-reading)
+    :is(#talera-flow-home,#talera-v5-editor-pencil):is([data-talera-photo-contrast],:not([data-talera-photo-contrast])) {
     color: #fff !important;
+  }
+  html body:not(.talera-recipient-presentation):not(.talera-v18-reading)
+    #talera-flow-home:is([data-talera-photo-contrast],:not([data-talera-photo-contrast]))::before {
+    border-left-color: #fff !important;
+    border-bottom-color: #fff !important;
   }
   /* The zero-example shell deliberately has no initial image source.
      Hide only its empty native image elements; loading an original source

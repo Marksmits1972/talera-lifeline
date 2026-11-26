@@ -19,6 +19,8 @@ import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';
 import {muteEditorOnlyVideo} from './f5-editor-video-mute-guard.mjs';
+import {patchAuthenticatedEditReturn} from './f5-edit-return.mjs';
+import {editReturnBrowserSources} from './generated/f5-edit-return-browser.mjs';
 import {localBackupPage} from './f5-local-backup-page.mjs';
 import {renderOriginalTaleraShare,renderTaleraLanding,guestClientScript} from './f5-guest-experience.mjs';
 
@@ -1099,7 +1101,8 @@ async function publicPage(request,env){
     // Isolate *local* originals, audio, video, photo and cue records by
     // verified account, without changing recorder, swipe or presentation logic.
     // If the upstream memory-store script ever changes, fail closed.
-    let scoped=scopeLocalMemories(privateHtml,await privateAccountScope(actor.id));
+    const editReturnAccountScope=await privateAccountScope(actor.id);
+    let scoped=scopeLocalMemories(privateHtml,editReturnAccountScope);
     // Only an explicitly configured existing Worker enables online enrichment.
     // The browser receives a boolean, never the provider username.
     if(['/mijn-leven','/meldingen','/present','/tell'].includes(pathname)&&typeof env.GEONAMES_USERNAME==='string'&&
@@ -1115,7 +1118,8 @@ async function publicPage(request,env){
     // the record panel is visible. The original present/player video round
     // with sound after narration is untouched.
     const silenced=pathname==='/tell'?muteEditorOnlyVideo(stableEditedCues):stableEditedCues;
-    const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(silenced):silenced;
+    const editReturnHtml=patchAuthenticatedEditReturn(silenced,pathname,editReturnAccountScope,editReturnBrowserSources);
+    const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(editReturnHtml):editReturnHtml;
     const converted=await assetizeHtml(threeTabHome,new Set(approvedAssets));
     const storyEntryHtml=hideUnselectedEntryPhoto(converted.html,request.url);
     const menuEntryHtml=preventHomeMenuPresentationFlash(storyEntryHtml,request.url);

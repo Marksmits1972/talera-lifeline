@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
 import {verifyDesktopLayout} from './f5-desktop-layout.browser-test.mjs';
+import {verifyEditReturn} from './f5-edit-return.browser-test.mjs';
 import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_DATE_GAP} from './f5-timeline-loupe.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -121,6 +122,7 @@ backupRegression: try{
     await testTimelineLoupe();
     break backupRegression;
   }
+  await verifyEditReturn({browser,origin,gate,sid,mobileDevice:devices['iPhone 13']});
   await verifyDesktopLayout({browser,origin,gate,sid,mobileDevice:devices['iPhone 13']});
   // Actual picker import on the real authenticated Worker, with a private
   // synthetic browser context containing previous memories. No live data.

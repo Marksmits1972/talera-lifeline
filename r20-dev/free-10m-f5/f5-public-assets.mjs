@@ -5,6 +5,7 @@ import {installDesktopHomeLayout} from './f5-desktop-home-layout.mjs';
 import {installDesktopPresentationLayout} from './f5-desktop-presentation-layout.mjs';
 import {installDesktopMemoryTransition} from './f5-desktop-memory-transition.mjs';
 import {buildF5OfflineServiceWorker} from './f5-offline-sw.mjs';
+import {buildEditReturnBrowserSources} from './f5-edit-return.mjs';
 import {completePublishedRemovalOnOtherPage,installOriginalPayloadReader} from './f5-library-editor-stable-save.mjs';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu,keepOnlyFunctionalFreeMenu} from './f5-account-switch-guard.mjs';
@@ -2513,6 +2514,7 @@ for(const name of supportNames){
   const offlinePackageVersion=sha(Buffer.concat([
    Buffer.from(JSON.stringify({referencePages:refs,scripts})),
    readFileSync(path.join(here,'f5-worker.mjs')),
+   readFileSync(path.join(here,'f5-edit-return.mjs')) ,
    readFileSync(path.join(here,'f5-offline-sw.mjs'))
   ])).slice(0,32);
   a=Buffer.from(buildF5OfflineServiceWorker(a.toString('utf8'),offlinePackageVersion),'utf8');
@@ -2534,6 +2536,7 @@ for(const name of supportNames){
 }
 for(const mandatory of ['/sw.js','/manifest.webmanifest'])
  assert.ok(support[mandatory],'Missing mandatory original PWA resource '+mandatory);
+writeFileSync(path.join(generated,'f5-edit-return-browser.mjs'),'// Generated with the same TALERA build.\nexport const editReturnBrowserSources=Object.freeze('+JSON.stringify(buildEditReturnBrowserSources())+');\n');
 writeFileSync(path.join(generated,'public-template-map.mjs'),
   '// Generated only from current approved anonymous public TALERA source.\n'+
   'export const referencePages = Object.freeze('+JSON.stringify(refs,null,2)+');\n'+

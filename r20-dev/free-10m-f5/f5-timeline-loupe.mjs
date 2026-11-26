@@ -72,6 +72,35 @@ export function nextLoupeMove(scale,position,target,selectedId){
  return {position:target};
 }
 
+// The loupe retains the native day tick marks and calendar projection, but
+// uses the former second label row for one substantially larger weekday.
+// All coordinates are in the original ruler's (pre-zoom) drawing space.
+export function paintLoupeWeekdayLabels({ctx,from,to,lifeStart,lifeEnd,locale,project,axisY,availableHeight,dayWidth,tick}){
+ const dt=new Date(from);dt.setHours(0,0,0,0);
+ const weekday=new Intl.DateTimeFormat(locale,{weekday:'short'});
+ const labelTop=axisY+12;
+ const rowHeight=Math.max(0,availableHeight-14);
+ const fontSize=Math.min(24,Math.floor(rowHeight));
+ const maxWidth=Math.max(1,dayWidth*.86);
+ while(dt.getTime()<=to){
+  const ms=dt.getTime();
+  if(ms>=lifeStart&&ms<=lifeEnd){
+   const x=project(ms);
+   // Preserve the existing major tick, without either of its small labels.
+   tick(x,axisY,true,'','',true);
+   if(fontSize>0){
+    ctx.save();
+    ctx.font='700 '+fontSize+'px Inter,-apple-system,sans-serif';
+    ctx.fillStyle='rgba(15,39,71,.90)';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(weekday.format(dt).replace(/\.$/,''),x,labelTop+rowHeight/2,maxWidth);
+    ctx.restore();
+   }
+  }
+  dt.setDate(dt.getDate()+1);
+ }
+}
+
 export function mountTimelineLoupe({surface,openNative,closeNative,selection,select,memories,lifeStart,lifeEnd,locale,redraw}){
  const panel=document.createElement('div');
  panel.id='talera-timeline-loupe';panel.hidden=true;panel.setAttribute('aria-hidden','true');
@@ -294,15 +323,10 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,sel
    drawMemoryBeacons(3,from,to,w,axisY,m=>x(scale.byId.get(m.id)?.position??scale.positionAt(m.ms)));
    ctx.strokeStyle='rgba(91,143,185,.44)';ctx.lineWidth=1.2;
    ctx.beginPath();ctx.moveTo(left,axisY+.5);ctx.lineTo(right,axisY+.5);ctx.stroke();
-   const dt=new Date(from);dt.setHours(0,0,0,0);
-   // Daily labels remain readable, stable and attached to the scrolling axis.
-   const weekday=new Intl.DateTimeFormat(locale(),{weekday:'short'});
-   const date=new Intl.DateTimeFormat(locale(),{day:'numeric',month:'short'});
-   while(dt.getTime()<=to){
-    const ms=dt.getTime();
-    if(ms>=lifeStart&&ms<=lifeEnd)tick(project(ms),axisY,true,weekday.format(dt).replace(/\.$/,''),date.format(dt),true);
-    dt.setDate(dt.getDate()+1);
-   }
+   paintLoupeWeekdayLabels({
+    ctx,from,to,lifeStart,lifeEnd,locale:locale(),project,axisY,
+    availableHeight:Math.max(0,(cy+ch-compactAxis)/zoom),dayWidth:unit,tick
+   });
    ctx.restore();
   }
  };

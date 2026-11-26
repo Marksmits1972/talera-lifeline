@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {desktopMemoryDirection,installDesktopMemoryTransition,desktopMemoryTransitionStyle} from './f5-desktop-memory-transition.mjs';
+const origin='https://talera.example',home=origin+'/mijn-leven',present=origin+'/present?memory=A';
+assert.equal(desktopMemoryDirection(home,present),'forward');
+assert.equal(desktopMemoryDirection(present,origin+'/'),'back');
+for(const [a,b] of [[home,origin+'/tell'],[home,origin+'/present?year=2026'],[present,origin+'/mijn-leven?reset=1'],[home,'https://other.example/present?memory=A'],[null,present],[home,origin+'/present?memory=A&memory=B']])assert.equal(desktopMemoryDirection(a,b),null);
+const original='<html><head></head><body><img id="heroImage"></body></html>';
+const html=installDesktopMemoryTransition(original,'/mijn-leven');
+assert.equal(html.replace(desktopMemoryTransitionStyle,'').replace(/<script id="talera-f5-desktop-memory-transition">[\s\S]*?<\/script>/,''),original);
+assert.equal(installDesktopMemoryTransition(original,'/tell'),original);
+assert.throws(()=>installDesktopMemoryTransition(html,'/mijn-leven'),/DUPLICATE/);
+const script=html.match(/<script id="talera-f5-desktop-memory-transition">([\s\S]*?)<\/script>/)[1];
+const handlers={},properties=new Map();
+let desktop=true,loaded=true,heroHref='/present?memory=A',skips=0;
+const style={getPropertyValue:k=>properties.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>properties.set(k,v),removeProperty:k=>properties.delete(k)};
+const img={get complete(){return loaded},get naturalWidth(){return loaded?100:0},getAttribute:()=>loaded?'blob:original':null};
+const window={location:{href:home},addEventListener:(name,fn)=>handlers[name]=fn,matchMedia:()=>({matches:desktop})};
+const document={getElementById:id=>id==='heroImage'?img:id==='heroCaption'?{dataset:{presentHref:heroHref}}:null,querySelector:()=>({style})};
+vm.runInNewContext(script,{window,document,URL});
+function swap(from,to){handlers.pageswap({activation:{from:{url:from},entry:{url:to}},viewTransition:{skipTransition(){skips++},finished:Promise.resolve()}})}
+swap(home,present);assert.equal(properties.get('view-transition-name'),'talera-desktop-memory');
+await Promise.resolve();assert.equal(properties.has('view-transition-name'),false);
+desktop=false;swap(home,present);assert.equal(skips,1);
+desktop=true;loaded=false;swap(home,present);assert.equal(skips,2);
+loaded=true;heroHref='/present?memory=B';swap(home,present);assert.equal(skips,3);
+heroHref='/present?memory=A';swap(home,origin+'/tell');assert.equal(skips,4);
+console.log('TALERA_DESKTOP_MEMORY_TRANSITION_CONTRACT_PASS');
+// The presentation builds the reverse transition from the same route, without
+// replacing the existing back link, and never participates on unrelated routes.
+const presentationOriginal='<html><head></head><body><div id="photoStage"></div></body></html>';
+const presentationHTML=installDesktopMemoryTransition(presentationOriginal,'/present');
+const presentationScript=presentationHTML.match(/<script id="talera-f5-desktop-memory-transition">([\s\S]*?)<\/script>/)[1];
+const presentHandlers={},presentProperties=new Map();
+const presentStyle={getPropertyValue:k=>presentProperties.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>presentProperties.set(k,v),removeProperty:k=>presentProperties.delete(k)};
+const presentWindow={location:{href:present},navigation:{activation:{from:{url:home},entry:{url:present}}},matchMedia:()=>({matches:true}),addEventListener:(n,f)=>presentHandlers[n]=f};
+const presentDocument={getElementById:id=>id==='photoStage'?{style:presentStyle}:null,querySelector:()=>null};
+vm.runInNewContext(presentationScript,{window:presentWindow,document:presentDocument,URL});
+const presentEvent=()=>({viewTransition:{skipTransition(){throw Error('unexpected skip')},finished:Promise.resolve()}});
+presentHandlers.pagereveal(presentEvent());assert.equal(presentProperties.get('view-transition-name'),'talera-desktop-memory');
+await Promise.resolve();assert.equal(presentProperties.has('view-transition-name'),false);
+presentHandlers.pageswap({...presentEvent(),activation:{from:{url:present},entry:{url:home}}});
+assert.equal(presentProperties.get('view-transition-name'),'talera-desktop-memory');
+await Promise.resolve();assert.equal(presentProperties.has('view-transition-name'),false);
+console.log('TALERA_DESKTOP_MEMORY_TRANSITION_REVERSE_CONTRACT_PASS');

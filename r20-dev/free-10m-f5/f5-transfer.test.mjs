@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {newDiagnostic,safeCandidateKinds,validDiagnosticEvents,diagnosticError} from './f5-transfer-diagnostic.mjs';
 import {TransferSignaling} from './f5-transfer-signal.mjs';
 import {inventory,planTransfer,makeTransfer,reviewTransfer} from './f5-transfer-library.mjs';
 import {sendFrame,frameReceiver,pairingVerificationCode} from './f5-transfer-transport.mjs';
@@ -47,6 +48,37 @@ test('automatic discovery is temporary, account-local, invisible to its owner an
  now+=4000;signal.handle(sid,{action:'create',code,sdp,proof});
  assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
  assert.deepEqual(signal.offer(other,code).offer,{sdp,proof});
+});
+test('diagnostic report is bounded, sanitized, temporary and account/session isolated',()=>{
+ let now=0;const signal=new TransferSignaling(()=>now),unrelated=new TransferSignaling(()=>now);
+ const events=[[0,'START',0],[100,'CREATE_HTTP',200]],sendEvents=[[0,'START',0],[110,'JOIN_HTTP',200]];
+ const cmd=(role,events)=>({action:'diagnostic',code,role,events});
+ assert.throws(()=>signal.handle(sid,cmd('receive',events))); // no pairing
+ signal.handle(sid,{action:'create',code,sdp,proof,secret:'f'.repeat(20)});
+ assert.throws(()=>signal.handle(other,cmd('receive',events)));
+ assert.throws(()=>signal.handle(sid,cmd('send',events)));
+ assert.throws(()=>signal.handle(sid,cmd('receive',[[0,'local IP: 10.1.1.2',0]])));
+ assert.throws(()=>signal.handle(sid,cmd('receive',[[0,'START','private']])));
+ assert.throws(()=>signal.handle(sid,cmd('receive',Array(65).fill([0,'START',0]))));
+ assert.deepEqual(signal.handle(sid,cmd('receive',events)).reports,{receive:events,send:[]});
+ assert.deepEqual(signal.handle(other,cmd('send',sendEvents)).reports,{receive:events,send:sendEvents});
+ assert.throws(()=>unrelated.handle(other,cmd('send',sendEvents)));
+ assert.throws(()=>signal.handle('d'.repeat(64),cmd('send',sendEvents)));
+ signal.handle(other,{action:'join',code,sdp,proof});
+ signal.handle(sid,{action:'cancel',code});
+ assert.deepEqual(signal.handle(sid,cmd('receive',[])).reports,{receive:events,send:sendEvents});
+ now=300001;assert.throws(()=>signal.handle(sid,cmd('receive',[])));
+});
+test('local diagnostics omit addresses, ICE strings, raw errors, and cap trace length',()=>{
+ let t=0;const d=newDiagnostic('send',()=>t++);
+ d.mark('START');d.mark('NOT_VALID');d.mark('ACCOUNT_HTTP','secret');
+ const kinds=safeCandidateKinds({candidate:'candidate:123 1 UDP 100 192.0.2.1 1234 typ host'});
+ assert.deepEqual(kinds,['CANDIDATE_HOST','CANDIDATE_IPV4','CANDIDATE_UDP']);
+ assert.deepEqual(safeCandidateKinds({type:'host',address:'private-address.local',protocol:'tcp'}),['CANDIDATE_HOST','CANDIDATE_MDNS','CANDIDATE_TCP']);
+ assert.equal(diagnosticError(new Error('private diagnostic text')),'ERROR_OTHER');
+ for(let i=0;i<100;i++)d.mark(i%2?'ICE_NEW':'ICE_CHECKING');
+ assert.equal(d.events.length,64);assert.equal(d.events[0][1],'START');assert.ok(validDiagnosticEvents(d.events));
+ assert.ok(!JSON.stringify(d.events).includes('secret'));
 });
 test('confirmation code binds both SDP messages and locator',async()=>{
  const a=await pairingVerificationCode(code,sdp,sdp+'answer');

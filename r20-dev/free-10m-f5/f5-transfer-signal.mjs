@@ -1,3 +1,4 @@
+import {validDiagnosticEvents,DIAG_TTL} from './f5-transfer-diagnostic.mjs';
 // Temporary, per-account, non-persistent signaling. No media or library data.
 const CODE=/^[a-f0-9]{32}$/;
 const HASH=/^[a-f0-9]{64}$/;
@@ -9,12 +10,30 @@ const validSDP=(s,type)=>typeof s==='string'&&s.length<=12000&&s.startsWith('v=0
  !s.split(/\r?\n/).some(l=>/^m=(audio|video) /.test(l))&&
  ['offer','answer'].includes(type);
 export class TransferSignaling {
- constructor(now=()=>Date.now()){this.now=now;this.state=null;this.nextCreate=0}
+ constructor(now=()=>Date.now()){this.now=now;this.state=null;this.nextCreate=0;this.diagnostic=null}
  handle(session,command){
   if(!HASH.test(session)||!command||typeof command!=='object'||Array.isArray(command))err();
   const {action,code,sdp,proof,secret}=command;
   const now=this.now();
   if(this.state&&this.state.expires<=now)this.state=null;
+  if(this.diagnostic&&this.diagnostic.expires<=now)this.diagnostic=null;
+  if(action==='diagnostic'){
+   const {role,events}=command;
+   if(Object.keys(command).sort().join()!=='action,code,events,role'||typeof code!=='string'||!CODE.test(code)||
+      !['receive','send'].includes(role)||!validDiagnosticEvents(events))err();
+   const st=this.state;
+   let d=this.diagnostic;
+   if(!d||d.code!==code){
+    if(!st||st.code!==code||role==='receive'&&st.owner!==session||role==='send'&&(st.owner===session||st.joiner&&st.joiner!==session))err();
+    d=this.diagnostic={code,owner:st.owner,joiner:st.joiner,expires:now+DIAG_TTL,receive:null,send:null};
+   }
+   if(role==='receive'&&d.owner!==session||role==='send'&&(d.owner===session||d.joiner&&d.joiner!==session||st?.code===code&&st.joiner&&st.joiner!==session))err();
+   if(role==='send')d.joiner=session;
+   const previous=d[role];
+   // Rate and memory bounded; permit a read without replacing a trace.
+   if(events.length&&(!previous||now-previous.at>=1000))d[role]={at:now,events:events.map(e=>e.slice())};
+   return {ok:true,reports:{receive:d.receive?.events||[],send:d.send?.events||[]}};
+  }
   if(action==='discover'){
    if(Object.keys(command).join()!=='action')err();
    const st=this.state;

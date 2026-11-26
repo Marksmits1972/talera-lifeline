@@ -10,8 +10,8 @@ import {TransferSignaling} from './f5-transfer-signal.mjs';
 import {privateAccountScope} from './f5-local-scope.mjs';
 const account='12345678-1234-4123-8123-123456789abc';
 const scope='talera-free-local-'+(await privateAccountScope(account)).slice(0,32)+'-v1';
-const assets=new Set(['backup-controller.mjs','f5-portable-idb.mjs','f5-portable-archive.mjs','f5-library-persistence.mjs','f5-transfer-controller.mjs','f5-transfer-library.mjs','f5-transfer-transport.mjs','f5-transfer-qr.mjs','f5-transfer-scan.mjs','f5-transfer-jsqr.mjs']);
-let signal=new TransferSignaling(),networkPosts=0;
+const assets=new Set(['backup-controller.mjs','f5-portable-idb.mjs','f5-portable-archive.mjs','f5-library-persistence.mjs','f5-transfer-controller.mjs','f5-transfer-library.mjs','f5-transfer-transport.mjs','f5-transfer-diagnostic.mjs','f5-transfer-qr.mjs','f5-transfer-scan.mjs','f5-transfer-jsqr.mjs']);
+let signal=new TransferSignaling(),networkPosts=0,diagnosticPosts=0,rejectJoin=false;
 // Fail closed with an exact checkpoint, even if the Playwright protocol,
 // a browser-side promise or shutdown never resolves. No product behavior changed.
 let checkpoint='fixture initialization';
@@ -37,6 +37,8 @@ const server=createServer(async(req,res)=>{
    const sid=/sid=([ab])/.exec(req.headers.cookie||'')?.[1]?.repeat(64);
    assert.ok(sid);
    const c=JSON.parse(data);
+   if(c.action==='diagnostic')diagnosticPosts++;
+   if(rejectJoin&&c.action==='join'){res.writeHead(409).end('test-only rejection');return}
    // No SDP, pairing secrets, media or personal data in diagnostics.
    console.log('TALERA_TRANSFER_BROWSER_SIGNAL',c.action);
    const result=c.action==='offer'?signal.offer(sid,c.code):signal.handle(sid,c);
@@ -82,17 +84,26 @@ const inspect=p=>p.evaluate(async scope=>{
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const url='http://127.0.0.1:'+server.address().port;
 try{
- for(const engine of [chromium,webkit]){
+ for(const [engine,receivingEngine] of [[chromium,chromium],[webkit,webkit],[webkit,chromium]]){
   signal=new TransferSignaling();
-  const name=engine.name();
+  const diagBefore=diagnosticPosts;
+  const mixed=engine!==receivingEngine,name=mixed?engine.name()+'-to-'+receivingEngine.name():engine.name();
   const browser=await bounded(name+' launch',()=>engine===chromium?chromium.launch():webkit.launch(),35000);
+  let receivingBrowser=browser;
   try{
-   const a=await bounded(name+' sender context',()=>browser.newContext()),b=await bounded(name+' receiver context',()=>browser.newContext());
+   if(mixed)receivingBrowser=await bounded(name+' receiving engine launch',()=>receivingEngine.launch(),35000);
+   const a=await bounded(name+' sender context',()=>browser.newContext()),b=await bounded(name+' receiver context',()=>receivingBrowser.newContext());
    await a.addCookies([{name:'sid',value:'a',url}]);await b.addCookies([{name:'sid',value:'b',url}]);
    const sender=await bounded(name+' sender page',()=>a.newPage()),receiver=await bounded(name+' receiver page',()=>b.newPage());
    for(const [role,page] of [['sender',sender],['receiver',receiver]]){page.setDefaultTimeout(15000);page.on('pageerror',e=>console.error('TALERA_TRANSFER_BROWSER_PAGE_ERROR',name,role,e.message));}
    await bounded(name+' sender goto',()=>sender.goto(url+'/__f5/backup'));await bounded(name+' receiver goto',()=>receiver.goto(url+'/__f5/backup'));
    await bounded(name+' seed first existing story',()=>seed(sender,'local-one'));await bounded(name+' seed empty receiving library',()=>seed(receiver,null));
+   if(mixed){
+    for(const page of [sender,receiver]){
+     await page.locator('#transfer-diagnosis summary').click();
+     await page.locator('#transfer-diagnostic-enable').check();
+    }
+   }
    async function once(count,before,manual=false){
     // Pairing server throttles consecutive starts for 3 seconds.
     const step=name+' transfer '+before+'/'+count;
@@ -134,6 +145,15 @@ try{
      const receiverCode=await receiver.locator('#transfer-verify-code').innerText();
      assert.match(receiverCode,/^\d{4} \d{4}$/);
      assert.equal(receiverCode,await sender.locator('#transfer-verify-code').innerText());
+     if(mixed){
+      await receiver.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.includes('CHANNEL_OPEN'));
+      await sender.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.includes('CHANNEL_OPEN'));
+      await receiver.waitForTimeout(1800);
+      await receiver.locator('#transfer-diagnostic-refresh').click();
+      await receiver.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.split('ANDER APPARAAT')[1]?.includes('JOIN_OK'),{},{timeout:15000});
+      const report=await receiver.locator('#transfer-diagnostic-report').textContent();
+      assert.ok(!report.includes(receiverCode)&&!report.includes('candidate:')&&!report.includes('v=0'));
+     }
      mark(step+' approve both');
      await sender.locator('#transfer-approve').click();
      assert.equal(await receiver.locator('#transfer-import').isVisible(),false);
@@ -151,9 +171,28 @@ try{
      assert.deepEqual(await bounded(step+' inspect receiver',()=>inspect(receiver)),await bounded(step+' inspect sender',()=>inspect(sender)));
     }catch(e){console.error('TALERA_TRANSFER_BROWSER_FAILURE',checkpoint,e.message);for(const [role,page] of [['sender',sender],['receiver',receiver]]){try{console.error(role,await bounded(step+' '+role+' status',()=>page.locator('#transfer-status').textContent({timeout:2000}),3000))}catch{}}throw e}
    }
-   await once(1,0);await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2,true);
-   console.log('TALERA_DIRECT_TRANSFER_BROWSER_PASS',engine.name(),{networkPosts,firstCopy:true,repeatOnlyNew:true,identicalBytes:true,explicitConfirmation:true,automaticDiscovery:true,manualFallback:true});
-  }finally{await bounded(name+' browser close',()=>browser.close(),15000)}
+   if(mixed){
+    // Deliberate synthetic signaling error; no production behavior or data changed.
+    rejectJoin=true;
+    try{
+     await receiver.locator('#transfer-receive').click();
+     await receiver.locator('#transfer-pair').waitFor({state:'visible',timeout:25000});
+     await sender.locator('#transfer-send').click();
+     await sender.locator('#transfer-found').waitFor({state:'visible'});
+     await sender.locator('#transfer-connect-found').click();
+     await sender.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.includes('ERROR_PAIR'));
+     await receiver.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.split('ANDER APPARAAT')[1]?.includes('JOIN_HTTP 409'),{},{timeout:15000});
+     assert.equal((await inspect(receiver)).stories.length,0);
+     await receiver.locator('#transfer-cancel').click();
+     await receiver.waitForFunction(()=>!document.getElementById('transfer-receive').disabled);
+     await sender.waitForFunction(()=>!document.getElementById('transfer-send').disabled);
+     console.log('TALERA_TRANSFER_DIAGNOSTIC_MIXED_ENGINE_FAILURE_VISIBLE_PASS');
+    }finally{rejectJoin=false}
+   }
+   await once(1,0);if(!mixed){await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2,true);}
+   assert.equal(mixed?diagnosticPosts>diagBefore:diagnosticPosts===diagBefore,true,'diagnostics must be opt-in');
+   console.log('TALERA_DIRECT_TRANSFER_BROWSER_PASS',name,{networkPosts,firstCopy:true,repeatOnlyNew:true,identicalBytes:true,explicitConfirmation:true,automaticDiscovery:true,manualFallback:!mixed,crossEngine:mixed,diagnosticsEnabled:mixed});
+  }finally{if(receivingBrowser!==browser)await bounded(name+' receiving browser close',()=>receivingBrowser.close(),15000);await bounded(name+' browser close',()=>browser.close(),15000)}
   mark(name+' complete including cleanup');
  }
 }finally{

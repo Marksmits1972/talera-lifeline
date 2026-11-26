@@ -49,6 +49,13 @@ details{margin-top:14px}summary{cursor:pointer;color:#23497e;font-weight:600}det
 <button type="button" id="transfer-approve" hidden>Codes zijn gelijk — bevestig verbinding</button>
 <button type="button" id="transfer-import" hidden>Herinneringen toevoegen</button>
 <button type="button" id="transfer-cancel" hidden>Stoppen</button>
+<details id="transfer-diagnosis"><summary>Technische diagnose bij verbindingsproblemen</summary>
+<p class="note">Schakel dit op beide apparaten in vóór het verbinden. Alleen technische statussen worden maximaal vijf minuten via hetzelfde account gedeeld. Geen foto's, IP-adressen, wachtwoorden of verbindingscodes.</p>
+<label><input type="checkbox" id="transfer-diagnostic-enable"> Tijdelijke diagnose inschakelen</label>
+<div id="transfer-diagnostic-panel" hidden><button type="button" id="transfer-diagnostic-refresh">Diagnose van beide apparaten ophalen</button>
+<button type="button" id="transfer-diagnostic-copy">Diagnose kopiëren</button>
+<output id="transfer-diagnostic-status" role="status"></output>
+<pre id="transfer-diagnostic-report" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:.88rem;max-height:340px;overflow:auto" tabindex="0"></pre></div></details>
 <p class="note">Lukt verbinden niet? Gebruik de bestaande back-up hieronder. Er wordt niets overschreven.</p>
 </section>
 <section><h2>Back-up maken</h2>

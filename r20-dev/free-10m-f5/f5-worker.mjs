@@ -268,6 +268,7 @@ const BACKUP_MODULES=Object.freeze({
  '/__f5/f5-transfer-controller.mjs':'f5-transfer-controller.mjs',
  '/__f5/f5-transfer-library.mjs':'f5-transfer-library.mjs',
  '/__f5/f5-transfer-transport.mjs':'f5-transfer-transport.mjs',
+ '/__f5/f5-transfer-diagnostic.mjs':'f5-transfer-diagnostic.mjs',
  '/__f5/f5-transfer-qr.mjs':'f5-transfer-qr.mjs',
  '/__f5/f5-transfer-scan.mjs':'f5-transfer-scan.mjs',
  '/__f5/f5-transfer-jsqr.mjs':'f5-transfer-jsqr.mjs'

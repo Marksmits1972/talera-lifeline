@@ -220,7 +220,7 @@ jobs:
             # the owner-requested ordered backup picker UI and controller are exact-blob guarded.
             # Archive codec, read/write adapter, owner data and presentation remain unchanged.
             if [ "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117 ]; then
-              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "6171c9997926129e0d4941e34ef860263dcad33e"
+              test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "f5ad3899943cad773c467e3659bcff215f464110"
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-backup-controller.mjs)" = "ee5720f3766399404bf366c1b8eb3ce695973f09"
             elif [ "$GITHUB_REF_NAME" = feature/free-f5-narrator-story-swipe-20261113 ]; then
               test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-backup-page.mjs)" = "3d0fd5b8e290aa83347bf5c4eec2f1091777022f"

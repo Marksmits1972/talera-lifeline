@@ -7,6 +7,7 @@ import {mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
+import {createLoupeScale,LOUPE_VISIBLE_DAYS} from './f5-timeline-loupe.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 // Each CI execution gets its own synthetic originals + local Wrangler DO store.
@@ -385,7 +386,7 @@ async function testTimelineLoupe(){
   await lp.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
   await lp.waitForFunction(()=>!!window.TaleraMemories?.save);
   const ids=await lp.evaluate(async()=>{
-   const dates=['2003-02-03','2003-02-03','2003-02-04','2003-02-12'];
+   const dates=['2003-02-03','2003-02-03','2003-02-04','2003-02-06'];
    const colors=['#922244','#228844','#225599','#aa8822'];
    const result=[];
    for(let i=0;i<dates.length;i++){
@@ -407,24 +408,24 @@ async function testTimelineLoupe(){
   await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
   const box=await lp.locator('#surface').boundingBox();
   assert.ok(box?.width>200&&box.height>100);
-  const x=box.x+box.width*.65,y=box.y+box.height-64;
+  const x=box.x+box.width*.65,y=box.y+box.height*.26;
   const panel=lp.locator('#talera-timeline-loupe');
   const state=()=>lp.evaluate(()=>({
    open:!document.getElementById('talera-timeline-loupe').hidden,
    id:window.__taleraTimelineRuntime.currentMemory()?.storyId,
    runtimeId:window.__taleraTimelineRuntime.activeMemoryId(),
    loupeId:document.getElementById('talera-timeline-loupe').dataset.memoryId,
+   position:Number(document.getElementById('talera-timeline-loupe').dataset.position),
    center:window.__taleraTimelineRuntime.centerMs(),date:document.getElementById('focusText').textContent
   }));
   // An intentional drag, followed by a pause, can never open the loupe.
   await lp.mouse.move(x,y);await lp.mouse.down();
-  await lp.mouse.move(x-32,y,{steps:4});await lp.waitForTimeout(2150);
+  await lp.mouse.move(x-45,y,{steps:2});await lp.waitForTimeout(500);
   assert.equal((await state()).open,false);await lp.mouse.up();
   await load(lp,expected[0].id,1);
   await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
-  // Small accidental movement still permits a two-second stationary hold.
-  await lp.mouse.move(x,y);await lp.mouse.down();await lp.mouse.move(x+3,y+2);
-  await lp.waitForTimeout(1100);assert.equal((await state()).open,false);
+  // Natural small finger movement still permits a short hold, anywhere in the ruler.
+  await lp.mouse.move(x,y);await lp.mouse.down();await lp.mouse.move(x+9,y+5);
   await panel.waitFor({state:'visible',timeout:3000});await lp.mouse.up();
   const opened=await state();
   assert.equal(opened.id,expected[0].id);assert.equal(opened.runtimeId,opened.loupeId);
@@ -435,12 +436,14 @@ async function testTimelineLoupe(){
    const d=document.getElementById('focusText').getBoundingClientRect();
    const needle=document.querySelector('#surface>.center-needle').getBoundingClientRect();
    return {width:p.width/r.width,center:Math.abs((p.left+p.right-r.left-r.right)/2),
-     labels:[...document.querySelectorAll('#talera-timeline-loupe .talera-loupe-scale span')].map(e=>e.textContent),
+     height:p.height,canvasCount:document.querySelectorAll('#surface canvas').length,
+     canvasOpacity:getComputedStyle(document.getElementById('timelineCanvas')).opacity,
+     userSelect:getComputedStyle(document.getElementById('surface')).userSelect,
      dateSeparate:p.bottom<=d.top+2,needleVisible:needle.height>10,
      panelTop:p.top,panelBottom:p.bottom,dateTop:d.top,rulerTop:r.top,rulerBottom:r.bottom};
   });
-  assert.ok(geometry.width>.60&&geometry.width<.72&&geometry.center<2&&geometry.needleVisible);
-  assert.equal(geometry.labels.length,7);assert.ok(geometry.labels.every(Boolean));
+  assert.ok(geometry.width>.94&&geometry.height>=90&&geometry.center<2&&geometry.needleVisible,JSON.stringify(geometry));
+  assert.equal(geometry.canvasCount,1);assert.equal(geometry.canvasOpacity,'1');assert.equal(geometry.userSelect,'none');
   assert.equal(geometry.dateSeparate,true,'Date indicator must remain clear of the loupe: '+JSON.stringify(geometry));
   assert.ok(geometry.panelTop>=geometry.rulerTop-1,'Loupe must stay inside existing upper ruler: '+JSON.stringify(geometry));
   // Count calls to the actual existing adjacent-selection bridge separately
@@ -462,29 +465,44 @@ async function testTimelineLoupe(){
    return window.__loupeTestVisited;
   });
   assert.deepEqual(seen,[]);
-  // One controlled continuous drag, including two memories at the same instant.
+  // Use the original chronological projection to measure actual days, not
+  // invented equally spaced steps between memories with different dates.
+  async function model(){
+    const data=await lp.evaluate(()=>({memories:window.__taleraPhotoBook.list().map(m=>({id:m.id,storyId:m.storyId,ms:m.ms})),
+      start:window.__taleraTimelineRuntime.lifeStart,end:window.__taleraTimelineRuntime.lifeEnd}));
+    return {scale:createLoupeScale(data.memories,data.start,data.end),memories:data.memories};
+  }
+  async function travelTo(id){
+    const {scale,memories}=await model(),stop=scale.byId.get(memories.find(m=>m.storyId===id).id);
+    for(let attempt=0;attempt<30;attempt++){
+      const current=await state(),delta=stop.position-current.position;
+      if(current.id===id&&Math.abs(delta)<.12)break;
+      const b=await lp.locator('#surface').boundingBox(),direction=Math.sign(delta)||1;
+      const sx=b.x+b.width*(direction>0?.8:.2),sy=b.y+b.height*.64;
+      const distance=Math.min(110,Math.max(5,Math.abs(delta)*b.width/LOUPE_VISIBLE_DAYS+3));
+      await lp.mouse.move(sx,sy);await lp.mouse.down();
+      await lp.mouse.move(sx-direction*distance,sy,{steps:4});
+      await lp.waitForTimeout(260);await lp.mouse.up();
+    }
+    const v=await state();assert.equal(v.id,id,'Calendar stop '+JSON.stringify(v));
+    assert.ok(Math.abs(v.center-stop.ms)<1000,'Calendar center '+JSON.stringify(v));
+    assert.equal(v.runtimeId,v.loupeId);
+  }
+  await travelTo(expected[1].id);
+  await travelTo(expected[2].id);
+  // The time ruler must change even between memories; no photo switch in
+  // an empty interval and the date and needle must remain synchronized.
+  const beforeBlank=await state();
+  const needleBefore=await lp.locator('#surface>.center-needle').boundingBox();
   await lp.mouse.move(x,y);await lp.mouse.down();
-  for(let i=1;i<=3;i++){
-   await lp.mouse.move(x-i*34,y);await lp.waitForTimeout(330);
-   const v=await state();
-   assert.equal(v.id,expected[i].id);assert.equal(v.center,expected[i].ms);
-   assert.equal(v.runtimeId,v.loupeId);
-  }
-  await lp.waitForTimeout(180);await lp.mouse.up();
+  await lp.mouse.move(x-box.width/LOUPE_VISIBLE_DAYS*.65,y,{steps:5});
+  await lp.waitForTimeout(250);await lp.mouse.up();
+  const blank=await state();assert.equal(blank.id,beforeBlank.id);
+  assert.ok(blank.center>beforeBlank.center+0.5*86400000);
+  assert.deepEqual(await lp.locator('#surface>.center-needle').boundingBox(),needleBefore);
+  await travelTo(expected[3].id);
+  await travelTo(expected[2].id);await travelTo(expected[1].id);await travelTo(expected[0].id);
   assert.equal((await state()).open,true);
-  // Return in the opposite direction using the part beside the visible panel.
-  const edge=await lp.evaluate(({x,y})=>{
-   const node=document.elementFromPoint(x,y);
-   return {hit:node?.id||node?.className||node?.tagName,insideSurface:!!node?.closest('#surface')};
-  },{x:box.x+20,y});
-  await lp.mouse.move(box.x+20,y);await lp.mouse.down();
-  for(let i=1;i<=3;i++){
-   await lp.mouse.move(box.x+20+i*34,y);await lp.waitForTimeout(330);
-   const v=await state();
-   assert.equal(v.id,expected[3-i].id,'Reverse step '+i+': '+JSON.stringify({edge,state:v,steps:await lp.evaluate(()=>window.__loupeTestSteps)}));
-   assert.equal(v.center,expected[3-i].ms);
-  }
-  await lp.waitForTimeout(180);await lp.mouse.up();
   const {visited,steps}=await lp.evaluate(()=>({visited:window.__loupeTestVisited,steps:window.__loupeTestSteps}));
   const expectedIds=expected.slice(1).map(m=>m.id).concat(expected.slice(0,3).reverse().map(m=>m.id));
   assert.deepEqual(steps.map(m=>m.after),expectedIds,'Actual selection bridge must be called exactly once for each adjacent memory');
@@ -519,7 +537,7 @@ async function testTimelineLoupe(){
   await load(lp,expected[0].id,1);
   await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
   const touchBox=await lp.locator('#surface').boundingBox();
-  const tx=touchBox.x+touchBox.width*.65,ty=touchBox.y+touchBox.height-64;
+  const tx=touchBox.x+touchBox.width*.82,ty=touchBox.y+touchBox.height*.36;
   if(!webkitPickerOnly){
    const session=await lp.context().newCDPSession(lp);
    try{
@@ -534,8 +552,7 @@ async function testTimelineLoupe(){
     await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
    }finally{await session.detach()}
   }else{
-   await lp.mouse.move(tx,ty);await lp.mouse.down();
-   await panel.waitFor({state:'visible',timeout:4000});await lp.mouse.up();
+   await lp.touchscreen.tap(tx,ty);await panel.waitFor({state:'visible',timeout:4000});
   }
   const touchSaved=await state(),touchStory=await lp.locator('#memoryStoryScroll').boundingBox();
   const tapX=touchStory.x+touchStory.width*.45,tapY=touchStory.y+touchStory.height*.48;
@@ -572,13 +589,13 @@ async function testTimelineLoupe(){
   await load(lp,expected[3].id,1);
   await lp.waitForFunction(id=>window.__taleraPhotoBook.list().some(m=>m.storyId===id),mixed.id);
   await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active);
-  const mb=await lp.locator('#surface').boundingBox(),mx=mb.x+mb.width*.65,my=mb.y+mb.height-64;
+  const mb=await lp.locator('#surface').boundingBox(),mx=mb.x+mb.width*.65,my=mb.y+mb.height*.25;
   await lp.mouse.move(mx,my);await lp.mouse.down();await panel.waitFor({state:'visible',timeout:4000});await lp.mouse.up();
-  await lp.mouse.move(mx,my);await lp.mouse.down();await lp.mouse.move(mx-40,my);await lp.waitForTimeout(350);await lp.mouse.up();
+  await travelTo(mixed.id);
   assert.equal((await state()).id,mixed.id,'Loupe must pass narrated memory ID to original engine');
   await lp.locator('.talera-independent-narrator-layer audio').waitFor({state:'attached',timeout:10000});
   await lp.evaluate(()=>{window.__loupeNarratorAudio=window.__taleraF5SharedAudible.get()});
-  await lp.mouse.move(mx,my);await lp.mouse.down();await lp.mouse.move(mx+40,my);await lp.waitForTimeout(350);await lp.mouse.up();
+  await travelTo(expected[3].id);
   assert.equal((await state()).id,expected[3].id,'Loupe must return to ordinary memory');
   await lp.locator('.talera-independent-narrator-layer').waitFor({state:'detached',timeout:10000});
   const soundHandoff=await lp.evaluate(()=>{

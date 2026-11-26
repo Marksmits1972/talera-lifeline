@@ -1564,36 +1564,58 @@ function installTimelineLoupe(html){
  assert.ok(!source.includes('</script>'));
  one('let zoomPos=0;','let zoomPos=0;\nlet taleraLoupeHoldId=null,taleraLoupeHoldMs=null;','HOLD_ID');
  one('  centerMs=clamp(centerMs,minCenter,LIFE_END);',
-  '  centerMs=clamp(centerMs,taleraLoupeHoldId!==null&&centerMs===taleraLoupeHoldMs?LIFE_START:minCenter,LIFE_END);','LIFE_LIMIT');
+  '  centerMs=clamp(centerMs,(surface.dataset.taleraLoupe==="open"||taleraLoupeHoldMs!==null&&centerMs===taleraLoupeHoldMs)?LIFE_START:minCenter,LIFE_END);','LIFE_LIMIT');
  one('  if (!window.__taleraBandRolling) {\n    if (userIsMoving) renderJourneyPreview();',
-  '  if (!window.__taleraBandRolling && !(taleraLoupeHoldId!==null&&taleraLoupeHoldId===activeMemoryId&&centerMs===taleraLoupeHoldMs)) {\n    if (userIsMoving) renderJourneyPreview();','EXACT_SELECTION');
+  '  if (!window.__taleraBandRolling && surface.dataset.taleraLoupe!=="open" && !(taleraLoupeHoldMs!==null&&centerMs===taleraLoupeHoldMs)) {\n    if (userIsMoving) renderJourneyPreview();','EXACT_SELECTION');
+ // Share the original canvas, density-beacons, tick appearance and date badge.
+ one('function drawDensity(level,startMs,endMs,w,axisY) {',
+  'function drawDensity(level,startMs,endMs,w,axisY,project=null) {','DENSITY_PROJECTION');
+ one('    const x=((LIFE_START+mid*MS_DAY-startMs)/(endMs-startMs))*w;',
+  '    const x=project?project(LIFE_START+mid*MS_DAY):((LIFE_START+mid*MS_DAY-startMs)/(endMs-startMs))*w;','DENSITY_X');
+ one('    const bw=Math.max(level<2?2.2:3.2,bucket/visible*w*.64);',
+  '    const bw=Math.max(level<2?2.2:3.2,(project?Math.abs(project(LIFE_START+be*MS_DAY)-project(LIFE_START+bs*MS_DAY)):bucket/visible*w)*.64);','DENSITY_WIDTH');
+ one('function drawMemoryBeacons(level,startMs,endMs,w,axisY) {',
+  'function drawMemoryBeacons(level,startMs,endMs,w,axisY,project=null) {','BEACON_PROJECTION');
+ one('    const x=((m.ms-startMs)/(endMs-startMs))*w;',
+  '    const x=project?project(m):((m.ms-startMs)/(endMs-startMs))*w;','BEACON_X');
+ one('  if(x<-55 || x>canvas.clientWidth+55 || x>endX) return;',
+  '  if(x<-55 || x>canvas.clientWidth+55 || (surface.dataset.taleraLoupe!=="open"&&x>endX)) return;','TICK_CLIP');
+ one('  if(major&&label&&x+Math.max(18,String(label).length*4)>endX){label="";sub="";}',
+  '  if(surface.dataset.taleraLoupe!=="open"&&major&&label&&x+Math.max(18,String(label).length*4)>endX){label="";sub="";}','TICK_END_LABEL');
+ one('  const endX=Math.max(0,Math.min(w,((LIFE_END-startMs)/(endMs-startMs))*w));',
+  '  if(surface.dataset.taleraLoupe==="open"){taleraLoupe.paint({ctx,w,h,axisY,drawDensity,drawMemoryBeacons,tick})}else{\n  const endX=Math.max(0,Math.min(w,((LIFE_END-startMs)/(endMs-startMs))*w));','PAINT');
+ one('  const localOnTimeline=MEMORIES.find(m=>m.id===activeMemoryId);',
+  '  }\n  const localOnTimeline=MEMORIES.find(m=>m.id===activeMemoryId);','PAINT_END');
  const marker='surface.addEventListener("pointerdown",e=>{';
  const bind=`
 const taleraLoupe=mountTimelineLoupe({
  surface,lifeStart:LIFE_START,lifeEnd:LIFE_END,locale:()=>window.TaleraI18n?.locale||'nl-NL',
  selection:()=>({id:MEMORIES.find(m=>m.id===activeMemoryId)?.id??null,ms:centerMs}),
+ memories:()=>MEMORIES,
+ redraw:ms=>{centerMs=ms;taleraLoupeHoldMs=ms;keepCenterValid();draw()},
  openNative:id=>{
   if(pointers.size!==1||!pointers.has(id))return false;
   const band=window.__taleraIntegratedBand?.getState?.();
   if(band?.drag||band?.snap||band?.timelineTracking||band?.active)return false;
   const current=MEMORIES.find(m=>m.id===activeMemoryId);
-  if(current?._photoLoading)return false;
+
   pointers.clear();userIsMoving=false;clearTimeout(snapTimer);cancelAnimationFrame(raf);
   clearTimeout(candidateTimer);clearTimeout(storySwitchTimer);pendingMemoryId=null;
   cancelVisualScaleAnimation();searchVelocity=0;
   window.__taleraNativeTimelineReleaseMs=null;
-  zoomPos=visualZoomPos=1;
-  if(current){taleraLoupeHoldId=current.id;taleraLoupeHoldMs=current.ms;centerMs=current.ms}
+  zoomPos=visualZoomPos=3;
+  taleraLoupeHoldId=current?.id??null;taleraLoupeHoldMs=centerMs;
   keepCenterValid();draw();return true;
  },
  closeNative:()=>{
   clearTimeout(snapTimer);cancelAnimationFrame(raf);cancelVisualScaleAnimation();
   zoomPos=visualZoomPos=1;userIsMoving=false;searchVelocity=0;
-  resetVisualIntent(performance.now());keepCenterValid();draw();
+  taleraLoupeHoldMs=centerMs;resetVisualIntent(performance.now());keepCenterValid();draw();
  },
- step:direction=>{
+ select:id=>{
   const index=MEMORIES.findIndex(m=>m.id===activeMemoryId);
-  const target=index>=0?MEMORIES[index+direction]:null;
+  const targetIndex=MEMORIES.findIndex(m=>m.id===id);
+  const target=MEMORIES[targetIndex];
   if(!target||!Number.isFinite(target.ms)||target.ms<LIFE_START||target.ms>LIFE_END)return false;
   taleraLoupeHoldId=target.id;taleraLoupeHoldMs=target.ms;
   clearTimeout(candidateTimer);clearTimeout(storySwitchTimer);pendingMemoryId=null;
@@ -1601,7 +1623,7 @@ const taleraLoupe=mountTimelineLoupe({
   // handing off a different memory. It stops the outgoing engine even if
   // the next ordinary photo is already hydrated; no player changes needed.
   document.dispatchEvent(new Event("talera:timeline-user-motion"));
-  return window.__taleraPhotoBook.step(direction);
+  return index>=0&&Math.abs(targetIndex-index)===1?window.__taleraPhotoBook.step(targetIndex-index):window.__taleraPhotoBook.choose(targetIndex);
  }
 });
 function taleraNativeTimelineStart(){
@@ -1619,17 +1641,14 @@ function taleraNativeTimelineStart(){
  one('surface.addEventListener("pointermove",e=>{\n  if(!pointers.has(e.pointerId)) return;',
   'surface.addEventListener("pointermove",e=>{\n  if(taleraLoupe.move(e))return;\n  if(!pointers.has(e.pointerId)) return;\n  if(taleraLoupe.waiting(e))return;\n  if(!userIsMoving)taleraNativeTimelineStart();','MOVE');
  one('function pointerEnd(e) {\n  if(pointers.has(e.pointerId)) pointers.delete(e.pointerId);',
-  'function pointerEnd(e) {\n  if(taleraLoupe.end(e))return;\n  if(taleraLoupe.cancelPending(e.pointerId)){pointers.delete(e.pointerId);userIsMoving=false;return}\n  if(!pointers.has(e.pointerId))return;\n  pointers.delete(e.pointerId);','END');
+  'function pointerEnd(e) {\n  if(taleraLoupe.end(e))return;\n  if(taleraLoupe.releasePending(e))return;\n  if(taleraLoupe.cancelPending(e.pointerId)){pointers.delete(e.pointerId);userIsMoving=false;return}\n  if(!pointers.has(e.pointerId))return;\n  pointers.delete(e.pointerId);','END');
  one('surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  userIsMoving = true;',
   'surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  if(taleraLoupe.wheel(e))return;\n  taleraLoupeHoldId=null;taleraLoupeHoldMs=null;\n  userIsMoving = true;','WHEEL');
  const css='<style id="talera-timeline-loupe-style">'+
- '#talera-timeline-loupe{position:absolute;left:50%;transform:translateX(-50%);bottom:38px;width:66.666%;height:58px;box-sizing:border-box;border-radius:25px;border:1px solid rgba(255,255,255,.9);background:#faf9f5;color:#0f2747;z-index:3;pointer-events:none;overflow:hidden;box-shadow:0 2px 9px rgba(15,39,71,.12)}'+
+ '#surface,#surface *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;touch-action:none!important}'+
+ '#talera-timeline-loupe{position:absolute;inset:0 4px 44px;box-sizing:border-box;border-radius:22px;border:1px solid rgba(255,255,255,.7);background:rgba(225,237,248,.9);z-index:1;pointer-events:none;overflow:hidden;box-shadow:0 2px 9px rgba(15,39,71,.12)}'+
  '#talera-timeline-loupe[hidden]{display:none!important}'+
- '#talera-timeline-loupe .talera-loupe-scale{position:absolute;inset:5px 0 0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:end;text-align:center;font:700 13px Inter,-apple-system,sans-serif}'+
- '#talera-timeline-loupe .talera-loupe-scale:before{content:"";position:absolute;top:26px;left:0;right:0;border-top:1px solid rgba(91,143,185,.65)}'+
- '#talera-timeline-loupe .talera-loupe-scale span{position:relative;height:100%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;box-sizing:border-box}'+
- '#talera-timeline-loupe .talera-loupe-scale span:before{content:"";position:absolute;top:7px;height:25px;left:50%;border-left:1.5px solid #0f2747}'+
- '#talera-timeline-loupe .talera-loupe-scale .is-empty:before{display:none}'+
+ '#surface[data-talera-loupe="open"]>#timelineCanvas{opacity:1!important;filter:none!important;transition:none!important}'+
  '#surface[data-talera-loupe="open"]>.center-needle{z-index:4!important;opacity:1!important}'+
  '</style>';
  one('</head>',css+'</head>','STYLE');

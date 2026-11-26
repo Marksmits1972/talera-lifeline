@@ -1,103 +1,111 @@
-// One local day/week loupe owned by the existing TALERA timeline only.
-// No media, storage, playback, network or second memory ordering.
-export const LOUPE_HOLD_MS=2000;
-export const LOUPE_SLOP_PX=8;
-export const LOUPE_STEP_PX=28;
-export const LOUPE_STEP_INTERVAL_MS=280;
-const loupeClamp=(x,min,max)=>Math.max(min,Math.min(max,x));
+// The enlarged ruler uses the existing timeline canvas, calendar and photo book.
+// No second memory order, media, storage, playback or network.
+export const LOUPE_HOLD_MS=350;
+export const LOUPE_SLOP_PX=16;
+export const LOUPE_VISIBLE_DAYS=6;
+const LOUPE_MS_DAY=86400000;
+const clampLoupe=(x,min,max)=>Math.max(min,Math.min(max,x));
 
-// One adjacent memory per accepted step, even on an exceptionally fast flick.
-// Keep at most one extra step of gesture credit; never queue a long runaway.
-export function createLoupeMotion(step){
- let credit=0,lastStep=-Infinity,velocity=0,previousAt=0,previousX=0,tail=0;
- const cap=LOUPE_STEP_PX*1.5;
- const maxVelocity=LOUPE_STEP_PX*1000/LOUPE_STEP_INTERVAL_MS;
- function consume(now){
-  if(Math.abs(credit)<LOUPE_STEP_PX||now-lastStep<LOUPE_STEP_INTERVAL_MS)return false;
-  const dir=Math.sign(credit);
-  if(!step(dir)){credit=0;velocity=0;tail=0;return false}
-  credit-=dir*LOUPE_STEP_PX;lastStep=now;return true;
+// Normally one wheel unit is one day. Only very close/coincident memories
+// receive extra room, so each original ID has its own reachable stop.
+// Calendar labels and beacons share this projection (including the expansion).
+export function createLoupeScale(memories,lifeStart,lifeEnd){
+ const stops=[];let shift=0,previous=-Infinity;
+ const day=ms=>(ms-lifeStart)/LOUPE_MS_DAY;
+ for(const m of memories){
+  if(!Number.isFinite(m.ms)||m.ms<lifeStart||m.ms>lifeEnd)continue;
+  const position=Math.max(day(m.ms)+shift,previous+.46);
+  shift=position-day(m.ms);previous=position;
+  stops.push({id:m.id,ms:m.ms,position});
+ }
+ const end=day(lifeEnd)+shift;
+ const byId=new Map(stops.map(s=>[s.id,s]));
+ const anchors=[{ms:lifeStart,position:0},...stops,{ms:lifeEnd,position:end}];
+ function upper(key,value){
+  let l=0,r=anchors.length;
+  while(l<r){const mid=(l+r)>>1;if(anchors[mid][key]<=value)l=mid+1;else r=mid}
+  return l;
+ }
+ function convert(key,other,value){
+  const i=upper(key,value),a=anchors[Math.max(0,i-1)],b=anchors[Math.min(anchors.length-1,i)];
+  if(i===0||i===anchors.length||b[key]===a[key])return a[other];
+  return a[other]+(b[other]-a[other])*(value-a[key])/(b[key]-a[key]);
  }
  return {
-  begin(x,now){credit=0;velocity=0;tail=0;previousX=x;previousAt=now},
-  move(x,now){
-   const dx=previousX-x,dt=Math.max(8,now-previousAt);
-   previousX=x;previousAt=now;
-   if(!dx)return false;
-   if(Math.sign(dx)!==Math.sign(credit))credit=0;
-   credit=loupeClamp(credit+dx,-cap,cap);
-   velocity=loupeClamp(dx*1000/dt,-maxVelocity,maxVelocity);
-   return consume(now);
-  },
-  release(now){
-   // A stationary finger at release never produces a delayed selection.
-   if(now-previousAt>100||Math.abs(velocity)<20){credit=0;velocity=0;tail=0;return false}
-   tail=360;return true;
-  },
-  coast(now,dt){
-   if(tail<=0)return false;
-   dt=loupeClamp(dt,0,40);tail-=dt;
-   credit=loupeClamp(credit+velocity*dt/1000,-cap,cap);
-   velocity*=Math.exp(-dt/155);
-   consume(now);
-   if(tail<=0||Math.abs(velocity)<5){credit=0;velocity=0;tail=0;return false}
-   return true;
-  },
-  stop(){credit=0;velocity=0;tail=0}
+  stops,byId,end,
+  msAt:p=>convert('position','ms',clampLoupe(p,0,end)),
+  positionAt:ms=>convert('ms','position',clampLoupe(ms,lifeStart,lifeEnd)),
  };
 }
 
-// Calendar days, not fixed 24-hour durations (DST transitions are supported).
-export function loupeDays(ms,lifeStart,lifeEnd,locale='nl-NL'){
- const base=new Date(ms);base.setHours(12,0,0,0);
- const lower=new Date(lifeStart);lower.setHours(0,0,0,0);
- const upper=new Date(lifeEnd);upper.setHours(23,59,59,999);
- const format=new Intl.DateTimeFormat(locale,{weekday:'short'});
- return Array.from({length:7},(_,i)=>{
-  const d=new Date(base);d.setDate(d.getDate()+i-3);
-  return {label:d>=lower&&d<=upper?format.format(d).replace(/\.$/,''):'',center:i===3};
- });
+// A drag moves the actual scale continuously. When an unselected memory is
+// reached, land on its exact stop before continuing, never skipping IDs.
+export function nextLoupeMove(scale,position,target,selectedId){
+ target=clampLoupe(target,0,scale.end);
+ const direction=Math.sign(target-position);
+ if(!direction)return {position};
+ const list=scale.stops;
+ let lo=0,hi=list.length;
+ while(lo<hi){const mid=(lo+hi)>>1;if(list[mid].position<position)lo=mid+1;else hi=mid}
+ let i=direction>0?lo:Math.min(list.length-1,lo);
+ for(;i>=0&&i<list.length;i+=direction){
+  const s=list[i];
+  if(direction>0&&s.position>target||direction<0&&s.position<target)break;
+  if(direction>0&&s.position<position||direction<0&&s.position>position||s.id===selectedId)continue;
+  return {position:s.position,stop:s};
+ }
+ return {position:target};
 }
 
-export function mountTimelineLoupe({surface,openNative,closeNative,selection,step,lifeStart,lifeEnd,locale}){
+export function mountTimelineLoupe({surface,openNative,closeNative,selection,select,memories,lifeStart,lifeEnd,locale,redraw}){
  const panel=document.createElement('div');
  panel.id='talera-timeline-loupe';panel.hidden=true;panel.setAttribute('aria-hidden','true');
- const scale=document.createElement('div');scale.className='talera-loupe-scale';panel.append(scale);
- const cells=Array.from({length:7},()=>{const cell=document.createElement('span');scale.append(cell);return cell});
- surface.insertBefore(panel,surface.querySelector('.center-needle'));
- let pending=null,active=null,opened=false,frame=0,outside=null,swallowClick=false,lastWheel=-Infinity;
- const motion=createLoupeMotion(dir=>{const changed=step(dir);if(changed)render();return changed});
+ surface.insertBefore(panel,surface.firstChild);
+ let pending=null,active=null,opened=false,frame=0,outside=null,swallowClick=false;
+ let scale=null,position=0,target=0,previousX=0,readyAt=0;
  const now=()=>performance.now();
+ const pxPerUnit=()=>Math.max(1,surface.clientWidth)/LOUPE_VISIBLE_DAYS;
  const clearPending=()=>{if(!pending)return;clearTimeout(pending.timer);pending=null};
- function layout(){
-  if(!opened)return;
-  const ruler=surface.getBoundingClientRect(),date=surface.querySelector('#focusText')?.getBoundingClientRect();
-  if(!date||!ruler.height)return;
-  // Only move the loupe, never the existing date/needle. Reserve room for
-  // the date's existing engaged/afterglow transform, also on small phones.
-  panel.style.bottom=Math.max(38,Math.ceil(ruler.bottom-date.top+12))+'px';
- }
- const resizeObserver=new ResizeObserver(layout);
- resizeObserver.observe(surface);
- const dateNode=surface.querySelector('#focusText');
- if(dateNode)resizeObserver.observe(dateNode);
- window.addEventListener('resize',layout,{passive:true});
- window.visualViewport?.addEventListener('resize',layout,{passive:true});
  function render(){
-  layout();
+  if(!opened)return;
   const current=selection();
-  const days=loupeDays(current.ms,lifeStart,lifeEnd,locale());
-  cells.forEach((cell,i)=>{cell.textContent=days[i].label;cell.classList.toggle('is-empty',!days[i].label);cell.classList.toggle('is-center',days[i].center)});
-  // Accessible description and testable identity are the existing selection,
-  // never a second selection state or a saved record.
   panel.dataset.memoryId=current.id==null?'':String(current.id);
+  panel.dataset.position=String(position);
+  redraw(scale.msAt(position));
  }
- function stop(){if(frame)cancelAnimationFrame(frame);frame=0;motion.stop()}
- function open(e){
-  const p=pending;clearPending();
-  if(!p||!openNative(p.id))return;
-  opened=true;surface.dataset.taleraLoupe='open';panel.hidden=false;
-  active=p.id;motion.begin(p.x,now());render();
+ function stop(){if(frame)cancelAnimationFrame(frame);frame=0;target=position;readyAt=0}
+ function refresh(){
+  scale=createLoupeScale(memories(),lifeStart,lifeEnd);
+  const current=selection(),selected=scale.byId.get(current.id);
+  position=selected&&Math.abs(current.ms-selected.ms)<1?selected.position:scale.positionAt(current.ms);
+  target=position;
+ }
+ function pump(t){
+  frame=0;
+  if(!opened||target===position)return;
+  if(t<readyAt){frame=requestAnimationFrame(pump);return}
+  const next=nextLoupeMove(scale,position,target,selection().id);
+  const before=position;
+  position=next.position;
+  if(next.stop){
+   if(!select(next.stop.id)){position=before;target=position;render();return}
+   // Give the selected photo time to be seen before another memory crosses.
+   readyAt=t+180;
+  }
+  render();
+  if(target!==position)frame=requestAnimationFrame(pump);
+ }
+ function shift(dx){
+  if(!dx)return;
+  // Bound pending movement during a dense cluster, not travel through empty days.
+  target=clampLoupe(target+dx/pxPerUnit(),Math.max(0,position-2),Math.min(scale.end,position+2));
+  if(!frame)pump(now());
+ }
+ function open(p,held){
+  clearPending();
+  if(!p||!openNative(p.id))return false;
+  refresh();opened=true;surface.dataset.taleraLoupe='open';panel.hidden=false;
+  active=held?p.id:null;previousX=p.lastX;render();return true;
  }
  function close(){
   if(!opened)return;
@@ -105,40 +113,40 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
   closeNative();
  }
  function inside(e){
-  const r=surface.getBoundingClientRect(),axis=r.bottom-64;
-  return e.clientX>=r.left&&e.clientX<=r.right&&Math.abs(e.clientY-axis)<=20;
+  const r=surface.getBoundingClientRect();
+  return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
  }
  function cancelEvent(e){if(e.cancelable)e.preventDefault();e.stopImmediatePropagation()}
  function beginPointer(e){
   if(active!==null||e.button!==0||e.isPrimary===false)return;
-  stop();active=e.pointerId;
-  // The approved full-width band may include a different hit target than
-  // surface. Capture the owned gesture independently of that target.
+  stop();active=e.pointerId;previousX=e.clientX;
   try{surface.setPointerCapture(e.pointerId)}catch{}
-  motion.begin(e.clientX,now());
+ }
+ function movePointer(e){
+  const dx=previousX-e.clientX;previousX=e.clientX;
+  if(dx)shift(dx)
  }
  function finishPointer(e){
   if(active!==e.pointerId)return;
   active=null;
-  let previous=now();
-  if(e.type==='pointerup'&&motion.release(previous)){
-   const animate=t=>{frame=0;const dt=t-previous;previous=t;if(motion.coast(t,dt))frame=requestAnimationFrame(animate)};
-   frame=requestAnimationFrame(animate);
-  }else stop();
- }
- // Consume the entire outside gesture, including its compatibility click.
- // A later, separate gesture is not consumed.
- document.addEventListener('pointerdown',e=>{
-  swallowClick=false;
-  if(!opened)return;
+  if(e.type!=='pointerup'){stop();return}
+  // Never keep rolling after the finger has stopped. A dense cluster can
+  // settle on the one memory just reached; a new gesture cancels any backlog.
   stop();
+  const selected=scale.byId.get(selection().id);
+  if(selected&&Math.abs(selected.position-position)*pxPerUnit()<=8){
+   position=target=selected.position;render();
+  }
+ }
+ document.addEventListener('pointerdown',e=>{
+  swallowClick=false;if(!opened)return;
   if(active!==null){if(e.pointerId!==active)cancelEvent(e);return}
   if(inside(e)){beginPointer(e);cancelEvent(e);return}
   outside={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
   swallowClick=true;cancelEvent(e);
  },true);
  document.addEventListener('pointermove',e=>{
-  if(opened&&active===e.pointerId){motion.move(e.clientX,now());cancelEvent(e);return}
+  if(opened&&active===e.pointerId){movePointer(e);cancelEvent(e);return}
   if(!outside||outside.id!==e.pointerId)return;
   if(Math.hypot(e.clientX-outside.x,e.clientY-outside.y)>LOUPE_SLOP_PX)outside.moved=true;
   cancelEvent(e);
@@ -152,13 +160,14 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
  document.addEventListener('pointerup',outsideEnd,true);
  document.addEventListener('pointercancel',outsideEnd,true);
  document.addEventListener('click',e=>{if(swallowClick||opened){swallowClick=false;cancelEvent(e)}},true);
- // Existing photo/reading gestures include touch listeners; prevent their
- // compatibility events only while the loupe owns this gesture.
  for(const type of ['touchstart','touchmove','touchend','touchcancel']){
   document.addEventListener(type,e=>{if(opened||outside||swallowClick)cancelEvent(e)},{capture:true,passive:false});
  }
- document.addEventListener('contextmenu',e=>{if(opened||pending)cancelEvent(e)},true);
- function interrupt(){clearPending();stop();active=null;outside=null;swallowClick=false}
+ // Safari may start selection/callout before a long press has completed.
+ for(const type of ['contextmenu','selectstart','dragstart']){
+  document.addEventListener(type,e=>{if(opened||pending||inside(e)||surface.contains(e.target))cancelEvent(e)},true);
+ }
+ function interrupt(){clearPending();close();active=null;outside=null;swallowClick=false}
  window.addEventListener('pagehide',interrupt);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)interrupt()});
  return {
@@ -166,32 +175,52 @@ export function mountTimelineLoupe({surface,openNative,closeNative,selection,ste
   arm(e){
    clearPending();
    if(e.button!==0||e.isPrimary===false)return false;
-   const p={id:e.pointerId,x:e.clientX,y:e.clientY,timer:0};
-   pending=p;p.timer=setTimeout(()=>open(e),LOUPE_HOLD_MS);return true;
+   if(e.cancelable)e.preventDefault();
+   const p={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,timer:0};
+   pending=p;p.timer=setTimeout(()=>open(p,true),LOUPE_HOLD_MS);return true;
   },
   cancelPending(id){
    if(!pending||(id!==undefined&&pending.id!==id))return false;
    clearPending();return true;
   },
+  releasePending(e){
+   if(!pending||pending.id!==e.pointerId)return false;
+   const p=pending;clearPending();
+   if(e.type==='pointerup')return open(p,false);
+   return false;
+  },
   waiting(e){
    if(!pending||pending.id!==e.pointerId)return false;
+   pending.lastX=e.clientX;
    if(Math.hypot(e.clientX-pending.x,e.clientY-pending.y)<=LOUPE_SLOP_PX)return true;
    clearPending();return false;
   },
-  down(e){
-   if(!opened)return false;
-   if(inside(e))beginPointer(e);
-   return true;
-  },
-  move(e){
-   if(!opened)return false;
-   if(active===e.pointerId)motion.move(e.clientX,now());return true;
-  },
-  end(e){
-   if(!opened)return false;
-   finishPointer(e);
-   return true;
-  },
-  wheel(e){if(!opened)return false;stop();const t=now();if(t-lastWheel>=LOUPE_STEP_INTERVAL_MS&&Math.abs(e.deltaX)>Math.abs(e.deltaY)*.75&&e.deltaX){lastWheel=t;step(Math.sign(e.deltaX));render()}return true}
+  down(e){if(!opened)return false;if(inside(e))beginPointer(e);return true},
+  move(e){if(!opened)return false;if(active===e.pointerId)movePointer(e);return true},
+  end(e){if(!opened)return false;finishPointer(e);return true},
+  wheel(e){if(!opened)return false;shift((e.deltaX||e.deltaY)*(e.deltaMode===1?16:1));return true},
+  // The same native ruler drawing functions are supplied by its closure.
+  paint({ctx,w,h,axisY,drawDensity,drawMemoryBeacons,tick}){
+   if(!opened||!scale)return;
+   const unit=w/LOUPE_VISIBLE_DAYS,x=p=>w/2+(p-position)*unit;
+   const from=scale.msAt(position-LOUPE_VISIBLE_DAYS/2),to=scale.msAt(position+LOUPE_VISIBLE_DAYS/2);
+   const project=ms=>x(scale.positionAt(ms));
+   const left=Math.max(0,x(0)),right=Math.min(w,x(scale.end));
+   ctx.save();ctx.beginPath();ctx.rect(left,0,Math.max(0,right-left),h);ctx.clip();
+   if(to>from)drawDensity(3,from,to,w,axisY,project);
+   drawMemoryBeacons(3,from,to,w,axisY,m=>x(scale.byId.get(m.id)?.position??scale.positionAt(m.ms)));
+   ctx.strokeStyle='rgba(91,143,185,.44)';ctx.lineWidth=1.2;
+   ctx.beginPath();ctx.moveTo(left,axisY+.5);ctx.lineTo(right,axisY+.5);ctx.stroke();
+   const dt=new Date(from);dt.setHours(0,0,0,0);
+   // Daily labels remain readable, stable and attached to the scrolling axis.
+   const weekday=new Intl.DateTimeFormat(locale(),{weekday:'short'});
+   const date=new Intl.DateTimeFormat(locale(),{day:'numeric',month:'short'});
+   while(dt.getTime()<=to){
+    const ms=dt.getTime();
+    if(ms>=lifeStart&&ms<=lifeEnd)tick(project(ms),axisY,true,weekday.format(dt).replace(/\.$/,''),date.format(dt),true);
+    dt.setDate(dt.getDate()+1);
+   }
+   ctx.restore();
+  }
  };
 }

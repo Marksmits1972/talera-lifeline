@@ -1,12 +1,12 @@
 // Passive presentation decoration: the current decoded image remains the
 // authority; never modify a playback clock, cue, media index or storage.
-function mountTaleraCapturePlace(flagPositions){
+function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPositions)){
  const title=document.getElementById('memoryStory'),caption=document.getElementById('memoryCaption');
  const stage=document.getElementById('photoStage'),runtime=window.__taleraTimelineRuntime;
  const library=window.TaleraLibrary;
  if(!title||!caption||!stage||
     document.getElementById('talera-capture-place'))return;
- const row=document.createElement('div');row.id='talera-capture-place';row.hidden=true;
+ const row=document.createElement('div');row.id='talera-capture-place';row.hidden=true;row.dataset.taleraExplicitLanguage='';
  const flag=document.createElement('span');flag.className='talera-capture-flag';flag.setAttribute('aria-hidden','true');
  const label=document.createElement('span');label.className='talera-capture-label';
  row.append(flag,label);title.after(row);
@@ -65,7 +65,8 @@ function mountTaleraCapturePlace(flagPositions){
   if(!item)return {code:'catalogus-item-ontbreekt'};
   // The catalog is the only authority. Even older original files must be
   // enriched by the library, never inspected for location by presentation.
-  const place=valid(item.capturePlace);
+  const selected=selectDisplayedLocation(story,item,countryCodes);
+  const place=selected?.source==='manual-memory'?selected:valid(selected);
   if(place)return {place};
   return {code:'plaats-onbekend'};
  }
@@ -85,13 +86,13 @@ function mountTaleraCapturePlace(flagPositions){
    if(own!==serial||selected()?.identity!==next)return;
    if(current.guard||!result.place)return;
    const place=result.place;
-   const [x,y]=flagPositions[place.countryCode];
-   flag.style.backgroundPosition=x+'px '+y+'px';
+   const xy=flagPositions[place.countryCode];
+   flag.hidden=!xy;if(xy)flag.style.backgroundPosition=xy[0]+'px '+xy[1]+'px';
    const locale=window.TaleraI18n?.locale||document.documentElement.lang||'en';
-   let localizedCountry=place.country;try{localizedCountry=new Intl.DisplayNames([locale],{type:'region',fallback:'none'}).of(place.countryCode)||place.country}catch{}
+   let localizedCountry=place.country||place.countryCode||'';if(place.countryCode)try{localizedCountry=new Intl.DisplayNames([locale],{type:'region',fallback:'none'}).of(place.countryCode)||localizedCountry}catch{}
    const locationLabel=place.source==='geonames-locality-v2'
     ?window.TaleraI18n.t('core.present.captureNear',{city:place.city}):place.city;
-   label.textContent=localizedCountry+' · '+locationLabel;row.hidden=false;
+   label.textContent=[localizedCountry,locationLabel].filter(Boolean).join(' · ');row.hidden=false;
   });
  }
  function schedule(){if(!queued){queued=true;queueMicrotask(refresh)}}

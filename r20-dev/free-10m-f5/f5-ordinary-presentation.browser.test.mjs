@@ -1190,6 +1190,25 @@ async function testTimelineLoupe(){
       return m._photoIndex===1&&document.getElementById('talera-capture-place')?.hidden===true;
     },null,{timeout:10000});
     console.log('TALERA_CAPTURE_PLACE_ACTUAL_PRESENTATION_FRAME_PASS');
+    // The exact approved editor: automatically detected values are visible,
+    // yet only an explicit user action stores a memory-level override.
+    await metadataPage.goto(origin+'/tell?edit='+encodeURIComponent(result.id),{waitUntil:'domcontentloaded'});
+    await metadataPage.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
+    await metadataPage.locator('.talera-location-toggle').click();
+    await metadataPage.waitForFunction(()=>document.querySelector('#talera-memory-city')?.value==='Arnhem');
+    assert.equal(await metadataPage.locator('.talera-location-country-name').innerText(),'Nederland');
+    assert.equal(await metadataPage.locator('.talera-location-status').innerText(),'Automatisch ingevuld – aanpasbaar');
+    assert.equal(await metadataPage.evaluate(async id=>(await window.TaleraMemories.get(id)).manualLocation??null,result.id),null);
+    await metadataPage.locator('#talera-memory-city').fill('Nijmegen');
+    await metadataPage.locator('#publish').click();
+    await metadataPage.waitForFunction(async id=>(await window.TaleraMemories?.get?.(id))?.manualLocation?.city==='Nijmegen',result.id,{timeout:25000});
+    await metadataPage.goto(origin+'/present?memory='+encodeURIComponent(result.id),{waitUntil:'domcontentloaded'});
+    await metadataPage.waitForFunction(id=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===2},result.id,{timeout:20000});
+    await metadataPage.evaluate(()=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,1,true)});
+    await metadataPage.waitForFunction(()=>{const row=document.getElementById('talera-capture-place');return row&&!row.hidden&&row.textContent==='Nederland · Nijmegen'},null,{timeout:10000});
+    const corrected=await metadataPage.evaluate(async id=>{const row=await window.TaleraLibrary.readStory(id);return {place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,keys:row.items.map(x=>x.key),manualLocation:row.manualLocation}},result.id);
+    assert.deepEqual(corrected,{place:result.place,missing:null,keys:result.keys,manualLocation:{countryCode:'NL',city:'Nijmegen'}});
+    console.log('TALERA_MANUAL_LOCATION_AUTO_CORRECTION_AND_ORIGINAL_CAPTURE_PASS');
     await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),result.id);
     console.log('TALERA_CAPTURE_PLACE_ACCOUNT_CATALOG_REOPEN_PASS');
   }finally{await metadataPage.close()}

@@ -1,5 +1,6 @@
 import {localizeEmbeddedPlayer} from './f5-embed-language-build.mjs';
 import {centralizeCoreLanguage} from './f5-core-language-build.mjs';
+import {installMemoryLocationStore,installMemoryLocationEditor,memoryLocationSharedSource,memoryLocationCountryCodes} from './f5-memory-location-build.mjs';
 import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
@@ -1233,8 +1234,8 @@ function installCapturePlacePresentation(html){
   '</style>';
  const source=readFileSync(path.join(here,'f5-capture-place-presentation.browser.js'),'utf8');
  assert.ok(!source.includes('</script'),'CAPTURE_PLACE_UNSAFE_UI_SOURCE');
- const script='<script id="talera-capture-place-script">'+source+
-  '\nmountTaleraCapturePlace('+JSON.stringify(flags.positions)+');</script>';
+ const script='<script id="talera-capture-place-script">'+memoryLocationSharedSource+'\n'+source+
+  '\nmountTaleraCapturePlace('+JSON.stringify(flags.positions)+','+JSON.stringify(memoryLocationCountryCodes)+');</script>';
  assert.equal(html.split('</head>').length,2,'CAPTURE_PLACE_HEAD_DRIFT');
  assert.equal(html.split('</body>').length,2,'CAPTURE_PLACE_BODY_DRIFT');
  return html.replace('</head>',()=>css+'</head>').replace('</body>',()=>script+'</body>');
@@ -1964,6 +1965,8 @@ for(const [route,filename] of Object.entries(routes)){
    readFileSync(path.join(delivery,'generated','reference-tell.html'),'utf8'));
  else html=installOriginalPayloadReader(html);
  html=installCapturePlaceCatalog(html,route);
+ html=installMemoryLocationStore(html);
+ if(route==='/tell')html=installMemoryLocationEditor(html);
  if(route==='/present')html=installCapturePlacePresentation(html);
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);

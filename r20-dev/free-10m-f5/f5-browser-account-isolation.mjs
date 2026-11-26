@@ -1055,6 +1055,48 @@ try{
        approvedTopicTilesPreserved:true,realIphoneAccepted:false}));
  }finally{await mixedHome.close()}
  await verifyTellEditorLayout(page,a.id);
+ // The existing tagged fixture is about to be removed by the next
+ // regression; exercise unknown location, all languages and offline picker
+ // on the exact existing editor first, with no new temporary app or account.
+ const locationEdit=await page.context().newPage();
+ try{
+  const before=await page.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {keys:row.items.map(x=>x.key),bytes:Array.from(new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer()))}},tagged.id);
+  await locationEdit.goto(origin+'/tell?edit='+encodeURIComponent(tagged.id),{waitUntil:'domcontentloaded'});
+  await locationEdit.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
+  assert.equal(await locationEdit.evaluate(()=>document.querySelector('.talera-memory-location').previousElementSibling?.classList.contains('talera-tags-v20')),true);
+  await locationEdit.locator('.talera-location-toggle').click();
+  assert.equal(await locationEdit.locator('#talera-memory-city').inputValue(),'');
+  assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Kies een land');
+  for(const lang of ['nl','en','de','fr','es']){
+   await locationEdit.evaluate(l=>window.TaleraI18n.setLanguage(l),lang);
+   assert.equal(await locationEdit.locator('.talera-location-title').innerText(),languageCatalog[lang]['core.editor.location.heading']);
+   assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),languageCatalog[lang]['core.editor.location.countryPlaceholder']);
+  }
+  await locationEdit.evaluate(()=>window.TaleraI18n.setLanguage('nl'));
+  await locationEdit.context().setOffline(true);
+  try{
+   await locationEdit.locator('#talera-memory-country').click();
+   await locationEdit.locator('.talera-location-dialog[open]').waitFor({state:'visible'});
+   assert.ok(await locationEdit.locator('.talera-location-choice').count()>195);
+   await locationEdit.locator('.talera-location-search').fill('Frankrijk');
+   await locationEdit.locator('.talera-location-choice').filter({hasText:'Frankrijk'}).click();
+   assert.equal(await locationEdit.locator('.talera-location-dialog[open]').count(),0);
+   assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Frankrijk');
+   await locationEdit.locator('#talera-memory-city').fill('Parijs');
+  }finally{await locationEdit.context().setOffline(false)}
+  assert.equal(await page.evaluate(async id=>(await window.TaleraMemories.get(id)).manualLocation??null,tagged.id),null,'Draft must not publish automatically');
+  await locationEdit.locator('#publish').click();
+  await page.waitForFunction(async id=>(await window.TaleraMemories.get(id))?.manualLocation?.city==='Parijs',tagged.id,{timeout:25000});
+  const after=await page.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {manualLocation:row.manualLocation,keys:row.items.map(x=>x.key),bytes:Array.from(new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer()))}},tagged.id);
+  assert.deepEqual(after,{...before,manualLocation:{countryCode:'FR',city:'Parijs'}});
+  await locationEdit.goto(origin+'/tell?edit='+encodeURIComponent(tagged.id),{waitUntil:'domcontentloaded'});
+  await locationEdit.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
+  await locationEdit.locator('.talera-location-toggle').click();
+  assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Frankrijk');
+  assert.equal(await locationEdit.locator('#talera-memory-city').inputValue(),'Parijs');
+  console.log('TALERA_LOCATION_EDITOR_OFFLINE_COUNTRY_FIVE_LANGUAGES_AND_SAVE_PASS');
+ }finally{await locationEdit.close()}
+
  // Reuse the already existing tagged fixture after its final Home assertions.
  // No new synthetic media or account; test the actual signed-in editor route.
  const deleteEditor=await page.context().newPage();

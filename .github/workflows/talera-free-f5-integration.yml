@@ -44,7 +44,7 @@ jobs:
           npm ci
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-          node --test r20-dev/free-10m-f5/f5-language.test.mjs
+          node --test r20-dev/free-10m-f5/f5-language.test.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs
       - name: Archive allowlisted anonymous software outputs and bind to exact commit
         id: package
         run: |

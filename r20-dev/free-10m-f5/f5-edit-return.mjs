@@ -186,13 +186,13 @@ export function pristineDraftRemovalPlan(catalog,expected){
 // A resemblance in title/date/photos, missing attachment or unknown field
 // is never sufficient. Unlinked older drafts remain editable.
 export function publishedDraftPairs(draft,story){
- const allowed=new Set(['id','title','text','date','media','voice','voiceCues','tags','voiceDurationMs','existing','canonicalByDraft','precision','season','dateSource','dateConfirmed','voiceWave']);
+ const allowed=new Set(['id','title','text','date','media','voice','voiceCues','tags','voiceDurationMs','existing','canonicalByDraft','precision','season','dateSource','dateConfirmed','voiceWave','manualLocation']);
  if(!draft||!story||story.id!==draft.existing||story.source!=='pwa-local'||
     Object.keys(draft).some(k=>!allowed.has(k))||
     typeof draft.title!=='string'||typeof draft.text!=='string'||typeof draft.date!=='string'||
     draft.title!==story.title||draft.text!==story.text||draft.date!==story.date||
     !Array.isArray(draft.tags)||!Array.isArray(draft.media)||!Array.isArray(story.items)||
-    !same(draft.tags,story.tags??[])||!draft.canonicalByDraft||
+    !same(draft.tags,story.tags??[])||!same(draft.manualLocation??null,story.manualLocation??null)||!draft.canonicalByDraft||
     typeof draft.canonicalByDraft!=='object'||Array.isArray(draft.canonicalByDraft)||
     typeof draft.voice!=='string'||!Array.isArray(draft.voiceCues)||
     !Number.isSafeInteger(draft.voiceDurationMs)||draft.voiceDurationMs<0)return null;

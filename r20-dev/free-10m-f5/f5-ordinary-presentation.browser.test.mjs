@@ -549,10 +549,25 @@ async function testTimelineLoupe(){
   await lp.mouse.click(x,y);await panel.waitFor({state:'visible',timeout:4000});
   const lower=await lp.locator('#memoryStoryScroll').boundingBox();
   const lowerY=lower.y+lower.height*.55;
-  await lp.mouse.move(lower.x+lower.width*.82,lowerY);await lp.mouse.down();
-  await lp.mouse.move(lower.x+lower.width*.18,lowerY,{steps:13});await lp.mouse.up();
-  await lp.waitForFunction(id=>window.__taleraTimelineRuntime.currentMemory()?.storyId===id,expected[1].id,{timeout:13000});
+  await lp.evaluate(()=>{
+    window.__loupeLowerTrace=[];
+    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])document.addEventListener(type,e=>{
+      if(window.__loupeLowerTrace.length<30)window.__loupeLowerTrace.push({type:e.type,x:e.clientX,y:e.clientY,story:!!e.target?.closest?.('#memoryStoryScroll')});
+    },true);
+  });
+  const startLowerX=lower.x+lower.width*.82,endLowerX=lower.x+lower.width*.18;
+  await lp.mouse.move(startLowerX,lowerY);await lp.mouse.down();
+  // Pace the swipe deliberately. WebKit delivers a multi-step mouse.move
+  // almost instantaneously, which the original strip treats as a fast flick
+  // capable of skipping two stories; this checks a single normal swipe.
+  for(let n=1;n<=13;n++){
+    await lp.mouse.move(startLowerX+(endLowerX-startLowerX)*n/13,lowerY);
+    await lp.waitForTimeout(35);
+  }
+  await lp.waitForTimeout(80);await lp.mouse.up();
   await lp.waitForFunction(()=>!window.__taleraIntegratedBand?.getState()?.active,null,{timeout:13000});
+  const lowerTrace=await lp.evaluate(()=>({trace:window.__loupeLowerTrace,band:window.__taleraIntegratedBand?.getState(),innerHeight:innerHeight}));
+  console.log('TALERA_LOUPE_LOWER_NATIVE_SWIPE_TRACE',JSON.stringify({state:await state(),expected:expected[1],...lowerTrace}));
   const lowerSwiped=await state();assert.equal(lowerSwiped.open,true,'Lower photo swipe must keep loupe open');
   assert.equal(lowerSwiped.id,expected[1].id);assert.equal(lowerSwiped.runtimeId,lowerSwiped.loupeId);
   assert.equal(lowerSwiped.center,expected[1].ms);

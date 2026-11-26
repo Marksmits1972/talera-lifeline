@@ -19,8 +19,63 @@ permissions:
   actions: read
 
 jobs:
+  f5_candidate_package:
+    name: Build and archive the exact TALERA Free candidate once
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-edit-return-exact-tested-20261126' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    permissions:
+      contents: read
+    outputs:
+      archive_sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies and build public TALERA once
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git ls-files r20-dev/free-10m-delivery/public r20-dev/free-10m-delivery/generated r20-dev/free-10m-f5/generated)"
+          npm ci
+          node r20-dev/free-10m-delivery/build.mjs
+          node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Archive allowlisted anonymous software outputs and bind to exact commit
+        id: package
+        run: |
+          set -euo pipefail
+          roots=(r20-dev/free-10m-delivery/public r20-dev/free-10m-delivery/generated r20-dev/free-10m-f5/generated)
+          for root in "${roots[@]}"; do
+            test -d "$root"
+            test -z "$(find "$root" ! -type d ! -type f -print)"
+            test -z "$(find "$root" -type f \( -name '*.env' -o -name '.env*' -o -name '*.sqlite*' -o -name '*.db' -o -name '*cookie*' -o -name '*secret*' -o -name 'f5-results.json' \) -print)"
+          done
+          # These files are generated solely from approved anonymous public app sources.
+          # Archive before any browser, account, Worker or database tests run.
+          out="$RUNNER_TEMP/talera-candidate-package"
+          mkdir -p "$out"
+          tar --sort=name --owner=0 --group=0 --numeric-owner -czf "$out/candidate.tar.gz" "${roots[@]}"
+          printf '%s\n' "$GITHUB_SHA" > "$out/source.sha"
+          (cd "$out" && sha256sum candidate.tar.gz > archive.sha256)
+          digest="$(cut -d' ' -f1 "$out/archive.sha256")"
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
+          echo "TALERA_CANDIDATE_ARCHIVE_SHA256=$digest SOURCE=$GITHUB_SHA"
+      - name: Retain immutable exact candidate for independent tests and explicit release
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-f5-candidate-package
+          path: ${{ runner.temp }}/talera-candidate-package/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
+    needs: f5_candidate_package
     if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-edit-return-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
@@ -32,11 +87,26 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Build exact original TALERA Free interface
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Download the same immutable TALERA candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: talera-free-f5-candidate-package
+          path: ${{ runner.temp }}/talera-candidate-package
+      - name: Verify exact commit and package SHA256 before independent tests
+        env:
+          EXPECTED_ARCHIVE_SHA256: ${{ needs.f5_candidate_package.outputs.archive_sha256 }}
         run: |
-          npm ci
-          node r20-dev/free-10m-delivery/build.mjs
-          node r20-dev/free-10m-f5/f5-public-assets.mjs
+          set -euo pipefail
+          out="$RUNNER_TEMP/talera-candidate-package"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
+          (cd "$out" && sha256sum -c archive.sha256)
+          tar -xzf "$out/candidate.tar.gz"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
       - name: Run existing synthetic account browser regression without unrelated photo-slider checks
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
@@ -54,7 +124,8 @@ jobs:
 
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
-    if: ${{ github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-edit-return-exact-tested-20261126' }}
+    needs: f5_candidate_package
+    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-edit-return-exact-tested-20261126') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -68,9 +139,31 @@ jobs:
       - name: Install existing locked Cloudflare Wrangler
         run: npm ci
       - name: Build approved public code using only six anonymous GETs
+        if: ${{ github.ref_name != 'feature/free-f5-library-boundary-20261117' }}
         run: node r20-dev/free-10m-delivery/build.mjs
       - name: Package only public PWA references and stable external JavaScript
+        if: ${{ github.ref_name != 'feature/free-f5-library-boundary-20261117' }}
         run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Download the same immutable TALERA candidate
+        if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: talera-free-f5-candidate-package
+          path: ${{ runner.temp }}/talera-candidate-package
+      - name: Verify exact commit and package SHA256 before independent tests
+        if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' }}
+        env:
+          EXPECTED_ARCHIVE_SHA256: ${{ needs.f5_candidate_package.outputs.archive_sha256 }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/talera-candidate-package"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
+          (cd "$out" && sha256sum -c archive.sha256)
+          tar -xzf "$out/candidate.tar.gz"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
       - name: Inspect exact existing service worker for safe offline design (read-only)
         run: node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
       - name: Verify read-only TALERA library gateway preserves original IDs and bytes
@@ -1418,6 +1511,7 @@ jobs:
 
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
+    needs: f5_candidate_package
     if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-edit-return-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -1428,8 +1522,24 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: node r20-dev/free-10m-delivery/build.mjs
-      - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Download the same immutable TALERA candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: talera-free-f5-candidate-package
+          path: ${{ runner.temp }}/talera-candidate-package
+      - name: Verify exact commit and package SHA256 before independent tests
+        env:
+          EXPECTED_ARCHIVE_SHA256: ${{ needs.f5_candidate_package.outputs.archive_sha256 }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/talera-candidate-package"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
+          (cd "$out" && sha256sum -c archive.sha256)
+          tar -xzf "$out/candidate.tar.gz"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
       - name: Show only static original deletion method from account-scoped page source
         run: |
           node --input-type=module <<'NODE'
@@ -1565,6 +1675,7 @@ jobs:
 
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
+    needs: f5_candidate_package
     if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-edit-return-exact-tested-20261126' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
@@ -1575,8 +1686,24 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: node r20-dev/free-10m-delivery/build.mjs
-      - run: node r20-dev/free-10m-f5/f5-public-assets.mjs
+      - name: Download the same immutable TALERA candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: talera-free-f5-candidate-package
+          path: ${{ runner.temp }}/talera-candidate-package
+      - name: Verify exact commit and package SHA256 before independent tests
+        env:
+          EXPECTED_ARCHIVE_SHA256: ${{ needs.f5_candidate_package.outputs.archive_sha256 }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/talera-candidate-package"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
+          (cd "$out" && sha256sum -c archive.sha256)
+          tar -xzf "$out/candidate.tar.gz"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
       - name: Exercise actual signed-in Home reset button and link with account-local store
         run: node r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs
 

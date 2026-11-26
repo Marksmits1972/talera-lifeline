@@ -1529,6 +1529,44 @@ function installTimelineLoupe(html){
  const source=readFileSync(path.join(here,'f5-timeline-loupe.mjs'),'utf8').replaceAll('export ','');
  assert.ok(!source.includes('</script>'));
  one('let zoomPos=0;','let zoomPos=0;\nlet taleraLoupeHoldId=null,taleraLoupeHoldMs=null;','HOLD_ID');
+ // Observe decisive horizontal flicks even while the loupe is waiting for
+ // its stationary-hold threshold. The old ruler saw every pointer sample;
+ // the loupe's 16px slop now delays the filtered 90ms overview intent.
+ // Retain the original .85px/ms strong-overview threshold. A short
+ // coherent 24px burst is enough; jitter, vertical motion and a pause
+ // are not. Use actual event timestamps instead of a clamped long gap.
+ one('let scaleLastX=0,scaleLastT=0,searchVelocity=0;',`let scaleLastX=0,scaleLastT=0,searchVelocity=0;
+let quickOverviewX=0,quickOverviewY=0,quickOverviewT=0,quickOverviewDistance=0,quickOverviewDirection=0;
+function quickOverviewEventTime(e){
+  return Number.isFinite(e.timeStamp)?e.timeStamp:performance.now();
+}
+function resetQuickOverview(e){
+  quickOverviewX=e.clientX;quickOverviewY=e.clientY;quickOverviewT=quickOverviewEventTime(e);
+  quickOverviewDistance=0;quickOverviewDirection=0;
+}
+function observeQuickOverview(e){
+  const now=quickOverviewEventTime(e);
+  const dx=e.clientX-quickOverviewX,dy=e.clientY-quickOverviewY,dt=now-quickOverviewT;
+  quickOverviewX=e.clientX;quickOverviewY=e.clientY;quickOverviewT=now;
+  const dir=Math.sign(dx);
+  if(dt<0||dt>64||Math.abs(dx)<Math.abs(dy)||Math.abs(dx)/Math.max(8,dt)<.85){
+    quickOverviewDistance=0;quickOverviewDirection=0;return false;
+  }
+  if(dir!==quickOverviewDirection)quickOverviewDistance=0;
+  quickOverviewDirection=dir;quickOverviewDistance+=Math.abs(dx);
+  return quickOverviewDistance>=24;
+}`,'QUICK_OVERVIEW_SAMPLE');
+ one('    resetVisualIntent(scaleLastT);\n    gestureUsedPinch=false;',
+  '    resetVisualIntent(scaleLastT);\n    resetQuickOverview(e);\n    gestureUsedPinch=false;','QUICK_OVERVIEW_RESET');
+ one('    considerVisualScale(searchVelocity,now);',`    // Strong short swipe may bypass the old dwell/gear-hold, but only
+    // on the native year/overview ruler, never an explicit deeper pinch.
+    if(quickOverview&&visualZoomPos<=VISUAL_AUTO_MAX_ZOOM&&
+       (visualZoomPos>0||visualScaleTransitioning&&visualIntentLevel===1)&&
+       (!visualScaleTransitioning||visualIntentLevel===1)){
+      visualIntentLevel=0;visualIntentSince=now;
+      animateVisualScaleTo(0,260);
+    }else considerVisualScale(searchVelocity,now);`,'QUICK_OVERVIEW_INTENT');
+
  // Closing the loupe deliberately leaves the native zoom at level 1. The
  // speed-sensitive visual ruler can subsequently return to level 0 without
  // changing that native value. At both the initial grip and a settled gear
@@ -1655,7 +1693,7 @@ function taleraNativeTimelineStart(){
  one('  } else if(pointers.size===2) {\n    markZoomDiscovered();',
   '  } else if(pointers.size===2) {\n    taleraLoupe.cancelPending();taleraNativeTimelineStart();\n    markZoomDiscovered();','PINCH');
  one('surface.addEventListener("pointermove",e=>{\n  if(!pointers.has(e.pointerId)) return;',
-  'surface.addEventListener("pointermove",e=>{\n  if(taleraLoupe.move(e))return;\n  if(!pointers.has(e.pointerId)) return;\n  if(taleraLoupe.waiting(e))return;\n  if(!userIsMoving)taleraNativeTimelineStart();','MOVE');
+  'surface.addEventListener("pointermove",e=>{\n  if(taleraLoupe.move(e))return;\n  if(!pointers.has(e.pointerId)) return;\n  const quickOverview=pointers.size===1&&!gestureUsedPinch&&observeQuickOverview(e);\n  if(taleraLoupe.waiting(e))return;\n  if(!userIsMoving)taleraNativeTimelineStart();','MOVE');
  one('function pointerEnd(e) {\n  if(pointers.has(e.pointerId)) pointers.delete(e.pointerId);',
   'function pointerEnd(e) {\n  if(taleraLoupe.end(e))return;\n  if(taleraLoupe.cancelPending(e.pointerId)){pointers.delete(e.pointerId);userIsMoving=false;return}\n  if(!pointers.has(e.pointerId))return;\n  pointers.delete(e.pointerId);','END');
  one('surface.addEventListener("wheel",e=>{\n  e.preventDefault();\n  userIsMoving = true;',

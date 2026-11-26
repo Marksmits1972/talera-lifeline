@@ -674,6 +674,47 @@ async function testTimelineLoupe(){
   await lp.touchscreen.tap(tapX,tapY);
   assert.equal(await lp.evaluate(()=>window.__loupeTouchOutsideClicks),1);
   console.log('TALERA_LOUPE_TOUCH_REGRESSION_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',trustedTouchDrag:!webkitPickerOnly,trustedOutsideTap:true,lowerSwipeKeepsLoupe:true,physicalIphoneAccepted:false}));
+  // On the existing year ruler returned by closing the loupe, a short
+  // trusted, fast horizontal swipe must switch back to the coarse ruler.
+  // Record actual browser event timing so a slow CI input is not mistaken
+  // for a fast gesture. No product state or zoom is forced by the test.
+  const quickBox=await lp.locator('#surface').boundingBox();
+  const qx=quickBox.x+quickBox.width*.65,qy=quickBox.y+quickBox.height*.26;
+  await lp.evaluate(()=>{
+    const rt=window.__taleraTimelineRuntime;
+    rt.setCenter(rt.lifeStart+(rt.lifeEnd-rt.lifeStart)*.55);rt.draw();
+    window.__taleraQuickSwipeSamples=[];
+    const surface=document.getElementById('surface');
+    for(const type of ['pointerdown','pointermove'])surface.addEventListener(type,e=>{
+      if(type==='pointerdown'||e.buttons===1)window.__taleraQuickSwipeSamples.push({
+        type,x:e.clientX,y:e.clientY,t:e.timeStamp,trusted:e.isTrusted
+      });
+    },true);
+  });
+  let quickSample=null;
+  for(let attempt=0;attempt<4&&!quickSample;attempt++){
+    await lp.mouse.move(qx,qy);
+    await lp.evaluate(()=>{window.__taleraQuickSwipeSamples=[]});
+    await lp.mouse.down();await lp.mouse.move(qx-48,qy);await lp.mouse.up();
+    const samples=await lp.evaluate(()=>window.__taleraQuickSwipeSamples);
+    const down=samples.find(s=>s.type==='pointerdown'),move=samples.find(s=>s.type==='pointermove');
+    if(down&&move&&down.trusted&&move.trusted&&move.t>=down.t&&
+       move.t-down.t<=64&&Math.abs(move.x-down.x)/Math.max(8,move.t-down.t)>=.85)
+      quickSample={pixels:Math.abs(move.x-down.x),ms:move.t-down.t};
+    await lp.waitForTimeout(350);
+  }
+  assert.ok(quickSample,'Trusted browser fast short swipe timing must be demonstrable');
+  const coarseBefore=await lp.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
+  await lp.mouse.move(qx,qy);await lp.mouse.down();await lp.mouse.move(qx-52,qy);
+  const coarseAfter=await lp.evaluate(()=>window.__taleraTimelineRuntime.centerMs());
+  await lp.mouse.up();
+  const travelledYears=(coarseAfter-coarseBefore)/(365.2425*86400000);
+  assert.ok(travelledYears>1.4&&travelledYears<3.5,
+    'Short fast swipe must restore actual coarse scale grip, not merely animate labels: '+JSON.stringify({quickSample,travelledYears}));
+  assert.equal((await state()).open,false,'Short fast swipe must not open loupe');
+  console.log('TALERA_NATIVE_SHORT_FAST_OVERVIEW_BROWSER_PASS',JSON.stringify({
+    engine:webkitPickerOnly?'webkit':'chromium',...quickSample,travelledYears,physicalIphoneAccepted:false
+  }));
   // Add one narrated memory through the existing library writer, without
   // modifying the original player or the previously verified photo fixture.
   await lp.goto(origin+'/tell',{waitUntil:'domcontentloaded'});

@@ -146,6 +146,84 @@ const emptyDate=rt.centerMs();
 closeGesture(11,280);
 near(rt.centerMs(),emptyDate,'No forced nearest photo or date on release');
 assert.equal(rt.currentMemory(),null);
+// Recreate the real slow native movement, not a test-only forced scale.
+function slowlyEnterYear(id,x=280){
+ wait(1300);rt.setCenter(base);rt.draw();
+ surface.dispatchEvent(pointer('pointerdown',id,x));
+ for(let i=0;i<105;i++){
+   tick(16);x-=1;surface.dispatchEvent(pointer('pointermove',id,x));
+ }
+ assert.equal(snap().visualZoomPos,1,'Slow positioning selects the actual year scale');
+ assert.equal(snap().visualScaleTransitioning,false);
+ return x;
+}
+// The original 112ms rapid swipe worked; the loupe's first 16px ignored
+// the first speed sample and made that same swipe miss its 90ms dwell.
+// A deliberate SHORT burst (28px in 28ms) must now select overview.
+let x=slowlyEnterYear(12);
+closeGesture(12,x);
+rt.setCenter(base);rt.draw();
+surface.dispatchEvent(pointer('pointerdown',13,220));
+tick(14);surface.dispatchEvent(pointer('pointermove',13,206));
+assert.equal(snap().visualScaleTransitioning,false,'Sub-slop movement remains harmless');
+tick(14);surface.dispatchEvent(pointer('pointermove',13,192));
+assert.equal(snap().visualScaleTransitioning,true,'28px quick swipe engages overview');
+const fastDate=rt.centerMs();
+closeGesture(13,192);
+assert.equal(snap().visualZoomPos,0);
+near(rt.centerMs(),fastDate,'Short swipe keeps the date during scale change');
+assert.equal(isOpen(),false);
+
+// Accelerate without releasing the same finger that just selected year.
+// The 1200ms gear-hold must not defeat a deliberate horizontal burst.
+x=slowlyEnterYear(14);
+tick(14);x+=14;surface.dispatchEvent(pointer('pointermove',14,x));
+tick(14);x+=14;surface.dispatchEvent(pointer('pointermove',14,x));
+assert.equal(snap().visualScaleTransitioning,true,'Same-finger acceleration overrides gear dwell');
+wait(272);assert.equal(snap().visualZoomPos,0);
+const coarseDate=rt.centerMs();
+surface.dispatchEvent(pointer('pointermove',14,x-104));
+near((rt.centerMs()-coarseDate)/year,4,'Overview immediately restores coarse finger grip');
+closeGesture(14,x-104);
+
+// Slow positioning and a single movement after a genuine pause must not
+// be misclassified by the quick path; small alternating jitter is not a flick.
+x=slowlyEnterYear(15);closeGesture(15,x);
+rt.setCenter(base);rt.draw();
+surface.dispatchEvent(pointer('pointerdown',16,220));
+for(let i=0;i<10;i++){
+ tick(14);surface.dispatchEvent(pointer('pointermove',16,i%2?220:232));
+}
+assert.equal(snap().visualZoomPos,1);assert.equal(snap().visualScaleTransitioning,false);
+assert.equal(isOpen(),false);
+for(let i=0;i<14;i++){
+ tick(24);surface.dispatchEvent(pointer('pointermove',16,220-i*2));
+}
+assert.equal(snap().visualZoomPos,1);assert.equal(snap().visualScaleTransitioning,false);
+wait(240);surface.dispatchEvent(pointer('pointermove',16,168));
+assert.equal(snap().visualScaleTransitioning,false,'A pause is not a rapid burst');
+closeGesture(16,168);
+assert.equal(snap().visualZoomPos,1);
+assert.equal(isOpen(),false);
+
+// The deliberate loupe still opens on a held touch, closes to the year
+// view, and supports the same short, fast return to overview.
+surface.dispatchEvent(pointer('pointerdown',17,220));wait(2000);
+assert.equal(isOpen(),true);
+surface.dispatchEvent(pointer('pointerup',17,220));
+doc.dispatchEvent(pointer('pointerdown',18,100,500));
+doc.dispatchEvent(pointer('pointerup',18,100,500));
+assert.equal(snap().visualZoomPos,1);assert.equal(isOpen(),false);
+surface.dispatchEvent(pointer('pointerdown',19,180));
+tick(32);surface.dispatchEvent(pointer('pointermove',19,212));
+assert.equal(snap().visualScaleTransitioning,true,'Short rightward swipe after loupe close');
+closeGesture(19,212);
+assert.equal(snap().visualZoomPos,0);
+assert.equal(isOpen(),false);
+console.log('TALERA_NATIVE_SHORT_FAST_OVERVIEW_SWITCH_PASS',JSON.stringify({
+ shortSwipePx:28,shortSwipeMs:28,oneFingerAcceleration:true,slowAndJitterStayYear:true,
+ stationaryPauseNotFast:true,afterLoupe:true,physicalIphoneAccepted:false
+}));
 console.log('TALERA_NATIVE_TIMELINE_GRIP_AND_INTENTIONAL_LOUPE_PASS',
  JSON.stringify({initialOverviewYears:initial,afterLoupeOverviewYears:6,yearViewYears:.8,
  shortTap:false,shortHold:false,cancelledHold:false,deliberateHold:2000,pausedDrag:false,

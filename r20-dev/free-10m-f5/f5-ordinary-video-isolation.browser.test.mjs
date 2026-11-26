@@ -43,7 +43,7 @@ try{
   const sid=/talera_sid=([a-f0-9]{64})/.exec(result.headers.get('set-cookie')||'')?.[1];
   assert.ok(sid,'Synthetic cookie missing');
   browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
-  const ctx=await browser.newContext({...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate}});
+  const ctx=await browser.newContext({...devices['iPhone 13'],locale:'nl-NL',extraHTTPHeaders:{'x-talera-f5-key':gate}});
   await ctx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
     path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];

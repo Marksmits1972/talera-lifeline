@@ -2705,7 +2705,9 @@ async function testTimelineLoupe(){
     assert.ok(archiveBytes.length>300,'Real Free export must include media bytes');
 
     restoredContext=await browser.newContext({
-      ...devices['iPhone 13'],extraHTTPHeaders:{'x-talera-f5-key':gate}
+      // This regression asserts Dutch full UI messages. Do not rely on the
+      // runner's default English device locale after the five-language change.
+      ...devices['iPhone 13'],locale:'nl-NL',extraHTTPHeaders:{'x-talera-f5-key':gate}
     });
     await restoredContext.addCookies([{name:'talera_sid',value:sid,
       domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
@@ -2763,9 +2765,19 @@ async function testTimelineLoupe(){
       buffer:archiveBytes
     });
     await restoredPage.locator('#preview-restore').click();
-    await restoredPage.waitForFunction(()=>
-      document.getElementById('restore-hint')?.textContent.includes('Geen dubbele'),
-      null,{timeout:25000});
+    assert.equal(await restoredPage.locator('html').getAttribute('lang'),'nl');
+    try{
+      await restoredPage.waitForFunction(()=>
+        document.getElementById('restore-hint')?.textContent.includes('Geen dubbele'),
+        null,{timeout:25000});
+    }catch(error){
+      console.error('TALERA_RESTORE_PREVIEW_DIAGNOSTIC',JSON.stringify(await restoredPage.evaluate(()=>({
+        language:document.documentElement.lang,previewStatus:document.getElementById('restore-status')?.textContent,
+        hint:document.getElementById('restore-hint')?.textContent,
+        canConfirm:!document.getElementById('confirm-restore')?.disabled
+      }))));
+      throw error;
+    }
     assert.equal(await restoredPage.locator('#backup-step-confirm').isVisible(),true);
     await restoredPage.locator('#confirm-restore').check();
     await restoredPage.locator('#run-restore').click();

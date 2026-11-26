@@ -72,7 +72,7 @@ body:has(#app #main .work.talera-r16-editor) #app>header.top #back::after{conten
 #app #main .work.talera-r16-editor #details #dateToggle{color:#476376!important;font-weight:600!important;}
 #app #main .work.talera-compact-work.talera-r16-editor .talera-v9-remove-media{width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;border:0!important;border-radius:50%!important;margin:2px!important;background:radial-gradient(circle at center,rgba(255,255,255,.96) 0 12px,transparent 12.5px)!important;color:#0b1b3c!important;box-shadow:none!important;text-shadow:none!important;font:500 21px/1 system-ui!important;display:grid!important;place-items:center!important;padding:0!important;}
 #app #main .work.talera-r16-editor .talera-tags-v20{border-radius:15px!important;}
-#app #main .work.talera-r16-editor .talera-tags-toggle{font-weight:600!important;white-space:normal!important;gap:6px!important;}
+#app #main .work.talera-r16-editor .talera-tags-toggle{font-weight:600!important;white-space:nowrap!important;gap:6px!important;}
 #app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]{border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;}
 #app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]+.talera-tags-selected{display:none!important;}
 #app #main .work.talera-r16-editor .talera-tags-panel:not([hidden]){margin:0!important;padding:8px!important;border:1px solid #dbe4ef!important;border-top:0!important;border-radius:0 0 15px 15px!important;background:#fff!important;scrollbar-width:thin!important;scrollbar-color:#a9b9ca transparent!important;}

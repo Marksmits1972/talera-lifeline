@@ -9,7 +9,7 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
   await ctx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',path:'/',
     secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),errors=[];
-  page.on('pageerror',e=>errors.push(e.message));
+  page.on('pageerror',e=>errors.push({message:e.message,route:page.url(),stack:e.stack||''}));
   const eye=page.locator('#talera-f5-edit-return-eye'),pencil=page.locator('#talera-v5-editor-pencil');
   const go=async pathname=>{
    const res=await page.goto(origin+pathname,{waitUntil:'domcontentloaded'});
@@ -43,6 +43,10 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    }finally{db.close()}
   });
   const baseline=await read();
+  const settleImages=async()=>{
+   await page.waitForLoadState('load');
+   await page.waitForFunction(()=>Array.from(document.querySelectorAll('.talera-work-tiles img')).every(img=>img.complete),null,{timeout:10000});
+  };
   const selected=async id=>{
    await page.waitForFunction(id=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length>0},id,{timeout:20000});
   };
@@ -120,6 +124,7 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
     await option.click();assert.equal(await option.getAttribute('aria-pressed'),'false');
     await toggle.click();await panel.waitFor({state:'hidden'});
    }
+   await settleImages();
    const opened=await read();
    assert.equal(opened.catalog.filter(x=>x.existing===id).length,1,'One existing edit draft');
    await eye.click();
@@ -150,19 +155,41 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    return {storyTags:story.tags??[],draftTags:draft?.find(x=>x.existing===target)?.tags??null};
   },target);
   assert.deepEqual(edited.storyTags,baseline.stories.find(x=>x.id===target).tags,'Tag selection is not a published change');
+  // Playwright's waitForFunction polls a truthy value, not the resolved
+  // result of an asynchronous IndexedDB predicate. Poll explicitly so a
+  // pending promise or a navigation cannot be mistaken for a successful save.
+  const pollDb=async(fn,arg,limit,label)=>{
+   const until=Date.now()+limit;
+   while(Date.now()<until){
+    try{if(await page.evaluate(fn,arg)===true)return;}
+    catch(e){if(!/Execution context was destroyed|Cannot find context|navigation/i.test(e.message))throw e;}
+    await page.waitForTimeout(150);
+   }
+   throw Error(label);
+  };
   // Wait for the original async draft queue via the same manifest.
-  await page.waitForFunction(async target=>{
+  await pollDb(async target=>{
    const draft=await window.TaleraMemories.blob('talera-v4-work:manifest');
    const story=await window.TaleraMemories.get(target);
    const tags=draft?.find(x=>x.existing===target)?.tags;
-   return tags&&tags.length===(story.tags??[]).length+1;
-  },target,{timeout:10000});
+   return !!tags&&tags.length===(story.tags??[]).length+1;
+  },target,10000,'Direct selection was not persisted to the original draft');
   const expected=await page.evaluate(async target=>(await window.TaleraMemories.blob('talera-v4-work:manifest')).find(x=>x.existing===target).tags,target);
+  await settleImages();
   await page.locator('#publish').click();
-  await page.waitForFunction(async ({target,expected})=>{
-   const row=await window.TaleraMemories?.get?.(target);
-   return row&&JSON.stringify(row.tags??[])===JSON.stringify(expected);
-  },{target,expected},{timeout:20000});
+  await pollDb(async ({target,expected})=>{
+   const mem=window.TaleraMemories;
+   if(!mem?.get||!mem?.list)return false;
+   const row=await mem.get(target),rows=await mem.list();
+   const draft=await mem.blob('talera-v4-work:manifest');
+   return !!row&&JSON.stringify(row.tags??[])===JSON.stringify(expected)&&
+     JSON.stringify(rows.find(x=>x.id===target)?.tags??[])===JSON.stringify(expected)&&
+     !(draft??[]).some(x=>x.existing===target);
+  },{target,expected},20000,'Actual normal Save did not finish with the selected characteristic and original draft cleanup');
+  // Reopen the actual existing library route, not merely the same JS context.
+  await settleImages();
+  await go('/mijn-leven');
+  await page.waitForLoadState('load');
   const saved=await read();
   assert.equal(saved.stories.length,baseline.stories.length,'Save does not create a new memory');
   const expectedStories=structuredClone(baseline.stories);expectedStories.find(x=>x.id===target).tags=expected;

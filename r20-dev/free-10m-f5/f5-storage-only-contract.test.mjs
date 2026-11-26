@@ -35,7 +35,7 @@ assert.ok(gateway.includes("pathname==='/tell'?preserveOriginalMediaIdsOnEdit(re
 assert.ok(gateway.includes("const silenced=pathname==='/tell'?restoreEditorVideoCover(muteEditorOnlyVideo(stableEditedCues)):stableEditedCues;")&&
   gateway.includes('const editReturnHtml=patchAuthenticatedEditReturn(silenced,pathname,editReturnAccountScope,editReturnBrowserSources);')&&
   gateway.includes('const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(editReturnHtml):editReturnHtml;')&&
-  gateway.includes('assetizeHtml(threeTabHome,new Set(approvedAssets))'),
+  gateway.includes('assetizeHtml(threeTabHome,new Set([...approvedAssets,...languageAssets]))'),
   'Existing approved editor video muting and three-tab Home must retain the same scoped storage');
 assert.ok(gateway.includes("if(p==='/api/version'&&m==='GET')"),
   'Restore the original periodic version check without replacing the UI');

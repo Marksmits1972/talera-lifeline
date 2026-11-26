@@ -403,11 +403,11 @@ try{
  const ids=await Promise.all(users.map(createUser));
  browser=await chromium.launch({headless:true});
  const context=await browser.newContext({
-   ...devices['iPhone 13'],serviceWorkers:'allow',
+   ...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'allow',
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
  });
  const registrationContext=await browser.newContext({
-   ...devices['iPhone 13'],serviceWorkers:'allow',
+   ...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'allow',
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.79'}
  });
  const registrationPage=await registrationContext.newPage();
@@ -514,7 +514,7 @@ try{
    // A second browser with the same email must never silently appear to
    // accept registration: reproduce a real owner-visible 409 in the SAME app.
    const existingContext=await browser.newContext({
-     ...devices['iPhone 13'],serviceWorkers:'allow',
+     ...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'allow',
      extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.78'}
    });
    try{
@@ -1161,7 +1161,7 @@ try{
  // migrated. This is a possible mechanism, not proof of its occurrence on
  // the physical iPhone after the Worker release.
  const otherContainer=await browser.newContext({
-   ...devices['iPhone 13'],serviceWorkers:'allow',
+   ...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'allow',
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}
  });
  try{

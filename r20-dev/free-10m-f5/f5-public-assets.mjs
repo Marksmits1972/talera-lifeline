@@ -1,6 +1,9 @@
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
+import {installDesktopHomeLayout} from './f5-desktop-home-layout.mjs';
+import {installDesktopPresentationLayout} from './f5-desktop-presentation-layout.mjs';
+import {installDesktopMemoryTransition} from './f5-desktop-memory-transition.mjs';
 import {buildF5OfflineServiceWorker} from './f5-offline-sw.mjs';
 import {completePublishedRemovalOnOtherPage,installOriginalPayloadReader} from './f5-library-editor-stable-save.mjs';
 import assert from 'node:assert/strict';
@@ -1895,6 +1898,7 @@ for(const [route,filename] of Object.entries(routes)){
    (route!=='/mijn-leven'||guest.includes('id="navMore"'))&&
    (route!=='/present'||guest.includes('id="photoStage"')),
    'GUEST_ORIGINAL_ENTRY_DOM_MISSING');
+ guest=installDesktopMemoryTransition(installDesktopPresentationLayout(installDesktopHomeLayout(guest,route),route),route);
  const guestFile=sha(guest)+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',guestFile),guest,'utf8');
  guestPages[route]='/__talera_free/f5references/'+guestFile;
@@ -1940,6 +1944,7 @@ for(const [route,filename] of Object.entries(routes)){
 
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
+ html=installDesktopMemoryTransition(installDesktopPresentationLayout(installDesktopHomeLayout(html,route),route),route);
  const hash=sha(html),file=hash+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;

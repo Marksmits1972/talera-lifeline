@@ -9,10 +9,19 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   serviceWorkers:'block',extraHTTPHeaders:{'x-talera-f5-key':gate}
  });
  try{
-  await context.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
-   path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(String(e.message)));
+  // The existing signed-out presentation has no reference photos. Do not
+  // show a broken-image icon, but keep the native elements for later data.
+  await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+  const emptyPhotos=await page.evaluate(()=>['memoryPhotoA','memoryPhotoB'].map(id=>{
+   const img=document.getElementById(id);
+   return img?{id,src:!!img.getAttribute('src'),srcset:!!img.getAttribute('srcset'),visibility:getComputedStyle(img).visibility}:null;
+  }));
+  assert.ok(emptyPhotos.every(p=>p&&!p.src&&!p.srcset&&p.visibility==='hidden'),'Empty native desktop photos: '+JSON.stringify(emptyPhotos));
+  console.log('TALERA_DESKTOP_EMPTY_PHOTOS_HIDDEN_PASS');
+  await context.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
+   path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   // No user account or photos: reuse the existing synthetic local store API.
   await page.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>!!window.TaleraMemories?.save);
@@ -43,6 +52,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
     const rect=(selector)=>{const e=document.querySelector(selector),r=e?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}:null};
     return {width:innerWidth,height:innerHeight,sheet:rect('#sheet'),hero:rect('.hero'),nav:rect('.flow-nav'),
       add:rect('a[href="/tell"]'),scrollWidth:document.documentElement.scrollWidth,
+      readingSizes:Object.fromEntries(['.sheet-sub','#v17-year-summary','#v17-min-year','#v17-mid-year','#v17-max-year','.v18-era-note','#navMine'].map(s=>{const e=document.querySelector(s);return [s,e?parseFloat(getComputedStyle(e).fontSize):null]})),
       desktop:matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)').matches};
    });
    assert.ok(geometry.desktop,JSON.stringify(geometry));
@@ -50,6 +60,8 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    assert.ok(close(geometry.hero.right,width)&&geometry.hero.width>geometry.sheet.width,'Remembrance must dominate desktop '+JSON.stringify(geometry));
    assert.ok(geometry.nav.left>=0&&geometry.nav.right<=geometry.sheet.right+3,'Navigation stays on left '+JSON.stringify(geometry));
    assert.ok(geometry.scrollWidth<=width+1,'No horizontal page overflow');
+   for(const [selector,minimum] of [['.sheet-sub',14],['#v17-year-summary',14],['#v17-min-year',13],['#v17-mid-year',13],['#v17-max-year',13],['.v18-era-note',14],['#navMine',13]])
+    assert.ok(geometry.readingSizes[selector]>=minimum,'Desktop reading size '+selector+': '+JSON.stringify(geometry.readingSizes));
    sizes.push(geometry);
   }
   // Real click on the existing visible image, rather than constructing a new
@@ -70,13 +82,18 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    const g=await page.evaluate(()=>{
     const rect=(selector)=>{const r=document.querySelector(selector)?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}:null};
     return {surface:rect('#surface'),canvas:rect('#timelineCanvas'),date:rect('#focusText'),
-      dots:rect('.talera-photo-dots'),stage:rect('#photoStage'),id:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId};
+      dots:rect('.talera-photo-dots'),stage:rect('#photoStage'),id:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+      controlColors:Object.fromEntries(['#talera-flow-home','#talera-v5-editor-pencil'].map(s=>{const e=document.querySelector(s);return [s,e?{background:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color}:null]}))};
    });
    assert.ok(close(g.surface.width,expected)&&close((g.surface.left+g.surface.right)/2,width/2),'Centered shorter ruler '+JSON.stringify(g));
    assert.ok(close(g.canvas.width,g.surface.width),'Canvas must match native hit area');
    assert.ok(g.dots.height>0&&g.canvas.top<g.date.top&&g.date.top<g.dots.top,'Timeline, date, orange dots order preserved');
    assert.ok(close(g.stage.width,width)&&close(g.stage.height,height),'Full photo stage');
    assert.equal(g.id,id,'Resizing must not change selection');
+   for(const [selector,style] of Object.entries(g.controlColors)){
+    assert.equal(style?.background,'rgba(11, 30, 57, 0.88)','Desktop contrast '+selector);
+    assert.equal(style?.color,'rgb(255, 255, 255)','Desktop foreground '+selector);
+   }
    presentations.push(g);
   }
   console.log('TALERA_DESKTOP_GEOMETRY_AND_MEMORY_PASS',JSON.stringify({sizes:sizes.map(s=>[s.width,s.height,s.sheet.width]),presentations:presentations.map(g=>g.surface.width),sameMemoryId:true}));

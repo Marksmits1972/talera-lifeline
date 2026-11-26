@@ -37,6 +37,23 @@ export const desktopHomeStyle = `<style id="talera-f5-desktop-home-layout">
     padding-bottom: 84px !important;
     box-sizing: border-box !important;
   }
+  /* Desktop reading sizes: retain the existing font family, controls and layout. */
+  #sheetBody .sheet-sub,
+  #sheetBody .v17-empty-year,
+  #sheetBody .v17-guide,
+  #sheetBody .v18-era-note,
+  #sheetBody #v17-year-summary,
+  #sheetBody #myCount,
+  #sheetBody #v17-go-year {
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+  }
+  #sheetBody #v17-min-year,
+  #sheetBody #v17-mid-year,
+  #sheetBody #v17-max-year {
+    font-size: 13px !important;
+  }
+  #sheetBody .action-start > span:first-child { font-size: 16px !important; }
   .flow-nav {
     left: calc(var(--talera-home-control-width) / 2) !important;
     right: auto !important;
@@ -45,6 +62,7 @@ export const desktopHomeStyle = `<style id="talera-f5-desktop-home-layout">
     bottom: 12px !important;
     transform: translateX(-50%) !important;
   }
+  .flow-nav a { font-size: 13px !important; }
   body:has(#sheet.expanded) .flow-nav {
     left: calc(min(65vw, 980px) / 2) !important;
   }

@@ -7,6 +7,9 @@ assert.equal(result.replace(desktopHomeStyle,''), original, 'Only one style bloc
 assert.ok(desktopHomeStyle.includes('@media '+DESKTOP_HOME_MEDIA));
 assert.ok(desktopHomeStyle.includes('35vw'));
 assert.ok(desktopHomeStyle.includes('prefers-reduced-motion'));
+for (const selector of ['.sheet-sub', '#v17-year-summary', '#v17-min-year', '#v17-mid-year', '#v17-max-year', '.v18-era-note', '.flow-nav a']) {
+ assert.ok(desktopHomeStyle.includes(selector), `Missing desktop reading rule: ${selector}`);
+}
 assert.equal(installDesktopHomeLayout(original,'/present'),original);
 assert.equal(installDesktopHomeLayout(original,'/tell'),original);
 assert.throws(()=>installDesktopHomeLayout(result,'/mijn-leven'), /DUPLICATE/);

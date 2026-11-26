@@ -12,6 +12,20 @@ export const desktopPresentationStyle = `<style id="talera-f5-desktop-presentati
     transform: translateX(-50%) !important;
   }
   #surface #timelineCanvas { width: 100% !important; }
+  /* Preserve existing hit areas and icon artwork on light and dark photos. */
+  #talera-flow-home,
+  #talera-v5-editor-pencil {
+    background-color: rgba(11, 30, 57, .88) !important;
+    border-color: rgba(255, 255, 255, .82) !important;
+    color: #fff !important;
+  }
+  /* The zero-example shell deliberately has no initial image source.
+     Hide only its empty native image elements; loading an original source
+     automatically removes this rule without touching any player state. */
+  img#memoryPhotoA:is(:not([src]),[src=""]):is(:not([srcset]),[srcset=""]),
+  img#memoryPhotoB:is(:not([src]),[src=""]):is(:not([srcset]),[srcset=""]) {
+    visibility: hidden !important;
+  }
 }
 </style>`;
 

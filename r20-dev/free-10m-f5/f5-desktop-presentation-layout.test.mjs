@@ -9,6 +9,11 @@ assert.ok(desktopPresentationStyle.includes('width: min(62vw, 960px)'));
 assert.ok(!desktopPresentationStyle.includes('#photoStage'), 'Photo stage must remain unchanged');
 assert.ok(!desktopPresentationStyle.includes('#focusText'), 'Original date position must remain unchanged');
 assert.ok(!desktopPresentationStyle.includes('.talera-photo-dots'), 'Original dots position must remain unchanged');
+assert.ok(desktopPresentationStyle.includes('#talera-flow-home'));
+assert.ok(desktopPresentationStyle.includes('#talera-v5-editor-pencil'));
+assert.ok(desktopPresentationStyle.includes('rgba(11, 30, 57, .88)'));
+for (const id of ['memoryPhotoA','memoryPhotoB'])
+ assert.ok(desktopPresentationStyle.includes('img#'+id+':is(:not([src]),[src=""]):is(:not([srcset]),[srcset=""])'), 'Only source-less native photo elements may be hidden');
 assert.equal(installDesktopPresentationLayout(original,'/mijn-leven'),original);
 assert.equal(installDesktopPresentationLayout(original,'/tell'),original);
 assert.throws(()=>installDesktopPresentationLayout(result,'/present'),/DUPLICATE/);

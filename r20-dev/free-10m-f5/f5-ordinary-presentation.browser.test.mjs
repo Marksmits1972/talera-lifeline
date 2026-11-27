@@ -1271,6 +1271,13 @@ async function testTimelineLoupe(){
       Object.defineProperty(AbortSignal,'timeout',{configurable:true,value:undefined});
       window.__taleraGeoOnline=false;
       Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>window.__taleraGeoOnline});
+      window.__taleraDeviceCalls=0;window.__taleraDeviceDenied=false;
+      Object.defineProperty(navigator,'geolocation',{configurable:true,value:{
+       getCurrentPosition(ok,bad){window.__taleraDeviceCalls++;
+        if(window.__taleraDeviceDenied){bad({code:1});return}
+        ok({coords:{latitude:51.63,longitude:5.31,accuracy:25},timestamp:Date.now()});
+       }
+      }});
     });
     const geoPage=await geoCtx.newPage(),geoErrors=[];
     geoPage.on('pageerror',error=>geoErrors.push(error.message));
@@ -1510,8 +1517,41 @@ async function testTimelineLoupe(){
     assert.deepEqual(sixStored.bytes,six);
     assert.deepEqual(sixStored.locations,[{capture:'Arnhem',manual:null},{capture:'Rome',manual:null},{capture:'Paris',manual:null},{capture:null,manual:{countryCode:'FR',city:'Parijs',mode:'fill'}},{capture:null,manual:{countryCode:'FR',city:'Parijs',mode:'fill'}},{capture:null,manual:null}]);
     assert.equal(sent.length,3,'Local metadata and confirmed missing data must not consume provider requests');
-    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),sixId);
+    assert.equal(await geoPage.evaluate(()=>window.__taleraDeviceCalls),0,'No current position may be requested during import');
     console.log('TALERA_SIX_PHOTO_LOCATION_SELECTED_BULK_AND_ORIGINAL_BYTES_PASS');
+    // Reopen the exact same saved originals. The one unknown photo can be
+    // assigned the current location only after a distinct, informed action.
+    await geoPage.goto(origin+'/tell?edit='+encodeURIComponent(sixId),{waitUntil:'domcontentloaded'});
+    await geoPage.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
+    await geoPage.locator('.talera-location-toggle').click();
+    const currentButton=geoPage.locator('.talera-location-device');
+    await currentButton.waitFor({state:'visible',timeout:20000});
+    assert.equal(await currentButton.count(),1);assert.equal(await geoPage.evaluate(()=>window.__taleraDeviceCalls),0);
+    await currentButton.click(); // offline, no device permission or provider lookup
+    await geoPage.getByText('Geen internetverbinding. Je kunt de locatie handmatig invullen.',{exact:true}).waitFor({state:'visible'});
+    assert.equal(await geoPage.evaluate(()=>window.__taleraDeviceCalls),0);assert.equal(sent.length,3);
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.__taleraDeviceDenied=true;window.dispatchEvent(new Event('online'))});
+    await currentButton.click();
+    await geoPage.getByText('Geen toestemming voor de actuele locatie. Je kunt de locatie handmatig invullen.',{exact:true}).waitFor({state:'visible'});
+    assert.equal(sent.length,3);
+    await geoPage.evaluate(()=>{window.__taleraDeviceDenied=false});
+    await currentButton.click();
+    await geoPage.locator('.talera-location-tile-label').filter({hasText:city}).waitFor({state:'visible',timeout:15000});
+    assert.equal(await currentButton.count(),0);assert.equal(await geoPage.evaluate(()=>window.__taleraDeviceCalls),2);
+    assert.equal(sent.length,4);assert.deepEqual(sent[3].body,{latitude:51.63,longitude:5.31});
+    assert.ok((await geoPage.locator('.talera-location-summary').innerText()).includes('3 van 6'),'User-confirmed current place is not original EXIF recognition');
+    await geoPage.locator('#publish').click();
+    await geoPage.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.get('published')===sixId,{timeout:25000});
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
+    const assisted=await geoPage.evaluate(async id=>{
+     const row=await window.TaleraMemories.get(id);
+     return {locations:row.items.map(item=>({capture:item.capturePlace?.city??null,manual:item.manualPhotoLocation??null})),bytes:await Promise.all(row.items.map(async item=>[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]))};
+    },sixId);
+    assert.deepEqual(assisted.bytes,six);
+    const expected=structuredClone(sixStored.locations);expected[5].manual={countryCode:'NL',city,mode:'fill'};
+    assert.deepEqual(assisted.locations,expected);
+    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),sixId);
+    console.log('TALERA_USER_CONFIRMED_CURRENT_PLACE_ONE_PHOTO_ONLY_NO_RAW_GPS_STORED_PASS');
 
 
     assert.deepEqual(geoErrors,[]);

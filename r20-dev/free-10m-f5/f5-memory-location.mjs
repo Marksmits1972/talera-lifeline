@@ -98,7 +98,7 @@ export function filterCountryRows(rows,query,locale){
 }
 // Mounted inside the existing editor whether or not its optional panel is open.
 // All selections are draft IDs, not array positions; reordering cannot retarget.
-export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset,preview,inspect,flagPositions,codes}){
+export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset,preview,inspect,lookupDevicePlace,flagPositions,codes}){
  if(!anchor||anchor.parentElement?.querySelector(':scope > .talera-memory-location'))return;
  const doc=anchor.ownerDocument,win=doc.defaultView||window;
  const locale=()=>win.TaleraI18n?.locale||doc.documentElement.lang||'en',t=(key,params)=>win.TaleraI18n.t('core.editor.location.'+key,params);
@@ -107,6 +107,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  if(!g.taleraLocationResults)Object.defineProperty(g,'taleraLocationResults',{configurable:true,value:new Map(Object.entries(g.photoLocationAutomatic||{}))});
  const result=g.taleraLocationResults,existing=new Map();let disposed=false,running=false,controller=null,timer=null,serial=0;
  let selected=new Set(),seenUnknown=new Set(),single=null,entry={countryCode:'',city:''};
+ let deviceAttempt=null;const deviceStatus=new Map();
  const box=doc.createElement('section');box.className='talera-memory-location';box.dataset.taleraExplicitLanguage='';
  const node=(tag,cls,parent)=>{const x=doc.createElement(tag);if(cls)x.className=cls;if(parent)parent.append(x);return x};
  const button=(cls,parent)=>{const x=node('button',cls,parent);x.type='button';return x};
@@ -118,7 +119,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  const panel=node('div','talera-location-panel',box);panel.id='talera-memory-location-fields';panel.hidden=true;toggle.setAttribute('aria-controls',panel.id);toggle.setAttribute('aria-expanded','false');
  const legacy=node('p','talera-location-status',panel);
  const recognizedHeading=node('h3','talera-location-label',panel),recognized=node('div','talera-location-grid',panel);
- const unknownHeading=node('h3','talera-location-label',panel),unknown=node('div','talera-location-grid',panel);
+ const unknownHeading=node('h3','talera-location-label',panel),deviceHint=node('p','talera-location-status',panel),unknown=node('div','talera-location-grid',panel);
  const pendingHeading=node('h3','talera-location-label',panel),pending=node('div','talera-location-grid',panel);
  const form=node('div','talera-location-form',panel);
  const modeLabel=node('p','talera-location-status',form),reset=button('talera-location-clear',form);
@@ -145,6 +146,27 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
   single=id;const value=display(id);entry=value?{countryCode:value.countryCode,city:value.city}:{countryCode:'',city:''};paint();
  }
  function setManual(id,value){g.photoLocations={...(g.photoLocations||{}),[id]:value}}
+ // Never rely on selected bulk IDs or filenames; the click confirms one exact
+ // photo. The fix is temporary; only the validated country/city is saved as
+ // user-confirmed fill, so later original metadata still takes precedence.
+ const deviceEligible=id=>!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().includes(id)&&state(id).reason==='no-readable-gps'&&!display(id);
+ async function confirmDevicePlace(id){
+  if(deviceAttempt||!deviceEligible(id))return;
+  if(win.navigator.onLine===false){deviceStatus.set(id,'deviceOffline');paint();return}
+  const original=getAsset(id),attempt={id,controller:new AbortController()};
+  if(!original)return;
+  deviceAttempt=attempt;deviceStatus.delete(id);paint();
+  const signal=attempt.controller.signal;
+  try{
+   const outcome=await requestConfirmedPhotoPlace({geolocation:win.navigator.geolocation,
+    lookup:(gps,activeSignal)=>deviceAttempt===attempt&&deviceEligible(id)&&getAsset(id)===original?lookupDevicePlace(gps,activeSignal):{ok:false},signal});
+   if(signal.aborted||deviceAttempt!==attempt||!deviceEligible(id)||getAsset(id)!==original)return;
+   const place=outcome.status==='known'?confirmedPhotoLocation(outcome.place,codes):null;
+   if(place){setManual(id,{countryCode:place.countryCode,city:place.city,mode:'fill'});selected.delete(id);deviceStatus.delete(id);saveDraft()}
+   else deviceStatus.set(id,outcome.status==='denied'?'deviceDenied':outcome.status==='no-place'?'deviceNoPlace':'deviceUnavailable');
+  }catch(_){if(!signal.aborted&&deviceAttempt===attempt&&deviceEligible(id))deviceStatus.set(id,'deviceUnavailable')}
+  finally{if(deviceAttempt===attempt){deviceAttempt=null;paint()}}
+ }
  function fillEntry(){
   countryLabel.textContent=t('countryLabel');cityLabel.textContent=t('cityLabel');
   countryName.textContent=countryText(entry.countryCode)||t('countryPlaceholder');flag(countryFlag,entry.countryCode);
@@ -163,6 +185,13 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
    const pick=node('label','talera-location-check',card),check=node('input','',pick);check.type='checkbox';check.checked=selected.has(id);
    node('span','',pick).textContent=t('selectPhoto',{number:index+1});
    check.onchange=()=>{single=null;if(check.checked)selected.add(id);else selected.delete(id);fillEntry();paint()};
+   if(state(id).reason==='no-readable-gps'){
+    const use=button('talera-location-device',card);
+    use.textContent=t(deviceAttempt?.id===id?'deviceSearching':'deviceConfirm');
+    use.disabled=!!deviceAttempt||!deviceEligible(id);use.onclick=()=>void confirmDevicePlace(id);
+    const feedback=deviceStatus.get(id);
+    if(feedback){const message=node('p','talera-location-tile-status',card);message.setAttribute('role','status');message.textContent=t(feedback)}
+   }
   }else if(value){
    const info=node('p','talera-location-tile-status',card);info.textContent=t(value.source==='manual-photo'?'photoManualStatus':'photoAutoStatus');
    const edit=button('talera-location-edit',card);edit.textContent=t('editPhoto',{number:index+1});edit.onclick=()=>chooseSingle(id);
@@ -183,6 +212,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
   recognized.replaceChildren();unknown.replaceChildren();pending.replaceChildren();
   ids.forEach((id,i)=>{const value=display(id),s=state(id).state;tile(id,i,value?recognized:s==='unknown'?unknown:pending,s)});
   recognizedHeading.hidden=recognized.hidden=!recognized.childElementCount;unknownHeading.hidden=unknown.hidden=!unknown.childElementCount;pendingHeading.hidden=pending.hidden=!pending.childElementCount;
+  deviceHint.hidden=![...unknownNow].some(id=>state(id).reason==='no-readable-gps');deviceHint.textContent=t('deviceHint');
   form.hidden=!single&&!unknownNow.size;
   modeLabel.textContent=single?t('editingPhoto',{number:ids.indexOf(single)+1}):t('bulkHint');
   reset.hidden=!single;reset.textContent=t('backToBulk');
@@ -229,7 +259,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
   }
  }
  function wake(){if(timer!==null){win.clearTimeout(timer);timer=null}if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing)void scan()}
- function stop(){controller?.abort();if(timer!==null){win.clearTimeout(timer);timer=null}}
+ function stop(){controller?.abort();deviceAttempt?.controller.abort();deviceAttempt=null;if(timer!==null){win.clearTimeout(timer);timer=null}}
  toggle.onclick=()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden){paint();wake()}};
  country.onclick=()=>{search.value='';renderCountries();dialog.showModal();choices.scrollTop=0};
  close.onclick=closePicker;dialog.addEventListener('cancel',e=>{e.preventDefault();closePicker()});
@@ -254,4 +284,37 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  win.addEventListener('talera-capture-place-updated',changed);win.addEventListener('online',wake);win.addEventListener('pageshow',wake);win.addEventListener('pagehide',stop);win.addEventListener('beforeunload',stop);doc.addEventListener('visibilitychange',visibility);doc.addEventListener('talera:languagechange',language);
  Object.defineProperty(g,'taleraLocationStop',{configurable:true,value:stop});Object.defineProperty(g,'taleraLocationWake',{configurable:true,value:wake});
  paint();wake();return box;
+}
+
+// This is an explicit user-confirmed fallback, never a photo-source inference.
+// Native iOS file-picker results do not reliably prove which option was used.
+// A fresh, adequately accurate fix may be used only for the exact confirmed photo.
+export async function requestConfirmedPhotoPlace({geolocation,lookup,signal,now=Date.now}){
+ const stopped=()=>signal?.aborted;
+ if(stopped())return {status:'aborted'};
+ if(typeof geolocation?.getCurrentPosition!=='function'||typeof lookup!=='function')return {status:'unavailable'};
+ const start=now();
+ const fix=await new Promise(resolve=>{
+  let finished=false,timer;
+  const finish=value=>{if(finished)return;finished=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);resolve(value)};
+  const abort=()=>finish({status:'aborted'});
+  signal?.addEventListener('abort',abort,{once:true});
+  if(stopped()){abort();return}
+  timer=setTimeout(()=>finish({status:'unavailable'}),20000);
+  try{
+   geolocation.getCurrentPosition(position=>{
+    const c=position?.coords,at=position?.timestamp,time=now();
+    if(!c||![c.latitude,c.longitude,c.accuracy,at].every(Number.isFinite)||
+      Math.abs(c.latitude)>90||Math.abs(c.longitude)>180||c.accuracy<0||c.accuracy>250||
+      at<start-1000||at>time+1000||time-at>10000){finish({status:'unavailable'});return}
+    finish({status:'fix',latitude:c.latitude,longitude:c.longitude});
+   },error=>finish({status:error?.code===1?'denied':'unavailable'}),
+   {enableHighAccuracy:true,maximumAge:0,timeout:12000});
+  }catch(_){finish({status:'unavailable'})}
+ });
+ if(stopped())return {status:'aborted'};
+ if(fix.status!=='fix')return fix;
+ let result;try{result=await lookup({latitude:fix.latitude,longitude:fix.longitude},signal)}catch(_){return {status:stopped()?'aborted':'unavailable'}}
+ if(stopped())return {status:'aborted'};
+ return result?.ok?(result.place?{status:'known',place:result.place}:{status:'no-place'}):{status:'unavailable'};
 }

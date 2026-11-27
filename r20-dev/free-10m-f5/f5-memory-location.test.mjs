@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {normalizeManualLocation,manualLocationPatch,selectDisplayedLocation,localizedCountryRows,filterCountryRows,normalizePhotoLocation,applyPhotoLocationInputs,localPhotoState,draftPhotoChanges,draftPhotoInputs,moveDraftPhotoLocation} from './f5-memory-location.mjs';
+import {normalizeManualLocation,manualLocationPatch,selectDisplayedLocation,localizedCountryRows,filterCountryRows,normalizePhotoLocation,applyPhotoLocationInputs,localPhotoState,draftPhotoChanges,draftPhotoInputs,moveDraftPhotoLocation,requestConfirmedPhotoPlace} from './f5-memory-location.mjs';
 import {installMemoryLocationStore,installMemoryLocationEditor,memoryLocationCountryCodes as codes} from './f5-memory-location-build.mjs';
 import {languageCatalog} from './f5-language-catalog.mjs';
 import {referencePages} from './generated/public-template-map.mjs';
@@ -58,10 +58,51 @@ test('only a completed unknown result produces negative marker; durable changes 
  assert.deepEqual(inputs,[{automatic:{state:'known',place:auto(nl).capturePlace}},{manual:fill},null]);
  const target={media:['a','b']};moveDraftPhotoLocation(draft,target,'a');moveDraftPhotoLocation(draft,target,'b');assert.deepEqual(draftPhotoChanges(target),{photoLocations:{a:fill},photoLocationAutomatic:{b:{state:'known',place:auto(nl).capturePlace}}});
 });
+test('explicit photo confirmation requests one fresh device fix and uses only validated coordinates',async()=>{
+ let requests=0,lookups=0;
+ const now=()=>100000;
+ const location={coords:{latitude:51.6,longitude:5.3,accuracy:40},timestamp:100000};
+ const geolocation={getCurrentPosition(ok,_error,opts){requests++;assert.deepEqual(opts,{enableHighAccuracy:true,maximumAge:0,timeout:12000});ok(location)}};
+ const lookup=async(gps,signal)=>{lookups++;assert.deepEqual(gps,{latitude:51.6,longitude:5.3});assert.equal(signal.aborted,false);return {ok:true,place:auto(nl).capturePlace}};
+ const signal=new AbortController().signal;
+ const value=await requestConfirmedPhotoPlace({geolocation,lookup,signal,now});
+ assert.deepEqual(value,{status:'known',place:auto(nl).capturePlace});assert.equal(requests,1);assert.equal(lookups,1);
+ for(const x of [
+  {...location,timestamp:90000},{...location,timestamp:110000},
+  {...location,coords:{...location.coords,accuracy:251}},
+  {...location,coords:{...location.coords,latitude:91}},
+  {...location,coords:{...location.coords,longitude:Infinity}},
+  {coords:{latitude:51,longitude:5,accuracy:20}}
+ ]){
+  assert.deepEqual(await requestConfirmedPhotoPlace({geolocation:{getCurrentPosition(ok){ok(x)}},lookup,signal,now}),{status:'unavailable'});
+ }
+ assert.equal(lookups,1,'Invalid, stale or inaccurate fixes never reach the provider');
+ assert.deepEqual(await requestConfirmedPhotoPlace({geolocation:{getCurrentPosition(_ok,bad){bad({code:1})}},lookup,signal,now}),{status:'denied'});
+ assert.deepEqual(await requestConfirmedPhotoPlace({geolocation:{getCurrentPosition(_ok,bad){bad({code:3})}},lookup,signal,now}),{status:'unavailable'});
+ assert.deepEqual(await requestConfirmedPhotoPlace({geolocation,lookup:async()=>({ok:true,place:null}),signal,now}),{status:'no-place'});
+ assert.deepEqual(await requestConfirmedPhotoPlace({geolocation,lookup:async()=>({ok:false}),signal,now}),{status:'unavailable'});
+});
+test('cancelled location consent or navigation ignores late fixes and late provider responses',async()=>{
+ let late,lookups=0;const controller=new AbortController(),now=()=>100000;
+ const location={coords:{latitude:51.6,longitude:5.3,accuracy:40},timestamp:100000};
+ const pending=requestConfirmedPhotoPlace({geolocation:{getCurrentPosition(ok){late=ok}},lookup:async()=>{lookups++;return {ok:true,place:auto(nl).capturePlace}},signal:controller.signal,now});
+ controller.abort();late(location);
+ assert.deepEqual(await pending,{status:'aborted'});assert.equal(lookups,0);
+ const second=new AbortController();let resolveLookup,lookupStarted;
+ const started=new Promise(r=>lookupStarted=r);
+ const lookupPending=requestConfirmedPhotoPlace({geolocation:{getCurrentPosition(ok){ok(location)}},lookup:()=>{lookupStarted();return new Promise(r=>resolveLookup=r)},signal:second.signal,now});
+ await started;second.abort();resolveLookup({ok:true,place:auto(nl).capturePlace});
+ assert.deepEqual(await lookupPending,{status:'aborted'});
+ const draft={media:['original','second'],photoLocations:{second:{...nl,mode:'fill'}}};
+ const items=[auto(fr),{kind:'photo',key:'second',capturePlaceChecked:'v4-no-readable-gps'}];
+ applyPhotoLocationInputs(items,draftPhotoInputs(draft,()=>({type:'image/jpeg'})),codes);
+ assert.equal(items[0].capturePlace.city,'Paris');assert.deepEqual(items[1].manualPhotoLocation,{...nl,mode:'fill'});
+ assert.equal(items[1].capturePlace,undefined);assert.equal(items[1].capturePlaceChecked,'v4-no-readable-gps');
+});
 test('country list is local and translated; every new independent location key exists in all five languages',()=>{
  const regions=new Set(codes);assert.equal(regions.size,codes.length);assert.ok(codes.length>=195);
  const keys=Object.keys(languageCatalog.nl).filter(x=>x.startsWith('core.editor.location.'));
- assert.equal(keys.length,36);
+ assert.equal(keys.length,43);
  for(const language of ['nl','en','de','fr','es']){
   const rows=localizedCountryRows(codes,language);assert.equal(rows.length,codes.length);
   assert.ok(rows.every(x=>x.code&&x.name!==x.code&&x.name));
@@ -92,6 +133,7 @@ test('actual editor package contains one mount and ordered inputs; legacy stored
    else if(!html.includes("className='talera-memory-location'"))html=installMemoryLocationEditor(html);
    assert.equal(html.split('mountMemoryLocationEditor({g,anchor:').length,2);
    assert.ok(html.includes("photoLocations:draftPhotoInputs(g,id=>assets.get(id))")&&html.includes("g.taleraLocationStop?.()"));
+   assert.ok(html.includes("use.onclick=()=>void confirmDevicePlace(id)")&&html.includes("lookupDevicePlace:(...args)=>mem.lookupConfirmedDevicePlace(...args)")&&html.includes("deviceAttempt?.controller.abort()"));
   }
   for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(m[2].includes('function normalizeManualLocation'))new vm.Script(m[2]);
  }

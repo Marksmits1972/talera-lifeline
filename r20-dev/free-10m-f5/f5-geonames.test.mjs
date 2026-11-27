@@ -274,6 +274,17 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
   assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal),{state:'unknown',reason:'no-place'});
   assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal),{state:'unknown',reason:'no-place'});
   assert.equal(requests,2);
+  // Explicit consent fallback reuses the exact existing account-scoped API,
+  // is not a photo metadata read, and never modifies/saves a catalog row.
+  const device={latitude:51.985,longitude:5.88};
+  nav.onLine=false;
+  assert.deepEqual(await store.lookupConfirmedDevicePlace(device,signal),{ok:false});assert.equal(requests,2);
+  nav.onLine=true;
+  assert.deepEqual(await store.lookupConfirmedDevicePlace({...device,latitude:91},signal),{ok:false});assert.equal(requests,2);
+  providerResult=resolved;
+  assert.deepEqual(await store.lookupConfirmedDevicePlace(device,signal),{ok:true,place:resolved});assert.equal(requests,3);
+  assert.deepEqual(await store.inspectDraftCapturePlace(plain,'photo',signal),{state:'unknown',reason:'no-readable-gps'});
+  assert.equal(requests,3); // device location never replaces original GPS evidence
 
   const canceled=new AbortController();canceled.abort();
   assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',canceled.signal),{state:'pending'});

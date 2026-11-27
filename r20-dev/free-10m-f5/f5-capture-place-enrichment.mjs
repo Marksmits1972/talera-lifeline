@@ -129,6 +129,17 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    }finally{clearTimeout(timeout);signal.removeEventListener('abort',cancel)}
   }catch(_){return {ok:false,diagnostic:'api-netwerk-fout'}}
  };
+ // Only the editor's explicit confirmed-photo action uses this route.
+ // Reuse the existing account-scoped, bounded, rate-limited lookup. Do not
+ // store coordinates or a second catalog record and never trigger on import.
+ if(location.pathname==='/tell')store.lookupConfirmedDevicePlace=async(gps,signal)=>{
+  if(!signal||signal.aborted||!canLookup()||Date.now()<blockedUntil||
+   !gps||!Number.isFinite(gps.latitude)||!Number.isFinite(gps.longitude)||
+   Math.abs(gps.latitude)>90||Math.abs(gps.longitude)>180)return {ok:false};
+  const outcome=await lookup(gps,signal);
+  if(!outcome.ok&&!signal.aborted)blockedUntil=Math.max(blockedUntil,Date.now()+(outcome.retryAfterMs||60000));
+  return outcome;
+ };
  const commit=async(expected,index,place,reason,active)=>{
   if(!active())return null;
   const db=await bounded(()=>open());

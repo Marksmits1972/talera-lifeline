@@ -4,7 +4,7 @@ const moduleSource=readFileSync(new URL('./f5-memory-location.mjs',import.meta.u
 const split=moduleSource.indexOf('export function mountMemoryLocationEditor(');
 assert.ok(split>0&&!moduleSource.includes('</script'));
 const shared=moduleSource.slice(0,split).replaceAll('export function ','function ');
-const editor=moduleSource.slice(split).replaceAll('export function ','function ');
+const editor=moduleSource.slice(split).replaceAll('export function ','function ').replaceAll('export async function ','async function ');
 const flags=JSON.parse(readFileSync(new URL('./f5-capture-flags.json',import.meta.url),'utf8')).positions;
 const codes=Object.keys(flags).filter(code=>!['AN','CS'].includes(code)); // obsolete country codes, never offer for new manual selection
 const sprite=readFileSync(new URL('./f5-capture-flags.png',import.meta.url)).toString('base64');
@@ -26,7 +26,7 @@ export function installMemoryLocationEditor(html){
  const hook='function workView(){';
  html=exact(html,hook,shared+'\n'+editor+'\n'+hook,'WORK_VIEW');
  const mount='taleraV16InstallToolbar(g);';
- html=exact(html,mount,mount+"\n mountMemoryLocationEditor({g,anchor:main.querySelector('.talera-tags-v20'),saveDraft,readStory:id=>mem.get(id),getAsset:id=>assets.get(id),preview:id=>url(id),inspect:(...args)=>mem.inspectDraftCapturePlace(...args),flagPositions:"+JSON.stringify(flags)+",codes:"+JSON.stringify(codes)+"});",'MOUNT');
+ html=exact(html,mount,mount+"\n mountMemoryLocationEditor({g,anchor:main.querySelector('.talera-tags-v20'),saveDraft,readStory:id=>mem.get(id),getAsset:id=>assets.get(id),preview:id=>url(id),inspect:(...args)=>mem.inspectDraftCapturePlace(...args),lookupDevicePlace:(...args)=>mem.lookupConfirmedDevicePlace(...args),flagPositions:"+JSON.stringify(flags)+",codes:"+JSON.stringify(codes)+"});",'MOUNT');
  // Optional key absent from existing drafts. Canonical-ID adapter still sees
  // its exact unchanged voiceDurationMs/ existing tail.
  const snapshot='function snapshot(){return groups.map(g=>({tags:';
@@ -69,6 +69,8 @@ export function installMemoryLocationEditor(html){
 #app #main .work .talera-location-edit{border:0;background:#edf2f8;color:#224d7c;border-radius:7px;min-height:36px;padding:3px;font:600 11px/1.3 system-ui}
 #app #main .work .talera-location-apply{border:0;background:#102344;color:white;border-radius:10px;min-height:44px;padding:8px;font:700 14px/1.3 system-ui}
 #app #main .work .talera-location-apply:disabled{opacity:.45}
+#app #main .work .talera-location-device{border:0;background:#edf2f8;color:#224d7c;border-radius:7px;min-height:44px;padding:4px;overflow-wrap:anywhere;font:600 11px/1.3 system-ui}
+#app #main .work .talera-location-device:disabled{opacity:.5}
 
 .talera-location-label{font:700 14px/1.3 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#173b64;margin:6px 0 0}
 #app #main .work .talera-location-country,#app #main .work .talera-location-city{width:100%;box-sizing:border-box;min-height:44px;padding:8px 12px;background:white;color:#0b1b3c;border:1px solid #b9c8da;border-radius:10px;font:500 16px/1.3 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;min-width:0}

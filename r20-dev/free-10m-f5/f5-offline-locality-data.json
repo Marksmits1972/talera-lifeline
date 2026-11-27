@@ -1,0 +1,22 @@
+{
+  "format": "TLPLC001",
+  "source": "https://download.geonames.org/export/dump/cities500.zip",
+  "sourceSha256": "29fec9cb0b35f3a9252de6187a5639b7b1f503321838119e0505da4f18eadd90",
+  "sourceBytes": 13937092,
+  "archiveMemberDate": [
+    2026,
+    11,
+    27,
+    3,
+    47,
+    30
+  ],
+  "license": "CC BY 4.0",
+  "attribution": "GeoNames — https://www.geonames.org/",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "changes": "Filtered populated places, quantized coordinates, retained one display name, indexed by country and latitude; no personal data.",
+  "records": 237408,
+  "countries": 246,
+  "bytes": 5426386,
+  "sha256": "5f5e7a13226670435ce8ef028bc97f50542047b5e7bac0b7b3591aef24b737ae"
+}

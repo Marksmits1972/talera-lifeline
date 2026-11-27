@@ -1,4 +1,4 @@
-// Ordered, reliable binary frames; no external ICE/relay service.
+// Ordered, reliable binary frames; no relay service. STUN only on the second attempt.
 // No entire archive arrayBuffer. Keep the channel send buffer and RAM bounded.
 const CHUNK=16*1024, HIGH=512*1024, WINDOW=256*1024;
 export const MAX_CONTROL=8*1024*1024, MAX_ARCHIVE=2*1024*1024*1024;
@@ -19,9 +19,27 @@ export async function gather(peer,description){
  if(peer.iceGatheringState!=='complete'||!peer.localDescription?.sdp)throw Error('TALERA_TRANSFER_NETWORK');
  return peer.localDescription.sdp;
 }
-export function newDirectPeer(){
+// Inspect only the datachannel candidates; never log addresses or SDP.
+export function candidateCounts(sdp){
+ const counts={host:0,srflx:0,prflx:0,relay:0,unknown:0};let application=false;
+ for(const line of String(sdp).split(/\r?\n/)){
+  if(line.startsWith('m='))application=line.startsWith('m=application ');
+  if(application&&line.startsWith('a=candidate:')){
+   const type=/\styp\s+(host|srflx|prflx|relay)(?:\s|$)/.exec(line)?.[1]||'unknown';
+   counts[type]++;
+  }
+ }
+ return counts;
+}
+export function checkDirectSDP(sdp,route){
+ const c=candidateCounts(sdp);
+ if(c.relay||c.unknown||(!route&&(c.srflx||c.prflx)))throw Error('TALERA_TRANSFER_NETWORK');
+ return c;
+}
+export function newDirectPeer(route=0){
  if(typeof RTCPeerConnection!=='function')throw Error('TALERA_TRANSFER_NOT_SUPPORTED');
- return new RTCPeerConnection({iceServers:[],iceTransportPolicy:'all',bundlePolicy:'max-bundle'});
+ if(route!==0&&route!==1)throw Error('TALERA_TRANSFER_NOT_SUPPORTED');
+ return new RTCPeerConnection({iceServers:route===1?[{urls:'stun:stun.cloudflare.com:3478'}]:[],iceTransportPolicy:'all',bundlePolicy:'max-bundle'});
 }
 export async function sendFrame(channel,kind,blob,progress=()=>{}){
  if(!types.has(kind)||!(blob instanceof Blob)||blob.size>(kind==='archive'?MAX_ARCHIVE:MAX_CONTROL))throw fail();

@@ -151,3 +151,142 @@ test('unexpected archive headers are rejected before allocating a receive sink',
  c.dispatchEvent(new MessageEvent('message',{data:JSON.stringify({kind:'archive',bytes:1024*1024*100})}));
  await new Promise(r=>setTimeout(r,5));assert.equal(checked,1);assert.match(error.message,/PROTOCOL/);await receiver.dispose();
 });
+
+test('one STUN retry stays bound to original authenticated pair, cannot become relay or be replayed',()=>{
+ let now=0;const signal=new TransferSignaling(()=>now),third='d'.repeat(64);
+ signal.handle(sid,{action:'create',code,sdp,proof});
+ assert.throws(()=>signal.handle(sid,{action:'retry',code,sdp,proof}));
+ signal.handle(other,{action:'join',code,sdp,proof});
+ assert.deepEqual(signal.handle(other,{action:'retryOffer',code}),{ok:true,offer:null});
+ assert.throws(()=>signal.handle(third,{action:'retryOffer',code}));
+ assert.throws(()=>signal.handle(other,{action:'retry',code,sdp,proof}));
+ const retrySDP=sdp+'a=ice-ufrag:new\r\n';
+ signal.handle(sid,{action:'retry',code,sdp:retrySDP,proof});
+ assert.equal(signal.handle(sid,{action:'poll',code}).answer,null);
+ assert.deepEqual(signal.handle(other,{action:'retryOffer',code}).offer,{sdp:retrySDP,proof});
+ assert.throws(()=>signal.handle(third,{action:'retryJoin',code,sdp,proof}));
+ assert.throws(()=>signal.handle(other,{action:'join',code,sdp,proof}));
+ signal.handle(other,{action:'retryJoin',code,sdp:retrySDP,proof});
+ assert.deepEqual(signal.handle(sid,{action:'poll',code}).answer,{sdp:retrySDP,proof});
+ assert.throws(()=>signal.handle(sid,{action:'retry',code,sdp,proof}));
+ assert.throws(()=>signal.handle(other,{action:'retryJoin',code,sdp,proof}));
+ now+=60001;assert.throws(()=>signal.handle(other,{action:'retryOffer',code}));
+});
+test('local then STUN configuration never creates a TURN peer; datachannel candidate counts omit addresses',async()=>{
+ const {newDirectPeer,checkDirectSDP}=await import('./f5-transfer-transport.mjs');
+ const before=globalThis.RTCPeerConnection;
+ globalThis.RTCPeerConnection=class{constructor(config){this.config=config}};
+ try{
+  assert.deepEqual(newDirectPeer(0).config.iceServers,[]);
+  assert.deepEqual(newDirectPeer(1).config.iceServers,[{urls:'stun:stun.cloudflare.com:3478'}]);
+  assert.throws(()=>newDirectPeer(2));
+ }finally{if(before)globalThis.RTCPeerConnection=before;else delete globalThis.RTCPeerConnection}
+ const host='a=candidate:1 1 UDP 100 private.local 1234 typ host\r\n';
+ const srflx='a=candidate:2 1 UDP 100 192.0.2.1 1234 typ srflx\r\n';
+ const relay='a=candidate:3 1 UDP 100 192.0.2.2 1234 typ relay\r\n';
+ assert.deepEqual(checkDirectSDP(sdp+host,0),{host:1,srflx:0,prflx:0,relay:0,unknown:0});
+ assert.throws(()=>checkDirectSDP(sdp+host+srflx,0));
+ assert.equal(checkDirectSDP(sdp+host+srflx,1).srflx,1);
+ assert.throws(()=>checkDirectSDP(sdp+relay,1));
+});
+
+// Execute the actual controller in two isolated JavaScript contexts, with
+// shared production signaling and simulated browser APIs. This demonstrates
+// orchestration, not ICE/NAT behavior or real iPhone acceptance.
+async function controllerFixture(successRoute){
+ const vm=await import('node:vm'),{readFile}=await import('node:fs/promises');
+ const transport=await import('./f5-transfer-transport.mjs');
+ const diagnostic=await import('./f5-transfer-diagnostic.mjs');
+ const library=await import('./f5-transfer-library.mjs');
+ const {pairingScanner}=await import('./f5-transfer-scan.mjs');
+ const {drawPairingQR}=await import('./f5-transfer-qr.mjs');
+ const {localBackupPage}=await import('./f5-local-backup-page.mjs');
+ const raw=await readFile(new URL('./f5-transfer-controller.mjs',import.meta.url),'utf8');
+ const controller=raw.replace(/^import .*;$/gm,'');
+ const account='12345678-1234-4123-8123-123456789abc';
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('TALERA_FREE_BROWSER_MEMORY_V1:'+account));
+ const db='talera-free-local-'+Buffer.from(bytes).toString('hex').slice(0,32)+'-v1';
+ const clockStart=Date.now(),clock=()=>clockStart+(Date.now()-clockStart)*25,timers=new Set();
+ const schedule=(fn,ms)=>{const id=setTimeout(()=>{timers.delete(id);fn()},Math.max(1,Math.ceil(ms/25)));timers.add(id);return id};
+ const clear=id=>{clearTimeout(id);timers.delete(id)};
+ const signaling=new TransferSignaling(clock),actions=[],peers=[],frames=[];
+ class Element extends EventTarget{
+  constructor(hidden){super();this.hidden=hidden;this.disabled=false;this.checked=false;this.textContent='';this.value='';this.dataset={database:db};}
+  pause(){} focus(){}
+  click(){assert.equal(this.disabled,false,'button unexpectedly disabled');this.dispatchEvent(new Event('click'))}
+ }
+ class Wire extends EventTarget{
+  readyState='connecting';bufferedAmount=0;label='talera-transfer-v1';
+  send(data){assert.equal(this.readyState,'open');frames.push(data);queueMicrotask(()=>this.other.dispatchEvent(new MessageEvent('message',{data})))}
+  close(){if(this.readyState==='closed')return;this.readyState='closed';this.dispatchEvent(new Event('close'));this.other?.close()}
+ }
+ class Peer extends EventTarget{
+  iceGatheringState='complete';iceConnectionState='new';connectionState='new';
+  constructor(role,route){super();this.role=role;this.route=route;peers.push(this)}
+  createDataChannel(){return this.channel=new Wire()}
+  description(type){return {type,sdp:sdp+'a=ice-ufrag:'+this.role+this.route+'\r\n'+'a=candidate:1 1 UDP 100 private.local 1234 typ host\r\n'}}
+  async createOffer(){return this.description('offer')}
+  async createAnswer(){return this.description('answer')}
+  async setLocalDescription(desc){this.localDescription=desc}
+  async setRemoteDescription(desc){
+   this.remoteDescription=desc;
+   if(this.role!=='receive'||this.route!==successRoute)return;
+   const sender=peers.find(p=>p.role==='send'&&p.route===this.route);
+   assert.ok(sender);
+   const receiverChannel=this.channel,senderChannel=sender.channel=new Wire();
+   receiverChannel.other=senderChannel;senderChannel.other=receiverChannel;
+   const incoming=new Event('datachannel');incoming.channel=senderChannel;sender.dispatchEvent(incoming);
+   schedule(()=>{if(this.connectionState==='closed'||sender.connectionState==='closed')return;
+    for(const p of [this,sender]){p.connectionState='connected';p.iceConnectionState='connected';p.channel.readyState='open';p.channel.dispatchEvent(new Event('open'))}
+   },100);
+  }
+  close(){this.connectionState='closed';this.channel?.close()}
+  async getStats(){return new Map()}
+ }
+ function page(role,session){
+  const html=localBackupPage(db),nodes=new Map([...html.matchAll(/<[^>]+ id="([^"]+)"[^>]*>/g)].map(m=>[m[1],new Element(/\shidden(?:\s|>)/.test(m[0]))]));
+  const document=new EventTarget();document.getElementById=id=>nodes.get(id);
+  const window=new EventTarget();window.TaleraLanguage={t:(key,params)=>key==='transfer.status.diagReport'?params.own+'\nANDER APPARAAT\n'+params.other:key};
+  const fetch=async(url,opts)=>{
+   if(url==='/api/me')return {ok:true,status:200,json:async()=>({account:{id:account}})};
+   const cmd=JSON.parse(opts.body);actions.push([role,cmd.action]);
+   try{const result=cmd.action==='offer'?signaling.offer(session,cmd.code):signaling.handle(session,cmd);
+    return {ok:true,status:200,json:async()=>result};
+   }catch{return {ok:false,status:409}}
+  };
+  const context=vm.createContext({document,window,crypto,TextEncoder,ArrayBuffer,Uint8Array,Blob,AbortController,AbortSignal,
+   Date:class extends Date{static now(){return clock()}},performance:{now:clock},setTimeout:schedule,clearTimeout:clear,fetch,
+   ...transport,...diagnostic,...library,newDirectPeer:route=>new Peer(role,route),pairingScanner,drawPairingQR,
+   location:{origin},console});
+  vm.runInContext(controller,context,{filename:'f5-transfer-controller.mjs'});
+  nodes.get('transfer-diagnostic-enable').checked=true;
+  nodes.get('transfer-diagnostic-enable').dispatchEvent(new Event('change'));
+  return nodes;
+ }
+ const receiver=page('receive',sid),sender=page('send',other);
+ const waitFor=async predicate=>{const deadline=Date.now()+4000;while(!predicate()){if(Date.now()>deadline)throw Error('FIXTURE_TIMEOUT '+receiver.get('transfer-status').textContent+' / '+sender.get('transfer-status').textContent);await new Promise(r=>setTimeout(r,5))}};
+ const click=(nodes,id)=>nodes.get(id).click(),visible=(nodes,id)=>!nodes.get(id).hidden;
+ const start=async()=>{click(receiver,'transfer-receive');await waitFor(()=>visible(receiver,'transfer-pair'));
+  click(sender,'transfer-send');await waitFor(()=>visible(sender,'transfer-found'));click(sender,'transfer-connect-found')};
+ const cancel=()=>{for(const page of [receiver,sender])if(visible(page,'transfer-cancel'))click(page,'transfer-cancel');for(const timer of timers)clearTimeout(timer)};
+ return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames};
+}
+for(const route of [0,1,null])test('controller orchestration: '+(route===null?'both routes fail safely':route?'local fails, one STUN attempt':'local succeeds without STUN'),async()=>{
+ const f=await controllerFixture(route);
+ try{
+  await f.start();
+  if(route===null){
+   await f.waitFor(()=>!f.receiver.get('transfer-receive').disabled&&!f.sender.get('transfer-send').disabled);
+   assert.equal(f.visible(f.receiver,'transfer-approve'),false);
+   assert.equal(f.visible(f.sender,'transfer-approve'),false);
+  }else{
+   await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+   assert.match(f.receiver.get('transfer-verify-code').textContent,/^\d{4} \d{4}$/);
+   assert.equal(f.receiver.get('transfer-verify-code').textContent,f.sender.get('transfer-verify-code').textContent);
+  }
+  assert.equal(f.actions.filter(x=>x[1]==='retry').length,route===0?0:1);
+  assert.equal(f.actions.filter(x=>x[1]==='retryJoin').length,route===0?0:1);
+  assert.deepEqual(f.peers.map(p=>p.route).sort(),route===0?[0,0]:[0,0,1,1]);
+  assert.equal(f.frames.length,0,'no data before mutual confirmation');
+ }finally{f.cancel()}
+});

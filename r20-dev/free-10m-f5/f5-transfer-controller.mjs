@@ -1,7 +1,7 @@
 const t=(key,params)=>window.TaleraLanguage.t(key,params);
 // User-triggered transfer on the EXISTING private backup page only.
 import {readTransferLibrary,inventory,makeTransfer,reviewTransfer,commitTransfer} from './f5-transfer-library.mjs';
-import {newDirectPeer,gather,sendFrame,frameReceiver,jsonBlob,readJSON,pairingVerificationCode} from './f5-transfer-transport.mjs';
+import {newDirectPeer,gather,checkDirectSDP,sendFrame,frameReceiver,jsonBlob,readJSON,pairingVerificationCode} from './f5-transfer-transport.mjs';
 import {newDiagnostic,safeCandidateKinds,diagnosticError,validDiagnosticEvents} from './f5-transfer-diagnostic.mjs';
 import {drawPairingQR} from './f5-transfer-qr.mjs';
 import {pairingScanner} from './f5-transfer-scan.mjs';
@@ -21,14 +21,15 @@ function renderDiagnostic(d){
  diagReport.textContent=t('transfer.status.diagReport',{role:d.role,own:format(own),other:format(other)});
 }
 async function syncDiagnostic(d,manual=false){
- if(diag!==d||!diagEnable.checked||!d.locator||d.busy||(!manual&&d.sends>=12))return;
+ if(diag!==d||!diagEnable.checked||!d.locator||(!manual&&d.sends>=12))return;
+ if(d.busy){if(!manual)return;while(d.busy&&diag===d)await wait(50);if(diag!==d)return;}
  d.busy=true;d.sends++;d.lastSync=performance.now();
  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),6000);
  try{
   const r=await fetch('/api/device-transfer',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
    headers:{'content-type':'application/json'},body:JSON.stringify({action:'diagnostic',code:d.locator,role:d.role,events:d.events}),
    signal:abort.signal});
-  if(!r.ok)throw Error('DIAG');
+  d.mark('DIAG_HTTP',r.status);renderDiagnostic(d);if(!r.ok)throw Error('DIAG');
   const result=await r.json();if(diag!==d)return;
   if(!result.reports||!validDiagnosticEvents(result.reports.receive)||!validDiagnosticEvents(result.reports.send))throw Error('DIAG');
   d.remote=result.reports;diagStatus.textContent=t('transfer.status.diagUpdated');renderDiagnostic(d);
@@ -55,7 +56,7 @@ function diagnosticLocator(locator){if(diag)diag.locator=locator}
 function observePeer(s){
  if(!diag)return;
  const peer=s.peer,d=diag;
- const emit=(phase)=>{if(diag===d&&active===s)markDiagnostic(phase)};
+ const emit=(phase)=>{if(diag===d&&active===s&&s.peer===peer)markDiagnostic(phase)};
  const snapshot=()=>{
   emit('GATHER_'+String(peer.iceGatheringState).toUpperCase());
   emit('ICE_'+String(peer.iceConnectionState).toUpperCase());
@@ -68,7 +69,11 @@ function observePeer(s){
 diagEnable.addEventListener('change',()=>{if(diag?.timer)clearTimeout(diag.timer);diag=null;diagPanel.hidden=!diagEnable.checked;diagReport.textContent='';diagStatus.textContent=diagEnable.checked?t('transfer.status.diagStart'):''});
 el('transfer-diagnostic-refresh').addEventListener('click',()=>{if(diag)void syncDiagnostic(diag,true)});
 el('transfer-diagnostic-copy').addEventListener('click',async()=>{
- if(!diag)return;try{await navigator.clipboard.writeText(diagReport.textContent);diagStatus.textContent=t('transfer.status.diagCopied')}
+ if(!diag)return;const d=diag;try{
+  const report=async()=>{await syncDiagnostic(d,true);if(diag!==d)throw Error('DIAG');return diagReport.textContent};
+  if(typeof ClipboardItem==='function'&&navigator.clipboard?.write){
+   await navigator.clipboard.write([new ClipboardItem({'text/plain':report().then(value=>new Blob([value],{type:'text/plain'}))})]);
+  }else await navigator.clipboard.writeText(await report());diagStatus.textContent=t('transfer.status.diagCopied')}
  catch{diagStatus.textContent=t('transfer.status.diagCopyFail')}
 });
 const say=text=>{status.textContent=text};
@@ -101,7 +106,7 @@ async function account(){
 async function api(action,locator,extra={}){
  markDiagnostic(action.toUpperCase()+'_BEGIN');
  const r=await fetch('/api/device-transfer',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
- headers:{'content-type':'application/json'},body:JSON.stringify({action,code:locator,...extra})});
+ headers:{'content-type':'application/json'},body:JSON.stringify({action,code:locator,...extra}),signal:AbortSignal.timeout(8000)});
  markDiagnostic(action.toUpperCase()+'_HTTP',r.status);
  if(!r.ok)throw Error('PAIR');
  return r.json();
@@ -141,9 +146,9 @@ function timeout(s,ms){
 }
 function newSession(role){
  if(active)throw Error('BUSY');
- const s={role,peer:newDirectPeer(),closed:false,approved:false,otherReady:false,started:false,plan:null,archive:null};
- active=s;observePeer(s);receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;timeout(s,140000);
- s.peer.addEventListener('connectionstatechange',()=>{if(['failed','closed'].includes(s.peer.connectionState)&&active===s&&!s.committing)failure(s,Error('NETWORK'))});
+ const s={role,route:0,peer:newDirectPeer(0),closed:false,approved:false,otherReady:false,started:false,plan:null,archive:null};
+ active=s;markDiagnostic('ROUTE_LOCAL');observePeer(s);receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;timeout(s,140000);
+
  return s;
 }
 function queueFrame(s,kind,blob,progress){
@@ -207,15 +212,54 @@ async function handleFrame(s,kind,blob){
  }
  throw Error('PROTOCOL');
 }
+function routeSDP(s,sdp,side){
+ const counts=checkDirectSDP(sdp,s.route);
+ for(const kind of ['host','srflx'])markDiagnostic(side+'_'+kind.toUpperCase(),Math.min(counts[kind],600));
+ return sdp;
+}
+function watchChannel(s){
+ const peer=s.peer;
+ peer.addEventListener('datachannel',event=>{
+  if(active!==s||s.peer!==peer)return;
+  try{if(event.channel.label!=='talera-transfer-v1')throw Error('PROTOCOL');attach(s,event.channel)}catch(e){failure(s,e)}
+ });
+}
+async function switchToStun(s){
+ live(s);
+ if(s.route!==0||s.verification||s.channel?.readyState==='open')throw Error('NETWORK');
+ const old=s.peer,oldChannel=s.channel,oldReceiver=s.receiver;
+ s.route=1;s.peer=newDirectPeer(1);s.channel=null;s.receiver=null;
+ try{oldChannel?.close()}catch{}try{old.close()}catch{}void oldReceiver?.dispose();
+ markDiagnostic('ROUTE_STUN');observePeer(s);
+ say(t('transfer.status.connecting'));timeout(s,45000);
+}
+async function awaitChannel(s,ms){
+ const until=Date.now()+ms;
+ while(Date.now()<until){live(s);if(s.channel?.readyState==='open'||s.verification)return true;await wait(200)}
+ live(s);return s.channel?.readyState==='open';
+}
+async function reportSelectedRoute(s,peer){
+ try{
+  const stats=await Promise.race([peer.getStats(),wait(2000).then(()=>null)]);
+  if(!stats||active!==s||s.peer!==peer)return;
+  const transport=[...stats.values()].find(entry=>entry.type==='transport'&&entry.selectedCandidatePairId);
+  const pair=transport?stats.get(transport.selectedCandidatePairId):[...stats.values()].find(entry=>entry.type==='candidate-pair'&&entry.state==='succeeded'&&entry.nominated);
+  if(!pair)return;
+  for(const [side,id] of [['LOCAL',pair.localCandidateId],['REMOTE',pair.remoteCandidateId]]){
+   const kind=String(stats.get(id)?.candidateType||'').toUpperCase();
+   if(['HOST','SRFLX','PRFLX','RELAY'].includes(kind))markDiagnostic('SELECTED_'+side+'_'+kind);
+  }
+ }catch{} // optional diagnostics must not block transfer
+}
 function attach(s,channel){
  if(s.channel)throw Error('PROTOCOL');
  s.channel=channel;markDiagnostic('CHANNEL_CREATED');
- s.receiver=frameReceiver(channel,(kind,blob)=>handleFrame(s,kind,blob),error=>{if(!s.committing)failure(s,error)},(kind,n,total)=>{
+ s.receiver=frameReceiver(channel,(kind,blob)=>{if(s.channel===channel)return handleFrame(s,kind,blob)},error=>{if(s.channel===channel&&!s.committing)failure(s,error)},(kind,n,total)=>{
   if(kind==='archive')say(t('transfer.status.receiveProgress',{percent:Math.floor(n*100/total)}));
  },(kind,bytes)=>{
   // Reject unexpected frames BEFORE allocating memory or OPFS. The
   // prior queued frame has completed protocol validation at this point.
-  if(active!==s||s.closed||s.committing||bytes<=0)return false;
+  if(active!==s||s.channel!==channel||s.closed||s.committing||bytes<=0)return false;
   if(kind==='ready')return !s.otherReady&&bytes<=100;
   if(!s.approved||!s.otherReady)return false;
   if(kind==='inventory')return s.role==='send'&&s.phase==='inventory';
@@ -225,16 +269,17 @@ function attach(s,channel){
   return false;
  });
  channel.addEventListener('open',async()=>{
-  if(active!==s)return;markDiagnostic('CHANNEL_OPEN');clearQR();closeCamera();pair.hidden=join.hidden=true;el('transfer-code').textContent='';input.value='';
+  if(active!==s||s.channel!==channel)return;markDiagnostic('CHANNEL_OPEN');markDiagnostic('ROUTE_OPEN',s.route);if(diag)void reportSelectedRoute(s,s.peer);timeout(s,140000);clearQR();closeCamera();pair.hidden=join.hidden=true;el('transfer-code').textContent='';input.value='';
   try{
    s.verification=await pairingVerificationCode(s.locator,s.offer,s.answer);live(s);
    markDiagnostic('VERIFICATION_READY');verifyCode.textContent=s.verification;verify.hidden=false;
    say(t('transfer.status.verify'));approve.hidden=false;approve.disabled=false;
-   if(s.locator)api('cancel',s.locator).catch(()=>{});
+   // Keep temporary signaling available until the pair is finished or expires.
   }catch(e){failure(s,e)}
  });
  channel.addEventListener('close',()=>{
-  if(active!==s)return;markDiagnostic('CHANNEL_CLOSE');
+  if(active!==s||s.channel!==channel)return;markDiagnostic('CHANNEL_CLOSE');
+  if(!s.verification&&!s.started)return; // bounded negotiation can still retry
   if(s.committing&&s.phase!=='complete')return;
   if(s.phase==='complete')void finish(s,s.resultMessage||t('transfer.status.complete'));
   else failure(s,Error('NETWORK'));
@@ -249,7 +294,7 @@ async function startReceive(automatic){
   attach(s,s.peer.createDataChannel('talera-transfer-v1',{ordered:true}));
   const code=hex(crypto.getRandomValues(new Uint8Array(10)));
   s.locator=(await codeHash(code)).slice(0,32);live(s);
-  markDiagnostic('LOCAL_OFFER_BEGIN');const offer=await gather(s.peer,await s.peer.createOffer());live(s);s.offer=offer;markDiagnostic('LOCAL_OFFER_OK');
+  markDiagnostic('LOCAL_OFFER_BEGIN');const offer=routeSDP(s,await gather(s.peer,await s.peer.createOffer()),'LOCAL');live(s);s.offer=offer;markDiagnostic('LOCAL_OFFER_OK');
   const signature=await proof(code,'offer',offer);live(s);
   await api('create',s.locator,{sdp:offer,proof:signature,...(automatic?{secret:code}:{})});
   if(active!==s){void api('cancel',s.locator).catch(()=>{});return}
@@ -265,8 +310,25 @@ async function startReceive(automatic){
    await wait(2000);live(s);const r=await api('poll',s.locator);live(s);
    if(!r.answer)continue;markDiagnostic('ANSWER_RECEIVED');
    if(r.answer.proof!==await proof(code,'answer',r.answer.sdp))throw Error('PAIR');
-   live(s);s.answer=r.answer.sdp;
-   markDiagnostic('REMOTE_ANSWER_BEGIN');await s.peer.setRemoteDescription({type:'answer',sdp:s.answer});live(s);markDiagnostic('REMOTE_ANSWER_OK');return;
+   live(s);s.answer=routeSDP(s,r.answer.sdp,'REMOTE');
+   markDiagnostic('REMOTE_ANSWER_BEGIN');await s.peer.setRemoteDescription({type:'answer',sdp:s.answer});live(s);markDiagnostic('REMOTE_ANSWER_OK');
+   timeout(s,60000);
+   if(await awaitChannel(s,9000))return;
+   await switchToStun(s);
+   attach(s,s.peer.createDataChannel('talera-transfer-v1',{ordered:true}));
+   s.offer=routeSDP(s,await gather(s.peer,await s.peer.createOffer()),'LOCAL');live(s);
+   await api('retry',s.locator,{sdp:s.offer,proof:await proof(code,'offer-stun',s.offer)});live(s);
+   const retryUntil=Date.now()+25000;
+   while(Date.now()<retryUntil){
+    await wait(1500);live(s);const next=await api('poll',s.locator);live(s);
+    if(!next.answer)continue;
+    if(next.answer.proof!==await proof(code,'answer-stun',next.answer.sdp))throw Error('PAIR');
+    live(s);s.answer=routeSDP(s,next.answer.sdp,'REMOTE');
+    await s.peer.setRemoteDescription({type:'answer',sdp:s.answer});live(s);
+    if(await awaitChannel(s,15000))return;
+    throw Error('NETWORK');
+   }
+   throw Error('TIMEOUT');
   }
   throw Error('TIMEOUT');
  }catch(e){if(s)failure(s,e);else if(run===flow){markDiagnostic(diagnosticError(e));reset();say(t('transfer.status.noAccount'))}}
@@ -307,12 +369,28 @@ async function connect(code,expectedLocator=null){
   if(expectedLocator&&expectedLocator!==s.locator)throw Error('PAIR');
   const r=await api('offer',s.locator);live(s);
   if(!r.offer||r.offer.proof!==await proof(code,'offer',r.offer.sdp))throw Error('PAIR');
-  live(s);s.offer=r.offer.sdp;diagnosticLocator(s.locator);markDiagnostic('OFFER_OK');
-  s.peer.addEventListener('datachannel',event=>{try{if(event.channel.label!=='talera-transfer-v1')throw Error('PROTOCOL');attach(s,event.channel)}catch(e){failure(s,e)}});
+  live(s);s.offer=routeSDP(s,r.offer.sdp,'REMOTE');diagnosticLocator(s.locator);markDiagnostic('OFFER_OK');
+  watchChannel(s);
   markDiagnostic('REMOTE_OFFER_BEGIN');await s.peer.setRemoteDescription({type:'offer',sdp:s.offer});live(s);markDiagnostic('REMOTE_OFFER_OK');
-  markDiagnostic('LOCAL_ANSWER_BEGIN');const answer=await gather(s.peer,await s.peer.createAnswer());live(s);s.answer=answer;markDiagnostic('LOCAL_ANSWER_OK');
+  markDiagnostic('LOCAL_ANSWER_BEGIN');const answer=routeSDP(s,await gather(s.peer,await s.peer.createAnswer()),'LOCAL');live(s);s.answer=answer;markDiagnostic('LOCAL_ANSWER_OK');
   const signature=await proof(code,'answer',answer);live(s);
-  await api('join',s.locator,{sdp:answer,proof:signature});live(s);markDiagnostic('JOIN_OK');
+  await api('join',s.locator,{sdp:answer,proof:signature});live(s);markDiagnostic('JOIN_OK');timeout(s,65000);
+  const retryUntil=Date.now()+35000;
+  while(Date.now()<retryUntil){
+   if(await awaitChannel(s,1500))return;
+   const next=await api('retryOffer',s.locator);live(s);
+   if(s.channel?.readyState==='open'||s.verification)return;
+   if(!next.offer)continue;
+   if(next.offer.proof!==await proof(code,'offer-stun',next.offer.sdp))throw Error('PAIR');
+   live(s);await switchToStun(s);watchChannel(s);
+   s.offer=routeSDP(s,next.offer.sdp,'REMOTE');
+   await s.peer.setRemoteDescription({type:'offer',sdp:s.offer});live(s);
+   s.answer=routeSDP(s,await gather(s.peer,await s.peer.createAnswer()),'LOCAL');live(s);
+   await api('retryJoin',s.locator,{sdp:s.answer,proof:await proof(code,'answer-stun',s.answer)});live(s);
+   if(await awaitChannel(s,25000))return;
+   throw Error('NETWORK');
+  }
+  throw Error('TIMEOUT');
  }catch(e){if(s)failure(s,e);else if(run===flow){markDiagnostic(diagnosticError(e));reset();say(t('transfer.status.connectFailed'))}}
 }
 el('transfer-connect').addEventListener('click',()=>void connect(input.value.trim().replace(/-/g,'').toLowerCase()));

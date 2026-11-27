@@ -42,7 +42,7 @@ export class TransferSignaling {
    // No device ID, account data, SDP or media is included in this discovery.
    return {ok:true,invitation:{code:st.code,secret:st.secret}};
   }
-  const fields={create:['action','code','sdp','proof'],join:['action','code','sdp','proof'],poll:['action','code'],cancel:['action','code']};
+  const fields={create:['action','code','sdp','proof'],join:['action','code','sdp','proof'],poll:['action','code'],cancel:['action','code'],retry:['action','code','sdp','proof'],retryOffer:['action','code'],retryJoin:['action','code','sdp','proof']};
   if(action==='create'&&Object.hasOwn(command,'secret')){
    if(typeof secret!=='string'||!SECRET.test(secret))err();
    fields.create.push('secret');
@@ -51,14 +51,27 @@ export class TransferSignaling {
   if(action==='create'){
    if(this.state||now<this.nextCreate||!validSDP(sdp,'offer')||!HASH.test(proof))err();
    this.nextCreate=now+3000;
-   this.state={code,owner:session,offer:{sdp,proof},expires:now+TTL,joiner:null,answer:null,secret:secret||null};
+   this.state={code,owner:session,offer:{sdp,proof},expires:now+TTL,joiner:null,answer:null,route:0,secret:secret||null};
    return {ok:true};
   }
   const st=this.state;
   if(!st||code!==st.code)err();
+  // Only the original pair may negotiate ONE fallback, with fresh SDP proofs.
+  if(action==='retry'){
+   if(st.owner!==session||!st.joiner||!st.answer||st.route!==0||!validSDP(sdp,'offer')||!HASH.test(proof))err();
+   st.route=1;st.offer={sdp,proof};st.answer=null;st.expires=now+60000;return {ok:true};
+  }
+  if(action==='retryOffer'){
+   if(st.joiner!==session)err();
+   return {ok:true,offer:st.route===1?st.offer:null};
+  }
+  if(action==='retryJoin'){
+   if(st.route!==1||st.joiner!==session||st.answer||!validSDP(sdp,'answer')||!HASH.test(proof))err();
+   st.answer={sdp,proof};return {ok:true};
+  }
   if(action==='join'){
    if(st.owner===session||st.joiner||!validSDP(sdp,'answer')||!HASH.test(proof))err();
-   st.joiner=session;st.answer={sdp,proof};st.secret=null;return {ok:true};
+   st.joiner=session;st.answer={sdp,proof};st.secret=null;st.expires=Math.max(st.expires,now+60000);return {ok:true};
   }
   if(action==='poll'){
    if(st.owner!==session)err();

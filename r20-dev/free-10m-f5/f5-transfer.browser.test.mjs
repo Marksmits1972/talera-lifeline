@@ -11,7 +11,7 @@ import {privateAccountScope} from './f5-local-scope.mjs';
 const account='12345678-1234-4123-8123-123456789abc';
 const scope='talera-free-local-'+(await privateAccountScope(account)).slice(0,32)+'-v1';
 const assets=new Set(['backup-controller.mjs','f5-portable-idb.mjs','f5-portable-archive.mjs','f5-library-persistence.mjs','f5-transfer-controller.mjs','f5-transfer-library.mjs','f5-transfer-transport.mjs','f5-transfer-diagnostic.mjs','f5-transfer-qr.mjs','f5-transfer-scan.mjs','f5-transfer-jsqr.mjs']);
-let signal=new TransferSignaling(),networkPosts=0,diagnosticPosts=0,rejectJoin=false;
+let signal=new TransferSignaling(),networkPosts=0,diagnosticPosts=0,rejectJoin=false,routeRetries=0,routeRetryJoins=0;
 // Fail closed with an exact checkpoint, even if the Playwright protocol,
 // a browser-side promise or shutdown never resolves. No product behavior changed.
 let checkpoint='fixture initialization';
@@ -38,6 +38,8 @@ const server=createServer(async(req,res)=>{
    assert.ok(sid);
    const c=JSON.parse(data);
    if(c.action==='diagnostic')diagnosticPosts++;
+   if(c.action==='retry')routeRetries++;
+   if(c.action==='retryJoin')routeRetryJoins++;
    if(rejectJoin&&c.action==='join'){res.writeHead(409).end('test-only rejection');return}
    // No SDP, pairing secrets, media or personal data in diagnostics.
    console.log('TALERA_TRANSFER_BROWSER_SIGNAL',c.action);
@@ -95,6 +97,25 @@ try{
   assert.ok(receivingBrowser,'Previously launched Chromium is required for the mixed-engine test');
   try{
    const a=await bounded(name+' sender context',()=>browser.newContext({locale:'nl-NL'})),b=await bounded(name+' receiver context',()=>receivingBrowser.newContext({locale:'nl-NL'}));
+   // Deliberate local-route failure in the existing browser fixture. The
+   // second browser peer uses real loopback ICE while recording the production
+   // STUN configuration; no request to an external STUN or relay service.
+   for(const context of [a,b])await context.addInitScript(()=>{
+    const Native=window.RTCPeerConnection;
+    window.__transferRouteFixture={enabled:false,configs:[]};
+    window.RTCPeerConnection=class extends Native {
+     constructor(config){
+      const fixture=window.__transferRouteFixture,enabled=fixture.enabled,stun=Boolean(config?.iceServers?.length);
+      if(enabled)fixture.configs.push(config?.iceServers||[]);
+      super(enabled&&stun?{...config,iceServers:[]}:config);
+      this.__blockLocalCandidates=enabled&&!stun;
+     }
+     setRemoteDescription(desc){
+      if(this.__blockLocalCandidates&&desc?.sdp)desc={type:desc.type,sdp:desc.sdp.replace(/^a=candidate:.*(?:\r?\n|$)/gm,'')};
+      return super.setRemoteDescription(desc);
+     }
+    };
+   });
    await a.addCookies([{name:'sid',value:'a',url}]);await b.addCookies([{name:'sid',value:'b',url}]);
    const sender=await bounded(name+' sender page',()=>a.newPage()),receiver=await bounded(name+' receiver page',()=>b.newPage());
    for(const [role,page] of [['sender',sender],['receiver',receiver]]){page.setDefaultTimeout(15000);page.on('pageerror',e=>console.error('TALERA_TRANSFER_BROWSER_PAGE_ERROR',name,role,e.message));}
@@ -106,9 +127,10 @@ try{
      await page.locator('#transfer-diagnostic-enable').check();
     }
    }
-   async function once(count,before,manual=false){
+   async function once(count,before,manual=false,forced=false){
     // Pairing server throttles consecutive starts for 3 seconds.
-    const step=name+' transfer '+before+'/'+count;
+    const step=name+' transfer '+before+'/'+count+(forced?' forced-local-failure':'');
+    const retriesBefore=routeRetries,joinsBefore=routeRetryJoins;
     mark(step+' begin');
     await receiver.waitForTimeout(3100);
     if(manual){
@@ -143,10 +165,16 @@ try{
     }
     try{
      mark(step+' wait for direct channel');
-     await Promise.all([sender.locator('#transfer-approve').waitFor({state:'visible',timeout:25000}),receiver.locator('#transfer-approve').waitFor({state:'visible',timeout:25000})]);
+     await Promise.all([sender.locator('#transfer-approve').waitFor({state:'visible',timeout:forced?65000:25000}),receiver.locator('#transfer-approve').waitFor({state:'visible',timeout:forced?65000:25000})]);
      const receiverCode=await receiver.locator('#transfer-verify-code').innerText();
      assert.match(receiverCode,/^\d{4} \d{4}$/);
      assert.equal(receiverCode,await sender.locator('#transfer-verify-code').innerText());
+     assert.equal(routeRetries-retriesBefore,forced?1:0,'unexpected route switch');
+     assert.equal(routeRetryJoins-joinsBefore,forced?1:0,'unexpected retry answer');
+     if(forced)for(const page of [sender,receiver]){
+      const configs=await page.evaluate(()=>window.__transferRouteFixture.configs);
+      assert.deepEqual(configs,[[],[{urls:'stun:stun.cloudflare.com:3478'}]]);
+     }
      if(mixed){
       await receiver.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.includes('CHANNEL_OPEN'));
       await sender.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.includes('CHANNEL_OPEN'));
@@ -192,6 +220,12 @@ try{
     }finally{rejectJoin=false}
    }
    await once(1,0);if(!mixed){await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2,true);}
+   if(engine===chromium){
+    await bounded(name+' seed third story',()=>seed(sender,'local-three'));
+    for(const page of [sender,receiver])await page.evaluate(()=>{window.__transferRouteFixture.enabled=true});
+    await once(1,2,false,true);
+    console.log('TALERA_STUN_FALLBACK_BROWSER_ORCHESTRATION_PASS',name,{externalStunTested:false,physicalIPhoneAccepted:false});
+   }
    assert.equal(mixed?diagnosticPosts>diagBefore:diagnosticPosts===diagBefore,true,'diagnostics must be opt-in');
    console.log('TALERA_DIRECT_TRANSFER_BROWSER_PASS',name,{networkPosts,firstCopy:true,repeatOnlyNew:true,identicalBytes:true,explicitConfirmation:true,automaticDiscovery:true,manualFallback:!mixed,crossEngine:mixed,diagnosticsEnabled:mixed});
    if(engine===chromium){await bounded(name+' sender context close',()=>a.close());await bounded(name+' receiver context close',()=>b.close())}

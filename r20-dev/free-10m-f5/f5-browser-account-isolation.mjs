@@ -2139,9 +2139,17 @@ try{
      return true;
    });
    assert.equal(originalPhotoSafe,true,'Synthetic account needs an original local photo');
+   // Force the real account response to arrive after typing. Neither the
+   // service response nor the authorization checks are stubbed or bypassed.
+   let releaseShareAuth;
+   const holdShareAuth=new Promise(resolve=>{releaseShareAuth=resolve});
+   const delayShareAuth=async route=>{await holdShareAuth;await route.continue()};
+   await sharePage.route('**/api/me',delayShareAuth);
+   const personalDraft='Hé, weet je nog die middag?';
+   try{
    await sharePage.locator('#talera-clean-social [data-action=share]').click();
    await sharePage.waitForFunction(()=>
-     !!document.querySelector('#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
+     document.querySelector('#talera-clean-overlay:not([hidden]) .status')?.textContent.includes('TALERA controleert je aanmelding'),
      null,{timeout:15000});
    // One compact selector, truly EMPTY personal field, and draft survives
    // changing the expiry and switching back to the default invitation.
@@ -2152,9 +2160,22 @@ try{
    assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),'',
      'Own WhatsApp message must start with an entirely blank text field');
    assert.equal(await sharePage.locator('#talera-clean-preview-photo').isChecked(),true,'Photo accompanies the message by default');
-   const personalDraft='Hé, weet je nog die middag?';
-   await sharePage.locator('#talera-clean-personal').fill(personalDraft);
+   const personalField=sharePage.locator('#talera-clean-personal');
+   await personalField.fill(personalDraft);
+   const originalField=await personalField.elementHandle();
+   await originalField.evaluate(el=>el.setSelectionRange(4,4));
+   releaseShareAuth();
+   await sharePage.waitForFunction(()=>document.querySelector('#talera-clean-overlay:not([hidden]) .status')?.textContent.includes('Kies een geldigheidsduur'),
+     null,{timeout:15000});
+   assert.equal(await originalField.evaluate(el=>el===document.querySelector('#talera-clean-personal')&&el.isConnected&&document.activeElement===el&&el.selectionStart===4&&el.selectionEnd===4),true,
+     'The real async authorization update must retain the focused original draft textbox and cursor');
+   assert.equal(await personalField.inputValue(),personalDraft,'Delayed authorization must preserve the unsent draft');
    await sharePage.locator('#talera-clean-expiry').selectOption('24');
+   assert.equal(await originalField.evaluate(el=>el===document.querySelector('#talera-clean-personal')&&el.isConnected),true,
+     'Changing duration must keep the same native draft textbox');
+   await originalField.dispose();
+   console.log('TALERA_FREE_WHATSAPP_ASYNC_AUTH_DRAFT_AND_CARET_PRESERVED_PASS');
+   }finally{releaseShareAuth();await sharePage.unroute('**/api/me',delayShareAuth)}
    assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),personalDraft,
      'Changing validity may not delete the unsent personal message');
    await sharePage.locator('#talera-clean-expiry').selectOption('168');

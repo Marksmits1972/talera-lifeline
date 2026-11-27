@@ -2206,6 +2206,33 @@ async function taleraFreeOriginalSharePhoto(memory){
    const addedVars=String.raw`
 const taleraStandardText=()=>window.TaleraI18n.t('core.whatsapp.standardMessage');
 let messageChoice='personal',personalMessage='',uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
+// Keep the actual native draft textbox connected across asynchronous renders.
+// Draft lifetime remains the existing open share sheet only.
+let taleraDraftField=null;
+function taleraRenderSharePanel(html){
+ const field=taleraDraftField;
+ if(field?.parentNode===panel&&messageChoice==='personal'){
+  const template=document.createElement('template');
+  template.innerHTML=html;
+  const next=template.content.querySelector('#talera-clean-personal');
+  if(next?.parentNode===template.content){
+   const before=document.createDocumentFragment(),after=document.createDocumentFragment();
+   let past=false;
+   for(const node of Array.from(template.content.childNodes)){
+    if(node===next){past=true;continue}
+    (past?after:before).appendChild(node);
+   }
+   // Never detach the textarea: pending input, focus, composition and
+   // selection must stay on the same native element.
+   while(field.previousSibling)field.previousSibling.remove();
+   while(field.nextSibling)field.nextSibling.remove();
+   panel.insertBefore(before,field);panel.appendChild(after);
+   return;
+  }
+ }
+ panel.innerHTML=html;
+ taleraDraftField=panel.querySelector('#talera-clean-personal');
+}
 
 let taleraWhatsAppHandoffPending=false;
 const taleraWhatsAppReturnKey='talera-wa-handoff-return';
@@ -2267,10 +2294,18 @@ window.__taleraShareProgress=taleraShareProgress;
    // ONLY during actual XHR upload bytes. No fictitious overall progress.
    shipped=shipped.replace(buttonPoint,
     "(v.state==='preparing'?'<div class=\"talera-share-progress\" role=\"status\" aria-live=\"polite\"><span class=\"talera-share-spinner\" aria-hidden=\"true\"></span><div><span id=\"talera-free-progress-label\">'+escapeText(uploadPhase)+(uploadPercent===null?'':': '+uploadPercent+'%')+'</span><progress id=\"talera-free-progress-meter\" max=\"100\" value=\"'+(uploadPercent===null?0:uploadPercent)+'\" '+(uploadPercent===null?'hidden':'')+'></progress></div></div>':'')+"+buttonPoint);
+   const shareRenderState="const v=share.current(),labels=";
+   const shareRenderStart="panel.innerHTML=closeButton+'<h2>Delen via WhatsApp";
+   const shareRenderEnd=`(v.state==='ready'?'<p class="status">'+(v.invite?.photo?'De foto is toegevoegd aan de persoonlijke link. WhatsApp kan deze als voorbeeld tonen.':'Dit verhaal heeft geen foto; alleen de tekst wordt gedeeld.')+'</p>':'');`;
+   for(const anchor of [shareRenderState,shareRenderStart,shareRenderEnd])
+    assert.equal(shipped.split(anchor).length,2,'WHATSAPP_DRAFT_RENDER_SOURCE_DRIFT');
+   shipped=shipped.replace(shareRenderState,"if(taleraDraftField?.parentNode===panel)personalMessage=taleraDraftField.value;"+shareRenderState)
+    .replace(shareRenderStart,"taleraRenderSharePanel(closeButton+'<h2>Delen via WhatsApp")
+    .replace(shareRenderEnd,shareRenderEnd.slice(0,-1)+');');
    const openShare="if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}";
    assert.equal(shipped.split(openShare).length,2,'WHATSAPP_DRAFT_NEW_INVITE_DRIFT');
    shipped=shipped.replace(openShare,
-    "if(a==='share'){consent=false;messageChoice='personal';personalMessage='';includePreviewPhoto=true;uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}");
+    "if(a==='share'){consent=false;messageChoice='personal';personalMessage='';taleraDraftField=null;includePreviewPhoto=true;uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}");
    const clickPart="if(a==='prepare'){if(shareAuth!==true){void verifyShareAuth();return}";
    assert.equal(shipped.split(clickPart).length,2,'WHATSAPP_PERSONAL_PREPARE_DRIFT');
    shipped=shipped.replace(clickPart,
@@ -2386,7 +2421,7 @@ function taleraUploadMediaProgress(path,blob,label,previewConsent=false){
      previewSource+"\n"+
      "  if(taleraPreviewConsent&&preview?.size&&preview.type==='image/jpeg'&&typeof File==='function')"+
      "taleraNativeSharePhoto=new File([preview],'talera-herinnering.jpg',{type:'image/jpeg'});");
-   const currentOpen="if(a==='share'){consent=false;messageChoice='personal';personalMessage='';includePreviewPhoto=true;uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}";
+   const currentOpen="if(a==='share'){consent=false;messageChoice='personal';personalMessage='';taleraDraftField=null;includePreviewPhoto=true;uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}";
    assert.equal(shipped.split(currentOpen).length,2,'WHATSAPP_NATIVE_OPEN_RESET_DRIFT');
    shipped=shipped.replace(currentOpen,
      currentOpen.replace('consent=false;','consent=false;taleraNativeSharePhoto=null;'));

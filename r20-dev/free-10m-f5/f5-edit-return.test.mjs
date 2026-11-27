@@ -40,6 +40,15 @@ test('fresh unchanged exits, existing draft and every meaningful edited field pr
  for(const gate of ['recording','importing','busy'])assert.equal(decideEditExit({...base,[gate]:true}),'blocked');
  assert.equal(decideEditExit({...base,current:{...draft,existing:id2}}),'blocked');
 });
+test('background location recognition never dirties an unchanged edit; manual edits never disappear',()=>{
+ const base={id,baseline:draft,current:draft,fresh:true};
+ const automatic={ [draft.media[0]]:{state:'unknown'} };
+ assert.equal(decideEditExit({...base,current:{...draft,photoLocationAutomatic:automatic}}),'pristine');
+ assert.equal(decideEditExit({...base,current:{...draft,photoLocationAutomatic:automatic,photoLocations:{[draft.media[0]]:{countryCode:'NL',city:'Eindhoven',mode:'fill'}}}}),'preserve');
+ const changed={...draft,photoLocationAutomatic:automatic};
+ assert.equal(pristineDraftRemovalPlan([changed],draft),null);
+ assert.ok(pristineDraftRemovalPlan([changed],changed));
+});
 test('atomic cleanup PLAN touches only a pristine newly created draft and unshared draft keys',()=>{
  const survivor={id:'draft-87654321',existing:id2,media:['draft-photo-2'],voice:''};
  const original=structuredClone([draft,survivor]);const plan=pristineDraftRemovalPlan(original,draft);

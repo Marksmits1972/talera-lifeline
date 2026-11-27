@@ -132,7 +132,12 @@ export function mountReturnButton({document,window,context,language,onReturn}){
 export function decideEditExit({id,baseline,current,fresh,recording,importing,busy}){
  if(!EDIT_RETURN_ID.test(id||'')||!current||current.existing!==id||recording||importing||busy)return 'blocked';
  if(!fresh||!baseline||baseline.id!==current.id||baseline.existing!==id)return 'preserve';
- return same(baseline,current)?'pristine':'preserve';
+ // Recognition is derived from the unchanged originals, not a user edit.
+ // Only this one machine-owned field is excluded from the dirty decision;
+ // the cleanup transaction still compares the entire exact persisted draft.
+ const {photoLocationAutomatic:beforeAutomatic,...before}=baseline;
+ const {photoLocationAutomatic:afterAutomatic,...after}=current;
+ return same(before,after)?'pristine':'preserve';
 }
 
 // Local orchestration for the real editor closure. Its adapter is required
@@ -424,6 +429,8 @@ export function patchEditorReturn(html,scope,serialized=buildEditReturnBrowserSo
   // Only the existing editor behind the button is briefly inert. This
   // blocks a second edit/save action while the atomic comparison runs.
   if(app)app.setAttribute('inert','');
+  const group=active();let returning=false;
+  if(group?.taleraLocationStop){group.taleraLocationPublishing=true;group.taleraLocationStop()}
   try{
    const result=await executeEditReturn({context,inspect,flush:async()=>{await queue;await savingOriginals;await thumbnailQueue;await queue;},
     confirmPreserve:()=>window.confirm((messages[lang()]||messages.nl)[0]),
@@ -434,11 +441,12 @@ export function patchEditorReturn(html,scope,serialized=buildEditReturnBrowserSo
      if(ok)groups=groups.filter(row=>row.id!==freshId); // never rewrite other stored drafts
      return ok;
     },markReturning:c=>writeReturnContext(window.sessionStorage,scope,c),navigate:path=>location.replace(path)});
+   returning=result==='returned';
    if(result!=='returned'&&result!=='cancelled'){
     if(view==='work'&&!active())open(groups.length?'overview':'start');
     showError((messages[lang()]||messages.nl)[1]);
    }
-  }finally{if(app&&!wasInert)app.removeAttribute('inert')}
+  }finally{if(group?.taleraLocationStop&&!returning){group.taleraLocationPublishing=false;group.taleraLocationWake?.()}if(app&&!wasInert)app.removeAttribute('inert')}
  }
  return {beforeOpen(g){if(context?.id===g.existing){freshId=g.id;persistedBaseline=clone(snapshot().find(row=>row.id===g.id));}},afterOpen(g){if(freshId===g.id&&context?.id===g.existing)visibleBaseline=selectedSnapshot();},sync(){
   const show=!!context&&view==='work'&&active()?.existing===context.id;

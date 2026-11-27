@@ -11,6 +11,8 @@ import {verifyDesktopLayout} from './f5-desktop-layout.browser-test.mjs';
 import {verifyEditReturn} from './f5-edit-return.browser-test.mjs';
 import {verifyCharacteristicSearch} from './f5-topic-search.browser-test.mjs';
 import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_DATE_GAP,LOUPE_HOLD_MS} from './f5-timeline-loupe.mjs';
+import {createOfflineLocalityResolver} from './f5-offline-locality.mjs';
+import {createOfflineCountryResolver} from './f5-offline-country.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 // Each CI execution gets its own synthetic originals + local Wrangler DO store.
@@ -18,6 +20,51 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const generated=path.join(here,'generated','ordinary-presentation-'+randomUUID());
 mkdirSync(generated,{recursive:true});
 const origin='http://127.0.0.1:8837',gate='1'.repeat(64);
+// Select a real public place-centre newly reachable by the filtered register,
+// independently checking the already approved country and baseline algorithms.
+function selectActualWorldTestPoint(){
+ const dir=path.join(here,'f5-world-settlement-data'),m=JSON.parse(readFileSync(path.join(dir,'world-manifest.json')));
+ const part=m.layers.populated.parts.find(p=>p.coverage.NL);
+ assert.ok(part);
+ const data=readFileSync(path.join(dir,part.file)),old=createOfflineLocalityResolver(readFileSync(path.join(here,'f5-offline-locality-data.bin')));
+ const newer=createOfflineLocalityResolver(data),country=createOfflineCountryResolver(JSON.parse(readFileSync(path.join(here,'f5-offline-country-data.json'))));
+ const slot=(78-65)*26+76-65,first=data.readUInt32LE(16+slot*8),count=data.readUInt32LE(20+slot*8),base=16+676*8;
+ for(let i=first;i<first+count;i++){
+  const at=base+i*14,gps={latitude:data.readInt32LE(at)/100000,longitude:data.readInt32LE(at+4)/100000};
+  if(gps.latitude<51.2||gps.latitude>53.1||gps.longitude<4.0||gps.longitude>7.0||country(gps)?.countryCode!=='NL'||old(gps,'NL'))continue;
+  const name=newer(gps,'NL');
+  if(name)return {gps,name,url:'/__talera_free/assets/'+part.file,sha256:part.sha256,bytes:part.bytes};
+ }
+ throw Error('No actual newly eligible NL settlement test point');
+}
+async function inspectWorldFixture(page,coords,localOnly=false){
+ return page.evaluate(async({coords,localOnly})=>{
+  const canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#267f95';ctx.fillRect(0,0,32,32);
+  const jpeg=new Uint8Array(await (await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'))).arrayBuffer());
+  const t=new Uint8Array(130),v=new DataView(t.buffer),u16=(i,n)=>v.setUint16(i,n,true),u32=(i,n)=>v.setUint32(i,n,true);
+  u16(0,0x4949);u16(2,42);u32(4,8);u16(8,1);u16(10,0x8825);u16(12,4);u32(14,1);u32(18,26);u16(26,4);
+  const entry=(i,tag,type,count,value)=>{
+   const p=28+i*12;u16(p,tag);u16(p+2,type);u32(p+4,count);
+   if(type===2)t[p+8]=value.charCodeAt(0);else u32(p+8,value);
+  };
+  entry(0,1,2,2,coords.latitude<0?'S':'N');entry(1,2,5,3,82);
+  entry(2,3,2,2,coords.longitude<0?'W':'E');entry(3,4,5,3,106);
+  const angle=(p,n)=>{
+   n=Math.abs(n);const d=Math.floor(n),minutes=(n-d)*60,m=Math.floor(minutes),sec=Math.round((minutes-m)*60*100000);
+   u32(p,d);u32(p+4,1);u32(p+8,m);u32(p+12,1);u32(p+16,sec);u32(p+20,100000);
+  };
+  angle(82,coords.latitude);angle(106,coords.longitude);
+  const len=2+6+t.length,marker=Uint8Array.from([255,225,len>>8,len&255,69,120,105,102,0,0,...t]);
+  const file=new File([jpeg.subarray(0,2),marker,jpeg.subarray(2)],'world-locality-synthetic.jpg',{type:'image/jpeg'});
+  const mem=window.TaleraMemories,signal=new AbortController().signal;
+  const first=await mem.inspectDraftCapturePlace(file,'photo',signal,true);
+  if(localOnly)return {first};
+  const second=await mem.inspectDraftCapturePlace(file,'photo',signal,false);
+  return {first,second,bytes:[...new Uint8Array(await file.arrayBuffer())]};
+ },{coords,localOnly});
+}
+
 let worker=null,browser=null,log='';
 async function stop(){
   if(browser)await browser.close().catch(()=>{});
@@ -122,6 +169,71 @@ backupRegression: try{
   if(process.env.TALERA_TIMELINE_LOUPE_ONLY==='1'){
     await testTimelineLoupe();
     break backupRegression;
+  }
+
+  // Actual same authenticated app, same location reader, exact public
+  // dataset asset, persistent local browser cache, and real original bytes.
+  {
+   const target=selectActualWorldTestPoint();
+   const anonymous=await fetch(origin+target.url,{redirect:'error'});
+   assert.equal(anonymous.status,200,'Public immutable world part missing on existing asset-first route');
+   assert.match(anonymous.headers.get('content-type')||'',/application\/octet-stream/i);
+   assert.match(anonymous.headers.get('cache-control')||'',/immutable/i);
+   assert.equal((await anonymous.arrayBuffer()).byteLength,target.bytes);
+   const worldCtx=await browser.newContext({...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'block',extraHTTPHeaders:{'x-talera-f5-key':gate}});
+   try{
+    await worldCtx.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
+    const calls=[],geoCalls=[];
+    let blockWorld=false;
+    await worldCtx.route(url=>url.origin===origin&&/^\/__talera_free\/assets\/places-[a-f0-9]{64}\.bin$/.test(url.pathname),async route=>{
+     const request=route.request(),headers=await request.allHeaders();
+     calls.push({url:request.url(),method:request.method(),cookie:headers.cookie||'',referer:headers.referer||''});
+     if(blockWorld)await route.abort();else await route.continue();
+    });
+    worldCtx.on('request',request=>{if(new URL(request.url()).pathname==='/api/capture-place')geoCalls.push(request.url())});
+    const worldPage=await worldCtx.newPage(),worldErrors=[];
+    worldPage.on('pageerror',e=>worldErrors.push(String(e.message)));
+    await worldPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await worldPage.waitForFunction(()=>!!window.TaleraMemories?.inspectDraftCapturePlace);
+    const first=await inspectWorldFixture(worldPage,target.gps,true);
+    assert.deepEqual(first.first.place,{countryCode:'NL',country:'Nederland',city:'',source:'offline-country-v1'});
+    assert.equal(calls.length,0,'Country must appear without fetching the world part');
+    const actual=await inspectWorldFixture(worldPage,target.gps);
+    const expected={countryCode:'NL',country:'Nederland',city:target.name,source:'offline-locality-v1'};
+    assert.deepEqual(actual.second.place,expected,'Newly covered real settlement must be identified by original GPS');
+    assert.equal(calls.length,1);
+    assert.deepEqual(calls[0],{url:origin+target.url,method:'GET',cookie:'',referer:''});
+    const cached=await worldPage.evaluate(async url=>{
+     const c=await caches.open('talera-free-public-places-v1'),r=await c.match(url);
+     if(!r)return null;
+     const b=await r.arrayBuffer();
+     return {bytes:b.byteLength,digest:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),v=>v.toString(16).padStart(2,'0')).join('')};
+    },target.url);
+    assert.deepEqual(cached,{bytes:target.bytes,digest:target.sha256});
+    const saved=await worldPage.evaluate(async({bytes,place})=>{
+     const mem=window.TaleraMemories;
+     const file=new File([Uint8Array.from(bytes)],'world-test.jpg',{type:'image/jpeg'});
+     const row=await mem.save({title:'Synthetic world location test',date:'2026-11-27',time:'12:00:00',text:'Technical only',tags:[],photoLocations:[{automatic:{state:'known',place,localityChecked:true}}]},[file]);
+     const record=await mem.get(row.id);const original=await mem.blob(record.items[0].key);
+     return {id:row.id,items:record.items.map(i=>({key:i.key,place:i.capturePlace})),bytes:[...new Uint8Array(await original.arrayBuffer())]};
+    },{bytes:actual.bytes,place:expected});
+    assert.deepEqual(saved.items[0].place,expected);assert.deepEqual(saved.bytes,actual.bytes);
+    await worldPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
+    // Reopen the same existing app, warm only the proven old register, then
+    // disconnect all networking. The newly-covered location must still work
+    // from the already downloaded public cache, not a resident old resolver.
+    blockWorld=true;
+    await worldPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await worldPage.waitForFunction(()=>!!window.TaleraMemories?.inspectDraftCapturePlace);
+    const baseline=await inspectWorldFixture(worldPage,{latitude:51.98,longitude:5.91111});
+    assert.equal(baseline.second.place.city,'Arnhem');
+    await worldCtx.setOffline(true);
+    const offline=await inspectWorldFixture(worldPage,target.gps);
+    assert.deepEqual(offline.second.place,expected);
+    assert.equal(calls.length,1,'Cached part must not be downloaded for another photo or page');
+    assert.equal(geoCalls.length,0);assert.deepEqual(worldErrors,[]);
+    console.log('TALERA_WORLD_REAL_ORIGINAL_GPS_DIRECT_PUBLIC_CACHE_OFFLINE_PASS',JSON.stringify({webkit:webkitPickerOnly,place:target.name,bytes:target.bytes,networkRequests:calls.length,originalBytesPreserved:true}));
+   }finally{await worldCtx.close()}
   }
   await verifyEditReturn({browser,origin,gate,sid,mobileDevice:devices['iPhone 13']});
   await verifyDesktopLayout({browser,origin,gate,sid,mobileDevice:devices['iPhone 13']});

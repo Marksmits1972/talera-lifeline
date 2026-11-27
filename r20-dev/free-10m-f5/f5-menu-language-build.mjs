@@ -281,6 +281,6 @@ export function localizeApprovedMenu(source){
  patch(`'+esc(t("menu.help.discover1"))+'</a></div>';break;`,
   `'+esc(t("menu.help.discover1"))+'</a></div>'+
    '<div class="info" id="talera-geonames-attribution"><strong>'+esc(t("menu.help.sourcesLicenses"))+'</strong><p>'+esc(t("menu.help.geonamesCredit"))+'</p>'+
-   '<p><a href="https://www.geonames.org/" rel="noopener noreferrer" target="_blank">GeoNames</a> · <a href="https://download.geonames.org/export/dump/cities500.zip" rel="noopener noreferrer" target="_blank">cities500.zip</a> · <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener noreferrer" target="_blank">CC BY 4.0</a></p></div>';break;`);
+   '<p><a href="https://www.geonames.org/" rel="noopener noreferrer" target="_blank">GeoNames</a> · <a href="https://download.geonames.org/export/dump/cities500.zip" rel="noopener noreferrer" target="_blank">cities500.zip</a> · <a href="https://download.geonames.org/export/dump/allCountries.zip" rel="noopener noreferrer" target="_blank">allCountries.zip</a> · <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener noreferrer" target="_blank">CC BY 4.0</a></p></div>';break;`);
  return result;
 }

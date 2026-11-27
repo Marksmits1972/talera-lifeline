@@ -80,3 +80,86 @@ export function createOfflineLocalityLoader(url,bytes,fetcher=fetch){
   return {ready:true,place:city?{...place,city,source:'offline-locality-v1'}:place};
  };
 }
+
+// GeoNames allCountries independent settlements; no per-photo geocoding.
+// The published small resolver has absolute priority. Only its misses request
+// an immutable public group, never an account, GPS, filename or photo token.
+// One expanded resolver is resident at a time, and public bytes are cached
+// separately from private shell/account state.
+export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher=fetch,cacheStorage=globalThis.caches,clock=Date.now){
+ const baseline=createOfflineLocalityLoader(baseUrl,baseBytes,fetcher);
+ const byCountry=new Map(),seen=new Set();
+ for(const part of parts){
+  if(!part||!/^[a-f0-9]{64}$/.test(part.sha256)||!Number.isInteger(part.bytes)||part.bytes<1||part.bytes>24*1024*1024||seen.has(part.sha256)||!Array.isArray(part.countries)||!part.countries.length)
+   throw Error('INVALID_WORLD_LOCALITY_PART');
+  seen.add(part.sha256);
+  for(const cc of part.countries){
+   if(!/^[A-Z]{2}$/.test(cc)||byCountry.has(cc))throw Error('INVALID_WORLD_LOCALITY_DIRECTORY');
+   byCountry.set(cc,part);
+  }
+ }
+ let resident=null,queue=Promise.resolve();
+ const failures=new Map();
+ const cacheName='talera-free-public-places-v1';
+ const responseHeaders={'content-type':'application/octet-stream','cache-control':'public, max-age=31536000, immutable'};
+ const cacheBound=async task=>{
+  let timer;
+  try{return await Promise.race([task,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('WORLD_LOCALITY_CACHE_TIMEOUT')),5000)})])}
+  finally{clearTimeout(timer)}
+ };
+ const attemptCache=async()=>{try{return await cacheBound(cacheStorage?.open(cacheName))}catch{return null}};
+ const validate=async(response,part)=>{
+  if(!response?.ok||!String(response.headers.get('content-type')).toLowerCase().includes('application/octet-stream'))throw Error('WORLD_LOCALITY_ASSET_NOT_AVAILABLE');
+  const length=response.headers.get('content-length');
+  if(length!==null&&!response.headers.get('content-encoding')&&Number(length)!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
+  const buffer=await response.arrayBuffer();
+  if(buffer.byteLength!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer)),b=>b.toString(16).padStart(2,'0')).join('');
+  if(digest!==part.sha256)throw Error('WORLD_LOCALITY_ASSET_DIGEST');
+  return {buffer,resolve:createOfflineLocalityResolver(buffer)};
+ };
+ const getPart=async(part)=>{
+  if(resident?.sha256===part.sha256)return resident.resolve;
+  if(clock()<(failures.get(part.sha256)||0))return null;
+  resident=null;
+  const url='/__talera_free/assets/places-'+part.sha256+'.bin';
+  const cache=await attemptCache();
+  try{
+   let data=null;
+   try{
+    const cached=await cacheBound(cache?.match(url));
+    if(cached){
+     try{data=await validate(cached,part)}
+     catch{await cacheBound(cache.delete(url)).catch(()=>{});}
+    }
+   }catch{/* Cache failure is not a negative geographic result. */}
+   if(!data){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+    try{
+     const response=await fetcher(url,{credentials:'omit',cache:failures.has(part.sha256)?'reload':'force-cache',signal:controller.signal,redirect:'error',referrerPolicy:'no-referrer'});
+     data=await validate(response,part);
+    }finally{clearTimeout(timer)}
+    if(cache)try{await cacheBound(cache.put(url,new Response(data.buffer,{headers:responseHeaders})))}catch{/* Browser storage quota may be unavailable. */}
+   }
+   resident={sha256:part.sha256,resolve:data.resolve};
+   failures.delete(part.sha256);
+   return resident.resolve;
+  }catch{failures.set(part.sha256,clock()+30000);return null}
+ };
+ return async(gps,place)=>{
+  if(!place?.countryCode||place.source!=='offline-country-v1'||place.city)return {ready:true,place};
+  if(!Number.isFinite(gps?.latitude)||!Number.isFinite(gps?.longitude)||Math.abs(gps.latitude)>90||Math.abs(gps.longitude)>180)return {ready:true,place};
+  const old=await baseline(gps,place);
+  if(!old.ready||old.place?.city)return old;
+  const part=byCountry.get(place.countryCode);
+  if(!part)return old;
+  const run=queue.then(async()=>{
+   const resolve=await getPart(part);
+   if(!resolve)return {ready:false,place};
+   const city=resolve(gps,place.countryCode);
+   return {ready:true,place:city?{...place,city,source:'offline-locality-v1'}:place};
+  });
+  queue=run.then(()=>undefined,()=>undefined);
+  return run;
+ };
+}

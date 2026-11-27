@@ -53,7 +53,7 @@ export function applyPhotoLocationInputs(items,inputs,codes){
    const refinable=previous?.source==='offline-country-v1'&&place?.countryCode===previous.countryCode&&!item.manualPhotoLocation;
    if(result.state==='known'&&place&&(!previous||refinable)){
     item.capturePlace=place;delete item.capturePlaceChecked;
-    if(result.localityChecked===true&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-v1';
+    if(result.localityChecked===true&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-world-v2';
     else if(place.source==='offline-locality-v1')delete item.captureLocalityChecked;
    }
    else if(!previous&&result.state==='unknown'&&completedDraftLocation(result))item.capturePlaceChecked=result.reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
@@ -66,7 +66,7 @@ export function applyPhotoLocationInputs(items,inputs,codes){
  }
 }
 export function localPhotoState(item,codes){
- if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes),...(item.captureLocalityChecked==='offline-locality-v1'?{localityChecked:true}:{})};
+ if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes),...(item.captureLocalityChecked==='offline-locality-world-v2'?{localityChecked:true}:{})};
  if(['v4-no-readable-gps','v5-no-country'].includes(item?.capturePlaceChecked))return {state:'unknown',reason:item.capturePlaceChecked.slice(3)};
  return {state:'pending'};
 }

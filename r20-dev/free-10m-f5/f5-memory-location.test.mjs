@@ -145,7 +145,7 @@ test('actual editor package contains one mount and ordered inputs; legacy stored
   assert.equal(html.split('...manualLocationPatch(existing,input,taleraLocationCountryCodes)').length,3);
   assert.equal(html.split('applyPhotoLocationInputs(files,input.photoLocations,taleraLocationCountryCodes)').length,2);
   assert.equal(html.split('resolveCountry:createOfflineCountryResolver(').length,2,'One offline location resolver on the existing page');
-  assert.equal(html.split('resolveLocality:createOfflineLocalityLoader(').length,2,'One locality extension on the existing page');
+  assert.equal(html.split('resolveLocality:createOfflineWorldLocalityLoader(').length,2,'One locality extension on the existing page');
   assert.match(html,/<link rel="talera-offline-locality" href="\/__talera_free\/places-[a-f0-9]{64}\.bin">/);
   assert.ok(html.includes('v5-no-country')&&!html.includes('/*TALERA_GEONAMES_ENABLED*/false'),'Current recognition must not wait for provider configuration');
   if(route==='/tell'){

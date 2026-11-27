@@ -4,7 +4,7 @@
 // Confirmed original metadata and historical reliable place names are retained.
 const capturePlaceCheckDone=item=>['v4-no-readable-gps','v5-no-country'].includes(item?.capturePlaceChecked);
 const confirmedPlace=item=>['iptc-location-created','geonames-locality-v2','offline-country-v1','offline-locality-v1'].includes(item?.capturePlace?.source);
-const needsOfflineLocality=item=>item?.kind==='photo'&&item.capturePlace?.source==='offline-country-v1'&&!item.capturePlace.city&&item.captureLocalityChecked!=='offline-locality-v1'&&!item.manualPhotoLocation;
+const needsOfflineLocality=item=>item?.kind==='photo'&&item.capturePlace?.source==='offline-country-v1'&&!item.capturePlace.city&&item.captureLocalityChecked!=='offline-locality-world-v2'&&!item.manualPhotoLocation;
 export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,resolveLocality=null,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{},retryItems=null,now=Date.now}){
  const paused=()=>({more:true,blocked:true});
  const stories=await list();
@@ -149,7 +149,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    if(!item||(confirmedPlace(item)&&!upgrading)||capturePlaceCheckDone(item))return;
    if(upgrading&&(!place||place.countryCode!==item.capturePlace.countryCode||!place.city&&!localityChecked))return;
    if(place){item.capturePlace=place;delete item.capturePlaceChecked;
-    if(localityChecked&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-v1';
+    if(localityChecked&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-world-v2';
     else if(place.source==='offline-locality-v1')delete item.captureLocalityChecked;
    }
    else if(['no-readable-gps','no-country'].includes(reason))item.capturePlaceChecked=reason==='no-country'?'v5-no-country':'v4-no-readable-gps';

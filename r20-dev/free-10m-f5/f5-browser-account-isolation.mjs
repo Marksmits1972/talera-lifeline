@@ -441,7 +441,7 @@ try{
        assert.equal(await credit.locator('strong').innerText(),pack['menu.help.sourcesLicenses']);
        assert.equal(await credit.locator('p').first().innerText(),pack['menu.help.geonamesCredit']);
        const links=await credit.locator('a').evaluateAll(nodes=>nodes.map(a=>[a.getAttribute('href'),a.getAttribute('target'),a.getAttribute('rel')]));
-       assert.deepEqual(links,['https://www.geonames.org/','https://download.geonames.org/export/dump/cities500.zip','https://creativecommons.org/licenses/by/4.0/'].map(url=>[url,'_blank','noopener noreferrer']));
+       assert.deepEqual(links,['https://www.geonames.org/','https://download.geonames.org/export/dump/cities500.zip','https://download.geonames.org/export/dump/allCountries.zip','https://creativecommons.org/licenses/by/4.0/'].map(url=>[url,'_blank','noopener noreferrer']));
        if(lang==='nl')assert.equal(await registrationPage.evaluate(()=>navigator.onLine),false);
      }finally{if(lang==='nl')await registrationContext.setOffline(false)}
      await hub.locator('[data-action="back"]').click();

@@ -35,6 +35,31 @@ assert.equal(sha(localityBytes),localityMeta.sha256,'LOCALITY_DATA_HASH_MISMATCH
 assert.equal(localityBytes.subarray(0,8).toString(),'TLPLC001');
 const localityRoute='/__talera_free/places-'+localityMeta.sha256+'.bin';
 const localityCreditRoute='/__talera_free/places-'+localityMeta.sha256+'.json';
+// Use the exact independent-settlement selection derived from the previously
+// frozen world source. Travel geography remains separate; never pretend a
+// mountain, lake, or district is a city. The existing verified baseline stays.
+const worldSource=path.join(here,'f5-world-settlement-data');
+const worldMeta=JSON.parse(readFileSync(path.join(worldSource,'world-manifest.json'),'utf8'));
+assert.equal(worldMeta.sourceSha256,'6a0850259892fa149f51a1ae0204d1654b1db7739886ef88127b986931d9dcd5');
+assert.equal(worldMeta.settlementPolicy,'independent-settlement-v1');
+assert.equal(worldMeta.layers.populated.records,5001680);
+assert.equal(worldMeta.layers.populated.parts.length,6);
+assert.equal(worldMeta.excluded.non_independent_settlement_or_unknown,171418);
+assert.equal(worldMeta.license,'CC BY 4.0');
+const worldCountries=new Set();
+const worldParts=worldMeta.layers.populated.parts.map(part=>{
+ assert.match(part.sha256,/^[a-f0-9]{64}$/);
+ assert.equal(part.file,'places-'+part.sha256+'.bin');
+ assert.ok(Number.isInteger(part.bytes)&&part.bytes>0&&part.bytes<=24*1024*1024,'WORLD_PUBLIC_ASSET_LIMIT');
+ const countries=Object.keys(part.coverage);
+ for(const cc of countries){assert.match(cc,/^[A-Z]{2}$/);assert.ok(!worldCountries.has(cc),'WORLD_COUNTRY_SHARD_SPLIT');worldCountries.add(cc)}
+ return {sha256:part.sha256,bytes:part.bytes,countries};
+});
+assert.equal(worldCountries.size,248);
+const worldDirectory=JSON.stringify(worldParts);
+const worldCreditBytes=Buffer.from(JSON.stringify({...worldMeta,layers:{populated:worldMeta.layers.populated}})+'\n');
+const worldCreditRoute='/__talera_free/assets/places-world-'+sha(worldCreditBytes)+'.json';
+
 // iOS Home Screen: retain the already approved original three-panel TALERA logo.
 // Fetch ONLY the existing approved deep-blue icon files, never user data.
 const approvedLogoOrigin='https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev';
@@ -1285,8 +1310,8 @@ function installCapturePlaceCatalog(html,route){
  assert.equal(matches.length,1,'CAPTURE_ENRICHMENT_STORE_MARKER_DRIFT');
  const mount=matches[0],at=mount.index+mount[0].length;
  const install='\n'+gpsReaders+'\n'+enrichment+'\n' +countryEngine+'\n'+localityEngine+'\n'+
-  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:readOriginalCaptureGps,resolveCountry:createOfflineCountryResolver("+countryData+"),resolveLocality:createOfflineLocalityLoader("+JSON.stringify(localityRoute)+","+localityBytes.length+")});\n";
- return (html.slice(0,at)+install+html.slice(at)).replace('</head>','<link rel="talera-offline-locality" href="'+localityRoute+'"><link rel="talera-data-attribution" href="'+localityCreditRoute+'"></head>');
+  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:readOriginalCaptureGps,resolveCountry:createOfflineCountryResolver("+countryData+"),resolveLocality:createOfflineWorldLocalityLoader("+JSON.stringify(localityRoute)+","+localityBytes.length+","+worldDirectory+")});\n";
+ return (html.slice(0,at)+install+html.slice(at)).replace('</head>','<link rel="talera-offline-locality" href="'+localityRoute+'"><link rel="talera-data-attribution" href="'+localityCreditRoute+'"><link rel="talera-world-data-attribution" href="'+worldCreditRoute+'"></head>');
 }
 
 function installReadOnlyLibraryGateway(html){
@@ -2569,6 +2594,22 @@ const supportNames=['/sw.js','/manifest.webmanifest','/pwa-192.png',
   '/pwa-512.png','/apple-touch-icon.png','/favicon.png','/talera-brand-v9.svg'];
 const support={};
 mkdirSync(path.join(publicDir,'__talera_free','f5support'),{recursive:true});
+// Already public, hashed static namespace with the existing asset-first
+// routing and immutable headers. This adds no Worker request, private route,
+// binding or storage service. Do not preload the six binary files in HTML.
+const worldPublic=path.join(publicDir,'__talera_free','assets');
+mkdirSync(worldPublic,{recursive:true});
+for(const part of worldMeta.layers.populated.parts){
+ const bytes=readFileSync(path.join(worldSource,part.file));
+ assert.equal(bytes.length,part.bytes,'WORLD_LOCALITY_ASSET_LENGTH');
+ assert.equal(sha(bytes),part.sha256,'WORLD_LOCALITY_ASSET_HASH');
+ assert.equal(bytes.subarray(0,8).toString(),'TLPLC001');
+ assert.equal(bytes.readUInt32LE(8),part.records);
+ writeFileSync(path.join(worldPublic,part.file),bytes);
+}
+writeFileSync(path.join(worldPublic,worldCreditRoute.split('/').pop()),worldCreditBytes);
+console.log('TALERA_WORLD_SETTLEMENT_STATIC_ASSETS_PACKAGED',worldParts.length,worldMeta.layers.populated.records,worldMeta.layers.populated.bytes);
+
 for(const [route,bytes] of [[localityRoute,localityBytes],[localityCreditRoute,localityMetaBytes]]){
  const filename=route.split('/').pop();
  writeFileSync(path.join(publicDir,'__talera_free','f5support',filename),bytes);

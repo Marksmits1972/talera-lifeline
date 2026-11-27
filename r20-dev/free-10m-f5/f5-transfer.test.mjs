@@ -219,7 +219,7 @@ async function controllerFixture(successRoute,options={}){
   signaling.handle(sid,{action:'active',code:old});signaling.handle(other,{action:'active',code:old});
   signaling.state.activityAt=clock()-PAIR_STALE_MS+20000;
  }
- let rejectDiagnostics=false,oldArchiveBytes=0,newArchiveBytes=0,reviewed=0;
+ let rejectDiagnostics=false,oldArchiveBytes=0,newArchiveBytes=0,reviewed=0,committed=0;
  class Element extends EventTarget{
   constructor(hidden){super();this.hidden=hidden;this.disabled=false;this.checked=false;this.textContent='';this.value='';this.dataset={database:db};}
   pause(){} focus(){}
@@ -284,7 +284,8 @@ async function controllerFixture(successRoute,options={}){
   const context=vm.createContext({document,window,crypto,TextEncoder,ArrayBuffer,Uint8Array,Blob,AbortController,AbortSignal,
    Date:class extends Date{static now(){return clock()}},performance:{now:clock},setTimeout:schedule,clearTimeout:clear,fetch,
    ...transport,...diagnostic,...library,newDirectPeer:route=>new Peer(role,route),createTransferCertificate:async()=>options.dropArchive?{}:null,pairingScanner,drawPairingQR,
-   ...(options.dropArchive?{readTransferLibrary:async()=>role==='send'?options.full:empty,
+   ...((options.dropArchive||options.flow)?{readTransferLibrary:async()=>role==='send'?options.full:empty,
+    ...(options.flow?{commitTransfer:async(...args)=>{assert.equal(args[4].confirmed,true);committed++;return {count:options.full.stories.length}}}:{}),
     reviewTransfer:async(...args)=>{const result=await library.reviewTransfer(...args);reviewed++;return result}}:{}),
    location:{origin},console});
   vm.runInContext(controller,context,{filename:'f5-transfer-controller.mjs'});
@@ -298,7 +299,7 @@ async function controllerFixture(successRoute,options={}){
  const start=async()=>{click(receiver,'transfer-receive');await waitFor(()=>visible(receiver,'transfer-pair'));
   click(sender,'transfer-send');await waitFor(()=>actions.some(a=>a[0]==='send'&&a[1]==='offer'))};
  const cancel=()=>{for(const page of [receiver,sender])if(visible(page,'transfer-cancel'))click(page,'transfer-cancel');for(const timer of timers)clearTimeout(timer)};
- return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames,signaling,metrics:()=>({oldArchiveBytes,newArchiveBytes,reviewed}),rejectDiagnostics:()=>{rejectDiagnostics=true}};
+ return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames,signaling,metrics:()=>({oldArchiveBytes,newArchiveBytes,reviewed,committed}),rejectDiagnostics:()=>{rejectDiagnostics=true}};
 }
 for(const route of [0,1,null])test('controller orchestration: '+(route===null?'both routes fail safely':route?'local fails, one STUN attempt':'local succeeds without STUN'),async()=>{
  const f=await controllerFixture(route);
@@ -507,11 +508,14 @@ test('controller holds original open peer through a transient disconnect without
   const before=f.receiver.get('transfer-verify-code').textContent;
   p.iceConnectionState='disconnected';p.connectionState='disconnected';p.dispatchEvent(new Event('iceconnectionstatechange'));
   await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('RECOVERY_WAIT'));
-  assert.equal(f.receiver.get('transfer-status').textContent,'transfer.status.connecting');
+  assert.equal(f.receiver.get('transfer-status').textContent,'transfer.status.verify');
+  assert.equal(f.receiver.get('transfer-connection-status').textContent,'transfer.flow.reconnecting');
+  assert.equal(f.visible(f.receiver,'transfer-connection-status'),true);
   assert.equal(f.visible(f.receiver,'transfer-approve'),true);
   p.iceConnectionState='connected';p.connectionState='connected';p.dispatchEvent(new Event('iceconnectionstatechange'));
   await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('RECOVERY_OK'));
   assert.equal(p.channel,channel);assert.equal(f.receiver.get('transfer-verify-code').textContent,before);
+  assert.equal(f.visible(f.receiver,'transfer-connection-status'),false);
   assert.equal(f.frames.length,0);
  }finally{f.cancel()}
 });
@@ -634,5 +638,62 @@ test('controller resumes actual archive on a fresh same-identity peer after chan
   assert.equal(f.actions.filter(a=>a[1]==='replaceOffer').length,1);
   assert.equal(f.actions.filter(a=>a[1]==='replaceAnswer').length,1);
   assert.equal(f.peers.length,6); // local pair, STUN pair, authenticated replacement pair
+ }finally{f.cancel()}
+});
+
+test('step-by-step transfer exposes only relevant actions and confirmed success',async()=>{
+ const data={stories:[a],files:[{key:photo.key,blob:new File([new Uint8Array(1024).fill(71)],'photo.jpg',{type:'image/jpeg'})}]};
+ const f=await controllerFixture(0,{flow:true,full:data});
+ const step=(page,key)=>assert.equal(page.get('transfer-step').textContent,'transfer.flow.'+key);
+ try{
+  assert.equal(f.visible(f.receiver,'transfer-choice'),true);
+  assert.equal(f.visible(f.receiver,'backup-file-actions'),true);
+  assert.equal(f.visible(f.receiver,'transfer-import'),false);
+  await f.start();
+  await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  for(const page of [f.receiver,f.sender]){
+   step(page,'verify');
+   assert.equal(f.visible(page,'transfer-choice'),false);
+   assert.equal(f.visible(page,'backup-file-actions'),false);
+   assert.equal(f.visible(page,'transfer-verify'),true);
+   assert.equal(f.visible(page,'transfer-import'),false);
+  }
+  f.click(f.sender,'transfer-approve');
+  await f.waitFor(()=>!f.visible(f.sender,'transfer-approve'));
+  step(f.sender,'verify');
+  assert.equal(f.sender.get('transfer-status').textContent,'transfer.status.waitConfirm');
+  assert.equal(f.visible(f.receiver,'transfer-approve'),true);
+  assert.equal(f.metrics().committed,0);
+  f.click(f.receiver,'transfer-approve');
+  await f.waitFor(()=>f.visible(f.receiver,'transfer-import')&&f.sender.get('transfer-step').textContent==='transfer.flow.import');
+  for(const page of [f.receiver,f.sender]){
+   step(page,'import');
+   assert.equal(f.visible(page,'transfer-verify'),false);
+   assert.equal(f.visible(page,'transfer-approve'),false);
+   assert.equal(f.visible(page,'transfer-return'),false);
+  }
+  assert.equal(f.visible(f.sender,'transfer-import'),false);
+  assert.equal(f.sender.get('transfer-status').textContent,'transfer.flow.waitForImport');
+  assert.equal(f.metrics().committed,0);
+  const peer=f.peers.find(p=>p.role==='receive');
+  peer.iceConnectionState='disconnected';peer.connectionState='disconnected';peer.dispatchEvent(new Event('iceconnectionstatechange'));
+  assert.equal(f.receiver.get('transfer-status').textContent,'transfer.status.review');
+  assert.equal(f.visible(f.receiver,'transfer-connection-status'),true);
+  peer.iceConnectionState='connected';peer.connectionState='connected';peer.dispatchEvent(new Event('iceconnectionstatechange'));
+  assert.equal(f.visible(f.receiver,'transfer-connection-status'),false);
+  assert.equal(f.receiver.get('transfer-status').textContent,'transfer.status.review');
+  f.click(f.receiver,'transfer-import');
+  await f.waitFor(()=>f.visible(f.receiver,'transfer-return')&&f.visible(f.sender,'transfer-return'));
+  assert.equal(f.metrics().committed,1);
+  for(const page of [f.receiver,f.sender]){
+   step(page,'done');
+   assert.equal(f.visible(page,'transfer-import'),false);
+   assert.equal(f.visible(page,'transfer-cancel'),false);
+   assert.equal(f.visible(page,'transfer-choice'),false);
+   f.click(page,'transfer-restart');
+   step(page,'choose');
+   assert.equal(f.visible(page,'transfer-choice'),true);
+   assert.equal(f.visible(page,'backup-file-actions'),true);
+  }
  }finally{f.cancel()}
 });

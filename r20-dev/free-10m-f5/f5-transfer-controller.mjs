@@ -88,6 +88,25 @@ el('transfer-diagnostic-copy').addEventListener('click',async()=>{
  catch{diagStatus.textContent=t('transfer.status.diagCopyFail')}
 });
 const say=text=>{status.textContent=text};
+// Presentation only: the protocol, commitments and timers remain authoritative.
+const step=el('transfer-step'),choice=el('transfer-choice'),fileActions=el('backup-file-actions');
+const recoveryNotice=el('transfer-connection-status'),returnLink=el('transfer-return'),restart=el('transfer-restart');
+function showRecovery(show){
+ recoveryNotice.hidden=!show;recoveryNotice.textContent=show?t('transfer.flow.reconnecting'):'';
+}
+function setStage(stage){
+ const key='transfer.flow.'+(stage==='saving'?'import':stage);
+ step.dataset.taleraText=key;step.textContent=t(key);
+ choice.hidden=fileActions.hidden=stage!=='choose';
+ receive.hidden=send.hidden=receiveManual.hidden=stage!=='choose';
+ returnLink.hidden=restart.hidden=stage!=='done';
+ if(stage!=='verify')verify.hidden=approve.hidden=true;
+ if(stage!=='import')apply.hidden=true;
+ if(stage!=='connect')pair.hidden=join.hidden=true;
+ stop.hidden=['choose','done','saving'].includes(stage);
+ if(stage==='choose'||stage==='done')showRecovery(false);
+}
+restart.addEventListener('click',()=>{if(!active&&!connecting){reset();say('')}});
 const qr=el('transfer-qr'),scanButton=el('transfer-scan'),scanStop=el('transfer-scan-stop');
 const scan=pairingScanner({translate:t,video:el('transfer-camera'),report:msg=>{say(msg);if(el('transfer-camera').hidden){scanButton.disabled=false;scanStop.hidden=true}},onCode:code=>{
  if(join.hidden||active)return;
@@ -156,7 +175,7 @@ async function createInvitation(s,offer,signature,automatic){
    scheduleKeep(s);return true;
   }
   if(result?.reason!=='PAIR_BUSY'||!Number.isSafeInteger(result.retryAfterMs)||result.retryAfterMs<=0||result.retryAfterMs>PAIR_STALE_MS)throw Error('PAIR');
-  markDiagnostic('CREATE_BUSY');say(t('transfer.status.connecting'));
+  markDiagnostic('CREATE_BUSY');say(t('transfer.flow.busy'));
   const remaining=until-Date.now();
   if(remaining<=0)throw Error('PAIR');
   await wait(Math.min(remaining,10000,Math.max(1000,result.retryAfterMs)));
@@ -169,14 +188,14 @@ function reset(){
  receive.disabled=send.disabled=receiveManual.disabled=false;pair.hidden=join.hidden=approve.hidden=apply.hidden=stop.hidden=true;
  found.hidden=verify.hidden=pairManual.hidden=true;waiting.hidden=false;search.disabled=connectFound.disabled=false;
  discovered=null;verifyCode.textContent='';el('transfer-manual-receive').open=el('transfer-manual-send').open=false;
- el('transfer-code').textContent='';input.value='';
+ el('transfer-code').textContent='';input.value='';search.hidden=true;setStage('choose');
 }
-async function finish(s,message,{signal=true}={}){
+async function finish(s,message,{signal=true,completed=false}={}){
  if(active!==s)return;
- if(s.phase==='complete')markDiagnostic('TRANSFER_DONE');
+ if(completed)markDiagnostic('TRANSFER_DONE');
  active=null;s.closed=true;clearTimeout(s.timer);clearTimeout(s.recoveryTimer);clearTimeout(s.repairPollTimer);clearTimeout(s.keepTimer);
  try{s.channel?.close()}catch{}try{s.peer?.close()}catch{}
- reset();say(message);
+ reset();if(completed)setStage('done');say(message);
  if(signal&&s.locator){
   const d=diag;
   // Cancel signaling immediately; retain the opted-in report separately.
@@ -227,8 +246,8 @@ function monitorConnection(s){
  if(!s.openHandled||s.closed||s.committing||active!==s)return;
  if(connectionInterrupted(s)){
   if(s.recoveryTimer){scheduleRepair(s,0);return;}
-  s.recoverySince=Date.now();s.recoveryStatus=status.textContent;
-  markDiagnostic('RECOVERY_WAIT');say(t('transfer.status.connecting'));
+  s.recoverySince=Date.now();
+  markDiagnostic('RECOVERY_WAIT');showRecovery(true);
   s.recoveryTimer=setTimeout(()=>{if(active===s&&connectionInterrupted(s)){
    markDiagnostic('RECOVERY_TIMEOUT');failure(s,Error('NETWORK'));
   }},RECOVERY_LIMIT);
@@ -236,7 +255,7 @@ function monitorConnection(s){
  }else if(s.recoveryTimer){
   clearTimeout(s.recoveryTimer);s.recoveryTimer=null;s.recoverySince=null;
   markDiagnostic('RECOVERY_OK');
-  if(status.textContent===t('transfer.status.connecting'))say(s.recoveryStatus);
+  showRecovery(false);
  }
 }
 // One active restart per verified pair. The receiving device is the sole
@@ -389,7 +408,7 @@ function queueFrame(s,kind,blob,progress){
 async function sendJSON(s,kind,value){await queueFrame(s,kind,jsonBlob(value))}
 async function maybeStart(s){
  if(s.started||!s.approved||!s.otherReady)return;
- markDiagnostic('TRANSFER_START');s.started=true;s.phase=s.role==='receive'?'plan':'inventory';timeout(s,30*60*1000);await account();live(s);await api('active',s.locator);live(s);
+ markDiagnostic('TRANSFER_START');s.started=true;s.phase=s.role==='receive'?'plan':'inventory';setStage('transfer');say(t(s.role==='receive'?'transfer.status.checkLibrary':'transfer.status.waitOtherCheck'));timeout(s,30*60*1000);await account();live(s);await api('active',s.locator);live(s);
  if(s.role==='receive'){
   say(t('transfer.status.checkLibrary'));
   const own=await inventory(await readTransferLibrary(scope));live(s);
@@ -411,7 +430,7 @@ async function handleFrame(s,kind,blob){
   const result=await makeTransfer(await readTransferLibrary(scope),await readJSON(blob),scope,location.origin);live(s);
   s.phase='done';s.expected=result.count;
   await sendJSON(s,'plan',{count:result.count,duplicates:result.duplicates,reuse:result.reuse});
-  if(result.archive){s.outgoingArchive=true;say(t('transfer.status.sending'));void queueFrame(s,'archive',result.archive,(n,total)=>say(t('transfer.status.sendProgress',{percent:Math.floor(100*n/total)}))).catch(e=>failure(s,e));}
+  if(result.archive){s.outgoingArchive=true;say(t('transfer.status.sending'));void queueFrame(s,'archive',result.archive,(n,total)=>{if(active===s&&s.phase==='done')say(t('transfer.status.sendProgress',{percent:Math.floor(100*n/total)}))}).then(()=>{if(active===s&&s.phase==='done'){setStage('import');say(t('transfer.flow.waitForImport'))}}).catch(e=>failure(s,e));}
   else say(t('transfer.status.noneFound'));
   return;
  }
@@ -431,7 +450,7 @@ async function handleFrame(s,kind,blob){
   await account();live(s);
   const result=await reviewTransfer(blob,s.plan.reuse,await readTransferLibrary(scope),scope,location.origin);live(s);
   if(result.stories.length!==s.plan.count)throw Error('PROTOCOL');
-  s.archive=blob;s.phase='confirm';
+  s.archive=blob;s.phase='confirm';setStage('import');
   say(t('transfer.status.review',{count:result.stories.length,duplicates:s.plan.duplicates}));
   apply.hidden=false;apply.disabled=false;return;
  }
@@ -439,7 +458,7 @@ async function handleFrame(s,kind,blob){
   const result=await readJSON(blob);
   if(!Number.isSafeInteger(result.count)||result.count!==s.expected)throw Error('PROTOCOL');
   s.phase='complete';
-  await finish(s,t('transfer.status.doneOther',{count:result.count}));return;
+  await finish(s,t('transfer.status.doneOther',{count:result.count}),{completed:true});return;
  }
  throw Error('PROTOCOL');
 }
@@ -488,7 +507,7 @@ function attach(s,channel){
  if(s.channel)throw Error('PROTOCOL');
  s.channel=channel;markDiagnostic('CHANNEL_CREATED');
  const receiver=frameReceiver(channel,(kind,blob)=>{if(s.receiver===receiver)return handleFrame(s,kind,blob)},error=>{if(s.receiver===receiver&&!s.committing)failure(s,error)},(kind,n,total)=>{
-  if(kind==='archive')say(t('transfer.status.receiveProgress',{percent:Math.floor(n*100/total)}));
+  if(kind==='archive'&&active===s&&s.phase==='archive')say(t('transfer.status.receiveProgress',{percent:Math.floor(n*100/total)}));
  },(kind,bytes)=>{
   // Reject unexpected frames BEFORE allocating memory or OPFS. The
   // prior queued frame has completed protocol validation at this point.
@@ -507,7 +526,7 @@ function attach(s,channel){
   try{
    s.verification=await pairingVerificationCode(s.locator,s.offer,s.answer);live(s);
    await api('opened',s.locator);live(s);s.openRegistered=true;scheduleRepair(s);
-   markDiagnostic('VERIFICATION_READY');verifyCode.textContent=s.verification;verify.hidden=false;
+   markDiagnostic('VERIFICATION_READY');setStage('verify');verifyCode.textContent=s.verification;verify.hidden=false;
    say(t('transfer.status.verify'));approve.hidden=false;approve.disabled=false;
    // Keep temporary signaling available until the pair is finished or expires.
   }catch(e){failure(s,e)}
@@ -518,7 +537,7 @@ function attach(s,channel){
   if(active!==s||s.channel!==channel)return;markDiagnostic('CHANNEL_CLOSE');
   if(!s.verification&&!s.started)return; // bounded negotiation can still retry
   if(s.committing&&s.phase!=='complete')return;
-  if(s.phase==='complete')void finish(s,s.resultMessage||t('transfer.status.complete'));
+  if(s.phase==='complete')void finish(s,s.resultMessage||t('transfer.status.complete'),{completed:true});
   else if(s.replacing)return;
   else if(canReplace(s))requestReplacement(s);
   else failure(s,Error('NETWORK'));
@@ -526,7 +545,7 @@ function attach(s,channel){
 }
 async function startReceive(automatic){
  if(active||connecting)return;beginDiagnostic('receive');
- const run=++flow;connecting=true;receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;
+ const run=++flow;connecting=true;receive.disabled=send.disabled=receiveManual.disabled=true;setStage('connect');say(t('transfer.status.prepare'));
  let s;
  try{
   await account();const certificate=await createTransferCertificate();if(run!==flow)return;connecting=false;s=newSession('receive',certificate);say(t('transfer.status.prepare'));
@@ -578,8 +597,8 @@ function cancelDiscovery(){clearTimeout(discoveryTimer);discoveryTimer=null}
 async function discover(){
  cancelDiscovery();
  if(active||connecting||join.hidden||el('transfer-manual-send').open)return;
- if(Date.now()>=discoveryUntil){say(t('transfer.status.notFound'));return}
- const run=++flow;connecting=true;search.disabled=true;discovered=null;found.hidden=true;
+ if(Date.now()>=discoveryUntil){search.hidden=false;say(t('transfer.status.notFound'));return}
+ const run=++flow;connecting=true;search.disabled=true;search.hidden=true;discovered=null;found.hidden=true;
  closeCamera();say(t('transfer.status.search'));
  try{
   await account();if(run!==flow)return;
@@ -589,20 +608,20 @@ async function discover(){
    if(el('transfer-manual-send').open)return;
    markDiagnostic('DISCOVER_EMPTY');
    if(Date.now()<discoveryUntil){discoveryTimer=setTimeout(()=>void discover(),Math.min(discoveryDelay,discoveryUntil-Date.now()));discoveryDelay=Math.min(15000,discoveryDelay*2)}
-   else say(t('transfer.status.notFound'));
+   else{search.hidden=false;say(t('transfer.status.notFound'))}
    return
   }
   if(!invitation||Object.keys(invitation).sort().join()!=='code,secret'||typeof invitation.code!=='string'||typeof invitation.secret!=='string'||!/^[a-f0-9]{32}$/.test(invitation.code)||!/^[a-f0-9]{20}$/.test(invitation.secret)||(await codeHash(invitation.secret)).slice(0,32)!==invitation.code)throw Error('PAIR');
   if(run!==flow)return;discovered=invitation;diagnosticLocator(invitation.code);markDiagnostic('DISCOVER_FOUND');found.hidden=false;say(t('transfer.status.found'));
   if(!el('transfer-manual-send').open){connecting=false;void connect(invitation.secret,invitation.code)}
- }catch(e){if(run===flow){markDiagnostic('DISCOVER_ERROR');say(t('transfer.status.searchFailed'))}}
+ }catch(e){if(run===flow){markDiagnostic('DISCOVER_ERROR');search.hidden=false;say(t('transfer.status.searchFailed'))}}
  finally{if(run===flow){connecting=false;search.disabled=false}}
 }
 send.addEventListener('click',()=>{
- if(active||connecting)return;beginDiagnostic('send');join.hidden=false;stop.hidden=false;receive.disabled=send.disabled=receiveManual.disabled=true;discoveryUntil=Date.now()+INVITATION_TTL;discoveryDelay=2000;void discover();
+ if(active||connecting)return;beginDiagnostic('send');setStage('connect');join.hidden=false;receive.disabled=send.disabled=receiveManual.disabled=true;discoveryUntil=Date.now()+INVITATION_TTL;discoveryDelay=2000;void discover();
 });
 search.addEventListener('click',()=>{el('transfer-manual-send').open=false;discoveryUntil=Date.now()+INVITATION_TTL;discoveryDelay=2000;void discover()});
-el('transfer-manual-send').addEventListener('toggle',()=>{if(el('transfer-manual-send').open)cancelDiscovery()});
+el('transfer-manual-send').addEventListener('toggle',()=>{if(el('transfer-manual-send').open){cancelDiscovery();search.hidden=false}});
 scanButton.addEventListener('click',()=>{
  if(active||connecting||join.hidden)return;
  scanButton.disabled=true;scanStop.hidden=false;void scan.start();
@@ -649,12 +668,12 @@ connectFound.addEventListener('click',()=>{if(discovered)void connect(discovered
 approve.addEventListener('click',async()=>{
  const s=active;if(!s||s.approved||!s.verification)return;approve.disabled=true;
  try{await account();live(s);s.approved=true;markDiagnostic('APPROVED');if(s.role==='send'&&s.otherReady)s.phase='inventory';
-  await sendJSON(s,'ready',{ready:true});say(t('transfer.status.waitConfirm'));await maybeStart(s);
+  approve.hidden=true;say(t('transfer.status.waitConfirm'));await sendJSON(s,'ready',{ready:true});await maybeStart(s);
  }catch(e){failure(s,e)}
 });
 apply.addEventListener('click',async()=>{
  const s=active;if(!s||s.phase!=='confirm')return;
- apply.disabled=true;stop.disabled=true;s.committing=true;clearTimeout(s.timer);
+ apply.disabled=true;stop.disabled=true;s.committing=true;setStage('saving');say(t('transfer.status.committing'));clearTimeout(s.timer);
  try{
   await account();live(s);say(t('transfer.status.committing'));
   const result=await commitTransfer(s.archive,s.plan.reuse,scope,location.origin,{confirmed:true});

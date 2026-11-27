@@ -167,6 +167,11 @@ try{
     try{
      mark(step+' wait for direct channel');
      await Promise.all([sender.locator('#transfer-approve').waitFor({state:'visible',timeout:forced?65000:25000}),receiver.locator('#transfer-approve').waitFor({state:'visible',timeout:forced?65000:25000})]);
+     for(const page of [sender,receiver]){
+      assert.equal(await page.locator('#transfer-choice').isVisible(),false);
+      assert.equal(await page.locator('#backup-file-actions').isVisible(),false);
+      assert.equal(await page.locator('#transfer-step').innerText(),'3. Bevestig de beveiligingscode');
+     }
      const receiverCode=await receiver.locator('#transfer-verify-code').innerText();
      assert.match(receiverCode,/^\d{4} \d{4}$/);
      assert.equal(receiverCode,await sender.locator('#transfer-verify-code').innerText());
@@ -192,14 +197,26 @@ try{
      await receiver.locator('#transfer-approve').click();
      if(count){
       await receiver.locator('#transfer-import').waitFor({state:'visible',timeout:30000});
+      assert.equal(await receiver.locator('#transfer-step').innerText(),'5. Herinneringen toevoegen');
+      assert.equal(await receiver.locator('#transfer-verify').isVisible(),false);
+      assert.equal(await receiver.locator('#transfer-approve').isVisible(),false);
+      assert.equal(await sender.locator('#transfer-import').isVisible(),false);
       assert.equal((await bounded(step+' inspect before commit',()=>inspect(receiver))).stories.length,before);
       await receiver.locator('#transfer-import').click();
      }
      mark(step+' verify receipt');
      await sender.locator('#transfer-status').filter({hasText:count+' herinneringen toegevoegd en gecontroleerd'}).waitFor({timeout:30000});
-     await receiver.locator('#transfer-receive').waitFor({state:'visible'});
-     await receiver.waitForFunction(()=>!document.getElementById('transfer-receive').disabled);
+     await receiver.locator('#transfer-return').waitFor({state:'visible'});
      assert.deepEqual(await bounded(step+' inspect receiver',()=>inspect(receiver)),await bounded(step+' inspect sender',()=>inspect(sender)));
+     for(const page of [sender,receiver]){
+      await page.locator('#transfer-return').waitFor({state:'visible'});
+      assert.equal(await page.locator('#transfer-step').innerText(),'Overdracht afgerond');
+      assert.equal(await page.locator('#transfer-cancel').isVisible(),false);
+      assert.equal(await page.locator('#transfer-import').isVisible(),false);
+      await page.locator('#transfer-restart').click();
+      assert.equal(await page.locator('#transfer-choice').isVisible(),true);
+      assert.equal(await page.locator('#backup-file-actions').isVisible(),true);
+     }
     }catch(e){console.error('TALERA_TRANSFER_BROWSER_FAILURE',checkpoint,e.message);for(const [role,page] of [['sender',sender],['receiver',receiver]]){try{console.error(role,await bounded(step+' '+role+' status',()=>page.locator('#transfer-status').textContent({timeout:2000}),3000))}catch{}}throw e}
    }
    if(mixed){

@@ -75,6 +75,9 @@ test('actual frozen GeoNames data: digest, actual locations, cross-country and r
  const lookup=createOfflineLocalityResolver(data);
  assert.equal(lookup(gps(51.98000,5.91111),'NL'),'Arnhem');
  assert.equal(lookup(gps(51.6225,5.43194),'NL'),'Schijndel');
+ // Published GeoNames public place-centre test coordinates, not owner photo GPS.
+ assert.equal(lookup(gps(45.08268,13.63457),'HR'),'Rovinj');
+ assert.equal(lookup(gps(47.79941,13.04399),'AT'),'Salzburg');
  assert.equal(lookup(gps(51.98000,5.91111),'HR'),null);
  assert.equal(lookup(gps(47.074,12.695),'AT'),null); // high mountain, no nearby populated centre
  assert.equal(lookup(gps(0,-150),'NL'),null);

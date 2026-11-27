@@ -115,12 +115,15 @@ test('cancelled location consent or navigation ignores late fixes and late provi
 test('country list is local and translated; every new independent location key exists in all five languages',()=>{
  const regions=new Set(codes);assert.equal(regions.size,codes.length);assert.ok(codes.length>=195);
  const keys=Object.keys(languageCatalog.nl).filter(x=>x.startsWith('core.editor.location.'));
- assert.equal(keys.length,50);
+ assert.equal(keys.length,51);
+ assert.ok(keys.includes('core.editor.location.nearby'));
  for(const language of ['nl','en','de','fr','es']){
   const rows=localizedCountryRows(codes,language);assert.equal(rows.length,codes.length);
   assert.ok(rows.every(x=>x.code&&x.name!==x.code&&x.name));
   assert.equal(filterCountryRows(rows,'FR',language).some(x=>x.code==='FR'),true);
   assert.ok(keys.every(k=>languageCatalog[language][k]));
+  assert.match(languageCatalog[language]['core.editor.location.nearby'],/\{city\}/);
+  assert.equal(languageCatalog[language]['core.editor.location.nearby'],languageCatalog[language]['core.present.captureOfflineNear']);
  }
  assert.equal(filterCountryRows(localizedCountryRows(codes,'nl'),'belgie','nl')[0].code,'BE');
  assert.equal(localizedCountryRows(codes,'fr').find(x=>x.code==='NL').name,'Pays-Bas');
@@ -142,6 +145,8 @@ test('actual editor package contains one mount and ordered inputs; legacy stored
   assert.equal(html.split('...manualLocationPatch(existing,input,taleraLocationCountryCodes)').length,3);
   assert.equal(html.split('applyPhotoLocationInputs(files,input.photoLocations,taleraLocationCountryCodes)').length,2);
   assert.equal(html.split('resolveCountry:createOfflineCountryResolver(').length,2,'One offline location resolver on the existing page');
+  assert.equal(html.split('resolveLocality:createOfflineLocalityLoader(').length,2,'One locality extension on the existing page');
+  assert.match(html,/<link rel="talera-offline-locality" href="\/__talera_free\/places-[a-f0-9]{64}\.bin">/);
   assert.ok(html.includes('v5-no-country')&&!html.includes('/*TALERA_GEONAMES_ENABLED*/false'),'Current recognition must not wait for provider configuration');
   if(route==='/tell'){
    if(process.env.CI)assert.ok(html.includes("className='talera-memory-location'"),'Actual packaged editor control missing');

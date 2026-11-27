@@ -882,6 +882,51 @@ async function testTimelineLoupe(){
       assert.equal(home.status(),200,'Real PWA offline home returned unavailable 503');
       assert.equal(await home.headerValue('x-talera-offline'),'verified-device-shell',
         'Real offline home did not use encrypted device shell');
+      // The SAME disconnected Worker regression also verifies the frozen
+      // location data, not merely navigator.onLine or a simulated resolver.
+      const cachedPlaces=await offlinePage.evaluate(async()=>{
+        const href=document.querySelector('link[rel="talera-offline-locality"]')?.getAttribute('href');
+        if(!href)throw Error('Missing packaged offline places link');
+        const response=await fetch(href,{credentials:'omit',cache:'force-cache'});
+        const buffer=await response.arrayBuffer();
+        const hex=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer)),b=>b.toString(16).padStart(2,'0')).join('');
+        return {ok:response.ok,bytes:buffer.byteLength,digest:hex,href};
+      });
+      assert.equal(cachedPlaces.ok,true,'Public places index must remain cached after Worker disconnect');
+      assert.equal(cachedPlaces.bytes,5426386);
+      assert.equal(cachedPlaces.digest,'5f5e7a13226670435ce8ef028bc97f50542047b5e7bac0b7b3591aef24b737ae');
+      assert.ok(cachedPlaces.href.endsWith(cachedPlaces.digest+'.bin'));
+      console.log('TALERA_REAL_OFFLINE_LOCALITY_DATA_CACHE_DIGEST_PASS');
+      const offlinePlaces=await offlinePage.evaluate(async()=>{
+        const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+        const paint=canvas.getContext('2d');paint.fillStyle='#39ad72';paint.fillRect(0,0,64,64);
+        const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+        const original=new Uint8Array(await jpeg.arrayBuffer());
+        // Same local EXIF GPS fixture as the library contract, with real JPEG pixels.
+        const t=new Uint8Array(130),v=new DataView(t.buffer);
+        const u16=(i,n)=>v.setUint16(i,n,true),u32=(i,n)=>v.setUint32(i,n,true);
+        v.setUint16(0,0x4949);u16(2,42);u32(4,8);u16(8,1);
+        u16(10,0x8825);u16(12,4);u32(14,1);u32(18,26);u16(26,4);
+        function entry(i,tag,type,count,val){
+          const p=28+i*12;u16(p,tag);u16(p+2,type);u32(p+4,count);
+          if(type===2)t[p+8]=val.charCodeAt(0);else u32(p+8,val);
+        }
+        entry(0,1,2,2,'N');entry(1,2,5,3,82);
+        entry(2,3,2,2,'E');entry(3,4,5,3,106);
+        [51,58,48,5,54,40].forEach((n,i)=>{u32(82+i*8,n);u32(86+i*8,1)});
+        const len=2+6+t.length,marker=Uint8Array.from([255,225,len>>8,len&255,69,120,105,102,0,0,...t]);
+        const file=new File([original.subarray(0,2),marker,original.subarray(2)],'synthetic-gps.jpg',{type:'image/jpeg'});
+        const mem=window.TaleraMemories;
+        const signal=new AbortController().signal;
+        const first=await mem.inspectDraftCapturePlace(file,'photo',signal,true);
+        const second=await mem.inspectDraftCapturePlace(file,'photo',signal,false);
+        return {first,second};
+      });
+      assert.equal(offlinePlaces.first?.place?.source,'offline-country-v1');
+      assert.equal(offlinePlaces.first?.place?.countryCode,'NL');
+      assert.deepEqual(offlinePlaces.second,{state:'known',place:{countryCode:'NL',country:'Nederland',city:'Arnhem',source:'offline-locality-v1'},localityChecked:true});
+      console.log('TALERA_REAL_OFFLINE_LOCALITY_FROM_ORIGINAL_GPS_PASS');
+
       // Verify the ACTUAL existing "Bewaar een nieuw moment" entry.
       // Earlier tests called TaleraMemories.save directly; they could miss
       // a broken offline page transition from the owner's visible button.
@@ -1288,6 +1333,12 @@ async function testTimelineLoupe(){
     const isGeo=url=>{const u=new URL(url);return u.origin===origin&&u.pathname==='/api/capture-place'};
     geoCtx.on('request',request=>{if(isGeo(request.url()))observed.push(request.method())});
     await geoCtx.route(url=>isGeo(url.href),async route=>{sent.push(route.request().method());await route.abort()});
+    let releaseLocality;
+    const localityGate=new Promise(resolve=>{releaseLocality=resolve});
+    const localityRequests=[];
+    await geoCtx.route(url=>url.origin===origin&&/^\/__talera_free\/places-[a-f0-9]{64}\.bin$/.test(url.pathname),async route=>{
+      localityRequests.push(route.request().url());await localityGate;await route.continue();
+    });
     const country='Nederland',expectedPlace={countryCode:'NL',country,city:'Arnhem',source:'offline-locality-v1'},expectedLabel=country+' · omgeving Arnhem';
     const geoPage=await geoCtx.newPage(),geoErrors=[];
     geoPage.on('pageerror',error=>geoErrors.push(error.message));
@@ -1338,6 +1389,11 @@ async function testTimelineLoupe(){
     await geoPage.locator('.talera-location-toggle').click();
     await geoPage.locator('.talera-location-tile-label').filter({hasText:country}).waitFor({state:'visible',timeout:10000});
     assert.equal(await geoPage.locator('.talera-location-tile[data-location-state="unknown"]').count(),0,'Offline resolved GPS must not be classified as unknown');
+    assert.equal(await geoPage.locator('.talera-location-tile-label').innerText(),country,'Country must appear even while the optional places download is held');
+    releaseLocality();
+    await geoPage.locator('.talera-location-tile-label').filter({hasText:expectedLabel}).waitFor({state:'visible',timeout:30000});
+    assert.equal(localityRequests.length,1,'Only one places download for this document');
+    console.log('TALERA_OFFLINE_LOCALITY_COUNTRY_FIRST_CITY_SECOND_PASS');
 
     const saved=await geoPage.evaluate(async()=>{
       const mem=window.TaleraMemories;

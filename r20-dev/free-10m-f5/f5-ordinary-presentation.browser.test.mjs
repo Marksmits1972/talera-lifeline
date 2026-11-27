@@ -227,9 +227,27 @@ backupRegression: try{
     await worldPage.waitForFunction(()=>!!window.TaleraMemories?.inspectDraftCapturePlace);
     const baseline=await inspectWorldFixture(worldPage,{latitude:51.98,longitude:5.91111});
     assert.equal(baseline.second.place.city,'Arnhem');
-    await worldCtx.setOffline(true);
-    const offline=await inspectWorldFixture(worldPage,target.gps);
+    // WebKit's simulated offline switch also breaks reading newly generated
+    // canvas/blob fixtures (NotReadableError outside the application). Block
+    // every HTTP(S) request instead, keeping File APIs representative of a
+    // physically disconnected phone. Prove the block independently, then
+    // inspect a fresh File from the same already-verified original bytes.
+    const blockedRequests=[];
+    await worldCtx.route(/^https?:\/\//,async route=>{blockedRequests.push(route.request().url());await route.abort('internetdisconnected')});
+    const blocked=await worldPage.evaluate(async url=>{try{await fetch(url,{cache:'no-store'});return false}catch{return true}},origin+target.url);
+    assert.equal(blocked,true,'The disconnected browser must not reach even the public asset');
+    assert.ok(blockedRequests.includes(origin+target.url));blockedRequests.length=0;
+    if(!webkitPickerOnly)await worldCtx.setOffline(true);
+    const offline=await worldPage.evaluate(async bytes=>{
+     const file=new File([Uint8Array.from(bytes)],'world-offline-original.jpg',{type:'image/jpeg'});
+     const mem=window.TaleraMemories,signal=new AbortController().signal;
+     const first=await mem.inspectDraftCapturePlace(file,'photo',signal,true);
+     const second=await mem.inspectDraftCapturePlace(file,'photo',signal,false);
+     return {first,second};
+    },actual.bytes);
+    assert.deepEqual(offline.first.place,{countryCode:'NL',country:'Nederland',city:'',source:'offline-country-v1'});
     assert.deepEqual(offline.second.place,expected);
+    assert.equal(blockedRequests.filter(url=>url===origin+target.url).length,0,'Offline recognition must not even attempt an HTTP request for the public part');
     assert.equal(calls.length,1,'Cached part must not be downloaded for another photo or page');
     assert.equal(geoCalls.length,0);assert.deepEqual(worldErrors,[]);
     console.log('TALERA_WORLD_REAL_ORIGINAL_GPS_DIRECT_PUBLIC_CACHE_OFFLINE_PASS',JSON.stringify({webkit:webkitPickerOnly,place:target.name,bytes:target.bytes,networkRequests:calls.length,originalBytesPreserved:true}));

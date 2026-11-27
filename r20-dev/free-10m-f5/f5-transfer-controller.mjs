@@ -3,7 +3,7 @@ const CHANNEL_LABEL='talera-transfer-v2';
 // User-triggered transfer on the EXISTING private backup page only.
 import {readTransferLibrary,inventory,makeTransfer,reviewTransfer,commitTransfer} from './f5-transfer-library.mjs';
 import {newDirectPeer,gather,checkDirectSDP,sendFrame,frameReceiver,jsonBlob,readJSON,pairingVerificationCode,assertSameFingerprint,createTransferCertificate} from './f5-transfer-transport.mjs';
-import {newDiagnostic,safeCandidateKinds,diagnosticError,validDiagnosticEvents,INVITATION_TTL,VERIFICATION_TTL} from './f5-transfer-diagnostic.mjs';
+import {newDiagnostic,safeCandidateKinds,diagnosticError,validDiagnosticEvents,INVITATION_TTL,VERIFICATION_TTL,PAIR_STALE_MS} from './f5-transfer-diagnostic.mjs';
 import {drawPairingQR} from './f5-transfer-qr.mjs';
 import {pairingScanner} from './f5-transfer-scan.mjs';
 const el=id=>document.getElementById(id),scope=el('talera-free-backup')?.dataset.database;
@@ -49,7 +49,7 @@ function scheduleDiagnostic(d){
 function markDiagnostic(phase,detail=0){
  const d=diag;if(!d||!diagEnable.checked)return;
  // Routine polling must not exhaust the bounded diagnostic upload budget.
- if(['POLL_HTTP','DISCOVER_HTTP','DISCOVER_EMPTY','RETRYOFFER_HTTP'].includes(phase)){
+ if(['POLL_HTTP','DISCOVER_HTTP','DISCOVER_EMPTY','RETRYOFFER_HTTP','CREATE_BUSY'].includes(phase)){
   d.routine||=new Map();
   if(d.routine.get(phase)===detail)return;
   d.routine.set(phase,detail);
@@ -117,12 +117,52 @@ async function account(){
 async function api(action,locator,extra={}){
  markDiagnostic(action.toUpperCase()+'_BEGIN');
  const r=await fetch('/api/device-transfer',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
- headers:{'content-type':'application/json'},body:JSON.stringify({action,code:locator,...extra}),signal:AbortSignal.timeout(8000)});
+ headers:{'content-type':'application/json'},body:JSON.stringify({action,code:locator,...extra}),keepalive:action==='cancel',signal:AbortSignal.timeout(8000)});
  markDiagnostic(action.toUpperCase()+'_HTTP',r.status);
- if(!r.ok)throw Error('PAIR');
- return r.json();
+ if(!r.ok){
+  if(action==='create'&&r.status===409){
+   const busy=await r.json().catch(()=>null);
+   if(busy?.ok===false&&busy.reason==='PAIR_BUSY'&&Number.isSafeInteger(busy.retryAfterMs)&&busy.retryAfterMs>0&&busy.retryAfterMs<=PAIR_STALE_MS)return busy;
+  }
+  throw Error('PAIR');
+ }
+ const result=await r.json();
+ if(result?.ok===true&&active&&active.locator===locator&&action!=='cancel')active.lastSignalAt=Date.now();
+ return result;
 }
 function live(s){if(active!==s||s.closed)throw Error('STOPPED')}
+// Existing offer/repair polls already prove liveness. Only send a small
+// keep request when such traffic has stopped (e.g. after a successful repair).
+const KEEP_INTERVAL=30000;
+function scheduleKeep(s){
+ clearTimeout(s.keepTimer);
+ if(active!==s||s.closed)return;
+ s.keepTimer=setTimeout(async()=>{
+  if(active!==s||s.closed)return;
+  if(Date.now()-(s.lastSignalAt??0)>=KEEP_INTERVAL){
+   try{await api('keep',s.locator)}catch{/* temporary network error; existing transfer recovery remains authoritative */}
+  }
+  if(active===s&&!s.closed)scheduleKeep(s);
+ },KEEP_INTERVAL);
+}
+async function createInvitation(s,offer,signature,automatic){
+ const until=Date.now()+PAIR_STALE_MS+10000;
+ while(true){
+  live(s);
+  const result=await api('create',s.locator,{sdp:offer,proof:signature,...(automatic?{secret:s.secret}:{})});
+  if(active!==s){if(result?.ok===true)void api('cancel',s.locator).catch(()=>{});return false}
+  if(result?.ok===true){
+   if(result.retired===true)markDiagnostic('CREATE_STALE_RETIRED');
+   scheduleKeep(s);return true;
+  }
+  if(result?.reason!=='PAIR_BUSY'||!Number.isSafeInteger(result.retryAfterMs)||result.retryAfterMs<=0||result.retryAfterMs>PAIR_STALE_MS)throw Error('PAIR');
+  markDiagnostic('CREATE_BUSY');say(t('transfer.status.connecting'));
+  const remaining=until-Date.now();
+  if(remaining<=0)throw Error('PAIR');
+  await wait(Math.min(remaining,10000,Math.max(1000,result.retryAfterMs)));
+  live(s);await account();live(s);
+ }
+}
 function reset(){
  diagEnable.disabled=false;
  clearTimeout(discoveryTimer);discoveryTimer=null;flow++;connecting=false;el('transfer-connect').disabled=false;closeCamera();clearQR();
@@ -134,7 +174,7 @@ function reset(){
 async function finish(s,message,{signal=true}={}){
  if(active!==s)return;
  if(s.phase==='complete')markDiagnostic('TRANSFER_DONE');
- active=null;s.closed=true;clearTimeout(s.timer);clearTimeout(s.recoveryTimer);clearTimeout(s.repairPollTimer);
+ active=null;s.closed=true;clearTimeout(s.timer);clearTimeout(s.recoveryTimer);clearTimeout(s.repairPollTimer);clearTimeout(s.keepTimer);
  try{s.channel?.close()}catch{}try{s.peer?.close()}catch{}
  reset();say(message);
  if(signal&&s.locator){
@@ -495,8 +535,7 @@ async function startReceive(automatic){
   s.secret=code;s.locator=(await codeHash(code)).slice(0,32);live(s);
   markDiagnostic('LOCAL_OFFER_BEGIN');const offer=routeSDP(s,await gather(s.peer,await s.peer.createOffer()),'LOCAL');live(s);s.offer=offer;markDiagnostic('LOCAL_OFFER_OK');
   const signature=await proof(code,'offer',offer);live(s);
-  await api('create',s.locator,{sdp:offer,proof:signature,...(automatic?{secret:code}:{})});
-  if(active!==s){void api('cancel',s.locator).catch(()=>{});return}
+  if(!await createInvitation(s,offer,signature,automatic))return;
   diagnosticLocator(s.locator);markDiagnostic('CREATE_OK');
   pairManual.hidden=automatic;waiting.hidden=!automatic;pair.hidden=false;
   if(!automatic){
@@ -586,7 +625,7 @@ async function connect(code,expectedLocator=null){
   markDiagnostic('REMOTE_OFFER_BEGIN');await s.peer.setRemoteDescription({type:'offer',sdp:s.offer});live(s);markDiagnostic('REMOTE_OFFER_OK');
   markDiagnostic('LOCAL_ANSWER_BEGIN');const answer=routeSDP(s,await gather(s.peer,await s.peer.createAnswer()),'LOCAL');live(s);s.answer=answer;markDiagnostic('LOCAL_ANSWER_OK');
   const signature=await proof(code,'answer',answer);live(s);
-  await api('join',s.locator,{sdp:answer,proof:signature});live(s);markDiagnostic('JOIN_OK');if(!s.openHandled)timeout(s,65000);
+  await api('join',s.locator,{sdp:answer,proof:signature});live(s);scheduleKeep(s);markDiagnostic('JOIN_OK');if(!s.openHandled)timeout(s,65000);
   const retryUntil=Date.now()+35000;
   while(Date.now()<retryUntil){
    if(await awaitChannel(s,1500))return;

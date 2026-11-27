@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newDiagnostic,safeCandidateKinds,validDiagnosticEvents,diagnosticError,INVITATION_TTL} from './f5-transfer-diagnostic.mjs';
+import {newDiagnostic,safeCandidateKinds,validDiagnosticEvents,diagnosticError,INVITATION_TTL,PAIR_STALE_MS} from './f5-transfer-diagnostic.mjs';
 import {TransferSignaling,storedTransferSignal,expireTransferSignaling,TRANSFER_STORAGE_KEY} from './f5-transfer-signal.mjs';
 import {inventory,planTransfer,makeTransfer,reviewTransfer} from './f5-transfer-library.mjs';
 import {sendFrame,frameReceiver,pairingVerificationCode} from './f5-transfer-transport.mjs';
@@ -211,6 +211,14 @@ async function controllerFixture(successRoute,options={}){
  const schedule=(fn,ms)=>{const id=setTimeout(()=>{timers.delete(id);fn()},Math.max(1,Math.ceil(ms/25)));timers.add(id);return id};
  const clear=id=>{clearTimeout(id);timers.delete(id)};
  const signaling=new TransferSignaling(clock),actions=[],peers=[],frames=[];
+ if(options.abandoned){
+  const old='d'.repeat(32);
+  signaling.handle(sid,{action:'create',code:old,sdp,proof});
+  signaling.handle(other,{action:'join',code:old,sdp,proof});
+  signaling.handle(sid,{action:'opened',code:old});signaling.handle(other,{action:'opened',code:old});
+  signaling.handle(sid,{action:'active',code:old});signaling.handle(other,{action:'active',code:old});
+  signaling.state.activityAt=clock()-PAIR_STALE_MS+20000;
+ }
  let rejectDiagnostics=false,oldArchiveBytes=0,newArchiveBytes=0,reviewed=0;
  class Element extends EventTarget{
   constructor(hidden){super();this.hidden=hidden;this.disabled=false;this.checked=false;this.textContent='';this.value='';this.dataset={database:db};}
@@ -269,7 +277,8 @@ async function controllerFixture(successRoute,options={}){
    const cmd=JSON.parse(opts.body);actions.push([role,cmd.action]);
    if(rejectDiagnostics&&cmd.action==='diagnostic')return {ok:false,status:409};
    try{const result=cmd.action==='offer'?signaling.offer(session,cmd.code):signaling.handle(session,cmd);
-    return {ok:true,status:200,json:async()=>result};
+    const busy=cmd.action==='create'&&result.reason==='PAIR_BUSY';
+    return {ok:!busy,status:busy?409:200,json:async()=>result};
    }catch{return {ok:false,status:409}}
   };
   const context=vm.createContext({document,window,crypto,TextEncoder,ArrayBuffer,Uint8Array,Blob,AbortController,AbortSignal,
@@ -289,7 +298,7 @@ async function controllerFixture(successRoute,options={}){
  const start=async()=>{click(receiver,'transfer-receive');await waitFor(()=>visible(receiver,'transfer-pair'));
   click(sender,'transfer-send');await waitFor(()=>actions.some(a=>a[0]==='send'&&a[1]==='offer'))};
  const cancel=()=>{for(const page of [receiver,sender])if(visible(page,'transfer-cancel'))click(page,'transfer-cancel');for(const timer of timers)clearTimeout(timer)};
- return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames,metrics:()=>({oldArchiveBytes,newArchiveBytes,reviewed}),rejectDiagnostics:()=>{rejectDiagnostics=true}};
+ return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames,signaling,metrics:()=>({oldArchiveBytes,newArchiveBytes,reviewed}),rejectDiagnostics:()=>{rejectDiagnostics=true}};
 }
 for(const route of [0,1,null])test('controller orchestration: '+(route===null?'both routes fail safely':route?'local fails, one STUN attempt':'local succeeds without STUN'),async()=>{
  const f=await controllerFixture(route);
@@ -351,6 +360,87 @@ test('opened channel keeps confirmation available beyond previous two-minute lim
   await new Promise(r=>setTimeout(r,6500)); // simulated 162.5 seconds
   assert.ok(f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
   assert.equal(f.frames.length,0);
+ }finally{f.cancel()}
+});
+test('abandoned active pairing no longer blocks a new receive attempt for thirty minutes',()=>{
+ let now=10000;const signal=new TransferSignaling(()=>now),next='b'.repeat(32),third='d'.repeat(64);
+ const call=(session,action,extra={})=>signal.handle(session,{action,code,...extra});
+ call(sid,'create',{sdp,proof});call(other,'join',{sdp,proof});
+ call(sid,'opened');call(other,'opened');call(sid,'active');call(other,'active');
+ const report=[[0,'START',0],[50,'CHANNEL_OPEN',0]];
+ call(sid,'diagnostic',{role:'receive',events:report});
+ now+=PAIR_STALE_MS-1000;
+ assert.deepEqual(call(sid,'create',{code:next,sdp,proof}),{ok:false,reason:'PAIR_BUSY',retryAfterMs:1000});
+ assert.equal(signal.state.code,code);
+ // Only a valid participant request refreshes the lease; diagnostic reads
+ // and a third session cannot cause an abandoned attempt to remain reserved.
+ call(sid,'diagnostic',{role:'receive',events:[]});
+ assert.throws(()=>call(third,'keep'));
+ now+=1000;
+ assert.throws(()=>call(sid,'create',{code:next,sdp:sdp+'m=video 9 UDP\r\n',proof}));
+ assert.equal(signal.state.code,code);
+ assert.deepEqual(call(sid,'create',{code:next,sdp,proof,secret:'f'.repeat(20)}),{ok:true,retired:true});
+ assert.equal(signal.state.code,next);assert.equal(signal.state.expires,now+INVITATION_TTL);
+ assert.throws(()=>call(other,'cancel'));assert.throws(()=>call(sid,'repairPoll'));
+ assert.deepEqual(call(sid,'diagnostic',{role:'receive',events:[]}).reports.receive,report);
+ assert.equal(signal.diagnostic.expires,now+300000);
+ assert.deepEqual(signal.handle(other,{action:'discover'}).invitation,{code:next,secret:'f'.repeat(20)});
+});
+test('a live pairing, including one kept alive by only one current participant, cannot be replaced',()=>{
+ let now=10000;const signal=new TransferSignaling(()=>now),next='b'.repeat(32),third='d'.repeat(64);
+ const call=(session,action,extra={})=>signal.handle(session,{action,code,...extra});
+ call(sid,'create',{sdp,proof});call(other,'join',{sdp,proof});
+ call(sid,'opened');call(other,'opened');call(sid,'active');call(other,'active');
+ const expiry=signal.state.expires;
+ for(let i=0;i<8;i++){
+  now+=30000;call(i%2?sid:other,'keep');
+  const busy=call(third,'create',{code:next,sdp,proof});
+  assert.equal(busy.reason,'PAIR_BUSY');assert.equal(signal.state.code,code);
+ }
+ assert.equal(signal.state.expires,expiry,'liveness never extends the hard deadline');
+ now+=90000;call(other,'repairPoll');now+=100000;
+ assert.equal(call(sid,'create',{code:next,sdp,proof}).reason,'PAIR_BUSY');
+ call(other,'cancel');assert.deepEqual(call(sid,'create',{code:next,sdp,proof}),{ok:true});
+});
+test('persisted pre-upgrade pairing receives a full grace period instead of being overwritten',async()=>{
+ let now=10000,alarm=null;
+ const data=new Map([['account',{id:'unchanged'}]]);
+ const storage={transaction:async fn=>fn({get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),delete:async k=>data.delete(k),getAlarm:async()=>alarm,setAlarm:async n=>{alarm=n},deleteAlarm:async()=>{alarm=null}})};
+ const call=(session,command)=>storedTransferSignal(storage,session,command,now);
+ await call(sid,{action:'create',code,sdp,proof});await call(other,{action:'join',code,sdp,proof});
+ delete data.get(TRANSFER_STORAGE_KEY).state.activityAt;
+ now+=200000;const next='b'.repeat(32);
+ const req={action:'create',code:next,sdp,proof};
+ assert.equal((await call(sid,req)).retryAfterMs,PAIR_STALE_MS);
+ assert.equal(data.get(TRANSFER_STORAGE_KEY).state.activityAt,now);
+ now+=PAIR_STALE_MS-1;assert.equal((await call(sid,req)).reason,'PAIR_BUSY');
+ now+=1;assert.deepEqual(await call(sid,req),{ok:true,retired:true});
+ assert.equal(data.get(TRANSFER_STORAGE_KEY).state.code,next);
+ assert.deepEqual(data.get('account'),{id:'unchanged'});
+});
+test('controller waits on explicit busy response, then creates and connects the same attempt automatically',async()=>{
+ const f=await controllerFixture(0,{abandoned:true});
+ try{
+  f.click(f.receiver,'transfer-receive');
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('CREATE_BUSY'));
+  f.click(f.sender,'transfer-send');
+  await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  assert.ok(f.actions.filter(x=>x[1]==='create').length>=2);
+  assert.ok(f.receiver.get('transfer-diagnostic-report').textContent.includes('CREATE_STALE_RETIRED'));
+  assert.equal(f.frames.length,0,'the new pair still requires both explicit confirmations');
+ }finally{f.cancel()}
+});
+test('user can stop waiting on a blocked invitation without canceling the old pair',async()=>{
+ const f=await controllerFixture(0,{abandoned:true});
+ try{
+  f.click(f.receiver,'transfer-receive');
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('CREATE_BUSY'));
+  f.click(f.receiver,'transfer-cancel');
+  const attempts=f.actions.filter(x=>x[1]==='create').length;
+  await new Promise(r=>setTimeout(r,1000));
+  assert.equal(f.actions.filter(x=>x[1]==='create').length,attempts);
+  assert.equal(f.signaling.state.code,'d'.repeat(32));
+  assert.equal(f.receiver.get('transfer-receive').disabled,false);
  }finally{f.cancel()}
 });
 test('both failed routes leave the remote diagnostic accessible after cancellation',async()=>{

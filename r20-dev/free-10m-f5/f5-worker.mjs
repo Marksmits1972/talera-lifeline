@@ -1349,7 +1349,8 @@ export default {
               return deny(400,'Verbinding niet beschikbaar');
           }
           const sid=await shaHex(readSessionCookie(request));
-          return json(await accountHome(env,actor.id).transferSignal(sid,command));
+          const result=await accountHome(env,actor.id).transferSignal(sid,command);
+          return json(result,command?.action==='create'&&result?.reason==='PAIR_BUSY'?409:200);
         }catch{return deny(409,'Verbinding niet beschikbaar');}
       }
       if(p==='/api/capture-place')return capturePlaceApi(request,env,{getAccount:()=>sessionAccount(request,env),getScope:privateAccountScope});

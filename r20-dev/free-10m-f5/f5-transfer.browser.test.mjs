@@ -7,11 +7,12 @@ import {readFile} from 'node:fs/promises';
 import {chromium,webkit} from 'playwright';
 import {localBackupPage} from './f5-local-backup-page.mjs';
 import {TransferSignaling} from './f5-transfer-signal.mjs';
+import {PAIR_STALE_MS} from './f5-transfer-diagnostic.mjs';
 import {privateAccountScope} from './f5-local-scope.mjs';
 const account='12345678-1234-4123-8123-123456789abc';
 const scope='talera-free-local-'+(await privateAccountScope(account)).slice(0,32)+'-v1';
 const assets=new Set(['backup-controller.mjs','f5-portable-idb.mjs','f5-portable-archive.mjs','f5-library-persistence.mjs','f5-transfer-controller.mjs','f5-transfer-library.mjs','f5-transfer-transport.mjs','f5-transfer-diagnostic.mjs','f5-transfer-qr.mjs','f5-transfer-scan.mjs','f5-transfer-jsqr.mjs']);
-let signal=new TransferSignaling(),networkPosts=0,diagnosticPosts=0,rejectJoin=false,routeRetries=0,routeRetryJoins=0;
+let signal=new TransferSignaling(),networkPosts=0,diagnosticPosts=0,rejectJoin=false,routeRetries=0,routeRetryJoins=0,busyCreates=0,retiredCreates=0;
 // Fail closed with an exact checkpoint, even if the Playwright protocol,
 // a browser-side promise or shutdown never resolves. No product behavior changed.
 let checkpoint='fixture initialization';
@@ -44,6 +45,8 @@ const server=createServer(async(req,res)=>{
    // No SDP, pairing secrets, media or personal data in diagnostics.
    console.log('TALERA_TRANSFER_BROWSER_SIGNAL',c.action);
    const result=c.action==='offer'?signal.offer(sid,c.code):signal.handle(sid,c);
+   if(c.action==='create'&&result.reason==='PAIR_BUSY'){res.statusCode=409;busyCreates++}
+   if(c.action==='create'&&result.retired===true)retiredCreates++;
    res.setHeader('content-type','application/json');res.end(JSON.stringify(result));return
   }
   if(req.url==='/__f5/backup'){res.setHeader('content-type','text/html');res.end(localBackupPage(scope));return}
@@ -215,7 +218,20 @@ try{
      console.log('TALERA_TRANSFER_DIAGNOSTIC_MIXED_ENGINE_FAILURE_VISIBLE_PASS');
     }finally{rejectJoin=false}
    }
-   await once(1,0);if(!mixed){await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2,true);}
+   if(engine===chromium){
+    // Reproduce the owner report on the same backup page: an old joined and
+    // active record with no running browser peer, followed by a new attempt.
+    const old='f'.repeat(32),sdp='v=0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n',proof='c'.repeat(64);
+    const call=(sid,action,extra={})=>signal.handle(sid.repeat(64),{action,code:old,...extra});
+    call('b','create',{sdp,proof});call('a','join',{sdp,proof});
+    call('b','opened');call('a','opened');call('b','active');call('a','active');
+    signal.state.activityAt=Date.now()-PAIR_STALE_MS+10000;
+    const busyBefore=busyCreates,retiredBefore=retiredCreates;
+    await once(1,0);
+    assert.ok(busyCreates>busyBefore);assert.equal(retiredCreates,retiredBefore+1);
+    console.log('TALERA_STALE_PAIR_RECOVERY_BROWSER_PASS',name);
+   }else await once(1,0);
+   if(!mixed){await bounded(name+' seed second story',()=>seed(sender,'local-two'));await once(1,1);await once(0,2,true);}
    if(engine===chromium){
     await bounded(name+' seed third story',()=>seed(sender,'local-three'));
     for(const page of [sender,receiver])await page.evaluate(()=>{window.__transferRouteFixture.enabled=true});

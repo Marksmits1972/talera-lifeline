@@ -1,8 +1,11 @@
-import {validDiagnosticEvents,DIAG_TTL,INVITATION_TTL,VERIFICATION_TTL} from './f5-transfer-diagnostic.mjs';
+import {validDiagnosticEvents,DIAG_TTL,INVITATION_TTL,VERIFICATION_TTL,PAIR_STALE_MS} from './f5-transfer-diagnostic.mjs';
 // Temporary, per-account signaling. No media or library data.
 const CODE=/^[a-f0-9]{32}$/;
 const HASH=/^[a-f0-9]{64}$/;
 const SECRET=/^[a-f0-9]{20}$/;
+// Retire only on a new, valid invitation request, never on a timer alone.
+// Allow the existing 90-second recovery window plus a safety margin.
+const ACTIVITY_WRITE_INTERVAL=10000;
 const err=()=>{throw Error('TALERA_PAIR_UNAVAILABLE')};
 const validSDP=(s,type)=>typeof s==='string'&&s.length<=12000&&s.startsWith('v=0')&&
  s.split(/\r?\n/).some(l=>l.startsWith('m=application '))&&
@@ -12,11 +15,24 @@ export class TransferSignaling {
  constructor(now=()=>Date.now()){this.now=now;this.state=null;this.nextCreate=0;this.diagnostic=null}
  prune(now=this.now()){
   if(this.state&&this.state.expires<=now)this.state=null;
+  // Older persisted invitations have no activity clock. Start a full grace
+  // window on first observation instead of declaring them abandoned.
+  if(this.state&&!Number.isSafeInteger(this.state.activityAt))this.state.activityAt=now;
   for(const key of ['repair','replacement'])if(this.state?.[key]?.expires<=now&&this.state[key].offer!==undefined)this.state[key]={expires:this.state[key].expires};
   if(this.diagnostic&&this.diagnostic.expires<=now)this.diagnostic=null;
   if(this.nextCreate<=now)this.nextCreate=0;
  }
  handle(session,command){
+  const result=this.handleCommand(session,command);
+  const st=this.state,now=this.now();
+  // Only successful, authorized pair traffic counts. Diagnostic and discovery
+  // reads must not keep an abandoned record alive. Coalesce durable writes.
+  if(result.ok&&st&&command.code===st.code&&
+     (st.owner===session||st.joiner===session)&&!['diagnostic','discover'].includes(command.action)&&
+     now-st.activityAt>=ACTIVITY_WRITE_INTERVAL)st.activityAt=now;
+  return result;
+ }
+ handleCommand(session,command){
   if(!HASH.test(session)||!command||typeof command!=='object'||Array.isArray(command))err();
   const {action,code,sdp,proof,secret}=command;
   const now=this.now();
@@ -50,21 +66,32 @@ export class TransferSignaling {
    // No device ID, account data, SDP or media is included in this discovery.
    return {ok:true,invitation:{code:st.code,secret:st.secret}};
   }
-  const fields={create:['action','code','sdp','proof'],join:['action','code','sdp','proof'],poll:['action','code'],cancel:['action','code'],retry:['action','code','sdp','proof'],retryOffer:['action','code'],retryJoin:['action','code','sdp','proof'],opened:['action','code'],active:['action','code'],repairRequest:['action','code'],repairPoll:['action','code'],repairOffer:['action','code','sdp','proof'],repairAnswer:['action','code','sdp','proof'],replaceRequest:['action','code'],replaceOffer:['action','code','sdp','proof'],replaceAnswer:['action','code','sdp','proof']};
+  const fields={create:['action','code','sdp','proof'],join:['action','code','sdp','proof'],poll:['action','code'],cancel:['action','code'],keep:['action','code'],retry:['action','code','sdp','proof'],retryOffer:['action','code'],retryJoin:['action','code','sdp','proof'],opened:['action','code'],active:['action','code'],repairRequest:['action','code'],repairPoll:['action','code'],repairOffer:['action','code','sdp','proof'],repairAnswer:['action','code','sdp','proof'],replaceRequest:['action','code'],replaceOffer:['action','code','sdp','proof'],replaceAnswer:['action','code','sdp','proof']};
   if(action==='create'&&Object.hasOwn(command,'secret')){
    if(typeof secret!=='string'||!SECRET.test(secret))err();
    fields.create.push('secret');
   }
   if(!Object.hasOwn(fields,action)||Object.keys(command).sort().join()!==fields[action].sort().join()||!CODE.test(code))err();
   if(action==='create'){
-   if(this.state||now<this.nextCreate||!validSDP(sdp,'offer')||!HASH.test(proof))err();
+   if(!validSDP(sdp,'offer')||!HASH.test(proof))err();
+   const old=this.state;
+   const remaining=Math.max(old?old.activityAt+PAIR_STALE_MS-now:0,this.nextCreate-now);
+   if(remaining>0)return {ok:false,reason:'PAIR_BUSY',retryAfterMs:Math.min(PAIR_STALE_MS,remaining)};
+   if(old?.code===code)err();
+   // A prior attempt is retired atomically with creation of the new locator;
+   // late requests using the old locator cannot cancel or modify the new one.
+   if(old&&this.diagnostic?.code===old.code)this.diagnostic.expires=now+DIAG_TTL;
    this.nextCreate=now+3000;
-   this.state={code,owner:session,offer:{sdp,proof},expires:now+INVITATION_TTL,joiner:null,answer:null,route:0,secret:secret||null};
-   return {ok:true};
+   this.state={code,owner:session,offer:{sdp,proof},expires:now+INVITATION_TTL,joiner:null,answer:null,route:0,secret:secret||null,activityAt:now};
+   return old?{ok:true,retired:true}:{ok:true};
   }
   const st=this.state;
   if(!st||code!==st.code)err();
   const participant=st.owner===session?'receive':st.joiner===session?'send':null;
+  if(action==='keep'){
+   if(!participant)err();
+   return {ok:true};
+  }
   if(['opened','active','repairRequest','repairPoll','repairOffer','repairAnswer','replaceRequest','replaceOffer','replaceAnswer'].includes(action)){
    if(!participant||!st.joiner||(!st.answer&&!st.negotiated))err();
    if(action==='opened'){

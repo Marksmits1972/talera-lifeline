@@ -1,0 +1,2626 @@
+{
+  "archiveMemberDate": [
+    2026,
+    11,
+    27,
+    3,
+    47,
+    30
+  ],
+  "attribution": "GeoNames — https://www.geonames.org/",
+  "changes": "Selected modern populated places and separate travel features; quantized coordinates, one display name, country and latitude indexes, split immutable public parts; no personal data.",
+  "excluded": {
+    "historical_abandoned_destroyed": 61944,
+    "invalid_country_or_name": 136
+  },
+  "featureCounts": {
+    "H.LK": 310244,
+    "L.PRK": 90230,
+    "L.RESN": 3087,
+    "L.RESW": 688,
+    "P.": 1,
+    "P.PPL": 4717729,
+    "P.PPLA": 3476,
+    "P.PPLA2": 23379,
+    "P.PPLA3": 30524,
+    "P.PPLA4": 27379,
+    "P.PPLA5": 40,
+    "P.PPLC": 241,
+    "P.PPLF": 20538,
+    "P.PPLG": 9,
+    "P.PPLL": 177618,
+    "P.PPLR": 164,
+    "P.PPLS": 357,
+    "P.PPLX": 171417,
+    "P.STLMT": 226,
+    "S.HUT": 7735,
+    "S.HUTS": 85,
+    "S.RSRT": 6034,
+    "T.BCH": 16174,
+    "T.BCHS": 43,
+    "T.ISL": 166936,
+    "T.ISLS": 7729,
+    "T.MT": 423842,
+    "T.MTS": 29674,
+    "T.PASS": 45706,
+    "T.PK": 52320,
+    "T.VAL": 141224
+  },
+  "format": "TLPLC001",
+  "layers": {
+    "populated": {
+      "bytes": 107840955,
+      "countries": 248,
+      "parts": [
+        {
+          "bytes": 10320289,
+          "coverage": {
+            "AD": {
+              "maxLat": 42.62055,
+              "minLat": 42.44,
+              "records": 72
+            },
+            "AE": {
+              "maxLat": 26.05285,
+              "minLat": 22.83548,
+              "records": 2401
+            },
+            "AF": {
+              "maxLat": 38.45573,
+              "minLat": 29.42086,
+              "records": 31511
+            },
+            "AG": {
+              "maxLat": 17.68581,
+              "minLat": 16.99597,
+              "records": 190
+            },
+            "AI": {
+              "maxLat": 18.26168,
+              "minLat": 18.17186,
+              "records": 45
+            },
+            "AL": {
+              "maxLat": 42.60968,
+              "minLat": 39.65,
+              "records": 4436
+            },
+            "AM": {
+              "maxLat": 41.28024,
+              "minLat": 38.86506,
+              "records": 1401
+            },
+            "AO": {
+              "maxLat": -4.4,
+              "minLat": -18.02078,
+              "records": 17139
+            },
+            "AQ": {
+              "maxLat": -62.0915,
+              "minLat": -80.41714,
+              "records": 32
+            },
+            "AR": {
+              "maxLat": -21.87065,
+              "minLat": -77.87418,
+              "records": 14854
+            },
+            "AS": {
+              "maxLat": -11.05528,
+              "minLat": -14.54313,
+              "records": 127
+            },
+            "AT": {
+              "maxLat": 49.01667,
+              "minLat": 46.43333,
+              "records": 20907
+            },
+            "AU": {
+              "maxLat": -9.23333,
+              "minLat": -43.56149,
+              "records": 19206
+            },
+            "AW": {
+              "maxLat": 12.60755,
+              "minLat": 12.41881,
+              "records": 172
+            },
+            "AX": {
+              "maxLat": 60.5258,
+              "minLat": 59.91667,
+              "records": 338
+            },
+            "AZ": {
+              "maxLat": 41.8377,
+              "minLat": 38.45169,
+              "records": 5067
+            },
+            "BA": {
+              "maxLat": 45.26907,
+              "minLat": 42.5657,
+              "records": 21416
+            },
+            "BB": {
+              "maxLat": 13.33426,
+              "minLat": 13.04792,
+              "records": 587
+            },
+            "BD": {
+              "maxLat": 26.62671,
+              "minLat": 20.60406,
+              "records": 49054
+            },
+            "BE": {
+              "maxLat": 51.50014,
+              "minLat": 49.5,
+              "records": 12658
+            },
+            "BF": {
+              "maxLat": 15.00406,
+              "minLat": 9.4295,
+              "records": 10423
+            },
+            "BG": {
+              "maxLat": 44.19269,
+              "minLat": 41.27165,
+              "records": 7152
+            },
+            "BH": {
+              "maxLat": 26.28417,
+              "minLat": 25.88333,
+              "records": 123
+            },
+            "BI": {
+              "maxLat": -2.327,
+              "minLat": -4.4532,
+              "records": 6977
+            },
+            "BJ": {
+              "maxLat": 12.40508,
+              "minLat": 6.2463,
+              "records": 3760
+            },
+            "BL": {
+              "maxLat": 17.91774,
+              "minLat": 17.88777,
+              "records": 29
+            },
+            "BM": {
+              "maxLat": 32.38167,
+              "minLat": 32.25164,
+              "records": 31
+            },
+            "BN": {
+              "maxLat": 5.03915,
+              "minLat": 4.23333,
+              "records": 365
+            },
+            "BO": {
+              "maxLat": -9.66667,
+              "minLat": -22.86119,
+              "records": 25772
+            },
+            "BQ": {
+              "maxLat": 17.643,
+              "minLat": 12.03333,
+              "records": 119
+            },
+            "BR": {
+              "maxLat": 4.76857,
+              "minLat": -33.73694,
+              "records": 72383
+            },
+            "BS": {
+              "maxLat": 27.25993,
+              "minLat": 20.94982,
+              "records": 353
+            },
+            "BT": {
+              "maxLat": 28.29989,
+              "minLat": 26.71667,
+              "records": 253
+            },
+            "BW": {
+              "maxLat": -17.80165,
+              "minLat": -26.9,
+              "records": 1819
+            },
+            "BY": {
+              "maxLat": 56.13706,
+              "minLat": 50.71667,
+              "records": 25565
+            },
+            "BZ": {
+              "maxLat": 18.48514,
+              "minLat": 15.90964,
+              "records": 522
+            },
+            "CA": {
+              "maxLat": 82.50169,
+              "minLat": 41.74306,
+              "records": 22071
+            },
+            "CC": {
+              "maxLat": -12.11645,
+              "minLat": -12.15681,
+              "records": 2
+            },
+            "CD": {
+              "maxLat": 5.35,
+              "minLat": -13.35,
+              "records": 37157
+            },
+            "CF": {
+              "maxLat": 10.463,
+              "minLat": 2.43333,
+              "records": 5694
+            },
+            "CG": {
+              "maxLat": 3.68333,
+              "minLat": -4.99889,
+              "records": 5781
+            },
+            "CH": {
+              "maxLat": 47.79817,
+              "minLat": 45.82053,
+              "records": 13185
+            },
+            "CI": {
+              "maxLat": 10.69417,
+              "minLat": 4.36413,
+              "records": 12072
+            },
+            "CK": {
+              "maxLat": -8.95873,
+              "minLat": -21.95045,
+              "records": 56
+            },
+            "CL": {
+              "maxLat": -17.55157,
+              "minLat": -55.07943,
+              "records": 6934
+            },
+            "CM": {
+              "maxLat": 12.86132,
+              "minLat": 2.01667,
+              "records": 14369
+            }
+          },
+          "file": "places-4298f9edc3597b0c2fffebb4c3691c7847e1683364e16113cb688164c7376d8b.bin",
+          "records": 474580,
+          "sha256": "4298f9edc3597b0c2fffebb4c3691c7847e1683364e16113cb688164c7376d8b"
+        },
+        {
+          "bytes": 18003509,
+          "coverage": {
+            "CN": {
+              "maxLat": 53.5,
+              "minLat": 16.83912,
+              "records": 899880
+            },
+            "CO": {
+              "maxLat": 13.38316,
+              "minLat": -4.21079,
+              "records": 35933
+            },
+            "CR": {
+              "maxLat": 11.21667,
+              "minLat": 8.0644,
+              "records": 5782
+            },
+            "CU": {
+              "maxLat": 23.19347,
+              "minLat": 19.84116,
+              "records": 16062
+            },
+            "CV": {
+              "maxLat": 17.20171,
+              "minLat": 14.8245,
+              "records": 2846
+            },
+            "CW": {
+              "maxLat": 12.38333,
+              "minLat": 12.01667,
+              "records": 100
+            },
+            "CX": {
+              "maxLat": -10.41517,
+              "minLat": -10.45719,
+              "records": 6
+            },
+            "CY": {
+              "maxLat": 35.59719,
+              "minLat": 34.63774,
+              "records": 807
+            },
+            "CZ": {
+              "maxLat": 51.03531,
+              "minLat": 48.56667,
+              "records": 16625
+            }
+          },
+          "file": "places-4da4d4a1b5f9af96490b479a9e4bb56a338ebe96ffd6cb9f1c3f2d82086d0397.bin",
+          "records": 978041,
+          "sha256": "4da4d4a1b5f9af96490b479a9e4bb56a338ebe96ffd6cb9f1c3f2d82086d0397"
+        },
+        {
+          "bytes": 15756313,
+          "coverage": {
+            "DE": {
+              "maxLat": 55.04463,
+              "minLat": 47.31636,
+              "records": 82352
+            },
+            "DJ": {
+              "maxLat": 12.645,
+              "minLat": 10.98914,
+              "records": 70
+            },
+            "DK": {
+              "maxLat": 57.72819,
+              "minLat": 54.56832,
+              "records": 7278
+            },
+            "DM": {
+              "maxLat": 15.6315,
+              "minLat": 15.21222,
+              "records": 132
+            },
+            "DO": {
+              "maxLat": 19.92074,
+              "minLat": 17.78178,
+              "records": 7938
+            },
+            "DZ": {
+              "maxLat": 37.075,
+              "minLat": 19.16667,
+              "records": 8312
+            },
+            "EC": {
+              "maxLat": 1.45051,
+              "minLat": -4.96667,
+              "records": 11457
+            },
+            "EE": {
+              "maxLat": 59.98333,
+              "minLat": 57.52139,
+              "records": 7089
+            },
+            "EG": {
+              "maxLat": 31.61166,
+              "minLat": -29.24722,
+              "records": 12080
+            },
+            "EH": {
+              "maxLat": 27.4625,
+              "minLat": 21.29987,
+              "records": 49
+            },
+            "ER": {
+              "maxLat": 17.97544,
+              "minLat": 12.43333,
+              "records": 1367
+            },
+            "ES": {
+              "maxLat": 43.77159,
+              "minLat": 27.64134,
+              "records": 30672
+            },
+            "ET": {
+              "maxLat": 14.77917,
+              "minLat": 3.50472,
+              "records": 11114
+            },
+            "FI": {
+              "maxLat": 70.08214,
+              "minLat": 59.78107,
+              "records": 29196
+            },
+            "FJ": {
+              "maxLat": -12.48134,
+              "minLat": -21.03286,
+              "records": 2241
+            },
+            "FK": {
+              "maxLat": -51.29086,
+              "minLat": -52.22074,
+              "records": 57
+            },
+            "FM": {
+              "maxLat": 10.08685,
+              "minLat": 1.07861,
+              "records": 466
+            },
+            "FO": {
+              "maxLat": 62.36651,
+              "minLat": 61.39376,
+              "records": 182
+            },
+            "FR": {
+              "maxLat": 51.07786,
+              "minLat": 41.36778,
+              "records": 81430
+            },
+            "GA": {
+              "maxLat": 2.29017,
+              "minLat": -3.89774,
+              "records": 3936
+            },
+            "GB": {
+              "maxLat": 60.82478,
+              "minLat": 34.58333,
+              "records": 43689
+            },
+            "GD": {
+              "maxLat": 12.52523,
+              "minLat": 11.99365,
+              "records": 300
+            },
+            "GE": {
+              "maxLat": 43.5826,
+              "minLat": 41.1597,
+              "records": 5372
+            },
+            "GF": {
+              "maxLat": 5.74601,
+              "minLat": 2.19635,
+              "records": 671
+            },
+            "GG": {
+              "maxLat": 49.72861,
+              "minLat": 49.41333,
+              "records": 262
+            },
+            "GH": {
+              "maxLat": 11.16861,
+              "minLat": 4.74607,
+              "records": 15964
+            },
+            "GI": {
+              "maxLat": 36.14711,
+              "minLat": 36.11397,
+              "records": 10
+            },
+            "GL": {
+              "maxLat": 80.0,
+              "minLat": 59.88333,
+              "records": 205
+            },
+            "GM": {
+              "maxLat": 13.81667,
+              "minLat": 13.07278,
+              "records": 2015
+            },
+            "GN": {
+              "maxLat": 12.63333,
+              "minLat": 7.21111,
+              "records": 6810
+            },
+            "GP": {
+              "maxLat": 16.53333,
+              "minLat": 15.84866,
+              "records": 1579
+            },
+            "GQ": {
+              "maxLat": 3.75578,
+              "minLat": -1.45833,
+              "records": 2048
+            },
+            "GR": {
+              "maxLat": 41.72048,
+              "minLat": 34.82023,
+              "records": 14999
+            },
+            "GS": {
+              "maxLat": -54.0085,
+              "minLat": -54.28298,
+              "records": 3
+            },
+            "GT": {
+              "maxLat": 17.81003,
+              "minLat": 9.49241,
+              "records": 16979
+            },
+            "GU": {
+              "maxLat": 13.58666,
+              "minLat": 13.25526,
+              "records": 127
+            },
+            "GW": {
+              "maxLat": 12.68333,
+              "minLat": 10.95,
+              "records": 3889
+            },
+            "GY": {
+              "maxLat": 8.26867,
+              "minLat": 1.35,
+              "records": 907
+            },
+            "HK": {
+              "maxLat": 22.55404,
+              "minLat": 22.16184,
+              "records": 1341
+            },
+            "HN": {
+              "maxLat": 16.51667,
+              "minLat": 13.005,
+              "records": 12965
+            },
+            "HR": {
+              "maxLat": 46.52802,
+              "minLat": 42.39258,
+              "records": 11530
+            },
+            "HT": {
+              "maxLat": 20.0802,
+              "minLat": 18.02472,
+              "records": 10945
+            },
+            "HU": {
+              "maxLat": 48.58333,
+              "minLat": 45.75,
+              "records": 16014
+            },
+            "ID": {
+              "maxLat": 5.89861,
+              "minLat": -10.934,
+              "records": 257596
+            },
+            "IE": {
+              "maxLat": 55.37694,
+              "minLat": 51.445,
+              "records": 12158
+            },
+            "IL": {
+              "maxLat": 33.27929,
+              "minLat": 29.54453,
+              "records": 1683
+            },
+            "IM": {
+              "maxLat": 54.3956,
+              "minLat": 54.06961,
+              "records": 44
+            }
+          },
+          "file": "places-717e1a81da8205886935b44d40214b849d2df10ec679ef614ff36abe3d8de4c1.bin",
+          "records": 737523,
+          "sha256": "717e1a81da8205886935b44d40214b849d2df10ec679ef614ff36abe3d8de4c1"
+        },
+        {
+          "bytes": 22132958,
+          "coverage": {
+            "IN": {
+              "maxLat": 35.33902,
+              "minLat": 6.80833,
+              "records": 549061
+            },
+            "IO": {
+              "maxLat": -6.66887,
+              "minLat": -7.28749,
+              "records": 3
+            },
+            "IQ": {
+              "maxLat": 37.35366,
+              "minLat": 29.10968,
+              "records": 22453
+            },
+            "IR": {
+              "maxLat": 59.64,
+              "minLat": 25.06704,
+              "records": 76972
+            },
+            "IS": {
+              "maxLat": 66.53938,
+              "minLat": 63.41944,
+              "records": 117
+            },
+            "IT": {
+              "maxLat": 47.05486,
+              "minLat": 35.49568,
+              "records": 62843
+            },
+            "JE": {
+              "maxLat": 49.25666,
+              "minLat": 49.16823,
+              "records": 85
+            },
+            "JM": {
+              "maxLat": 18.52178,
+              "minLat": 17.7424,
+              "records": 3639
+            },
+            "JO": {
+              "maxLat": 33.31405,
+              "minLat": 29.33337,
+              "records": 1753
+            },
+            "JP": {
+              "maxLat": 45.51638,
+              "minLat": 24.05954,
+              "records": 50767
+            },
+            "KE": {
+              "maxLat": 4.61667,
+              "minLat": -4.6771,
+              "records": 6956
+            },
+            "KG": {
+              "maxLat": 43.218,
+              "minLat": 39.46101,
+              "records": 2512
+            },
+            "KH": {
+              "maxLat": 14.4956,
+              "minLat": 10.43269,
+              "records": 11213
+            },
+            "KI": {
+              "maxLat": 4.69717,
+              "minLat": -2.77677,
+              "records": 192
+            },
+            "KM": {
+              "maxLat": -11.3675,
+              "minLat": -12.43333,
+              "records": 394
+            },
+            "KN": {
+              "maxLat": 17.41667,
+              "minLat": 17.11591,
+              "records": 129
+            },
+            "KP": {
+              "maxLat": 43.00361,
+              "minLat": 37.68333,
+              "records": 35052
+            },
+            "KR": {
+              "maxLat": 38.58333,
+              "minLat": 33.16667,
+              "records": 62729
+            },
+            "KW": {
+              "maxLat": 30.04219,
+              "minLat": 28.55417,
+              "records": 127
+            },
+            "KY": {
+              "maxLat": 19.75433,
+              "minLat": 19.26713,
+              "records": 80
+            },
+            "KZ": {
+              "maxLat": 55.40796,
+              "minLat": 40.60695,
+              "records": 13485
+            },
+            "LA": {
+              "maxLat": 22.43937,
+              "minLat": 13.93811,
+              "records": 13330
+            },
+            "LB": {
+              "maxLat": 34.67889,
+              "minLat": 33.07781,
+              "records": 3712
+            },
+            "LC": {
+              "maxLat": 14.09956,
+              "minLat": 13.71331,
+              "records": 337
+            },
+            "LI": {
+              "maxLat": 47.24788,
+              "minLat": 47.05913,
+              "records": 361
+            },
+            "LK": {
+              "maxLat": 9.83333,
+              "minLat": 5.91667,
+              "records": 17838
+            },
+            "LR": {
+              "maxLat": 8.53361,
+              "minLat": 4.35683,
+              "records": 6323
+            },
+            "LS": {
+              "maxLat": -28.56667,
+              "minLat": -30.572,
+              "records": 401
+            },
+            "LT": {
+              "maxLat": 56.44507,
+              "minLat": 53.90431,
+              "records": 20759
+            },
+            "LU": {
+              "maxLat": 50.18167,
+              "minLat": 49.45964,
+              "records": 692
+            },
+            "LV": {
+              "maxLat": 58.02556,
+              "minLat": 55.70753,
+              "records": 7745
+            },
+            "LY": {
+              "maxLat": 33.1485,
+              "minLat": 21.14356,
+              "records": 906
+            },
+            "MA": {
+              "maxLat": 36.61,
+              "minLat": 3.7,
+              "records": 46879
+            },
+            "MC": {
+              "maxLat": 43.7489,
+              "minLat": 43.72687,
+              "records": 14
+            },
+            "MD": {
+              "maxLat": 48.47118,
+              "minLat": 45.48167,
+              "records": 1813
+            },
+            "ME": {
+              "maxLat": 43.54528,
+              "minLat": 41.88083,
+              "records": 4015
+            },
+            "MF": {
+              "maxLat": 18.11049,
+              "minLat": 18.05669,
+              "records": 62
+            }
+          },
+          "file": "places-87ef9b007e69bbbf04af8d6d800634a09e9f04d83f8eb3793e6e61a4bfdd2dbd.bin",
+          "records": 1025749,
+          "sha256": "87ef9b007e69bbbf04af8d6d800634a09e9f04d83f8eb3793e6e61a4bfdd2dbd"
+        },
+        {
+          "bytes": 21527776,
+          "coverage": {
+            "MG": {
+              "maxLat": -11.96667,
+              "minLat": -25.9,
+              "records": 24173
+            },
+            "MH": {
+              "maxLat": 11.3509,
+              "minLat": 4.57762,
+              "records": 111
+            },
+            "MK": {
+              "maxLat": 42.36556,
+              "minLat": 40.87556,
+              "records": 2633
+            },
+            "ML": {
+              "maxLat": 22.67691,
+              "minLat": 10.21667,
+              "records": 15914
+            },
+            "MM": {
+              "maxLat": 28.23333,
+              "minLat": 9.98238,
+              "records": 54629
+            },
+            "MN": {
+              "maxLat": 51.55556,
+              "minLat": 41.98333,
+              "records": 1535
+            },
+            "MO": {
+              "maxLat": 22.20056,
+              "minLat": 22.11806,
+              "records": 9
+            },
+            "MP": {
+              "maxLat": 19.69177,
+              "minLat": 14.13269,
+              "records": 48
+            },
+            "MQ": {
+              "maxLat": 14.8778,
+              "minLat": 14.41121,
+              "records": 1294
+            },
+            "MR": {
+              "maxLat": 25.91778,
+              "minLat": 14.73794,
+              "records": 7635
+            },
+            "MS": {
+              "maxLat": 16.8183,
+              "minLat": 16.68524,
+              "records": 60
+            },
+            "MT": {
+              "maxLat": 36.07778,
+              "minLat": 35.81306,
+              "records": 287
+            },
+            "MU": {
+              "maxLat": -10.38803,
+              "minLat": -20.51667,
+              "records": 560
+            },
+            "MV": {
+              "maxLat": 6.98249,
+              "minLat": -0.7,
+              "records": 119
+            },
+            "MW": {
+              "maxLat": -9.38495,
+              "minLat": -17.13333,
+              "records": 7980
+            },
+            "MX": {
+              "maxLat": 32.71488,
+              "minLat": 14.5361,
+              "records": 300294
+            },
+            "MY": {
+              "maxLat": 7.35961,
+              "minLat": 0.33333,
+              "records": 21576
+            },
+            "MZ": {
+              "maxLat": -10.54278,
+              "minLat": -26.85111,
+              "records": 22676
+            },
+            "NA": {
+              "maxLat": -16.98503,
+              "minLat": -28.88949,
+              "records": 2909
+            },
+            "NC": {
+              "maxLat": -19.56667,
+              "minLat": -22.68333,
+              "records": 740
+            },
+            "NE": {
+              "maxLat": 22.65322,
+              "minLat": 11.71213,
+              "records": 13064
+            },
+            "NF": {
+              "maxLat": -29.02435,
+              "minLat": -29.05459,
+              "records": 4
+            },
+            "NG": {
+              "maxLat": 13.87722,
+              "minLat": 4.27843,
+              "records": 61351
+            },
+            "NI": {
+              "maxLat": 14.99741,
+              "minLat": 10.71667,
+              "records": 2630
+            },
+            "NL": {
+              "maxLat": 53.48025,
+              "minLat": 17.50375,
+              "records": 7783
+            },
+            "NO": {
+              "maxLat": 71.16667,
+              "minLat": 57.98333,
+              "records": 13804
+            },
+            "NP": {
+              "maxLat": 30.40964,
+              "minLat": 26.354,
+              "records": 87899
+            },
+            "NR": {
+              "maxLat": -0.50352,
+              "minLat": -0.55085,
+              "records": 15
+            },
+            "NU": {
+              "maxLat": -18.95,
+              "minLat": -19.12936,
+              "records": 50
+            },
+            "NZ": {
+              "maxLat": -34.45363,
+              "minLat": -50.7546,
+              "records": 3037
+            },
+            "OM": {
+              "maxLat": 26.36903,
+              "minLat": 16.65395,
+              "records": 5950
+            },
+            "PA": {
+              "maxLat": 10.31539,
+              "minLat": 7.20955,
+              "records": 13238
+            },
+            "PE": {
+              "maxLat": -0.11722,
+              "minLat": -18.3349,
+              "records": 47455
+            },
+            "PF": {
+              "maxLat": -8.81949,
+              "minLat": -27.61965,
+              "records": 406
+            },
+            "PG": {
+              "maxLat": -1.08333,
+              "minLat": -11.6408,
+              "records": 11546
+            },
+            "PH": {
+              "maxLat": 20.80473,
+              "minLat": 4.65442,
+              "records": 44370
+            },
+            "PK": {
+              "maxLat": 37.0365,
+              "minLat": 23.93333,
+              "records": 149327
+            },
+            "PL": {
+              "maxLat": 54.93333,
+              "minLat": 49.06582,
+              "records": 47719
+            },
+            "PM": {
+              "maxLat": 47.0975,
+              "minLat": 46.77914,
+              "records": 13
+            },
+            "PN": {
+              "maxLat": -25.06597,
+              "minLat": -25.06597,
+              "records": 1
+            },
+            "PR": {
+              "maxLat": 18.50633,
+              "minLat": 17.93802,
+              "records": 2475
+            },
+            "PS": {
+              "maxLat": 32.54346,
+              "minLat": 31.25864,
+              "records": 1238
+            },
+            "PT": {
+              "maxLat": 42.15178,
+              "minLat": 30.03392,
+              "records": 16610
+            },
+            "PW": {
+              "maxLat": 8.08228,
+              "minLat": 3.00488,
+              "records": 84
+            }
+          },
+          "file": "places-8dbc26827cf202f58c4498f34f3a646bb3f1a00b7c656b040cc4b00a675d753d.bin",
+          "records": 995251,
+          "sha256": "8dbc26827cf202f58c4498f34f3a646bb3f1a00b7c656b040cc4b00a675d753d"
+        },
+        {
+          "bytes": 20100110,
+          "coverage": {
+            "PY": {
+              "maxLat": -19.45,
+              "minLat": -27.48333,
+              "records": 6839
+            },
+            "QA": {
+              "maxLat": 26.13978,
+              "minLat": 24.7437,
+              "records": 261
+            },
+            "RE": {
+              "maxLat": -20.87774,
+              "minLat": -21.38443,
+              "records": 783
+            },
+            "RO": {
+              "maxLat": 48.25,
+              "minLat": 43.51667,
+              "records": 18241
+            },
+            "RS": {
+              "maxLat": 46.15389,
+              "minLat": 42.24595,
+              "records": 9509
+            },
+            "RU": {
+              "maxLat": 75.81301,
+              "minLat": 41.28413,
+              "records": 192160
+            },
+            "RW": {
+              "maxLat": -1.0625,
+              "minLat": -2.822,
+              "records": 10259
+            },
+            "SA": {
+              "maxLat": 32.49918,
+              "minLat": 16.41667,
+              "records": 5113
+            },
+            "SB": {
+              "maxLat": -6.59678,
+              "minLat": -12.30198,
+              "records": 2549
+            },
+            "SC": {
+              "maxLat": -4.29583,
+              "minLat": -10.12158,
+              "records": 52
+            },
+            "SD": {
+              "maxLat": 23.06667,
+              "minLat": 5.02396,
+              "records": 7881
+            },
+            "SE": {
+              "maxLat": 68.90553,
+              "minLat": 55.34337,
+              "records": 28468
+            },
+            "SG": {
+              "maxLat": 1.48265,
+              "minLat": 1.20639,
+              "records": 381
+            },
+            "SH": {
+              "maxLat": -7.92861,
+              "minLat": -37.06757,
+              "records": 20
+            },
+            "SI": {
+              "maxLat": 46.86084,
+              "minLat": 45.18333,
+              "records": 6581
+            },
+            "SJ": {
+              "maxLat": 78.92373,
+              "minLat": 70.9221,
+              "records": 11
+            },
+            "SK": {
+              "maxLat": 49.52721,
+              "minLat": 47.73892,
+              "records": 5038
+            },
+            "SL": {
+              "maxLat": 9.99594,
+              "minLat": 6.93262,
+              "records": 14385
+            },
+            "SM": {
+              "maxLat": 43.98333,
+              "minLat": 43.90346,
+              "records": 24
+            },
+            "SN": {
+              "maxLat": 16.66667,
+              "minLat": 12.33333,
+              "records": 11791
+            },
+            "SO": {
+              "maxLat": 11.96611,
+              "minLat": -1.63772,
+              "records": 4509
+            },
+            "SR": {
+              "maxLat": 5.93333,
+              "minLat": 2.11667,
+              "records": 527
+            },
+            "SS": {
+              "maxLat": 12.2048,
+              "minLat": 3.55,
+              "records": 5309
+            },
+            "ST": {
+              "maxLat": 1.69253,
+              "minLat": 0.00059,
+              "records": 563
+            },
+            "SV": {
+              "maxLat": 14.45,
+              "minLat": 13.16583,
+              "records": 4889
+            },
+            "SX": {
+              "maxLat": 18.0636,
+              "minLat": 18.01367,
+              "records": 62
+            },
+            "SY": {
+              "maxLat": 37.28161,
+              "minLat": 32.32355,
+              "records": 11601
+            },
+            "SZ": {
+              "maxLat": -25.74453,
+              "minLat": -27.31005,
+              "records": 703
+            },
+            "TC": {
+              "maxLat": 21.954,
+              "minLat": 21.31906,
+              "records": 41
+            },
+            "TD": {
+              "maxLat": 21.8375,
+              "minLat": 7.5136,
+              "records": 12275
+            },
+            "TF": {
+              "maxLat": -37.79509,
+              "minLat": -49.34916,
+              "records": 3
+            },
+            "TG": {
+              "maxLat": 11.10389,
+              "minLat": 6.12028,
+              "records": 4218
+            },
+            "TH": {
+              "maxLat": 20.45114,
+              "minLat": 5.66806,
+              "records": 87255
+            },
+            "TJ": {
+              "maxLat": 41.02329,
+              "minLat": 36.67907,
+              "records": 2763
+            },
+            "TK": {
+              "maxLat": -8.54212,
+              "minLat": -9.38516,
+              "records": 5
+            },
+            "TL": {
+              "maxLat": -8.13333,
+              "minLat": -9.47361,
+              "records": 3419
+            },
+            "TM": {
+              "maxLat": 42.71499,
+              "minLat": 35.23376,
+              "records": 1430
+            },
+            "TN": {
+              "maxLat": 37.33278,
+              "minLat": 30.97875,
+              "records": 2221
+            },
+            "TO": {
+              "maxLat": -15.56802,
+              "minLat": -21.38333,
+              "records": 149
+            },
+            "TR": {
+              "maxLat": 42.07657,
+              "minLat": 35.82077,
+              "records": 54855
+            },
+            "TT": {
+              "maxLat": 11.32859,
+              "minLat": 10.04732,
+              "records": 460
+            },
+            "TV": {
+              "maxLat": -5.67398,
+              "minLat": -10.791,
+              "records": 26
+            },
+            "TW": {
+              "maxLat": 26.36907,
+              "minLat": 21.89778,
+              "records": 16101
+            },
+            "TZ": {
+              "maxLat": -1.00111,
+              "minLat": -11.73333,
+              "records": 7758
+            },
+            "UA": {
+              "maxLat": 54.33333,
+              "minLat": 44.39312,
+              "records": 33333
+            },
+            "UG": {
+              "maxLat": 3.85723,
+              "minLat": -1.43657,
+              "records": 11455
+            },
+            "UM": {
+              "maxLat": 28.21222,
+              "minLat": 0.80776,
+              "records": 7
+            },
+            "US": {
+              "maxLat": 71.38556,
+              "minLat": 19.02086,
+              "records": 183980
+            },
+            "UY": {
+              "maxLat": -30.12703,
+              "minLat": -34.94747,
+              "records": 1088
+            },
+            "UZ": {
+              "maxLat": 45.13592,
+              "minLat": 37.20111,
+              "records": 8000
+            },
+            "VA": {
+              "maxLat": 41.90268,
+              "minLat": 41.90268,
+              "records": 1
+            },
+            "VC": {
+              "maxLat": 13.38132,
+              "minLat": 12.59309,
+              "records": 165
+            },
+            "VE": {
+              "maxLat": 12.2,
+              "minLat": 1.2394,
+              "records": 25525
+            },
+            "VG": {
+              "maxLat": 18.71983,
+              "minLat": 18.38504,
+              "records": 142
+            },
+            "VI": {
+              "maxLat": 18.37162,
+              "minLat": 17.68609,
+              "records": 222
+            },
+            "VN": {
+              "maxLat": 23.36667,
+              "minLat": 8.5963,
+              "records": 41500
+            },
+            "VU": {
+              "maxLat": -13.07708,
+              "minLat": -20.2491,
+              "records": 1907
+            },
+            "WF": {
+              "maxLat": -13.22173,
+              "minLat": -14.3502,
+              "records": 99
+            },
+            "WS": {
+              "maxLat": -13.44219,
+              "minLat": -14.04694,
+              "records": 408
+            },
+            "XK": {
+              "maxLat": 43.24135,
+              "minLat": 41.94444,
+              "records": 2598
+            },
+            "YE": {
+              "maxLat": 18.2,
+              "minLat": 12.18399,
+              "records": 81205
+            },
+            "YT": {
+              "maxLat": -12.68112,
+              "minLat": -13.0,
+              "records": 156
+            },
+            "ZA": {
+              "maxLat": -22.3,
+              "minLat": -46.87618,
+              "records": 13529
+            },
+            "ZM": {
+              "maxLat": -8.23333,
+              "minLat": -17.90152,
+              "records": 13045
+            },
+            "ZW": {
+              "maxLat": -15.7,
+              "minLat": -22.23333,
+              "records": 2101
+            }
+          },
+          "file": "places-cfc3b15cac8d4e4ed6eb65c44f14a163b514990eebda03fa637c0124613400b1.bin",
+          "records": 961954,
+          "sha256": "cfc3b15cac8d4e4ed6eb65c44f14a163b514990eebda03fa637c0124613400b1"
+        }
+      ],
+      "records": 5173098
+    },
+    "travel": {
+      "bytes": 31713074,
+      "countries": 250,
+      "parts": [
+        {
+          "bytes": 22348679,
+          "coverage": {
+            "AD": {
+              "maxLat": 42.65342,
+              "minLat": 42.43217,
+              "records": 376
+            },
+            "AE": {
+              "maxLat": 26.04443,
+              "minLat": 23.83333,
+              "records": 349
+            },
+            "AF": {
+              "maxLat": 38.48548,
+              "minLat": 29.38028,
+              "records": 16321
+            },
+            "AG": {
+              "maxLat": 20.73557,
+              "minLat": 16.93781,
+              "records": 58
+            },
+            "AI": {
+              "maxLat": 18.58996,
+              "minLat": 18.15715,
+              "records": 18
+            },
+            "AL": {
+              "maxLat": 42.65939,
+              "minLat": 39.65,
+              "records": 1645
+            },
+            "AM": {
+              "maxLat": 41.33331,
+              "minLat": 38.85828,
+              "records": 2469
+            },
+            "AN": {
+              "maxLat": 18.73333,
+              "minLat": 18.73333,
+              "records": 1
+            },
+            "AO": {
+              "maxLat": -4.5,
+              "minLat": -17.73333,
+              "records": 2797
+            },
+            "AQ": {
+              "maxLat": -60.5,
+              "minLat": -88.0,
+              "records": 8338
+            },
+            "AR": {
+              "maxLat": -21.78333,
+              "minLat": -67.57328,
+              "records": 8164
+            },
+            "AS": {
+              "maxLat": -14.0,
+              "minLat": -14.5475,
+              "records": 133
+            },
+            "AT": {
+              "maxLat": 49.0,
+              "minLat": 46.37333,
+              "records": 9795
+            },
+            "AU": {
+              "maxLat": 44.9076,
+              "minLat": -55.88238,
+              "records": 30333
+            },
+            "AW": {
+              "maxLat": 12.60569,
+              "minLat": 12.41719,
+              "records": 14
+            },
+            "AX": {
+              "maxLat": 60.66424,
+              "minLat": 59.75,
+              "records": 1742
+            },
+            "AZ": {
+              "maxLat": 43.135,
+              "minLat": 37.7,
+              "records": 1614
+            },
+            "BA": {
+              "maxLat": 45.22528,
+              "minLat": 42.55775,
+              "records": 7049
+            },
+            "BB": {
+              "maxLat": 13.27457,
+              "minLat": 13.0666,
+              "records": 22
+            },
+            "BD": {
+              "maxLat": 26.19191,
+              "minLat": 20.6,
+              "records": 222
+            },
+            "BE": {
+              "maxLat": 51.4089,
+              "minLat": 49.7561,
+              "records": 53
+            },
+            "BF": {
+              "maxLat": 14.99751,
+              "minLat": 10.63333,
+              "records": 25
+            },
+            "BG": {
+              "maxLat": 44.14029,
+              "minLat": 41.23333,
+              "records": 2107
+            },
+            "BH": {
+              "maxLat": 26.2922,
+              "minLat": 25.624,
+              "records": 36
+            },
+            "BI": {
+              "maxLat": -2.36306,
+              "minLat": -4.455,
+              "records": 574
+            },
+            "BJ": {
+              "maxLat": 11.2482,
+              "minLat": 6.49497,
+              "records": 19
+            },
+            "BL": {
+              "maxLat": 17.97352,
+              "minLat": 17.87433,
+              "records": 22
+            },
+            "BM": {
+              "maxLat": 32.38472,
+              "minLat": 32.24887,
+              "records": 129
+            },
+            "BN": {
+              "maxLat": 5.04197,
+              "minLat": 0.0,
+              "records": 41
+            },
+            "BO": {
+              "maxLat": -10.21667,
+              "minLat": -22.96667,
+              "records": 3906
+            },
+            "BQ": {
+              "maxLat": 17.6491,
+              "minLat": 12.06667,
+              "records": 34
+            },
+            "BR": {
+              "maxLat": 5.26667,
+              "minLat": -33.13333,
+              "records": 8920
+            },
+            "BS": {
+              "maxLat": 29.54722,
+              "minLat": 21.02457,
+              "records": 732
+            },
+            "BT": {
+              "maxLat": 28.28333,
+              "minLat": 26.78333,
+              "records": 59
+            },
+            "BV": {
+              "maxLat": -54.40917,
+              "minLat": -54.45278,
+              "records": 6
+            },
+            "BW": {
+              "maxLat": -17.81101,
+              "minLat": -25.25742,
+              "records": 56
+            },
+            "BY": {
+              "maxLat": 56.1043,
+              "minLat": 51.33051,
+              "records": 1657
+            },
+            "BZ": {
+              "maxLat": 18.46528,
+              "minLat": 15.89065,
+              "records": 279
+            },
+            "CA": {
+              "maxLat": 83.10224,
+              "minLat": 41.68338,
+              "records": 142105
+            },
+            "CC": {
+              "maxLat": -11.83062,
+              "minLat": -12.20107,
+              "records": 30
+            },
+            "CD": {
+              "maxLat": 42.49476,
+              "minLat": -13.15,
+              "records": 669
+            },
+            "CF": {
+              "maxLat": 49.26963,
+              "minLat": 3.55677,
+              "records": 159
+            },
+            "CG": {
+              "maxLat": 3.41667,
+              "minLat": -4.92917,
+              "records": 195
+            },
+            "CH": {
+              "maxLat": 47.78976,
+              "minLat": 45.7559,
+              "records": 11021
+            },
+            "CI": {
+              "maxLat": 10.27639,
+              "minLat": 4.68685,
+              "records": 196
+            },
+            "CK": {
+              "maxLat": -8.92206,
+              "minLat": -21.95124,
+              "records": 158
+            },
+            "CL": {
+              "maxLat": -17.56944,
+              "minLat": -56.52314,
+              "records": 10392
+            },
+            "CM": {
+              "maxLat": 13.01269,
+              "minLat": 2.29231,
+              "records": 736
+            },
+            "CN": {
+              "maxLat": 52.66667,
+              "minLat": 8.18272,
+              "records": 8308
+            },
+            "CO": {
+              "maxLat": 13.38819,
+              "minLat": -4.21472,
+              "records": 3670
+            },
+            "CR": {
+              "maxLat": 11.11667,
+              "minLat": 5.50969,
+              "records": 1426
+            },
+            "CU": {
+              "maxLat": 23.26761,
+              "minLat": 19.88359,
+              "records": 1701
+            },
+            "CV": {
+              "maxLat": 17.19535,
+              "minLat": 14.80826,
+              "records": 724
+            },
+            "CW": {
+              "maxLat": 12.3374,
+              "minLat": 11.99119,
+              "records": 21
+            },
+            "CX": {
+              "maxLat": -10.42382,
+              "minLat": -10.54357,
+              "records": 20
+            },
+            "CY": {
+              "maxLat": 35.70623,
+              "minLat": 34.68102,
+              "records": 255
+            },
+            "CZ": {
+              "maxLat": 51.01876,
+              "minLat": 48.05,
+              "records": 1071
+            },
+            "DE": {
+              "maxLat": 55.0355,
+              "minLat": 47.27533,
+              "records": 10167
+            },
+            "DJ": {
+              "maxLat": 12.57977,
+              "minLat": 10.98214,
+              "records": 686
+            },
+            "DK": {
+              "maxLat": 57.59187,
+              "minLat": 54.57119,
+              "records": 614
+            },
+            "DM": {
+              "maxLat": 15.6151,
+              "minLat": 15.22664,
+              "records": 44
+            },
+            "DO": {
+              "maxLat": 19.93169,
+              "minLat": 17.4759,
+              "records": 1330
+            },
+            "DZ": {
+              "maxLat": 37.085,
+              "minLat": 19.52088,
+              "records": 6610
+            },
+            "EC": {
+              "maxLat": 1.67814,
+              "minLat": -4.91667,
+              "records": 1239
+            },
+            "EE": {
+              "maxLat": 59.81778,
+              "minLat": 57.58222,
+              "records": 418
+            },
+            "EG": {
+              "maxLat": 31.59915,
+              "minLat": 21.72161,
+              "records": 1989
+            },
+            "EH": {
+              "maxLat": 27.26667,
+              "minLat": 20.93333,
+              "records": 34
+            },
+            "ER": {
+              "maxLat": 17.81667,
+              "minLat": 12.40616,
+              "records": 1822
+            },
+            "ES": {
+              "maxLat": 43.79061,
+              "minLat": 27.65271,
+              "records": 6276
+            },
+            "ET": {
+              "maxLat": 14.81917,
+              "minLat": 3.39835,
+              "records": 1733
+            },
+            "FI": {
+              "maxLat": 70.07052,
+              "minLat": 59.70554,
+              "records": 89290
+            },
+            "FJ": {
+              "maxLat": -12.46645,
+              "minLat": -21.03833,
+              "records": 1485
+            },
+            "FK": {
+              "maxLat": -50.99957,
+              "minLat": -52.91667,
+              "records": 271
+            },
+            "FM": {
+              "maxLat": 10.08904,
+              "minLat": 1.03708,
+              "records": 205
+            },
+            "FO": {
+              "maxLat": 62.38109,
+              "minLat": 61.39836,
+              "records": 374
+            },
+            "FR": {
+              "maxLat": 51.03333,
+              "minLat": 10.3,
+              "records": 7767
+            },
+            "GA": {
+              "maxLat": 2.16449,
+              "minLat": -3.53358,
+              "records": 319
+            },
+            "GB": {
+              "maxLat": 60.85387,
+              "minLat": 34.63333,
+              "records": 6001
+            },
+            "GD": {
+              "maxLat": 12.51879,
+              "minLat": 11.98698,
+              "records": 89
+            },
+            "GE": {
+              "maxLat": 43.55425,
+              "minLat": 41.16667,
+              "records": 1286
+            },
+            "GF": {
+              "maxLat": 5.7472,
+              "minLat": 2.24604,
+              "records": 179
+            },
+            "GG": {
+              "maxLat": 49.73333,
+              "minLat": 49.40111,
+              "records": 34
+            },
+            "GH": {
+              "maxLat": 10.78769,
+              "minLat": 4.79258,
+              "records": 109
+            },
+            "GI": {
+              "maxLat": 36.15313,
+              "minLat": 36.10907,
+              "records": 9
+            },
+            "GL": {
+              "maxLat": 83.66667,
+              "minLat": 59.81306,
+              "records": 3048
+            },
+            "GM": {
+              "maxLat": 13.71667,
+              "minLat": 13.268,
+              "records": 35
+            },
+            "GN": {
+              "maxLat": 12.3609,
+              "minLat": 7.36576,
+              "records": 487
+            },
+            "GP": {
+              "maxLat": 16.46667,
+              "minLat": 15.83626,
+              "records": 264
+            },
+            "GQ": {
+              "maxLat": 3.75908,
+              "minLat": -1.48333,
+              "records": 55
+            },
+            "GR": {
+              "maxLat": 41.55,
+              "minLat": 34.84184,
+              "records": 3585
+            },
+            "GS": {
+              "maxLat": -53.65,
+              "minLat": -59.46667,
+              "records": 229
+            },
+            "GT": {
+              "maxLat": 17.82891,
+              "minLat": 13.85312,
+              "records": 1587
+            },
+            "GU": {
+              "maxLat": 13.65418,
+              "minLat": 13.23721,
+              "records": 67
+            },
+            "GW": {
+              "maxLat": 12.29555,
+              "minLat": 10.86997,
+              "records": 121
+            },
+            "GY": {
+              "maxLat": 8.24801,
+              "minLat": 1.31667,
+              "records": 428
+            },
+            "HK": {
+              "maxLat": 22.55175,
+              "minLat": 22.155,
+              "records": 239
+            },
+            "HM": {
+              "maxLat": -52.91667,
+              "minLat": -53.2,
+              "records": 25
+            },
+            "HN": {
+              "maxLat": 17.41667,
+              "minLat": 13.00139,
+              "records": 2017
+            },
+            "HR": {
+              "maxLat": 46.49125,
+              "minLat": 42.37803,
+              "records": 2447
+            },
+            "HT": {
+              "maxLat": 20.05315,
+              "minLat": 18.06667,
+              "records": 844
+            },
+            "HU": {
+              "maxLat": 48.58333,
+              "minLat": 45.79083,
+              "records": 751
+            },
+            "ID": {
+              "maxLat": 6.07407,
+              "minLat": -10.98876,
+              "records": 27652
+            },
+            "IE": {
+              "maxLat": 55.43198,
+              "minLat": 51.44056,
+              "records": 3178
+            },
+            "IL": {
+              "maxLat": 33.33028,
+              "minLat": 29.49587,
+              "records": 1155
+            },
+            "IM": {
+              "maxLat": 54.4,
+              "minLat": 54.0532,
+              "records": 14
+            },
+            "IN": {
+              "maxLat": 35.72353,
+              "minLat": 6.85,
+              "records": 10184
+            },
+            "IO": {
+              "maxLat": -5.23343,
+              "minLat": -7.2481,
+              "records": 67
+            },
+            "IQ": {
+              "maxLat": 37.37898,
+              "minLat": 29.39373,
+              "records": 1478
+            },
+            "IR": {
+              "maxLat": 39.586,
+              "minLat": 25.25528,
+              "records": 68217
+            },
+            "IS": {
+              "maxLat": 67.14914,
+              "minLat": 63.3008,
+              "records": 3718
+            },
+            "IT": {
+              "maxLat": 47.09195,
+              "minLat": 35.49568,
+              "records": 10186
+            },
+            "JE": {
+              "maxLat": 49.29167,
+              "minLat": 49.16074,
+              "records": 17
+            },
+            "JM": {
+              "maxLat": 18.50802,
+              "minLat": 16.95,
+              "records": 271
+            },
+            "JO": {
+              "maxLat": 32.71044,
+              "minLat": 29.30796,
+              "records": 608
+            },
+            "JP": {
+              "maxLat": 45.52585,
+              "minLat": 20.41667,
+              "records": 7901
+            },
+            "KE": {
+              "maxLat": 4.63333,
+              "minLat": -4.71989,
+              "records": 1077
+            },
+            "KG": {
+              "maxLat": 42.98439,
+              "minLat": 39.23333,
+              "records": 1927
+            },
+            "KH": {
+              "maxLat": 14.43644,
+              "minLat": 9.92584,
+              "records": 1057
+            },
+            "KI": {
+              "maxLat": 4.67968,
+              "minLat": -10.06136,
+              "records": 76
+            },
+            "KM": {
+              "maxLat": -11.37194,
+              "minLat": -12.41669,
+              "records": 202
+            },
+            "KN": {
+              "maxLat": 17.36846,
+              "minLat": 17.11818,
+              "records": 17
+            },
+            "KP": {
+              "maxLat": 42.98633,
+              "minLat": 37.62111,
+              "records": 9738
+            },
+            "KR": {
+              "maxLat": 40.52414,
+              "minLat": 33.11769,
+              "records": 13417
+            },
+            "KW": {
+              "maxLat": 30.00167,
+              "minLat": 28.68025,
+              "records": 14
+            },
+            "KY": {
+              "maxLat": 19.75379,
+              "minLat": 19.26314,
+              "records": 29
+            },
+            "KZ": {
+              "maxLat": 55.42888,
+              "minLat": 40.98233,
+              "records": 5144
+            },
+            "LA": {
+              "maxLat": 22.439,
+              "minLat": 13.9434,
+              "records": 2747
+            },
+            "LB": {
+              "maxLat": 34.65,
+              "minLat": 33.08333,
+              "records": 1936
+            },
+            "LC": {
+              "maxLat": 14.10492,
+              "minLat": 13.72588,
+              "records": 76
+            },
+            "LI": {
+              "maxLat": 47.22516,
+              "minLat": 47.05272,
+              "records": 170
+            },
+            "LK": {
+              "maxLat": 9.7491,
+              "minLat": 5.93333,
+              "records": 594
+            },
+            "LR": {
+              "maxLat": 8.39056,
+              "minLat": 4.3668,
+              "records": 114
+            },
+            "LS": {
+              "maxLat": -28.6569,
+              "minLat": -30.66667,
+              "records": 283
+            },
+            "LT": {
+              "maxLat": 56.35053,
+              "minLat": 53.92225,
+              "records": 2422
+            },
+            "LU": {
+              "maxLat": 49.94222,
+              "minLat": 49.48229,
+              "records": 5
+            },
+            "LV": {
+              "maxLat": 58.02306,
+              "minLat": 55.7,
+              "records": 2425
+            },
+            "LY": {
+              "maxLat": 32.87357,
+              "minLat": 21.5,
+              "records": 369
+            },
+            "MA": {
+              "maxLat": 35.91953,
+              "minLat": 28.10788,
+              "records": 11789
+            },
+            "MC": {
+              "maxLat": 43.74656,
+              "minLat": 43.74466,
+              "records": 2
+            },
+            "MD": {
+              "maxLat": 48.16088,
+              "minLat": 45.60025,
+              "records": 38
+            },
+            "ME": {
+              "maxLat": 43.54778,
+              "minLat": 41.86417,
+              "records": 2867
+            },
+            "MF": {
+              "maxLat": 18.11936,
+              "minLat": 18.05053,
+              "records": 28
+            },
+            "MG": {
+              "maxLat": -11.95,
+              "minLat": -25.5,
+              "records": 1491
+            },
+            "MH": {
+              "maxLat": 14.6565,
+              "minLat": 4.5813,
+              "records": 468
+            },
+            "MK": {
+              "maxLat": 42.37282,
+              "minLat": 40.85614,
+              "records": 3727
+            },
+            "ML": {
+              "maxLat": 22.9928,
+              "minLat": 11.03901,
+              "records": 353
+            },
+            "MM": {
+              "maxLat": 28.35,
+              "minLat": 9.60974,
+              "records": 3062
+            },
+            "MN": {
+              "maxLat": 52.1,
+              "minLat": 41.63333,
+              "records": 1825
+            },
+            "MO": {
+              "maxLat": 22.21639,
+              "minLat": 22.12583,
+              "records": 16
+            },
+            "MP": {
+              "maxLat": 20.546,
+              "minLat": 14.12049,
+              "records": 81
+            },
+            "MQ": {
+              "maxLat": 14.878,
+              "minLat": 14.39059,
+              "records": 203
+            },
+            "MR": {
+              "maxLat": 25.58426,
+              "minLat": 15.06667,
+              "records": 212
+            },
+            "MS": {
+              "maxLat": 16.82079,
+              "minLat": 16.69047,
+              "records": 12
+            },
+            "MT": {
+              "maxLat": 36.07222,
+              "minLat": 35.78739,
+              "records": 36
+            },
+            "MU": {
+              "maxLat": -2.9,
+              "minLat": -20.50083,
+              "records": 191
+            },
+            "MV": {
+              "maxLat": 7.10479,
+              "minLat": -0.69448,
+              "records": 1219
+            },
+            "MW": {
+              "maxLat": -9.41667,
+              "minLat": -17.1,
+              "records": 645
+            },
+            "MX": {
+              "maxLat": 45.0,
+              "minLat": 14.66667,
+              "records": 37292
+            },
+            "MY": {
+              "maxLat": 7.37768,
+              "minLat": 0.86667,
+              "records": 3274
+            },
+            "MZ": {
+              "maxLat": -10.53333,
+              "minLat": -26.86667,
+              "records": 6349
+            },
+            "NA": {
+              "maxLat": -17.0389,
+              "minLat": -28.91667,
+              "records": 924
+            },
+            "NC": {
+              "maxLat": -18.01667,
+              "minLat": -22.9,
+              "records": 1285
+            },
+            "NE": {
+              "maxLat": 23.27477,
+              "minLat": 12.04074,
+              "records": 691
+            },
+            "NF": {
+              "maxLat": -29.01124,
+              "minLat": -29.11667,
+              "records": 6
+            },
+            "NG": {
+              "maxLat": 13.71243,
+              "minLat": 4.36691,
+              "records": 703
+            },
+            "NI": {
+              "maxLat": 14.98976,
+              "minLat": 10.71923,
+              "records": 517
+            },
+            "NL": {
+              "maxLat": 53.54115,
+              "minLat": 50.75455,
+              "records": 1058
+            },
+            "NO": {
+              "maxLat": 71.17326,
+              "minLat": 57.96305,
+              "records": 82711
+            },
+            "NP": {
+              "maxLat": 30.37842,
+              "minLat": 26.65,
+              "records": 2209
+            },
+            "NR": {
+              "maxLat": -0.52642,
+              "minLat": -0.5351,
+              "records": 3
+            },
+            "NU": {
+              "maxLat": -18.96241,
+              "minLat": -19.12676,
+              "records": 14
+            },
+            "NZ": {
+              "maxLat": 41.30028,
+              "minLat": -52.61667,
+              "records": 9301
+            },
+            "OM": {
+              "maxLat": 26.50388,
+              "minLat": 16.68632,
+              "records": 567
+            },
+            "PA": {
+              "maxLat": 9.64599,
+              "minLat": 7.21414,
+              "records": 2148
+            },
+            "PE": {
+              "maxLat": -1.38333,
+              "minLat": -18.28333,
+              "records": 25259
+            },
+            "PF": {
+              "maxLat": -7.86138,
+              "minLat": -27.8931,
+              "records": 1163
+            },
+            "PG": {
+              "maxLat": -0.75498,
+              "minLat": -11.61525,
+              "records": 2601
+            },
+            "PH": {
+              "maxLat": 21.11177,
+              "minLat": 4.58985,
+              "records": 5412
+            },
+            "PK": {
+              "maxLat": 37.05249,
+              "minLat": 24.10278,
+              "records": 9901
+            },
+            "PL": {
+              "maxLat": 54.83333,
+              "minLat": 49.00232,
+              "records": 2514
+            },
+            "PM": {
+              "maxLat": 46.99694,
+              "minLat": 46.77769,
+              "records": 14
+            },
+            "PN": {
+              "maxLat": -23.91828,
+              "minLat": -25.24966,
+              "records": 11
+            },
+            "PR": {
+              "maxLat": 18.51078,
+              "minLat": 17.88219,
+              "records": 1445
+            },
+            "PS": {
+              "maxLat": 32.46612,
+              "minLat": 31.37406,
+              "records": 91
+            },
+            "PT": {
+              "maxLat": 42.07909,
+              "minLat": 30.03228,
+              "records": 2224
+            },
+            "PW": {
+              "maxLat": 8.168,
+              "minLat": 2.913,
+              "records": 114
+            },
+            "PY": {
+              "maxLat": -20.25,
+              "minLat": -27.53333,
+              "records": 265
+            },
+            "QA": {
+              "maxLat": 26.17735,
+              "minLat": 24.74972,
+              "records": 31
+            },
+            "RE": {
+              "maxLat": -20.0,
+              "minLat": -21.37958,
+              "records": 347
+            },
+            "RO": {
+              "maxLat": 48.5,
+              "minLat": 43.65096,
+              "records": 3972
+            },
+            "RS": {
+              "maxLat": 46.09107,
+              "minLat": 41.87722,
+              "records": 3113
+            },
+            "RU": {
+              "maxLat": 81.79422,
+              "minLat": 41.25797,
+              "records": 45559
+            },
+            "RW": {
+              "maxLat": -1.2677,
+              "minLat": -2.8119,
+              "records": 269
+            },
+            "SA": {
+              "maxLat": 31.54413,
+              "minLat": 16.40685,
+              "records": 1320
+            },
+            "SB": {
+              "maxLat": -5.02979,
+              "minLat": -12.29284,
+              "records": 1466
+            },
+            "SC": {
+              "maxLat": -3.72077,
+              "minLat": -10.21667,
+              "records": 127
+            }
+          },
+          "file": "places-f24d6e42e7d88e76883c130e765fd54ffdbfba2ee7d4afa23e25836dc686388a.bin",
+          "records": 912601,
+          "sha256": "f24d6e42e7d88e76883c130e765fd54ffdbfba2ee7d4afa23e25836dc686388a"
+        },
+        {
+          "bytes": 9364395,
+          "coverage": {
+            "SD": {
+              "maxLat": 23.18333,
+              "minLat": 9.58333,
+              "records": 2475
+            },
+            "SE": {
+              "maxLat": 69.04588,
+              "minLat": 55.33333,
+              "records": 19006
+            },
+            "SG": {
+              "maxLat": 1.46361,
+              "minLat": 1.15989,
+              "records": 133
+            },
+            "SH": {
+              "maxLat": -7.93333,
+              "minLat": -40.3699,
+              "records": 94
+            },
+            "SI": {
+              "maxLat": 46.75472,
+              "minLat": 45.46667,
+              "records": 386
+            },
+            "SJ": {
+              "maxLat": 80.82758,
+              "minLat": 70.83333,
+              "records": 2221
+            },
+            "SK": {
+              "maxLat": 49.59625,
+              "minLat": 47.74694,
+              "records": 1663
+            },
+            "SL": {
+              "maxLat": 9.90472,
+              "minLat": 6.92673,
+              "records": 353
+            },
+            "SM": {
+              "maxLat": 43.93119,
+              "minLat": 43.93119,
+              "records": 1
+            },
+            "SN": {
+              "maxLat": 16.61026,
+              "minLat": 12.39083,
+              "records": 96
+            },
+            "SO": {
+              "maxLat": 11.92731,
+              "minLat": -1.65872,
+              "records": 1078
+            },
+            "SR": {
+              "maxLat": 5.9474,
+              "minLat": 2.41667,
+              "records": 163
+            },
+            "SS": {
+              "maxLat": 12.2,
+              "minLat": 3.60077,
+              "records": 548
+            },
+            "ST": {
+              "maxLat": 1.72545,
+              "minLat": -0.01197,
+              "records": 222
+            },
+            "SV": {
+              "maxLat": 14.43333,
+              "minLat": 13.15861,
+              "records": 508
+            },
+            "SX": {
+              "maxLat": 18.05067,
+              "minLat": 18.01806,
+              "records": 12
+            },
+            "SY": {
+              "maxLat": 37.09174,
+              "minLat": 32.35257,
+              "records": 2046
+            },
+            "SZ": {
+              "maxLat": -25.71785,
+              "minLat": -27.31287,
+              "records": 288
+            },
+            "TC": {
+              "maxLat": 21.96099,
+              "minLat": 21.16667,
+              "records": 67
+            },
+            "TD": {
+              "maxLat": 22.5,
+              "minLat": 7.5,
+              "records": 1032
+            },
+            "TF": {
+              "maxLat": -11.5163,
+              "minLat": -50.01405,
+              "records": 613
+            },
+            "TG": {
+              "maxLat": 10.88333,
+              "minLat": 6.26667,
+              "records": 116
+            },
+            "TH": {
+              "maxLat": 20.40861,
+              "minLat": 5.61321,
+              "records": 8487
+            },
+            "TJ": {
+              "maxLat": 41.02661,
+              "minLat": 36.81,
+              "records": 574
+            },
+            "TK": {
+              "maxLat": -8.53426,
+              "minLat": -9.44303,
+              "records": 32
+            },
+            "TL": {
+              "maxLat": -8.15306,
+              "minLat": -9.45333,
+              "records": 1728
+            },
+            "TM": {
+              "maxLat": 42.63156,
+              "minLat": 35.21667,
+              "records": 522
+            },
+            "TN": {
+              "maxLat": 37.55742,
+              "minLat": 30.52882,
+              "records": 1133
+            },
+            "TO": {
+              "maxLat": -15.59404,
+              "minLat": -22.33333,
+              "records": 247
+            },
+            "TR": {
+              "maxLat": 42.09276,
+              "minLat": 31.93617,
+              "records": 7766
+            },
+            "TT": {
+              "maxLat": 11.36116,
+              "minLat": 10.12092,
+              "records": 107
+            },
+            "TV": {
+              "maxLat": -5.6475,
+              "minLat": -10.78873,
+              "records": 44
+            },
+            "TW": {
+              "maxLat": 26.38157,
+              "minLat": 20.69992,
+              "records": 2739
+            },
+            "TZ": {
+              "maxLat": -1.0,
+              "minLat": -11.33333,
+              "records": 594
+            },
+            "UA": {
+              "maxLat": 52.33207,
+              "minLat": 43.5,
+              "records": 980
+            },
+            "UG": {
+              "maxLat": 4.12831,
+              "minLat": -1.43333,
+              "records": 701
+            },
+            "UM": {
+              "maxLat": 28.228,
+              "minLat": -0.375,
+              "records": 42
+            },
+            "US": {
+              "maxLat": 71.38431,
+              "minLat": 18.91106,
+              "records": 303424
+            },
+            "UY": {
+              "maxLat": -30.10217,
+              "minLat": -35.02709,
+              "records": 378
+            },
+            "UZ": {
+              "maxLat": 45.43333,
+              "minLat": 37.23972,
+              "records": 420
+            },
+            "VC": {
+              "maxLat": 13.37895,
+              "minLat": 12.53716,
+              "records": 80
+            },
+            "VE": {
+              "maxLat": 28.41433,
+              "minLat": 0.8,
+              "records": 6613
+            },
+            "VG": {
+              "maxLat": 18.73129,
+              "minLat": 18.31803,
+              "records": 65
+            },
+            "VI": {
+              "maxLat": 18.41412,
+              "minLat": 17.68145,
+              "records": 341
+            },
+            "VN": {
+              "maxLat": 23.13333,
+              "minLat": 7.89184,
+              "records": 4456
+            },
+            "VU": {
+              "maxLat": -13.13333,
+              "minLat": -20.25179,
+              "records": 539
+            },
+            "WF": {
+              "maxLat": -13.18501,
+              "minLat": -14.35,
+              "records": 50
+            },
+            "WS": {
+              "maxLat": -13.45022,
+              "minLat": -14.07286,
+              "records": 100
+            },
+            "XK": {
+              "maxLat": 43.26775,
+              "minLat": 41.8775,
+              "records": 1083
+            },
+            "YE": {
+              "maxLat": 18.15,
+              "minLat": 12.12044,
+              "records": 4176
+            },
+            "YT": {
+              "maxLat": -12.64162,
+              "minLat": -13.00214,
+              "records": 121
+            },
+            "ZA": {
+              "maxLat": -22.19631,
+              "minLat": -46.9596,
+              "records": 7318
+            },
+            "ZM": {
+              "maxLat": -6.0,
+              "minLat": -18.05,
+              "records": 561
+            },
+            "ZW": {
+              "maxLat": -15.6,
+              "minLat": -22.1,
+              "records": 608
+            }
+          },
+          "file": "places-0df6401f35ba64b99373d4eaba055853d8c25e8e425da14e2c21daf2d9f86db7.bin",
+          "records": 389150,
+          "sha256": "0df6401f35ba64b99373d4eaba055853d8c25e8e425da14e2c21daf2d9f86db7"
+        }
+      ],
+      "records": 1301751
+    }
+  },
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "rawRows": 13484539,
+  "source": "https://download.geonames.org/export/dump/allCountries.zip",
+  "sourceBytes": 422571429,
+  "sourceSha256": "6a0850259892fa149f51a1ae0204d1654b1db7739886ef88127b986931d9dcd5"
+}

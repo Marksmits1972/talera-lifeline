@@ -77,7 +77,7 @@ def make_parts(root,kind,counts,output):
     flush()
     assert sum(p['records'] for p in parts)==sum(counts.values())
     return parts
-def build(archive,output,fixture=False):
+def build(archive,output,fixture=False,exclude_districts=False):
     t=time.monotonic();output.mkdir(parents=True,exist_ok=True)
     source_sha=digest(archive)
     counts={k:collections.Counter() for k in ('populated','travel')}
@@ -104,6 +104,8 @@ def build(archive,output,fixture=False):
                         lat,lon=float(fields[4]),float(fields[5])
                         if not (math.isfinite(lat) and math.isfinite(lon) and -90<=lat<=90 and -180<=lon<=180):
                             reasons['invalid_coordinates']+=1;continue
+                        if exclude_districts and fc=='P' and code in {'PPLX',''}:
+                            reasons['non_independent_settlement_or_unknown']+=1;continue
                         raw_name=fields[1]
                         k=(kind,cc)
                         if k not in handles: handles[k]=(root/f'{kind}-{cc}.tmp').open('wb')
@@ -122,11 +124,12 @@ def build(archive,output,fixture=False):
             layers[kind]={'records':sum(counts[kind].values()),'countries':len(counts[kind]),'bytes':sum(x['bytes'] for x in parts),'parts':parts}
         meta={'format':'TLPLC001','source':SOURCE,'sourceSha256':source_sha,'sourceBytes':archive.stat().st_size,'archiveMemberDate':list(member.date_time),'rawRows':all_rows,
             'license':'CC BY 4.0','attribution':'GeoNames — https://www.geonames.org/','licenseUrl':'https://creativecommons.org/licenses/by/4.0/',
-            'changes':'Selected modern populated places and separate travel features; quantized coordinates, one display name, country and latitude indexes, split immutable public parts; no personal data.',
+            'changes':'Selected modern populated places and separate travel features; '+('excluded sections of populated places (PPLX) and unclassified populated points from recognition; ' if exclude_districts else '')+'quantized coordinates, one display name, country and latitude indexes, split immutable public parts; no personal data.',
+            'settlementPolicy':'independent-settlement-v1' if exclude_districts else 'modern-populated-v1',
             'excluded':dict(reasons),'featureCounts':dict(sorted(codes.items())),'layers':layers}
         (output/'world-manifest.json').write_text(json.dumps(meta,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
         summary={k:{x:y for x,y in v.items() if x!='parts'}|{'parts':len(v['parts']),'maxPartBytes':max((p['bytes'] for p in v['parts']),default=0),'multiPartCountries':sorted(cc for cc in counts[k] if sum(cc in p['coverage'] for p in v['parts'])>1)} for k,v in layers.items()}
         print('TALERA_GEONAMES_WORLD_DATA_MEASURED',json.dumps({'sourceBytes':meta['sourceBytes'],'sourceSha256':source_sha,'rawRows':all_rows,'archiveMemberDate':meta['archiveMemberDate'],'excluded':meta['excluded'],'features':meta['featureCounts'],'layers':summary,'seconds':round(time.monotonic()-t,3)},ensure_ascii=False),flush=True)
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('archive',type=pathlib.Path);p.add_argument('output',type=pathlib.Path);p.add_argument('--fixture',action='store_true')
-    a=p.parse_args();build(a.archive,a.output,a.fixture)
+    p=argparse.ArgumentParser();p.add_argument('archive',type=pathlib.Path);p.add_argument('output',type=pathlib.Path);p.add_argument('--fixture',action='store_true');p.add_argument('--exclude-districts',action='store_true')
+    a=p.parse_args();build(a.archive,a.output,a.fixture,a.exclude_districts)

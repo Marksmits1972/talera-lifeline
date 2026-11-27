@@ -19,6 +19,68 @@ permissions:
   actions: read
 
 jobs:
+  f5_world_settlement_selection:
+    name: Verify independent settlements from exact frozen GeoNames source, same TALERA Free, no publish
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pin the original verified source and exclude only explicitly unsuitable place categories
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = d1002ac0fabde1fd4777be09b7008632e9f1fb6b
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 2 --max-time 600 --max-filesize 1000000000 https://download.geonames.org/export/dump/allCountries.zip -o "$RUNNER_TEMP/world.zip"
+          echo "6a0850259892fa149f51a1ae0204d1654b1db7739886ef88127b986931d9dcd5  $RUNNER_TEMP/world.zip" | sha256sum -c -
+          src=r20-dev/free-10m-f5
+          python3 "$src/f5-offline-world-data-build.py" "$RUNNER_TEMP/world.zip" "$RUNNER_TEMP/settlements" --exclude-districts
+          node "$src/f5-offline-world-data-benchmark.mjs" "$RUNNER_TEMP/settlements" "$src/f5-offline-locality-data.bin"
+      - name: Verify exact counts and unchanged separate geographic layer
+        run: |
+          set -euo pipefail
+          python3 - <<'PYDATA'
+          import os, pathlib, json, hashlib
+          prior=pathlib.Path("r20-dev/free-10m-f5/f5-world-data")
+          current=pathlib.Path(os.environ['RUNNER_TEMP'])/'settlements'
+          a=json.loads((prior/'world-manifest.json').read_text())
+          b=json.loads((current/'world-manifest.json').read_text())
+          assert a['sourceSha256']==b['sourceSha256']
+          assert b['settlementPolicy']=='independent-settlement-v1'
+          assert b['layers']['populated']['records']==a['layers']['populated']['records']-a['featureCounts']['P.PPLX']-a['featureCounts']['P.']
+          assert b['excluded']['non_independent_settlement_or_unknown']==a['featureCounts']['P.PPLX']+a['featureCounts']['P.']
+          assert b['layers']['travel']==a['layers']['travel']
+          assert all(p['bytes']<24*1024*1024 for p in b['layers']['populated']['parts'])
+          print('TALERA_WORLD_SETTLEMENT_POLICY_VERIFIED',b['layers']['populated']['records'],b['excluded']['non_independent_settlement_or_unknown'])
+          PYDATA
+      - name: Freeze exact filtered public selection in same source branch, preserving previous frozen commit
+        run: |
+          set -euo pipefail
+          root=r20-dev/free-10m-f5/f5-world-settlement-data
+          mkdir "$root"
+          cp "$RUNNER_TEMP/settlements/world-manifest.json" "$root/"
+          python3 - <<'PYDATA'
+          import os, pathlib, json, shutil
+          root=pathlib.Path('r20-dev/free-10m-f5/f5-world-settlement-data')
+          m=json.loads((root/'world-manifest.json').read_text())
+          for p in m['layers']['populated']['parts']:
+            shutil.copyfile(pathlib.Path(os.environ['RUNNER_TEMP'])/'settlements'/p['file'],root/p['file'])
+          PYDATA
+          git add "$root"
+          git diff --cached --name-only
+          test -z "$(git diff --cached --name-only | grep -v '^r20-dev/free-10m-f5/f5-world-settlement-data/' || true)"
+          test "$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)" = "$GITHUB_SHA"
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Freeze exact independent settlement selection; previous GeoNames data unchanged; no deploy'
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          echo "TALERA_WORLD_INDEPENDENT_SETTLEMENT_DATA_COMMIT=$(git rev-parse HEAD)"
+
   f5_freeze_global_geonames_data:
     name: Freeze exact verified public GeoNames data in the existing Free branch, no deploy
     if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'freeze-TALERA-free-verified-global-geonames-data-20261127' }}
@@ -116,7 +178,7 @@ jobs:
 
   f5_candidate_package:
     name: Build and archive the exact TALERA Free candidate once
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -172,7 +234,7 @@ jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -221,7 +283,7 @@ jobs:
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
     needs: f5_candidate_package
-    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127') }}
+    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -1907,7 +1969,7 @@ jobs:
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -2071,7 +2133,7 @@ jobs:
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:

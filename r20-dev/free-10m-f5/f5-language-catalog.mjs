@@ -2,6 +2,13 @@
 // Each interface position has its own independently editable key across the five languages.
 export const languageCatalog=Object.freeze({
  "nl": {
+  "core.topicSearch.toggle": "Zoek op meer kenmerken",
+  "core.topicSearch.choose": "Kies één of meer kenmerken",
+  "core.topicSearch.open": "Bekijk herinneringen",
+  "core.topicSearch.zero": "Geen herinneringen met deze combinatie.",
+  "core.topicSearch.one": "1 herinnering",
+  "core.topicSearch.many": "{count} herinneringen",
+  "core.topicSearch.back": "Terug naar Mijn leven",
   "common.back": "Terug",
   "common.close": "Sluiten",
   "common.done": "Klaar",
@@ -1311,6 +1318,13 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Handmatig ingevuld"
  },
  "en": {
+  "core.topicSearch.toggle": "Search by more characteristics",
+  "core.topicSearch.choose": "Choose one or more characteristics",
+  "core.topicSearch.open": "View memories",
+  "core.topicSearch.zero": "No memories match this combination.",
+  "core.topicSearch.one": "1 memory",
+  "core.topicSearch.many": "{count} memories",
+  "core.topicSearch.back": "Back to My life",
   "common.back": "Back",
   "common.close": "Close",
   "common.done": "Done",
@@ -2620,6 +2634,13 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Entered manually"
  },
  "de": {
+  "core.topicSearch.toggle": "Nach weiteren Merkmalen suchen",
+  "core.topicSearch.choose": "Wähle ein oder mehrere Merkmale",
+  "core.topicSearch.open": "Erinnerungen ansehen",
+  "core.topicSearch.zero": "Keine Erinnerungen mit dieser Kombination.",
+  "core.topicSearch.one": "1 Erinnerung",
+  "core.topicSearch.many": "{count} Erinnerungen",
+  "core.topicSearch.back": "Zurück zu Mein Leben",
   "common.back": "Zurück",
   "common.close": "Schließen",
   "common.done": "Fertig",
@@ -3929,6 +3950,13 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Manuell eingegeben"
  },
  "fr": {
+  "core.topicSearch.toggle": "Rechercher par d’autres caractéristiques",
+  "core.topicSearch.choose": "Choisis une ou plusieurs caractéristiques",
+  "core.topicSearch.open": "Voir les souvenirs",
+  "core.topicSearch.zero": "Aucun souvenir ne correspond à cette combinaison.",
+  "core.topicSearch.one": "1 souvenir",
+  "core.topicSearch.many": "{count} souvenirs",
+  "core.topicSearch.back": "Retour à Ma vie",
   "common.back": "Retour",
   "common.close": "Fermer",
   "common.done": "Terminé",
@@ -5238,6 +5266,13 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Saisi manuellement"
  },
  "es": {
+  "core.topicSearch.toggle": "Buscar por más características",
+  "core.topicSearch.choose": "Elige una o más características",
+  "core.topicSearch.open": "Ver recuerdos",
+  "core.topicSearch.zero": "Ningún recuerdo coincide con esta combinación.",
+  "core.topicSearch.one": "1 recuerdo",
+  "core.topicSearch.many": "{count} recuerdos",
+  "core.topicSearch.back": "Volver a Mi vida",
   "common.back": "Volver",
   "common.close": "Cerrar",
   "common.done": "Listo",

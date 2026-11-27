@@ -9,6 +9,7 @@ import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
 import {verifyDesktopLayout} from './f5-desktop-layout.browser-test.mjs';
 import {verifyEditReturn} from './f5-edit-return.browser-test.mjs';
+import {verifyCharacteristicSearch} from './f5-topic-search.browser-test.mjs';
 import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_DATE_GAP,LOUPE_HOLD_MS} from './f5-timeline-loupe.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -124,6 +125,7 @@ backupRegression: try{
   }
   await verifyEditReturn({browser,origin,gate,sid,mobileDevice:devices['iPhone 13']});
   await verifyDesktopLayout({browser,origin,gate,sid,mobileDevice:devices['iPhone 13']});
+  await verifyCharacteristicSearch({browser,origin,gate,sid,mobileDevice:devices['iPhone 13']});
   // Actual picker import on the real authenticated Worker, with a private
   // synthetic browser context containing previous memories. No live data.
   const photoPath=path.join(generated,'picker-photo.jpg');
@@ -824,7 +826,7 @@ async function testTimelineLoupe(){
       const b=await new Promise(ok=>c.toBlob(ok,'image/png'));
       return window.TaleraMemories.save({
         title:'Synthetic offline picture',date:'2026-11-23',
-        time:'16:00:00',text:'Technical test only'
+        time:'16:00:00',text:'Technical test only',tags:['Offline familie','Offline vakantie']
       },[new File([b],'synthetic-offline.png',{type:'image/png'})]);
     });
     const account=await offlinePage.evaluate(async()=>{
@@ -998,6 +1000,21 @@ async function testTimelineLoupe(){
       console.log('TALERA_REAL_OWNER_PHOTO_OFFLINE_START_AND_PRESENT_PASS',
         JSON.stringify({sameWorker:true,sameOrigin:true,ownPhoto:true,
           realIphoneAccepted:false}));
+      // Extend the real disconnected Worker regression, not a simulated app.
+      const filterHome=await offlinePage.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded',timeout:18000});
+      assert.equal(await filterHome.headerValue('x-talera-offline'),'verified-device-shell');
+      const filter=offlinePage.locator('#talera-characteristic-search');
+      await filter.locator('summary').click();
+      await filter.getByLabel('Offline familie',{exact:true}).check();
+      await filter.getByLabel('Offline vakantie',{exact:true}).check();
+      const [filterPresent]=await Promise.all([
+        offlinePage.waitForNavigation({waitUntil:'domcontentloaded',timeout:18000}),
+        filter.locator('button').click()
+      ]);
+      assert.equal(await filterPresent.headerValue('x-talera-offline'),'verified-device-shell');
+      await offlinePage.waitForFunction(id=>window.__taleraPhotoBook?.list().length===1&&window.__taleraPhotoBook.list()[0].storyId===id,saved.id,{timeout:18000});
+      console.log('TALERA_CHARACTERISTIC_SEARCH_REAL_OFFLINE_PASS');
+
     }finally{
       await start();
       console.log('TALERA_SAME_TEST_WORKER_RESTARTED_WITH_PERSISTED_DO_STORE');

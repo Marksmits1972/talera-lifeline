@@ -1,3 +1,4 @@
+import {installCharacteristicSearchHome,installCharacteristicSearchPresentation} from './f5-topic-search.mjs';
 import {localizeEmbeddedPlayer} from './f5-embed-language-build.mjs';
 import {centralizeCoreLanguage} from './f5-core-language-build.mjs';
 import {installMemoryLocationStore,installMemoryLocationEditor,memoryLocationSharedSource,memoryLocationCountryCodes} from './f5-memory-location-build.mjs';
@@ -1972,6 +1973,8 @@ for(const [route,filename] of Object.entries(routes)){
  assert.ok(html.length>50000,'Unexpectedly small anonymous reference '+route);
  assert.ok(!/\b(?:talera_sid|set-cookie)\s*=\s*[a-f0-9]{64}/i.test(html),'Refuse session-bearing HTML');
  html=installDesktopMemoryTransition(installDesktopPresentationLayout(installDesktopHomeLayout(html,route),route),route);
+ if(route==='/mijn-leven')html=installCharacteristicSearchHome(html);
+ if(route==='/present')html=installCharacteristicSearchPresentation(html);
  html=localizeCore(html,route);
  const hash=sha(html),file=hash+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');

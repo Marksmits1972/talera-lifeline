@@ -189,3 +189,85 @@ test('both existing independent embedded player sources use their own complete c
   for(const sub of ['pauseButton','playPauseButton','recordingStarted','recordingResumed'])assert.ok(languageCatalog.nl[prefix+sub]);
  }
 });
+
+// Characteristics contract tests run in this existing CI group.
+import "./f5-topic-search.test.mjs";
+
+test('compiled app keeps the new control on own Home and excludes the signed-out shells',()=>{
+ const load=ref=>fs.readFileSync('r20-dev/free-10m-delivery/public'+ref,'utf8');
+ const home=load(referencePages['/mijn-leven']);
+ const present=load(referencePages['/present']);
+ assert.ok(home.includes("if(location.pathname==='/mijn-leven')window.__taleraCharacteristicSearch.render(grid,available);"));
+ assert.ok(present.includes('window.__taleraCharacteristicSearch.selection(location)'));
+ for(const route of ['/mijn-leven','/present','/tell'])
+  assert.ok(!load(guestPages[route]).includes('talera-characteristic-search-script'));
+ assert.ok(!load(referencePages['/tell']).includes('talera-characteristic-search-script'));
+ const share=renderOriginalTaleraShare(present,{title:'Original recipient story',storyText:'Synthetic',eventDate:'1990-01-01',hasPhoto:false,hasVideo:false,hasAudio:false},'/s/'+'A'.repeat(43),'a'.repeat(64));
+ assert.ok(share.includes('window.TaleraGuestOneMemory={list,get}'));
+ for(const source of [home,present,share]){
+  const search=/<script id="talera-characteristic-search-script">([\s\S]*?)<\/script>/.exec(source);
+  assert.ok(search);new vm.Script(search[1]);
+ }
+});
+
+test('compiled presentation registration preserves matching own IDs, date order and legacy topic behavior',()=>{
+ const html=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages['/present'],'utf8');
+ const api=/<script id="talera-characteristic-search-script">([\s\S]*?)<\/script>/.exec(html)[1];
+ const start=html.indexOf('const TALERA_ACTIVE_TOPIC =');
+ const end=html.indexOf('const MEMORIES = [];',start);
+ assert.ok(start>=0&&end>start);
+ const scope=html.slice(start,end);
+ const first=html.indexOf('  registerMemories(memories){');
+ const last=html.indexOf('  restrictToMemory(memory){',first);
+ assert.ok(first>=0&&last>first);
+ const actual=html.slice(first,last);
+ const rows=[
+  {id:'b',storyId:'local-b',ms:200,tags:['Familie','Vakantie'],_taleraLocal:true},
+  {id:'single',storyId:'local-single',ms:150,tags:['Familie'],_taleraLocal:true},
+  {id:'a',storyId:'local-a',ms:100,tags:['Familie','Vakantie','Kinderen'],_taleraLocal:true},
+  {id:'guest',storyId:'guest',ms:300,tags:['Familie','Vakantie'],_taleraLocal:false},
+  {id:'other',storyId:'local-other',ms:350,tags:['Werk'],_taleraLocal:true}
+ ];
+ const run=route=>{
+  const location=new URL(route,'https://example.invalid');
+  let empty=0,replaced=0,selected=null;
+  location.replace=()=>replaced++;
+  const context={URLSearchParams,location,window:{},MEMORIES:[{storyId:'stale',ms:0}],taleraRecipientLock:false,centerMs:0,activeMemoryId:null,
+    taleraRebuildDensity(){},keepCenterValid(){},writeMemory:m=>selected=m.storyId,draw(){},
+    document:{documentElement:{classList:{remove(){}}}}};
+  vm.runInNewContext(api,context);
+  context.window.__taleraCharacteristicSearch.showEmpty=()=>empty++;
+  const result=vm.runInNewContext(scope+'\n({'+actual+'})',context);
+  const count=result.registerMemories(rows);
+  return {count,ids:context.MEMORIES.map(m=>m.storyId),empty,replaced,selected};
+ };
+ const url=tags=>'/present#talera-kenmerken='+encodeURIComponent(JSON.stringify(tags));
+ assert.deepEqual(run(url(['familie','vakantie'])),{count:2,ids:['local-a','local-b'],empty:0,replaced:0,selected:'local-b'});
+ assert.deepEqual(run(url(['familie','vakantie','kinderen'])),{count:1,ids:['local-a'],empty:0,replaced:0,selected:'local-a'});
+ assert.deepEqual(run(url(['familie','werk'])),{count:0,ids:[],empty:1,replaced:0,selected:null});
+ assert.deepEqual(run('/present?theme=Familie'),{count:3,ids:['local-a','local-single','local-b'],empty:0,replaced:0,selected:'local-b'});
+ assert.deepEqual(run('/present?memory=local-a'+url(['familie']).slice('/present'.length)),{count:0,ids:[],empty:1,replaced:0,selected:null});
+});
+
+test('compiled characteristic filter retains account-isolated private library and existing offline base route',async()=>{
+ const {scopeLocalMemories}=await import('./f5-local-scope.mjs');
+ const {OFFLINE_RUNTIME}=await import('./f5-offline-sw.mjs');
+ for(const route of ['/mijn-leven','/present']){
+  const source=fs.readFileSync('r20-dev/free-10m-delivery/public'+referencePages[route],'utf8');
+  const a=scopeLocalMemories(source,'a'.repeat(64));
+  const b=scopeLocalMemories(source,'b'.repeat(64));
+  assert.ok(a.includes("var DB_NAME='talera-free-local-"+'a'.repeat(32)+"-v1'"));
+  assert.ok(b.includes("var DB_NAME='talera-free-local-"+'b'.repeat(32)+"-v1'"));
+  assert.ok(!a.includes('talera-lifeline-dev-local-v1'));
+  assert.ok(!b.includes('talera-free-local-'+'a'.repeat(32)+'-v1'));
+  assert.ok(a.includes('talera-characteristic-search-script')&&b.includes('talera-characteristic-search-script'));
+ }
+ // Execute the existing offline routing logic. This is not a substitute for
+ // the disconnected real-Worker browser test in the presentation CI suite.
+ const context={URL,self:{navigator:{languages:['nl']},location:{origin:'https://example.invalid'},addEventListener(){}}};
+ vm.runInNewContext(OFFLINE_RUNTIME.replaceAll('__TALERA_OFFLINE_PACKAGE_VERSION__','a'.repeat(32)).replace('__TALERA_OFFLINE_LANGUAGE_PACKS__','{}')+'\nglobalThis.localOfflinePage=offlinePage;',context);
+ const u=new URL('/present#talera-kenmerken='+encodeURIComponent(JSON.stringify(['familie','vakantie'])),'https://example.invalid');
+ assert.equal(context.localOfflinePage(u),'/present');
+ assert.equal(context.localOfflinePage(new URL('/present?memory=local-12345678','https://example.invalid')),'/present');
+ assert.equal(context.localOfflinePage(new URL('/present?theme=Familie&extra=1','https://example.invalid')),null);
+});

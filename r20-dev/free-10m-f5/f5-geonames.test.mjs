@@ -228,3 +228,40 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
   }
  }
  console.log('TALERA_CAPTURE_MOUNT_PAGEHIDE_PAGESHOW_RETRY_PASS');
+
+// Draft inspection shares the exact private reader and provider path but owns
+// no story write. An offline GPS photo stays pending, a confirmed absent GPS
+// photo is unknown, and a completed draft response is reused in that document.
+{
+ const names=['window','document','location','navigator','fetch'];
+ const originals=new Map(names.map(n=>[n,Object.getOwnPropertyDescriptor(globalThis,n)]));
+ const win=new EventTarget(),doc=new EventTarget();win.top=win;doc.hidden=false;
+ const nav={onLine:false},tagged=new Blob([Uint8Array.of(1)],{type:'image/jpeg'}),plain=new Blob([Uint8Array.of(2)],{type:'image/jpeg'}),gps=new Blob([Uint8Array.of(3)],{type:'image/jpeg'});
+ let requests=0,reads=0;
+ try{
+  for(const [n,v] of Object.entries({window:win,document:doc,location:{pathname:'/tell'},navigator:nav,
+   fetch:async(url,opts)=>{requests++;assert.equal(url,'/api/capture-place');assert.deepEqual(Object.keys(JSON.parse(opts.body)).sort(),['latitude','longitude']);return Response.json({place:resolved})}}))
+   Object.defineProperty(globalThis,n,{configurable:true,writable:true,value:v});
+  const store={list:async()=>[]};
+  mountCapturePlaceEnrichment({dbName:'talera-free-local-'+'b'.repeat(32)+'-v1',enabled:true,store,
+   open:()=>{throw Error('draft inspection must not create a catalog row')},done:()=>{},
+   readPlace:async original=>{reads++;return original===tagged?iptc:null},
+   readGps:async original=>original===gps?{latitude:51.985,longitude:5.88}:null});
+  const signal=new AbortController().signal;
+  assert.deepEqual(await store.inspectDraftCapturePlace(tagged,'photo',signal,true),{state:'known',place:iptc});
+  assert.deepEqual(await store.inspectDraftCapturePlace(plain,'photo',signal,true),{state:'unknown'});
+  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal,true),{state:'pending'});
+  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'pending'});
+  assert.equal(requests,0);assert.equal(reads,3);
+  nav.onLine=true;
+  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'known',place:resolved});
+  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'known',place:resolved});
+  assert.equal(requests,1);assert.equal(reads,3);
+  const canceled=new AbortController();canceled.abort();
+  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',canceled.signal),{state:'pending'});
+  win.dispatchEvent(new Event('pagehide'));
+ }finally{
+  for(const [n,d] of originals)if(d)Object.defineProperty(globalThis,n,d);else delete globalThis[n];
+ }
+}
+console.log('TALERA_DRAFT_INSPECTION_LOCAL_FIRST_OFFLINE_PENDING_NO_CATALOG_WRITE_PASS');

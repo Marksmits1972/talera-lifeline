@@ -1190,26 +1190,39 @@ async function testTimelineLoupe(){
       return m._photoIndex===1&&document.getElementById('talera-capture-place')?.hidden===true;
     },null,{timeout:10000});
     console.log('TALERA_CAPTURE_PLACE_ACTUAL_PRESENTATION_FRAME_PASS');
-    // The exact approved editor: automatically detected values are visible,
-    // yet only an explicit user action stores a memory-level override.
+    // The two original images carry different location states. A bulk fill
+    // applies only to the unknown image; explicit correction affects only A.
     await metadataPage.goto(origin+'/tell?edit='+encodeURIComponent(result.id),{waitUntil:'domcontentloaded'});
     await metadataPage.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
     await metadataPage.locator('.talera-location-toggle').click();
-    await metadataPage.waitForFunction(()=>document.querySelector('#talera-memory-city')?.value==='Arnhem');
+    await metadataPage.locator('.talera-location-check input').waitFor({state:'visible',timeout:20000});
+    assert.equal(await metadataPage.locator('.talera-location-check input').count(),1);
+    assert.ok((await metadataPage.locator('.talera-location-tile').first().innerText()).includes('Arnhem'));
+    await metadataPage.locator('#talera-memory-country').click();
+    await metadataPage.locator('.talera-location-search').fill('Frankrijk');
+    await metadataPage.locator('.talera-location-choice').filter({hasText:'Frankrijk'}).click();
+    await metadataPage.locator('#talera-memory-city').fill('Parijs');
+    await metadataPage.locator('.talera-location-apply').click();
+    assert.equal(await metadataPage.locator('.talera-location-check input').count(),0);
+    const original=metadataPage.locator('.talera-location-tile').filter({hasText:'Arnhem'});
+    await original.locator('.talera-location-edit').click();
     assert.equal(await metadataPage.locator('.talera-location-country-name').innerText(),'Nederland');
-    assert.equal(await metadataPage.locator('.talera-location-status').innerText(),'Automatisch ingevuld – aanpasbaar');
-    assert.equal(await metadataPage.evaluate(async id=>(await window.TaleraMemories.get(id)).manualLocation??null,result.id),null);
+    assert.equal(await metadataPage.locator('#talera-memory-city').inputValue(),'Arnhem');
     await metadataPage.locator('#talera-memory-city').fill('Nijmegen');
+    await metadataPage.locator('.talera-location-apply').click();
+    assert.equal(await metadataPage.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].manualPhotoLocation??null,result.id),null);
     await metadataPage.locator('#publish').click();
     try{await metadataPage.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.get('published')===result.id,{timeout:25000})}
     catch(error){console.error('TALERA_LOCATION_CORRECTION_SAVE_DIAGNOSTIC',JSON.stringify({url:metadataPage.url(),error:await metadataPage.locator('#error').textContent({timeout:1000}).catch(()=>null),busy:await metadataPage.locator('#busy').isVisible().catch(()=>false)}));throw error}
     await metadataPage.goto(origin+'/present?memory='+encodeURIComponent(result.id),{waitUntil:'domcontentloaded'});
     await metadataPage.waitForFunction(id=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===2},result.id,{timeout:20000});
-    await metadataPage.evaluate(()=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,1,true)});
-    await metadataPage.waitForFunction(()=>{const row=document.getElementById('talera-capture-place');return row&&!row.hidden&&row.textContent==='Nederland · Nijmegen'},null,{timeout:10000});
-    const corrected=await metadataPage.evaluate(async id=>{const row=await window.TaleraLibrary.readStory(id);return {place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,keys:row.items.map(x=>x.key),manualLocation:row.manualLocation}},result.id);
-    assert.deepEqual(corrected,{place:result.place,missing:null,keys:result.keys,manualLocation:{countryCode:'NL',city:'Nijmegen'}});
-    console.log('TALERA_MANUAL_LOCATION_AUTO_CORRECTION_AND_ORIGINAL_CAPTURE_PASS');
+    for(const [index,label] of [[0,'Nederland · Nijmegen'],[1,'Frankrijk · Parijs']]){
+     await metadataPage.evaluate(i=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,i,true)},index);
+     await metadataPage.waitForFunction(expected=>{const row=document.getElementById('talera-capture-place');return row&&!row.hidden&&row.textContent===expected},label,{timeout:10000});
+    }
+    const corrected=await metadataPage.evaluate(async id=>{const row=await window.TaleraLibrary.readStory(id);return {place:row.items[0].capturePlace,missing:row.items[1].capturePlace??null,keys:row.items.map(x=>x.key),manual:row.items.map(x=>x.manualPhotoLocation),legacy:row.manualLocation??null}},result.id);
+    assert.deepEqual(corrected,{place:result.place,missing:null,keys:result.keys,manual:[{countryCode:'NL',city:'Nijmegen',mode:'correct'},{countryCode:'FR',city:'Parijs',mode:'fill'}],legacy:null});
+    console.log('TALERA_PER_PHOTO_LOCATION_BULK_AND_INDIVIDUAL_CORRECTION_PASS');
     await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),result.id);
     console.log('TALERA_CAPTURE_PLACE_ACCOUNT_CATALOG_REOPEN_PASS');
   }finally{await metadataPage.close()}
@@ -1285,6 +1298,11 @@ async function testTimelineLoupe(){
       await geoPage.waitForTimeout(150);
     }
     assert.equal(draftReady,true,'Actual picker must retain every original GPS-bearing byte');
+    await geoPage.locator('.talera-location-toggle').waitFor({state:'visible',timeout:15000});
+    await geoPage.locator('.talera-location-toggle').click();
+    await geoPage.locator('.talera-location-tile-label').filter({hasText:'in afwachting'}).waitFor({state:'visible',timeout:10000});
+    assert.equal(await geoPage.locator('.talera-location-check input').count(),0,'Pending GPS must not be classified as unknown');
+
     const saved=await geoPage.evaluate(async()=>{
       const mem=window.TaleraMemories;
       const d=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
@@ -1406,6 +1424,75 @@ async function testTimelineLoupe(){
     assert.equal(sent.length,2,'Exactly one lookup per distinct saved original in this scenario');
     assert.equal(new URL(geoPage.url()).pathname,'/tell');
     await geoPage.evaluate(id=>window.TaleraMemories.remove(id),editorId);
+    // Reopen the same original draft (the earlier technical direct-save did
+    // not consume it). Its GPS is now resolved BEFORE the real publish.
+    // The existing overview opens the sole draft using its original button.
+    await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
+    await geoPage.locator('[data-open]').first().waitFor({state:'visible',timeout:15000});
+    await geoPage.locator('[data-open]').first().click();
+    await geoPage.locator('.talera-location-toggle').waitFor({state:'visible',timeout:15000});
+    await geoPage.locator('.talera-location-toggle').click();
+    await geoPage.locator('.talera-location-tile-label').filter({hasText:city}).waitFor({state:'visible',timeout:20000});
+    assert.equal(sent.length,3,'Draft location must be requested before publication');
+    assert.equal(await geoPage.evaluate(async()=> (await window.TaleraMemories.list()).length),0,'Draft recognition must not publish a story');
+    await geoPage.locator('#publish').click();
+    await geoPage.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.has('published'),{timeout:25000});
+    const draftPublished=new URL(geoPage.url()).searchParams.get('published');
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
+    const previewSaved=await geoPage.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {place:row.items[0].capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer())]}},draftPublished);
+    assert.equal(previewSaved.place.city,city);assert.deepEqual(previewSaved.bytes,fixtureBytes);
+    await geoPage.waitForTimeout(1500);assert.equal(sent.length,3,'Completed draft result must not be requested again after publication');
+    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),draftPublished);
+    console.log('TALERA_GEONAMES_DRAFT_BEFORE_PUBLISH_NO_DUPLICATE_REQUEST_PASS');
+    // Six real picker images on the same editor: three explicit XMP locations,
+    // three missing locations. No network request or forced per-photo entry.
+    await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await geoPage.locator('#photoInput').waitFor({state:'attached',timeout:15000});
+    const six=await geoPage.evaluate(async()=>{
+     const rows=[];
+     for(let i=0;i<6;i++){
+      const canvas=document.createElement('canvas');canvas.width=20;canvas.height=20;
+      const ctx=canvas.getContext('2d');ctx.fillStyle='rgb('+(i*40)+',30,90)';ctx.fillRect(0,0,20,20);
+      const bytes=new Uint8Array(await (await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'))).arrayBuffer());
+      let data=bytes;
+      if(i<3){
+       const cities=['Arnhem','Rome','Paris'],codes=['NL','IT','FR'],countries=['Nederland','Italië','Frankrijk'];
+       const packet='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:i="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"><i:LocationCreated><rdf:Bag><rdf:li rdf:parseType="Resource"><i:City>'+cities[i]+'</i:City><i:CountryCode>'+codes[i]+'</i:CountryCode><i:CountryName>'+countries[i]+'</i:CountryName></rdf:li></rdf:Bag></i:LocationCreated></rdf:Description></rdf:RDF></x:xmpmeta>';
+       const xmp=new TextEncoder().encode('http://ns.adobe.com/xap/1.0/\0'+packet),n=xmp.length+2;
+       data=new Uint8Array([...bytes.slice(0,2),255,225,n>>8,n&255,...xmp,...bytes.slice(2)]);
+      }
+      rows.push([...data]);
+     }
+     return rows;
+    });
+    await geoPage.locator('#photoInput').setInputFiles(six.map((bytes,i)=>({name:'six-location-'+i+'.jpg',mimeType:'image/jpeg',buffer:Buffer.from(bytes)})));
+    await geoPage.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
+    await geoPage.locator('.talera-location-toggle').click();
+    await geoPage.waitForFunction(()=>document.querySelectorAll('.talera-location-check input').length===3,null,{timeout:20000});
+    assert.ok((await geoPage.locator('.talera-location-summary').innerText()).includes('3 van 6'));
+    await geoPage.locator('.talera-location-check input').last().uncheck();
+    await geoPage.locator('#talera-memory-country').click();
+    await geoPage.locator('.talera-location-search').fill('Frankrijk');
+    await geoPage.locator('.talera-location-choice').filter({hasText:'Frankrijk'}).click();
+    await geoPage.locator('#talera-memory-city').fill('Parijs');
+    await geoPage.locator('.talera-location-apply').click();
+    assert.equal(await geoPage.locator('.talera-location-check input').count(),1);
+    await geoPage.locator('#publish').click();
+    await geoPage.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.has('published'),{timeout:25000});
+    const sixId=new URL(geoPage.url()).searchParams.get('published');
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
+    const sixStored=await geoPage.evaluate(async id=>{
+     const row=await window.TaleraMemories.get(id);
+     return {locations:row.items.map(item=>({capture:item.capturePlace?.city??null,manual:item.manualPhotoLocation??null})),bytes:await Promise.all(row.items.map(async item=>[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]))};
+    },sixId);
+    assert.deepEqual(sixStored.bytes,six);
+    assert.deepEqual(sixStored.locations,[{capture:'Arnhem',manual:null},{capture:'Rome',manual:null},{capture:'Paris',manual:null},{capture:null,manual:{countryCode:'FR',city:'Parijs',mode:'fill'}},{capture:null,manual:{countryCode:'FR',city:'Parijs',mode:'fill'}},{capture:null,manual:null}]);
+    assert.equal(sent.length,3,'Local metadata and confirmed missing data must not consume provider requests');
+    await geoPage.evaluate(id=>window.TaleraMemories.remove(id),sixId);
+    console.log('TALERA_SIX_PHOTO_LOCATION_SELECTED_BULK_AND_ORIGINAL_BYTES_PASS');
+
+
     assert.deepEqual(geoErrors,[]);
     console.log('TALERA_GEONAMES_LIBRARY_ALL_MAIN_SCREENS_SAVE_RECONNECT_LIVE_LABEL_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',realWorkerAuthScopeValidated:true,providerResponseSimulated:true,physicalIphoneAccepted:false,homeVisitRequired:false}));
   }finally{await geoCtx.close();await restartGeoWorker(false)}

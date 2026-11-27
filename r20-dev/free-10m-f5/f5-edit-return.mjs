@@ -186,7 +186,7 @@ export function pristineDraftRemovalPlan(catalog,expected){
 // A resemblance in title/date/photos, missing attachment or unknown field
 // is never sufficient. Unlinked older drafts remain editable.
 export function publishedDraftPairs(draft,story){
- const allowed=new Set(['id','title','text','date','media','voice','voiceCues','tags','voiceDurationMs','existing','canonicalByDraft','precision','season','dateSource','dateConfirmed','voiceWave','manualLocation']);
+ const allowed=new Set(['id','title','text','date','media','voice','voiceCues','tags','voiceDurationMs','existing','canonicalByDraft','precision','season','dateSource','dateConfirmed','voiceWave','manualLocation','photoLocations','photoLocationAutomatic']);
  if(!draft||!story||story.id!==draft.existing||story.source!=='pwa-local'||
     Object.keys(draft).some(k=>!allowed.has(k))||
     typeof draft.title!=='string'||typeof draft.text!=='string'||typeof draft.date!=='string'||
@@ -210,12 +210,17 @@ export function publishedDraftPairs(draft,story){
  const ids=[...draft.media,...(draft.voice?[draft.voice]:[])];
  if(ids.length!==story.items.length||new Set(ids).size!==ids.length||
     Object.keys(draft.canonicalByDraft).length!==ids.length)return null;
+ const changes=draft.photoLocations,automatic=draft.photoLocationAutomatic;
+ if(automatic!==undefined&&(!automatic||Array.isArray(automatic)||typeof automatic!=='object'||Object.keys(automatic).some(id=>!draft.media.includes(id))||Object.values(automatic).some(v=>!v||!['known','unknown'].includes(v.state))))return null;
+ if(changes!==undefined&&(!changes||Array.isArray(changes)||typeof changes!=='object'||Object.keys(changes).some(id=>!draft.media.includes(id))))return null;
  const pairs=[];
  for(let i=0;i<ids.length;i++){
   const item=story.items[i],draftId=ids[i];
   if(!DRAFT_ID.test(draftId||'')||!item||draft.canonicalByDraft[draftId]!==item.key||
      typeof item.key!=='string'||!Number.isSafeInteger(item.size)||item.size<1||
      typeof item.mime!=='string'||(i<draft.media.length?!['photo','video'].includes(item.kind):item.kind!=='audio'))return null;
+  if(automatic&&Object.hasOwn(automatic,draftId)){const v=automatic[draftId];if(v.state==='known'&&!same(v.place,item.capturePlace)||v.state==='unknown'&&!item.capturePlace&&item.capturePlaceChecked!=='v3')return null;}
+  if(changes&&Object.hasOwn(changes,draftId)&&!same(changes[draftId],item.manualPhotoLocation??null))return null;
   pairs.push({draft:PREFIX+draftId,original:item.key,size:item.size,mime:item.mime});
  }
  if(draft.voiceDurationMs!==(story.narrationDurationMs??0))return null;

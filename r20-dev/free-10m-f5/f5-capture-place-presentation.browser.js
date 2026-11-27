@@ -66,7 +66,7 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
   // The catalog is the only authority. Even older original files must be
   // enriched by the library, never inspected for location by presentation.
   const selected=selectDisplayedLocation(story,item,countryCodes);
-  const place=selected?.source==='manual-memory'?selected:valid(selected);
+  const place=selected?.source==='manual-photo'?selected:valid(selected);
   if(place)return {place};
   return {code:'plaats-onbekend'};
  }

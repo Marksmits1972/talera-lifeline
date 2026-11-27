@@ -148,8 +148,40 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   };
   try{await finished}finally{clearTimeout(timeout)}
   // Notify passive readers only AFTER the existing catalog transaction commits.
-  if(active()&&updated&&place)window.dispatchEvent(new Event('talera-capture-place-updated'));
+  if(active()&&updated)window.dispatchEvent(new Event('talera-capture-place-updated'));
   return updated;
+ };
+ // The existing /tell editor may inspect draft originals immediately, without
+ // a published catalog row or an additional database. Only validated results
+ // leave this private reader; coordinates live in a per-document WeakMap.
+ const draftMetadata=new WeakMap(),draftResults=new WeakMap();
+ store.inspectDraftCapturePlace=async(original,kind,signal,localOnly=false)=>{
+  const pending={state:'pending'},active=()=>available()&&!signal?.aborted;
+  if(!active()||kind!=='photo'||!(original instanceof Blob)||!original.size)return pending;
+  if(draftResults.has(original))return draftResults.get(original);
+  const read=async(fn)=>{
+   const controller=new AbortController(),cancel=()=>controller.abort();
+   signal?.addEventListener('abort',cancel,{once:true});if(!active())cancel();
+   try{return await bounded(()=>fn(original,controller.signal))}
+   finally{signal?.removeEventListener('abort',cancel);cancel()}
+  };
+  try{
+   let metadata=draftMetadata.get(original);
+   if(!metadata){
+    let place=null;try{place=await read(readPlace)}catch(_){if(!active())return pending}
+    if(!active())return pending;
+    if(place){const result={state:'known',place};draftResults.set(original,result);return result}
+    const gps=await read(readGps);if(!active())return pending;
+    if(!gps){const result={state:'unknown'};draftResults.set(original,result);return result}
+    metadata={gps};draftMetadata.set(original,metadata);
+   }
+   if(localOnly||!canLookup()||Date.now()<blockedUntil)return pending;
+   const outcome=await lookup(metadata.gps,signal||new AbortController().signal);
+   if(!active())return pending;
+   if(!outcome.ok){blockedUntil=Math.max(blockedUntil,Date.now()+(outcome.retryAfterMs||60000));return pending}
+   const result=outcome.place?{state:'known',place:outcome.place}:{state:'unknown'};
+   draftMetadata.delete(original);draftResults.set(original,result);return result;
+  }catch(_){return pending}
  };
  const run=async()=>{
   timer=null;timerDue=Infinity;if(running||!available())return;

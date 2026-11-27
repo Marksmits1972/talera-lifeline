@@ -18,21 +18,32 @@ export function installMemoryLocationStore(html){
  html=exact(html,save,shared+'\nconst taleraLocationCountryCodes='+JSON.stringify(codes)+';\n'+save,'SAVE_SOURCE');
  html=exact(html,"place:place||existing.place||'',text:text,tags:tags,","place:place||existing.place||'',text:text,tags:tags,...manualLocationPatch(existing,input,taleraLocationCountryCodes),",'TEXT_SAVE');
  html=exact(html,"place:place,text:text,tags:Array.isArray(input.tags)?","place:place,text:text,...manualLocationPatch(existing,input,taleraLocationCountryCodes),tags:Array.isArray(input.tags)?",'MEDIA_SAVE');
+ const anchor=" var precision=['exact','month','year','season','period'].includes(input.datePrecision)?input.datePrecision:'exact';";
+ html=exact(html,anchor," applyPhotoLocationInputs(files,input.photoLocations,taleraLocationCountryCodes);\n"+anchor,'PHOTO_INPUTS');
  return html;
 }
 export function installMemoryLocationEditor(html){
  const hook='function workView(){';
  html=exact(html,hook,shared+'\n'+editor+'\n'+hook,'WORK_VIEW');
  const mount='taleraV16InstallToolbar(g);';
- html=exact(html,mount,mount+"\n mountMemoryLocationEditor({g,anchor:main.querySelector('.talera-tags-v20'),saveDraft,readStory:id=>mem.get(id),flagPositions:"+JSON.stringify(flags)+",codes:"+JSON.stringify(codes)+"});",'MOUNT');
+ html=exact(html,mount,mount+"\n mountMemoryLocationEditor({g,anchor:main.querySelector('.talera-tags-v20'),saveDraft,readStory:id=>mem.get(id),getAsset:id=>assets.get(id),preview:id=>url(id),inspect:(...args)=>mem.inspectDraftCapturePlace(...args),flagPositions:"+JSON.stringify(flags)+",codes:"+JSON.stringify(codes)+"});",'MOUNT');
  // Optional key absent from existing drafts. Canonical-ID adapter still sees
  // its exact unchanged voiceDurationMs/ existing tail.
  const snapshot='function snapshot(){return groups.map(g=>({tags:';
- html=exact(html,snapshot,"function snapshot(){return groups.map(g=>({...(Object.hasOwn(g,'manualLocation')?{manualLocation:g.manualLocation}:{}),tags:",'DRAFT');
+ html=exact(html,snapshot,"function snapshot(){return groups.map(g=>({...draftPhotoChanges(g),...(Object.hasOwn(g,'manualLocation')?{manualLocation:g.manualLocation}:{}),tags:",'DRAFT');
  const boot='existing:row.id},entries=[];';
  html=exact(html,boot,"existing:row.id,...(Object.hasOwn(row,'manualLocation')?{manualLocation:row.manualLocation}:{})},entries=[];",'LOAD');
+ const itemBoot="entries.push([id,file]);if(it.kind==='audio')g.voice=id;else g.media.push(id)";
+ html=exact(html,itemBoot,"if(it.kind==='photo'&&it.manualPhotoLocation)g.photoLocations={...(g.photoLocations||{}),[id]:it.manualPhotoLocation};"+itemBoot,'LOAD_PHOTO_MANUAL');
+ const move="a.media=a.media.filter(id=>id!==media);";
+ html=exact(html,move,"moveDraftPhotoLocation(a,b,media);"+move,'MOVE_PHOTO_LOCATION');
  const write='mem.save({title,date:g.date,time:';
- html=exact(html,write,"mem.save({... (Object.hasOwn(g,'manualLocation')?{manualLocation:g.manualLocation}:{}),title,date:g.date,time:",'PUBLISH');
+ html=exact(html,write,"mem.save({photoLocations:draftPhotoInputs(g,id=>assets.get(id)),... (Object.hasOwn(g,'manualLocation')?{manualLocation:g.manualLocation}:{}),title,date:g.date,time:",'PUBLISH');
+ // A running optional scan cannot modify the draft receipt while publishing.
+ const publishing="try{await queue;const uploads=g.media.map(id=>assets.get(id));";
+ html=exact(html,publishing,"g.taleraLocationPublishing=true;g.taleraLocationStop?.();"+publishing,'STOP_ON_PUBLISH');
+ const failed="catch(e){clearBusy();showError('Nog niet geplaatst: '+e.message);return false}";
+ html=exact(html,failed,"catch(e){g.taleraLocationPublishing=false;g.taleraLocationWake?.();clearBusy();showError('Nog niet geplaatst: '+e.message);return false}",'RESUME_ON_PUBLISH_FAILURE');
  const css=`<style id="talera-memory-location-css">
 #app #main .work .talera-memory-location{margin:5px 0 8px;min-width:0;flex:none;background:#f5f8fc;color:#173b64;border:1px solid #dbe4ef;border-radius:15px;box-sizing:border-box}
 .talera-memory-location [hidden]{display:none!important}
@@ -45,7 +56,20 @@ export function installMemoryLocationEditor(html){
 .talera-location-title{flex:1;min-width:0}
 .talera-location-chevron{width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;box-sizing:border-box;transform:rotate(45deg);margin:0 2px 4px 0;flex:none}
 .talera-location-toggle[aria-expanded="true"] .talera-location-chevron{transform:rotate(225deg);margin:4px 2px 0 0}
-.talera-location-panel{padding:0 12px 12px;display:grid;gap:5px}
+.talera-location-summary{margin:-3px 12px 9px 43px;color:#657a91;font:500 12px/1.4 system-ui}
+.talera-location-panel{padding:0 12px 12px;display:grid;gap:7px;max-height:min(55dvh,490px);overflow-y:auto;overscroll-behavior:contain}
+.talera-location-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.talera-location-tile{background:white;border:1px solid #dbe4ef;border-radius:10px;min-width:0;padding:5px;display:grid;align-content:start;gap:4px}
+.talera-location-thumb{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px}
+.talera-location-tile-label{display:flex;align-items:center;gap:4px;margin:0;font:600 11px/1.3 system-ui;overflow-wrap:anywhere}
+.talera-location-tile-status{margin:0;color:#657a91;font:400 10px/1.3 system-ui}
+.talera-location-check{display:flex;align-items:center;gap:4px;min-height:32px;font:600 11px/1.3 system-ui}
+.talera-location-check input{width:18px;height:18px;flex:none;accent-color:#224d7c}
+.talera-location-form{display:grid;gap:5px}
+#app #main .work .talera-location-edit{border:0;background:#edf2f8;color:#224d7c;border-radius:7px;min-height:36px;padding:3px;font:600 11px/1.3 system-ui}
+#app #main .work .talera-location-apply{border:0;background:#102344;color:white;border-radius:10px;min-height:44px;padding:8px;font:700 14px/1.3 system-ui}
+#app #main .work .talera-location-apply:disabled{opacity:.45}
+
 .talera-location-label{font:700 14px/1.3 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#173b64;margin:6px 0 0}
 #app #main .work .talera-location-country,#app #main .work .talera-location-city{width:100%;box-sizing:border-box;min-height:44px;padding:8px 12px;background:white;color:#0b1b3c;border:1px solid #b9c8da;border-radius:10px;font:500 16px/1.3 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;min-width:0}
 #app #main .work .talera-location-country{display:flex;align-items:center;text-align:left;gap:8px;cursor:pointer}

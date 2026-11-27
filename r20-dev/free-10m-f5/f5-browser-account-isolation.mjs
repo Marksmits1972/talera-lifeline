@@ -1065,6 +1065,7 @@ try{
   await locationEdit.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
   assert.equal(await locationEdit.evaluate(()=>document.querySelector('.talera-memory-location').previousElementSibling?.classList.contains('talera-tags-v20')),true);
   await locationEdit.locator('.talera-location-toggle').click();
+  await locationEdit.locator('.talera-location-check input').waitFor({state:'visible',timeout:20000});
   assert.equal(await locationEdit.locator('#talera-memory-city').inputValue(),'');
   assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Kies een land');
   for(const lang of ['nl','en','de','fr','es']){
@@ -1083,16 +1084,19 @@ try{
    assert.equal(await locationEdit.locator('.talera-location-dialog[open]').count(),0);
    assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Frankrijk');
    await locationEdit.locator('#talera-memory-city').fill('Parijs');
+   await locationEdit.locator('.talera-location-apply').click();
   }finally{await locationEdit.context().setOffline(false)}
-  assert.equal(await page.evaluate(async id=>(await window.TaleraMemories.get(id)).manualLocation??null,tagged.id),null,'Draft must not publish automatically');
+  assert.equal(await page.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].manualPhotoLocation??null,tagged.id),null,'Draft must not publish automatically');
   await locationEdit.locator('#publish').click();
   try{await locationEdit.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.get('published')===tagged.id,{timeout:25000})}
   catch(error){console.error('TALERA_LOCATION_SAVE_DIAGNOSTIC',JSON.stringify({url:locationEdit.url(),error:await locationEdit.locator('#error').textContent({timeout:1000}).catch(()=>null),busy:await locationEdit.locator('#busy').isVisible().catch(()=>false)}));throw error}
-  const after=await page.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {manualLocation:row.manualLocation,keys:row.items.map(x=>x.key),bytes:Array.from(new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer()))}},tagged.id);
-  assert.deepEqual(after,{...before,manualLocation:{countryCode:'FR',city:'Parijs'}});
+  const after=await page.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {manualPhotoLocation:row.items[0].manualPhotoLocation,keys:row.items.map(x=>x.key),bytes:Array.from(new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer()))}},tagged.id);
+  assert.deepEqual(after,{...before,manualPhotoLocation:{countryCode:'FR',city:'Parijs',mode:'fill'}});
   await locationEdit.goto(origin+'/tell?edit='+encodeURIComponent(tagged.id),{waitUntil:'domcontentloaded'});
   await locationEdit.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
   await locationEdit.locator('.talera-location-toggle').click();
+  await locationEdit.locator('.talera-location-edit').waitFor({state:'visible',timeout:20000});
+  await locationEdit.locator('.talera-location-edit').click();
   assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Frankrijk');
   assert.equal(await locationEdit.locator('#talera-memory-city').inputValue(),'Parijs');
   console.log('TALERA_LOCATION_EDITOR_OFFLINE_COUNTRY_FIVE_LANGUAGES_AND_SAVE_PASS');

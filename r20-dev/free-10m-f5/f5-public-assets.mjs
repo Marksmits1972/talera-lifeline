@@ -27,6 +27,14 @@ const generated=path.join(here,'generated');
 const origin='https://talera-design-cleanup-fase1-test-20261107.mark-a39.workers.dev';
 const routes={'/mijn-leven':'mijn-leven','/present':'present','/tell':'tell'};
 const sha=buf=>createHash('sha256').update(buf).digest('hex');
+const localityMetaBytes=readFileSync(path.join(here,'f5-offline-locality-data.json'));
+const localityMeta=JSON.parse(localityMetaBytes);
+const localityBytes=readFileSync(path.join(here,'f5-offline-locality-data.bin'));
+assert.match(localityMeta.sha256,/^[a-f0-9]{64}$/);
+assert.equal(sha(localityBytes),localityMeta.sha256,'LOCALITY_DATA_HASH_MISMATCH');
+assert.equal(localityBytes.subarray(0,8).toString(),'TLPLC001');
+const localityRoute='/__talera_free/places-'+localityMeta.sha256+'.bin';
+const localityCreditRoute='/__talera_free/places-'+localityMeta.sha256+'.json';
 // iOS Home Screen: retain the already approved original three-panel TALERA logo.
 // Fetch ONLY the existing approved deep-blue icon files, never user data.
 const approvedLogoOrigin='https://talera-closed-memory-diepblauw-test-20261107.mark-a39.workers.dev';
@@ -1268,15 +1276,17 @@ function installCapturePlaceCatalog(html,route){
  const gpsReaders=raw.slice(gpsStart,start)+raw.slice(end,gpsEnd);
  const enrichment=readFileSync(path.join(here,'f5-capture-place-enrichment.mjs'),'utf8').replaceAll('export ','');
  const countryEngine=readFileSync(path.join(here,'f5-offline-country.mjs'),'utf8').replaceAll('export ','');
+ const localityEngine=readFileSync(path.join(here,'f5-offline-locality.mjs'),'utf8').replaceAll('export ','');
+ assert.ok(!localityEngine.includes('</script'),'LOCALITY_ENGINE_UNSAFE');
  const countryData=JSON.stringify(JSON.parse(readFileSync(path.join(here,'f5-offline-country-data.json'),'utf8')));
  assert.ok(!countryEngine.includes('</script')&&!countryData.includes('</script'),'COUNTRY_DATA_UNSAFE');
  assert.ok(!gpsReaders.includes('</script')&&!enrichment.includes('</script'),'CAPTURE_ENRICHMENT_UNSAFE_SOURCE');
  const matches=[...html.matchAll(/window\.TaleraMemories=\{[^\n;]*localOnly:true\};/g)];
  assert.equal(matches.length,1,'CAPTURE_ENRICHMENT_STORE_MARKER_DRIFT');
  const mount=matches[0],at=mount.index+mount[0].length;
- const install='\n'+gpsReaders+'\n'+enrichment+'\n'+countryEngine+'\n'+
-  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:readOriginalCaptureGps,resolveCountry:createOfflineCountryResolver("+countryData+")});\n";
- return html.slice(0,at)+install+html.slice(at);
+ const install='\n'+gpsReaders+'\n'+enrichment+'\n' +countryEngine+'\n'+localityEngine+'\n'+
+  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:readOriginalCaptureGps,resolveCountry:createOfflineCountryResolver("+countryData+"),resolveLocality:createOfflineLocalityLoader("+JSON.stringify(localityRoute)+","+localityBytes.length+")});\n";
+ return (html.slice(0,at)+install+html.slice(at)).replace('</head>','<link rel="talera-offline-locality" href="'+localityRoute+'"><link rel="talera-data-attribution" href="'+localityCreditRoute+'"></head>');
 }
 
 function installReadOnlyLibraryGateway(html){
@@ -2559,6 +2569,11 @@ const supportNames=['/sw.js','/manifest.webmanifest','/pwa-192.png',
   '/pwa-512.png','/apple-touch-icon.png','/favicon.png','/talera-brand-v9.svg'];
 const support={};
 mkdirSync(path.join(publicDir,'__talera_free','f5support'),{recursive:true});
+for(const [route,bytes] of [[localityRoute,localityBytes],[localityCreditRoute,localityMetaBytes]]){
+ const filename=route.split('/').pop();
+ writeFileSync(path.join(publicDir,'__talera_free','f5support',filename),bytes);
+ support[route]='/__talera_free/f5support/'+filename;
+}
 for(const name of supportNames){
  const url=new URL(name,origin);
  async function get(){

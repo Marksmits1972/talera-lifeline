@@ -12,10 +12,10 @@ export function manualLocationPatch(existing,input,codes){
  return existing&&Object.hasOwn(existing,'manualLocation')?{manualLocation:existing.manualLocation}:{};
 }
 export function confirmedPhotoLocation(place,codes){
- if(!place||!['iptc-location-created','geonames-locality-v2','offline-country-v1'].includes(place.source)||typeof place.country!=='string')return null;
+ if(!place||!['iptc-location-created','geonames-locality-v2','offline-country-v1','offline-locality-v1'].includes(place.source)||typeof place.country!=='string')return null;
  try{
   const location=normalizeManualLocation({countryCode:place.countryCode,city:place.city},codes);
-  if(!location?.countryCode||(place.source==='geonames-locality-v2'&&!location.city)||(place.source==='offline-country-v1'&&location.city)||new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(location.countryCode)!==place.country)return null;
+  if(!location?.countryCode||(['geonames-locality-v2','offline-locality-v1'].includes(place.source)&&!location.city)||(place.source==='offline-country-v1'&&location.city)||new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(location.countryCode)!==place.country)return null;
   return {...location,country:place.country,source:place.source};
  }catch(_){return null}
 }
@@ -30,7 +30,7 @@ export function selectDisplayedLocation(story,item,codes){
  const automatic=confirmedPhotoLocation(item?.capturePlace,codes);
  let manual=null;try{manual=normalizePhotoLocation(item?.manualPhotoLocation??null,codes)}catch(_){}
  if(manual&&(manual.mode==='correct'||!automatic))return {countryCode:manual.countryCode,city:manual.city,source:'manual-photo'};
- if(manual&&automatic&&!automatic.city&&manual.city&&(!manual.countryCode||manual.countryCode===automatic.countryCode))return {countryCode:automatic.countryCode,city:manual.city,source:'manual-photo'};
+ if(manual&&automatic&&(!automatic.city||automatic.source==='offline-locality-v1')&&manual.city&&(!manual.countryCode||manual.countryCode===automatic.countryCode))return {countryCode:automatic.countryCode,city:manual.city,source:'manual-photo'};
  return automatic;
 }
 // Legacy v3 and old draft negatives had no proof of whether GPS was read.
@@ -48,20 +48,25 @@ export function applyPhotoLocationInputs(items,inputs,codes){
   const item=items[i],input=inputs[i];
   if(input==null)continue;
   if(item.kind!=='photo'||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['automatic','manual'].includes(k)))throw Error('TALERA_INVALID_PHOTO_LOCATION_INPUT');
-  if(!confirmedPhotoLocation(item.capturePlace,codes)&&input.automatic){
-   const result=input.automatic,place=confirmedPhotoLocation(result.place,codes);
-   if(result.state==='known'&&place){item.capturePlace=place;delete item.capturePlaceChecked}
-   else if(result.state==='unknown'&&completedDraftLocation(result))item.capturePlaceChecked=result.reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
+  if(input.automatic){
+   const previous=confirmedPhotoLocation(item.capturePlace,codes),result=input.automatic,place=confirmedPhotoLocation(result.place,codes);
+   const refinable=previous?.source==='offline-country-v1'&&place?.countryCode===previous.countryCode&&!item.manualPhotoLocation;
+   if(result.state==='known'&&place&&(!previous||refinable)){
+    item.capturePlace=place;delete item.capturePlaceChecked;
+    if(result.localityChecked===true&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-v1';
+    else if(place.source==='offline-locality-v1')delete item.captureLocalityChecked;
+   }
+   else if(!previous&&result.state==='unknown'&&completedDraftLocation(result))item.capturePlaceChecked=result.reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
   }
   if(Object.hasOwn(input,'manual')){
    const manual=normalizePhotoLocation(input.manual,codes);
    if(!manual)delete item.manualPhotoLocation;
-   else if(manual.mode==='correct'||!confirmedPhotoLocation(item.capturePlace,codes)||!item.capturePlace.city&&manual.city&&(!manual.countryCode||manual.countryCode===item.capturePlace.countryCode))item.manualPhotoLocation=manual;
+   else if(manual.mode==='correct'||!confirmedPhotoLocation(item.capturePlace,codes)||(!item.capturePlace.city||item.capturePlace.source==='offline-locality-v1')&&manual.city&&(!manual.countryCode||manual.countryCode===item.capturePlace.countryCode))item.manualPhotoLocation=manual;
   }
  }
 }
 export function localPhotoState(item,codes){
- if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes)};
+ if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes),...(item.captureLocalityChecked==='offline-locality-v1'?{localityChecked:true}:{})};
  if(['v4-no-readable-gps','v5-no-country'].includes(item?.capturePlaceChecked))return {state:'unknown',reason:item.capturePlaceChecked.slice(3)};
  return {state:'pending'};
 }
@@ -180,7 +185,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
   const info=node('div','talera-location-row-copy',card);
   const number=node('span','talera-location-photo-number',info);number.textContent=t('photoNumber',{number:photoNumber(id)});
   const value=display(id),label=node('p','talera-location-tile-label',info);
-  if(value){const f=node('span','talera-location-flag',label);flag(f,value.countryCode);node('span','',label).textContent=[countryText(value.countryCode),value.city].filter(Boolean).join(' · ')}
+  if(value){const f=node('span','talera-location-flag',label);flag(f,value.countryCode);node('span','',label).textContent=[countryText(value.countryCode),value.source==='offline-locality-v1'?t('nearby',{city:value.city}):value.city].filter(Boolean).join(' · ')}
   else label.textContent=t(state(id).state==='pending'?'checkingLocation':'locationUnknown');
   const edit=button('talera-location-edit',card);edit.textContent=t(value?'changeLocation':'addLocation');edit.setAttribute('aria-label',t(value?'editPhoto':'addPhotoLocation',{number:photoNumber(id)}));edit.setAttribute('aria-expanded',String(single===id));edit.onclick=()=>chooseSingle(id);
  }
@@ -230,7 +235,8 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
    const canonical=g.taleraSavedReceipt?.canonicalByDraft||g.canonicalByDraft||{};
    for(const localOnly of [true,false])for(const id of photoIds()){
     if(signal.aborted||disposed||g.taleraLocationPublishing)return;
-    if(state(id).state!=='pending'||canonical[id]&&!localOnly)continue;
+    const current=state(id),refine=!localOnly&&!canonical[id]&&!manual(id)&&current.place?.source==='offline-country-v1'&&!current.localityChecked;
+    if(!refine&&(current.state!=='pending'||canonical[id]&&!localOnly))continue;
     const original=getAsset(id);if(!original)continue;
     let value;try{value=await inspect(original,'photo',signal,localOnly)}catch(_){value={state:'pending'}}
     if(signal.aborted||disposed||g.taleraLocationPublishing)return;
@@ -240,7 +246,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
    }
   }finally{
    controller=null;running=false;
-   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&!completedDraftLocation(result.get(id))))timer=win.setTimeout(scan,60000);
+   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&(!completedDraftLocation(result.get(id))||!manual(id)&&state(id).place?.source==='offline-country-v1'&&!state(id).localityChecked)))timer=win.setTimeout(scan,60000);
   }
  }
  function wake(){if(timer!==null){win.clearTimeout(timer);timer=null}if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing)void scan()}

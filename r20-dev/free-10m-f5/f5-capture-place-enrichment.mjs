@@ -3,8 +3,9 @@
 // Legacy geocoder misses (v4-no-place) are rechecked once against offline boundaries.
 // Confirmed original metadata and historical reliable place names are retained.
 const capturePlaceCheckDone=item=>['v4-no-readable-gps','v5-no-country'].includes(item?.capturePlaceChecked);
-const confirmedPlace=item=>['iptc-location-created','geonames-locality-v2','offline-country-v1'].includes(item?.capturePlace?.source);
-export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{},retryItems=null,now=Date.now}){
+const confirmedPlace=item=>['iptc-location-created','geonames-locality-v2','offline-country-v1','offline-locality-v1'].includes(item?.capturePlace?.source);
+const needsOfflineLocality=item=>item?.kind==='photo'&&item.capturePlace?.source==='offline-country-v1'&&!item.capturePlace.city&&item.captureLocalityChecked!=='offline-locality-v1'&&!item.manualPhotoLocation;
+export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,resolveLocality=null,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{},retryItems=null,now=Date.now}){
  const paused=()=>({more:true,blocked:true});
  const stories=await list();
  if(!available())return paused();
@@ -20,7 +21,8 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
   let story=initial;
   for(let i=0;i<story.items.length;i++){
    const item=story.items[i];
-   if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||confirmedPlace(item)||capturePlaceCheckDone(item))continue;
+   const upgrading=!!resolveLocality&&needsOfflineLocality(item);
+   if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||(confirmedPlace(item)&&!upgrading)||capturePlaceCheckDone(item))continue;
    if(!available())return paused();
    if(unreadable.has(keyOf(item))||!canLookup()&&deferred.has(keyOf(item)))continue;
    const retryKey=keyOf(item),retryAt=retryItems?.get(retryKey)||0;
@@ -30,7 +32,10 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
    count++;
    diagnose(item.key,'bestand-lezen');
    try{
-    let place=known.get(keyOf(item))||null,reason='no-readable-gps';
+    let place=upgrading?null:known.get(keyOf(item))||null,reason='no-readable-gps',localityChecked=false;
+    // A duplicate country-only descriptor must not suppress the independent
+    // original GPS read while the optional offline locality is available.
+    if(resolveLocality&&item.kind==='photo'&&place?.source==='offline-country-v1')place=null;
     if(!place){
      let original;
      try{original=await blob(item.key)}catch(error){
@@ -47,7 +52,7 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
      // A malformed optional IPTC/XMP packet may not prevent independent GPS extraction.
      if(item.kind==='photo')try{place=await readPlace(original)}catch(_){if(!available())return paused();diagnose(item.key,'iptc-leesfout')}
      if(!available())return paused();
-     if(!place){
+     if(!place||upgrading&&!place.city){
       // If the caller is paused, defer GPS. In the real app,
       // local lookup is available even without a network.
       if(!canLookup()){diagnose(item.key,'wacht-internet-of-configuratie');deferred.add(keyOf(item));continue}
@@ -70,22 +75,43 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
         return {more:true,blocked:true,retryAfterMs:delay,...(retryItems?{diagnostic:result?.diagnostic||'land-verwerking-fout'}:{})};
        }
        place=result.place;reason='no-country';
+       if(upgrading&&place?.source==='offline-country-v1'){
+        if(place.countryCode===item.capturePlace.countryCode){
+         const locality=await resolveLocality(gps,place);
+         if(!available())return paused();
+         if(locality?.ready){place=locality.place;localityChecked=true}
+         else if(upgrading){if(retryItems){const at=now()+60000;retryItems.set(retryKey,at);nextRetry=Math.min(nextRetry,at)}continue}
+        }
+       }
       }
      }
     }
     if(!available())return paused();
+    if(upgrading){
+     // Country-only results may be enriched, never replaced with a different
+     // country or erased. An original metadata place outranks approximate data.
+     if(!place||place.countryCode!==item.capturePlace.countryCode||!place.city&&!localityChecked){
+      place=item.capturePlace;
+      if(reason==='no-readable-gps'||reason==='no-country')localityChecked=true;
+      else continue;
+     }
+    }
     // commit must compare the full snapshot and never recreate a deleted story.
-    const updated=await commit(story,i,place,reason);
+    const updated=await commit(story,i,place,reason,localityChecked);
     if(!available())return paused();
     if(!updated){diagnose(item.key,'catalogus-conflict');if(retryItems){const at=now()+1000;retryItems.set(retryKey,at);nextRetry=Math.min(nextRetry,at)}break}
     story=updated;
-    if(place){known.set(keyOf(item),place);diagnose(item.key,'plaats-opgeslagen')}
+    if(place){known.set(keyOf(item),place);diagnose(item.key,'plaats-opgeslagen');
+     if(resolveLocality&&item.kind==='photo'&&place.source==='offline-country-v1'&&!localityChecked&&!item.manualPhotoLocation&&retryItems){
+      const at=now()+1000;retryItems.set(retryKey,at);nextRetry=Math.min(nextRetry,at)
+     }
+    }
    }catch(_){if(!available())return paused();diagnose(item.key,'verwerking-fout');if(retryItems){const at=now()+60000;retryItems.set(retryKey,at);nextRetry=Math.min(nextRetry,at)} /* optional: never block normal save, read, playback or backup */ }
   }
  }
  return Number.isFinite(nextRetry)?{more:true,blocked:true,retryAfterMs:Math.max(250,nextRetry-now()),itemRetryOnly:true}:{more:false,blocked:false};
 }
-export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,resolveCountry}){
+export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,resolveCountry,resolveLocality=null}){
  if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(dbName)||!['/mijn-leven','/meldingen','/present','/tell'].includes(location.pathname)||window.top!==window)return;
  let activeController=null,running=false,timer=null,timerDue=Infinity,departing=false,pendingDelay=null,blockedUntil=0;
  const available=()=>!departing&&!document.hidden;
@@ -106,7 +132,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   try{return {ok:true,place:resolveCountry(gps)}}catch(_){return {ok:false}}
  };
  if(location.pathname==='/tell')store.lookupConfirmedDevicePlace=lookup;
- const commit=async(expected,index,place,reason,active)=>{
+ const commit=async(expected,index,place,reason,active,localityChecked=false)=>{
   if(!active())return null;
   const db=await bounded(()=>open());
   if(!active())return null;
@@ -119,8 +145,13 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    const current=req.result;
    if(!active()||!current||current.source!=='pwa-local'||JSON.stringify(current)!==JSON.stringify(expected))return;
    const item=current.items[index];
-   if(!item||confirmedPlace(item)||capturePlaceCheckDone(item))return;
-   if(place){item.capturePlace=place;delete item.capturePlaceChecked}
+   const upgrading=!!resolveLocality&&needsOfflineLocality(item);
+   if(!item||(confirmedPlace(item)&&!upgrading)||capturePlaceCheckDone(item))return;
+   if(upgrading&&(!place||place.countryCode!==item.capturePlace.countryCode||!place.city&&!localityChecked))return;
+   if(place){item.capturePlace=place;delete item.capturePlaceChecked;
+    if(localityChecked&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-v1';
+    else if(place.source==='offline-locality-v1')delete item.captureLocalityChecked;
+   }
    else if(['no-readable-gps','no-country'].includes(reason))item.capturePlaceChecked=reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
    else return;
    rows.put(current);updated=current;
@@ -137,7 +168,9 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  store.inspectDraftCapturePlace=async(original,kind,signal,localOnly=false)=>{
   const pending={state:'pending'},active=()=>available()&&!signal?.aborted;
   if(!active()||kind!=='photo'||!(original instanceof Blob)||!original.size)return pending;
-  if(draftResults.has(original))return draftResults.get(original);
+  const previous=draftResults.get(original);
+  const canRefine=!!resolveLocality&&previous?.place?.source==='offline-country-v1'&&!previous.localityChecked;
+  if(previous&&(!canRefine||localOnly))return previous;
   const read=async(fn)=>{
    const controller=new AbortController(),cancel=()=>controller.abort();
    signal?.addEventListener('abort',cancel,{once:true});if(!active())cancel();
@@ -158,7 +191,16 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    const outcome=await lookup(metadata.gps,signal||new AbortController().signal);
    if(!active())return pending;
    if(!outcome.ok){blockedUntil=Math.max(blockedUntil,Date.now()+(outcome.retryAfterMs||60000));return pending}
-   const result=outcome.place?{state:'known',place:outcome.place}:{state:'unknown',reason:'no-country'};
+   let result=outcome.place?{state:'known',place:outcome.place}:{state:'unknown',reason:'no-country'};
+   // Always return the country on the first pass without loading the data.
+   // The second pass refines it locally; no GPS is saved to the draft.
+   if(resolveLocality&&outcome.place?.source==='offline-country-v1'){
+    if(localOnly){draftResults.set(original,result);return result}
+    const locality=await resolveLocality(metadata.gps,outcome.place);
+    if(!active())return pending;
+    if(!locality?.ready){draftResults.set(original,result);return result}
+    result={state:'known',place:locality.place,localityChecked:true};
+   }
    draftMetadata.delete(original);draftResults.set(original,result);return result;
   }catch(_){return pending}
  };
@@ -179,7 +221,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    });
   };
   try{
-   const result=await enrichCapturePlaces({list:async()=>{const rows=await bounded(()=>store.list());queueStatus('wachtrij-bestanden');return rows},blob:id=>bounded(()=>store.blob(id)),readPlace:blob=>readBounded(readPlace,blob),readGps:blob=>readBounded(readGps,blob),lookup:gps=>lookup(gps,signal),commit:(expected,index,place,reason)=>commit(expected,index,place,reason,active),available:active,canLookup:()=>active()&&canLookup(),deferred,unreadable,diagnose,retryItems});
+   const result=await enrichCapturePlaces({list:async()=>{const rows=await bounded(()=>store.list());queueStatus('wachtrij-bestanden');return rows},blob:id=>bounded(()=>store.blob(id)),readPlace:blob=>readBounded(readPlace,blob),readGps:blob=>readBounded(readGps,blob),lookup:gps=>lookup(gps,signal),resolveLocality,commit:(expected,index,place,reason,localityChecked)=>commit(expected,index,place,reason,active,localityChecked),available:active,canLookup:()=>active()&&canLookup(),deferred,unreadable,diagnose,retryItems});
    if(!active())return;
    if(!result.more)unreadable.clear();
    // Old entries cannot grow without bound during long active sessions.

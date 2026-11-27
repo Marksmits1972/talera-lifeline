@@ -1301,11 +1301,13 @@ async function publicPwaSupport(request,env){
  if(!asset||request.method!=='GET'||!env.ASSETS)return deny(404,'PWA-onderdeel niet beschikbaar');
  const source=await env.ASSETS.fetch(new Request(new URL(asset,new URL(request.url).origin)));
  if(!source.ok)return deny(503,'PWA-onderdeel kan niet worden geladen');
- const contentType=pathname==='/sw.js'?'text/javascript; charset=utf-8':
+ const locality=/^\/__talera_free\/places-[a-f0-9]{64}\.(bin|json)$/.test(pathname);
+ if(locality&&new URL(request.url).search)return deny(404,'Onbekend plaatsenregister');
+ const contentType=locality?(pathname.endsWith('.bin')?'application/octet-stream':'application/json; charset=utf-8'):pathname==='/sw.js'?'text/javascript; charset=utf-8':
    pathname==='/manifest.webmanifest'?'application/manifest+json; charset=utf-8':
    pathname.endsWith('.svg')?'image/svg+xml':'image/png';
  const headers=new Headers({
-   'content-type':contentType,'cache-control':'private, no-store',
+   'content-type':contentType,'cache-control':locality?'public, max-age=31536000, immutable':'private, no-store',
    'x-content-type-options':'nosniff'
  });
  if(pathname==='/sw.js')headers.set('service-worker-allowed','/');
@@ -1357,7 +1359,7 @@ export default {
     }
     if(m==='GET'&&!url.search&&(p==='/wachtwoord-vergeten'||p==='/wachtwoord-instellen'))
       return passwordResetPage(p==='/wachtwoord-vergeten'?'request':'confirm');
-    if(m==='GET'&&PUBLIC_INSTALL_ICON_PATHS.has(p))
+    if(m==='GET'&&(PUBLIC_INSTALL_ICON_PATHS.has(p)||/^\/__talera_free\/places-[a-f0-9]{64}\.(bin|json)$/.test(p)&&Object.hasOwn(verifiedPublicSupport,p)))
       return publicPwaSupport(request,env);
     // Preserve the ALREADY iPhone-approved 9-November original back route.
     // It must never regress when the separate local-backup branch is merged.

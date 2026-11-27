@@ -1288,7 +1288,7 @@ async function testTimelineLoupe(){
     const isGeo=url=>{const u=new URL(url);return u.origin===origin&&u.pathname==='/api/capture-place'};
     geoCtx.on('request',request=>{if(isGeo(request.url()))observed.push(request.method())});
     await geoCtx.route(url=>isGeo(url.href),async route=>{sent.push(route.request().method());await route.abort()});
-    const country='Nederland',expectedPlace={countryCode:'NL',country,city:'',source:'offline-country-v1'};
+    const country='Nederland',expectedPlace={countryCode:'NL',country,city:'Arnhem',source:'offline-locality-v1'},expectedLabel=country+' · omgeving Arnhem';
     const geoPage=await geoCtx.newPage(),geoErrors=[];
     geoPage.on('pageerror',error=>geoErrors.push(error.message));
     const editor=await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
@@ -1310,7 +1310,7 @@ async function testTimelineLoupe(){
       }
       entry(0,1,2,2,'N');entry(1,2,5,3,82);
       entry(2,3,2,2,'E');entry(3,4,5,3,106);
-      [51,59,6,5,53,18].forEach((n,i)=>{u32(82+i*8,n);u32(86+i*8,1)});
+      [51,58,48,5,54,40].forEach((n,i)=>{u32(82+i*8,n);u32(86+i*8,1)});
       const len=2+6+t.length,marker=Uint8Array.from([255,225,len>>8,len&255,69,120,105,102,0,0,...t]);
       const file=new File([original.subarray(0,2),marker,original.subarray(2)],'synthetic-gps.jpg',{type:'image/jpeg'});
       return [...new Uint8Array(await file.arrayBuffer())];
@@ -1359,7 +1359,7 @@ async function testTimelineLoupe(){
     await geoPage.waitForFunction(expected=>{
       const row=document.getElementById('talera-capture-place');
       return row&&!row.hidden&&row.getClientRects().length>0&&row.textContent===expected;
-    },country,{timeout:20000});
+    },expectedLabel,{timeout:30000});
     const stored=await geoPage.evaluate(async id=>{
       const row=await window.TaleraMemories.get(id),item=row.items[0];
       return {key:item.key,place:item.capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]};
@@ -1384,7 +1384,7 @@ async function testTimelineLoupe(){
     let editorPlace=null;
     for(let attempt=0;attempt<75;attempt++){
       editorPlace=await geoPage.evaluate(async id=>(await window.TaleraMemories.get(id))?.items?.[0]?.capturePlace??null,editorId);
-      if(editorPlace?.countryCode==='NL')break;
+      if(editorPlace?.source==='offline-locality-v1')break;
       await geoPage.waitForTimeout(200);
     }
     assert.deepEqual(editorPlace,expectedPlace,'Save in editor must wake independent library');
@@ -1400,7 +1400,7 @@ async function testTimelineLoupe(){
     await geoPage.locator('[data-open]').first().click();
     await geoPage.locator('.talera-location-toggle').waitFor({state:'visible',timeout:15000});
     await geoPage.locator('.talera-location-toggle').click();
-    await geoPage.locator('.talera-location-tile-label').filter({hasText:country}).waitFor({state:'visible',timeout:20000});
+    await geoPage.locator('.talera-location-tile-label').filter({hasText:expectedLabel}).waitFor({state:'visible',timeout:30000});
     assert.equal(sent.length,0,'Draft location must be recognized locally before publication');
     assert.equal(await geoPage.evaluate(async()=> (await window.TaleraMemories.list()).length),0,'Draft recognition must not publish a story');
     await geoPage.locator('#publish').click();

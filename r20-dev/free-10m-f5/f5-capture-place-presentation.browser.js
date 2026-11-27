@@ -48,10 +48,10 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
   return {storyId:memory.storyId,key:frame.key,guard,identity:JSON.stringify([memory.storyId,frame.key,guard])};
  }
  function valid(place){
-  if(!place||!['iptc-location-created','geonames-locality-v2','offline-country-v1'].includes(place.source)||!Object.hasOwn(flagPositions,place.countryCode))return null;
+  if(!place||!['iptc-location-created','geonames-locality-v2','offline-country-v1','offline-locality-v1'].includes(place.source)||!Object.hasOwn(flagPositions,place.countryCode))return null;
   const safe=x=>typeof x==='string'&&x.length>0&&x.length<=120&&
    !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(x);
-  if((place.city!==''&&!safe(place.city))||(place.source==='geonames-locality-v2'&&!place.city)||!safe(place.country))return null;
+  if((place.city!==''&&!safe(place.city))||(['geonames-locality-v2','offline-locality-v1'].includes(place.source)&&!place.city)||!safe(place.country))return null;
   try{
    const country=new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(place.countryCode);
    if(country!==place.country)return null;
@@ -91,7 +91,7 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
    const locale=window.TaleraI18n?.locale||document.documentElement.lang||'en';
    let localizedCountry=place.country||place.countryCode||'';if(place.countryCode)try{localizedCountry=new Intl.DisplayNames([locale],{type:'region',fallback:'none'}).of(place.countryCode)||localizedCountry}catch{}
    const locationLabel=place.source==='geonames-locality-v2'
-    ?window.TaleraI18n.t('core.present.captureNear',{city:place.city}):place.city;
+    ?window.TaleraI18n.t('core.present.captureNear',{city:place.city}):place.source==='offline-locality-v1'?window.TaleraI18n.t('core.present.captureOfflineNear',{city:place.city}):place.city;
    label.textContent=[localizedCountry,locationLabel].filter(Boolean).join(' · ');row.hidden=false;
   });
  }

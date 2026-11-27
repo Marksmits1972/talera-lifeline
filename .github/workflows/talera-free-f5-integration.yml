@@ -19,39 +19,9 @@ permissions:
   actions: read
 
 jobs:
-  f5_prepare_offline_locality_data:
-    name: Freeze official public GeoNames cities500 source for existing TALERA
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'prepare-TALERA-free-offline-locality-data-20261127' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-      - name: Fetch the public GeoNames source and freeze only validated data in current branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          branch=feature/free-f5-library-boundary-20261117
-          test "$GITHUB_REF_NAME" = "$branch"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA"
-          base=r20-dev/free-10m-f5
-          test ! -e "$base/f5-offline-locality-data.bin"
-          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 2 --max-time 150 --max-filesize 50000000 https://download.geonames.org/export/dump/cities500.zip -o "$RUNNER_TEMP/geonames-cities500.zip"
-          python3 "$base/f5-offline-locality-build.py" "$RUNNER_TEMP/geonames-cities500.zip" "$base/f5-offline-locality-data.bin"
-          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA"
-          git add "$base/f5-offline-locality-data.bin" "$base/f5-offline-locality-data.json"
-          test "$(git diff --cached --name-only | wc -l)" -eq 2
-          git -c user.name='TALERA data preparation' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Freeze CC BY GeoNames cities500 data for TALERA offline place recognition (no release)'
-          git push origin "HEAD:refs/heads/$branch"
-          echo "TALERA_FROZEN_LOCALITY_DATA_COMMIT=$(git rev-parse HEAD)"
-
   f5_candidate_package:
     name: Build and archive the exact TALERA Free candidate once
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-location-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-offline-locality-data-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-location-exact-green-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -74,7 +44,7 @@ jobs:
           npm ci
           node r20-dev/free-10m-delivery/build.mjs
           node r20-dev/free-10m-f5/f5-public-assets.mjs
-          node --test r20-dev/free-10m-f5/f5-language.test.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs
+          node --test r20-dev/free-10m-f5/f5-language.test.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs r20-dev/free-10m-f5/f5-offline-locality.test.mjs
       - name: Archive allowlisted anonymous software outputs and bind to exact commit
         id: package
         run: |

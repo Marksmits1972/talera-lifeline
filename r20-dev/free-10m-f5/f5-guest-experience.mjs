@@ -335,6 +335,16 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
  ].join('\n').replace('__GUEST_ROW__',safe(row)).replace('__GUEST_MEDIA__',safe(media));
  let html=original.slice(0,matched[0].index+matched[0][0].length)+'\n'+bridge+'\n'+
   original.slice(matched[0].index+matched[0][0].length);
+ // Keep the already-approved presentation tint motor as the single writer
+ // of theme-color. Only guest mode supplies the selected photo colour;
+ // raising the original reading sheet must retain its existing paper tint.
+ const tintPhoto="setBottomColor(reading ? paper : BLACK, reading ? 'tekstpaneel' : 'foto');";
+ const tintRefresh="window.addEventListener('pageshow', sync, {passive:true});";
+ if(html.split(tintPhoto).length!==2||html.split(tintRefresh).length!==2)
+  throw Error('GUEST_ORIGINAL_TINT_MOTOR_DRIFT');
+ html=html.replace(tintPhoto,
+   "setBottomColor(reading ? paper : (doc.style.getPropertyValue('--talera-guest-edge-top')||BLACK), reading ? 'tekstpaneel' : 'foto');")
+  .replace(tintRefresh,tintRefresh+"\n    window.addEventListener('talera:guest-edge-change', sync);");
  // Do not mount a separate photo stage, story sheet, player or timeline.
  // The original TALERA DOM retains its own iPhone lift-to-read gesture.
  const guestUi=[
@@ -519,10 +529,8 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   "// Visual-only theme hints; samples the already decoded, selected photo locally.",
   "// No change to the native player, no network request, no photo data retained.",
   "const edgeRoot=document.documentElement;",
-  "let edgeMeta=document.querySelector('meta[name=\"theme-color\"]');",
-  "if(!edgeMeta){edgeMeta=document.createElement('meta');edgeMeta.name='theme-color';document.head.append(edgeMeta)}",
   "let sampledEdgeSource='',sampledEdgeSize='';",
-  "const setEdgeColors=(top,bottom)=>{edgeRoot.style.setProperty('--talera-guest-edge-top',top);edgeRoot.style.setProperty('--talera-guest-edge-bottom',bottom);edgeMeta.content=top;};",
+  "const setEdgeColors=(top,bottom)=>{edgeRoot.style.setProperty('--talera-guest-edge-top',top);edgeRoot.style.setProperty('--talera-guest-edge-bottom',bottom);window.dispatchEvent(new Event('talera:guest-edge-change'));};",
   "const neutralEdges=()=>{sampledEdgeSource='';sampledEdgeSize='';setEdgeColors('#17344a','#17344a')};",
   "const sampleGuestEdges=()=>{",
   " if(document.hidden)return;",
@@ -532,9 +540,11 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   " if(m._zeroFrames?.[index]?.kind!=='photo'){if(sampledEdgeSource)neutralEdges();return}",
   " const src=m.photos?.[index];",
   " if(typeof src!=='string'||!src.startsWith('blob:'))return;",
-  " const img=[...document.querySelectorAll('#photoStage img')].find(im=>im.currentSrc===src&&im.complete&&im.naturalWidth>0&&im.naturalHeight>0);",
+  " const stage=$('photoStage');if(!stage)return;",
+  " const images=[...stage.querySelectorAll('img')].filter(im=>im.currentSrc===src&&im.complete&&im.naturalWidth>0&&im.naturalHeight>0);",
+  " const img=images.find(im=>im.matches('.talera-story-synced-sharp,#memoryPhotoA,#memoryPhotoB'))||images[0];",
   " if(!img)return;",
-  " const rect=img.getBoundingClientRect();",
+  " const rect=stage.getBoundingClientRect();",
   " if(rect.width<1||rect.height<1)return;",
   " const size=rect.width+'x'+rect.height;",
   " if(sampledEdgeSource===src&&sampledEdgeSize===size)return;",
@@ -640,8 +650,8 @@ export function renderOriginalTaleraShare(original,share,pagePath,tokenHex,openG
   (share.hasPhoto?escapeHtml(pagePath)+'/photo':null);
  const hasVisual=!!(share.hasPhoto||share.hasVideo);
  const bootstrap='<style id="talera-guest-first-frame-bootstrap">'+
-  'html{background:var(--talera-guest-edge-top,#17344a)!important}'+
-  'html body{background:var(--talera-guest-edge-bottom,#17344a)!important}'+
+  'html:not([data-talera-present-reading="true"]){background-color:var(--talera-guest-edge-top,#17344a)!important}'+
+  'html:not([data-talera-present-reading="true"]) body[data-talera-guest="one-memory"]{background-color:var(--talera-guest-edge-bottom,#17344a)!important}'+
   '#taleraGuestEntryCover{position:fixed;inset:0;z-index:2147480180;pointer-events:none;overflow:hidden;background:#17344a}'+
   '#taleraGuestEntryCover img{display:block;width:100%;height:100%;object-fit:cover}'+
   '</style>'+

@@ -2295,7 +2295,10 @@ window.__taleraShareProgress=taleraShareProgress;
     throw Error('Onveilige uitnodigingslink');
    const message=messageChoice==='personal'?personalMessage.trim():taleraStandardText();
    if(!message)throw Error('Schrijf eerst je persoonlijke bericht.');
-   const url=target.href;
+   // Only the validated outgoing caption uses the existing public redirect.
+   // Claims, media and storage stay on the exact same canonical app origin.
+   const url=target.origin==='https://talera-free-f5-storage-qa-20261109.mark-a39.workers.dev'
+     ?'https://talera.app'+target.pathname:target.href;
    const caption=message+'\n\n'+url;
    const fallback=()=>{taleraRememberWhatsAppHandoff();location.assign('https://wa.me/?text='+encodeURIComponent(caption))};
    const photo=taleraNativeSharePhoto;

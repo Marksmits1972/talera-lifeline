@@ -1259,7 +1259,7 @@ function installCapturePlaceCatalog(html,route){
  html=html.replace(item,()=>item+
   "\n  if(kind==='photo')try{\n"+
   "   const capturePlace=await readCapturePlace(f);\n"+
-  "   if(capturePlace)files[files.length-1].capturePlace=capturePlace;\n"+
+  "   if(capturePlace&&!files[files.length-1].capturePlace)files[files.length-1].capturePlace=capturePlace;\n"+
   "  }catch(_){ /* Optional metadata must never prevent posting. */ }\n");
  // Mount one library-owned enrichment process on every authenticated main
  // screen, using the original local store closure, never a second IndexedDB owner.
@@ -1267,12 +1267,15 @@ function installCapturePlaceCatalog(html,route){
  assert.ok(gpsStart>=0&&gpsEnd>end,'CAPTURE_GPS_READER_SOURCE_DRIFT');
  const gpsReaders=raw.slice(gpsStart,start)+raw.slice(end,gpsEnd);
  const enrichment=readFileSync(path.join(here,'f5-capture-place-enrichment.mjs'),'utf8').replaceAll('export ','');
+ const countryEngine=readFileSync(path.join(here,'f5-offline-country.mjs'),'utf8').replaceAll('export ','');
+ const countryData=JSON.stringify(JSON.parse(readFileSync(path.join(here,'f5-offline-country-data.json'),'utf8')));
+ assert.ok(!countryEngine.includes('</script')&&!countryData.includes('</script'),'COUNTRY_DATA_UNSAFE');
  assert.ok(!gpsReaders.includes('</script')&&!enrichment.includes('</script'),'CAPTURE_ENRICHMENT_UNSAFE_SOURCE');
  const matches=[...html.matchAll(/window\.TaleraMemories=\{[^\n;]*localOnly:true\};/g)];
  assert.equal(matches.length,1,'CAPTURE_ENRICHMENT_STORE_MARKER_DRIFT');
  const mount=matches[0],at=mount.index+mount[0].length;
- const install='\n'+gpsReaders+'\n'+enrichment+'\n'+
-  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:readOriginalCaptureGps,enabled:/*TALERA_GEONAMES_ENABLED*/false});\n";
+ const install='\n'+gpsReaders+'\n'+enrichment+'\n'+countryEngine+'\n'+
+  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:readOriginalCaptureGps,resolveCountry:createOfflineCountryResolver("+countryData+")});\n";
  return html.slice(0,at)+install+html.slice(at);
 }
 

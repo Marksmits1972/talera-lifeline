@@ -25,6 +25,22 @@ allowed=false;assert.equal((await capturePlaceApi(req(),env,deps)).status,429);a
 console.log('TALERA_GEONAMES_AUTH_SCOPE_LIMIT_PRIVACY_CONTRACT_PASS');
 
 import {enrichCapturePlaces,mountCapturePlaceEnrichment} from './f5-capture-place-enrichment.mjs';
+import {createOfflineCountryResolver} from './f5-offline-country.mjs';
+import {readFileSync} from 'node:fs';
+const countryResolver=createOfflineCountryResolver(JSON.parse(readFileSync(new URL('./f5-offline-country-data.json',import.meta.url),'utf8')));
+// Geographic fixtures are public coordinates, never the user's photos or position.
+for(const [countryCode,latitude,longitude] of [
+ ['FR',48.8566,2.3522],['NL',51.59,5.32],['DE',52.52,13.405],['ES',40.4168,-3.7038],
+ ['IT',41.902,12.496],['NO',59.91,10.75],['GB',51.5074,-.1278],['BE',50.85,4.35],
+ ['US',38.9072,-77.0369],['CA',45.42,-75.69],['BR',-15.79,-47.88],['KE',-1.29,36.82],
+ ['IN',28.61,77.21],['JP',35.68,139.65],['AU',-33.8688,151.2093],['NZ',-41.29,174.78],
+ ['FJ',-17.8,178.0]
+]){
+ const place=countryResolver({latitude,longitude});
+ assert.deepEqual(place,{countryCode,country:new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(countryCode),city:'',source:'offline-country-v1'});
+}
+for(const gps of [{latitude:0,longitude:0},{latitude:48.57,longitude:7.79},{latitude:91,longitude:0},{latitude:NaN,longitude:0},{latitude:0,longitude:181},{}])assert.equal(countryResolver(gps),null);
+console.log('TALERA_OFFLINE_COUNTRY_17_COUNTRIES_BORDER_OCEAN_INVALID_PASS');
 const original=new Blob(['gps'],{type:'image/jpeg'});
 const record={id:'story-a',source:'pwa-local',items:[{key:'photo-a',kind:'photo',mime:'image/jpeg',size:3,name:'a.jpg'}]};
 const duplicate={...record,id:'story-b',items:[{...record.items[0]}]};
@@ -37,7 +53,7 @@ const options={list:async()=>structuredClone(catalog),blob:async()=>original,
   if(deleted)return null;
   const current=catalog.find(x=>x.id===expected.id);
   assert.deepEqual(current,expected);writes++;
-  if(value)current.items[index].capturePlace=value;else current.items[index].capturePlaceChecked='v4-'+reason;
+  if(value)current.items[index].capturePlace=value;else current.items[index].capturePlaceChecked=reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
   return structuredClone(current);
  }};
 await enrichCapturePlaces(options);assert.equal(requests,0);assert.equal(writes,0);
@@ -97,7 +113,7 @@ console.log('TALERA_OLD_LOCALITY_RECHECK_ONCE_PASS');
  let unknownPlaceRequests=0;
  const noPlace={...options,lookup:async()=>{unknownPlaceRequests++;return {ok:true,place:null}}};
  await enrichCapturePlaces(noPlace);
- assert.equal(catalog[0].items[0].capturePlaceChecked,'v4-no-place');
+ assert.equal(catalog[0].items[0].capturePlaceChecked,'v5-no-country');
  assert.equal(catalog[0].items[0].capturePlace,undefined);
  await enrichCapturePlaces(noPlace);assert.equal(unknownPlaceRequests,1);
  console.log('TALERA_GPS_FOUND_BUT_UNRESOLVED_LOCATION_DISTINCT_NEGATIVE_PASS');
@@ -119,7 +135,7 @@ console.log('TALERA_UNREADABLE_HISTORICAL_MEDIA_DO_NOT_STARVE_LATER_GPS_PASS');
 // TEMPORARY diagnostic contracts: codes only; failed lookups do not mark/write.
 catalog=[structuredClone(record)];const diagnosticCodes=[];
 await enrichCapturePlaces({...options,diagnose:(key,code)=>diagnosticCodes.push(code),lookup:async()=>({ok:false,diagnostic:'api-503'})});
-assert.deepEqual(diagnosticCodes,['bestand-lezen','gps-gevonden','geonames-aanvraag','api-503']);
+assert.deepEqual(diagnosticCodes,['bestand-lezen','gps-gevonden','land-lokaal-bepalen','api-503']);
 assert.equal(catalog[0].items[0].capturePlace,undefined);
 assert.equal(catalog[0].items[0].capturePlaceChecked,undefined);
 catalog=[structuredClone(record)];diagnosticCodes.length=0;
@@ -211,7 +227,7 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
   const second=new Promise(resolve=>{secondResolve=resolve});
   try{
    mountCapturePlaceEnrichment({
-    dbName:'talera-free-local-'+'a'.repeat(32)+'-v1',enabled:false,
+    dbName:'talera-free-local-'+'a'.repeat(32)+'-v1',resolveCountry:countryResolver,
     store:{list:async()=>[structuredClone(record)],blob:async()=>original},
     open:async()=>{opened++;throw Error('no transaction during interrupted read')},
     done:()=>{throw Error('unexpected transaction')},
@@ -223,7 +239,7 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
      }
      secondSignal=signal;secondResolve();return null;
     },
-    readGps:async()=>{throw Error('no GPS while disabled')}
+    readGps:async()=>{throw Error('interrupted scan must not commit')}
    });
    await first;
    win.dispatchEvent(new Event('beforeunload'));assert.equal(firstSignal.aborted,true);
@@ -241,51 +257,37 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
  }
  console.log('TALERA_CAPTURE_MOUNT_PAGEHIDE_PAGESHOW_RETRY_PASS');
 
-// Draft inspection shares the exact private reader and provider path but owns
-// no story write. An offline GPS photo stays pending, a confirmed absent GPS
-// photo is unknown, and a completed draft response is reused in that document.
+// The actual installed candidate must finish recognition on a disconnected
+// device. No external API, no private catalog write and no current location.
 {
  const names=['window','document','location','navigator','fetch'];
  const originals=new Map(names.map(n=>[n,Object.getOwnPropertyDescriptor(globalThis,n)]));
  const win=new EventTarget(),doc=new EventTarget();win.top=win;doc.hidden=false;
- const nav={onLine:false},tagged=new Blob([Uint8Array.of(1)],{type:'image/jpeg'}),plain=new Blob([Uint8Array.of(2)],{type:'image/jpeg'}),gps=new Blob([Uint8Array.of(3)],{type:'image/jpeg'});
- let requests=0,reads=0,providerResult=resolved;
+ const nav={onLine:false},tagged=new Blob([Uint8Array.of(1)],{type:'image/jpeg'}),plain=new Blob([Uint8Array.of(2)],{type:'image/jpeg'}),gps=new Blob([Uint8Array.of(3)],{type:'image/jpeg'}),ocean=new Blob([Uint8Array.of(4)],{type:'image/jpeg'});
+ let requests=0,reads=0,lookups=0;
+ const local={countryCode:'NL',country:'Nederland',city:'',source:'offline-country-v1'};
  try{
   for(const [n,v] of Object.entries({window:win,document:doc,location:{pathname:'/tell'},navigator:nav,
-   fetch:async(url,opts)=>{requests++;assert.equal(url,'/api/capture-place');assert.deepEqual(Object.keys(JSON.parse(opts.body)).sort(),['latitude','longitude']);return Response.json({place:providerResult})}}))
+   fetch:async()=>{requests++;throw Error('No location network request permitted')}}))
    Object.defineProperty(globalThis,n,{configurable:true,writable:true,value:v});
   const store={list:async()=>[]};
-  mountCapturePlaceEnrichment({dbName:'talera-free-local-'+'b'.repeat(32)+'-v1',enabled:true,store,
+  mountCapturePlaceEnrichment({dbName:'talera-free-local-'+'b'.repeat(32)+'-v1',resolveCountry:gps=>{lookups++;return countryResolver(gps)},store,
    open:()=>{throw Error('draft inspection must not create a catalog row')},done:()=>{},
    readPlace:async original=>{reads++;return original===tagged?iptc:null},
-   readGps:async original=>original===gps||original.size===2?{latitude:51.985,longitude:5.88}:null});
+   readGps:async original=>original===gps?{latitude:51.985,longitude:5.88}:original===ocean?{latitude:0,longitude:0}:null});
   const signal=new AbortController().signal;
   assert.deepEqual(await store.inspectDraftCapturePlace(tagged,'photo',signal,true),{state:'known',place:iptc});
   assert.deepEqual(await store.inspectDraftCapturePlace(plain,'photo',signal,true),{state:'unknown',reason:'no-readable-gps'});
-  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal,true),{state:'pending'});
-  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'pending'});
-  assert.equal(requests,0);assert.equal(reads,3);
-  nav.onLine=true;
-  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'known',place:resolved});
-  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'known',place:resolved});
-  assert.equal(requests,1);assert.equal(reads,3);
-  providerResult=null;const unresolved=new Blob([Uint8Array.of(4,5)],{type:'image/jpeg'});
-  assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal,true),{state:'pending'});
-  assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal),{state:'unknown',reason:'no-place'});
-  assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal),{state:'unknown',reason:'no-place'});
-  assert.equal(requests,2);
-  // Explicit consent fallback reuses the exact existing account-scoped API,
-  // is not a photo metadata read, and never modifies/saves a catalog row.
+  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal,true),{state:'known',place:local});
+  assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'known',place:local});
+  assert.deepEqual(await store.inspectDraftCapturePlace(ocean,'photo',signal,true),{state:'unknown',reason:'no-country'});
+  assert.deepEqual(await store.inspectDraftCapturePlace(ocean,'photo',signal),{state:'unknown',reason:'no-country'});
+  assert.equal(lookups,2);assert.equal(reads,4);assert.equal(requests,0);
   const device={latitude:51.985,longitude:5.88};
-  nav.onLine=false;
-  assert.deepEqual(await store.lookupConfirmedDevicePlace(device,signal),{ok:false});assert.equal(requests,2);
-  nav.onLine=true;
-  assert.deepEqual(await store.lookupConfirmedDevicePlace({...device,latitude:91},signal),{ok:false});assert.equal(requests,2);
-  providerResult=resolved;
-  assert.deepEqual(await store.lookupConfirmedDevicePlace(device,signal),{ok:true,place:resolved});assert.equal(requests,3);
+  assert.deepEqual(await store.lookupConfirmedDevicePlace(device,signal),{ok:true,place:local});
+  assert.deepEqual(await store.lookupConfirmedDevicePlace({...device,latitude:91},signal),{ok:false});
   assert.deepEqual(await store.inspectDraftCapturePlace(plain,'photo',signal),{state:'unknown',reason:'no-readable-gps'});
-  assert.equal(requests,3); // device location never replaces original GPS evidence
-
+  assert.equal(lookups,3);assert.equal(requests,0);
   const canceled=new AbortController();canceled.abort();
   assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',canceled.signal),{state:'pending'});
   win.dispatchEvent(new Event('pagehide'));
@@ -293,4 +295,4 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
   for(const [n,d] of originals)if(d)Object.defineProperty(globalThis,n,d);else delete globalThis[n];
  }
 }
-console.log('TALERA_DRAFT_INSPECTION_LOCAL_FIRST_OFFLINE_PENDING_NO_CATALOG_WRITE_PASS');
+console.log('TALERA_DRAFT_INSPECTION_GPS_COUNTRY_OFFLINE_NO_CATALOG_WRITE_NO_NETWORK_PASS');

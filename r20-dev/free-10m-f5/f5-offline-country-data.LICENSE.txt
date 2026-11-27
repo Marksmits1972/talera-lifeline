@@ -1,0 +1,11 @@
+TALERA offline country lookup data
+Natural Earth vector data 5.1.2, 1:50m admin-0 boundary map units (public domain).
+Source: https://www.naturalearthdata.com/about/terms-of-use/
+Derived geometry: https://github.com/cublya/world-atlas/blob/53dae26f52046f4e196ffe2e56b2d7136fb704b0/countries-independent-50m.json
+Source blob 2a517ac13cd5f6154db7ba5ea37391dcdf95866a.
+Quantized delta arcs encoded as unsigned zigzag varints (base64); map units
+retain their polygon/ring topology. ISO alpha-2 codes from source, except France
+and Norway: Natural Earth ISO_A2_EH (FR and NO). Units lacking an unambiguous
+code and disputed/indeterminate units are not auto-assigned. Natural Earth is
+cartographic generalization, not a legal or surveying boundary. No inference
+by nearest country; near competing borders and outside polygons are unknown.

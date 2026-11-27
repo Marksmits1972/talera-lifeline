@@ -12,10 +12,10 @@ export function manualLocationPatch(existing,input,codes){
  return existing&&Object.hasOwn(existing,'manualLocation')?{manualLocation:existing.manualLocation}:{};
 }
 export function confirmedPhotoLocation(place,codes){
- if(!place||!['iptc-location-created','geonames-locality-v2'].includes(place.source)||typeof place.country!=='string')return null;
+ if(!place||!['iptc-location-created','geonames-locality-v2','offline-country-v1'].includes(place.source)||typeof place.country!=='string')return null;
  try{
   const location=normalizeManualLocation({countryCode:place.countryCode,city:place.city},codes);
-  if(!location?.countryCode||!location.city||new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(location.countryCode)!==place.country)return null;
+  if(!location?.countryCode||(place.source==='geonames-locality-v2'&&!location.city)||(place.source==='offline-country-v1'&&location.city)||new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(location.countryCode)!==place.country)return null;
   return {...location,country:place.country,source:place.source};
  }catch(_){return null}
 }
@@ -30,13 +30,14 @@ export function selectDisplayedLocation(story,item,codes){
  const automatic=confirmedPhotoLocation(item?.capturePlace,codes);
  let manual=null;try{manual=normalizePhotoLocation(item?.manualPhotoLocation??null,codes)}catch(_){}
  if(manual&&(manual.mode==='correct'||!automatic))return {countryCode:manual.countryCode,city:manual.city,source:'manual-photo'};
+ if(manual&&automatic&&!automatic.city&&manual.city&&(!manual.countryCode||manual.countryCode===automatic.countryCode))return {countryCode:automatic.countryCode,city:manual.city,source:'manual-photo'};
  return automatic;
 }
 // Legacy v3 and old draft negatives had no proof of whether GPS was read.
  // Never treat them as settled; re-read the original with the current reader.
 export function completedDraftLocation(result){
  return !!result&&(result.state==='known'&&!!result.place||result.state==='unknown'&&
-  Object.keys(result).sort().join(',')==='reason,state'&&['no-readable-gps','no-place'].includes(result.reason));
+  Object.keys(result).sort().join(',')==='reason,state'&&['no-readable-gps','no-country'].includes(result.reason));
 }
 // Called only for the existing save's ordered uploads, after original metadata
 // was retained/read. Explicit single correction is distinct from bulk fill.
@@ -50,18 +51,18 @@ export function applyPhotoLocationInputs(items,inputs,codes){
   if(!confirmedPhotoLocation(item.capturePlace,codes)&&input.automatic){
    const result=input.automatic,place=confirmedPhotoLocation(result.place,codes);
    if(result.state==='known'&&place){item.capturePlace=place;delete item.capturePlaceChecked}
-   else if(result.state==='unknown'&&completedDraftLocation(result))item.capturePlaceChecked='v4-'+result.reason;
+   else if(result.state==='unknown'&&completedDraftLocation(result))item.capturePlaceChecked=result.reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
   }
   if(Object.hasOwn(input,'manual')){
    const manual=normalizePhotoLocation(input.manual,codes);
    if(!manual)delete item.manualPhotoLocation;
-   else if(manual.mode==='correct'||!confirmedPhotoLocation(item.capturePlace,codes))item.manualPhotoLocation=manual;
+   else if(manual.mode==='correct'||!confirmedPhotoLocation(item.capturePlace,codes)||!item.capturePlace.city&&manual.city&&(!manual.countryCode||manual.countryCode===item.capturePlace.countryCode))item.manualPhotoLocation=manual;
   }
  }
 }
 export function localPhotoState(item,codes){
  if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes)};
- if(['v4-no-readable-gps','v4-no-place'].includes(item?.capturePlaceChecked))return {state:'unknown',reason:item.capturePlaceChecked.slice(3)};
+ if(['v4-no-readable-gps','v5-no-country'].includes(item?.capturePlaceChecked))return {state:'unknown',reason:item.capturePlaceChecked.slice(3)};
  return {state:'pending'};
 }
 export function draftPhotoChanges(g){
@@ -106,7 +107,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  if(!photoIds().length)return;
  if(!g.taleraLocationResults)Object.defineProperty(g,'taleraLocationResults',{configurable:true,value:new Map(Object.entries(g.photoLocationAutomatic||{}))});
  const result=g.taleraLocationResults,existing=new Map();let disposed=false,running=false,controller=null,timer=null,serial=0;
- let selected=new Set(),seenUnknown=new Set(),single=null,entry={countryCode:'',city:''};
+ let single=null,singleMode='fill',entry={countryCode:'',city:''};
  let deviceAttempt=null;const deviceStatus=new Map();
  const box=doc.createElement('section');box.className='talera-memory-location';box.dataset.taleraExplicitLanguage='';
  const node=(tag,cls,parent)=>{const x=doc.createElement(tag);if(cls)x.className=cls;if(parent)parent.append(x);return x};
@@ -118,11 +119,10 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  const chevron=node('span','talera-location-chevron',toggle);chevron.setAttribute('aria-hidden','true');
  const panel=node('div','talera-location-panel',box);panel.id='talera-memory-location-fields';panel.hidden=true;toggle.setAttribute('aria-controls',panel.id);toggle.setAttribute('aria-expanded','false');
  const legacy=node('p','talera-location-status',panel);
- const recognizedHeading=node('h3','talera-location-label',panel),recognized=node('div','talera-location-grid',panel);
- const unknownHeading=node('h3','talera-location-label',panel),deviceHint=node('p','talera-location-status',panel),unknown=node('div','talera-location-grid',panel);
- const pendingHeading=node('h3','talera-location-label',panel),pending=node('div','talera-location-grid',panel);
+ const rows=node('div','talera-location-list',panel);
  const form=node('div','talera-location-form',panel);
  const modeLabel=node('p','talera-location-status',form),reset=button('talera-location-clear',form);
+ const deviceHint=node('p','talera-location-status',form),use=button('talera-location-device',form),deviceFeedback=node('p','talera-location-tile-status',form);deviceFeedback.setAttribute('role','status');
  const countryLabel=node('label','talera-location-label',form);countryLabel.htmlFor='talera-memory-country';
  const country=button('talera-location-country',form);country.id=countryLabel.htmlFor;country.setAttribute('aria-haspopup','dialog');
  const countryFlag=node('span','talera-location-flag',country);countryFlag.setAttribute('aria-hidden','true');
@@ -141,9 +141,11 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  const state=id=>{const catalog=localPhotoState(existing.get(id),codes),candidate=result.get(id);return catalog.state!=='pending'?catalog:completedDraftLocation(candidate)?candidate:catalog};
  const manual=id=>{try{return normalizePhotoLocation(Object.hasOwn(g.photoLocations||{},id)?g.photoLocations[id]:existing.get(id)?.manualPhotoLocation??null,codes)}catch(_){return null}};
  const display=id=>selectDisplayedLocation(null,{capturePlace:state(id).place,manualPhotoLocation:manual(id)},codes);
- const unknownIds=()=>photoIds().filter(id=>state(id).state==='unknown'&&!display(id));
+ const photoNumber=id=>g.media.indexOf(id)+1;
+ function closeEntry(){deviceAttempt?.controller.abort();deviceAttempt=null;single=null;entry={countryCode:'',city:''}}
  function chooseSingle(id){
-  single=id;const value=display(id);entry=value?{countryCode:value.countryCode,city:value.city}:{countryCode:'',city:''};paint();
+  if(single===id){closeEntry();paint();return}
+  closeEntry();single=id;const value=display(id);singleMode=value?'correct':'fill';entry=value?{countryCode:value.countryCode,city:value.city}:{countryCode:'',city:''};paint();form.scrollIntoView?.({block:'nearest'});
  }
  function setManual(id,value){g.photoLocations={...(g.photoLocations||{}),[id]:value}}
  // Never rely on selected bulk IDs or filenames; the click confirms one exact
@@ -152,7 +154,6 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  const deviceEligible=id=>!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().includes(id)&&state(id).reason==='no-readable-gps'&&!display(id);
  async function confirmDevicePlace(id){
   if(deviceAttempt||!deviceEligible(id))return;
-  if(win.navigator.onLine===false){deviceStatus.set(id,'deviceOffline');paint();return}
   const original=getAsset(id),attempt={id,controller:new AbortController()};
   if(!original)return;
   deviceAttempt=attempt;deviceStatus.delete(id);paint();
@@ -162,7 +163,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
     lookup:(gps,activeSignal)=>deviceAttempt===attempt&&deviceEligible(id)&&getAsset(id)===original?lookupDevicePlace(gps,activeSignal):{ok:false},signal});
    if(signal.aborted||deviceAttempt!==attempt||!deviceEligible(id)||getAsset(id)!==original)return;
    const place=outcome.status==='known'?confirmedPhotoLocation(outcome.place,codes):null;
-   if(place){setManual(id,{countryCode:place.countryCode,city:place.city,mode:'fill'});selected.delete(id);deviceStatus.delete(id);saveDraft()}
+   if(place){setManual(id,{countryCode:place.countryCode,city:place.city,mode:'fill'});deviceStatus.delete(id);saveDraft();single=null;entry={countryCode:'',city:''}}
    else deviceStatus.set(id,outcome.status==='denied'?'deviceDenied':outcome.status==='no-place'?'deviceNoPlace':'deviceUnavailable');
   }catch(_){if(!signal.aborted&&deviceAttempt===attempt&&deviceEligible(id))deviceStatus.set(id,'deviceUnavailable')}
   finally{if(deviceAttempt===attempt){deviceAttempt=null;paint()}}
@@ -171,52 +172,36 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
   countryLabel.textContent=t('countryLabel');cityLabel.textContent=t('cityLabel');
   countryName.textContent=countryText(entry.countryCode)||t('countryPlaceholder');flag(countryFlag,entry.countryCode);
   city.placeholder=t('cityPlaceholder');if(doc.activeElement!==city)city.value=entry.city;
-  const count=single?1:[...selected].filter(id=>unknownIds().includes(id)).length;
-  apply.textContent=single?t('applySingle'):t(count===1?'applyOne':'applyMany',{count});
-  apply.disabled=!count||!entry.countryCode&&!entry.city.trim();
+  apply.textContent=t('applySingle');
+  apply.disabled=!single||!entry.countryCode&&!entry.city.trim();
  }
- function tile(id,index,parent,status){
-  const card=node('div','talera-location-tile',parent);card.dataset.locationMediaId=id;
-  const image=node('img','talera-location-thumb',card);image.alt='';image.src=preview(id);
-  const value=display(id);const label=node('p','talera-location-tile-label',card);
+ function tile(id,parent){
+  const card=node('div','talera-location-tile',parent);card.dataset.locationMediaId=id;card.dataset.locationState=display(id)?'known':state(id).state;
+  const info=node('div','talera-location-row-copy',card);
+  const number=node('span','talera-location-photo-number',info);number.textContent=t('photoNumber',{number:photoNumber(id)});
+  const value=display(id),label=node('p','talera-location-tile-label',info);
   if(value){const f=node('span','talera-location-flag',label);flag(f,value.countryCode);node('span','',label).textContent=[countryText(value.countryCode),value.city].filter(Boolean).join(' · ')}
-  else {const reason=state(id).reason;label.textContent=t(status==='pending'?'photoPending':reason==='no-place'?'photoGpsNoPlace':reason==='no-readable-gps'?'photoGpsUnreadable':'photoUnknown',{number:index+1})}
-  if(status==='unknown'&&!value){
-   const pick=node('label','talera-location-check',card),check=node('input','',pick);check.type='checkbox';check.checked=selected.has(id);
-   node('span','',pick).textContent=t('selectPhoto',{number:index+1});
-   check.onchange=()=>{single=null;if(check.checked)selected.add(id);else selected.delete(id);fillEntry();paint()};
-   if(state(id).reason==='no-readable-gps'){
-    const use=button('talera-location-device',card);
-    use.textContent=t(deviceAttempt?.id===id?'deviceSearching':'deviceConfirm');
-    use.disabled=!!deviceAttempt||!deviceEligible(id);use.onclick=()=>void confirmDevicePlace(id);
-    const feedback=deviceStatus.get(id);
-    if(feedback){const message=node('p','talera-location-tile-status',card);message.setAttribute('role','status');message.textContent=t(feedback)}
-   }
-  }else if(value){
-   const info=node('p','talera-location-tile-status',card);info.textContent=t(value.source==='manual-photo'?'photoManualStatus':'photoAutoStatus');
-   const edit=button('talera-location-edit',card);edit.textContent=t('editPhoto',{number:index+1});edit.onclick=()=>chooseSingle(id);
-  }
+  else label.textContent=t(state(id).state==='pending'?'checkingLocation':'locationUnknown');
+  const edit=button('talera-location-edit',card);edit.textContent=t(value?'changeLocation':'addLocation');edit.setAttribute('aria-label',t(value?'editPhoto':'addPhotoLocation',{number:photoNumber(id)}));edit.setAttribute('aria-expanded',String(single===id));edit.onclick=()=>chooseSingle(id);
  }
  function paint(){
   if(disposed||!box.isConnected)return;
-  const ids=photoIds(),unknownNow=new Set(unknownIds());
-  for(const id of unknownNow)if(!seenUnknown.has(id)){seenUnknown.add(id);selected.add(id)}
-  for(const id of selected)if(!unknownNow.has(id))selected.delete(id);
-  if(single&&!ids.includes(single))single=null;
+  const ids=photoIds();
+  if(single&&!ids.includes(single))closeEntry();
   const automatic=ids.filter(id=>state(id).state==='known').length,complete=ids.filter(id=>state(id).state!=='pending').length;
   title.textContent=t('heading');
   summary.textContent=complete<ids.length?t('progress',{done:complete,total:ids.length}):t('recognizedSummary',{count:automatic,total:ids.length});
   legacy.hidden=true;
   try{const old=normalizeManualLocation(g.manualLocation??null,codes);if(old){legacy.hidden=false;legacy.textContent=t('legacyNotice',{location:[countryText(old.countryCode),old.city].filter(Boolean).join(' · ')})}}catch(_){}
-  recognizedHeading.textContent=t('recognizedHeading');unknownHeading.textContent=t('unknownHeading');pendingHeading.textContent=t('pendingHeading');
-  recognized.replaceChildren();unknown.replaceChildren();pending.replaceChildren();
-  ids.forEach((id,i)=>{const value=display(id),s=state(id).state;tile(id,i,value?recognized:s==='unknown'?unknown:pending,s)});
-  recognizedHeading.hidden=recognized.hidden=!recognized.childElementCount;unknownHeading.hidden=unknown.hidden=!unknown.childElementCount;pendingHeading.hidden=pending.hidden=!pending.childElementCount;
-  deviceHint.hidden=![...unknownNow].some(id=>state(id).reason==='no-readable-gps');deviceHint.textContent=t('deviceHint');
-  form.hidden=!single&&!unknownNow.size;
-  modeLabel.textContent=single?t('editingPhoto',{number:ids.indexOf(single)+1}):t('bulkHint');
-  reset.hidden=!single;reset.textContent=t('backToBulk');
-  clear.hidden=!single||!manual(single);clear.textContent=t('clearManual');
+  rows.replaceChildren();ids.forEach(id=>tile(id,rows));
+  form.hidden=!single;
+  modeLabel.textContent=single?t('editingPhoto',{number:photoNumber(single)}):'';
+  reset.textContent=t('cancelEdit');clear.hidden=!single||!manual(single);clear.textContent=t('clearManual');
+  const eligible=!!single&&deviceEligible(single);
+  deviceHint.hidden=use.hidden=!eligible;deviceHint.textContent=t('deviceHint');
+  use.textContent=t(deviceAttempt?.id===single?'deviceSearching':'deviceConfirm');
+  use.disabled=!!deviceAttempt||!eligible;
+  const feedback=single&&deviceStatus.get(single);deviceFeedback.hidden=!feedback;deviceFeedback.textContent=feedback?t(feedback):'';
   fillEntry();heading.textContent=t('pickerHeading');close.setAttribute('aria-label',t('pickerClose'));search.placeholder=t('pickerSearch');search.setAttribute('aria-label',t('pickerSearchAria'));
   if(dialog.open)renderCountries();
  }
@@ -255,12 +240,13 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
    }
   }finally{
    controller=null;running=false;
-   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&!completedDraftLocation(result.get(id)))&&win.navigator.onLine!==false)timer=win.setTimeout(scan,60000);
+   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&!completedDraftLocation(result.get(id))))timer=win.setTimeout(scan,60000);
   }
  }
  function wake(){if(timer!==null){win.clearTimeout(timer);timer=null}if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing)void scan()}
  function stop(){controller?.abort();deviceAttempt?.controller.abort();deviceAttempt=null;if(timer!==null){win.clearTimeout(timer);timer=null}}
- toggle.onclick=()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden){paint();wake()}};
+ toggle.onclick=()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden){paint();wake()}else{closeEntry();paint()}};
+ use.onclick=()=>{const id=single;if(id)void confirmDevicePlace(id)};
  country.onclick=()=>{search.value='';renderCountries();dialog.showModal();choices.scrollTop=0};
  close.onclick=closePicker;dialog.addEventListener('cancel',e=>{e.preventDefault();closePicker()});
  dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientY<r.top||e.clientY>r.bottom||e.clientX<r.left||e.clientX>r.right)closePicker()}});
@@ -268,14 +254,12 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  city.oninput=()=>{city.value=city.value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu,'');entry.city=city.value;fillEntry()};
  apply.onclick=()=>{
   const value=normalizeManualLocation(entry,codes);if(!value)return;
-  if(single&&photoIds().includes(single)){setManual(single,{...value,mode:'correct'});single=null}
-  else for(const id of unknownIds())if(selected.has(id)){setManual(id,{...value,mode:'fill'});selected.delete(id)}
-  entry={countryCode:'',city:''};saveDraft();paint();
+  if(!single||!photoIds().includes(single))return;
+  setManual(single,{...value,mode:singleMode});closeEntry();saveDraft();paint();
  };
- clear.onclick=()=>{if(single&&photoIds().includes(single)){setManual(single,null);saveDraft();single=null;entry={countryCode:'',city:''};paint()}};
- reset.onclick=()=>{single=null;entry={countryCode:'',city:''};paint()};
+ clear.onclick=()=>{if(single&&photoIds().includes(single)){setManual(single,null);saveDraft();closeEntry();paint()}};
+ reset.onclick=()=>{closeEntry();paint()};
  anchor.insertAdjacentElement('afterend',box);
- try{const old=normalizeManualLocation(g.manualLocation??null,codes);if(old)entry=old}catch(_){}
  const changed=()=>{if(box.isConnected)void refreshExisting();else dispose()};
  const language=()=>{if(box.isConnected)paint();else dispose()};
  const visibility=()=>{if(doc.hidden)stop();else wake()};

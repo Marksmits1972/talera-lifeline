@@ -1,9 +1,9 @@
 // Optional local catalog enrichment. No GPS persistence, no new store and no media uploads.
 // The caller supplies the existing account-local library and its transaction owner.
-// v3 merged missing GPS and unresolved GeoNames results. Recheck legacy
-// negatives on the original bytes once; distinct new outcomes are durable.
-const capturePlaceCheckDone=item=>['v4-no-readable-gps','v4-no-place'].includes(item?.capturePlaceChecked);
-const confirmedPlace=item=>['iptc-location-created','geonames-locality-v2'].includes(item?.capturePlace?.source);
+// Legacy geocoder misses (v4-no-place) are rechecked once against offline boundaries.
+// Confirmed original metadata and historical reliable place names are retained.
+const capturePlaceCheckDone=item=>['v4-no-readable-gps','v5-no-country'].includes(item?.capturePlaceChecked);
+const confirmedPlace=item=>['iptc-location-created','geonames-locality-v2','offline-country-v1'].includes(item?.capturePlace?.source);
 export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{},retryItems=null,now=Date.now}){
  const paused=()=>({more:true,blocked:true});
  const stories=await list();
@@ -48,30 +48,28 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
      if(item.kind==='photo')try{place=await readPlace(original)}catch(_){if(!available())return paused();diagnose(item.key,'iptc-leesfout')}
      if(!available())return paused();
      if(!place){
-      // Offline or before provider configuration, only explicit metadata
-      // is needed. Do not scan GPS or persist negative results yet.
+      // If the caller is paused, defer GPS. In the real app,
+      // local lookup is available even without a network.
       if(!canLookup()){diagnose(item.key,'wacht-internet-of-configuratie');deferred.add(keyOf(item));continue}
       const gps=await readGps(original);
       if(!available())return paused();
       diagnose(item.key,gps?'gps-gevonden':'gps-niet-herkend');
       if(gps){
        if(!available())return paused();
-       // A stored original can be inspected locally without internet. Do not
-       // mark unresolved GPS as checked or delay other local metadata.
+       // Resolve coordinates strictly inside local country boundaries.
        if(!canLookup()){deferred.add(keyOf(item));continue}
-       diagnose(item.key,'geonames-aanvraag');
+       diagnose(item.key,'land-lokaal-bepalen');
        const result=await lookup(gps);
        if(!available())return paused();
-       diagnose(item.key,result?.ok?(result.place?'geonames-plaats':'geonames-geen-plaats'):(result?.diagnostic||'geonames-fout'));
+       diagnose(item.key,result?.ok?(result.place?'land-bekend':'land-onbekend'):(result?.diagnostic||'land-verwerking-fout'));
        if(!result?.ok){
         const delay=result?.retryAfterMs===3600000?3600000:60000;
-        // A single failed original may not monopolise the next scan. The
-        // actual provider/account backoff remains global, then another item
-        // gets its turn before retrying this one. No writes on failed lookup.
+        // An unexpected local processing failure must not monopolise the
+        // queue. A transient failure is not a negative GPS result.
         if(retryItems){retryItems.set(retryKey,now()+delay+60000)}
-        return {more:true,blocked:true,retryAfterMs:delay,...(retryItems?{diagnostic:result?.diagnostic||'geonames-fout'}:{})};
+        return {more:true,blocked:true,retryAfterMs:delay,...(retryItems?{diagnostic:result?.diagnostic||'land-verwerking-fout'}:{})};
        }
-       place=result.place;reason='no-place';
+       place=result.place;reason='no-country';
       }
      }
     }
@@ -87,12 +85,11 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
  }
  return Number.isFinite(nextRetry)?{more:true,blocked:true,retryAfterMs:Math.max(250,nextRetry-now()),itemRetryOnly:true}:{more:false,blocked:false};
 }
-export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,enabled}){
+export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,resolveCountry}){
  if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(dbName)||!['/mijn-leven','/meldingen','/present','/tell'].includes(location.pathname)||window.top!==window)return;
- const scope=dbName.slice('talera-free-local-'.length,-3);
  let activeController=null,running=false,timer=null,timerDue=Infinity,departing=false,pendingDelay=null,blockedUntil=0;
  const available=()=>!departing&&!document.hidden;
- const canLookup=()=>enabled&&available()&&navigator.onLine!==false;
+ const canLookup=()=>available();
  const deferred=new Set(),unreadable=new Set();
  // TEMPORARY location diagnosis: in-memory codes only; no logs or persistent fields.
  const retryItems=new Map();
@@ -101,45 +98,14 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
  // unexpected IDB read must not prevent subsequent originals from being seen.
  const bounded=(work,ms=12000)=>{let id;return Promise.race([Promise.resolve().then(work),new Promise((_,reject)=>{id=setTimeout(()=>reject(Error('CAPTURE_READ_TIMEOUT')),ms)})]).finally(()=>clearTimeout(id))};
  const diagnose=()=>{};
- const safe=s=>typeof s==='string'&&s.length>0&&s.length<=120&&!/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(s);
- const valid=p=>{
-  if(!p||p.source!=='geonames-locality-v2'||!/^[A-Z]{2}$/.test(p.countryCode)||p.countryCode==='ZZ'||!safe(p.city)||!safe(p.country))return false;
-  try{return new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(p.countryCode)===p.country}catch(_){return false}
- };
+ // Pure local geometry; no fetch, credentials, timeout, external provider
+ // dependency or raw GPS persistence. Old clients may still use the existing
+ // server route; this installed candidate never calls it.
  const lookup=async(gps,signal)=>{
-  try{
-   if(!canLookup()||signal.aborted)return {ok:false};
-   // Standard AbortController also works on WebKit versions that do not
-   // expose AbortSignal.timeout. Never leave a request hanging indefinitely.
-   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
-   const cancel=()=>controller.abort();
-   signal.addEventListener('abort',cancel,{once:true});
-   try{
-    const response=await fetch('/api/capture-place',{method:'POST',credentials:'same-origin',cache:'no-store',
-     headers:{'content-type':'application/json','x-talera-local-scope':scope},
-     body:JSON.stringify({latitude:gps.latitude,longitude:gps.longitude}),signal:controller.signal});
-    if(!response.ok){
-     let reason=null;try{reason=(await response.json()).diagnostic}catch(_){}
-     const safeReasons=['api-configuratie','api-limiet-opslag','api-provider-http','api-provider-status','api-provider-netwerk','api-provider-antwoord'];
-     return {ok:false,retryAfterMs:response.status===429?3600000:60000,diagnostic:safeReasons.includes(reason)?reason:({401:'api-401',403:'api-403',429:'api-429',503:'api-503',400:'api-400'})[response.status]||'api-overige-fout'};
-    }
-    const result=await response.json();
-    if(result.place===null)return {ok:true,place:null};
-    return valid(result.place)?{ok:true,place:result.place}:{ok:false,diagnostic:'api-antwoord-ongeldig'};
-   }finally{clearTimeout(timeout);signal.removeEventListener('abort',cancel)}
-  }catch(_){return {ok:false,diagnostic:'api-netwerk-fout'}}
+  if(!canLookup()||signal?.aborted||!gps||!Number.isFinite(gps.latitude)||!Number.isFinite(gps.longitude)||Math.abs(gps.latitude)>90||Math.abs(gps.longitude)>180)return {ok:false};
+  try{return {ok:true,place:resolveCountry(gps)}}catch(_){return {ok:false}}
  };
- // Only the editor's explicit confirmed-photo action uses this route.
- // Reuse the existing account-scoped, bounded, rate-limited lookup. Do not
- // store coordinates or a second catalog record and never trigger on import.
- if(location.pathname==='/tell')store.lookupConfirmedDevicePlace=async(gps,signal)=>{
-  if(!signal||signal.aborted||!canLookup()||Date.now()<blockedUntil||
-   !gps||!Number.isFinite(gps.latitude)||!Number.isFinite(gps.longitude)||
-   Math.abs(gps.latitude)>90||Math.abs(gps.longitude)>180)return {ok:false};
-  const outcome=await lookup(gps,signal);
-  if(!outcome.ok&&!signal.aborted)blockedUntil=Math.max(blockedUntil,Date.now()+(outcome.retryAfterMs||60000));
-  return outcome;
- };
+ if(location.pathname==='/tell')store.lookupConfirmedDevicePlace=lookup;
  const commit=async(expected,index,place,reason,active)=>{
   if(!active())return null;
   const db=await bounded(()=>open());
@@ -155,7 +121,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    const item=current.items[index];
    if(!item||confirmedPlace(item)||capturePlaceCheckDone(item))return;
    if(place){item.capturePlace=place;delete item.capturePlaceChecked}
-   else if(['no-readable-gps','no-place'].includes(reason))item.capturePlaceChecked='v4-'+reason;
+   else if(['no-readable-gps','no-country'].includes(reason))item.capturePlaceChecked=reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
    else return;
    rows.put(current);updated=current;
   };
@@ -188,11 +154,11 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
     if(!gps){const result={state:'unknown',reason:'no-readable-gps'};draftResults.set(original,result);return result}
     metadata={gps};draftMetadata.set(original,metadata);
    }
-   if(localOnly||!canLookup()||Date.now()<blockedUntil)return pending;
+   if(!canLookup())return pending;
    const outcome=await lookup(metadata.gps,signal||new AbortController().signal);
    if(!active())return pending;
    if(!outcome.ok){blockedUntil=Math.max(blockedUntil,Date.now()+(outcome.retryAfterMs||60000));return pending}
-   const result=outcome.place?{state:'known',place:outcome.place}:{state:'unknown',reason:'no-place'};
+   const result=outcome.place?{state:'known',place:outcome.place}:{state:'unknown',reason:'no-country'};
    draftMetadata.delete(original);draftResults.set(original,result);return result;
   }catch(_){return pending}
  };

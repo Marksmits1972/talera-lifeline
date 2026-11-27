@@ -48,10 +48,10 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
   return {storyId:memory.storyId,key:frame.key,guard,identity:JSON.stringify([memory.storyId,frame.key,guard])};
  }
  function valid(place){
-  if(!place||!['iptc-location-created','geonames-locality-v2'].includes(place.source)||!Object.hasOwn(flagPositions,place.countryCode))return null;
+  if(!place||!['iptc-location-created','geonames-locality-v2','offline-country-v1'].includes(place.source)||!Object.hasOwn(flagPositions,place.countryCode))return null;
   const safe=x=>typeof x==='string'&&x.length>0&&x.length<=120&&
    !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(x);
-  if(!safe(place.city)||!safe(place.country))return null;
+  if((place.city!==''&&!safe(place.city))||(place.source==='geonames-locality-v2'&&!place.city)||!safe(place.country))return null;
   try{
    const country=new Intl.DisplayNames(['nl'],{type:'region',fallback:'none'}).of(place.countryCode);
    if(country!==place.country)return null;

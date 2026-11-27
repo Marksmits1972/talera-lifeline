@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {createOfflineCountryResolver} from './f5-offline-country.mjs';
 const source=readFileSync(new URL('./f5-library-access.browser.js',import.meta.url),'utf8');
 const sandbox={Blob,globalThis:null};
 sandbox.globalThis=sandbox;
@@ -81,7 +82,7 @@ console.log('TALERA_LIBRARY_READONLY_GATEWAY_CONTRACT_PASS',JSON.stringify({
 }));
 
 // Local capture metadata contract. Real media bytes are never rewritten.
-function fixture(le=true,latRef='N',lonRef='E'){
+function fixture(le=true,latRef='N',lonRef='E',coordinates=[51,59,6,5,53,18]){
  const t=new Uint8Array(128),v=new DataView(t.buffer);
  const u16=(i,n)=>v.setUint16(i,n,le),u32=(i,n)=>v.setUint32(i,n,le);
  v.setUint16(0,le?0x4949:0x4d4d);u16(2,42);u32(4,8);
@@ -94,7 +95,7 @@ function fixture(le=true,latRef='N',lonRef='E'){
  entry(0,1,2,2,latRef);entry(1,2,5,3,82);entry(2,3,2,2,lonRef);entry(3,4,5,3,106);
  // TIFF header + GPS IFD ends at 82. Reserve 48 bytes for 6 rationals.
  const extended=new Uint8Array(130);extended.set(t);const e=new DataView(extended.buffer);
- [51,59,6,5,53,18].forEach((n,i)=>{e.setUint32(82+i*8,n,le);e.setUint32(86+i*8,1,le)});
+ coordinates.forEach((n,i)=>{e.setUint32(82+i*8,n,le);e.setUint32(86+i*8,1,le)});
  const len=2+6+extended.length;
  return Uint8Array.from([255,216,255,225,len>>8,len&255,69,120,105,102,0,0,...extended,255,217]);
 }
@@ -133,6 +134,18 @@ await assert.rejects(()=>library.captureGps(''),/TALERA_LIBRARY_INVALID_MEDIA_ID
  }
  console.log('TALERA_PICKER_MISLABELED_JPEG_ORIGINAL_GPS_PASS');
 console.log('TALERA_LOCAL_JPEG_CAPTURE_GPS_CONTRACT_PASS');
+const localResolver=createOfflineCountryResolver(JSON.parse(readFileSync(new URL('./f5-offline-country-data.json',import.meta.url),'utf8')));
+for(const [key,coords,code] of [
+ ['gps-france',[48,51,24,2,21,8],'FR'],['gps-germany',[52,31,12,13,24,18],'DE'],['gps-netherlands',[51,59,6,5,53,18],'NL']
+]){
+ const bytes=fixture(true,'N','E',coords),blob=new Blob([bytes],{type:'image/jpeg'});files.set(key,blob);
+ assert.equal(localResolver(await library.captureGps(key))?.countryCode,code);
+ assert.strictEqual(await library.originalBlob(key),blob);
+ assert.deepEqual([...new Uint8Array(await blob.arrayBuffer())],[...bytes]);
+}
+assert.equal(localResolver(await library.captureGps('media-photo-1')||{}),null);
+console.log('TALERA_ORIGINAL_GPS_TO_OFFLINE_COUNTRY_PER_PHOTO_BYTES_UNCHANGED_PASS');
+
 
 function movieFixture(value='+51.9850+005.8883+012.0/',full=true,legacy=null){
  const bytes=s=>Uint8Array.from(s,c=>c.charCodeAt(0));

@@ -58,15 +58,14 @@ export function installMemoryLocationEditor(html){
 .talera-location-toggle[aria-expanded="true"] .talera-location-chevron{transform:rotate(225deg);margin:4px 2px 0 0}
 .talera-location-summary{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#657a91;font:500 11px/1.2 system-ui}
 .talera-location-panel{padding:0 12px 12px;display:grid;gap:7px;max-height:min(55dvh,490px);overflow-y:auto;overscroll-behavior:contain}
-.talera-location-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.talera-location-tile{background:white;border:1px solid #dbe4ef;border-radius:10px;min-width:0;padding:5px;display:grid;align-content:start;gap:4px}
-.talera-location-thumb{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px}
-.talera-location-tile-label{display:flex;align-items:center;gap:4px;margin:0;font:600 11px/1.3 system-ui;overflow-wrap:anywhere}
-.talera-location-tile-status{margin:0;color:#657a91;font:400 10px/1.3 system-ui}
-.talera-location-check{display:flex;align-items:center;gap:4px;min-height:32px;font:600 11px/1.3 system-ui}
-.talera-location-check input{width:18px;height:18px;flex:none;accent-color:#224d7c}
-.talera-location-form{display:grid;gap:5px}
-#app #main .work .talera-location-edit{border:0;background:#edf2f8;color:#224d7c;border-radius:7px;min-height:36px;padding:3px;font:600 11px/1.3 system-ui}
+.talera-location-list{display:grid;gap:5px}
+.talera-location-tile{background:white;border:1px solid #dbe4ef;border-radius:10px;min-width:0;padding:5px 8px;display:flex;align-items:center;gap:8px}
+.talera-location-row-copy{flex:1;min-width:0;display:grid;gap:3px}
+.talera-location-photo-number{display:block;color:#657a91;font:500 11px/1.2 system-ui}
+.talera-location-tile-label{display:flex;align-items:center;gap:5px;margin:0;font:600 13px/1.3 system-ui;overflow-wrap:anywhere}
+.talera-location-tile-status{margin:0;color:#657a91;font:400 12px/1.3 system-ui}
+.talera-location-form{display:grid;gap:5px;border-top:1px solid #dbe4ef;padding-top:8px}
+#app #main .work .talera-location-edit{border:0;background:#edf2f8;color:#224d7c;border-radius:8px;min-height:44px;max-width:48%;padding:6px 9px;font:600 12px/1.3 system-ui;flex:none;overflow-wrap:anywhere}
 #app #main .work .talera-location-apply{border:0;background:#102344;color:white;border-radius:10px;min-height:44px;padding:8px;font:700 14px/1.3 system-ui}
 #app #main .work .talera-location-apply:disabled{opacity:.45}
 #app #main .work .talera-location-device{border:0;background:#edf2f8;color:#224d7c;border-radius:7px;min-height:44px;padding:4px;overflow-wrap:anywhere;font:600 11px/1.3 system-ui}

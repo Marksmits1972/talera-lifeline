@@ -271,23 +271,27 @@
  const item=entries[0],descs=children(item,RDF,'Description');
  if(descs.length>1||(descs.length===1&&item.children.length!==1))return null;
  const node=descs[0]||item;
- function field(name){
+ function field(name,allowEmpty=false){
   const el=children(node,IPTC,name);
   const attr=node.getAttributeNS(IPTC,name);
   if(el.length>1||(el.length&&attr!==null)||el.some(x=>x.children.length))return null;
   const s=(attr??el[0]?.textContent??'').normalize('NFC').trim();
+  if(!s&&allowEmpty)return '';
   if(!s||s.length>120||/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(s))return null;
   return s;
  }
- const countryCode=field('CountryCode'),city=field('City'),country=field('CountryName');
- const hasCountry=children(node,IPTC,'CountryName').length>0||node.hasAttributeNS(IPTC,'CountryName');
+ let countryCode=field('CountryCode');const city=field('City',true),country=field('CountryName');
+ const present=name=>children(node,IPTC,name).length>0||node.hasAttributeNS(IPTC,name);
+ const hasCountry=present('CountryName');
  // Initial support is intentionally limited to ISO alpha-2 with a
  // recognisable country name. Unknown/contradictory codes fail closed.
- if(!countryCode||!/^[A-Z]{2}$/.test(countryCode)||!city||(hasCountry&&!country))return null;
+ if(city===null||(present('CountryCode')&&!countryCode)||(hasCountry&&!country))return null;
  const iso='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW';
- if(!iso.split(' ').includes(countryCode))return null;
- const names=['nl','en','de','fr','es'].map(l=>new Intl.DisplayNames([l],{type:'region',fallback:'none'}).of(countryCode)).filter(Boolean);
- const norm=s=>s.normalize('NFC').toLocaleLowerCase('en');
+ const languages=['nl','en','de','fr','es'],norm=s=>s.normalize('NFC').toLocaleLowerCase('en');
+ const regions=iso.split(' '),displayNames=languages.map(l=>new Intl.DisplayNames([l],{type:'region',fallback:'none'})),namesFor=code=>displayNames.map(names=>names.of(code)).filter(Boolean);
+ if(!countryCode&&country){const matches=regions.filter(code=>namesFor(code).some(name=>norm(name)===norm(country)));if(matches.length===1)countryCode=matches[0]}
+ if(!regions.includes(countryCode))return null;
+ const names=namesFor(countryCode);
  if(!names.length||hasCountry&&!names.some(x=>norm(x)===norm(country)))return null;
  return Object.freeze({countryCode,country:names[0],city,source:'iptc-location-created'});
 }

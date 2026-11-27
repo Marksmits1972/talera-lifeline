@@ -5,14 +5,12 @@ import {DurableObject} from 'cloudflare:workers';
 import {validAccountId,validEmail,validHandle,validDisplay,passwordHash,safeEqualHex} from './auth-util.mjs';
 import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 
-import {TransferSignaling} from '../free-10m-f5/f5-transfer-signal.mjs';
+import {storedTransferSignal,expireTransferSignaling} from '../free-10m-f5/f5-transfer-signal.mjs';
 
 export class FreeAuthAccount extends DurableObject {
- // One short-lived pairing only; no storage writes, account mutation or media relay.
- transferSignal(session,command){
-  this.transferSignaling??=new TransferSignaling();
-  return command.action==='offer' ? this.transferSignaling.offer(session,command.code) : this.transferSignaling.handle(session,command);
- }
+ // One short-lived pairing; no account mutation or media relay.
+ transferSignal(session,command){return storedTransferSignal(this.ctx.storage,session,command)}
+ alarm(){return expireTransferSignaling(this.ctx.storage)}
  async create(record){
   validAccountId(record?.id);
   if(typeof record?.email!=='string'||!record.email.includes('@')||

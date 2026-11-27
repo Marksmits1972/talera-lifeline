@@ -10,13 +10,14 @@ const PHASES=new Set([
  'PEER_NEW','PEER_CONNECTING','PEER_CONNECTED','PEER_DISCONNECTED','PEER_FAILED','PEER_CLOSED',
  'CANDIDATE_HOST','CANDIDATE_SRFLX','CANDIDATE_PRFLX','CANDIDATE_RELAY','CANDIDATE_UNKNOWN',
  'CANDIDATE_MDNS','CANDIDATE_IPV4','CANDIDATE_IPV6','CANDIDATE_ADDRESS_UNKNOWN','CANDIDATE_UDP','CANDIDATE_TCP','CANDIDATE_OTHER',
- 'CHANNEL_CREATED','CHANNEL_OPEN','CHANNEL_CLOSE','VERIFICATION_READY','APPROVED','OTHER_READY','TRANSFER_START','TRANSFER_DONE',
+ 'REPLACE_REQUEST','REPLACE_OFFER','REPLACE_ANSWER','REPLACE_OPEN','REPAIR_REQUEST','REPAIR_OFFER','REPAIR_ANSWER','REPAIR_APPLIED','RECOVERY_WAIT','RECOVERY_OK','RECOVERY_TIMEOUT','PAGE_HIDDEN','PAGE_VISIBLE','NETWORK_ONLINE','NETWORK_OFFLINE','CHANNEL_CREATED','CHANNEL_OPEN','CHANNEL_CLOSE','VERIFICATION_READY','APPROVED','OTHER_READY','TRANSFER_START','TRANSFER_DONE',
  'ERROR_TIMEOUT','ERROR_NETWORK','ERROR_ACCOUNT','ERROR_PAIR','ERROR_PROTOCOL','ERROR_CONFLICT','ERROR_STORAGE','ERROR_OTHER','ERROR_OPERATION','ERROR_INVALID_STATE','ERROR_PERMISSION','ERROR_UNSUPPORTED','ERROR_TYPE','ERROR_ABORT','ERROR_SECURITY','STOPPED'
 ]);
 export function validDiagnosticEvents(events){
  return Array.isArray(events)&&events.length<=DIAG_LIMIT&&events.every(e=>Array.isArray(e)&&e.length===3&&
   Number.isSafeInteger(e[0])&&e[0]>=0&&e[0]<=1800000&&PHASES.has(e[1])&&Number.isSafeInteger(e[2])&&e[2]>=0&&e[2]<=600);
 }
+const MILESTONES=new Set(['START','CREATE_OK','OFFER_OK','JOIN_OK','ROUTE_LOCAL','ROUTE_STUN','ROUTE_OPEN','CHANNEL_OPEN','VERIFICATION_READY','APPROVED','OTHER_READY','TRANSFER_START','TRANSFER_DONE','REPAIR_REQUEST','REPAIR_APPLIED','RECOVERY_OK','RECOVERY_TIMEOUT','REPLACE_REQUEST','REPLACE_OPEN']);
 export function newDiagnostic(role,now=()=>performance.now()){
  const start=now(),events=[];
  return {role,events,mark(phase,detail=0){
@@ -25,7 +26,10 @@ export function newDiagnostic(role,now=()=>performance.now()){
   const previous=events.at(-1);
   if(previous&&previous[1]===phase&&previous[2]===detail)return;
   // Keep the start and latest checkpoints; never unbounded.
-  if(events.length>=DIAG_LIMIT)events.splice(1,1);
+  if(events.length>=DIAG_LIMIT){
+   const drop=events.findIndex((e,i)=>i>0&&!MILESTONES.has(e[1]));
+   events.splice(drop>0?drop:1,1);
+  }
   events.push(event);
  }};
 }
@@ -40,6 +44,6 @@ export function safeCandidateKinds(candidate){
 export function diagnosticError(error){
  const raw=String(error?.message||'');
  const names={OperationError:'OPERATION',InvalidStateError:'INVALID_STATE',NotAllowedError:'PERMISSION',NotSupportedError:'UNSUPPORTED',TypeError:'TYPE',AbortError:'ABORT',SecurityError:'SECURITY',NetworkError:'NETWORK'};
- const kind=/TIMEOUT/.test(raw)?'TIMEOUT':/NETWORK/.test(raw)?'NETWORK':/ACCOUNT/.test(raw)?'ACCOUNT':/PAIR/.test(raw)?'PAIR':/PROTOCOL/.test(raw)?'PROTOCOL':/CONFLICT|EXISTING_CONTENT|DUPLICATE/.test(raw)?'CONFLICT':/STORAGE|Quota|MEMORY/.test(raw)?'STORAGE':(Object.hasOwn(names,error?.name)?names[error.name]:'OTHER');
+ const kind=/TIMEOUT/.test(raw)?'TIMEOUT':/NETWORK/.test(raw)?'NETWORK':/ACCOUNT/.test(raw)?'ACCOUNT':/PAIR/.test(raw)?'PAIR':/PROTOCOL/.test(raw)?'PROTOCOL':/SECURITY/.test(raw)?'SECURITY':/CONFLICT|EXISTING_CONTENT|DUPLICATE/.test(raw)?'CONFLICT':/STORAGE|Quota|MEMORY/.test(raw)?'STORAGE':(Object.hasOwn(names,error?.name)?names[error.name]:'OTHER');
  return 'ERROR_'+kind;
 }

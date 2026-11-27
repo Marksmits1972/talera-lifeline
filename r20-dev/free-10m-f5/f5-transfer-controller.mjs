@@ -1,7 +1,8 @@
 const t=(key,params)=>window.TaleraLanguage.t(key,params);
+const CHANNEL_LABEL='talera-transfer-v2';
 // User-triggered transfer on the EXISTING private backup page only.
 import {readTransferLibrary,inventory,makeTransfer,reviewTransfer,commitTransfer} from './f5-transfer-library.mjs';
-import {newDirectPeer,gather,checkDirectSDP,sendFrame,frameReceiver,jsonBlob,readJSON,pairingVerificationCode} from './f5-transfer-transport.mjs';
+import {newDirectPeer,gather,checkDirectSDP,sendFrame,frameReceiver,jsonBlob,readJSON,pairingVerificationCode,assertSameFingerprint,createTransferCertificate} from './f5-transfer-transport.mjs';
 import {newDiagnostic,safeCandidateKinds,diagnosticError,validDiagnosticEvents,INVITATION_TTL,VERIFICATION_TTL} from './f5-transfer-diagnostic.mjs';
 import {drawPairingQR} from './f5-transfer-qr.mjs';
 import {pairingScanner} from './f5-transfer-scan.mjs';
@@ -18,10 +19,10 @@ function renderDiagnostic(d){
  if(diag!==d)return;
  const format=events=>events.length?events.map(([ms,phase,detail])=>(ms/1000).toFixed(3)+'s  '+phase+(detail?' '+detail:'')).join('\n'):t('transfer.status.diagEmpty');
  const own=d.events,other=d.remote?.[d.role==='receive'?'send':'receive']||[];
- diagReport.textContent=t('transfer.status.diagReport',{role:d.role,own:format(own),other:format(other)});
+ diagReport.textContent=t('transfer.status.diagReport',{role:d.role,own:format(own),other:(d.stale&&other.length?'['+t('transfer.status.diagUnavailable')+']\n':'')+format(other)});
 }
 async function syncDiagnostic(d,manual=false){
- if(diag!==d||!diagEnable.checked||!d.locator||(!manual&&d.sends>=12))return;
+ if(diag!==d||!diagEnable.checked||!d.locator||(!manual&&d.sends>=24))return;
  if(d.busy){if(!manual)return;while(d.busy&&diag===d)await wait(50);if(diag!==d)return;}
  d.busy=true;d.sends++;d.lastSync=performance.now();
  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),6000);
@@ -32,12 +33,15 @@ async function syncDiagnostic(d,manual=false){
   d.mark('DIAG_HTTP',r.status);renderDiagnostic(d);if(!r.ok)throw Error('DIAG');
   const result=await r.json();if(diag!==d)return;
   if(!result.reports||!validDiagnosticEvents(result.reports.receive)||!validDiagnosticEvents(result.reports.send))throw Error('DIAG');
-  d.remote=result.reports;diagStatus.textContent=t(result.reports[d.role==='receive'?'send':'receive'].length?'transfer.status.diagUpdated':'transfer.status.diagUnavailable');renderDiagnostic(d);
- }catch{if(diag===d){d.remote=null;renderDiagnostic(d);diagStatus.textContent=t('transfer.status.diagUnavailable')}}
+  const remoteRole=d.role==='receive'?'send':'receive';
+  if(result.reports[remoteRole].length){d.remote=result.reports;d.stale=false}
+  else d.stale=true;
+  diagStatus.textContent=t(!d.stale?'transfer.status.diagUpdated':'transfer.status.diagUnavailable');renderDiagnostic(d);
+ }catch{if(diag===d){d.stale=true;renderDiagnostic(d);diagStatus.textContent=t('transfer.status.diagUnavailable')}}
  finally{clearTimeout(timer);d.busy=false;if(diag===d&&d.dirty){d.dirty=false;scheduleDiagnostic(d)}}
 }
 function scheduleDiagnostic(d){
- if(diag!==d||!d.locator||d.sends>=12)return;
+ if(diag!==d||!d.locator||d.sends>=24)return;
  if(d.busy){d.dirty=true;return}
  if(d.timer)return;
  d.timer=setTimeout(()=>{d.timer=null;void syncDiagnostic(d)},Math.max(0,1200-(performance.now()-d.lastSync)));
@@ -60,13 +64,15 @@ function beginDiagnostic(role){
 }
 function diagnosticLocator(locator){if(diag){diag.locator=locator;scheduleDiagnostic(diag)}}
 function observePeer(s){
- if(!diag)return;
  const peer=s.peer,d=diag;
  const emit=(phase)=>{if(diag===d&&active===s&&s.peer===peer)markDiagnostic(phase)};
+ const last=new Map();
  const snapshot=()=>{
-  emit('GATHER_'+String(peer.iceGatheringState).toUpperCase());
-  emit('ICE_'+String(peer.iceConnectionState).toUpperCase());
-  emit('PEER_'+String(peer.connectionState).toUpperCase());
+  if(active!==s||s.peer!==peer)return;
+  for(const [kind,state] of [['GATHER',peer.iceGatheringState],['ICE',peer.iceConnectionState],['PEER',peer.connectionState]]){
+   if(last.get(kind)===state)continue;last.set(kind,state);emit(kind+'_'+String(state).toUpperCase());
+  }
+  monitorConnection(s);
  };
  for(const event of ['icegatheringstatechange','iceconnectionstatechange','connectionstatechange'])peer.addEventListener(event,snapshot);
  peer.addEventListener('icecandidate',e=>{for(const kind of safeCandidateKinds(e.candidate))emit(kind)});
@@ -128,7 +134,7 @@ function reset(){
 async function finish(s,message,{signal=true}={}){
  if(active!==s)return;
  if(s.phase==='complete')markDiagnostic('TRANSFER_DONE');
- active=null;s.closed=true;clearTimeout(s.timer);
+ active=null;s.closed=true;clearTimeout(s.timer);clearTimeout(s.recoveryTimer);clearTimeout(s.repairPollTimer);
  try{s.channel?.close()}catch{}try{s.peer?.close()}catch{}
  reset();say(message);
  if(signal&&s.locator){
@@ -161,21 +167,189 @@ function failure(s,error){
 function timeout(s,ms){
  clearTimeout(s.timer);s.timer=setTimeout(()=>failure(s,Error('TIMEOUT')),ms);
 }
-function newSession(role){
+function newSession(role,certificate){
  if(active)throw Error('BUSY');
- const s={role,route:0,peer:newDirectPeer(0),closed:false,approved:false,otherReady:false,started:false,plan:null,archive:null};
+ let peer;
+ try{peer=newDirectPeer(0,certificate)}catch(e){if(!certificate)throw e;certificate=null;peer=newDirectPeer(0)}
+ const s={role,route:0,peer,certificate,closed:false,approved:false,otherReady:false,started:false,plan:null,archive:null};
  active=s;markDiagnostic('ROUTE_LOCAL');observePeer(s);receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;timeout(s,INVITATION_TTL+20000);
 
  return s;
 }
+// Keep the same reliable data channel and temporary receive sink during a
+// short network interruption. Never re-send unverified bytes on a new channel.
+const RECOVERY_LIMIT=90000,REPAIR_AFTER=8000,REPAIR_POLL=15000;
+function connectionInterrupted(s){
+ return s.replacing||s.repairNegotiating||['disconnected','failed'].includes(s.peer.iceConnectionState)||
+  ['disconnected','failed'].includes(s.peer.connectionState);
+}
+function monitorConnection(s){
+ if(!s.openHandled||s.closed||s.committing||active!==s)return;
+ if(connectionInterrupted(s)){
+  if(s.recoveryTimer){scheduleRepair(s,0);return;}
+  s.recoverySince=Date.now();s.recoveryStatus=status.textContent;
+  markDiagnostic('RECOVERY_WAIT');say(t('transfer.status.connecting'));
+  s.recoveryTimer=setTimeout(()=>{if(active===s&&connectionInterrupted(s)){
+   markDiagnostic('RECOVERY_TIMEOUT');failure(s,Error('NETWORK'));
+  }},RECOVERY_LIMIT);
+  scheduleRepair(s,REPAIR_AFTER);
+ }else if(s.recoveryTimer){
+  clearTimeout(s.recoveryTimer);s.recoveryTimer=null;s.recoverySince=null;
+  markDiagnostic('RECOVERY_OK');
+  if(status.textContent===t('transfer.status.connecting'))say(s.recoveryStatus);
+ }
+}
+// One active restart per verified pair. The receiving device is the sole
+// offerer, even when the sender notices loss first. Poll slowly in healthy
+// periods only while the authorized transfer is open; accelerate on loss.
+function scheduleRepair(s,delay=REPAIR_POLL){
+ if(!s.verification||!s.openRegistered||s.replacementDone||s.repairDone&&!s.certificate||s.repairBusy||active!==s||s.closed||s.committing)return;
+ clearTimeout(s.repairPollTimer);
+ s.repairPollTimer=setTimeout(()=>void repairTick(s),delay);
+}
+async function repairTick(s){
+ if(active!==s||s.closed||s.replacementDone||s.repairBusy||s.committing)return;
+ s.repairBusy=true;
+ try{
+  const failed=s.peer.iceConnectionState==='failed'||s.peer.connectionState==='failed';
+  if(s.replacing&&!s.replacementRequested){
+   await account();live(s);await api('replaceRequest',s.locator);live(s);
+   s.replacementRequested=true;markDiagnostic('REPLACE_REQUEST');
+  }
+  if(!s.replacing&&!s.repairDone&&!s.repairRequested&&!s.repairNegotiating&&connectionInterrupted(s)&&(failed||Date.now()-(s.recoverySince??Date.now())>=REPAIR_AFTER)){
+   await account();live(s);await api('repairRequest',s.locator);live(s);
+   s.repairRequested=true;markDiagnostic('REPAIR_REQUEST');
+  }
+  const {repair,replacement}=await api('repairPoll',s.locator);live(s);
+  if(replacement){await replacementTick(s,replacement);return}
+  if(s.replacing||s.repairDone||!repair)return;
+  if(s.channel?.readyState!=='open')throw Error('NETWORK');
+  s.repairNegotiating=true;monitorConnection(s);
+  const auth=(type,sdp)=>proof(s.secret,'repair-v1:'+s.locator+':'+s.verification+':'+type,sdp);
+  const checked=(original,sdp,side)=>routeSDP(s,assertSameFingerprint(original,sdp),side);
+  if(s.role==='receive'){
+   if(!s.repairOffer){
+    if(repair.offer)throw Error('PAIR');
+    await account();live(s);
+    const offer=checked(s.offer,await gather(s.peer,await s.peer.createOffer({iceRestart:true})),'LOCAL');live(s);
+    await api('repairOffer',s.locator,{sdp:offer,proof:await auth('offer',offer)});live(s);
+    s.repairOffer=offer;markDiagnostic('REPAIR_OFFER');
+   }
+   if(repair.answer&&!s.repairApplied){
+    if(repair.answer.proof!==await auth('answer',repair.answer.sdp))throw Error('PAIR');
+    const answer=checked(s.answer,repair.answer.sdp,'REMOTE');live(s);
+    await s.peer.setRemoteDescription({type:'answer',sdp:answer});live(s);
+    s.repairApplied=true;markDiagnostic('REPAIR_ANSWER');
+   }
+  }else if(repair.offer&&!s.repairApplied){
+   if(repair.offer.proof!==await auth('offer',repair.offer.sdp))throw Error('PAIR');
+   await account();live(s);const offer=checked(s.offer,repair.offer.sdp,'REMOTE');
+   await s.peer.setRemoteDescription({type:'offer',sdp:offer});live(s);
+   const answer=checked(s.answer,await gather(s.peer,await s.peer.createAnswer()),'LOCAL');live(s);
+   await api('repairAnswer',s.locator,{sdp:answer,proof:await auth('answer',answer)});live(s);
+   s.repairApplied=true;markDiagnostic('REPAIR_ANSWER');
+  }
+  if(s.repairApplied){
+   s.repairNegotiating=false;s.repairDone=true;markDiagnostic('REPAIR_APPLIED');monitorConnection(s);
+  }
+ }catch(e){
+  // A transient HTTP fault before negotiation does not break an otherwise
+  // healthy data channel. A failed authenticated negotiation fails closed.
+  if((s.repairNegotiating||s.replacementPeer)&&active===s)failure(s,e);
+ }finally{
+  s.repairBusy=false;if(active===s&&!s.replacementDone)scheduleRepair(s,connectionInterrupted(s)||s.repairRequested?2000:REPAIR_POLL);
+ }
+}
+function canReplace(s){
+ return s.certificate&&s.started&&s.approved&&s.otherReady&&!s.committing&&!s.replacementDone&&
+  (s.role==='send'?s.phase==='done'&&s.outgoingArchive:['archive','review','confirm'].includes(s.phase));
+}
+function requestReplacement(s){
+ if(!canReplace(s))throw Error('NETWORK');
+ s.replacing=true;s.repairNegotiating=false;monitorConnection(s);scheduleRepair(s,0);
+}
+async function replacementTick(s,record){
+ live(s);if(!canReplace(s))throw Error('NETWORK');
+ if(!s.replacing)requestReplacement(s);
+ const auth=(type,sdp)=>proof(s.secret,'replace-v1:'+s.locator+':'+s.verification+':'+type,sdp);
+ const checked=(original,sdp,side)=>routeSDP(s,assertSameFingerprint(original,sdp),side);
+ if(!s.replacementPeer){
+  await account();live(s);
+  // A new peer uses ONLY the exact ephemeral certificate whose fingerprint
+  // was verified by the human comparison on the original channel.
+  const old=s.peer;s.replacementPeer=newDirectPeer(s.route,s.certificate);s.peer=s.replacementPeer;
+  observePeer(s);try{s.channel.close()}catch{}try{old.close()}catch{}
+  if(s.role==='receive')watchReplacementChannel(s,s.peer.createDataChannel(CHANNEL_LABEL,{ordered:true}));
+  else s.peer.addEventListener('datachannel',event=>{if(active===s&&s.peer===s.replacementPeer)try{watchReplacementChannel(s,event.channel)}catch(e){failure(s,e)}});
+ }
+ if(s.role==='receive'){
+  if(!s.replacementOffer){
+   if(record.offer)throw Error('PAIR');
+   const offer=checked(s.offer,await gather(s.peer,await s.peer.createOffer()),'LOCAL');live(s);
+   await api('replaceOffer',s.locator,{sdp:offer,proof:await auth('offer',offer)});live(s);
+   s.replacementOffer=offer;markDiagnostic('REPLACE_OFFER');
+  }
+  if(record.answer&&!s.replacementApplied){
+   if(record.answer.proof!==await auth('answer',record.answer.sdp))throw Error('PAIR');
+   const answer=checked(s.answer,record.answer.sdp,'REMOTE');live(s);
+   await s.peer.setRemoteDescription({type:'answer',sdp:answer});live(s);
+   s.replacementApplied=true;markDiagnostic('REPLACE_ANSWER');
+  }
+ }else if(record.offer&&!s.replacementApplied){
+  if(record.offer.proof!==await auth('offer',record.offer.sdp))throw Error('PAIR');
+  const offer=checked(s.offer,record.offer.sdp,'REMOTE');live(s);
+  await s.peer.setRemoteDescription({type:'offer',sdp:offer});live(s);
+  const answer=checked(s.answer,await gather(s.peer,await s.peer.createAnswer()),'LOCAL');live(s);
+  await api('replaceAnswer',s.locator,{sdp:answer,proof:await auth('answer',answer)});live(s);
+  s.replacementApplied=true;markDiagnostic('REPLACE_ANSWER');
+ }
+}
+function watchReplacementChannel(s,channel){
+ if(channel.label!==CHANNEL_LABEL||s.replacementChannel)throw Error('PROTOCOL');
+ s.replacementChannel=channel;
+ const opened=async()=>{
+  if(active!==s||s.replacementDone||s.installingReplacement)return;
+  s.installingReplacement=true;
+  try{
+   // The remote description has been authenticated before the DTLS channel
+   // opens. The old queued blocks are drained before accepting resume.
+   await s.receiver.replaceChannel(channel);live(s);
+   s.channel=channel;s.replacementDone=true;s.replacing=false;s.repairDone=true;
+   markDiagnostic('REPLACE_OPEN');monitorConnection(s);
+  }catch(e){failure(s,e)}
+ };
+ channel.addEventListener('open',opened);if(channel.readyState==='open')void opened();
+ channel.addEventListener('close',()=>{if(active===s&&!s.committing)failure(s,Error('NETWORK'))});
+}
+async function recoverArchiveChannel(s,old){
+ if(!s.replacing&&!s.replacementDone)requestReplacement(s);
+ const until=Date.now()+RECOVERY_LIMIT;
+ while(active===s&&Date.now()<until){
+  if(s.replacementDone&&s.channel!==old&&s.channel.readyState==='open')return s.channel;
+  await wait(100);
+ }
+ throw Error('NETWORK');
+}
+async function awaitConnection(s){
+ live(s);monitorConnection(s);
+ if(!connectionInterrupted(s))return 0;
+ const start=Date.now();
+ while(connectionInterrupted(s)){
+  live(s);
+  if(Date.now()-(s.recoverySince??start)>=RECOVERY_LIMIT)throw Error('NETWORK');
+  if(s.channel?.readyState!=='open'&&!s.replacing)throw Error('NETWORK');
+  await wait(100);
+ }
+ live(s);monitorConnection(s);return Date.now()-start;
+}
 function queueFrame(s,kind,blob,progress){
- const next=(s.outbound||Promise.resolve()).then(()=>{live(s);return sendFrame(s.channel,kind,blob,progress)});
+ const next=(s.outbound||Promise.resolve()).then(()=>{live(s);const old=s.channel;return sendFrame(old,kind,blob,progress,()=>awaitConnection(s),kind==='archive'?()=>recoverArchiveChannel(s,old):null)});
  s.outbound=next;return next;
 }
 async function sendJSON(s,kind,value){await queueFrame(s,kind,jsonBlob(value))}
 async function maybeStart(s){
  if(s.started||!s.approved||!s.otherReady)return;
- markDiagnostic('TRANSFER_START');s.started=true;s.phase=s.role==='receive'?'plan':'inventory';timeout(s,30*60*1000);await account();live(s);
+ markDiagnostic('TRANSFER_START');s.started=true;s.phase=s.role==='receive'?'plan':'inventory';timeout(s,30*60*1000);await account();live(s);await api('active',s.locator);live(s);
  if(s.role==='receive'){
   say(t('transfer.status.checkLibrary'));
   const own=await inventory(await readTransferLibrary(scope));live(s);
@@ -197,7 +371,7 @@ async function handleFrame(s,kind,blob){
   const result=await makeTransfer(await readTransferLibrary(scope),await readJSON(blob),scope,location.origin);live(s);
   s.phase='done';s.expected=result.count;
   await sendJSON(s,'plan',{count:result.count,duplicates:result.duplicates,reuse:result.reuse});
-  if(result.archive){say(t('transfer.status.sending'));await queueFrame(s,'archive',result.archive,(n,total)=>say(t('transfer.status.sendProgress',{percent:Math.floor(100*n/total)})));}
+  if(result.archive){s.outgoingArchive=true;say(t('transfer.status.sending'));void queueFrame(s,'archive',result.archive,(n,total)=>say(t('transfer.status.sendProgress',{percent:Math.floor(100*n/total)}))).catch(e=>failure(s,e));}
   else say(t('transfer.status.noneFound'));
   return;
  }
@@ -238,14 +412,16 @@ function watchChannel(s){
  const peer=s.peer;
  peer.addEventListener('datachannel',event=>{
   if(active!==s||s.peer!==peer)return;
-  try{if(event.channel.label!=='talera-transfer-v1')throw Error('PROTOCOL');attach(s,event.channel)}catch(e){failure(s,e)}
+  try{if(event.channel.label!==CHANNEL_LABEL)throw Error('PROTOCOL');attach(s,event.channel)}catch(e){failure(s,e)}
  });
 }
 async function switchToStun(s){
  live(s);
  if(s.route!==0||s.verification||s.channel?.readyState==='open')throw Error('NETWORK');
  const old=s.peer,oldChannel=s.channel,oldReceiver=s.receiver;
- s.route=1;s.openHandled=false;s.peer=newDirectPeer(1);s.channel=null;s.receiver=null;
+ s.route=1;s.openHandled=false;
+ try{s.peer=newDirectPeer(1,s.certificate)}catch(e){if(!s.certificate)throw e;s.certificate=null;s.peer=newDirectPeer(1)}
+ s.channel=null;s.receiver=null;
  try{oldChannel?.close()}catch{}try{old.close()}catch{}void oldReceiver?.dispose();
  markDiagnostic('ROUTE_STUN');observePeer(s);
  say(t('transfer.status.connecting'));timeout(s,45000);
@@ -271,12 +447,12 @@ async function reportSelectedRoute(s,peer){
 function attach(s,channel){
  if(s.channel)throw Error('PROTOCOL');
  s.channel=channel;markDiagnostic('CHANNEL_CREATED');
- s.receiver=frameReceiver(channel,(kind,blob)=>{if(s.channel===channel)return handleFrame(s,kind,blob)},error=>{if(s.channel===channel&&!s.committing)failure(s,error)},(kind,n,total)=>{
+ const receiver=frameReceiver(channel,(kind,blob)=>{if(s.receiver===receiver)return handleFrame(s,kind,blob)},error=>{if(s.receiver===receiver&&!s.committing)failure(s,error)},(kind,n,total)=>{
   if(kind==='archive')say(t('transfer.status.receiveProgress',{percent:Math.floor(n*100/total)}));
  },(kind,bytes)=>{
   // Reject unexpected frames BEFORE allocating memory or OPFS. The
   // prior queued frame has completed protocol validation at this point.
-  if(active!==s||s.channel!==channel||s.closed||s.committing||bytes<=0)return false;
+  if(active!==s||s.receiver!==receiver||s.closed||s.committing||bytes<=0)return false;
   if(kind==='ready')return !s.otherReady&&bytes<=100;
   if(!s.approved||!s.otherReady)return false;
   if(kind==='inventory')return s.role==='send'&&s.phase==='inventory';
@@ -285,10 +461,12 @@ function attach(s,channel){
   if(kind==='done')return s.role==='send'&&s.phase==='done'&&bytes<=100;
   return false;
  });
+ s.receiver=receiver;
  const onOpen=async()=>{
   if(active!==s||s.channel!==channel||s.openHandled)return;s.openHandled=true;markDiagnostic('CHANNEL_OPEN');markDiagnostic('ROUTE_OPEN',s.route);if(diag)void reportSelectedRoute(s,s.peer);timeout(s,VERIFICATION_TTL);clearQR();closeCamera();pair.hidden=join.hidden=true;el('transfer-code').textContent='';input.value='';
   try{
    s.verification=await pairingVerificationCode(s.locator,s.offer,s.answer);live(s);
+   await api('opened',s.locator);live(s);s.openRegistered=true;scheduleRepair(s);
    markDiagnostic('VERIFICATION_READY');verifyCode.textContent=s.verification;verify.hidden=false;
    say(t('transfer.status.verify'));approve.hidden=false;approve.disabled=false;
    // Keep temporary signaling available until the pair is finished or expires.
@@ -301,6 +479,8 @@ function attach(s,channel){
   if(!s.verification&&!s.started)return; // bounded negotiation can still retry
   if(s.committing&&s.phase!=='complete')return;
   if(s.phase==='complete')void finish(s,s.resultMessage||t('transfer.status.complete'));
+  else if(s.replacing)return;
+  else if(canReplace(s))requestReplacement(s);
   else failure(s,Error('NETWORK'));
  });
 }
@@ -309,10 +489,10 @@ async function startReceive(automatic){
  const run=++flow;connecting=true;receive.disabled=send.disabled=receiveManual.disabled=true;stop.hidden=false;
  let s;
  try{
-  await account();if(run!==flow)return;connecting=false;s=newSession('receive');say(t('transfer.status.prepare'));
-  attach(s,s.peer.createDataChannel('talera-transfer-v1',{ordered:true}));
+  await account();const certificate=await createTransferCertificate();if(run!==flow)return;connecting=false;s=newSession('receive',certificate);say(t('transfer.status.prepare'));
+  attach(s,s.peer.createDataChannel(CHANNEL_LABEL,{ordered:true}));
   const code=hex(crypto.getRandomValues(new Uint8Array(10)));
-  s.locator=(await codeHash(code)).slice(0,32);live(s);
+  s.secret=code;s.locator=(await codeHash(code)).slice(0,32);live(s);
   markDiagnostic('LOCAL_OFFER_BEGIN');const offer=routeSDP(s,await gather(s.peer,await s.peer.createOffer()),'LOCAL');live(s);s.offer=offer;markDiagnostic('LOCAL_OFFER_OK');
   const signature=await proof(code,'offer',offer);live(s);
   await api('create',s.locator,{sdp:offer,proof:signature,...(automatic?{secret:code}:{})});
@@ -335,7 +515,7 @@ async function startReceive(automatic){
    if(!s.openHandled)timeout(s,60000);
    if(await awaitChannel(s,9000))return;
    await switchToStun(s);
-   attach(s,s.peer.createDataChannel('talera-transfer-v1',{ordered:true}));
+   attach(s,s.peer.createDataChannel(CHANNEL_LABEL,{ordered:true}));
    s.offer=routeSDP(s,await gather(s.peer,await s.peer.createOffer()),'LOCAL');live(s);
    await api('retry',s.locator,{sdp:s.offer,proof:await proof(code,'offer-stun',s.offer)});live(s);
    const retryUntil=Date.now()+25000;
@@ -395,8 +575,8 @@ async function connect(code,expectedLocator=null){
  cancelDiscovery();let s;const run=++flow;
  try{
   connecting=true;discovered=null;el('transfer-connect').disabled=connectFound.disabled=search.disabled=true;closeCamera();
-  await account();if(run!==flow)return;connecting=false;s=newSession('send');join.hidden=true;say(t('transfer.status.connecting'));
-  s.locator=(await codeHash(code)).slice(0,32);live(s);
+  await account();const certificate=await createTransferCertificate();if(run!==flow)return;connecting=false;s=newSession('send',certificate);join.hidden=true;say(t('transfer.status.connecting'));
+  s.secret=code;s.locator=(await codeHash(code)).slice(0,32);live(s);
   if(expectedLocator&&expectedLocator!==s.locator)throw Error('PAIR');
   diagnosticLocator(s.locator);
   const r=await api('offer',s.locator);live(s);
@@ -445,5 +625,8 @@ apply.addEventListener('click',async()=>{
  }catch(e){failure(s,e)}finally{stop.disabled=false}
 });
 stop.addEventListener('click',()=>{markDiagnostic('STOPPED');if(active&&!active.committing)void finish(active,t('transfer.status.stopped'));else if(!active){reset();say(t('transfer.status.connectionStopped'))}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)closeCamera()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)closeCamera();markDiagnostic(document.hidden?'PAGE_HIDDEN':'PAGE_VISIBLE')});
 window.addEventListener('pagehide',()=>{closeCamera();clearQR();if(active&&!active.committing)void finish(active,t('transfer.status.pageExit'));else if(!active)reset()});
+
+window.addEventListener('online',()=>markDiagnostic('NETWORK_ONLINE'));
+window.addEventListener('offline',()=>markDiagnostic('NETWORK_OFFLINE'));

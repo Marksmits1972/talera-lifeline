@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newDiagnostic,safeCandidateKinds,validDiagnosticEvents,diagnosticError,INVITATION_TTL} from './f5-transfer-diagnostic.mjs';
-import {TransferSignaling} from './f5-transfer-signal.mjs';
+import {TransferSignaling,storedTransferSignal,expireTransferSignaling,TRANSFER_STORAGE_KEY} from './f5-transfer-signal.mjs';
 import {inventory,planTransfer,makeTransfer,reviewTransfer} from './f5-transfer-library.mjs';
 import {sendFrame,frameReceiver,pairingVerificationCode} from './f5-transfer-transport.mjs';
 const code='a'.repeat(32),sid='a'.repeat(64),other='b'.repeat(64),proof='c'.repeat(64);
@@ -170,7 +170,8 @@ test('one STUN retry stays bound to original authenticated pair, cannot become r
  assert.deepEqual(signal.handle(sid,{action:'poll',code}).answer,{sdp:retrySDP,proof});
  assert.throws(()=>signal.handle(sid,{action:'retry',code,sdp,proof}));
  assert.throws(()=>signal.handle(other,{action:'retryJoin',code,sdp,proof}));
- now+=60001;assert.throws(()=>signal.handle(other,{action:'retryOffer',code}));
+ now+=60001;assert.ok(signal.handle(other,{action:'retryOffer',code}).offer);
+ now=600000;assert.throws(()=>signal.handle(other,{action:'retryOffer',code}));
 });
 test('local then STUN configuration never creates a TURN peer; datachannel candidate counts omit addresses',async()=>{
  const {newDirectPeer,checkDirectSDP}=await import('./f5-transfer-transport.mjs');
@@ -193,7 +194,7 @@ test('local then STUN configuration never creates a TURN peer; datachannel candi
 // Execute the actual controller in two isolated JavaScript contexts, with
 // shared production signaling and simulated browser APIs. This demonstrates
 // orchestration, not ICE/NAT behavior or real iPhone acceptance.
-async function controllerFixture(successRoute){
+async function controllerFixture(successRoute,options={}){
  const vm=await import('node:vm'),{readFile}=await import('node:fs/promises');
  const transport=await import('./f5-transfer-transport.mjs');
  const diagnostic=await import('./f5-transfer-diagnostic.mjs');
@@ -210,31 +211,47 @@ async function controllerFixture(successRoute){
  const schedule=(fn,ms)=>{const id=setTimeout(()=>{timers.delete(id);fn()},Math.max(1,Math.ceil(ms/25)));timers.add(id);return id};
  const clear=id=>{clearTimeout(id);timers.delete(id)};
  const signaling=new TransferSignaling(clock),actions=[],peers=[],frames=[];
+ let rejectDiagnostics=false,oldArchiveBytes=0,newArchiveBytes=0,reviewed=0;
  class Element extends EventTarget{
   constructor(hidden){super();this.hidden=hidden;this.disabled=false;this.checked=false;this.textContent='';this.value='';this.dataset={database:db};}
   pause(){} focus(){}
   click(){assert.equal(this.disabled,false,'button unexpectedly disabled');this.dispatchEvent(new Event('click'))}
  }
  class Wire extends EventTarget{
-  readyState='connecting';bufferedAmount=0;label='talera-transfer-v1';
-  send(data){assert.equal(this.readyState,'open');frames.push(data);queueMicrotask(()=>this.other.dispatchEvent(new MessageEvent('message',{data})))}
+  readyState='connecting';bufferedAmount=0;label='talera-transfer-v2';
+  send(data){
+   assert.equal(this.readyState,'open');frames.push(data);queueMicrotask(()=>this.other.dispatchEvent(new MessageEvent('message',{data})));
+   if(options.dropArchive&&this.role==='send'){
+    if(typeof data==='string'&&data.includes('"kind":"archive"'))this.archive=true;
+    if(typeof data==='string'&&data.startsWith('resume?:'))this.archive=true;
+    if(this.archive&&data instanceof ArrayBuffer){
+     if(this.replacement)newArchiveBytes+=data.byteLength;
+     else{oldArchiveBytes+=data.byteLength;if(oldArchiveBytes>=262144+32768)this.close()}
+    }
+   }
+  }
   close(){if(this.readyState==='closed')return;this.readyState='closed';this.dispatchEvent(new Event('close'));this.other?.close()}
  }
  class Peer extends EventTarget{
   iceGatheringState='complete';iceConnectionState='new';connectionState='new';
   constructor(role,route){super();this.role=role;this.route=route;peers.push(this)}
   createDataChannel(){return this.channel=new Wire()}
-  description(type){return {type,sdp:sdp+'a=ice-ufrag:'+this.role+this.route+'\r\n'+'a=candidate:1 1 UDP 100 private.local 1234 typ host\r\n'}}
-  async createOffer(){return this.description('offer')}
+  description(type){return {type,sdp:sdp+'a=ice-ufrag:'+this.role+this.route+'\r\n'+'a=fingerprint:sha-256 '+Array(32).fill(this.role==='send'?'AB':'CD').join(':')+'\r\n'+'a=candidate:1 1 UDP 100 private.local 1234 typ host\r\n'}}
+  async createOffer(options){if(options?.iceRestart){this.restart=true;this.iceConnectionState='checking';this.connectionState='connecting';this.dispatchEvent(new Event('iceconnectionstatechange'))}return this.description('offer')}
   async createAnswer(){return this.description('answer')}
   async setLocalDescription(desc){this.localDescription=desc}
   async setRemoteDescription(desc){
    this.remoteDescription=desc;
    if(this.role!=='receive'||this.route!==successRoute)return;
-   const sender=peers.find(p=>p.role==='send'&&p.route===this.route);
+   const sender=peers.findLast(p=>p.role==='send'&&p.route===this.route);
    assert.ok(sender);
+   if(this.restart){
+    for(const p of [this,sender]){p.connectionState='connected';p.iceConnectionState='connected';p.dispatchEvent(new Event('iceconnectionstatechange'))}
+    return;
+   }
    const receiverChannel=this.channel,senderChannel=sender.channel=new Wire();
    receiverChannel.other=senderChannel;senderChannel.other=receiverChannel;
+   senderChannel.role='send';senderChannel.replacement=peers.filter(p=>p.role==='receive'&&p.route===this.route).length>1;
    const incoming=new Event('datachannel');incoming.channel=senderChannel;sender.dispatchEvent(incoming);
    schedule(()=>{if(this.connectionState==='closed'||sender.connectionState==='closed')return;
     for(const p of [this,sender]){p.connectionState='connected';p.iceConnectionState='connected';p.channel.readyState='open';p.channel.dispatchEvent(new Event('open'))}
@@ -250,13 +267,16 @@ async function controllerFixture(successRoute){
   const fetch=async(url,opts)=>{
    if(url==='/api/me')return {ok:true,status:200,json:async()=>({account:{id:account}})};
    const cmd=JSON.parse(opts.body);actions.push([role,cmd.action]);
+   if(rejectDiagnostics&&cmd.action==='diagnostic')return {ok:false,status:409};
    try{const result=cmd.action==='offer'?signaling.offer(session,cmd.code):signaling.handle(session,cmd);
     return {ok:true,status:200,json:async()=>result};
    }catch{return {ok:false,status:409}}
   };
   const context=vm.createContext({document,window,crypto,TextEncoder,ArrayBuffer,Uint8Array,Blob,AbortController,AbortSignal,
    Date:class extends Date{static now(){return clock()}},performance:{now:clock},setTimeout:schedule,clearTimeout:clear,fetch,
-   ...transport,...diagnostic,...library,newDirectPeer:route=>new Peer(role,route),pairingScanner,drawPairingQR,
+   ...transport,...diagnostic,...library,newDirectPeer:route=>new Peer(role,route),createTransferCertificate:async()=>options.dropArchive?{}:null,pairingScanner,drawPairingQR,
+   ...(options.dropArchive?{readTransferLibrary:async()=>role==='send'?options.full:empty,
+    reviewTransfer:async(...args)=>{const result=await library.reviewTransfer(...args);reviewed++;return result}}:{}),
    location:{origin},console});
   vm.runInContext(controller,context,{filename:'f5-transfer-controller.mjs'});
   nodes.get('transfer-diagnostic-enable').checked=true;
@@ -269,7 +289,7 @@ async function controllerFixture(successRoute){
  const start=async()=>{click(receiver,'transfer-receive');await waitFor(()=>visible(receiver,'transfer-pair'));
   click(sender,'transfer-send');await waitFor(()=>actions.some(a=>a[0]==='send'&&a[1]==='offer'))};
  const cancel=()=>{for(const page of [receiver,sender])if(visible(page,'transfer-cancel'))click(page,'transfer-cancel');for(const timer of timers)clearTimeout(timer)};
- return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames};
+ return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames,metrics:()=>({oldArchiveBytes,newArchiveBytes,reviewed}),rejectDiagnostics:()=>{rejectDiagnostics=true}};
 }
 for(const route of [0,1,null])test('controller orchestration: '+(route===null?'both routes fail safely':route?'local fails, one STUN attempt':'local succeeds without STUN'),async()=>{
  const f=await controllerFixture(route);
@@ -310,7 +330,7 @@ test('invitation remains valid at nine minutes but cannot be discovered after te
  now=600000;assert.equal(signal.handle(other,{action:'discover'}).invitation,null);
  assert.throws(()=>signal.offer(other,code));
 });
-test('diagnosis expires per report, but new checkpoints are retained after a long active invitation',()=>{
+test('diagnosis is retained during a long active invitation, and expires after cancellation',()=>{
  let now=0;const signal=new TransferSignaling(()=>now),secret='f'.repeat(20);
  const start=[[0,'START',0]],end=[[0,'START',0],[540000,'ERROR_TIMEOUT',0]];
  const cmd=(role,events)=>({action:'diagnostic',code,role,events});
@@ -342,5 +362,187 @@ test('both failed routes leave the remote diagnostic accessible after cancellati
   f.click(f.receiver,'transfer-diagnostic-refresh');
   await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.split('ANDER APPARAAT')[1]?.includes('ERROR_'));
   assert.equal(f.frames.length,0);
+ }finally{f.cancel()}
+});
+
+test('temporary pairing survives isolate recreation, respects ten minutes, and alarm removes only transfer data',async()=>{
+ let now=10000,alarm=null;
+ const data=new Map([['account',{id:'unchanged'}]]);
+ const storage={transaction:async fn=>fn({get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),delete:async k=>data.delete(k),getAlarm:async()=>alarm,setAlarm:async n=>{alarm=n},deleteAlarm:async()=>{alarm=null}})};
+ const call=(session,command)=>storedTransferSignal(storage,session,command,now);
+ const cmd=(role,events)=>({action:'diagnostic',code,role,events});
+ const events=[[0,'START',0],[100,'CHANNEL_OPEN',0]];
+ await call(sid,{action:'create',code,sdp,proof,secret:'f'.repeat(20)});
+ await call(other,{action:'join',code,sdp,proof});now+=15000;
+ await call(sid,{action:'retry',code,sdp,proof});
+ await call(other,{action:'retryJoin',code,sdp,proof});
+ assert.equal(data.get(TRANSFER_STORAGE_KEY).state.secret,null);
+ await call(sid,cmd('receive',events));await call(other,cmd('send',events));
+ now+=61000;assert.deepEqual((await call(sid,cmd('receive',[]))).reports,{receive:events,send:events});
+ now+=300000;assert.deepEqual((await call(sid,cmd('receive',[]))).reports,{receive:events,send:events});
+ await assert.rejects(call('d'.repeat(64),cmd('send',[])));
+ await call(sid,{action:'cancel',code});assert.equal(data.get(TRANSFER_STORAGE_KEY).state,null);
+ assert.equal(alarm,now+300000);
+ now+=300000;await expireTransferSignaling(storage,now);
+ assert.equal(data.has(TRANSFER_STORAGE_KEY),false);assert.equal(alarm,null);
+ assert.deepEqual(data.get('account'),{id:'unchanged'});
+});
+test('diagnostic milestone survives repeated network state changes',()=>{
+ const d=newDiagnostic('receive');d.mark('START');d.mark('ROUTE_STUN');d.mark('CHANNEL_OPEN');d.mark('VERIFICATION_READY');d.mark('TRANSFER_START');
+ for(let i=0;i<100;i++)d.mark(i%2?'ICE_DISCONNECTED':'ICE_CONNECTED');
+ for(const phase of ['START','ROUTE_STUN','CHANNEL_OPEN','VERIFICATION_READY','TRANSFER_START'])assert.ok(d.events.some(e=>e[1]===phase));
+ assert.equal(d.events.length,64);
+});
+
+test('recovering same channel pauses bytes, retains local sink and progress means acknowledged bytes',async()=>{
+ const a=new Channel(),b=new Channel();a.other=b;b.other=a;
+ const data=new Uint8Array(600000);for(let i=0;i<data.length;i++)data[i]=i%251;
+ let received,release,paused=false,seen=0;
+ const gate=new Promise(r=>{release=r});
+ const receiver=frameReceiver(b,async(kind,blob)=>{received=new Uint8Array(await blob.arrayBuffer())},e=>{throw e},(kind,n)=>{seen=n});
+ const progress=[];
+ const run=sendFrame(a,'archive',new Blob([data]),(n,total)=>{
+  assert.ok(seen>=n);progress.push(n);if(n===262144)paused=true;
+ },async()=>{if(!paused)return 0;const start=Date.now();await gate;return Date.now()-start});
+ while(!paused)await new Promise(r=>setTimeout(r,5));
+ await new Promise(r=>setTimeout(r,100));assert.equal(seen,262144);assert.equal(received,undefined);
+ release();await run;await receiver.dispose();
+ assert.deepEqual(received,data);assert.equal(progress.at(-1),data.length);
+});
+test('controller holds original open peer through a transient disconnect without removing confirmation',async()=>{
+ const f=await controllerFixture(1);
+ try{
+  await f.start();await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  const p=f.peers.find(x=>x.role==='receive'&&x.route===1),channel=p.channel;
+  const before=f.receiver.get('transfer-verify-code').textContent;
+  p.iceConnectionState='disconnected';p.connectionState='disconnected';p.dispatchEvent(new Event('iceconnectionstatechange'));
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('RECOVERY_WAIT'));
+  assert.equal(f.receiver.get('transfer-status').textContent,'transfer.status.connecting');
+  assert.equal(f.visible(f.receiver,'transfer-approve'),true);
+  p.iceConnectionState='connected';p.connectionState='connected';p.dispatchEvent(new Event('iceconnectionstatechange'));
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('RECOVERY_OK'));
+  assert.equal(p.channel,channel);assert.equal(f.receiver.get('transfer-verify-code').textContent,before);
+  assert.equal(f.frames.length,0);
+ }finally{f.cancel()}
+});
+test('failed diagnostic refresh preserves previously retrieved remote report',async()=>{
+ const f=await controllerFixture(0);
+ try{
+  await f.start();await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  await new Promise(r=>setTimeout(r,200));f.click(f.receiver,'transfer-diagnostic-refresh');
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.split('ANDER APPARAAT')[1]?.includes('JOIN_OK'));
+  f.rejectDiagnostics();f.click(f.receiver,'transfer-diagnostic-refresh');
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('DIAG_HTTP 409'));
+  assert.ok(f.receiver.get('transfer-diagnostic-report').textContent.split('ANDER APPARAAT')[1].includes('JOIN_OK'));
+ }finally{f.cancel()}
+});
+
+test('repair signaling is one-time, session-bound and expires without retaining repair SDP',()=>{
+ let now=1000;const s=new TransferSignaling(()=>now),third='d'.repeat(64);
+ const call=(session,action,extra={})=>s.handle(session,{action,code,...extra});
+ call(sid,'create',{sdp,proof});call(other,'join',{sdp,proof});
+ assert.throws(()=>call(other,'repairRequest'));
+ now+=40000;call(sid,'opened');call(other,'opened');assert.equal(s.state.expires,now+600000);
+ call(sid,'active');call(other,'active');assert.equal(s.state.expires,now+1800000);assert.equal(s.state.offer,null);assert.equal(s.state.answer,null);
+ now+=610000;assert.throws(()=>call(third,'repairRequest'));
+ call(other,'repairRequest');assert.throws(()=>call(other,'repairOffer',{sdp,proof}));
+ call(sid,'repairOffer',{sdp,proof});assert.throws(()=>call(sid,'repairOffer',{sdp,proof}));
+ call(other,'repairAnswer',{sdp,proof});assert.throws(()=>call(other,'repairAnswer',{sdp,proof}));
+ assert.deepEqual(call(sid,'repairPoll').repair.answer,{sdp,proof});
+ now+=90000;assert.equal(call(sid,'repairPoll').repair,null);assert.equal(s.state.repair.offer,undefined);
+ assert.throws(()=>call(sid,'repairRequest'));
+});
+test('ICE restart must preserve the original DTLS fingerprint',async()=>{
+ const {assertSameFingerprint}=await import('./f5-transfer-transport.mjs');
+ const a=sdp+'a=fingerprint:sha-256 '+Array(32).fill('AB').join(':')+'\r\n';
+ assert.equal(assertSameFingerprint(a,a+'a=ice-ufrag:new\r\n'),a+'a=ice-ufrag:new\r\n');
+ assert.throws(()=>assertSameFingerprint(a,a.replace('AB:AB','CD:AB')),/SECURITY/);
+ assert.throws(()=>assertSameFingerprint(sdp,sdp),/SECURITY/);
+});
+test('sender-only connection failure triggers one authenticated ICE restart with original channel and confirmation',async()=>{
+ const f=await controllerFixture(1);
+ try{
+  await f.start();await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  const a=f.peers.find(x=>x.role==='receive'&&x.route===1),b=f.peers.find(x=>x.role==='send'&&x.route===1);
+  const original=a.channel,codeBefore=f.receiver.get('transfer-verify-code').textContent;
+  b.iceConnectionState='failed';b.connectionState='failed';b.dispatchEvent(new Event('iceconnectionstatechange'));
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.includes('REPAIR_APPLIED')&&f.sender.get('transfer-diagnostic-report').textContent.includes('REPAIR_APPLIED'));
+  assert.equal(a.channel,original);assert.equal(f.receiver.get('transfer-verify-code').textContent,codeBefore);
+  assert.equal(f.actions.filter(x=>x[1]==='repairOffer').length,1);
+  assert.equal(f.actions.filter(x=>x[1]==='repairAnswer').length,1);
+  assert.equal(f.frames.length,0);assert.equal(f.peers.length,4);
+ }finally{f.cancel()}
+});
+
+test('partial archive bytes are not a checkpoint until block hash verified; corrupted block cannot import',async()=>{
+ const channel=new Channel(),data=new Uint8Array(16384).fill(7);
+ let error,frames=0;const receiver=frameReceiver(channel,()=>{frames++},e=>{error=e});
+ const event=data=>channel.dispatchEvent(new MessageEvent('message',{data}));
+ event(JSON.stringify({kind:'archive',bytes:data.length}));event(data.buffer);
+ await new Promise(r=>setTimeout(r,10));assert.equal(receiver.checkpoint(),null);
+ event('block:'+data.length+':'+('0'.repeat(64)));
+ await new Promise(r=>setTimeout(r,10));assert.match(error.message,/CHECKSUM/);assert.equal(receiver.checkpoint(),null);assert.equal(frames,0);
+ await receiver.dispose();
+});
+test('archive checkpoint is local and proves exact verified bytes before progress',async()=>{
+ const a=new Channel(),b=new Channel();a.other=b;b.other=a;
+ const data=new Uint8Array(600000).fill(23),seen=[];let received;
+ const receiver=frameReceiver(b,async(kind,blob)=>{received=new Uint8Array(await blob.arrayBuffer())},e=>{throw e});
+ await sendFrame(a,'archive',new Blob([data]),(n,total)=>{
+  const last=receiver.checkpoint();assert.equal(last.offset,n);assert.match(last.digest,/^[a-f0-9]{64}$/);seen.push(n);
+ });
+ assert.deepEqual(seen,[262144,524288,600000]);assert.deepEqual(received,data);await receiver.dispose();
+});
+
+test('archive resumes after closed channel from last verified local block, discarding only unverified bytes',async()=>{
+ const a=new Channel(),b=new Channel(),c=new Channel(),d=new Channel();a.other=b;b.other=a;c.other=d;d.other=c;
+ const data=new Uint8Array(760000);for(let i=0;i<data.length;i++)data[i]=i%251;
+ let received,oldBytes=0,newBytes=0,recoveries=0,finalFrames=0;
+ const receiver=frameReceiver(b,async(kind,blob)=>{finalFrames++;received=new Uint8Array(await blob.arrayBuffer())},e=>{throw e});
+ const oldSend=a.send.bind(a),newSend=c.send.bind(c);
+ a.send=value=>{if(value instanceof ArrayBuffer)oldBytes+=value.byteLength;oldSend(value);
+  if(oldBytes>=262144+32768){a.readyState=b.readyState='closed'}};
+ c.send=value=>{if(value instanceof ArrayBuffer)newBytes+=value.byteLength;newSend(value)};
+ await sendFrame(a,'archive',new Blob([data]),()=>{},async()=>0,async()=>{
+  recoveries++;await receiver.replaceChannel(d);return c;
+ });
+ assert.equal(recoveries,1);assert.equal(oldBytes,262144+32768);assert.equal(newBytes,data.length-262144);
+ assert.equal(finalFrames,1);assert.deepEqual(received,data);await receiver.dispose();
+});
+test('replacement rejects a forged checkpoint instead of skipping archive bytes',async()=>{
+ const a=new Channel(),b=new Channel(),c=new Channel();a.other=b;b.other=a;
+ const receiver=frameReceiver(b,()=>{throw Error('unexpected import')},e=>{throw e});
+ const oldSend=a.send.bind(a);let oldBytes=0;
+ a.send=value=>{if(value instanceof ArrayBuffer)oldBytes+=value.byteLength;oldSend(value);
+  if(oldBytes>262144)a.readyState=b.readyState='closed'};
+ c.send=value=>{if(typeof value==='string'&&value.startsWith('resume?:'))queueMicrotask(()=>c.dispatchEvent(new MessageEvent('message',{data:'resume!:524288:'+('0'.repeat(64))})))};
+ await assert.rejects(sendFrame(a,'archive',new Blob([new Uint8Array(760000)]),()=>{},async()=>0,async()=>c),/SECURITY_CHECKPOINT/);
+ await receiver.dispose();
+});
+
+test('replacement signaling requires both active participants, bounds one replacement, and rejects unrelated sessions',()=>{
+ let now=1;const s=new TransferSignaling(()=>now),third='d'.repeat(64);
+ const call=(session,action,extra={})=>s.handle(session,{action,code,...extra});
+ call(sid,'create',{sdp,proof});call(other,'join',{sdp,proof});call(sid,'opened');call(other,'opened');
+ assert.throws(()=>call(sid,'replaceRequest'));call(sid,'active');assert.throws(()=>call(sid,'replaceRequest'));call(other,'active');
+ assert.throws(()=>call(third,'replaceRequest'));call(other,'replaceRequest');
+ assert.throws(()=>call(other,'replaceOffer',{sdp,proof}));call(sid,'replaceOffer',{sdp,proof});call(other,'replaceAnswer',{sdp,proof});
+ assert.deepEqual(call(sid,'repairPoll').replacement.answer,{sdp,proof});
+ now+=90000;assert.equal(call(sid,'repairPoll').replacement,null);assert.throws(()=>call(sid,'replaceRequest'));
+});
+test('controller resumes actual archive on a fresh same-identity peer after channel closes, keeps explicit import',async()=>{
+ const large=new File([new Uint8Array(760000).fill(71)],'large.jpg',{type:'image/jpeg',lastModified:10});
+ const data={stories:[a],files:[{key:photo.key,blob:large}]};
+ const f=await controllerFixture(1,{dropArchive:true,full:data});
+ try{
+  await f.start();await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  const original=f.receiver.get('transfer-verify-code').textContent;
+  f.click(f.receiver,'transfer-approve');f.click(f.sender,'transfer-approve');
+  await f.waitFor(()=>f.visible(f.receiver,'transfer-import'));
+  assert.equal(f.receiver.get('transfer-verify-code').textContent,original);
+  const m=f.metrics();assert.equal(m.reviewed,1);assert.equal(m.oldArchiveBytes,262144+32768);const size=JSON.parse(f.frames.find(x=>typeof x==='string'&&x.includes('"kind":"archive"'))).bytes;assert.equal(m.newArchiveBytes,size-262144);
+  assert.equal(f.actions.filter(a=>a[1]==='replaceOffer').length,1);
+  assert.equal(f.actions.filter(a=>a[1]==='replaceAnswer').length,1);
+  assert.equal(f.peers.length,6); // local pair, STUN pair, authenticated replacement pair
  }finally{f.cancel()}
 });

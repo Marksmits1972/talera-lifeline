@@ -21,7 +21,7 @@ permissions:
 jobs:
   f5_candidate_package:
     name: Build and archive the exact TALERA Free candidate once
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-device-pairing-ten-minute-green-exact-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-confirmed-current-photo-place-green-exact-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -77,7 +77,7 @@ jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-device-pairing-ten-minute-green-exact-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-confirmed-current-photo-place-green-exact-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -126,7 +126,7 @@ jobs:
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
     needs: f5_candidate_package
-    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-device-pairing-ten-minute-green-exact-20261127') }}
+    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-confirmed-current-photo-place-green-exact-20261127') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -1017,7 +1017,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-device-pairing-ten-minute-green-exact-20261127' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-confirmed-current-photo-place-green-exact-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     concurrency:
@@ -1031,7 +1031,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 395af2db-b399-4195-897a-b6158c4425e4
+      F5_EXPECTED_LIVE_VERSION: d6074621-9aa1-423e-ab9c-dafb2d28a70b
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -1057,9 +1057,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = c056ad90bcdd523664d283eaa714345cd58db50c
-          test "$(git diff --name-only c056ad90bcdd523664d283eaa714345cd58db50c HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          git diff --exit-code c056ad90bcdd523664d283eaa714345cd58db50c HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          test "$(git rev-parse HEAD^)" = dc8a6a31f317b3af02a8c714c7c60d7a5e494ef7
+          test "$(git diff --name-only dc8a6a31f317b3af02a8c714c7c60d7a5e494ef7 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          git diff --exit-code dc8a6a31f317b3af02a8c714c7c60d7a5e494ef7 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -1068,7 +1068,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='45983000540',sha='c056ad90bcdd523664d283eaa714345cd58db50c';
+          const id='45993162081',sha='dc8a6a31f317b3af02a8c714c7c60d7a5e494ef7';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const packageName='Build and archive the exact TALERA Free candidate once';
@@ -1097,7 +1097,7 @@ jobs:
           const artifacts=await get(id+'/artifacts?name=talera-free-f5-candidate-package&per_page=100');
           assert.equal(artifacts.artifacts.length,1);
           const artifact=artifacts.artifacts[0];
-          assert.equal(String(artifact.id),'15190396136');assert.equal(artifact.digest,'sha256:39e07b949dd2e6886e0d046c71133bca08340b9bbd53766c53edd28d78e1f273');assert.equal(artifact.expired,false);
+          assert.equal(String(artifact.id),'15194856826');assert.equal(artifact.digest,'sha256:2d7f116233d39689da425fb5502375523fa1ffa6e58f2e330285b6a738368ece');assert.equal(artifact.expired,false);
           assert.equal(artifact.workflow_run?.head_sha,sha);assert.equal(String(artifact.workflow_run?.id),id);
           const main=jobs.find(j=>j.name===mainName);
           for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
@@ -1112,7 +1112,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45983000540');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_45993162081');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1164,17 +1164,17 @@ jobs:
         with:
           name: talera-free-f5-candidate-package
           github-token: ${{ github.token }}
-          run-id: 45983000540
+          run-id: 45993162081
           path: ${{ runner.temp }}/talera-candidate-package
       - name: Verify source and tested SHA256 before unpacking for release
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(cat "$out/source.sha")" = "c056ad90bcdd523664d283eaa714345cd58db50c"
-          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "c509fb5793d40cd7c979b38dfb4a1df4b89f2d762cdec9844fc651ada2c1c411"
+          test "$(cat "$out/source.sha")" = "dc8a6a31f317b3af02a8c714c7c60d7a5e494ef7"
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "e03345f30d76acb798b97c4ab621e57114aae682271cde3db3edcf55c31333f7"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=c509fb5793d40cd7c979b38dfb4a1df4b89f2d762cdec9844fc651ada2c1c411"
+          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=e03345f30d76acb798b97c4ab621e57114aae682271cde3db3edcf55c31333f7"
       - name: Verify same tested TALERA with no examples and verify account and personal media contracts
         run: |
           set -euo pipefail
@@ -1282,8 +1282,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code c056ad90bcdd523664d283eaa714345cd58db50c HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45983000540'
+          git diff --exit-code dc8a6a31f317b3af02a8c714c7c60d7a5e494ef7 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_45993162081'
       - name: Prepare original Worker without unverified email binding or account migration
         run: |
           set -euo pipefail
@@ -1603,7 +1603,7 @@ jobs:
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-device-pairing-ten-minute-green-exact-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-confirmed-current-photo-place-green-exact-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -1767,7 +1767,7 @@ jobs:
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-device-pairing-ten-minute-green-exact-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-confirmed-current-photo-place-green-exact-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:

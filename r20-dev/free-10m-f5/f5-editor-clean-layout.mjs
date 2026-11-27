@@ -121,6 +121,7 @@ body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{posi
   display:grid!important;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)!important;
   grid-auto-rows:min-content!important;gap:20px 32px!important;align-items:start!important;
   align-content:start!important;min-height:0!important;flex:0 0 auto!important;
+  width:100%!important;max-width:none!important;box-sizing:border-box!important;
   padding:0!important;
  }
  body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor #details{

@@ -119,6 +119,7 @@ test('desktop workbench, writer and recorder styling is desktop-only; location a
  const html=simplifyTellMemoryEditor(source),desktop=html.split('/* Desktop workbench only:')[1].split('</style>')[0];
  assert.match(desktop, /@media \(min-width: 1024px\) and \(hover: hover\) and \(pointer: fine\)/);
  assert.match(desktop,/grid-template-columns:minmax\(0,1\.2fr\) minmax\(0,1fr\)/);
+ assert.match(desktop,/width:100%!important;max-width:none!important;box-sizing:border-box!important/);
  assert.match(desktop,/#taleraWriterOverlay \.talera-writer-body/);
  assert.match(desktop,/#taleraV61RecControls/);
  assert.match(desktop,/#v30DateModal:not\(\[hidden\]\) #v30DateBox/);

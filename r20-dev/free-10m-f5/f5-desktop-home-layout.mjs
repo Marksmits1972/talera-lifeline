@@ -25,10 +25,39 @@ export const desktopMenuRules = `
     padding-bottom: 22px !important;
   }
 `;
+// An explicit native link to the existing presentation overview, not a new route.
+export const desktopPresentationLink = '<a id="talera-desktop-present-link" href="/present" data-i18n="core.present.presentationTab" style="display:none">Presentatie</a>';
 export const desktopHomeStyle = `<style id="talera-f5-desktop-home-layout">
 @media ${DESKTOP_HOME_MEDIA} {
   ${desktopMenuRules}
   :root { --talera-home-control-width: clamp(350px, 35vw, 620px); }
+  /* The explicit overview entry is visible only on desktop Home. The original
+     photo and caption still open the selected memory as before. */
+  body[data-tab="mine"] #sheetBody #talera-desktop-present-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    min-height: 48px !important;
+    margin: 2px 0 12px !important;
+    padding: 10px 16px !important;
+    box-sizing: border-box !important;
+    border-radius: 12px !important;
+    border: 1px solid #0b1e39 !important;
+    background: #0b1e39 !important;
+    color: #fff !important;
+    text-decoration: none !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+  }
+  #talera-desktop-present-link::before {
+    content: '' !important;
+    border: 7px solid transparent;
+    border-left: 11px solid currentColor;
+    border-right: 0;
+  }
+  #talera-desktop-present-link:focus-visible { outline: 3px solid #6ea3e7; outline-offset: 3px; }
   .hero {
     left: var(--talera-home-control-width) !important;
     right: 0 !important;
@@ -125,5 +154,9 @@ export function installDesktopHomeLayout(html, route) {
   for (const token of ['id="heroImage"', 'id="sheet"', 'id="sheetBody"', 'id="v17-timebox"', 'id="v18-phases"', 'id="navMore"']) {
     assert.ok(html.includes(token), 'DESKTOP_HOME_SOURCE_DRIFT: ' + token);
   }
-  return html.replace('</head>', () => desktopHomeStyle + '</head>');
+  const anchor = '<section id="v17-timebox"';
+  assert.equal(html.split(anchor).length, 2, 'DESKTOP_HOME_PRESENT_LINK_ANCHOR_DRIFT');
+  assert.ok(!html.includes('id="talera-desktop-present-link"'), 'DESKTOP_HOME_PRESENT_LINK_DUPLICATE');
+  return html.replace(anchor, () => desktopPresentationLink + anchor)
+    .replace('</head>', () => desktopHomeStyle + '</head>');
 }

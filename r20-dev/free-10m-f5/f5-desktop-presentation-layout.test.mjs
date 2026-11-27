@@ -7,7 +7,9 @@ assert.equal(result.replace(desktopPresentationStyle,''),original,'Only a respon
 assert.ok(desktopPresentationStyle.includes('@media '+DESKTOP_HOME_MEDIA));
 assert.ok(desktopPresentationStyle.includes(desktopMenuRules));
 assert.ok(desktopPresentationStyle.includes('width: min(62vw, 960px)'));
-assert.ok(!desktopPresentationStyle.includes('#photoStage'), 'Photo stage must remain unchanged');
+assert.ok(desktopPresentationStyle.includes('#photoStage :is(.example-photo,.talera-story-synced-sharp)'));
+assert.match(desktopPresentationStyle, /#photoStage :is\(\.example-photo,\.talera-story-synced-sharp\) \{\s*object-fit: contain !important;\s*object-position: center center !important;\s*\}/);
+assert.ok(!desktopPresentationStyle.includes('#photoStage {'), 'Keep native stage geometry intact');
 assert.ok(!desktopPresentationStyle.includes('#focusText'), 'Original date position must remain unchanged');
 assert.ok(!desktopPresentationStyle.includes('.talera-photo-dots'), 'Original dots position must remain unchanged');
 assert.ok(desktopPresentationStyle.includes('#talera-flow-home'));

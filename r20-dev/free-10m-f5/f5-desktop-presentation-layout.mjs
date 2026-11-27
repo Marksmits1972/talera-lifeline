@@ -51,6 +51,15 @@ export const desktopPresentationStyle = `<style id="talera-f5-desktop-presentati
     border-left-color: #fff !important;
     border-bottom-color: #fff !important;
   }
+  /* Fit the ORIGINAL image into the current desktop viewport. The native
+     layers, opacity, navigation, video, transitions and media IDs stay intact.
+     A portrait, square or landscape image retains its aspect ratio and is
+     fully visible instead of being cropped by full-bleed object-fit:cover. */
+  html body:not(.talera-recipient-presentation):not(.talera-v18-reading)
+    #photoStage :is(.example-photo,.talera-story-synced-sharp) {
+    object-fit: contain !important;
+    object-position: center center !important;
+  }
   /* The zero-example shell deliberately has no initial image source.
      Hide only its empty native image elements; loading an original source
      automatically removes this rule without touching any player state. */

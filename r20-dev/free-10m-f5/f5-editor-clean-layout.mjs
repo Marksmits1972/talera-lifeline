@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {DESKTOP_HOME_MEDIA} from './f5-desktop-home-layout.mjs';
 
 // Approved TALERA editor redesign. Restrict all source edits to the original
 // tag widget and the existing toolbar; no new routes, stores, or save path.
@@ -101,6 +102,110 @@ body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{posi
 #app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]::before{background:#dbe6f5!important;border-color:#dbe6f5!important;}
 #app #main .work.talera-r16-editor .talera-tag-choice:focus-visible{outline:2px solid #224d7c!important;outline-offset:-3px!important;}
 #app #main .work.talera-r16-editor .talera-tag-choice:disabled{opacity:.52!important;}
+/* Desktop workbench only: same fields/media nodes, same draft and save handlers.
+   Location is deliberately not targeted; its separate project owns that feature. */
+@media ${DESKTOP_HOME_MEDIA} {
+ body:has(#app #main .work.talera-r16-editor) #app{
+  width:100%!important;max-width:1440px!important;min-width:0!important;
+  margin-inline:auto!important;box-sizing:border-box!important;
+ }
+ body:has(#app #main .work.talera-r16-editor) #app>header.top{
+  padding:8px clamp(24px,3vw,44px)!important;min-height:64px!important;
+  box-sizing:border-box!important;
+ }
+ body:not(.talera-v61-inline-recording):has(#app #main .work.talera-r16-editor) #app #main{
+  flex:1 1 auto!important;min-height:0!important;padding:24px clamp(24px,3vw,44px) 32px!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+ }
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor{
+  display:grid!important;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)!important;
+  grid-auto-rows:min-content!important;gap:20px 32px!important;align-items:start!important;
+  align-content:start!important;min-height:0!important;flex:0 0 auto!important;
+  padding:0!important;
+ }
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor #details{
+  grid-column:1/-1!important;grid-row:1!important;
+ }
+ #app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #title{
+  font-size:30px!important;min-height:48px!important;
+ }
+ #app #main .work.talera-compact-work.talera-r16-editor .talera-v14-heading #dateToggle{
+  font-size:16px!important;min-height:42px!important;
+ }
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor>.talera-work-tiles{
+  grid-column:1!important;grid-row:2 / span 2!important;
+  margin:0!important;min-width:0!important;
+ }
+ #app #main .work.talera-compact-work.talera-r16-editor .talera-work-tiles .tiles{
+  grid-template-columns:repeat(auto-fill,minmax(145px,1fr))!important;gap:14px!important;
+ }
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor>.talera-tags-v20{
+  grid-column:2!important;grid-row:2!important;min-width:0!important;
+ }
+ #app #main .work.talera-r16-editor .talera-tags-choices{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;max-height:220px!important;
+ }
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor>.work-tools.talera-r16-toolbar{
+  grid-column:1/-1!important;justify-self:end!important;width:min(100%,630px)!important;
+  margin:10px 0 0!important;padding:14px 0!important;gap:12px!important;
+ }
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor>#error{
+  grid-column:1/-1!important;
+ }
+ #app .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar :is(#speak,#write){
+  flex-direction:row!important;gap:9px!important;font-size:15px!important;
+ }
+ #app .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar #publish{
+  font-size:15px!important;min-height:48px!important;
+ }
+
+ /* Existing writer: room to read the photographs and write next to them.
+    Preserve its native scrolling, auto-resize, text and done action. */
+ #taleraWriterOverlay{box-sizing:border-box!important;width:100%!important;max-width:100%!important;}
+ #taleraWriterOverlay .talera-writer-top{
+  width:100%!important;max-width:1440px!important;margin-inline:auto!important;
+  padding:16px clamp(24px,3vw,44px)!important;box-sizing:border-box!important;
+ }
+ #taleraWriterOverlay .talera-writer-body{
+  display:grid!important;grid-template-columns:minmax(260px,.85fr) minmax(0,1.4fr)!important;
+  align-items:start!important;align-content:start!important;gap:28px!important;
+  width:100%!important;max-width:1440px!important;padding:28px clamp(24px,3vw,44px)!important;
+  box-sizing:border-box!important;
+ }
+ #taleraWriterOverlay #taleraWriterPhotos:not([hidden]){
+  grid-template-columns:repeat(auto-fill,minmax(130px,1fr))!important;
+  gap:12px!important;margin:0!important;padding:0!important;border-bottom:0!important;
+ }
+ #taleraWriterOverlay #taleraWriterPhotos .talera-writer-thumbnail img{
+  object-fit:contain!important;
+ }
+ #taleraWriterOverlay #taleraWriterText{
+  min-height:max(360px,60dvh)!important;width:100%!important;min-width:0!important;
+  padding:24px!important;font-size:18px!important;box-sizing:border-box!important;
+ }
+ #taleraWriterOverlay .talera-writer-body:has(#taleraWriterPhotos[hidden]){
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+
+ /* Existing recording player: keep controls clear of the whole source image.
+    No new recorder, overlay state, inputs, audio handling or cue logic. */
+ body.talera-v61-inline-recording #app .work.talera-compact-work #frame{
+  inset:20px 24px 176px!important;width:calc(100% - 48px)!important;
+  height:calc(100dvh - 196px)!important;max-height:none!important;
+  box-sizing:border-box!important;border-radius:16px!important;
+ }
+ #taleraV61RecControls{
+  left:50%!important;right:auto!important;bottom:20px!important;
+  width:min(700px,calc(100% - 48px))!important;transform:translateX(-50%)!important;
+  box-sizing:border-box!important;padding:16px 20px!important;
+ }
+ #taleraV61RecControls .talera-v61-rec-actions button{min-width:0!important;}
+ #v30DateModal:not([hidden]) #v30DateBox{
+  width:min(460px,calc(100vw - 48px))!important;max-width:100%!important;
+  max-height:calc(100dvh - 48px)!important;overflow-y:auto!important;
+  box-sizing:border-box!important;
+ }
+}
 </style>`;
  return replace(html,'</head>',css+'</head>','STYLE_HEAD');
 }

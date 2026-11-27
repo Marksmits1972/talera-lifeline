@@ -42,7 +42,11 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   console.log('TALERA_DESKTOP_CENTERED_MENU_PASS',JSON.stringify({settings,messages}));
   // The existing signed-out presentation has no reference photos. Do not
   // show a broken-image icon, but keep the native elements for later data.
-  await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+  const overview=page.locator('#talera-desktop-present-link');
+  await overview.waitFor({state:'visible'});
+  assert.equal(await overview.getAttribute('href'),'/present');
+  await Promise.all([page.waitForURL(u=>u.pathname==='/present'&&!u.search),overview.click()]);
+  console.log('TALERA_DESKTOP_EXPLICIT_PRESENTATION_ENTRY_PASS');
   const emptyPhotos=await page.evaluate(()=>['memoryPhotoA','memoryPhotoB'].map(id=>{
    const img=document.getElementById(id);
    return img?{id,src:!!img.getAttribute('src'),srcset:!!img.getAttribute('srcset'),visibility:getComputedStyle(img).visibility}:null;
@@ -122,6 +126,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    return m?.storyId===id&&!m._photoLoading;
   },id,{timeout:20000});
   await page.waitForFunction(()=>!document.documentElement.classList.contains('talera-direct-memory-entering'),null,{timeout:8000});
+  await page.waitForFunction(()=>[...document.querySelectorAll('#photoStage img.example-photo,#photoStage img.talera-story-synced-sharp')].some(e=>e.complete&&e.naturalWidth>0),null,{timeout:15000});
   const presentations=[];
   for(const [width,height] of widths){
    await page.setViewportSize({width,height});
@@ -130,7 +135,9 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    const g=await page.evaluate(()=>{
     const rect=(selector)=>{const r=document.querySelector(selector)?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}:null};
     return {surface:rect('#surface'),canvas:rect('#timelineCanvas'),date:rect('#focusText'),
-      dots:rect('.talera-photo-dots'),stage:rect('#photoStage'),id:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
+      dots:rect('.talera-photo-dots'),stage:rect('#photoStage'),
+      photos:[...document.querySelectorAll('#photoStage img.example-photo,#photoStage img.talera-story-synced-sharp')].map(e=>({fit:getComputedStyle(e).objectFit,natural:[e.naturalWidth,e.naturalHeight],rect:e.getBoundingClientRect().toJSON()})),
+      id:window.__taleraTimelineRuntime?.currentMemory?.()?.storyId,
       controlColors:Object.fromEntries(['#talera-flow-home','#talera-v5-editor-pencil'].map(s=>{const e=document.querySelector(s);return [s,e?{background:getComputedStyle(e,'::after').backgroundColor,hitBackground:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,paintWidth:getComputedStyle(e,'::after').width,hitWidth:getComputedStyle(e).width}:null]}))};
    });
    assert.ok(close(g.surface.width,expected)&&close((g.surface.left+g.surface.right)/2,width/2),'Centered shorter ruler '+JSON.stringify(g));
@@ -138,6 +145,8 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    assert.ok(g.dots.height>0&&g.canvas.top<g.date.top&&g.date.top<g.dots.top,'Timeline, date, orange dots order preserved');
    assert.ok(close(g.stage.width,width)&&close(g.stage.height,height),'Full photo stage');
    assert.equal(g.id,id,'Resizing must not change selection');
+   assert.ok(g.photos.some(p=>p.natural[0]>0&&p.natural[1]>0),'At least one decoded original photo');
+   assert.ok(g.photos.every(p=>p.fit==='contain'),'All native photo layers must keep their full image '+JSON.stringify(g.photos));
    for(const [selector,style] of Object.entries(g.controlColors)){
     assert.equal(style?.background,'rgba(11, 30, 57, 0.88)','Desktop contrast '+selector);
     assert.equal(style?.color,'rgb(255, 255, 255)','Desktop foreground '+selector);
@@ -172,6 +181,52 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   }
   await page.waitForFunction(async id=>!!window.TaleraMemories?.list&&
    (await window.TaleraMemories.list()).some(row=>row.id===id),id);
+  // Verify the real original edit route with the same synthetic memory.
+  // Opening/closing its existing date, writer and recorder does not record,
+  // overwrite, reorder or publish any story.
+  await page.setViewportSize({width:1366,height:768});
+  await page.goto(origin+'/tell?edit='+encodeURIComponent(id),{waitUntil:'domcontentloaded'});
+  await page.locator('#app #main .work.talera-r16-editor #title').waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelectorAll('.talera-work-tiles .tile').length>=3);
+  const editor=await page.evaluate(()=>{
+   const r=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();
+   return {app:r('#app'),media:r('.talera-work-tiles'),tags:r('.talera-tags-v20'),toolbar:r('.talera-r16-toolbar'),title:r('#title'),
+    width:innerWidth,layout:getComputedStyle(document.querySelector('.work.talera-r16-editor')).display};
+  });
+  assert.ok(editor.app.width>1100&&editor.layout==='grid'&&editor.media.right<editor.tags.left&&editor.title.width>1000,
+    'Desktop two-column original editor '+JSON.stringify(editor));
+  assert.ok(editor.toolbar.width<=630&&editor.toolbar.right<=editor.app.right,'Compact original editor actions '+JSON.stringify(editor));
+  await page.locator('#dateToggle').click();
+  const date=page.locator('#v30DateBox');
+  await date.waitFor({state:'visible'});
+  const dateBox=await date.boundingBox();assert.ok(dateBox&&close(dateBox.x+dateBox.width/2,683)&&dateBox.width<=460,
+   'Date modal centered and bounded');
+  await page.locator('#v30DateCancel').click();
+  await date.waitFor({state:'hidden'});
+  await page.locator('#write').click();
+  const writer=page.locator('#taleraWriterOverlay');
+  await writer.waitFor({state:'visible'});
+  const writerGeometry=await page.evaluate(()=>{
+   const r=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();
+   return {photos:r('#taleraWriterPhotos'),text:r('#taleraWriterText'),done:r('#taleraWriterDone'),header:r('.talera-writer-top'),width:innerWidth};
+  });
+  assert.ok(writerGeometry.photos.right<writerGeometry.text.left&&writerGeometry.text.width>500&&writerGeometry.text.height>=360,
+   'Desktop original writer photos beside text '+JSON.stringify(writerGeometry));
+  assert.ok(writerGeometry.done.left>=0&&writerGeometry.done.right<=writerGeometry.width+1,'Writer Done stays in viewport');
+  await page.locator('#taleraWriterDone').click();
+  await writer.waitFor({state:'hidden'});
+  await page.locator('#speak').click();
+  const recorder=page.locator('#taleraV61RecControls');
+  await recorder.waitFor({state:'visible'});
+  const rec=await page.evaluate(()=>{
+   const r=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();
+   return {controls:r('#taleraV61RecControls'),frame:r('#frame'),close:r('#taleraV61RecClose'),width:innerWidth};
+  });
+  assert.ok(rec.controls.width<=700&&close(rec.controls.left+rec.controls.width/2,rec.width/2)&&rec.frame.bottom<=rec.controls.top,
+   'Original recorder shows image above compact controls '+JSON.stringify(rec));
+  await page.locator('#taleraV61RecClose').click();
+  await recorder.waitFor({state:'hidden'});
+  console.log('TALERA_DESKTOP_EDITOR_WRITER_RECORDER_DATE_PASS',JSON.stringify({editor,writerGeometry,rec}));
   assert.deepEqual(errors,[],'Desktop runtime errors');
   console.log('TALERA_DESKTOP_SAME_APP_LAYOUT_PASS',JSON.stringify({sizes:sizes.map(s=>[s.width,s.height,s.sheet.width]),presentations:presentations.map(g=>g.surface.width),sameMemoryId:true,originalBack:true}));
  }finally{await context.close()}
@@ -181,14 +236,16 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   const page=await mobile.newPage();
   await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>!!document.getElementById('sheet'));
+  await page.locator('#talera-desktop-present-link').waitFor({state:'hidden'});
   const home=await page.evaluate(()=>({width:innerWidth,sheet:document.getElementById('sheet').getBoundingClientRect().width,
    hero:document.querySelector('.hero').getBoundingClientRect().width,
    desktop:matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)').matches}));
   assert.ok(!home.desktop&&close(home.sheet,home.width)&&close(home.hero,home.width),'Original mobile Home geometry '+JSON.stringify(home));
   await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>!!document.getElementById('surface'));
-  const presentation=await page.evaluate(()=>({width:innerWidth,surface:document.getElementById('surface').getBoundingClientRect().width}));
+  const presentation=await page.evaluate(()=>({width:innerWidth,surface:document.getElementById('surface').getBoundingClientRect().width,photoFit:getComputedStyle(document.getElementById('memoryPhotoA')).objectFit}));
   assert.ok(close(presentation.surface,presentation.width),'Original mobile ruler still full width');
+  assert.equal(presentation.photoFit,'cover','Mobile presentation keeps the original full-bleed photo rule');
   console.log('TALERA_DESKTOP_MOBILE_LAYOUT_UNCHANGED_PASS');
  }finally{await mobile.close()}
 }

@@ -114,3 +114,14 @@ test('refuse original source drift and keep layout style editor scoped',()=>{
  assert.match(html,/#talera-f5-edit-return-eye>svg\{position:absolute!important/);
 
 });
+
+test('desktop workbench, writer and recorder styling is desktop-only; location and existing save code remain untouched',()=>{
+ const html=simplifyTellMemoryEditor(source),desktop=html.split('/* Desktop workbench only:')[1].split('</style>')[0];
+ assert.match(desktop, /@media \(min-width: 1024px\) and \(hover: hover\) and \(pointer: fine\)/);
+ assert.match(desktop,/grid-template-columns:minmax\(0,1\.2fr\) minmax\(0,1fr\)/);
+ assert.match(desktop,/#taleraWriterOverlay \.talera-writer-body/);
+ assert.match(desktop,/#taleraV61RecControls/);
+ assert.match(desktop,/#v30DateModal:not\(\[hidden\]\) #v30DateBox/);
+ assert.doesNotMatch(desktop,/talera-memory-location|talera-location-|saveDraft\(|addEventListener|onclick/);
+ assert.equal(fixture({existing:'local-12345678',edit:'?edit=local-12345678'}).publish.textContent,'Opslaan');
+});

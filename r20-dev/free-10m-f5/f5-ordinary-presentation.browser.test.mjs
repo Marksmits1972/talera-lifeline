@@ -203,13 +203,19 @@ backupRegression: try{
     assert.deepEqual(actual.second.place,expected,'Newly covered real settlement must be identified by original GPS');
     assert.equal(calls.length,1);
     assert.deepEqual(calls[0],{url:origin+target.url,method:'GET',cookie:'',referer:''});
-    const cached=await worldPage.evaluate(async url=>{
-     const c=await caches.open('talera-free-public-places-v1'),r=await c.match(url);
-     if(!r)return null;
-     const b=await r.arrayBuffer();
-     return {bytes:b.byteLength,digest:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),v=>v.toString(16).padStart(2,'0')).join('')};
-    },target.url);
-    assert.deepEqual(cached,{bytes:target.bytes,digest:target.sha256});
+    // Read the exact committed public bytes without touching any private database.
+    const readPublicWorld=async()=>worldPage.evaluate(async sha=>{
+     let db;
+     try{
+      db=await new Promise((resolve,reject)=>{const r=indexedDB.open('talera-free-public-places-v1');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+      if(!db.objectStoreNames.contains('parts'))return {state:'absent'};
+      const b=await new Promise((resolve,reject)=>{const tx=db.transaction('parts','readonly'),r=tx.objectStore('parts').get(sha);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+      if(!b)return {state:'absent'};
+      return {state:'found',bytes:b.byteLength,digest:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),v=>v.toString(16).padStart(2,'0')).join('')};
+     }catch(e){return {state:'error',error:e.name+': '+e.message}}finally{db?.close()}
+    },target.sha256);
+    const expectedPublic={state:'found',bytes:target.bytes,digest:target.sha256};
+    assert.deepEqual(await readPublicWorld(),expectedPublic);
     const saved=await worldPage.evaluate(async({bytes,place})=>{
      const mem=window.TaleraMemories;
      const file=new File([Uint8Array.from(bytes)],'world-test.jpg',{type:'image/jpeg'});
@@ -232,13 +238,8 @@ backupRegression: try{
     // every HTTP(S) request instead, keeping File APIs representative of a
     // physically disconnected phone. Prove the block independently, then
     // inspect a fresh File from the same already-verified original bytes.
-    const readCachedWorld=async()=>worldPage.evaluate(async url=>{
-     try{const c=await caches.open('talera-free-public-places-v1'),r=await c.match(url);
-      if(!r)return {state:'absent',keys:(await c.keys()).map(k=>new URL(k.url).pathname)};
-      const b=await r.arrayBuffer();return {state:'found',bytes:b.byteLength,digest:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),v=>v.toString(16).padStart(2,'0')).join(''),type:r.headers.get('content-type')};
-     }catch(e){return {state:'error',error:e.name+': '+e.message}}
-    },target.url);
-    const cacheAfterNavigation=await readCachedWorld();
+    const cacheAfterNavigation=await readPublicWorld();
+    assert.deepEqual(cacheAfterNavigation,expectedPublic,'Verified public data must persist after same-origin navigation');
     const blockedRequests=[];
     await worldCtx.route(/^https?:\/\//,async route=>{blockedRequests.push(route.request().url());await route.abort('internetdisconnected')});
     const blocked=await worldPage.evaluate(async url=>{try{await fetch(url,{cache:'no-store'});return false}catch{return true}},origin+'/manifest.webmanifest');
@@ -252,7 +253,7 @@ backupRegression: try{
      const second=await mem.inspectDraftCapturePlace(file,'photo',signal,false);
      return {first,second};
     },actual.bytes);
-    console.log('TALERA_WORLD_WEBKIT_CACHE_DIAGNOSTIC',JSON.stringify({webkit:webkitPickerOnly,cacheAfterNavigation,offline,blockedRequests:blockedRequests.map(url=>new URL(url).pathname)}));
+    console.log('TALERA_WORLD_PUBLIC_INDEXEDDB_REOPEN_PROOF',JSON.stringify({webkit:webkitPickerOnly,cacheAfterNavigation,offline,blockedRequests:blockedRequests.map(url=>new URL(url).pathname)}));
     assert.deepEqual(offline.first.place,{countryCode:'NL',country:'Nederland',city:'',source:'offline-country-v1'});
     assert.deepEqual(offline.second.place,expected);
     assert.equal(blockedRequests.filter(url=>url===origin+target.url).length,0,'Offline recognition must not even attempt an HTTP request for the public part');

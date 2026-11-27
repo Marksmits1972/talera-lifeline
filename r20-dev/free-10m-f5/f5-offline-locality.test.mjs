@@ -87,12 +87,10 @@ const testBaseUrl='/__talera_free/places-'+'a'.repeat(64)+'.bin';
 const partInfo=(bytes,countries)=>({sha256:createHash('sha256').update(bytes).digest('hex'),bytes:bytes.length,countries});
 const worldUrl=part=>'/__talera_free/assets/places-'+part.sha256+'.bin';
 const asBinary=bytes=>new Response(bytes,{headers:{'content-type':'application/octet-stream'}});
+const toArrayBuffer=bytes=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);
 const mockPublicCache=()=>{
  const stored=new Map();
- return {stored,open:async name=>{
-  assert.equal(name,'talera-free-public-places-v1');
-  return {match:async key=>stored.get(key)?.clone(),put:async(key,r)=>{stored.set(key,r.clone())},delete:async key=>stored.delete(key)};
- }};
+ return {stored,get:async key=>stored.get(key)?.slice(0)??null,put:async(key,b)=>{stored.set(key,b.slice(0))},delete:async key=>stored.delete(key)};
 };
 test('world: preserve baseline before requesting more; one immutable group download, cache re-use across documents, no coordinates or credentials',async()=>{
  const data=fixture([['NL',53,6,'Extra village'],['NL',51.98,5.91111,'Competing new label'],['DE',53,6,'Another country']]);
@@ -122,18 +120,18 @@ test('world: preserve baseline before requesting more; one immutable group downl
 test('world: reject corrupt bytes and cache; offline stays pending, no false negative, retry succeeds',async()=>{
  const data=fixture([['NL',53,6,'Extra village']]),part=partInfo(data,['NL']),url=worldUrl(part),cache=mockPublicCache();
  const corrupt=Buffer.from(data);corrupt[corrupt.length-1]^=255;
- cache.stored.set(url,asBinary(corrupt));
+ cache.stored.set(part.sha256,toArrayBuffer(corrupt));
  let now=1000,requests=0,online=false;
  const load=createOfflineWorldLocalityLoader(testBaseUrl,sample.length,[part],async(path)=>{
   if(path===testBaseUrl)return asBinary(sample);
   requests++;return online?asBinary(data):asBinary(corrupt);
  },cache,()=>now);
  assert.deepEqual(await load(gps(53,6),country),{ready:false,place:country});
- assert.equal(cache.stored.has(url),false);assert.equal(requests,1);
+ assert.equal(cache.stored.has(part.sha256),false);assert.equal(requests,1);
  assert.deepEqual(await load(gps(53,6),country),{ready:false,place:country});assert.equal(requests,1);
  now+=30001;online=true;
  assert.equal((await load(gps(53,6),country)).place.city,'Extra village');
- assert.equal(requests,2);assert.equal(cache.stored.has(url),true);
+ assert.equal(requests,2);assert.equal(cache.stored.has(part.sha256),true);
  assert.throws(()=>createOfflineWorldLocalityLoader(testBaseUrl,sample.length,[part,{...part,sha256:'b'.repeat(64)}]),/INVALID_WORLD_LOCALITY_DIRECTORY/);
 });
 test('world: existing negative marker is re-evaluated once, manual correction and positive labels unchanged',async()=>{

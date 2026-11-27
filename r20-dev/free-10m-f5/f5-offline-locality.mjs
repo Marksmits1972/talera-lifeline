@@ -81,12 +81,38 @@ export function createOfflineLocalityLoader(url,bytes,fetcher=fetch){
  };
 }
 
+// Public immutable files only. WebKit's CacheStorage was empirically empty
+// after reopening; use the same browser's durable IndexedDB mechanism but
+// never any account-private database, object store, identifier or original.
+export function createPublicPlaceStore(idb=globalThis.indexedDB){
+ const name='talera-free-public-places-v1',table='parts';
+ const run=(mode,operation)=>new Promise((resolve,reject)=>{
+  if(!idb){reject(Error('PUBLIC_PLACE_STORAGE_UNAVAILABLE'));return}
+  let request,ended=false;
+  const fail=error=>{if(!ended){ended=true;reject(error||Error('PUBLIC_PLACE_STORAGE_FAILED'))}};
+  try{request=idb.open(name,1)}catch(e){fail(e);return}
+  request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains(table))request.result.createObjectStore(table)};
+  request.onerror=()=>fail(request.error);request.onblocked=()=>fail(Error('PUBLIC_PLACE_STORAGE_BLOCKED'));
+  request.onsuccess=()=>{
+   const db=request.result;if(ended){db.close();return}
+   db.onversionchange=()=>db.close();
+   try{
+    const tx=db.transaction(table,mode),req=operation(tx.objectStore(table));let value;
+    req.onsuccess=()=>{value=req.result};
+    tx.oncomplete=()=>{db.close();if(!ended){ended=true;resolve(value??null)}};
+    tx.onabort=tx.onerror=()=>{db.close();fail(tx.error||req.error)};
+   }catch(e){db.close();fail(e)}
+  };
+ });
+ return {get:key=>run('readonly',store=>store.get(key)),put:(key,buffer)=>run('readwrite',store=>store.put(buffer,key)),delete:key=>run('readwrite',store=>store.delete(key))};
+}
+
 // GeoNames allCountries independent settlements; no per-photo geocoding.
 // The published small resolver has absolute priority. Only its misses request
 // an immutable public group, never an account, GPS, filename or photo token.
 // One expanded resolver is resident at a time, and public bytes are cached
 // separately from private shell/account state.
-export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher=fetch,cacheStorage=globalThis.caches,clock=Date.now){
+export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher=fetch,storage=createPublicPlaceStore(),clock=Date.now){
  const baseline=createOfflineLocalityLoader(baseUrl,baseBytes,fetcher);
  const byCountry=new Map(),seen=new Set();
  for(const part of parts){
@@ -100,37 +126,35 @@ export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher
  }
  let resident=null,queue=Promise.resolve();
  const failures=new Map();
- const cacheName='talera-free-public-places-v1';
- const responseHeaders={'content-type':'application/octet-stream','cache-control':'public, max-age=31536000, immutable'};
  const cacheBound=async task=>{
   let timer;
   try{return await Promise.race([task,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('WORLD_LOCALITY_CACHE_TIMEOUT')),5000)})])}
   finally{clearTimeout(timer)}
  };
- const attemptCache=async()=>{try{return await cacheBound(cacheStorage?.open(cacheName))}catch{return null}};
+ const validateBuffer=async(buffer,part)=>{
+  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer)),b=>b.toString(16).padStart(2,'0')).join('');
+  if(digest!==part.sha256)throw Error('WORLD_LOCALITY_ASSET_DIGEST');
+  return {buffer,resolve:createOfflineLocalityResolver(buffer)};
+ };
  const validate=async(response,part)=>{
   if(!response?.ok||!String(response.headers.get('content-type')).toLowerCase().includes('application/octet-stream'))throw Error('WORLD_LOCALITY_ASSET_NOT_AVAILABLE');
   const length=response.headers.get('content-length');
   if(length!==null&&!response.headers.get('content-encoding')&&Number(length)!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
-  const buffer=await response.arrayBuffer();
-  if(buffer.byteLength!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
-  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer)),b=>b.toString(16).padStart(2,'0')).join('');
-  if(digest!==part.sha256)throw Error('WORLD_LOCALITY_ASSET_DIGEST');
-  return {buffer,resolve:createOfflineLocalityResolver(buffer)};
+  return validateBuffer(await response.arrayBuffer(),part);
  };
  const getPart=async(part)=>{
   if(resident?.sha256===part.sha256)return resident.resolve;
   if(clock()<(failures.get(part.sha256)||0))return null;
   resident=null;
   const url='/__talera_free/assets/places-'+part.sha256+'.bin';
-  const cache=await attemptCache();
   try{
    let data=null;
    try{
-    const cached=await cacheBound(cache?.match(url));
+    const cached=await cacheBound(storage?.get(part.sha256));
     if(cached){
-     try{data=await validate(cached,part)}
-     catch{await cacheBound(cache.delete(url)).catch(()=>{});}
+     try{data=await validateBuffer(cached,part)}
+     catch{await cacheBound(storage.delete(part.sha256)).catch(()=>{});}
     }
    }catch{/* Cache failure is not a negative geographic result. */}
    if(!data){
@@ -139,7 +163,7 @@ export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher
      const response=await fetcher(url,{credentials:'omit',cache:failures.has(part.sha256)?'reload':'force-cache',signal:controller.signal,redirect:'error',referrerPolicy:'no-referrer'});
      data=await validate(response,part);
     }finally{clearTimeout(timer)}
-    if(cache)try{await cacheBound(cache.put(url,new Response(data.buffer,{headers:responseHeaders})))}catch{/* Browser storage quota may be unavailable. */}
+    if(storage)try{await cacheBound(storage.put(part.sha256,data.buffer))}catch{/* Browser storage quota may be unavailable. */}
    }
    resident={sha256:part.sha256,resolve:data.resolve};
    failures.delete(part.sha256);

@@ -159,9 +159,7 @@ try{
      assert.equal(await receiver.locator('#transfer-qr').isVisible(),false);
      assert.equal(await receiver.locator('#transfer-code').textContent(),'');
      await sender.locator('#transfer-send').click();
-     await sender.locator('#transfer-found').waitFor({state:'visible'});
      assert.equal(await sender.locator('#transfer-camera').isVisible(),false);
-     await sender.locator('#transfer-connect-found').click();
     }
     try{
      mark(step+' wait for direct channel');
@@ -208,8 +206,6 @@ try{
      await receiver.locator('#transfer-receive').click();
      await receiver.locator('#transfer-pair').waitFor({state:'visible',timeout:25000});
      await sender.locator('#transfer-send').click();
-     await sender.locator('#transfer-found').waitFor({state:'visible'});
-     await sender.locator('#transfer-connect-found').click();
      await sender.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.includes('ERROR_PAIR'));
      await receiver.waitForFunction(()=>document.getElementById('transfer-diagnostic-report').textContent.split('ANDER APPARAAT')[1]?.includes('JOIN_HTTP 409'),{},{timeout:15000});
      assert.equal((await inspect(receiver)).stories.length,0);

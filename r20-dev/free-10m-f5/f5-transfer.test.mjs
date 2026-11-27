@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newDiagnostic,safeCandidateKinds,validDiagnosticEvents,diagnosticError} from './f5-transfer-diagnostic.mjs';
+import {newDiagnostic,safeCandidateKinds,validDiagnosticEvents,diagnosticError,INVITATION_TTL} from './f5-transfer-diagnostic.mjs';
 import {TransferSignaling} from './f5-transfer-signal.mjs';
 import {inventory,planTransfer,makeTransfer,reviewTransfer} from './f5-transfer-library.mjs';
 import {sendFrame,frameReceiver,pairingVerificationCode} from './f5-transfer-transport.mjs';
@@ -18,7 +18,7 @@ test('pairing bound to separate sessions, one join, expiry and cancel',()=>{
  assert.deepEqual(signal.handle(sid,{action:'poll',code}).answer,{sdp,proof});
  assert.throws(()=>signal.handle('d'.repeat(64),{action:'join',code,sdp,proof}));
  signal.handle(other,{action:'cancel',code});assert.throws(()=>signal.handle(sid,{action:'poll',code}));
- now=4000;signal.handle(sid,{action:'create',code,sdp,proof});now+=120001;
+ now=4000;signal.handle(sid,{action:'create',code,sdp,proof});now+=INVITATION_TTL+1;
  assert.throws(()=>signal.offer(other,code));assert.throws(()=>signal.handle(sid,{action:'poll',code}));
 });
 test('pairing rejects media SDP and oversized messages',()=>{
@@ -44,7 +44,7 @@ test('automatic discovery is temporary, account-local, invisible to its owner an
  signal.handle(sid,{action:'cancel',code});
  assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
  now=4000;signal.handle(sid,{action:'create',code,sdp,proof,secret});
- now+=120000;assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
+ now+=INVITATION_TTL;assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
  now+=4000;signal.handle(sid,{action:'create',code,sdp,proof});
  assert.deepEqual(signal.handle(other,search),{ok:true,invitation:null});
  assert.deepEqual(signal.offer(other,code).offer,{sdp,proof});
@@ -267,7 +267,7 @@ async function controllerFixture(successRoute){
  const waitFor=async predicate=>{const deadline=Date.now()+4000;while(!predicate()){if(Date.now()>deadline)throw Error('FIXTURE_TIMEOUT '+receiver.get('transfer-status').textContent+' / '+sender.get('transfer-status').textContent);await new Promise(r=>setTimeout(r,5))}};
  const click=(nodes,id)=>nodes.get(id).click(),visible=(nodes,id)=>!nodes.get(id).hidden;
  const start=async()=>{click(receiver,'transfer-receive');await waitFor(()=>visible(receiver,'transfer-pair'));
-  click(sender,'transfer-send');await waitFor(()=>visible(sender,'transfer-found'));click(sender,'transfer-connect-found')};
+  click(sender,'transfer-send');await waitFor(()=>actions.some(a=>a[0]==='send'&&a[1]==='offer'))};
  const cancel=()=>{for(const page of [receiver,sender])if(visible(page,'transfer-cancel'))click(page,'transfer-cancel');for(const timer of timers)clearTimeout(timer)};
  return {receiver,sender,waitFor,visible,click,start,cancel,actions,peers,frames};
 }
@@ -288,5 +288,59 @@ for(const route of [0,1,null])test('controller orchestration: '+(route===null?'b
   assert.equal(f.actions.filter(x=>x[1]==='retryJoin').length,route===0?0:1);
   assert.deepEqual(f.peers.map(p=>p.route).sort(),route===0?[0,0]:[0,0,1,1]);
   assert.equal(f.frames.length,0,'no data before mutual confirmation');
+ }finally{f.cancel()}
+});
+
+test('send first automatically retries discovery and connects without manual action',async()=>{
+ const f=await controllerFixture(0);
+ try{
+  f.click(f.sender,'transfer-send');
+  await f.waitFor(()=>f.actions.some(a=>a[0]==='send'&&a[1]==='discover'));
+  f.click(f.receiver,'transfer-receive');
+  await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  assert.ok(f.actions.filter(a=>a[1]==='discover').length>=2);
+  assert.equal(f.frames.length,0);
+ }finally{f.cancel()}
+});
+test('invitation remains valid at nine minutes but cannot be discovered after ten',()=>{
+ let now=0;const signal=new TransferSignaling(()=>now),secret='f'.repeat(20);
+ signal.handle(sid,{action:'create',code,sdp,proof,secret});
+ now=540000;assert.deepEqual(signal.handle(other,{action:'discover'}).invitation,{code,secret});
+ assert.deepEqual(signal.offer(other,code).offer,{sdp,proof});
+ now=600000;assert.equal(signal.handle(other,{action:'discover'}).invitation,null);
+ assert.throws(()=>signal.offer(other,code));
+});
+test('diagnosis expires per report, but new checkpoints are retained after a long active invitation',()=>{
+ let now=0;const signal=new TransferSignaling(()=>now),secret='f'.repeat(20);
+ const start=[[0,'START',0]],end=[[0,'START',0],[540000,'ERROR_TIMEOUT',0]];
+ const cmd=(role,events)=>({action:'diagnostic',code,role,events});
+ signal.handle(sid,{action:'create',code,sdp,proof,secret});
+ signal.handle(sid,cmd('receive',start));
+ now=540000;signal.handle(sid,cmd('receive',end));
+ assert.deepEqual(signal.handle(other,cmd('send',start)).reports,{receive:end,send:start});
+ signal.handle(sid,{action:'cancel',code});
+ now+=1000;assert.deepEqual(signal.handle(sid,cmd('receive',[])).reports,{receive:end,send:start});
+ now+=300000;assert.throws(()=>signal.handle(sid,cmd('receive',[])));
+});
+
+test('opened channel keeps confirmation available beyond previous two-minute limit',async()=>{
+ const f=await controllerFixture(0);
+ try{
+  await f.start();
+  await f.waitFor(()=>f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  await new Promise(r=>setTimeout(r,6500)); // simulated 162.5 seconds
+  assert.ok(f.visible(f.receiver,'transfer-approve')&&f.visible(f.sender,'transfer-approve'));
+  assert.equal(f.frames.length,0);
+ }finally{f.cancel()}
+});
+test('both failed routes leave the remote diagnostic accessible after cancellation',async()=>{
+ const f=await controllerFixture(null);
+ try{
+  await f.start();
+  await f.waitFor(()=>!f.receiver.get('transfer-receive').disabled&&!f.sender.get('transfer-send').disabled);
+  await new Promise(r=>setTimeout(r,160));
+  f.click(f.receiver,'transfer-diagnostic-refresh');
+  await f.waitFor(()=>f.receiver.get('transfer-diagnostic-report').textContent.split('ANDER APPARAAT')[1]?.includes('ERROR_'));
+  assert.equal(f.frames.length,0);
  }finally{f.cancel()}
 });

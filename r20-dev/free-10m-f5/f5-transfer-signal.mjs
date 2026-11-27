@@ -1,9 +1,8 @@
-import {validDiagnosticEvents,DIAG_TTL} from './f5-transfer-diagnostic.mjs';
+import {validDiagnosticEvents,DIAG_TTL,INVITATION_TTL} from './f5-transfer-diagnostic.mjs';
 // Temporary, per-account, non-persistent signaling. No media or library data.
 const CODE=/^[a-f0-9]{32}$/;
 const HASH=/^[a-f0-9]{64}$/;
 const SECRET=/^[a-f0-9]{20}$/;
-const TTL=120000;
 const err=()=>{throw Error('TALERA_PAIR_UNAVAILABLE')};
 const validSDP=(s,type)=>typeof s==='string'&&s.length<=12000&&s.startsWith('v=0')&&
  s.split(/\r?\n/).some(l=>l.startsWith('m=application '))&&
@@ -31,8 +30,12 @@ export class TransferSignaling {
    if(role==='send')d.joiner=session;
    const previous=d[role];
    // Rate and memory bounded; permit a read without replacing a trace.
-   if(events.length&&(!previous||now-previous.at>=1000))d[role]={at:now,events:events.map(e=>e.slice())};
-   return {ok:true,reports:{receive:d.receive?.events||[],send:d.send?.events||[]}};
+   if(events.length&&(!previous||now-previous.at>=1000)&&JSON.stringify(previous?.events)!==JSON.stringify(events)){
+    d[role]={at:now,events:events.map(e=>e.slice())};
+    if(st?.code===code)d.expires=now+DIAG_TTL;
+   }
+   const recent=role=>d[role]&&now-d[role].at<DIAG_TTL?d[role].events:[];
+   return {ok:true,reports:{receive:recent('receive'),send:recent('send')}};
   }
   if(action==='discover'){
    if(Object.keys(command).join()!=='action')err();
@@ -51,7 +54,7 @@ export class TransferSignaling {
   if(action==='create'){
    if(this.state||now<this.nextCreate||!validSDP(sdp,'offer')||!HASH.test(proof))err();
    this.nextCreate=now+3000;
-   this.state={code,owner:session,offer:{sdp,proof},expires:now+TTL,joiner:null,answer:null,route:0,secret:secret||null};
+   this.state={code,owner:session,offer:{sdp,proof},expires:now+INVITATION_TTL,joiner:null,answer:null,route:0,secret:secret||null};
    return {ok:true};
   }
   const st=this.state;
@@ -71,7 +74,8 @@ export class TransferSignaling {
   }
   if(action==='join'){
    if(st.owner===session||st.joiner||!validSDP(sdp,'answer')||!HASH.test(proof))err();
-   st.joiner=session;st.answer={sdp,proof};st.secret=null;st.expires=Math.max(st.expires,now+60000);return {ok:true};
+   st.joiner=session;st.answer={sdp,proof};st.secret=null;
+   if(this.diagnostic?.code===code&&this.diagnostic.joiner!==session){this.diagnostic.joiner=session;this.diagnostic.send=null;}st.expires=Math.max(st.expires,now+60000);return {ok:true};
   }
   if(action==='poll'){
    if(st.owner!==session)err();
@@ -79,6 +83,7 @@ export class TransferSignaling {
   }
   if(action==='cancel'){
    if(st.owner!==session&&st.joiner!==session)err();
+   if(this.diagnostic?.code===code)this.diagnostic.expires=now+DIAG_TTL;
    this.state=null;return {ok:true};
   }
   err();

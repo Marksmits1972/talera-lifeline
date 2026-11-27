@@ -41,6 +41,9 @@ doc.querySelectorAll=()=>[];doc.createElement=s=>new MockNode(s);doc.hidden=fals
 let now=0;class MockEvent{constructor(type,init){this.type=type;Object.assign(this,init)} }
 const context={document:doc,location:{search:'',origin:'http://127.0.0.1',pathname:'/present'},URLSearchParams,Date,Intl,Math,Number,Map,Set,Array,Uint16Array,console,performance:{now:()=>now},navigator:{maxTouchPoints:1},innerHeight:800,innerWidth:390,devicePixelRatio:1,Image:MockNode,Event:MockEvent,CustomEvent:MockEvent,ResizeObserver:class{observe(){}},MutationObserver:class{observe(){}},localStorage:{getItem(){return null},setItem(){}},requestAnimationFrame:f=>{frames.set(++seq,f);return seq},cancelAnimationFrame:i=>frames.delete(i),setTimeout:(f,ms)=>{timers.set(++seq,{f,due:now+(ms||0)});return seq},clearTimeout:i=>timers.delete(i),addEventListener(){},removeEventListener(){},getComputedStyle:()=>({}),matchMedia:()=>({matches:false}),window:null};context.window=context;
 vm.createContext(context);
+const characteristicSearch=scripts.find(x=>x[1].includes('id="talera-characteristic-search-script"'));
+assert.ok(characteristicSearch,'Generated owner presentation includes characteristic search runtime');
+vm.runInContext(characteristicSearch[2],context,{filename:'actual-generated-characteristic-search.js'});
 vm.runInContext(instrumented,context,{filename:'actual-generated-timeline.js'});
 vm.runInContext(wheel,context,{filename:'actual-generated-wheel.js'});
 const rt=context.__taleraTimelineRuntime,band=context.__taleraIntegratedBand;

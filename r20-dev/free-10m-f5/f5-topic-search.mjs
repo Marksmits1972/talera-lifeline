@@ -175,6 +175,6 @@ export function installCharacteristicSearchPresentation(html){
   // Limit conversion, map and initial cover warming to matching *own* rows.
   // The same existing date order, IDs, media and timeline are retained.
   const conversion='const memories=rows.map(toMemory).filter(Boolean);';
-  html=replaceOne(html,conversion,"const memories=(TALERA_ACTIVE_FEATURES===null?rows:rows.filter(row=>row?.source==='pwa-local'&&window.__taleraCharacteristicSearch.matches(row.tags,TALERA_ACTIVE_FEATURES))).map(toMemory).filter(Boolean);",'METADATA');
+  html=replaceOne(html,conversion,"const activeFeatures=window.__taleraCharacteristicSearch.selection(location);\n   if(activeFeatures!==null){let next=0;for(const row of rows)if(row?.source==='pwa-local'&&window.__taleraCharacteristicSearch.matches(row.tags,activeFeatures))rows[next++]=row;rows.length=next;}\n   const memories=rows.map(toMemory).filter(Boolean);",'METADATA');
   return include(html);
 }

@@ -89,6 +89,18 @@
    catch(error){cleanup();reject(error)}
   });
  }
+ // Photo pickers may convert native HEIF to JPEG while retaining the old
+ // filename (or provide an unhelpful MIME type). Inspect the original
+ // container signature before selecting either strict metadata reader.
+ async function detectCapturePhotoFormat(blob,signal){
+  const bytes=new Uint8Array(await readCaptureMetadataSlice(blob,0,Math.min(12,blob.size),signal));
+  if(bytes.length>=2&&bytes[0]===255&&bytes[1]===216)return 'jpeg';
+  if(bytes.length>=12&&bytes[4]===102&&bytes[5]===116&&bytes[6]===121&&bytes[7]===112)return 'heif';
+  // A valid HEIF can have a leading padding box instead of ftyp.
+  // Preserve support for these when hinted; the HEIF reader still validates the container.
+  if(/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(blob.type)||/\.(?:heic|heif)$/i.test(blob.name||''))return 'heif';
+  return null;
+ }
  async function readJpegCaptureGps(blob,signal){
  // Bounded original-header read only; never fetch or read a phone preview.
  const bytes=new Uint8Array(await readCaptureMetadataSlice(blob,0,2*1024*1024,signal));
@@ -280,11 +292,12 @@
  return Object.freeze({countryCode,country:names[0],city,source:'iptc-location-created'});
 }
  async function readCapturePlace(blob,signal){
- if(/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(blob.type)||/\.(?:heic|heif)$/i.test(blob.name||'')){
+ const format=await detectCapturePhotoFormat(blob,signal);
+ if(format==='heif'){
   const packet=await readHeifCaptureMetadata(blob,'xmp',signal);
   return packet?parseCapturePlacePacket(new TextDecoder('utf-8',{fatal:true}).decode(packet)):null;
  }
- return readJpegCapturePlace(blob,signal);
+ return format==='jpeg'?readJpegCapturePlace(blob,signal):null;
  }
  async function readHeifCaptureGps(blob,signal){
  return readHeifCaptureMetadata(blob,'exif',signal);
@@ -406,6 +419,13 @@
  const gps=parseExifCaptureGps(data,offset,data.length);
  return gps?Object.freeze({...gps,source:'heif-exif-gps'}):null;
 }
+ // Shared by the gateway, passive saved-media enrichment and draft preview.
+ async function readOriginalCaptureGps(original,signal){
+  if(/^video\/(?:quicktime|mp4|x-m4v)$/i.test(original.type))return readQuickTimeCaptureGps(original,signal);
+  const format=await detectCapturePhotoFormat(original,signal);
+  if(format==='heif')return readHeifCaptureGps(original,signal);
+  return format==='jpeg'?readJpegCaptureGps(original,signal):null;
+ }
  function create(store){
   if(!store||typeof store.list!=='function'||typeof store.get!=='function'||
      typeof store.blob!=='function'||typeof store.mediaUrl!=='function')
@@ -473,9 +493,7 @@
     requireId(id,'MEDIA_ID');
     try{
      const original=await originalBlob(id);
-     if(/^video\/(?:quicktime|mp4|x-m4v)$/i.test(original.type))return await readQuickTimeCaptureGps(original);
-     if(/^image\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(original.type)||/\.(?:heic|heif)$/i.test(original.name||''))return await readHeifCaptureGps(original);
-     return await readJpegCaptureGps(original);
+     return await readOriginalCaptureGps(original);
     }
     catch(_){return null} // Optional metadata never blocks existing playback.
    },

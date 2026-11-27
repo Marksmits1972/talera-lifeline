@@ -1,7 +1,8 @@
 // Optional local catalog enrichment. No GPS persistence, no new store and no media uploads.
 // The caller supplies the existing account-local library and its transaction owner.
-// Re-evaluate old proximity-only results and negative markers once using the new rule.
-const checkedVersion=()=> 'v3';
+// v3 merged missing GPS and unresolved GeoNames results. Recheck legacy
+// negatives on the original bytes once; distinct new outcomes are durable.
+const capturePlaceCheckDone=item=>['v4-no-readable-gps','v4-no-place'].includes(item?.capturePlaceChecked);
 const confirmedPlace=item=>['iptc-location-created','geonames-locality-v2'].includes(item?.capturePlace?.source);
 export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,commit,available,canLookup=available,deferred=new Set(),unreadable=new Set(),limit=12,diagnose=()=>{},retryItems=null,now=Date.now}){
  const paused=()=>({more:true,blocked:true});
@@ -19,7 +20,7 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
   let story=initial;
   for(let i=0;i<story.items.length;i++){
    const item=story.items[i];
-   if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||confirmedPlace(item)||item.capturePlaceChecked===checkedVersion(item))continue;
+   if(!item||!['photo','video'].includes(item.kind)||typeof item.key!=='string'||confirmedPlace(item)||capturePlaceCheckDone(item))continue;
    if(!available())return paused();
    if(unreadable.has(keyOf(item))||!canLookup()&&deferred.has(keyOf(item)))continue;
    const retryKey=keyOf(item),retryAt=retryItems?.get(retryKey)||0;
@@ -29,7 +30,7 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
    count++;
    diagnose(item.key,'bestand-lezen');
    try{
-    let place=known.get(keyOf(item))||null;
+    let place=known.get(keyOf(item))||null,reason='no-readable-gps';
     if(!place){
      let original;
      try{original=await blob(item.key)}catch(error){
@@ -70,13 +71,13 @@ export async function enrichCapturePlaces({list,blob,readPlace,readGps,lookup,co
         if(retryItems){retryItems.set(retryKey,now()+delay+60000)}
         return {more:true,blocked:true,retryAfterMs:delay,...(retryItems?{diagnostic:result?.diagnostic||'geonames-fout'}:{})};
        }
-       place=result.place;
+       place=result.place;reason='no-place';
       }
      }
     }
     if(!available())return paused();
     // commit must compare the full snapshot and never recreate a deleted story.
-    const updated=await commit(story,i,place);
+    const updated=await commit(story,i,place,reason);
     if(!available())return paused();
     if(!updated){diagnose(item.key,'catalogus-conflict');if(retryItems){const at=now()+1000;retryItems.set(retryKey,at);nextRetry=Math.min(nextRetry,at)}break}
     story=updated;
@@ -128,7 +129,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    }finally{clearTimeout(timeout);signal.removeEventListener('abort',cancel)}
   }catch(_){return {ok:false,diagnostic:'api-netwerk-fout'}}
  };
- const commit=async(expected,index,place,active)=>{
+ const commit=async(expected,index,place,reason,active)=>{
   if(!active())return null;
   const db=await bounded(()=>open());
   if(!active())return null;
@@ -141,9 +142,10 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    const current=req.result;
    if(!active()||!current||current.source!=='pwa-local'||JSON.stringify(current)!==JSON.stringify(expected))return;
    const item=current.items[index];
-   if(!item||confirmedPlace(item)||item.capturePlaceChecked===checkedVersion(item))return;
+   if(!item||confirmedPlace(item)||capturePlaceCheckDone(item))return;
    if(place){item.capturePlace=place;delete item.capturePlaceChecked}
-   else item.capturePlaceChecked=checkedVersion(item);
+   else if(['no-readable-gps','no-place'].includes(reason))item.capturePlaceChecked='v4-'+reason;
+   else return;
    rows.put(current);updated=current;
   };
   try{await finished}finally{clearTimeout(timeout)}
@@ -172,14 +174,14 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
     if(!active())return pending;
     if(place){const result={state:'known',place};draftResults.set(original,result);return result}
     const gps=await read(readGps);if(!active())return pending;
-    if(!gps){const result={state:'unknown'};draftResults.set(original,result);return result}
+    if(!gps){const result={state:'unknown',reason:'no-readable-gps'};draftResults.set(original,result);return result}
     metadata={gps};draftMetadata.set(original,metadata);
    }
    if(localOnly||!canLookup()||Date.now()<blockedUntil)return pending;
    const outcome=await lookup(metadata.gps,signal||new AbortController().signal);
    if(!active())return pending;
    if(!outcome.ok){blockedUntil=Math.max(blockedUntil,Date.now()+(outcome.retryAfterMs||60000));return pending}
-   const result=outcome.place?{state:'known',place:outcome.place}:{state:'unknown'};
+   const result=outcome.place?{state:'known',place:outcome.place}:{state:'unknown',reason:'no-place'};
    draftMetadata.delete(original);draftResults.set(original,result);return result;
   }catch(_){return pending}
  };
@@ -200,7 +202,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
    });
   };
   try{
-   const result=await enrichCapturePlaces({list:async()=>{const rows=await bounded(()=>store.list());queueStatus('wachtrij-bestanden');return rows},blob:id=>bounded(()=>store.blob(id)),readPlace:blob=>readBounded(readPlace,blob),readGps:blob=>readBounded(readGps,blob),lookup:gps=>lookup(gps,signal),commit:(expected,index,place)=>commit(expected,index,place,active),available:active,canLookup:()=>active()&&canLookup(),deferred,unreadable,diagnose,retryItems});
+   const result=await enrichCapturePlaces({list:async()=>{const rows=await bounded(()=>store.list());queueStatus('wachtrij-bestanden');return rows},blob:id=>bounded(()=>store.blob(id)),readPlace:blob=>readBounded(readPlace,blob),readGps:blob=>readBounded(readGps,blob),lookup:gps=>lookup(gps,signal),commit:(expected,index,place,reason)=>commit(expected,index,place,reason,active),available:active,canLookup:()=>active()&&canLookup(),deferred,unreadable,diagnose,retryItems});
    if(!active())return;
    if(!result.more)unreadable.clear();
    // Old entries cannot grow without bound during long active sessions.

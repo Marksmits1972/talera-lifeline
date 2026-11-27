@@ -1272,10 +1272,7 @@ function installCapturePlaceCatalog(html,route){
  assert.equal(matches.length,1,'CAPTURE_ENRICHMENT_STORE_MARKER_DRIFT');
  const mount=matches[0],at=mount.index+mount[0].length;
  const install='\n'+gpsReaders+'\n'+enrichment+'\n'+
-  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:async (original,signal)=>{"+
-  "if(/^video\\/(?:quicktime|mp4|x-m4v)$/i.test(original.type))return readQuickTimeCaptureGps(original,signal);"+
-  "if(/^image\\/(?:heic|heif|heic-sequence|heif-sequence)$/i.test(original.type)||/\\.(?:heic|heif)$/i.test(original.name||''))return readHeifCaptureGps(original,signal);"+
-  "return readJpegCaptureGps(original,signal)},enabled:/*TALERA_GEONAMES_ENABLED*/false});\n";
+  "mountCapturePlaceEnrichment({store:window.TaleraMemories,open,done,dbName:DB_NAME,readPlace:readCapturePlace,readGps:readOriginalCaptureGps,enabled:/*TALERA_GEONAMES_ENABLED*/false});\n";
  return html.slice(0,at)+install+html.slice(at);
 }
 

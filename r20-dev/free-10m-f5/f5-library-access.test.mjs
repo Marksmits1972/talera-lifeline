@@ -123,6 +123,15 @@ for(const id of ['gps-bad-reference','gps-truncated','gps-zero-denominator','gps
  assert.equal(await library.captureGps(id),null,id);
 }
 await assert.rejects(()=>library.captureGps(''),/TALERA_LIBRARY_INVALID_MEDIA_ID/);
+// Simulate a picker conversion retaining HEIF name or metadata.
+ // The old type/extension selection incorrectly invoked the HEIF reader.
+ for(const [name,mime] of [['converted.HEIC','image/jpeg'],['converted.heif','image/heic'],['converted.jpg','application/octet-stream']]){
+  const bytes=fixture(),original=new File([bytes],name,{type:mime});files.set(name,original);
+  const gps=await library.captureGps(name);
+  assert.equal(gps?.source,'jpeg-exif-gps',name);
+  assert.deepEqual([...new Uint8Array(await original.arrayBuffer())],[...bytes]);
+ }
+ console.log('TALERA_PICKER_MISLABELED_JPEG_ORIGINAL_GPS_PASS');
 console.log('TALERA_LOCAL_JPEG_CAPTURE_GPS_CONTRACT_PASS');
 
 function movieFixture(value='+51.9850+005.8883+012.0/',full=true,legacy=null){
@@ -203,6 +212,15 @@ for(const [id,data] of [
  files.set(id,new Blob([data],{type:'image/heic'}));
  assert.equal(await library.captureGps(id),null,id);
 }
+for(const [name,mime] of [['renamed.jpg','image/jpeg'],['renamed.bin','application/octet-stream']]){
+  const bytes=heifFixture(fixture()),original=new File([bytes],name,{type:mime});files.set(name,original);
+  assert.equal((await library.captureGps(name))?.source,'heif-exif-gps',name);
+  assert.deepEqual([...new Uint8Array(await original.arrayBuffer())],[...bytes]);
+ }
+ const padded=new Blob([Uint8Array.from([0,0,0,8,102,114,101,101]),heifFixture(fixture(),{method:1})],{type:'image/heif'});
+ files.set('padded-heif',padded);
+ assert.equal((await library.captureGps('padded-heif'))?.source,'heif-exif-gps');
+ console.log('TALERA_PICKER_MISLABELED_HEIF_ORIGINAL_GPS_PASS');
 console.log('TALERA_LOCAL_HEIF_CAPTURE_GPS_CONTRACT_PASS');
  // A primary grid with hidden coded tiles must not lose its own GPS metadata.
  for(const method of [0,1]){

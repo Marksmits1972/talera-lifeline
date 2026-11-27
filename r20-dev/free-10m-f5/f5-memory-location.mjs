@@ -32,6 +32,12 @@ export function selectDisplayedLocation(story,item,codes){
  if(manual&&(manual.mode==='correct'||!automatic))return {countryCode:manual.countryCode,city:manual.city,source:'manual-photo'};
  return automatic;
 }
+// Legacy v3 and old draft negatives had no proof of whether GPS was read.
+ // Never treat them as settled; re-read the original with the current reader.
+export function completedDraftLocation(result){
+ return !!result&&(result.state==='known'&&!!result.place||result.state==='unknown'&&
+  Object.keys(result).sort().join(',')==='reason,state'&&['no-readable-gps','no-place'].includes(result.reason));
+}
 // Called only for the existing save's ordered uploads, after original metadata
 // was retained/read. Explicit single correction is distinct from bulk fill.
 export function applyPhotoLocationInputs(items,inputs,codes){
@@ -44,7 +50,7 @@ export function applyPhotoLocationInputs(items,inputs,codes){
   if(!confirmedPhotoLocation(item.capturePlace,codes)&&input.automatic){
    const result=input.automatic,place=confirmedPhotoLocation(result.place,codes);
    if(result.state==='known'&&place){item.capturePlace=place;delete item.capturePlaceChecked}
-   else if(result.state==='unknown'&&Object.keys(result).length===1)item.capturePlaceChecked='v3';
+   else if(result.state==='unknown'&&completedDraftLocation(result))item.capturePlaceChecked='v4-'+result.reason;
   }
   if(Object.hasOwn(input,'manual')){
    const manual=normalizePhotoLocation(input.manual,codes);
@@ -55,12 +61,12 @@ export function applyPhotoLocationInputs(items,inputs,codes){
 }
 export function localPhotoState(item,codes){
  if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes)};
- if(item?.capturePlaceChecked==='v3')return {state:'unknown'};
+ if(['v4-no-readable-gps','v4-no-place'].includes(item?.capturePlaceChecked))return {state:'unknown',reason:item.capturePlaceChecked.slice(3)};
  return {state:'pending'};
 }
 export function draftPhotoChanges(g){
  const filtered=Object.fromEntries((g.media||[]).filter(id=>Object.hasOwn(g.photoLocations||{},id)).map(id=>[id,g.photoLocations[id]]));
- const automatic=Object.fromEntries((g.media||[]).map(id=>[id,g.taleraLocationResults?.get(id)??g.photoLocationAutomatic?.[id]]).filter(([,v])=>v&&['known','unknown'].includes(v.state)));
+ const automatic=Object.fromEntries((g.media||[]).map(id=>[id,g.taleraLocationResults?.get(id)??g.photoLocationAutomatic?.[id]]).filter(([,v])=>completedDraftLocation(v)));
  return {...(Object.keys(filtered).length?{photoLocations:filtered}:{}),...(Object.keys(automatic).length?{photoLocationAutomatic:automatic}:{})};
 }
 export function moveDraftPhotoLocation(source,target,id){
@@ -77,7 +83,7 @@ export function draftPhotoInputs(g,assets){
  return [...g.media,...(g.voice?[g.voice]:[])].map(id=>{
   const file=assets(id);if(!file||!String(file.type||'').startsWith('image/'))return null;
   const entry={};const automatic=g.taleraLocationResults?.get(id)??g.photoLocationAutomatic?.[id];
-  if(automatic&&['known','unknown'].includes(automatic.state))entry.automatic=automatic;
+  if(completedDraftLocation(automatic))entry.automatic=automatic;
   if(Object.hasOwn(g.photoLocations||{},id))entry.manual=g.photoLocations[id];
   return Object.keys(entry).length?entry:null;
  });
@@ -131,7 +137,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  const choices=node('div','talera-location-choices',dialog);
  const flag=(el,code)=>{const xy=flagPositions[code];el.hidden=!xy;if(xy)el.style.backgroundPosition=xy[0]+'px '+xy[1]+'px'};
  const countryText=code=>code?new Intl.DisplayNames([locale()],{type:'region',fallback:'none'}).of(code)||code:'';
- const state=id=>{const catalog=localPhotoState(existing.get(id),codes);return catalog.state!=='pending'?catalog:result.get(id)||catalog};
+ const state=id=>{const catalog=localPhotoState(existing.get(id),codes),candidate=result.get(id);return catalog.state!=='pending'?catalog:completedDraftLocation(candidate)?candidate:catalog};
  const manual=id=>{try{return normalizePhotoLocation(Object.hasOwn(g.photoLocations||{},id)?g.photoLocations[id]:existing.get(id)?.manualPhotoLocation??null,codes)}catch(_){return null}};
  const display=id=>selectDisplayedLocation(null,{capturePlace:state(id).place,manualPhotoLocation:manual(id)},codes);
  const unknownIds=()=>photoIds().filter(id=>state(id).state==='unknown'&&!display(id));
@@ -152,7 +158,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
   const image=node('img','talera-location-thumb',card);image.alt='';image.src=preview(id);
   const value=display(id);const label=node('p','talera-location-tile-label',card);
   if(value){const f=node('span','talera-location-flag',label);flag(f,value.countryCode);node('span','',label).textContent=[countryText(value.countryCode),value.city].filter(Boolean).join(' · ')}
-  else label.textContent=t(status==='pending'?'photoPending':'photoUnknown',{number:index+1});
+  else {const reason=state(id).reason;label.textContent=t(status==='pending'?'photoPending':reason==='no-place'?'photoGpsNoPlace':reason==='no-readable-gps'?'photoGpsUnreadable':'photoUnknown',{number:index+1})}
   if(status==='unknown'&&!value){
    const pick=node('label','talera-location-check',card),check=node('input','',pick);check.type='checkbox';check.checked=selected.has(id);
    node('span','',pick).textContent=t('selectPhoto',{number:index+1});
@@ -214,12 +220,12 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
     let value;try{value=await inspect(original,'photo',signal,localOnly)}catch(_){value={state:'pending'}}
     if(signal.aborted||disposed||g.taleraLocationPublishing)return;
     if(!photoIds().includes(id)||getAsset(id)!==original)continue;
-    if(['known','unknown'].includes(value?.state)){result.set(id,value);saveDraft()}
+    if(completedDraftLocation(value)){result.set(id,value);saveDraft()}
     paint();
    }
   }finally{
    controller=null;running=false;
-   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&!['known','unknown'].includes(result.get(id)?.state))&&win.navigator.onLine!==false)timer=win.setTimeout(scan,60000);
+   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&!completedDraftLocation(result.get(id)))&&win.navigator.onLine!==false)timer=win.setTimeout(scan,60000);
   }
  }
  function wake(){if(timer!==null){win.clearTimeout(timer);timer=null}if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing)void scan()}

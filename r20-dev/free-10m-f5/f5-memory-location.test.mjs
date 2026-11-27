@@ -39,11 +39,19 @@ test('bulk filling cannot override known photos, even if recognition arrives aft
  assert.throws(()=>normalizePhotoLocation({...fr,mode:'x'},codes),/INVALID_PHOTO_LOCATION/);
 });
 test('only a completed unknown result produces negative marker; durable changes follow draft IDs and never order, removed IDs or voice',()=>{
- const items=[{kind:'photo',key:'p1'},{kind:'photo',key:'p2'}];
- assert.deepEqual(localPhotoState(items[0],codes),{state:'pending'});
- applyPhotoLocationInputs(items,[{automatic:{state:'pending'}},{automatic:{state:'unknown'}}],codes);
- assert.equal(items[0].capturePlaceChecked,undefined);assert.equal(items[1].capturePlaceChecked,'v3');
- assert.deepEqual(localPhotoState(items[1],codes),{state:'unknown'});
+ const items=[{kind:'photo',key:'p1',capturePlaceChecked:'v3'},{kind:'photo',key:'p2'},{kind:'photo',key:'p3'},{kind:'photo',key:'p4'}];
+ assert.deepEqual(localPhotoState(items[0],codes),{state:'pending'},'Old v3 negative must not prevent a new original inspection');
+ applyPhotoLocationInputs(items,[{automatic:{state:'pending'}},{automatic:{state:'unknown'}},{automatic:{state:'unknown',reason:'no-readable-gps'}},{automatic:{state:'unknown',reason:'no-place'}}],codes);
+ assert.equal(items[0].capturePlaceChecked,'v3');assert.equal(items[1].capturePlaceChecked,undefined);
+ assert.equal(items[2].capturePlaceChecked,'v4-no-readable-gps');assert.equal(items[3].capturePlaceChecked,'v4-no-place');
+ assert.deepEqual(localPhotoState(items[2],codes),{state:'unknown',reason:'no-readable-gps'});
+ assert.deepEqual(localPhotoState(items[3],codes),{state:'unknown',reason:'no-place'});
+ const oldDraft={media:['a','b'],photoLocationAutomatic:{a:{state:'unknown'},b:{state:'unknown',reason:'no-place'}},photoLocations:{a:fill}};
+ assert.deepEqual(draftPhotoChanges(oldDraft),{photoLocations:{a:fill},photoLocationAutomatic:{b:{state:'unknown',reason:'no-place'}}});
+ assert.deepEqual(draftPhotoInputs(oldDraft,()=>({type:'image/jpeg'})),[{manual:fill},{automatic:{state:'unknown',reason:'no-place'}}]);
+ applyPhotoLocationInputs(items,[{automatic:{state:'known',place:auto(nl).capturePlace}},null,null,null],codes);
+ assert.deepEqual(items[0].capturePlace,auto(nl).capturePlace);assert.equal(items[0].capturePlaceChecked,undefined);
+
  const draft={media:['b','a'],voice:'v',photoLocations:{a:fill,unused:correct,v:correct},taleraLocationResults:new Map([['b',{state:'known',place:auto(nl).capturePlace}]])};
  assert.deepEqual(draftPhotoChanges(draft),{photoLocations:{a:fill},photoLocationAutomatic:{b:{state:'known',place:auto(nl).capturePlace}}});
  const inputs=draftPhotoInputs(draft,id=>({type:id==='v'?'audio/mp4':'image/png'}));
@@ -53,7 +61,7 @@ test('only a completed unknown result produces negative marker; durable changes 
 test('country list is local and translated; every new independent location key exists in all five languages',()=>{
  const regions=new Set(codes);assert.equal(regions.size,codes.length);assert.ok(codes.length>=195);
  const keys=Object.keys(languageCatalog.nl).filter(x=>x.startsWith('core.editor.location.'));
- assert.equal(keys.length,34);
+ assert.equal(keys.length,36);
  for(const language of ['nl','en','de','fr','es']){
   const rows=localizedCountryRows(codes,language);assert.equal(rows.length,codes.length);
   assert.ok(rows.every(x=>x.code&&x.name!==x.code&&x.name));

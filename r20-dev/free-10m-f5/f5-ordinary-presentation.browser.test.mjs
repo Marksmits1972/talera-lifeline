@@ -1300,7 +1300,9 @@ async function testTimelineLoupe(){
     });
     // Import through the real picker and existing draft library, not direct
     // injection into the final catalog. Test the exact original bytes first.
-    await geoPage.locator('#photoInput').setInputFiles({name:'synthetic-gps.jpg',mimeType:'image/jpeg',buffer:Buffer.from(fixtureBytes)});
+    // The picker may export JPEG bytes with the former HEIF filename. The
+    // production reader must choose from the actual bytes, not the suffix.
+    await geoPage.locator('#photoInput').setInputFiles({name:'synthetic-gps.HEIC',mimeType:'image/jpeg',buffer:Buffer.from(fixtureBytes)});
     let draftReady=false;
     for(let attempt=0;attempt<150;attempt++){
       draftReady=await geoPage.evaluate(async expected=>{
@@ -1489,6 +1491,7 @@ async function testTimelineLoupe(){
     await geoPage.locator('.talera-location-toggle').click();
     await geoPage.waitForFunction(()=>document.querySelectorAll('.talera-location-check input').length===3,null,{timeout:20000});
     assert.ok((await geoPage.locator('.talera-location-summary').innerText()).includes('3 van 6'));
+    assert.equal(await geoPage.locator('.talera-location-tile-label').filter({hasText:'geen leesbare GPS-gegevens'}).count(),3);
     await geoPage.locator('.talera-location-check input').last().uncheck();
     await geoPage.locator('#talera-memory-country').click();
     await geoPage.locator('.talera-location-search').fill('Frankrijk');

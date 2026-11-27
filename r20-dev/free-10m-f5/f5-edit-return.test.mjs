@@ -232,6 +232,19 @@ test('completed draft proof compares all editable fields, exact ID order and can
  ])assert.equal(publishedDraftPairs({...completedDraft,...change},completedStory),null);
  assert.equal(publishedDraftPairs(completedDraft,{...completedStory,narrationCues:[{t:1,index:0,mediaId:'original-a'}]}),null);
 });
+test('completed concept retains reasoned photo recognition and safely handles older negative markers',()=>{
+ const photoId=completedDraft.media[0];
+ for(const reason of ['no-readable-gps','no-place']){
+  const draft={...completedDraft,photoLocationAutomatic:{[photoId]:{state:'unknown',reason}}};
+  const story=structuredClone(completedStory);story.items[0].capturePlaceChecked='v4-'+reason;
+  assert.equal(publishedDraftPairs(draft,story)?.length,3);
+  story.items[0].capturePlaceChecked='v3';assert.equal(publishedDraftPairs(draft,story),null);
+ }
+ const legacy={...completedDraft,photoLocationAutomatic:{[photoId]:{state:'unknown'}}},story=structuredClone(completedStory);
+ story.items[0].capturePlaceChecked='v3';assert.equal(publishedDraftPairs(legacy,story)?.length,3);
+ story.items[0].capturePlace={countryCode:'NL',city:'Boxtel'};
+ assert.equal(publishedDraftPairs({...legacy,photoLocationAutomatic:{[photoId]:{state:'unknown',reason:'invalid'}}},story),null);
+});
 test('verified content compares full bytes and metadata; absent or changed media keeps concept',async()=>{
  const pairs=publishedDraftPairs(completedDraft,completedStory);
  const rows=new Map();

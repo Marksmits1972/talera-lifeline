@@ -33,11 +33,11 @@ const resolved={countryCode:'NL',country:'Nederland',city:'Schijndel',source:'ge
 const options={list:async()=>structuredClone(catalog),blob:async()=>original,
  readPlace:async()=>null,readGps:async()=>({latitude:51.62,longitude:5.43}),
  available:()=>online,lookup:async()=>{requests++;return fail?{ok:false}:{ok:true,place:resolved}},
- commit:async(expected,index,value)=>{
+ commit:async(expected,index,value,reason)=>{
   if(deleted)return null;
   const current=catalog.find(x=>x.id===expected.id);
   assert.deepEqual(current,expected);writes++;
-  if(value)current.items[index].capturePlace=value;else current.items[index].capturePlaceChecked='v3';
+  if(value)current.items[index].capturePlace=value;else current.items[index].capturePlaceChecked='v4-'+reason;
   return structuredClone(current);
  }};
 await enrichCapturePlaces(options);assert.equal(requests,0);assert.equal(writes,0);
@@ -48,7 +48,7 @@ assert.deepEqual(catalog[1].items[0].capturePlace,resolved);
 await enrichCapturePlaces(options);assert.equal(requests,2);assert.equal(writes,2);
 catalog=[structuredClone(record)];deleted=true;await enrichCapturePlaces(options);assert.equal(writes,2);assert.equal(catalog[0].items[0].capturePlace,undefined);
 deleted=false;catalog=[structuredClone(record)];await enrichCapturePlaces({...options,readGps:async()=>null});
-assert.equal(catalog[0].items[0].capturePlaceChecked,'v3');
+assert.equal(catalog[0].items[0].capturePlaceChecked,'v4-no-readable-gps');
 const before=requests;await enrichCapturePlaces(options);assert.equal(requests,before);
 console.log('TALERA_GEONAMES_LOCAL_ENRICHMENT_OFFLINE_RETRY_DEDUP_PASS');
 
@@ -81,15 +81,27 @@ console.log('TALERA_GEONAMES_TRANSIENT_AND_QUOTA_BACKOFF_PASS');
 // confirmed explicit metadata remains untouched.
 const legacy={...record,id:'legacy-location',items:[{...record.items[0],capturePlace:{...resolved,city:'Breukelen',source:'geonames-nearby-place'}}]};
 const oldNegative={...record,id:'legacy-negative',items:[{...record.items[0],key:'legacy-negative',capturePlaceChecked:'v2'}]};
-const currentNegative={...record,id:'current-negative',items:[{...record.items[0],key:'current-negative',capturePlaceChecked:'v3'}]};
-catalog=[legacy,oldNegative,currentNegative].map(x=>structuredClone(x));
+const legacyV3={...record,id:'legacy-v3',items:[{...record.items[0],key:'legacy-v3',capturePlaceChecked:'v3'}]};
+const currentNegative={...record,id:'current-negative',items:[{...record.items[0],key:'current-negative',capturePlaceChecked:'v4-no-readable-gps'}]};
+catalog=[legacy,oldNegative,legacyV3,currentNegative].map(x=>structuredClone(x));
 let retries=0;
 const retryOptions={...options,lookup:async()=>{retries++;return {ok:true,place:resolved}}};
-await enrichCapturePlaces(retryOptions);assert.equal(retries,2);
-assert.deepEqual(catalog[0].items[0].capturePlace,resolved);assert.deepEqual(catalog[1].items[0].capturePlace,resolved);
-assert.equal(catalog[2].items[0].capturePlace,undefined);
-await enrichCapturePlaces(retryOptions);assert.equal(retries,2);
+await enrichCapturePlaces(retryOptions);assert.equal(retries,3);
+for(const index of [0,1,2])assert.deepEqual(catalog[index].items[0].capturePlace,resolved);
+assert.equal(catalog[3].items[0].capturePlace,undefined);
+await enrichCapturePlaces(retryOptions);assert.equal(retries,3);
 console.log('TALERA_OLD_LOCALITY_RECHECK_ONCE_PASS');
+ // Coordinates exist yet the provider cannot safely identify a locality.
+ // Preserve that reason and do not repeat a request on every screen.
+ catalog=[structuredClone(record)];
+ let unknownPlaceRequests=0;
+ const noPlace={...options,lookup:async()=>{unknownPlaceRequests++;return {ok:true,place:null}}};
+ await enrichCapturePlaces(noPlace);
+ assert.equal(catalog[0].items[0].capturePlaceChecked,'v4-no-place');
+ assert.equal(catalog[0].items[0].capturePlace,undefined);
+ await enrichCapturePlaces(noPlace);assert.equal(unknownPlaceRequests,1);
+ console.log('TALERA_GPS_FOUND_BUT_UNRESOLVED_LOCATION_DISTINCT_NEGATIVE_PASS');
+
 
 // Invalid historical originals cannot occupy every slot of every bounded batch.
 const brokenItems=Array.from({length:3},(_,i)=>({...record.items[0],key:'unreadable-'+i}));
@@ -237,19 +249,19 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
  const originals=new Map(names.map(n=>[n,Object.getOwnPropertyDescriptor(globalThis,n)]));
  const win=new EventTarget(),doc=new EventTarget();win.top=win;doc.hidden=false;
  const nav={onLine:false},tagged=new Blob([Uint8Array.of(1)],{type:'image/jpeg'}),plain=new Blob([Uint8Array.of(2)],{type:'image/jpeg'}),gps=new Blob([Uint8Array.of(3)],{type:'image/jpeg'});
- let requests=0,reads=0;
+ let requests=0,reads=0,providerResult=resolved;
  try{
   for(const [n,v] of Object.entries({window:win,document:doc,location:{pathname:'/tell'},navigator:nav,
-   fetch:async(url,opts)=>{requests++;assert.equal(url,'/api/capture-place');assert.deepEqual(Object.keys(JSON.parse(opts.body)).sort(),['latitude','longitude']);return Response.json({place:resolved})}}))
+   fetch:async(url,opts)=>{requests++;assert.equal(url,'/api/capture-place');assert.deepEqual(Object.keys(JSON.parse(opts.body)).sort(),['latitude','longitude']);return Response.json({place:providerResult})}}))
    Object.defineProperty(globalThis,n,{configurable:true,writable:true,value:v});
   const store={list:async()=>[]};
   mountCapturePlaceEnrichment({dbName:'talera-free-local-'+'b'.repeat(32)+'-v1',enabled:true,store,
    open:()=>{throw Error('draft inspection must not create a catalog row')},done:()=>{},
    readPlace:async original=>{reads++;return original===tagged?iptc:null},
-   readGps:async original=>original===gps?{latitude:51.985,longitude:5.88}:null});
+   readGps:async original=>original===gps||original.size===2?{latitude:51.985,longitude:5.88}:null});
   const signal=new AbortController().signal;
   assert.deepEqual(await store.inspectDraftCapturePlace(tagged,'photo',signal,true),{state:'known',place:iptc});
-  assert.deepEqual(await store.inspectDraftCapturePlace(plain,'photo',signal,true),{state:'unknown'});
+  assert.deepEqual(await store.inspectDraftCapturePlace(plain,'photo',signal,true),{state:'unknown',reason:'no-readable-gps'});
   assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal,true),{state:'pending'});
   assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'pending'});
   assert.equal(requests,0);assert.equal(reads,3);
@@ -257,6 +269,12 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
   assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'known',place:resolved});
   assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',signal),{state:'known',place:resolved});
   assert.equal(requests,1);assert.equal(reads,3);
+  providerResult=null;const unresolved=new Blob([Uint8Array.of(4,5)],{type:'image/jpeg'});
+  assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal,true),{state:'pending'});
+  assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal),{state:'unknown',reason:'no-place'});
+  assert.deepEqual(await store.inspectDraftCapturePlace(unresolved,'photo',signal),{state:'unknown',reason:'no-place'});
+  assert.equal(requests,2);
+
   const canceled=new AbortController();canceled.abort();
   assert.deepEqual(await store.inspectDraftCapturePlace(gps,'photo',canceled.signal),{state:'pending'});
   win.dispatchEvent(new Event('pagehide'));

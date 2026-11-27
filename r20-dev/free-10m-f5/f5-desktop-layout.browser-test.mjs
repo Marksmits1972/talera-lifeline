@@ -11,6 +11,35 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
  try{
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(String(e.message)));
+  // Open the existing menu and messages using the original visible links.
+  await page.goto(origin+'/mijn-leven',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.__taleraMoreMenu?.ready);
+  const panel=page.locator('#talera-more-menu > .panel');
+  const dialogGeometry=async(view)=>{
+   await panel.and(page.locator('[data-view="'+view+'"]')).waitFor({state:'visible'});
+   const g=await panel.evaluate(e=>{
+    const r=e.getBoundingClientRect(),b=e.querySelector('.body');
+    return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,viewport:[innerWidth,innerHeight],bodyOverflow:getComputedStyle(b).overflowY};
+   });
+   assert.ok(close(g.width,620)&&close((g.left+g.right)/2,g.viewport[0]/2)&&close((g.top+g.bottom)/2,g.viewport[1]/2),'Centered desktop menu '+view+': '+JSON.stringify(g));
+   assert.ok(g.top>=23&&g.bottom<=g.viewport[1]-23&&g.bodyOverflow==='auto','Menu remains within viewport and scrollable '+JSON.stringify(g));
+   return g;
+  };
+  await page.locator('#navMore').click();
+  await dialogGeometry('hub');
+  await panel.locator('button[data-view="settings"]').click();
+  const settings=await dialogGeometry('settings');
+  assert.ok(settings.height<600,'Settings should not be a full-height mobile sheet '+JSON.stringify(settings));
+  await panel.locator('[data-action="back"]').click();
+  await dialogGeometry('hub');
+  await panel.locator('[data-action="close"]').click();
+  await panel.waitFor({state:'hidden'});
+  await page.locator('#navNotifications').click();
+  const messages=await dialogGeometry('messages');
+  assert.ok(messages.height<500,'Signed-out messages fit their content '+JSON.stringify(messages));
+  await panel.locator('[data-action="close"]').click();
+  await panel.waitFor({state:'hidden'});
+  console.log('TALERA_DESKTOP_CENTERED_MENU_PASS',JSON.stringify({settings,messages}));
   // The existing signed-out presentation has no reference photos. Do not
   // show a broken-image icon, but keep the native elements for later data.
   await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
@@ -20,19 +49,37 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   }));
   assert.ok(emptyPhotos.every(p=>p&&!p.src&&!p.srcset&&p.visibility==='hidden'),'Empty native desktop photos: '+JSON.stringify(emptyPhotos));
   console.log('TALERA_DESKTOP_EMPTY_PHOTOS_HIDDEN_PASS');
+  for(const [width,height] of widths){
+   await page.setViewportSize({width,height});
+   const dock=await page.evaluate(()=>{
+    const nav=document.querySelector('nav[data-i18n-aria-label="core.present.navAria"]'),r=nav?.getBoundingClientRect();
+    return r?{left:r.left,right:r.right,width:r.width,bottom:r.bottom,buttons:[...nav.children].map(e=>({tag:e.tagName,cls:e.className,font:parseFloat(getComputedStyle(e).fontSize),width:e.getBoundingClientRect().width}))}:null;
+   });
+   assert.ok(dock&&close(dock.width,420)&&close((dock.left+dock.right)/2,width/2)&&close(dock.bottom,height-12),'Compact desktop navigation '+JSON.stringify(dock));
+   assert.equal(dock.buttons.length,3,'Original three navigation actions retained');
+   assert.ok(dock.buttons.every(b=>b.tag==='BUTTON'&&b.width>=44),'Original usable navigation targets '+JSON.stringify(dock));
+   assert.ok(dock.buttons.filter(b=>b.cls.includes('nav-item')).every(b=>b.font>=13),'Readable desktop navigation labels');
+  }
+  console.log('TALERA_DESKTOP_COMPACT_NAVIGATION_PASS');
   await context.addCookies([{name:'talera_sid',value:sid,domain:'127.0.0.1',
    path:'/',secure:false,httpOnly:true,sameSite:'Lax'}]);
   // No user account or photos: reuse the existing synthetic local store API.
   await page.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>!!window.TaleraMemories?.save);
   const id=await page.evaluate(async()=>{
-   const canvas=document.createElement('canvas');canvas.width=160;canvas.height=120;
-   const c=canvas.getContext('2d');c.fillStyle='#336677';c.fillRect(0,0,160,120);
-   const blob=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
+   // Distinct portrait, landscape and square photos make the existing
+   // random Home image and first presentation frame visibly distinguishable.
+   const files=[];
+   for(const [i,[width,height,color]] of [[160,120,'#336677'],[120,160,'#985344'],[140,140,'#476a3d']].entries()){
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const c=canvas.getContext('2d');c.fillStyle=color;c.fillRect(0,0,width,height);
+    const blob=await new Promise(ok=>canvas.toBlob(ok,'image/png'));
+    files.push(new File([blob],'desktop-regression-'+i+'.png',{type:'image/png'}));
+   }
    const row=await window.TaleraMemories.save({
     title:'Desktop geometry regression',date:new Date().toISOString().slice(0,10),
     time:'12:00:00',text:'Synthetic local layout fixture'
-   },[0,1,2].map(i=>new File([blob],'desktop-regression-'+i+'.png',{type:'image/png'})));
+   },files);
    return row.id;
   });
   const href='/present?memory='+encodeURIComponent(id);
@@ -50,7 +97,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    },null,{timeout:7000});
    const geometry=await page.evaluate(()=>{
     const rect=(selector)=>{const e=document.querySelector(selector),r=e?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}:null};
-    return {width:innerWidth,height:innerHeight,sheet:rect('#sheet'),hero:rect('.hero'),nav:rect('.flow-nav'),
+    return {width:innerWidth,height:innerHeight,sheet:rect('#sheet'),hero:rect('.hero'),nav:rect('.flow-nav'), language:rect('#talera-v23-language'), logo:rect('.mast .logo'),
       add:rect('a[href="/tell"]'),scrollWidth:document.documentElement.scrollWidth,
       readingSizes:Object.fromEntries(['.sheet-sub','#v17-year-summary','#v17-min-year','#v17-mid-year','#v17-max-year','.v18-era-note','#navMine'].map(s=>{const e=document.querySelector(s);return [s,e?parseFloat(getComputedStyle(e).fontSize):null]})),
       desktop:matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)').matches};
@@ -59,6 +106,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    assert.ok(close(geometry.sheet.left,0)&&close(geometry.sheet.right,geometry.hero.left),'Control/image boundary '+JSON.stringify(geometry));
    assert.ok(close(geometry.hero.right,width)&&geometry.hero.width>geometry.sheet.width,'Remembrance must dominate desktop '+JSON.stringify(geometry));
    assert.ok(geometry.nav.left>=0&&geometry.nav.right<=geometry.sheet.right+3,'Navigation stays on left '+JSON.stringify(geometry));
+   assert.ok(geometry.language&&geometry.logo&&geometry.language.left>=geometry.logo.right&&geometry.language.right<=geometry.sheet.right-8,'Language belongs to controls and must not overlap logo '+JSON.stringify(geometry));
    assert.ok(geometry.scrollWidth<=width+1,'No horizontal page overflow');
    for(const [selector,minimum] of [['.sheet-sub',14],['#v17-year-summary',14],['#v17-min-year',13],['#v17-mid-year',13],['#v17-max-year',13],['.v18-era-note',14],['#navMine',13]])
     assert.ok(geometry.readingSizes[selector]>=minimum,'Desktop reading size '+selector+': '+JSON.stringify(geometry.readingSizes));

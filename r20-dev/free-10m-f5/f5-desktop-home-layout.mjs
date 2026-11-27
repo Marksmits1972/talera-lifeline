@@ -2,8 +2,32 @@
 // Injection is scoped to the existing generated Home document.
 import assert from 'node:assert/strict';
 export const DESKTOP_HOME_MEDIA = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
+// Shared visual rules for the existing runtime menu on Home and Presentation.
+// No menu actions, hidden state, routes, or content are changed.
+export const desktopMenuRules = `
+  body:not(.talera-recipient-presentation) #talera-more-menu {
+    align-items: center !important;
+    padding: 24px !important;
+    box-sizing: border-box !important;
+  }
+  body:not(.talera-recipient-presentation) #talera-more-menu > .panel {
+    width: min(620px, 100%) !important;
+    height: auto !important;
+    max-height: min(760px, calc(100dvh - 48px)) !important;
+    min-height: 0 !important;
+    border-radius: 24px !important;
+    box-shadow: 0 16px 52px rgba(11, 30, 57, .24) !important;
+  }
+  body:not(.talera-recipient-presentation) #talera-more-menu > .panel > .body {
+    flex: 0 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-bottom: 22px !important;
+  }
+`;
 export const desktopHomeStyle = `<style id="talera-f5-desktop-home-layout">
 @media ${DESKTOP_HOME_MEDIA} {
+  ${desktopMenuRules}
   :root { --talera-home-control-width: clamp(350px, 35vw, 620px); }
   .hero {
     left: var(--talera-home-control-width) !important;
@@ -17,6 +41,15 @@ export const desktopHomeStyle = `<style id="talera-f5-desktop-home-layout">
   .mast { background: linear-gradient(to right,
     #0b1e39 0, #0b1e39 var(--talera-home-control-width),
     transparent var(--talera-home-control-width)) !important; }
+  /* Keep the existing language picker beside the desktop controls. */
+  .mast .talera-v23-language {
+    position: absolute !important;
+    left: auto !important;
+    right: calc(100% - var(--talera-home-control-width) + 16px) !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+  }
+  .mast #talera-v23-language { font-size: 13px !important; }
   #sheet.life-sheet {
     position: fixed !important;
     left: 0 !important; right: auto !important;
@@ -62,7 +95,19 @@ export const desktopHomeStyle = `<style id="talera-f5-desktop-home-layout">
     bottom: 12px !important;
     transform: translateX(-50%) !important;
   }
+  .flow-nav { border-radius: 12px !important; }
   .flow-nav a { font-size: 13px !important; }
+  /* Only wide desktop panels have room for icon and localized label in a row.
+     Keep the original hidden items hidden and all original links untouched. */
+  @media (min-width: 1320px) {
+    .flow-nav a:not([hidden]) {
+      flex-direction: row !important;
+      justify-content: center !important;
+      gap: 6px !important;
+      min-width: 0 !important;
+    }
+    .flow-nav a:not([hidden]) svg { flex: 0 0 18px !important; }
+  }
   body:has(#sheet.expanded) .flow-nav {
     left: calc(min(65vw, 980px) / 2) !important;
   }

@@ -2205,7 +2205,7 @@ async function taleraFreeOriginalSharePhoto(memory){
    const vars="let mode=null,memory=runtime.currentMemory(),focus=null,consent=false,shareAuth=null,authBusy=false;";
    const addedVars=String.raw`
 const taleraStandardText=()=>window.TaleraI18n.t('core.whatsapp.standardMessage');
-let messageChoice='personal',personalMessage='',includePreviewPhoto=true,uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
+let messageChoice='personal',personalMessage='',uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
 
 let taleraWhatsAppHandoffPending=false;
 const taleraWhatsAppReturnKey='talera-wa-handoff-return';
@@ -2375,7 +2375,7 @@ function taleraUploadMediaProgress(path,blob,label,previewConsent=false){
    const nativeSlot="const shareAdapter={";
    assert.equal(shipped.split(nativeSlot).length,2,'WHATSAPP_NATIVE_SLOT_DRIFT');
    shipped=shipped.replace(nativeSlot,
-     "let taleraNativeSharePhoto=null;\n"+nativeSlot);
+     "let taleraNativeSharePhoto=null,includePreviewPhoto=true;\n"+nativeSlot);
    const previewSource="  const preview=await previewPhotoBlob(current);";
    assert.equal(shipped.split(previewSource).length,2,'WHATSAPP_NATIVE_PREVIEW_DRIFT');
    shipped=shipped.replace(previewSource,

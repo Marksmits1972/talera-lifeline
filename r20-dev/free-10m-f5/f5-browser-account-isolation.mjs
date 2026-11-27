@@ -2270,6 +2270,27 @@ try{
    });
    try{
      const guest=await anonymous.newPage();
+     // Chromium's page fetch carries the secure first-party claim cookie on
+     // loopback; Playwright APIRequestContext may omit it on HTTP. For direct
+     // contract probes only, reuse the exact cookie already issued to this
+     // real browser for this particular capability. Never manufacture a cookie
+     // or attach it to another host or legacy private-account path.
+     const guestRequest=Object.fromEntries(['get','post','fetch'].map(method=>[
+       method,async(url,options={})=>{
+         const target=new URL(url,origin);
+         const match=target.origin===origin&&/^\/s\/([A-Za-z0-9_-]{43})(?:\/|$)/.exec(target.pathname);
+         if(!match)return guest.request[method](url,options);
+         const token=Buffer.from(match[1],'base64url').toString('hex');
+         const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
+         const hash=Buffer.from(digest).toString('hex');
+         const name='__Host-talera_g_'+hash.slice(0,24);
+         const cookies=await anonymous.cookies();
+         const cookie=cookies.find(c=>c.name===name&&c.secure&&c.httpOnly&&c.path==='/');
+         const headers={...options.headers};
+         if(cookie)headers.cookie=name+'='+cookie.value;
+         return guest.request[method](url,{...options,headers});
+       }
+     ]));
      const openGuest=async url=>{
        const actual=guest.waitForResponse(r=>r.url()===url&&r.status()===200&&
          r.headers()['x-talera-free-f5']==='original-presentation-one-memory-capability',{timeout:20000});
@@ -2598,7 +2619,7 @@ try{
        JSON.stringify({oneOnly:true,originalPresentation:true,originalStory:true,
          privateLibraryDenied:true,writeDenied:true,originalMediaKey:true,
          feedback:true,introReturn:true,iphoneAccepted:false}));
-     const guestSnapshot=await guest.request.get(issued.link+'/feedback',
+     const guestSnapshot=await guestRequest.get(issued.link+'/feedback',
        {headers:{'x-talera-guest-id':await guest.evaluate(()=>
          sessionStorage.getItem('talera-guest-browser-v1'))}});
      assert.equal(guestSnapshot.status(),200);
@@ -2634,7 +2655,7 @@ try{
        'Signed-in owner must keep their original private comment');
      const privateCountBefore=privateView.data.commentCount;
 
-     const guestPrivateProbe=await guest.request.get(issued.link+'/feedback');
+     const guestPrivateProbe=await guestRequest.get(issued.link+'/feedback');
      assert.equal(guestPrivateProbe.status(),200);
      const guestIsolated=await guestPrivateProbe.json();
      assert.equal(guestIsolated.commentCount,1,
@@ -2648,7 +2669,7 @@ try{
      const rawShare=Buffer.from(new URL(issued.link).pathname.split('/')[2],'base64url');
      assert.equal(rawShare.byteLength,32,'Original capability entropy remains 256 bits');
      const rawShareToken=rawShare.toString('hex');
-     const legacyGuest=await guest.request.get(origin+
+     const legacyGuest=await guestRequest.get(origin+
        '/__social/memory/'+sharedStoryId+'/view',{
         headers:{'x-qa-share-token':rawShareToken}});
      assert.equal(legacyGuest.status(),403,
@@ -2656,18 +2677,18 @@ try{
      // Anonymous share rights must never mutate the original signed-in
      // TALERA account's conversation via legacy social endpoints.
      const privateSocialPath=origin+'/__social/memory/'+sharedStoryId;
-     const tokenOnlyReply=await guest.request.post(privateSocialPath+'/comment',{
+     const tokenOnlyReply=await guestRequest.post(privateSocialPath+'/comment',{
        headers:{origin,'x-qa-share-token':rawShareToken,
         'content-type':'application/json'},
        data:{body:'DO_NOT_WRITE_PRIVATE_THREAD'}});
      assert.equal(tokenOnlyReply.status(),403,
        'Only the protected guest /s/:token/comment can accept anonymous text');
-     const tokenOnlyHeart=await guest.request.post(privateSocialPath+'/like',{
+     const tokenOnlyHeart=await guestRequest.post(privateSocialPath+'/like',{
        headers:{origin,'x-qa-share-token':rawShareToken,
         'content-type':'application/json'},data:{}});
      assert.equal(tokenOnlyHeart.status(),403,
        'Only the protected guest /s/:token/heart can accept anonymous hearts');
-     const unauthenticated=await guest.request.get(origin+
+     const unauthenticated=await guestRequest.get(origin+
        '/__social/memory/'+sharedStoryId+'/view');
      assert.equal(unauthenticated.status(),403,
        'No free access by guessing a story ID without the capability');
@@ -2713,14 +2734,14 @@ try{
        return {opening:opening.status,claim:claimed.status};
      },siblingUrl);
      assert.deepEqual(siblingClaim,{opening:200,claim:200});
-     const siblingFeedbackRes=await guest.request.get(siblingUrl+'/feedback');
+     const siblingFeedbackRes=await guestRequest.get(siblingUrl+'/feedback');
      assert.equal(siblingFeedbackRes.status(),200);
      const siblingFeedback=await siblingFeedbackRes.json();
      assert.deepEqual({likes:siblingFeedback.likes,comments:siblingFeedback.commentCount},
        {likes:0,comments:0},'Two links must never exchange guest reactions');
-     assert.equal((await guest.request.get(siblingUrl+'/photo')).status(),404,
+     assert.equal((await guestRequest.get(siblingUrl+'/photo')).status(),404,
        'An unuploaded photo for share B cannot reuse share A media');
-     assert.equal((await guest.request.get(issued.link+'/photo')).status(),200,
+     assert.equal((await guestRequest.get(issued.link+'/photo')).status(),200,
        'An existing valid share A keeps its own permitted media');
      const siblingRevoke=await sharePage.evaluate(async id=>{
        const r=await fetch('/api/shares/'+id+'/revoke',{
@@ -2728,15 +2749,15 @@ try{
        return r.status;
      },siblingInvite.data.id);
      assert.equal(siblingRevoke,200);
-     assert.equal((await guest.request.get(siblingUrl+'/feedback')).status(),404);
-     assert.equal((await guest.request.get(issued.link+'/feedback')).status(),200,
+     assert.equal((await guestRequest.get(siblingUrl+'/feedback')).status(),404);
+     assert.equal((await guestRequest.get(issued.link+'/feedback')).status(),200,
        'Revoking one invitation must not revoke another');
      console.log('TALERA_FREE_ONE_MEMORY_MULTIPLE_LINK_RIGHTS_ISOLATION_PASS',
        JSON.stringify({oneMemory:true,separateGuestReactions:true,separateMedia:true,
         selectiveRevoke:true,presenterUnchanged:true}));
 
 
-     const alienReaction=await guest.request.post(issued.link+'/heart',{
+     const alienReaction=await guestRequest.post(issued.link+'/heart',{
        headers:{origin:'https://attacker.invalid','content-type':'application/json'},
        data:{guestId:'00000000-0000-4000-8000-000000000000'}});
      assert.equal(alienReaction.status(),403);
@@ -2744,7 +2765,7 @@ try{
      console.log('TALERA_FREE_GUEST_NAMED_REACTION_AND_ORIGIN_PROTECTION_PASS',
        JSON.stringify({accountRequired:false,guestLike:true,
          guestFirstName:true,foreignOriginDenied:true,realIphoneAccepted:false}));
-     const imageResponse=await guest.request.get(issued.link+'/photo');
+     const imageResponse=await guestRequest.get(issued.link+'/photo');
      assert.equal(imageResponse.status(),200,'Temporary shared photo must load');
      assert.match(imageResponse.headers()['content-type']||'',/image\/jpeg/i);
      assert.ok((await imageResponse.body()).length>100,
@@ -2762,25 +2783,25 @@ try{
      },issued.id);
      assert.equal(syntheticVideo.status,200,'Consented video test is stored under the existing share token');
      const videoPath=issued.link+'/video';
-     const probe=await guest.request.get(videoPath,{headers:{range:'bytes=0-1'}});
+     const probe=await guestRequest.get(videoPath,{headers:{range:'bytes=0-1'}});
      assert.equal(probe.status(),206,'iPhone must get two-byte video probe');
      assert.equal(probe.headers()['content-range'],'bytes 0-1/1024');
      assert.equal(probe.headers()['accept-ranges'],'bytes');
      assert.deepEqual([...await probe.body()],[0,1]);
-     const seek=await guest.request.get(videoPath,{headers:{range:'bytes=128-159'}});
+     const seek=await guestRequest.get(videoPath,{headers:{range:'bytes=128-159'}});
      assert.equal(seek.status(),206);
      assert.equal((await seek.body()).length,32);
-     const suffix=await guest.request.get(videoPath,{headers:{range:'bytes=-16'}});
+     const suffix=await guestRequest.get(videoPath,{headers:{range:'bytes=-16'}});
      assert.equal(suffix.status(),206);
      assert.equal(suffix.headers()['content-range'],'bytes 1008-1023/1024');
-     const pastEnd=await guest.request.get(videoPath,{headers:{range:'bytes=1000-999999'}});
+     const pastEnd=await guestRequest.get(videoPath,{headers:{range:'bytes=1000-999999'}});
      assert.equal(pastEnd.status(),206,'iPhone range extending beyond the end must be clipped');
      assert.equal(pastEnd.headers()['content-range'],'bytes 1000-1023/1024');
      assert.equal((await pastEnd.body()).length,24);
-     const bad=await guest.request.get(videoPath,{headers:{range:'bytes=1024-1030'}});
+     const bad=await guestRequest.get(videoPath,{headers:{range:'bytes=1024-1030'}});
      assert.equal(bad.status(),416,'Out-of-bounds ranges must not reveal media');
      assert.equal(bad.headers()['content-range'],'bytes */1024');
-     const headVideo=await guest.request.fetch(videoPath,{method:'HEAD'});
+     const headVideo=await guestRequest.fetch(videoPath,{method:'HEAD'});
      assert.equal(headVideo.status(),200);
      assert.equal(headVideo.headers()['content-length'],'1024');
      assert.equal((await headVideo.body()).length,0);
@@ -2816,13 +2837,13 @@ try{
        return {status:r.status,data:await r.json()};
      },issued.id);
      assert.equal(revoke.status,200,'Synthetic owner must revoke own share');
-     assert.equal((await guest.request.get(issued.link,{headers:{accept:'text/html'}})).status(),404);
-     assert.equal((await guest.request.get(issued.link+'/photo')).status(),404);
-     assert.equal((await guest.request.get(origin+
+     assert.equal((await guestRequest.get(issued.link,{headers:{accept:'text/html'}})).status(),404);
+     assert.equal((await guestRequest.get(issued.link+'/photo')).status(),404);
+     assert.equal((await guestRequest.get(origin+
        '/__social/memory/'+sharedStoryId+'/view',{
         headers:{'x-qa-share-token':rawShareToken}})).status(),403,
        'Legacy capability access is denied immediately after revocation');
-     assert.equal((await guest.request.get(videoPath,{headers:{range:'bytes=0-1'}})).status(),404,
+     assert.equal((await guestRequest.get(videoPath,{headers:{range:'bytes=0-1'}})).status(),404,
        'Revoked guest media must not be streamable anymore');
      // Photo-only Free memories are legitimate. Verify NO public access before
      // the consented photo arrives; after upload verify the same one-memory
@@ -3011,7 +3032,7 @@ try{
        assert.equal(untitledRow.text,'');
        assert.deepEqual(untitledRow.items.map(x=>x.kind),['photo']);
        console.log('TALERA_NATIVE_UNTITLED_PHOTO_NO_FAKE_HEADING_PASS');
-       assert.equal((await guest.request.get(issuedUntitled.link+'/photo')).status(),200);
+       assert.equal((await guestRequest.get(issuedUntitled.link+'/photo')).status(),200);
        const stopped=await sharePage.evaluate(async token=>{
          const response=await fetch('/api/shares/'+token+'/revoke',
            {method:'POST',credentials:'same-origin'});
@@ -3203,7 +3224,7 @@ try{
          'Original album, voice and video file bytes must be identical');
        assert.equal(copy.thumbSha,completeFixture.thumbSha,
          'The existing video thumbnail must arrive byte-identical at the guest');
-       assert.equal((await guest.request.get(invitation.link+'/poster/3')).status(),200);
+       assert.equal((await guestRequest.get(invitation.link+'/poster/3')).status(),200);
        const simplified=copy.cues.map(c=>({
          t:c.t,index:c.index,mediaIndex:copy.kinds.findIndex((kind,i)=>
            c.mediaId===('local-'+invitation.id.slice(0,32)+':'+i)),
@@ -3218,7 +3239,7 @@ try{
        // The original source video is larger than the old 1.8MB limit;
        // three SHA-256-verified chunks must remain accessible only via the
        // ONE finished guest capability, without an alternate media Worker.
-       assert.equal((await guest.request.get(invitation.link+'/media/3/2')).status(),200);
+       assert.equal((await guestRequest.get(invitation.link+'/media/3/2')).status(),200);
        assert.equal(copy.presentation,true);
        assert.equal(copy.storyLift,true);
        // Synthetic video fallback, not a new test app or presentation:
@@ -3277,9 +3298,9 @@ try{
          (await fetch('/api/shares/'+token+'/revoke',
            {method:'POST',credentials:'same-origin'})).status,invitation.id);
        assert.equal(revoked,200);
-       assert.equal((await guest.request.get(invitation.link)).status(),404);
-       assert.equal((await guest.request.get(invitation.link+'/media/0/0')).status(),404);
-       assert.equal((await guest.request.get(invitation.link+'/poster/3')).status(),404);
+       assert.equal((await guestRequest.get(invitation.link)).status(),404);
+       assert.equal((await guestRequest.get(invitation.link+'/media/0/0')).status(),404);
+       assert.equal((await guestRequest.get(invitation.link+'/poster/3')).status(),404);
        console.log('TALERA_GUEST_COMPLETE_ORIGINAL_MULTIMEDIA_NARRATION_PASS',
          JSON.stringify({mediaCount:4,photographs:2,voice:true,video:true,
            originalBytesIdentical:true,allCuesExact:true,sameOriginalPresenter:true,
@@ -3382,7 +3403,7 @@ try{
        assert.ok(outcome.entryCover&&outcome.originalPresenter,
          'A video-only WhatsApp guest must start with the stored first thumbnail');
        for(let i=0;i<6;i++){
-         const response=await guest.request.get(invite.link+'/poster/'+i);
+         const response=await guestRequest.get(invite.link+'/poster/'+i);
          assert.equal(response.status(),200,'Video poster '+i+' must be accessible');
          assert.equal(response.headers()['cache-control'],'private, no-store');
        }
@@ -3390,7 +3411,7 @@ try{
          (await fetch('/api/shares/'+token+'/revoke',
            {method:'POST',credentials:'same-origin'})).status,invite.id)),200);
        for(let i=0;i<6;i++)assert.equal(
-         (await guest.request.get(invite.link+'/poster/'+i)).status(),404,
+         (await guestRequest.get(invite.link+'/poster/'+i)).status(),404,
          'Revoked share must deny video thumbnail '+i);
        console.log('TALERA_GUEST_SIX_EXISTING_VIDEO_THUMBNAILS_SECURE_HANDOFF_PASS',
          JSON.stringify({videos:6,posters:6,iphoneSixthMimeNormalized:true,originalBytesEqual:true,orderUnchanged:true,

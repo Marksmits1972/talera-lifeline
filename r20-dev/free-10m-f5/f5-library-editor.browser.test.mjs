@@ -33,7 +33,9 @@ assert.ok(edited.includes("async function writeFiles(entries){if(!taleraDraftCat
 assert.ok(edited.includes("async function deleteFiles(ids){if(!taleraDraftCatalogReadable)")&&edited.includes("return mem.draftDeleteKeys(ids.map("));
 assert.ok(!edited.includes("async function writeFiles(entries){const db=await dbOpen()"));
 assert.ok(edited.includes("draftReadPayload:readDraftPayload,"));
-assert.ok(edited.includes("const {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);"));
+assert.ok(edited.includes("let {catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX);"));
+assert.ok(edited.includes("if(completed.size)({catalog,originals,previews}=await mem.draftReadPayload(MANIFEST,PREFIX));"),
+ 'After verified cleanup the editor must reread the current manifest from the same library');
 assert.ok(!edited.includes("async function readDraft(){const db=await dbOpen()"));
 assert.ok(edited.includes("const cached=await mem.blob(PREFIX+'duplicate-index-v7');"));
 assert.ok(!edited.includes("const req=db.transaction('files','readonly').objectStore('files').get(PREFIX+'duplicate-index-v7')"));

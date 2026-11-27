@@ -195,7 +195,7 @@ export function publishedDraftPairs(draft,story){
  if(!draft||!story||story.id!==draft.existing||story.source!=='pwa-local'||
     Object.keys(draft).some(k=>!allowed.has(k))||
     typeof draft.title!=='string'||typeof draft.text!=='string'||typeof draft.date!=='string'||
-    draft.title!==story.title||draft.text!==story.text||draft.date!==story.date||
+    draft.title.trim()!==story.title||draft.text.trim()!==story.text||draft.date!==story.date||
     !Array.isArray(draft.tags)||!Array.isArray(draft.media)||!Array.isArray(story.items)||
     !same(draft.tags,story.tags??[])||!same(draft.manualLocation??null,story.manualLocation??null)||!draft.canonicalByDraft||
     typeof draft.canonicalByDraft!=='object'||Array.isArray(draft.canonicalByDraft)||
@@ -266,7 +266,7 @@ export async function verifyPublishedDraftBytes(pairs,read){
 // non-Blob row unchanged, so no new codec/database/schema is introduced.
 // Lock files AND stories together while reading, but never write stories.
 // All actual writes occur inside the same IDB callback/transaction.
-export function discardPristineDraftAtomically(db,expected,readLogical){
+export function discardPristineDraftAtomically(db,expected,readLogical,verifiedStory){
  return new Promise((resolve,reject)=>{
   const tx=db.transaction(['stories','files'],'readwrite');
   const files=tx.objectStore('files'),stories=tx.objectStore('stories');
@@ -283,6 +283,18 @@ export function discardPristineDraftAtomically(db,expected,readLogical){
     const original=allStories.find(row=>row?.id===expected.existing&&row.source==='pwa-local');
     // Do not leave an editor for a missing or structurally invalid memory.
     if(!original||!Array.isArray(original.items))return;
+    // Immediate placement: the exact receipt was written together with the
+    // story and the editor read its originals and final narration back.
+    // Verify both records under the same existing transaction lock before
+    // retiring the draft. Never use this shortcut for historical concepts.
+    if(verifiedStory!==undefined){
+     if(!verifiedStory||!same(original,verifiedStory))return;
+     const ids=[...expected.media,...(expected.voice?[expected.voice]:[])];
+     if(ids.length!==original.items.length||new Set(ids).size!==ids.length||
+        Object.keys(expected.canonicalByDraft||{}).length!==ids.length||
+        ids.some((id,i)=>expected.canonicalByDraft[id]!==original.items[i]?.key||
+          (i<expected.media.length?!['photo','video'].includes(original.items[i]?.kind):original.items[i]?.kind!=='audio')))return;
+    }
     const claimed=new Set();
     for(const row of allStories){
      if(!row||!Array.isArray(row.items))return;
@@ -345,7 +357,7 @@ export function patchLibraryAtomicCleanup(html,serialized=buildEditReturnBrowser
  const api='draftReadPayload:readDraftPayload,';
  if(source.split(anchor).length!==2||source.split(api).length!==2||!source.includes('async function readDraftPayload(manifestKey,prefix)')||source.includes('draftDiscardPristineEdit:'))throw Error('EDIT_RETURN_LIBRARY_ANCHOR_DRIFT');
  const cleanupSource=serialized.cleanup;
- const next=source.replace(anchor,()=>cleanupSource+anchor).replace(api,()=>api+'draftDiscardPristineEdit:discardFreshEditConcept,draftDiscardCompletedEdit:discardCompletedEditConcept,');
+ const next=source.replace(anchor,()=>cleanupSource+anchor).replace(api,()=>api+'draftDiscardPristineEdit:discardFreshEditConcept,draftDiscardCompletedEdit:discardCompletedEditConcept,draftDiscardSavedEdit:discardSavedEditConcept,');
  return html.slice(0,block.index)+block[0].replace(source,()=>next)+html.slice(block.index+block[0].length);
 }
 
@@ -393,7 +405,7 @@ function browserReturnCore(editor){
 // Worker; all browser declarations then arrive as immutable strings, so a
 // bundler's variable renaming cannot break lexical dependencies.
 export function buildEditReturnBrowserSources(){
- const cleanup=`async function discardFreshEditConcept(expected){return discardEditConcept(expected,false);}\nasync function discardCompletedEditConcept(expected){return discardEditConcept(expected,true);}\nasync function discardEditConcept(expected,verify){const db=await open();return (function(){const EDIT_RETURN_ID=${EDIT_RETURN_ID},DRAFT_ID=${DRAFT_ID},PREFIX=${JSON.stringify(PREFIX)},MANIFEST=${JSON.stringify(MANIFEST)};const same=${same.toString()};${pristineDraftRemovalPlan.toString()}\n${publishedDraftPairs.toString()}\n${verifyPublishedDraftBytes.toString()}\n${discardPristineDraftAtomically.toString()}\nreturn discardPristineDraftAtomically(db,expected,verify?taleraPayload.read:null);})();}\n`;
+ const cleanup=`async function discardFreshEditConcept(expected){return discardEditConcept(expected,false);}\nasync function discardCompletedEditConcept(expected){return discardEditConcept(expected,true);}\nasync function discardSavedEditConcept(expected,verifiedStory){if(!verifiedStory)return false;return discardEditConcept(expected,false,verifiedStory);}\nasync function discardEditConcept(expected,verify,verifiedStory){const db=await open();return (function(){const EDIT_RETURN_ID=${EDIT_RETURN_ID},DRAFT_ID=${DRAFT_ID},PREFIX=${JSON.stringify(PREFIX)},MANIFEST=${JSON.stringify(MANIFEST)};const same=${same.toString()};${pristineDraftRemovalPlan.toString()}\n${publishedDraftPairs.toString()}\n${verifyPublishedDraftBytes.toString()}\n${discardPristineDraftAtomically.toString()}\nreturn discardPristineDraftAtomically(db,expected,verify?taleraPayload.read:null,verifiedStory);})();}\n`;
  return Object.freeze({capture:captureReturnContext.toString(),cleanup,editor:browserReturnCore(true),presentation:browserReturnCore(false),editorLibrary:buildEditorLibraryBrowserSources()});
 }
 

@@ -429,3 +429,68 @@ test('completed draft cleanup runs actual byte checks inside one transaction and
   assert.equal(lib.stories.get(id),completedStory);
  }
 });
+
+test('successful placement retires only its receipt and unshared draft files, using the exact final verified story',async()=>{
+ const other={id:'draft-survivor-123456',existing:id2,media:[draft.media[1]],voice:''};
+ const lib=transactionLibrary({catalog:[completedDraft,other],published:[completedStory]});
+ const originalFiles=[...lib.files].filter(([key])=>!key.startsWith('talera-v4-work:'));
+ assert.equal(await discardPristineDraftAtomically(lib.db,completedDraft,null,completedStory),true);
+ assert.deepEqual(lib.files.get(lib.manifest).blob,[other]);
+ assert.equal(lib.files.has('talera-v4-work:'+draft.media[0]),false);
+ assert.equal(lib.files.has('talera-v4-work:'+draft.media[1]),true);
+ assert.deepEqual([...lib.files].filter(([key])=>!key.startsWith('talera-v4-work:')),originalFiles);
+ assert.deepEqual(lib.originals,[completedStory]);
+});
+test('immediate retirement refuses altered receipt, newer story, mismatched original ordering and rolls back on deletion failure',async()=>{
+ for(const [catalog,published] of [
+  [[{...completedDraft,text:'new unsaved text'}],[completedStory]],
+  [[completedDraft],[{...completedStory,title:'edited after placement'}]],
+  [[completedDraft],[{...completedStory,items:[...completedStory.items].reverse()}]]
+ ]){
+  const lib=transactionLibrary({catalog,published}),before=structuredClone([...lib.files]);
+  assert.equal(await discardPristineDraftAtomically(lib.db,completedDraft,null,completedStory),false);
+  assert.deepEqual([...lib.files],before);assert.deepEqual(lib.writes,[]);
+ }
+ const shuffled={...completedStory,items:[...completedStory.items].reverse()};
+ const mismatch=transactionLibrary({catalog:[completedDraft],published:[shuffled]});
+ assert.equal(await discardPristineDraftAtomically(mismatch.db,completedDraft,null,shuffled),false);
+ const abort=transactionLibrary({catalog:[completedDraft],published:[completedStory],failDelete:true}),before=structuredClone([...abort.files]);
+ await assert.rejects(discardPristineDraftAtomically(abort.db,completedDraft,null,completedStory),/simulated delete failure/);
+ assert.deepEqual([...abort.files],before);
+});
+test('historical receipt accepts only the original save normalization of title and text, never discarded substantive text',()=>{
+ assert.equal(publishedDraftPairs({...completedDraft,title:' '+completedDraft.title+' ',text:'\n'+completedDraft.text+'\n'},completedStory)?.length,3);
+ assert.equal(publishedDraftPairs({...completedDraft,text:completedDraft.text+' something new'},completedStory),null);
+});
+
+test('actual patched editor retires a successful receipt, without a whole-manifest save or separate delete',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const {scopeLocalMemories}=await import('./f5-local-scope.mjs');
+ const {alignEditedNarrationCueRefs}=await import('./f5-edit-cue-rebind.mjs');
+ const {preserveOriginalMediaIdsOnEdit}=await import('./f5-library-editor-stable-save.mjs');
+ const raw=readFileSync(new URL('../free-10m-delivery/generated/reference-tell.html',import.meta.url),'utf8');
+ const html=preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scopeLocalMemories(raw,scope))));
+ const start=html.indexOf('// The story and its linked receipt have already committed.');
+ const end=html.indexOf("location.assign('/mijn-leven?published='",start);
+ assert.ok(start>0&&end>start);
+ const cleanup=html.slice(start,end);
+ assert.doesNotMatch(cleanup,/\b(?:saveDraft|deleteFiles)\(/);
+ const run=new Function('g','groups','editorDraft','verifiedStory','persistedMatchesPlacement','mem','assets','previewBlobs','snapshot','revoke','console',
+  'return (async()=>{let queue=Promise.resolve(),savingOriginals=Promise.resolve(),taleraRetirement=null;'+cleanup+';return {groups,assets,previewBlobs}})()');
+ const receipt={existing:completedDraft.existing,canonicalByDraft:completedDraft.canonicalByDraft};
+ const initial={...completedDraft,existing:'',canonicalByDraft:null};
+ const other={id:'other-concept',media:[completedDraft.media[1]],voice:''};
+ for(const mode of ['success','conflict','abort','changed']){
+  const g={...completedDraft,taleraSavedReceipt:receipt},assets=new Map(completedDraft.media.map(id=>[id,'asset'])),previews=new Map(assets),revoked=[];
+  let calls=0;
+  const result=await run(g,[g,other],initial,completedStory,true,{draftDiscardSavedEdit:async(d,s)=>{
+   calls++;assert.deepEqual(d,completedDraft);assert.deepEqual(s,completedStory);
+   if(mode==='abort')throw Error('test abort');return mode==='success';
+  }},assets,previews,()=>[mode==='changed'?{...completedDraft,title:'new edit'}:completedDraft,other],id=>revoked.push(id),{warn(){}});
+  assert.equal(calls,mode==='changed'?0:1);
+  assert.deepEqual(result.groups,mode==='success'?[other]:[g,other]);
+  assert.equal(assets.has(draft.media[0]),mode!=='success');assert.equal(assets.has(draft.media[1]),true);
+  assert.equal(previews.has(draft.media[0]),mode!=='success');
+  assert.equal(revoked.includes(draft.media[0]),mode==='success');
+ }
+});

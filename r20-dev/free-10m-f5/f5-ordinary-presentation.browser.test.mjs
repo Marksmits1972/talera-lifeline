@@ -1506,6 +1506,11 @@ async function testTimelineLoupe(){
     await geoPage.locator('#talera-memory-city').fill('Parijs');
     await geoPage.locator('.talera-location-apply').click();
     assert.equal(await geoPage.locator('.talera-location-check input').count(),1);
+    const placedDraftId=await geoPage.evaluate(async()=>{
+     const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+     return d.catalog.find(g=>g.media.length===6)?.id;
+    });
+    assert.ok(placedDraftId,'Existing six-photo editor must have a real persisted concept');
     await geoPage.locator('#publish').click();
     await geoPage.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.has('published'),{timeout:25000});
     const sixId=new URL(geoPage.url()).searchParams.get('published');
@@ -1519,6 +1524,17 @@ async function testTimelineLoupe(){
     assert.equal(sent.length,3,'Local metadata and confirmed missing data must not consume provider requests');
     assert.equal(await geoPage.evaluate(()=>window.__taleraDeviceCalls),0,'No current position may be requested during import');
     console.log('TALERA_SIX_PHOTO_LOCATION_SELECTED_BULK_AND_ORIGINAL_BYTES_PASS');
+    // Open Bewaar een nieuw moment again on the same account. The exact
+    // completed concept is absent, and the published story is still present.
+    await geoPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await geoPage.waitForFunction(()=>!!window.TaleraMemories?.draftReadPayload);
+    const remaining=await geoPage.evaluate(async ({placedDraftId,sixId})=>{
+     const mem=window.TaleraMemories;
+     const d=await mem.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
+     return {pending:d.catalog.some(g=>g.id===placedDraftId||g.existing===sixId),story:!!await mem.get(sixId)};
+    },{placedDraftId,sixId});
+    assert.deepEqual(remaining,{pending:false,story:true});
+    console.log('TALERA_PLACED_DRAFT_NO_LONGER_IN_NEW_MOMENT_OVERVIEW_PASS');
     // Reopen the exact same saved originals. The one unknown photo can be
     // assigned the current location only after a distinct, informed action.
     await geoPage.goto(origin+'/tell?edit='+encodeURIComponent(sixId),{waitUntil:'domcontentloaded'});

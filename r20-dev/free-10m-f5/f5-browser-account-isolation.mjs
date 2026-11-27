@@ -2291,8 +2291,18 @@ try{
        received=await openGuest(issued.link);
        assert.equal(received.status(),200);
        assert.equal((await previewProbe.request.get(issued.link)).status(),403);
+       // The APIRequestContext uses plain HTTP loopback and may omit Secure
+       // cookies. Exercise the exact issued cookie explicitly, without ever
+       // relaxing the production cookie attributes or claim authorization.
+       const issuedCookie=pre.headers()['set-cookie']||'';
+       assert.match(issuedCookie,/^__Host-talera_g_[a-f0-9]{24}=[a-f0-9]{64}; Secure; HttpOnly; SameSite=Lax; Path=\//);
+       const crawlerCookie=issuedCookie.split(';')[0];
        assert.equal((await previewProbe.request.post(issued.link+'/claim',{
-         headers:{origin,'content-type':'application/json'},data:'{}'})).status(),409);
+         headers:{origin,'content-type':'application/json',cookie:''},data:'{}'})).status(),403);
+       assert.equal((await previewProbe.request.post(issued.link+'/claim',{
+         headers:{origin,'content-type':'application/json',cookie:crawlerCookie},data:'{}'})).status(),409);
+       assert.equal((await previewProbe.request.get(issued.link+'/photo',{
+         headers:{cookie:crawlerCookie}})).status(),404);
        for(const suffix of ['/photo','/photo-full','/media/0/0','/poster/0','/audio','/video','/feedback'])
          assert.equal((await previewProbe.request.get(issued.link+suffix)).status(),404);
        assert.equal((await previewProbe.request.post(issued.link+'/heart',{
@@ -2696,8 +2706,13 @@ try{
        return r.status;
      },siblingInvite.data.id);
      assert.equal(siblingFinal,200);
-     assert.equal((await guest.request.get(siblingUrl)).status(),200);
-     assert.equal((await guest.request.post(siblingUrl+'/claim',{headers:{origin,'content-type':'application/json'},data:'{}'})).status(),200);
+     const siblingClaim=await guest.evaluate(async url=>{
+       const opening=await fetch(url,{credentials:'same-origin'});
+       const claimed=await fetch(url+'/claim',{method:'POST',credentials:'same-origin',
+         headers:{'content-type':'application/json'},body:'{}'});
+       return {opening:opening.status,claim:claimed.status};
+     },siblingUrl);
+     assert.deepEqual(siblingClaim,{opening:200,claim:200});
      const siblingFeedbackRes=await guest.request.get(siblingUrl+'/feedback');
      assert.equal(siblingFeedbackRes.status(),200);
      const siblingFeedback=await siblingFeedbackRes.json();

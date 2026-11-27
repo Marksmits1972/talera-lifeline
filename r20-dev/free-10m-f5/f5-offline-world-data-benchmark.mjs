@@ -58,12 +58,14 @@ for(const [label,cc,latitude,longitude] of cases){
   const gps={latitude,longitude};
   console.log('TALERA_WORLD_PUBLIC_COORDINATE',JSON.stringify({label,cc,old:original(gps,cc),expanded:lookup(gps,cc)}));
 }
-let oldKnown=0,newKnown=0,added=0,lost=0,changed=0,exact=0;const times=[],oldTimes=[];
+let oldKnown=0,newKnown=0,added=0,lost=0,changed=0,exact=0,combinedKnown=0,combinedLost=0,combinedChanged=0;const times=[],oldTimes=[];
 for(const {cc,lat,lon,label} of sampled){
   const gps={latitude:lat,longitude:lon};
   let t=performance.now();const a=original(gps,cc);oldTimes.push(performance.now()-t);
   t=performance.now();const b=lookup(gps,cc);times.push(performance.now()-t);
-  if(a)oldKnown++;if(b)newKnown++;if(!a&&b)added++;if(a&&!b)lost++;if(a&&b&&a!==b)changed++;if(b===label)exact++;
+  if(a)oldKnown++;if(b)newKnown++;if(!a&&b)added++;if(a&&!b)lost++;if(a&&b&&a!==b)changed++;if(b===label)exact++;const combined=a||b;if(combined)combinedKnown++;if(a&&!combined)combinedLost++;if(a&&combined!==a)combinedChanged++;
 }
+assert.equal(combinedLost,0);assert.equal(combinedChanged,0);assert.equal(combinedKnown,oldKnown+added);
+console.log('TALERA_WORLD_BASELINE_FIRST',JSON.stringify({samples:sampled.length,oldKnown,combinedKnown,added,combinedLost,combinedChanged}));
 const quantile=(rows,p)=>rows.slice().sort((a,b)=>a-b)[Math.floor((rows.length-1)*p)];
 console.log('TALERA_WORLD_INDEX_BENCHMARK',JSON.stringify({node:process.version,sample:'deterministically sampled real place centre records; not a general photo accuracy test',samples:sampled.length,oldKnown,newKnown,added,lost,changed,exact,oldP95Ms:quantile(oldTimes,.95),newP50Ms:quantile(times,.5),newP95Ms:quantile(times,.95),newP99Ms:quantile(times,.99),newMaxMs:Math.max(...times),maxPartOpenMs,rssBytes:process.memoryUsage().rss,externalBytes:process.memoryUsage().external,physicalIphoneAccepted:false}));

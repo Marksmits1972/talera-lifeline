@@ -19,9 +19,54 @@ permissions:
   actions: read
 
 jobs:
+  f5_prepare_global_geonames_data:
+    name: Measure and prepare full GeoNames public offline data for SAME TALERA Free, no deploy
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'prepare-TALERA-free-global-geonames-data-20261127' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download official public world extract, no keys, preserve existing source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = bf19f7f189c250e1f356f5b0a2e36e04ebcf3749
+          test "$(sha256sum r20-dev/free-10m-f5/f5-offline-locality-data.bin | cut -d' ' -f1)" = 5f5e7a13226670435ce8ef028bc97f50542047b5e7bac0b7b3591aef24b737ae
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 2 --max-time 600 --max-filesize 1000000000 https://download.geonames.org/export/dump/allCountries.zip -o "$RUNNER_TEMP/geonames-allCountries.zip"
+          echo "TALERA_WORLD_ARCHIVE_BYTES=$(stat -c %s "$RUNNER_TEMP/geonames-allCountries.zip")"
+          sha256sum "$RUNNER_TEMP/geonames-allCountries.zip"
+      - name: Build immutable compact parts and independent travel-feature selection from real full dataset
+        run: |
+          set -euo pipefail
+          src=r20-dev/free-10m-f5
+          mkdir -p "$RUNNER_TEMP/talera-world"
+          python3 "$src/f5-offline-world-data-build.py" "$RUNNER_TEMP/geonames-allCountries.zip" "$RUNNER_TEMP/talera-world"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/talera-world/source.sha"
+      - name: Verify every coordinate and checksum, compare actual published resolver, measure real index lookup
+        run: |
+          set -euo pipefail
+          src=r20-dev/free-10m-f5
+          node "$src/f5-offline-world-data-benchmark.mjs" "$RUNNER_TEMP/talera-world" "$src/f5-offline-locality-data.bin" | tee "$RUNNER_TEMP/talera-world/benchmark.log"
+      - name: Retain exact public data package for existing TALERA candidate ONLY
+        uses: actions/upload-artifact@v4
+        with:
+          name: talera-free-world-geonames-public-data
+          path: ${{ runner.temp }}/talera-world/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
+
   f5_candidate_package:
     name: Build and archive the exact TALERA Free candidate once
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -77,7 +122,7 @@ jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -126,7 +171,7 @@ jobs:
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
     needs: f5_candidate_package
-    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127') }}
+    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     steps:
@@ -1812,7 +1857,7 @@ jobs:
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -1976,7 +2021,7 @@ jobs:
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-offline-places-credits-exact-green-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:

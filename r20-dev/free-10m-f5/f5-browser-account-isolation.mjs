@@ -1065,7 +1065,11 @@ try{
   await locationEdit.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
   assert.equal(await locationEdit.evaluate(()=>document.querySelector('.talera-memory-location').previousElementSibling?.classList.contains('talera-tags-v20')),true);
   await locationEdit.locator('.talera-location-toggle').click();
-  await locationEdit.locator('.talera-location-check input').waitFor({state:'visible',timeout:20000});
+  const unresolved=locationEdit.locator('.talera-location-tile[data-location-state="unknown"]');
+  await unresolved.waitFor({state:'visible',timeout:20000});
+  assert.equal(await locationEdit.locator('.talera-location-tile').count(),1);
+  assert.equal(await locationEdit.locator('.talera-memory-location img,.talera-memory-location input[type=checkbox]').count(),0);
+  await unresolved.locator('.talera-location-edit').click();
   assert.equal(await locationEdit.locator('#talera-memory-city').inputValue(),'');
   assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Kies een land');
   for(const lang of ['nl','en','de','fr','es']){
@@ -1074,6 +1078,7 @@ try{
    assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),languageCatalog[lang]['core.editor.location.countryPlaceholder']);
   }
   await locationEdit.evaluate(()=>window.TaleraI18n.setLanguage('nl'));
+  assert.equal(await locationEdit.locator('.talera-location-tile-label').innerText(),'Locatie onbekend');
   await locationEdit.context().setOffline(true);
   try{
    await locationEdit.locator('#talera-memory-country').click();

@@ -1442,6 +1442,7 @@ async function testTimelineLoupe(){
     await geoPage.waitForFunction(()=>!!window.TaleraMemories?.get);
     const previewSaved=await geoPage.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {place:row.items[0].capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer())]}},draftPublished);
     assert.equal(previewSaved.place.city,city);assert.deepEqual(previewSaved.bytes,fixtureBytes);
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
     await geoPage.waitForTimeout(1500);assert.equal(sent.length,3,'Completed draft result must not be requested again after publication');
     await geoPage.evaluate(id=>window.TaleraMemories.remove(id),draftPublished);
     console.log('TALERA_GEONAMES_DRAFT_BEFORE_PUBLISH_NO_DUPLICATE_REQUEST_PASS');

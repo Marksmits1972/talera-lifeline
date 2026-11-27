@@ -106,8 +106,9 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  const button=(cls,parent)=>{const x=node('button',cls,parent);x.type='button';return x};
  const toggle=button('talera-location-toggle',box);
  const pin=node('span','talera-location-pin',toggle);pin.setAttribute('aria-hidden','true');pin.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>';
- const title=node('span','talera-location-title',toggle),chevron=node('span','talera-location-chevron',toggle);chevron.setAttribute('aria-hidden','true');
- const summary=node('p','talera-location-summary',box);summary.setAttribute('aria-live','polite');
+ const copy=node('span','talera-location-copy',toggle),title=node('span','talera-location-title',copy);
+ const summary=node('span','talera-location-summary',copy);summary.setAttribute('aria-live','polite');
+ const chevron=node('span','talera-location-chevron',toggle);chevron.setAttribute('aria-hidden','true');
  const panel=node('div','talera-location-panel',box);panel.id='talera-memory-location-fields';panel.hidden=true;toggle.setAttribute('aria-controls',panel.id);toggle.setAttribute('aria-expanded','false');
  const legacy=node('p','talera-location-status',panel);
  const recognizedHeading=node('h3','talera-location-label',panel),recognized=node('div','talera-location-grid',panel);

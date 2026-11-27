@@ -51,12 +51,12 @@ export function installMemoryLocationEditor(html){
    characteristics keeps its approved two visible rows and footer geometry.
    The optional location section reappears immediately when it is closed. */
 @media(max-height:760px){#app #main .work:has(.talera-work-tiles .tile:nth-child(4)):has(.talera-tags-toggle[aria-expanded="true"]) .talera-memory-location{display:none!important}}
-#app #main .work .talera-location-toggle{display:flex;align-items:center;width:100%;gap:9px;min-height:48px;background:transparent;border:0;padding:10px 12px;color:#224d7c;border-radius:15px;font:700 clamp(13px,3.85vw,15px)/1.32 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;text-align:left;cursor:pointer}
+#app #main .work .talera-location-toggle{display:flex;align-items:center;width:100%;gap:9px;min-height:48px;height:48px;box-sizing:border-box;background:transparent;border:0;padding:6px 12px;color:#224d7c;border-radius:15px;font:700 clamp(13px,3.85vw,15px)/1.32 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;text-align:left;cursor:pointer}
 .talera-location-pin{width:22px;height:22px;display:block;flex:none}.talera-location-pin svg{display:block;width:100%;height:100%}
-.talera-location-title{flex:1;min-width:0}
+.talera-location-copy{flex:1;min-width:0;display:grid;gap:1px}.talera-location-title{display:block;min-width:0}
 .talera-location-chevron{width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;box-sizing:border-box;transform:rotate(45deg);margin:0 2px 4px 0;flex:none}
 .talera-location-toggle[aria-expanded="true"] .talera-location-chevron{transform:rotate(225deg);margin:4px 2px 0 0}
-.talera-location-summary{margin:-3px 12px 9px 43px;color:#657a91;font:500 12px/1.4 system-ui}
+.talera-location-summary{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#657a91;font:500 11px/1.2 system-ui}
 .talera-location-panel{padding:0 12px 12px;display:grid;gap:7px;max-height:min(55dvh,490px);overflow-y:auto;overscroll-behavior:contain}
 .talera-location-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .talera-location-tile{background:white;border:1px solid #dbe4ef;border-radius:10px;min-width:0;padding:5px;display:grid;align-content:start;gap:4px}

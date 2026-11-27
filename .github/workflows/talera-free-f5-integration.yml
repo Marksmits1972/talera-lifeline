@@ -1057,7 +1057,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
-          test "$(git rev-parse HEAD^)" = 4a90102c2651f3ad396a5d64a642f2348c7ffa61
+          test "$(git rev-parse HEAD^)" = 84141d0f41094dc3274ae75c5b048381aefbb7e0
+          test "$(git rev-parse HEAD^^)" = 4a90102c2651f3ad396a5d64a642f2348c7ffa61
           test "$(git diff --name-only 4a90102c2651f3ad396a5d64a642f2348c7ffa61 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           git diff --exit-code 4a90102c2651f3ad396a5d64a642f2348c7ffa61 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
           node --input-type=module <<'NODE'
@@ -1324,7 +1325,18 @@ jobs:
             "  assert.equal((await ok(send,'discover')).invitation,null);",
             "  console.log('TALERA_REAL_LOCAL_WORKER_TRANSFER_RECOVERY_AND_RETAINED_DIAGNOSIS_PASS');"
           ].join('\n');
-          fs.writeFileSync('r20-dev/free-10m-f5/.f5-transfer-contract.generated.mjs',source.replace(marker,before+'\n'+marker+'\n'+after));
+          const header=source.slice(0,source.indexOf('const storyId=')).replace('health.data.closedQa===true','health.data.closedQa===false');
+          assert.ok(header.includes('health.data.closedQa===false')&&header.includes('function cookieOf'));
+          const setup=[
+            "async function run(){",
+            "  start();await ready();",
+            "  const identities=[];",
+            "  for(let i=0;i<users.length;i++){const r=await request('POST','/api/register',{body:users[i],ip:'192.0.2.'+(11+i)});assert.equal(r.status,200,'Synthetic registration '+i);identities.push({id:r.data.account.id,cookie:cookieOf(r)});}",
+            "  assert.equal(new Set(identities.map(x=>x.id)).size,3);",
+            "  const renewedLogin=await request('POST','/api/login',{body:{email:users[0].email,password:users[0].password}});assert.equal(renewedLogin.status,200);assert.equal(renewedLogin.data.account.id,identities[0].id);",
+            "  const renewedCookie=cookieOf(renewedLogin);assert.notEqual(renewedCookie,identities[0].cookie);"
+          ].join('\n');
+          fs.writeFileSync('r20-dev/free-10m-f5/.f5-transfer-contract.generated.mjs',header+'\n'+setup+'\n'+before+'\n'+marker+'\n'+after+'\n}\ntry{await run()}catch(e){console.error("LOCAL_RUNTIME_LOG",logs);throw e}finally{await stop()}\n');
           NODE
           env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID node "$testfile"
       - name: Prepare original Worker without unverified email binding or account migration

@@ -1389,7 +1389,7 @@ async function testTimelineLoupe(){
     await geoPage.locator('.talera-location-toggle').click();
     await geoPage.locator('.talera-location-tile-label').filter({hasText:country}).waitFor({state:'visible',timeout:10000});
     assert.equal(await geoPage.locator('.talera-location-tile[data-location-state="unknown"]').count(),0,'Offline resolved GPS must not be classified as unknown');
-    assert.equal(await geoPage.locator('.talera-location-tile-label').innerText(),country,'Country must appear even while the optional places download is held');
+    assert.equal((await geoPage.locator('.talera-location-tile-label').innerText()).trim(),country,'Country must appear even while the optional places download is held');
     releaseLocality();
     await geoPage.locator('.talera-location-tile-label').filter({hasText:expectedLabel}).waitFor({state:'visible',timeout:30000});
     assert.equal(localityRequests.length,1,'Only one places download for this document');

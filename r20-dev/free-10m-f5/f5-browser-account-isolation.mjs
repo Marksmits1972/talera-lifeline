@@ -431,6 +431,21 @@ try{
      assert.equal(await hub.locator('header strong').innerText(),pack['menu.header.title1']);
      assert.equal(await hub.locator('[data-view="mine"] strong').innerText(),pack['menu.hub.sent1']);
      assert.equal(await hub.locator('[data-view="help"] strong').innerText(),pack['menu.hub.Hulp_en_over_TALERA1']);
+     // Attribution is visible to a signed-out user in every language. For
+     // Dutch, prove it opens even when the existing app is disconnected.
+     if(lang==='nl')await registrationContext.setOffline(true);
+     try{
+       await hub.locator('[data-view="help"]').click();
+       const credit=hub.locator('#talera-geonames-attribution');
+       await credit.waitFor({state:'visible'});
+       assert.equal(await credit.locator('strong').innerText(),pack['menu.help.sourcesLicenses']);
+       assert.equal(await credit.locator('p').first().innerText(),pack['menu.help.geonamesCredit']);
+       const links=await credit.locator('a').evaluateAll(nodes=>nodes.map(a=>[a.getAttribute('href'),a.getAttribute('target'),a.getAttribute('rel')]));
+       assert.deepEqual(links,['https://www.geonames.org/','https://download.geonames.org/export/dump/cities500.zip','https://creativecommons.org/licenses/by/4.0/'].map(url=>[url,'_blank','noopener noreferrer']));
+       if(lang==='nl')assert.equal(await registrationPage.evaluate(()=>navigator.onLine),false);
+     }finally{if(lang==='nl')await registrationContext.setOffline(false)}
+     await hub.locator('[data-action="back"]').click();
+     assert.equal(await hub.locator('#talera-geonames-attribution').count(),0);
      await hub.locator('[data-view="account"]').click();
      await hub.locator('[data-view="login"]').click();
      assert.equal(await hub.locator('form[data-form="login"] button[type="submit"]').innerText(),pack['menu.login.signIn2']);
@@ -439,6 +454,7 @@ try{
    }
    await registrationPage.locator('#talera-v23-language').selectOption('nl');
    console.log('TALERA_FIVE_CONTEXTUAL_MENU_LANGUAGES_PASS');
+   console.log('TALERA_GEONAMES_CREDIT_FIVE_LANGUAGES_OFFLINE_NO_SIGNIN_PASS');
 
    const route=await registrationPage.goto(origin+'/present?talera_menu=hub',
      {waitUntil:'domcontentloaded'});

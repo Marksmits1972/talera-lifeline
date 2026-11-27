@@ -276,5 +276,11 @@ export function localizeApprovedMenu(source){
  patch('t("menu.password.showPassword1")','passwordAria(id,true)');
  patch('show?t("menu.password.hidePassword1"):t("menu.password.showPassword2")','passwordAria(input.id,!show)');
  patch('()=>{updateHomeNav();if(state.open)render();void updateUnreadBadge()}',`()=>{updateHomeNav();shell.querySelector(".panel")?.setAttribute("aria-label",t("menu.shell.title1"));shell.querySelector('[data-action="close"]')?.setAttribute("aria-label",t("menu.shell.close1"));if(state.open)render();void updateUnreadBadge()}`);
+ // Keep attribution in the existing Help view, independent of the protected
+ // future website. It is rendered locally; visiting a source link is optional.
+ patch(`'+esc(t("menu.help.discover1"))+'</a></div>';break;`,
+  `'+esc(t("menu.help.discover1"))+'</a></div>'+
+   '<div class="info" id="talera-geonames-attribution"><strong>'+esc(t("menu.help.sourcesLicenses"))+'</strong><p>'+esc(t("menu.help.geonamesCredit"))+'</p>'+
+   '<p><a href="https://www.geonames.org/" rel="noopener noreferrer" target="_blank">GeoNames</a> · <a href="https://download.geonames.org/export/dump/cities500.zip" rel="noopener noreferrer" target="_blank">cities500.zip</a> · <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener noreferrer" target="_blank">CC BY 4.0</a></p></div>';break;`);
  return result;
 }

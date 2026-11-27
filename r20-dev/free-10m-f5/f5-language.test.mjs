@@ -57,6 +57,8 @@ test('private backup markup uses separate contexts and preserves order, IDs and 
  const keys=[...html.matchAll(/data-talera-(?:text|aria-label)="([^"]+)"/g)].map(m=>m[1]);
  assert.equal(keys.length,new Set(keys).size);
  assert.ok(keys.length>=50);
+ assert.ok(keys.includes('transfer.flow.choose')&&keys.includes('transfer.flow.return')&&keys.includes('backup.page.back'));
+ for(const lang of langs)assert.equal(translate(lang,'transfer.flow.return'),translate(lang,'backup.page.back'));
  assert.ok(html.includes('<strong>TALERA-back-up.talera</strong>'));
  for(const id of ['restore-file','backup-step-check','backup-step-confirm','run-restore','transfer-approve','transfer-import']){
   assert.equal([...html.matchAll(new RegExp('id="'+id+'"','g'))].length,1);

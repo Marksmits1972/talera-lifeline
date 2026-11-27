@@ -60,7 +60,7 @@ details{margin-top:14px}summary{cursor:pointer;color:#23497e;font-weight:600}det
 <div id="transfer-verify" hidden><output id="transfer-verify-code" style="font-size:1.55rem;font-weight:700;letter-spacing:.1em;text-align:center"></output></div>
 <div class="transfer-actions"><button type="button" id="transfer-approve" hidden>${languageSpan('transfer.page.approve')}</button>
 <button type="button" id="transfer-import" hidden>${languageSpan('transfer.page.import')}</button>
-<a id="transfer-return" class="save" href="/mijn-leven" hidden>${languageSpan('backup.page.back')}</a>
+<a id="transfer-return" class="save" href="/mijn-leven" hidden>${languageSpan('transfer.flow.return')}</a>
 <button type="button" id="transfer-restart" hidden>${languageSpan('transfer.flow.restart')}</button>
 <button type="button" id="transfer-cancel" hidden>${languageSpan('transfer.page.stop')}</button></div>
 <details id="transfer-diagnosis"><summary>${languageSpan('transfer.page.diagnosticHeading')}</summary>

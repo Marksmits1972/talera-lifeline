@@ -835,7 +835,7 @@ async function legacyShareApi(request,env){
   if(!bytes.byteLength||bytes.byteLength>1800000)
    return deny(413,'Media te groot voor veilige tijdelijke deelopslag');
   const mime=(request.headers.get('content-type')||'').split(';')[0].toLowerCase();
-  try{await socialMemoryHome(env,storyId).saveShareMedia(actor.id,hash,upload[2],mime,bytes)}
+  try{await socialMemoryHome(env,storyId).saveShareMedia(actor.id,hash,upload[2],mime,bytes,upload[2]==='photo'&&request.headers.get('x-talera-preview-consent')==='1')}
   catch{return deny(400,'Dit type of formaat media kan niet veilig worden gedeeld')}
   return json({ok:true});
  }
@@ -905,29 +905,94 @@ function safeShareHtml(value){
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
  }[c]));
 }
+// Keep the same pointer namespace, story DO and origin. Do not use the
+// old public social view as a locator: protected shares deny token-only view.
+async function guestShareLookup(env,token){
+ const hash=await shaHex(token);
+ const base=env.SOCIAL_POINTER;
+ const ns=env.SOCIAL_STORAGE_JURISDICTION==='eu'?base?.jurisdiction('eu'):
+   env.SOCIAL_STORAGE_JURISDICTION==='local-test'?base:null;
+ if(!ns)throw Error('SOCIAL_JURISDICTION_NOT_EXPLICIT');
+ const storyId=await ns.get(ns.idFromName('talera-free-share-pointer-v1:'+hash)).locate(hash);
+ return storyId&&FREE_SHARE_ID.test(storyId)?{home:socialMemoryHome(env,storyId),hash,storyId}:null;
+}
+function guestCookieName(hash){return '__Host-talera_g_'+hash.slice(0,24)}
+function guestBrowserToken(request,hash){
+ const name=guestCookieName(hash),cookie=request.headers.get('cookie')||'';
+ const parts=cookie.split(';').map(p=>p.trim()).filter(p=>p.startsWith(name+'='));
+ return parts.length===1&&FREE_SHARE_TOKEN.test(parts[0].slice(name.length+1))?parts[0].slice(name.length+1):null;
+}
+async function guestBrowserHash(request,hash){
+ const value=guestBrowserToken(request,hash);
+ return value?shaHex('talera-guest-browser-v1:'+hash+':'+value):null;
+}
+function guestCookie(hash,value,expiresAt){
+ const age=Math.max(0,Math.min(2592000,Math.floor((expiresAt-Date.now())/1000)));
+ return guestCookieName(hash)+'='+value+'; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age='+age;
+}
+function guestPreviewMeta(request,basePath,hasPreview){
+ const u=new URL(request.url),lang=requestLanguage(request);
+ return '<meta property="og:type" content="article">'+
+  '<meta property="og:site_name" content="TALERA">'+
+  '<meta property="og:title" content="'+safeShareHtml(translate(lang,'guest.preview.title'))+'">'+
+  '<meta property="og:description" content="'+safeShareHtml(translate(lang,'guest.preview.description'))+'">'+
+  '<meta name="twitter:card" content="summary_large_image">'+
+  '<meta property="og:url" content="'+safeShareHtml(u.origin+basePath)+'">'+
+  '<meta property="og:image" content="'+safeShareHtml(u.origin+(hasPreview?basePath+'/preview':'/pwa-512.png'))+'">';
+}
+function guestClaimPage(request,hash,gate,basePath){
+ const lang=requestLanguage(request);
+ const title=safeShareHtml(translate(lang,'guest.preview.title'));
+ const message=safeShareHtml(translate(lang,gate.claimed?'guest.claim.used':gate.ready?'guest.claim.opening':'guest.claim.waiting'));
+ // A plain GET or HEAD, including WhatsApp link previews, does not claim.
+ // Only a visible executing browser submits the same-origin POST. A scanner
+ // that actually executes the full page can still be a first opener.
+ const script=gate.ready&&!gate.claimed?'<script>(function(){let busy=false;async function open(){if(busy||document.hidden||document.prerendering)return;busy=true;try{const r=await fetch(location.pathname+"/claim",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:"{}"});if(r.ok){location.reload();return}if(r.status===409){location.reload();return}}catch{}busy=false;document.getElementById("retry").hidden=false}document.addEventListener("visibilitychange",open);document.addEventListener("prerenderingchange",open);document.getElementById("retry").addEventListener("click",open);open()})();</script>':'';
+ const headers=new Headers({'content-type':'text/html; charset=utf-8','cache-control':'private, no-store',
+  'referrer-policy':'no-referrer','x-content-type-options':'nosniff','x-robots-tag':'noindex, nofollow',
+  'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"});
+ if(gate.ready&&!gate.claimed&&!guestBrowserToken(request,hash)){
+  const value=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
+  headers.set('set-cookie',guestCookie(hash,value,gate.expiresAt));
+ }
+ return new Response('<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'+guestPreviewMeta(request,basePath,gate.hasPreview)+'<title>'+title+'</title><style>body{font:17px system-ui;background:#f7f5f0;color:#071a3d;margin:0;min-height:100vh;display:grid;place-items:center;text-align:center}main{padding:24px;max-width:340px}button{font:inherit;padding:12px;border-radius:12px;border:1px solid #071a3d;background:#fff}</style></head><body><main><p>'+message+'</p><button id="retry" hidden>'+safeShareHtml(translate(lang,'guest.claim.retry'))+'</button></main>'+script+'</body></html>',{status:gate.claimed?403:gate.ready?200:409,headers});
+}
 async function publicWhatsAppMemory(request,env){
  const u=new URL(request.url);
- const legacy=/^\/__social\/shared\/([a-f0-9]{64})(?:\/(photo|photo-full|audio|video|poster\/\d{1,2}|media\/\d{1,2}\/\d{1,2}))?$/.exec(u.pathname);
- const short=/^\/s\/([A-Za-z0-9_-]{43})(?:\/(photo|photo-full|audio|video|poster\/\d{1,2}|media\/\d{1,2}\/\d{1,2}))?$/.exec(u.pathname);
+ const legacy=/^\/__social\/shared\/([a-f0-9]{64})(?:\/(claim|preview|photo|photo-full|audio|video|poster\/\d{1,2}|media\/\d{1,2}\/\d{1,2}))?$/.exec(u.pathname);
+ const short=/^\/s\/([A-Za-z0-9_-]{43})(?:\/(claim|preview|photo|photo-full|audio|video|poster\/\d{1,2}|media\/\d{1,2}\/\d{1,2}))?$/.exec(u.pathname);
  const decoded=short?expandWhatsAppToken(short[1]):null;
  const m=legacy||(decoded?[short[0],decoded,short[2]]:null);
- if(!m||!(request.method==='GET'||request.method==='HEAD'&&!!m[2]))
+ if(!m||!(request.method==='GET'||request.method==='HEAD'||request.method==='POST'&&m[2]==='claim'))
   return deny(404,'Link niet gevonden');
- // Only the random token grants access. Never expose the owner's private
- // library, account ID, other stories or originals via this public route.
- const target=new URL('/__social/shared/'+m[1],u);
- const lookup=await socialApi(new Request(target,{method:'GET',
-  headers:request.headers}),env);
- if(!lookup.ok)return deny(404,'Deze deellink is verlopen of ingetrokken');
- const data=await lookup.json();
- if(!data.ok||!FREE_SHARE_ID.test(data.storyId||''))
-  return deny(404,'Deze deellink is verlopen of ingetrokken');
- const home=socialMemoryHome(env,data.storyId);
- const hash=await shaHex(m[1]);
-
-
+ const located=await guestShareLookup(env,m[1]);
+ if(!located)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ const {home,hash}=located,sessionHash=await guestBrowserHash(request,hash);
+ const gate=await home.browserGate(hash,sessionHash,false);
+ if(!gate.active)return deny(404,'Deze deellink is verlopen of ingetrokken');
+ if(m[2]==='preview'){
+  if(!gate.protected||!gate.ready||!gate.hasPreview||!['GET','HEAD'].includes(request.method))return deny(404,'Niet gevonden');
+  const media=await home.browserPreview(hash);
+  if(!media)return deny(404,'Niet gevonden');
+  return new Response(request.method==='HEAD'?null:media.bytes,{headers:{
+   'content-type':media.mime,'content-length':String(media.bytes.byteLength),'cache-control':'private, no-store',
+   'referrer-policy':'no-referrer','x-content-type-options':'nosniff'}});
+ }
+ if(m[2]==='claim'){
+  if(!gate.protected||request.method!=='POST'||!sameOrigin(request)||
+     request.headers.get('content-type')!=='application/json'||!sessionHash)return deny(403,'Geen toegang');
+  if(Number(request.headers.get('content-length')||0)>16)return deny(413,'Aanvraag te groot');
+  if(await request.text()!=='{}')return deny(400,'Ongeldige aanvraag');
+  const claimed=await home.browserGate(hash,sessionHash,true);
+  return json({ok:claimed.allowed===true},claimed.allowed?200:409);
+ }
+ if(request.method==='HEAD'&&!m[2])return new Response(null,{status:200,headers:{'cache-control':'private, no-store'}});
+ if(gate.protected&&!gate.allowed){
+  if(m[2])return deny(404,'Geen toegang');
+  return guestClaimPage(request,hash,gate,u.pathname);
+ }
  if(m[2]&&/^poster\/\d{1,2}$/.test(m[2])){
-  const stored=await home.sharedPoster(hash,Number(m[2].slice(7)));
+  const stored=await home.sharedPoster(hash,Number(m[2].slice(7)),sessionHash);
   if(!stored)return deny(404,'Deze miniatuur is niet beschikbaar');
   return new Response(request.method==='HEAD'?null:stored.bytes,{
    status:200,headers:{
@@ -942,7 +1007,7 @@ async function publicWhatsAppMemory(request,env){
  }
  if(m[2]&&/^media\/\d{1,2}\/\d{1,2}$/.test(m[2])){
   const [_,asset,part]=m[2].split('/');
-  const stored=await home.sharedPart(hash,Number(asset),Number(part));
+  const stored=await home.sharedPart(hash,Number(asset),Number(part),sessionHash);
   if(!stored)return deny(404,'Dit deelbestand is niet beschikbaar');
   return new Response(request.method==='HEAD'?null:stored.bytes,{
    status:200,headers:{
@@ -953,7 +1018,7 @@ async function publicWhatsAppMemory(request,env){
   });
  }
  if(m[2]){
-  const media=await home.sharedMedia(hash,m[2]);
+  const media=await home.sharedMedia(hash,m[2],sessionHash);
   if(!media)return deny(404,'Foto of media niet gevonden');
   const length=media.bytes.byteLength;
   const isStream=m[2]==='video'||m[2]==='audio';
@@ -1000,7 +1065,7 @@ async function publicWhatsAppMemory(request,env){
   headers.set('content-length',String(length));
   return new Response(request.method==='HEAD'?null:media.bytes,{status:200,headers});
  }
- const content=await home.shareContent(hash);
+ const content=await home.shareContent(hash,sessionHash);
  if(!content)return deny(404,'Deze deellink is verlopen of ingetrokken');
  const title=safeShareHtml(content.title),story=safeShareHtml(content.storyText);
  const date=safeShareHtml(content.eventDate);
@@ -1014,8 +1079,8 @@ async function publicWhatsAppMemory(request,env){
   '<meta property="og:description" content="'+safeShareHtml(translate(previewLanguage,'guest.preview.description'))+'">'+
   '<meta name="twitter:card" content="summary_large_image">'+
   '<meta property="og:url" content="'+safeShareHtml(u.href)+'">'+
-  (content.hasPhoto?'<meta property="og:image" content="'+
-    safeShareHtml(u.origin+u.pathname+'/photo')+'">':'');
+  (gate.protected?'<meta property="og:image" content="'+safeShareHtml(u.origin+(gate.hasPreview?u.pathname+'/preview':'/pwa-512.png'))+'">':
+    content.hasPhoto?'<meta property="og:image" content="'+safeShareHtml(u.origin+u.pathname+'/photo')+'">':'');
  // Use the SAME packaged original TALERA presenter as authenticated /present.
  // Never modify its timeline, story lift gesture, original player or narrator.
  // Only this one /s/<capability> response receives an anonymous read adapter.
@@ -1051,13 +1116,11 @@ async function publicGuestFeedback(request,env){
  if(action!=='feedback'&&
     (!sameOrigin(request)||!(request.headers.get('content-type')||'').toLowerCase().startsWith('application/json')))
   return guestDeny(403,'guest.api.origin');
- const forwarded=new URL('/__social/shared/'+token,u);
- const lookup=await socialApi(new Request(forwarded,{method:'GET',headers:request.headers}),env);
- if(!lookup.ok)return guestDeny(404,'guest.api.lookup');
- const data=await lookup.json();
- if(!data.ok||!FREE_SHARE_ID.test(data.storyId||''))
-  return guestDeny(404,'guest.api.story');
- const hash=await shaHex(token);
+ const located=await guestShareLookup(env,token);
+ if(!located)return guestDeny(404,'guest.api.lookup');
+ const {home,hash}=located,sessionHash=await guestBrowserHash(request,hash);
+ const gate=await home.browserGate(hash,sessionHash,false);
+ if(!gate.active||!gate.allowed)return guestDeny(404,'guest.api.denied');
  let payload={};
  if(action!=='feedback'){
   if(Number(request.headers.get('content-length')||0)>2400)return guestDeny(413,'guest.api.headerTooLarge');
@@ -1070,8 +1133,8 @@ async function publicGuestFeedback(request,env){
  const actor=await sessionAccount(request,env);
  const guestId=action==='feedback'?request.headers.get('x-talera-guest-id'):payload.guestId;
  try{
-  const result=await socialMemoryHome(env,data.storyId).guestFeedback(hash,{
-   action,guestId,actorId:actor?.id||null,
+  const result=await home.guestFeedback(hash,{
+   action,guestId,sessionHash,actorId:actor?.id||null,
    name:actor?.displayName||payload.firstName||'',body:payload.body||''
   });
   return json(result);
@@ -1373,6 +1436,8 @@ export default {
       if(revoke)return revokeAccountShare(request,env,revoke[1]);
       const grantRevoke=/^\/api\/memories\/([A-Za-z0-9_-]{8,80})\/grants\/([0-9a-fA-F-]{36})\/revoke$/.exec(p);
       if(grantRevoke)return revokeAccountGrant(request,env,grantRevoke[1],grantRevoke[2]);
+      if(/^\/(?:s\/[A-Za-z0-9_-]{43}|__social\/shared\/[a-f0-9]{64})\/(?:claim|preview)$/.test(p))
+        return publicWhatsAppMemory(request,env);
       if((m==='GET'||m==='HEAD')&&/^\/__social\/shared\/[a-f0-9]{64}(?:\/(?:photo|photo-full|audio|video|poster\/\d{1,2}|media\/\d{1,2}\/\d{1,2}))?$/.test(p)&&
          (p.endsWith('/photo')||p.endsWith('/photo-full')||p.endsWith('/audio')||
           p.endsWith('/video')||/\/poster\/\d{1,2}$/.test(p)||/\/media\/\d{1,2}\/\d{1,2}$/.test(p)||(request.headers.get('accept')||'').includes('text/html')))

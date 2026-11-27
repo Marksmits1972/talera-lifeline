@@ -26,6 +26,7 @@ export class FreeSocialMemory extends DurableObject{
   // Optional, explicitly consented WhatsApp snapshots. The original Free
   // library never leaves the phone. Only the one selected memory is copied
   // into these existing per-memory DO tables, and expires automatically.
+  this.sql.exec("CREATE TABLE IF NOT EXISTS share_browser (token_hash TEXT PRIMARY KEY, session_hash TEXT, preview_allowed INTEGER NOT NULL DEFAULT 0)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_draft (singleton INTEGER PRIMARY KEY CHECK(singleton=1), title TEXT NOT NULL, story_text TEXT NOT NULL, event_date TEXT NOT NULL, expires_at INTEGER NOT NULL)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_snapshot (token_hash TEXT PRIMARY KEY, title TEXT NOT NULL, story_text TEXT NOT NULL, event_date TEXT NOT NULL)");
   this.sql.exec("CREATE TABLE IF NOT EXISTS share_media (token_hash TEXT NOT NULL, kind TEXT NOT NULL, mime TEXT NOT NULL, bytes BLOB NOT NULL, PRIMARY KEY(token_hash,kind))");
@@ -99,13 +100,16 @@ export class FreeSocialMemory extends DurableObject{
   this.checkOwner(actor);verifyTokenHash(hash);
   const draft=this.sql.exec("SELECT title,story_text,event_date,expires_at FROM share_draft WHERE singleton=1").toArray()[0];
   if(!draft||draft.expires_at<=now())throw Error('SHARE_DRAFT_EXPIRED');
+  // No pointer is published by the caller until this policy is installed.
+  // All previously issued shares without this row retain their old policy.
   await this.addShare(actor,hash,expires);
+  this.sql.exec("INSERT INTO share_browser(token_hash,session_hash) VALUES (?,NULL)",hash);
   this.sql.exec("INSERT INTO share_snapshot(token_hash,title,story_text,event_date) VALUES (?,?,?,?)",
    hash,draft.title,draft.story_text,draft.event_date);
   await this.refreshContentAlarm();
   return response(true,{expiresAt:expires});
  }
- async saveShareMedia(actor,hash,kind,mime,bytes){
+ async saveShareMedia(actor,hash,kind,mime,bytes,previewConsent=false){
   this.checkOwner(actor);verifyTokenHash(hash);
   if(!['photo','photo-full','audio','video'].includes(kind))throw Error('INVALID_MEDIA_KIND');
   if(!({photo:['image/jpeg'], 'photo-full':['image/jpeg'],
@@ -116,8 +120,11 @@ export class FreeSocialMemory extends DurableObject{
    throw Error('INVALID_MEDIA_SIZE');
   const exists=this.sql.exec("SELECT s.token_hash FROM shares s JOIN share_snapshot c ON c.token_hash=s.token_hash WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?",hash,now()).toArray()[0];
   if(!exists)throw Error('SHARE_NOT_ACTIVE');
+  const protectedShare=this.sql.exec("SELECT 1 AS present FROM share_browser WHERE token_hash=?",hash).toArray()[0];
+  if(protectedShare&&kind==='photo'&&this.sql.exec("SELECT 1 AS ready FROM share_manifest WHERE token_hash=?",hash).toArray()[0])throw Error('SHARE_ALREADY_COMPLETE');
   this.sql.exec("INSERT INTO share_media(token_hash,kind,mime,bytes) VALUES (?,?,?,?) ON CONFLICT(token_hash,kind) DO UPDATE SET mime=excluded.mime,bytes=excluded.bytes",
    hash,kind,mime,bytes);
+  if(protectedShare&&kind==='photo')this.sql.exec("UPDATE share_browser SET preview_allowed=? WHERE token_hash=?",previewConsent===true?1:0,hash);
   return response(true,{stored:true});
  }
 
@@ -242,9 +249,41 @@ export class FreeSocialMemory extends DurableObject{
   return response(true,{complete:true,originalItems:document.items.length});
  }
 
- async sharedPoster(hash,index){
+ // Browser possession is independent of the URL. Only a completed share
+ // can be claimed. The conditional update is synchronous/atomic in this DO.
+ browserAllowed(hash,sessionHash=null){
+  if(!this.access(null,hash))return false;
+  const row=this.sql.exec('SELECT session_hash FROM share_browser WHERE token_hash=?',hash).toArray()[0];
+  return !row||typeof sessionHash==='string'&&HASH.test(sessionHash)&&row.session_hash===sessionHash;
+ }
+ async browserGate(hash,sessionHash=null,claim=false){
   verifyTokenHash(hash);
-  if(!Number.isInteger(index)||index<0||index>=24||!this.access(null,hash))return null;
+  if(sessionHash!==null)verifyTokenHash(sessionHash);
+  const active=this.sql.exec('SELECT expires_at,revoked_at FROM shares WHERE token_hash=?',hash).toArray()[0];
+  if(!active||active.revoked_at!==null||active.expires_at<=now())return {active:false};
+  const row=this.sql.exec('SELECT session_hash FROM share_browser WHERE token_hash=?',hash).toArray()[0];
+  if(!row)return {active:true,protected:false,allowed:true,expiresAt:active.expires_at};
+  const ready=!!this.sql.exec('SELECT 1 AS ready FROM share_manifest WHERE token_hash=?',hash).toArray()[0];
+  if(claim&&ready&&sessionHash!==null){
+   this.sql.exec('UPDATE share_browser SET session_hash=? WHERE token_hash=? AND session_hash IS NULL AND EXISTS (SELECT 1 FROM shares WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?)',sessionHash,hash,hash,now());
+  }
+  const current=this.sql.exec('SELECT session_hash FROM share_browser WHERE token_hash=?',hash).toArray()[0];
+  const hasPreview=ready&&!!this.sql.exec("SELECT 1 AS present FROM share_media m JOIN share_browser b ON b.token_hash=m.token_hash WHERE m.token_hash=? AND m.kind='photo' AND m.mime='image/jpeg' AND b.preview_allowed=1",hash).toArray()[0];
+  return {active:true,protected:true,ready,hasPreview,claimed:current?.session_hash!==null,
+   allowed:ready&&sessionHash!==null&&current?.session_hash===sessionHash,expiresAt:active.expires_at};
+ }
+ // A specifically consented reduced JPEG is the only public preview.
+ // It is intentionally not a claim and never exposes the full media.
+ async browserPreview(hash){
+  verifyTokenHash(hash);
+  if(!this.access(null,hash))return null;
+  if(!this.sql.exec('SELECT 1 AS ready FROM share_manifest WHERE token_hash=?',hash).toArray()[0])return null;
+  const row=this.sql.exec("SELECT m.mime,m.bytes FROM share_media m JOIN share_browser b ON b.token_hash=m.token_hash WHERE m.token_hash=? AND m.kind='photo' AND b.preview_allowed=1",hash).toArray()[0];
+  return row?.mime==='image/jpeg'?{mime:row.mime,bytes:row.bytes}:null;
+ }
+ async sharedPoster(hash,index,sessionHash=null){
+  verifyTokenHash(hash);
+  if(!Number.isInteger(index)||index<0||index>=24||!this.browserAllowed(hash,sessionHash))return null;
   const raw=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',
    hash).toArray()[0]?.document;
   if(!raw)return null;
@@ -255,11 +294,11 @@ export class FreeSocialMemory extends DurableObject{
   return row&&row.mime===meta.mime&&row.bytes.byteLength===meta.size?
    {mime:row.mime,bytes:row.bytes}:null;
  }
- async sharedPart(hash,index,part){
+ async sharedPart(hash,index,part,sessionHash=null){
   verifyTokenHash(hash);
   if(!Number.isInteger(index)||index<0||index>=24||
      !Number.isInteger(part)||part<0||part>=96||
-     !this.access(null,hash))return null;
+     !this.browserAllowed(hash,sessionHash))return null;
   const raw=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',hash).toArray()[0]?.document;
   if(!raw)return null;
   const item=JSON.parse(raw).items?.[index];
@@ -269,9 +308,9 @@ export class FreeSocialMemory extends DurableObject{
   return row&&row.mime===item.mime?{mime:row.mime,bytes:row.bytes}:null;
  }
 
- async shareContent(hash){
+ async shareContent(hash,sessionHash=null){
   verifyTokenHash(hash);
-  if(!this.access(null,hash))return null;
+  if(!this.browserAllowed(hash,sessionHash))return null;
   const info=this.sql.exec("SELECT title,story_text,event_date FROM share_snapshot WHERE token_hash=?",hash).toArray()[0];
   if(!info)return null;
   const media=this.sql.exec("SELECT kind FROM share_media WHERE token_hash=?",hash)
@@ -283,9 +322,9 @@ export class FreeSocialMemory extends DurableObject{
   return {title:info.title,storyText:info.story_text,eventDate:info.event_date,
    hasPhoto:has('photo'),hasAudio:has('audio'),hasVideo:has('video'),manifest};
  }
- async sharedMedia(hash,kind){
+ async sharedMedia(hash,kind,sessionHash=null){
   verifyTokenHash(hash);
-  if(!['photo','photo-full','audio','video'].includes(kind)||!this.access(null,hash))return null;
+  if(!['photo','photo-full','audio','video'].includes(kind)||!this.browserAllowed(hash,sessionHash))return null;
   const row=this.sql.exec("SELECT mime,bytes FROM share_media WHERE token_hash=? AND kind=?",hash,kind).toArray()[0];
   return row?{mime:row.mime,bytes:row.bytes}:null;
  }
@@ -300,6 +339,7 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec("DELETE FROM share_media WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM share_snapshot WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM share_manifest WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
+  this.sql.exec("DELETE FROM share_browser WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM guest_feedback_hearts WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM guest_feedback_comments WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   await this.refreshContentAlarm();
@@ -329,15 +369,16 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec('DELETE FROM share_media WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM share_snapshot WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM share_manifest WHERE token_hash=?',tokenHash);
+  this.sql.exec('DELETE FROM share_browser WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM guest_feedback_hearts WHERE token_hash=?',tokenHash);
   this.sql.exec('DELETE FROM guest_feedback_comments WHERE token_hash=?',tokenHash);
   return response(true,{revoked:true});
  }
  // A browser identity is anonymous and NOT a verified human identity.
  // Server-side per-link and per-browser bounds limit obvious abuse.
- async guestFeedback(tokenHash,{action,guestId,actorId=null,name='',body=''}={}){
+ async guestFeedback(tokenHash,{action,guestId,actorId=null,name='',body='',sessionHash=null}={}){
   verifyTokenHash(tokenHash);
-  if(!this.access(null,tokenHash))throw Error('ACCESS_DENIED');
+  if(!this.browserAllowed(tokenHash,sessionHash))throw Error('ACCESS_DENIED');
   if(!['feedback','heart','comment'].includes(action))throw Error('INVALID_GUEST_ACTION');
   if(actorId)verifyAccountId(actorId);
   if(guestId!=null&&guestId!==''&&!/^[a-f0-9-]{36}$/.test(guestId))
@@ -405,7 +446,7 @@ export class FreeSocialMemory extends DurableObject{
    }
   }
   if(!accountGranted){
-   if(!tokenHash||!this.access(null,tokenHash))throw Error('ACCESS_DENIED');
+   if(!tokenHash||!this.browserAllowed(tokenHash))throw Error('ACCESS_DENIED');
    const guest=await this.guestFeedback(tokenHash,{action:'feedback'});
    return response(true,{storyId:owner.story_id,likes:guest.likes,
     commentCount:guest.commentCount,comments:guest.comments});

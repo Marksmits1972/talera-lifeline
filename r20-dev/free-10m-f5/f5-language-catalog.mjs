@@ -2,6 +2,15 @@
 // Each interface position has its own independently editable key across the five languages.
 export const languageCatalog=Object.freeze({
  "nl": {
+  "core.whatsapp.previewPhoto": "Een foto meesturen",
+  "core.whatsapp.previewPrivacy": "De foto staat los van de beveiligde link en kan worden doorgestuurd.",
+  "core.whatsapp.standardMessage": "Ik kwam deze herinnering tegen en moest aan je denken.",
+  "core.whatsapp.personalChoice": "Eigen bericht",
+  "core.whatsapp.standardChoice": "Standaardbericht",
+  "guest.claim.opening": "Je herinnering wordt geopend…",
+  "guest.claim.used": "Deze uitnodiging is al in een andere browser geopend.",
+  "guest.claim.waiting": "Deze herinnering wordt nog voorbereid.",
+  "guest.claim.retry": "Opnieuw proberen",
   "core.topicSearch.toggle": "Zoek op meer kenmerken",
   "core.topicSearch.choose": "Kies één of meer kenmerken",
   "core.topicSearch.open": "Bekijk herinneringen",
@@ -1339,6 +1348,15 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Handmatig ingevuld"
  },
  "en": {
+  "core.whatsapp.previewPhoto": "Include a photo",
+  "core.whatsapp.previewPrivacy": "The photo is separate from the protected link and can be forwarded.",
+  "core.whatsapp.standardMessage": "I came across this memory and thought of you.",
+  "core.whatsapp.personalChoice": "Your own message",
+  "core.whatsapp.standardChoice": "Suggested message",
+  "guest.claim.opening": "Opening your memory…",
+  "guest.claim.used": "This invitation has already been opened in another browser.",
+  "guest.claim.waiting": "This memory is still being prepared.",
+  "guest.claim.retry": "Try again",
   "core.topicSearch.toggle": "Search by more characteristics",
   "core.topicSearch.choose": "Choose one or more characteristics",
   "core.topicSearch.open": "View memories",
@@ -2676,6 +2694,15 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Entered manually"
  },
  "de": {
+  "core.whatsapp.previewPhoto": "Ein Foto mitsenden",
+  "core.whatsapp.previewPrivacy": "Das Foto ist unabhängig vom geschützten Link und kann weitergeleitet werden.",
+  "core.whatsapp.standardMessage": "Ich bin auf diese Erinnerung gestoßen und musste an dich denken.",
+  "core.whatsapp.personalChoice": "Eigene Nachricht",
+  "core.whatsapp.standardChoice": "Vorgeschlagene Nachricht",
+  "guest.claim.opening": "Deine Erinnerung wird geöffnet…",
+  "guest.claim.used": "Diese Einladung wurde bereits in einem anderen Browser geöffnet.",
+  "guest.claim.waiting": "Diese Erinnerung wird noch vorbereitet.",
+  "guest.claim.retry": "Erneut versuchen",
   "core.topicSearch.toggle": "Nach weiteren Merkmalen suchen",
   "core.topicSearch.choose": "Wähle ein oder mehrere Merkmale",
   "core.topicSearch.open": "Erinnerungen ansehen",
@@ -4013,6 +4040,15 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Manuell eingegeben"
  },
  "fr": {
+  "core.whatsapp.previewPhoto": "Joindre une photo",
+  "core.whatsapp.previewPrivacy": "La photo est indépendante du lien protégé et peut être transférée.",
+  "core.whatsapp.standardMessage": "Je suis retombé sur ce souvenir et j’ai pensé à toi.",
+  "core.whatsapp.personalChoice": "Ton propre message",
+  "core.whatsapp.standardChoice": "Message proposé",
+  "guest.claim.opening": "Ouverture de ton souvenir…",
+  "guest.claim.used": "Cette invitation a déjà été ouverte dans un autre navigateur.",
+  "guest.claim.waiting": "Ce souvenir est encore en préparation.",
+  "guest.claim.retry": "Réessayer",
   "core.topicSearch.toggle": "Rechercher par d’autres caractéristiques",
   "core.topicSearch.choose": "Choisis une ou plusieurs caractéristiques",
   "core.topicSearch.open": "Voir les souvenirs",
@@ -5350,6 +5386,15 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Saisi manuellement"
  },
  "es": {
+  "core.whatsapp.previewPhoto": "Adjuntar una foto",
+  "core.whatsapp.previewPrivacy": "La foto es independiente del enlace protegido y se puede reenviar.",
+  "core.whatsapp.standardMessage": "Me encontré con este recuerdo y pensé en ti.",
+  "core.whatsapp.personalChoice": "Tu propio mensaje",
+  "core.whatsapp.standardChoice": "Mensaje sugerido",
+  "guest.claim.opening": "Abriendo tu recuerdo…",
+  "guest.claim.used": "Esta invitación ya se ha abierto en otro navegador.",
+  "guest.claim.waiting": "Este recuerdo aún se está preparando.",
+  "guest.claim.retry": "Intentar de nuevo",
   "core.topicSearch.toggle": "Buscar por más características",
   "core.topicSearch.choose": "Elige una o más características",
   "core.topicSearch.open": "Ver recuerdos",

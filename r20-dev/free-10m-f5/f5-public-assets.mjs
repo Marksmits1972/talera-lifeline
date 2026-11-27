@@ -2204,8 +2204,8 @@ async function taleraFreeOriginalSharePhoto(memory){
    shipped=shipped.replace(applyCss,'style.textContent=css+taleraShareAdditionalCss;document.head.append(style);');
    const vars="let mode=null,memory=runtime.currentMemory(),focus=null,consent=false,shareAuth=null,authBusy=false;";
    const addedVars=String.raw`
-const taleraStandardText='Hoi! Ik deel graag een persoonlijke herinnering met je via TALERA.';
-let messageChoice='standard',personalMessage='',uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
+const taleraStandardText=()=>window.TaleraI18n.t('core.whatsapp.standardMessage');
+let messageChoice='personal',personalMessage='',includePreviewPhoto=true,uploadPhase='Uitnodiging voorbereiden…',uploadPercent=null;
 
 let taleraWhatsAppHandoffPending=false;
 const taleraWhatsAppReturnKey='talera-wa-handoff-return';
@@ -2238,8 +2238,8 @@ document.addEventListener('visibilitychange',()=>{
 function taleraChoiceHtml(){
  const choice=(name,label)=>'<button type="button" class="talera-share-choice" data-action="message-'+name+'" aria-pressed="'+(messageChoice===name)+'">'+label+'</button>';
  return '<div class="talera-share-choices" role="group" aria-label="Bericht bij de uitnodiging">'+
-  choice('standard','TALERA-bericht')+choice('personal','Eigen bericht')+'</div>'+
-  (messageChoice==='personal'?'<label for="talera-clean-personal">Jouw persoonlijke bericht</label><textarea id="talera-clean-personal" rows="3" maxlength="1200" aria-label="Jouw persoonlijke bericht">'+escapeText(personalMessage)+'</textarea>':'');
+  choice('personal',escapeText(window.TaleraI18n.t('core.whatsapp.personalChoice')))+choice('standard',escapeText(window.TaleraI18n.t('core.whatsapp.standardChoice')))+'</div>'+
+  (messageChoice==='personal'?'<label for="talera-clean-personal">Jouw persoonlijke bericht</label><textarea id="talera-clean-personal" rows="3" maxlength="1200" aria-label="Jouw persoonlijke bericht">'+escapeText(personalMessage)+'</textarea>':'')+'<label><input type="checkbox" id="talera-clean-preview-photo" '+(includePreviewPhoto?'checked ':'')+(['preparing','ready'].includes(share.current().state)?'disabled':'')+'> '+escapeText(window.TaleraI18n.t('core.whatsapp.previewPhoto'))+'</label><p>'+escapeText(window.TaleraI18n.t('core.whatsapp.previewPrivacy'))+'</p>';
 }
 function taleraShareProgress(phase,data){
  if(mode!=='share'||overlay.hidden)return;
@@ -2270,7 +2270,7 @@ window.__taleraShareProgress=taleraShareProgress;
    const openShare="if(a==='share'){consent=false;share.open(String(social.activeMemoryId));open('share')}";
    assert.equal(shipped.split(openShare).length,2,'WHATSAPP_DRAFT_NEW_INVITE_DRIFT');
    shipped=shipped.replace(openShare,
-    "if(a==='share'){consent=false;messageChoice='standard';personalMessage='';uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}");
+    "if(a==='share'){consent=false;messageChoice='personal';personalMessage='';includePreviewPhoto=true;uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}");
    const clickPart="if(a==='prepare'){if(shareAuth!==true){void verifyShareAuth();return}";
    assert.equal(shipped.split(clickPart).length,2,'WHATSAPP_PERSONAL_PREPARE_DRIFT');
    shipped=shipped.replace(clickPart,
@@ -2293,10 +2293,10 @@ window.__taleraShareProgress=taleraShareProgress;
       !/^\/s\/[A-Za-z0-9_-]{43}$/.test(target.pathname)||
       target.search||target.hash)
     throw Error('Onveilige uitnodigingslink');
-   const message=messageChoice==='personal'?personalMessage.trim():taleraStandardText;
+   const message=messageChoice==='personal'?personalMessage.trim():taleraStandardText();
    if(!message)throw Error('Schrijf eerst je persoonlijke bericht.');
    const url=target.href;
-   const caption=message+'\n'+url;
+   const caption=message+'\n\n'+url;
    const fallback=()=>{taleraRememberWhatsAppHandoff();location.assign('https://wa.me/?text='+encodeURIComponent(caption))};
    const photo=taleraNativeSharePhoto;
    // A native JPEG photo + caption needs the iOS OS share sheet. No file
@@ -2328,7 +2328,7 @@ window.__taleraShareProgress=taleraShareProgress;
    const changePoint="overlay.addEventListener('change',e=>{";
    const onInput="overlay.addEventListener('input',e=>{if(e.target.id==='talera-clean-personal'){personalMessage=e.target.value;const can=!!personalMessage.trim(),v=share.current(),prep=panel.querySelector('[data-action=prepare]'),send=panel.querySelector('[data-action=send]');if(prep)prep.disabled=shareAuth!==true||v.state==='preparing'||!can;if(send)send.disabled=shareAuth!==true||v.state!=='ready'||!can}});\n ";
    assert.equal(shipped.split(changePoint).length,2,'WHATSAPP_PERSONAL_INPUT_LOCATION_DRIFT');
-   shipped=shipped.replace(changePoint,onInput+changePoint);
+   shipped=shipped.replace(changePoint,onInput+changePoint+"if(e.target.id==='talera-clean-preview-photo'){if(!['preparing','ready'].includes(share.current().state))includePreviewPhoto=e.target.checked;return}");
    // Don't upload twice from rapid tapping. User changes of duration/draft
    // remain possible without losing the written personal message.
    const preparing="(shareAuth===true?'':'disabled')+'>Uitnodiging voorbereiden</button>'";
@@ -2343,13 +2343,14 @@ window.__taleraShareProgress=taleraShareProgress;
    // message draft is held in memory and never written to local storage.
    // ShareController continues to handle expiration, ready and cancellation.
    const uploader=String.raw`
-function taleraUploadMediaProgress(path,blob,label){
+function taleraUploadMediaProgress(path,blob,label,previewConsent=false){
  return new Promise((resolve,reject)=>{
   const request=new XMLHttpRequest();
   request.open('POST',path,true);
   request.withCredentials=true;
   request.setRequestHeader('accept','application/json');
   request.setRequestHeader('content-type',blob.type.split(';')[0]);
+   if(previewConsent===true&&/\/photo$/.test(path))request.setRequestHeader('x-talera-preview-consent','1');
   window.__taleraShareProgress?.(label,null);
   request.upload.onprogress=e=>{
    window.__taleraShareProgress?.(label,e.lengthComputable?{loaded:e.loaded,total:e.total}:null);
@@ -2378,11 +2379,11 @@ function taleraUploadMediaProgress(path,blob,label){
    const previewSource="  const preview=await previewPhotoBlob(current);";
    assert.equal(shipped.split(previewSource).length,2,'WHATSAPP_NATIVE_PREVIEW_DRIFT');
    shipped=shipped.replace(previewSource,
-     "  taleraNativeSharePhoto=null;\n"+
+     "  taleraNativeSharePhoto=null;\n  const taleraPreviewConsent=includePreviewPhoto;\n"+
      previewSource+"\n"+
-     "  if(preview?.size&&preview.type==='image/jpeg'&&typeof File==='function')"+
+     "  if(taleraPreviewConsent&&preview?.size&&preview.type==='image/jpeg'&&typeof File==='function')"+
      "taleraNativeSharePhoto=new File([preview],'talera-herinnering.jpg',{type:'image/jpeg'});");
-   const currentOpen="if(a==='share'){consent=false;messageChoice='standard';personalMessage='';uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}";
+   const currentOpen="if(a==='share'){consent=false;messageChoice='personal';personalMessage='';includePreviewPhoto=true;uploadPhase='Uitnodiging voorbereiden…';uploadPercent=null;share.open(String(social.activeMemoryId));open('share')}";
    assert.equal(shipped.split(currentOpen).length,2,'WHATSAPP_NATIVE_OPEN_RESET_DRIFT');
    shipped=shipped.replace(currentOpen,
      currentOpen.replace('consent=false;','consent=false;taleraNativeSharePhoto=null;'));
@@ -2477,7 +2478,7 @@ async function taleraVerifiedGuestShareMime(item,original,position){
     const before=shipped.slice(from,end+2);
     assert.ok(before.includes("method:'POST'")&&before.includes('body:'+variable)&&
       before.includes("'content-type'"),'WHATSAPP_REAL_UPLOAD_'+medium+'_BODY_DRIFT');
-    const after="taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(d.id)+'/"+medium+"',"+variable+","+JSON.stringify(label)+")";
+    const after="taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(d.id)+'/"+medium+"',"+variable+","+JSON.stringify(label)+(medium==='photo'?",taleraPreviewConsent":"")+")";
     shipped=shipped.slice(0,from)+after+shipped.slice(end+2);
    }
 

@@ -2147,11 +2147,11 @@ try{
    // changing the expiry and switching back to the default invitation.
    const choices=sharePage.locator('#talera-clean-overlay .talera-share-choice');
    assert.equal(await choices.count(),2,'Exactly two original WhatsApp message options');
-   assert.equal(await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').getAttribute('aria-pressed'),'true');
-   assert.equal(await sharePage.locator('#talera-clean-personal').count(),0);
-   await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').click();
+   assert.equal(await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').getAttribute('aria-pressed'),'true');
+   assert.equal(await sharePage.locator('#talera-clean-personal').count(),1);
    assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),'',
      'Own WhatsApp message must start with an entirely blank text field');
+   assert.equal(await sharePage.locator('#talera-clean-preview-photo').isChecked(),true,'Photo accompanies the message by default');
    const personalDraft='Hé, weet je nog die middag?';
    await sharePage.locator('#talera-clean-personal').fill(personalDraft);
    await sharePage.locator('#talera-clean-expiry').selectOption('24');
@@ -2163,6 +2163,7 @@ try{
    await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').click();
    assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),personalDraft);
    await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').click();
+   assert.equal(await sharePage.locator('#talera-clean-preview-photo').isChecked(),true,'Photo choice survives rerenders');
    // Use the standard message in the previously proven one-invite test.
    await sharePage.locator('#talera-clean-consent').check();
    await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
@@ -2220,7 +2221,7 @@ try{
    assert.ok(payload.size>100,'Native iOS share must attach actual JPEG pixels');
    assert.equal(payload.count,1,'Only the selected memory photo may be shared');
    assert.equal(payload.text,
-     'Hoi! Ik deel graag een persoonlijke herinnering met je via TALERA.\n'+issued.link,
+     'Ik kwam deze herinnering tegen en moest aan je denken.\n\n'+issued.link,
      'The exact default caption and restricted recipient URL must travel together');
    assert.equal(payload.hasSeparateUrl,false,
      'iOS text with the URL must be one share body, not a second URL item');
@@ -2269,7 +2270,35 @@ try{
    });
    try{
      const guest=await anonymous.newPage();
-     const received=await guest.goto(issued.link,{waitUntil:'domcontentloaded'});
+     const openGuest=async url=>{
+       const actual=guest.waitForResponse(r=>r.url()===url&&r.status()===200&&
+         r.headers()['x-talera-free-f5']==='original-presentation-one-memory-capability',{timeout:20000});
+       await guest.goto(url,{waitUntil:'domcontentloaded'}).catch(e=>{
+         if(!/navigation|aborted|interrupted/i.test(String(e)))throw e;
+       });
+       return actual;
+     };
+     // Plain crawler fetches may create a cookie but must never claim.
+     const previewProbe=await browser.newContext({extraHTTPHeaders:{'x-talera-f5-key':gate}});
+     let received;
+     try{
+       const pre=await previewProbe.request.get(issued.link);
+       assert.equal(pre.status(),200);
+       assert.ok(!(await pre.text()).includes('synthetic ACCOUNT ISOLATION 1'));
+       assert.equal((await previewProbe.request.get(issued.link+'/preview')).status(),200);
+       assert.equal((await previewProbe.request.get(issued.link+'/photo')).status(),404);
+       assert.equal((await previewProbe.request.get(issued.link+'/feedback')).status(),404);
+       received=await openGuest(issued.link);
+       assert.equal(received.status(),200);
+       assert.equal((await previewProbe.request.get(issued.link)).status(),403);
+       assert.equal((await previewProbe.request.post(issued.link+'/claim',{
+         headers:{origin,'content-type':'application/json'},data:'{}'})).status(),409);
+       for(const suffix of ['/photo','/photo-full','/media/0/0','/poster/0','/audio','/video','/feedback'])
+         assert.equal((await previewProbe.request.get(issued.link+suffix)).status(),404);
+       assert.equal((await previewProbe.request.post(issued.link+'/heart',{
+         headers:{origin,'content-type':'application/json'},data:{guestId:crypto.randomUUID()}})).status(),404);
+       console.log('TALERA_GUEST_FIRST_BROWSER_CLAIM_FORWARD_DENIED_PASS');
+     }finally{await previewProbe.close()}
      console.log('TALERA_FREE_WHATSAPP_RECIPIENT_DIAG',JSON.stringify({
        status:received.status(),contentType:received.headers()['content-type'],
        prefix:received.status()!==200?(await received.text()).slice(0,400):'expected HTML'}));
@@ -2320,6 +2349,16 @@ try{
      assert.equal(guest.url(),issued.link,
        'Guest pencil must not navigate to original private editor');
      console.log('TALERA_GUEST_EDITOR_HIDDEN_AND_CLICK_BLOCKED_PASS');
+     // The same guest picture supplies browser appearance hints, without
+     // changing the original photo stage dimensions or requesting new media.
+     await guest.waitForFunction(()=>{
+       const root=document.documentElement;
+       const top=root.style.getPropertyValue('--talera-guest-edge-top');
+       const bottom=root.style.getPropertyValue('--talera-guest-edge-bottom');
+       return /^#[0-9a-f]{6}$/.test(top)&&/^#[0-9a-f]{6}$/.test(bottom)&&
+         top!=='#17344a'&&document.querySelector('meta[name="theme-color"]')?.content===top;
+     },null,{timeout:15000});
+     console.log('TALERA_GUEST_PHOTO_BROWSER_THEME_HINT_PASS');
      assert.deepEqual(guestGeometry.photoStage.rect,originalGeometry.photoStage.rect,
        'Guest uses the original TALERA presenter geometry, not a second design');
      const guestNativeSocial=await guest.evaluate(()=>{
@@ -2345,7 +2384,7 @@ try{
      assert.match(html,/Local-only imaginary image/);
      assert.match(html,/<meta property="og:title" content="Een persoonlijke herinnering via TALERA">/);
      assert.match(html,/<meta property="og:image" content=/);
-     assert.ok(html.includes(issued.link+'/photo'));
+     assert.ok(html.includes(issued.link+'/preview'));
      assert.ok(!html.includes('class="stage"'),
        'Separate improvised WhatsApp guest hero has been retired');
      assert.ok(html.includes('id="photoStage"')&&
@@ -2602,15 +2641,8 @@ try{
      const legacyGuest=await guest.request.get(origin+
        '/__social/memory/'+sharedStoryId+'/view',{
         headers:{'x-qa-share-token':rawShareToken}});
-     assert.equal(legacyGuest.status(),200,
-       'Legacy token-view remains functional for the same guest invitation');
-     const legacyBody=await legacyGuest.json();
-     assert.equal(legacyBody.commentCount,1,
-       'Legacy token-view must not count account-only comments');
-     assert.equal(legacyBody.likes,1,
-       'Legacy token-view must not include account-only hearts');
-     assert.ok(legacyBody.comments.every(x=>x.body!==internalText),
-       'Legacy token-view must never expose account-only comment text');
+     assert.equal(legacyGuest.status(),403,
+       'Old token-only JSON view must not bypass the browser-bound share');
      // Anonymous share rights must never mutate the original signed-in
      // TALERA account's conversation via legacy social endpoints.
      const privateSocialPath=origin+'/__social/memory/'+sharedStoryId;
@@ -2658,6 +2690,14 @@ try{
      assert.equal(siblingInvite.status,200,'Existing owner can share the same memory twice');
      const siblingUrl=new URL(siblingInvite.data.link,origin).href;
      assert.notEqual(siblingUrl,issued.link,'Different recipients get separate share capabilities');
+     const siblingFinal=await sharePage.evaluate(async token=>{
+       const r=await fetch('/api/shares/'+token+'/manifest',{method:'POST',credentials:'same-origin',
+         headers:{'content-type':'application/json'},body:JSON.stringify({version:1,items:[],narrationCues:[],narrationDurationMs:0})});
+       return r.status;
+     },siblingInvite.data.id);
+     assert.equal(siblingFinal,200);
+     assert.equal((await guest.request.get(siblingUrl)).status(),200);
+     assert.equal((await guest.request.post(siblingUrl+'/claim',{headers:{origin,'content-type':'application/json'},data:'{}'})).status(),200);
      const siblingFeedbackRes=await guest.request.get(siblingUrl+'/feedback');
      assert.equal(siblingFeedbackRes.status(),200);
      const siblingFeedback=await siblingFeedbackRes.json();
@@ -2797,14 +2837,26 @@ try{
          method:'POST',credentials:'same-origin',
          headers:{'content-type':'image/jpeg'},body:jpeg
        });
-       const after=await fetch(share.data.link,{
-         headers:{accept:'text/html'},credentials:'omit'});
-       const html=await after.text();
+       const part=await fetch('/api/shares/'+share.data.id+'/media/0/0',{method:'POST',credentials:'same-origin',
+         headers:{'content-type':'image/jpeg'},body:jpeg});
+       const digest=await crypto.subtle.digest('SHA-256',await jpeg.arrayBuffer());
+       const hash=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+       const finalized=await post('/api/shares/'+share.data.id+'/manifest',{version:1,
+         items:[{kind:'photo',mime:'image/jpeg',size:jpeg.size,parts:1,hashes:[hash]}],
+         narrationCues:[],narrationDurationMs:0});
+       if(part.status!==200||finalized.status!==200)return {step:'finalize',part:part.status,finalized};
+       const after=await fetch(share.data.link,{headers:{accept:'text/html'},credentials:'same-origin'});
+       const gateHtml=await after.text();
+       if(gateHtml.includes('synthetic PHOTO ONLY'))return {step:'leaked-before-claim'};
+       const claimed=await post(new URL(share.data.link).pathname+'/claim',{});
+       if(claimed.status!==200)return {step:'claim',claimed};
+       const opened=await fetch(share.data.link,{headers:{accept:'text/html'},credentials:'same-origin'});
+       const html=await opened.text();
        const revoke=await fetch('/api/shares/'+share.data.id+'/revoke',{
          method:'POST',credentials:'same-origin'});
        const unavailable=await fetch(share.data.link,{
          headers:{accept:'text/html'},credentials:'omit'});
-       return {before:before.status,after:after.status,
+       return {before:before.status,after:opened.status,
          media:media.status,revoke:revoke.status,
          unavailable:unavailable.status,
          hasPhoto:html.includes('/photo'),hasTitle:html.includes('synthetic PHOTO ONLY'),
@@ -2815,7 +2867,7 @@ try{
        media:pictureOnly.media,revoke:pictureOnly.revoke,
        unavailable:pictureOnly.unavailable,
        hasPhoto:pictureOnly.hasPhoto,hasTitle:pictureOnly.hasTitle
-     },{before:404,after:200,media:200,revoke:200,unavailable:404,
+     },{before:409,after:200,media:200,revoke:200,unavailable:404,
        hasPhoto:true,hasTitle:true},
        'Photo-only memory must be private until consented media exists, then revocable');
      assert.ok(Math.abs(pictureOnly.expiresAt-(Date.now()+3600000))<60000,
@@ -2884,6 +2936,7 @@ try{
          'WhatsApp must synchronously stop playing audio AND video elements');
        await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').click();
        assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),'');
+       assert.equal(await sharePage.locator('#talera-clean-preview-photo').isChecked(),true);
        await sharePage.locator('#talera-clean-personal').fill('Weet je nog dat moment? Dit wilde ik met je delen.');
        await sharePage.locator('#talera-clean-consent').check();
        await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
@@ -2917,7 +2970,7 @@ try{
        assert.ok(personalPayload.size>100);
        const personalLink=createdLinks.at(-1)?.link;
        assert.equal(personalPayload.text,
-         'Weet je nog dat moment? Dit wilde ik met je delen.\n'+personalLink,
+         'Weet je nog dat moment? Dit wilde ik met je delen.\n\n'+personalLink,
          'Personal invitation must NOT receive any automatic promotional copy');
        console.log('TALERA_FREE_NATIVE_IOS_PERSONAL_PHOTO_AND_LINK_SHARE_PAYLOAD_PASS',
          JSON.stringify({image:true,ownWordsOnly:true,secureLink:true,realIphoneAccepted:false}));
@@ -2925,8 +2978,7 @@ try{
        const issuedUntitled=createdLinks.at(-1);
        assert.equal(createdLinks.length,4,'Original, independent sibling, direct photo-only and untitled UI invitations are distinct');
        assert.equal(issuedUntitled.status,200);
-       const photoOnlyView=await guest.goto(issuedUntitled.link,
-         {waitUntil:'domcontentloaded'});
+       const photoOnlyView=await openGuest(issuedUntitled.link);
        assert.equal(photoOnlyView.status(),200);
        const untitledHtml=await photoOnlyView.text();
        assert.ok(untitledHtml.includes('id="photoStage"')&&
@@ -3088,6 +3140,9 @@ try{
        await sharePage.waitForFunction(()=>!!document.querySelector(
          '#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
          null,{timeout:16000});
+       await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').click();
+       await sharePage.locator('#talera-clean-preview-photo').uncheck();
+       assert.equal(await sharePage.locator('#talera-clean-preview-photo').isChecked(),false);
        await sharePage.locator('#talera-clean-consent').check();
        await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
        await sharePage.waitForFunction(()=>!!document.querySelector(
@@ -3095,7 +3150,14 @@ try{
          null,{timeout:45000});
        const invitation=createdLinks.at(-1);
        assert.equal(invitation?.status,200);
-       const opened=await guest.goto(invitation.link,{waitUntil:'domcontentloaded'});
+       const noPreview=await browser.newContext({extraHTTPHeaders:{'x-talera-f5-key':gate}});
+       try{
+         const pre=await noPreview.request.get(invitation.link);
+         assert.equal(pre.status(),200);
+         assert.ok((await pre.text()).includes(origin+'/pwa-512.png'));
+         assert.equal((await noPreview.request.get(invitation.link+'/preview')).status(),404);
+       }finally{await noPreview.close()}
+       const opened=await openGuest(invitation.link);
        assert.equal(opened.status(),200);
        await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
          null,{timeout:22000});
@@ -3264,6 +3326,7 @@ try{
        await sharePage.waitForFunction(()=>!!document.querySelector(
          '#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
          null,{timeout:15000});
+       await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').click();
        await sharePage.locator('#talera-clean-consent').check();
        await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
        await sharePage.waitForFunction(()=>!!document.querySelector(
@@ -3271,7 +3334,7 @@ try{
          null,{timeout:45000});
        const invite=createdLinks.at(-1);
        assert.equal(invite?.status,200);
-       const opened=await guest.goto(invite.link,{waitUntil:'domcontentloaded'});
+       const opened=await openGuest(invite.link);
        assert.equal(opened.status(),200);
        await guest.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal,
          null,{timeout:20000});
@@ -3377,6 +3440,7 @@ try{
        await sharePage.waitForFunction(()=>!!document.querySelector(
          '#talera-clean-overlay:not([hidden]) [data-action=prepare]'),
          null,{timeout:14000});
+       await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').click();
        await sharePage.locator('#talera-clean-consent').check();
        await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
        await sharePage.waitForFunction(()=>!!document.querySelector(
@@ -3417,7 +3481,7 @@ try{
          await new Promise(done=>setTimeout(done,500));
          await route.continue();
        });
-       const response=await guest.goto(movingInvite.link,{waitUntil:'domcontentloaded'});
+       const response=await openGuest(movingInvite.link);
        assert.equal(response.status(),200);
        await guest.waitForFunction(()=>
          window.__taleraTimelineRuntime?.currentMemory?.()?._zeroFrames?.[0]?.kind==='video',

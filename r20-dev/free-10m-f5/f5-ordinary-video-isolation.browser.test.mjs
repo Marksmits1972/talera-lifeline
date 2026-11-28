@@ -191,8 +191,9 @@ try{
       childList:true,subtree:true,attributes:true,attributeFilter:['src']});
     window.__taleraOrdinaryVideoObserver=observer;
   });
-  // No manual selection: wait for the normal photo timer to bring the video into view.
-  await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:18000});
+  // No manual selection: two ordinary photos now take 2 × 10 seconds before the video.
+  // Allow modest decode/runner overhead without weakening the media playback assertions.
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:27000});
   const info=()=>page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     const v=document.querySelector('video.talera-v61-inline-video');
@@ -228,7 +229,7 @@ try{
   // Switch the same existing Settings contract ON before the next automatic cycle.
   await page.evaluate(()=>{window.__taleraAudioControls.isEnabled=()=>true});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=2,
-    null,{timeout:18000});
+    null,{timeout:27000});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[1]?.played,
     null,{timeout:10000});
   const audible=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[1]);
@@ -350,7 +351,7 @@ try{
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
     null,{timeout:7000});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
-    null,{timeout:16000});
+    null,{timeout:27000});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[3]?.played,
     null,{timeout:7000});
   const consecutive=await page.evaluate(()=>({

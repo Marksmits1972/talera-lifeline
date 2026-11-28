@@ -178,7 +178,7 @@ jobs:
 
   f5_candidate_package:
     name: Build and archive the exact TALERA Free candidate once
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-memory-first-editor-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-whatsapp-optional-preview-seven-days-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -243,7 +243,7 @@ jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-memory-first-editor-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-whatsapp-optional-preview-seven-days-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -296,7 +296,7 @@ jobs:
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
     needs: f5_candidate_package
-    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-memory-first-editor-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127') }}
+    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-whatsapp-optional-preview-seven-days-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     env:
@@ -1200,7 +1200,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-memory-first-editor-exact-green-20261128' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-whatsapp-optional-preview-seven-days-green-20261128' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     concurrency:
@@ -1214,7 +1214,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: 997dea30-774b-4309-a3c1-4de19452ee84
+      F5_EXPECTED_LIVE_VERSION: 472182a3-b58c-4c1b-8bef-78a8c0d9b291
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -1241,37 +1241,34 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse HEAD^1)" = 0e02324612d22e69d311a67d66436b5a573b756c
-          test "$(git rev-parse HEAD~2)" = 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
+          test "$(git rev-parse HEAD^1)" = 9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02
           test "$(git diff --name-only HEAD^1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          test "$(git diff --name-only HEAD~2 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          # Same shared app, only owner-approved memory-first editor and visual recorder response plus regression tests; preserve silent photo location.
-          git checkout --detach 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
-          test "$(git rev-parse HEAD)" = 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
-          test "$(git rev-parse HEAD^)" = 5ae325f232cc8c6d0c0fc66736ea0735e5dc62b0
-          test "$(git rev-parse HEAD^{tree})" = 51a5972af092e66c7d35f766cb11b7feb08130e8
-          test "$(git diff --name-only f4741512710353659a0e4862bcf02d3788235b91 HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-desktop-layout.browser-test.mjs r20-dev/free-10m-f5/f5-edit-return.browser-test.mjs r20-dev/free-10m-f5/f5-language-catalog.mjs r20-dev/free-10m-f5/f5-memory-first-editor.mjs r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs r20-dev/free-10m-f5/f5-voice-orb-build.mjs r20-dev/free-10m-f5/f5-voice-orb.browser-test.mjs r20-dev/free-10m-f5/f5-voice-orb.browser.js)"
-          test "$(git diff --name-only f4741512710353659a0e4862bcf02d3788235b91 HEAD^)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-desktop-layout.browser-test.mjs r20-dev/free-10m-f5/f5-edit-return.browser-test.mjs r20-dev/free-10m-f5/f5-language-catalog.mjs r20-dev/free-10m-f5/f5-memory-first-editor.mjs r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs r20-dev/free-10m-f5/f5-voice-orb-build.mjs r20-dev/free-10m-f5/f5-voice-orb.browser-test.mjs r20-dev/free-10m-f5/f5-voice-orb.browser.js)"
+          # Exact green product candidate on the current shared app; WhatsApp derivative and duration only.
+          git checkout --detach 9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02
+          test "$(git rev-parse HEAD)" = 9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02
+          test "$(git rev-parse HEAD^)" = 67677ef70d1ad0102b55dc141e0f22af22d6a226
+          test "$(git rev-parse HEAD^{tree})" = 8619edc5a90177bf67b78e6775fba7be80920379
+          test "$(git diff --name-only 76de95b7c6ce6dc0f3d18d5540b90b58d503c424 HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-local-test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs r20-dev/free-10m-f5/f5-worker.mjs r20-dev/free-10m-social-do/guest-preview-policy.mjs r20-dev/free-10m-social-do/guest-preview-policy.test.mjs r20-dev/free-10m-social-do/social-worker.mjs)"
           test "$(git diff --name-only HEAD^ HEAD)" = r20-dev/free-10m-f5/f5-browser-account-isolation.mjs
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-edit-return.browser-test.mjs)" = e69aa7819a097ac0a8a7be639e9bc561395b8a2b
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-independent-narrator.browser.js)" = e2658df560743c77e1ab5fbe8f96131a93968b6f
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-independent-narrator.test.mjs)" = 0296a7d94a964aa97cbab5de1ab6e1f6d99b3d32
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-language-catalog.mjs)" = 847114fcc92d2c7011084211bbb4820e292386fb
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)" = 1083db9e8166d04a86b2fa45694f53c05aea1b41
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-public-assets.mjs)" = f48199069f0965b3c1bbc665327af85069a66b23
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-public-assets.mjs)" = 04698f124fa5c4775504fb01a75364dc4b23fd23
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-voice-orb-build.mjs)" = 7fb9f643e3104061897294d859bce5bd0c55bfcf
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-voice-orb.browser-test.mjs)" = aa477f5bf9b1dff7d62a8f119d472dace14f26ca
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-voice-orb.browser.js)" = d69df957a678d5e33f4ede284decd594b94e55fc
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-voice-orb.test.mjs)" = 8d2553aa3fd8b383fdf70ad6e8d4b69e6fa2e4e5
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-capture-place-presentation.browser.js)" = 2a2a4318ceebca9eccb0cb319650f4452201c6ab
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-memory-location.test.mjs)" = a3d9c7a131a31efd5ffdf9f184a7dd03007b6a9e
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-browser-account-isolation.mjs)" = 75777a62da0c82b59953318f025dbcc1648606f8
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-browser-account-isolation.mjs)" = 71bedec549d5e080cfa148d1f8f8a054d7a85659
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-storage-only-contract.test.mjs)" = 278851a615ea33e5c12b14b68a1b4fee998691f6
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-worker.mjs)" = 84258ad433a2f283bf3541b72f7ddc271d824af8
-          test "$(git rev-parse HEAD:r20-dev/free-10m-social-do/guest-preview-policy.mjs)" = bae58d2d3f91434f01a65caaa0f3fda16f4f3493
-          test "$(git rev-parse HEAD:r20-dev/free-10m-social-do/guest-preview-policy.test.mjs)" = ef1f9bdf865e24ae15e54e6a5f437fcdf64fc0e4
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-worker.mjs)" = 3da35b4a16706852ed62293160c1405557ac88a3
+          test "$(git rev-parse HEAD:r20-dev/free-10m-social-do/guest-preview-policy.mjs)" = cc4190ba8e6d1f5780db3152014d2f23b6c50c5e
+          test "$(git rev-parse HEAD:r20-dev/free-10m-social-do/guest-preview-policy.test.mjs)" = 1783d2c53a7acd051b3c900a0beaf203df9502d6
           test "$(git rev-parse HEAD:r20-dev/free-10m-social-do/social-objects.mjs)" = 5b8da2a5029cafd96064dae50cc7affae4629243
-          test "$(git rev-parse HEAD:r20-dev/free-10m-social-do/social-worker.mjs)" = 7531163ce560509bc34349981cacc89a3f309156
+          test "$(git rev-parse HEAD:r20-dev/free-10m-social-do/social-worker.mjs)" = 5090bbdb80b5699c7d4bee294634aef39e4821cb
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-desktop-layout.browser-test.mjs)" = 5eb9c90504c8f333b3f07ba1b3542eea21e6f04c
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-editor-clean-layout.mjs)" = b1d4e7435da2916e518f4e4bf92006913cddc21d
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-editor-clean-layout.test.mjs)" = d71b280799e17b85368ce910871f37512dadaba4
@@ -1279,7 +1276,8 @@ jobs:
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-memory-location.mjs)" = 22ad226fb154e72de0e6e58a2858fc3c9d54f4f5
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-offline-locality.test.mjs)" = febb23b27557a0cc1c97e214a101654d9f72a8fe
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-memory-first-editor.mjs)" = f34a33dda65371db022db6fd713e0906a5690580
-          echo TALERA_RELEASE_EXACT_MEMORY_FIRST_EDITOR_SOURCE_VERIFIED 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-local-test.mjs)" = 2a6f747fb3e49ae2ae0628e90d5871c451118de6
+          echo TALERA_RELEASE_EXACT_WHATSAPP_PREVIEW_FIXED_DURATION_SOURCE_VERIFIED 9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -1288,7 +1286,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='46169161502',sha='1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811',runSha='1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811',digest='238e26073128752d4bbe000ff42f08f643ab0465ec1858439c9a86b4b638cd84';
+          const id='46171385164',sha='9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02',runSha='9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02',digest='455fffbf84d49eac696da9ba104879b0ff669f6ca70447709f34b5b0d6322ba7';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const packageName='Build and archive the exact TALERA Free candidate once';
@@ -1317,7 +1315,7 @@ jobs:
           const artifacts=await get(id+'/artifacts?name=talera-free-f5-candidate-package&per_page=100');
           assert.equal(artifacts.artifacts.length,1);
           const artifact=artifacts.artifacts[0];
-          assert.equal(String(artifact.id),'15273096712');assert.equal(artifact.digest,'sha256:72ebf58f16875baa2c184c1f353f087fbe50df120e6bc5d4ea6657d3f6598e16');assert.equal(artifact.expired,false);
+          assert.equal(String(artifact.id),'15272999069');assert.equal(artifact.digest,'sha256:e9358c9e3b576146da52cff0e3866bf5b4f64b0834958afeaa49accdd3a6d82d');assert.equal(artifact.expired,false);
           assert.equal(artifact.workflow_run?.head_sha,runSha);assert.equal(String(artifact.workflow_run?.id),id);
           const readLog=async job=>{
             const r=await fetch(root.replace('/runs/','/jobs/')+job.id+'/logs',{
@@ -1346,6 +1344,7 @@ jobs:
             'TALERA_FREE_COMPACT_LINK_CAPTION_SHARE_PAYLOAD_PASS',
             'TALERA_FREE_COMPACT_PERSONAL_LINK_SHARE_PAYLOAD_PASS',
             'TALERA_COMPACT_WHATSAPP_ACTUAL_SAME_APP_TARGETED_PASS',
+            'TALERA_COMPACT_PREVIEW_METADATA_SANITIZED_AND_OPTIONAL_HTTP_REJECTION_FALLBACK_PASS',
             'TALERA_GUEST_FIRST_BROWSER_CLAIM_FORWARD_DENIED_PASS',
             'TALERA_GUEST_EDITOR_HIDDEN_AND_CLICK_BLOCKED_PASS','TALERA_GUEST_PHOTO_BROWSER_THEME_HINT_PASS',
             'TALERA_GUEST_COMPLETE_ORIGINAL_MULTIMEDIA_NARRATION_PASS']){
@@ -1359,6 +1358,7 @@ jobs:
           const accountLog=await accountLogResponse.text();
           assert.ok(accountLog.split('\n').some(line=>line.includes('Z TALERA_FREE_WHATSAPP_ASYNC_AUTH_DRAFT_AND_CARET_PRESERVED_PASS')),'Missing independent async draft regression proof');
           assert.ok(actualLine(accountLog,'TALERA_COMPACT_WHATSAPP_ACTUAL_SAME_APP_TARGETED_PASS'),'Missing independent compact guest invitation proof');
+          assert.ok(actualLine(accountLog,'TALERA_COMPACT_PREVIEW_METADATA_SANITIZED_AND_OPTIONAL_HTTP_REJECTION_FALLBACK_PASS'),'Missing independent optional preview fallback proof');
           console.log('TALERA_EXACT_DESKTOP_AND_WHATSAPP_BROWSER_REGRESSION_EVIDENCE_VERIFIED');
           for(const input of [log,accountLog]){
             for(const marker of ['TALERA_TELL_EDITOR_LAYOUT_ONLY_PASS','TALERA_FREE_WRITE_SIX_PHOTO_CARET_AND_SAVE_PASS','TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS'])
@@ -1437,7 +1437,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_46169161502');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_46171385164');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1489,17 +1489,17 @@ jobs:
         with:
           name: talera-free-f5-candidate-package
           github-token: ${{ github.token }}
-          run-id: 46169161502
+          run-id: 46171385164
           path: ${{ runner.temp }}/talera-candidate-package
       - name: Verify source and tested SHA256 before unpacking for release
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(cat "$out/source.sha")" = "1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811"
-          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "238e26073128752d4bbe000ff42f08f643ab0465ec1858439c9a86b4b638cd84"
+          test "$(cat "$out/source.sha")" = "9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02"
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "455fffbf84d49eac696da9ba104879b0ff669f6ca70447709f34b5b0d6322ba7"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=238e26073128752d4bbe000ff42f08f643ab0465ec1858439c9a86b4b638cd84"
+          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=455fffbf84d49eac696da9ba104879b0ff669f6ca70447709f34b5b0d6322ba7"
       - name: Verify exact compact WhatsApp software assets before release
         run: |
           set -euo pipefail
@@ -1515,11 +1515,15 @@ jobs:
             if(route.endsWith('ui-integration.mjs')){
               assert.ok(bytes.includes('taleraCompactPreviewPhoto')&&bytes.includes('navigator.share({text:caption})'));
               assert.ok(!bytes.includes('navigator.share({files:[photo]'));
+              assert.ok(bytes.includes('sanitizeCompactJPEG')&&bytes.includes('INVALID_COMPACT_PREVIEW'));
+              assert.ok(!bytes.includes('id="talera-clean-expiry"'));
+            }else{
+              assert.ok(bytes.includes('Object.freeze([168])'),'New link controller must offer only fixed 168 hours');
             }
             fs.writeFileSync(file,bytes);
           }
           const policy=fs.readFileSync('r20-dev/free-10m-social-do/guest-preview-policy.mjs','utf8');
-          assert.ok(policy.includes('[1,24,168]')&&policy.includes('PREVIEW_LIMIT=131072'));
+          assert.ok(policy.includes('GUEST_DURATION_HOURS=168')&&policy.includes('PREVIEW_LIMIT=131072')&&policy.includes('sanitizeCompactJPEG'));
           console.log('TALERA_COMPACT_WHATSAPP_EXACT_TESTED_SOFTWARE_ASSETS_VERIFIED');
           NODE
       - name: Verify exact offline locality data and attribution software before release
@@ -1710,8 +1714,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_46169161502'
+          git diff --exit-code 9203e67e1fe9bdaf7ba28b19bc2dcf42ba459c02 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_46171385164'
       - name: Verify actual private device-transfer signaling and retained diagnosis in the same local Worker
         run: |
           set -euo pipefail
@@ -2208,7 +2212,7 @@ jobs:
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-memory-first-editor-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-whatsapp-optional-preview-seven-days-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -2376,7 +2380,7 @@ jobs:
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-memory-first-editor-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-settled-layout-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-voice-only-orb-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-internal-people-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-whatsapp-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-editor-visual-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-whatsapp-optional-preview-seven-days-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     env:

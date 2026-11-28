@@ -952,7 +952,7 @@ function guestPreviewMeta(request,basePath,gate){
    '<meta property="og:title" content="'+safeShareHtml(gate.previewTitle||translate(lang,'guest.preview.title'))+'">'+
    '<meta name="twitter:card" content="summary">'+
    '<meta property="og:url" content="'+safeShareHtml(publicOrigin+basePath)+'">'+
-   '<meta property="og:image" content="'+safeShareHtml(publicOrigin+(hasPreview?basePath+'/preview':'/pwa-512.png'))+'">'+
+   '<meta property="og:image" content="'+safeShareHtml(u.origin+(hasPreview?basePath+'/preview':'/pwa-512.png'))+'">'+
    '<meta property="og:image:width" content="512"><meta property="og:image:height" content="512">';
  }
  return '<meta property="og:type" content="article">'+

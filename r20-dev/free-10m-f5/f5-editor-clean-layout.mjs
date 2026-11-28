@@ -110,7 +110,7 @@ body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{posi
 #app #main .work.talera-r16-editor .talera-tags-toggle{
  background:#fff!important;color:#071A3D!important;border-color:#DCE2EC!important;
  min-height:48px!important;padding:9px 12px!important;font-weight:650!important;
- white-space:normal!important;overflow-wrap:anywhere!important;
+ white-space:nowrap!important;
 }
 #app #main .work.talera-r16-editor .talera-tags-toggle::after{color:#23497E!important;}
 #app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]{color:#071A3D!important;}
@@ -153,10 +153,19 @@ body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{posi
 @media (max-width:1023px), (hover:none), (pointer:coarse){
  body:not(.talera-v61-inline-recording):has(#app #main .work.talera-r16-editor) #app #main{
    flex:1 1 0!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;
+   margin-bottom:calc(90px + max(12px,env(safe-area-inset-bottom,0px)))!important;
    overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;
  }
  body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor{
    flex:1 0 auto!important;min-height:100%!important;
+ }
+ /* The original action dock must never move when either panel expands.
+    Reserve its actual 90px height plus the old bottom inset outside the
+    scrollport so every location row can scroll fully above it. */
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor>.work-tools.talera-r16-toolbar{
+   position:fixed!important;left:50%!important;right:auto!important;top:auto!important;
+   bottom:max(12px,env(safe-area-inset-bottom,0px))!important;transform:translateX(-50%)!important;
+   width:min(calc(100% - 32px),658px)!important;margin:0!important;z-index:20!important;
  }
  #app #main .work.talera-r16-editor .talera-tags-v20{margin:10px 0 0!important;}
  #app #main .work.talera-r16-editor .talera-tags-toggle{border-radius:12px!important;}
@@ -181,6 +190,9 @@ body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{posi
  body.talera-v61-inline-recording #app .work.talera-compact-work #frame:has(> #prev) > :is(img,video){
    height:calc(100% - 232px - env(safe-area-inset-bottom,0px))!important;
  }
+}
+@media (max-width:359px){
+ #app #main .work.talera-r16-editor .talera-tags-toggle{white-space:normal!important;overflow-wrap:anywhere!important;}
 }
 
 /* Desktop workbench only: same fields/media nodes, same draft and save handlers.

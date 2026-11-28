@@ -235,6 +235,8 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   for(const [width,height] of [[320,568],[390,844],[430,932]]){
    await page.setViewportSize({width,height});
    const tags=page.locator('.talera-tags-toggle'),loc=page.locator('.talera-location-toggle');
+   const publish=page.locator('.talera-r16-toolbar #publish');
+   const fixedBefore=await publish.boundingBox();
    await tags.scrollIntoViewIfNeeded();
    await tags.click();
    assert.equal(await tags.getAttribute('aria-expanded'),'true');
@@ -251,13 +253,14 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
     return {inside:r.top>=main.top-1&&r.bottom<=main.bottom+1,hit:hit===e||e.contains(hit),overflow:document.documentElement.scrollWidth>innerWidth+1};
    });
    assert.ok(visible.inside&&visible.hit&&!visible.overflow,'Reachable expanded location controls at '+width+'px '+JSON.stringify(visible));
-   const publish=page.locator('.talera-r16-toolbar #publish');
    await publish.scrollIntoViewIfNeeded();
    const pub=await publish.evaluate(e=>{
     const r=e.getBoundingClientRect(),s=getComputedStyle(e),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
     return {rgb:s.backgroundColor,hit:hit===e||e.contains(hit),disabled:e.disabled};
    });
    assert.ok(!pub.disabled&&pub.rgb==='rgb(7, 26, 61)'&&pub.hit,'Existing Save remains the reachable primary action '+JSON.stringify(pub));
+   const fixedAfter=await publish.boundingBox();
+   assert.ok(fixedBefore&&fixedAfter&&Math.abs(fixedBefore.y-fixedAfter.y)<2,'Both expanded panels must leave Save at the same fixed position');
    // Close the original panels, then enter the original writer.
    await loc.click();await tags.click();
    await page.locator('#write').click();

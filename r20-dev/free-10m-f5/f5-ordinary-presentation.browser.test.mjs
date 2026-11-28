@@ -962,6 +962,66 @@ async function testTimelineLoupe(){
  }finally{await loupeCtx.close()}
 }
 
+  async function testCompactCapturePlace(){
+    const metadataPage=await ctx.newPage();
+    try{
+    // Exercise the two stored approximation sources without changing the
+    // original bytes, source provenance, editor, title or reaction dock.
+    // These three technical photos use the same actual account-local writer.
+    await metadataPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
+    await metadataPage.waitForFunction(()=>!!window.TaleraMemories?.save);
+    const compact=await metadataPage.evaluate(async()=>{
+      const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+      const ctx=canvas.getContext('2d');ctx.fillStyle='#008267';ctx.fillRect(0,0,64,64);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+      const places=[
+        {countryCode:'HR',country:'Kroatië',city:'Plitvička Jezera',source:'offline-locality-v1'},
+        {countryCode:'NL',country:'Nederland',city:'Boxtel',source:'geonames-locality-v2'},
+        {countryCode:'AT',country:'Oostenrijk',city:'',source:'offline-country-v1'}
+      ];
+      const row=await window.TaleraMemories.save({title:'Synthetic compact location',date:'2026-11-10',text:'',photoLocations:places.map(place=>({automatic:{state:'known',place,localityChecked:true}}))},places.map((_,i)=>new File([blob],'compact-'+i+'.jpg',{type:'image/jpeg'})));
+      return {id:row.id,places,keys:row.items.map(x=>x.key),bytes:[...new Uint8Array(await blob.arrayBuffer())]};
+    });
+    await metadataPage.goto(origin+'/present?memory='+encodeURIComponent(compact.id),{waitUntil:'domcontentloaded'});
+    await metadataPage.waitForFunction(id=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3},compact.id,{timeout:20000});
+    const oldSize=metadataPage.viewportSize(),proof=[];
+    for(const viewport of [{width:320,height:700},{width:390,height:844},{width:430,height:932},{width:1280,height:800}]){
+     await metadataPage.setViewportSize(viewport);
+     for(const [index,expected] of [[0,'Kroatië · Plitvička Jezera'],[1,'Nederland · Boxtel'],[2,'Oostenrijk']]){
+      await metadataPage.evaluate(i=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,i,true)},index);
+      await metadataPage.waitForFunction(text=>{
+       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social');
+       return row&&!row.hidden&&row.textContent===text&&dock?.getBoundingClientRect().width>0&&row.getBoundingClientRect().right<=dock.getBoundingClientRect().left-7;
+      },expected,{timeout:10000});
+      const geometry=await metadataPage.evaluate(()=>{
+       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social'),label=row.querySelector('.talera-capture-label'),flag=row.querySelector('.talera-capture-flag');
+       const r=row.getBoundingClientRect(),d=dock.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(label);
+       const lines=Array.from(range.getClientRects()).filter(r=>r.width>0);
+       return {width:innerWidth,lines:lines.length,left:r.left,right:r.right,dockLeft:d.left,dockRight:d.right,dockTop:d.top,dockBottom:d.bottom,flagWidth:flag.getBoundingClientRect().width,
+        labelVisible:label.scrollWidth<=label.clientWidth+1&&label.scrollHeight<=label.clientHeight+1,
+        textWithin:lines.every(l=>l.right<=d.left-7&&l.left>=r.left),font:getComputedStyle(label).fontSize,belowTitle:row.previousElementSibling?.id==='memoryStory'};
+      });
+      assert.ok(geometry.labelVisible&&geometry.textWithin&&geometry.belowTitle,JSON.stringify(geometry));
+      assert.equal(geometry.flagWidth,16);assert.equal(geometry.font,'12px');
+      if(index===0&&viewport.width===320)assert.ok(geometry.lines>=2,'Long name wraps rather than truncating');
+      if(index>0){const before=proof.at(-1);assert.deepEqual([geometry.dockLeft,geometry.dockRight,geometry.dockTop,geometry.dockBottom],[before.dockLeft,before.dockRight,before.dockTop,before.dockBottom],'Share dock must remain fixed');}
+      proof.push({index,...geometry});
+     }
+    }
+    await metadataPage.setViewportSize(oldSize);
+    const retained=await metadataPage.evaluate(async id=>{
+      const original=await window.TaleraMemories.get(id);
+      const bytes=await Promise.all(original.items.map(async item=>[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]));
+      return {keys:original.items.map(x=>x.key),places:original.items.map(x=>x.capturePlace),bytes};
+    },compact.id);
+    assert.deepEqual(retained.keys,compact.keys);assert.deepEqual(retained.places,compact.places);
+    assert.deepEqual(retained.bytes,compact.places.map(()=>compact.bytes));
+    await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),compact.id);
+    console.log('TALERA_COMPACT_CAPTURE_PLACE_NO_CREDIT_NO_OVERLAP_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',proof,storedLocationsAndOriginalsPreserved:true}));
+    }finally{await metadataPage.close()}
+  }
+  await testCompactCapturePlace();
+
   if(webkitPickerOnly){
     // Reuse the actual same-account, same-origin GPS-to-catalog browser scenario
     // with the WebKit engine before ending the existing picker-only run.
@@ -1462,59 +1522,6 @@ async function testTimelineLoupe(){
     console.log('TALERA_PER_PHOTO_LOCATION_COMPACT_ROWS_AND_INDIVIDUAL_CORRECTION_PASS');
     await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),result.id);
     console.log('TALERA_CAPTURE_PLACE_ACCOUNT_CATALOG_REOPEN_PASS');
-    // Exercise the two stored approximation sources without changing the
-    // original bytes, source provenance, editor, title or reaction dock.
-    // These three technical photos use the same actual account-local writer.
-    await metadataPage.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
-    await metadataPage.waitForFunction(()=>!!window.TaleraMemories?.save);
-    const compact=await metadataPage.evaluate(async()=>{
-      const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
-      const ctx=canvas.getContext('2d');ctx.fillStyle='#008267';ctx.fillRect(0,0,64,64);
-      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
-      const places=[
-        {countryCode:'HR',country:'Kroatië',city:'Plitvička Jezera',source:'offline-locality-v1'},
-        {countryCode:'NL',country:'Nederland',city:'Boxtel',source:'geonames-locality-v2'},
-        {countryCode:'AT',country:'Oostenrijk',city:'',source:'offline-country-v1'}
-      ];
-      const row=await window.TaleraMemories.save({title:'Synthetic compact location',date:'2026-11-10',text:'',photoLocations:places.map(place=>({automatic:{state:'known',place,localityChecked:true}}))},places.map((_,i)=>new File([blob],'compact-'+i+'.jpg',{type:'image/jpeg'})));
-      return {id:row.id,places,keys:row.items.map(x=>x.key),bytes:[...new Uint8Array(await blob.arrayBuffer())]};
-    });
-    await metadataPage.goto(origin+'/present?memory='+encodeURIComponent(compact.id),{waitUntil:'domcontentloaded'});
-    await metadataPage.waitForFunction(id=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===3},compact.id,{timeout:20000});
-    const oldSize=metadataPage.viewportSize(),proof=[];
-    for(const viewport of [{width:320,height:700},{width:390,height:844},{width:430,height:932},{width:1280,height:800}]){
-     await metadataPage.setViewportSize(viewport);
-     for(const [index,expected] of [[0,'Kroatië · Plitvička Jezera'],[1,'Nederland · Boxtel'],[2,'Oostenrijk']]){
-      await metadataPage.evaluate(i=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,i,true)},index);
-      await metadataPage.waitForFunction(text=>{
-       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social');
-       return row&&!row.hidden&&row.textContent===text&&dock?.getBoundingClientRect().width>0&&row.getBoundingClientRect().right<=dock.getBoundingClientRect().left-7;
-      },expected,{timeout:10000});
-      const geometry=await metadataPage.evaluate(()=>{
-       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social'),label=row.querySelector('.talera-capture-label'),flag=row.querySelector('.talera-capture-flag');
-       const r=row.getBoundingClientRect(),d=dock.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(label);
-       const lines=Array.from(range.getClientRects()).filter(r=>r.width>0);
-       return {width:innerWidth,lines:lines.length,left:r.left,right:r.right,dockLeft:d.left,dockRight:d.right,dockTop:d.top,dockBottom:d.bottom,flagWidth:flag.getBoundingClientRect().width,
-        labelVisible:label.scrollWidth<=label.clientWidth+1&&label.scrollHeight<=label.clientHeight+1,
-        textWithin:lines.every(l=>l.right<=d.left-7&&l.left>=r.left),font:getComputedStyle(label).fontSize,belowTitle:row.previousElementSibling?.id==='memoryStory'};
-      });
-      assert.ok(geometry.labelVisible&&geometry.textWithin&&geometry.belowTitle,JSON.stringify(geometry));
-      assert.equal(geometry.flagWidth,16);assert.equal(geometry.font,'12px');
-      if(index===0&&viewport.width===320)assert.ok(geometry.lines>=2,'Long name wraps rather than truncating');
-      if(index>0){const before=proof.at(-1);assert.deepEqual([geometry.dockLeft,geometry.dockRight,geometry.dockTop,geometry.dockBottom],[before.dockLeft,before.dockRight,before.dockTop,before.dockBottom],'Share dock must remain fixed');}
-      proof.push({index,...geometry});
-     }
-    }
-    await metadataPage.setViewportSize(oldSize);
-    const retained=await metadataPage.evaluate(async id=>{
-      const original=await window.TaleraMemories.get(id);
-      const bytes=await Promise.all(original.items.map(async item=>[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]));
-      return {keys:original.items.map(x=>x.key),places:original.items.map(x=>x.capturePlace),bytes};
-    },compact.id);
-    assert.deepEqual(retained.keys,compact.keys);assert.deepEqual(retained.places,compact.places);
-    assert.deepEqual(retained.bytes,compact.places.map(()=>compact.bytes));
-    await metadataPage.evaluate(id=>window.TaleraMemories.remove(id),compact.id);
-    console.log('TALERA_COMPACT_CAPTURE_PLACE_NO_CREDIT_NO_OVERLAP_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',proof,storedLocationsAndOriginalsPreserved:true}));
 
   }finally{await metadataPage.close()}
 

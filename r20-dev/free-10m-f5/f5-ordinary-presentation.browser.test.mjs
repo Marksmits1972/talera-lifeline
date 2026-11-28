@@ -1533,6 +1533,17 @@ async function testTimelineLoupe(){
     });
     await start(enabled);
   }
+  // The catalog predicates are asynchronous IndexedDB reads. Explicitly poll
+  // their resolved values, not a Promise's truthiness in a browser predicate.
+  async function waitForCatalog(page,predicate,arg,{timeout=30000}={}){
+    const deadline=Date.now()+timeout;
+    do{
+      const result=await page.evaluate(predicate,arg);
+      if(result)return result;
+      await page.waitForTimeout(150);
+    }while(Date.now()<deadline);
+    throw Error('TALERA_CATALOG_PREDICATE_NOT_SATISFIED');
+  }
   async function testGeoNamesCatalog(){
   await restartGeoWorker(true);
   const geoCtx=await browser.newContext({...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'block',
@@ -1612,7 +1623,7 @@ async function testTimelineLoupe(){
     assert.equal(draftReady,true,'Actual picker must retain every original GPS-bearing byte');
     await geoPage.locator('#publish').waitFor({state:'visible',timeout:15000});
     assert.equal(await geoPage.locator('.talera-memory-location,.talera-location-toggle,#talera-memory-country,#talera-memory-city').count(),0);
-    await geoPage.waitForFunction(async expected=>{
+    await waitForCatalog(geoPage,async expected=>{
       const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
       return d.catalog.some(g=>g.media.length===1&&g.photoLocationAutomatic?.[g.media[0]]?.place?.countryCode==='NL'&&g.photoLocationAutomatic[g.media[0]].place.source===expected);
     },'offline-country-v1',{timeout:15000});
@@ -1622,12 +1633,12 @@ async function testTimelineLoupe(){
     await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
     for(let i=0;i<100&&!localityRequests.length;i++)await geoPage.waitForTimeout(100);
     assert.equal(localityRequests.length,1,'Reconnection must wake the existing draft immediately');
-    await geoPage.waitForFunction(async expected=>{
+    await waitForCatalog(geoPage,async expected=>{
       const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
       return d.catalog.some(g=>g.media.length===1&&g.photoLocationAutomatic?.[g.media[0]]?.place?.countryCode==='NL'&&g.photoLocationAutomatic[g.media[0]].place.source===expected);
     },'offline-country-v1',{timeout:15000});
     releaseLocality();
-    await geoPage.waitForFunction(async expected=>{
+    await waitForCatalog(geoPage,async expected=>{
       const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
       return d.catalog.some(g=>g.media.length===1&&g.photoLocationAutomatic?.[g.media[0]]?.place?.city===expected&&g.photoLocationAutomatic[g.media[0]].place.source==='offline-locality-v1');
     },expectedPlace.city,{timeout:30000});
@@ -1650,7 +1661,7 @@ async function testTimelineLoupe(){
     // The later real publish test still proves the editor carries the exact
     // completed draft location without waiting for any post-save enrichment.
     try{
-      await geoPage.waitForFunction(async ({id,expected})=>{
+      await waitForCatalog(geoPage,async ({id,expected})=>{
         const item=(await window.TaleraMemories.get(id))?.items?.[0];
         return item?.capturePlace?.countryCode===expected.countryCode&&item.capturePlace.city===expected.city&&item.capturePlace.source===expected.source;
       },{id:saved.id,expected:expectedPlace},{timeout:30000});
@@ -1668,10 +1679,18 @@ async function testTimelineLoupe(){
       const m=window.__taleraTimelineRuntime?.currentMemory?.();
       return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length===1;
     },saved.id,{timeout:20000});
-    await geoPage.waitForFunction(expected=>{
-      const row=document.getElementById('talera-capture-place');
-      return row&&!row.hidden&&row.getClientRects().length>0&&row.textContent===expected;
-    },country+' · Arnhem',{timeout:30000});
+    try{
+      await geoPage.waitForFunction(expected=>{
+        const row=document.getElementById('talera-capture-place');
+        return row&&!row.hidden&&row.getClientRects().length>0&&row.textContent===expected;
+      },country+' · Arnhem',{timeout:30000});
+    }catch(error){
+      console.error('TALERA_DIRECT_PRESENT_LOCATION_DIAGNOSTIC',JSON.stringify(await geoPage.evaluate(async id=>{
+        const row=document.getElementById('talera-capture-place'),m=window.__taleraTimelineRuntime?.currentMemory?.();
+        const stored=await window.TaleraMemories.get(id);
+        return {place:stored?.items?.[0]?.capturePlace??null,display:{exists:!!row,hidden:row?.hidden,text:row?.textContent,rects:row?.getClientRects().length},frame:m?._photoIndex,loading:m?._photoLoading,documentHidden:document.hidden};
+      },saved.id)));throw error;
+    }
     const stored=await geoPage.evaluate(async id=>{
       const row=await window.TaleraMemories.get(id),item=row.items[0];
       return {key:item.key,place:item.capturePlace,bytes:[...new Uint8Array(await (await window.TaleraMemories.blob(item.key)).arrayBuffer())]};
@@ -1712,7 +1731,7 @@ async function testTimelineLoupe(){
     await geoPage.locator('[data-open]').first().click();
     await geoPage.locator('#publish').waitFor({state:'visible',timeout:15000});
     assert.equal(await geoPage.locator('.talera-memory-location,.talera-location-toggle,#talera-memory-country,#talera-memory-city').count(),0);
-    await geoPage.waitForFunction(async expected=>{
+    await waitForCatalog(geoPage,async expected=>{
       const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
       return d.catalog.some(g=>g.media.length===1&&g.photoLocationAutomatic?.[g.media[0]]?.place?.city===expected&&g.photoLocationAutomatic[g.media[0]].place.source==='offline-locality-v1');
     },expectedPlace.city,{timeout:30000});
@@ -1752,14 +1771,11 @@ async function testTimelineLoupe(){
     await geoPage.locator('#photoInput').setInputFiles(six.map((bytes,i)=>({name:'six-location-'+i+'.jpg',mimeType:'image/jpeg',buffer:Buffer.from(bytes)})));
     await geoPage.locator('#publish').waitFor({state:'visible',timeout:20000});
     assert.equal(await geoPage.locator('.talera-memory-location,.talera-location-toggle,#talera-memory-country,#talera-memory-city').count(),0);
-    await geoPage.waitForFunction(async()=>{
+    const placedDraftId=await waitForCatalog(geoPage,async()=>{
      const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
-     return d.catalog.some(g=>g.media.length===6&&g.media.every((id,i)=>g.photoLocationAutomatic?.[id]?.state===(i<3?'known':'unknown')));
+     const group=d.catalog.find(g=>g.id&&g.media.length===6&&g.media.every((id,i)=>g.photoLocationAutomatic?.[id]?.state===(i<3?'known':'unknown')));
+     return group?.id||null;
     },null,{timeout:20000});
-    const placedDraftId=await geoPage.evaluate(async()=>{
-     const d=await window.TaleraMemories.draftReadPayload('talera-v4-work:manifest','talera-v4-work:');
-     return d.catalog.find(g=>g.media.length===6)?.id;
-    });
     assert.ok(placedDraftId,'Existing six-photo editor must have a real persisted concept');
     await geoPage.locator('#publish').click();
     await geoPage.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.has('published'),{timeout:25000});

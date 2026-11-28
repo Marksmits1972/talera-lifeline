@@ -31,6 +31,7 @@ export function installVoiceOrb(html,route){
     preview.addEventListener(event,previewTick);
   const onPageHide=event=>{if(!event.persisted)removeVoiceOrb()};
   window.addEventListener('pagehide',onPageHide);
+  ensureVoiceOrb(true); // Resting visual only: no microphone or AudioContext.
 `,'EDITOR_SESSION');
   one('  const cleanMedia=()=>{','  const cleanMedia=()=>{\n    removeVoiceOrb();','RECORD_CLEANUP');
   one('    preview.pause();panel.remove();document.body.classList.remove(\'talera-v61-inline-recording\');',
@@ -38,5 +39,7 @@ export function installVoiceOrb(html,route){
   one('      s.stream=await navigator.mediaDevices.getUserMedia({audio:true});',
       '      ensureVoiceOrb(true)?.prepareMic();\n      s.stream=await navigator.mediaDevices.getUserMedia({audio:true});','MICROPHONE_PREPARE');
   one('      r.start(1000);','      r.start(1000);voiceOrb?.startMic(s.stream,r);','MICROPHONE_EXISTING_STREAM');
+  one("}finally{s.saving=false;window.TaleraI18n.setText(start,'core.tell.recordStart3');start.disabled=false}",
+      "}finally{s.saving=false;window.TaleraI18n.setText(start,'core.tell.recordStart3');start.disabled=false;ensureVoiceOrb(!g.voice);if(g.voice)previewTick()}",'REST_AFTER_SAVE');
   return html;
 }

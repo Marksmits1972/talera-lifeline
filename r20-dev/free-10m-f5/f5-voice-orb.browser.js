@@ -114,13 +114,14 @@ function taleraMountVoiceOrb(host,{recording=false}={}){
     if(hasDrawn&&energy===0&&root.dataset.level==='0.000')return;
     root.dataset.level=energy.toFixed(3);hasDrawn=true;
     flowClock+=dt*energy*6;
-    core.style.transform='scale('+(1+energy*.045).toFixed(3)+')';
+    const visualEnergy=energy*(recording?1.25:1);
+    core.style.transform='scale('+(1+visualEnergy*.045).toFixed(3)+')';
     rings.forEach(({node,alpha},i)=>{
-      node.style.opacity=(alpha+energy*(.065+i*.025)).toFixed(3);
-      node.style.transform='translate(-50%,-50%) scale('+(1+energy*(.045+i*.016)).toFixed(3)+')';
+      node.style.opacity=(alpha+visualEnergy*(.065+i*.025)).toFixed(3);
+      node.style.transform='translate(-50%,-50%) scale('+(1+visualEnergy*(.045+i*.016)).toFixed(3)+')';
     });
     bars.forEach((bar,i)=>{
-      const movement=.76+energy*(.27+.25*Math.sin(flowClock*1.8+i*1.37));
+      const movement=.76+visualEnergy*(.27+.25*Math.sin(flowClock*1.8+i*1.37));
       bar.style.height=(profile[i]*100*movement).toFixed(2)+'%';
     });
   }

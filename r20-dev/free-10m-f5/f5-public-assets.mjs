@@ -17,6 +17,7 @@ import {installDesktopMemoryTransition} from './f5-desktop-memory-transition.mjs
 import {buildF5OfflineServiceWorker} from './f5-offline-sw.mjs';
 import {buildEditReturnBrowserSources} from './f5-edit-return.mjs';
 import {simplifyTellMemoryEditor} from './f5-editor-clean-layout.mjs';
+import {installMemoryFirstEditor} from './f5-memory-first-editor.mjs';
 import {completePublishedRemovalOnOtherPage,installOriginalPayloadReader} from './f5-library-editor-stable-save.mjs';
 import assert from 'node:assert/strict';
 import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu,keepOnlyFunctionalFreeMenu} from './f5-account-switch-guard.mjs';
@@ -2141,6 +2142,7 @@ for(const [route,filename] of Object.entries(routes)){
    'GUEST_ORIGINAL_ENTRY_DOM_MISSING');
  guest=installDesktopMemoryTransition(installDesktopPresentationLayout(installDesktopHomeLayout(guest,route),route),route);
  guest=localizeCore(guest,route);
+ if(route==='/tell')guest=installMemoryFirstEditor(guest,{authenticated:false});
  const guestFile=sha(guest)+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',guestFile),guest,'utf8');
  guestPages[route]='/__talera_free/f5references/'+guestFile;
@@ -2195,6 +2197,7 @@ for(const [route,filename] of Object.entries(routes)){
  html=localizeCore(html,route);
  if(route==='/present')html=installOrdinaryPhotoPause(html);
  html=installVoiceOrb(html,route);
+ if(route==='/tell')html=installMemoryFirstEditor(html);
  html=installInternalPresentation(html,route);
  const hash=sha(html),file=hash+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');

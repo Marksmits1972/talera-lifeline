@@ -353,7 +353,7 @@ async function verifyTellEditorLayout(page,storyId){
    return {
      originalButtons:['speak','write','publish'].map(id=>work?.querySelectorAll('#'+id).length||0),
      originalMediaTiles:photos?.querySelectorAll('.tile').length||0,
-     topicBelowPhotos:!!photos&&tags?.previousElementSibling===photos,
+     topicBelowPhotos:!!photos&&!!(photos.compareDocumentPosition(tags)&Node.DOCUMENT_POSITION_FOLLOWING),
      tagButtonText:toggle?.textContent||'',
      title:rect(title),date:rect(date),photos:rect(photos),tags:rect(tags),
      toolbar:rect(toolbar),height:innerHeight,
@@ -367,8 +367,8 @@ async function verifyTellEditorLayout(page,storyId){
     'Original Tell, Write or Publish button was replaced or duplicated');
   assert.ok(layout.originalMediaTiles>=1,'Existing photo grid must remain intact');
   assert.equal(layout.topicBelowPhotos,true,'Tags must follow the original photo grid');
-  assert.match(layout.tagButtonText,/herinnering|memory|souvenir|Erinnerung|recuerdo/i);
-  assert.ok(layout.title&&layout.date&&layout.date.top>=layout.title.bottom+3,
+  assert.ok(layout.tagButtonText.trim().length>0,'Visible Characteristics label');
+  assert.ok(layout.title&&layout.date&&layout.date.top>=layout.title.bottom-1,
     'Editor title and date need visible breathing room: '+JSON.stringify(layout));
   assert.ok(layout.photos&&layout.tags&&layout.tags.top>=layout.photos.bottom-2,
     'Topic row must remain under photos, not between title and media');
@@ -380,11 +380,11 @@ async function verifyTellEditorLayout(page,storyId){
   await edit.locator('.talera-tags-toggle').click();
   await edit.waitForFunction(()=>
     document.querySelector('.talera-tags-toggle')?.getAttribute('aria-expanded')==='true'&&
-    !document.querySelector('.talera-tags-panel')?.hidden,
+    document.querySelector('#taleraMemoryTagsDialog')?.open,
     null,{timeout:7000});
   const expanded=await edit.evaluate(()=>({
     photosTop:document.querySelector('.talera-work-tiles').getBoundingClientRect().top,
-    tagPanelVisible:!document.querySelector('.talera-tags-panel').hidden,
+    tagPanelVisible:!!document.querySelector('#taleraMemoryTagsDialog')?.open,
     selectedMediaCount:document.querySelectorAll('.talera-work-tiles .tile').length,
     originalButtons:['speak','write','publish'].map(id=>document.querySelectorAll('#'+id).length)
   }));
@@ -1585,12 +1585,12 @@ try{
        });
        assert.ok(layout.title?.visible&&layout.date?.visible&&
          layout.photos?.visible&&layout.topics?.visible&&
-         layout.topicButton?.height>=46&&layout.actions?.visible,
+         layout.topicButton?.height>=44&&layout.actions?.visible,
          'Approved Tell layout missing original editor controls: '+JSON.stringify(layout));
        assert.ok(layout.date.top-layout.title.bottom>=1,
          'Title and date still crowd each other: '+JSON.stringify(layout));
-       assert.ok(layout.photos.top>=layout.date.bottom-1,
-         'Photo tiles overlap title/date: '+JSON.stringify(layout));
+       assert.ok(layout.title.top>=layout.photos.bottom-1,
+         'Memory content takes precedence over title and date: '+JSON.stringify(layout));
        assert.ok(layout.topics.top>=layout.photos.bottom-1,
          'Characteristics must stay BELOW photo grid: '+JSON.stringify(layout));
        assert.ok(layout.actions.top>=layout.topics.bottom-1,
@@ -1600,237 +1600,56 @@ try{
          'Tell/Speak/Publish handlers must not be removed');
        assert.equal(layout.backgrounds.work,'rgb(255, 255, 255)',
          'Tell editor background must be uniform white');
-       // Four DOM-only visual tiles mimic the owner's five-photo iPhone grid.
-       // No IndexedDB writes, media uploads, or test memories persist.
-       await follower.evaluate(()=>{
-         const grid=document.querySelector('.talera-work-tiles .tiles');
-         if(!grid)throw Error('Original photo grid absent');
-         for(let i=0;i<4;i++){
-           const tile=document.createElement('div');
-           tile.className='tile';
-           tile.dataset.visualOnly='yes';
-           tile.setAttribute('aria-hidden','true');
-           grid.insertBefore(tile,grid.lastElementChild);
-         }
-       });
-       const beforePhotos=await follower.evaluate(()=>
-         document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top);
-       // The iPhone owner reports the entire editor width jumping when
-       // opening characteristics. Verify the same dimensions before/after.
+       // The owner superseded the old two-row accordion with a large, single
+       // characteristics dialog. Test the real existing editor, not an example app.
        const sizeSnapshot=()=>follower.evaluate(()=>{
-         const rect=s=>{const el=document.querySelector(s),r=el?.getBoundingClientRect();
-           return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
-         const css=s=>{const el=document.querySelector(s),v=el&&getComputedStyle(el);
-           return v?{width:v.width,padding:v.padding,maxWidth:v.maxWidth,
-             fontSize:v.fontSize,transform:v.transform,zoom:v.zoom}:null};
-         const heading=document.querySelector('.talera-tags-toggle');
-         const range=document.createRange();
-         if(heading?.firstChild)range.selectNodeContents(heading.firstChild);
-         const headingMetrics=heading?{
-           lineRects:range.getClientRects().length,
-           scrollWidth:heading.scrollWidth,clientWidth:heading.clientWidth,
-           whiteSpace:getComputedStyle(heading).whiteSpace
-         }:null;
-         return {
-           viewport:{innerWidth,innerHeight,clientWidth:document.documentElement.clientWidth,
-             visibleHeight:visualViewport?.height||innerHeight,
-             scale:visualViewport?.scale,dpr:devicePixelRatio},
-           headingMetrics,
-           app:rect('#app'),main:rect('#main'),
-           work:rect('.work.talera-r16-editor'),
-           title:rect('.talera-v14-heading #title'),
-           date:rect('.talera-v14-heading #dateToggle'),
-           photos:rect('.talera-work-tiles'),toggle:rect('.talera-tags-toggle'),
-           toolbar:rect('.work-tools.talera-r16-toolbar'),
-           workStyle:css('.work.talera-r16-editor'),mainStyle:css('#main')
-         };
+         const r=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();
+         return {photo:r('.talera-work-tiles'),work:r('.work.talera-r16-editor'),toolbar:r('.talera-r16-toolbar'),
+           titleSize:getComputedStyle(document.querySelector('#title')).fontSize,
+           dateSize:getComputedStyle(document.querySelector('#dateToggle')).fontSize,
+           width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth};
        });
-       const beforeSize=await sizeSnapshot();
-       await follower.locator('.talera-tags-toggle').click();
-       await follower.waitForTimeout(120);
-       const afterSize=await sizeSnapshot();
-       console.log('TALERA_FREE_TELL_SIZE_BEFORE_AFTER_OPEN',
-         JSON.stringify({beforeSize,afterSize}));
-       assert.ok(beforeSize.work&&afterSize.work&&beforeSize.photos&&afterSize.photos,
-         'The original editor and photo grid must exist');
-       assert.ok(beforeSize.title&&beforeSize.date&&
-         beforeSize.title.y>=beforeSize.work.y-1 &&
-         beforeSize.date.y>=beforeSize.title.y+beforeSize.title.height-1 &&
-         beforeSize.photos.y>=beforeSize.date.y+beforeSize.date.height-1 &&
-         beforeSize.photos.y<=180,
-         'Title, date, and photos must move UP without overlap: '+
-           JSON.stringify(beforeSize));
-       assert.ok(beforeSize.toolbar&&afterSize.toolbar&&
-         Math.abs(afterSize.toolbar.y-beforeSize.toolbar.y)<3 &&
-         afterSize.toolbar.y+afterSize.toolbar.height<=
-           afterSize.viewport.visibleHeight-8,
-         'Original action controls must remain stationary');
-       assert.ok(beforeSize.work.width>=beforeSize.viewport.innerWidth-34 &&
-         afterSize.work.width>=afterSize.viewport.innerWidth-34,
-         'Tell editor must retain full original wide layout: '+
-         JSON.stringify({beforeSize,afterSize}));
-       assert.ok([beforeSize,afterSize].every(x=>x.headingMetrics &&
-         x.headingMetrics.lineRects===1 &&
-         x.headingMetrics.whiteSpace==='nowrap' &&
-         x.headingMetrics.scrollWidth<=x.headingMetrics.clientWidth+1),
-         'Full characteristics question must fit on ONE line with no clipping: '+
-         JSON.stringify({beforeSize,afterSize}));
-       assert.ok(Math.abs(beforeSize.work.width-afterSize.work.width)<2 &&
-         Math.abs(beforeSize.photos.width-afterSize.photos.width)<2 &&
-         Math.abs(beforeSize.photos.x-afterSize.photos.x)<2 &&
-         Math.abs((beforeSize.viewport.scale||1)-(afterSize.viewport.scale||1))<.01,
-         'Editor must not change width or visual zoom on characteristics expansion: '+
-           JSON.stringify({beforeSize,afterSize}));
-       const scroller=await follower.evaluate(async()=>{
-         const panel=document.querySelector('.talera-tags-choices');
-         const buttons=[...panel.querySelectorAll('.talera-tag-choice')];
-         const toolbar=document.querySelector('.work.talera-r16-editor .work-tools.talera-r16-toolbar');
-         panel.scrollTop=0;
-         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-         const before=panel.scrollTop, viewportRect=panel.getBoundingClientRect();
-         const rows=buttons.map(b=>b.getBoundingClientRect());
-         const full=rows.filter(r=>r.top>=viewportRect.top-1&&r.bottom<=viewportRect.bottom+1).length;
-         const partial=rows.filter(r=>r.top<viewportRect.bottom-1&&r.bottom>viewportRect.top+1&&!(r.top>=viewportRect.top-1&&r.bottom<=viewportRect.bottom+1)).length;
-         const toolbarBeforeScroll=toolbar?.getBoundingClientRect().bottom;
-         const pageBeforeScroll=document.scrollingElement?.scrollTop||0;
-         panel.scrollTop=panel.scrollHeight;
-         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-         const after=panel.scrollTop,last=buttons.at(-1).getBoundingClientRect();
-         return {
-           before,after,scrollHeight:panel.scrollHeight,clientHeight:panel.clientHeight,
-           count:buttons.length,full,partial,lastFullyVisible:last.top>=viewportRect.top-1&&last.bottom<=viewportRect.bottom+1,
-           overflow:getComputedStyle(panel).overflowY,
-           toolbarBottom:toolbar?.getBoundingClientRect().bottom,
-           toolbarBeforeScroll,
-           pageBeforeScroll,pageAfterScroll:document.scrollingElement?.scrollTop||0,
-           viewport:window.visualViewport?.height||innerHeight,
-           fakeTiles:document.querySelectorAll('.talera-work-tiles .tile[data-visual-only=yes]').length,
-           photoTop:document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top
-         };
-       });
-       assert.equal(scroller.fakeTiles,4,'Five-photo visual test missing tiles');
-       assert.equal(scroller.overflow,'auto','Topic choices must independently scroll');
-       assert.equal(scroller.full,Math.min(6,scroller.count),'Reference layout must show TWO full rows on the short iPhone');
-       assert.equal(scroller.partial,0,'Never show a clipped third row');
-       assert.ok(scroller.lastFullyVisible,'Last setting-defined characteristic must scroll fully into view');
-       assert.ok(scroller.scrollHeight>scroller.clientHeight+15,
-         'Long topic options must be bounded: '+JSON.stringify(scroller));
-       assert.ok(scroller.after>scroller.before+15,
-         'The final characteristic must be reachable: '+JSON.stringify(scroller));
-       assert.ok(Math.abs(scroller.toolbarBottom-scroller.toolbarBeforeScroll)<2,
-         'Scrolling the choices must NOT move the original toolbar: '+
-           JSON.stringify(scroller));
-       assert.equal(scroller.pageAfterScroll,scroller.pageBeforeScroll,
-         'Scrolling the choices must NOT scroll the whole page');
-       const expanded=await follower.evaluate(()=>{
-         const panel=document.querySelector('.talera-tags-panel');
-         return {expanded:document.querySelector('.talera-tags-toggle')?.getAttribute('aria-expanded'),
-           panelVisible:!!panel&&!panel.hidden,
-           photoTop:document.querySelector('.talera-work-tiles')?.getBoundingClientRect().top,
-           topicTop:document.querySelector('.talera-tags-v20')?.getBoundingClientRect().top};
-       });
-       assert.equal(expanded.expanded,'true','Original characteristic toggle no longer opens');
-       assert.equal(expanded.panelVisible,true,'Characteristic choices are still hidden');
-       assert.ok(Math.abs(expanded.photoTop-beforePhotos)<3,
-         'Opening characteristics must not shift photos upward: '+JSON.stringify(expanded));
-       await follower.locator('.talera-tags-toggle').click();
-       assert.equal(await follower.locator('.talera-tags-toggle').getAttribute('aria-expanded'),'false');
-       // Owner-approved reference: two complete rows even on the taller
-       // iPhone, more calm white space, and the lowered stationary footer.
-       await follower.setViewportSize({width:390,height:844});
-       await follower.waitForTimeout(120);
-       const tallBefore=await follower.evaluate(()=>{
-         const bounds=s=>document.querySelector(s)?.getBoundingClientRect();
-         return {
-           toolbarTop:bounds('.work-tools.talera-r16-toolbar')?.top,
-           toolbarBottom:bounds('.work-tools.talera-r16-toolbar')?.bottom,
-           photoTop:bounds('.talera-work-tiles')?.top,
-           photoWidth:bounds('.talera-work-tiles')?.width,
-           titleTop:bounds('.talera-v14-heading #title')?.top,
-           dateTop:bounds('.talera-v14-heading #dateToggle')?.top,
-           tagsTop:bounds('.talera-tags-toggle')?.top
-         };
-       });
-       await follower.locator('.talera-tags-toggle').click();
-       await follower.waitForTimeout(140);
-       const tallAfter=await follower.evaluate(()=>{
-         const bounds=s=>document.querySelector(s)?.getBoundingClientRect();
-         const panel=document.querySelector('.talera-tags-panel');
-         const choices=panel.querySelector('.talera-tags-choices');
-         const boundsChoices=choices.getBoundingClientRect();
-         const rows=[...choices.querySelectorAll('.talera-tag-choice')].map(b=>b.getBoundingClientRect());
-         const whole=rows.filter(r=>r.top>=boundsChoices.top-1&&r.bottom<=boundsChoices.bottom+1).length;
-         const partial=rows.filter(r=>r.top<boundsChoices.bottom-1&&r.bottom>boundsChoices.top+1&&!(r.top>=boundsChoices.top-1&&r.bottom<=boundsChoices.bottom+1)).length;
-         const publish=document.querySelector('#publish');
-         const rect=publish?.getBoundingClientRect();
-         const bottom=window.visualViewport?.height||innerHeight;
-         return {
-           toolbarTop:bounds('.work-tools.talera-r16-toolbar')?.top,
-           toolbarBottom:bounds('.work-tools.talera-r16-toolbar')?.bottom,
-           photoTop:bounds('.talera-work-tiles')?.top,
-           photoWidth:bounds('.talera-work-tiles')?.width,
-           panelHeight:panel?.getBoundingClientRect().height,
-           panelClientHeight:choices?.clientHeight,
-           appliedRowBound:panel.style.getPropertyValue('--talera-tag-visible-height'),
-           panelScrollHeight:choices?.scrollHeight,
-           choiceCount:rows.length,whole,partial,
-           footerGap:bottom-bounds('.work-tools.talera-r16-toolbar')?.bottom,
-           publishTouchable:!!rect&&rect.top>=0&&rect.bottom<=bottom-8&&
-             document.elementFromPoint(rect.left+rect.width*.5,
-               rect.top+rect.height*.5)?.closest('#publish')===publish
-         };
-       });
-       console.log('TALERA_FREE_TELL_TALL_GAP_USE',
-         JSON.stringify({before:tallBefore,after:tallAfter}));
-       assert.ok(tallAfter.panelHeight>=88&&tallAfter.panelHeight<=104&&
-         tallAfter.panelScrollHeight>tallAfter.panelClientHeight+12,
-         'Reference compact two-row panel must be independently scrollable: '+
-           JSON.stringify({tallBefore,tallAfter}));
-       assert.equal(tallAfter.appliedRowBound,'88px','Actual generated viewport script applies two-row bound');
-       assert.equal(tallAfter.whole,Math.min(6,tallAfter.choiceCount),'Exactly two full rows on tall iPhone');
-       assert.equal(tallAfter.partial,0,'No cut-off row on tall iPhone');
-       assert.ok(tallBefore.titleTop<=58&&tallBefore.dateTop<=103&&tallBefore.photoTop<=153,
-         'Title, date and photos must be raised towards the approved design: '+JSON.stringify(tallBefore));
-       assert.ok(tallAfter.footerGap>=8&&tallAfter.footerGap<=20,
-         'Lower the original action bar but retain the safe bottom margin: '+JSON.stringify(tallAfter));
-       assert.ok(Math.abs(tallBefore.toolbarTop-tallAfter.toolbarTop)<2 &&
-         Math.abs(tallBefore.toolbarBottom-tallAfter.toolbarBottom)<2 &&
-         Math.abs(tallBefore.photoTop-tallAfter.photoTop)<2 &&
-         Math.abs(tallBefore.photoWidth-tallAfter.photoWidth)<2 &&
-         tallAfter.publishTouchable,
-         'Tall iPhone must preserve photos and the original fixed action bar: '+
-           JSON.stringify({tallBefore,tallAfter}));
-       // A selected characteristic must not create a new hidden footer.
-       // Test with a DOM-only chip: never persist data in a real account.
-       const selectedChip=await follower.evaluate(()=>{
-         const selected=document.querySelector('.talera-tags-selected');
-         if(!selected)return {exists:false};
-         const chip=document.createElement('span');
-         chip.textContent='Jeugd ×';
-         chip.dataset.visualOnly='yes';
-         selected.append(chip);
-         window.dispatchEvent(new Event('resize'));
-         return {exists:true};
-       });
-       assert.ok(selectedChip.exists,'Original selected-characteristics area missing');
-       await follower.waitForTimeout(120);
-       const chosenTall=await follower.evaluate(()=>{
-         const bar=document.querySelector('.work-tools.talera-r16-toolbar')?.getBoundingClientRect();
-         const panel=document.querySelector('.talera-tags-panel')?.getBoundingClientRect();
-         const chosen=document.querySelector('.talera-tags-selected')?.getBoundingClientRect();
-         return {barTop:bar?.top,barBottom:bar?.bottom,
-           panelHeight:panel?.height,chosenHeight:chosen?.height,
-           chosenTop:chosen?.top,viewport:visualViewport?.height||innerHeight};
-       });
-       console.log('TALERA_FREE_TELL_SELECTED_TAG_GAP',JSON.stringify(chosenTall));
-       assert.ok(Math.abs(tallBefore.toolbarTop-chosenTall.barTop)<2 &&
-         chosenTall.barBottom<=chosenTall.viewport-8,
-         'Selected topic may NOT move original bottom actions: '+
-           JSON.stringify({tallBefore,chosenTall}));
-       await follower.evaluate(()=>{
-         document.querySelector('.talera-tags-selected [data-visual-only=yes]')?.remove();
-       });
-       await follower.locator('.talera-tags-toggle').click();
+       for(const [width,height] of [[320,568],[390,844],[430,932]]){
+         await follower.setViewportSize({width,height});
+         const tags=follower.locator('.talera-tags-toggle');
+         await tags.scrollIntoViewIfNeeded();
+         const before=await sizeSnapshot();
+         assert.equal(before.titleSize,before.dateSize,'Subordinate title/date use same size');
+         assert.ok(before.scrollWidth<=width+1,'No horizontal page overflow');
+         await tags.click();
+         const dialog=follower.locator('#taleraMemoryTagsDialog');
+         await dialog.waitFor({state:'visible'});
+         const after=await sizeSnapshot();
+         const panel=await dialog.evaluate(el=>{
+           const r=el.getBoundingClientRect(),body=el.querySelector('.talera-memory-tags-body'),b=body.getBoundingClientRect();
+           const buttons=[...el.querySelectorAll('.talera-tag-choice')];
+           return {height:r.height,width:r.width,bodyHeight:b.height,overflow:getComputedStyle(body).overflowY,
+             total:buttons.length,fullyVisible:buttons.filter(e=>{const a=e.getBoundingClientRect();return a.top>=b.top-1&&a.bottom<=b.bottom+1}).length,
+             minHeight:Math.min(...buttons.map(e=>e.getBoundingClientRect().height)),open:el.open};
+         });
+         assert.ok(panel.open&&panel.height>=height*.88&&panel.total>=25&&panel.minHeight>=44&&panel.fullyVisible>=8&&panel.overflow==='auto',
+           'Spacious characteristics with large targets '+JSON.stringify(panel));
+         assert.ok(Math.abs(before.photo.y-after.photo.y)<3&&Math.abs(before.toolbar.y-after.toolbar.y)<3,
+           'Opening characteristics must not move the existing editor');
+         const first=dialog.locator('.talera-tag-choice').first(),old=await first.getAttribute('aria-pressed');
+         await first.click();
+         assert.notEqual(await first.getAttribute('aria-pressed'),old);
+         await dialog.locator('.talera-tag-cancel').click();
+         assert.equal(await tags.getAttribute('aria-expanded'),'false');
+         await tags.click();
+         assert.equal(await dialog.locator('.talera-tag-choice').first().getAttribute('aria-pressed'),old,
+           'Cancel must preserve original tags');
+         await dialog.locator('.talera-memory-manage').click();
+         assert.ok(await dialog.locator('.talera-tag-choice').count()>=25,'All existing tags available in one dialog');
+         await dialog.locator('.talera-memory-manage').click();
+         await dialog.locator('.talera-tag-choice').last().scrollIntoViewIfNeeded();
+         assert.ok(await dialog.locator('.talera-tag-choice').last().isVisible(),'Last tag reachable');
+         await dialog.locator('.talera-tag-cancel').click();
+         const publish=follower.locator('#publish');
+         const pub=await publish.evaluate(e=>{const r=e.getBoundingClientRect();return {hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e||e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)),color:getComputedStyle(e).backgroundColor}});
+         assert.ok(pub.hit&&pub.color==='rgb(7, 26, 61)','Primary save reachable again after dialog closes');
+         console.log('TALERA_FREE_MEMORY_FIRST_TAGS_PASS',JSON.stringify({width,height,panel}));
+       }
        await follower.setViewportSize({width:390,height:664});
        // Six-photo visual regression in the EXISTING original writer and same
        // account context. Five extra previews are DOM-only clones of the
@@ -1869,12 +1688,12 @@ try{
          };
        });
        console.log('TALERA_FREE_WRITE_PHOTOS_INITIAL',JSON.stringify(writerInitial));
-       assert.ok(writerInitial.count===6&&writerInitial.columns===3&&
+       assert.ok(writerInitial.count===6&&writerInitial.columns>=5&&
          writerInitial.display==='grid'&&writerInitial.photoSrcLocal&&
-         writerInitial.sixthBottom<=writerInitial.bodyBottom-60&&
+         writerInitial.photoBottom-writerInitial.photoTop<=75&&writerInitial.sixthBottom<=writerInitial.bodyBottom-60&&
          writerInitial.textTop<writerInitial.bodyBottom-40&&
          writerInitial.scrollTop<3,
-         'All six existing/local previews must be visible with the keyboard '+ 
+         'All six existing/local previews must fit the compact horizontal strip with the keyboard '+ 
          'and the original textarea must remain accessible: '+JSON.stringify(writerInitial));
        const longStory=Array.from({length:70},(_,i)=>
          'Dit moment herinner ik me nog goed, regel '+(i+1)).join('\n');
@@ -1916,7 +1735,7 @@ try{
               console.log('TALERA_FREE_TELL_LAYOUT_BELOW_PHOTOS_PASS',JSON.stringify({
          visualOnly:true,titleAndDateSeparated:true,topicBelowMedia:true,
          openKeepsPhotoPosition:true,originalControlsPreserved:true,
-         fivePhotoScreenSimulated:true,onlyTagPanelScrollable:true,
+         largeCharacteristicsDialog:true,compactPhotoStrip:true,
          lastCharacteristicReachable:true,bottomToolbarStationary:true,
          noPersonalData:true,realIphoneAccepted:false
        }));

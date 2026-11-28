@@ -70,6 +70,20 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   // No user account or photos: reuse the existing synthetic local store API.
   await page.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>!!window.TaleraMemories?.save);
+  // The two choices are peers on the real initial Tell screen.
+  await page.locator('#without').waitFor({state:'visible'});
+  const entry=await page.evaluate(()=>{
+   const photos=document.querySelector('.talera-memory-entry:has(#photoInput)'),voice=document.querySelector('#without');
+   return [photos,voice].map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height}));
+  });
+  assert.ok(close(entry[0].w,entry[1].w)&&close(entry[0].h,entry[1].h),'Both memory entry cards have the same visual weight');
+  const samePageURL=page.url();
+  await page.locator('#without').click();
+  await page.locator('#taleraV61RecControls').waitFor({state:'visible'});
+  assert.equal(page.url(),samePageURL,'Voice-only starts directly in the existing Tell recorder');
+  assert.equal(await page.locator('.talera-voice-orb').count(),1,'Idle voice-only visualization');
+  assert.equal(await page.locator('#taleraV61RecStop').isVisible(),false,'Never start recording without a separate action');
+  await page.locator('#taleraV61RecClose').click();
   const id=await page.evaluate(async()=>{
    // Distinct portrait, landscape and square photos make the existing
    // random Home image and first presentation frame visibly distinguishable.
@@ -193,7 +207,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    return {app:r('#app'),media:r('.talera-work-tiles'),tags:r('.talera-tags-v20'),toolbar:r('.talera-r16-toolbar'),title:r('#title'),
     width:innerWidth,layout:getComputedStyle(document.querySelector('.work.talera-r16-editor')).display};
   });
-  assert.ok(editor.app.width>1100&&editor.layout==='grid'&&editor.media.right<editor.tags.left&&editor.title.width>1000,
+  assert.ok(editor.app.width>1100&&editor.layout==='grid'&&editor.media.right<editor.tags.left&&editor.title.width>300&&editor.title.left>=editor.media.right,
     'Desktop two-column original editor '+JSON.stringify(editor));
   assert.ok(editor.toolbar.width<=630&&editor.toolbar.right<=editor.app.right,'Compact original editor actions '+JSON.stringify(editor));
   await page.locator('#dateToggle').click();
@@ -242,6 +256,10 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    assert.equal(await tags.getAttribute('aria-expanded'),'true');
    assert.equal(await page.locator('.talera-memory-location,.talera-location-toggle,#talera-memory-country,#talera-memory-city').count(),0,'No manual location UI within the actual editor');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'No horizontal overflow');
+   const dialog=page.locator('#taleraMemoryTagsDialog');
+   await dialog.waitFor({state:'visible'});
+   assert.ok(await dialog.locator('.talera-tag-choice').count()>=25);
+   await dialog.locator('.talera-tag-cancel').click();
    await publish.scrollIntoViewIfNeeded();
    const pub=await publish.evaluate(e=>{
     const r=e.getBoundingClientRect(),s=getComputedStyle(e),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
@@ -250,8 +268,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    assert.ok(!pub.disabled&&pub.rgb==='rgb(7, 26, 61)'&&pub.hit,'Existing Save remains the reachable primary action '+JSON.stringify(pub));
    const fixedAfter=await publish.boundingBox();
    assert.ok(fixedBefore&&fixedAfter&&Math.abs(fixedBefore.y-fixedAfter.y)<2,'Expanded characteristics must leave Save at the same fixed position');
-   // Close the original panels, then enter the original writer.
-   await tags.click();
+   // Dialog has closed. Enter the original writer.
    await page.locator('#write').click();
    await writer.waitFor({state:'visible'});
    const done=page.locator('#taleraWriterDone');

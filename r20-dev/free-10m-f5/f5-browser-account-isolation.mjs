@@ -1594,8 +1594,17 @@ try{
          'Memory content takes precedence over title and date: '+JSON.stringify(layout));
        assert.ok(layout.topics.top>=layout.photos.bottom-1,
          'Characteristics must stay BELOW photo grid: '+JSON.stringify(layout));
-       assert.ok(layout.actions.top>=layout.topics.bottom-1,
-         'Original actions must stay below topic editor: '+JSON.stringify(layout));
+       // On a short phone the fixed save bar remains visible while the
+       // central editor scrolls; the optional characteristics row must
+       // be reachable above it rather than forcing all content into 664 px.
+       await follower.locator('.talera-tags-toggle').evaluate(e=>e.scrollIntoView({block:'center'}));
+       const reachable=await follower.evaluate(()=>{
+         const tag=document.querySelector('.talera-tags-toggle'),bar=document.querySelector('.talera-r16-toolbar');
+         const a=tag.getBoundingClientRect(),b=bar.getBoundingClientRect(),hit=document.elementFromPoint(a.x+a.width/2,a.y+a.height/2);
+         return {tagBottom:a.bottom,barTop:b.top,barBottom:b.bottom,hit:tag===hit||tag.contains(hit),viewport:visualViewport?.height||innerHeight};
+       });
+       assert.ok(reachable.hit&&reachable.tagBottom<=reachable.barTop+1&&reachable.barBottom<=reachable.viewport,
+         'Scrollable optional characteristics must remain reachable above fixed save bar: '+JSON.stringify(reachable));
        assert.equal(layout.originalTiles,1,'Same one original photo tile expected');
        assert.deepEqual(layout.nativeActions.map(x=>x.exists),[true,true,true],
          'Tell/Speak/Publish handlers must not be removed');
@@ -1613,7 +1622,7 @@ try{
        for(const [width,height] of [[320,568],[390,844],[430,932]]){
          await follower.setViewportSize({width,height});
          const tags=follower.locator('.talera-tags-toggle');
-         await tags.scrollIntoViewIfNeeded();
+         await tags.evaluate(e=>e.scrollIntoView({block:'center'}));
          const before=await sizeSnapshot();
          assert.equal(before.titleSize,before.dateSize,'Subordinate title/date use same size');
          assert.ok(before.scrollWidth<=width+1,'No horizontal page overflow');

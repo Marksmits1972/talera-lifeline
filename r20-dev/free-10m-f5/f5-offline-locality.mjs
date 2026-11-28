@@ -104,7 +104,19 @@ export function createPublicPlaceStore(idb=globalThis.indexedDB){
    }catch(e){db.close();fail(e)}
   };
  });
- return {get:key=>run('readonly',store=>store.get(key)),put:(key,buffer)=>run('readwrite',store=>store.put(buffer,key)),delete:key=>run('readwrite',store=>store.delete(key))};
+ const reserveAttempt=(key,now)=>new Promise((resolve,reject)=>{
+  if(!idb){reject(Error('PUBLIC_PLACE_STORAGE_UNAVAILABLE'));return}
+  const request=idb.open(name,1);
+  request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains(table))request.result.createObjectStore(table)};
+  request.onerror=()=>reject(request.error);request.onblocked=()=>reject(Error('PUBLIC_PLACE_STORAGE_BLOCKED'));
+  request.onsuccess=()=>{
+   const db=request.result,tx=db.transaction(table,'readwrite'),store=tx.objectStore(table),read=store.get(key);
+   let result;read.onsuccess=()=>{result=nextPublicPlaceAttempt(read.result,now);if(result.allowed)store.put(result.state,key)};
+   tx.oncomplete=()=>{db.close();resolve(result)};
+   tx.onabort=tx.onerror=()=>{db.close();reject(tx.error||Error('PUBLIC_PLACE_RETRY_WRITE_FAILED'))};
+  };
+ });
+ return {get:key=>run('readonly',store=>store.get(key)),put:(key,buffer)=>run('readwrite',store=>store.put(buffer,key)),delete:key=>run('readwrite',store=>store.delete(key)),reserveAttempt};
 }
 
 // GeoNames allCountries independent settlements; no per-photo geocoding.
@@ -112,8 +124,18 @@ export function createPublicPlaceStore(idb=globalThis.indexedDB){
 // an immutable public group, never an account, GPS, filename or photo token.
 // One expanded resolver is resident at a time, and public bytes are cached
 // separately from private shell/account state.
-export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher=fetch,storage=createPublicPlaceStore(),clock=Date.now){
- const baseline=createOfflineLocalityLoader(baseUrl,baseBytes,fetcher);
+// The retry record is shared by the public content hash, NOT by photo/account.
+// Reservation happens before network I/O, atomically across open tabs.
+export function nextPublicPlaceAttempt(previous,now){
+ const attempts=Number.isInteger(previous?.attempts)?Math.max(0,previous.attempts):0;
+ if(attempts>=3)return {allowed:false,blocked:'exhausted',state:previous};
+ if((previous?.at||0)>now)return {allowed:false,blocked:'retry',retryAt:previous.at,state:previous};
+ const number=attempts+1,at=now+(number===1?300000:1800000);
+ return {allowed:true,state:{attempts:number,at}};
+}
+export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher=fetch,storage=createPublicPlaceStore(),clock=Date.now,online=()=>globalThis.navigator?.onLine!==false){
+ if(!/^\/__talera_free\/places-[a-f0-9]{64}\.bin$/.test(baseUrl)||!Number.isInteger(baseBytes)||baseBytes<1)throw Error('INVALID_LOCALITY_ASSET');
+ const base={sha256:baseUrl.match(/[a-f0-9]{64}/)[0],bytes:baseBytes,url:baseUrl,baseline:true};
  const byCountry=new Map(),seen=new Set();
  for(const part of parts){
   if(!part||!/^[a-f0-9]{64}$/.test(part.sha256)||!Number.isInteger(part.bytes)||part.bytes<1||part.bytes>24*1024*1024||seen.has(part.sha256)||!Array.isArray(part.countries)||!part.countries.length)
@@ -124,8 +146,7 @@ export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher
    byCountry.set(cc,part);
   }
  }
- let resident=null,queue=Promise.resolve();
- const failures=new Map();
+ let baseline=null,resident=null,queue=Promise.resolve();
  const cacheBound=async task=>{
   let timer;
   try{return await Promise.race([task,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('WORLD_LOCALITY_CACHE_TIMEOUT')),5000)})])}
@@ -133,54 +154,78 @@ export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher
  };
  const validateBuffer=async(buffer,part)=>{
   if(!(buffer instanceof ArrayBuffer)||buffer.byteLength!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
-  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer)),b=>b.toString(16).padStart(2,'0')).join('');
-  if(digest!==part.sha256)throw Error('WORLD_LOCALITY_ASSET_DIGEST');
+  // Retain legacy baseline validation contract; all expanded files are SHA-verified.
+  if(!part.baseline){
+   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer)),b=>b.toString(16).padStart(2,'0')).join('');
+   if(digest!==part.sha256)throw Error('WORLD_LOCALITY_ASSET_DIGEST');
+  }
   return {buffer,resolve:createOfflineLocalityResolver(buffer)};
  };
- const validate=async(response,part)=>{
-  if(!response?.ok||!String(response.headers.get('content-type')).toLowerCase().includes('application/octet-stream'))throw Error('WORLD_LOCALITY_ASSET_NOT_AVAILABLE');
-  const length=response.headers.get('content-length');
-  if(length!==null&&!response.headers.get('content-encoding')&&Number(length)!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
-  return validateBuffer(await response.arrayBuffer(),part);
+ const keyOf=part=>'retry:'+part.sha256;
+ const reserve=async(part)=>{
+  if(!storage)throw Error('WORLD_LOCALITY_RETRY_STORAGE_REQUIRED');
+  const key=keyOf(part);
+  if(storage.reserveAttempt)return cacheBound(storage.reserveAttempt(key,clock()));
+  // Injection boundary for deterministic test stores. Production uses the
+  // single readwrite IndexedDB transaction below, not two separate requests.
+  const result=nextPublicPlaceAttempt(await cacheBound(storage.get(key)),clock());
+  if(result.allowed)await cacheBound(storage.put(key,result.state));
+  return result;
  };
- const getPart=async(part)=>{
-  if(resident?.sha256===part.sha256)return resident.resolve;
-  if(clock()<(failures.get(part.sha256)||0))return null;
-  resident=null;
-  const url='/__talera_free/assets/places-'+part.sha256+'.bin';
+ const getPart=async(part,signal)=>{
+  if(part.baseline&&baseline)return {resolve:baseline};
+  if(!part.baseline&&resident?.sha256===part.sha256)return {resolve:resident.resolve};
+  const install=data=>{
+   if(part.baseline)baseline=data.resolve;
+   else resident={sha256:part.sha256,resolve:data.resolve};
+   return {resolve:data.resolve};
+  };
+  if(signal?.aborted)return {blocked:'offline'};
   try{
    let data=null;
    try{
     const cached=await cacheBound(storage?.get(part.sha256));
-    if(cached){
-     try{data=await validateBuffer(cached,part)}
-     catch{await cacheBound(storage.delete(part.sha256)).catch(()=>{});}
-    }
+    if(cached){try{data=await validateBuffer(cached,part)}catch{await cacheBound(storage.delete(part.sha256)).catch(()=>{})}}
    }catch{/* Cache failure is not a negative geographic result. */}
-   if(!data){
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
-    try{
-     const response=await fetcher(url,{credentials:'omit',cache:failures.has(part.sha256)?'reload':'force-cache',signal:controller.signal,redirect:'error',referrerPolicy:'no-referrer'});
-     data=await validate(response,part);
-    }finally{clearTimeout(timer)}
-    if(storage)try{await cacheBound(storage.put(part.sha256,data.buffer))}catch{/* Browser storage quota may be unavailable. */}
-   }
-   resident={sha256:part.sha256,resolve:data.resolve};
-   failures.delete(part.sha256);
-   return resident.resolve;
-  }catch{failures.set(part.sha256,clock()+30000);return null}
+   if(data)return install(data);
+   const saved=await cacheBound(storage?.get(keyOf(part)));
+   if(saved?.attempts>=3)return {blocked:'exhausted'};
+   if(!online()||signal?.aborted)return {blocked:'offline'};
+   const budget=await reserve(part);
+   if(!budget.allowed)return budget;
+   const controller=new AbortController(),cancel=()=>controller.abort();
+   signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted)cancel();
+   const timer=setTimeout(cancel,25000);
+   try{
+    const url=part.url||'/__talera_free/assets/places-'+part.sha256+'.bin';
+    const response=await fetcher(url,{credentials:'omit',cache:budget.state.attempts>1?'reload':'force-cache',signal:controller.signal,redirect:'error',referrerPolicy:'no-referrer'});
+    if(!response?.ok||!String(response.headers.get('content-type')).toLowerCase().includes('application/octet-stream'))throw Error('WORLD_LOCALITY_ASSET_NOT_AVAILABLE');
+    const length=response.headers.get('content-length');
+    if(length!==null&&!response.headers.get('content-encoding')&&Number(length)!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
+    data=await validateBuffer(await response.arrayBuffer(),part);
+   }catch{
+    return budget.state.attempts>=3?{blocked:'exhausted'}:{blocked:'retry',retryAt:budget.state.at};
+   }finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel)}
+   try{
+    await cacheBound(storage.put(part.sha256,data.buffer));
+    await cacheBound(storage.delete(keyOf(part)));
+   }catch{/* Do not discard an already verified in-memory register. */}
+   return install(data);
+  }catch{return {blocked:'exhausted'}} // fail closed if durable retry accounting is unavailable
  };
- return async(gps,place)=>{
+ return async(gps,place,signal)=>{
   if(!place?.countryCode||place.source!=='offline-country-v1'||place.city)return {ready:true,place};
   if(!Number.isFinite(gps?.latitude)||!Number.isFinite(gps?.longitude)||Math.abs(gps.latitude)>90||Math.abs(gps.longitude)>180)return {ready:true,place};
-  const old=await baseline(gps,place);
-  if(!old.ready||old.place?.city)return old;
-  const part=byCountry.get(place.countryCode);
-  if(!part)return old;
   const run=queue.then(async()=>{
-   const resolve=await getPart(part);
-   if(!resolve)return {ready:false,place};
-   const city=resolve(gps,place.countryCode);
+   const old=await getPart(base,signal);
+   if(!old.resolve)return {ready:false,place,blocked:old.blocked,retryAt:old.retryAt};
+   const oldCity=old.resolve(gps,place.countryCode);
+   if(oldCity)return {ready:true,place:{...place,city:oldCity,source:'offline-locality-v1'}};
+   const part=byCountry.get(place.countryCode);
+   if(!part)return {ready:true,place};
+   const expanded=await getPart(part,signal);
+   if(!expanded.resolve)return {ready:false,place,blocked:expanded.blocked,retryAt:expanded.retryAt};
+   const city=expanded.resolve(gps,place.countryCode);
    return {ready:true,place:city?{...place,city,source:'offline-locality-v1'}:place};
   });
   queue=run.then(()=>undefined,()=>undefined);

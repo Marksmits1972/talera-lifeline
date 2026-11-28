@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {createOfflineLocalityResolver,createOfflineLocalityLoader,createOfflineWorldLocalityLoader} from './f5-offline-locality.mjs';
-import {enrichCapturePlaces} from './f5-capture-place-enrichment.mjs';
+import {enrichCapturePlaces,makeLocationWork,syncLocationWork,nextLocationWork,finishLocationWork,inspectLocationWork,installLocationQueueWrites} from './f5-capture-place-enrichment.mjs';
 import {applyPhotoLocationInputs,selectDisplayedLocation,localPhotoState} from './f5-memory-location.mjs';
 const gps=(latitude,longitude)=>({latitude,longitude});
 const country={countryCode:'NL',country:'Nederland',city:'',source:'offline-country-v1'};
@@ -90,7 +90,7 @@ const asBinary=bytes=>new Response(bytes,{headers:{'content-type':'application/o
 const toArrayBuffer=bytes=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);
 const mockPublicCache=()=>{
  const stored=new Map();
- return {stored,get:async key=>stored.get(key)?.slice(0)??null,put:async(key,b)=>{stored.set(key,b.slice(0))},delete:async key=>stored.delete(key)};
+ return {stored,get:async key=>structuredClone(stored.get(key)??null),put:async(key,b)=>{stored.set(key,structuredClone(b))},delete:async key=>stored.delete(key)};
 };
 test('world: preserve baseline before requesting more; one immutable group download, cache re-use across documents, no coordinates or credentials',async()=>{
  const data=fixture([['NL',53,6,'Extra village'],['NL',51.98,5.91111,'Competing new label'],['DE',53,6,'Another country']]);
@@ -108,7 +108,7 @@ test('world: preserve baseline before requesting more; one immutable group downl
  const expected={...country,city:'Extra village',source:'offline-locality-v1'};
  assert.deepEqual(await Promise.all([load(gps(53,6),country),load(gps(53,6),country)]),[{ready:true,place:expected},{ready:true,place:expected}]);
  assert.equal(baseRequests,1);assert.equal(worldRequests,1);
- assert.equal(cache.stored.size,1);
+ assert.equal(cache.stored.size,2);
  const second=createOfflineWorldLocalityLoader(testBaseUrl,sample.length,[part],async(path)=>{
   if(path===testBaseUrl)return asBinary(sample);throw Error('network must not be needed');
  },cache);
@@ -126,10 +126,10 @@ test('world: reject corrupt bytes and cache; offline stays pending, no false neg
   if(path===testBaseUrl)return asBinary(sample);
   requests++;return online?asBinary(data):asBinary(corrupt);
  },cache,()=>now);
- assert.deepEqual(await load(gps(53,6),country),{ready:false,place:country});
+ assert.equal((await load(gps(53,6),country)).blocked,'retry');
  assert.equal(cache.stored.has(part.sha256),false);assert.equal(requests,1);
- assert.deepEqual(await load(gps(53,6),country),{ready:false,place:country});assert.equal(requests,1);
- now+=30001;online=true;
+ assert.equal((await load(gps(53,6),country)).blocked,'retry');assert.equal(requests,1);
+ now+=300001;online=true;
  assert.equal((await load(gps(53,6),country)).place.city,'Extra village');
  assert.equal(requests,2);assert.equal(cache.stored.has(part.sha256),true);
  assert.throws(()=>createOfflineWorldLocalityLoader(testBaseUrl,sample.length,[part,{...part,sha256:'b'.repeat(64)}]),/INVALID_WORLD_LOCALITY_DIRECTORY/);
@@ -174,4 +174,54 @@ test('world: real frozen independent settlement data, actual country directory a
  }
  assert.equal(records,5001680);assert.equal(bytes,103864734);assert.equal(countries.size,248);
  console.log('TALERA_WORLD_VERIFIED_STATIC_DATA_AND_DIRECTORY_PASS');
+});
+
+test('location work: 50,000 completed descriptors are skipped; only eligible IDs enter index; save only adds its own row',()=>{
+ const known={kind:'photo',key:'p',capturePlace:refined},unknown={kind:'photo',key:'u'};
+ const rows=Array.from({length:50000},(_,i)=>({id:'s'+i,source:'pwa-local',items:[known]}));
+ rows.push({id:'pending',source:'pwa-local',items:[unknown,{...unknown,key:'manual',manualPhotoLocation:{city:'Own'}},{...unknown,key:'failed',captureLocationFailed:'retry-exhausted'},{...unknown,key:'no-gps',capturePlaceChecked:'v4-no-readable-gps'},{...unknown,key:'checked-country',capturePlace:country,captureLocalityChecked:'offline-locality-world-v2'}]});
+ const state=makeLocationWork(rows);
+ assert.deepEqual(state.items.map(x=>x.key),['u']);
+ const entry=nextLocationWork(state,1).entry;
+ finishLocationWork(state,entry,{kind:'retry'},1);
+ assert.equal(state.items[0].attempts,1);assert.equal(nextLocationWork(state,2).entry,undefined);
+ const after=structuredClone(state);
+ syncLocationWork(after,{id:'pending',source:'pwa-local',items:[unknown]});
+ assert.equal(after.items[0].attempts,1);
+ finishLocationWork(after,after.items[0],{kind:'offline'},300001);
+ assert.equal(after.items[0].attempts,1);
+ finishLocationWork(after,after.items[0],{kind:'retry'},600001);
+ assert.equal(after.items[0].at,2400001);assert.equal(after.items[0].attempts,2);
+ finishLocationWork(after,after.items[0],{kind:'retry'},2400001);
+ assert.deepEqual(nextLocationWork(after,99999999),{at:null});
+ syncLocationWork(after,{id:'fresh',source:'pwa-local',items:[{...unknown,key:'new'}]});
+ assert.deepEqual(after.items.map(x=>x.key),['new']);
+ assert.match(installLocationQueueWrites("mountCapturePlaceEnrichment({});tx.objectStore('stories').put(meta);"),/locationQueueWrite\(tx,meta\)/);
+});
+test('location work: invalid or absent GPS is terminal without network; corrupt file is not called again',async()=>{
+ const b=new Blob(['abc'],{type:'image/jpeg'});
+ const item={kind:'photo',key:'x',size:3,mime:'image/jpeg'};
+ let reads=0,network=0;
+ const options={item,blob:async()=>{reads++;return b},readPlace:async()=>null,readGps:async()=>null,lookup:async()=>{network++;return {ok:false}},resolveLocality:async()=>{network++;return {ready:false}}};
+ assert.deepEqual(await inspectLocationWork(options),{kind:'done',place:null,reason:'no-readable-gps',checked:false});
+ assert.equal(reads,1);assert.equal(network,0);
+ assert.deepEqual(await inspectLocationWork({...options,blob:async()=>null}),{kind:'done',failure:'unreadable'});
+ assert.equal(network,0);
+});
+test('public register: 100 photos, three shared attempts persist after re-open, disconnected phone spends none',async()=>{
+ const data=fixture([['NL',53,6,'Extra village']]),part=partInfo(data,['NL']),cache=mockPublicCache();
+ let now=1000,requests=0,online=false;
+ const fetcher=async url=>{if(url===testBaseUrl)return asBinary(sample);requests++;throw Error('offline server')};
+ // Warm the verified baseline once, then simulate disconnected network.
+ await cache.put(testBaseUrl.match(/[a-f0-9]{64}/)[0],toArrayBuffer(sample));
+ const create=()=>createOfflineWorldLocalityLoader(testBaseUrl,sample.length,[part],fetcher,cache,()=>now,()=>online);
+ let load=create();assert.equal((await load(gps(53,6),country)).blocked,'offline');assert.equal(requests,0);
+ online=true;
+ for(let i=0;i<100;i++)assert.equal((await load(gps(53,6),country)).blocked,'retry');
+ assert.equal(requests,1);now+=300000;
+ load=create();assert.equal((await load(gps(53,6),country)).blocked,'retry');assert.equal(requests,2);
+ now+=1800000;load=create();assert.equal((await load(gps(53,6),country)).blocked,'exhausted');assert.equal(requests,3);
+ now+=86400000;load=create();
+ for(let i=0;i<100;i++)assert.equal((await load(gps(53,6),country)).blocked,'exhausted');
+ assert.equal(requests,3);
 });

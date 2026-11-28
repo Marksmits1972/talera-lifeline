@@ -37,7 +37,7 @@ export function selectDisplayedLocation(story,item,codes){
  // Never treat them as settled; re-read the original with the current reader.
 export function completedDraftLocation(result){
  return !!result&&(result.state==='known'&&!!result.place||result.state==='unknown'&&
-  Object.keys(result).sort().join(',')==='reason,state'&&['no-readable-gps','no-country'].includes(result.reason));
+  Object.keys(result).sort().join(',')==='reason,state'&&['no-readable-gps','no-country','retry-exhausted'].includes(result.reason));
 }
 // Called only for the existing save's ordered uploads, after original metadata
 // was retained/read. Explicit single correction is distinct from bulk fill.
@@ -53,10 +53,14 @@ export function applyPhotoLocationInputs(items,inputs,codes){
    const refinable=previous?.source==='offline-country-v1'&&place?.countryCode===previous.countryCode&&!item.manualPhotoLocation;
    if(result.state==='known'&&place&&(!previous||refinable)){
     item.capturePlace=place;delete item.capturePlaceChecked;
-    if(result.localityChecked===true&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-world-v2';
+    if(result.failure==='register-unavailable')item.captureLocationFailed=result.failure;
+    else if(result.localityChecked===true&&place.source==='offline-country-v1')item.captureLocalityChecked='offline-locality-world-v2';
     else if(place.source==='offline-locality-v1')delete item.captureLocalityChecked;
    }
-   else if(!previous&&result.state==='unknown'&&completedDraftLocation(result))item.capturePlaceChecked=result.reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
+   else if(!previous&&result.state==='unknown'&&completedDraftLocation(result)){
+    if(result.reason==='retry-exhausted')item.captureLocationFailed=result.reason;
+    else item.capturePlaceChecked=result.reason==='no-country'?'v5-no-country':'v4-no-readable-gps';
+   }
   }
   if(Object.hasOwn(input,'manual')){
    const manual=normalizePhotoLocation(input.manual,codes);
@@ -66,7 +70,8 @@ export function applyPhotoLocationInputs(items,inputs,codes){
  }
 }
 export function localPhotoState(item,codes){
- if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes),...(item.captureLocalityChecked==='offline-locality-world-v2'?{localityChecked:true}:{})};
+ if(confirmedPhotoLocation(item?.capturePlace,codes))return {state:'known',place:confirmedPhotoLocation(item.capturePlace,codes),...(item.captureLocalityChecked==='offline-locality-world-v2'||item.captureLocationFailed?{localityChecked:true}:{})};
+ if(item?.captureLocationFailed)return {state:'unknown',reason:item.captureLocationFailed};
  if(['v4-no-readable-gps','v5-no-country'].includes(item?.capturePlaceChecked))return {state:'unknown',reason:item.capturePlaceChecked.slice(3)};
  return {state:'pending'};
 }
@@ -235,6 +240,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
    const canonical=g.taleraSavedReceipt?.canonicalByDraft||g.canonicalByDraft||{};
    for(const localOnly of [true,false])for(const id of photoIds()){
     if(signal.aborted||disposed||g.taleraLocationPublishing)return;
+    if(manual(id)||canonical[id])continue;
     const current=state(id),refine=!localOnly&&!canonical[id]&&!manual(id)&&current.place?.source==='offline-country-v1'&&!current.localityChecked;
     if(!refine&&(current.state!=='pending'||canonical[id]&&!localOnly))continue;
     const original=getAsset(id);if(!original)continue;
@@ -246,7 +252,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
    }
   }finally{
    controller=null;running=false;
-   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&(!completedDraftLocation(result.get(id))||!manual(id)&&state(id).place?.source==='offline-country-v1'&&!state(id).localityChecked)))timer=win.setTimeout(scan,60000);
+   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&!manual(id)&&(!completedDraftLocation(result.get(id))||state(id).place?.source==='offline-country-v1'&&!state(id).localityChecked)))timer=win.setTimeout(scan,60000);
   }
  }
  function wake(){if(timer!==null){win.clearTimeout(timer);timer=null}if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing)void scan()}

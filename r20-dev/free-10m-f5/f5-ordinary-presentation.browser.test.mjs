@@ -225,6 +225,32 @@ backupRegression: try{
     },{bytes:actual.bytes,place:expected});
     assert.deepEqual(saved.items[0].place,expected);assert.deepEqual(saved.bytes,actual.bytes);
     await worldPage.evaluate(id=>window.TaleraMemories.remove(id),saved.id);
+    // Existing account-local published photo with an old country-only result.
+    // Save through the SAME actual library owner, not a second app or schema.
+    const old=await worldPage.evaluate(async bytes=>{
+     const mem=window.TaleraMemories,file=new File([Uint8Array.from(bytes)],'world-old-location.jpg',{type:'image/jpeg'});
+     const row=await mem.save({title:'Technical previous country-only location',date:'2026-11-27',time:'12:00:00',text:'Technical only',tags:[],photoLocations:[{automatic:{state:'known',place:{countryCode:'NL',country:'Nederland',city:'',source:'offline-country-v1'}}}]},[file]);
+     return {id:row.id,key:row.items[0].key};
+    },actual.bytes);
+    await worldPage.waitForFunction(async ({id,expected})=>{
+     const row=await window.TaleraMemories.get(id);
+     return row?.items?.[0]?.capturePlace?.city===expected.city;
+    },{id:old.id,expected},{timeout:20000});
+    const queued=await worldPage.evaluate(async ({id,key})=>{
+     const row=await window.TaleraMemories.get(id),file=await window.TaleraMemories.blob(key);
+     const names=await indexedDB.databases(),name=names.find(x=>/^talera-free-local-[a-f0-9]{32}-v1$/.test(x.name))?.name;
+     if(!name)throw Error('No account DB');
+     const db=await new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+     try{
+      const state=await new Promise((resolve,reject)=>{const r=db.transaction('files','readonly').objectStore('files').get('talera-location-work-index-v1');r.onsuccess=()=>resolve(r.result?.blob);r.onerror=()=>reject(r.error)});
+      return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await file.arrayBuffer())],version:db.version,pending:state?.items?.length,lease:state?.lease};
+     }finally{db.close()}
+    },old);
+    assert.deepEqual(queued,{id:old.id,key:old.key,bytes:actual.bytes,version:1,pending:0,lease:null});
+    assert.equal(calls.length,1,'Existing country-only photo must use the same already-loaded group, no repeated download');
+    console.log('TALERA_LOCATION_INDEX_EXISTING_STORY_AND_ORIGINAL_PASS',JSON.stringify({webkit:webkitPickerOnly,version:queued.version,pending:queued.pending,originalBytesPreserved:true}));
+    await worldPage.evaluate(id=>window.TaleraMemories.remove(id),old.id);
+
     // Reopen the same existing app, warm only the proven old register, then
     // disconnect all networking. The newly-covered location must still work
     // from the already downloaded public cache, not a resident old resolver.

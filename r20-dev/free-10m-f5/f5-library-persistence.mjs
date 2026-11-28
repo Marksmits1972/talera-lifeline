@@ -362,7 +362,7 @@ export async function readAll(db){
  const stories=requestResult(tx.objectStore('stories').getAll());
  const files=requestResult(tx.objectStore('files').getAll());
  const catalog=await stories;
- return {stories:catalog,files:await originalPayloadStorage.logicalRowsVerified(await files,catalog)};
+ return {stories:catalog,files:await originalPayloadStorage.logicalRowsVerified((await files).filter(row=>row.key!=='talera-location-work-index-v1'),catalog)};
 }
 
 // Fail-closed relationship check for the ORIGINAL media within the single
@@ -562,6 +562,7 @@ export async function restoreRowsAtomic(db,decoded){
    try{
     const s=tx.objectStore('stories'),f=tx.objectStore('files');
     for(const row of decoded.stories)s.add(row);
+    f.delete('talera-location-work-index-v1'); // derived work index only; never original data
     let index=0;
     const next=()=>{
      if(index>=ownedFiles.length)return;

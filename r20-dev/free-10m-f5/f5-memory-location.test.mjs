@@ -10,14 +10,14 @@ import {createFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
 const nl={countryCode:'NL',city:'Boxtel'},fr={countryCode:'FR',city:'Paris'};
 const auto=(location,kind='photo')=>({key:'originalPhoto:0',kind,capturePlace:{...location,country:location.countryCode==='NL'?'Nederland':'Frankrijk',source:'geonames-locality-v2'}});
 const fill={...fr,mode:'fill'},correct={...fr,mode:'correct'};
-test('location layout never hides the independent location control when characteristics expand',()=>{
+test('the draft recognizer mounts without location UI, manual controls or device permission',()=>{
  const src=fs.readFileSync(new URL('./f5-memory-location-build.mjs',import.meta.url),'utf8');
- const css=src.slice(src.indexOf('<style id="talera-memory-location-css">'),src.indexOf('</style>'));
- assert.match(css,/Keep location available independently of tag expansion/);
- assert.doesNotMatch(css,/\.talera-tags-toggle\[aria-expanded="true"\].*\.talera-memory-location\{display:none/);
- assert.match(css,/\.talera-location-edit\{border:1px solid #B4C4D8;background:#fff;color:#23497E/);
- assert.match(css,/\.talera-location-apply\{border:1px solid #23497E;background:#fff;color:#23497E/);
- assert.match(css,/\.talera-memory-location \[hidden\]\{display:none!important\}/);
+ assert.doesNotMatch(src,/talera-memory-location-css|talera-location-toggle|lookupDevicePlace:/);
+ const module=fs.readFileSync(new URL('./f5-memory-location.mjs',import.meta.url),'utf8');
+ const mount=module.slice(module.indexOf('export function mountMemoryLocationEditor('),module.indexOf('// This is an explicit user-confirmed fallback'));
+ assert.doesNotMatch(mount,/createElement|insertAdjacentElement|navigator\.geolocation|requestConfirmedPhotoPlace|\.textContent\s*=/);
+ assert.match(mount,/anchor\.dataset\.taleraAutomaticLocation/);
+ assert.match(mount,/result\.set\(id,value\);saveDraft\(\)/);
 });
 test('legacy optional country and city validate and old memory data survive without presentation override',()=>{
  assert.deepEqual(normalizeManualLocation({countryCode:'',city:'  Cádiz  '},codes),{countryCode:'',city:'Cádiz'});
@@ -160,13 +160,12 @@ test('actual editor package contains one mount and ordered inputs; legacy stored
   assert.match(html,/<link rel="talera-offline-locality" href="\/__talera_free\/places-[a-f0-9]{64}\.bin">/);
   assert.ok(html.includes('v5-no-country')&&!html.includes('/*TALERA_GEONAMES_ENABLED*/false'),'Current recognition must not wait for provider configuration');
   if(route==='/tell'){
-   if(process.env.CI)assert.ok(html.includes("className='talera-memory-location'"),'Actual packaged editor control missing');
-   else if(!html.includes("className='talera-memory-location'"))html=installMemoryLocationEditor(html);
+   if(process.env.CI)assert.ok(html.includes('anchor.dataset.taleraAutomaticLocation'),'Actual packaged automatic recognition missing');
+   else if(!html.includes('anchor.dataset.taleraAutomaticLocation'))html=installMemoryLocationEditor(html);
    assert.equal(html.split('mountMemoryLocationEditor({g,anchor:').length,2);
    assert.ok(html.includes("photoLocations:draftPhotoInputs(g,id=>assets.get(id))")&&html.includes("g.taleraLocationStop?.()"));
-   assert.ok(html.includes("use.onclick=()=>{const id=single;if(id)void confirmDevicePlace(id)}")&&html.includes("lookupDevicePlace:(...args)=>mem.lookupConfirmedDevicePlace(...args)")&&html.includes("deviceAttempt?.controller.abort()"));
-   assert.ok(html.includes("const rows=node('div','talera-location-list',panel)")&&html.includes("setManual(single,{...value,mode:singleMode})"));
-   assert.ok(!html.includes("talera-location-thumb")&&!html.includes("talera-location-check"),'Simplified location panel must not repeat photos or use selection boxes');
+   assert.ok(html.includes("inspect:(...args)=>mem.inspectDraftCapturePlace(...args)"));
+   assert.doesNotMatch(html,/talera-memory-location-css|talera-location-toggle|talera-location-tile|talera-location-apply|talera-memory-country|talera-memory-city|requestConfirmedPhotoPlace\(/,'No location controls or current-device permission route in bundled editor');
   }
   for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(m[2].includes('function normalizeManualLocation'))new vm.Script(m[2]);
  }

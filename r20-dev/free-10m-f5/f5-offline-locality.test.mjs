@@ -336,6 +336,8 @@ test('draft editor waits offline and coalesces reconnection during an ongoing sc
      if(!win.navigator.onLine){reached();if(overlap)await blocked;return countryResult}
      return cityResult;
     }});
+   assert.equal(box,anchor,'The recognizer owns the existing anchor, not a new panel');
+   assert.deepEqual(main.children,[anchor]);assert.equal(anchor.children.length,0);
    await during;
    if(!overlap){await flush();assert.equal(timers.size,0,'country-only offline draft waits for reconnect');}
    win.navigator.onLine=true;win.dispatchEvent(new Event('online'));

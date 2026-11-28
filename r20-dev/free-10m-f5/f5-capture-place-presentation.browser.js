@@ -33,7 +33,7 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
  document.addEventListener('DOMContentLoaded',layout,{once:true});
  let active='',serial=0,queued=false;
  const cache=new Map();
- const hidden=()=>{row.hidden=true;row.removeAttribute('data-location-diagnosis');label.textContent='';flag.hidden=false;flag.style.removeProperty('background-position')};
+ const hidden=()=>{row.hidden=true;row.removeAttribute('data-location-diagnosis');label.textContent='';row.removeAttribute('aria-label');row.removeAttribute('role');label.hidden=false;flag.hidden=false;flag.style.removeProperty('background-position')};
  const visibleImage=(image,urls)=>image&&!image.closest('[hidden]')&&
   image.complete&&image.naturalWidth>0&&image.getClientRects().length>0&&
   getComputedStyle(image).visibility!=='hidden'&&
@@ -113,7 +113,11 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
    let localizedCountry=place.country||place.countryCode||'';if(place.countryCode)try{localizedCountry=new Intl.DisplayNames([locale],{type:'region',fallback:'none'}).of(place.countryCode)||localizedCountry}catch{}
    const locationLabel=place.source==='geonames-locality-v2'
     ?window.TaleraI18n.t('core.present.captureNear',{city:place.city}):place.source==='offline-locality-v1'?window.TaleraI18n.t('core.present.captureOfflineNear',{city:place.city}):place.city;
-   label.textContent=[localizedCountry,locationLabel].filter(Boolean).join(' · ');row.hidden=false;layout();
+   // A country-only result is a quiet flag; preserve an accessible country name.
+   label.textContent=locationLabel?[localizedCountry,locationLabel].filter(Boolean).join(' · '):'';
+   label.hidden=!locationLabel;
+   if(!locationLabel&&localizedCountry){row.setAttribute('role','img');row.setAttribute('aria-label',localizedCountry)}else{row.removeAttribute('role');row.removeAttribute('aria-label')}
+   row.hidden=false;layout();
   });
  }
  function schedule(){

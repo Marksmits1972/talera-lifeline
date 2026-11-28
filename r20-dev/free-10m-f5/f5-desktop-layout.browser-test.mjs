@@ -234,32 +234,14 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   const narrow=[];
   for(const [width,height] of [[320,568],[390,844],[430,932]]){
    await page.setViewportSize({width,height});
-   const tags=page.locator('.talera-tags-toggle'),loc=page.locator('.talera-location-toggle');
+   const tags=page.locator('.talera-tags-toggle');
    const publish=page.locator('.talera-r16-toolbar #publish');
    const fixedBefore=await publish.boundingBox();
    await tags.scrollIntoViewIfNeeded();
    await tags.click();
    assert.equal(await tags.getAttribute('aria-expanded'),'true');
-   await loc.scrollIntoViewIfNeeded();
-   assert.equal(await loc.isVisible(),true,'Location must remain available when tags are expanded');
-   await loc.click();
-   assert.equal(await loc.getAttribute('aria-expanded'),'true');
-   assert.equal(await tags.getAttribute('aria-expanded'),'true','Independent existing expansion states are retained');
-   // The existing EXIF inspection repaints the rows asynchronously. Wait
-   // for the three original synthetic PNGs to finish, then prove the actual
-   // last row is actionable (trial click scrolls and retries DOM replacement).
-   await page.waitForFunction(()=>{
-    const rows=[...document.querySelectorAll('.talera-location-tile')];
-    return rows.length===3&&rows.every(r=>r.dataset.locationState!=='pending');
-   });
-   const tile=page.locator('.talera-location-edit').last();
-   await tile.click({trial:true});
-   const visible=await tile.evaluate(e=>{
-    const r=e.getBoundingClientRect(),main=e.closest('#main').getBoundingClientRect();
-    const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-    return {inside:r.top>=main.top-1&&r.bottom<=main.bottom+1,hit:hit===e||e.contains(hit),overflow:document.documentElement.scrollWidth>innerWidth+1};
-   });
-   assert.ok(visible.inside&&visible.hit&&!visible.overflow,'Reachable expanded location controls at '+width+'px '+JSON.stringify(visible));
+   assert.equal(await page.locator('.talera-memory-location,.talera-location-toggle,#talera-memory-country,#talera-memory-city').count(),0,'No manual location UI within the actual editor');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'No horizontal overflow');
    await publish.scrollIntoViewIfNeeded();
    const pub=await publish.evaluate(e=>{
     const r=e.getBoundingClientRect(),s=getComputedStyle(e),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
@@ -267,9 +249,9 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    });
    assert.ok(!pub.disabled&&pub.rgb==='rgb(7, 26, 61)'&&pub.hit,'Existing Save remains the reachable primary action '+JSON.stringify(pub));
    const fixedAfter=await publish.boundingBox();
-   assert.ok(fixedBefore&&fixedAfter&&Math.abs(fixedBefore.y-fixedAfter.y)<2,'Both expanded panels must leave Save at the same fixed position');
+   assert.ok(fixedBefore&&fixedAfter&&Math.abs(fixedBefore.y-fixedAfter.y)<2,'Expanded characteristics must leave Save at the same fixed position');
    // Close the original panels, then enter the original writer.
-   await loc.click();await tags.click();
+   await tags.click();
    await page.locator('#write').click();
    await writer.waitFor({state:'visible'});
    const done=page.locator('#taleraWriterDone');
@@ -291,7 +273,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    assert.ok(bounds.prev.width>=44&&bounds.next.width>=44&&bounds.next.bottom<=height+1,'Original tap targets fit viewport');
    await page.locator('#frame > #next').click(); // same original photo navigation
    await page.locator('#taleraV61RecClose').click();await recorder.waitFor({state:'hidden'});
-   narrow.push({width,height,locationReachable:visible.hit,saveReachable:pub.hit});
+   narrow.push({width,height,locationControlsAbsent:true,saveReachable:pub.hit});
   }
   console.log('TALERA_NARROW_EDITOR_ACTION_HIERARCHY_GEOMETRY_PASS',JSON.stringify(narrow));
 

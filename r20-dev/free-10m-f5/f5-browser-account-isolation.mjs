@@ -1082,7 +1082,7 @@ try{
      'tagged-synthetic.png',{type:'image/png'});
    const record=await window.TaleraMemories.save({
      title:'Tagged local regression',date:'1986-05-16',text:'Tagged technical record',
-     tags:['Reizen'],narrationCues:[]
+     tags:['Reizen'],narrationCues:[],photoLocations:[{manual:{countryCode:'FR',city:'Parijs',mode:'fill'}}]
    },[image]);
    return {id:record.id,tags:record.tags,photoKey:record.items?.[0]?.key};
  },onePixelPng);
@@ -1183,49 +1183,28 @@ try{
  try{
   const before=await page.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {keys:row.items.map(x=>x.key),bytes:Array.from(new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer()))}},tagged.id);
   await locationEdit.goto(origin+'/tell?edit='+encodeURIComponent(tagged.id),{waitUntil:'domcontentloaded'});
-  await locationEdit.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
-  assert.equal(await locationEdit.evaluate(()=>document.querySelector('.talera-memory-location').previousElementSibling?.classList.contains('talera-tags-v20')),true);
-  await locationEdit.locator('.talera-location-toggle').click();
-  const unresolved=locationEdit.locator('.talera-location-tile[data-location-state="unknown"]');
-  await unresolved.waitFor({state:'visible',timeout:20000});
-  assert.equal(await locationEdit.locator('.talera-location-tile').count(),1);
-  assert.equal(await locationEdit.locator('.talera-memory-location img,.talera-memory-location input[type=checkbox]').count(),0);
-  await unresolved.locator('.talera-location-edit').click();
-  assert.equal(await locationEdit.locator('#talera-memory-city').inputValue(),'');
-  assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Kies een land');
+  await locationEdit.locator('#publish').waitFor({state:'visible',timeout:20000});
   for(const lang of ['nl','en','de','fr','es']){
    await locationEdit.evaluate(l=>window.TaleraI18n.setLanguage(l),lang);
-   assert.equal(await locationEdit.locator('.talera-location-title').innerText(),languageCatalog[lang]['core.editor.location.heading']);
-   assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),languageCatalog[lang]['core.editor.location.countryPlaceholder']);
+   assert.equal(await locationEdit.locator('.talera-memory-location,.talera-location-toggle,#talera-memory-country,#talera-memory-city').count(),0);
+   assert.equal(await locationEdit.locator('#publish').isEnabled(),true);
   }
   await locationEdit.evaluate(()=>window.TaleraI18n.setLanguage('nl'));
-  assert.equal(await locationEdit.locator('.talera-location-tile-label').innerText(),'Locatie onbekend');
   await locationEdit.context().setOffline(true);
   try{
-   await locationEdit.locator('#talera-memory-country').click();
-   await locationEdit.locator('.talera-location-dialog[open]').waitFor({state:'visible'});
-   assert.ok(await locationEdit.locator('.talera-location-choice').count()>195);
-   await locationEdit.locator('.talera-location-search').fill('Frankrijk');
-   await locationEdit.locator('.talera-location-choice').filter({hasText:'Frankrijk'}).click();
-   assert.equal(await locationEdit.locator('.talera-location-dialog[open]').count(),0);
-   assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Frankrijk');
-   await locationEdit.locator('#talera-memory-city').fill('Parijs');
-   await locationEdit.locator('.talera-location-apply').click();
+   assert.equal(await locationEdit.locator('.talera-location-dialog,.talera-location-device').count(),0);
+   assert.equal(await locationEdit.locator('#publish').isEnabled(),true);
   }finally{await locationEdit.context().setOffline(false)}
-  assert.equal(await page.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].manualPhotoLocation??null,tagged.id),null,'Draft must not publish automatically');
+  assert.deepEqual(await page.evaluate(async id=>(await window.TaleraMemories.get(id)).items[0].manualPhotoLocation,tagged.id),{countryCode:'FR',city:'Parijs',mode:'fill'},'Previously saved location is retained');
   await locationEdit.locator('#publish').click();
   try{await locationEdit.waitForURL(url=>url.pathname==='/mijn-leven'&&url.searchParams.get('published')===tagged.id,{timeout:25000})}
   catch(error){console.error('TALERA_LOCATION_SAVE_DIAGNOSTIC',JSON.stringify({url:locationEdit.url(),error:await locationEdit.locator('#error').textContent({timeout:1000}).catch(()=>null),busy:await locationEdit.locator('#busy').isVisible().catch(()=>false)}));throw error}
   const after=await page.evaluate(async id=>{const row=await window.TaleraMemories.get(id);return {manualPhotoLocation:row.items[0].manualPhotoLocation,keys:row.items.map(x=>x.key),bytes:Array.from(new Uint8Array(await (await window.TaleraMemories.blob(row.items[0].key)).arrayBuffer()))}},tagged.id);
   assert.deepEqual(after,{...before,manualPhotoLocation:{countryCode:'FR',city:'Parijs',mode:'fill'}});
   await locationEdit.goto(origin+'/tell?edit='+encodeURIComponent(tagged.id),{waitUntil:'domcontentloaded'});
-  await locationEdit.locator('.talera-location-toggle').waitFor({state:'visible',timeout:20000});
-  await locationEdit.locator('.talera-location-toggle').click();
-  await locationEdit.locator('.talera-location-edit').waitFor({state:'visible',timeout:20000});
-  await locationEdit.locator('.talera-location-edit').click();
-  assert.equal(await locationEdit.locator('.talera-location-country-name').innerText(),'Frankrijk');
-  assert.equal(await locationEdit.locator('#talera-memory-city').inputValue(),'Parijs');
-  console.log('TALERA_LOCATION_EDITOR_OFFLINE_COUNTRY_FIVE_LANGUAGES_AND_SAVE_PASS');
+  await locationEdit.locator('#publish').waitFor({state:'visible',timeout:20000});
+  assert.equal(await locationEdit.locator('.talera-memory-location,.talera-location-toggle,#talera-memory-country,#talera-memory-city').count(),0);
+  console.log('TALERA_LOCATION_EDITOR_NO_FIELDS_FIVE_LANGUAGES_EXISTING_LOCATION_PRESERVED_PASS');
  }finally{await locationEdit.close()}
 
  // Reuse the already existing tagged fixture after its final Home assertions.

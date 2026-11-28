@@ -1241,21 +1241,21 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse HEAD^1)" = d6c97bdb4ad6cc456e7e644abf148e6e73fcf310
+          test "$(git rev-parse HEAD^1)" = f3a450ee571486c50cfcd5c82a0690d8d8e8afce
           test "$(git diff --name-only HEAD^1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           # Same shared app, only silent photo location and its regression tests, retaining all preceding live product source.
-          git checkout --detach d6c97bdb4ad6cc456e7e644abf148e6e73fcf310
-          test "$(git rev-parse HEAD)" = d6c97bdb4ad6cc456e7e644abf148e6e73fcf310
-          test "$(git rev-parse HEAD^)" = 162c7b206c23196215fd32c7b124a8dd576e4e36
-          test "$(git rev-parse HEAD^{tree})" = 75465f5faf74eb2b37227d2cc947b2c4c908b77f
-          test "$(git diff --name-only 792007eeddcc63fc86ce7836901072e406e08e6f HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-capture-place-presentation.browser.js r20-dev/free-10m-f5/f5-desktop-layout.browser-test.mjs r20-dev/free-10m-f5/f5-memory-location-build.mjs r20-dev/free-10m-f5/f5-memory-location.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs r20-dev/free-10m-f5/f5-offline-locality.test.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)"
-          test "$(git diff --name-only 792007eeddcc63fc86ce7836901072e406e08e6f HEAD^)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-capture-place-presentation.browser.js r20-dev/free-10m-f5/f5-desktop-layout.browser-test.mjs r20-dev/free-10m-f5/f5-memory-location-build.mjs r20-dev/free-10m-f5/f5-memory-location.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs r20-dev/free-10m-f5/f5-offline-locality.test.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)"
+          git checkout --detach f3a450ee571486c50cfcd5c82a0690d8d8e8afce
+          test "$(git rev-parse HEAD)" = f3a450ee571486c50cfcd5c82a0690d8d8e8afce
+          test "$(git rev-parse HEAD^)" = 75aa4f1db73cad00289ef6d613f0d1971f7faf18
+          test "$(git rev-parse HEAD^{tree})" = 8d322934ed95a6139a55101518911d8e0c845e02
+          test "$(git diff --name-only 792007eeddcc63fc86ce7836901072e406e08e6f HEAD)" = "$(printf '%s\n' .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-capture-place-presentation.browser.js r20-dev/free-10m-f5/f5-desktop-layout.browser-test.mjs r20-dev/free-10m-f5/f5-memory-location-build.mjs r20-dev/free-10m-f5/f5-memory-location.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs r20-dev/free-10m-f5/f5-offline-locality.test.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)"
+          test "$(git diff --name-only 792007eeddcc63fc86ce7836901072e406e08e6f HEAD^)" = "$(printf '%s\n' .github/workflows/talera-free-f5-integration.yml r20-dev/free-10m-f5/f5-browser-account-isolation.mjs r20-dev/free-10m-f5/f5-capture-place-presentation.browser.js r20-dev/free-10m-f5/f5-desktop-layout.browser-test.mjs r20-dev/free-10m-f5/f5-memory-location-build.mjs r20-dev/free-10m-f5/f5-memory-location.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs r20-dev/free-10m-f5/f5-offline-locality.test.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)"
           test "$(git diff --name-only HEAD^ HEAD)" = r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-edit-return.browser-test.mjs)" = b55c14f2d57e6ee0b2948db27094632f3ae0171e
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-independent-narrator.browser.js)" = e2658df560743c77e1ab5fbe8f96131a93968b6f
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-independent-narrator.test.mjs)" = 0296a7d94a964aa97cbab5de1ab6e1f6d99b3d32
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-language-catalog.mjs)" = 8a0562ce92a275d43c947e882c5a5f0ee94151fe
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)" = bd856eafcf9c6b64650baccf74944cc63fa4379d
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)" = 1083db9e8166d04a86b2fa45694f53c05aea1b41
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-public-assets.mjs)" = 53186752fda75ade0c8613cb9c2a7749a6d6ca5c
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-voice-orb-build.mjs)" = 445b89e312fe852a925c0bafb8deb65b46bd76b7
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-voice-orb.browser-test.mjs)" = 8fa8c756b1b493b61018a9650187c5eb4437e745
@@ -1276,7 +1276,7 @@ jobs:
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-memory-location-build.mjs)" = 3e37788510c1a4b626bd0f8c4133217dabe2dbc1
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-memory-location.mjs)" = 22ad226fb154e72de0e6e58a2858fc3c9d54f4f5
           test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-offline-locality.test.mjs)" = febb23b27557a0cc1c97e214a101654d9f72a8fe
-          echo TALERA_RELEASE_EXACT_SILENT_PHOTO_LOCATION_SOURCE_VERIFIED d6c97bdb4ad6cc456e7e644abf148e6e73fcf310
+          echo TALERA_RELEASE_EXACT_SILENT_PHOTO_LOCATION_SOURCE_VERIFIED f3a450ee571486c50cfcd5c82a0690d8d8e8afce
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -1285,7 +1285,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='46165579811',sha='d6c97bdb4ad6cc456e7e644abf148e6e73fcf310',runSha='d6c97bdb4ad6cc456e7e644abf148e6e73fcf310',digest='d67f4604246e39a569385e2ee1c8d4c8df81e38cbd21e088fca054bc99cd1e59';
+          const id='46166207572',sha='f3a450ee571486c50cfcd5c82a0690d8d8e8afce',runSha='f3a450ee571486c50cfcd5c82a0690d8d8e8afce',digest='08fab84e3701c248189daa23213711c552f7b844a1178685430c65d192b08dc0';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const packageName='Build and archive the exact TALERA Free candidate once';
@@ -1314,7 +1314,7 @@ jobs:
           const artifacts=await get(id+'/artifacts?name=talera-free-f5-candidate-package&per_page=100');
           assert.equal(artifacts.artifacts.length,1);
           const artifact=artifacts.artifacts[0];
-          assert.equal(String(artifact.id),'15271686228');assert.equal(artifact.digest,'sha256:cb578c23121c430731a57a0997766937bf8e84d09a35d7e49dab6660df26185a');assert.equal(artifact.expired,false);
+          assert.equal(String(artifact.id),'15271503855');assert.equal(artifact.digest,'sha256:8547ea5d5796d5cd0ac4cf365c4be9fa36a3b525a29e9c794f8d9884bb2926e9');assert.equal(artifact.expired,false);
           assert.equal(artifact.workflow_run?.head_sha,runSha);assert.equal(String(artifact.workflow_run?.id),id);
           const readLog=async job=>{
             const r=await fetch(root.replace('/runs/','/jobs/')+job.id+'/logs',{
@@ -1423,7 +1423,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_46165579811');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_46166207572');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1475,17 +1475,17 @@ jobs:
         with:
           name: talera-free-f5-candidate-package
           github-token: ${{ github.token }}
-          run-id: 46165579811
+          run-id: 46166207572
           path: ${{ runner.temp }}/talera-candidate-package
       - name: Verify source and tested SHA256 before unpacking for release
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(cat "$out/source.sha")" = "d6c97bdb4ad6cc456e7e644abf148e6e73fcf310"
-          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "d67f4604246e39a569385e2ee1c8d4c8df81e38cbd21e088fca054bc99cd1e59"
+          test "$(cat "$out/source.sha")" = "f3a450ee571486c50cfcd5c82a0690d8d8e8afce"
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "08fab84e3701c248189daa23213711c552f7b844a1178685430c65d192b08dc0"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=d67f4604246e39a569385e2ee1c8d4c8df81e38cbd21e088fca054bc99cd1e59"
+          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=08fab84e3701c248189daa23213711c552f7b844a1178685430c65d192b08dc0"
       - name: Verify exact compact WhatsApp software assets before release
         run: |
           set -euo pipefail
@@ -1694,8 +1694,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code d6c97bdb4ad6cc456e7e644abf148e6e73fcf310 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_46165579811'
+          git diff --exit-code f3a450ee571486c50cfcd5c82a0690d8d8e8afce HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_46166207572'
       - name: Verify actual private device-transfer signaling and retained diagnosis in the same local Worker
         run: |
           set -euo pipefail

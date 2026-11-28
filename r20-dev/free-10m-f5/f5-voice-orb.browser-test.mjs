@@ -56,12 +56,15 @@ export async function verifyVoiceOrb(browser,accountContext,origin,gate){
     });
     await page.goto(origin+'/tell',{waitUntil:'domcontentloaded'});
     await page.locator('#without').click({timeout:20000});
-    await page.locator('#speak').click();
+    await page.locator('#frame .talera-voice-orb').waitFor({timeout:10000});
+    assert.equal(await page.evaluate(()=>typeof window.__orbTestTone),'undefined','Idle orb must not request microphone');
     await page.locator('#taleraV61RecStart').click();
     const orb=page.locator('#frame .talera-voice-orb');
     await orb.waitFor({timeout:10000});
     await page.waitForFunction(()=>Number(document.querySelector('#frame .talera-voice-orb')?.dataset.level||0)>.06,null,{timeout:12000});
     assert.match(await orb.innerText(),/5 minuten/);
+    const live=await orb.evaluate(el=>({level:Number(el.dataset.level),scale:Number(el.querySelector('.talera-voice-orb-core').style.transform.match(/scale\(([^)]+)/)[1])}));
+    assert.ok(Math.abs(live.scale-(1+live.level*.045*1.25))<.0011,'Only live visual energy increases exactly 25% '+JSON.stringify(live));
     await assertVoiceOrbLayout(page,'#frame .talera-voice-orb','taleraV61RecControls',{recording:true});
     await page.waitForTimeout(1200);
     // Simulate elapsed time only to verify the original count-up clock has

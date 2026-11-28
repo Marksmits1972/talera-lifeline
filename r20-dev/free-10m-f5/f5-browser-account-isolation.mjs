@@ -376,14 +376,15 @@ async function verifyTellEditorLayout(page,storyId){
     'Editor action row is unnecessarily high, leaving unused lower screen space');
   assert.equal(layout.workColor,'rgb(255, 255, 255)',
     'Original editing surface must have one even background');
-  const beforeY=layout.photos.top;
+  await edit.locator('.talera-tags-toggle').scrollIntoViewIfNeeded();
+  const beforeY=await edit.locator('.talera-work-tiles').evaluate(e=>e.getBoundingClientRect().top+document.querySelector('#main').scrollTop);
   await edit.locator('.talera-tags-toggle').click();
   await edit.waitForFunction(()=>
     document.querySelector('.talera-tags-toggle')?.getAttribute('aria-expanded')==='true'&&
     document.querySelector('#taleraMemoryTagsDialog')?.open,
     null,{timeout:7000});
   const expanded=await edit.evaluate(()=>({
-    photosTop:document.querySelector('.talera-work-tiles').getBoundingClientRect().top,
+    photosTop:document.querySelector('.talera-work-tiles').getBoundingClientRect().top+document.querySelector('#main').scrollTop,
     tagPanelVisible:!!document.querySelector('#taleraMemoryTagsDialog')?.open,
     selectedMediaCount:document.querySelectorAll('.talera-work-tiles .tile').length,
     originalButtons:['speak','write','publish'].map(id=>document.querySelectorAll('#'+id).length)
@@ -1604,7 +1605,7 @@ try{
        // characteristics dialog. Test the real existing editor, not an example app.
        const sizeSnapshot=()=>follower.evaluate(()=>{
          const r=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();
-         return {photo:r('.talera-work-tiles'),work:r('.work.talera-r16-editor'),toolbar:r('.talera-r16-toolbar'),
+         return {photo:r('.talera-work-tiles'),mainScroll:document.querySelector('#main').scrollTop,work:r('.work.talera-r16-editor'),toolbar:r('.talera-r16-toolbar'),
            titleSize:getComputedStyle(document.querySelector('#title')).fontSize,
            dateSize:getComputedStyle(document.querySelector('#dateToggle')).fontSize,
            width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth};
@@ -1629,7 +1630,7 @@ try{
          });
          assert.ok(panel.open&&panel.height>=height*.88&&panel.total>=25&&panel.minHeight>=44&&panel.fullyVisible>=8&&panel.overflow==='auto',
            'Spacious characteristics with large targets '+JSON.stringify(panel));
-         assert.ok(Math.abs(before.photo.y-after.photo.y)<3&&Math.abs(before.toolbar.y-after.toolbar.y)<3,
+         assert.ok(Math.abs(before.photo.y+before.mainScroll-after.photo.y-after.mainScroll)<3&&Math.abs(before.toolbar.y-after.toolbar.y)<3,
            'Opening characteristics must not move the existing editor');
          const first=dialog.locator('.talera-tag-choice').first(),old=await first.getAttribute('aria-pressed');
          await first.click();

@@ -98,8 +98,10 @@ for(const page of [packagedTell,readFileSync('r20-dev/free-10m-delivery/public'+
  const start=page.indexOf('function setupV20Tags(g,details){'),end=page.indexOf('}function setupV10(',start);
  assert.ok(start>0&&end>start);
  const owner=page.slice(start,end);
- assert.ok(page.includes('id="talera-editor-clean-layout-v1"')&&owner.includes('saveDraft();paintChips()'));
- assert.ok(owner.includes('openFavorites=clean([...favorites(),...g.tags])')&&!/talera-tag-apply|talera-tag-cancel|talera-tags-own-input/.test(owner));
+ assert.ok(page.includes('id="talera-memory-first-editor"')&&owner.includes('await saveDraft();paint()'));
+ assert.ok(owner.includes('dialog.showModal()')&&owner.includes('talera-tag-apply')&&owner.includes('talera-tag-cancel'));
+ assert.ok(owner.includes('talera-kenmerken-voorkeuren-v1')&&owner.includes('talera-kenmerken-catalog-v1'));
+ assert.ok(owner.includes('pending.length<16')&&owner.includes('...catalog,...favorites,...pending'));
  assert.ok(page.includes("new URLSearchParams(location.search).get('edit')===g.existing"));
  // Parse the real emitted classic script, not just the JS generator.
  // A line comment in the join('') array must never break the delivered editor.

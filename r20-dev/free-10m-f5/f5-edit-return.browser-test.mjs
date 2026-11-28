@@ -147,34 +147,32 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
     return {actual:document.getElementById('publish').textContent.trim(),expected:({nl:'Opslaan',en:'Save',de:'Speichern',fr:'Enregistrer',es:'Guardar'})[lang]||'Opslaan'};
    });
    assert.equal(saveLabel.actual,saveLabel.expected,'Existing pencil edit must say Save in the current language');
-   assert.equal(await page.locator('#app header.top strong').isVisible(),false,'Work editor has no logo');
-   assert.equal(await page.locator('.talera-tags-own-input,.talera-tag-apply,.talera-tag-cancel').count(),0,'No create/apply/cancel controls in the editor');
+   assert.equal(await page.locator('#app header.top strong').isVisible(),true,'Approved memory-first work editor retains TALERA logo');
+   assert.equal(await page.locator('#taleraMemoryTagsDialog').count(),0,'No extra panel until the owner opens characteristics');
    if(i===0){
     const toggle=page.locator('.talera-tags-toggle'),panel=page.locator('.talera-tags-panel'),publish=page.locator('#publish');
     assert.equal(await page.locator('.talera-work-tiles .talera-v9-remove-media').count(),6);
-    const before=await publish.boundingBox(),gridBefore=await page.locator('.talera-work-tiles').boundingBox();
+    await toggle.scrollIntoViewIfNeeded();
+    const before=await publish.boundingBox(),gridBefore=await page.locator('.talera-work-tiles').boundingBox(),scrollBefore=await page.locator('#main').evaluate(e=>e.scrollTop);
     await toggle.click();await panel.waitFor({state:'visible'});
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     const afterBox=await publish.boundingBox(),gridAfter=await page.locator('.talera-work-tiles').boundingBox();
-    assert.ok(Math.abs(gridBefore.y-gridAfter.y)<=2&&Math.abs(gridBefore.height-gridAfter.height)<=2,'Opening characteristics must not move photos');
+    const scrollAfter=await page.locator('#main').evaluate(e=>e.scrollTop);
+    assert.ok(Math.abs(gridBefore.y+scrollBefore-gridAfter.y-scrollAfter)<=2&&Math.abs(gridBefore.height-gridAfter.height)<=2,'Opening characteristics must not move photos');
     assert.ok(Math.abs(before.y-afterBox.y)<=4,'Opening characteristics must not move the footer: '+JSON.stringify({before,afterBox}));
-    assert.equal(await page.locator('.talera-tags-own-input,.talera-tag-apply,.talera-tag-cancel').count(),0);
-    assert.equal(await page.locator('.talera-tags-selected').isVisible(),false,'No duplicate selected chips in open panel');
-    const visible=await page.locator('.talera-tags-choices').evaluate(choices=>{
-     const viewport=choices.getBoundingClientRect(),rows=[...choices.querySelectorAll('.talera-tag-choice')].map(b=>b.getBoundingClientRect());
-     const whole=rows.filter(r=>r.top>=viewport.top-1&&r.bottom<=viewport.bottom+1).length;
-     const partial=rows.filter(r=>r.top<viewport.bottom-1&&r.bottom>viewport.top+1&&!(r.top>=viewport.top-1&&r.bottom<=viewport.bottom+1)).length;
-     return {count:rows.length,whole,partial,height:viewport.height};
+    assert.equal(await panel.locator('.talera-tag-apply,.talera-tag-cancel').count(),2);
+    const visible=await panel.evaluate(dialog=>{
+     const viewport=dialog.querySelector('.talera-memory-tags-body').getBoundingClientRect(),rows=[...dialog.querySelectorAll('.talera-tag-choice')].map(b=>b.getBoundingClientRect());
+     return {count:rows.length,whole:rows.filter(r=>r.top>=viewport.top-1&&r.bottom<=viewport.bottom+1).length,minHeight:Math.min(...rows.map(r=>r.height)),height:viewport.height};
     });
-    assert.equal(visible.whole,Math.min(6,visible.count),'Two complete characteristic rows on the actual six-photo editor: '+JSON.stringify(visible));
-    assert.equal(visible.partial,0,'No third partial row; '+JSON.stringify(visible));
-    console.log('TALERA_EDITOR_REFERENCE_TWO_COMPLETE_ROWS_PASS',JSON.stringify(visible));
+    assert.ok(visible.count>=25&&visible.whole>=8&&visible.minHeight>=44,'Large, readable characteristics selection: '+JSON.stringify(visible));
+    console.log('TALERA_EDITOR_LARGE_CHARACTERISTICS_DIALOG_PASS',JSON.stringify(visible));
     const choiceIndex=await page.locator('.talera-tag-choice').evaluateAll(nodes=>nodes.findIndex(n=>n.getAttribute('aria-pressed')==='false'));
     assert.ok(choiceIndex>=0,'Need an unselected existing characteristic');
     const option=page.locator('.talera-tag-choice').nth(choiceIndex);
     await option.click();assert.equal(await option.getAttribute('aria-pressed'),'true');
     await option.click();assert.equal(await option.getAttribute('aria-pressed'),'false');
-    await toggle.click();await panel.waitFor({state:'hidden'});
+    await panel.locator('.talera-tag-cancel').click();await panel.waitFor({state:'hidden'});
     // Capture the actual integrated app with six synthetic photos at the
     // owner's tall-phone geometry, both states, without touching any live
     // data or introducing another app. Only diagnostic test output, never
@@ -192,7 +190,7 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
      await capture('CLOSED');
      await toggle.click();await panel.waitFor({state:'visible'});
      await capture('OPEN');
-     await toggle.click();await panel.waitFor({state:'hidden'});
+     await panel.locator('.talera-tag-cancel').click();await panel.waitFor({state:'hidden'});
      if(originalViewport)await page.setViewportSize(originalViewport);
      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     }
@@ -222,6 +220,8 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
     assert.ok(choiceIndex>=0,'Need an unselected existing characteristic');
     const option=page.locator('.talera-tag-choice').nth(choiceIndex);
   await option.click();assert.equal(await option.getAttribute('aria-pressed'),'true');
+  await page.locator('#taleraMemoryTagsDialog .talera-tag-apply').click();
+  await page.locator('#taleraMemoryTagsDialog').waitFor({state:'detached'});
   const edited=await page.evaluate(async target=>{
    const story=await window.TaleraMemories.get(target);
    const draft=await window.TaleraMemories.blob('talera-v4-work:manifest');
@@ -322,6 +322,7 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
   }
   console.log('TALERA_EDITOR_ACTUAL_MIXED_VIDEO_CACHED_AND_NATIVE_PREVIEW_PASS');
   await page.locator('#without').click();
+  await page.locator('#taleraV61RecClose').click();
   await page.locator('#publish').waitFor({state:'visible'});
   assert.equal(await eye.count(),0,'No eye on new memory');
   const label=await page.locator('#publish').textContent();

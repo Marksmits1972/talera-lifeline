@@ -1644,6 +1644,23 @@ async function testTimelineLoupe(){
     });
     assert.deepEqual(saved.bytes,fixtureBytes,'GPS bytes unchanged after real picker and durable save');
     console.log('TALERA_OFFLINE_COUNTRY_REAL_PICKER_ORIGINAL_GPS_BYTES_PASS',JSON.stringify({engine:webkitPickerOnly?'webkit':'chromium',physicalIphoneAccepted:false}));
+    // The direct low-level save intentionally bypasses the editor's completed
+    // draft receipt. Await the independent catalog worker before navigating:
+    // aborting its IDB lease during unload can defer this synthetic save.
+    // The later real publish test still proves the editor carries the exact
+    // completed draft location without waiting for any post-save enrichment.
+    try{
+      await geoPage.waitForFunction(async ({id,expected})=>{
+        const item=(await window.TaleraMemories.get(id))?.items?.[0];
+        return item?.capturePlace?.countryCode===expected.countryCode&&item.capturePlace.city===expected.city&&item.capturePlace.source===expected.source;
+      },{id:saved.id,expected:expectedPlace},{timeout:30000});
+    }catch(error){
+      console.error('TALERA_DIRECT_SAVE_LOCATION_DIAGNOSTIC',JSON.stringify(await geoPage.evaluate(async id=>{
+        const row=await window.TaleraMemories.get(id),item=row?.items?.[0];
+        return {place:item?.capturePlace??null,checked:item?.capturePlaceChecked??null,failed:item?.captureLocationFailed??null,online:navigator.onLine};
+      },saved.id)));
+      throw error;
+    }
     // Same app direct presentation entry without Home or network geocoding.
     const direct=await geoPage.goto(origin+'/present?memory='+encodeURIComponent(saved.id),{waitUntil:'domcontentloaded'});
     assert.ok((await direct.text()).includes('resolveCountry:createOfflineCountryResolver('),'Authenticated presentation must mount offline library service');

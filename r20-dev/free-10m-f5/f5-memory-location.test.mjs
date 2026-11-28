@@ -10,6 +10,15 @@ import {createFreeArchive,decodeFreeArchive} from './f5-portable-archive.mjs';
 const nl={countryCode:'NL',city:'Boxtel'},fr={countryCode:'FR',city:'Paris'};
 const auto=(location,kind='photo')=>({key:'originalPhoto:0',kind,capturePlace:{...location,country:location.countryCode==='NL'?'Nederland':'Frankrijk',source:'geonames-locality-v2'}});
 const fill={...fr,mode:'fill'},correct={...fr,mode:'correct'};
+test('location layout never hides the independent location control when characteristics expand',()=>{
+ const src=fs.readFileSync(new URL('./f5-memory-location-build.mjs',import.meta.url),'utf8');
+ const css=src.slice(src.indexOf('<style id="talera-memory-location-css">'),src.indexOf('</style>'));
+ assert.match(css,/Keep location available independently of tag expansion/);
+ assert.doesNotMatch(css,/\.talera-tags-toggle\[aria-expanded="true"\].*\.talera-memory-location\{display:none/);
+ assert.match(css,/\.talera-location-edit\{border:1px solid #B4C4D8;background:#fff;color:#23497E/);
+ assert.match(css,/\.talera-location-apply\{border:1px solid #23497E;background:#fff;color:#23497E/);
+ assert.match(css,/\.talera-memory-location \[hidden\]\{display:none!important\}/);
+});
 test('legacy optional country and city validate and old memory data survive without presentation override',()=>{
  assert.deepEqual(normalizeManualLocation({countryCode:'',city:'  Cádiz  '},codes),{countryCode:'',city:'Cádiz'});
  assert.deepEqual(normalizeManualLocation({countryCode:'NL',city:''},codes),{countryCode:'NL',city:''});
@@ -162,3 +171,4 @@ test('actual editor package contains one mount and ordered inputs; legacy stored
   for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(m[2].includes('function normalizeManualLocation'))new vm.Script(m[2]);
  }
 });
+

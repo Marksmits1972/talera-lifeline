@@ -201,6 +201,7 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   await date.waitFor({state:'visible'});
   const dateBox=await date.boundingBox();assert.ok(dateBox&&close(dateBox.x+dateBox.width/2,683)&&dateBox.width<=460,
    'Date modal centered and bounded');
+  assert.equal(await page.locator('#v30DateSave').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(7, 26, 61)','Existing date confirmation uses primary TALERA navy');
   await page.locator('#v30DateCancel').click();
   await date.waitFor({state:'hidden'});
   await page.locator('#write').click();
@@ -227,6 +228,63 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   await page.locator('#taleraV61RecClose').click();
   await recorder.waitFor({state:'hidden'});
   console.log('TALERA_DESKTOP_EDITOR_WRITER_RECORDER_DATE_PASS',JSON.stringify({editor,writerGeometry,rec}));
+
+  // Test the SAME saved synthetic memory and actual editor in narrow viewports.
+  // No new test app, route, account, media ID, store, or save handler.
+  const narrow=[];
+  for(const [width,height] of [[320,568],[390,844],[430,932]]){
+   await page.setViewportSize({width,height});
+   const tags=page.locator('.talera-tags-toggle'),loc=page.locator('.talera-location-toggle');
+   await tags.scrollIntoViewIfNeeded();
+   await tags.click();
+   assert.equal(await tags.getAttribute('aria-expanded'),'true');
+   await loc.scrollIntoViewIfNeeded();
+   assert.equal(await loc.isVisible(),true,'Location must remain available when tags are expanded');
+   await loc.click();
+   assert.equal(await loc.getAttribute('aria-expanded'),'true');
+   assert.equal(await tags.getAttribute('aria-expanded'),'true','Independent existing expansion states are retained');
+   const tile=page.locator('.talera-location-edit').last();
+   await tile.scrollIntoViewIfNeeded();
+   const visible=await tile.evaluate(e=>{
+    const r=e.getBoundingClientRect(),main=e.closest('#main').getBoundingClientRect();
+    const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+    return {inside:r.top>=main.top-1&&r.bottom<=main.bottom+1,hit:hit===e||e.contains(hit),overflow:document.documentElement.scrollWidth>innerWidth+1};
+   });
+   assert.ok(visible.inside&&visible.hit&&!visible.overflow,'Reachable expanded location controls at '+width+'px '+JSON.stringify(visible));
+   const publish=page.locator('.talera-r16-toolbar #publish');
+   await publish.scrollIntoViewIfNeeded();
+   const pub=await publish.evaluate(e=>{
+    const r=e.getBoundingClientRect(),s=getComputedStyle(e),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+    return {rgb:s.backgroundColor,hit:hit===e||e.contains(hit),disabled:e.disabled};
+   });
+   assert.ok(!pub.disabled&&pub.rgb==='rgb(7, 26, 61)'&&pub.hit,'Existing Save remains the reachable primary action '+JSON.stringify(pub));
+   // Close the original panels, then enter the original writer.
+   await loc.click();await tags.click();
+   await page.locator('#write').click();
+   await writer.waitFor({state:'visible'});
+   const done=page.locator('#taleraWriterDone');
+   assert.equal(await done.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(7, 26, 61)');
+   await page.locator('#taleraWriterText').scrollIntoViewIfNeeded();
+   await done.click();
+   await writer.waitFor({state:'hidden'});
+   await page.locator('#speak').click();
+   await recorder.waitFor({state:'visible'});
+   const bounds=await page.evaluate(()=>{
+    const r=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();
+    return {card:r('#taleraV61RecControls'),prev:r('#frame > #prev'),next:r('#frame > #next'),pos:r('#frame > #pos'),
+     picture:r('#frame > img'),primary:getComputedStyle(document.getElementById('taleraV61RecStart')).backgroundColor};
+   });
+   assert.equal(bounds.primary,'rgb(7, 26, 61)');
+   assert.ok(bounds.prev&&bounds.next&&bounds.pos&&bounds.picture,'Existing photo navigation and image still present');
+   assert.ok(bounds.card.bottom<=Math.min(bounds.prev.top,bounds.next.top,bounds.pos.top)+1&&bounds.picture.bottom<=bounds.card.top+1,
+     'Separate photo, recorder, and navigation regions '+width+'px '+JSON.stringify(bounds));
+   assert.ok(bounds.prev.width>=44&&bounds.next.width>=44&&bounds.next.bottom<=height+1,'Original tap targets fit viewport');
+   await page.locator('#frame > #next').click(); // same original photo navigation
+   await page.locator('#taleraV61RecClose').click();await recorder.waitFor({state:'hidden'});
+   narrow.push({width,height,locationReachable:visible.hit,saveReachable:pub.hit});
+  }
+  console.log('TALERA_NARROW_EDITOR_ACTION_HIERARCHY_GEOMETRY_PASS',JSON.stringify(narrow));
+
   assert.deepEqual(errors,[],'Desktop runtime errors');
   console.log('TALERA_DESKTOP_SAME_APP_LAYOUT_PASS',JSON.stringify({sizes:sizes.map(s=>[s.width,s.height,s.sheet.width]),presentations:presentations.map(g=>g.surface.width),sameMemoryId:true,originalBack:true}));
  }finally{await context.close()}
@@ -249,3 +307,4 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
   console.log('TALERA_DESKTOP_MOBILE_LAYOUT_UNCHANGED_PASS');
  }finally{await mobile.close()}
 }
+

@@ -102,6 +102,87 @@ body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{posi
 #app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]::before{background:#dbe6f5!important;border-color:#dbe6f5!important;}
 #app #main .work.talera-r16-editor .talera-tag-choice:focus-visible{outline:2px solid #224d7c!important;outline-offset:-3px!important;}
 #app #main .work.talera-r16-editor .talera-tag-choice:disabled{opacity:.52!important;}
+
+/* 28-Nov editor visual refinement only. Keep the original DOM, actions,
+   bindings, media order, protected PWA bars and recorder lifecycle. */
+#app #main .work.talera-r16-editor #details #title{color:#071A3D!important;}
+#app #main .work.talera-r16-editor #details #dateToggle{color:#23497E!important;}
+#app #main .work.talera-r16-editor .talera-tags-toggle{
+ background:#fff!important;color:#071A3D!important;border-color:#DCE2EC!important;
+ min-height:48px!important;padding:9px 12px!important;font-weight:650!important;
+ white-space:normal!important;overflow-wrap:anywhere!important;
+}
+#app #main .work.talera-r16-editor .talera-tags-toggle::after{color:#23497E!important;}
+#app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]{color:#071A3D!important;}
+#app #main .work.talera-r16-editor .talera-tag-choice[aria-pressed="true"]::before{background:#E8EFF8!important;border-color:#B4C4D8!important;}
+#app #main .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar :is(#speak,#write){color:#23497E!important;}
+#app #main .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar #publish{
+ background:#071A3D!important;color:#fff!important;box-shadow:none!important;
+}
+#app #main .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar #publish:not(:disabled):active{background:#23497E!important;}
+#app #main .work.talera-compact-work.talera-r16-editor .talera-r16-toolbar #publish:disabled{background:#E6EBF1!important;color:#657A91!important;}
+
+/* Retain the existing date modal, choices and validation. Color only. */
+#v30DateModal #v30DateBox{background:#FFFFFF!important;color:#071A3D!important;}
+#v30DateModal #v30DateSave{background:#071A3D!important;color:#FFFFFF!important;}
+#v30DateModal #v30DateSave:disabled{background:#E6EBF1!important;color:#657A91!important;}
+#v30DateModal #v30DateCancel{background:#FFFFFF!important;color:#23497E!important;border:1px solid #B4C4D8!important;}
+
+/* The writer stays the existing single scrolling body; never replace it or
+   shorten the photo sequence, nor touch keyboard/viewport event handlers. */
+#taleraWriterOverlay{background:#FFFFFF!important;}
+#taleraWriterOverlay .talera-writer-top strong{color:#071A3D!important;font:650 20px/1.3 system-ui,sans-serif!important;}
+#taleraWriterOverlay #taleraWriterDone{background:#071A3D!important;color:#fff!important;box-shadow:none!important;}
+#taleraWriterOverlay #taleraWriterDone:disabled{background:#E6EBF1!important;color:#657A91!important;}
+#taleraWriterOverlay #taleraWriterText{color:#071A3D!important;caret-color:#23497E!important;border-color:#DCE2EC!important;font-family:system-ui,sans-serif!important;}
+#taleraWriterOverlay #taleraWriterText::placeholder{color:#657A91!important;}
+
+/* Existing recorder: one visual primary control. Start/Stop may be the
+   same existing button in different states; the actual handlers decide. */
+#taleraV61RecControls{color:#071A3D!important;background:#FFFFFF!important;border-color:#DCE2EC!important;box-shadow:0 4px 18px rgba(7,26,61,.08)!important;}
+#taleraV61RecControls .talera-v61-rec-top strong{color:#071A3D!important;}
+#taleraV61RecControls #taleraV61RecClose{background:#FFFFFF!important;color:#23497E!important;border-color:#DCE2EC!important;min-height:44px!important;}
+#taleraV61RecControls :is(#taleraV61RecStart,#taleraV61RecStop){background:#071A3D!important;color:#FFFFFF!important;box-shadow:none!important;}
+#taleraV61RecControls #taleraV61RecPause{background:#FFFFFF!important;color:#23497E!important;border:1px solid #B4C4D8!important;}
+#taleraV61RecControls #taleraV61RecPlay{color:#23497E!important;min-height:44px!important;}
+#taleraV61RecControls #taleraV61RecClock{color:#23497E!important;}
+#taleraV61RecControls :is(#taleraV61RecStart,#taleraV61RecStop,#taleraV61RecPause,#taleraV61RecPlay,#taleraV61RecClose):disabled{background:#E6EBF1!important;color:#657A91!important;}
+
+/* Keep the existing phone header and footer geometry. Long expanded content
+   must be reachable using the main native scroll, rather than hiding rows. */
+@media (max-width:1023px), (hover:none), (pointer:coarse){
+ body:not(.talera-v61-inline-recording):has(#app #main .work.talera-r16-editor) #app #main{
+   flex:1 1 0!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;
+   overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;
+ }
+ body:not(.talera-v61-inline-recording) #app #main .work.talera-compact-work.talera-r16-editor{
+   flex:1 0 auto!important;min-height:100%!important;
+ }
+ #app #main .work.talera-r16-editor .talera-tags-v20{margin:10px 0 0!important;}
+ #app #main .work.talera-r16-editor .talera-tags-toggle{border-radius:12px!important;}
+ #app #main .work.talera-r16-editor .talera-tags-toggle[aria-expanded="true"]{border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;}
+ /* Reserve a separate tap row under the recorder when multiple media are
+    present. Only the original photo/video frame is fitted; voice-orb layout
+    remains governed by its approved component. */
+ body.talera-v61-inline-recording:has(#frame > #prev) #taleraV61RecControls{
+   bottom:calc(62px + env(safe-area-inset-bottom,0px))!important;
+ }
+ body.talera-v61-inline-recording #frame > :is(#prev,#next){
+   bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;
+   min-width:44px!important;min-height:44px!important;background:#23497E!important;
+ }
+ body.talera-v61-inline-recording #frame > #pos{
+   bottom:calc(16px + env(safe-area-inset-bottom,0px))!important;background:#23497E!important;
+ }
+ body.talera-v61-inline-recording #app .work.talera-compact-work #frame > :is(img,video){
+   height:calc(100% - 176px - env(safe-area-inset-bottom,0px))!important;
+   align-self:flex-start!important;object-fit:contain!important;
+ }
+ body.talera-v61-inline-recording #app .work.talera-compact-work #frame:has(> #prev) > :is(img,video){
+   height:calc(100% - 232px - env(safe-area-inset-bottom,0px))!important;
+ }
+}
+
 /* Desktop workbench only: same fields/media nodes, same draft and save handlers.
    Location is deliberately not targeted; its separate project owns that feature. */
 @media ${DESKTOP_HOME_MEDIA} {
@@ -210,3 +291,4 @@ body:has(#app #main .work.talera-r16-editor) #talera-f5-edit-return-eye>svg{posi
 </style>`;
  return replace(html,'</head>',css+'</head>','STYLE_HEAD');
 }
+

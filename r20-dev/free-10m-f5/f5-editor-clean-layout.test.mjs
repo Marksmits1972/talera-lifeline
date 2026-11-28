@@ -86,6 +86,22 @@ test('existing favorites and original attached non-favorites are retained; selec
  toggle.onclick();assert.equal(panel.hidden,true);toggle.onclick();assert.equal(choices.children[3].attrs['aria-pressed'],'true');
  assert.doesNotMatch(f.html,/talera-tag-apply|talera-tag-cancel|talera-tags-confirm|talera-tags-own-input/);
 });
+
+test('TALERA visual hierarchy remains confined to existing work, writer and recorder controls',()=>{
+ const html=simplifyTellMemoryEditor(source);
+ const css=html.split('/* 28-Nov editor visual refinement only.')[1].split('/* Desktop workbench only:')[0];
+ assert.match(css,/#publish\{\s*background:#071A3D!important/);
+ assert.match(css,/#publish:disabled\{background:#E6EBF1!important/);
+ assert.match(css,/#taleraWriterDone\{background:#071A3D!important/);
+ assert.match(css,/#v30DateSave\{background:#071A3D!important/);
+ assert.match(css,/#taleraV61RecStart,#taleraV61RecStop\)\{background:#071A3D!important/);
+ assert.match(css,/#taleraV61RecPause\{background:#FFFFFF!important/);
+ assert.match(css,/flex:1 1 0!important;min-height:0!important;overflow-y:auto!important/);
+ assert.match(css,/has\(#frame > #prev\) #taleraV61RecControls\{/);
+ assert.match(css,/#frame > :is\(#prev,#next\)/);
+ assert.doesNotMatch(css,/header\.top|nav\.bottom|#photoStage|#timelineCanvas|#talera-clean-social|\.talera-voice-orb|onclick|addEventListener|saveDraft\(/);
+});
+
 test('existing memory Save only on exact edit route, five languages; ordinary new memory Place',()=>{
  for(const [language,label] of [['nl','Opslaan'],['en','Save'],['de','Speichern'],['fr','Enregistrer'],['es','Guardar']]){
   assert.equal(fixture({existing:'local-12345678',edit:'?edit=local-12345678',language}).publish.textContent,label);
@@ -126,3 +142,4 @@ test('desktop workbench, writer and recorder styling is desktop-only; location a
  assert.doesNotMatch(desktop,/talera-memory-location|talera-location-|saveDraft\(|addEventListener|onclick/);
  assert.equal(fixture({existing:'local-12345678',edit:'?edit=local-12345678'}).publish.textContent,'Opslaan');
 });
+

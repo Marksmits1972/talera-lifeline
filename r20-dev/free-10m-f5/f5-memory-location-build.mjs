@@ -45,30 +45,27 @@ export function installMemoryLocationEditor(html){
  const failed="catch(e){clearBusy();showError('Nog niet geplaatst: '+e.message);return false}";
  html=exact(html,failed,"catch(e){g.taleraLocationPublishing=false;g.taleraLocationWake?.();clearBusy();showError('Nog niet geplaatst: '+e.message);return false}",'RESUME_ON_PUBLISH_FAILURE');
  const css=`<style id="talera-memory-location-css">
-#app #main .work .talera-memory-location{margin:5px 0 8px;min-width:0;flex:none;background:#f5f8fc;color:#173b64;border:1px solid #dbe4ef;border-radius:15px;box-sizing:border-box}
+#app #main .work .talera-memory-location{margin:5px 0 8px;min-width:0;flex:none;background:#fff;color:#071A3D;border:1px solid #DCE2EC;border-radius:12px;box-sizing:border-box}
 .talera-memory-location [hidden]{display:none!important}
-/* A compact two-row photo grid has limited space. Opening the existing
-   characteristics keeps its approved two visible rows and footer geometry.
-   The optional location section reappears immediately when it is closed. */
-@media(max-height:760px){#app #main .work:has(.talera-work-tiles .tile:nth-child(4)):has(.talera-tags-toggle[aria-expanded="true"]) .talera-memory-location{display:none!important}}
-#app #main .work .talera-location-toggle{display:flex;align-items:center;width:100%;gap:9px;min-height:48px;height:48px;box-sizing:border-box;background:transparent;border:0;padding:6px 12px;color:#224d7c;border-radius:15px;font:700 clamp(13px,3.85vw,15px)/1.32 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;text-align:left;cursor:pointer}
+/* Keep location available independently of tag expansion; the editor's native main scroll handles short viewports. */
+#app #main .work .talera-location-toggle{display:flex;align-items:center;width:100%;gap:9px;min-height:48px;height:auto;box-sizing:border-box;background:transparent;border:0;padding:9px 12px;color:#071A3D;border-radius:12px;font:650 clamp(13px,3.85vw,15px)/1.32 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;text-align:left;cursor:pointer}
 .talera-location-pin{width:22px;height:22px;display:block;flex:none}.talera-location-pin svg{display:block;width:100%;height:100%}
 .talera-location-copy{flex:1;min-width:0;display:grid;gap:1px}.talera-location-title{display:block;min-width:0}
 .talera-location-chevron{width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;box-sizing:border-box;transform:rotate(45deg);margin:0 2px 4px 0;flex:none}
 .talera-location-toggle[aria-expanded="true"] .talera-location-chevron{transform:rotate(225deg);margin:4px 2px 0 0}
-.talera-location-summary{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#657a91;font:500 11px/1.2 system-ui}
-.talera-location-panel{padding:0 12px 12px;display:grid;gap:7px;max-height:min(55dvh,490px);overflow-y:auto;overscroll-behavior:contain}
+.talera-location-summary{display:block;min-width:0;overflow-wrap:anywhere;white-space:normal;color:#657a91;font:500 11px/1.2 system-ui}
+.talera-location-panel{padding:0 12px 10px;display:grid;gap:7px;max-height:min(55dvh,490px);overflow-y:auto;overscroll-behavior:contain}
 .talera-location-list{display:grid;gap:5px}
-.talera-location-tile{background:white;border:1px solid #dbe4ef;border-radius:10px;min-width:0;padding:5px 8px;display:flex;align-items:center;gap:8px}
+.talera-location-tile{background:white;border:0;border-bottom:1px solid #E5E9EF;border-radius:0;min-width:0;padding:6px 0;display:flex;align-items:center;gap:8px}
 .talera-location-row-copy{flex:1;min-width:0;display:grid;gap:3px}
 .talera-location-photo-number{display:block;color:#657a91;font:500 11px/1.2 system-ui}
 .talera-location-tile-label{display:flex;align-items:center;gap:5px;margin:0;font:600 13px/1.3 system-ui;overflow-wrap:anywhere}
 .talera-location-tile-status{margin:0;color:#657a91;font:400 12px/1.3 system-ui}
 .talera-location-form{display:grid;gap:5px;border-top:1px solid #dbe4ef;padding-top:8px}
-#app #main .work .talera-location-edit{border:0;background:#edf2f8;color:#224d7c;border-radius:8px;min-height:44px;max-width:48%;padding:6px 9px;font:600 12px/1.3 system-ui;flex:none;overflow-wrap:anywhere}
-#app #main .work .talera-location-apply{border:0;background:#102344;color:white;border-radius:10px;min-height:44px;padding:8px;font:700 14px/1.3 system-ui}
+#app #main .work .talera-location-edit{border:1px solid #B4C4D8;background:#fff;color:#23497E;border-radius:8px;min-height:44px;max-width:48%;padding:6px 9px;font:600 12px/1.3 system-ui;flex:none;overflow-wrap:anywhere}
+#app #main .work .talera-location-apply{border:1px solid #23497E;background:#fff;color:#23497E;border-radius:10px;min-height:44px;padding:8px;font:700 14px/1.3 system-ui}
 #app #main .work .talera-location-apply:disabled{opacity:.45}
-#app #main .work .talera-location-device{border:0;background:#edf2f8;color:#224d7c;border-radius:7px;min-height:44px;padding:4px;overflow-wrap:anywhere;font:600 11px/1.3 system-ui}
+#app #main .work .talera-location-device{border:1px solid #B4C4D8;background:#fff;color:#23497E;border-radius:8px;min-height:44px;padding:4px;overflow-wrap:anywhere;font:600 11px/1.3 system-ui}
 #app #main .work .talera-location-device:disabled{opacity:.5}
 
 .talera-location-label{font:700 14px/1.3 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#173b64;margin:6px 0 0}
@@ -95,3 +92,4 @@ export function installMemoryLocationEditor(html){
 </style>`;
  return exact(html,'</head>',css+'</head>','STYLE');
 }
+

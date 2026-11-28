@@ -1,6 +1,33 @@
 // Real browser acceptance against the SAME existing authenticated TALERA worker.
 // Test signal is generated only in the disposable browser test context.
 import assert from 'node:assert/strict';
+// Test the real generated layouts, including the actual moving recorder/share controls.
+async function assertVoiceOrbLayout(page,selector,controlId,{recording=false}={}){
+  await page.waitForFunction(({selector,controlId,recording})=>{
+    const root=document.querySelector(selector),control=document.getElementById(controlId);
+    const t=root?.querySelector('.talera-voice-orb-timing');
+    const graphic=root?.querySelector('.talera-voice-orb-symbol');
+    if(!root||!control||!t||!graphic)return false;
+    const r=root.getBoundingClientRect(),c=control.getBoundingClientRect(),b=t.getBoundingClientRect(),g=graphic.getBoundingClientRect();
+    if(c.width<=0||c.height<=0||getComputedStyle(control).visibility==='hidden')return false;
+    if(!b.width||!b.height||!g.width||!g.height)return false;
+    // Bounds are actual CSS pixels; tolerate subpixel rounding, not overlap.
+    return b.bottom+12<=c.top&&b.left>=r.left+20&&b.right<=r.right-20&&
+      g.top>=r.top&&g.bottom<=b.top-4&&b.width>=Math.min(540,r.width-48)-2&&
+      (recording?getComputedStyle(root.querySelector('progress')).display==='none':getComputedStyle(root.querySelector('progress')).display!=='none');
+  },{selector,controlId,recording},{timeout:12000});
+  const layout=await page.locator(selector).evaluate(root=>({
+    rings:root.querySelectorAll('.talera-voice-orb-ring').length,
+    bars:root.querySelectorAll('.talera-voice-orb-bar').length,
+    background:getComputedStyle(root).backgroundImage,
+    core:getComputedStyle(root.querySelector('.talera-voice-orb-core')).backgroundImage,
+    wave:Array.from(root.querySelectorAll('.talera-voice-orb-bar')).map(n=>getComputedStyle(n).backgroundColor)
+  }));
+  assert.equal(layout.rings,3);assert.equal(layout.bars,10);
+  assert.match(layout.background,/rgb\(16, 31, 53\)/);
+  assert.match(layout.core,/radial-gradient/);
+  assert.ok(layout.wave.every(color=>color==='rgb(247, 252, 255)'));
+}
 export async function verifyVoiceOrb(browser,accountContext,origin,gate){
   const ctx=await browser.newContext({
     viewport:{width:390,height:844},isMobile:true,hasTouch:true,locale:'nl-NL',
@@ -35,6 +62,7 @@ export async function verifyVoiceOrb(browser,accountContext,origin,gate){
     await orb.waitFor({timeout:10000});
     await page.waitForFunction(()=>Number(document.querySelector('#frame .talera-voice-orb')?.dataset.level||0)>.06,null,{timeout:12000});
     assert.match(await orb.innerText(),/5 minuten/);
+    await assertVoiceOrbLayout(page,'#frame .talera-voice-orb','taleraV61RecControls',{recording:true});
     await page.waitForTimeout(1200);
     // Simulate elapsed time only to verify the original count-up clock has
     // no 5 minute auto-stop. Restore the clock before writing original bytes.
@@ -53,6 +81,7 @@ export async function verifyVoiceOrb(browser,accountContext,origin,gate){
     await page.locator('#taleraV61RecPlay').click();
     await page.waitForFunction(()=>Number(document.querySelector('#frame .talera-voice-orb')?.dataset.level||0)>.02,null,{timeout:10000});
     assert.ok(await orb.locator('progress').isVisible());
+    await assertVoiceOrbLayout(page,'#frame .talera-voice-orb','taleraV61RecControls');
     await page.locator('#taleraV61RecPlay').click();
     await page.waitForFunction(()=>document.querySelector('#frame .talera-voice-orb')?.dataset.level==='0.000');
     await page.locator('#taleraV61RecClose').click();
@@ -89,6 +118,14 @@ export async function verifyVoiceOrb(browser,accountContext,origin,gate){
     assert.ok(readback.shared);assert.equal(readback.count,1);
     await page.evaluate(()=>window.__taleraF5SharedAudible.get().pause());
     await page.waitForFunction(()=>document.querySelector('#photoStage .talera-voice-orb')?.dataset.level==='0.000');
+    // Reflow the SAME presentation while its native audio is paused. The bar
+    // must follow the actual dock even when there is no audio animation tick.
+    for(const viewport of [{width:390,height:844},{width:320,height:568},{width:430,height:932},{width:1280,height:800}]){
+      await page.setViewportSize(viewport);
+      await assertVoiceOrbLayout(page,'#photoStage .talera-voice-orb','talera-clean-social');
+    }
+    await page.setViewportSize({width:390,height:844});
+    console.log('TALERA_VOICE_ORB_BLUE_SYMBOL_AND_SHARE_DOCK_GEOMETRY_PASS',JSON.stringify({recording:true,preview:true,pausedPresentation:true,widths:[390,320,430,1280]}));
     await page.goto(origin+'/tell?edit='+encodeURIComponent(id),{waitUntil:'domcontentloaded'});
     await page.locator('#speak').waitFor({timeout:15000});
     await page.locator('#speak').click();

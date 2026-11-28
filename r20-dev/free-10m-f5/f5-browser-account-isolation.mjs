@@ -327,22 +327,26 @@ async function verifyCompactWhatsAppFirst(browser){
   assert.ok(!noHtml.includes('synthetic ACCOUNT ISOLATION 99'));
   assert.equal((await crawler.request.get(no.issued.link+'/preview')).status(),404);
   await revoke(no.issued);
+  // Revocation through the owner API deliberately does not close the native
+  // share sheet; return via its real close button before opening a third link.
+  await page.locator('#talera-clean-overlay [data-action=close]').click();
+  await page.locator('#talera-clean-overlay').waitFor({state:'hidden'});
+  await page.locator('#talera-clean-social [data-action=share]').waitFor({state:'visible'});
   // Force just the optional preview upload to contain an invalid JPEG.
   // Actual Worker rejects it; complete original memory remains shareable.
-  let previewRejected=false;
   const badPreview=async route=>{
    const b=route.request().postDataBuffer();
    assert.ok(b?.length>2);
-   const response=await route.fetch({postData:Buffer.concat([b.subarray(0,2),Buffer.from([255,225,0,4,1,2]),b.subarray(2)])});
-   assert.equal(response.status(),400);
-   assert.equal((await response.json()).code,'INVALID_COMPACT_PREVIEW');
-   previewRejected=true;
-   await route.fulfill({response});
+   await route.continue({postData:Buffer.concat([b.subarray(0,2),Buffer.from([255,225,0,4,1,2]),b.subarray(2)])});
   };
   await page.route('**/api/shares/*/preview',badPreview);
   let fallback;
+  const rejected=page.waitForResponse(r=>r.request().method()==='POST'&&
+    /^\/api\/shares\/[a-f0-9]{64}\/preview$/.test(new URL(r.url()).pathname),{timeout:40000});
   try{fallback=await prepare(true)}finally{await page.unroute('**/api/shares/*/preview',badPreview)}
-  assert.equal(previewRejected,true);
+  const rejectedResponse=await rejected;
+  assert.equal(rejectedResponse.status(),400);
+  assert.equal((await rejectedResponse.json()).code,'INVALID_COMPACT_PREVIEW');
   const fallbackHTML=await (await crawler.request.get(fallback.issued.link)).text();
   assert.ok(fallbackHTML.includes(origin+'/pwa-512.png'));
   assert.match(fallbackHTML,/<meta property="og:title" content="synthetic ACCOUNT ISOLATION 99">/);

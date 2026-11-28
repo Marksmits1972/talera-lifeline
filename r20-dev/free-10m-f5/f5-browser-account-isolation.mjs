@@ -237,9 +237,9 @@ async function verifyCompactWhatsAppFirst(browser){
   await page.locator('#talera-clean-social [data-action=share]').waitFor({timeout:15000});
   const prepare=async consent=>{
    await page.locator('#talera-clean-social [data-action=share]').click();
-   const expiry=page.locator('#talera-clean-expiry');
-   assert.deepEqual(await expiry.locator('option').evaluateAll(o=>o.map(x=>Number(x.value))),[1,24,168]);
-   await expiry.selectOption('168');
+   assert.equal(await page.locator('#talera-clean-expiry').count(),0,'No duration control is rendered');
+   assert.equal(await page.locator('label[for="talera-clean-expiry"]').count(),0);
+   assert.ok(!(await page.locator('#talera-clean-panel').innerText()).includes('Link geldig voor'));
    await page.locator('#talera-clean-overlay [data-action=message-standard]').click();
    await page.locator('#talera-clean-preview-photo').setChecked(consent);
    await page.locator('#talera-clean-consent').check();
@@ -254,6 +254,22 @@ async function verifyCompactWhatsAppFirst(browser){
    assert.ok(Math.abs(issued.expiresAt-Date.now()-168*3600000)<60000);
    return {issued,sharePath:new URL(issuedResponse.url()).pathname};
   };
+  // Model a real canvas encoder adding EXIF/APP13/comments to its fresh 512px JPEG.
+  // The original media is never modified. This must still produce a valid preview.
+  await page.evaluate(()=>{
+   const original=HTMLCanvasElement.prototype.toBlob;
+   HTMLCanvasElement.prototype.toBlob=function(callback,type,quality){
+    const isPreview=this.width===512&&this.height===512&&type==='image/jpeg';
+    return original.call(this,async blob=>{
+     if(!isPreview||!blob)return callback(blob);
+     const bytes=new Uint8Array(await blob.arrayBuffer());
+     // Three forbidden marker segments, including a realistic Exif identifier.
+     const metadata=Uint8Array.from([255,225,0,8,69,120,105,102,0,0,
+       255,237,0,4,1,2,255,254,0,4,3,4]);
+     callback(new Blob([bytes.subarray(0,2),metadata,bytes.subarray(2)],{type:blob.type}));
+    },type,quality);
+   };
+  });
   const {issued,sharePath}=await prepare(true);
   assert.equal(await page.evaluate(async p=>(await fetch(p,{method:'POST',credentials:'same-origin',
    headers:{'content-type':'application/json'},body:JSON.stringify({consent:true,hours:720})})).status,sharePath),400);
@@ -311,6 +327,43 @@ async function verifyCompactWhatsAppFirst(browser){
   assert.ok(!noHtml.includes('synthetic ACCOUNT ISOLATION 99'));
   assert.equal((await crawler.request.get(no.issued.link+'/preview')).status(),404);
   await revoke(no.issued);
+  // Force just the optional preview upload to contain an invalid JPEG.
+  // Actual Worker rejects it; complete original memory remains shareable.
+  let previewRejected=false;
+  const badPreview=async route=>{
+   const b=route.request().postDataBuffer();
+   assert.ok(b?.length>2);
+   const response=await route.fetch({postData:Buffer.concat([b.subarray(0,2),Buffer.from([255,225,0,4,1,2]),b.subarray(2)])});
+   assert.equal(response.status(),400);
+   assert.equal((await response.json()).code,'INVALID_COMPACT_PREVIEW');
+   previewRejected=true;
+   await route.fulfill({response});
+  };
+  await page.route('**/api/shares/*/preview',badPreview);
+  let fallback;
+  try{fallback=await prepare(true)}finally{await page.unroute('**/api/shares/*/preview',badPreview)}
+  assert.equal(previewRejected,true);
+  const fallbackHTML=await (await crawler.request.get(fallback.issued.link)).text();
+  assert.ok(fallbackHTML.includes(origin+'/pwa-512.png'));
+  assert.match(fallbackHTML,/<meta property="og:title" content="synthetic ACCOUNT ISOLATION 99">/);
+  assert.equal((await crawler.request.get(fallback.issued.link+'/preview')).status(),404);
+  // Claim and verify the original photo in a fresh browser, not just 'ready'.
+  const fallbackGuest=await guestContext.newPage();
+  await fallbackGuest.goto(fallback.issued.link,{waitUntil:'domcontentloaded'}).catch(e=>{
+   if(!/navigation|aborted|interrupted/i.test(String(e)))throw e;
+  });
+  await fallbackGuest.waitForFunction(async()=>{
+   const rows=await window.TaleraMemories?.list?.();
+   return rows?.length===1&&window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal;
+  },null,{timeout:25000});
+  const fallbackBytes=await fallbackGuest.evaluate(async()=>{
+   const row=(await window.TaleraMemories.list())[0],blob=await window.TaleraMemories.blob(row.items[0].key);
+   return Array.from(new Uint8Array(await blob.arrayBuffer()));
+  });
+  assert.deepEqual(fallbackBytes,Array.from(Buffer.from(onePixelPng,'base64')));
+  await revoke(fallback.issued);
+  await fallbackGuest.close();
+  console.log('TALERA_COMPACT_PREVIEW_METADATA_SANITIZED_AND_OPTIONAL_HTTP_REJECTION_FALLBACK_PASS');
   console.log('TALERA_COMPACT_WHATSAPP_ACTUAL_SAME_APP_TARGETED_PASS',JSON.stringify({duration:168,titleConsent:true,previewJpeg:true,attachment:false,caption:true,firstBrowser:true,originalPhotoBytes:true,revocation:true,logoFallback:true,realIPhoneAccepted:false}));
  }finally{await Promise.all([ownerContext.close(),guestContext.close(),crawler.close()])}
 }
@@ -2161,13 +2214,12 @@ try{
    const personalDraft='Hé, weet je nog die middag?';
    try{
    await sharePage.locator('#talera-clean-social [data-action=share]').click();
-   const durations=await sharePage.locator('#talera-clean-expiry option').evaluateAll(opts=>opts.map(o=>Number(o.value)));
-   assert.deepEqual(durations,[1,24,168],'Only the existing shorter options and seven days are offered');
+   assert.equal(await sharePage.locator('#talera-clean-expiry').count(),0,'Seven days is fixed without a selector');
    await sharePage.waitForFunction(()=>
      document.querySelector('#talera-clean-overlay:not([hidden]) .status')?.textContent.includes('TALERA controleert je aanmelding'),
      null,{timeout:15000});
    // One compact selector, truly EMPTY personal field, and draft survives
-   // changing the expiry and switching back to the default invitation.
+   // the asynchronous sign-in and switching back to the default invitation.
    const choices=sharePage.locator('#talera-clean-overlay .talera-share-choice');
    assert.equal(await choices.count(),2,'Exactly two original WhatsApp message options');
    assert.equal(await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').getAttribute('aria-pressed'),'true');
@@ -2180,20 +2232,18 @@ try{
    const originalField=await personalField.elementHandle();
    await originalField.evaluate(el=>el.setSelectionRange(4,4));
    releaseShareAuth();
-   await sharePage.waitForFunction(()=>document.querySelector('#talera-clean-overlay:not([hidden]) .status')?.textContent.includes('Kies een geldigheidsduur'),
+   await sharePage.waitForFunction(()=>document.querySelector('#talera-clean-overlay:not([hidden]) .status')?.textContent.includes('Geef toestemming om deze herinnering te delen'),
      null,{timeout:15000});
    assert.equal(await originalField.evaluate(el=>el===document.querySelector('#talera-clean-personal')&&el.isConnected&&document.activeElement===el&&el.selectionStart===4&&el.selectionEnd===4),true,
      'The real async authorization update must retain the focused original draft textbox and cursor');
    assert.equal(await personalField.inputValue(),personalDraft,'Delayed authorization must preserve the unsent draft');
-   await sharePage.locator('#talera-clean-expiry').selectOption('24');
    assert.equal(await originalField.evaluate(el=>el===document.querySelector('#talera-clean-personal')&&el.isConnected),true,
-     'Changing duration must keep the same native draft textbox');
+     'The fixed duration does not interfere with the native draft textbox');
    await originalField.dispose();
    console.log('TALERA_FREE_WHATSAPP_ASYNC_AUTH_DRAFT_AND_CARET_PRESERVED_PASS');
    }finally{releaseShareAuth();await sharePage.unroute('**/api/me',delayShareAuth)}
    assert.equal(await sharePage.locator('#talera-clean-personal').inputValue(),personalDraft,
-     'Changing validity may not delete the unsent personal message');
-   await sharePage.locator('#talera-clean-expiry').selectOption('168');
+     'The async authorization must not delete the unsent personal message');
    await sharePage.locator('#talera-clean-overlay [data-action=message-standard]').click();
    assert.equal(await sharePage.locator('#talera-clean-personal').count(),0);
    await sharePage.locator('#talera-clean-overlay [data-action=message-personal]').click();

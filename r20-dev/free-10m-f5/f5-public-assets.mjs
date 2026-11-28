@@ -1,3 +1,4 @@
+import {PREVIEW_SIZE,PREVIEW_LIMIT,validCompactJPEG,sanitizeCompactJPEG} from '../free-10m-social-do/guest-preview-policy.mjs';
 import {installCharacteristicSearchHome,installCharacteristicSearchPresentation} from './f5-topic-search.mjs';
 import {localizeEmbeddedPlayer} from './f5-embed-language-build.mjs';
 import {centralizeCoreLanguage} from './f5-core-language-build.mjs';
@@ -2279,9 +2280,10 @@ for(const name of paths){
    shipped=installMyPeopleMenu(localizeApprovedMenu(keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body)))))));
  }
  if(name==='/__clean/share-controller.mjs'){
-   // Only the guest-link controller: new durations are capped at seven days.
-   shipped=shipped.replace(/\[\s*1\s*,\s*24\s*,\s*168\s*,\s*720\s*\]/g,'[1,24,168]')
-    .replace(/\b720\b/g,'168');
+   // Only the guest-link controller: seven days is the fixed duration.
+   const fixedDuration=shipped.replace(/\[\s*1\s*,\s*24\s*,\s*168\s*,\s*720\s*\]/g,'[168]');
+   assert.notEqual(fixedDuration,shipped,'WHATSAPP_FIXED_DURATION_SOURCE_DRIFT');
+   shipped=fixedDuration;
  }
  if(name==='/__clean/ui-integration.mjs'){
    // The original author-owned WhatsApp action treats a missing previous
@@ -2441,16 +2443,6 @@ let messageChoice='personal',personalMessage='',uploadPhase='Uitnodiging voorber
 // Draft lifetime remains the existing open share sheet only.
 let taleraDraftField=null;
 function taleraRenderSharePanel(html){
- // Keep the existing duration selector and input lifetime. Remove only
- // unsupported legacy durations, without creating another share screen.
- const durationTemplate=document.createElement('template');
- durationTemplate.innerHTML=html;
- const expiry=durationTemplate.content.querySelector('#talera-clean-expiry');
- if(expiry){
-  for(const option of Array.from(expiry.options))if(![1,24,168].includes(Number(option.value)))option.remove();
-  if(!expiry.options.length)throw Error('Geen geldige WhatsApp-geldigheidsduur.');
-  html=durationTemplate.innerHTML;
- }
  const field=taleraDraftField;
  if(field?.parentNode===panel&&messageChoice==='personal'){
   const template=document.createElement('template');
@@ -2528,7 +2520,16 @@ window.__taleraShareProgress=taleraShareProgress;
    // message selector AFTER the current selected photo, BEFORE expiry.
    const choicePoint = `+'<label for="talera-clean-expiry">`;
    assert.equal(shipped.split(choicePoint).length,2,'WHATSAPP_MESSAGE_CHOICE_LOCATION_DRIFT');
-   shipped=shipped.replace(choicePoint,'+taleraChoiceHtml()'+choicePoint);
+   // Replace the entire original duration field; do not render a hidden choice.
+   const fixedDurationField=choicePoint+'Link geldig voor</label><select id="talera-clean-expiry">\'+options+\'</select>';
+   assert.equal(shipped.split(fixedDurationField).length,2,'WHATSAPP_DURATION_FIELD_SOURCE_DRIFT');
+   shipped=shipped.replace(fixedDurationField,"+taleraChoiceHtml()+'");
+   const durationPrompt='Kies een geldigheidsduur en geef toestemming om deze herinnering te delen.';
+   assert.equal(shipped.split(durationPrompt).length,2,'WHATSAPP_DURATION_PROMPT_SOURCE_DRIFT');
+   shipped=shipped.replace(durationPrompt,'Geef toestemming om deze herinnering te delen.');
+   const durationChange="if(e.target.id==='talera-clean-expiry'){share.setDuration(Number(e.target.value));consent=false}else ";
+   assert.equal(shipped.split(durationChange).length,2,'WHATSAPP_DURATION_CHANGE_SOURCE_DRIFT');
+   shipped=shipped.replace(durationChange,'');
    const buttonPoint = `'<button type="button" class="primary" data-action="send" `;
    assert.equal(shipped.split(buttonPoint).length,2,'WHATSAPP_MESSAGE_SEND_SOURCE_DRIFT');
    // A visible, immediate spinner during all async stages, real percentages
@@ -2636,7 +2637,7 @@ function taleraUploadMediaProgress(path,blob,label,previewConsent=false){
    let data;try{data=JSON.parse(request.responseText)}catch{data=null}
    if(request.status<200||request.status>=300){
     const error=Error(data?.error||'Upload niet gelukt. Probeer opnieuw.');
-    error.status=request.status;reject(error);return;
+    error.status=request.status;error.code=data?.code;reject(error);return;
    }
    resolve(data);
   };
@@ -2653,7 +2654,7 @@ function taleraUploadMediaProgress(path,blob,label,previewConsent=false){
    const previewSource="  const preview=await previewPhotoBlob(current);";
    assert.equal(shipped.split(previewSource).length,2,'WHATSAPP_PREVIEW_SOURCE_DRIFT');
    shipped=shipped.replace(previewSource,"  const taleraPreviewConsent=includePreviewPhoto;\n"+previewSource);
-   const compactPreviewImage=String.raw`
+   const compactPreviewImage='const PREVIEW_SIZE='+PREVIEW_SIZE+',PREVIEW_LIMIT='+PREVIEW_LIMIT+';\n'+validCompactJPEG.toString()+'\n'+sanitizeCompactJPEG.toString()+'\n'+String.raw`
 async function taleraCompactPreviewPhoto(photo){
  if(!(photo instanceof Blob)||!photo.size)return null;
  const url=URL.createObjectURL(photo);
@@ -2670,13 +2671,16 @@ async function taleraCompactPreviewPhoto(photo){
   ctx.drawImage(logo,408,408,80,80);
   for(const quality of [0.82,0.70,0.57,0.40]){
    const jpeg=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
-   if(jpeg?.type==='image/jpeg'&&jpeg.size>0&&jpeg.size<=131072)return jpeg;
+   if(jpeg?.type==='image/jpeg'&&jpeg.size>0&&jpeg.size<=1048576){
+    const clean=sanitizeCompactJPEG(new Uint8Array(await jpeg.arrayBuffer()));
+    if(clean)return new Blob([clean],{type:'image/jpeg'});
+   }
   }
   return null;
  }catch{return null}finally{URL.revokeObjectURL(url)}
 }
 `;
-   const fullShareCopy="\nasync function taleraCompleteOriginalMemoryCopy(memory,shareId,previewConsent,preview){\n if(!memory?._taleraLocal||typeof memory.storyId!=='string')\n  throw Error('De gekozen herinnering moet uit jouw lokale TALERA-bibliotheek komen.');\n const library=window.TaleraLibrary||window.TaleraMemories;\n if(typeof library?.get!=='function'||typeof library?.blob!=='function')\n  throw Error('De originele TALERA-bibliotheek is niet beschikbaar.');\n const row=await library.get(memory.storyId);\n if(!row||row.id!==memory.storyId||!Array.isArray(row.items))\n  throw Error('De oorspronkelijke herinnering kon niet worden gecontroleerd.');\n if(row.items.length>24)throw Error('Deze herinnering heeft te veel mediabestanden voor een veilige uitnodiging.');\n const allowed=/^(image\\/(?:jpeg|png|webp|gif|heic|heif)|video\\/(?:mp4|webm|quicktime)|audio\\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/;\n const manifest={version:1,compactPreview:{version:1,title:previewConsent===true,photo:false},items:[],posters:[],narrationCues:[],narrationDurationMs:\n  Number.isSafeInteger(row.narrationDurationMs)&&row.narrationDurationMs>=0?\n   row.narrationDurationMs:0,\n  datePrecision:String(row.datePrecision||'unknown').slice(0,20),\n  time:String(row.time||'12:00:00').slice(0,20)};\n let total=0,partCount=0;\n const sources=[];\n for(const item of row.items){\n  if(!item||!['photo','video','audio'].includes(item.kind)||\n     typeof item.key!=='string')throw Error('Een oorspronkelijk mediabestand ontbreekt.');\n  const blob=await library.blob(item.key);\n  if(!(blob instanceof Blob)||!blob.size||!allowed.test(blob.type)||\n     !blob.type.startsWith(item.kind==='photo'?'image/':item.kind+'/'))\n   throw Error('Het originele bestand '+(sources.length+1)+' kan niet verliesvrij worden gedeeld.');\n  total+=blob.size;\n  const parts=Math.ceil(blob.size/1048576);\n  partCount+=parts;\n  if(total>96*1048576||parts>96||partCount>192)\n   throw Error('Deze herinnering bevat meer media dan veilig tijdelijk kunnen worden overgedragen. Er is niets verzonden.');\n  sources.push({item,blob,parts});\n  manifest.items.push({kind:item.kind,mime:blob.type,size:blob.size,parts,hashes:[]});\n }\n const visuals=row.items.filter(item=>item.kind==='photo'||item.kind==='video');\n const cues=Array.isArray(row.narrationCues)?row.narrationCues:[];\n if(cues.length>1000)throw Error('De oorspronkelijke vertelmarkeringen zijn te uitgebreid.');\n for(const original of cues){\n  if(!original||!Number.isSafeInteger(original.t)||!Number.isSafeInteger(original.index))\n   throw Error('De vertelmarkeringen zijn onvolledig.');\n  const cue={...original};\n  if(cue.mediaId){\n   const index=row.items.findIndex(item=>item.key===cue.mediaId);\n   if(index<0||!['photo','video'].includes(row.items[index].kind))\n    throw Error('Een vertelmarkering verwijst naar ontbrekende media.');\n   cue.mediaIndex=index;\n   delete cue.mediaId;\n  }\n  manifest.narrationCues.push(cue);\n }\n for(let index=0;index<sources.length;index++){\n  const source=sources[index];\n  for(let part=0;part<source.parts;part++){\n   const blob=source.blob.slice(part*1048576,Math.min((part+1)*1048576,source.blob.size),source.blob.type);\n   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),\n     n=>n.toString(16).padStart(2,'0')).join('');\n   manifest.items[index].hashes.push(hash);\n   await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+\n      '/media/'+index+'/'+part,blob,\n      'Origineel '+(index+1)+'/'+sources.length+' · deel '+(part+1)+'/'+source.parts);\n  }\n }\n // Transfer only EXISTING account-local :phone-v1 thumbnails. Original video\n // blobs, album order, IDs, narration cues and local poster bytes are unchanged.\n let posterBytes=0;\n for(let index=0;index<sources.length;index++){\n  const item=sources[index].item;\n  if(item.kind!=='video')continue;\n  const still=await library.blob(item.key+':phone-v1');\n  if(!(still instanceof Blob)||!still.size||still.size>1500000||\n     !['image/jpeg','image/png','image/webp'].includes(still.type))continue;\n  if(total+posterBytes+still.size>96*1048576)continue;\n  const digest=await crypto.subtle.digest('SHA-256',await still.arrayBuffer());\n  const hex=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');\n  try{\n   await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+\n     '/poster/'+index,still,'Videominiatuur '+(index+1)+'/'+sources.length);\n  }catch(error){continue}\n  posterBytes+=still.size;\n  manifest.posters.push({mediaIndex:index,mime:still.type,size:still.size,sha256:hex});\n }\n if(previewConsent===true&&row.items.some(item=>item.kind==='photo')){\n  const thumbnail=await taleraCompactPreviewPhoto(preview);\n  if(thumbnail){\n   await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+'/preview',thumbnail,'Linkvoorvertoning voorbereiden',true);\n   manifest.compactPreview.photo=true;\n  }\n }\n // This commit is the publication boundary. No partial photo sequence or\n // dropped narration may be called ready and passed to WhatsApp.\n await coreRequest('/api/shares/'+encodeURIComponent(shareId)+'/manifest',{\n  method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(manifest)});\n if(String(window.__taleraTimelineRuntime?.currentMemory?.()?.storyId)!==row.id)\n  throw Error('De gekozen herinnering is tijdens het delen veranderd.');\n return manifest.compactPreview;\n}\n";
+   const fullShareCopy="\nasync function taleraCompleteOriginalMemoryCopy(memory,shareId,previewConsent,preview){\n if(!memory?._taleraLocal||typeof memory.storyId!=='string')\n  throw Error('De gekozen herinnering moet uit jouw lokale TALERA-bibliotheek komen.');\n const library=window.TaleraLibrary||window.TaleraMemories;\n if(typeof library?.get!=='function'||typeof library?.blob!=='function')\n  throw Error('De originele TALERA-bibliotheek is niet beschikbaar.');\n const row=await library.get(memory.storyId);\n if(!row||row.id!==memory.storyId||!Array.isArray(row.items))\n  throw Error('De oorspronkelijke herinnering kon niet worden gecontroleerd.');\n if(row.items.length>24)throw Error('Deze herinnering heeft te veel mediabestanden voor een veilige uitnodiging.');\n const allowed=/^(image\\/(?:jpeg|png|webp|gif|heic|heif)|video\\/(?:mp4|webm|quicktime)|audio\\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/;\n const manifest={version:1,compactPreview:{version:1,title:previewConsent===true,photo:false},items:[],posters:[],narrationCues:[],narrationDurationMs:\n  Number.isSafeInteger(row.narrationDurationMs)&&row.narrationDurationMs>=0?\n   row.narrationDurationMs:0,\n  datePrecision:String(row.datePrecision||'unknown').slice(0,20),\n  time:String(row.time||'12:00:00').slice(0,20)};\n let total=0,partCount=0;\n const sources=[];\n for(const item of row.items){\n  if(!item||!['photo','video','audio'].includes(item.kind)||\n     typeof item.key!=='string')throw Error('Een oorspronkelijk mediabestand ontbreekt.');\n  const blob=await library.blob(item.key);\n  if(!(blob instanceof Blob)||!blob.size||!allowed.test(blob.type)||\n     !blob.type.startsWith(item.kind==='photo'?'image/':item.kind+'/'))\n   throw Error('Het originele bestand '+(sources.length+1)+' kan niet verliesvrij worden gedeeld.');\n  total+=blob.size;\n  const parts=Math.ceil(blob.size/1048576);\n  partCount+=parts;\n  if(total>96*1048576||parts>96||partCount>192)\n   throw Error('Deze herinnering bevat meer media dan veilig tijdelijk kunnen worden overgedragen. Er is niets verzonden.');\n  sources.push({item,blob,parts});\n  manifest.items.push({kind:item.kind,mime:blob.type,size:blob.size,parts,hashes:[]});\n }\n const visuals=row.items.filter(item=>item.kind==='photo'||item.kind==='video');\n const cues=Array.isArray(row.narrationCues)?row.narrationCues:[];\n if(cues.length>1000)throw Error('De oorspronkelijke vertelmarkeringen zijn te uitgebreid.');\n for(const original of cues){\n  if(!original||!Number.isSafeInteger(original.t)||!Number.isSafeInteger(original.index))\n   throw Error('De vertelmarkeringen zijn onvolledig.');\n  const cue={...original};\n  if(cue.mediaId){\n   const index=row.items.findIndex(item=>item.key===cue.mediaId);\n   if(index<0||!['photo','video'].includes(row.items[index].kind))\n    throw Error('Een vertelmarkering verwijst naar ontbrekende media.');\n   cue.mediaIndex=index;\n   delete cue.mediaId;\n  }\n  manifest.narrationCues.push(cue);\n }\n for(let index=0;index<sources.length;index++){\n  const source=sources[index];\n  for(let part=0;part<source.parts;part++){\n   const blob=source.blob.slice(part*1048576,Math.min((part+1)*1048576,source.blob.size),source.blob.type);\n   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),\n     n=>n.toString(16).padStart(2,'0')).join('');\n   manifest.items[index].hashes.push(hash);\n   await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+\n      '/media/'+index+'/'+part,blob,\n      'Origineel '+(index+1)+'/'+sources.length+' · deel '+(part+1)+'/'+source.parts);\n  }\n }\n // Transfer only EXISTING account-local :phone-v1 thumbnails. Original video\n // blobs, album order, IDs, narration cues and local poster bytes are unchanged.\n let posterBytes=0;\n for(let index=0;index<sources.length;index++){\n  const item=sources[index].item;\n  if(item.kind!=='video')continue;\n  const still=await library.blob(item.key+':phone-v1');\n  if(!(still instanceof Blob)||!still.size||still.size>1500000||\n     !['image/jpeg','image/png','image/webp'].includes(still.type))continue;\n  if(total+posterBytes+still.size>96*1048576)continue;\n  const digest=await crypto.subtle.digest('SHA-256',await still.arrayBuffer());\n  const hex=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');\n  try{\n   await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+\n     '/poster/'+index,still,'Videominiatuur '+(index+1)+'/'+sources.length);\n  }catch(error){continue}\n  posterBytes+=still.size;\n  manifest.posters.push({mediaIndex:index,mime:still.type,size:still.size,sha256:hex});\n }\n if(previewConsent===true&&row.items.some(item=>item.kind==='photo')){\n  const thumbnail=await taleraCompactPreviewPhoto(preview);\n  if(thumbnail){\n   try{\n    await taleraUploadMediaProgress('/api/shares/'+encodeURIComponent(shareId)+'/preview',thumbnail,'Linkvoorvertoning voorbereiden',true);\n    manifest.compactPreview.photo=true;\n   }catch(error){\n    // Only a rejected optional derivative may use the approved logo fallback.\n    // Original media, manifest, authority and network errors still abort.\n    if(error?.status!==400||error?.code!=='INVALID_COMPACT_PREVIEW')throw error;\n   }\n  }\n }\n // This commit is the publication boundary. No partial photo sequence or\n // dropped narration may be called ready and passed to WhatsApp.\n await coreRequest('/api/shares/'+encodeURIComponent(shareId)+'/manifest',{\n  method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(manifest)});\n if(String(window.__taleraTimelineRuntime?.currentMemory?.()?.storyId)!==row.id)\n  throw Error('De gekozen herinnering is tijdens het delen veranderd.');\n return manifest.compactPreview;\n}\n";
 
    // Same account-local original bytes. Only the temporary guest copy's
    // content-type can be corrected after checking the actual file header.

@@ -1,7 +1,7 @@
 // TALERA Free Social experimental, strictly isolated staging/test gateway.
 // QA authentication only: not a replacement for official TALERA sessions.
 // NO production social / account D1 and NO customer media are linked.
-import {GUEST_HOURS} from './guest-preview-policy.mjs';
+import {GUEST_HOURS,GUEST_DURATION_HOURS} from './guest-preview-policy.mjs';
 import {shaHex,safeEqualHex} from '../free-10m-auth-pilot/auth-util.mjs';
 import {verifyStoryId,verifyAccountId,FreeSocialMemory,FreeSocialSharePointer} from './social-objects.mjs';
 export {FreeSocialMemory,FreeSocialSharePointer} from './social-objects.mjs';
@@ -85,8 +85,9 @@ export default{
    if(op==='grant')return json(await home.grant(requireActor(actor),verifyAccountId(payload.recipientId)));
    if(op==='revoke-grant')return json(await home.revokeGrant(requireActor(actor),verifyAccountId(payload.recipientId)));
    if(op==='share'){
-    const hours=payload.mode==='whatsapp'?Number(payload.hours):1;
-    if(!GUEST_HOURS.includes(hours))throw Error('INVALID_SHARE_DURATION');
+    const requested=payload.mode==='whatsapp'?Number(payload.hours):1;
+    if(!GUEST_HOURS.includes(requested))throw Error('INVALID_SHARE_DURATION');
+    const hours=payload.mode==='whatsapp'?GUEST_DURATION_HOURS:requested;
     const raw=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
     const hash=await shaHex(raw),expires=Date.now()+hours*3600000;
     if(payload.mode==='whatsapp')await home.startShare(requireActor(actor),hash,expires);

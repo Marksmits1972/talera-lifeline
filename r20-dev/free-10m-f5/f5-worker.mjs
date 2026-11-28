@@ -8,7 +8,7 @@ import {capturePlaceApi} from './f5-geonames.mjs';
 import {peopleLinkApi} from './f5-people-link.mjs';
 import {internalShareApi} from './f5-internal-share-api.mjs';
 import {passwordResetPage} from './f5-password-reset-page.mjs';
-import {GUEST_HOURS,PREVIEW_LIMIT} from '../free-10m-social-do/guest-preview-policy.mjs';
+import {GUEST_HOURS,GUEST_DURATION_HOURS,PREVIEW_LIMIT,validCompactJPEG} from '../free-10m-social-do/guest-preview-policy.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
   readSessionCookie,sessionCookie,shaHex,safeEqualHex,json,sameOrigin,body
@@ -827,7 +827,7 @@ async function legacyShareApi(request,env){
   const headers=new Headers(request.headers);
   headers.set('content-type','application/json');
   const forwarded=new Request(forward,{method:'POST',headers,
-    body:JSON.stringify({mode:'whatsapp',hours:Number(payload.hours)})});
+    body:JSON.stringify({mode:'whatsapp',hours:GUEST_DURATION_HOURS})});
   const response=await socialApi(forwarded,env);
   if(!response.ok)return response;
   const d=await response.json();
@@ -848,6 +848,9 @@ async function legacyShareApi(request,env){
   if(!bytes.byteLength||bytes.byteLength>limit)
    return deny(413,'Media te groot voor veilige tijdelijke deelopslag');
   const mime=(request.headers.get('content-type')||'').split(';')[0].toLowerCase();
+  if(upload[2]==='preview'&&request.headers.get('x-talera-preview-consent')==='1'&&
+     (mime!=='image/jpeg'||!validCompactJPEG(bytes)))
+   return json({ok:false,error:'Dit type of formaat media kan niet veilig worden gedeeld',code:'INVALID_COMPACT_PREVIEW'},400);
   try{await socialMemoryHome(env,storyId).saveShareMedia(actor.id,hash,upload[2],mime,bytes,['photo','preview'].includes(upload[2])&&request.headers.get('x-talera-preview-consent')==='1')}
   catch{return deny(400,'Dit type of formaat media kan niet veilig worden gedeeld')}
   return json({ok:true});

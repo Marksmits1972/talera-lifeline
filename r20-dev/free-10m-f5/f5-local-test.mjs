@@ -643,6 +643,8 @@ async function run(){
    '/api/memories/'+prepared.data.memoryId+'/shares',{
     cookie:identities[0].cookie,body:{consent:true,hours:1}});
   assert.equal(createdInvite.status,200,'Guest uses SAME existing share route');
+  assert.ok(Math.abs(createdInvite.data.expiresAt-Date.now()-168*3600000)<60000,
+    'Even an older one-hour client request creates a new seven-day WhatsApp link');
   assert.match(createdInvite.data.link,/\/s\/[A-Za-z0-9_-]{43}$/);
   const guestPath=new URL(createdInvite.data.link).pathname;
   const guestPage=await request('GET',guestPath,{gate:false});

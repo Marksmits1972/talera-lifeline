@@ -220,7 +220,12 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
     assert.ok(choiceIndex>=0,'Need an unselected existing characteristic');
     const option=page.locator('.talera-tag-choice').nth(choiceIndex);
   await option.click();assert.equal(await option.getAttribute('aria-pressed'),'true');
-  await page.locator('#taleraMemoryTagsDialog .talera-tag-apply').click();
+  const characteristics=page.locator('#taleraMemoryTagsDialog');
+  await characteristics.locator('.talera-memory-own').click();
+  await characteristics.locator('.talera-memory-own-form input').fill('Lokaal testkenmerk');
+  await characteristics.locator('.talera-memory-own-form button').click();
+  assert.equal(await characteristics.locator('.talera-tag-choice[data-tag="Lokaal testkenmerk"]').getAttribute('aria-pressed'),'true');
+  await characteristics.locator('.talera-tag-apply').click();
   await page.locator('#taleraMemoryTagsDialog').waitFor({state:'detached'});
   const edited=await page.evaluate(async target=>{
    const story=await window.TaleraMemories.get(target);
@@ -245,8 +250,10 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
    const draft=await window.TaleraMemories.blob('talera-v4-work:manifest');
    const story=await window.TaleraMemories.get(target);
    const tags=draft?.find(x=>x.existing===target)?.tags;
-   return !!tags&&tags.length===(story.tags??[]).length+1;
-  },target,10000,'Direct selection was not persisted to the original draft');
+   return !!tags&&tags.length===(story.tags??[]).length+2&&tags.includes('Lokaal testkenmerk');
+  },target,10000,'Applied existing and own tags not persisted to the original draft');
+  assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('talera-kenmerken-catalog-v1')||'[]').includes('Lokaal testkenmerk')),
+   'Own characteristic persists in the existing catalog');
   const expected=await page.evaluate(async target=>(await window.TaleraMemories.blob('talera-v4-work:manifest')).find(x=>x.existing===target).tags,target);
   await settleImages();
   await page.locator('#publish').click();

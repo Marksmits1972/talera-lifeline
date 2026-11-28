@@ -441,11 +441,11 @@ async function assertSignedOutEmpty(page,previousStoryId){
          'synthetic ACCOUNT ISOLATION 1'),
        visibleHero:heroVisible,
        demoCards:[...document.querySelectorAll('#demoCards > *')].length,
-       guestEditorLayout:!!document.getElementById('talera-free-tell-layout-only'),
+       guestEditorLayout:!!document.getElementById('talera-memory-first-editor'),
        guestEditorMovesTags:[...document.scripts].some(script=>
-         script.textContent.includes("media.insertAdjacentElement('afterend',box)")),
+         script.textContent.includes("details.after(tags)")),
        guestEditorHasTopicPrompt:[...document.scripts].some(script=>
-         script.textContent.includes('Waar gaat deze herinnering over?'))
+         script.textContent.includes('dialog.showModal()')&&script.textContent.includes('core.tell.memoryFirst.tags'))
      };
    },previousStoryId);
    assert.equal(state.sessionStatus,401,'Signed-out account must be revoked '+route);

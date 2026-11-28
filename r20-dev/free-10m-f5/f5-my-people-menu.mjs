@@ -27,6 +27,9 @@ export function installMyPeopleMenu(source){
  patch('body.innerHTML=html+notice();taleraCleanFreeMenu();body.scrollTop=0;',
   'body.innerHTML=html+notice();taleraCleanFreeMenu();taleraRenderPeopleView();taleraRenderInbox();body.scrollTop=0;');
  patch('function clearPrivateState(){','function clearPrivateState(){\n  taleraClearPeopleView();taleraClearInbox();');
+ // Direct Meldingen entry uses the original account menu after the session
+ // is resolved, never an independent page or a separate inbox engine.
+ patch('void checkSession();',"if(location.pathname==='/meldingen'){void checkSession().then(()=>open('messages'))}else void checkSession();");
  patch('function close(){state.open=false;', 'function close(){taleraClearPeopleView();taleraInboxPanel?.root.remove();taleraInboxPanel=null;state.open=false;');
  patch("  const count=await api('/api/messages/unread-count');","  let count={unread:0};try{count=await api('/api/messages/unread-count')}catch{}");
  patch("  const value=Math.max(0,Number(count.unread)||0);",

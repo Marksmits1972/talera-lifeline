@@ -216,8 +216,7 @@ try{
    assert.equal((await get(b,receivedPath)).status,404,'Receipt must immediately remove server copy for the last recipient');
    await readerPage.locator('#talera-received-control a').click();
    await readerPage.waitForURL('**/meldingen',{timeout:20000});
-   await readerPage.waitForFunction(account=>window.__taleraMoreMenu?.state()?.accountId===account,b.id,{timeout:20000});
-   await readerPage.evaluate(()=>window.__taleraMoreMenu.open('messages'));
+   await readerPage.waitForFunction(account=>{const menu=window.__taleraMoreMenu?.state();return menu?.accountId===account&&menu.open&&menu.view==='messages'},b.id,{timeout:20000});
    await itemButton.waitFor({timeout:15000});assert.doesNotMatch(await itemButton.innerText(),/●/);
    await itemButton.click();
    await readerPage.waitForURL('**/present?received='+entry.key,{timeout:20000});

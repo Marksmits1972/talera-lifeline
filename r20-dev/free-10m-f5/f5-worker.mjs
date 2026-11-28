@@ -74,6 +74,13 @@ function evenlySpaceThreeHomeTabs(html){
 // its approved href. Nothing changes about the regular presentation/player.
 function shieldHomeWhileOpeningExistingMenu(html,requestUrl){
  const url=new URL(requestUrl);
+ // The existing Meldingen tab reuses Home's exact document. Mount the same
+ // account-menu module there, too, so a received story returns to the inbox.
+ if(url.pathname==='/meldingen'&&!url.search){
+  if(typeof html!=='string'||html.split('<head>').length!==2||!html.includes('id="navNotifications"'))
+   throw Error('TALERA_NOTIFICATIONS_MENU_SOURCE_DRIFT');
+  return html.replace('<head>','<head><script id="talera-f5-home-original-menu-module" type="module" src="/__clean/menu-integration.mjs"></script>');
+ }
  if(url.pathname!=='/mijn-leven'||url.search)return html;
  if(typeof html!=='string'||html.split('<head>').length!==2||
     !html.includes('id="navMore"')||

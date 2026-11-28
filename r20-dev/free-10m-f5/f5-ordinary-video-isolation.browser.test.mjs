@@ -191,8 +191,9 @@ try{
       childList:true,subtree:true,attributes:true,attributeFilter:['src']});
     window.__taleraOrdinaryVideoObserver=observer;
   });
-  // No manual selection: wait for the normal photo timer to bring the video into view.
-  await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:18000});
+  // No manual selection: two ordinary photos now take 2 × 10 seconds before the video.
+  // Allow modest decode/runner overhead without weakening the media playback assertions.
+  await page.waitForFunction(()=>window.__taleraOrdinaryVideoObserved,null,{timeout:27000});
   const info=()=>page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime?.currentMemory?.();
     const v=document.querySelector('video.talera-v61-inline-video');
@@ -228,7 +229,7 @@ try{
   // Switch the same existing Settings contract ON before the next automatic cycle.
   await page.evaluate(()=>{window.__taleraAudioControls.isEnabled=()=>true});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=2,
-    null,{timeout:18000});
+    null,{timeout:27000});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[1]?.played,
     null,{timeout:10000});
   const audible=await page.evaluate(()=>window.__taleraOrdinaryVideoSnapshots[1]);
@@ -282,7 +283,10 @@ try{
       }
       return originalPlay.apply(this,args);
     };
-    window.__taleraOrdinarySelectPhoto?.(id,2,true);
+    const selected=window.__taleraTimelineRuntime.currentMemory();
+    if(selected?.storyId!==id)throw Error('Video test selected a different story');
+    window.__taleraOrdinarySelectPhoto(selected.id,2,true);
+    if(selected._photoIndex!==2)throw Error('Manual video selection did not select the actual runtime frame');
   },id);
   await page.waitForFunction(()=>{
     const v=document.querySelector('video.talera-v61-inline-video');
@@ -350,7 +354,7 @@ try{
   await page.waitForFunction(()=>window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===0,
     null,{timeout:7000});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.length>=4,
-    null,{timeout:16000});
+    null,{timeout:27000});
   await page.waitForFunction(()=>window.__taleraOrdinaryVideoSnapshots?.[3]?.played,
     null,{timeout:7000});
   const consecutive=await page.evaluate(()=>({
@@ -375,7 +379,10 @@ try{
   // Safari has rejected audible autoplay, the clip is playing silently.
   await page.evaluate(id=>{
     window.__taleraDenyNextAudible=true;
-    window.__taleraOrdinarySelectPhoto?.(id,2,true);
+    const selected=window.__taleraTimelineRuntime.currentMemory();
+    if(selected?.storyId!==id)throw Error('Video test selected a different story');
+    window.__taleraOrdinarySelectPhoto(selected.id,2,true);
+    if(selected._photoIndex!==2)throw Error('Manual video selection did not select the actual runtime frame');
     const back=document.getElementById('talera-flow-home');
     if(!back)throw Error('Original Back control missing');
     back.addEventListener('click',()=>{
@@ -401,7 +408,12 @@ try{
   await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
 
   // Diagnose the reported top-left return control on the SAME ordinary player.
-  await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.(id,2,true),id);
+  await page.evaluate(id=>{
+    const selected=window.__taleraTimelineRuntime.currentMemory();
+    if(selected?.storyId!==id)throw Error('Video test selected a different story');
+    window.__taleraOrdinarySelectPhoto(selected.id,2,true);
+    if(selected._photoIndex!==2)throw Error('Manual video selection did not select the actual runtime frame');
+  },id);
   await page.waitForSelector('video.talera-v61-inline-video',{timeout:8000});
   const navigation=await page.evaluate(()=>{
     const nodes=[...document.querySelectorAll('button,a,[role="button"]')];

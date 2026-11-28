@@ -116,7 +116,21 @@ export function createPublicPlaceStore(idb=globalThis.indexedDB){
    tx.onabort=tx.onerror=()=>{db.close();reject(tx.error||Error('PUBLIC_PLACE_RETRY_WRITE_FAILED'))};
   };
  });
- return {get:key=>run('readonly',store=>store.get(key)),put:(key,buffer)=>run('readwrite',store=>store.put(buffer,key)),delete:key=>run('readwrite',store=>store.delete(key)),reserveAttempt};
+ const releaseAttempt=(key,expected,next)=>new Promise((resolve,reject)=>{
+  if(!idb){reject(Error('PUBLIC_PLACE_STORAGE_UNAVAILABLE'));return}
+  const request=idb.open(name,1);
+  request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains(table))request.result.createObjectStore(table)};
+  request.onerror=()=>reject(request.error);request.onblocked=()=>reject(Error('PUBLIC_PLACE_STORAGE_BLOCKED'));
+  request.onsuccess=()=>{
+   const db=request.result,tx=db.transaction(table,'readwrite'),store=tx.objectStore(table),read=store.get(key);
+   read.onsuccess=()=>{const state=read.result;
+    if(state?.attempts===expected.attempts&&state.at===expected.at&&state.leaseUntil===expected.leaseUntil)store.put(next,key);
+   };
+   tx.oncomplete=()=>{db.close();resolve()};
+   tx.onabort=tx.onerror=()=>{db.close();reject(tx.error||Error('PUBLIC_PLACE_RETRY_WRITE_FAILED'))};
+  };
+ });
+ return {get:key=>run('readonly',store=>store.get(key)),put:(key,buffer)=>run('readwrite',store=>store.put(buffer,key)),delete:key=>run('readwrite',store=>store.delete(key)),reserveAttempt,releaseAttempt};
 }
 
 // GeoNames allCountries independent settlements; no per-photo geocoding.
@@ -213,7 +227,10 @@ export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher
     // Release the in-flight reservation (especially the third attempt).
     // A concurrent photo must not be marked terminal before a live
     // download has had a chance to complete.
-    try{await cacheBound(storage.put(keyOf(part),{...budget.state,leaseUntil:0}))}catch{}
+    const interrupted=!online()||signal?.aborted&&signal.reason!=='location-timeout';
+    const next=interrupted?{attempts:budget.state.attempts-1,at:0,leaseUntil:0}:{...budget.state,leaseUntil:0};
+    try{await cacheBound(storage.releaseAttempt?storage.releaseAttempt(keyOf(part),budget.state,next):storage.put(keyOf(part),next))}catch{}
+    if(interrupted)return {blocked:'offline'};
     return budget.state.attempts>=3?{blocked:'exhausted'}:{blocked:'retry',retryAt:budget.state.at};
    }finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel)}
    try{

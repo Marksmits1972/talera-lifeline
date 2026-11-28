@@ -225,3 +225,23 @@ test('public register: 100 photos, three shared attempts persist after re-open, 
  for(let i=0;i<100;i++)assert.equal((await load(gps(53,6),country)).blocked,'exhausted');
  assert.equal(requests,3);
 });
+
+test('public register: losing connection during a transfer and leaving the page release the reservation',async()=>{
+ const data=fixture([['NL',53,6,'Extra village']]),part=partInfo(data,['NL']),cache=mockPublicCache();
+ let now=1000,requests=0,online=true,mode='disconnect',controller=new AbortController();
+ await cache.put(testBaseUrl.match(/[a-f0-9]{64}/)[0],toArrayBuffer(sample));
+ const fetcher=async()=>{requests++;
+  if(mode==='disconnect'){online=false;throw Error('connection lost')}
+  if(mode==='pause'){controller.abort();throw Error('page left')}
+  throw Error('server unavailable')
+ };
+ const create=()=>createOfflineWorldLocalityLoader(testBaseUrl,sample.length,[part],fetcher,cache,()=>now,()=>online);
+ assert.equal((await create()(gps(53,6),country)).blocked,'offline');
+ assert.equal((await cache.get('retry:'+part.sha256)).attempts,0);
+ online=true;mode='pause';controller=new AbortController();
+ assert.equal((await create()(gps(53,6),country,controller.signal)).blocked,'offline');
+ assert.equal((await cache.get('retry:'+part.sha256)).attempts,0);
+ mode='server';assert.equal((await create()(gps(53,6),country)).blocked,'retry');
+ assert.equal((await cache.get('retry:'+part.sha256)).attempts,1);
+ assert.equal(requests,3);
+});

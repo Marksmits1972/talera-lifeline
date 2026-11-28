@@ -398,7 +398,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   try{
    return await Promise.race([inspectDraftCapturePlace(original,kind,c.signal,localOnly),
     new Promise(resolve=>{timer=setTimeout(()=>{
-     c.abort();
+     c.abort('location-timeout');
      const old=draftResults.get(original);
      if(old){resolve(old);return}
      const attempts=(draftFailures.get(original)?.attempts||0)+1;
@@ -432,7 +432,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
     let timedOut=false;
     const timeout=new Promise(resolve=>{
      signal.addEventListener('abort',()=>resolve({kind:timedOut?'retry':'offline'}),{once:true});
-     deadline=setTimeout(()=>{timedOut=true;controller.abort()},30000);
+     deadline=setTimeout(()=>{timedOut=true;controller.abort('location-timeout')},30000);
     });
     const task=inspectLocationWork({item,blob:key=>store.blob(key),readPlace,readGps,lookup,resolveLocality,signal,available}).catch(error=>
      error?.message==='TALERA_LIBRARY_INVALID_SHARED_ORIGINAL'?{kind:'done',failure:'unreadable'}:{kind:'retry'});

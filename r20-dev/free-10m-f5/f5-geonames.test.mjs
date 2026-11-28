@@ -222,13 +222,17 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
   win.top=win;doc.hidden=false;
   for(const [n,v] of Object.entries({window:win,document:doc,location:{pathname:'/tell'}}))
    Object.defineProperty(globalThis,n,{configurable:true,writable:true,value:v});
-  let firstResolve,secondResolve,firstSignal,secondSignal,reads=0,opened=0;
+  let firstResolve,secondResolve,firstSignal,secondSignal,reads=0,opened=0,finishes=[];
   const first=new Promise(resolve=>{firstResolve=resolve});
   const second=new Promise(resolve=>{secondResolve=resolve});
   try{
    mountCapturePlaceEnrichment({
     dbName:'talera-free-local-'+'a'.repeat(32)+'-v1',resolveCountry:countryResolver,
-    store:{list:async()=>[structuredClone(record)],blob:async()=>original},
+    store:{list:async()=>{throw Error('optional work must not list the full catalog')},blob:async()=>original},
+    workIndex:{
+     claim:async()=>({entry:{story:record.id,key:record.items[0].key,signature:JSON.stringify([record.items[0].key,record.items[0].kind,record.items[0].size,record.items[0].mime,record.items[0].name]),attempts:0},row:structuredClone(record),token:'test'}),
+     finish:async(_entry,result)=>{finishes.push(result);return false}
+    },
     open:async()=>{opened++;throw Error('no transaction during interrupted read')},
     done:()=>{throw Error('unexpected transaction')},
     readPlace:async(blob,signal)=>{
@@ -249,6 +253,7 @@ console.log('TALERA_CAPTURE_NAVIGATION_INTERRUPTION_RETRY_PASS');
    assert.notStrictEqual(secondSignal,firstSignal);
    // The callback above proves the fresh signal was active when reading began.
    assert.equal(reads,2);assert.equal(opened,0);
+   assert.deepEqual(finishes,[{kind:'offline'}]);
    win.dispatchEvent(new Event('pagehide'));
   }finally{
    for(const [name,descriptor] of originals)

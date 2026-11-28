@@ -196,7 +196,7 @@ test('location work: 50,000 completed descriptors are skipped; only eligible IDs
  assert.deepEqual(nextLocationWork(after,99999999),{at:null});
  syncLocationWork(after,{id:'fresh',source:'pwa-local',items:[{...unknown,key:'new'}]});
  assert.deepEqual(after.items.map(x=>x.key),['new']);
- assert.match(installLocationQueueWrites("mountCapturePlaceEnrichment({});tx.objectStore('stories').put(meta);"),/locationQueueWrite\(tx,meta\)/);
+ assert.match(installLocationQueueWrites("mountCapturePlaceEnrichment({});tx.objectStore('stories').put(meta);stories.delete(id);"),/locationQueueWrite\(tx,meta\)/);
 });
 test('location work: invalid or absent GPS is terminal without network; corrupt file is not called again',async()=>{
  const b=new Blob(['abc'],{type:'image/jpeg'});

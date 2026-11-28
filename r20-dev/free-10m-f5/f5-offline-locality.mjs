@@ -128,10 +128,13 @@ export function createPublicPlaceStore(idb=globalThis.indexedDB){
 // Reservation happens before network I/O, atomically across open tabs.
 export function nextPublicPlaceAttempt(previous,now){
  const attempts=Number.isInteger(previous?.attempts)?Math.max(0,previous.attempts):0;
- if(attempts>=3)return {allowed:false,blocked:'exhausted',state:previous};
+ if(attempts>=3){
+  if((previous?.leaseUntil||0)>now)return {allowed:false,blocked:'retry',retryAt:previous.leaseUntil,state:previous};
+  return {allowed:false,blocked:'exhausted',state:previous};
+ }
  if((previous?.at||0)>now)return {allowed:false,blocked:'retry',retryAt:previous.at,state:previous};
  const number=attempts+1,at=now+(number===1?300000:1800000);
- return {allowed:true,state:{attempts:number,at}};
+ return {allowed:true,state:{attempts:number,at,leaseUntil:now+30000}};
 }
 export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher=fetch,storage=createPublicPlaceStore(),clock=Date.now,online=()=>globalThis.navigator?.onLine!==false){
  if(!/^\/__talera_free\/places-[a-f0-9]{64}\.bin$/.test(baseUrl)||!Number.isInteger(baseBytes)||baseBytes<1)throw Error('INVALID_LOCALITY_ASSET');
@@ -189,7 +192,10 @@ export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher
    }catch{/* Cache failure is not a negative geographic result. */}
    if(data)return install(data);
    const saved=await cacheBound(storage?.get(keyOf(part)));
-   if(saved?.attempts>=3)return {blocked:'exhausted'};
+   if(saved?.attempts>=3){
+    const status=nextPublicPlaceAttempt(saved,clock());
+    return {blocked:status.blocked,retryAt:status.retryAt};
+   }
    if(!online()||signal?.aborted)return {blocked:'offline'};
    const budget=await reserve(part);
    if(!budget.allowed)return budget;
@@ -204,6 +210,10 @@ export function createOfflineWorldLocalityLoader(baseUrl,baseBytes,parts,fetcher
     if(length!==null&&!response.headers.get('content-encoding')&&Number(length)!==part.bytes)throw Error('WORLD_LOCALITY_ASSET_LENGTH');
     data=await validateBuffer(await response.arrayBuffer(),part);
    }catch{
+    // Release the in-flight reservation (especially the third attempt).
+    // A concurrent photo must not be marked terminal before a live
+    // download has had a chance to complete.
+    try{await cacheBound(storage.put(keyOf(part),{...budget.state,leaseUntil:0}))}catch{}
     return budget.state.attempts>=3?{blocked:'exhausted'}:{blocked:'retry',retryAt:budget.state.at};
    }finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel)}
    try{

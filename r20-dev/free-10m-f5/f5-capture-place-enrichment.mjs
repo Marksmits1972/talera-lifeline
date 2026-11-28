@@ -169,7 +169,21 @@ export function installLocationQueueWrites(html){
  if(!html.includes('mountCapturePlaceEnrichment('))return html;
  const marker="tx.objectStore("+"'stories'"+").put(meta);";
  if(html.split(marker).length!==2)throw Error('LOCATION_QUEUE_SAVE_SOURCE_DRIFT');
- return html.replace(marker,marker+'locationQueueWrite(tx,meta);');
+ html=html.replace(marker,marker+'locationQueueWrite(tx,meta);');
+ // The approved complete-deletion core owns the same stores in its own
+ // closure on some screens. Remove only the derived task, atomically with
+ // the existing deletion; never change the original deletion result.
+ const deleteMarker='stories.'+'delete(id);';
+ if(html.split(deleteMarker).length>2)throw Error('LOCATION_QUEUE_DELETE_SOURCE_DRIFT');
+ const patch=`(()=>{const key='talera-location-work-index-v1',ignore=e=>{e.preventDefault();e.stopPropagation()};
+ const r=files.get(key);r.onerror=e=>{ignore(e);files.delete(key).onerror=ignore};
+ r.onsuccess=()=>{const state=r.result?.blob;if(state?.version!=='offline-locality-world-v2'||!Array.isArray(state.items))return;
+ const count=stories.count();count.onerror=e=>{ignore(e);files.delete(key).onerror=ignore};
+ count.onsuccess=()=>{if(state.count!==count.result+1){files.delete(key).onerror=ignore;return}
+ state.items=state.items.filter(e=>e.story!==id);if(state.lease?.story===id)state.lease=null;state.count=count.result;
+ files.put({key,blob:state}).onerror=e=>{ignore(e);files.delete(key).onerror=ignore};
+ };};})();`;
+ return html.replace(deleteMarker,deleteMarker+patch);
 }
 export function nextLocationWork(state,now=Date.now()){
  if(state.lease&&state.lease.until>now)return {at:state.lease.until};
@@ -247,7 +261,7 @@ function createLocationWorkIndex({open,done,clock=Date.now}){
     const count=stories.count();
     count.onsuccess=()=>{
      if(stored.count===count.result)use(stored);
-     else {const all=stories.getAll();all.onsuccess=()=>use(makeLocationWork(all.result||[]))}
+     else {const all=stories.getAll();all.onsuccess=()=>use(makeLocationWork(all.result||[]),true)}
     };
    }
   };
@@ -307,7 +321,7 @@ function createLocationWorkIndex({open,done,clock=Date.now}){
  return {claim,finish};
 }
 
-export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,resolveCountry,resolveLocality=null}){
+export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,readGps,resolveCountry,resolveLocality=null,workIndex=null}){
  if(!/^talera-free-local-[a-f0-9]{32}-v1$/.test(dbName)||!['/mijn-leven','/meldingen','/present','/tell'].includes(location.pathname)||window.top!==window)return;
  let activeController=null,running=false,timer=null,timerDue=Infinity,departing=false,pendingDelay=null,blockedUntil=0;
  const available=()=>!departing&&!document.hidden;
@@ -393,7 +407,7 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
     },30000)})]);
   }finally{clearTimeout(timer);outerSignal?.removeEventListener('abort',cancel);cancel()}
  };
- const work=createLocationWorkIndex({open,done});
+ const work=workIndex||createLocationWorkIndex({open,done});
  let onlineWake=navigator.onLine!==false;
  const run=async()=>{
   timer=null;timerDue=Infinity;if(running||!available())return;

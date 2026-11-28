@@ -283,7 +283,10 @@ try{
       }
       return originalPlay.apply(this,args);
     };
-    window.__taleraOrdinarySelectPhoto?.(id,2,true);
+    const selected=window.__taleraTimelineRuntime.currentMemory();
+    if(selected?.storyId!==id)throw Error('Video test selected a different story');
+    window.__taleraOrdinarySelectPhoto(selected.id,2,true);
+    if(selected._photoIndex!==2)throw Error('Manual video selection did not select the actual runtime frame');
   },id);
   await page.waitForFunction(()=>{
     const v=document.querySelector('video.talera-v61-inline-video');
@@ -376,7 +379,10 @@ try{
   // Safari has rejected audible autoplay, the clip is playing silently.
   await page.evaluate(id=>{
     window.__taleraDenyNextAudible=true;
-    window.__taleraOrdinarySelectPhoto?.(id,2,true);
+    const selected=window.__taleraTimelineRuntime.currentMemory();
+    if(selected?.storyId!==id)throw Error('Video test selected a different story');
+    window.__taleraOrdinarySelectPhoto(selected.id,2,true);
+    if(selected._photoIndex!==2)throw Error('Manual video selection did not select the actual runtime frame');
     const back=document.getElementById('talera-flow-home');
     if(!back)throw Error('Original Back control missing');
     back.addEventListener('click',()=>{
@@ -402,7 +408,12 @@ try{
   await page.evaluate(()=>window.__taleraOrdinaryVideoObserver?.disconnect());
 
   // Diagnose the reported top-left return control on the SAME ordinary player.
-  await page.evaluate(id=>window.__taleraOrdinarySelectPhoto?.(id,2,true),id);
+  await page.evaluate(id=>{
+    const selected=window.__taleraTimelineRuntime.currentMemory();
+    if(selected?.storyId!==id)throw Error('Video test selected a different story');
+    window.__taleraOrdinarySelectPhoto(selected.id,2,true);
+    if(selected._photoIndex!==2)throw Error('Manual video selection did not select the actual runtime frame');
+  },id);
   await page.waitForSelector('video.talera-v61-inline-video',{timeout:8000});
   const navigation=await page.evaluate(()=>{
     const nodes=[...document.querySelectorAll('button,a,[role="button"]')];

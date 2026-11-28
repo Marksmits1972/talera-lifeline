@@ -1560,6 +1560,13 @@ async function testTimelineLoupe(){
     await geoPage.locator('.talera-location-tile-label').filter({hasText:country}).waitFor({state:'visible',timeout:10000});
     assert.equal(await geoPage.locator('.talera-location-tile[data-location-state="unknown"]').count(),0,'Offline resolved GPS must not be classified as unknown');
     assert.equal((await geoPage.locator('.talera-location-tile-label').innerText()).trim(),country,'Country must appear even while the optional places download is held');
+    // The phone actually reports offline at this point. No optional file
+    // may start downloading or spend its retry budget until it reconnects.
+    assert.equal(localityRequests.length,0,'Disconnected draft must not request the optional place register');
+    await geoPage.evaluate(()=>{window.__taleraGeoOnline=true;window.dispatchEvent(new Event('online'))});
+    for(let i=0;i<100&&!localityRequests.length;i++)await geoPage.waitForTimeout(100);
+    assert.equal(localityRequests.length,1,'Reconnection must wake the existing draft immediately');
+    assert.equal((await geoPage.locator('.talera-location-tile-label').innerText()).trim(),country,'Country remains available while the one download is held');
     releaseLocality();
     await geoPage.locator('.talera-location-tile-label').filter({hasText:expectedLabel}).waitFor({state:'visible',timeout:30000});
     assert.equal(localityRequests.length,1,'Only one places download for this document');

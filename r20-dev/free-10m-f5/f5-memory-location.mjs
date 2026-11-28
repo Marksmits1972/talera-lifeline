@@ -116,7 +116,7 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
  const photoIds=()=>g.media.filter(id=>String(getAsset(id)?.type||'').startsWith('image/'));
  if(!photoIds().length)return;
  if(!g.taleraLocationResults)Object.defineProperty(g,'taleraLocationResults',{configurable:true,value:new Map(Object.entries(g.photoLocationAutomatic||{}))});
- const result=g.taleraLocationResults,existing=new Map();let disposed=false,running=false,controller=null,timer=null,serial=0;
+ const result=g.taleraLocationResults,existing=new Map();let disposed=false,running=false,wakeAgain=false,controller=null,timer=null,serial=0;
  let single=null,singleMode='fill',entry={countryCode:'',city:''};
  let deviceAttempt=null;const deviceStatus=new Map();
  const box=doc.createElement('section');box.className='talera-memory-location';box.dataset.taleraExplicitLanguage='';
@@ -252,11 +252,20 @@ export function mountMemoryLocationEditor({g,anchor,saveDraft,readStory,getAsset
    }
   }finally{
    controller=null;running=false;
-   if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>!(g.canonicalByDraft||{})[id]&&!manual(id)&&(!completedDraftLocation(result.get(id))||state(id).place?.source==='offline-country-v1'&&!state(id).localityChecked)))timer=win.setTimeout(scan,60000);
+   if(wakeAgain){wakeAgain=false;wake()}
+   else if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing&&photoIds().some(id=>{
+    if((g.taleraSavedReceipt?.canonicalByDraft||g.canonicalByDraft||{})[id]||manual(id))return false;
+    const current=state(id);
+    // Offline country-only results wait for the actual online event. Local
+    // metadata reads may retry independently of connectivity.
+    return current.state==='pending'||win.navigator.onLine!==false&&current.place?.source==='offline-country-v1'&&!current.localityChecked;
+   }))timer=win.setTimeout(scan,300000);
   }
  }
- function wake(){if(timer!==null){win.clearTimeout(timer);timer=null}if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing)void scan()}
- function stop(){controller?.abort();deviceAttempt?.controller.abort();deviceAttempt=null;if(timer!==null){win.clearTimeout(timer);timer=null}}
+ // An online/visible event can arrive while the previous pass is unwinding.
+ // Coalesce it into ONE follow-up, rather than losing it until the retry timer.
+ function wake(){if(timer!==null){win.clearTimeout(timer);timer=null}if(!disposed&&!doc.hidden&&!g.taleraLocationPublishing){if(running)wakeAgain=true;else void scan()}}
+ function stop(){wakeAgain=false;controller?.abort();deviceAttempt?.controller.abort();deviceAttempt=null;if(timer!==null){win.clearTimeout(timer);timer=null}}
  toggle.onclick=()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden){paint();wake()}else{closeEntry();paint()}};
  use.onclick=()=>{const id=single;if(id)void confirmDevicePlace(id)};
  country.onclick=()=>{search.value='';renderCountries();dialog.showModal();choices.scrollTop=0};

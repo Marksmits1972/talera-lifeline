@@ -185,10 +185,14 @@ export function installLocationQueueWrites(html){
  };};})();`;
  return html.replaceAll(deleteMarker,deleteMarker+patch);
 }
-export function nextLocationWork(state,now=Date.now()){
+export function nextLocationWork(state,now=Date.now(),online=true){
  if(state.lease&&state.lease.until>now)return {at:state.lease.until};
  let next=Infinity;
  for(const entry of state.items){
+  // An original that has already exhausted the local cache while offline
+  // must not be opened again just because another screen is mounted later.
+  // New originals still get their first, entirely local country inspection.
+  if(!online&&entry.networkOnly)continue;
   if(entry.at<=now)return {entry};
   next=Math.min(next,entry.at);
  }
@@ -199,9 +203,10 @@ export function finishLocationWork(state,entry,result,now=Date.now()){
  if(index<0)return state;
  const current=state.items[index];
  if(result.kind==='done')state.items.splice(index,1);
- else if(result.kind==='wait'){current.offline=false;current.at=Math.max(now+250,result.at||now+300000)}
- else if(result.kind==='offline'){current.offline=true;current.at=now+300000;}
+ else if(result.kind==='wait'){current.offline=false;delete current.networkOnly;current.at=Math.max(now+250,result.at||now+300000)}
+ else if(result.kind==='offline'){current.offline=true;if(result.networkOnly)current.networkOnly=true;current.at=now+300000;}
  else if(result.kind==='retry'){
+  current.offline=false;delete current.networkOnly;
   current.attempts=(current.attempts||0)+1;
   if(current.attempts>=3)state.items.splice(index,1);
   else current.at=now+LOCATION_RETRY_DELAYS[current.attempts-1];
@@ -240,7 +245,7 @@ export async function inspectLocationWork({item,blob,readPlace,readGps,lookup,re
  if(!active())return {kind:'offline',place};
  if(result?.ready)return {kind:'done',place:result.place||place,checked:true};
  if(result?.blocked==='exhausted')return {kind:'done',place,failure:'register-unavailable'};
- if(result?.blocked==='offline')return {kind:'offline',place};
+ if(result?.blocked==='offline')return {kind:'offline',place,networkOnly:true};
  return {kind:'wait',place,at:result?.retryAt};
 }
 function createLocationWorkIndex({open,done,clock=Date.now}){
@@ -268,15 +273,15 @@ function createLocationWorkIndex({open,done,clock=Date.now}){
   await finished;return typeof output==='function'?output():output;
  };
  const put=(files,state)=>files.put({key:LOCATION_WORK_KEY,blob:state});
- const claim=(onlineWake=false)=>transact((state,stories,files,tx,initial)=>{
-  if(onlineWake)for(const entry of state.items)if(entry.offline){entry.at=0;entry.offline=false;initial=true}
+ const claim=(onlineWake=false,online=true)=>transact((state,stories,files,tx,initial)=>{
+  if(onlineWake&&online)for(const entry of state.items)if(entry.offline){entry.at=0;entry.offline=false;delete entry.networkOnly;initial=true}
   const now=clock();
   if(state.lease&&state.lease.until<=now){
    const old=state.items.find(e=>e.story===state.lease.story&&e.signature===state.lease.signature);
    if(old){old.attempts=(old.attempts||0)+1;old.at=old.attempts>=3?0:now+LOCATION_RETRY_DELAYS[old.attempts-1]}
    state.lease=null;initial=true;
   }
-  const next=nextLocationWork(state,now);
+  const next=nextLocationWork(state,now,online);
   if(!next.entry){if(initial)put(files,state);return next}
   const token=crypto.randomUUID(),entry={...next.entry};
   state.lease={token,until:now+35000,story:entry.story,signature:entry.signature};
@@ -416,7 +421,8 @@ export function mountCapturePlaceEnrichment({store,open,done,dbName,readPlace,re
   activeController=controller;
   let claim=null,deadline=null;
   try{
-   const wake=onlineWake;onlineWake=false;claim=await work.claim(wake);
+   const online=navigator.onLine!==false,wake=onlineWake&&online;
+   onlineWake=false;claim=await work.claim(wake,online);
    if(!claim.entry){
     if(Number.isFinite(claim.at)&&claim.at!==null&&available()&&navigator.onLine!==false)schedule(Math.max(250,claim.at-Date.now()));
     return;

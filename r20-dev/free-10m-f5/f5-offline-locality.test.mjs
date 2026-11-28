@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {createOfflineLocalityResolver,createOfflineLocalityLoader,createOfflineWorldLocalityLoader} from './f5-offline-locality.mjs';
-import {enrichCapturePlaces,makeLocationWork,syncLocationWork,nextLocationWork,finishLocationWork,inspectLocationWork,installLocationQueueWrites} from './f5-capture-place-enrichment.mjs';
-import {applyPhotoLocationInputs,selectDisplayedLocation,localPhotoState} from './f5-memory-location.mjs';
+import {enrichCapturePlaces,makeLocationWork,syncLocationWork,nextLocationWork,finishLocationWork,inspectLocationWork,installLocationQueueWrites,mountCapturePlaceEnrichment} from './f5-capture-place-enrichment.mjs';
+import {applyPhotoLocationInputs,selectDisplayedLocation,localPhotoState,mountMemoryLocationEditor} from './f5-memory-location.mjs';
 const gps=(latitude,longitude)=>({latitude,longitude});
 const country={countryCode:'NL',country:'Nederland',city:'',source:'offline-country-v1'};
 const refined={...country,city:'Arnhem',source:'offline-locality-v1'};
@@ -208,6 +208,61 @@ test('location work: invalid or absent GPS is terminal without network; corrupt 
  assert.deepEqual(await inspectLocationWork({...options,blob:async()=>null}),{kind:'done',failure:'unreadable'});
  assert.equal(network,0);
 });
+test('location work: disconnected reopen never re-reads network-waiting originals; new local work stays eligible',async()=>{
+ const original=new Blob(['abc'],{type:'image/jpeg'});
+ const item={kind:'photo',key:'waiting',size:original.size,mime:original.type,capturePlace:country};
+ const state=makeLocationWork([{id:'old',source:'pwa-local',items:[item]}]);
+ let reads=0;
+ const result=await inspectLocationWork({item,blob:async()=>{reads++;return original},readPlace:async()=>null,
+  readGps:async()=>gps(53,6),lookup:async()=>({ok:true,place:country}),resolveLocality:async()=>({ready:false,blocked:'offline'})});
+ assert.deepEqual(result,{kind:'offline',place:country,networkOnly:true});
+ finishLocationWork(state,state.items[0],result,1);
+ assert.equal(state.items[0].attempts,0);
+ const reopened=structuredClone(state);
+ for(let i=1;i<=100;i++)assert.deepEqual(nextLocationWork(reopened,i*3600000,false),{at:null});
+ assert.equal(reads,1);
+ syncLocationWork(reopened,{id:'fresh',source:'pwa-local',items:[{kind:'photo',key:'fresh',size:original.size,mime:original.type}]});
+ assert.equal(nextLocationWork(reopened,3600000,false).entry.key,'fresh');
+ // A visibility/navigation pause is not a missing internet dependency.
+ const fresh=nextLocationWork(reopened,3600000,false).entry;
+ finishLocationWork(reopened,fresh,{kind:'offline'},3600000);
+ assert.equal(nextLocationWork(reopened,7200000,false).entry.key,'fresh');
+ assert.equal(nextLocationWork(reopened,7200000,true).entry.key,'waiting');
+ assert.equal(reopened.items[0].attempts,0);
+});
+test('location work: actual foreground scheduler passes connectivity and waits for the online event',async()=>{
+ const names=['window','document','location','navigator'];
+ const old=new Map(names.map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)]));
+ const win=new EventTarget(),doc=new EventTarget(),nav={onLine:false};
+ win.top=win;doc.hidden=false;
+ const original=new Blob(['abc'],{type:'image/jpeg'});
+ const row={id:'old',source:'pwa-local',items:[{kind:'photo',key:'waiting',size:original.size,mime:original.type,capturePlace:country}]};
+ const state=makeLocationWork([row]);
+ finishLocationWork(state,state.items[0],{kind:'offline',networkOnly:true},Date.now()-3600000);
+ const claims=[];let reads=0,finished=0;
+ const wait=async(check)=>{for(let i=0;i<150&&!check();i++)await new Promise(r=>setTimeout(r,20));assert.ok(check(),'scheduler did not settle')};
+ try{
+  for(const [name,value] of Object.entries({window:win,document:doc,location:{pathname:'/tell'},navigator:nav}))
+   Object.defineProperty(globalThis,name,{configurable:true,writable:true,value});
+  mountCapturePlaceEnrichment({dbName:'talera-free-local-'+'a'.repeat(32)+'-v1',
+   store:{blob:async()=>{reads++;return original}},readPlace:async()=>null,readGps:async()=>gps(53,6),
+   resolveCountry:()=>country,resolveLocality:async()=>({ready:true,place:refined}),
+   workIndex:{
+    claim:async(wake,online)=>{claims.push({wake,online});const next=nextLocationWork(state,Date.now(),online);return next.entry?{...next,row,token:'test'}:next},
+    finish:async(claim,result)=>{finishLocationWork(state,claim.entry,result);finished++;return true}
+   }});
+  await wait(()=>claims.length===1);
+  assert.deepEqual(claims,[{wake:false,online:false}]);assert.equal(reads,0);
+  win.dispatchEvent(new Event('focus'));await wait(()=>claims.length===2);
+  assert.equal(reads,0);
+  nav.onLine=true;win.dispatchEvent(new Event('online'));
+  await wait(()=>finished===1);
+  assert.deepEqual(claims[2],{wake:true,online:true});assert.equal(reads,1);assert.equal(state.items.length,0);
+ }finally{
+  win.dispatchEvent(new Event('pagehide'));
+  for(const [name,descriptor] of old)if(descriptor)Object.defineProperty(globalThis,name,descriptor);else delete globalThis[name];
+ }
+});
 test('public register: 100 photos, three shared attempts persist after re-open, disconnected phone spends none',async()=>{
  const data=fixture([['NL',53,6,'Extra village']]),part=partInfo(data,['NL']),cache=mockPublicCache();
  let now=1000,requests=0,online=false;
@@ -244,4 +299,52 @@ test('public register: losing connection during a transfer and leaving the page 
  mode='server';assert.equal((await create()(gps(53,6),country)).blocked,'retry');
  assert.equal((await cache.get('retry:'+part.sha256)).attempts,1);
  assert.equal(requests,3);
+});
+
+test('draft editor waits offline and coalesces reconnection during an ongoing scan',async()=>{
+ // Tiny DOM/timer adapter exercises the production editor scheduler, not a
+ // separate app. The real picker/browser test also checks the actual UI.
+ class El extends EventTarget{
+  constructor(doc){super();this.ownerDocument=doc;this.isConnected=true;this.dataset={};this.style={};this.children=[];this.hidden=false}
+  append(x){this.children.push(x);x.parentElement=this}
+  replaceChildren(){this.children=[]}
+  setAttribute(){}
+  querySelector(){return null}
+  insertAdjacentElement(_where,x){this.parentElement.append(x)}
+ }
+ const previousObserver=globalThis.MutationObserver;
+ globalThis.MutationObserver=class{observe(){}disconnect(){}};
+ const flush=()=>new Promise(resolve=>setImmediate(resolve));
+ try{
+  for(const overlap of [false,true]){
+   const win=new EventTarget(),doc=new EventTarget(),timers=new Map();
+   let timerId=0,calls=0,release,reached;
+   win.navigator={onLine:false};win.TaleraI18n={locale:'nl-NL',t:key=>key};
+   win.setTimeout=(fn,ms)=>{timers.set(++timerId,{fn,ms});return timerId};
+   win.clearTimeout=id=>timers.delete(id);
+   doc.defaultView=win;doc.hidden=false;doc.documentElement={lang:'nl'};doc.createElement=()=>new El(doc);
+   const main=new El(doc),anchor=new El(doc);main.append(anchor);doc.getElementById=()=>main;
+   const g={media:['photo']},original=new Blob(['photo'],{type:'image/jpeg'});
+   const countryResult={state:'known',place:country},cityResult={state:'known',place:refined,localityChecked:true};
+   const during=new Promise(resolve=>{reached=resolve});
+   const blocked=new Promise(resolve=>{release=resolve});
+   const box=mountMemoryLocationEditor({g,anchor,saveDraft:()=>{},readStory:async()=>null,getAsset:()=>original,
+    preview:()=>null,lookupDevicePlace:async()=>null,flagPositions:{},codes:['NL'],
+    inspect:async(_original,_kind,_signal,localOnly)=>{
+     calls++;
+     if(localOnly)return countryResult;
+     if(!win.navigator.onLine){reached();if(overlap)await blocked;return countryResult}
+     return cityResult;
+    }});
+   await during;
+   if(!overlap){await flush();assert.equal(timers.size,0,'country-only offline draft waits for reconnect');}
+   win.navigator.onLine=true;win.dispatchEvent(new Event('online'));
+   if(overlap){win.dispatchEvent(new Event('online'));release()}
+   await flush();await flush();
+   assert.deepEqual(g.taleraLocationResults.get('photo'),cityResult);
+   assert.equal(calls,3,'one local result, one offline refinement, one online refinement');
+   assert.equal(timers.size,0,'completed photo schedules no retry');
+   box.isConnected=false;win.dispatchEvent(new Event('talera-capture-place-updated'));
+  }
+ }finally{if(previousObserver===undefined)delete globalThis.MutationObserver;else globalThis.MutationObserver=previousObserver}
 });

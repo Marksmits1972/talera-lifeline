@@ -991,7 +991,13 @@ async function testTimelineLoupe(){
       await metadataPage.evaluate(i=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,i,true)},index);
       await metadataPage.waitForFunction(text=>{
        const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social');
-       return row&&!row.hidden&&row.textContent===text&&dock?.getBoundingClientRect().width>0&&row.getBoundingClientRect().right<=dock.getBoundingClientRect().left-7;
+       if(!row||row.hidden||row.textContent!==text||!dock)return false;
+       // The unchanged dock intentionally translates 13px and fades while
+       // swiping. Measure its settled geometry, not intermediate animation frames.
+       const style=getComputedStyle(dock),transform=style.transform;
+       return !dock.hidden&&dock.dataset.motion!=='moving'&&style.visibility==='visible'&&Number(style.opacity)===1
+        &&(transform==='none'||new DOMMatrixReadOnly(transform).isIdentity)
+        &&dock.getBoundingClientRect().width>0&&row.getBoundingClientRect().right<=dock.getBoundingClientRect().left-7;
       },expected,{timeout:10000});
       const geometry=await metadataPage.evaluate(()=>{
        const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social'),label=row.querySelector('.talera-capture-label'),flag=row.querySelector('.talera-capture-flag');

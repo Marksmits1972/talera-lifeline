@@ -1905,6 +1905,184 @@ function closeAnonymousPersonalLibrary(html){
 }
 
 // Build the logged-out entry from the very same zero-example source.
+// Extend the existing ordinary controller and its existing photo gesture only.
+// Deliberately run after the approved presentation/layout/language patches.
+function installOrdinaryPhotoPause(html){
+ const once=(a,b,k)=>{
+   assert.equal(html.split(a).length,2,'ORDINARY_PHOTO_PAUSE_'+k);
+   html=html.replace(a,b);
+ };
+ once('    },memory._taleraLocal?2500:AUTO_START_MS);',
+      '    },memory._taleraLocal?10000:AUTO_START_MS);','INTERVAL');
+ // This state belongs to the unvoiced ordinary engine, never the narrator.
+ once('  function ordinarySoundHint(show){',String.raw`  let ordinaryHeldPhotoId=null,ordinaryPausedPhotoId=null;
+  function ordinaryPhotoEligible(memory){
+    return Boolean(ordinaryMemory(memory)&&memory._taleraLocal&&
+      runtime.currentMemory()?.id===memory.id&&
+      !runtime.isMoving()&&!window.__taleraBandRolling&&!window.__taleraSharePauseActive&&
+      memory.photos?.length&&memory._zeroFrames?.[memory._photoIndex||0]?.kind==='photo');
+  }
+  function clearOrdinaryUserPause(){
+    ordinaryHeldPhotoId=null;ordinaryPausedPhotoId=null;
+    document.getElementById('talera-ordinary-pause-indicator')?.remove();
+  }
+  window.__taleraOrdinaryPhotoGesture={
+    begin(id){
+      const memory=currentMemory();
+      if(memory?.id!==id||!ordinaryPhotoEligible(memory))return false;
+      ordinaryHeldPhotoId=id;
+      // Stop a due timer AND an already-decoding next photo before it can paint.
+      clearAuto();ownSerial++;
+      return true;
+    },
+    pause(id){
+      const memory=currentMemory();
+      if(ordinaryHeldPhotoId!==id||memory?.id!==id||!ordinaryPhotoEligible(memory))return false;
+      ordinaryPausedPhotoId=id;ownSerial++;clearAuto();
+      // Only the existing ordinary player may be stopped; no narrator calls.
+      closeOrdinaryVideo(true);
+      if(!document.getElementById('talera-ordinary-pause-indicator')){
+        const indicator=document.createElement('span');
+        indicator.id='talera-ordinary-pause-indicator';
+        indicator.setAttribute('aria-hidden','true');
+        document.getElementById('photoStage')?.appendChild(indicator);
+      }
+      return true;
+    },
+    end(id){
+      if(ordinaryHeldPhotoId!==id)return;
+      ordinaryHeldPhotoId=null;
+      if(ordinaryPausedPhotoId!==id)scheduleAuto(currentMemory());
+    },
+    shouldHandleTap(id){
+      const memory=currentMemory();
+      return memory?.id===id&&(memory.photos?.length>1||ordinaryPausedPhotoId===id);
+    },
+    advance(id){
+      const memory=currentMemory();
+      if(memory?.id!==id||!ordinaryPhotoEligible(memory))return;
+      clearOrdinaryUserPause();
+      if(memory.photos.length>1)showPhoto(memory,(memory._photoIndex||0)+1,true);
+      else scheduleAuto(memory);
+    }
+  };
+  function ordinarySoundHint(show){`,'CONTROLLER');
+ once('  function showPhoto(memory,index,manual=false){\n    if(window.__taleraSharePauseActive)return;',
+      '  function showPhoto(memory,index,manual=false){\n    if(window.__taleraSharePauseActive||ordinaryHeldPhotoId===memory?.id||ordinaryPausedPhotoId===memory?.id)return;','PHOTO_GUARD');
+ once('    if(window.__taleraSharePauseActive)return;\n    if(!ordinaryMemory(memory)||runtime.currentMemory()?.id!==memory.id||\n       runtime.isMoving()',
+      '    if(window.__taleraSharePauseActive||ordinaryHeldPhotoId===memory?.id||ordinaryPausedPhotoId===memory?.id)return;\n    if(!ordinaryMemory(memory)||runtime.currentMemory()?.id!==memory.id||\n       runtime.isMoving()','TIMER_GUARD');
+ once('      if(token!==ownSerial||runtime.currentMemory()?.id!==id||\n         !ordinaryMemory(memory)||memory.photos[next]!==src)return;',
+      '      if(token!==ownSerial||runtime.currentMemory()?.id!==id||\n         ordinaryHeldPhotoId===id||ordinaryPausedPhotoId===id||\n         !ordinaryMemory(memory)||memory.photos[next]!==src)return;','DECODE_GUARD');
+ once('    if(changed){ownSerial++;clearAuto();\n      // An ordinary-to-ordinary swipe',
+      '    if(changed){clearOrdinaryUserPause();ownSerial++;clearAuto();\n      // An ordinary-to-ordinary swipe','MEMORY_CHANGE');
+ once('    ownSerial++;clearAuto();closeOrdinaryVideo(true);\n  });\n  window.addEventListener',
+      '    clearOrdinaryUserPause();ownSerial++;clearAuto();closeOrdinaryVideo(true);\n  });\n  window.addEventListener','TIMELINE_MOTION');
+ once("    if(document.hidden){ownSerial++;clearAuto();closeOrdinaryVideo();}",
+      "    if(document.hidden){ordinaryHeldPhotoId=null;ownSerial++;clearAuto();closeOrdinaryVideo();}",'BACKGROUND');
+ once("    if(event.detail&&event.detail.active)clearAuto();\n    else scheduleAuto(currentMemory());",
+      "    if(event.detail&&event.detail.active){clearOrdinaryUserPause();clearAuto()}\n    else scheduleAuto(currentMemory());",'WHEEL_MOTION');
+ // Replace only the pre-existing photo tap gesture, leaving native wheel,
+ // reading, timeline and video/narrator controls untouched.
+ const start='<script id="talera-v61-presentation-photo-r20">';
+ const at=html.indexOf(start),end=html.indexOf('</script>',at);
+ assert.ok(at>=0&&end>at&&html.indexOf(start,at+1)<0,'ORDINARY_PHOTO_GESTURE_SOURCE');
+ const previous=html.slice(at,end);
+ assert.ok(previous.includes('function photoMemory(e,checkBand)')&&
+   previous.includes('function selectAfterPointerRelease')&&previous.includes('m._zeroItems?.some'),'ORDINARY_PHOTO_GESTURE_DRIFT');
+ const gesture=String.raw`(()=> {
+'use strict';
+if(!['/','/mijn-leven','/present','/present/'].includes(location.pathname))return;
+const runtime=()=>window.__taleraTimelineRuntime;
+const control=()=>window.__taleraOrdinaryPhotoGesture;
+const interactive='button,a,input,select,textarea,video,audio,nav,.timeline,[role="button"],.memory-sheet,.talera-share-shell,.talera-memory-tools,[role="dialog"]';
+let gesture=null,consumed=null;
+function photoMemory(e,checkBand=true){
+ const r=runtime(),m=r?.currentMemory?.();
+ if(!m?._taleraLocal||m._photoLoading||!m.photos?.length||
+   m._zeroItems?.some(i=>i.kind==='audio')||
+   m._zeroFrames?.[m._photoIndex||0]?.kind!=='photo'||
+   r.isMoving?.()||(checkBand&&window.__taleraBandRolling)||window.__taleraSharePauseActive)return null;
+ const target=e.target?.nodeType===1?e.target:e.target?.parentElement;
+ if(!target||target.closest(interactive))return null;
+ const stage=document.getElementById('photoStage'),story=document.getElementById('memoryStoryScroll');
+ if(!stage||!story||story.classList.contains('is-reading')||
+    (!stage.contains(target)&&!story.contains(target)))return null;
+ const rect=stage.getBoundingClientRect(),sheet=story.querySelector('.memory-sheet');
+ if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom||
+    (sheet&&e.clientY>=sheet.getBoundingClientRect().top))return null;
+ return m;
+}
+function finish(g){
+ if(!g)return;
+ clearTimeout(g.timer);control()?.end(g.id);
+}
+document.addEventListener('pointerdown',e=>{
+ if(gesture){gesture.moved=true;finish(gesture);return} // no multi-touch selection
+ if(e.isPrimary===false||(e.pointerType==='mouse'&&e.button!==0))return;
+ // A new physical pointer gesture can never be a duplicate click.
+ consumed=null;
+ const m=photoMemory(e);
+ if(!m||!control()?.begin(m.id))return;
+ const g={pointerId:e.pointerId,x:e.clientX,y:e.clientY,id:m.id,long:false,moved:false};
+ gesture=g;
+ g.timer=setTimeout(()=>{
+   if(gesture===g&&!g.moved)g.long=Boolean(control()?.pause(g.id));
+ },2000);
+},true);
+document.addEventListener('pointermove',e=>{
+ const g=gesture;
+ if(g?.pointerId===e.pointerId&&!g.moved&&Math.hypot(e.clientX-g.x,e.clientY-g.y)>12){
+   g.moved=true;finish(g);
+ }
+},true);
+document.addEventListener('pointercancel',e=>{
+ const g=gesture;if(g?.pointerId!==e.pointerId)return;
+ gesture=null;finish(g);
+ if(g.long)consumed={at:performance.now(),x:e.clientX,y:e.clientY};
+},true);
+document.addEventListener('pointerup',e=>{
+ const g=gesture;if(g?.pointerId!==e.pointerId)return;
+ gesture=null;finish(g);
+ // Consume only the actual long-press or a valid photo action. An ordinary
+ // single-photo story tap (including the next tap after loupe close) remains native.
+ if(g.long){consumed={at:performance.now(),x:e.clientX,y:e.clientY};return}
+ if(g.moved||Math.hypot(e.clientX-g.x,e.clientY-g.y)>12)return;
+ const m=photoMemory(e,false);
+ if(m?.id!==g.id||!control()?.shouldHandleTap(g.id))return;
+ consumed={at:performance.now(),x:e.clientX,y:e.clientY};
+ // Preserve the original wait for the existing swipe owner to release its flag.
+ let attempts=0;
+ const commit=()=>{
+   const r=runtime(),m=r?.currentMemory?.();
+   if(m?.id!==g.id||r.isMoving?.())return;
+   if(window.__taleraBandRolling){if(++attempts<=16)setTimeout(commit,25);return}
+   control()?.advance(g.id);
+ };
+ setTimeout(commit,0);
+},true);
+document.addEventListener('click',e=>{
+ const c=consumed;
+ if(!c||performance.now()-c.at>800||Math.hypot(e.clientX-c.x,e.clientY-c.y)>25||
+    e.target?.closest?.(interactive))return;
+ consumed=null;e.preventDefault();e.stopImmediatePropagation();
+},true);
+document.addEventListener('contextmenu',e=>{
+ if(photoMemory(e))e.preventDefault();
+},true);
+window.addEventListener('blur',()=>{const g=gesture;gesture=null;finish(g)});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden){const g=gesture;gesture=null;finish(g)}
+});
+})();`;
+ html=html.slice(0,at)+start+gesture+html.slice(end);
+ const css='<style id="talera-ordinary-photo-pause-style">'+
+  '#photoStage #talera-ordinary-pause-indicator{position:absolute;right:20px;top:26%;width:40px;height:40px;border-radius:50%;background:rgba(7,26,61,.68);z-index:30;pointer-events:none;display:flex;justify-content:center;align-items:center;gap:5px}'+
+  '#talera-ordinary-pause-indicator::before,#talera-ordinary-pause-indicator::after{content:"";width:5px;height:17px;background:#fff;border-radius:1px}'+
+  '</style>';
+ once('</head>',css+'</head>','INDICATOR_STYLE');
+ return html;
+}
+
 // The old immutable 7-Nov shell held 500 demonstrations and could reappear
 // whenever an iPhone session expired. NEVER serve that snapshot as a fallback.
 const guestPages={};
@@ -2011,6 +2189,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/mijn-leven')html=installCharacteristicSearchHome(html);
  if(route==='/present')html=installCharacteristicSearchPresentation(html);
  html=localizeCore(html,route);
+ if(route==='/present')html=installOrdinaryPhotoPause(html);
  const hash=sha(html),file=hash+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;

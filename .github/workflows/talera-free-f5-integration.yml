@@ -1241,8 +1241,10 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse HEAD^1)" = 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
+          test "$(git rev-parse HEAD^1)" = 0e02324612d22e69d311a67d66436b5a573b756c
+          test "$(git rev-parse HEAD~2)" = 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
           test "$(git diff --name-only HEAD^1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
+          test "$(git diff --name-only HEAD~2 HEAD)" = .github/workflows/talera-free-f5-integration.yml
           # Same shared app, only owner-approved memory-first editor and visual recorder response plus regression tests; preserve silent photo location.
           git checkout --detach 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
           test "$(git rev-parse HEAD)" = 1a21c3757c6a6f5b1624dcfe704a9ba5d25eb811
@@ -1628,8 +1630,8 @@ jobs:
                   'Exact tested location-reader cancellation missing: '+route);
               }
               if(route==='/tell'){
-                assert.ok(html.includes('id="talera-editor-clean-layout-v1"')&&html.includes('talera:tag-selection'),
-                  'The exact approved clean memory editor is missing');
+                assert.ok(html.includes('id="talera-memory-first-editor"')&&html.includes('taleraMemoryTagsDialog'),
+                  'The exact approved memory-first editor is missing');
                 if(collection===referencePages){
                   assert.ok(html.includes('anchor.dataset.taleraAutomaticLocation')&&
                     html.includes('mountMemoryLocationEditor({g,anchor:')&&
@@ -1989,7 +1991,7 @@ jobs:
           for(const page of [signedPresent,signedTell])for(const marker of ['talera-voice-orb-wave','talera-voice-orb-ring','talera-voice-orb-timing','linear-gradient(180deg,#101f35,#14283e)','area.bottom-edge+16','talera-clean-social','taleraV61RecControls'])assert.ok(page.includes(marker),'Missing approved blue voice design or responsive layout '+marker);
           console.log('TALERA_EXACT_VOICE_ORB_PACKAGE_AND_SCOPE_VERIFIED');
           assert.equal(hash(Buffer.from(signedTell))+'.html',referencePages['/tell'].split('/').pop());
-          assert.ok(signedTell.includes('id="talera-editor-clean-layout-v1"')&&signedTell.includes('Wijzigingen opslaan')&&signedTell.includes('talera:tag-selection'));
+          assert.ok(signedTell.includes('id="talera-memory-first-editor"')&&signedTell.includes('taleraMemoryTagsDialog')&&signedTell.includes('Wijzigingen opslaan'));
           for (const page of [signedTell,fs.readFileSync(root+guestPages['/tell'],'utf8')]) {
             for(const marker of ['id="talera-memory-first-editor"','talera-memory-entry','taleraMemoryTagsDialog','talera-memory-tags-body','min-height:44px','talera-memory-own-form','talera-memory-story-action','talera-memory-write-action'])
               assert.ok(page.includes(marker),'Missing exact approved memory-first layout '+marker);
@@ -2000,7 +2002,7 @@ jobs:
           for(const marker of ['function applyPhotoLocationInputs(','function draftPhotoInputs(','photoLocationAutomatic','inspectDraftCapturePlace','manualPhotoLocation'])
             assert.ok(signedTell.includes(marker),'Exact tested per-photo automatic location preservation missing '+marker);
           for (const page of [signedTell,fs.readFileSync(root+guestPages['/tell'],'utf8')]) {
-            for (const marker of ['28-Nov editor visual refinement only','background:#071A3D!important','body.talera-v61-inline-recording #frame > :is(#prev,#next)']) assert.ok(page.includes(marker),'Missing exact editor visual CSS '+marker);
+            for (const marker of ['#taleraMemoryTagsDialog .talera-tag-choice','min-height:44px','#taleraWriterOverlay #taleraWriterPhotos','talera-memory-start .talera-memory-entry']) assert.ok(page.includes(marker),'Missing exact editor visual CSS '+marker);
           }
           assert.ok(signedTell.includes('const visualEnergy=energy*(recording?1.25:1);'),'Exact +25% visual recording response missing');
           assert.ok(signedTell.includes("open('work',g.id);openZeroPlayer(g)"),'Direct voice-only entry missing');
@@ -2124,22 +2126,15 @@ jobs:
             status=$(curl -sS --max-time 25 -o /tmp/talera-layout-guest.html -w '%{http_code}' \
               "https://$F5_STAGE_HOST/tell" || echo 000)
             if [ "$status" = 200 ] &&
-               grep -Fq 'id="talera-free-tell-layout-only"' /tmp/talera-layout-guest.html &&
-               grep -Fq "media.insertAdjacentElement('afterend',box)" /tmp/talera-layout-guest.html &&
-               grep -Fq 'topicsBelowPhotos' /tmp/talera-layout-guest.html &&
-               grep -Fq 'Waar gaat deze herinnering over?' /tmp/talera-layout-guest.html &&
-               grep -Fq 'id="talera-free-tell-topic-scroll-only"' /tmp/talera-layout-guest.html &&
-               grep -Fq 'overflow-y:auto!important' /tmp/talera-layout-guest.html &&
-               grep -Fq 'id="talera-editor-clean-layout-v1"' /tmp/talera-layout-guest.html &&
-               grep -Fq '28-Nov editor visual refinement only' /tmp/talera-layout-guest.html &&
-               grep -Fq 'background:#071A3D!important' /tmp/talera-layout-guest.html &&
-               grep -Fq 'body.talera-v61-inline-recording #frame > :is(#prev,#next)' /tmp/talera-layout-guest.html &&
-               grep -Fq 'grid-auto-rows:44px!important' /tmp/talera-layout-guest.html &&
-               grep -Fq 'max-height:var(--talera-tag-visible-height,88px)!important' /tmp/talera-layout-guest.html &&
-               grep -Fq 'grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)!important;' /tmp/talera-layout-guest.html &&
-               grep -Fq 'talera:tag-selection' /tmp/talera-layout-guest.html; then
+               grep -Fq 'id="talera-memory-first-editor"' /tmp/talera-layout-guest.html &&
+               grep -Fq 'talera-memory-entry' /tmp/talera-layout-guest.html &&
+               grep -Fq 'taleraMemoryTagsDialog' /tmp/talera-layout-guest.html &&
+               grep -Fq 'talera-memory-tags-body' /tmp/talera-layout-guest.html &&
+               grep -Fq 'talera-memory-own-form' /tmp/talera-layout-guest.html &&
+               grep -Fq 'talera-memory-write-action' /tmp/talera-layout-guest.html &&
+               grep -Fq 'min-height:44px' /tmp/talera-layout-guest.html; then
               guest_layout_visible=1
-              echo "TALERA_GUEST_EDITOR_PHOTOS_BEFORE_CHARACTERISTICS_LIVE_PASS"
+              echo "TALERA_GUEST_MEMORY_FIRST_EDITOR_LIVE_PASS"
               break
             fi
             sleep 3

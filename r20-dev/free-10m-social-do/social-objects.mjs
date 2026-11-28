@@ -2,6 +2,7 @@
 // Synthetic staging only. No link to the official TALERA social D1 or customer data.
 import {DurableObject} from 'cloudflare:workers';
 import {saveSnapshotPart,saveSnapshotPoster,completeSnapshotManifest} from './share-snapshot-storage.mjs';
+import {compactPreviewPolicy,validCompactPreview,validCompactJPEG} from './guest-preview-policy.mjs';
 import {InternalShareStore} from './internal-share-storage.mjs';
 const STORY=/^[A-Za-z0-9_-]{8,80}$/;
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -113,8 +114,8 @@ export class FreeSocialMemory extends DurableObject{
  }
  async saveShareMedia(actor,hash,kind,mime,bytes,previewConsent=false){
   this.checkOwner(actor);verifyTokenHash(hash);
-  if(!['photo','photo-full','audio','video'].includes(kind))throw Error('INVALID_MEDIA_KIND');
-  if(!({photo:['image/jpeg'], 'photo-full':['image/jpeg'],
+  if(!['photo','photo-full','audio','video','preview'].includes(kind))throw Error('INVALID_MEDIA_KIND');
+  if(!({photo:['image/jpeg'],preview:['image/jpeg'], 'photo-full':['image/jpeg'],
       audio:['audio/mpeg','audio/mp4','audio/webm','audio/ogg','audio/wav','audio/x-m4a'],
       video:['video/mp4','video/webm','video/quicktime']}[kind]||[]).includes(mime))
    throw Error('INVALID_MEDIA_TYPE');
@@ -123,7 +124,8 @@ export class FreeSocialMemory extends DurableObject{
   const exists=this.sql.exec("SELECT s.token_hash FROM shares s JOIN share_snapshot c ON c.token_hash=s.token_hash WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?",hash,now()).toArray()[0];
   if(!exists)throw Error('SHARE_NOT_ACTIVE');
   const protectedShare=this.sql.exec("SELECT 1 AS present FROM share_browser WHERE token_hash=?",hash).toArray()[0];
-  if(protectedShare&&kind==='photo'&&this.sql.exec("SELECT 1 AS ready FROM share_manifest WHERE token_hash=?",hash).toArray()[0])throw Error('SHARE_ALREADY_COMPLETE');
+  if(kind==='preview'&&(!protectedShare||previewConsent!==true||!validCompactJPEG(bytes)))throw Error('INVALID_COMPACT_PREVIEW');
+  if(protectedShare&&['photo','preview'].includes(kind)&&this.sql.exec("SELECT 1 AS ready FROM share_manifest WHERE token_hash=?",hash).toArray()[0])throw Error('SHARE_ALREADY_COMPLETE');
   this.sql.exec("INSERT INTO share_media(token_hash,kind,mime,bytes) VALUES (?,?,?,?) ON CONFLICT(token_hash,kind) DO UPDATE SET mime=excluded.mime,bytes=excluded.bytes",
    hash,kind,mime,bytes);
   if(protectedShare&&kind==='photo')this.sql.exec("UPDATE share_browser SET preview_allowed=? WHERE token_hash=?",previewConsent===true?1:0,hash);
@@ -147,6 +149,19 @@ export class FreeSocialMemory extends DurableObject{
  async completeShareManifest(actor,hash,document){
   this.checkOwner(actor);verifyTokenHash(hash);
   if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
+  const previous=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',hash).toArray()[0]?.document;
+  if(previous&&(compactPreviewPolicy(previous)||Object.hasOwn(document||{},'compactPreview'))){
+   if(previous===JSON.stringify(document))return response(true,{complete:true,originalItems:document.items.length});
+   throw Error('SHARE_ALREADY_COMPLETE');
+  }
+  if(Object.hasOwn(document||{},'compactPreview')){
+   const preview=document.compactPreview;
+   if(!validCompactPreview(preview))throw Error('INVALID_COMPACT_PREVIEW');
+   if(preview.photo){
+    const saved=this.sql.exec("SELECT mime,bytes FROM share_media WHERE token_hash=? AND kind='preview'",hash).toArray()[0];
+    if(!saved||saved.mime!=='image/jpeg'||!validCompactJPEG(new Uint8Array(saved.bytes)))throw Error('INVALID_COMPACT_PREVIEW');
+   }
+  }
   return completeSnapshotManifest(this.sql,hash,document);
  }
 
@@ -195,13 +210,15 @@ export class FreeSocialMemory extends DurableObject{
   if(!active||active.revoked_at!==null||active.expires_at<=now())return {active:false};
   const row=this.sql.exec('SELECT session_hash FROM share_browser WHERE token_hash=?',hash).toArray()[0];
   if(!row)return {active:true,protected:false,allowed:true,expiresAt:active.expires_at};
-  const ready=!!this.sql.exec('SELECT 1 AS ready FROM share_manifest WHERE token_hash=?',hash).toArray()[0];
+  const raw=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',hash).toArray()[0]?.document;
+  const ready=!!raw,compact=compactPreviewPolicy(raw);
   if(claim&&ready&&sessionHash!==null){
    this.sql.exec('UPDATE share_browser SET session_hash=? WHERE token_hash=? AND session_hash IS NULL AND EXISTS (SELECT 1 FROM shares WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?)',sessionHash,hash,hash,now());
   }
   const current=this.sql.exec('SELECT session_hash FROM share_browser WHERE token_hash=?',hash).toArray()[0];
-  const hasPreview=ready&&!!this.sql.exec("SELECT 1 AS present FROM share_media m JOIN share_browser b ON b.token_hash=m.token_hash WHERE m.token_hash=? AND m.kind='photo' AND m.mime='image/jpeg' AND b.preview_allowed=1",hash).toArray()[0];
-  return {active:true,protected:true,ready,hasPreview,claimed:current?.session_hash!==null,
+  const hasPreview=ready&&(!compact||compact.photo)&&!!this.sql.exec("SELECT 1 AS present FROM share_media m JOIN share_browser b ON b.token_hash=m.token_hash WHERE m.token_hash=? AND m.kind=? AND m.mime='image/jpeg' AND (m.kind='preview' OR b.preview_allowed=1)",hash,compact?'preview':'photo').toArray()[0];
+  const previewTitle=compact?.title?String(this.sql.exec('SELECT title FROM share_snapshot WHERE token_hash=?',hash).toArray()[0]?.title||'').trim().slice(0,180):'';
+  return {active:true,protected:true,ready,hasPreview,compact:!!compact,previewTitle,claimed:current?.session_hash!==null,
    allowed:ready&&sessionHash!==null&&current?.session_hash===sessionHash,expiresAt:active.expires_at};
  }
  // A specifically consented reduced JPEG is the only public preview.
@@ -209,8 +226,11 @@ export class FreeSocialMemory extends DurableObject{
  async browserPreview(hash){
   verifyTokenHash(hash);
   if(!this.access(null,hash))return null;
-  if(!this.sql.exec('SELECT 1 AS ready FROM share_manifest WHERE token_hash=?',hash).toArray()[0])return null;
-  const row=this.sql.exec("SELECT m.mime,m.bytes FROM share_media m JOIN share_browser b ON b.token_hash=m.token_hash WHERE m.token_hash=? AND m.kind='photo' AND b.preview_allowed=1",hash).toArray()[0];
+  const raw=this.sql.exec('SELECT document FROM share_manifest WHERE token_hash=?',hash).toArray()[0]?.document;
+  if(!raw)return null;
+  const compact=compactPreviewPolicy(raw);
+  if(compact&&!compact.photo)return null;
+  const row=this.sql.exec("SELECT m.mime,m.bytes FROM share_media m JOIN share_browser b ON b.token_hash=m.token_hash WHERE m.token_hash=? AND m.kind=? AND (m.kind='preview' OR b.preview_allowed=1)",hash,compact?'preview':'photo').toArray()[0];
   return row?.mime==='image/jpeg'?{mime:row.mime,bytes:row.bytes}:null;
  }
  async sharedPoster(hash,index,sessionHash=null){
@@ -290,7 +310,7 @@ export class FreeSocialMemory extends DurableObject{
  }
  async addShare(actor,tokenHash,expiresAt){
   this.checkOwner(actor);verifyTokenHash(tokenHash);
-  if(!Number.isSafeInteger(expiresAt)||expiresAt<=now()||expiresAt>now()+30*86400000)
+  if(!Number.isSafeInteger(expiresAt)||expiresAt<=now()||expiresAt>now()+7*86400000)
    throw Error('INVALID_EXPIRY');
   if(this.#internal().exists(tokenHash))throw Error('SHARE_KEY_CONFLICT');
   this.sql.exec('INSERT INTO shares(token_hash,expires_at,revoked_at) VALUES (?,?,NULL)',tokenHash,expiresAt);

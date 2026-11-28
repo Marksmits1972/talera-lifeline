@@ -2248,6 +2248,8 @@ try{
    const personalDraft='Hé, weet je nog die middag?';
    try{
    await sharePage.locator('#talera-clean-social [data-action=share]').click();
+   const durations=await sharePage.locator('#talera-clean-expiry option').evaluateAll(opts=>opts.map(o=>Number(o.value)));
+   assert.deepEqual(durations,[1,24,168],'Only the existing shorter options and seven days are offered');
    await sharePage.waitForFunction(()=>
      document.querySelector('#talera-clean-overlay:not([hidden]) .status')?.textContent.includes('TALERA controleert je aanmelding'),
      null,{timeout:15000});
@@ -2288,7 +2290,7 @@ try{
    // Use the standard message in the previously proven one-invite test.
    await sharePage.locator('#talera-clean-consent').check();
    await sharePage.locator('#talera-clean-overlay [data-action=prepare]').click();
-   await sharePage.waitForTimeout(1900);
+   await sharePage.waitForFunction(()=>!!document.querySelector('#talera-clean-overlay [data-action=send]:not([disabled])'),null,{timeout:30000});
    const status=await sharePage.evaluate(()=>{
      const sheet=document.querySelector('#talera-clean-overlay:not([hidden])');
      return {status:sheet?.querySelector('.status')?.textContent,
@@ -2301,6 +2303,10 @@ try{
      'The ORIGINAL WhatsApp button must prepare a real live share, not 404');
    assert.equal(createdLinks.length,1,'Only ONE temporary share should be created');
    const issued=createdLinks[0];
+   const sharePath=shareNetwork.find(x=>x.method==='POST'&&/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(x.path))?.path;
+   assert.ok(sharePath);
+   const invalidExpiry=await context.request.post(origin+sharePath,{headers:{origin,'content-type':'application/json'},data:{consent:true,hours:720}});
+   assert.equal(invalidExpiry.status(),400,'Thirty-day guest links are no longer accepted');
    assert.equal(issued.status,200,'Share creation must succeed');
    assert.match(issued.id,/^[a-f0-9]{64}$/);
    assert.ok(issued.link.startsWith(origin+'/s/'),
@@ -2313,13 +2319,12 @@ try{
    await sharePage.evaluate(()=>{
      window.__taleraNativeShareProbe=[];
      Object.defineProperty(navigator,'canShare',{configurable:true,value:data=>
-       Array.isArray(data?.files)&&data.files.length===1&&
-       data.files[0].type==='image/jpeg'});
+       typeof data?.text==='string'&&!Object.hasOwn(data,'files')});
      Object.defineProperty(navigator,'share',{configurable:true,value:data=>{
        const file=data.files?.[0];
        window.__taleraNativeShareProbe.push({
          name:file?.name,type:file?.type,size:file?.size,
-         count:data.files?.length,text:data.text,
+         count:data.files?.length||0,hasFiles:Object.hasOwn(data,'files'),text:data.text,
          hasSeparateUrl:Object.hasOwn(data,'url')
        });
        return Promise.resolve();
@@ -2337,10 +2342,8 @@ try{
    }));
    console.log('TALERA_NATIVE_PHOTO_SHARE_PREPARE_PROBE',JSON.stringify(nativeDiag));
    const payload=nativeDiag.payload;
-   assert.equal(payload?.name,'talera-herinnering.jpg');
-   assert.equal(payload?.type,'image/jpeg');
-   assert.ok(payload.size>100,'Native iOS share must attach actual JPEG pixels');
-   assert.equal(payload.count,1,'Only the selected memory photo may be shared');
+   assert.equal(payload?.count,0,'No standalone image attachment');
+   assert.equal(payload.hasFiles,false);
    assert.equal(payload.text,
      'Ik kwam deze herinnering tegen en moest aan je denken.\n\n'+issued.link,
      'The exact default caption and restricted recipient URL must travel together');
@@ -2363,8 +2366,8 @@ try{
      handoff.shareOverlayClosed&&handoff.noUnconfirmedSuccess,
      'WhatsApp handoff must truthfully return to original TALERA presenter');
    console.log('TALERA_FREE_WHATSAPP_TRUTHFUL_RETURN_TO_ORIGINAL_MEMORY_PASS');
-   console.log('TALERA_FREE_NATIVE_IOS_PHOTO_CAPTION_AND_LINK_SHARE_PAYLOAD_PASS',
-     JSON.stringify({picture:true,caption:true,sameSecureLink:true,realIphoneAccepted:false}));
+   console.log('TALERA_FREE_COMPACT_LINK_CAPTION_SHARE_PAYLOAD_PASS',
+     JSON.stringify({separatePicture:false,caption:true,sameSecureLink:true,realIphoneAccepted:false}));
 
    const compactPath=new URL(issued.link).pathname;
    assert.match(compactPath,/^\/s\/[A-Za-z0-9_-]{43}$/);
@@ -2426,8 +2429,20 @@ try{
      try{
        const pre=await previewProbe.request.get(issued.link);
        assert.equal(pre.status(),200);
-       assert.ok(!(await pre.text()).includes('synthetic ACCOUNT ISOLATION 1'));
-       assert.equal((await previewProbe.request.get(issued.link+'/preview')).status(),200);
+       const previewHTML=await pre.text();
+       assert.match(previewHTML,/<meta property="og:title" content="synthetic ACCOUNT ISOLATION 1">/);
+       assert.ok(!previewHTML.includes('Local-only imaginary image'),'Private story must not appear in the crawler page');
+       assert.match(previewHTML,/<meta name="twitter:card" content="summary">/);
+       assert.match(previewHTML,/<meta property="og:image:width" content="512">/);
+       const thumbnail=await previewProbe.request.get(issued.link+'/preview');
+       assert.equal(thumbnail.status(),200);
+       assert.equal(thumbnail.headers()['content-type'],'image/jpeg');
+       assert.match(thumbnail.headers()['cache-control'],/no-store/);
+       const bytes=await thumbnail.body();
+       assert.ok(bytes.length>100&&bytes.length<=131072,'Only compact reduced preview is public');
+       const head=await previewProbe.request.head(issued.link+'/preview');
+       assert.equal(head.status(),200);
+       assert.equal((await previewProbe.request.head(issued.link)).status(),200);
        assert.equal((await previewProbe.request.get(issued.link+'/photo')).status(),404);
        assert.equal((await previewProbe.request.get(issued.link+'/feedback')).status(),404);
        received=await openGuest(issued.link);
@@ -3109,13 +3124,12 @@ try{
        await sharePage.evaluate(()=>{
          window.__taleraNativeShareProbe=[];
          Object.defineProperty(navigator,'canShare',{configurable:true,value:data=>
-           Array.isArray(data?.files)&&data.files.length===1&&
-           data.files[0].type==='image/jpeg'});
+           typeof data?.text==='string'&&!Object.hasOwn(data,'files')});
          Object.defineProperty(navigator,'share',{configurable:true,value:data=>{
            const file=data.files?.[0];
            window.__taleraNativeShareProbe.push({
              name:file?.name,type:file?.type,size:file?.size,
-             count:data.files?.length,text:data.text
+             count:data.files?.length||0,hasFiles:Object.hasOwn(data,'files'),text:data.text
            });
            return Promise.resolve();
          }});
@@ -3123,14 +3137,14 @@ try{
        await sharePage.locator('#talera-clean-overlay [data-action=send]').click();
        const personalPayload=await sharePage.evaluate(()=>
          window.__taleraNativeShareProbe?.at(-1));
-       assert.equal(personalPayload?.type,'image/jpeg');
-       assert.ok(personalPayload.size>100);
+       assert.equal(personalPayload?.count,0);
+       assert.equal(personalPayload.hasFiles,false);
        const personalLink=createdLinks.at(-1)?.link;
        assert.equal(personalPayload.text,
          'Weet je nog dat moment? Dit wilde ik met je delen.\n\n'+personalLink,
          'Personal invitation must NOT receive any automatic promotional copy');
-       console.log('TALERA_FREE_NATIVE_IOS_PERSONAL_PHOTO_AND_LINK_SHARE_PAYLOAD_PASS',
-         JSON.stringify({image:true,ownWordsOnly:true,secureLink:true,realIphoneAccepted:false}));
+       console.log('TALERA_FREE_COMPACT_PERSONAL_LINK_SHARE_PAYLOAD_PASS',
+         JSON.stringify({separatePicture:false,ownWordsOnly:true,secureLink:true,realIphoneAccepted:false}));
 
        const issuedUntitled=createdLinks.at(-1);
        assert.equal(createdLinks.length,4,'Original, independent sibling, direct photo-only and untitled UI invitations are distinct');

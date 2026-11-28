@@ -8,6 +8,7 @@ import {capturePlaceApi} from './f5-geonames.mjs';
 import {peopleLinkApi} from './f5-people-link.mjs';
 import {internalShareApi} from './f5-internal-share-api.mjs';
 import {passwordResetPage} from './f5-password-reset-page.mjs';
+import {GUEST_HOURS,PREVIEW_LIMIT} from '../free-10m-social-do/guest-preview-policy.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
   readSessionCookie,sessionCookie,shaHex,safeEqualHex,json,sameOrigin,body
@@ -816,7 +817,7 @@ async function legacyShareApi(request,env){
   let payload;
   try{const raw=await request.text();if(raw.length>1000)throw Error();
     payload=JSON.parse(raw)}catch{return deny(400,'Ongeldige aanvraag')}
-  if(!payload||payload.consent!==true||![1,24,168,720].includes(Number(payload.hours)))
+  if(!payload||payload.consent!==true||!GUEST_HOURS.includes(Number(payload.hours)))
    return deny(400,'Toestemming of geldigheidsduur ontbreekt');
   const home=socialMemoryHome(env,create[1]);
   let ready;
@@ -834,19 +835,20 @@ async function legacyShareApi(request,env){
   if(!token)return deny(503,'Deellink kon niet veilig worden aangemaakt');
   return json({id:token,link:u.origin+'/s/'+compactWhatsAppToken(token),expiresAt:d.expiresAt});
  }
- const upload=/^\/api\/shares\/([a-f0-9]{64})\/(photo|photo-full|audio|video)$/.exec(p);
+ const upload=/^\/api\/shares\/([a-f0-9]{64})\/(photo|photo-full|audio|video|preview)$/.exec(p);
  if(upload){
   if(m!=='POST')return deny(405,'Methode niet toegestaan');
+  const limit=upload[2]==='preview'?PREVIEW_LIMIT:1800000;
   const bytesHint=Number(request.headers.get('content-length')||0);
-  if(bytesHint>1800000)return deny(413,'Media te groot voor veilige tijdelijke deelopslag');
+  if(bytesHint>limit)return deny(413,'Media te groot voor veilige tijdelijke deelopslag');
   const hash=await shaHex(upload[1]);
   const storyId=await accountHome(env,actor.id).socialShareStory(hash);
   if(!storyId)return deny(403,'Deze deellink hoort niet bij dit account');
   const bytes=new Uint8Array(await request.arrayBuffer());
-  if(!bytes.byteLength||bytes.byteLength>1800000)
+  if(!bytes.byteLength||bytes.byteLength>limit)
    return deny(413,'Media te groot voor veilige tijdelijke deelopslag');
   const mime=(request.headers.get('content-type')||'').split(';')[0].toLowerCase();
-  try{await socialMemoryHome(env,storyId).saveShareMedia(actor.id,hash,upload[2],mime,bytes,upload[2]==='photo'&&request.headers.get('x-talera-preview-consent')==='1')}
+  try{await socialMemoryHome(env,storyId).saveShareMedia(actor.id,hash,upload[2],mime,bytes,['photo','preview'].includes(upload[2])&&request.headers.get('x-talera-preview-consent')==='1')}
   catch{return deny(400,'Dit type of formaat media kan niet veilig worden gedeeld')}
   return json({ok:true});
  }
@@ -941,8 +943,18 @@ function guestCookie(hash,value,expiresAt){
  const age=Math.max(0,Math.min(2592000,Math.floor((expiresAt-Date.now())/1000)));
  return guestCookieName(hash)+'='+value+'; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age='+age;
 }
-function guestPreviewMeta(request,basePath,hasPreview){
- const u=new URL(request.url),lang=requestLanguage(request);
+function guestPreviewMeta(request,basePath,gate){
+ const u=new URL(request.url),lang=requestLanguage(request),hasPreview=gate.hasPreview;
+ if(gate.compact){
+  const publicOrigin=u.origin==='https://talera-free-f5-storage-qa-20261109.mark-a39.workers.dev'?'https://talera.app':u.origin;
+  return '<meta property="og:type" content="article">'+
+   '<meta property="og:site_name" content="TALERA">'+
+   '<meta property="og:title" content="'+safeShareHtml(gate.previewTitle||translate(lang,'guest.preview.title'))+'">'+
+   '<meta name="twitter:card" content="summary">'+
+   '<meta property="og:url" content="'+safeShareHtml(publicOrigin+basePath)+'">'+
+   '<meta property="og:image" content="'+safeShareHtml(publicOrigin+(hasPreview?basePath+'/preview':'/pwa-512.png'))+'">'+
+   '<meta property="og:image:width" content="512"><meta property="og:image:height" content="512">';
+ }
  return '<meta property="og:type" content="article">'+
   '<meta property="og:site_name" content="TALERA">'+
   '<meta property="og:title" content="'+safeShareHtml(translate(lang,'guest.preview.title'))+'">'+
@@ -966,7 +978,7 @@ function guestClaimPage(request,hash,gate,basePath){
   const value=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
   headers.set('set-cookie',guestCookie(hash,value,gate.expiresAt));
  }
- return new Response('<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'+guestPreviewMeta(request,basePath,gate.hasPreview)+'<title>'+title+'</title><style>body{font:17px system-ui;background:#f7f5f0;color:#071a3d;margin:0;min-height:100vh;display:grid;place-items:center;text-align:center}main{padding:24px;max-width:340px}button{font:inherit;padding:12px;border-radius:12px;border:1px solid #071a3d;background:#fff}</style></head><body><main><p>'+message+'</p><button id="retry" hidden>'+safeShareHtml(translate(lang,'guest.claim.retry'))+'</button></main>'+script+'</body></html>',{status:gate.claimed?403:gate.ready?200:409,headers});
+ return new Response('<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'+guestPreviewMeta(request,basePath,gate)+'<title>'+title+'</title><style>body{font:17px system-ui;background:#f7f5f0;color:#071a3d;margin:0;min-height:100vh;display:grid;place-items:center;text-align:center}main{padding:24px;max-width:340px}button{font:inherit;padding:12px;border-radius:12px;border:1px solid #071a3d;background:#fff}</style></head><body><main><p>'+message+'</p><button id="retry" hidden>'+safeShareHtml(translate(lang,'guest.claim.retry'))+'</button></main>'+script+'</body></html>',{status:gate.claimed?403:gate.ready?200:409,headers});
 }
 async function publicWhatsAppMemory(request,env){
  const u=new URL(request.url);
@@ -1084,7 +1096,7 @@ async function publicWhatsAppMemory(request,env){
  const video=content.hasVideo?'<video controls playsinline preload="none" src="'+u.pathname+'/video"></video>':'';
  const audio=content.hasAudio?'<audio controls preload="none" src="'+u.pathname+'/audio"></audio>':'';
  const previewLanguage=requestLanguage(request);
- const previewMeta='<meta property="og:type" content="article">'+
+ const previewMeta=gate.compact?guestPreviewMeta(request,u.pathname,gate):'<meta property="og:type" content="article">'+
   '<meta property="og:site_name" content="TALERA">'+
   '<meta property="og:title" content="'+safeShareHtml(translate(previewLanguage,'guest.preview.title'))+'">'+
   '<meta property="og:description" content="'+safeShareHtml(translate(previewLanguage,'guest.preview.description'))+'">'+
@@ -1447,7 +1459,7 @@ export default {
           deny(401,'Aanmelden vereist');
       }
       if(p==='/api/pwa/memory-link'||/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(p)||
-         /^\/api\/shares\/[a-f0-9]{64}\/(?:photo|photo-full|audio|video|revoke|manifest|poster\/\d{1,2}|media\/\d{1,2}\/\d{1,2})$/.test(p))
+         /^\/api\/shares\/[a-f0-9]{64}\/(?:photo|photo-full|audio|video|preview|revoke|manifest|poster\/\d{1,2}|media\/\d{1,2}\/\d{1,2})$/.test(p))
         return legacyShareApi(request,env);
       if(p==='/api/shares'||p==='/api/my-grants')
         return accountSocialLists(request,env);

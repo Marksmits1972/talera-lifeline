@@ -5,6 +5,7 @@ import {readFileSync} from 'node:fs';
 import {scopeLocalMemories,privateAccountScope} from './f5-local-scope.mjs';
 import {referencePages,guestPages} from './generated/public-template-map.mjs';
 import './f5-editor-clean-layout.test.mjs';
+import '../free-10m-social-do/guest-preview-policy.test.mjs';
 import {alignEditedNarrationCueRefs} from './f5-edit-cue-rebind.mjs';
 import {retainEditorCanonicalMediaIds} from './f5-editor-canonical-refs.mjs';
 import {preserveOriginalMediaIdsOnEdit} from './f5-library-editor-stable-save.mjs';

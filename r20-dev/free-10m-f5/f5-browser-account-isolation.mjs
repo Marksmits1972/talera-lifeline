@@ -2657,7 +2657,8 @@ try{
      const html=await received.text();
      assert.match(html,/synthetic ACCOUNT ISOLATION 1/);
      assert.match(html,/Local-only imaginary image/);
-     assert.match(html,/<meta property="og:title" content="Een persoonlijke herinnering via TALERA">/);
+     assert.match(html,/<meta property="og:title" content="synthetic ACCOUNT ISOLATION 1">/);
+     assert.match(html,/<meta name="twitter:card" content="summary">/);
      assert.match(html,/<meta property="og:image" content=/);
      assert.ok(html.includes(issued.link+'/preview'));
      assert.ok(!html.includes('class="stage"'),

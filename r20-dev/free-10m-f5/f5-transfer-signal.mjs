@@ -1,3 +1,4 @@
+import {syncAccountEphemeralAlarm} from './f5-people-link.mjs';
 import {validDiagnosticEvents,DIAG_TTL,INVITATION_TTL,VERIFICATION_TTL,PAIR_STALE_MS} from './f5-transfer-diagnostic.mjs';
 // Temporary, per-account signaling. No media or library data.
 const CODE=/^[a-f0-9]{32}$/;
@@ -203,11 +204,7 @@ async function accessSignaling(storage,operation,now){
    if(record)await txn.put(TRANSFER_STORAGE_KEY,record);
    else await txn.delete(TRANSFER_STORAGE_KEY);
   }
-  const next=expiries.length?Math.min(...expiries):null;
-  if(await txn.getAlarm()!==next){
-   if(next===null)await txn.deleteAlarm();
-   else await txn.setAlarm(next);
-  }
+  await syncAccountEphemeralAlarm(txn,now);
   return {result,error:error?.message};
  }).then(({result,error})=>{if(error)throw Error(error);return result});
 }

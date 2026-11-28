@@ -5,6 +5,8 @@ import {chooseLanguage,requestLanguage,translate} from './f5-language.mjs';
 // There is intentionally NO TALERA_BASE, D1, R2 or existing customer binding.
 import authPilot from '../free-10m-auth-pilot/auth-pilot-worker.mjs';
 import {capturePlaceApi} from './f5-geonames.mjs';
+import {peopleLinkApi} from './f5-people-link.mjs';
+import {internalShareApi} from './f5-internal-share-api.mjs';
 import {passwordResetPage} from './f5-password-reset-page.mjs';
 import socialPilot from '../free-10m-social-do/social-worker.mjs';
 import {
@@ -313,6 +315,7 @@ function allowedLocalUiSearch(url){
       !/[\u0000-\u001f\u007f<>\\]/.test(id);
   if(url.pathname==='/present'&&key==='memory'&&/^\d{1,6}$/.test(id))
     return Number(id)>=1&&Number(id)<=100000;
+  if(url.pathname==='/present'&&key==='received')return /^[a-f0-9]{64}$/.test(id);
   // The original local memory and editing routes retain their strict IDs.
   return ((url.pathname==='/mijn-leven'&&key==='published')||
       (url.pathname==='/tell'&&key==='edit')||
@@ -328,7 +331,7 @@ function canonicalReferralUiPath(url,method){
   const pairs=[...url.searchParams.entries()];
   if(!pairs.length||pairs.length>12)return null;
   let functional=null,passive=0;
-  const functionKeys=new Set(['talera_menu','published','edit','memory','year','decade','theme']);
+  const functionKeys=new Set(['talera_menu','published','edit','memory','year','decade','theme','received']);
   const reserved=/^(?:account|user|db|database|scope|story|file|redirect|return|return_url|next|url|token|code|key|auth|session|password|email|birthDate|state|callback|target|share|origin|id|path)$/i;
   for(const [key,value] of pairs){
     if(key.length>64||value.length>256||/[\u0000-\u001f\u007f]/.test(key+value))
@@ -1178,6 +1181,10 @@ async function publicPage(request,env){
     // If the upstream memory-store script ever changes, fail closed.
     const editReturnAccountScope=await privateAccountScope(actor.id);
     let scoped=scopeLocalMemories(privateHtml,editReturnAccountScope);
+    if(pathname==='/present'){
+      if(scoped.split('__TALERA_RECEIVED_SCOPE__').length!==2)return deny(503,'Ontvangen herinneringen niet beschikbaar');
+      scoped=scoped.replace('__TALERA_RECEIVED_SCOPE__',editReturnAccountScope);
+    }
     // Only an explicitly configured existing Worker enables online enrichment.
     // The browser receives a boolean, never the provider username.
     if(['/mijn-leven','/meldingen','/present','/tell'].includes(pathname)&&typeof env.GEONAMES_USERNAME==='string'&&
@@ -1423,6 +1430,8 @@ export default {
       if(AUTH_PATHS.has(p))return accountApi(request,env);
       if(p==='/api/profile/birthdate')return birthdateApi(request,env);
       if(p==='/api/discovery')return discoveryApi(request,env);
+      if(p==='/api/people/link')return peopleLinkApi(request,env,{getAccount:()=>sessionAccount(request,env),getHome:id=>accountHome(env,id)});
+      if(p==='/api/internal-share'||p.startsWith('/api/internal-share/'))return internalShareApi(request,env,{getAccount:()=>sessionAccount(request,env),getHome:id=>accountHome(env,id),getMemory:id=>socialMemoryHome(env,id),scopedStoryId:scopedShareId});
       // The original menu consumes local IndexedDB for /api/memories;
       // a network request can never retrieve Free originals from this Worker.
       if(p==='/api/memories'){

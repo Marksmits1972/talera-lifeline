@@ -10,6 +10,7 @@ import {renderOriginalTaleraShare,renderTaleraLanding,guestClientScript} from '.
 
 import {referencePages,guestPages,verifiedPublicScripts} from './generated/public-template-map.mjs';
 import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
+import {installMyPeopleMenu} from './f5-my-people-menu.mjs';
 import {keepOnlyFunctionalFreeMenu,removeInactiveDisplayMenu,removeInactiveAccessibilityMenu,connectExistingStorageBackup,secureAccountMenuTransitions} from './f5-account-switch-guard.mjs';
 const langs=['nl','en','de','fr','es'];
 const fields=x=>[...String(x).matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g)].map(m=>m[1]).sort();
@@ -107,7 +108,7 @@ test('password reset executes submit handler for every language with safe keyed 
 test('specific menu texts are compiled from the exact original, never from personal strings',()=>{
  const original=fs.readFileSync(new URL('./generated/approved-menu-original.mjs',import.meta.url),'utf8');
  const approved=keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(original)))));
- const output=localizeApprovedMenu(approved);
+ const output=installMyPeopleMenu(localizeApprovedMenu(approved));
  assert.equal(output,fs.readFileSync('r20-dev/free-10m-delivery/public'+verifiedPublicScripts['/__clean/menu-integration.mjs'],'utf8'));
  new vm.Script(output);
  assert.throws(()=>localizeApprovedMenu(approved+' '),/TALERA_MENU_LANGUAGE_SOURCE_DRIFT/);

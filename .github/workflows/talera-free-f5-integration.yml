@@ -503,6 +503,12 @@ jobs:
             echo "$RUNNER_TEMP/talera-f5-test-bin" >> "$GITHUB_PATH"
             "$RUNNER_TEMP/talera-f5-test-bin/ffmpeg" -version | head -n 1
           fi
+      - name: Verify private contacts, temporary package and actual same-app Chromium send/receive
+        if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
+        timeout-minutes: 4
+        run: |
+          node --test r20-dev/free-10m-f5/f5-my-people.test.mjs r20-dev/free-10m-f5/f5-people-link.test.mjs r20-dev/free-10m-f5/f5-internal-receive.test.mjs r20-dev/free-10m-f5/f5-internal-presentation.test.mjs r20-dev/free-10m-social-do/internal-share-storage.test.mjs
+          TALERA_PEOPLE_UI_BROWSER=chromium node r20-dev/free-10m-f5/f5-people-link.integration.mjs
       - name: Browser diagnose ordinary sound, return-navigation and video hit targets
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
         run: node r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs
@@ -524,6 +530,10 @@ jobs:
           # This is a second engine for the SAME local-origin Worker code, not an app.
           npx --no-install playwright install --with-deps webkit
           TALERA_OFFLINE_BROWSER=webkit node r20-dev/free-10m-f5/f5-offline-sw.browser.test.mjs
+      - name: Verify same private internal delivery flow in WebKit
+        if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}
+        timeout-minutes: 4
+        run: TALERA_PEOPLE_UI_BROWSER=webkit node r20-dev/free-10m-f5/f5-people-link.integration.mjs
       - name: Browser verify direct device transfer on existing private backup view
         timeout-minutes: 6
         if: ${{ github.event.head_commit.message != 'qa-deploy-TALERA-free-library-20261117' }}

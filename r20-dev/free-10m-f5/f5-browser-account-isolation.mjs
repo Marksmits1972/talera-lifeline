@@ -1188,10 +1188,44 @@ try{
   assert.ok(after.deleted&&after.mediaGone);
   console.log('TALERA_EXISTING_EDITOR_DELETE_CONFIRM_CANCEL_AND_EXACT_LIBRARY_READBACK_PASS');
  }finally{await deleteEditor.close()}
+ // The actual same-menu contact list uses an account-scoped local store.
+ await menu(page);await view(page,'people');
+ const ownerPeople=page.locator('[data-talera-people]');
+ await ownerPeople.getByText('Je hebt nog geen contacten toegevoegd.',{exact:true}).waitFor();
+ await ownerPeople.getByRole('button',{name:'Contact toevoegen',exact:true}).click();
+ await ownerPeople.locator('[data-people-field="name"]').fill('Contact owner A');
+ await ownerPeople.locator('[data-people-field="phone"]').fill('+31600000111');
+ await ownerPeople.getByRole('button',{name:'Opslaan',exact:true}).click();
+ await ownerPeople.getByText('Contact owner A',{exact:true}).waitFor();
+ await ownerPeople.getByRole('button',{name:'Contact owner A als favoriet markeren'}).click();
+ await ownerPeople.getByRole('button',{name:'Contact owner A uit favorieten halen'}).waitFor();
+ await ownerPeople.getByRole('button',{name:'TALERA koppelen',exact:true}).click();
+ await ownerPeople.getByRole('button',{name:'Uitnodiging maken',exact:true}).click();
+ const inviteField=ownerPeople.getByLabel('Uitnodigingscode',{exact:true});
+ await inviteField.waitFor();
+ const personalInvite=await inviteField.inputValue();
+ assert.match(personalInvite,/^TALERA1-/);
+ assert.equal(await ownerPeople.getByText('TALERA gekoppeld',{exact:true}).count(),0);
+
+ await page.locator('#talera-more-menu [data-action="close"]').first().click();
  await logout(page);
  await assertSignedOutEmpty(page,a.id);
  const guest=await login(page,users[1]);
  assert.equal(guest,ids[1],'Second login must switch browser to second ID');
+ await menu(page);await view(page,'people');
+ const guestPeople=page.locator('[data-talera-people]');
+ await guestPeople.getByText('Je hebt nog geen contacten toegevoegd.',{exact:true}).waitFor();
+ assert.equal(await guestPeople.getByText('Contact owner A',{exact:true}).count(),0);
+ await guestPeople.getByRole('button',{name:'Uitnodiging ontvangen',exact:true}).click();
+ await guestPeople.getByLabel('Uitnodigingscode',{exact:true}).fill(personalInvite);
+ await guestPeople.getByRole('button',{name:'Uitnodiging accepteren',exact:true}).click();
+ const proofField=guestPeople.getByLabel('Bevestigingscode',{exact:true});
+ await proofField.waitFor();
+ const personalProof=await proofField.inputValue();
+ assert.match(personalProof,/^[a-f0-9]{32}$/);
+ assert.equal(await guestPeople.getByText('Contact owner A',{exact:true}).count(),0);
+
+ await page.locator('#talera-more-menu [data-action="close"]').first().click();
  const beforeB=await inventory(page);
  assert.ok(!beforeB.ids.includes(a.id),'Second account can see FIRST local story');
  const foreignOriginal=await page.evaluate(async id=>({
@@ -1209,6 +1243,23 @@ try{
  await logout(page);
  await assertSignedOutEmpty(page,b.id);
  assert.equal(await login(page,users[0]),ids[0]);
+ await menu(page);await view(page,'people');
+ await page.locator('[data-talera-people]').getByText('Contact owner A',{exact:true}).waitFor();
+ await page.locator('[data-talera-people]').getByRole('button',{name:'Contact owner A uit favorieten halen'}).waitFor();
+ const returningPeople=page.locator('[data-talera-people]');
+ await returningPeople.getByRole('button',{name:'TALERA koppelen',exact:true}).click();
+ await returningPeople.getByLabel('Bevestigingscode',{exact:true}).fill(personalProof);
+ let confirmedAccount=false;
+ page.once('dialog',async d=>{confirmedAccount=d.message().includes(users[1].displayName);await d.accept()});
+ await returningPeople.getByRole('button',{name:'Koppeling bevestigen',exact:true}).click();
+ await returningPeople.getByText('TALERA gekoppeld',{exact:true}).waitFor();
+ assert.ok(confirmedAccount,'Owner must see the verified account name and confirm explicitly');
+ const noAutomaticRights=await page.evaluate(async()=>fetch('/api/my-grants').then(r=>r.json()));
+ assert.deepEqual(noAutomaticRights.items,[]);
+ console.log('TALERA_MY_PEOPLE_VERIFIED_ACCOUNT_LINK_REAL_BROWSER_PASS');
+
+ await page.locator('#talera-more-menu [data-action="close"]').first().click();
+ console.log('TALERA_MY_PEOPLE_ACCOUNT_ISOLATION_REAL_BROWSER_PASS');
  const returning=await inventory(page);
  assert.ok(returning.ids.includes(a.id),'Returning original account lost local memory');
  assert.ok(!returning.ids.includes(b.id),'Original account can see SECOND story');
@@ -2015,14 +2066,39 @@ try{
      hrefs:[...panel.querySelectorAll('a[href]')].map(x=>x.href)
    };
  });
- for(const active of ['account','mine','privacy','settings','help'])
+ for(const active of ['account','people','mine','privacy','settings','help'])
    assert.ok(cleanHub.listed.includes(active),'Working More destination removed: '+active);
- for(const unavailable of ['people','shared','subscription','forgot'])
+ for(const unavailable of ['shared','subscription','forgot'])
    assert.ok(!cleanHub.listed.includes(unavailable),
      'Unavailable Free option must not pretend to be working: '+unavailable);
  assert.equal(cleanHub.listed.filter(v=>v==='privacy').length,1,
    'Exactly one visible privacy option on the main More page');
 
+ await view(page,'people');
+ const people=page.locator('[data-talera-people]');
+ await people.waitFor();
+ await people.getByRole('button',{name:'Contact toevoegen',exact:true}).click();
+ await people.locator('[data-people-field="name"]').fill('Synthetic TALERA contact');
+ await people.locator('[data-people-field="phone"]').fill('+31600000123');
+ await people.getByRole('button',{name:'Opslaan',exact:true}).click();
+ await people.getByText('Synthetic TALERA contact',{exact:true}).waitFor();
+ await people.getByRole('button',{name:'Synthetic TALERA contact als favoriet markeren'}).click();
+ await people.getByRole('button',{name:'Synthetic TALERA contact uit favorieten halen'}).waitFor();
+ assert.equal(await people.locator('form[data-form="search"]').count(),0,'No old public account finder');
+ const vcard='BEGIN:VCARD\nVERSION:3.0\nFN:Contact file selected\nTEL:+31600000124\nNOTE:NOT_STORED\nEND:VCARD\nBEGIN:VCARD\nFN:Contact file unselected\nTEL:+31600000125\nEND:VCARD';
+ await people.locator('[data-people-import="vcard"]').setInputFiles({name:'synthetic.vcf',mimeType:'text/vcard',buffer:Buffer.from(vcard)});
+ await people.getByLabel('Contact file selected',{exact:true}).check();
+ await people.getByRole('button',{name:'Selectie toevoegen',exact:true}).click();
+ await people.getByText('Contact file selected',{exact:true}).waitFor();
+ assert.equal(await people.getByText('Contact file unselected',{exact:true}).count(),0);
+ assert.equal(await people.getByText('NOT_STORED').count(),0);
+
+ await page.locator('#talera-more-menu [data-action="back"]').first().click();
+ await view(page,'people');
+ await people.getByText('Synthetic TALERA contact',{exact:true}).waitFor();
+ await people.getByRole('button',{name:'Synthetic TALERA contact uit favorieten halen'}).waitFor();
+ await page.locator('#talera-more-menu [data-action="back"]').first().click();
+ console.log('TALERA_MY_PEOPLE_EXISTING_MENU_LOCAL_PASS');
  await view(page,'help');
  const helpLink=page.locator('#talera-more-menu a[href="https://talera-website.pages.dev/welkom/"]');
  assert.equal(await helpLink.count(),1,'Keep the existing TALERA help web link');

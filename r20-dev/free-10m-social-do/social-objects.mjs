@@ -1,6 +1,8 @@
 // TALERA Free Social: PRIVATE prototype of per-memory, EU-compatible Durable Objects.
 // Synthetic staging only. No link to the official TALERA social D1 or customer data.
 import {DurableObject} from 'cloudflare:workers';
+import {saveSnapshotPart,saveSnapshotPoster,completeSnapshotManifest} from './share-snapshot-storage.mjs';
+import {InternalShareStore} from './internal-share-storage.mjs';
 const STORY=/^[A-Za-z0-9_-]{8,80}$/;
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HASH=/^[a-f0-9]{64}$/;
@@ -132,121 +134,51 @@ export class FreeSocialMemory extends DurableObject{
  // bounded parts of the existing, token-scoped social DO, not a new media service.
  async saveSharePart(actor,hash,index,part,mime,bytes){
   this.checkOwner(actor);verifyTokenHash(hash);
-  if(!Number.isInteger(index)||index<0||index>=24||
-     !Number.isInteger(part)||part<0||part>=96)
-   throw Error('INVALID_SHARE_PART');
-  if(typeof mime!=='string'||!/^(image\/(?:jpeg|png|webp|gif|heic|heif)|video\/(?:mp4|webm|quicktime)|audio\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/.test(mime))
-   throw Error('INVALID_SHARE_MIME');
-  if(!(bytes instanceof Uint8Array)||bytes.byteLength<1||bytes.byteLength>1048576)
-   throw Error('INVALID_SHARE_PART_SIZE');
   if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
-  const kind='asset-'+index+'-'+part;
-  const previous=this.sql.exec('SELECT length(bytes) AS n FROM share_media WHERE token_hash=? AND kind=?',hash,kind).toArray()[0]?.n||0;
-  const total=this.sql.exec('SELECT COALESCE(SUM(length(bytes)),0) AS n FROM share_media WHERE token_hash=?',hash).toArray()[0]?.n||0;
-  if(total-previous+bytes.byteLength>96*1048576)throw Error('SHARE_TOTAL_SIZE_LIMIT');
-  this.sql.exec('INSERT INTO share_media(token_hash,kind,mime,bytes) VALUES (?,?,?,?) ON CONFLICT(token_hash,kind) DO UPDATE SET mime=excluded.mime,bytes=excluded.bytes',
-   hash,kind,mime,bytes);
-  return response(true,{stored:true});
+  return saveSnapshotPart(this.sql,hash,index,part,mime,bytes);
  }
 
  // Temporary read-only video thumbnails; never album photos or narration entries.
  async saveSharePoster(actor,hash,index,mime,bytes){
   this.checkOwner(actor);verifyTokenHash(hash);
-  if(!Number.isInteger(index)||index<0||index>=24||
-     !['image/jpeg','image/png','image/webp'].includes(mime)||
-     !(bytes instanceof Uint8Array)||bytes.byteLength<1||bytes.byteLength>1500000)
-   throw Error('INVALID_SHARE_POSTER');
   if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
-  const kind='poster-'+index;
-  const previous=this.sql.exec('SELECT length(bytes) AS n FROM share_media WHERE token_hash=? AND kind=?',
-   hash,kind).toArray()[0]?.n||0;
-  const total=this.sql.exec('SELECT COALESCE(SUM(length(bytes)),0) AS n FROM share_media WHERE token_hash=?',
-   hash).toArray()[0]?.n||0;
-  if(total-previous+bytes.byteLength>96*1048576)throw Error('SHARE_TOTAL_SIZE_LIMIT');
-  this.sql.exec('INSERT INTO share_media(token_hash,kind,mime,bytes) VALUES (?,?,?,?) ON CONFLICT(token_hash,kind) DO UPDATE SET mime=excluded.mime,bytes=excluded.bytes',
-   hash,kind,mime,bytes);
-  return response(true,{stored:true});
+  return saveSnapshotPoster(this.sql,hash,index,mime,bytes);
  }
  async completeShareManifest(actor,hash,document){
   this.checkOwner(actor);verifyTokenHash(hash);
   if(!this.access(null,hash))throw Error('SHARE_NOT_ACTIVE');
-  if(!document||document.version!==1||!Array.isArray(document.items)||
-    document.items.length>24||!Array.isArray(document.narrationCues)||
-    document.narrationCues.length>1000||
-    !Number.isSafeInteger(document.narrationDurationMs)||
-    document.narrationDurationMs<0||document.narrationDurationMs>86400000)
-   throw Error('INVALID_SHARE_MANIFEST');
-  const metadata=this.sql.exec('SELECT story_text FROM share_snapshot WHERE token_hash=?',hash).toArray()[0];
-  if(!metadata||(!document.items.length&&!metadata.story_text.trim()))
-   throw Error('EMPTY_SHARE');
-  let total=0,partsTotal=0;
-  for(let index=0;index<document.items.length;index++){
-   const item=document.items[index];
-   if(!item||!['photo','video','audio'].includes(item.kind)||
-      typeof item.mime!=='string'||
-      !/^(image\/(?:jpeg|png|webp|gif|heic|heif)|video\/(?:mp4|webm|quicktime)|audio\/(?:mpeg|mp4|webm|ogg|wav|x-m4a|aac|aiff|x-aiff))$/.test(item.mime)||
-      !item.mime.startsWith(item.kind==='photo'?'image/':item.kind+'/')||
-      !Number.isSafeInteger(item.size)||item.size<1||
-      !Number.isSafeInteger(item.parts)||item.parts<1||item.parts>96||
-      item.parts!==Math.ceil(item.size/1048576)||
-      !Array.isArray(item.hashes)||item.hashes.length!==item.parts||
-      !item.hashes.every(h=>typeof h==='string'&&/^[a-f0-9]{64}$/.test(h)))
-    throw Error('INVALID_SHARE_MEDIA_MANIFEST');
-   total+=item.size;partsTotal+=item.parts;
-   if(total>96*1048576||partsTotal>192)throw Error('SHARE_TOTAL_SIZE_LIMIT');
-   let actual=0;
-   for(let part=0;part<item.parts;part++){
-    const stored=this.sql.exec('SELECT mime,length(bytes) AS n FROM share_media WHERE token_hash=? AND kind=?',
-      hash,'asset-'+index+'-'+part).toArray()[0];
-    if(!stored||stored.mime!==item.mime||stored.n<1||
-       stored.n>1048576||(part<item.parts-1&&stored.n!==1048576))
-     throw Error('INCOMPLETE_SHARE_MEDIA');
-    actual+=stored.n;
-   }
-   if(actual!==item.size)throw Error('SHARE_MEDIA_LENGTH_MISMATCH');
-  }
+  return completeSnapshotManifest(this.sql,hash,document);
+ }
 
-  // Sidecars are separate from the complete source manifest and preserve its order.
-  const posters=document.posters===undefined?[]:document.posters;
-  if(!Array.isArray(posters)||posters.length>document.items.length)
-   throw Error('INVALID_SHARE_POSTER_MANIFEST');
-  const posterIndices=new Set();
-  for(const poster of posters){
-   if(!poster||!Number.isInteger(poster.mediaIndex)||
-      poster.mediaIndex<0||poster.mediaIndex>=document.items.length||
-      document.items[poster.mediaIndex]?.kind!=='video'||
-      posterIndices.has(poster.mediaIndex)||
-      !['image/jpeg','image/png','image/webp'].includes(poster.mime)||
-      !Number.isSafeInteger(poster.size)||poster.size<1||poster.size>1500000||
-      typeof poster.sha256!=='string'||!/^[a-f0-9]{64}$/.test(poster.sha256))
-    throw Error('INVALID_SHARE_POSTER_MANIFEST');
-   posterIndices.add(poster.mediaIndex);
-   const saved=this.sql.exec('SELECT mime,bytes FROM share_media WHERE token_hash=? AND kind=?',
-    hash,'poster-'+poster.mediaIndex).toArray()[0];
-   if(!saved||saved.mime!==poster.mime||saved.bytes.byteLength!==poster.size)
-    throw Error('INCOMPLETE_SHARE_POSTER');
-   const digest=await crypto.subtle.digest('SHA-256',saved.bytes);
-   const hex=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
-   if(hex!==poster.sha256)throw Error('SHARE_POSTER_HASH_MISMATCH');
-  }
-  const visual=document.items.map((item,index)=>
-    ['photo','video'].includes(item.kind)?index:null).filter(x=>x!==null);
-  for(const cue of document.narrationCues){
-   if(!cue||typeof cue!=='object'||Array.isArray(cue)||
-      !Number.isSafeInteger(cue.t)||cue.t<0||cue.t>86400000||
-      !Number.isSafeInteger(cue.index)||cue.index<0||cue.index>=Math.max(1,visual.length)||
-      Object.hasOwn(cue,'mediaId')||
-      (cue.mediaIndex!==undefined&&
-        (!Number.isInteger(cue.mediaIndex)||!visual.includes(cue.mediaIndex)))||
-      (cue.videoAtMs!==undefined&&
-       (!Number.isSafeInteger(cue.videoAtMs)||cue.videoAtMs<0)))
-    throw Error('INVALID_SHARE_VOICE_CUE');
-  }
-  const raw=JSON.stringify(document);
-  if(raw.length>30000)throw Error('SHARE_MANIFEST_TOO_LARGE');
-  this.sql.exec('INSERT INTO share_manifest(token_hash,document) VALUES (?,?) ON CONFLICT(token_hash) DO UPDATE SET document=excluded.document',
-   hash,raw);
-  return response(true,{complete:true,originalItems:document.items.length});
+ // Internal account shares have NO row in shares/share_browser or guest pointer.
+ // These methods are private binding RPCs, not exposed by the public router.
+ #internalStore;
+ #internal(){return this.#internalStore??=new InternalShareStore(this.ctx.storage)}
+ async stageInternalShare(actor,key,metadata,recipients,expiresAt){
+  const r=this.#internal().stage(actor,key,metadata,recipients,expiresAt);
+  await this.refreshContentAlarm();return r;
+ }
+ async uploadInternalPart(actor,key,index,part,mime,bytes){return this.#internal().upload(actor,key,index,part,mime,bytes)}
+ async uploadInternalPoster(actor,key,index,mime,bytes){return this.#internal().upload(actor,key,index,0,mime,bytes,true)}
+ async sealInternalShare(actor,key,document){return this.#internal().seal(actor,key,document)}
+ async internalOwnerSummary(actor,key){return this.#internal().ownerSummary(actor,key)}
+ async internalRecipientForContact(actor,key,contact){return this.#internal().recipientForContact(actor,key,contact)}
+ async internalPendingTargets(actor,key){return this.#internal().pendingTargets(actor,key)}
+ async activateInternalShare(actor,key,preparedAccounts){
+  const r=this.#internal().activate(actor,key,preparedAccounts);
+  await this.refreshContentAlarm();return r;
+ }
+ async internalShareSummary(actor,key){return this.#internal().summary(actor,key)}
+ async internalShareContent(actor,key){return this.#internal().content(actor,key)}
+ async internalSharePart(actor,key,index,part){return this.#internal().part(actor,key,index,part)}
+ async internalSharePoster(actor,key,index){return this.#internal().part(actor,key,index,0,true)}
+ async receiveInternalShare(actor,key,manifestHash){
+  const r=this.#internal().received(actor,key,manifestHash);
+  await this.refreshContentAlarm();return r;
+ }
+ async revokeInternalShare(actor,key,recipient=null){
+  const r=this.#internal().revoke(actor,key,recipient);
+  await this.refreshContentAlarm();return r;
  }
 
  // Browser possession is independent of the URL. Only a completed share
@@ -331,7 +263,8 @@ export class FreeSocialMemory extends DurableObject{
  async refreshContentAlarm(){
   const draft=this.sql.exec("SELECT expires_at FROM share_draft WHERE singleton=1").toArray()[0];
   const earliest=this.sql.exec("SELECT MIN(s.expires_at) AS next FROM shares s JOIN share_snapshot c ON c.token_hash=s.token_hash WHERE s.expires_at>?",now()).toArray()[0]?.next;
-  const next=[draft?.expires_at,earliest].filter(t=>Number.isSafeInteger(t)&&t>now()).sort((a,b)=>a-b)[0];
+  const clock=now(),internal=this.#internal().nextExpiry();
+  const next=[draft?.expires_at,earliest,Number.isSafeInteger(internal)?Math.max(clock+1,internal):null].filter(t=>Number.isSafeInteger(t)&&t>clock).sort((a,b)=>a-b)[0];
   if(next&&this.ctx.storage.setAlarm)await this.ctx.storage.setAlarm(next);
  }
  async alarm(){
@@ -342,6 +275,7 @@ export class FreeSocialMemory extends DurableObject{
   this.sql.exec("DELETE FROM share_browser WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM guest_feedback_hearts WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
   this.sql.exec("DELETE FROM guest_feedback_comments WHERE token_hash IN (SELECT token_hash FROM shares WHERE expires_at<=? OR revoked_at IS NOT NULL)",now());
+  this.#internal().cleanup();
   await this.refreshContentAlarm();
  }
  async grant(actor,recipientId){
@@ -358,6 +292,7 @@ export class FreeSocialMemory extends DurableObject{
   this.checkOwner(actor);verifyTokenHash(tokenHash);
   if(!Number.isSafeInteger(expiresAt)||expiresAt<=now()||expiresAt>now()+30*86400000)
    throw Error('INVALID_EXPIRY');
+  if(this.#internal().exists(tokenHash))throw Error('SHARE_KEY_CONFLICT');
   this.sql.exec('INSERT INTO shares(token_hash,expires_at,revoked_at) VALUES (?,?,NULL)',tokenHash,expiresAt);
   return response(true,{expiresAt});
  }

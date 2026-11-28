@@ -4,12 +4,13 @@ import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {secureAccountMenuTransitions,connectExistingStorageBackup,removeInactiveAccessibilityMenu,removeInactiveDisplayMenu,keepOnlyFunctionalFreeMenu} from './f5-account-switch-guard.mjs';
 import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
+import {installMyPeopleMenu} from './f5-my-people-menu.mjs';
 const source=readFileSync('r20-dev/free-10m-f5/generated/approved-menu-original.mjs','utf8');
 const {verifiedPublicScripts}=await import('./generated/public-template-map.mjs');
 const scriptPath=verifiedPublicScripts['/__clean/menu-integration.mjs'];
 assert.match(scriptPath||'',/^\/__talera_free\/f5scripts\/[a-f0-9]{64}\.mjs$/);
 const served=readFileSync(path.join('r20-dev/free-10m-delivery/public',scriptPath.slice(1)),'utf8');
-assert.equal(served,localizeApprovedMenu(keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(source)))))),
+assert.equal(served,installMyPeopleMenu(localizeApprovedMenu(keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(source))))))),
  'Original menu must preserve auth, backup and controls while hiding only unimplemented or redundant options');
 assert.ok(source.includes("option('accessibility'")&&source.includes("case 'accessibility':"),'Original menu source still has placeholder; verify minimal change');
 assert.ok(!served.includes("option('accessibility'")&&!served.includes("case 'accessibility':")&&!served.includes("accessibility:'Toegankelijkheid'")&&!served.includes("'accessibility','display'"),'No Accessibility menu, screen, heading or deep-link remains');
@@ -18,10 +19,11 @@ assert.ok(served.includes("option('language'")&&served.includes("option('storage
 
 assert.equal((served.match(/function taleraCleanFreeMenu\(\)/g)||[]).length,1,
  'Exactly one menu cleanup is injected into existing render cycle');
-for(const action of ["prune('people')","prune('shared')","prune('subscription')",
+for(const action of ["prune('shared')","prune('subscription')",
  "prune('forgot')","prune('privacy')",
  "body.querySelector('form[data-form=\"privacy\"]')?.remove()"])
  assert.ok(served.includes(action),'Missing non-functional/duplicate-menu protection: '+action);
+assert.ok(!served.includes("prune('people')")&&served.includes('talera-my-people-mount'),'Only functional Mijn mensen is now restored');
 assert.ok(served.includes("if(active==='help')")&&
  served.includes("prune('privacy')"),
  'Help keeps introduction link but loses redundant privacy entry');

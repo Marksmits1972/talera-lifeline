@@ -3,7 +3,10 @@ import {localizeEmbeddedPlayer} from './f5-embed-language-build.mjs';
 import {centralizeCoreLanguage} from './f5-core-language-build.mjs';
 import {installMemoryLocationStore,installMemoryLocationEditor,memoryLocationSharedSource,memoryLocationCountryCodes} from './f5-memory-location-build.mjs';
 import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
+import {installInternalPresentation} from './f5-internal-presentation-build.mjs';
 import {installVoiceOrb} from './f5-voice-orb-build.mjs';
+import {installMyPeopleMenu} from './f5-my-people-menu.mjs';
+import {installInternalSend} from './f5-internal-share-build.mjs';
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
@@ -2192,6 +2195,7 @@ for(const [route,filename] of Object.entries(routes)){
  html=localizeCore(html,route);
  if(route==='/present')html=installOrdinaryPhotoPause(html);
  html=installVoiceOrb(html,route);
+ html=installInternalPresentation(html,route);
  const hash=sha(html),file=hash+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;
@@ -2269,7 +2273,7 @@ for(const name of paths){
  let shipped=first.body;
  if(name==='/__clean/menu-integration.mjs'){
    writeFileSync(path.join(generated,'approved-menu-original.mjs'),first.body);
-   shipped=localizeApprovedMenu(keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body))))));
+   shipped=installMyPeopleMenu(localizeApprovedMenu(keepOnlyFunctionalFreeMenu(removeInactiveDisplayMenu(removeInactiveAccessibilityMenu(connectExistingStorageBackup(secureAccountMenuTransitions(first.body)))))));
  }
  if(name==='/__clean/ui-integration.mjs'){
    // The original author-owned WhatsApp action treats a missing previous
@@ -2759,6 +2763,7 @@ async function taleraVerifiedGuestShareMime(item,original,position){
 
    // Avoid mistaken status after a completed invite; the spinner is owned
    // by the existing ShareController.state preparing.
+   shipped=installInternalSend(shipped);
 
  }
  const filename=sha(shipped)+'.'+ext;

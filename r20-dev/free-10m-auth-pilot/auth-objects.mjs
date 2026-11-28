@@ -6,11 +6,13 @@ import {validAccountId,validEmail,validHandle,validDisplay,passwordHash,safeEqua
 import {validatedDate} from '../free-10m-delivery/free-account-router.mjs';
 
 import {storedTransferSignal,expireTransferSignaling} from '../free-10m-f5/f5-transfer-signal.mjs';
+import {storedPeopleCommand,expirePeopleInvites} from '../free-10m-f5/f5-people-link.mjs';
 
 export class FreeAuthAccount extends DurableObject {
  // One short-lived pairing; no account mutation or media relay.
  transferSignal(session,command){return storedTransferSignal(this.ctx.storage,session,command)}
- alarm(){return expireTransferSignaling(this.ctx.storage)}
+ peopleCommand(command){return storedPeopleCommand(this.ctx.storage,command)}
+ async alarm(){await expireTransferSignaling(this.ctx.storage);await expirePeopleInvites(this.ctx.storage)}
  async create(record){
   validAccountId(record?.id);
   if(typeof record?.email!=='string'||!record.email.includes('@')||

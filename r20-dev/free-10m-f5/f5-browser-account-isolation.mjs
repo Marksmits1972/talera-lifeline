@@ -2196,7 +2196,7 @@ try{
    if(/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(new URL(r.url()).pathname)&&
       r.request().method()==='POST'){
      const data=await r.json().catch(()=>({}));
-     createdLinks.push({status:r.status(),...data});
+     if(r.status()===200&&data.id&&data.link)createdLinks.push({status:r.status(),...data});
    }
  });
  try{

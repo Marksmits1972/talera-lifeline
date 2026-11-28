@@ -174,7 +174,7 @@ export function installLocationQueueWrites(html){
  // closure on some screens. Remove only the derived task, atomically with
  // the existing deletion; never change the original deletion result.
  const deleteMarker='stories.'+'delete(id);';
- if(html.split(deleteMarker).length>2)throw Error('LOCATION_QUEUE_DELETE_SOURCE_DRIFT');
+ if(html.split(deleteMarker).length>3)throw Error('LOCATION_QUEUE_DELETE_SOURCE_DRIFT');
  const patch=`(()=>{const key='talera-location-work-index-v1',ignore=e=>{e.preventDefault();e.stopPropagation()};
  const r=files.get(key);r.onerror=e=>{ignore(e);files.delete(key).onerror=ignore};
  r.onsuccess=()=>{const state=r.result?.blob;if(state?.version!=='offline-locality-world-v2'||!Array.isArray(state.items))return;
@@ -183,7 +183,7 @@ export function installLocationQueueWrites(html){
  state.items=state.items.filter(e=>e.story!==id);if(state.lease?.story===id)state.lease=null;state.count=count.result;
  files.put({key,blob:state}).onerror=e=>{ignore(e);files.delete(key).onerror=ignore};
  };};})();`;
- return html.replace(deleteMarker,deleteMarker+patch);
+ return html.replaceAll(deleteMarker,deleteMarker+patch);
 }
 export function nextLocationWork(state,now=Date.now()){
  if(state.lease&&state.lease.until>now)return {at:state.lease.until};

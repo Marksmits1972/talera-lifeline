@@ -1188,12 +1188,11 @@ async function publicPage(request,env){
     // Locked WhatsApp design-cleanup baseline: no visible UI or presentation
     // amendments. Only server-verified private local storage and saved cue
     // media-ID reconciliation may rewrite the original approved markup.
-    const stableEditedCues=pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped),editReturnBrowserSources.editorLibrary.poster),editReturnBrowserSources.editorLibrary):scoped;
+    const stableEditedCues=installLocationQueueWrites(pathname==='/tell'?preserveOriginalMediaIdsOnEdit(retainEditorCanonicalMediaIds(alignEditedNarrationCueRefs(scoped),editReturnBrowserSources.editorLibrary.poster),editReturnBrowserSources.editorLibrary):scoped);
     // Keep the editor's preview silent from the FIRST frame, even before
     // the record panel is visible. The original present/player video round
     // with sound after narration is untouched.
-    const locationIndexed=installLocationQueueWrites(stableEditedCues);
-    const silenced=pathname==='/tell'?restoreEditorVideoCover(muteEditorOnlyVideo(locationIndexed)):locationIndexed;
+    const silenced=pathname==='/tell'?restoreEditorVideoCover(muteEditorOnlyVideo(stableEditedCues)):stableEditedCues;
     const editReturnHtml=patchAuthenticatedEditReturn(silenced,pathname,editReturnAccountScope,editReturnBrowserSources);
     const threeTabHome=homeScreen?evenlySpaceThreeHomeTabs(editReturnHtml):editReturnHtml;
     const converted=await assetizeHtml(threeTabHome,new Set([...approvedAssets,...languageAssets]));

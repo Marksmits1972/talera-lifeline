@@ -236,17 +236,22 @@ backupRegression: try{
      const row=await window.TaleraMemories.get(id);
      return row?.items?.[0]?.capturePlace?.city===expected.city;
     },{id:old.id,expected},{timeout:20000});
-    const queued=await worldPage.evaluate(async ({id,key})=>{
+    const readQueue=()=>worldPage.evaluate(async ({id,key})=>{
      const row=await window.TaleraMemories.get(id),file=await window.TaleraMemories.blob(key);
      const names=await indexedDB.databases(),name=names.find(x=>/^talera-free-local-[a-f0-9]{32}-v1$/.test(x.name))?.name;
      if(!name)throw Error('No account DB');
      const db=await new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
      try{
       const state=await new Promise((resolve,reject)=>{const r=db.transaction('files','readonly').objectStore('files').get('talera-location-work-index-v1');r.onsuccess=()=>resolve(r.result?.blob);r.onerror=()=>reject(r.error)});
-      return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await file.arrayBuffer())],version:db.version,pending:state?.items?.length,lease:state?.lease};
+      return {id:row.id,key:row.items[0].key,bytes:[...new Uint8Array(await file.arrayBuffer())],version:db.version,pending:state?.items?.length,pendingKeys:state?.items?.map(e=>({key:e.key,attempts:e.attempts,at:e.at})),lease:state?.lease};
      }finally{db.close()}
     },old);
-    assert.deepEqual(queued,{id:old.id,key:old.key,bytes:actual.bytes,version:1,pending:0,lease:null});
+    // A separate stale/deleted item may still be in the existing scheduler's
+    // next 250ms turn. Require the whole persistent queue to settle, not only
+    // the UI city, and fail with exact pending IDs if it never settles.
+    let queued=await readQueue();
+    for(let i=0;i<40&&(queued.pending!==0||queued.lease);i++){await new Promise(r=>setTimeout(r,250));queued=await readQueue()}
+    assert.deepEqual(queued,{id:old.id,key:old.key,bytes:actual.bytes,version:1,pending:0,pendingKeys:[],lease:null});
     assert.equal(calls.length,1,'Existing country-only photo must use the same already-loaded group, no repeated download');
     console.log('TALERA_LOCATION_INDEX_EXISTING_STORY_AND_ORIGINAL_PASS',JSON.stringify({webkit:webkitPickerOnly,version:queued.version,pending:queued.pending,originalBytesPreserved:true}));
     await worldPage.evaluate(id=>window.TaleraMemories.remove(id),old.id);

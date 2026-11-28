@@ -211,6 +211,110 @@ async function saveSyntheticPhoto(page,n){
      dbs:(await indexedDB.databases()).map(x=>x.name)};
  },{png:onePixelPng,n});
 }
+// Run the requested guest change before unrelated UI regressions; same Worker,
+// same browser engine and actual packaged TALERA presenter, isolated synthetic owner.
+async function verifyCompactWhatsAppFirst(browser){
+ const owner={...users[0],email:'f5-compact-'+testKey+'@example.invalid',username:'f5compact'+testKey,
+  displayName:'F5 synthetic compact guest'};
+ const ownerId=await createUser(owner,7);
+ const ownerContext=await browser.newContext({...devices['iPhone 13'],locale:'nl-NL',
+  extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.87'}});
+ const guestContext=await browser.newContext({...devices['iPhone 13'],locale:'nl-NL',
+  extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.88'}});
+ const crawler=await browser.newContext({extraHTTPHeaders:{'x-talera-f5-key':gate}});
+ try{
+  const page=await ownerContext.newPage();
+  await page.goto(origin+'/present',{waitUntil:'domcontentloaded'});
+  await waitForLibrary(page);
+  const recoveryWasChecked=passwordRecoveryUiChecked;
+  try{
+   passwordRecoveryUiChecked=true; // Existing full suite independently checks recovery.
+   assert.equal(await login(page,owner),ownerId);
+  }finally{passwordRecoveryUiChecked=recoveryWasChecked}
+  const memory=await saveSyntheticPhoto(page,99);
+  await page.goto(origin+'/present?memory='+encodeURIComponent(memory.id),{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(id=>window.__taleraTimelineRuntime?.currentMemory?.()?.storyId===id,memory.id,{timeout:20000});
+  await page.locator('#talera-clean-social [data-action=share]').waitFor({timeout:15000});
+  const prepare=async consent=>{
+   await page.locator('#talera-clean-social [data-action=share]').click();
+   const expiry=page.locator('#talera-clean-expiry');
+   assert.deepEqual(await expiry.locator('option').evaluateAll(o=>o.map(x=>Number(x.value))),[1,24,168]);
+   await expiry.selectOption('168');
+   await page.locator('#talera-clean-overlay [data-action=message-standard]').click();
+   await page.locator('#talera-clean-preview-photo').setChecked(consent);
+   await page.locator('#talera-clean-consent').check();
+   const issuedPromise=page.waitForResponse(r=>r.request().method()==='POST'&&/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(new URL(r.url()).pathname));
+   const manifestPromise=page.waitForResponse(r=>r.request().method()==='POST'&&/^\/api\/shares\/[a-f0-9]{64}\/manifest$/.test(new URL(r.url()).pathname),{timeout:40000});
+   await page.locator('#talera-clean-overlay [data-action=prepare]').click();
+   const issuedResponse=await issuedPromise;
+   assert.equal(issuedResponse.status(),200);
+   assert.equal((await manifestPromise).status(),200);
+   const issued=await issuedResponse.json();
+   await page.waitForFunction(()=>!!document.querySelector('#talera-clean-overlay [data-action=send]:not([disabled])'),null,{timeout:30000});
+   assert.ok(Math.abs(issued.expiresAt-Date.now()-168*3600000)<60000);
+   return {issued,sharePath:new URL(issuedResponse.url()).pathname};
+  };
+  const {issued,sharePath}=await prepare(true);
+  assert.equal(await page.evaluate(async p=>(await fetch(p,{method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json'},body:JSON.stringify({consent:true,hours:720})})).status,sharePath),400);
+  const before=await crawler.request.get(issued.link);
+  assert.equal(before.status(),200);
+  const html=await before.text();
+  assert.match(html,/<meta property="og:title" content="synthetic ACCOUNT ISOLATION 99">/);
+  assert.match(html,/<meta property="og:site_name" content="TALERA">/);
+  assert.match(html,/<meta name="twitter:card" content="summary">/);
+  assert.match(html,/<meta property="og:image:width" content="512">/);
+  assert.ok(!html.includes('Local-only imaginary image'));
+  const preview=await crawler.request.get(issued.link+'/preview');
+  assert.equal(preview.status(),200);
+  assert.equal(preview.headers()['content-type'],'image/jpeg');
+  const previewBytes=await preview.body();
+  assert.ok(previewBytes.length>100&&previewBytes.length<=131072);
+  assert.equal((await crawler.request.head(issued.link+'/preview')).status(),200);
+  assert.equal((await crawler.request.head(issued.link)).status(),200);
+  assert.equal((await crawler.request.get(issued.link+'/media/0/0')).status(),404);
+  await page.evaluate(()=>{
+   Object.defineProperty(navigator,'canShare',{configurable:true,value:data=>typeof data?.text==='string'&&!Object.hasOwn(data,'files')});
+   Object.defineProperty(navigator,'share',{configurable:true,value:data=>{window.__compactSharePayload=data;return Promise.resolve()}});
+  });
+  await page.locator('#talera-clean-overlay [data-action=send]').click();
+  const payload=await page.evaluate(()=>window.__compactSharePayload);
+  assert.deepEqual(Object.keys(payload),['text']);
+  assert.equal(payload.text,'Ik kwam deze herinnering tegen en moest aan je denken.\n\n'+issued.link);
+  const guest=await guestContext.newPage();
+  const accepted=guest.waitForResponse(r=>r.url()===issued.link&&r.status()===200&&
+   r.headers()['x-talera-free-f5']==='original-presentation-one-memory-capability',{timeout:25000});
+  await guest.goto(issued.link,{waitUntil:'domcontentloaded'}).catch(e=>{
+   if(!/navigation|aborted|interrupted/i.test(String(e)))throw e;
+  });
+  await accepted;
+  await guest.waitForFunction(async()=>{
+   const rows=await window.TaleraMemories?.list?.();
+   return rows?.length===1&&window.__taleraTimelineRuntime?.currentMemory?.()?._taleraLocal;
+  },null,{timeout:25000});
+  const received=await guest.evaluate(async()=>{
+   const row=(await window.TaleraMemories.list())[0],blob=await window.TaleraMemories.blob(row.items[0].key);
+   return {title:row.title,text:row.text,bytes:Array.from(new Uint8Array(await blob.arrayBuffer()))};
+  });
+  assert.equal(received.title,'synthetic ACCOUNT ISOLATION 99');
+  assert.equal(received.text,'Local-only imaginary image');
+  assert.deepEqual(received.bytes,Array.from(Buffer.from(onePixelPng,'base64')));
+  assert.equal((await crawler.request.get(issued.link)).status(),403);
+  const revoke=async link=>assert.equal(await page.evaluate(async id=>(await fetch('/api/shares/'+id+'/revoke',{method:'POST',credentials:'same-origin'})).status,link.id),200);
+  await revoke(issued);
+  assert.equal((await crawler.request.get(issued.link+'/preview')).status(),404);
+  const no=await prepare(false);
+  const noPage=await crawler.request.get(no.issued.link);
+  assert.equal(noPage.status(),200);
+  const noHtml=await noPage.text();
+  assert.ok(noHtml.includes(origin+'/pwa-512.png'));
+  assert.ok(!noHtml.includes('synthetic ACCOUNT ISOLATION 99'));
+  assert.equal((await crawler.request.get(no.issued.link+'/preview')).status(),404);
+  await revoke(no.issued);
+  console.log('TALERA_COMPACT_WHATSAPP_ACTUAL_SAME_APP_TARGETED_PASS',JSON.stringify({duration:168,titleConsent:true,previewJpeg:true,attachment:false,caption:true,firstBrowser:true,originalPhotoBytes:true,revocation:true,logoFallback:true,realIPhoneAccepted:false}));
+ }finally{await Promise.all([ownerContext.close(),guestContext.close(),crawler.close()])}
+}
+
 // Real DOM layout check on the SAME /tell page and synthetic account only.
 // Verify original UI controls and photo IDs are unchanged while the *existing*
 // tags box is rendered below the original photo grid, never cloned.
@@ -409,6 +513,7 @@ try{
    JSON.stringify({routes:2,examples:0,privateRecordsAccessed:false,realIphoneAccepted:false}));
  const ids=await Promise.all(users.map(createUser));
  browser=await chromium.launch({headless:true});
+ await verifyCompactWhatsAppFirst(browser);
  const context=await browser.newContext({
    ...devices['iPhone 13'],locale:'nl-NL',serviceWorkers:'allow',
    extraHTTPHeaders:{'x-talera-f5-key':gate,'cf-connecting-ip':'192.0.2.73'}

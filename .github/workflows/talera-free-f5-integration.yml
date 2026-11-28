@@ -178,7 +178,7 @@ jobs:
 
   f5_candidate_package:
     name: Build and archive the exact TALERA Free candidate once
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-bounded-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -243,7 +243,7 @@ jobs:
   f5_actual_registration_button:
     name: Diagnose real TALERA account confirmation button in SAME app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-bounded-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     permissions:
@@ -296,7 +296,7 @@ jobs:
   f5_isolated_local:
     name: F5 - real local Worker, seven DOs, existing PWA anonymous shell
     needs: f5_candidate_package
-    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-bounded-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127') }}
+    if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     env:
@@ -1190,7 +1190,7 @@ jobs:
 
   publish_existing_empty_20261118:
     name: Publish exact GREEN Free candidate on SAME approved QA origin
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-bounded-location-exact-green-20261128' }}
+    if: ${{ github.event_name == 'push' && github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message == 'qa-deploy-TALERA-free-compact-location-exact-green-20261128' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     concurrency:
@@ -1204,7 +1204,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       F5_STAGE_NAME: talera-free-f5-storage-qa-20261109
       F5_STAGE_HOST: talera-free-f5-storage-qa-20261109.mark-a39.workers.dev
-      F5_EXPECTED_LIVE_VERSION: b2da4b54-fe25-4d47-ab7a-7134f1427cda
+      F5_EXPECTED_LIVE_VERSION: 1f179198-56d8-415b-8b71-92e840039ab4
       F5_OFFICIAL_RESTORE_VERSION: a35fd485-6e7b-4786-8763-eb996294aa3c
     steps:
       - uses: actions/checkout@v4
@@ -1231,19 +1231,21 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF_NAME" = feature/free-f5-library-boundary-20261117
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse HEAD^1)" = d672d45144d814a7e05264e0647a661e91d5d911
+          test "$(git rev-parse HEAD^1)" = 8fdde80c0257aad6e39b859bbf00d44b4db244b4
           test "$(git diff --name-only HEAD^1 HEAD)" = .github/workflows/talera-free-f5-integration.yml
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-public-assets.mjs)" = a0e8f40de5bd3b38ccdfd57ee84a55d9ce246000
-          # Release only the immutable, independently tested location integration.
-          git checkout --detach d672d45144d814a7e05264e0647a661e91d5d911
-          test "$(git rev-parse HEAD)" = d672d45144d814a7e05264e0647a661e91d5d911
-          test "$(git rev-parse HEAD^)" = a4c890a248e95cc91ea6b50f234eb7d1703e73be
-          test "$(git diff --name-only HEAD^ HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-capture-place-enrichment.mjs r20-dev/free-10m-f5/f5-memory-location.mjs r20-dev/free-10m-f5/f5-offline-locality.test.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)"
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-capture-place-enrichment.mjs)" = def0f41d552e98ff9b009fec51dfa13249a4332a
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-memory-location.mjs)" = cb5acea3d3e85d83f191509f574265348d45f629
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-offline-locality.test.mjs)" = b96eb66759dd1b4844b2d19e6c01748a10a4da2b
-          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)" = 4f703b806eb5dd70337e21de2d9cca27ec338cb5
-          echo TALERA_RELEASE_EXACT_BOUNDED_LOCATION_SOURCE_VERIFIED d672d45144d814a7e05264e0647a661e91d5d911
+          # Only five files changed versus the previously published software branch:
+          # presentation geometry/labels and their two exact tests.
+          git checkout --detach 8fdde80c0257aad6e39b859bbf00d44b4db244b4
+          test "$(git rev-parse HEAD)" = 8fdde80c0257aad6e39b859bbf00d44b4db244b4
+          test "$(git rev-parse HEAD^)" = fe7a4e9551af271f356f6d6fa1bc8c1d59455384
+          test "$(git rev-parse HEAD^^)" = e569dd7de0e7c421eb018ce4249ee8f47d910680
+          test "$(git diff --name-only e569dd7de0e7c421eb018ce4249ee8f47d910680 HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-capture-place-presentation.browser.js r20-dev/free-10m-f5/f5-language-catalog.mjs r20-dev/free-10m-f5/f5-memory-location.test.mjs r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-capture-place-presentation.browser.js)" = e29b15041d01414569b211b8ab86fdc893911969
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-language-catalog.mjs)" = e12b5da85ff71251a114aca1b26a06a5576b33fe
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-memory-location.test.mjs)" = 6ea8921d66849721c9c2576f97a8e472c5b14ccb
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs)" = 0e796350e7f8a7da53a9b3dd93c78bdb7c81f91b
+          test "$(git rev-parse HEAD:r20-dev/free-10m-f5/f5-public-assets.mjs)" = 371378dd21f3ca485b30bc96dd9fc6a41e86fee0
+          echo TALERA_RELEASE_EXACT_COMPACT_LOCATION_SOURCE_VERIFIED 8fdde80c0257aad6e39b859bbf00d44b4db244b4
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           const root='https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/';
@@ -1252,7 +1254,7 @@ jobs:
               Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(25000)});
             assert.equal(r.status,200);return r.json();
           };
-          const id='46118887045',sha='d672d45144d814a7e05264e0647a661e91d5d911',runSha='d672d45144d814a7e05264e0647a661e91d5d911',digest='6f4923eb6cc454db3f9b9bafa9d0a972bfbf9c0e2d593b2fe4d3730252450468';
+          const id='46121875739',sha='8fdde80c0257aad6e39b859bbf00d44b4db244b4',runSha='8fdde80c0257aad6e39b859bbf00d44b4db244b4',digest='d218ae65d93aa943474cde6ca3c4d0ec1e134f3d2d2b2d210cb77a0dcddd6a2b';
           const mainName='F5 - real local Worker, seven DOs, existing PWA anonymous shell';
           const pickerName='Audit original local story delete method in same TALERA code';
           const packageName='Build and archive the exact TALERA Free candidate once';
@@ -1281,7 +1283,7 @@ jobs:
           const artifacts=await get(id+'/artifacts?name=talera-free-f5-candidate-package&per_page=100');
           assert.equal(artifacts.artifacts.length,1);
           const artifact=artifacts.artifacts[0];
-          assert.equal(String(artifact.id),'15252902564');assert.equal(artifact.digest,'sha256:9e66c6bbcc955cf756f6280ffb5add095ff11be1a7243bf57113fcb21a72cc85');assert.equal(artifact.expired,false);
+          assert.equal(String(artifact.id),'15254083320');assert.equal(artifact.digest,'sha256:fce0bdc134515c5e8d7861a7e92878534658b394970521c3ad99f0b59225ea9f');assert.equal(artifact.expired,false);
           assert.equal(artifact.workflow_run?.head_sha,runSha);assert.equal(String(artifact.workflow_run?.id),id);
           const readLog=async job=>{
             const r=await fetch(root.replace('/runs/','/jobs/')+job.id+'/logs',{
@@ -1358,6 +1360,10 @@ jobs:
             assert.ok(gpsProof.some(p=>p.webkit===(engine==='webkit')&&p.place==='Mijnheerkens'&&p.bytes===20567157&&p.networkRequests===1&&p.originalBytesPreserved===true),'Missing exact world GPS and original byte proof '+engine);
             const indexProof=rows.filter(line=>line.includes('Z TALERA_LOCATION_INDEX_EXISTING_STORY_AND_ORIGINAL_PASS ')).map(line=>JSON.parse(line.slice(line.indexOf('Z TALERA_LOCATION_INDEX_EXISTING_STORY_AND_ORIGINAL_PASS ')+('Z TALERA_LOCATION_INDEX_EXISTING_STORY_AND_ORIGINAL_PASS ').length)));
             assert.ok(indexProof.some(p=>p.webkit===(engine==='webkit')&&p.version===1&&p.pending===0&&p.originalBytesPreserved===true),'Missing actual existing-library location index and original-byte proof '+engine);
+            const compactMarker='Z TALERA_COMPACT_CAPTURE_PLACE_NO_CREDIT_NO_OVERLAP_PASS ';
+            const compactProof=rows.filter(line=>line.includes(compactMarker)).map(line=>JSON.parse(line.slice(line.indexOf(compactMarker)+compactMarker.length)));
+            assert.ok(compactProof.some(p=>p.engine===engine&&p.storedLocationsAndOriginalsPreserved===true&&p.proof?.length===12&&p.proof.every(g=>g.labelVisible&&g.textWithin&&g.belowTitle&&g.right<=g.dockLeft-7&&g.flagWidth===16&&g.font==='12px')&&p.proof.some(g=>g.width===320&&g.index===0&&g.lines>=2)),'Missing actual compact location layout proof '+engine);
+
           }
           console.log('TALERA_EXACT_WORLD_PLACE_INDEXEDDB_BOTH_BROWSERS_VERIFIED');
           for(const name of ['Verify library original bytes and voice cue IDs before any backup or restore',
@@ -1373,7 +1379,7 @@ jobs:
             'Browser verify permanent original media IDs survive editor reorder and edit'])
             assert.equal(main.steps.find(s=>s.name===name)?.conclusion,'success');
           assert.equal(jobs.find(j=>j.name===pickerName)?.steps.find(s=>s.name==='Real WebKit photo and video picker with prior shared originals')?.conclusion,'success');
-          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_46118887045');
+          console.log('EXACT_FULL_GREEN_ORIGINAL_PAYLOAD_CANDIDATE_VERIFIED_46121875739');
           NODE
       - name: Verify existing 18 account and media bindings, exact live version, official recovery
         run: |
@@ -1425,17 +1431,17 @@ jobs:
         with:
           name: talera-free-f5-candidate-package
           github-token: ${{ github.token }}
-          run-id: 46118887045
+          run-id: 46121875739
           path: ${{ runner.temp }}/talera-candidate-package
       - name: Verify source and tested SHA256 before unpacking for release
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(cat "$out/source.sha")" = "d672d45144d814a7e05264e0647a661e91d5d911"
-          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "6f4923eb6cc454db3f9b9bafa9d0a972bfbf9c0e2d593b2fe4d3730252450468"
+          test "$(cat "$out/source.sha")" = "8fdde80c0257aad6e39b859bbf00d44b4db244b4"
+          test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "d218ae65d93aa943474cde6ca3c4d0ec1e134f3d2d2b2d210cb77a0dcddd6a2b"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=6f4923eb6cc454db3f9b9bafa9d0a972bfbf9c0e2d593b2fe4d3730252450468"
+          echo "TALERA_RELEASE_USES_EXACT_TESTED_CANDIDATE_SHA256=d218ae65d93aa943474cde6ca3c4d0ec1e134f3d2d2b2d210cb77a0dcddd6a2b"
       - name: Verify exact offline locality data and attribution software before release
         run: |
           set -euo pipefail
@@ -1486,6 +1492,13 @@ jobs:
           assert.equal(languageAssets.length,1);
           const lang=fs.readFileSync(base+'/__talera_free/assets/'+languageAssets[0]);
           assert.equal(hash(lang)+'.js',languageAssets[0]);assert.equal(lang.toString().split('"menu.help.geonamesCredit"').length-1,5);
+          for(const k of ['core.present.captureNear','core.present.captureOfflineNear']){
+            assert.equal(lang.toString().split('"'+k+'":"{city}"').length-1,5,'All presentation labels must be compact in five languages');
+          }
+          const compactPresent=fs.readFileSync(base+referencePages['/present'],'utf8');
+          for(const marker of ['max-width:min(100%,var(--talera-capture-available,100%))','white-space:normal;overflow-wrap:anywhere',"document.getElementById('talera-clean-social')","row.style.setProperty('--talera-capture-available',available)"])assert.ok(compactPresent.includes(marker),'Exact compact location layout missing '+marker);
+          console.log('TALERA_EXACT_COMPACT_CAPTURE_LOCATION_PACKAGE_AND_CREDIT_VERIFIED');
+
           for(const route of ['/mijn-leven','/present','/tell']){
             const page=fs.readFileSync(base+referencePages[route],'utf8');
             for(const v of ['createOfflineLocalityResolver','offline-locality-v1','offline-country-v1',path+'.bin'])assert.ok(page.includes(v),'Missing locality '+route+' '+v);
@@ -1614,8 +1627,8 @@ jobs:
       - name: Verify exact previously completed backup and actual render regression source
         run: |
           set -euo pipefail
-          git diff --exit-code d672d45144d814a7e05264e0647a661e91d5d911 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
-          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_46118887045'
+          git diff --exit-code 8fdde80c0257aad6e39b859bbf00d44b4db244b4 HEAD -- r20-dev/ r19-dev/ package.json package-lock.json
+          echo 'ALL_REQUIRED_EXACT_TALERA_REGRESSION_COVERAGE_COMPLETE_FROM_VERIFIED_RUN_46121875739'
       - name: Verify actual private device-transfer signaling and retained diagnosis in the same local Worker
         run: |
           set -euo pipefail
@@ -2072,12 +2085,12 @@ jobs:
           NODE
       - name: Restore previous TALERA version if deploy or postdeploy verification fails
         if: ${{ failure() && (steps.deployed.outcome == 'success' || steps.deployed.outcome == 'failure') }}
-        run: npx --no-install wrangler rollback "$F5_EXPECTED_LIVE_VERSION" --name "$F5_STAGE_NAME" --message "Restore exact previous TALERA QA after failed bounded location release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
+        run: npx --no-install wrangler rollback "$F5_EXPECTED_LIVE_VERSION" --name "$F5_STAGE_NAME" --message "Restore exact previous TALERA QA after failed compact location release" --config r20-dev/free-10m-f5/wrangler.owner-empty.generated.jsonc
 
   diagnose_owner_local_delete_source_20261119:
     name: Audit original local story delete method in same TALERA code
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-bounded-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -2245,7 +2258,7 @@ jobs:
   f5_owner_reset_exact_home_smoke:
     name: Verify in-app deletion on exact generated TALERA Home, no other app
     needs: f5_candidate_package
-    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-bounded-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
+    if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-presentation-only-video-timing-exact-green-20261128' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-location-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     env:

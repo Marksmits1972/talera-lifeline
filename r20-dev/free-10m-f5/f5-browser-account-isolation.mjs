@@ -2089,6 +2089,9 @@ try{
  await people.locator('[data-people-import="vcard"]').setInputFiles({name:'synthetic.vcf',mimeType:'text/vcard',buffer:Buffer.from(vcard)});
  await people.getByLabel('Contact file selected',{exact:true}).check();
  await people.getByRole('button',{name:'Selectie toevoegen',exact:true}).click();
+ // Wait for the asynchronous IndexedDB import and removal of the review.
+ // The selected label is already visible in the review before the commit.
+ await people.getByLabel('Contact file selected',{exact:true}).waitFor({state:'detached'});
  await people.getByText('Contact file selected',{exact:true}).waitFor();
  assert.equal(await people.getByText('Contact file unselected',{exact:true}).count(),0);
  assert.equal(await people.getByText('NOT_STORED').count(),0);

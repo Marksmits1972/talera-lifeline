@@ -90,9 +90,9 @@ export async function openReceivedStore(account,{isCurrent=()=>true,indexedDB=gl
 }
 // "entry" originates from the authenticated inbox, never a guest link.
 // Transport functions are injected for deterministic failure-path testing.
-export async function receiveInternalShare(entry,{store,fetchContent,fetchPart,acknowledge,isCurrent=()=>true,now=()=>Date.now()}){
+export async function receiveInternalShare(entry,{store:receivedStore,fetchContent,fetchPart,acknowledge,isCurrent=()=>true,now=()=>Date.now()}){
  validEntry(entry);checkCurrent(isCurrent);
- let record=await store.get(entry.key),descriptors;
+ let record=await receivedStore.get(entry.key),descriptors;
  checkCurrent(isCurrent);
  if(record?.state==='ready'){
   requireValid(record.sender===entry.sender&&record.expiresAt===entry.expiresAt,'RECEIVED_CONFLICT');
@@ -101,35 +101,35 @@ export async function receiveInternalShare(entry,{store,fetchContent,fetchPart,a
   requireValid(entry.expiresAt>now(),'RECEIVED_EXPIRED');
   const content=await fetchContent(entry.key);checkCurrent(isCurrent);
   descriptors=await validateContent(content);checkCurrent(isCurrent);
-  record=await store.stage({key:entry.key,sender:entry.sender,senderName:typeof entry.senderName==='string'?entry.senderName.slice(0,120):'',createdAt:entry.createdAt,expiresAt:entry.expiresAt,content});
+  record=await receivedStore.stage({key:entry.key,sender:entry.sender,senderName:typeof entry.senderName==='string'?entry.senderName.slice(0,120):'',createdAt:entry.createdAt,expiresAt:entry.expiresAt,content});
  }
  for(const part of descriptors){
   checkCurrent(isCurrent);
-  let bytes=await store.getPart(record.key,part.id);
+  let bytes=await receivedStore.getPart(record.key,part.id);
   if(await validPart(bytes,part))continue;
   requireValid(record.state!=='ready','RECEIVED_LOCAL_CORRUPT');
   requireValid(record.expiresAt>now(),'RECEIVED_EXPIRED');
   bytes=await fetchPart(record.key,part);checkCurrent(isCurrent);
   requireValid(await validPart(bytes,part),'RECEIVED_PART_HASH');
-  checkCurrent(isCurrent);await store.putPart(record.key,part.id,bytes);
-  const readback=await store.getPart(record.key,part.id);
+  checkCurrent(isCurrent);await receivedStore.putPart(record.key,part.id,bytes);
+  const readback=await receivedStore.getPart(record.key,part.id);
   requireValid(await validPart(readback,part),'RECEIVED_READBACK');
  }
  checkCurrent(isCurrent);
  // A fully committed package is visible locally even if the last network
  // request is lost. A later retry reuses it without downloading media again.
- if(record.state!=='ready')await store.markReady(record.key);
- const ready=await store.get(record.key);
+ if(record.state!=='ready')await receivedStore.markReady(record.key);
+ const ready=await receivedStore.get(record.key);
  requireValid(ready?.state==='ready'&&json(ready.content)===json(record.content),'RECEIVED_READBACK');
  checkCurrent(isCurrent);
  if(ready.receiptPending&&ready.expiresAt>now()){
   try{
    const receipt=await acknowledge(ready.key,ready.content.manifestHash);checkCurrent(isCurrent);
-   if(receipt?.received===true)await store.confirmReceipt(ready.key);
+   if(receipt?.received===true)await receivedStore.confirmReceipt(ready.key);
   }catch(e){checkCurrent(isCurrent);/* local delivery is safe; retry later */}
  }
  checkCurrent(isCurrent);
- return await store.get(record.key);
+ return await receivedStore.get(record.key);
 }
 export function receivedTransport(account,{isCurrent=()=>true,fetch=globalThis.fetch}={}){
  requireValid(is(UUID,account),'ACCOUNT_REQUIRED');

@@ -3,16 +3,16 @@
 import {receiveParts} from './f5-internal-receive.mjs';
 const requireProjection=(ok,code='RECEIVED_UNAVAILABLE')=>{if(!ok)throw Error(code)};
 const projectionHash=async data=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),b=>b.toString(16).padStart(2,'0')).join('');
-export async function makeReceivedProjection(key,store,{isCurrent=()=>true,createUrl=blob=>URL.createObjectURL(blob),revokeUrl=url=>URL.revokeObjectURL(url)}={}){
+export async function makeReceivedProjection(key,receivedStore,{isCurrent=()=>true,createUrl=blob=>URL.createObjectURL(blob),revokeUrl=url=>URL.revokeObjectURL(url)}={}){
  const guard=()=>requireProjection(isCurrent(),'ACCOUNT_CHANGED');
  guard();requireProjection(/^[a-f0-9]{64}$/.test(key));
- const record=await store.get(key);guard();
+ const record=await receivedStore.get(key);guard();
  requireProjection(record?.state==='ready'&&record.key===key);
  const content=record.content,manifest=content?.manifest;
  requireProjection(await projectionHash(new TextEncoder().encode(JSON.stringify(manifest)))===content?.manifestHash,'RECEIVED_MANIFEST_HASH');
  const parts=receiveParts(manifest),byId=new Map(parts.map(p=>[p.id,p])),assets=new Map(),urls=new Set();
  const read=async id=>{
-  guard();const part=byId.get(id),bytes=await store.getPart(key,id);guard();
+  guard();const part=byId.get(id),bytes=await receivedStore.getPart(key,id);guard();
   requireProjection(part&&bytes instanceof Uint8Array&&bytes.byteLength===part.size&&await projectionHash(bytes)===part.hash,'RECEIVED_LOCAL_CORRUPT');guard();return bytes;
  };
  // Confirm all local bytes before a single received frame is exposed.
@@ -44,7 +44,7 @@ export async function makeReceivedProjection(key,store,{isCurrent=()=>true,creat
  };
  const mediaUrl=async id=>{const data=await blob(id);guard();if(!data)return null;const url=createUrl(data);urls.add(url);return url};
  return {library:{list:async()=>{guard();return [row]},get:async id=>{guard();return id===row.id?row:null},blob,mediaUrl,displayUrl:mediaUrl},
-  markSeen:async()=>{guard();await store.markSeen(key);guard()},
-  dispose:()=>{for(const url of urls)revokeUrl(url);urls.clear();store.close()}
+  markSeen:async()=>{guard();await receivedStore.markSeen(key);guard()},
+  dispose:()=>{for(const url of urls)revokeUrl(url);urls.clear();receivedStore.close()}
  };
 }

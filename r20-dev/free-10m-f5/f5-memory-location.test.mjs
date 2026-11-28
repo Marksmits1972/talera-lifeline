@@ -123,7 +123,9 @@ test('country list is local and translated; every new independent location key e
   assert.equal(filterCountryRows(rows,'FR',language).some(x=>x.code==='FR'),true);
   assert.ok(keys.every(k=>languageCatalog[language][k]));
   assert.match(languageCatalog[language]['core.editor.location.nearby'],/\{city\}/);
-  assert.equal(languageCatalog[language]['core.editor.location.nearby'],languageCatalog[language]['core.present.captureOfflineNear']);
+  assert.notEqual(languageCatalog[language]['core.editor.location.nearby'],'{city}','Editor retains approximate-location wording');
+  assert.equal(languageCatalog[language]['core.present.captureNear'],'{city}');
+  assert.equal(languageCatalog[language]['core.present.captureOfflineNear'],'{city}');
  }
  assert.equal(filterCountryRows(localizedCountryRows(codes,'nl'),'belgie','nl')[0].code,'BE');
  assert.equal(localizedCountryRows(codes,'fr').find(x=>x.code==='NL').name,'Pays-Bas');

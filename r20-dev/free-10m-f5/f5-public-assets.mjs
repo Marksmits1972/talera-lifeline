@@ -1256,15 +1256,15 @@ function installCapturePlacePresentation(html){
  const sprite=readFileSync(path.join(here,'f5-capture-flags.png')).toString('base64');
  assert.ok(flags.positions.NL&&sprite.startsWith('iVBORw0KGgo'),'CAPTURE_FLAGS_INVALID');
  const css='<style id="talera-capture-place-css">'+
-  '#talera-capture-place{display:flex;align-items:center;gap:5px;margin-top:3px;max-width:66%;'+
+  '#talera-capture-place{display:flex;align-items:flex-start;gap:5px;margin-top:3px;width:max-content;max-width:min(100%,var(--talera-capture-available,100%));'+
   'font:500 12px/1.25 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#fff;'+
   'text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none}'+
   '#talera-capture-place[hidden],#memoryCaption.talera-v21-title-tracking #talera-capture-place,'+
   'html.talera-direct-memory-entering #talera-capture-place,body.talera-v18-reading #talera-capture-place{display:none!important}'+
   '#talera-capture-place .talera-capture-flag[hidden]{display:none!important}'+
-  '.talera-capture-flag{display:block;flex:0 0 16px;width:16px;height:11px;'+
+  '.talera-capture-flag{display:block;flex:0 0 16px;width:16px;height:11px;margin-top:2px;'+
   'background-repeat:no-repeat;background-image:url(data:image/png;base64,'+sprite+')}'+
-  '.talera-capture-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+  '.talera-capture-label{min-width:0;white-space:normal;overflow-wrap:anywhere}'+
   '</style>';
  const source=readFileSync(path.join(here,'f5-capture-place-presentation.browser.js'),'utf8');
  assert.ok(!source.includes('</script'),'CAPTURE_PLACE_UNSAFE_UI_SOURCE');

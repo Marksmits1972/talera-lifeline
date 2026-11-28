@@ -10,6 +10,27 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
  const flag=document.createElement('span');flag.className='talera-capture-flag';flag.setAttribute('aria-hidden','true');
  const label=document.createElement('span');label.className='talera-capture-label';
  row.append(flag,label);title.after(row);
+ // Measure the existing reaction/share dock, never change its position.
+ // Width updates are event-driven and touch only this decorative row.
+ let dock=null;
+ const layoutObserver=typeof ResizeObserver==='function'?new ResizeObserver(layout):null;
+ layoutObserver?.observe(caption);
+ function layout(){
+  const nextDock=document.getElementById('talera-v12-reactions-bar');
+  if(nextDock!==dock){
+   if(dock)layoutObserver?.unobserve(dock);
+   dock=nextDock;if(dock)layoutObserver?.observe(dock);
+  }
+  if(row.hidden||!row.getClientRects().length)return;
+  const left=row.getBoundingClientRect().left,rect=dock?.getBoundingClientRect();
+  // Reserve an 8 CSS pixel gutter even when the dock is momentarily fading.
+  const available=rect?.width>0&&rect.left>left?Math.max(24,Math.floor(rect.left-left-8))+'px':'100%';
+  if(row.style.getPropertyValue('--talera-capture-available')!==available)
+   row.style.setProperty('--talera-capture-available',available);
+ }
+ window.addEventListener('resize',layout,{passive:true});
+ window.visualViewport?.addEventListener('resize',layout,{passive:true});
+ document.addEventListener('DOMContentLoaded',layout,{once:true});
  let active='',serial=0,queued=false;
  const cache=new Map();
  const hidden=()=>{row.hidden=true;row.removeAttribute('data-location-diagnosis');label.textContent='';flag.hidden=false;flag.style.removeProperty('background-position')};
@@ -92,7 +113,7 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
    let localizedCountry=place.country||place.countryCode||'';if(place.countryCode)try{localizedCountry=new Intl.DisplayNames([locale],{type:'region',fallback:'none'}).of(place.countryCode)||localizedCountry}catch{}
    const locationLabel=place.source==='geonames-locality-v2'
     ?window.TaleraI18n.t('core.present.captureNear',{city:place.city}):place.source==='offline-locality-v1'?window.TaleraI18n.t('core.present.captureOfflineNear',{city:place.city}):place.city;
-   label.textContent=[localizedCountry,locationLabel].filter(Boolean).join(' · ');row.hidden=false;
+   label.textContent=[localizedCountry,locationLabel].filter(Boolean).join(' · ');row.hidden=false;layout();
   });
  }
  function schedule(){if(!queued){queued=true;queueMicrotask(refresh)}}

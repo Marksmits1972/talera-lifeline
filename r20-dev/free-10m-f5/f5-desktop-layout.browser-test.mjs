@@ -245,8 +245,15 @@ export async function verifyDesktopLayout({browser,origin,gate,sid,mobileDevice}
    await loc.click();
    assert.equal(await loc.getAttribute('aria-expanded'),'true');
    assert.equal(await tags.getAttribute('aria-expanded'),'true','Independent existing expansion states are retained');
+   // The existing EXIF inspection repaints the rows asynchronously. Wait
+   // for the three original synthetic PNGs to finish, then prove the actual
+   // last row is actionable (trial click scrolls and retries DOM replacement).
+   await page.waitForFunction(()=>{
+    const rows=[...document.querySelectorAll('.talera-location-tile')];
+    return rows.length===3&&rows.every(r=>r.dataset.locationState!=='pending');
+   });
    const tile=page.locator('.talera-location-edit').last();
-   await tile.scrollIntoViewIfNeeded();
+   await tile.click({trial:true});
    const visible=await tile.evaluate(e=>{
     const r=e.getBoundingClientRect(),main=e.closest('#main').getBoundingClientRect();
     const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);

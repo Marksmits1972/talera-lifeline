@@ -186,13 +186,13 @@ jobs:
     outputs:
       archive_sha256: ${{ steps.package.outputs.sha256 }}
     env:
-      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || github.sha }}
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || '' }}
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || '' }}
           persist-credentials: false
-          fetch-depth: ${{ github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 2 || 1 }}
+          fetch-depth: ${{ github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 2 || 1 }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -201,9 +201,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$F5_EXACT_SOURCE_SHA"
-          if [ "$F5_EXACT_SOURCE_SHA" = "f5a4aec8f99fc9285aa748244ac01bff1cd25930" ]; then
+          if [ "$F5_EXACT_SOURCE_SHA" = "a734049ef851929543d19f6659f2766dea93a2a5" ]; then
             test "$(git rev-parse HEAD^)" = "83648055027121dfb3fac150443d43d189fbf6d4"
-            test "$(git diff --name-only HEAD^ HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
+            test "$(git diff --name-only HEAD^ HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-ordinary-video-isolation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
             echo TALERA_PRESENTATION_ONLY_SOURCE_VERIFIED "$F5_EXACT_SOURCE_SHA"
           fi
           test -z "$(git ls-files r20-dev/free-10m-delivery/public r20-dev/free-10m-delivery/generated r20-dev/free-10m-f5/generated)"
@@ -249,11 +249,11 @@ jobs:
     permissions:
       contents: read
     env:
-      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || github.sha }}
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || '' }}
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -300,11 +300,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 24
     env:
-      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || github.sha }}
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || '' }}
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || '' }}
           fetch-depth: 0 # Required for exact 11-Nov approved restoration commit proof
       - uses: actions/setup-node@v4
         with:
@@ -2071,11 +2071,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
-      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || github.sha }}
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || '' }}
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -2239,11 +2239,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     env:
-      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || github.sha }}
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-fix-20261128' && 'f5a4aec8f99fc9285aa748244ac01bff1cd25930' || '' }}
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-video-timing-20261128' && 'a734049ef851929543d19f6659f2766dea93a2a5' || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

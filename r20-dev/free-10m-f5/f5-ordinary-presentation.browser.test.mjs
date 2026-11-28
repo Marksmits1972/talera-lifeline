@@ -128,7 +128,7 @@ function dominant(p,channel){
   return rgb[channel] > rgb[(channel+1)%3]*1.55 &&
     rgb[channel] > rgb[(channel+2)%3]*1.55;
 }
-const waitIndex=(page,index,timeout=9500)=>page.waitForFunction(index=>
+const waitIndex=(page,index,timeout=15000)=>page.waitForFunction(index=>
   window.__taleraTimelineRuntime?.currentMemory?.()?._photoIndex===index,
   index,{timeout});
 async function load(page,id,count){
@@ -2027,7 +2027,14 @@ async function testTimelineLoupe(){
   assert.equal((await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex)),0);
   const first=await centerPixel(page);
   assert.ok(dominant(first,0),'FIRST PHOTO IS NOT VISIBLE RED: '+JSON.stringify(first));
+  // The actual rendered first photo remains for substantially longer than
+  // the former 2.5 s interval and advances only after the new 10 s interval.
+  const index=()=>page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory()._photoIndex);
+  const observedAt=Date.now();
+  await page.waitForTimeout(6500);
+  assert.equal(await index(),0,'Ordinary rotation must not use the old short interval');
   await waitIndex(page,1);
+  assert.ok(Date.now()-observedAt>=8500,'Automatic photo advanced before ten-second window');
   const second=await centerPixel(page);
   assert.ok(dominant(second,1),'SECOND PHOTO DOES NOT DISPLAY GREEN, DOTS ONLY: '+
     JSON.stringify({first,second}));
@@ -2057,8 +2064,53 @@ async function testTimelineLoupe(){
     throw Error('MANUAL TAP INDEX CHANGED BUT PHOTO NOT BLUE: '+
       JSON.stringify({second,third,diag}).slice(0,12000));
   }
-  await waitIndex(page,0,9000);
+  await waitIndex(page,0,15000);
   assert.equal(await page.evaluate(()=>window.__taleraTimelineRuntime.currentMemory().storyId),plain);
+
+  // Real touch and desktop-style mouse events on the original photo surface.
+  // Hold across the automatic deadline: do not show the next image under a finger.
+  const pauseMarker=page.locator('#talera-ordinary-pause-indicator');
+  const photoPoint=await page.evaluate(()=>{
+    const r=document.getElementById('photoStage').getBoundingClientRect();
+    const c=document.getElementById('memoryCaption').getBoundingClientRect();
+    return {x:Math.round(r.left+r.width*.5),y:Math.round(Math.min(r.top+r.height*.36,c.top-18))};
+  });
+  await page.waitForTimeout(7700);
+  const touch=await ctx.newCDPSession(page);
+  try{
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[photoPoint]});
+    await page.waitForTimeout(1100);
+    assert.equal(await pauseMarker.count(),0,'Hold shorter than two seconds must not pause');
+    assert.equal(await index(),0,'Current photo must stay during the recognition hold');
+    await pauseMarker.waitFor({state:'visible',timeout:2500});
+    assert.equal(await index(),0,'Long press must freeze the original red frame even across the timer deadline');
+    await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  }finally{await touch.detach()}
+  await page.waitForTimeout(10500);
+  assert.equal(await index(),0,'Release after long press must not advance; paused timer must stay stopped');
+  assert.ok(dominant(await centerPixel(page),0),'Paused photo itself must stay visible, not just its dot');
+  assert.equal(await pauseMarker.count(),1);
+  await page.touchscreen.tap(photoPoint.x,photoPoint.y);
+  await waitIndex(page,1,3000);
+  assert.equal(await pauseMarker.count(),0,'Single new tap resumes and immediately selects the next frame');
+  assert.ok(dominant(await centerPixel(page),1),'Resumed photo must really be the next image');
+  // A fresh interval starts for the next photo, not the old remaining time.
+  await page.waitForTimeout(3000);
+  assert.equal(await index(),1);
+  await page.mouse.move(photoPoint.x,photoPoint.y);await page.mouse.down();
+  await pauseMarker.waitFor({state:'visible',timeout:3500});await page.mouse.up();
+  await page.waitForTimeout(250);
+  assert.equal(await index(),1,'Mouse release after a long hold must not advance');
+  await page.mouse.click(photoPoint.x,photoPoint.y);
+  await waitIndex(page,2,3000);
+  assert.equal(await pauseMarker.count(),0);
+  assert.ok(dominant(await centerPixel(page),2));
+  // A real movement cancels long-press recognition even when held still afterwards.
+  await page.mouse.move(photoPoint.x,photoPoint.y);await page.mouse.down();
+  await page.mouse.move(photoPoint.x,photoPoint.y+20,{steps:5});
+  await page.waitForTimeout(2200);await page.mouse.up();
+  assert.equal(await pauseMarker.count(),0,'Dragging must not start the photo pause');
+  console.log('TALERA_ORDINARY_TEN_SECOND_TOUCH_MOUSE_PAUSE_NEXT_PHOTO_PASS',JSON.stringify({delayMs:10000,holdMs:2000,pausedPixelsAndIndex:true,releaseDoesNotAdvance:true,tapAdvancesOnce:true,mouse:true,touch:true,dragNotPaused:true,physicalIphoneAccepted:false}));
 
   const mp4=path.join(generated,'ordinary-original-video.mp4');
   execFileSync('ffmpeg',['-y','-f','lavfi','-i','color=c=blue:s=160x120:d=1',
@@ -2248,7 +2300,7 @@ async function testTimelineLoupe(){
     (swipeEntryIndex===1&&nearColor(swipePhotoBefore,[0,217,242])),
     'SWIPED STORY PHOTO DOES NOT MATCH ACTIVE INDEX: '+
       JSON.stringify({swipeEntryIndex,swipePhotoBefore}));
-  await waitIndex(page,1,11000);
+  await waitIndex(page,1,15000);
   const swipePhotoAfter=await centerPixel(page);
   if(!nearColor(swipePhotoAfter,[0,217,242])){
     const trace=await page.evaluate(()=>{
@@ -2401,7 +2453,7 @@ async function testTimelineLoupe(){
     "Original grip missed the drag; center hit and pointer events: "+
     JSON.stringify({hit:gripBeforeDrag,trace:pointerTrace,
       during:gripDuring,after:gripAfter}));
-  await waitIndex(page,0,12000);
+  await waitIndex(page,0,15000);
   const state=await page.evaluate(()=>{
     const m=window.__taleraTimelineRuntime.currentMemory();
     return {id:m.storyId,video:document.body.classList.contains('talera-v61-narration-visual')};
@@ -2694,7 +2746,7 @@ async function testTimelineLoupe(){
   await load(page,plain,3);
   assert.equal(await page.locator('.talera-independent-narrator-layer').count(),0,
     'Ordinary memory must not receive any narrator layer');
-  // Local iPhone-photo hydration and ordinary 2.5 s rotation may complete
+  // Local iPhone-photo hydration and ordinary 10 s rotation may complete
   // after the memory ID changes; inspect the actual native layer, not a stale
   // first screenshot captured during the story-to-story handoff.
   let backToOrdinary=null;

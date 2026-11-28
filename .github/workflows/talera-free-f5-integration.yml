@@ -185,10 +185,14 @@ jobs:
       contents: read
     outputs:
       archive_sha256: ${{ steps.package.outputs.sha256 }}
+    env:
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || '' }}
           persist-credentials: false
+          fetch-depth: ${{ github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && 2 || 1 }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -196,7 +200,12 @@ jobs:
       - name: Install locked dependencies and build public TALERA once
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$F5_EXACT_SOURCE_SHA"
+          if [ "$F5_EXACT_SOURCE_SHA" = "88bcd032072a7d0ad6677d0c90e0233a713ff85d" ]; then
+            test "$(git rev-parse HEAD^)" = "83648055027121dfb3fac150443d43d189fbf6d4"
+            test "$(git diff --name-only HEAD^ HEAD)" = "$(printf '%s\n' r20-dev/free-10m-f5/f5-ordinary-presentation.browser.test.mjs r20-dev/free-10m-f5/f5-public-assets.mjs)"
+            echo TALERA_PRESENTATION_ONLY_SOURCE_VERIFIED "$F5_EXACT_SOURCE_SHA"
+          fi
           test -z "$(git ls-files r20-dev/free-10m-delivery/public r20-dev/free-10m-delivery/generated r20-dev/free-10m-f5/generated)"
           npm ci
           node r20-dev/free-10m-delivery/build.mjs
@@ -217,11 +226,11 @@ jobs:
           out="$RUNNER_TEMP/talera-candidate-package"
           mkdir -p "$out"
           tar --sort=name --owner=0 --group=0 --numeric-owner -czf "$out/candidate.tar.gz" "${roots[@]}"
-          printf '%s\n' "$GITHUB_SHA" > "$out/source.sha"
+          printf '%s\n' "$F5_EXACT_SOURCE_SHA" > "$out/source.sha"
           (cd "$out" && sha256sum candidate.tar.gz > archive.sha256)
           digest="$(cut -d' ' -f1 "$out/archive.sha256")"
           echo "sha256=$digest" >> "$GITHUB_OUTPUT"
-          echo "TALERA_CANDIDATE_ARCHIVE_SHA256=$digest SOURCE=$GITHUB_SHA"
+          echo "TALERA_CANDIDATE_ARCHIVE_SHA256=$digest SOURCE=$F5_EXACT_SOURCE_SHA"
       - name: Retain immutable exact candidate for independent tests and explicit release
         uses: actions/upload-artifact@v4
         with:
@@ -239,8 +248,12 @@ jobs:
     timeout-minutes: 14
     permissions:
       contents: read
+    env:
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -258,13 +271,13 @@ jobs:
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$F5_EXACT_SOURCE_SHA"
+          test "$(cat "$out/source.sha")" = "$F5_EXACT_SOURCE_SHA"
           test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
           test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$F5_EXACT_SOURCE_SHA"
       - name: Run existing synthetic account browser regression without unrelated photo-slider checks
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
@@ -286,9 +299,12 @@ jobs:
     if: ${{ !cancelled() && (github.ref_name != 'feature/free-f5-library-boundary-20261117' || needs.f5_candidate_package.result == 'success') && (github.event_name != 'push' || github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 24
+    env:
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || '' }}
           fetch-depth: 0 # Required for exact 11-Nov approved restoration commit proof
       - uses: actions/setup-node@v4
         with:
@@ -315,13 +331,13 @@ jobs:
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$F5_EXACT_SOURCE_SHA"
+          test "$(cat "$out/source.sha")" = "$F5_EXACT_SOURCE_SHA"
           test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
           test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$F5_EXACT_SOURCE_SHA"
       - name: Inspect exact existing service worker for safe offline design (read-only)
         run: node r20-dev/free-10m-f5/f5-sw-cache-audit.mjs
       - name: Verify read-only TALERA library gateway preserves original IDs and bytes
@@ -2030,8 +2046,12 @@ jobs:
     if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -2048,13 +2068,13 @@ jobs:
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$F5_EXACT_SOURCE_SHA"
+          test "$(cat "$out/source.sha")" = "$F5_EXACT_SOURCE_SHA"
           test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
           test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$F5_EXACT_SOURCE_SHA"
       - name: Show only static original deletion method from account-scoped page source
         run: |
           node --input-type=module <<'NODE'
@@ -2194,8 +2214,12 @@ jobs:
     if: ${{ github.ref_name == 'feature/free-f5-library-boundary-20261117' && github.event.head_commit.message != 'qa-deploy-TALERA-free-compact-backup-exact-tested-now-20261124' && github.event.head_commit.message != 'qa-restore-TALERA-free-official-morning-anchor-20261125' && github.event.head_commit.message != 'qa-deploy-TALERA-free-worldwide-places-exact-green-20261128' && github.event.head_commit.message != 'prepare-TALERA-free-global-geonames-data-20261127' && github.event.head_commit.message != 'freeze-TALERA-free-verified-global-geonames-data-20261127' && github.event.head_commit.message != 'prepare-TALERA-free-world-independent-settlements-20261127' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 7
+    env:
+      F5_EXACT_SOURCE_SHA: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.event.head_commit.message == 'test-TALERA-free-presentation-only-pinned-20261128' && '88bcd032072a7d0ad6677d0c90e0233a713ff85d' || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -2212,13 +2236,13 @@ jobs:
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/talera-candidate-package"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(cat "$out/source.sha")" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$F5_EXACT_SOURCE_SHA"
+          test "$(cat "$out/source.sha")" = "$F5_EXACT_SOURCE_SHA"
           test "${#EXPECTED_ARCHIVE_SHA256}" -eq 64
           test "$(sha256sum "$out/candidate.tar.gz" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE_SHA256"
           (cd "$out" && sha256sum -c archive.sha256)
           tar -xzf "$out/candidate.tar.gz"
-          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$GITHUB_SHA"
+          echo "TALERA_TESTS_USE_EXACT_CANDIDATE_SHA256=$EXPECTED_ARCHIVE_SHA256 SOURCE=$F5_EXACT_SOURCE_SHA"
       - name: Exercise actual signed-in Home reset button and link with account-local store
         run: node r20-dev/free-10m-f5/f5-owner-reset-smoke.mjs
 

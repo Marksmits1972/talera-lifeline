@@ -2052,8 +2052,32 @@ try{
  await people.locator('[data-people-field="phone"]').fill('+31600000123');
  await people.getByRole('button',{name:'Opslaan',exact:true}).click();
  await people.getByText('Synthetic TALERA contact',{exact:true}).waitFor();
- await people.getByRole('button',{name:'Synthetic TALERA contact als favoriet markeren'}).click();
- await people.getByRole('button',{name:'Synthetic TALERA contact uit favorieten halen'}).waitFor();
+ // The star is rendered before the existing linked-contact refresh can
+ // finish. A real contact file is chosen only after that prior operation.
+ // Observe actual network completion, not mocked responses or a forced click.
+ const pendingPeopleLists=new Set();
+ const trackPeopleList=request=>{
+  if(new URL(request.url()).pathname!=='/api/people/link'||request.method()!=='POST')return;
+  try{if(request.postDataJSON()?.action==='list')pendingPeopleLists.add(request)}catch{}
+ };
+ const finishPeopleList=request=>pendingPeopleLists.delete(request);
+ page.on('request',trackPeopleList);page.on('requestfinished',finishPeopleList);page.on('requestfailed',finishPeopleList);
+ try{
+  await people.getByRole('button',{name:'Synthetic TALERA contact als favoriet markeren'}).click();
+  await people.getByRole('button',{name:'Synthetic TALERA contact uit favorieten halen'}).waitFor();
+  const deadline=Date.now()+15000;
+  while(pendingPeopleLists.size){
+   assert.ok(Date.now()<deadline,'Real linked-contact refresh did not finish');
+   for(const request of [...pendingPeopleLists]){
+    const response=await request.response();
+    if(response)await response.finished();
+   }
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
+  }
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ }finally{
+  page.off('request',trackPeopleList);page.off('requestfinished',finishPeopleList);page.off('requestfailed',finishPeopleList);
+ }
  assert.equal(await people.locator('form[data-form="search"]').count(),0,'No old public account finder');
  const vcard='BEGIN:VCARD\nVERSION:3.0\nFN:Contact file selected\nTEL:+31600000124\nNOTE:NOT_STORED\nEND:VCARD\nBEGIN:VCARD\nFN:Contact file unselected\nTEL:+31600000125\nEND:VCARD';
  await people.locator('[data-people-import="vcard"]').setInputFiles({name:'synthetic.vcf',mimeType:'text/vcard',buffer:Buffer.from(vcard)});
@@ -3013,8 +3037,8 @@ try{
      },{before:409,after:200,media:200,revoke:200,unavailable:404,
        hasPhoto:true,hasTitle:true},
        'Photo-only memory must be private until consented media exists, then revocable');
-     assert.ok(Math.abs(pictureOnly.expiresAt-(Date.now()+3600000))<60000,
-       'Photo-only temporary share must honour one-hour choice');
+     assert.ok(Math.abs(pictureOnly.expiresAt-(Date.now()+168*3600000))<60000,
+       'Even legacy one-hour requests for photo-only shares use the fixed seven-day expiry');
      console.log('TALERA_FREE_WHATSAPP_SHARE_READY_RECIPIENT_PHOTO_REVOKED_PASS',
        JSON.stringify({originalWhatsAppUI:true,receiverHtml:200,photo:200,
          revoke:200,expiredLinkAfterRevoke:404,otherStoriesUntouched:true,

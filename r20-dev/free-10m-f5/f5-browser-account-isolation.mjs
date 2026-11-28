@@ -2305,8 +2305,11 @@ try{
    const issued=createdLinks[0];
    const sharePath=shareNetwork.find(x=>x.method==='POST'&&/^\/api\/memories\/[a-f0-9]{64}\/shares$/.test(x.path))?.path;
    assert.ok(sharePath);
-   const invalidExpiry=await context.request.post(origin+sharePath,{headers:{origin,'content-type':'application/json'},data:{consent:true,hours:720}});
-   assert.equal(invalidExpiry.status(),400,'Thirty-day guest links are no longer accepted');
+   const invalidExpiry=await sharePage.evaluate(async path=>{
+     const r=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({consent:true,hours:720})});
+     return r.status;
+   },sharePath);
+   assert.equal(invalidExpiry,400,'Thirty-day guest links are no longer accepted');
    assert.equal(issued.status,200,'Share creation must succeed');
    assert.match(issued.id,/^[a-f0-9]{64}$/);
    assert.ok(issued.link.startsWith(origin+'/s/'),

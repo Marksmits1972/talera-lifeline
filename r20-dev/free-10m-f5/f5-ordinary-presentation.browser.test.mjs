@@ -1487,11 +1487,11 @@ async function testTimelineLoupe(){
      for(const [index,expected] of [[0,'Kroatië · Plitvička Jezera'],[1,'Nederland · Boxtel'],[2,'Oostenrijk']]){
       await metadataPage.evaluate(i=>{const m=window.__taleraTimelineRuntime.currentMemory();window.__taleraOrdinarySelectPhoto(m.id,i,true)},index);
       await metadataPage.waitForFunction(text=>{
-       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-v12-reactions-bar');
+       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social');
        return row&&!row.hidden&&row.textContent===text&&dock?.getBoundingClientRect().width>0&&row.getBoundingClientRect().right<=dock.getBoundingClientRect().left-7;
       },expected,{timeout:10000});
       const geometry=await metadataPage.evaluate(()=>{
-       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-v12-reactions-bar'),label=row.querySelector('.talera-capture-label'),flag=row.querySelector('.talera-capture-flag');
+       const row=document.getElementById('talera-capture-place'),dock=document.getElementById('talera-clean-social'),label=row.querySelector('.talera-capture-label'),flag=row.querySelector('.talera-capture-flag');
        const r=row.getBoundingClientRect(),d=dock.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(label);
        const lines=Array.from(range.getClientRects()).filter(r=>r.width>0);
        return {width:innerWidth,lines:lines.length,left:r.left,right:r.right,dockLeft:d.left,dockRight:d.right,dockTop:d.top,dockBottom:d.bottom,flagWidth:flag.getBoundingClientRect().width,

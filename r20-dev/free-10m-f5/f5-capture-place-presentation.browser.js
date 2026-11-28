@@ -16,7 +16,7 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
  const layoutObserver=typeof ResizeObserver==='function'?new ResizeObserver(layout):null;
  layoutObserver?.observe(caption);
  function layout(){
-  const nextDock=document.getElementById('talera-v12-reactions-bar');
+  const nextDock=document.getElementById('talera-clean-social');
   if(nextDock!==dock){
    if(dock)layoutObserver?.unobserve(dock);
    dock=nextDock;if(dock)layoutObserver?.observe(dock);
@@ -116,13 +116,16 @@ function mountTaleraCapturePlace(flagPositions,countryCodes=Object.keys(flagPosi
    label.textContent=[localizedCountry,locationLabel].filter(Boolean).join(' · ');row.hidden=false;layout();
   });
  }
- function schedule(){if(!queued){queued=true;queueMicrotask(refresh)}}
+ function schedule(){
+  if(document.getElementById('talera-clean-social')!==dock)layout();
+  if(!queued){queued=true;queueMicrotask(refresh)}
+ }
  const observer=new MutationObserver(schedule);
  observer.observe(stage,{subtree:true,childList:true,attributes:true,attributeFilter:['src','class','hidden']});
  observer.observe(caption,{attributes:true,attributeFilter:['class']});
  observer.observe(title,{subtree:true,childList:true,characterData:true});
  observer.observe(document.documentElement,{attributes:true,attributeFilter:['class']});
- observer.observe(document.body,{attributes:true,attributeFilter:['class']});
+ observer.observe(document.body,{childList:true,attributes:true,attributeFilter:['class']});
  // Dots are outside the stage in some approved layouts.
  const dots=document.querySelector('.talera-photo-dot')?.parentElement;
  if(dots)observer.observe(dots,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});

@@ -50,6 +50,15 @@ export async function verifyEditReturn({browser,origin,gate,sid,mobileDevice}){
   };
   const selected=async id=>{
    await page.waitForFunction(id=>{const m=window.__taleraTimelineRuntime?.currentMemory?.();return m?.storyId===id&&!m._photoLoading&&m._zeroFrames?.length>0},id,{timeout:20000});
+   // Wait for the actual existing social read to finish before the next
+   // scripted navigation. WebKit can report a cancelled fetch as a page
+   // error while tearing down the old document, even with its catch in place.
+   // Keep the strict errors=[] assertion and do not suppress any errors.
+   await page.waitForFunction(id=>{
+     const m=window.__taleraTimelineRuntime?.currentMemory?.();
+     const state=window.__taleraCleanSocial?.social?.current();
+     return m?.storyId===id&&state?.memoryId===String(m.id)&&['ready','error'].includes(state.status);
+   },id,{timeout:20000});
   };
   for(const [i,id] of ids.entries()){
    await go('/present?memory='+encodeURIComponent(id));await selected(id);

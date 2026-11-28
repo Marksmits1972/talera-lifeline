@@ -2,6 +2,7 @@
 // Each interface position has its own independently editable key across the five languages.
 export const languageCatalog=Object.freeze({
  "nl": {
+  "core.tell.voiceOrbGuide": "Richttijd: ongeveer 5 minuten",
   "core.whatsapp.previewPhoto": "Een foto meesturen",
   "core.whatsapp.previewPrivacy": "De foto staat los van de beveiligde link en kan worden doorgestuurd.",
   "core.whatsapp.standardMessage": "Ik kwam deze herinnering tegen en moest aan je denken.",
@@ -1359,6 +1360,7 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Handmatig ingevuld"
  },
  "en": {
+  "core.tell.voiceOrbGuide": "Suggested length: about 5 minutes",
   "core.whatsapp.previewPhoto": "Include a photo",
   "core.whatsapp.previewPrivacy": "The photo is separate from the protected link and can be forwarded.",
   "core.whatsapp.standardMessage": "I came across this memory and thought of you.",
@@ -2716,6 +2718,7 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Entered manually"
  },
  "de": {
+  "core.tell.voiceOrbGuide": "Richtwert: etwa 5 Minuten",
   "core.whatsapp.previewPhoto": "Ein Foto mitsenden",
   "core.whatsapp.previewPrivacy": "Das Foto ist unabhängig vom geschützten Link und kann weitergeleitet werden.",
   "core.whatsapp.standardMessage": "Ich bin auf diese Erinnerung gestoßen und musste an dich denken.",
@@ -4073,6 +4076,7 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Manuell eingegeben"
  },
  "fr": {
+  "core.tell.voiceOrbGuide": "Durée conseillée : environ 5 minutes",
   "core.whatsapp.previewPhoto": "Joindre une photo",
   "core.whatsapp.previewPrivacy": "La photo est indépendante du lien protégé et peut être transférée.",
   "core.whatsapp.standardMessage": "Je suis retombé sur ce souvenir et j’ai pensé à toi.",
@@ -5430,6 +5434,7 @@ export const languageCatalog=Object.freeze({
   "core.editor.location.photoManualStatus": "Saisi manuellement"
  },
  "es": {
+  "core.tell.voiceOrbGuide": "Duración orientativa: unos 5 minutos",
   "core.whatsapp.previewPhoto": "Adjuntar una foto",
   "core.whatsapp.previewPrivacy": "La foto es independiente del enlace protegido y se puede reenviar.",
   "core.whatsapp.standardMessage": "Me encontré con este recuerdo y pensé en ti.",

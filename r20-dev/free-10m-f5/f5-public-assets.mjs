@@ -3,6 +3,7 @@ import {localizeEmbeddedPlayer} from './f5-embed-language-build.mjs';
 import {centralizeCoreLanguage} from './f5-core-language-build.mjs';
 import {installMemoryLocationStore,installMemoryLocationEditor,memoryLocationSharedSource,memoryLocationCountryCodes} from './f5-memory-location-build.mjs';
 import {localizeApprovedMenu} from './f5-menu-language-build.mjs';
+import {installVoiceOrb} from './f5-voice-orb-build.mjs';
 // Build F5 templates from the user-identified 2026-11-07 design-cleanup candidate. It retains the earlier 5-language + DOB changes; test before any deploy.
 // No account, cookie, D1, R2 or live private data is fetched.
 import {createHash} from 'node:crypto';
@@ -2190,6 +2191,7 @@ for(const [route,filename] of Object.entries(routes)){
  if(route==='/present')html=installCharacteristicSearchPresentation(html);
  html=localizeCore(html,route);
  if(route==='/present')html=installOrdinaryPhotoPause(html);
+ html=installVoiceOrb(html,route);
  const hash=sha(html),file=hash+'.html';
  writeFileSync(path.join(publicDir,'__talera_free','f5references',file),html,'utf8');
  refs[route]='/__talera_free/f5references/'+file;

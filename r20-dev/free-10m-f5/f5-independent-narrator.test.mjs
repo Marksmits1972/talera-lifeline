@@ -1,6 +1,7 @@
 // TALERA F5 narrator isolation: source contract + actual synthetic state machine.
 // No separate app, no cloud media, no customer accounts or live publication.
 import assert from 'node:assert/strict';
+import './f5-voice-orb.test.mjs';
 import {translate} from './f5-language.mjs';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
@@ -322,6 +323,31 @@ assert.equal([...tapHandlers.values()].every(set=>set.size===0),true,
   'Narrator touch/click handlers must not leak into ordinary presentation');
 assert.equal(made.filter(x=>x.tag==='audio').length,1,
   'One persistent audio node must survive all voice/video transitions');
+
+// Audio-only memories: no fictitious media/cues or second player. The
+// visual component gets the existing original Blob + existing audio clock.
+let orbMounts=0,orbDestroyed=0,orbBlob=null,orbTicks=[];
+ctx.taleraMountVoiceOrb=layer=>{
+  assert.equal(layer.className,'talera-independent-narrator-layer');orbMounts++;
+  return {preparePlayback(blob){orbBlob=blob},playbackTick(audio,duration){
+    assert.equal(audio,permanentAudio);orbTicks.push({at:audio.currentTime,duration,paused:audio.paused})},
+    destroy(){orbDestroyed++}};
+};
+const voiceOnly={id:'pwa:voice-only-synthetic',_zeroItems:[{kind:'audio',key:'voice-original'}],
+  _zeroFrames:[],_taleraNarrationCues:[],_taleraNarrationDurationMs:301000};
+assert.deepEqual(Array.from(motor.plan(voiceOnly).cues),[]);
+current=voiceOnly.id;await motor.open(voiceOnly);
+assert.equal(orbMounts,1);assert.ok(orbBlob instanceof FakeBlob);
+assert.equal(permanentAudio.paused,false);
+permanentAudio.currentTime=301;permanentAudio.ontimeupdate();
+assert.equal(orbTicks.at(-1).at,301);
+assert.equal(orbTicks.at(-1).duration,301);
+permanentAudio.pause();assert.equal(orbTicks.at(-1).paused,true);
+motor.stop();assert.equal(orbDestroyed,1);assert.equal(made.filter(x=>x.tag==='audio').length,1);
+current=memory.id;await motor.open(memory);
+assert.equal(orbMounts,1,'Photo/video narration must never use the voice-only visual');
+motor.stop();
+console.log('TALERA_VOICE_ONLY_EXISTING_NARRATOR_CONTRACT_PASS');
 
 console.log('TALERA_INDEPENDENT_NARRATOR_TEST_PASS',JSON.stringify({
  originalIdsUnchanged:true,repeatSwipesRetained:true,

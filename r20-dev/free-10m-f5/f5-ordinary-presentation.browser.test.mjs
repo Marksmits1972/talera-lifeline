@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {chromium,webkit,devices} from 'playwright';
 import {verifyDesktopLayout} from './f5-desktop-layout.browser-test.mjs';
+import {verifyVoiceOrb} from './f5-voice-orb.browser-test.mjs';
 import {verifyEditReturn} from './f5-edit-return.browser-test.mjs';
 import {verifyCharacteristicSearch} from './f5-topic-search.browser-test.mjs';
 import {createLoupeScale,LOUPE_VISIBLE_DAYS,LOUPE_PANEL_SCALE,LOUPE_DATE_GAP,LOUPE_HOLD_MS} from './f5-timeline-loupe.mjs';
@@ -169,6 +170,11 @@ backupRegression: try{
   if(process.env.TALERA_TIMELINE_LOUPE_ONLY==='1'){
     await testTimelineLoupe();
     break backupRegression;
+  }
+
+  if(!webkitPickerOnly&&process.env.TALERA_BACKUP_REGRESSION_ONLY!=='1'){
+    await verifyVoiceOrb(browser,ctx,origin,gate);
+    if(process.env.TALERA_VOICE_ORB_ONLY==='1')break backupRegression;
   }
 
   // Actual same authenticated app, same location reader, exact public

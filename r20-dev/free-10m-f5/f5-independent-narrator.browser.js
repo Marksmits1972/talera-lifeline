@@ -217,6 +217,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       // Reparent the SAME existing node, never detach/destroy it.
       if(s.audio.parentElement!==document.body)document.body.appendChild(s.audio);
     }
+    s.voiceOrb?.destroy();
     if(s.voiceUrl)URL.revokeObjectURL(s.voiceUrl);
     removeVideo(s);clearButton(s);
     if(s.tapTarget&&s.onSoundTap)s.tapTarget.removeEventListener('click',s.onSoundTap,true);
@@ -313,6 +314,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     if(!isCurrent(s)||s.phase!=='voice'||!s.audio)return;
     const ms=Math.max(0,Math.round((Number(s.audio.currentTime)||0)*1000));
     drawCue(s,ms);
+    s.voiceOrb?.playbackTick(s.audio,s.voiceDuration);
     if(s.video){
       if(s.audio.paused){if(!s.video.paused)s.video.pause()}
     }
@@ -388,6 +390,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
   function nextAfterVoice(s){
     if(!isCurrent(s))return;
     clearButton(s);
+    s.voiceOrb?.playbackTick(s.audio,s.voiceDuration);
     if(s.timer){clearInterval(s.timer);s.timer=null}
     if(s.audio){
       s.audio.onplay=s.audio.onpause=s.audio.onended=null;
@@ -422,6 +425,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     stop();
     const plan=taleraIndependentNarrationPlan(memory);
     const voice=memory._zeroItems.find(item=>item.kind==='audio');
+    const voiceOnly=!memory._zeroItems.some(item=>item.kind==='photo'||item.kind==='video')&&!plan.frames.length;
     const id=memory.id,run=++generation;
     // Render the SAME independent narrator INSIDE the already approved
     // photo stage so iPhone compositing cannot cover its reading sheet.
@@ -440,7 +444,7 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
     const s={id,generation:run,plan,layer,photo,host,
       hostPosition:oldPosition,hostPositionChanged:changePosition,
       phase:'loading',audio:null,voiceUrl:null,video:null,videoId:'',videoUrl:null,
-      nativeAudioSession:null,
+      nativeAudioSession:null,voiceOrb:null,voiceDuration:Math.max(0,Number(memory._taleraNarrationDurationMs)||0)/1000,
       videoSerial:0,frameSerial:0,currentId:'',timer:null,postTimer:null,
       postIndex:0,button:null,createdUrls:new Set(),
       interruptedRetries:0,interruptedRetryTimer:null,
@@ -504,6 +508,13 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       if(plan.frames.length)displayPhoto(s,plan.frames[0]);
       return;
     }
+    if(voiceOnly){
+      photo.hidden=true;
+      try{
+        s.voiceOrb=taleraMountVoiceOrb(layer);
+        void s.voiceOrb.preparePlayback(blob);
+      }catch(error){console.warn('TALERA voice visualization unavailable',error)}
+    }
     s.voiceUrl=URL.createObjectURL(blob);
     const audio=sharedAudible.claim(s,s.voiceUrl);
     layer.appendChild(audio);s.audio=audio;
@@ -514,12 +525,14 @@ function taleraCreateIndependentNarrator({stage,store,runtime}){
       if(s.timer)clearInterval(s.timer);
       voiceTick(s);s.timer=setInterval(()=>voiceTick(s),90)};
     audio.onpause=()=>{if(s.timer){clearInterval(s.timer);s.timer=null}
-      if(s.video&&!s.video.paused)s.video.pause()};
+      if(s.video&&!s.video.paused)s.video.pause();
+      s.voiceOrb?.playbackTick(audio,s.voiceDuration)};
     audio.onended=()=>{voiceTick(s);nextAfterVoice(s)};
     audio.ontimeupdate=()=>voiceTick(s);
     audio.onseeking=()=>voiceTick(s);
     audio.onseeked=()=>voiceTick(s);
     drawCue(s,0);
+    s.voiceOrb?.playbackTick(audio,s.voiceDuration);
     attemptPlay(s,audio);
   }
   return {open,stop,plan:taleraIndependentNarrationPlan};
